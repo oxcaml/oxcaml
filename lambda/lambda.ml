@@ -1713,39 +1713,11 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice (_, slambda) -> free_variables_slambda slambda
+  | Lsplice _ as l -> fatal_error_invalid_constructor l
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
     set exprs
-
-and free_variables_slambda = function
-  | SLlayout _ | SLglobal _ | SLvar _ | SLmissing | SLfield _ -> Ident.Set.empty
-  | SLrecord fields ->
-      List.fold_left
-        (fun set field ->
-          Ident.Set.union (free_variables_slambda field) set)
-        Ident.Set.empty fields
-  | SLhalves { sval_comptime; sval_runtime } ->
-      Ident.Set.union
-        (free_variables_slambda sval_comptime)
-        (free_variables sval_runtime)
-  | SLproj_comptime slambda | SLproj_runtime slambda ->
-      free_variables_slambda slambda
-  | SLtemplate _ ->
-      (* Notably we don't recurse into templates as they would only introduce
-         new free variables into their call site. *)
-      Ident.Set.empty
-  | SLinstantiate { sapp_func; sapp_arguments } ->
-      (* Mechanically the result of instantiation could introduce new free
-         variables, however it's an invariant of slambda that it doesn't. *)
-      Array.fold_left
-        (fun set arg -> Ident.Set.union (free_variables_slambda arg) set)
-        (free_variables_slambda sapp_func) sapp_arguments
-  | SLlet { slet_name = _; slet_value; slet_body } ->
-      Ident.Set.union
-        (free_variables_slambda slet_value)
-        (free_variables_slambda slet_body)
 
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()

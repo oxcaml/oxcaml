@@ -29,8 +29,6 @@ type t
 
 include Identifiable.S with type t := t
 
-val print : Format.formatter -> t -> unit
-
 (** Creates a new unique identifier. *)
 val create_local : string -> t
 

@@ -35,6 +35,9 @@
 
 open Lambda
 
+let create_dynamic sval_runtime =
+  SLhalves { sval_comptime = SLmissing; sval_runtime }
+
 (** Fracture a lambda constant, currently no constants have a compile time part
     so does nothing. *)
 let fracture_const lambda _const =
@@ -55,26 +58,20 @@ let rec fracture_lam lambda : slambda =
         sval_runtime = lambda
       }
   | Lmutvar _ ->
-    (* Mutable variables are always dynamic as we have no concept of mutation in
-       slambda. *)
-    SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
+    (* Mutable variables are always dynamic as we currently have no concept of
+       mutation in slambda. *)
+    create_dynamic lambda
   | Lconst const -> fracture_const lambda const
   | Lapply ({ ap_func; ap_args; _ } as apply) ->
     let func = fracture_dynamic ap_func in
     let args = fracture_dynamic_list ap_args in
-    SLhalves
-      { sval_comptime = SLmissing;
-        sval_runtime =
-          (if func == ap_func && args == ap_args
-           then lambda
-           else Lapply { apply with ap_func = func; ap_args = args })
-      }
+    create_dynamic
+      (if func == ap_func && args == ap_args
+       then lambda
+       else Lapply { apply with ap_func = func; ap_args = args })
   | Lfunction lfun ->
     let ffun = fracture_fun lfun in
-    SLhalves
-      { sval_comptime = SLmissing;
-        sval_runtime = (if lfun == ffun then lambda else Lfunction ffun)
-      }
+    create_dynamic (if lfun == ffun then lambda else Lfunction ffun)
   | Llet (str, layout, id, duid, def, body) -> (
     let def_id = Slambdaident.of_ident id in
     let fdef = fracture_lam def in
@@ -83,8 +80,12 @@ let rec fracture_lam lambda : slambda =
     | ( SLhalves { sval_comptime = _; sval_runtime = def_r },
         SLhalves { sval_comptime = body_c; sval_runtime = body_r } )
       when body_r == body && def_r == def ->
-      (* 1. [body_r == body] implies that body_r doesn't reference def in
-            slambda (as it has no slambda).
+      (* If the body and def are [SLhalves] then we get away with not
+         actually binding def when evaluation [body_r] if both these conditions
+         are true.
+
+         1. [body_r == body] implies that body_r doesn't reference def in
+            slambda (as it has no slambda), body_c may reference it.
          2. [def_r == def] implies def_r contains no compile-time effects (again
             as it contains no slambda). *)
       let sval_comptime =
@@ -102,6 +103,14 @@ let rec fracture_lam lambda : slambda =
       (* We use (1) to know that we don't need to bind def. *)
       SLhalves { sval_comptime; sval_runtime = lambda }
     | _ ->
+      (* This is the general case for a let, we're translating the tlambda
+         [let id = def in body]
+        into the slambda:
+        {[
+          let <def_id> = <fdef> in
+          let body = <fbody> in
+          { c = body.c; r = << let id = $(<def_id>.r) in $(body.r) >> }
+        ]} *)
       SLlet
         { slet_name = def_id;
           slet_value = fdef;
@@ -109,7 +118,7 @@ let rec fracture_lam lambda : slambda =
             (let def_r =
                Lsplice (try_to_find_location def, SLproj_runtime (SLvar def_id))
              in
-             slet_local_loc "body" fbody (try_to_find_location body)
+             slet_local_slam "body" fbody (try_to_find_location body)
                (fun body_c body_r ->
                  SLhalves
                    { sval_comptime = body_c;
@@ -118,10 +127,20 @@ let rec fracture_lam lambda : slambda =
         })
   | Lmutlet (layout, id, duid, def, body) -> (
     (* let mutable always binds dynamically, but we might still need to execute
-       the compile-time effects in def. *)
+       the compile-time effects in def and those need to happen before any
+       effects in body, so we can't use [fracture_dynamic].
+
+       [{
+         let <id> = <fracture def> in
+         let body = <fracture body> in
+         { c = body.c; r = << let mutable id = $(<id>.r) in $(body.r) >> }
+       }]
+       The code below here attempts to omit the let bindings where possible
+       like [slet_local] does. *)
     let fdef = fracture_lam def in
     match fdef with
     | SLhalves { sval_comptime = _; sval_runtime = def_r } ->
+      (* We're using the fact that the compile-time half has no effects. *)
       slet_local "body" body (fun body_c body_r ->
           SLhalves
             { sval_comptime = body_c;
@@ -146,19 +165,24 @@ let rec fracture_lam lambda : slambda =
                   })
         })
   | Lletrec (bindings, body) ->
-    (* This only works because functions currently have no static part *)
-    let bindings_unchanged, bindings =
-      List.fold_left_map
-        (fun unchanged ({ def } as binding) ->
-          let ffun = fracture_fun def in
-          unchanged && def == ffun, { binding with def = ffun })
-        true bindings
+    (* This only works because functions currently have no static part.
+
+       {[
+         let body = <fracture body> in
+         { c = body.c; r = << let rec <(fracture bindings).r> in $(body.r) >> }
+       ]} *)
+    let bindings_r =
+      Misc.Stdlib.List.map_sharing
+        (fun ({ id; debug_uid; def } as binding) ->
+          let fdef = fracture_fun def in
+          if fdef == def then binding else { id; debug_uid; def = fdef })
+        bindings
     in
     slet_local "body" body (fun body_c body_r ->
         SLhalves
           { sval_comptime = body_c;
             sval_runtime =
-              (if bindings_unchanged && body_r == body
+              (if bindings_r == bindings && body_r == body
                then lambda
                else Lletrec (bindings, body_r))
           })
@@ -195,52 +219,42 @@ let rec fracture_lam lambda : slambda =
     let farg = fracture_dynamic arg in
     let fcases = fracture_dynamic_alist cases in
     let fdefault = fracture_dynamic_opt default in
-    SLhalves
-      { sval_comptime = SLmissing;
-        sval_runtime =
-          (if farg == arg && fcases == cases && fdefault == default
-           then lambda
-           else Lstringswitch (farg, fcases, fdefault, loc, layout))
-      }
+    create_dynamic
+      (if farg == arg && fcases == cases && fdefault == default
+       then lambda
+       else Lstringswitch (farg, fcases, fdefault, loc, layout))
   | Lstaticraise (lbl, args) ->
     let fargs = fracture_dynamic_list args in
-    SLhalves
-      { sval_comptime = SLmissing;
-        sval_runtime =
-          (if fargs == args then lambda else Lstaticraise (lbl, fargs))
-      }
+    create_dynamic (if fargs == args then lambda else Lstaticraise (lbl, fargs))
   | Lstaticcatch (body, id, handler, pop_region, kind) ->
     let fbody = fracture_dynamic body in
     let fhandler = fracture_dynamic handler in
-    SLhalves
-      { sval_comptime = SLmissing;
-        sval_runtime =
-          (if fbody == body && fhandler == handler
-           then lambda
-           else Lstaticcatch (fbody, id, fhandler, pop_region, kind))
-      }
+    create_dynamic
+      (if fbody == body && fhandler == handler
+       then lambda
+       else Lstaticcatch (fbody, id, fhandler, pop_region, kind))
   | Ltrywith (body, exn, duid, handler, kind) ->
     let fbody = fracture_dynamic body in
     let fhandler = fracture_dynamic handler in
-    SLhalves
-      { sval_comptime = SLmissing;
-        sval_runtime =
-          (if fbody == body && fhandler == handler
-           then lambda
-           else Ltrywith (fbody, exn, duid, fhandler, kind))
-      }
+    create_dynamic
+      (if fbody == body && fhandler == handler
+       then lambda
+       else Ltrywith (fbody, exn, duid, fhandler, kind))
   | Lifthenelse (cond, ifso, ifnot, kind) ->
     let fcond = fracture_dynamic cond in
     let fifso = fracture_dynamic ifso in
     let fifnot = fracture_dynamic ifnot in
-    SLhalves
-      { sval_comptime = SLmissing;
-        sval_runtime =
-          (if fcond == cond && fifso == ifso && fifnot == ifnot
-           then lambda
-           else Lifthenelse (fcond, fifso, fifnot, kind))
-      }
+    create_dynamic
+      (if fcond == cond && fifso == ifso && fifnot == ifnot
+       then lambda
+       else Lifthenelse (fcond, fifso, fifnot, kind))
   | Lsequence (left, right) ->
+    (* {[
+         let left = <fracture left> in
+         let right = <fracture right> in
+         { c = right.c; r = << $(left.r); $(right.r) >> }
+       ]}
+       Note this discards [left.c]. *)
     slet_local "left" left (fun left_c left_r ->
         ignore left_c;
         slet_local "right" right (fun right_c right_r ->
@@ -254,13 +268,10 @@ let rec fracture_lam lambda : slambda =
   | Lwhile { wh_cond; wh_body } ->
     let fcond = fracture_dynamic wh_cond in
     let fbody = fracture_dynamic wh_body in
-    SLhalves
-      { sval_comptime = SLmissing;
-        sval_runtime =
-          (if fcond == wh_cond && fbody == wh_body
-           then lambda
-           else Lwhile { wh_cond = fcond; wh_body = fbody })
-      }
+    create_dynamic
+      (if fcond == wh_cond && fbody == wh_body
+       then lambda
+       else Lwhile { wh_cond = fcond; wh_body = fbody })
   | Lfor { for_id; for_debug_uid; for_loc; for_from; for_to; for_dir; for_body }
     ->
     let ffor_from = fracture_dynamic for_from in
@@ -285,21 +296,15 @@ let rec fracture_lam lambda : slambda =
       }
   | Lassign (id, lam) ->
     let value = fracture_dynamic lam in
-    SLhalves
-      { sval_comptime = SLmissing;
-        sval_runtime = (if lam == value then lambda else Lassign (id, value))
-      }
+    create_dynamic (if lam == value then lambda else Lassign (id, value))
   | Lsend (kind, met, obj, args, pos, mode, loc, layout) ->
     let fmet = fracture_dynamic met in
     let fobj = fracture_dynamic obj in
     let fargs = fracture_dynamic_list args in
-    SLhalves
-      { sval_comptime = SLmissing;
-        sval_runtime =
-          (if fmet == met && fobj == obj && fargs == args
-           then lambda
-           else Lsend (kind, fmet, fobj, fargs, pos, mode, loc, layout))
-      }
+    create_dynamic
+      (if fmet == met && fobj == obj && fargs == args
+       then lambda
+       else Lsend (kind, fmet, fobj, fargs, pos, mode, loc, layout))
   | Levent (lam, ev) ->
     slet_local "body" lam (fun body_c body_r ->
         SLhalves
@@ -412,15 +417,15 @@ and fracture_prim lambda prim args loc =
     fractured [value]. [comptime] is guaranteed to not contain any effects and
     [runtime] is physically equal to [value] where possible. *)
 and slet_local name value body =
-  slet_local_loc name (fracture_lam value) (try_to_find_location value) body
+  slet_local_slam name (fracture_lam value) (try_to_find_location value) body
 
 (** Same as [slet_local] but useful when you've already fractured [value]. *)
-and slet_local_loc name value value_loc body =
-  let name = Slambdaident.create_local name in
+and slet_local_slam name value value_loc body =
   match value with
   | SLhalves { sval_comptime = comptime; sval_runtime = runtime } ->
     body comptime runtime
   | _ ->
+    let name = Slambdaident.create_local name in
     SLlet
       { slet_name = name;
         slet_value = value;
@@ -439,36 +444,22 @@ and fracture_dynamic lam =
 (** Helper function fracture a [('a * lambda) list] where we only need the
     dynamic part of the result. *)
 and fracture_dynamic_list lams =
-  let unchanged, fractured =
-    List.fold_left_map
-      (fun unchanged lam ->
-        let elem = fracture_dynamic lam in
-        unchanged && elem == lam, elem)
-      true lams
-  in
-  if unchanged then lams else fractured
+  Misc.Stdlib.List.map_sharing fracture_dynamic lams
 
 (** Helper function to fracture a [('a * lambda) list] where we only need the
     dynamic part of the result. *)
 and fracture_dynamic_alist : 'a. ('a * lambda) list -> ('a * lambda) list =
  fun lams ->
-  let unchanged, fractured =
-    List.fold_left_map
-      (fun unchanged (key, lam) ->
-        let value = fracture_dynamic lam in
-        unchanged && value == lam, (key, value))
-      true lams
-  in
-  if unchanged then lams else fractured
+  Misc.Stdlib.List.map_sharing
+    (fun ((key, lam) as entry) ->
+      let value = fracture_dynamic lam in
+      if lam == value then entry else key, value)
+    lams
 
 (** Helper function to fracture a [lambda option] where we only need the dynamic
     part of the result. *)
 and fracture_dynamic_opt lam_opt =
-  match lam_opt with
-  | None -> lam_opt
-  | Some lam ->
-    let flam = fracture_dynamic lam in
-    if flam == lam then lam_opt else Some lam
+  Misc.Stdlib.Option.map_sharing fracture_dynamic lam_opt
 
 (** This is the only externally accessible entry point to this module. *)
 let fracture lam = Profile.record "slambda_fracture" fracture_lam lam
