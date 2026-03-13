@@ -157,7 +157,11 @@ let rec parse_args mnemonic acc encs args imm res =
       match String.trim enc with
       | "ModRM:reg" -> RM_r
       | "ModRM:r/m" -> RM_rm
-      | "BaseReg" (* Vector address, always r/m *) -> RM_rm
+      | "BaseReg" ->
+        (* Vector address: always r/m, and only used for gathers. We set this
+           operand as an output to assure it gets a distinct register. *)
+        set_res_arg ();
+        RM_rm
       | "VEX.vvvv" -> Vex_v
       | "NA" | "<XMM0>" | "<RAX>" | "<RDI>" | "<RCX>" | "<RDX>" | "implicit" ->
         Implicit
