@@ -288,7 +288,7 @@ let iter_on_occurrences
       | Ttyp_unboxed_tuple _
       | Ttyp_quote _ | Ttyp_splice _ | Ttyp_of_kind _
       | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_call_pos
-      | Ttyp_repr _ -> ());
+      | Ttyp_repr _ | Ttyp_newlayout _ -> ());
       default_iterator.typ sub ct);
 
   pat =

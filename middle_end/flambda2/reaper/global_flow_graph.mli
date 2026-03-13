@@ -67,6 +67,15 @@ module Relations : sig
 
   val any_source : Code_id_or_name.t term -> _ atom
 
+  (* [zero_alloc_source x] means that [x] has any source, but furthermore, that
+     all fields read from [x] are themselves [zero_alloc_source] (and hence
+     [any_source]), even if they are local fields. This is not fully tracked,
+     and will be lost if a [zero_alloc_source] variable is stored somewhere and
+     then read from there. It is only intended as a hack to make zero_alloc
+     checking work, waiting for the redesign that does not depend on keeping
+     dead code alive. *)
+  val zero_alloc_source : Code_id_or_name.t term -> _ atom
+
   (* An entry (code_id, v) in this relation means that [v] is the "my_closure"
      variable of the code associated to [code_id]. *)
   val code_id_my_closure :
@@ -109,6 +118,8 @@ val add_alias_if_any_source_dep :
 val add_any_usage : graph -> Code_id_or_name.t -> unit
 
 val add_any_source : graph -> Code_id_or_name.t -> unit
+
+val add_zero_alloc_source : graph -> Code_id_or_name.t -> unit
 
 val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
 

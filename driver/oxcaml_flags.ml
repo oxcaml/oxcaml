@@ -40,10 +40,13 @@ let cfg_prologue_shrink_wrap = ref false    (* -[no-]cfg-prologue-shrink-wrap *)
 let cfg_prologue_shrink_wrap_threshold = ref 16384
                                        (* -cfg-prologue-shrink-wrap-threshold *)
 
+let cfg_merge_blocks = ref false        (* -[no]-cfg-merge-blocks *)
+
 let cfg_value_propagation = ref true    (* -[no]-cfg-value-propagation *)
 let cfg_value_propagation_float = ref false
                                         (* -[no]-cfg-value-propagation-float *)
-
+let cfg_value_propagation_flow = ref false
+                                        (* -[no]-cfg-value-propagation-flow *)
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
 let basic_block_sections = ref false    (* -basic-block-sections *)
 (* -module-entry-functions-section *)

@@ -298,6 +298,7 @@ type error =
   | Unexpected_hole
   | Eval_format
   | Let_poly_not_yet_implemented
+  | Layout_poly_inst_not_yet_supported
 
 
 let not_principal fmt =
@@ -1382,7 +1383,8 @@ let add_pattern_variables ?check ?check_as env pv =
           pv_attributes; pv_uid} env ->
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
-         {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
+         {val_type = pv_type; val_kind = pv_kind; val_lpoly = [];
+          Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
@@ -3558,6 +3560,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
           Env.add_value ~mode:Mode.Value.legacy pv_id
             { val_type = pv_type
             ; val_kind = Val_reg pv_sort
+            ; val_lpoly = []
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.undefined
@@ -3570,6 +3573,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
           Env.add_value ~mode:Mode.Value.legacy id' ~check
             { val_type = pv_type
             ; val_kind = Val_ivar (Immutable, cl_num)
+            ; val_lpoly = []
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.undefined
@@ -8086,6 +8090,8 @@ and type_ident env ?(recarg=Rejected) lid =
 
   Therefore, we need to cross modes upon look-up. Ideally that should be done in
   [Env], but that is difficult due to cyclic dependency between jkind and env. *)
+  if not @@ List.is_empty desc.val_lpoly then
+    raise (Error (lid.loc, env, Layout_poly_inst_not_yet_supported));
   let mode = cross_left env desc.val_type mode in
   (* There can be locks between the definition and a use of a value. For
   example, if a function closes over a value, there will be Closure_lock between
@@ -9081,6 +9087,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         let id = Ident.create_local name in
         let desc =
           { val_type = ty; val_kind = Val_reg sort;
+            val_lpoly = [];
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.undefined;
@@ -12268,6 +12275,9 @@ let report_error ~loc env =
       Location.errorf ~loc
         "The %a annotation is not yet implemented."
         Style.inline_code "let poly_"
+  | Layout_poly_inst_not_yet_supported ->
+      Location.errorf ~loc
+        "Instantiation of layout-polymorphic values is not yet supported."
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

@@ -223,8 +223,11 @@ let add_attribute_list ty attrs =
 
 let rec add_native_repr_attributes ty attrs =
   match ty, attrs with
-    (* Otyp_poly case might have been added in e.g. tree_of_value_description *)
+    (* Otyp_poly and Otyp_newlayout case might have been added in e.g.
+       tree_of_value_description *)
   | Otyp_poly (vars, ty), _ -> Otyp_poly (vars, add_native_repr_attributes ty attrs)
+  | Otyp_newlayout (vars, ty), _ ->
+    Otyp_newlayout (vars, add_native_repr_attributes ty attrs)
   | Otyp_arrow (label, am, a, Otyp_ret (rm, r)), attr_l :: rest ->
     let r = add_native_repr_attributes r rest in
     let a = add_attribute_list a attr_l in
@@ -474,6 +477,7 @@ module Repr_check = struct
     | Product _ -> true
     | Base _ -> false
     | Univar _ -> Misc.fatal_error "sort_is_product: univar"
+    | Genvar _ -> Misc.fatal_error "sort_is_product: genvar"
 
   let valid_c_stub_arg = function
     | Same_as_ocaml_repr s ->
@@ -491,6 +495,8 @@ module Repr_check = struct
     | Same_as_ocaml_repr (Product _) -> false
     | Same_as_ocaml_repr (Univar _) ->
       Misc.fatal_error "valid_c_stub_return: univar"
+    | Same_as_ocaml_repr (Genvar _) ->
+      Misc.fatal_error "valid_c_stub_return: genvar"
 
   let check checks prim =
     let reprs = args_res_reprs prim in
