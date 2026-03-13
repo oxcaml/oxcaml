@@ -169,7 +169,12 @@ let get_simple_unboxable env simple =
         "Expected unboxable name in [get_simple_unboxable], got constant %a"
         Reg_width_const.print const)
     ~name:(fun name ~coercion:_ ->
-      Option.get (DS.get_unboxed_fields env.uses (Code_id_or_name.name name)))
+      match DS.get_unboxed_fields env.uses (Code_id_or_name.name name) with
+      | Some unboxing -> unboxing
+      | None ->
+        Misc.fatal_errorf
+          "Cannot get unboxing information for name that was not unboxed:@ %a"
+          Name.print name)
     simple
 
 let simple_changed_repr env simple =
@@ -775,7 +780,20 @@ let rewrite_apply_cont_expr env ac =
   else
     let args =
       let args_to_keep = Continuation.Map.find cont env.cont_params_to_keep in
-      get_args env args_to_keep args
+      try get_args env args_to_keep args
+      with Misc.Fatal_error ->
+        let bt = Printexc.get_raw_backtrace () in
+        Format.eprintf
+          "\n\
+           %tContext is:%t rewriting apply_cont for continuation %a with@ \
+           original args @[(%a)@],@ params to keep @[(%a)@]\n"
+          Flambda_colours.error Flambda_colours.pop Continuation.print cont
+          (Format.pp_print_list ~pp_sep:Format.pp_print_space Simple.print)
+          args
+          (Format.pp_print_list ~pp_sep:Format.pp_print_space
+             print_param_decision)
+          args_to_keep;
+        Printexc.raise_with_backtrace Misc.Fatal_error bt
     in
     Some (Apply_cont_expr.with_continuation_and_args ac cont ~args)
 
@@ -1096,7 +1114,19 @@ let rebuild_apply env apply =
             (* This contains the exn argument that is not part of the extra
                args *)
           in
-          get_args_with_kinds env args_to_keep (List.map fst extra_args)
+          try get_args_with_kinds env args_to_keep (List.map fst extra_args)
+          with Misc.Fatal_error ->
+            let bt = Printexc.get_raw_backtrace () in
+            Format.eprintf
+              "\n\
+               %tContext is:%t rebuilding exception continuation@ %a,@ with \
+               args to keep @[(%a)@]\n"
+              Flambda_colours.error Flambda_colours.pop Exn_continuation.print
+              exn_continuation
+              (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                 print_param_decision)
+              args_to_keep;
+            Printexc.raise_with_backtrace Misc.Fatal_error bt
           (* with Not_found -> (* Not defined in cont_params_to_keep *)
              extra_args *)
         in
@@ -1199,8 +1229,9 @@ let rebuild_apply env apply =
     | Changing_calling_convention code_id ->
       (* Format.eprintf "CHANGING CALLING CONVENTION %a %a@." Code_id.print
          code_id Apply.print apply; *)
+      let original_callee = Apply.callee apply in
       let args_from_unboxed_callee, callee =
-        match Apply.callee apply with
+        match original_callee with
         | Some callee when simple_is_unboxable env callee ->
           let fields = get_simple_unboxable env callee in
           let new_args =
@@ -1234,7 +1265,49 @@ let rebuild_apply env apply =
         Flambda_arity.group_by_parameter (Apply.args_arity apply)
           (Apply.args apply)
       in
-      let args = List.map2 (get_args_with_kinds env) params_decisions args in
+      let args =
+        try List.map2 (get_args_with_kinds env) params_decisions args
+        with Misc.Fatal_error ->
+          let bt = Printexc.get_raw_backtrace () in
+          Format.eprintf
+            "\n\
+             %tContext is:%t changing calling convention of direct apply with \
+             code id %a,@ original callee %a@ (new callee is %a%a),@ original \
+             args @[(%a)@],@ unboxing decisions @[(%a)@]\n"
+            Flambda_colours.error Flambda_colours.pop Code_id.print code_id
+            (Format.pp_print_option
+               ~none:(fun ppf () -> Format.pp_print_string ppf "absent")
+               Simple.print)
+            original_callee
+            (Format.pp_print_option
+               ~none:(fun ppf () -> Format.pp_print_string ppf "absent")
+               Simple.print)
+            callee
+            (fun ppf args_from_unboxed_callee ->
+              match args_from_unboxed_callee with
+              | [] -> ()
+              | args ->
+                Format.fprintf ppf " and unboxed into args: @[(%a)@]"
+                  (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                     (fun ppf (simple, _) -> Simple.print ppf simple))
+                  args)
+            args_from_unboxed_callee
+            (Format.pp_print_list ~pp_sep:Format.pp_print_space
+               (fun ppf param ->
+                 Format.fprintf ppf "@[(%a)@]"
+                   (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                      Simple.print)
+                   param))
+            args
+            (Format.pp_print_list ~pp_sep:Format.pp_print_space
+               (fun ppf param_decisions ->
+                 Format.fprintf ppf "@[(%a)@]"
+                   (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                      print_param_decision)
+                   param_decisions))
+            params_decisions;
+          Printexc.raise_with_backtrace Misc.Fatal_error bt
+      in
       let args =
         match args with
         | [] ->
