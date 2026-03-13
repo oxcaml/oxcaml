@@ -25,8 +25,6 @@ let enable_sub_or_intersect = true
 
 let enable_sub_or_error = false
 
-let enable_fast_sub = Sys.getenv_opt "OXCAML_ENABLE_FAST_SUB" <> None
-
 let reset_constructor_ikind_on_substitution = false
 
 module Ldd = Types.Ldd
@@ -1345,7 +1343,7 @@ let sub_or_intersect ?origin
   in
   if not (enable_sub_or_intersect && !Clflags.ikinds)
   then Jkind.sub_or_intersect ~type_equal ~context ~level env t1 t2
-  else if enable_fast_sub && fast_sub ~context ~level env t1 t2
+  else if fast_sub ~context ~level env t1 t2
   then (
     if !Clflags.ikinds_debug
     then (
