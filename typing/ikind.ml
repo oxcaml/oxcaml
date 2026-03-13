@@ -1180,11 +1180,6 @@ let with_bounds_is_empty :
   | Types.No_with_bounds -> true
   | Types.With_bounds _ -> false
 
-let sort_is_value sort =
-  match Jkind_types.Sort.get sort with
-  | Base Value -> true
-  | Base _ | Var _ | Univar _ | Product _ -> false
-
 let fast_sub_of_value_sub :
     type r.
     Axis_lattice.t ->
@@ -1210,13 +1205,10 @@ let fast_sub_of_any_super :
   match sub.jkind.base with
   | Types.Layout
       (Jkind_types.Layout.Sort
-         (sub_sort, { pointerness = _ })) ->
-    if not (sort_is_value sub_sort)
-    then false
-    else
-      fast_sub_of_value_sub
-        (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
-        sub
+         (_sub_sort, { pointerness = _ })) ->
+    fast_sub_of_value_sub
+      (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
+      sub
   | Types.Layout _ | Types.Kconstr _ -> false
 
 let fast_sub_of_sort_super :
@@ -1231,8 +1223,6 @@ let fast_sub_of_sort_super :
       (Jkind_types.Layout.Sort
          (sub_sort, { pointerness = _ })) ->
     if not (Jkind_types.Sort.equate sub_sort super_sort)
-    then false
-    else if not (sort_is_value sub_sort)
     then false
     else
       fast_sub_of_value_sub
