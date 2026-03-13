@@ -111,7 +111,8 @@ module Dummy : sig
       so that two dummies with different stamps cannot be confused
       together. *)
 
-  type fresh_dummy = Fresh : 'stamp dummy -> fresh_dummy
+  type fresh_dummy : value mod portable contended =
+    Fresh : 'stamp dummy -> fresh_dummy [@@unsafe_allow_any_mode_crossing]
   val fresh : unit -> fresh_dummy
   (** The type of [fresh] enforces a fresh/unknown/opaque stamp for
       the returned dummy, distinct from all previous stamps. *)
@@ -210,7 +211,8 @@ end = struct
      functional values where marshalling fails, see [fresh ()] below
      for how we do it.) *)
   type 'stamp dummy = < >
-  type fresh_dummy = Fresh : 'stamp dummy -> fresh_dummy
+  type fresh_dummy : value mod portable contended =
+    Fresh : 'stamp dummy -> fresh_dummy [@@unsafe_allow_any_mode_crossing]
 
   let fresh () =
     (* dummies and marshalling: we intentionally
@@ -354,12 +356,13 @@ end = struct
   end
 end
 
-type 'a t = Pack : ('a, 'stamp) t_ -> 'a t [@@unboxed]
+type !'a t : mutable_data with 'a =
+  Pack : ('a, 'stamp) t_ -> 'a t [@@unboxed] [@@unsafe_allow_any_mode_crossing]
 and ('a, 'stamp) t_ = {
   mutable length : int;
   mutable arr : ('a, 'stamp) Dummy.with_dummy array;
   dummy : 'stamp Dummy.dummy;
-}
+} [@@unsafe_allow_any_mode_crossing]
 
 let global_dummy = Dummy.fresh ()
 (* We need to ensure that dummies are never exposed to the user as
