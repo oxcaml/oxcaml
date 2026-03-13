@@ -445,30 +445,38 @@ let rec print_out_type_0 ppf =
    - It is an argument to a function ([~arg])
    - Or, there is at least one mode to print.
  *)
-and print_out_type_mode ~arg mode ppf ty =
+and print_out_type_mode ~arg ~zero_alloc mode ppf ty =
+  let has_zero_alloc =
+    match zero_alloc with
+    | Zero_alloc.Default_zero_alloc -> false
+    | _ -> true
+  in
   let parens =
-    is_initially_labeled_tuple ty && arg
+    (is_initially_labeled_tuple ty || has_zero_alloc) && arg
   in
   if parens then
     pp_print_char ppf '(';
   print_out_type_2 ppf ty;
+  if has_zero_alloc then
+    pp_arg_zero_alloc ppf zero_alloc;
   if parens then
     pp_print_char ppf ')';
   print_out_modes ppf mode
 
 and print_out_type_1 ppf =
   function
-  | Otyp_arrow (lab, _zero_alloc, am, ty1, ty2) ->
+  | Otyp_arrow (lab, zero_alloc, am, ty1, ty2) ->
       pp_open_box ppf 0;
-      print_arg_label_and_out_type ppf lab ty1 ~print_type:(print_out_arg am);
+      print_arg_label_and_out_type ppf lab ty1
+        ~print_type:(print_out_arg ~zero_alloc am);
       pp_print_string ppf " ->";
       pp_print_space ppf ();
       print_out_ret ppf ty2;
       pp_close_box ppf ()
   | ty -> print_out_type_2 ppf ty
 
-and print_out_arg am ppf ty =
-  print_out_type_mode ~arg:true am ppf ty
+and print_out_arg ~zero_alloc am ppf ty =
+  print_out_type_mode ~arg:true ~zero_alloc am ppf ty
 
 and print_out_ret ppf =
   function
@@ -482,7 +490,9 @@ and print_out_ret ppf =
       pp_print_char ppf ')';
       print_out_modes ppf rm
     end
-  | Otyp_ret (Orm_any rm, ty) -> print_out_type_mode ~arg:false rm ppf ty
+  | Otyp_ret (Orm_any rm, ty) ->
+    print_out_type_mode ~arg:false ~zero_alloc:Zero_alloc.Default_zero_alloc
+      rm ppf ty
   | _ -> assert false
 
 and print_out_type_2 ppf =

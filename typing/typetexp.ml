@@ -889,19 +889,19 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           let zero_alloc =
             match Types.get_desc arg_cty.ctyp_type with
             | Tpoly (_, _, zero_alloc) -> zero_alloc
-            | _ -> begin
+            | _ ->
+              let default_arity =
                 match arg_cty.ctyp_desc with
-                | Ttyp_arrow _ ->
-                  let default_arity = syntactic_arity arg.ptyp_desc in
-                  Builtin_attributes.get_zero_alloc_attribute
-                    ~in_signature:false
-                    ~on_application:false
-                    ~on_function_argument:true
-                    ~default_arity
-                    arg_cty.ctyp_attributes
-                  |> Zero_alloc.create_const
-                | _ -> Zero_alloc.default
-              end
+                | Ttyp_arrow _ -> syntactic_arity arg.ptyp_desc
+                | _ -> 1 (* some default is needed *)
+              in
+              Builtin_attributes.get_zero_alloc_attribute
+                ~in_signature:false
+                ~on_application:false
+                ~on_function_argument:true
+                ~default_arity
+                arg_cty.ctyp_attributes
+              |> Zero_alloc.create_const
           in
           begin
             let open Builtin_attributes in

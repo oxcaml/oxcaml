@@ -1535,8 +1535,7 @@ type typvariant_repr = {
   tags : string list option
 }
 
-let rec tree_of_modal_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc)
-          mode modal ty =
+let rec tree_of_modal_typexp mode modal ty =
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
@@ -1579,6 +1578,8 @@ let rec tree_of_modal_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc)
           else
             tree_of_typexp mode arg_mode ty1
         in
+        let _, _, zero_alloc = tpoly_get_poly ty1 in
+        let zero_alloc = Zero_alloc.get zero_alloc in
         let acc_mode = curry_mode alloc_mode arg_mode in
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
@@ -1633,14 +1634,12 @@ let rec tree_of_modal_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc)
         Otyp_stuff "<Tsubst>"
     | Tlink _ ->
         fatal_error "Printtyp.tree_of_typexp"
-    | Tpoly (ty, [], zero_alloc) ->
-        let zero_alloc = Zero_alloc.get zero_alloc in
-        tree_of_typexp ~zero_alloc mode alloc_mode ty
-    | Tpoly (ty, tyl, zero_alloc) ->
+    | Tpoly (ty, [], _) ->
+        tree_of_typexp mode alloc_mode ty
+    | Tpoly (ty, tyl, _) ->
         (*let print_names () =
           List.iter (fun (_, name) -> prerr_string (name ^ " ")) !names;
           prerr_string "; " in *)
-        let zero_alloc = Zero_alloc.get zero_alloc in
         let tyl = List.map Transient_expr.repr tyl in
         let old_delayed = !delayed in
         (* Make the names delayed, so that the real type is
@@ -1648,7 +1647,7 @@ let rec tree_of_modal_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc)
         List.iter add_delayed tyl;
         let tl = tree_of_qtvs tyl in
         let tr =
-          Otyp_poly (tl, tree_of_typexp ~zero_alloc mode alloc_mode ty)
+          Otyp_poly (tl, tree_of_typexp mode alloc_mode ty)
         in
         (* Forget names when we leave scope *)
         Names.remove_names tyl;
@@ -1730,9 +1729,8 @@ let rec tree_of_modal_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc)
         Otyp_ret (rm, ty)
     | Other m -> pr_typ m
 
-and tree_of_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc)
-      mode alloc_mode ty =
-  tree_of_modal_typexp mode (Other alloc_mode) ~zero_alloc ty
+and tree_of_typexp mode alloc_mode ty =
+  tree_of_modal_typexp mode (Other alloc_mode) ty
 
 (* qtvs = quantified type variables *)
 (* this silently drops any arguments that are not generic Tvar or Tunivar *)
