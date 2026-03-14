@@ -769,14 +769,18 @@ module Map = struct
     | Empty -> Empty
     | Leaf (i, d) -> leaf_or_empty i (f i (Some d) None)
     | Branch (pbit, t00, t01) ->
-      branch pbit (merge_left f t00) (merge_left f t01)
+      let t01' = merge_left f t01 in
+      let t00' = merge_left f t00 in
+      branch pbit t00' t01'
 
   let rec merge_right f t1 =
     match t1 with
     | Empty -> Empty
     | Leaf (i, d) -> leaf_or_empty i (f i None (Some d))
     | Branch (pbit, t10, t11) ->
-      branch pbit (merge_right f t10) (merge_right f t11)
+      let t11' = merge_right f t11 in
+      let t10' = merge_right f t10 in
+      branch pbit t10' t11'
 
   let rec merge f t0 t1 =
     match t0, t1 with
@@ -791,32 +795,59 @@ module Map = struct
       if match_pbit i pbit
       then
         if zero_bit i bit
-        then branch pbit (merge f t0 t10) (merge_right f t11)
-        else branch pbit (merge_right f t10) (merge f t0 t11)
+        then
+          let t11' = merge_right f t11 in
+          let t10' = merge f t0 t10 in
+          branch pbit t10' t11'
+        else
+          let t11' = merge f t0 t11 in
+          let t10' = merge_right f t10 in
+          branch pbit t10' t11'
       else join i (merge_left f t0) pbit (merge_right f t1)
     | Branch (pbit, t00, t01), Leaf (i, _) ->
       let bit = pbit_bit pbit in
       if match_pbit i pbit
       then
         if zero_bit i bit
-        then branch pbit (merge f t00 t1) (merge_left f t01)
-        else branch pbit (merge_left f t00) (merge f t01 t1)
+        then
+          let t01' = merge_left f t01 in
+          let t00' = merge f t00 t1 in
+          branch pbit t00' t01'
+        else
+          let t01' = merge f t01 t1 in
+          let t00' = merge_left f t00 in
+          branch pbit t00' t01'
       else join pbit (merge_left f t0) i (merge_right f t1)
     | Branch (pbit0, t00, t01), Branch (pbit1, t10, t11) ->
       let bit0 = pbit_bit pbit0 in
       let bit1 = pbit_bit pbit1 in
       if pbit0 = pbit1
-      then branch pbit0 (merge f t00 t10) (merge f t01 t11)
+      then
+        let t01' = merge f t01 t11 in
+        let t00' = merge f t00 t10 in
+        branch pbit0 t00' t01'
       else if includes_pbit pbit0 pbit1
       then
         if zero_bit pbit1 bit0
-        then branch pbit0 (merge f t00 t1) (merge_left f t01)
-        else branch pbit0 (merge_left f t00) (merge f t01 t1)
+        then
+          let t01' = merge_left f t01 in
+          let t00' = merge f t00 t1 in
+          branch pbit0 t00' t01'
+        else
+          let t01' = merge f t01 t1 in
+          let t00' = merge_left f t00 in
+          branch pbit0 t00' t01'
       else if includes_pbit pbit1 pbit0
       then
         if zero_bit pbit0 bit1
-        then branch pbit1 (merge f t0 t10) (merge_right f t11)
-        else branch pbit1 (merge_right f t10) (merge f t0 t11)
+        then
+          let t11' = merge_right f t11 in
+          let t10' = merge f t0 t10 in
+          branch pbit1 t10' t11'
+        else
+          let t11' = merge f t0 t11 in
+          let t10' = merge_right f t10 in
+          branch pbit1 t10' t11'
       else join pbit0 (merge_left f t0) pbit1 (merge_right f t1)
 
   let rec union_total f t0 t1 =
@@ -977,7 +1008,9 @@ module Map = struct
     | Empty -> Empty
     | Leaf (k, d1) -> leaf_or_empty k (f k None d1)
     | Branch (pbit, t10, t11) ->
-      branch pbit (update_many_right f t10) (update_many_right f t11)
+      let t11' = update_many_right f t11 in
+      let t10' = update_many_right f t10 in
+      branch pbit t10' t11'
 
   let rec update_many f t0 t1 =
     match t0, t1 with
@@ -992,8 +1025,14 @@ module Map = struct
       if match_pbit i pbit
       then
         if zero_bit i bit
-        then branch pbit (update_many f t0 t10) (update_many_right f t11)
-        else branch pbit (update_many_right f t10) (update_many f t0 t11)
+        then
+          let t11' = update_many_right f t11 in
+          let t10' = update_many f t0 t10 in
+          branch pbit t10' t11'
+        else
+          let t11' = update_many f t0 t11 in
+          let t10' = update_many_right f t10 in
+          branch pbit t10' t11'
       else join i t0 pbit (update_many_right f t1)
     | Branch _, Leaf (_, _) ->
       merge
@@ -1008,17 +1047,30 @@ module Map = struct
       let bit0 = pbit_bit pbit0 in
       let bit1 = pbit_bit pbit1 in
       if pbit0 = pbit1
-      then branch pbit0 (update_many f t00 t10) (update_many f t01 t11)
+      then
+        let t01' = update_many f t01 t11 in
+        let t00' = update_many f t00 t10 in
+        branch pbit0 t00' t01'
       else if includes_pbit pbit0 pbit1
       then
         if zero_bit pbit1 bit0
-        then branch pbit0 (update_many f t00 t1) t01
-        else branch pbit0 t00 (update_many f t01 t1)
+        then
+          let t00' = update_many f t00 t1 in
+          branch pbit0 t00' t01
+        else
+          let t01' = update_many f t01 t1 in
+          branch pbit0 t00 t01'
       else if includes_pbit pbit1 pbit0
       then
         if zero_bit pbit0 bit1
-        then branch pbit1 (update_many f t0 t10) (update_many_right f t11)
-        else branch pbit1 (update_many_right f t10) (update_many f t0 t11)
+        then
+          let t11' = update_many_right f t11 in
+          let t10' = update_many f t0 t10 in
+          branch pbit1 t10' t11'
+        else
+          let t11' = update_many f t0 t11 in
+          let t10' = update_many_right f t10 in
+          branch pbit1 t10' t11'
       else join pbit0 t0 pbit1 (update_many_right f t1)
 
   let rec diff f t0 t1 =
@@ -1240,21 +1292,19 @@ module Map = struct
     | Empty -> t
     | Leaf (i, d) -> if p i d then t else Empty
     | Branch (pbit, t0, t1) ->
+      let t1' = filter p t1 in
       let t0' = filter p t0 in
-      if t0' == t0
-      then
-        let t1' = filter p t1 in
-        if t1' == t1 then t else branch pbit t0 t1'
-      else
-        let t1' = filter p t1 in
-        branch pbit t0' t1'
+      if t0' == t0 && t1' == t1 then t else branch pbit t0' t1'
 
   let rec filter_map f t =
     match t with
     | Empty -> Empty
     | Leaf (k, d) -> (
       match f k d with None -> Empty | Some d' -> Leaf (k, d'))
-    | Branch (pbit, t0, t1) -> branch pbit (filter_map f t0) (filter_map f t1)
+    | Branch (pbit, t0, t1) ->
+      let t1' = filter_map f t1 in
+      let t0' = filter_map f t0 in
+      branch pbit t0' t1'
 
   let rec filter_map_sharing f t =
     match t with
@@ -1421,7 +1471,10 @@ module Map = struct
     match t with
     | Empty -> Empty
     | Leaf (k, datum) -> Leaf (k, f datum)
-    | Branch (pbit, t0, t1) -> branch_non_empty pbit (map f t0) (map f t1)
+    | Branch (pbit, t0, t1) ->
+      let t1' = map f t1 in
+      let t0' = map f t0 in
+      branch_non_empty pbit t0' t1'
 
   let rec map_sharing f t =
     match t with
@@ -1438,7 +1491,10 @@ module Map = struct
     match t with
     | Empty -> Empty
     | Leaf (key, datum) -> Leaf (key, f key datum)
-    | Branch (pbit, t0, t1) -> branch_non_empty pbit (mapi f t0) (mapi f t1)
+    | Branch (pbit, t0, t1) ->
+      let t1' = mapi f t1 in
+      let t0' = mapi f t0 in
+      branch_non_empty pbit t0' t1'
 
   type 'a iterator =
     | Done
