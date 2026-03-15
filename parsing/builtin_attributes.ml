@@ -111,6 +111,7 @@ let builtin_attrs =
   ; "noalloc"
   ; "zero_alloc"
   ; "untagged"
+  ; "unpacked"
   ; "poll"
   ; "loop"
   ; "tail_mod_cons"

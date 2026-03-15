@@ -93,7 +93,7 @@ val is_fixed_type : Parsetree.type_declaration -> bool
 
 val mixed_block_element : Env.t -> type_expr -> _ jkind -> mixed_block_element
 
-type native_repr_kind = Unboxed | Untagged
+type native_repr_kind = Unboxed | Untagged | Unpacked
 
 (* Records reason for a jkind representability requirement in errors. *)
 type jkind_sort_loc =
