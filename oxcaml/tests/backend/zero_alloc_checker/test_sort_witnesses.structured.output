@@ -1,0 +1,32 @@
+File "test_sort_witnesses.ml", line 42, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Test_sort_witnesses.compute (_CamlU19Test_sort_witnessesF9compute_HIDE_STAMP).
+
+File "test_sort_witnesses.ml", line 49, characters 10-16:
+Error: allocation of 16 bytes
+inlined from
+test_sort_witnesses.ml:38,19--43[Test_sort_witnesses.S.to_float_option][_CamlU19Test_sort_witnessesM1SF17to_float_option_HIDE_STAMP]
+test_sort_witnesses.ml:44,4--30[Test_sort_witnesses.compute.size][_CamlU19Test_sort_witnessesF7computeF6size_HIDE_STAMP]
+test_sort_witnesses.ml:49,10--16[Test_sort_witnesses.compute]
+
+File "test_sort_witnesses.ml", line 49, characters 10-16:
+Error: allocation of 16 bytes for float
+inlined from
+test_sort_witnesses.ml:26,35--77[Test_sort_witnesses.Int.to_float][_CamlU19Test_sort_witnessesM3IntF10to_float_HIDE_STAMP]
+test_sort_witnesses.ml:38,24--43[Test_sort_witnesses.S.to_float_option][_CamlU19Test_sort_witnessesM1SF17to_float_option_HIDE_STAMP]
+test_sort_witnesses.ml:44,4--30[Test_sort_witnesses.compute.size][_CamlU19Test_sort_witnessesF7computeF6size_HIDE_STAMP]
+test_sort_witnesses.ml:49,10--16[Test_sort_witnesses.compute]
+
+File "test_sort_witnesses.ml", line 50, characters 10-16:
+Error: allocation of 16 bytes
+inlined from
+test_sort_witnesses.ml:38,19--43[Test_sort_witnesses.S.to_float_option][_CamlU19Test_sort_witnessesM1SF17to_float_option_HIDE_STAMP]
+test_sort_witnesses.ml:44,4--30[Test_sort_witnesses.compute.size][_CamlU19Test_sort_witnessesF7computeF6size_HIDE_STAMP]
+test_sort_witnesses.ml:50,10--16[Test_sort_witnesses.compute]
+
+File "test_sort_witnesses.ml", line 50, characters 10-16:
+Error: allocation of 16 bytes for float
+inlined from
+test_sort_witnesses.ml:26,35--77[Test_sort_witnesses.Int.to_float][_CamlU19Test_sort_witnessesM3IntF10to_float_HIDE_STAMP]
+test_sort_witnesses.ml:38,24--43[Test_sort_witnesses.S.to_float_option][_CamlU19Test_sort_witnessesM1SF17to_float_option_HIDE_STAMP]
+test_sort_witnesses.ml:44,4--30[Test_sort_witnesses.compute.size][_CamlU19Test_sort_witnessesF7computeF6size_HIDE_STAMP]
+test_sort_witnesses.ml:50,10--16[Test_sort_witnesses.compute]

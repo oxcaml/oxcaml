@@ -16,6 +16,7 @@
    ocamlobjinfo;
 
    runtime5;
+   structured-name-mangling;
    check-program-output;
  }{
    program = "question.cmx";

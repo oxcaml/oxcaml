@@ -1,0 +1,10 @@
+U18Backend_attributesF10with_irc
+use_regalloc=irc
+U18Backend_attributesF10with_irc
+use_regalloc=irc
+U18Backend_attributesF20with_irc_and_param
+use_regalloc=irc
+regalloc_params=IRC_SPILLING_HEURISTICS=flat
+U18Backend_attributesF20with_irc_and_param
+use_regalloc=irc
+regalloc_params=IRC_SPILLING_HEURISTICS=flat

@@ -2642,8 +2642,8 @@ let fundecl fundecl =
       it. This provides symbols for perf, gdb, and similar tools.
 
       This means that, for example, the function [let g (x: int) = x] will be
-      emitted as follows on GAS-like systems (and with slightly different label
-      names on macOS):
+      emitted as follows on GAS-like systems using the flat name-mangling scheme
+      (and with slightly different label names on macOS):
 
       camlFile__g_0_1_code:
       .LcamlFile__g_0_1_code:

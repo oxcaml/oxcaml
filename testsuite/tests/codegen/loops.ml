@@ -5,6 +5,7 @@
  compile_only = "true";
  ocamlopt.opt;
 
+ flat-name-mangling;
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -cfg-prologue-shrink-wrap";

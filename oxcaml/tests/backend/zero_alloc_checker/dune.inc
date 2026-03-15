@@ -31,10 +31,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail1.output.corrected)
+ (targets fail1.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail1.ml) filter.sh)
  (action
-   (with-outputs-to fail1.output.corrected
+   (with-outputs-to fail1.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -46,15 +46,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail1.output fail1.output.corrected)
- (action (diff fail1.output fail1.output.corrected)))
+ (action (diff fail1.%{env:OXCAML_NAME_MANGLING=flat}.output fail1.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail2.output.corrected)
+ (targets fail2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail2.ml) filter.sh)
  (action
-   (with-outputs-to fail2.output.corrected
+   (with-outputs-to fail2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -66,15 +65,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail2.output fail2.output.corrected)
- (action (diff fail2.output fail2.output.corrected)))
+ (action (diff fail2.%{env:OXCAML_NAME_MANGLING=flat}.output fail2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail3.output.corrected)
+ (targets fail3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml t3.ml fail3.ml) filter.sh)
  (action
-   (with-outputs-to fail3.output.corrected
+   (with-outputs-to fail3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -86,15 +84,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail3.output fail3.output.corrected)
- (action (diff fail3.output fail3.output.corrected)))
+ (action (diff fail3.%{env:OXCAML_NAME_MANGLING=flat}.output fail3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail4.output.corrected)
+ (targets fail4.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml t4.ml fail4.ml) filter.sh)
  (action
-   (with-outputs-to fail4.output.corrected
+   (with-outputs-to fail4.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -106,15 +103,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail4.output fail4.output.corrected)
- (action (diff fail4.output fail4.output.corrected)))
+ (action (diff fail4.%{env:OXCAML_NAME_MANGLING=flat}.output fail4.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail5.output.corrected)
+ (targets fail5.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail5.ml) filter.sh)
  (action
-   (with-outputs-to fail5.output.corrected
+   (with-outputs-to fail5.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -126,15 +122,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail5.output fail5.output.corrected)
- (action (diff fail5.output fail5.output.corrected)))
+ (action (diff fail5.%{env:OXCAML_NAME_MANGLING=flat}.output fail5.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail6.output.corrected)
+ (targets fail6.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail6.ml) filter.sh)
  (action
-   (with-outputs-to fail6.output.corrected
+   (with-outputs-to fail6.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -146,15 +141,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail6.output fail6.output.corrected)
- (action (diff fail6.output fail6.output.corrected)))
+ (action (diff fail6.%{env:OXCAML_NAME_MANGLING=flat}.output fail6.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail7.output.corrected)
+ (targets fail7.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail7.ml) filter.sh)
  (action
-   (with-outputs-to fail7.output.corrected
+   (with-outputs-to fail7.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -166,15 +160,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail7.output fail7.output.corrected)
- (action (diff fail7.output fail7.output.corrected)))
+ (action (diff fail7.%{env:OXCAML_NAME_MANGLING=flat}.output fail7.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail8.output.corrected)
+ (targets fail8.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail8.ml) filter.sh)
  (action
-   (with-outputs-to fail8.output.corrected
+   (with-outputs-to fail8.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -186,15 +179,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail8.output fail8.output.corrected)
- (action (diff fail8.output fail8.output.corrected)))
+ (action (diff fail8.%{env:OXCAML_NAME_MANGLING=flat}.output fail8.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail9.output.corrected)
+ (targets fail9.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail9.ml) filter.sh)
  (action
-   (with-outputs-to fail9.output.corrected
+   (with-outputs-to fail9.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -206,15 +198,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail9.output fail9.output.corrected)
- (action (diff fail9.output fail9.output.corrected)))
+ (action (diff fail9.%{env:OXCAML_NAME_MANGLING=flat}.output fail9.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail10.output.corrected)
+ (targets fail10.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail10.ml) filter.sh)
  (action
-   (with-outputs-to fail10.output.corrected
+   (with-outputs-to fail10.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -226,15 +217,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail10.output fail10.output.corrected)
- (action (diff fail10.output fail10.output.corrected)))
+ (action (diff fail10.%{env:OXCAML_NAME_MANGLING=flat}.output fail10.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail12.output.corrected)
+ (targets fail12.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail12.ml) filter.sh)
  (action
-   (with-outputs-to fail12.output.corrected
+   (with-outputs-to fail12.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -246,15 +236,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail12.output fail12.output.corrected)
- (action (diff fail12.output fail12.output.corrected)))
+ (action (diff fail12.%{env:OXCAML_NAME_MANGLING=flat}.output fail12.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail13.output.corrected)
+ (targets fail13.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail13.ml) filter.sh)
  (action
-   (with-outputs-to fail13.output.corrected
+   (with-outputs-to fail13.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -266,15 +255,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail13.output fail13.output.corrected)
- (action (diff fail13.output fail13.output.corrected)))
+ (action (diff fail13.%{env:OXCAML_NAME_MANGLING=flat}.output fail13.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail14.output.corrected)
+ (targets fail14.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail14.ml) filter.sh)
  (action
-   (with-outputs-to fail14.output.corrected
+   (with-outputs-to fail14.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -286,15 +274,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail14.output fail14.output.corrected)
- (action (diff fail14.output fail14.output.corrected)))
+ (action (diff fail14.%{env:OXCAML_NAME_MANGLING=flat}.output fail14.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail15.output.corrected)
+ (targets fail15.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail15.ml) filter.sh)
  (action
-   (with-outputs-to fail15.output.corrected
+   (with-outputs-to fail15.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -306,15 +293,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail15.output fail15.output.corrected)
- (action (diff fail15.output fail15.output.corrected)))
+ (action (diff fail15.%{env:OXCAML_NAME_MANGLING=flat}.output fail15.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail16.output.corrected)
+ (targets fail16.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail16.ml) filter.sh)
  (action
-   (with-outputs-to fail16.output.corrected
+   (with-outputs-to fail16.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -326,15 +312,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail16.output fail16.output.corrected)
- (action (diff fail16.output fail16.output.corrected)))
+ (action (diff fail16.%{env:OXCAML_NAME_MANGLING=flat}.output fail16.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail17.output.corrected)
+ (targets fail17.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail17.ml) filter.sh)
  (action
-   (with-outputs-to fail17.output.corrected
+   (with-outputs-to fail17.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -346,15 +331,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail17.output fail17.output.corrected)
- (action (diff fail17.output fail17.output.corrected)))
+ (action (diff fail17.%{env:OXCAML_NAME_MANGLING=flat}.output fail17.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail18.output.corrected)
+ (targets fail18.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail18.ml) filter.sh)
  (action
-   (with-outputs-to fail18.output.corrected
+   (with-outputs-to fail18.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -366,15 +350,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail18.output fail18.output.corrected)
- (action (diff fail18.output fail18.output.corrected)))
+ (action (diff fail18.%{env:OXCAML_NAME_MANGLING=flat}.output fail18.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail19.output.corrected)
+ (targets fail19.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml dep19.ml fail19.ml) filter.sh)
  (action
-   (with-outputs-to fail19.output.corrected
+   (with-outputs-to fail19.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -386,15 +369,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail19.output fail19.output.corrected)
- (action (diff fail19.output fail19.output.corrected)))
+ (action (diff fail19.%{env:OXCAML_NAME_MANGLING=flat}.output fail19.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail20.output.corrected)
+ (targets fail20.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail20.ml) filter.sh)
  (action
-   (with-outputs-to fail20.output.corrected
+   (with-outputs-to fail20.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -406,15 +388,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail20.output fail20.output.corrected)
- (action (diff fail20.output fail20.output.corrected)))
+ (action (diff fail20.%{env:OXCAML_NAME_MANGLING=flat}.output fail20.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail21.output.corrected)
+ (targets fail21.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail21.ml) filter.sh)
  (action
-   (with-outputs-to fail21.output.corrected
+   (with-outputs-to fail21.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -426,15 +407,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail21.output fail21.output.corrected)
- (action (diff fail21.output fail21.output.corrected)))
+ (action (diff fail21.%{env:OXCAML_NAME_MANGLING=flat}.output fail21.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_attribute_error_duplicate.output.corrected)
+ (targets test_attribute_error_duplicate.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_attribute_error_duplicate.ml) filter.sh)
  (action
-   (with-outputs-to test_attribute_error_duplicate.output.corrected
+   (with-outputs-to test_attribute_error_duplicate.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -446,15 +426,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attribute_error_duplicate.output test_attribute_error_duplicate.output.corrected)
- (action (diff test_attribute_error_duplicate.output test_attribute_error_duplicate.output.corrected)))
+ (action (diff test_attribute_error_duplicate.%{env:OXCAML_NAME_MANGLING=flat}.output test_attribute_error_duplicate.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_attr_unused.output.corrected)
+ (targets test_attr_unused.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_attr_unused.ml) filter.sh)
  (action
-   (with-outputs-to test_attr_unused.output.corrected
+   (with-outputs-to test_attr_unused.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -466,15 +445,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attr_unused.output test_attr_unused.output.corrected)
- (action (diff test_attr_unused.output test_attr_unused.output.corrected)))
+ (action (diff test_attr_unused.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_unused.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets t6.output.corrected)
+ (targets t6.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml t6.ml) filter.sh)
  (action
-   (with-outputs-to t6.output.corrected
+   (with-outputs-to t6.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -486,8 +464,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps t6.output t6.output.corrected)
- (action (diff t6.output t6.output.corrected)))
+ (action (diff t6.%{env:OXCAML_NAME_MANGLING=flat}.output t6.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (alias   runtest)
@@ -503,10 +480,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets t1.output.corrected)
+ (targets t1.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml t1.ml) filter.sh)
  (action
-   (with-outputs-to t1.output.corrected
+   (with-outputs-to t1.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -518,15 +495,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps t1.output t1.output.corrected)
- (action (diff t1.output t1.output.corrected)))
+ (action (diff t1.%{env:OXCAML_NAME_MANGLING=flat}.output t1.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_warning199.output.corrected)
+ (targets test_warning199.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_warning199.mli test_warning199.ml) filter.sh)
  (action
-   (with-outputs-to test_warning199.output.corrected
+   (with-outputs-to test_warning199.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -538,15 +514,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_warning199.output test_warning199.output.corrected)
- (action (diff test_warning199.output test_warning199.output.corrected)))
+ (action (diff test_warning199.%{env:OXCAML_NAME_MANGLING=flat}.output test_warning199.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_warning199_disabled.output.corrected)
+ (targets test_warning199_disabled.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_warning199_disabled.mli test_warning199_disabled.ml) filter.sh)
  (action
-   (with-outputs-to test_warning199_disabled.output.corrected
+   (with-outputs-to test_warning199_disabled.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -558,15 +533,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_warning199_disabled.output test_warning199_disabled.output.corrected)
- (action (diff test_warning199_disabled.output test_warning199_disabled.output.corrected)))
+ (action (diff test_warning199_disabled.%{env:OXCAML_NAME_MANGLING=flat}.output test_warning199_disabled.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_never_returns_normally.output.corrected)
+ (targets test_never_returns_normally.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_never_returns_normally.ml) filter.sh)
  (action
-   (with-outputs-to test_never_returns_normally.output.corrected
+   (with-outputs-to test_never_returns_normally.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -578,15 +552,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_never_returns_normally.output test_never_returns_normally.output.corrected)
- (action (diff test_never_returns_normally.output test_never_returns_normally.output.corrected)))
+ (action (diff test_never_returns_normally.%{env:OXCAML_NAME_MANGLING=flat}.output test_never_returns_normally.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail22.output.corrected)
+ (targets fail22.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail22.ml) filter.sh)
  (action
-   (with-outputs-to fail22.output.corrected
+   (with-outputs-to fail22.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -598,15 +571,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail22.output fail22.output.corrected)
- (action (diff fail22.output fail22.output.corrected)))
+ (action (diff fail22.%{env:OXCAML_NAME_MANGLING=flat}.output fail22.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail23.output.corrected)
+ (targets fail23.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail23.ml) filter.sh)
  (action
-   (with-outputs-to fail23.output.corrected
+   (with-outputs-to fail23.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -618,8 +590,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail23.output fail23.output.corrected)
- (action (diff fail23.output fail23.output.corrected)))
+ (action (diff fail23.%{env:OXCAML_NAME_MANGLING=flat}.output fail23.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (alias   runtest)
@@ -635,10 +606,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_assume_fail.output.corrected)
+ (targets test_assume_fail.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_assume_fail.ml) filter.sh)
  (action
-   (with-outputs-to test_assume_fail.output.corrected
+   (with-outputs-to test_assume_fail.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -650,15 +621,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_fail.output test_assume_fail.output.corrected)
- (action (diff test_assume_fail.output test_assume_fail.output.corrected)))
+ (action (diff test_assume_fail.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_fail.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_assume_on_call.output.corrected)
+ (targets test_assume_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_assume_on_call.ml) filter.sh)
  (action
-   (with-outputs-to test_assume_on_call.output.corrected
+   (with-outputs-to test_assume_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -670,15 +640,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_on_call.output test_assume_on_call.output.corrected)
- (action (diff test_assume_on_call.output test_assume_on_call.output.corrected)))
+ (action (diff test_assume_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_misplaced_assume.output.corrected)
+ (targets test_misplaced_assume.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_misplaced_assume.ml) filter.sh)
  (action
-   (with-outputs-to test_misplaced_assume.output.corrected
+   (with-outputs-to test_misplaced_assume.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -690,15 +659,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_misplaced_assume.output test_misplaced_assume.output.corrected)
- (action (diff test_misplaced_assume.output test_misplaced_assume.output.corrected)))
+ (action (diff test_misplaced_assume.%{env:OXCAML_NAME_MANGLING=flat}.output test_misplaced_assume.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_attr_check.output.corrected)
+ (targets test_attr_check.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_attr_check.ml) filter.sh)
  (action
-   (with-outputs-to test_attr_check.output.corrected
+   (with-outputs-to test_attr_check.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -710,15 +678,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attr_check.output test_attr_check.output.corrected)
- (action (diff test_attr_check.output test_attr_check.output.corrected)))
+ (action (diff test_attr_check.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_attr_check_all.output.corrected)
+ (targets test_attr_check_all.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_attr_check_all.ml) filter.sh)
  (action
-   (with-outputs-to test_attr_check_all.output.corrected
+   (with-outputs-to test_attr_check_all.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -730,15 +697,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attr_check_all.output test_attr_check_all.output.corrected)
- (action (diff test_attr_check_all.output test_attr_check_all.output.corrected)))
+ (action (diff test_attr_check_all.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check_all.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_attr_check_opt.output.corrected)
+ (targets test_attr_check_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_attr_check_opt.ml) filter.sh)
  (action
-   (with-outputs-to test_attr_check_opt.output.corrected
+   (with-outputs-to test_attr_check_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -750,15 +716,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attr_check_opt.output test_attr_check_opt.output.corrected)
- (action (diff test_attr_check_opt.output test_attr_check_opt.output.corrected)))
+ (action (diff test_attr_check_opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_attr_check_none.output.corrected)
+ (targets test_attr_check_none.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_attr_check_none.ml) filter.sh)
  (action
-   (with-outputs-to test_attr_check_none.output.corrected
+   (with-outputs-to test_attr_check_none.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -770,15 +735,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_attr_check_none.output test_attr_check_none.output.corrected)
- (action (diff test_attr_check_none.output test_attr_check_none.output.corrected)))
+ (action (diff test_attr_check_none.%{env:OXCAML_NAME_MANGLING=flat}.output test_attr_check_none.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail24.output.corrected)
+ (targets fail24.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail24.ml) filter.sh)
  (action
-   (with-outputs-to fail24.output.corrected
+   (with-outputs-to fail24.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -790,8 +754,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail24.output fail24.output.corrected)
- (action (diff fail24.output fail24.output.corrected)))
+ (action (diff fail24.%{env:OXCAML_NAME_MANGLING=flat}.output fail24.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (alias   runtest)
@@ -801,10 +764,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail25.output.corrected)
+ (targets fail25.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail25.ml) filter.sh)
  (action
-   (with-outputs-to fail25.output.corrected
+   (with-outputs-to fail25.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -816,15 +779,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail25.output fail25.output.corrected)
- (action (diff fail25.output fail25.output.corrected)))
+ (action (diff fail25.%{env:OXCAML_NAME_MANGLING=flat}.output fail25.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail26.output.corrected)
+ (targets fail26.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail26.ml) filter.sh)
  (action
-   (with-outputs-to fail26.output.corrected
+   (with-outputs-to fail26.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -836,15 +798,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail26.output fail26.output.corrected)
- (action (diff fail26.output fail26.output.corrected)))
+ (action (diff fail26.%{env:OXCAML_NAME_MANGLING=flat}.output fail26.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_all_opt.output.corrected)
+ (targets test_all_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_all_opt.ml) filter.sh)
  (action
-   (with-outputs-to test_all_opt.output.corrected
+   (with-outputs-to test_all_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -856,15 +817,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_all_opt.output test_all_opt.output.corrected)
- (action (diff test_all_opt.output test_all_opt.output.corrected)))
+ (action (diff test_all_opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_all_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_all_opt2.output.corrected)
+ (targets test_all_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_all_opt2.ml) filter.sh)
  (action
-   (with-outputs-to test_all_opt2.output.corrected
+   (with-outputs-to test_all_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -876,15 +836,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_all_opt2.output test_all_opt2.output.corrected)
- (action (diff test_all_opt2.output test_all_opt2.output.corrected)))
+ (action (diff test_all_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output test_all_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_all_opt3.output.corrected)
+ (targets test_all_opt3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_all_opt3.ml) filter.sh)
  (action
-   (with-outputs-to test_all_opt3.output.corrected
+   (with-outputs-to test_all_opt3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -896,15 +855,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_all_opt3.output test_all_opt3.output.corrected)
- (action (diff test_all_opt3.output test_all_opt3.output.corrected)))
+ (action (diff test_all_opt3.%{env:OXCAML_NAME_MANGLING=flat}.output test_all_opt3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_arity.output.corrected)
+ (targets test_arity.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_arity.ml) filter.sh)
  (action
-   (with-outputs-to test_arity.output.corrected
+   (with-outputs-to test_arity.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -916,8 +874,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_arity.output test_arity.output.corrected)
- (action (diff test_arity.output test_arity.output.corrected)))
+ (action (diff test_arity.%{env:OXCAML_NAME_MANGLING=flat}.output test_arity.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (alias runtest)
@@ -928,10 +885,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_signatures_functors.output.corrected)
+ (targets test_signatures_functors.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_signatures_functors.ml) filter.sh)
  (action
-   (with-outputs-to test_signatures_functors.output.corrected
+   (with-outputs-to test_signatures_functors.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -943,15 +900,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_signatures_functors.output test_signatures_functors.output.corrected)
- (action (diff test_signatures_functors.output test_signatures_functors.output.corrected)))
+ (action (diff test_signatures_functors.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_functors.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_signatures_first_class_modules.output.corrected)
+ (targets test_signatures_first_class_modules.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_signatures_first_class_modules.ml) filter.sh)
  (action
-   (with-outputs-to test_signatures_first_class_modules.output.corrected
+   (with-outputs-to test_signatures_first_class_modules.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -963,8 +919,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_signatures_first_class_modules.output test_signatures_first_class_modules.output.corrected)
- (action (diff test_signatures_first_class_modules.output test_signatures_first_class_modules.output.corrected)))
+ (action (diff test_signatures_first_class_modules.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_first_class_modules.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (alias runtest)
@@ -975,10 +930,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_signatures_separate.output.corrected)
+ (targets test_signatures_separate.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps test_signatures_separate_a.cmi (:ml test_signatures_separate_b.ml) filter.sh)
  (action
-   (with-outputs-to test_signatures_separate.output.corrected
+   (with-outputs-to test_signatures_separate.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -990,15 +945,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_signatures_separate.output test_signatures_separate.output.corrected)
- (action (diff test_signatures_separate.output test_signatures_separate.output.corrected)))
+ (action (diff test_signatures_separate.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_separate.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_signatures_separate.opt.output.corrected)
+ (targets test_signatures_separate.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps test_signatures_separate_a.cmi (:ml test_signatures_separate_b.ml) filter.sh)
  (action
-   (with-outputs-to test_signatures_separate.opt.output.corrected
+   (with-outputs-to test_signatures_separate.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1010,15 +964,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_signatures_separate.opt.output test_signatures_separate.opt.output.corrected)
- (action (diff test_signatures_separate.opt.output test_signatures_separate.opt.output.corrected)))
+ (action (diff test_signatures_separate.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_signatures_separate.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_assume_inlining.output.corrected)
+ (targets test_assume_inlining.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_assume_inlining.ml) filter.sh)
  (action
-   (with-outputs-to test_assume_inlining.output.corrected
+   (with-outputs-to test_assume_inlining.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1030,15 +983,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_inlining.output test_assume_inlining.output.corrected)
- (action (diff test_assume_inlining.output test_assume_inlining.output.corrected)))
+ (action (diff test_assume_inlining.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_inlining.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_assume_error.output.corrected)
+ (targets test_assume_error.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_assume_error.ml) filter.sh)
  (action
-   (with-outputs-to test_assume_error.output.corrected
+   (with-outputs-to test_assume_error.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1050,8 +1002,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_error.output test_assume_error.output.corrected)
- (action (diff test_assume_error.output test_assume_error.output.corrected)))
+ (action (diff test_assume_error.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_error.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
@@ -1070,15 +1021,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_stub.output test_assume_stub.output.corrected)
  (action (diff test_assume_stub.output test_assume_stub.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_bounded_join.output.corrected)
+ (targets test_bounded_join.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_bounded_join.ml) filter_fatal_error.sh)
  (action
-   (with-outputs-to test_bounded_join.output.corrected
+   (with-outputs-to test_bounded_join.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1090,15 +1040,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_bounded_join.output test_bounded_join.output.corrected)
- (action (diff test_bounded_join.output test_bounded_join.output.corrected)))
+ (action (diff test_bounded_join.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_bounded_join2.output.corrected)
+ (targets test_bounded_join2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_bounded_join2.ml) filter.sh)
  (action
-   (with-outputs-to test_bounded_join2.output.corrected
+   (with-outputs-to test_bounded_join2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1110,15 +1059,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_bounded_join2.output test_bounded_join2.output.corrected)
- (action (diff test_bounded_join2.output test_bounded_join2.output.corrected)))
+ (action (diff test_bounded_join2.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_bounded_join3.output.corrected)
+ (targets test_bounded_join3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_bounded_join3.ml) filter.sh)
  (action
-   (with-outputs-to test_bounded_join3.output.corrected
+   (with-outputs-to test_bounded_join3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1130,15 +1078,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_bounded_join3.output test_bounded_join3.output.corrected)
- (action (diff test_bounded_join3.output test_bounded_join3.output.corrected)))
+ (action (diff test_bounded_join3.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join3.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_bounded_join4.output.corrected)
+ (targets test_bounded_join4.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_bounded_join4.ml) filter.sh)
  (action
-   (with-outputs-to test_bounded_join4.output.corrected
+   (with-outputs-to test_bounded_join4.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1150,15 +1097,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_bounded_join4.output test_bounded_join4.output.corrected)
- (action (diff test_bounded_join4.output test_bounded_join4.output.corrected)))
+ (action (diff test_bounded_join4.%{env:OXCAML_NAME_MANGLING=flat}.output test_bounded_join4.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_inference.output.corrected)
+ (targets test_inference.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_inference.mli test_inference.ml) filter.sh)
  (action
-   (with-outputs-to test_inference.output.corrected
+   (with-outputs-to test_inference.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1170,15 +1116,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_inference.output test_inference.output.corrected)
- (action (diff test_inference.output test_inference.output.corrected)))
+ (action (diff test_inference.%{env:OXCAML_NAME_MANGLING=flat}.output test_inference.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_inference.opt.output.corrected)
+ (targets test_inference.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_inference.mli test_inference.ml) filter.sh)
  (action
-   (with-outputs-to test_inference.opt.output.corrected
+   (with-outputs-to test_inference.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1190,15 +1135,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_inference.opt.output test_inference.opt.output.corrected)
- (action (diff test_inference.opt.output test_inference.opt.output.corrected)))
+ (action (diff test_inference.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_inference.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_remove_inferred_assume.output.corrected)
+ (targets test_remove_inferred_assume.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_remove_inferred_assume.ml) filter.sh)
  (action
-   (with-outputs-to test_remove_inferred_assume.output.corrected
+   (with-outputs-to test_remove_inferred_assume.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1210,8 +1154,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_remove_inferred_assume.output test_remove_inferred_assume.output.corrected)
- (action (diff test_remove_inferred_assume.output test_remove_inferred_assume.output.corrected)))
+ (action (diff test_remove_inferred_assume.%{env:OXCAML_NAME_MANGLING=flat}.output test_remove_inferred_assume.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (alias   runtest)
@@ -1221,10 +1164,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail27.output.corrected)
+ (targets fail27.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail27.ml) filter.sh)
  (action
-   (with-outputs-to fail27.output.corrected
+   (with-outputs-to fail27.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1236,15 +1179,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail27.output fail27.output.corrected)
- (action (diff fail27.output fail27.output.corrected)))
+ (action (diff fail27.%{env:OXCAML_NAME_MANGLING=flat}.output fail27.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail27_opt.output.corrected)
+ (targets fail27_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail27_opt.ml) filter.sh)
  (action
-   (with-outputs-to fail27_opt.output.corrected
+   (with-outputs-to fail27_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1256,15 +1198,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail27_opt.output fail27_opt.output.corrected)
- (action (diff fail27_opt.output fail27_opt.output.corrected)))
+ (action (diff fail27_opt.%{env:OXCAML_NAME_MANGLING=flat}.output fail27_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail27_default.output.corrected)
+ (targets fail27_default.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail27_default.ml) filter.sh)
  (action
-   (with-outputs-to fail27_default.output.corrected
+   (with-outputs-to fail27_default.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1276,15 +1217,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail27_default.output fail27_default.output.corrected)
- (action (diff fail27_default.output fail27_default.output.corrected)))
+ (action (diff fail27_default.%{env:OXCAML_NAME_MANGLING=flat}.output fail27_default.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail28.output.corrected)
+ (targets fail28.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail28.ml) filter.sh)
  (action
-   (with-outputs-to fail28.output.corrected
+   (with-outputs-to fail28.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1296,15 +1236,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail28.output fail28.output.corrected)
- (action (diff fail28.output fail28.output.corrected)))
+ (action (diff fail28.%{env:OXCAML_NAME_MANGLING=flat}.output fail28.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail28_opt.output.corrected)
+ (targets fail28_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml fail28_opt.ml) filter.sh)
  (action
-   (with-outputs-to fail28_opt.output.corrected
+   (with-outputs-to fail28_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1316,8 +1255,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail28_opt.output fail28_opt.output.corrected)
- (action (diff fail28_opt.output fail28_opt.output.corrected)))
+ (action (diff fail28_opt.%{env:OXCAML_NAME_MANGLING=flat}.output fail28_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (alias runtest)
@@ -1328,10 +1266,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail29.output.corrected)
+ (targets fail29.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps fail29.cmi (:ml fail29.ml) filter.sh)
  (action
-   (with-outputs-to fail29.output.corrected
+   (with-outputs-to fail29.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1343,8 +1281,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail29.output fail29.output.corrected)
- (action (diff fail29.output fail29.output.corrected)))
+ (action (diff fail29.%{env:OXCAML_NAME_MANGLING=flat}.output fail29.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (alias runtest)
@@ -1355,10 +1292,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail29_opt.output.corrected)
+ (targets fail29_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps fail29_opt.cmi (:ml fail29_opt.ml) filter.sh)
  (action
-   (with-outputs-to fail29_opt.output.corrected
+   (with-outputs-to fail29_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1370,8 +1307,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail29_opt.output fail29_opt.output.corrected)
- (action (diff fail29_opt.output fail29_opt.output.corrected)))
+ (action (diff fail29_opt.%{env:OXCAML_NAME_MANGLING=flat}.output fail29_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (alias runtest)
@@ -1382,10 +1318,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets fail29_opt2.output.corrected)
+ (targets fail29_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps fail29_opt2.cmi (:ml fail29_opt2.ml) filter.sh)
  (action
-   (with-outputs-to fail29_opt2.output.corrected
+   (with-outputs-to fail29_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1397,15 +1333,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps fail29_opt2.output fail29_opt2.output.corrected)
- (action (diff fail29_opt2.output fail29_opt2.output.corrected)))
+ (action (diff fail29_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output fail29_opt2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_assume_unless_opt.output.corrected)
+ (targets test_assume_unless_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_assume_unless_opt.ml) filter.sh)
  (action
-   (with-outputs-to test_assume_unless_opt.output.corrected
+   (with-outputs-to test_assume_unless_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1417,8 +1352,7 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_unless_opt.output test_assume_unless_opt.output.corrected)
- (action (diff test_assume_unless_opt.output test_assume_unless_opt.output.corrected)))
+ (action (diff test_assume_unless_opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (alias   runtest)
@@ -1428,10 +1362,10 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_assume_unless_opt_sig.output.corrected)
+ (targets test_assume_unless_opt_sig.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_assume_unless_opt_sig.ml) filter.sh)
  (action
-   (with-outputs-to test_assume_unless_opt_sig.output.corrected
+   (with-outputs-to test_assume_unless_opt_sig.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1443,15 +1377,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_unless_opt_sig.output test_assume_unless_opt_sig.output.corrected)
- (action (diff test_assume_unless_opt_sig.output test_assume_unless_opt_sig.output.corrected)))
+ (action (diff test_assume_unless_opt_sig.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_sig.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_assume_unless_opt_sig2.output.corrected)
+ (targets test_assume_unless_opt_sig2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_assume_unless_opt_sig2.ml) filter.sh)
  (action
-   (with-outputs-to test_assume_unless_opt_sig2.output.corrected
+   (with-outputs-to test_assume_unless_opt_sig2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1463,15 +1396,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_unless_opt_sig2.output test_assume_unless_opt_sig2.output.corrected)
- (action (diff test_assume_unless_opt_sig2.output test_assume_unless_opt_sig2.output.corrected)))
+ (action (diff test_assume_unless_opt_sig2.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_sig2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_assume_unless_opt_on_call.output.corrected)
+ (targets test_assume_unless_opt_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_assume_unless_opt_on_call.ml) filter.sh)
  (action
-   (with-outputs-to test_assume_unless_opt_on_call.output.corrected
+   (with-outputs-to test_assume_unless_opt_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1483,15 +1415,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_unless_opt_on_call.output test_assume_unless_opt_on_call.output.corrected)
- (action (diff test_assume_unless_opt_on_call.output test_assume_unless_opt_on_call.output.corrected)))
+ (action (diff test_assume_unless_opt_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_on_call.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_assume_unless_opt_on_call2.output.corrected)
+ (targets test_assume_unless_opt_on_call2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_assume_unless_opt_on_call2.ml) filter.sh)
  (action
-   (with-outputs-to test_assume_unless_opt_on_call2.output.corrected
+   (with-outputs-to test_assume_unless_opt_on_call2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1503,15 +1434,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_assume_unless_opt_on_call2.output test_assume_unless_opt_on_call2.output.corrected)
- (action (diff test_assume_unless_opt_on_call2.output test_assume_unless_opt_on_call2.output.corrected)))
+ (action (diff test_assume_unless_opt_on_call2.%{env:OXCAML_NAME_MANGLING=flat}.output test_assume_unless_opt_on_call2.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_custom_error_msg.output.corrected)
+ (targets test_custom_error_msg.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_custom_error_msg.ml) filter.sh)
  (action
-   (with-outputs-to test_custom_error_msg.output.corrected
+   (with-outputs-to test_custom_error_msg.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1523,15 +1453,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_custom_error_msg.output test_custom_error_msg.output.corrected)
- (action (diff test_custom_error_msg.output test_custom_error_msg.output.corrected)))
+ (action (diff test_custom_error_msg.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_custom_error_msg.opt.output.corrected)
+ (targets test_custom_error_msg.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_custom_error_msg.ml) filter.sh)
  (action
-   (with-outputs-to test_custom_error_msg.opt.output.corrected
+   (with-outputs-to test_custom_error_msg.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1543,15 +1472,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_custom_error_msg.opt.output test_custom_error_msg.opt.output.corrected)
- (action (diff test_custom_error_msg.opt.output test_custom_error_msg.opt.output.corrected)))
+ (action (diff test_custom_error_msg.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_custom_error_msg_sig.output.corrected)
+ (targets test_custom_error_msg_sig.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_custom_error_msg_sig.mli test_custom_error_msg_sig.ml) filter.sh)
  (action
-   (with-outputs-to test_custom_error_msg_sig.output.corrected
+   (with-outputs-to test_custom_error_msg_sig.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1563,15 +1491,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_custom_error_msg_sig.output test_custom_error_msg_sig.output.corrected)
- (action (diff test_custom_error_msg_sig.output test_custom_error_msg_sig.output.corrected)))
+ (action (diff test_custom_error_msg_sig.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg_sig.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_custom_error_msg_sig.opt.output.corrected)
+ (targets test_custom_error_msg_sig.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_custom_error_msg_sig.mli test_custom_error_msg_sig.ml) filter.sh)
  (action
-   (with-outputs-to test_custom_error_msg_sig.opt.output.corrected
+   (with-outputs-to test_custom_error_msg_sig.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1583,15 +1510,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_custom_error_msg_sig.opt.output test_custom_error_msg_sig.opt.output.corrected)
- (action (diff test_custom_error_msg_sig.opt.output test_custom_error_msg_sig.opt.output.corrected)))
+ (action (diff test_custom_error_msg_sig.opt.%{env:OXCAML_NAME_MANGLING=flat}.output test_custom_error_msg_sig.opt.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_arch_specific_witness.output.corrected)
+ (targets test_arch_specific_witness.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_arch_specific_witness.ml) filter.sh)
  (action
-   (with-outputs-to test_arch_specific_witness.output.corrected
+   (with-outputs-to test_arch_specific_witness.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1603,15 +1529,14 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_arch_specific_witness.output test_arch_specific_witness.output.corrected)
- (action (diff test_arch_specific_witness.output test_arch_specific_witness.output.corrected)))
+ (action (diff test_arch_specific_witness.%{env:OXCAML_NAME_MANGLING=flat}.output test_arch_specific_witness.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_sort_witnesses.output.corrected)
+ (targets test_sort_witnesses.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)
  (deps (:ml test_sort_witnesses.ml) filter.sh)
  (action
-   (with-outputs-to test_sort_witnesses.output.corrected
+   (with-outputs-to test_sort_witnesses.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
@@ -1623,5 +1548,4 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_sort_witnesses.output test_sort_witnesses.output.corrected)
- (action (diff test_sort_witnesses.output test_sort_witnesses.output.corrected)))
+ (action (diff test_sort_witnesses.%{env:OXCAML_NAME_MANGLING=flat}.output test_sort_witnesses.%{env:OXCAML_NAME_MANGLING=flat}.output.corrected)))

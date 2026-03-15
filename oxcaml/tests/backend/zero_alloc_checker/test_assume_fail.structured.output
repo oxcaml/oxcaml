@@ -1,0 +1,84 @@
+File "test_assume_fail.ml", line 6, characters 5-15:
+Error: Annotation check for zero_alloc strict failed on function Test_assume_fail.foo (_CamlU16Test_assume_failF5foo_HIDE_STAMP).
+
+File "test_assume_fail.ml", line 6, characters 32-37:
+Error: called function may allocate on a path to exceptional return (direct tailcall _CamlU16Test_assume_failF5bar_HIDE_STAMP)
+
+File "test_assume_fail.ml", line 12, characters 5-15:
+Error: Annotation check for zero_alloc strict failed on function Test_assume_fail.foo' (_CamlU16Test_assume_failFu9D27_foo_HIDE_STAMP).
+
+File "test_assume_fail.ml", line 12, characters 33-39:
+Error: called function may allocate on a path to exceptional return (indirect call)
+inlined from
+repo/root/relative/dir/test_assume_fail.ml:9,25--53[Test_assume_fail.bar'][_CamlU16Test_assume_failFu9D27_bar_HIDE_STAMP]
+repo/root/relative/dir/test_assume_fail.ml:12,33--39[Test_assume_fail.foo']
+
+File "test_assume_fail.ml", line 12, characters 33-39:
+Error: called function may allocate on a path to exceptional return (direct call _CamlU18CamlinternalFormatF15make_printf_HIDE_STAMP)
+inlined from
+stdlib/printf.ml:46,2--31[Stdlib__Printf.ksprintf][_CamlU14Stdlib__PrintfF11ksprintf_HIDE_STAMP]
+stdlib/printf.ml:48,18--43[Stdlib__Printf.sprintf][_CamlU14Stdlib__PrintfF10sprintf_HIDE_STAMP]
+repo/root/relative/dir/test_assume_fail.ml:9,25--53[Test_assume_fail.bar'][_CamlU16Test_assume_failFu9D27_bar_HIDE_STAMP]
+repo/root/relative/dir/test_assume_fail.ml:12,33--39[Test_assume_fail.foo']
+
+File "test_assume_fail.ml", line 17, characters 5-15:
+Error: Annotation check for zero_alloc strict failed on function Test_assume_fail.test48 (_CamlU16Test_assume_failF8test48_HIDE_STAMP).
+
+File "test_assume_fail.ml", line 18, characters 2-56:
+Error: called function may allocate on a path to exceptional return (direct call _CamlU18CamlinternalFormatF15make_printf_HIDE_STAMP)
+inlined from
+stdlib/printf.ml:46,2--31[Stdlib__Printf.ksprintf][_CamlU14Stdlib__PrintfF11ksprintf_HIDE_STAMP]
+stdlib/printf.ml:48,18--43[Stdlib__Printf.sprintf][_CamlU14Stdlib__PrintfF10sprintf_HIDE_STAMP]
+repo/root/relative/dir/test_assume_fail.ml:15,25--48[Test_assume_fail.test46][_CamlU16Test_assume_failF8test46_HIDE_STAMP]
+repo/root/relative/dir/test_assume_fail.ml:18,2--56[Test_assume_fail.test48]
+
+File "test_assume_fail.ml", line 36, characters 5-15:
+Error: Annotation check for zero_alloc strict failed on function Test_assume_fail.test51 (_CamlU16Test_assume_failF8test51_HIDE_STAMP).
+
+File "test_assume_fail.ml", line 36, characters 35-43:
+Error: allocation of 24 bytes on a path to diverge
+inlined from
+repo/root/relative/dir/test_assume_fail.ml:34,75--79[Test_assume_fail.test50][_CamlU16Test_assume_failF8test50_HIDE_STAMP]
+repo/root/relative/dir/test_assume_fail.ml:36,35--43[Test_assume_fail.test51]
+
+File "test_assume_fail.ml", line 40, characters 5-15:
+Error: Annotation check for zero_alloc strict failed on function Test_assume_fail.test53 (_CamlU16Test_assume_failF9test53_HIDE_STAMP).
+
+File "test_assume_fail.ml", line 40, characters 35-43:
+Error: called function may allocate on a path to exceptional return (direct tailcall _CamlU16Test_assume_failF8test52_HIDE_STAMP)
+
+File "test_assume_fail.ml", line 74, characters 5-15:
+Error: Annotation check for zero_alloc strict failed on function Test_assume_fail.test64 (_CamlU16Test_assume_failF9test64_HIDE_STAMP).
+
+File "test_assume_fail.ml", line 75, characters 10-20:
+Error: allocation of 24 bytes on a path to exceptional return
+
+File "test_assume_fail.ml", line 75, characters 14-20:
+Error: allocation of 24 bytes on a path to exceptional return
+
+File "test_assume_fail.ml", line 76, characters 2-56:
+Error: called function may allocate on a path to exceptional return (direct tailcall _CamlU16Test_assume_failF9test62_HIDE_STAMP)
+
+File "test_assume_fail.ml", line 90, characters 5-15:
+Error: Annotation check for zero_alloc strict failed on function Test_assume_fail.test68 (_CamlU16Test_assume_failF9test68_HIDE_STAMP).
+
+File "test_assume_fail.ml", line 92, characters 2-6:
+Error: allocation of 24 bytes
+
+File "test_assume_fail.ml", line 114, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Test_assume_fail.g1 (_CamlU16Test_assume_failF5g1_HIDE_STAMP).
+
+File "test_assume_fail.ml", line 115, characters 10-42:
+Error: called function may allocate (direct tailcall _CamlU16Test_assume_failF4f_HIDE_STAMP)
+
+File "test_assume_fail.ml", line 118, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Test_assume_fail.g2 (_CamlU16Test_assume_failF5g2_HIDE_STAMP).
+
+File "test_assume_fail.ml", line 119, characters 10-40:
+Error: called function may allocate (direct tailcall _CamlU16Test_assume_failF4f_HIDE_STAMP)
+
+File "test_assume_fail.ml", line 122, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Test_assume_fail.g3 (_CamlU16Test_assume_failF5g3_HIDE_STAMP).
+
+File "test_assume_fail.ml", line 123, characters 10-63:
+Error: called function may allocate (direct tailcall _CamlU16Test_assume_failF4f_HIDE_STAMP)
