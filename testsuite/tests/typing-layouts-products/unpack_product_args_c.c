@@ -215,3 +215,39 @@ value unpacked_second_bytecode(value a, value prod) {
   return Val_long(Long_val(a)
                   + Long_val(Field(prod, 0)) + Long_val(Field(prod, 1)));
 }
+
+/* Wide tuple: 9 ints, enough to spill on amd64 (6 int C arg registers) */
+
+value add_wide_native(value a, value b, value c, value d,
+                      value e, value f, value g, value h,
+                      value i) {
+  return Val_long(Long_val(a) + Long_val(b) + Long_val(c) + Long_val(d)
+                  + Long_val(e) + Long_val(f) + Long_val(g) + Long_val(h)
+                  + Long_val(i));
+}
+
+value add_wide_bytecode(value prod) {
+  return Val_long(Long_val(Field(prod, 0)) + Long_val(Field(prod, 1))
+                  + Long_val(Field(prod, 2)) + Long_val(Field(prod, 3))
+                  + Long_val(Field(prod, 4)) + Long_val(Field(prod, 5))
+                  + Long_val(Field(prod, 6)) + Long_val(Field(prod, 7))
+                  + Long_val(Field(prod, 8)));
+}
+
+/* Wide float tuple: 9 doubles, enough to spill on amd64 (8 float registers) */
+
+double add_wide_float_native(double a, double b, double c, double d,
+                             double e, double f, double g, double h,
+                             double i) {
+  return a + b + c + d + e + f + g + h + i;
+}
+
+value add_wide_float_bytecode(value prod) {
+  CAMLparam1(prod);
+  double sum = Double_val(Field(prod, 0)) + Double_val(Field(prod, 1))
+             + Double_val(Field(prod, 2)) + Double_val(Field(prod, 3))
+             + Double_val(Field(prod, 4)) + Double_val(Field(prod, 5))
+             + Double_val(Field(prod, 6)) + Double_val(Field(prod, 7))
+             + Double_val(Field(prod, 8));
+  CAMLreturn(caml_copy_double(sum));
+}

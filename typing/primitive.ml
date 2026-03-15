@@ -74,7 +74,8 @@ type error =
   | Inconsistent_attributes_for_effects
   | Inconsistent_noalloc_attributes_for_effects
   | Invalid_representation_polymorphic_attribute
-  | Invalid_native_repr_for_primitive of string
+  | Invalid_native_repr_for_primitive of
+      { prim_name : string; has_product_arg : bool }
 
 exception Error of Location.t * error
 
@@ -1041,8 +1042,17 @@ let prim_has_valid_reprs ~loc prim =
        errors dependent on the [prim_name]. *)
     ()
   | Wrong_repr ->
+    let has_product_arg =
+      not (is_builtin_prim_name prim.prim_name)
+      && List.exists (fun (_, repr) ->
+           match repr with
+           | Same_as_ocaml_repr (Product _) -> true
+           | _ -> false)
+           prim.prim_native_repr_args
+    in
     raise (Error (loc,
-            Invalid_native_repr_for_primitive (prim.prim_name)))
+            Invalid_native_repr_for_primitive
+              { prim_name = prim.prim_name; has_product_arg }))
 
 let prim_can_contain_layout_any prim =
   match prim.prim_name with
@@ -1105,12 +1115,17 @@ let report_error ppf err =
     Format_doc.fprintf ppf "Attribute %a can only be used \
                         on built-in primitives."
       Style.inline_code "[@layout_poly]"
-  | Invalid_native_repr_for_primitive name ->
+  | Invalid_native_repr_for_primitive { prim_name; has_product_arg } ->
     Format_doc.fprintf ppf
       "The primitive [%s] is used in an invalid declaration.@ \
        The declaration contains argument/return types with the@ \
        wrong layout."
-      name
+      prim_name;
+    if has_product_arg then
+      Format_doc.fprintf ppf
+        "@ Hint: Types with product layouts in C stub arguments@ \
+         require the %a attribute."
+        Style.inline_code "[@unpacked]"
 
 let () =
   Location.register_error_of_exn

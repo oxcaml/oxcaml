@@ -160,6 +160,7 @@ type error =
   | Inconsistent_attributes_for_effects
   | Inconsistent_noalloc_attributes_for_effects
   | Invalid_representation_polymorphic_attribute
-  | Invalid_native_repr_for_primitive of string
+  | Invalid_native_repr_for_primitive of
+      { prim_name : string; has_product_arg : bool }
 
 exception Error of Location.t * error

@@ -3771,6 +3771,11 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
               (Warnings.Non_value_sort layout)));
     Same_as_ocaml_repr c
   | Native_repr_attr_present Unpacked, Sort (Product _ as sort) ->
+    (if Language_extension.erasable_extensions_only ()
+     then
+       Location.prerr_warning core_type.ptyp_loc
+         (Warnings.Incompatible_with_upstream
+            Warnings.Unpacked_attribute));
     Unpacked_product sort
   | Native_repr_attr_present Unpacked, (Sort (Base _) | Poly) ->
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unpacked))

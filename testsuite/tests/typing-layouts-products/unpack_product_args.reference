@@ -16,3 +16,5 @@ add_with_void: 42
 all_voids: 42
 unpacked_first: 6
 unpacked_second: 6
+add_wide: 987654321
+add_wide_float: 987654321.000000

@@ -192,3 +192,32 @@ external unpacked_second :
 let () =
   let result = unpacked_second 1 #(2, 3) in
   Printf.printf "unpacked_second: %d\n" result
+
+(* Wide tuple: 9 ints, enough to spill *)
+
+external add_wide :
+  (#(int * int * int * int * int * int * int * int * int) [@unpacked])
+  -> int =
+  "add_wide_bytecode" "add_wide_native"
+
+let () =
+  let result =
+    add_wide #(1, 20, 300, 4000, 50000, 600000, 7000000, 80000000,
+               900000000)
+  in
+  Printf.printf "add_wide: %d\n" result
+
+(* Wide tuple: 9 float#s, enough to spill *)
+
+external add_wide_float :
+  (#(float# * float# * float# * float# * float# * float# * float#
+     * float# * float#) [@unpacked])
+  -> float# =
+  "add_wide_float_bytecode" "add_wide_float_native"
+
+let () =
+  let result =
+    add_wide_float #(#1., #20., #300., #4000., #50000., #600000.,
+                     #7000000., #80000000., #900000000.)
+  in
+  Printf.printf "add_wide_float: %f\n" (box_float result)

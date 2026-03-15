@@ -202,8 +202,8 @@ let extern_repr_of_native_repr:
   | Unboxed_or_untagged_integer i, _ -> Unboxed_or_untagged_integer i
   | Unboxed_vector i, _ -> Unboxed_vector i
   | Unpacked_product sort, _ ->
-    (* This relies on the fact that the OxCaml calling convention for unboxed
-       products is the same as if each component were a separate argument. *)
+    (* The product sort is unarized into separate C arguments by
+       [unarize_extern_repr] in [closure_conversion.ml]. *)
     Same_as_ocaml_repr sort
 
 let sort_of_native_repr ~poly_sort repr =
