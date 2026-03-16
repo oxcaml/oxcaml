@@ -240,6 +240,10 @@ let mk_o3 f =
   "-O3", Arg.Unit f, " Apply aggressive optimization for speed (may \
     significantly increase code size and compilation time)"
 
+let mk_o4 f =
+  "-O4", Arg.Unit f, " Like -O3, but also enable the reaper pass \
+    (Flambda 2 only)"
+
 let mk_rounds f =
   "-rounds", Arg.Int f,
     Printf.sprintf "<n>  Repeat tree optimization and inlining phases this \
@@ -1289,6 +1293,7 @@ module type Optcommon_options = sig
   val _no_unbox_specialised_args : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+  val _o4 : unit -> unit
   val _insn_sched : unit -> unit
   val _no_insn_sched : unit -> unit
   val _linscan : unit -> unit
@@ -1371,6 +1376,7 @@ module type Jscomp_options = sig
   val _classic_inlining : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+  val _o4 : unit -> unit
 end
 
 module type Opttop_options = sig
@@ -1735,6 +1741,7 @@ struct
     mk_o F._o;
     mk_o2 F._o2;
     mk_o3 F._o3;
+    mk_o4 F._o4;
     mk_opaque F._opaque;
     mk_open F._open;
     mk_output_obj F._output_obj;
@@ -1904,6 +1911,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_no_unbox_specialised_args F._no_unbox_specialised_args;
     mk_o2 F._o2;
     mk_o3 F._o3;
+    mk_o4 F._o4;
     mk_open F._open;
     mk_ppx F._ppx;
     mk_principal F._principal;
@@ -2037,6 +2045,7 @@ struct
     mk_o F._o;
     mk_o2 F._o2;
     mk_o3 F._o3;
+    mk_o4 F._o4;
     mk_opaque F._opaque;
     mk_open F._open;
     mk_output_obj F._output_obj;
@@ -2415,6 +2424,7 @@ module Default = struct
     *)
     let _o2 () = Clflags.set_o2 ()
     let _o3 () = Clflags.set_o3 ()
+    let _o4 () = Clflags.set_o4 ()
     let _remove_unused_arguments = set remove_unused_arguments
     let _rounds n = simplify_rounds := (Some n)
     let _unbox_closures = set unbox_closures
@@ -2747,5 +2757,6 @@ third-party libraries such as Lwt, but with a different API."
     let _classic_inlining () = set_oclassic ()
     let _o2 () = Clflags.set_o2 ()
     let _o3 () = Clflags.set_o3 ()
+    let _o4 () = Clflags.set_o4 ()
   end
 end

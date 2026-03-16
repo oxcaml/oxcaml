@@ -1029,6 +1029,7 @@ let typ sub x =
     | Ttyp_open (path, mod_ident, t) ->
         Ttyp_open (path, map_loc sub mod_ident, sub.typ sub t)
     | Ttyp_repr (vars, ct) -> Ttyp_repr (vars, sub.typ sub ct)
+    | Ttyp_newlayout (vars, ct) -> Ttyp_newlayout (vars, sub.typ sub ct)
     | Ttyp_of_kind jkind ->
         Ttyp_of_kind (sub.jkind_annotation sub jkind)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)
