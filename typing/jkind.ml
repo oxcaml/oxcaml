@@ -1682,6 +1682,7 @@ module Const = struct
         Scannable_axes.to_string_list_diff ~base:base_sa actual_sa
 
     let modalities_of_ignored_axes axes_to_ignore =
+      (* The modality is constant along axes to ignore and id along others *)
       List.fold_left
         (fun (modal_modality, nonmodal_axes) (Axis.Pack axis) ->
           match axis with
@@ -2037,8 +2038,7 @@ module Const = struct
           | None -> axes
           | Some ext ->
             let is_top =
-              Per_axis.(
-                le (Nonmodal Externality) (max (Nonmodal Externality)) ext)
+              Per_axis.le (Nonmodal Externality) Externality.max ext
             in
             if is_top then axes else Axis_set.remove axes (Nonmodal Externality)
         in
