@@ -766,13 +766,13 @@ let create_allocation_mode_l :
     Alloc.lr -> alloc_mode_l = fun mode ->
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode = newvar_above_if_modepoly 0 locality_mode in
-  Typedtree.create_alloc_mode_l alloc_mode
+  Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
 
 let create_allocation_modes (mode : Alloc.lr) =
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode,_ = Locality.newvar_below 0 locality_mode in
   let alloc_mode_l =
-    Typedtree.create_alloc_mode_l alloc_mode
+    Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
   in
   let alloc_mode_r =
     Typedtree.create_alloc_mode_r (Locality.disallow_left alloc_mode)
@@ -6901,12 +6901,13 @@ and type_expect_
           (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
             :: record.exp_extra }
       in
+      let access_mode, _ =
+        Mode.Locality.newvar_above 0
+          (Mode.Alloc.proj_comonadic Areality (value_to_alloc_r2l rmode)) in
       unify_exp env record ty_record;
       rue {
         exp_desc = Texp_setfield (record,
-          Locality.disallow_right
-            (Alloc.proj_comonadic Areality
-               (value_to_alloc_r2l rmode)),
+          access_mode,
           label_loc, label, newval);
         exp_loc = loc; exp_extra = [];
         exp_type = instance Predef.type_unit;

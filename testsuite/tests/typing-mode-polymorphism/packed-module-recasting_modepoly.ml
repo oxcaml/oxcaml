@@ -53,7 +53,8 @@ module type S = sig type t val x : t end
 module type S' =
   sig type _ t_aux type t val eq : (t, unit t_aux) eq val x : t end
 val cast_value_under_equality :
-  (module S' with type t = 't) -> (module S with type t = 't) = <fun>
+  (module S' with type t = 't) @ stateless ->
+  (module S with type t = 't) @ immutable = <fun>
 |}]
 
 module type S = sig
@@ -87,7 +88,8 @@ module type S' =
     val x : u
   end
 val cast_value_under_manifest_equality :
-  (module S' with type t = 't) -> (module S with type t = 't) = <fun>
+  (module S' with type t = 't) @ stateless ->
+  (module S with type t = 't) @ immutable = <fun>
 |}]
 
 module type S = sig

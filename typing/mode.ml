@@ -6011,21 +6011,33 @@ module Value_with (Areality : Areality) = struct
       { iter = (fun obj msrc -> zap_to_legacy_obj obj msrc) }
 
   let add_covariant_to_zap_scope { monadic; comonadic } scope =
+    let comonadic_upper =
+      Comonadic.Guts.get_floor comonadic |> Comonadic.of_const
+    in
+    let monadic_upper = Monadic.Guts.get_floor monadic |> Monadic.of_const in
     Monadic.iter_covariant monadic (fun i m ->
+        let m = Monadic.join [monadic_upper; m] in
         let zap_to_floor () = Monadic.zap_to_floor_force m |> ignore in
         let zap_to_legacy () = zap_to_legacy_src_var_monadic m in
         Z.add_zap_to_ceil_to_zap_scope i zap_to_floor zap_to_legacy scope);
     Comonadic.iter_covariant comonadic (fun i m ->
+        let m = Comonadic.join [comonadic_upper; m] in
         let zap_to_floor () = Comonadic.zap_to_floor_force m |> ignore in
         let zap_to_legacy () = zap_to_legacy_src_var_comonadic m in
         Z.add_zap_to_floor_to_zap_scope i zap_to_floor zap_to_legacy scope)
 
   let add_contravariant_to_zap_scope { monadic; comonadic } scope =
+    let comonadic_upper =
+      Comonadic.Guts.get_ceil comonadic |> Comonadic.of_const
+    in
+    let monadic_lower = Monadic.Guts.get_ceil monadic |> Monadic.of_const in
     Monadic.iter_contravariant monadic (fun i m ->
+        let m = Monadic.meet [monadic_lower; m] in
         let zap_to_ceil () = Monadic.zap_to_ceil_force m |> ignore in
         let zap_to_legacy () = zap_to_legacy_src_var_monadic m in
         Z.add_zap_to_floor_to_zap_scope i zap_to_ceil zap_to_legacy scope);
     Comonadic.iter_contravariant comonadic (fun i m ->
+        let m = Comonadic.meet [comonadic_upper; m] in
         let zap_to_ceil () = Comonadic.zap_to_ceil m |> ignore in
         let zap_to_legacy () = zap_to_legacy_src_var_comonadic m in
         Z.add_zap_to_ceil_to_zap_scope i zap_to_ceil zap_to_legacy scope)
