@@ -292,6 +292,7 @@ type error =
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Mode_mismatch of mode_mismatch_kind * Alloc.equate_error
   | Uncurried_function_escapes_comonadic of Alloc.Comonadic.error
+  | Uncurried_function_escapes_locality
   | Function_returns_local
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
@@ -6387,7 +6388,7 @@ type type_function_result_param =
 
 type fun_alloc_mode =
   { alloc_mode: Locality.lr;
-    fun_closure_mode: Mode.Alloc.Comonadic.lr;
+    fun_closure_mode: Mode.Alloc.Comonadic.lr
   }
 
 (* The result of calling [type_function]. For the outer call to
@@ -7328,10 +7329,12 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
-      let ap_mode =
+      let ap_mode_alloc =
         create_allocation_mode_l mode_ret
+        |> Typedtree.create_return_mode
       in
       let mode_ret = Alloc.disallow_right mode_ret in
+      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
@@ -7350,8 +7353,7 @@ and type_expect_
       in
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
       let exp = rue {
-        exp_desc = Texp_apply(funct, args, pm.apply_position,
-                              Typedtree.create_return_mode ap_mode,
+        exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode_alloc,
                               zero_alloc);
         exp_loc = loc; exp_extra;
         exp_type = ty_ret;
@@ -7687,6 +7689,9 @@ and type_expect_
           (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
             :: record.exp_extra }
       in
+      let modality, _ =
+        Mode.Locality.newvar_above 0
+          (Mode.Alloc.proj_comonadic Areality (value_to_alloc_r2l rmode)) in
       unify_exp ~sexp env record ty_record;
       let record_sorts, record_repres =
         update_labels env Legacy ~representative_label:label ~loc
@@ -7698,10 +7703,7 @@ and type_expect_
           record;
           record_repres;
           record_sorts;
-          modality =
-            Locality.disallow_right
-              (Alloc.proj_comonadic Areality
-               (value_to_alloc_r2l rmode));
+          modality;
           lid = label_loc;
           label;
           newval;
@@ -9445,20 +9447,24 @@ and type_function
                   begin match
                     Alloc.Comonadic.submode arg_mode fun_closure_mode
                   with
-                    | Ok () -> ()
+                    | Ok () ->
+                        Locality.submode_exn
+                        (Alloc.Comonadic.proj Areality arg_mode)
+                        alloc_mode
                     | Error e ->
                       raise (Error(loc_fun, env,
                         Uncurried_function_escapes_comonadic e))
                   end;
                   begin match
-                    Alloc.Comonadic.submode
-                      (Alloc.Comonadic.disallow_right closure_mode)
-                      fun_closure_mode
-                  with
-                    | Ok () -> ()
+                      Alloc.Comonadic.submode closure_mode fun_closure_mode
+                    with
+                    | Ok () ->
+                        Locality.submode_exn
+                        (Alloc.Comonadic.proj Areality closure_mode)
+                        alloc_mode
                     | Error e ->
                       raise (Error(loc_fun, env,
-                        Uncurried_function_escapes_comonadic e))
+                        Uncurried_function_escapes_comonadic e));
                   end;
                   More_args
                     { partial_mode = Locality.disallow_right alloc_mode }
@@ -13453,6 +13459,11 @@ let report_error ~loc env =
               but expected to be %a."
             (Style.as_inline_code (Alloc.Const.print_axis (Comonadic ax))) left
             (Style.as_inline_code (Alloc.Const.print_axis (Comonadic ax))) right
+    end
+  | Uncurried_function_escapes_locality -> begin
+      Location.errorf ~loc
+        "This function or one of its parameters escape their region@ \
+        when it is partially applied."
     end
   | Bad_tail_annotation err ->
       Location.errorf ~loc
