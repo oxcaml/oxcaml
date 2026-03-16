@@ -166,6 +166,10 @@
   (package ocaml))
 
 
+(alias
+ (name C-only)
+ (deps libunix_stubs.a dllunix_stubs.so))
+
 (rule
   (targets unix.ml)
   (mode fallback)
