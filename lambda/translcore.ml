@@ -392,7 +392,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_apply_layout (func, args) ->
       Linstantiate {
             ap_func = (transl_exp ~scopes Jkind.Sort.Const.for_function func);
-            ap_args = List.map (fun l -> Lvar (Ident.create_sort_var (Jkind_types.Sort.Var.get_id l :> int))) args;
+            ap_args = List.map
+              (fun var ->
+                let layout = Jkind.Sort.default_for_transl_and_get (Var var) in
+                let layout = Typeopt.layout_of_sort e.exp_loc layout in
+                Lconst (Const_layout layout)
+                )
+              args;
             ap_result_layout = Lambda.layout_function;
             ap_region_close = Rc_normal;
             ap_mode = alloc_heap;

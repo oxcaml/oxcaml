@@ -4419,7 +4419,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
             debug_uid = debug_uid_none;
             layout = layout_unboxed_unit;
             attributes = default_param_attribute;
-            mode = alloc_local})
+            mode = alloc_heap})
         (Val_lpoly.get_exn lpoly)
     in
     let f =
