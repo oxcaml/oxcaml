@@ -759,16 +759,23 @@ let create_allocation_mode_r mode =
   let alloc_mode = Typedtree.create_alloc_mode_r alloc_mode in
   alloc_mode
 
-let create_allocation_mode_l :
+let create_allocation_mode_l_arg :
     Alloc.lr -> alloc_mode_l = fun mode ->
   let locality_mode = Alloc.proj_comonadic Areality mode in
-  Typedtree.create_alloc_mode_l locality_mode
+  let alloc_mode = newvar_above_if_modepoly 0 locality_mode in
+  Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
+
+let create_allocation_mode_l_ret :
+    Alloc.lr -> alloc_mode_l = fun mode ->
+  let locality_mode = Alloc.proj_comonadic Areality mode in
+  let alloc_mode = newvar_below_if_modepoly 0 locality_mode in
+  Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
 
 let create_allocation_modes (mode : Alloc.lr) =
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode,_ = Locality.newvar_below 0 locality_mode in
   let alloc_mode_l =
-    Typedtree.create_alloc_mode_l alloc_mode
+    Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
   in
   let alloc_mode_r =
     Typedtree.create_alloc_mode_r (Locality.disallow_left alloc_mode)
@@ -4586,10 +4593,10 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
                  (Alloc.disallow_left mode_cls)
              in
              let mode_arg =
-               create_allocation_mode_l mode_arg
+               create_allocation_mode_l_arg mode_arg
              in
              let mode_ret =
-               create_allocation_mode_l mode_ret
+               create_allocation_mode_l_ret mode_ret
              in
              register_allocation_mode mode_closure;
              let arg =
@@ -6892,12 +6899,13 @@ and type_expect_
           (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
             :: record.exp_extra }
       in
+      let access_mode, _ =
+        Mode.Locality.newvar_above 0
+          (Mode.Alloc.proj_comonadic Areality (value_to_alloc_r2l rmode)) in
       unify_exp env record ty_record;
       rue {
         exp_desc = Texp_setfield (record,
-          Locality.disallow_right
-            (Alloc.proj_comonadic Areality
-               (value_to_alloc_r2l rmode)),
+          access_mode,
           label_loc, label, newval);
         exp_loc = loc; exp_extra = [];
         exp_type = instance Predef.type_unit;
@@ -8563,7 +8571,7 @@ and type_function
             param,
             param_uid
       in
-      let arg_mode = create_allocation_mode_l arg_mode in
+      let arg_mode = create_allocation_mode_l_arg arg_mode in
       let param =
         { has_poly;
           param =
@@ -8585,7 +8593,7 @@ and type_function
         match ret_info with
         | Some _ as x -> x
         | None ->
-          let ret_mode = create_allocation_mode_l ret_mode in
+          let ret_mode = create_allocation_mode_l_ret ret_mode in
           let ret_mode =
             {ret_mode_annots with mode_modes = ret_mode }
           in
@@ -9287,10 +9295,10 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         let cases_loc = { texp.exp_loc with loc_ghost = true } in
         let param, param_uid = name_cases "param" cases in
         let fc_arg_mode =
-          create_allocation_mode_l marg
+          create_allocation_mode_l_arg marg
         in
         let fc_ret_mode =
-          create_allocation_mode_l mret
+          create_allocation_mode_l_ret mret
         in
         { texp with exp_type = ty_fun; exp_desc =
           Texp_function
@@ -10282,7 +10290,7 @@ and type_function_cases_expect
     in
     unify_exp_types loc env ty_fun (instance ty_expected);
     let fc_arg_mode =
-      create_allocation_mode_l arg_mode
+      create_allocation_mode_l_arg arg_mode
     in
     let param , param_uid = name_cases "param" cases in
     let cases =
@@ -10307,7 +10315,7 @@ and type_function_cases_expect
     cases, ty_fun, fun_alloc_mode,
       { ret_sort;
         ret_mode =
-          {mode_modes = create_allocation_mode_l ret_mode; mode_desc = []} }
+          {mode_modes = create_allocation_mode_l_ret ret_mode; mode_desc = []} }
   end
 
 (* Typing of let bindings *)
