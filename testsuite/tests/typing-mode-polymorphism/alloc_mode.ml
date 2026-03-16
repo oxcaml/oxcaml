@@ -15,16 +15,13 @@ type 'a myref = { mutable i : 'a }
 type 'a myref = { mutable i : 'a; }
 |}]
 
-(* CR ageorges: the following can accept stack locations but
-  uses setfield_ptr(maybe-stack). This is a soundness bug *)
-
 (* Must be [setfield_ptr(maybe-stack)] *)
 let foo r x = r.i <- x
 [%%expect{|
 (let
   (foo/293 =
      (function {nlocal = 1} r/295[L] x/296 : int
-       (setfield_ptr 0 r/295 x/296)))
+       (setfield_ptr(maybe-stack) 0 r/295 x/296)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/293))
 val foo : 'a myref -> 'a -> unit = <fun>
 |}]
@@ -33,7 +30,7 @@ let foo (r @ local) x = r.i <- x
 [%%expect{|
 (let
   (foo/297 =
-     (function {nlocal = 1} r/298[L] x/299 : int
+     (function {nlocal = 2} r/298[L] x/299 : int
        (setfield_ptr(maybe-stack) 0 r/298 x/299)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/297))
 val foo : 'a myref @ local -> 'a -> unit = <fun>
@@ -83,7 +80,7 @@ Warning 26 [unused-var]: unused variable "r".
        (region
          (let (r/312 =mut "bar")
            (function {nlocal = 1} r/315[L] : int
-             (setfield_ptr 0 r/315 "foobar"))))))
+             (setfield_ptr(maybe-stack) 0 r/315 "foobar"))))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/311))
 
 val foo : unit -> string myref -> unit = <fun>
@@ -235,7 +232,7 @@ let app_yielding (f @ yielding) (x @ yielding) = app f x
 (let
   (app/355 =? (apply (field_imm 0 (global Toploop!)) "app")
    app_yielding/359 =
-     (function {nlocal = 1} f/361[L] x/362[L]? : stack
+     (function {nlocal = 1} f/361 x/362[L]? : stack
        (apply[yielding] app/355 f/361 x/362)))
   (apply (field_imm 1 (global Toploop!)) "app_yielding" app_yielding/359))
 val app_yielding : ('a @ yielding -> 'b) @ yielding -> 'a @ yielding -> 'b =
