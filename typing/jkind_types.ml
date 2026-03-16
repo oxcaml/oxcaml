@@ -48,12 +48,15 @@ module Sort = struct
 
   (* Special sentinel levels stored in [var.level] when [contents = None]:
      - [level_generic]: a generalized sort variable (genvar), used for layout
-       polymorphism; must be registered in [sub_map] or [instance_map].
+       polymorphism and must be quantified. That is, they can only appear under
+       [sub_map] or [instance_map], etc.)
      - [level_rigid]: a rigid sort variable that cannot be unified.
      - [level_fresh]: a freshly-created unifiable sort variable whose level has
        not yet been set; it will be lowered via [update_level] as soon as it is
        unified with another variable.
      When [contents = Some t], [level] is meaningless. *)
+  (* CR-soon zqian: Add the invariant that, when [contents = Some v], we have
+    [level >= v.level]. This can improve performance. *)
   let level_generic = Ident.highest_scope
 
   let level_rigid = Ident.highest_scope - 1
@@ -68,13 +71,7 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
-      mutable level : int;
-      (* When [contents = None], [generic_level] indicates generic sort
-        variables, and [rigid_level] indicates rigid variables. When [contents =
-        Some t], [level] is meaningless and the variable means whatever [t]
-        means. *)
-      (* CR-soon zqian: Add the invariant that, when [contents = Some v], we
-         have [level >= v.level]. This can improve performance. *)
+      mutable level : int;  (** See comments on [level_generic] *)
       uid : int (* For debugging / printing only *)
     }
 
