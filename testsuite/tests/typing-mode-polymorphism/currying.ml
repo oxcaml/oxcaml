@@ -60,13 +60,10 @@ Line 4, characters 10-21:
 Warning 5 [ignored-partial-application]: this function application is partial,
   maybe some arguments are missing.
 
-Line 5, characters 10-20:
+Line 5, characters 14-20:
 5 |   let _ = fst clocal in
-              ^^^^^^^^^^
-Warning 5 [ignored-partial-application]: this function application is partial,
-  maybe some arguments are missing.
-
-val foo : unit = ()
+                  ^^^^^^
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let bar (x @ once) =
