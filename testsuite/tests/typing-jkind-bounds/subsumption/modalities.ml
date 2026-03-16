@@ -564,6 +564,58 @@ end
 module Check2 : sig type 'a t : value mod external_ with 'a end
 |}]
 
+(* [mod internal] does nothing *)
+
+module Fails : sig
+  type 'a t : value mod external_
+end = struct
+  type 'a t : value mod internal with 'a @@ external_
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t : value mod internal with 'a @@ external_
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t end
+       is not included in
+         sig type 'a t : value mod external_ end
+       Type declarations do not match:
+         type 'a t
+       is not included in
+         type 'a t : value mod external_
+       The kind of the first is value
+         because of the definition of t at line 4, characters 2-53.
+       But the kind of the first must be a subkind of value mod external_
+         because of the definition of t at line 2, characters 2-33.
+|}]
+
+module Fails : sig
+  type 'a t : value mod external_
+end = struct
+  type 'a t : value mod internal with 'a @@ internal
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t : value mod internal with 'a @@ internal
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t end
+       is not included in
+         sig type 'a t : value mod external_ end
+       Type declarations do not match:
+         type 'a t
+       is not included in
+         type 'a t : value mod external_
+       The kind of the first is value
+         because of the definition of t at line 4, characters 2-52.
+       But the kind of the first must be a subkind of value mod external_
+         because of the definition of t at line 2, characters 2-33.
+|}]
+
 (* Non-modal axes other than externality are not supported in with-bounds *)
 type 'a t : value with 'a @@ non_null
 [%%expect{|
