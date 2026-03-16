@@ -26,7 +26,7 @@ type 'a myref = { mutable i : 'a }
 let alloc x = { i = x }
 [%%expect{|
 type 'a myref = { mutable i : 'a; }
-val alloc : 'a -> 'a myref @ immutable = <fun>
+val alloc : 'a -> 'a myref = <fun>
 |}]
 
 (* CR ageorges: make a test case that checks that the codegen of a store
@@ -36,12 +36,12 @@ val alloc : 'a -> 'a myref @ immutable = <fun>
 (* The code generation of the following needs to use [caml_modify_local] *)
 let store_any x y = x.i <- y
 [%%expect{|
-val store_any : 'a myref @ stateless -> 'a -> unit = <fun>
+val store_any : 'a myref -> 'a -> unit = <fun>
 |}]
 
 let store_global (x @ global) y = x.i <- y
 [%%expect{|
-val store_global : 'a myref @ stateless -> 'a -> unit = <fun>
+val store_global : 'a myref -> 'a -> unit = <fun>
 |}]
 
 let () =
@@ -51,9 +51,9 @@ let () =
   store_any x' "test";
   store_global x "should fail"
 [%%expect{|
-Line 4, characters 12-13:
-4 |   store_any x "test";
-                ^
+Line 6, characters 15-16:
+6 |   store_global x "should fail"
+                   ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -66,17 +66,19 @@ let foo () =
   use_unique yunique.i;
   use_unique yaliased.i
 [%%expect{|
-Line 2, characters 19-27:
-2 |   let x @ unique = alloc 42 in
-                       ^^^^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+Line 6, characters 13-22:
+6 |   use_unique yunique.i;
+                 ^^^^^^^^^
+Error: This value is "aliased"
+         because it is the field "i" (with some modality) of the record at line 6, characters 13-20.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 type 'a myrecord = { j : 'a }
 let create x = { j = x }
 [%%expect{|
 type 'a myrecord = { j : 'a; }
-val create : 'a @ stateless -> 'a myrecord @ immutable = <fun>
+val create : 'a -> 'a myrecord = <fun>
 |}]
 
 (* but immutable fields are *)
@@ -89,20 +91,20 @@ let foo () =
   use_unique yaliased.j
 
 [%%expect{|
-Line 2, characters 19-28:
-2 |   let x @ unique = create 42 in
-                       ^^^^^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+Line 7, characters 13-23:
+7 |   use_unique yaliased.j
+                 ^^^^^^^^^^
+Error: This value is "aliased"
+         because it is the field "j" of the record at line 7, characters 13-21
+         which is "aliased".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* CR ageorges: principality issue with portable refs *)
 let foo () =
   use_portable (alloc 42)
 [%%expect{|
-Line 2, characters 15-25:
-2 |   use_portable (alloc 42)
-                   ^^^^^^^^^^
-Error: This value is "immutable" but is expected to be "read_write".
+val foo : unit -> unit = <fun>
 |}, Principal{|
 Line 2, characters 15-25:
 2 |   use_portable (alloc 42)
@@ -128,8 +130,5 @@ Error: This value is "once" but is expected to be "many".
 
 let foo (x @ contended) = alloc x
 [%%expect{|
-Line 1, characters 32-33:
-1 | let foo (x @ contended) = alloc x
-                                    ^
-Error: This value is "contended" but is expected to be "uncontended".
+val foo : 'a @ contended -> 'a myref @ contended = <fun>
 |}]

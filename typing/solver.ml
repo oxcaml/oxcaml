@@ -1314,8 +1314,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let vars = ref (0, [])
 
-  let debug_modes = ref true
-
   let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper ~level obj =
     let id, l = !vars in
     let upper, upper_hint =
@@ -1334,7 +1332,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     in
     let vlower = Option.value vlower ~default:VarMap.empty in
     let vupper = Option.value vupper ~default:VarMap.empty in
-    let level = if !debug_modes then id mod 5 else level in
     let gencopy = None in
     let subst = None in
     let var =
@@ -1636,20 +1633,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           update_level_v ~log obj level v)
         mvs
 
-  let cnt = ref 0
-
   let submode (type a r l) (pp : H.Pinpoint.t) (obj : a C.obj)
       (a : (a, allowed * r) mode) (b : (a, l * allowed) mode) ~log =
-    if !debug_modes
-    then begin
-      if !cnt mod 10 = 0 then update_level (!cnt mod 3) obj a ~log;
-      if !cnt mod 15 = 0 then update_level (!cnt mod 5) obj b ~log
-    end;
-    if !debug_modes && !cnt mod 29 = 0
-    then begin
-      let current_level = !cnt mod 13 in
-      generalize ~current_level ~log obj a
-    end;
     let submode_cc ~log:_ _pp obj left left_hint right right_hint =
       if C.le obj left right
       then Ok ()

@@ -28,8 +28,8 @@ val use_global : 'a -> unit = <fun>
 let id x = x
 let id' x = id x
 [%%expect{|
-val id : 'a @ stateless -> 'a @ immutable = <fun>
-val id' : 'a @ stateless -> 'a @ immutable = <fun>
+val id : 'a -> 'a = <fun>
+val id' : 'a -> 'a = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -38,9 +38,9 @@ let foo (x @ portable) (y @ nonportable) =
   use_portable x;
   use_portable y
 [%%expect{|
-Line 3, characters 14-15:
-3 |   let y = id' y in
-                  ^
+Line 5, characters 15-16:
+5 |   use_portable y
+                   ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
@@ -71,9 +71,7 @@ Error: This value is "nonportable" but is expected to be "portable".
 (* higher-order application should propagate mode constraints *)
 let apply f = fun x -> f x
 [%%expect{|
-val apply :
-  ('a -> 'b @ stateless) @ stateless -> 'a @ stateless -> 'b @ immutable =
-  <fun>
+val apply : ('a -> 'b) -> 'a -> 'b = <fun>
 |}]
 
 let foo (x @ unique) (y @ aliased) =
@@ -82,10 +80,10 @@ let foo (x @ unique) (y @ aliased) =
   use_unique x;
   use_unique y
 [%%expect{|
-Line 2, characters 16-18:
-2 |   let x = apply id x in
-                    ^^
-Error: This value is "stateful" but is expected to be "stateless".
+Line 5, characters 13-14:
+5 |   use_unique y
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -95,9 +93,9 @@ let foo (x @ portable) (y @ nonportable) =
   use_portable x;
   use_portable y
 [%%expect{|
-Line 4, characters 19-20:
-4 |   let y = apply id y in
-                       ^
+Line 6, characters 15-16:
+6 |   use_portable y
+                   ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
@@ -105,10 +103,7 @@ Error: This value is "nonportable" but is expected to be "portable".
 
 let compose f g x = f (g x)
 [%%expect{|
-val compose :
-  ('a -> 'b @ stateless) @ stateless immutable ->
-  ('c @ immutable -> 'a @ stateless) @ stateless immutable ->
-  'c @ stateless -> 'b @ immutable = <fun>
+val compose : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b = <fun>
 |}]
 
 (* mode polymorphism propagates through composition *)
@@ -119,10 +114,10 @@ let foo (x @ portable) (y @ nonportable) =
   use_portable x;
   use_portable y
 [%%expect{|
-Line 2, characters 18-20:
-2 |   let x = compose id id x in
-                      ^^
-Error: This value is "stateful" but is expected to be "stateless".
+Line 5, characters 15-16:
+5 |   use_portable y
+                   ^
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* CHAINING APPLICATIONS *)
@@ -133,26 +128,17 @@ let chain x =
   let z = id y in
   z
 [%%expect{|
-Line 3, characters 13-14:
-3 |   let z = id y in
-                 ^
-Error: This value is "stateful" but is expected to be "stateless".
+val chain : 'a -> 'a = <fun>
 |}]
 
 let foo (x @ unique) = use_unique (chain x)
 [%%expect{|
-Line 1, characters 35-40:
-1 | let foo (x @ unique) = use_unique (chain x)
-                                       ^^^^^
-Error: Unbound value "chain"
+val foo : 'a @ unique -> unit = <fun>
 |}]
 
 let foo (x @ portable) = use_portable (chain x)
 [%%expect{|
-Line 1, characters 39-44:
-1 | let foo (x @ portable) = use_portable (chain x)
-                                           ^^^^^
-Error: Unbound value "chain"
+val foo : 'a @ portable -> unit = <fun>
 |}]
 
 (* RECURSIVE FUNCTIONS *)
@@ -160,33 +146,28 @@ Error: Unbound value "chain"
 let rec recursive x n =
   if n <= 0 then x else recursive x (n - 1)
 [%%expect{|
-val recursive : 'a @ stateless immutable -> int -> 'a @ stateless immutable =
-  <fun>
+val recursive : 'a -> int -> 'a = <fun>
 |}]
 
 let foo (x @ portable) =
   let x = recursive x 10 in
   use_portable x
 [%%expect{|
-Line 3, characters 15-16:
-3 |   use_portable x
-                   ^
-Error: This value is "immutable" but is expected to be "read_write".
+val foo : 'a @ portable -> unit = <fun>
 |}]
 
 let recursive' = recursive
 [%%expect{|
-val recursive' : 'a @ stateless immutable -> int -> 'a @ stateless immutable =
-  <fun>
+val recursive' : 'a -> int -> 'a = <fun>
 |}]
 
 let foo (x @ nonportable) =
   let x = recursive x 10 in
   use_portable x
 [%%expect{|
-Line 2, characters 20-21:
-2 |   let x = recursive x 10 in
-                        ^
+Line 3, characters 15-16:
+3 |   use_portable x
+                   ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
@@ -194,9 +175,7 @@ let rec map f = function
   | [] -> []
   | x :: xs -> f x :: map f xs
 [%%expect{|
-val map :
-  ('a -> 'b @ stateless) @ stateless immutable ->
-  'a list @ stateless -> 'b list @ stateless immutable = <fun>
+val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 |}]
 
 let foo (y @ portable) =
@@ -205,12 +184,7 @@ let foo (y @ portable) =
   let lg = map g l in
   use_portable lg
 [%%expect{|
-Line 4, characters 15-16:
-4 |   let lg = map g l in
-                   ^
-Error: This expression has type "unit -> 'a @ immutable"
-       but an expression was expected of type "'b -> 'c @ stateless"
-       Hint: Did you forget to provide "()" as argument?
+val foo : 'a @ portable -> unit = <fun>
 |}]
 
 let foo (y @ nonportable) =
@@ -219,13 +193,10 @@ let foo (y @ nonportable) =
   let lg = map g l in
   use_portable lg
 [%%expect{|
-Line 4, characters 15-16:
-4 |   let lg = map g l in
-                   ^
-Error: This value is "nonportable"
-         because it closes over the value "y" at line 2, characters 13-14
-         which is "nonportable".
-       However, the highlighted expression is expected to be "portable".
+Line 5, characters 15-17:
+5 |   use_portable lg
+                   ^^
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* SEQUENCING *)
@@ -233,7 +204,7 @@ Error: This value is "nonportable"
 (* using a value and returning it *)
 let use_and_return x = ignore x; x
 [%%expect{|
-val use_and_return : 'a @ stateless -> 'a @ immutable = <fun>
+val use_and_return : 'a -> 'a = <fun>
 |}]
 
 (* contended values cannot be use_and_returned due to uncontended bound *)

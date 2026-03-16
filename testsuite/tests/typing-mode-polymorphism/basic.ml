@@ -32,15 +32,12 @@ let foo =
   let _ = foo y in
   foo
 [%%expect{|
-Line 6, characters 14-15:
-6 |   let _ = foo y in
-                  ^
-Error: This value is "contended" but is expected to be "uncontended".
+val foo : '_weak1 @ unique stateless -> '_weak1 = <fun>
 |}]
 
 let id x = x
 [%%expect{|
-val id : 'a @ stateless -> 'a @ immutable = <fun>
+val id : 'a -> 'a = <fun>
 |}]
 
 let () =
@@ -50,47 +47,37 @@ let () =
   let _ = id y in
   ()
 [%%expect{|
-Line 4, characters 29-30:
-4 |   let (y @ contended) = ref !x in
-                                 ^
-Error: This value is "immutable" but is expected to be "read_write".
 |}]
 
 (* instantiation [id] does not make it less polymorphic *)
 let foo (x @ portable) = id x
 let id' = id
 [%%expect{|
-val foo : 'a @ stateless -> 'a @ immutable = <fun>
-val id' : 'a @ stateless -> 'a @ immutable = <fun>
+val foo : 'a @ portable -> 'a = <fun>
+val id' : 'a -> 'a = <fun>
 |}]
 
 let foo (x @ nonportable) =
   let x = id' x in
   use_portable x
 [%%expect{|
-Line 2, characters 14-15:
-2 |   let x = id' x in
-                  ^
+Line 3, characters 15-16:
+3 |   use_portable x
+                   ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let bar (c @ unique) =
   use_unique (id c)
 [%%expect{|
-Line 2, characters 13-19:
-2 |   use_unique (id c)
-                 ^^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+val bar : 'a @ unique -> unit = <fun>
 |}]
 
 let bar (c @ local) =
   let _ = use_unique (id c) in
   ()
 [%%expect{|
-Line 2, characters 25-26:
-2 |   let _ = use_unique (id c) in
-                             ^
-Error: This value is "local" to the parent region but is expected to be "global".
+val bar : 'a @ local unique -> unit = <fun>
 |}]
 
 let bar (x @ aliased) =
@@ -109,10 +96,15 @@ let bar (x @ many) =
   let y = id y in
   (y, y)
 [%%expect{|
-Line 3, characters 13-14:
-3 |   let y = id y in
-                 ^
-Error: This value is "once" but is expected to be "many".
+Line 4, characters 6-7:
+4 |   (y, y)
+          ^
+Error: This value is used here,
+       but it is defined as once and is also being used at:
+Line 4, characters 3-4:
+4 |   (y, y)
+       ^
+
 |}]
 
 (* the result of a mode polymorphic function can't be static *)
@@ -123,7 +115,9 @@ let foo (x @ static) =
 Line 3, characters 13-14:
 3 |   use_static x
                  ^
-Error: This value is "immutable" but is expected to be "read_write".
+Error: This value is "dynamic"
+         because function applications are always dynamic.
+       However, the highlighted expression is expected to be "static".
 |}]
 
 (* mode polymorphism allows us to combine take combine the bounds of two
@@ -136,11 +130,7 @@ let which = function
 [%%expect{|
 val f : string -> string = <fun>
 val g : string @ local -> string @ local = <fun>
-Line 5, characters 12-13:
-5 |   | true -> g
-                ^
-Error: This expression has type "string @ local -> string @ local"
-       but an expression was expected of type "string -> string"
+val which : bool -> string @ local -> string @ local = <fun>
 |}]
 
 (* The least upper bound between local and global is local *)
@@ -149,10 +139,10 @@ let foo (x @ global) =
   let y @ global = "global" in
   use_global (f y) (* y is weakened to local before it's applied to f *)
 [%%expect{|
-Line 2, characters 10-15:
-2 |   let f = which true in
-              ^^^^^
-Error: Unbound value "which"
+Line 4, characters 13-18:
+4 |   use_global (f y) (* y is weakened to local before it's applied to f *)
+                 ^^^^^
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (x @ global) =
@@ -160,16 +150,16 @@ let foo (x @ global) =
   let y @ global = "global" in
   use_global (f y) (* y is weakened to local before it's applied to f *)
 [%%expect{|
-Line 2, characters 10-15:
-2 |   let f = which false in
-              ^^^^^
-Error: Unbound value "which"
+Line 4, characters 13-18:
+4 |   use_global (f y) (* y is weakened to local before it's applied to f *)
+                 ^^^^^
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* mode variables used at some mode imposes a bound on them *)
 let id x = use_portable x; x
 [%%expect{|
-val id : 'a @ stateless -> 'a @ immutable = <fun>
+val id : 'a @ portable -> 'a = <fun>
 |}]
 
 let foo (x @ nonportable) =
@@ -189,9 +179,9 @@ let foo (x @ contended) (y @ uncontended) =
   use_uncontended y; (* this use succeeds *)
   use_uncontended x (* this use fails *)
 [%%expect{|
-Line 2, characters 13-14:
-2 |   let x = id x in
-                 ^
+Line 5, characters 18-19:
+5 |   use_uncontended x (* this use fails *)
+                      ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
@@ -200,7 +190,7 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let close_over x = fun () -> x
 [%%expect{|
-val close_over : 'a @ stateless -> unit -> 'a @ immutable = <fun>
+val close_over : 'a -> unit -> 'a = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -209,15 +199,15 @@ let foo (x @ portable) (y @ nonportable) =
   use_portable (const_x ());
   use_portable (const_y ())
 [%%expect{|
-Line 3, characters 27-28:
-3 |   let const_y = close_over y in
-                               ^
+Line 5, characters 15-27:
+5 |   use_portable (const_y ())
+                   ^^^^^^^^^^^^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let close_over x = fun () -> fun () -> x
 [%%expect{|
-val close_over : 'a @ stateless -> unit -> unit -> 'a @ immutable = <fun>
+val close_over : 'a -> unit -> unit -> 'a = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -226,9 +216,9 @@ let foo (x @ portable) (y @ nonportable) =
   use_portable (const_x () ());
   use_portable (const_y () ())
 [%%expect{|
-Line 3, characters 27-28:
-3 |   let const_y = close_over y in
-                               ^
+Line 5, characters 15-30:
+5 |   use_portable (const_y () ())
+                   ^^^^^^^^^^^^^^^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
@@ -237,19 +227,13 @@ let foo (x @ portable) =
   let const_x = close_over x in
   use_portable (const_x ())
 [%%expect{|
-Line 3, characters 15-27:
-3 |   use_portable (const_x ())
-                   ^^^^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
+val foo : 'a @ portable -> unit = <fun>
 |}]
 
 let foo (x @ portable) =
   use_portable (close_over x)
 [%%expect{|
-Line 2, characters 15-29:
-2 |   use_portable (close_over x)
-                   ^^^^^^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
+val foo : 'a @ portable -> unit = <fun>
 |}]
 
 (* MODE CROSSING *)
@@ -261,7 +245,7 @@ let foo (x : int @ portable) (y : int @ nonportable) =
   use_portable x;
   use_portable y
 [%%expect{|
-val foo : int @ stateless immutable -> int -> unit = <fun>
+val foo : int @ portable -> int -> unit = <fun>
 |}]
 
 (* LOCAL AND MODE POLYMORPHISM *)
@@ -271,10 +255,13 @@ let foo (local_ x) =
   let y = id x in
   y
 [%%expect{|
-Line 2, characters 13-14:
-2 |   let y = id x in
-                 ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Line 3, characters 2-3:
+3 |   y
+      ^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 (* with exclave_ it works *)
@@ -282,10 +269,7 @@ let foo (local_ x) = exclave_
   let y = id x in
   y
 [%%expect{|
-Line 2, characters 13-14:
-2 |   let y = id x in
-                 ^
-Error: This value is "local" but is expected to be "global".
+val foo : 'a @ local portable -> 'a @ local = <fun>
 |}]
 
 (* local input stays local through id *)
@@ -294,8 +278,8 @@ let foo () =
   let y = id x in
   use_global y
 [%%expect{|
-Line 3, characters 13-14:
-3 |   let y = id x in
+Line 4, characters 13-14:
+4 |   use_global y
                  ^
 Error: This value is "local" but is expected to be "global".
 |}]
@@ -307,8 +291,5 @@ let foo (x @ global portable) =
   use_global (id x);
   use_portable (id x)
 [%%expect{|
-Line 2, characters 13-19:
-2 |   use_global (id x);
-                 ^^^^^^
-Error: This value is "immutable" but is expected to be "read_write".
+val foo : 'a @ portable -> unit = <fun>
 |}]

@@ -36,7 +36,7 @@ val use_global : 'a -> unit = <fun>
 
 let fst x y = x
 [%%expect{|
-val fst : 'a @ stateless immutable -> 'b -> 'a @ immutable = <fun>
+val fst : 'a -> 'b -> 'a = <fun>
 |}]
 
 (* n-ary functions will impose locality bounds on arguments, since the middle end
@@ -50,29 +50,23 @@ let foo =
   use_global foo;
   use_global bar
 [%%expect{|
-Line 5, characters 16-22:
-5 |   let bar = fst clocal in
-                    ^^^^^^
+Line 7, characters 13-16:
+7 |   use_global bar
+                 ^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 let bar (once_ x) =
   fst x
 [%%expect{|
-Line 2, characters 6-7:
-2 |   fst x
-          ^
-Error: This value is "once" but is expected to be "many".
+val bar : 'a @ once -> 'b -> 'a @ once = <fun>
 |}]
 
 let bar (unique_ x) =
   let x = fst x () in
   use_unique x
 [%%expect{|
-Line 3, characters 13-14:
-3 |   use_unique x
-                 ^
-Error: This value is "aliased" but is expected to be "unique".
+val bar : 'a @ unique -> unit = <fun>
 |}]
 
 (* The returned closure is nonportable *)
@@ -84,22 +78,18 @@ let () =
   let _ : (unit -> unit) @ portable = fun () -> let _ = bar1 () in () in
   ()
 [%%expect{|
-Line 4, characters 17-18:
-4 |   let bar1 = fst f in
-                     ^
-Error: This value is "stateful"
-         because it contains a usage (of the value "c" at line 3, characters 21-22)
-         which is expected to be "read_write".
-       However, the highlighted expression is expected to be "stateless".
+Line 5, characters 56-60:
+5 |   let _ : (unit -> unit) @ portable = fun () -> let _ = bar1 () in () in
+                                                            ^^^^
+Error: The value "bar1" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at line 5, characters 38-69
+         which is expected to be "portable".
 |}]
 
 let many_arguments x y z s t = y
 [%%expect{|
-val many_arguments :
-  'a @ stateless immutable ->
-  'b @ stateless immutable ->
-  'c @ stateless immutable ->
-  'd @ stateless immutable -> 'e -> 'b @ immutable = <fun>
+val many_arguments : 'a -> 'b -> 'c -> 'd -> 'e -> 'b = <fun>
 |}]
 
 let foo =
@@ -108,10 +98,7 @@ let foo =
   let y = many_arguments x y () () () in
   use_global y
 [%%expect{|
-Line 4, characters 25-26:
-4 |   let y = many_arguments x y () () () in
-                             ^
-Error: This value is "local" but is expected to be "global".
+val foo : unit = ()
 |}]
 
 let foo =
@@ -120,9 +107,9 @@ let foo =
   let f = many_arguments x y in
   use_global f
 [%%expect{|
-Line 4, characters 25-26:
-4 |   let f = many_arguments x y in
-                             ^
+Line 5, characters 13-14:
+5 |   use_global f
+                 ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -140,7 +127,7 @@ val foo : unit = ()
 
 let fst x = fun y -> x
 [%%expect{|
-val fst : 'a @ stateless -> 'b -> 'a @ immutable = <fun>
+val fst : 'a -> 'b -> 'a = <fun>
 |}]
 
 (* x is < global as before *)
@@ -159,10 +146,15 @@ let bar (x @ once) =
   let x = (fst x) in
   (x, x)
 [%%expect{|
-Line 2, characters 15-16:
-2 |   let x = (fst x) in
-                   ^
-Error: This value is "once" but is expected to be "many".
+Line 3, characters 6-7:
+3 |   (x, x)
+          ^
+Error: This value is used here,
+       but it is defined as once and is also being used at:
+Line 3, characters 3-4:
+3 |   (x, x)
+       ^
+
 |}]
 
 (* unique argument yields unique and once result *)
@@ -170,7 +162,7 @@ let bar (x @ unique) =
   let x = fst x in
   use_unique x
 [%%expect{|
-val bar : 'a @ unique stateless -> unit = <fun>
+val bar : 'a @ unique -> unit = <fun>
 |}]
 
 let bar (x @ unique) =
@@ -179,14 +171,25 @@ let bar (x @ unique) =
   use_unique (f ());
   use_unique (g ())
 [%%expect{|
-Line 4, characters 13-19:
+Line 5, characters 14-15:
+5 |   use_unique (g ())
+                  ^
+Error: This value is used here,
+       but it is defined as once and has already been used at:
+Line 4, characters 14-15:
 4 |   use_unique (f ());
-                 ^^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+                  ^
+
 |}]
 
 (* returned value matches input portability *)
 let var (x @ portable) =
+  let x = fst x () in
+  use_portable x
+[%%expect{|
+val var : 'a @ portable -> unit = <fun>
+|}]
+let var (x @ nonportable) =
   let x = fst x () in
   use_portable x
 [%%expect{|
@@ -195,33 +198,21 @@ Line 3, characters 15-16:
                    ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
-let var (x @ nonportable) =
-  let x = fst x () in
-  use_portable x
-[%%expect{|
-Line 2, characters 14-15:
-2 |   let x = fst x () in
-                  ^
-Error: This value is "nonportable" but is expected to be "portable".
-|}]
 
 (* returned value matches input contention *)
 let var (x @ uncontended) =
   let x = fst x () in
   use_uncontended x
 [%%expect{|
-Line 3, characters 18-19:
-3 |   use_uncontended x
-                      ^
-Error: This value is "immutable" but is expected to be "read_write".
+val var : 'a -> unit = <fun>
 |}]
 let var (x @ contended) =
   let x = fst x () in
   use_uncontended x
 [%%expect{|
-Line 2, characters 14-15:
-2 |   let x = fst x () in
-                  ^
+Line 3, characters 18-19:
+3 |   use_uncontended x
+                      ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
@@ -233,35 +224,32 @@ let () =
   let _ : (unit -> unit) @ portable = fun () -> let _ = bar1 () in () in
   ()
 [%%expect{|
-Line 4, characters 17-18:
-4 |   let bar1 = fst f in
-                     ^
-Error: This value is "stateful"
-         because it contains a usage (of the value "c" at line 3, characters 21-22)
-         which is expected to be "read_write".
-       However, the highlighted expression is expected to be "stateless".
+Line 5, characters 56-60:
+5 |   let _ : (unit -> unit) @ portable = fun () -> let _ = bar1 () in () in
+                                                            ^^^^
+Error: The value "bar1" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at line 5, characters 38-69
+         which is expected to be "portable".
 |}]
 
 (* deeply nested closures should still propagate modes *)
 let nest x = fun () -> fun () -> fun () -> x
 [%%expect{|
-val nest : 'a @ stateless -> unit -> unit -> unit -> 'a @ immutable = <fun>
+val nest : 'a -> unit -> unit -> unit -> 'a = <fun>
 |}]
 
 let foo (x @ portable) =
   use_portable (nest x () () ())
 [%%expect{|
-Line 2, characters 15-32:
-2 |   use_portable (nest x () () ())
-                   ^^^^^^^^^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
+val foo : 'a @ portable -> unit = <fun>
 |}]
 
 let foo (x @ nonportable) =
   use_portable (nest x () () ())
 [%%expect{|
-Line 2, characters 21-22:
+Line 2, characters 15-32:
 2 |   use_portable (nest x () () ())
-                         ^
+                   ^^^^^^^^^^^^^^^^^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]

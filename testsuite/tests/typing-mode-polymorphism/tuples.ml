@@ -25,16 +25,13 @@ val use_global : 'a -> unit = <fun>
 (* Since a tuple is returned in tail-position, its allocation will be global *)
 let prod x y = (x, y)
 [%%expect{|
-val prod : 'a @ stateless immutable -> 'b @ stateless -> 'a * 'b @ immutable =
-  <fun>
+val prod : 'a -> 'b -> 'a * 'b = <fun>
 |}]
 
 (* With exclave_ the tuple is local *)
 let prod_local x y = exclave_ (x, y)
 [%%expect{|
-val prod_local :
-  'a @ stateless immutable -> 'b @ stateless -> 'a * 'b @ local immutable =
-  <fun>
+val prod_local : 'a -> 'b -> 'a * 'b @ local = <fun>
 |}]
 
 (* [prod] is polymorphic on the other axes *)
@@ -43,13 +40,7 @@ let foo (x @ portable) (y @ portable) =
   use_portable b;
   use_portable a
 [%%expect{|
-Line 3, characters 15-16:
-3 |   use_portable b;
-                   ^
-Error: This value is "nonportable"
-         because it is an element of the tuple at line 2, characters 15-23
-         which is "nonportable".
-       However, the highlighted expression is expected to be "portable".
+val foo : 'a @ portable -> 'b @ portable -> unit = <fun>
 |}]
 
 (* But the returned tuple will be the meet of its arguments *)
@@ -57,15 +48,18 @@ let foo (x @ portable) (y @ nonportable) =
   let (b, a) = prod x y in
   use_portable b
 [%%expect{|
-Line 2, characters 22-23:
-2 |   let (b, a) = prod x y in
-                          ^
-Error: This value is "nonportable" but is expected to be "portable".
+Line 3, characters 15-16:
+3 |   use_portable b
+                   ^
+Error: This value is "nonportable"
+         because it is an element of the tuple at line 2, characters 15-23
+         which is "nonportable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 let dupl x = (x, x)
 [%%expect{|
-val dupl : 'a @ stateless -> 'a * 'a @ immutable = <fun>
+val dupl : 'a -> 'a * 'a = <fun>
 |}]
 
 (* The arguments must be global *)
@@ -92,10 +86,10 @@ let foo (x @ local) (y @ local) =
   let p = prod_local x y in
   use_global (fst p) (* but the elements of the product are local *)
 [%%expect{|
-Line 2, characters 21-22:
-2 |   let p = prod_local x y in
-                         ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Line 3, characters 13-20:
+3 |   use_global (fst p) (* but the elements of the product are local *)
+                 ^^^^^^^
+Error: This value is "yielding" but is expected to be "unyielding".
 |}]
 
 (* [dupl] uses an argument twice and the polymorphic mode must be many *)
@@ -113,31 +107,28 @@ let foo (x @ unique) =
   let p = dupl x in
   use_unique (fst p)
 [%%expect{|
-Line 3, characters 18-19:
+Line 3, characters 13-20:
 3 |   use_unique (fst p)
-                      ^
-Error: This value is "immutable" but is expected to be "read_write".
+                 ^^^^^^^
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (* mode polymorphism works over tuples *)
 let swap (a, b) = (b, a)
 [%%expect{|
-val swap : 'a * 'b @ stateless -> 'b * 'a @ immutable = <fun>
+val swap : 'a * 'b -> 'b * 'a = <fun>
 |}]
 
 let swap_local (a, b) = exclave_ (b, a)
 [%%expect{|
-val swap_local : 'a * 'b @ stateless -> 'b * 'a @ local immutable = <fun>
+val swap_local : 'a * 'b -> 'b * 'a @ local = <fun>
 |}]
 
 let foo (x @ portable) (y @ portable) =
   let p = swap (x, y) in
   use_portable p
 [%%expect{|
-Line 3, characters 15-16:
-3 |   use_portable p
-                   ^
-Error: This value is "nonportable" but is expected to be "portable".
+val foo : 'a @ portable -> 'b @ portable -> unit = <fun>
 |}]
 
 let foo (x @ local) (y @ local) =
@@ -156,13 +147,10 @@ let foo (x @ global) (y @ local) =
   let p = swap_local (x, y) in
   use_global (snd p)
 [%%expect{|
-Line 2, characters 25-26:
-2 |   let p = swap_local (x, y) in
-                             ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
-         because it is an element of the tuple at line 2, characters 21-27
-         which is expected to be "global".
+Line 3, characters 13-20:
+3 |   use_global (snd p)
+                 ^^^^^^^
+Error: This value is "yielding" but is expected to be "unyielding".
 |}]
 
 let foo (x @ global) (y @ global) =
