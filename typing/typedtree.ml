@@ -149,14 +149,12 @@ let create_alloc_mode_r m = m
 
 let alloc_mode_r_legacy = Mode.Locality.disallow_left Mode.Locality.legacy
 
-type alloc_mode_l = Mode.Locality.lr
+type alloc_mode_l = Mode.Locality.l
 
 let alloc_mode_l_iter alloc_mode ~f = f (Locality.disallow_right alloc_mode)
 
-let check_const_alloc_l (alloc_mode : alloc_mode_l) =
-  if Mode.Locality.check_level_var alloc_mode Btype.generic_level
-  then Mode.Locality.Guts.check_const alloc_mode
-  else Some (Mode.Locality.zap_to_floor_exn alloc_mode)
+let zap_alloc_l_to_floor_exn (alloc_mode : alloc_mode_l) =
+  Mode.Locality.zap_to_floor_exn alloc_mode
 
 let print_alloc_mode_l ppf alloc_mode =
   let open Format in
@@ -166,7 +164,7 @@ let print_alloc_mode_l ppf alloc_mode =
 
 let create_alloc_mode_l m = m
 
-let alloc_mode_l_legacy = Mode.Locality.legacy
+let alloc_mode_l_legacy = Mode.Locality.disallow_right Mode.Locality.legacy
 
 type texp_field_boxing =
   | Boxing of alloc_mode_r * unique_use

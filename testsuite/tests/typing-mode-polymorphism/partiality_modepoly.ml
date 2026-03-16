@@ -30,7 +30,7 @@ type t = { a : bool; mutable b : int option; }
        (if (field_int 0 x/292)
          (let (*match*/296 =o? (field_mut 1 x/292))
            (if *match*/296
-             (if (seq (setfield_ptr 1 x/292 0) 0) 2
+             (if (seq (setfield_ptr(maybe-stack) 1 x/292 0) 0) 2
                (let (*match*/297 =o? (field_mut 1 x/292))
                  (field_imm 0 *match*/297)))
              1))

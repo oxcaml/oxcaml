@@ -46,9 +46,9 @@ let () =
   store_any x' "test";
   store_global x "should fail"
 [%%expect{|
-Line 4, characters 12-13:
-4 |   store_any x "test";
-                ^
+Line 6, characters 15-16:
+6 |   store_global x "should fail"
+                   ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
