@@ -523,6 +523,7 @@ module Gen = struct
                     (* CR-someday: this sort should be based on the jkind of [tyleft]. But
                        this isn't important since this value is just used for printing. *)
                     Val_reg (Base Value);
+                  val_lpoly = [];
                   val_loc = Location.none;
                   val_attributes = [];
                   val_zero_alloc = Zero_alloc.default;

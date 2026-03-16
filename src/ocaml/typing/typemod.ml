@@ -62,7 +62,6 @@ type error =
   | Signature_parameter_expected of module_type
   | Signature_result_expected of module_type
   | Recursive_include_functor
-  | Recursive_jkind_declaration
   | With_no_component of Longident.t
   | With_mismatch of Longident.t * Includemod.explanation
   | With_makes_applicative_functor_ill_typed of
@@ -415,15 +414,23 @@ let type_module_type_of_fwd :
 (* Additional validity checks on type definitions arising from
    recursive modules *)
 
-let check_recmod_typedecls env decls =
+let check_recmod_decls env decls =
   let recmod_ids = List.map fst decls in
   List.iter
     (fun (id, md) ->
+      let { Mtype.types; jkinds } =
+        Mtype.type_and_jkind_paths env (Pident id) md.Types.md_type
+      in
       List.iter
         (fun path ->
           Typedecl.check_recmod_typedecl env md.Types.md_loc recmod_ids
                                          path (Env.find_type path env))
-        (Mtype.type_paths env (Pident id) md.Types.md_type))
+        types;
+      List.iter
+        (fun path ->
+          Typedecl.check_recmod_jkind_decl env md.Types.md_loc recmod_ids
+                                           path (Env.find_jkind path env))
+        jkinds)
     decls
 
 (* Merge one "with" constraint in a signature *)
@@ -624,7 +631,7 @@ let check_well_formed_module env loc context mty =
       | Sig_module (id, _, mty, Trec_first, _) :: rem ->
           let (id_mty_l, rem) = extract_next_modules rem in
           begin try
-            check_recmod_typedecls (Lazy.force env) ((id, mty) :: id_mty_l)
+            check_recmod_decls (Lazy.force env) ((id, mty) :: id_mty_l)
           with Typedecl.Error (_, err) ->
             raise (Error (loc, Lazy.force env,
                           Badly_formed_signature(context, err)))
@@ -1549,8 +1556,12 @@ and approx_sig_items env ssg=
           ) decls [rem]
           |> List.flatten
       | Psig_jkind sdecl ->
-          (* CR layouts: support this - internal ticket 5793 *)
-          raise (Error(sdecl.pjkind_loc, env, Recursive_jkind_declaration))
+          let jkind_decl = Typedecl.approx_jkind_decl sdecl in
+          let scope = Ctype.create_scope () in
+          let (id, newenv) =
+            Env.enter_jkind ~scope sdecl.pjkind_name.txt jkind_decl env
+          in
+          Sig_jkind(id, jkind_decl, Exported) :: approx_sig_items newenv srem
       | _ ->
           approx_sig_items env srem
 
@@ -2594,7 +2605,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
       (fun () -> transition env0 init)
   in
   let env1 = make_env dcl1 in
-  check_recmod_typedecls env1 (map_mtys dcl1);
+  check_recmod_decls env1 (map_mtys dcl1);
   let dcl2 = transition env1 dcl1 in
 (*
   List.iter
@@ -2603,7 +2614,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     dcl2;
 *)
   let env2 = make_env dcl2 in
-  check_recmod_typedecls env2 (map_mtys dcl2);
+  check_recmod_decls env2 (map_mtys dcl2);
   let dcl2 =
     List.map2 (fun (pmd, _) (id_shape, id_loc, md, mmode, md_modalities, mty) ->
       let tmd =
@@ -4709,6 +4720,15 @@ let package_units initial_env objfiles target_cmi modulename =
 
 open Printtyp
 
+(* A heuristic used in nondep errors: the input describes a declaration
+   that has made invalid, and this says what about it is now invalid. *)
+let invalid_part_of_user_kind : Sig_component_kind.t -> string  = function
+  | Type -> "kind"
+  | Jkind -> "definition"
+  | ( Value | Constructor | Label | Unboxed_label | Module | Module_type
+    | Extension_constructor | Class | Class_type ) ->
+    "type"
+
 let report_error ~loc _env = function
     Cannot_apply mty ->
       Location.errorf ~loc
@@ -4755,10 +4775,6 @@ let report_error ~loc _env = function
   | Recursive_include_functor ->
       Location.errorf ~loc
         "@[Including a functor is not supported in recursive module signatures @]"
-  | Recursive_jkind_declaration ->
-      Location.errorf ~loc
-        "@[Kind declarations are not yet supported in recursive module \
-         signatures@]"
   | With_no_component lid ->
       Location.errorf ~loc
         "@[The signature constrained by %a has no component named %a@]"
@@ -4919,11 +4935,13 @@ let report_error ~loc _env = function
           (String.capitalize_ascii shadowed_item_kind)
           Style.inline_code shadowed
       in
+      let invalid_part = invalid_part_of_user_kind user_kind in
       let user_msg =
         Location.msg ~loc:user_loc
-        "@[The %s %a has no valid type@ if %a is shadowed.@]"
+        "@[The %s %a has no valid %s@ if %a is shadowed.@]"
         (Sig_component_kind.to_string user_kind)
          Style.inline_code (Ident.name user_id)
+         invalid_part
          Style.inline_code shadowed
       in
       Location.errorf ~loc ~sub:[shadowed_msg; user_msg]
@@ -4935,11 +4953,13 @@ let report_error ~loc _env = function
       { opened_item_kind; opened_item_id; user_id; user_kind; user_loc } ->
       let opened_item_kind= Sig_component_kind.to_string opened_item_kind in
       let opened_id = Ident.name opened_item_id in
+      let invalid_part = invalid_part_of_user_kind user_kind in
       let user_msg =
         Location.msg ~loc:user_loc
-          "@[The %s %a has no valid type@ if %a is hidden.@]"
+          "@[The %s %a has no valid %s@ if %a is hidden.@]"
           (Sig_component_kind.to_string user_kind)
           Style.inline_code (Ident.name user_id)
+          invalid_part
           Style.inline_code opened_id
       in
       Location.errorf ~loc ~sub:[user_msg]

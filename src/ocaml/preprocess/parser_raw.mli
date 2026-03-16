@@ -78,6 +78,7 @@ type token =
   | LBRACELESS
   | LBRACE
   | LAZY
+  | LAYOUT
   | LABEL of (string)
   | KIND_OF
   | KIND
@@ -281,6 +282,7 @@ module MenhirInterpreter : sig
     | T_LBRACELESS : unit terminal
     | T_LBRACE : unit terminal
     | T_LAZY : unit terminal
+    | T_LAYOUT : unit terminal
     | T_LABEL : (string) terminal
     | T_KIND_OF : unit terminal
     | T_KIND : unit terminal
@@ -431,6 +433,7 @@ module MenhirInterpreter : sig
     | N_reversed_nonempty_llist_typevar_repr_ : (string Location.loc list) nonterminal
     | N_reversed_nonempty_llist_typevar_ : ((string Location.loc * Parsetree.jkind_annotation option) list) nonterminal
     | N_reversed_nonempty_llist_name_tag_ : (string list) nonterminal
+    | N_reversed_nonempty_llist_mkrhs_ident__ : (string Location.loc list) nonterminal
     | N_reversed_nonempty_llist_labeled_simple_expr_ : ((Parsetree.arg_label * Parsetree.expression) list) nonterminal
     | N_reversed_nonempty_llist_functor_arg_ : ((Lexing.position * Parsetree.functor_parameter) list) nonterminal
     | N_reversed_nonempty_llist_comprehension_clause_ : (Parsetree.comprehension_clause list) nonterminal
@@ -527,7 +530,7 @@ module MenhirInterpreter : sig
     | N_mk_longident_mod_ext_longident_type_trailing_no_hash_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_type_trailing_hash_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_ident_ : (Longident.t) nonterminal
-    | N_mk_longident_mod_ext_longident___anonymous_52_ : (Longident.t) nonterminal
+    | N_mk_longident_mod_ext_longident___anonymous_53_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_UIDENT_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_LIDENT_ : (Longident.t) nonterminal
     | N_method_ : ((string Location.loc * Asttypes.private_flag * Parsetree.class_field_kind) *

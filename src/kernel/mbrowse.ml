@@ -342,8 +342,8 @@ let rec is_recovered_expression e =
   (* Recovery on arbitrary expressions *)
   | Texp_tuple ([ _ ], _) -> true
   (* Recovery on unbound identifier *)
-  | Texp_ident (Path.Pident id, _, _, _, _, _)
-    when Ident.name id = "*type-error*" -> true
+  | Texp_ident { path = Path.Pident id; _ } when Ident.name id = "*type-error*"
+    -> true
   (* Recovery on desugared optional label application *)
   | Texp_construct _ as cstr when is_recovered_Texp_construct cstr -> true
   | _ -> false

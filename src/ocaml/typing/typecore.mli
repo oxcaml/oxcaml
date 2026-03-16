@@ -345,6 +345,7 @@ type error =
   | Unexpected_hole
   | Eval_format
   | Let_poly_not_yet_implemented
+  | Layout_poly_inst_not_yet_supported
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

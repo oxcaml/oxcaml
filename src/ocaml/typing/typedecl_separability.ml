@@ -389,7 +389,18 @@ let check_type
   : upstream_compatible:bool -> Env.t -> type_expr -> mode -> context
   = fun ~upstream_compatible env ty m ->
   let rec check_type hyps ty m =
+    (* If the jkind of [ty] says it is [Non_float], then [ty]
+       is separable with no constraints on its free variables. However, this
+       only suffices for [Sep] mode, not [Deepsep]: a type like ['b list]
+       is [Non_float] (lists are never flat floats), but for deep
+       separability we must still recurse into sub-type-expressions to
+       check ['b]. Without the [m <> Deepsep] guard, an abstract type
+       [type 'a t constraint 'a = 'b list] whose representation depends
+       on ['b] (not ['a]) would be wrongly deemed separable, because the
+       parameter ['a = 'b list] is [Non_float] yet ['b] is unconstrained.
+       See testsuite/tests/typing-separability/separability-bug.ml. *)
     if not upstream_compatible
+      && m <> Deepsep
       && Ctype.check_type_separability env ty Non_float
     then empty else
     if Hyps.safe ty m hyps then empty

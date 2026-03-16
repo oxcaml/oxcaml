@@ -450,6 +450,7 @@ let ocaml_ignored_flags =
     "-dlinear";
     "-dparsetree";
     "-dshape";
+    "-dtlambda";
     "-dslambda";
     "-drawclambda";
     "-drawflambda";
@@ -489,6 +490,7 @@ let ocaml_ignored_flags =
     "-no-unboxed-types";
     "-O2";
     "-O3";
+    "-O4";
     "-Oclassic";
     "-only-erasable-extensions";
     "-opaque";
@@ -641,10 +643,14 @@ let ocaml_ignored_flags =
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
     "-no-cfg-prologue-shrink-wrap";
+    "-cfg-merge-blocks";
+    "-no-cfg-merge-blocks";
     "-cfg-value-propagation";
     "-no-cfg-value-propagation";
     "-cfg-value-propagation-float";
     "-no-cfg-value-propagation-float";
+    "-cfg-value-propagation-flow";
+    "-no-cfg-value-propagation-flow";
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
     "-afl-instrument";
@@ -681,6 +687,7 @@ let ocaml_ignored_flags =
     "-no-reaper-local-fields";
     "-reaper-unbox";
     "-no-reaper-unbox";
+    "-reaper-max-unbox-size";
     "-reaper-change-calling-conventions";
     "-no-reaper-change-calling-conventions";
     "-flambda2-expert-cmm-safe-subst";

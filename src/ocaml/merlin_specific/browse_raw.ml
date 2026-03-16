@@ -415,9 +415,6 @@ let of_method_call obj meth loc env (f : _ f0) acc =
 
 let of_block_access = function
   | Baccess_field (_, _) -> id_fold
-  | Baccess_array
-      { mut = _; index_kind = _; index; base_ty = _; elt_ty = _; elt_sort = _ }
-    -> of_expression index
   | Baccess_block (_, exp) -> of_expression exp
 
 let of_unboxed_access = function
@@ -683,7 +680,8 @@ and of_core_type_desc = function
     of_core_type ct ** of_jkind_annotation_opt jkind
   | Ttyp_variant (rfs, _, _) -> list_fold (fun rf -> app (Row_field rf)) rfs
   | Ttyp_package pt -> app (Package_type pt)
-  | Ttyp_quote ct | Ttyp_splice ct | Ttyp_repr (_, ct) -> of_core_type ct
+  | Ttyp_quote ct | Ttyp_splice ct | Ttyp_repr (_, ct) | Ttyp_newlayout (_, ct)
+    -> of_core_type ct
 
 and of_class_type_desc = function
   | Tcty_constr (_, _, cts) -> list_fold of_core_type cts
@@ -966,7 +964,7 @@ let bindop_path { bop_op_name; bop_op_path } =
 let expression_paths { Typedtree.exp_desc; exp_extra; _ } =
   let init =
     match exp_desc with
-    | Texp_ident (path, loc, _, _, _, _) -> [ (reloc path loc, Some loc.txt) ]
+    | Texp_ident { path; lid = loc; _ } -> [ (reloc path loc, Some loc.txt) ]
     | Texp_letop { let_; ands } ->
       bindop_path let_ :: List.map ~f:bindop_path ands
     | Texp_new (path, loc, _, _) -> [ (reloc path loc, Some loc.txt) ]

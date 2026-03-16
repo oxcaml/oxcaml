@@ -220,7 +220,6 @@ let iter_on_occurrences
   let iter_block_access exp_env = function
     | Baccess_field (lid, label_desc) ->
       add_label ~namespace:Label exp_env lid label_desc
-    | Baccess_array _ -> ()
     | Baccess_block _ -> ()
   in
   let iter_unboxed_access exp_env = function
@@ -237,7 +236,7 @@ let iter_on_occurrences
 
   expr = (fun sub ({ exp_desc; exp_env; _ } as e) ->
       (match exp_desc with
-      | Texp_ident (path, lid, _, _, _, _) ->
+      | Texp_ident { path; lid; _ } ->
           f ~namespace:Value exp_env path lid
       | Texp_construct (lid, constr_desc, _, _) ->
           add_constructor_description exp_env lid constr_desc
@@ -306,7 +305,7 @@ let iter_on_occurrences
       | Ttyp_unboxed_tuple _
       | Ttyp_quote _ | Ttyp_splice _ | Ttyp_of_kind _
       | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_call_pos
-      | Ttyp_repr _ -> ());
+      | Ttyp_repr _ | Ttyp_newlayout _ -> ());
       default_iterator.typ sub ct);
 
   pat =

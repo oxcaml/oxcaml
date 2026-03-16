@@ -375,17 +375,13 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   in
   let iter_block_access sub = function
     | Baccess_field (lid, _) -> iter_loc sub lid
-    | Baccess_array
-      { mut = _; index_kind = _; index; base_ty = _; elt_ty = _; elt_sort = _
-      } ->
-      sub.expr sub index
     | Baccess_block (_, idx) -> sub.expr sub idx
   in
   let iter_unboxed_access sub = function
     | Uaccess_unboxed_field (lid, _) -> iter_loc sub lid
   in
   match exp_desc with
-  | Texp_ident (_, lid, _, _, _, _)  -> iter_loc sub lid
+  | Texp_ident { lid; _ } -> iter_loc sub lid
   | Texp_constant _ -> ()
   | Texp_let (rec_flag, list, exp) ->
       sub.value_bindings sub (rec_flag, list);
@@ -760,6 +756,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   | Ttyp_quote t -> sub.typ sub t
   | Ttyp_splice t -> sub.typ sub t
   | Ttyp_repr (_, ct) -> sub.typ sub ct
+  | Ttyp_newlayout (_, ct) -> sub.typ sub ct
   | Ttyp_of_kind jkind -> sub.jkind_annotation sub jkind
   | Ttyp_call_pos -> ()
 

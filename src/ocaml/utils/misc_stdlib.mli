@@ -273,6 +273,14 @@ end
 
 type (_, _) eq = Refl : ('a, 'a) eq
 
+(** Propositional comparison *)
+type ('a, 'b) comparison =
+  | Less_than : ('a, 'b) comparison
+  | Equal : ('a, 'a) comparison
+  | Greater_than : ('a, 'b) comparison
+
+val comparison_result : ('a, 'b) comparison -> int
+
 module type T1 = sig
   type 'a t
 end
@@ -335,4 +343,3 @@ module Maybe_bounded : sig
   (** [of_int n] creates a bounded integer with bound [n] (not inclusive). *)
   val of_int : int -> t
 end
-

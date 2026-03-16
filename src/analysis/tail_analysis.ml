@@ -33,16 +33,14 @@ open Typedtree
 let tail_operator = function
   | { exp_desc =
         Texp_ident
-          ( _,
-            _,
-            { Types.val_kind =
-                Types.Val_prim
-                  { Primitive.prim_name = "%sequand" | "%sequor"; _ };
-              _
-            },
-            _,
-            _,
-            _ );
+          { desc =
+              { Types.val_kind =
+                  Types.Val_prim
+                    { Primitive.prim_name = "%sequand" | "%sequor"; _ };
+                _
+              };
+            _
+          };
       _
     } -> true
   | _ -> false

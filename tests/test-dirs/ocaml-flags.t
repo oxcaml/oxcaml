@@ -151,6 +151,7 @@ logic.
   -dtypedtree
   -dshape
   -drawlambda
+  -dtlambda
   -dslambda
   -dlambda
   -dblambda

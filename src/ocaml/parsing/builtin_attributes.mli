@@ -22,6 +22,7 @@
     - ocaml.deprecated_mutable
     - ocaml.explicit_arity
     - ocaml.flambda_o3
+    - ocaml.flambda_o4
     - ocaml.flambda_oclassic
     - ocaml.immediate
     - ocaml.immediate64

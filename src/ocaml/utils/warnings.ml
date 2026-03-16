@@ -47,6 +47,7 @@ type upstream_compat_warning =
   | Separability_check
       (* example: [type packed = | Mk of 'a t [@@unboxed]]
          where ['a t : value mod non_float]. *)
+  | Unpacked_attribute
 
 type name_out_of_scope_warning =
   | Name of string
@@ -1329,6 +1330,8 @@ let message = function
   | Incompatible_with_upstream Separability_check ->
       "This type relies on OxCaml's extended separability checking \n\
        and would not be accepted by upstream OCaml."
+  | Incompatible_with_upstream Unpacked_attribute ->
+      "[@unpacked] is not supported by upstream OCaml."
   | Unerasable_position_argument -> "this position argument cannot be erased."
   | Unnecessarily_partial_tuple_pattern ->
       "This tuple pattern\n\

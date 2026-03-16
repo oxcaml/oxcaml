@@ -27,7 +27,7 @@ let extract_ident (exp_desc : Typedtree.expression_desc) =
     | Lapply (p1, p2) -> Format.fprintf ppf "%a(%a)" longident p1 longident p2
   in
   match exp_desc with
-  | Texp_ident (_, { txt = li; _ }, _, _, _, _) ->
+  | Texp_ident { lid = { txt = li; _ }; _ } ->
     let ppf, to_string = Format.to_string () in
     longident ppf li;
     Some (to_string ())

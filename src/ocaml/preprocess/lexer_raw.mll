@@ -109,6 +109,7 @@ let keyword_table : keywords =
     "initializer", INITIALIZER;
     "kind_", KIND;
     "kind_of_", KIND_OF;
+    "layout_", LAYOUT;
     "lazy", LAZY;
     "let", LET;
     "local_", LOCAL;

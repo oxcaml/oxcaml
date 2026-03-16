@@ -3,6 +3,13 @@ open Mode
 open Jkind_axis
 module Jkind = Btype.Jkind0
 
+(* Merlin-specific: change some module paths to match the compiler *)
+module Misc = struct
+  include Misc
+  module Stdlib = Misc_stdlib
+  include Misc_stdlib
+end
+
 type 'a modes =
   { mode_modes : 'a;
     mode_desc : Mode.Alloc.atom Location.loc list
@@ -605,7 +612,7 @@ let sort_dedup_modalities ~warn l =
       =
     let (P ax0) = Axis.to_value (P ax0) in
     let (P ax1) = Axis.to_value (P ax1) in
-    Mode.Value.Axis.compare ax0 ax1
+    Misc.comparison_result (Mode.Value.Axis.compare ax0 ax1)
   in
   let dedup ~on_dup =
     let rec loop x = function

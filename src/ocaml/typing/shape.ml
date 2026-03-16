@@ -179,7 +179,7 @@ module Sig_component_kind = struct
     | Extension_constructor -> "extension constructor"
     | Class -> "class"
     | Class_type -> "class type"
-    | Jkind -> "jkind"
+    | Jkind -> "kind"
 
   let can_appear_in_types = function
     | Value

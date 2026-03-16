@@ -163,6 +163,7 @@ type module_unbound_reason =
 type stage_lock =
   | Quotation_lock
   | Splice_lock
+  | Toplevel_lock_for_directive
 
 type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
@@ -3104,6 +3105,12 @@ let enter_modtype ~scope name mtd env =
   let env = store_modtype id (Subst.Lazy.of_modtype_decl mtd) shape env in
   (id, env)
 
+let enter_jkind ~scope name decl env =
+  let id = Ident.create_scoped ~scope name in
+  let shape = Shape.leaf decl.jkind_uid in
+  let env = store_jkind ~check:false id decl shape env in
+  (id, env)
+
 let enter_class ~scope name desc env =
   let id = Ident.create_scoped ~scope name in
   let addr = class_declaration_address env id desc in
@@ -3164,6 +3171,9 @@ let enter_splice ~loc env =
     raise (Error (Toplevel_splice loc));
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
 
+let mark_toplevel_in_quotations env =
+  add_stage_lock Toplevel_lock_for_directive env
+
 let check_no_open_quotations loc env context =
   if env.stage = 0
   then ()
@@ -3176,9 +3186,9 @@ let stage_locks_offset locks =
     (fun lock rel_stage ->
        match lock with
        | Quotation_lock -> rel_stage + 1
-       | Splice_lock -> rel_stage - 1)
-    locks
-    0
+       | Splice_lock -> rel_stage - 1
+       | Toplevel_lock_for_directive -> 0)
+    locks 0
 
 (* Insertion of all components of a signature *)
 

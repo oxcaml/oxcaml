@@ -510,6 +510,8 @@ val enter_modtype:
 val enter_class: scope:int -> string -> class_declaration -> t -> Ident.t * t
 val enter_cltype:
   scope:int -> string -> class_type_declaration -> t -> Ident.t * t
+val enter_jkind:
+  scope:int -> string -> jkind_declaration -> t -> Ident.t * t
 
 (* Same as [add_signature] but refreshes (new stamp) and rescopes bound idents
    in the process. *)
@@ -544,6 +546,7 @@ val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t
+val mark_toplevel_in_quotations : t -> t
 
 val check_no_open_quotations :
   Location.t -> t -> no_open_quotations_context -> unit

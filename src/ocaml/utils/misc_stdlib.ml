@@ -432,6 +432,16 @@ end
 
 type (_, _) eq = Refl : ('a, 'a) eq
 
+type ('a, 'b) comparison =
+  | Less_than : ('a, 'b) comparison
+  | Equal : ('a, 'a) comparison
+  | Greater_than : ('a, 'b) comparison
+
+let comparison_result : type a b. (a, b) comparison -> int = function
+  | Less_than -> -1
+  | Equal -> 0
+  | Greater_than -> 1
+
 module type T1 = sig
   type 'a t
 end

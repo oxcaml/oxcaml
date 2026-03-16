@@ -499,7 +499,7 @@ let mk_add_extension add_extension id args =
       | Base Value -> ()
       | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
-      | Univar _ | Product _ -> raise_error ())
+      | Univar _ | Genvar _ | Product _ -> raise_error ())
     args;
   add_extension id
     { ext_type_path = path_exn;
@@ -642,7 +642,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
            ~type_expr:param)
   |> add_type2 ident_idx_imm
        ~param1_jkind:(
-         Jkind.Builtin.value ~why:(Type_argument {
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_imm;
            position = 1;
            arity = 2;
@@ -660,7 +660,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
        ~type_separability:[Separability.Ind; Separability.Ind]
   |> add_type2 ident_idx_mut
        ~param1_jkind:(
-         Jkind.Builtin.value ~why:(Type_argument {
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_mut;
            position = 1;
            arity = 2;

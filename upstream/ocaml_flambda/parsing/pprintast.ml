@@ -535,7 +535,7 @@ and core_type ctxt f x =
     | Ptyp_alias (ct, s, j) ->
         pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct
           tyvar_loc_option_jkind (s, j)
-    | Ptyp_poly ([], ct) | Ptyp_repr ([], ct) ->
+    | Ptyp_poly ([], ct) | Ptyp_repr ([], ct) | Ptyp_newlayout ([], ct) ->
         core_type ctxt f ct
     | Ptyp_poly (sl, ct) ->
         pp f "@[<2>%a%a@]"
@@ -557,6 +557,10 @@ and core_type ctxt f x =
                           (tyvar_loc_repr tyvar) ~sep:"@;")
                           l)
           lv (core_type ctxt) ct
+    | Ptyp_newlayout (lv, ct) ->
+        pp f "@[<2>layout_@;%a.@;%a@]"
+          (list string_loc ~sep:"@;") lv
+          (core_type ctxt) ct
     | Ptyp_of_kind jkind ->
       pp f "@[(type@ :@ %a)@]" (jkind_annotation reset_ctxt) jkind
     | _ -> pp f "@[<2>%a@]" (core_type1 ctxt) x
@@ -648,7 +652,7 @@ and core_type1 ctxt f x =
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_repr _
-      | Ptyp_of_kind _) ->
+      | Ptyp_newlayout _ | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x
 
 and core_type2 ctxt f x =
@@ -2297,21 +2301,6 @@ and directive_argument f x =
 and block_access ctxt f = function
   | Baccess_field li ->
     pp f ".%a" longident_loc li
-  | Baccess_array (mut, index_kind, index) ->
-    let dotop =
-      match mut with
-      | Mutable -> "."
-      | Immutable -> ".:"
-    in
-    let suffix = match index_kind with
-      | Index_int -> ""
-      | Index_unboxed_int64 -> "L"
-      | Index_unboxed_int32 -> "l"
-      | Index_unboxed_int16 -> "S"
-      | Index_unboxed_int8 -> "s"
-      | Index_unboxed_nativeint -> "n"
-    in
-    pp f "%s%s(%a)" dotop suffix (expression ctxt) index
   | Baccess_block (mut, index) ->
     let s =
       match mut with

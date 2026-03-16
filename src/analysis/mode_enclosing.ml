@@ -58,7 +58,7 @@ end
 let from_node (_env, node) =
   let open Browse_raw in
   match node with
-  | Expression { exp_desc = Texp_ident (_, _, _, _, _, mode); exp_loc; _ } ->
+  | Expression { exp_desc = Texp_ident { mode; _ }; exp_loc; _ } ->
     Some (exp_loc, mode)
   | Pattern { pat_desc = Tpat_var { mode; _ }; pat_loc; _ } ->
     Some (pat_loc, mode)

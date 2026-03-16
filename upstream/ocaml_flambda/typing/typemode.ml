@@ -605,7 +605,7 @@ let sort_dedup_modalities ~warn l =
       =
     let (P ax0) = Axis.to_value (P ax0) in
     let (P ax1) = Axis.to_value (P ax1) in
-    Mode.Value.Axis.compare ax0 ax1
+    Misc.comparison_result (Mode.Value.Axis.compare ax0 ax1)
   in
   let dedup ~on_dup =
     let rec loop x = function

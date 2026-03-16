@@ -162,7 +162,7 @@ let classify_expression : Typedtree.expression -> sd =
         let size = classify_module_expression env mexp in
         let env = Ident.add mid size env in
         classify_expression env e
-    | Texp_ident (path, _, _, _, _, _) ->
+    | Texp_ident { path; _ } ->
         classify_path env path
 
     (* non-binding cases *)
@@ -228,7 +228,7 @@ let classify_expression : Typedtree.expression -> sd =
         (* CR vlaviron: Dynamic would probably be a better choice *)
         Static
 
-    | Texp_apply ({exp_desc = Texp_ident (_, _, vd, Id_prim _, _, _)},
+    | Texp_apply ({exp_desc = Texp_ident { desc = vd; kind = Id_prim _; _ }},
         _, _, _, _)
       when is_ref vd ->
         Static
@@ -647,7 +647,7 @@ let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
 *)
 let rec expression : Typedtree.expression -> term_judg =
   fun exp -> match exp.exp_desc with
-    | Texp_ident (pth, _, _, _, _, _) ->
+    | Texp_ident { path = pth; _ } ->
       path pth
     | Texp_let (rec_flag, bindings, body) ->
       (*
@@ -710,8 +710,8 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_mutvar id ->
         single id.txt << Dereference
     | Texp_apply
-        ({exp_desc = Texp_ident (_, _, vd, Id_prim _, _, _)}, [_, Arg (arg, _)],
-         _, _, _)
+        ({exp_desc = Texp_ident { desc = vd; kind = Id_prim _; _ }},
+         [_, Arg (arg, _)], _, _, _)
       when is_ref vd ->
       (*
         G |- e: m[Guard]
@@ -759,14 +759,6 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> empty
-        | Baccess_array
-            { mut = _
-            ; index_kind = _
-            ; index
-            ; base_ty = _
-            ; elt_ty = _
-            ; elt_sort = _ } ->
-          expression index << Dereference
         | Baccess_block (_, idx) ->
           expression idx << Dereference
       in

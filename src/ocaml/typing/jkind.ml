@@ -131,6 +131,7 @@ module Layout = struct
       | Product consts ->
         Product (List.map (fun s -> of_sort_const s sa) consts)
       | Univar uv -> Univar uv
+      | Genvar v -> Genvar v
 
     (* if so, scannable axis annotations should not trigger a warning *)
     let is_value_or_any = function
@@ -142,6 +143,7 @@ module Layout = struct
         false
       | Product _ -> false
       | Univar _ -> false
+      | Genvar _ -> false
 
     let rec equal_up_to_scannable_axes c1 c2 =
       match c1, c2 with
@@ -154,7 +156,8 @@ module Layout = struct
            abbreviation to use for printing, so physical equality suffices here.
            [Sort.equal_univar_univar] is not available from this module. *)
         uv1 == uv2
-      | (Base _ | Any _ | Product _ | Univar _), _ -> false
+      | Genvar v1, Genvar v2 -> v1 == v2
+      | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
 
     let set_root_pointerness t pointerness =
       match t with
@@ -162,6 +165,7 @@ module Layout = struct
       | Base (b, sa) ->
         Static.of_base b (Scannable_axes.set_pointerness sa pointerness)
       | Product _ -> t
+      | Genvar _ -> t
       | Univar _ -> t
 
     (* Returns [None] if the root has no meaningful scannable axes. *)
@@ -171,6 +175,7 @@ module Layout = struct
       | Base (_, sa) -> if is_value_or_any t then Some sa else None
       | Product _ -> None
       | Univar _ -> None
+      | Genvar _ -> None
 
     let to_string t =
       let rec to_string nested (t : t) =
@@ -187,6 +192,7 @@ module Layout = struct
               (if nested then ")" else "") ]
         | Univar { name = Some n } -> n
         | Univar { name = None } -> "_"
+        | Genvar v -> Sort.to_string_genvar v
       in
       to_string false t
 
@@ -218,13 +224,17 @@ module Layout = struct
   let rec get : Sort.t t -> Sort.Flat.t t =
     let rec flatten_sort (s : Sort.t) sa : Sort.Flat.t t =
       match s with
-      | Var v -> Sort (Var (Sort.Var.get_id v), sa)
+      | Var v ->
+        (* [v.contents] guaranteed to be [None] *)
+        if Sort.is_genvar v
+        then Sort (Genvar v, sa)
+        else Sort (Var (Sort.Var.get_id v), sa)
       | Base b ->
         Sort (Base b, sa)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
       | Product sorts ->
         Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
-      | Univar x -> Sort (Univar x, Scannable_axes.max)
+      | Univar x -> Sort (Univar x, sa)
     in
     function
     | Any sa -> Any sa
@@ -2057,6 +2067,7 @@ module Const = struct
       | Base (Value, _), Maybe_null ->
         Stable
       | Univar _, _ -> Alpha
+      | Genvar _, _ -> Alpha
       | Product layouts, _ ->
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
@@ -2142,6 +2153,18 @@ let of_new_sort_var ~why ~level =
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
+
+let rec instance_layout : Sort.t Layout.t -> Sort.t Layout.t = function
+  | Sort (s, sa) -> Sort (Sort.instance s, sa)
+  | Product ls -> Product (List.map instance_layout ls)
+  | Any _ as l -> l
+
+let instance jkind =
+  match jkind.jkind.base with
+  | Kconstr _ -> jkind
+  | Layout l ->
+    let jkind_desc = { jkind.jkind with base = Layout (instance_layout l) } in
+    { jkind with jkind = jkind_desc }
 
 let of_new_legacy_sort_var ~why ~level =
   let jkind, sort = Jkind_desc.of_new_sort_var ~level Non_null Separable in
@@ -3215,7 +3238,7 @@ module Violation = struct
     in
     let rec has_sort_var_layout : Sort.Flat.t Layout.t -> bool = function
       | Sort (Var _, _) -> true
-      | Sort (Univar _, _) -> Misc.fatal_error "has_sort_var: univar"
+      | Sort (Univar _, _) | Sort (Genvar _, _) -> false
       | Product layouts -> List.exists has_sort_var_layout layouts
       | Sort (Base _, _) | Any _ -> false
     in

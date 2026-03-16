@@ -89,8 +89,8 @@ let rec erroneous_expr_check e =
   erroneous_type_check e.Typedtree.exp_type
   ||
   match e.Typedtree.exp_desc with
-  | Typedtree.Texp_ident (p, _, _, _, _, _) when Ident.name (Path.head p) = "_"
-    -> true
+  | Typedtree.Texp_ident { path; _ } when Ident.name (Path.head path) = "_" ->
+    true
   | Typedtree.Texp_apply (e', _, _, _, _) -> erroneous_expr_check e'
   | _ -> false
 
