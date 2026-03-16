@@ -598,10 +598,12 @@ let params_and_body env res code_id p ~result_arity ~fun_dbg
         Format.eprintf
           "\n\
            %tContext is:%t translating function %a to Cmm with return cont %a, \
-           exn cont %a and body:@ %a\n"
+           exn cont %a, params %a and body:@ %a\n"
           Flambda_colours.error Flambda_colours.pop Code_id.print code_id
           Continuation.print return_continuation Continuation.print
-          exn_continuation Expr.print body;
+          exn_continuation
+          Bound_parameters.print params
+          Expr.print body;
         Printexc.raise_with_backtrace e bt)
 
 (* Translation of sets of closures. *)
