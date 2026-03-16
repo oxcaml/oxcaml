@@ -45,6 +45,10 @@ type param_decision =
   | Delete
   | Unbox of Variable.t DS.unboxed_fields Field.Map.t
 
+type my_closure_param_decision =
+  | Keep_my_closure
+  | Unbox_my_closure of Variable.t DS.unboxed_fields Field.Map.t
+
 (* CR sspies: Throughout this file, we create bound paramters and variables
    without corresponding debugging uids. Does it make sense to properly
    propagate debugging uids there? If so, where should they come from? *)
@@ -74,6 +78,7 @@ type env =
     cont_params_to_keep : param_decision list Continuation.Map.t;
     should_keep_param : Continuation.t -> Variable.t -> KS.t -> param_decision;
     (* TODO same here *)
+    my_closure_decisions : my_closure_param_decision Code_id.Map.t;
     function_params_to_keep : param_decision list Code_id.Map.t;
     should_keep_function_param :
       Code_id.t -> Variable.t -> KS.t -> param_decision;
@@ -1250,22 +1255,38 @@ let rebuild_apply env apply =
          code_id Apply.print apply; *)
       let original_callee = Apply.callee apply in
       let args_from_unboxed_callee, callee =
-        match original_callee with
-        | Some callee when simple_is_unboxable env callee ->
-          let fields = get_simple_unboxable env callee in
-          let new_args =
-            DS.fold_unboxed_with_kind
-              (fun kind v acc -> (Simple.var v, KS.anything kind) :: acc)
-              fields []
-          in
-          new_args, None
-        | (None | Some _) as callee ->
+        match Code_id.Map.find_opt code_id env.my_closure_decisions with
+        | None ->
+          Misc.fatal_errorf
+            "No my_closure_decisions found for code id %a in direct apply \
+             rewrite of@ %a"
+            Code_id.print code_id Apply.print apply
+        | Some Keep_my_closure ->
           ( [],
             (* Note here that callee is rewritten with [rewrite_simple_opt],
                which will put [None] as the callee instead of a dummy value, as
                a dummy value would then be further used in a later simplify pass
                to refine the call kind and produce an invalid. *)
-            rewrite_simple_opt env callee )
+            rewrite_simple_opt env (Apply.callee apply) )
+        | Some (Unbox_my_closure fields) ->
+          let callee =
+            match Apply.callee apply with
+            | None ->
+              Misc.fatal_errorf "No callee for apply %a with unboxed closure"
+                Apply.print apply
+            | Some callee -> callee
+          in
+          if not (simple_is_unboxable env callee)
+          then
+            Misc.fatal_errorf
+              "Callee is not unboxable in apply %a with unboxed closure"
+              Apply.print apply;
+          let callee_fields = get_simple_unboxable env callee in
+          ( fold2_unboxed_subset_with_kind
+              (fun kind _param callee_field acc ->
+                (Simple.var callee_field, KS.anything kind) :: acc)
+              fields callee_fields [],
+            None )
       in
       let params_decisions =
         match Code_id.Map.find_opt code_id env.function_params_to_keep with
@@ -2365,6 +2386,25 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
         List.map2 (should_keep_function_param code_id) code_dep.params kinds)
       code_deps
   in
+  let my_closure_decisions =
+    Code_id.Map.mapi
+      (fun code_id (code_dep : Traverse_acc.code_dep) ->
+        let unboxed_fields =
+          DS.get_unboxed_fields solved_dep
+            (Code_id_or_name.var code_dep.my_closure)
+        in
+        match unboxed_fields with
+        | None -> Keep_my_closure
+        | Some unboxed_fields ->
+          if DS.cannot_change_calling_convention solved_dep code_id
+          then
+            Misc.fatal_errorf
+              "For code_id %a, we cannot change calling convention but closure \
+               is expected to be unboxed"
+              Code_id.print code_id;
+          Unbox_my_closure unboxed_fields)
+      code_deps
+  in
   let should_keep_function_param code_id =
     match Code_id.Map.find_opt code_id code_deps with
     | None -> fun var kind -> Keep (var, kind)
@@ -2446,6 +2486,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;
+      my_closure_decisions;
       function_params_to_keep;
       should_keep_function_param;
       function_return_decision;
