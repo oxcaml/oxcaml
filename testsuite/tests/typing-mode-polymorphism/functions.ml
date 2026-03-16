@@ -38,8 +38,8 @@ let foo (x @ portable) (y @ nonportable) =
   use_portable x;
   use_portable y
 [%%expect{|
-Line 4, characters 15-16:
-4 |   use_portable x;
+Line 5, characters 15-16:
+5 |   use_portable y
                    ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
@@ -80,8 +80,8 @@ let foo (x @ unique) (y @ aliased) =
   use_unique x;
   use_unique y
 [%%expect{|
-Line 4, characters 13-14:
-4 |   use_unique x;
+Line 5, characters 13-14:
+5 |   use_unique y
                  ^
 Error: This value is "aliased" but is expected to be "unique".
 |}]
@@ -93,8 +93,8 @@ let foo (x @ portable) (y @ nonportable) =
   use_portable x;
   use_portable y
 [%%expect{|
-Line 5, characters 15-16:
-5 |   use_portable x;
+Line 6, characters 15-16:
+6 |   use_portable y
                    ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
@@ -114,8 +114,8 @@ let foo (x @ portable) (y @ nonportable) =
   use_portable x;
   use_portable y
 [%%expect{|
-Line 4, characters 15-16:
-4 |   use_portable x;
+Line 5, characters 15-16:
+5 |   use_portable y
                    ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
@@ -133,18 +133,12 @@ val chain : 'a -> 'a = <fun>
 
 let foo (x @ unique) = use_unique (chain x)
 [%%expect{|
-Line 1, characters 34-43:
-1 | let foo (x @ unique) = use_unique (chain x)
-                                      ^^^^^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+val foo : 'a @ unique -> unit = <fun>
 |}]
 
 let foo (x @ portable) = use_portable (chain x)
 [%%expect{|
-Line 1, characters 38-47:
-1 | let foo (x @ portable) = use_portable (chain x)
-                                          ^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
+val foo : 'a @ portable -> unit = <fun>
 |}]
 
 (* RECURSIVE FUNCTIONS *)
@@ -159,10 +153,7 @@ let foo (x @ portable) =
   let x = recursive x 10 in
   use_portable x
 [%%expect{|
-Line 3, characters 15-16:
-3 |   use_portable x
-                   ^
-Error: This value is "nonportable" but is expected to be "portable".
+val foo : 'a @ portable -> unit = <fun>
 |}]
 
 let recursive' = recursive
@@ -193,10 +184,7 @@ let foo (y @ portable) =
   let lg = map g l in
   use_portable lg
 [%%expect{|
-Line 5, characters 15-17:
-5 |   use_portable lg
-                   ^^
-Error: This value is "nonportable" but is expected to be "portable".
+val foo : 'a @ portable -> unit = <fun>
 |}]
 
 let foo (y @ nonportable) =

@@ -51,9 +51,9 @@ let () =
   store_any x' "test";
   store_global x "should fail"
 [%%expect{|
-Line 4, characters 12-13:
-4 |   store_any x "test";
-                ^
+Line 6, characters 15-16:
+6 |   store_global x "should fail"
+                   ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -66,10 +66,12 @@ let foo () =
   use_unique yunique.i;
   use_unique yaliased.i
 [%%expect{|
-Line 2, characters 19-27:
-2 |   let x @ unique = alloc 42 in
-                       ^^^^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+Line 6, characters 13-22:
+6 |   use_unique yunique.i;
+                 ^^^^^^^^^
+Error: This value is "aliased"
+         because it is the field "i" (with some modality) of the record at line 6, characters 13-20.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 type 'a myrecord = { j : 'a }
@@ -89,10 +91,13 @@ let foo () =
   use_unique yaliased.j
 
 [%%expect{|
-Line 2, characters 19-28:
-2 |   let x @ unique = create 42 in
-                       ^^^^^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+Line 7, characters 13-23:
+7 |   use_unique yaliased.j
+                 ^^^^^^^^^^
+Error: This value is "aliased"
+         because it is the field "j" of the record at line 7, characters 13-21
+         which is "aliased".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* CR ageorges: principality issue with portable refs *)
@@ -125,11 +130,5 @@ Error: This value is "once" but is expected to be "many".
 
 let foo (x @ contended) = alloc x
 [%%expect{|
-Line 1, characters 32-33:
-1 | let foo (x @ contended) = alloc x
-                                    ^
-Error: This value is "contended"
-       but is expected to be "uncontended"
-         because it is the field "i" of the record at line 2, characters 14-23
-         which is expected to be "uncontended".
+val foo : 'a @ contended -> 'a myref @ contended = <fun>
 |}]

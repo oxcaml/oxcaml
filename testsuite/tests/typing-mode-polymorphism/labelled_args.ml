@@ -65,9 +65,9 @@ let () =
   let y = fst ~label1:x ~label2:() in
   use_global y
 [%%expect{|
-Line 3, characters 22-23:
-3 |   let y = fst ~label1:x ~label2:() in
-                          ^
+Line 4, characters 13-14:
+4 |   use_global y
+                 ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -114,9 +114,9 @@ let () =
   let foo = fst ~label2 in
   use_global foo
 [%%expect{|
-Line 3, characters 17-23:
-3 |   let foo = fst ~label2 in
-                     ^^^^^^
+Line 4, characters 13-16:
+4 |   use_global foo
+                 ^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -149,9 +149,9 @@ let () =
   let y = foo x in
   use_global y
 [%%expect{|
-Line 3, characters 14-15:
-3 |   let y = foo x in
-                  ^
+Line 4, characters 13-14:
+4 |   use_global y
+                 ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -172,9 +172,9 @@ let () =
   let y = foo x in
   use_global y
 [%%expect{|
-Line 3, characters 14-15:
-3 |   let y = foo x in
-                  ^
+Line 4, characters 13-14:
+4 |   use_global y
+                 ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -193,8 +193,5 @@ let bar (x @ uncontended) =
   let y = f ~label1:() in
   use_portable y
 [%%expect{|
-Line 4, characters 15-16:
-4 |   use_portable y
-                   ^
-Error: This value is "nonportable" but is expected to be "portable".
+val bar : 'a @ portable -> unit = <fun>
 |}]
