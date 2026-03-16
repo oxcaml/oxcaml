@@ -10,7 +10,7 @@
   pollInsertion ? false,
   runtime5 ? false,
   stackChecks ? false,
-  magicNumberVersion ? "999",
+  magicNumberVersion ? null,
   warnError ? true,
   oxcamlClang ? false,
   oxcamlLldb ? false,
@@ -28,7 +28,6 @@ let
       mkFlag = bool: name: if bool then "--enable-${name}" else "--disable-${name}";
     in
     [
-      "--with-magic-number-version=${magicNumberVersion}"
       "--cache-file=/dev/null"
       "--with-objcopy=${pkgs.llvm}/bin/llvm-objcopy"
       "--enable-assembler-suitable-for-dissector=${pkgs.llvm}/bin/llvm-mc"
@@ -43,7 +42,9 @@ let
       (mkFlag warnError "warn-error")
       (mkFlag ocamltest "ocamltest")
       (mkFlag syntaxQuotations "syntax-quotations")
-    ];
+    ]
+    ++ lib.optional (magicNumberVersion != null)
+      "--with-magic-number-version=${magicNumberVersion}";
 
 
   # Boot compilers

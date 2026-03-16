@@ -298,17 +298,22 @@ AC_SUBST([OCAML_VERSION_EXTRA], [OCAML__VERSION_EXTRA])
 AC_SUBST([OCAML_VERSION_SHORT], [OCAML__VERSION_SHORT])
 AC_ARG_WITH([magic-number-version],
   [AS_HELP_STRING([--with-magic-number-version=VERSION],
-    [magic number version for compiled file formats (required)])])
+    [magic number version for compiled file formats])])
 
-AS_IF([test x"$with_magic_number_version" = "x"],
-  [with_magic_number_version=999])
+AS_IF([test -z "$with_magic_number_version"],
+  [magic_number_version="ox0"],
+  [AS_CASE([$with_magic_number_version],
+    [*@<:@!a-zA-Z0-9._-@:>@*],
+    [AC_MSG_ERROR(
+      [--with-magic-number-version may only contain] \
+      [alphanumeric characters, dots, hyphens, and underscores])])
+   version_len=${#with_magic_number_version}
+   magic_number_version="ox${version_len}:${with_magic_number_version}"])
 
-magic_number_version=$with_magic_number_version
-magic_number_length=$(( ${#magic_number_version} + 9 ))
+magic_number_length=$(( 9 + ${#magic_number_version} ))
 
 AC_DEFINE([MAGIC_NUMBER_PREFIX], ["][MAGIC_NUMBER__PREFIX]["])
 AC_DEFINE_UNQUOTED([MAGIC_NUMBER_VERSION], ["$magic_number_version"])
-AC_SUBST([MAGIC_NUMBER_LENGTH], [$magic_number_length])
 AC_DEFINE_UNQUOTED([EXEC_MAGIC_LENGTH], [$magic_number_length])
 AC_DEFINE([EXEC_FORMAT], ["][EXEC__FORMAT]["])
 AC_SUBST([EXEC_MAGIC_NUMBER], [EXEC__MAGIC_NUMBER$magic_number_version])
