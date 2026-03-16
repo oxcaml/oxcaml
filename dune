@@ -643,6 +643,7 @@
   cfg_prologue
   extra_debug
   label
+  printcfg
   linear_utils
   simplify_terminator
   vectorize

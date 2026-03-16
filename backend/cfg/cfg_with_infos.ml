@@ -53,6 +53,8 @@ let liveness t =
   compute_if_necessary t.liveness ~f:(fun () ->
       liveness_analysis t.cfg_with_layout)
 
+let liveness_if_available t = !(t.liveness)
+
 let liveness_find t id = InstructionId.Tbl.find (liveness t) id
 
 let liveness_find_opt t id = InstructionId.Tbl.find_opt (liveness t) id

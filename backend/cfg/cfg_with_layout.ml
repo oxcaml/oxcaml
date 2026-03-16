@@ -113,54 +113,6 @@ let is_trap_handler t label =
 
 (* Printing utilities for debug *)
 
-let dump ppf t ~msg =
-  let open Format in
-  fprintf ppf "\ncfg for %s\n" msg;
-  fprintf ppf "%s\n" t.cfg.fun_name;
-  let regalloc =
-    List.find_map
-      (function[@ocaml.warning "-4"]
-        | Cfg.Use_regalloc regalloc -> Some regalloc | _ -> None)
-      t.cfg.fun_codegen_options
-  in
-  (match regalloc with
-  | None -> ()
-  | Some regalloc ->
-    fprintf ppf "use_regalloc=%a\n" Clflags.Register_allocator.format regalloc);
-  let regalloc_params =
-    List.find_map
-      (function[@ocaml.warning "-4"]
-        | Cfg.Use_regalloc_param params -> Some params | _ -> None)
-      t.cfg.fun_codegen_options
-  in
-  (match regalloc_params with
-  | None -> ()
-  | Some regalloc_params ->
-    fprintf ppf "regalloc_params=%s\n" (String.concat ", " regalloc_params));
-  fprintf ppf "layout.length=%d\n" (DLL.length t.layout);
-  fprintf ppf "blocks.length=%d\n" (Label.Tbl.length t.cfg.blocks);
-  let print_block label =
-    let block = Label.Tbl.find t.cfg.blocks label in
-    fprintf ppf "\n%a:\n" Label.format label;
-    let pp_with_id ppf ~pp (instr : _ Cfg.instruction) =
-      fprintf ppf "(id:%a) %a\n" InstructionId.format instr.id pp instr
-    in
-    DLL.iter ~f:(pp_with_id ppf ~pp:Cfg.print_basic) block.body;
-    pp_with_id ppf ~pp:Cfg.print_terminator block.terminator;
-    fprintf ppf "\npredecessors:";
-    Label.Set.iter (fprintf ppf " %a" Label.format) block.predecessors;
-    fprintf ppf "\nsuccessors:";
-    Label.Set.iter
-      (fprintf ppf " %a" Label.format)
-      (Cfg.successor_labels ~normal:true ~exn:false block);
-    fprintf ppf "\nexn-successors:";
-    Label.Set.iter
-      (fprintf ppf " %a" Label.format)
-      (Cfg.successor_labels ~normal:false ~exn:true block);
-    fprintf ppf "\n"
-  in
-  DLL.iter ~f:print_block t.layout
-
 let print_row r ppf = Format.dprintf "@,@[<v 1><tr>%t@]@,</tr>" r ppf
 
 type align =
