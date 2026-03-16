@@ -84,4 +84,4 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_exn(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_final_do_calls_exn
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_do_pending_actions_exn
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_do_pending_actions_flags_exn(flags=#0l : int)
