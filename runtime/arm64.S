@@ -566,8 +566,6 @@ L(caml_call_gc):
         ldr     TMP, Caml_state(preemption)
         cmp     TMP, #3
         b.hi    G(caml_preempt)
-L(preempt_unhandled):
-    /* caml_preempt will jump back here if the preemption is unhandled */
 L(resume_from_preempt):
     /* When preempted continuations resume, they always jump back here, with a
        frame for the continuation's address on the stack */
@@ -608,6 +606,9 @@ FUNCTION(caml_preempt)
         str     xzr, [x1, #8]                 /* set last fiber of continuation to NULL */
         ldr     TMP, Caml_state(gc_regs)
         str     TMP, [x1, #16]                /* save gc_regs in continuation */
+    /* Clear gc_regs, as we'll be leaving the runtime after the effect is
+       performed */
+        str     xzr, Caml_state(gc_regs)
     /* Pop the frame saved by caml_call_gc, restoring x29 and x30, so that
        SWITCH_OCAML_STACKS in do_perform saves the correct return address */
         ldp     x29, x30, [sp], 16
@@ -1249,7 +1250,7 @@ L(do_perform):
         continue execution. Otherwise, raise Effect.Unhandled. */
         WOSIZE_VAL TMP, x1
         cmp     TMP, #3
-        b.eq    L(preempt_unhandled)
+        b.eq    L(preempt_unhandled_resume)
 #if defined(WITH_THREAD_SANITIZER)
         /* We must let the TSan runtime know that we switched back to the
            original performer stack. For that, we perform the necessary calls
@@ -1266,6 +1267,22 @@ L(do_perform):
 #endif
         ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_unhandled_effect)
         b       G(caml_c_call)
+L(preempt_unhandled_resume):
+    /* Preemption was unhandled. Redo the skipped allocation and restore
+       the saved registers to resume execution. This mirrors the handled
+       path (label 4 in caml_resume). */
+        ldr     x25, [x1, #16]                /* x25 = gc_regs from continuation */
+        str     x25, Caml_state(gc_regs)
+        str     ALLOC_PTR, Caml_state(young_ptr)
+    /* Push a frame so caml_redo_preempted_allocation sees the expected stack
+       layout, and resume_from_preempt can pop it. */
+        stp     x29, x30, [sp, -16]!
+        CFI_ADJUST(16)
+        add     x29, sp, #0
+        SWITCH_OCAML_TO_C
+        bl      G(caml_redo_preempted_allocation)
+        SWITCH_C_TO_OCAML
+        b       L(resume_from_preempt)
         CFI_ENDPROC
 END_FUNCTION(caml_perform)
 
