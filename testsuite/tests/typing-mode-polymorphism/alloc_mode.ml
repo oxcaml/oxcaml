@@ -15,16 +15,13 @@ type 'a myref = { mutable i : 'a }
 type 'a myref = { mutable i : 'a; }
 |}]
 
-(* CR ageorges: the following can accept stack locations but
-  uses setfield_ptr(maybe-stack). This is a soundness bug *)
-
 (* Must be [setfield_ptr(maybe-stack)] *)
 let foo r x = r.i <- x
 [%%expect{|
 (let
   (foo/288 =
      (function {nlocal = 1} r/290[L] x/291 : int
-       (setfield_ptr 0 r/290 x/291)))
+       (setfield_ptr(maybe-stack) 0 r/290 x/291)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/288))
 val foo : 'a myref -> 'a -> unit = <fun>
 |}]
@@ -33,7 +30,7 @@ let foo (r @ local) x = r.i <- x
 [%%expect{|
 (let
   (foo/292 =
-     (function {nlocal = 1} r/293[L] x/294 : int
+     (function {nlocal = 2} r/293[L] x/294 : int
        (setfield_ptr(maybe-stack) 0 r/293 x/294)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/292))
 val foo : 'a myref @ local -> 'a -> unit = <fun>
@@ -83,7 +80,7 @@ Warning 26 [unused-var]: unused variable r.
        (region
          (let (r/307 =mut "bar")
            (function {nlocal = 1} r/310[L] : int
-             (setfield_ptr 0 r/310 "foobar"))))))
+             (setfield_ptr(maybe-stack) 0 r/310 "foobar"))))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/306))
 
 val foo : unit -> string myref -> unit = <fun>

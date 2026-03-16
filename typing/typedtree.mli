@@ -133,11 +133,11 @@ val alloc_mode_l_iter :
   -> f:(Mode.Locality.l -> unit)
   -> unit
 
-val check_const_alloc_l : alloc_mode_l -> Mode.Locality.Const.t option
+val zap_alloc_l_to_floor_exn : alloc_mode_l -> Mode.Locality.Const.t
 
 val print_alloc_mode_l : Format.formatter -> alloc_mode_l -> unit
 
-val create_alloc_mode_l : Mode.Locality.lr -> alloc_mode_l
+val create_alloc_mode_l : Mode.Locality.l -> alloc_mode_l
 
 val alloc_mode_l_legacy : alloc_mode_l
 

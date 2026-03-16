@@ -23,10 +23,7 @@ let transl_locality_mode_l locality =
   Locality.zap_to_floor_exn locality |> transl_locality_mode
 
 let transl_alloc_mode_l (mode : Typedtree.alloc_mode_l) =
-  Option.value
-    (Typedtree.check_const_alloc_l mode)
-    ~default:Locality.Const.Global
-  |> transl_locality_mode
+  Typedtree.zap_alloc_l_to_floor_exn mode |> transl_locality_mode
 
 let transl_alloc_mode_r (mode : Typedtree.alloc_mode_r) =
   (* alloc modes are for allocations; [optimise_allocations] should have pushed it
