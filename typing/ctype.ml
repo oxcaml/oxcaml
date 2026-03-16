@@ -4075,9 +4075,8 @@ let add_jkind_equation ~reason uenv destination jkind1 =
             (* CR layouts v2.8: We might be able to do better here. Internal
                ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
-            | Some jkind, Some decl_jkind when
-                   not (Jkind.equal env jkind
-                          decl_jkind) ->
+            | Some jkind, Some decl_jkind
+                when not (Jkind.equal env jkind decl_jkind) ->
                let refined_decl =
                  { decl with type_jkind = Jkind.disallow_right jkind }
                in
@@ -6130,8 +6129,7 @@ let all_distinct_vars_with_original_jkinds env vars =
          tys := TypeSet.add ty !tys;
          match get_desc ty with
          | Tvar { jkind = inferred_jkind } ->
-           if Jkind.equate env inferred_jkind
-                original_jkind
+           if Jkind.equate env inferred_jkind original_jkind
            then All_good
            else Jkind_mismatch { original_jkind; inferred_jkind; ty }
          | _ -> Unification_failure { name; ty }

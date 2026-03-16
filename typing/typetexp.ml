@@ -379,8 +379,7 @@ end = struct
     in
     begin match Env.find_implicit_jkind name env with
     | Some implicit_jkind
-      when not (Jkind.equate env original_jkind
-                  implicit_jkind) ->
+      when not (Jkind.equate env original_jkind implicit_jkind) ->
         raise (Error (loc, env,
           Mismatched_jkind_annotation { name; explicit_jkind = original_jkind;
                                         implicit_jkind }))
@@ -695,8 +694,7 @@ let transl_type_param env path jkind_default styp =
           Jkind.of_annotation ~context:(Type_parameter (path, name)) env
             jkind_annot
         in
-        if not (Jkind.equate env jkind
-                  implicit_jkind) then
+        if not (Jkind.equate env jkind implicit_jkind) then
           raise (Error (loc, env,
             Mismatched_jkind_annotation
               { name = var_name; explicit_jkind = jkind;
