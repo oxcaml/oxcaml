@@ -383,12 +383,7 @@ module History = struct
     | Class_term_argument
     | Debug_printer_argument
     | Array_type_kind
-    | Quotation_result
-    | Antiquotation_result
-    | Evaluation_result
-    | Tquote
-    | Tsplice
-    | Tquote_eval
+    | Quoted_expression
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =
@@ -420,6 +415,8 @@ module History = struct
           arity : int
         }
     | Overapproximation_of_with_bounds
+    | Inside_quote
+    | Evaluated_quote
 
   type product_creation_reason =
     | Unboxed_tuple

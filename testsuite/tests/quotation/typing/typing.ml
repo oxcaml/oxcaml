@@ -520,27 +520,10 @@ val both : 'a expr * 'b expr -> <[$('a) * $('b)]> expr = <fun>
 
 let x = <[ #42L ]>
 [%%expect {|
-Line 1, characters 11-15:
-1 | let x = <[ #42L ]>
-               ^^^^
-Error: This expression has type "int64#" but an expression was expected of type
-         "('a : value)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
-         because it's the result type of a quotation.
+val x : <[int64#]> expr = <[#42L]>
 |}]
 
 let x = <[ #("abc", #42L) ]>
 [%%expect {|
-Line 1, characters 11-25:
-1 | let x = <[ #("abc", #42L) ]>
-               ^^^^^^^^^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value)"
-       The layout of #('a * 'b) is
-           '_representable_layout_1 & '_representable_layout_2
-         because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
-         because it's the result type of a quotation.
+val x : <[#(string * int64#)]> expr = <[#("abc", #42L)]>
 |}]

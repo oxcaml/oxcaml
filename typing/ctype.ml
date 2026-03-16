@@ -2678,9 +2678,11 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
     end
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
-  | Tquote _ -> Jkind.Builtin.value ~why:Tquote
-  | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
-  | Tquote_eval _ -> Jkind.Builtin.value ~why:Tquote_eval
+   (* CR quoted-kinds jbachurski: These quote/splice the jkind. *)
+  | Tquote ty
+  | Tsplice ty
+  | Tquote_eval ty ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -2828,6 +2830,12 @@ let constrain_type_jkind ~fixed env ty jkind =
          But if we ever choose to substitute min mod-bounds for [Tunivar]s, we
          must do so here. Internal ticket 5746. *)
       loop ~fuel ~expanded:false t ty's_jkind jkind
+
+    (* CR quoted-kinds jbachurski: These quote/splice [ty's_jkind]. *)
+    | Tquote ty
+    | Tsplice ty
+    | Tquote_eval ty ->
+      loop ~fuel ~expanded ty ty's_jkind jkind
 
     | _ ->
        match
