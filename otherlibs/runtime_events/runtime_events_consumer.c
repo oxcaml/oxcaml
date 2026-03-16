@@ -103,22 +103,6 @@ static int format_runtime_ring_file(
     }
   } else {
     /* Attaching to a process by directory and PID */
-<<<<<<< oxcaml
-    ring_file = caml_stat_alloc_noexc(RING_FILE_NAME_MAX_LEN);
-    if (ring_file == NULL) {
-      ret = E_ALLOC_FAIL;
-      goto fail_alloc_file;
-    }
-
-    int err;
-||||||| upstream-base
-  /* In this case we are reading the ring for a different process */
-    if (runtime_events_path) {
-      char* path_u8 = caml_stat_strdup_of_os(runtime_events_path);
-      ret = snprintf_os(runtime_events_loc, RING_FILE_NAME_MAX_LEN,
-                      T("%s/%d.events"), path_u8, pid);
-      caml_stat_free(path_u8);
-=======
     int err;
     ring_file = caml_stat_alloc_noexc(RING_FILE_NAME_MAX_LEN);
     if (ring_file == NULL) {
@@ -126,7 +110,6 @@ static int format_runtime_ring_file(
       goto fail_alloc_file;
     }
 
->>>>>>> upstream-incoming
     if (input_path) {
       err = snprintf_os(ring_file, RING_FILE_NAME_MAX_LEN,
                         T("%s/%d.events"), input_path, input_pid);
