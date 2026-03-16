@@ -155,11 +155,7 @@ let is_register = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true
   | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
 
-let is_non_zero_extending_arg = function
-  | Reg8L _ | Reg8H _ | Reg16 _ | Reg64 _ -> true
-  | Imm _ | Sym _ | Reg32 _ | Regf _ | Mem _ | Mem64_RIP _ -> false
-
-let is_safe_for_dead_register_opt = function
+let is_reg64 = function
   | Reg64 _ -> true
   | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Regf _ | Mem _
   | Mem64_RIP _ ->
@@ -204,7 +200,7 @@ let reg_is_written_by_arg target arg =
   | Regf _ -> equal_args target arg
   | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
 
-let reg_in_memory_address target arg =
+let reg_read_when_writing target arg =
   match arg with
   | Mem addr -> (
     match underlying_reg64 target with
@@ -214,9 +210,10 @@ let reg_in_memory_address target arg =
         | _ -> false)
       || (addr.scale <> 0 && equal_reg_idx (Scalar target_r64) addr.idx)
     | None -> false)
-  | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _
-  | Mem64_RIP _ ->
-    false
+  (* Writing to small registers implicitly reads the old register value to
+     update. *)
+  | Reg8L _ | Reg8H _ | Reg16 _ -> registers_alias target arg
+  | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _ | Mem64_RIP _ -> false
 
 let is_control_flow = function
   | J _ | JMP _ | CALL _ | RET -> true
@@ -229,9 +226,6 @@ let is_control_flow = function
   | SIMD _ | ADC _ | SBB _ ->
     false
 
-(* CR xclerc: in `writes_to_arg` and `reads_from_arg`, when there are
-   occurrences of `Reg64 RAX` or `Reg64 RDX`, consider checking for
-   subregisters. *)
 let writes_to_arg target = function
   | MOV (_, dst)
   | MOVSX (_, dst)
@@ -276,7 +270,7 @@ let writes_to_arg target = function
 
 let reads_from_arg target = function
   | MOV (src, dst) | MOVSX (src, dst) | MOVSXD (src, dst) | MOVZX (src, dst) ->
-    reg_appears_in_arg target src || reg_in_memory_address target dst
+    reg_appears_in_arg target src || reg_read_when_writing target dst
   | PUSH src -> reg_appears_in_arg target src
   | ADD (src, dst)
   | SUB (src, dst)
@@ -288,7 +282,8 @@ let reads_from_arg target = function
   | ADC (src, dst)
   | SBB (src, dst) ->
     reg_appears_in_arg target src || reg_appears_in_arg target dst
-  | LEA (src, _) | BSF (src, _) | BSR (src, _) -> reg_appears_in_arg target src
+  | LEA (src, dst) | BSF (src, dst) | BSR (src, dst) ->
+    reg_appears_in_arg target src || reg_read_when_writing target dst
   | SAL (src, dst) | SAR (src, dst) | SHR (src, dst) ->
     reg_appears_in_arg target src || reg_appears_in_arg target dst
   | CMOV (_, src, dst) ->
@@ -319,8 +314,8 @@ let reads_from_arg target = function
   | LOCK_OR (op1, op2)
   | LOCK_XOR (op1, op2) ->
     reg_appears_in_arg target op1 || reg_appears_in_arg target op2
-  | SET (_, dst) -> reg_in_memory_address target dst
-  | POP dst -> reg_in_memory_address target dst
+  | SET (_, dst) -> reg_read_when_writing target dst
+  | POP dst -> reg_read_when_writing target dst
   | CLDEMOTE arg -> reg_appears_in_arg target arg
   | PREFETCH (_, _, arg) -> reg_appears_in_arg target arg
   (* Conservative: assume SIMD, fences, and other instructions may read from
@@ -350,17 +345,6 @@ let find_next_occurrence_of_register target start_cell =
   in
   loop (DLL.next start_cell)
 
-let reads_flags = function
-  | J _ | CMOV _ | SET _ | ADC _ | SBB _ -> true
-  | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
-  | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
-  | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | BSF _ | BSR _
-  | BSWAP _ | JMP _ | CALL _ | RET | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _
-  | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _
-  | PREFETCH _ | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE
-  | MFENCE | SIMD _ ->
-    false
-
 let writes_flags = function
   | ADD _ | SUB _ | AND _ | OR _ | XOR _ | CMP _ | TEST _ | INC _ | DEC _
   | NEG _ | MUL _ | IMUL _ | IDIV _ | BSF _ | BSR _ | SAL _ | SAR _ | SHR _
@@ -372,24 +356,3 @@ let writes_flags = function
   | PREFETCH _ | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE
   | MFENCE | SIMD _ ->
     false
-
-let find_next_flag_use start_cell =
-  let rec loop cell_opt =
-    match cell_opt with
-    | None -> NotFound
-    | Some cell -> (
-      match DLL.value cell with
-      | Ins instr ->
-        if is_control_flow instr
-        then if reads_flags instr then ReadFound else NotFound
-        else if reads_flags instr
-        then ReadFound
-        else if writes_flags instr
-        then WriteFound
-        else loop (DLL.next cell)
-      | Directive _ ->
-        if is_hard_barrier (DLL.value cell)
-        then NotFound
-        else loop (DLL.next cell))
-  in
-  loop (DLL.next start_cell)
