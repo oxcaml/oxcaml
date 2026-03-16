@@ -96,10 +96,14 @@ module Deep = struct
   external reperform :
     'a t -> ('a, _, 'b) cont -> last_fiber -> 'b = "%reperform"
 
+  (* CR effect-syntax: Upstream the 3-parameter version of continuation and use
+     it to maintain type safety here. *)
+  let burn f k = f (Obj.magic k)
+
   let match_with comp arg handler =
     let effc eff k last_fiber =
       match handler.effc eff with
-      | Some f -> f (Cont k)
+      | Some f -> burn f (Cont k)
       | None -> reperform eff k last_fiber
     in
     with_stack handler.retc handler.exnc effc comp arg
@@ -110,10 +114,14 @@ module Deep = struct
   let try_with comp arg handler =
     let effc' eff k last_fiber =
       match handler.effc eff with
-      | Some f -> f (Cont k)
+      | Some f -> burn f (Cont k)
       | None -> reperform eff k last_fiber
     in
     with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
+
+  let continue k = burn continue k
+  let discontinue k = burn discontinue k
+  let discontinue_with_backtrace k = burn discontinue_with_backtrace k
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =
