@@ -284,7 +284,11 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let code_metadata = Env.get_code_metadata env code_id in
     let params_arity = Code_metadata.params_arity code_metadata in
     if not (C.check_arity params_arity args)
-    then Misc.fatal_errorf "Wrong arity for direct call";
+    then
+      Misc.fatal_errorf "Wrong arity for direct call:@ params_arity:@ %a@ args:@ (%a)@ apply:@ %a"
+        Flambda_arity.print params_arity
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space Printcmm.expression) args
+        Apply.print apply;
     let args =
       if Code_metadata.is_my_closure_used code_metadata
       then
