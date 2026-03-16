@@ -4407,6 +4407,46 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       | Asttypes.Mutable -> Lmutlet (k, id, duid, param, body)
       | Asttypes.Immutable -> Llet (Strict, k, id, duid, param, body)
       end
+  | Tpat_fun_layout { id; uid = duid; lpoly; _ } ->
+    assert (mutable_flag == Asttypes.Immutable);
+    let k = Typeopt.layout pat.pat_env pat.pat_loc arg_sort pat.pat_type in
+    let params =
+      List.map
+        (fun var ->
+          let id = (Jkind_types.Sort.Var.get_id var :> int) in
+          let name = Ident.create_sort_var id in
+          { name;
+            debug_uid = debug_uid_none;
+            layout = layout_unboxed_unit;
+            attributes = default_param_attribute;
+            mode = alloc_local})
+        (Val_lpoly.get_exn lpoly)
+    in
+    let f =
+      lfunction'
+        ~kind:(Curried { nlocal = 0 })
+        ~params
+        ~return:k
+        ~body:param
+        ~attr:default_function_attribute
+        ~loc:(Scoped_location.of_location ~scopes loc)
+        (* TODO: These modes are lies! *)
+        ~mode:alloc_heap
+        ~ret_mode:alloc_heap
+    in
+    let free_vars =
+      Ident.Map.of_set (fun ident ->
+        (* TODO: This is a hack! *)
+        match Subst.Lazy.force_value_description (Env.find_value (Path.Pident ident) pat.pat_env) with
+        | { val_type; val_kind = Val_reg sort; val_loc; _ } ->
+          let layout = Jkind.Sort.default_for_transl_and_get sort in
+          Typeopt.layout pat.pat_env val_loc layout val_type
+        | _ | exception Not_found ->
+          Misc.fatal_errorf "Failed to find value_desc for %a in %a"
+            Ident.print ident Printlambda.lambda param)
+        (Lambda.free_variables param)
+    in
+    Llet (Strict, k, id, duid, Ltemplate (f, free_vars), body)
   | _ ->
       let opt = ref false in
       let nraise = next_raise_count () in
