@@ -593,6 +593,13 @@ and raise_kind =
   | Raise_reraise
   | Raise_notrace
 
+let equal_raise_kind left right =
+  match left, right with
+  | Raise_regular, Raise_regular
+  | Raise_reraise, Raise_reraise
+  | Raise_notrace, Raise_notrace -> true
+  | (Raise_regular | Raise_reraise | Raise_notrace), _ -> false
+
 let generic_value =
   { raw_kind = Pgenval;
     nullable = Nullable;
@@ -2681,6 +2688,8 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
     layout_unboxed_product (List.map layout_of_const_sort sorts)
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
+  | Genvar _ ->
+    Misc.fatal_error "layout_of_const_sort: unexpected genvar"
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
@@ -2705,6 +2714,8 @@ let extern_repr_involves_unboxed_products extern_repr =
     false
   | Same_as_ocaml_repr (Univar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"
+  | Same_as_ocaml_repr (Genvar _) ->
+    Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected genvar"
 
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)

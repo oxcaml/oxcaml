@@ -1708,16 +1708,32 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   let res_used =
     match simd.res with
     | Res_none -> 0
-    | First_arg ->
-      assert (Reg.same_loc instr.arg.(0) instr.res.(0));
-      1
+    | Arg rr ->
+      Array.fold_left
+        (fun r a ->
+          let len = Simd.loc_reg_count simd.args.(a).loc in
+          let a = Simd.unarized_reg_index simd.args a in
+          for idx = 0 to len - 1 do
+            assert (Reg.same_loc instr.arg.(a + idx) instr.res.(r + idx))
+          done;
+          r + len)
+        0 rr
     | Res rr ->
       Array.iteri
         (fun i ({ loc; _ } : Simd.arg) -> assert_loc loc instr.res.(i))
         rr;
       Array.length rr
   in
-  assert (res_used = Array.length instr.res)
+  assert (res_used = Array.length instr.res);
+  (* Gathers require that all args are distinct registers. *)
+  match[@warning "-4"] simd.id with
+  | Vpgatherdd_X_M32X_X | Vpgatherdd_Y_M32Y_Y | Vpgatherdq_X_M32X_X
+  | Vpgatherdq_Y_M32X_Y | Vpgatherqd_X_M64X_X | Vpgatherqd_X_M64Y_X
+  | Vpgatherqq_X_M64X_X | Vpgatherqq_Y_M64Y_Y ->
+    let module Set = Reg.UsingLocEquality.Set in
+    let set = Array.fold_right Set.add instr.arg Set.empty in
+    assert (Set.cardinal set = Array.length instr.arg)
+  | _ -> ()
 
 let to_arg_with_width loc instr i =
   match Simd.loc_register_width loc with
@@ -1791,7 +1807,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   let args =
     match simd.res with
-    | Res_none | First_arg -> args
+    | Res_none | Arg _ -> args
     | Res rr ->
       Array.fold_left
         (fun (idx, acc) ({ loc; enc } : Simd.arg) ->

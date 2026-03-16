@@ -407,6 +407,7 @@ let read_one_param ppf position name v =
   | "Oclassic" -> if check_bool ppf "Oclassic" v then Clflags.set_oclassic ()
   | "O2" -> if check_bool ppf "O2" v then Clflags.set_o2 ()
   | "O3" -> if check_bool ppf "O3" v then Clflags.set_o3 ()
+  | "O4" -> if check_bool ppf "O4" v then Clflags.set_o4 ()
   | "unbox-closures" ->
       set "unbox-closures" [ unbox_closures ] v
   | "unbox-closures-factor" ->

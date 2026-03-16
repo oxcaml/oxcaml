@@ -1360,6 +1360,11 @@ let rec copy ?partial ?keep_names copy_scope ty =
               (* Return a new copy *)
               Tvariant (copy_row copy true row keep more')
           end
+      | Tvar { name; jkind } ->
+          let name = if keep_names = Some true then name else None in
+          Tvar { name; jkind = Jkind.instance jkind }
+      | Tunivar { name; jkind } ->
+          Tunivar { name; jkind = Jkind.instance jkind }
       | Tobject (ty1, _) when partial <> None ->
           Tobject (copy ty1, ref None)
       | _ -> copy_type_desc ?keep_names copy desc
@@ -1426,6 +1431,14 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_unboxed_default = false;
     type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
     type_unboxed_version = None;
+  }
+
+let new_local_jkind ?(loc = Location.none) ?manifest () =
+  {
+    jkind_manifest = manifest;
+    jkind_attributes = [];
+    jkind_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
+    jkind_loc = loc;
   }
 
 let existential_name name_counter ty =
@@ -5715,7 +5728,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    Usually, the subject is given by the user, and the pattern
    is unimportant.  So, no need to propagate abbreviations.
 *)
-let moregeneral env inst_nongen pat_sch subj_sch =
+let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
   let old_level = !current_level in
   current_level := generic_level - 1;
   (*
@@ -5724,17 +5737,42 @@ let moregeneral env inst_nongen pat_sch subj_sch =
      then copied with [duplicate_type].  That way, its levels won't be
      changed.
   *)
-  let subj_inst = instance subj_sch in
+  let (subj_sorts, subj_inst) =
+    Jkind_types.Sort.instance_with ~level:!current_level subj_sort_vars
+      (fun () -> instance subj_sch)
+  in
   let subj = duplicate_type subj_inst in
   current_level := generic_level;
   (* Duplicate generic variables *)
-  let patt = instance pat_sch in
+  let (pat_sorts, patt) =
+    Jkind_types.Sort.instance_with ~level:!current_level pat_sort_vars
+      (fun () -> instance pat_sch)
+  in
   Misc.try_finally
     (fun () ->
        try
          Misc.protect_refs [R (univar_pairs, [])] begin fun () ->
          let type_pairs = fresh_moregen_pairs () in
-         moregen inst_nongen Covariant type_pairs env patt subj
+         let (pat_sort_refs, ()) =
+           Jkind_types.Sort.sub_with pat_sorts (fun () ->
+             moregen inst_nongen Covariant type_pairs env patt subj)
+         in
+         (* [subj_sorts] are ephemeral rigid vars created by
+            [instance_with] to stand for [subj_sort_vars] during moregen.
+            Replace them back with the originals so that the returned
+            [pat_sort_refs] refer to [subj_sort_vars], not to the
+            short-lived rigid instances. *)
+         let subst_map = List.combine subj_sorts subj_sort_vars in
+         let rec subst_sort (s : Jkind_types.Sort.t) =
+           match s with
+           | Var v ->
+             (match List.assq_opt v subst_map with
+              | Some v' -> Jkind_types.Sort.Var v'
+              | None -> s)
+           | Base _ | Univar _ -> s
+           | Product ts -> Jkind_types.Sort.Product (List.map subst_sort ts)
+         in
+         List.map (Option.map subst_sort) pat_sort_refs
          end
        with Moregen_trace trace ->
          (* Moregen splits the generic level into two finer levels:
@@ -5751,8 +5789,8 @@ let moregeneral env inst_nongen pat_sch subj_sch =
     ~always:(fun () -> current_level := old_level)
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
-  match moregeneral env inst_nongen pat_sch subj_sch with
-  | () -> true
+  match moregeneral env inst_nongen [] [] pat_sch subj_sch with
+  | _ -> true
   | exception Moregen _ -> false
 
 let all_distinct_vars env vars =

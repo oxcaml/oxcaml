@@ -107,6 +107,7 @@ module Sort : sig
   module Flat : sig
     type t =
       | Var of Var.id
+      | Genvar of var
       | Univar of univar
       | Base of base
   end
@@ -135,6 +136,12 @@ module Layout : sig
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
       | Univar of Sort.univar
+      | Genvar of Sort.var
+          (** A layout variable bound by a surrounding [val_lpoly]. It's a
+              "fake" constant that will be instantiated to real layout constant
+              by slambda. The [var] is used only for physical identity; its
+              contents are not consumed and its level must be
+              [Ident.highest_scope]. *)
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t

@@ -162,7 +162,7 @@ module Namespace = struct
     | Jkind -> 7
      (* we do not handle those component *)
 
-  let size = 1 + id Unboxed_label
+  let size = 1 + id Jkind
 
 
   let pp ppf x =
@@ -737,10 +737,8 @@ and raw_type_desc ppf = function
         raw_type t
         raw_type_list tl
   | Trepr (t, sort_vars) ->
-      let print_sort_univar ppf (uv : Jkind_types.Sort.univar) =
-        match uv.name with
-        | Some n -> fprintf ppf "%s" n
-        | None -> fprintf ppf "_"
+      let print_sort_univar ppf uv =
+        fprintf ppf "%s" (Option.value uv.Jkind_types.Sort.name ~default:"_")
       in
       fprintf ppf "@[<hov1>Trepr(@,%a,@,[@[%a@]])@]"
         raw_type t
@@ -2385,7 +2383,13 @@ let tree_of_value_description id decl =
       Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         decl.val_modalities
   in
-  let qtvs = extract_qtvs [decl.val_type] in
+  let qsvs, qtvs =
+    (* Important: process the fvs *after* the type; tree_of_type_scheme
+       resets the naming context. Both must be inside print_with_genvars
+       so that sort poly var names are registered when jkinds are printed. *)
+    Jkind_types.Sort.print_with_genvars decl.val_lpoly (fun names ->
+      names, extract_qtvs [decl.val_type])
+  in
   let apparent_arity =
     let rec count n typ =
       match get_desc typ with
@@ -2422,7 +2426,7 @@ let tree_of_value_description id decl =
   in
   let vd =
     { oval_name = id;
-      oval_type = Otyp_poly(qtvs, ty);
+      oval_type = Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty));
       oval_modalities = tree_of_modalities Immutable moda;
       oval_prims = [];
       oval_attributes = attrs
