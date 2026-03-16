@@ -74,20 +74,10 @@ and scope_field = int
 and type_expr = transient_expr
 
 and type_desc =
-<<<<<<< oxcaml
   | Tvar of { name : string option; jkind : jkind_lr }
   | Tarrow of arrow_desc * type_expr * type_expr * commutable
   | Ttuple of (string option * type_expr) list
   | Tunboxed_tuple of (string option * type_expr) list
-||||||| upstream-base
-    Tvar of string option
-  | Tarrow of arg_label * type_expr * type_expr * commutable
-  | Ttuple of type_expr list
-=======
-    Tvar of string option
-  | Tarrow of arg_label * type_expr * type_expr * commutable
-  | Ttuple of (string option * type_expr) list
->>>>>>> upstream-incoming
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   | Tfield of string * field_kind * type_expr * type_expr
@@ -99,9 +89,8 @@ and type_desc =
   | Tvariant of row_desc
   | Tunivar of { name : string option; jkind : jkind_lr }
   | Tpoly of type_expr * type_expr list
-<<<<<<< oxcaml
   | Trepr of type_expr * Jkind_types.Sort.univar list
-  | Tpackage of Path.t * (Longident.t * type_expr) list
+  | Tpackage of package
   | Tof_kind of jkind_lr
 
 and arg_label =
@@ -112,15 +101,10 @@ and arg_label =
 
 and arrow_desc =
   arg_label * Mode.Alloc.lr * Mode.Alloc.lr
-||||||| upstream-base
-  | Tpackage of Path.t * (Longident.t * type_expr) list
-=======
-  | Tpackage of package
 
 and package =
     { pack_path : Path.t;
       pack_cstrs : (string list * type_expr) list }
->>>>>>> upstream-incoming
 
 and row_desc =
     { row_fields: (label * row_field) list;
@@ -461,15 +445,8 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
-<<<<<<< oxcaml
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
-||||||| upstream-base
-    ld_mutable: mutable_flag;
-=======
-    ld_mutable: mutable_flag;
-    ld_atomic: atomic_flag;
->>>>>>> upstream-incoming
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t;
     ld_loc: Location.t;
@@ -647,7 +624,6 @@ module Make_wrapped(Wrap : Wrap) = struct
   module rec M : Wrapped with type 'a wrapped = 'a Wrap.t = M
   include M
 
-<<<<<<< oxcaml
   let sort_of_signature_item = function
     | Sig_value(_, decl, _) ->
       begin match decl.val_kind with
@@ -744,32 +720,6 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
 end
 
 include Make_wrapped(struct type 'a t = 'a end)
-
-(* Constructor and record label descriptions inserted held in typing
-   environments *)
-
-type constructor_description =
-  { cstr_name: string;                  (* Constructor name *)
-    cstr_res: type_expr;                (* Type of the result *)
-    cstr_existentials: type_expr list;  (* list of existentials *)
-    cstr_args: constructor_argument list; (* Type of the arguments *)
-    cstr_arity: int;                    (* Number of arguments *)
-    cstr_tag: tag;                      (* Tag for heap blocks *)
-    cstr_repr: variant_representation;  (* Repr of the outer variant *)
-    cstr_shape: constructor_representation; (* Repr of the constructor itself *)
-    cstr_constant: bool;
-    (* True if it's the constructor of a non-[@@unboxed] variant with 0 bits of
-       payload. (Or equivalently, if it's represented as either a tagged int or
-       the null pointer) *)
-    cstr_consts: int;                   (* Number of constant constructors *)
-    cstr_nonconsts: int;                (* Number of non-const constructors *)
-    cstr_generalized: bool;             (* Constrained return type? *)
-    cstr_private: private_flag;         (* Read-only constructor? *)
-    cstr_loc: Location.t;
-    cstr_attributes: Parsetree.attributes;
-    cstr_inlined: type_declaration option;
-    cstr_uid: Uid.t;
-   }
 
 let equal_tag t1 t2 =
   match (t1, t2) with
@@ -894,48 +844,6 @@ let equal_record_representation r1 r2 = match r1, r2 with
 let equal_record_unboxed_product_representation r1 r2 = match r1, r2 with
   | Record_unboxed_product, Record_unboxed_product -> true
 
-let may_equal_constr c1 c2 =
-  c1.cstr_arity = c2.cstr_arity
-  && (match c1.cstr_tag,c2.cstr_tag with
-     | Extension _, Extension _ ->
-         (* extension constructors may be rebindings of each other *)
-         true
-     | tag1, tag2 ->
-         equal_tag tag1 tag2)
-
-type 'a gen_label_description =
-  { lbl_name: string;                   (* Short name *)
-    lbl_res: type_expr;                 (* Type of the result *)
-    lbl_arg: type_expr;                 (* Type of the argument *)
-    lbl_mut: mutability;                (* Is this a mutable field? *)
-    lbl_modalities: Mode.Modality.Const.t;(* Modalities on the field *)
-    lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
-    lbl_pos: int;                       (* Position in type *)
-    lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
-    lbl_repres: 'a;                     (* Representation for outer record *)
-    lbl_private: private_flag;          (* Read-only field? *)
-    lbl_loc: Location.t;
-    lbl_attributes: Parsetree.attributes;
-    lbl_uid: Uid.t;
-  }
-
-type label_description = record_representation gen_label_description
-
-type unboxed_label_description =
-  record_unboxed_product_representation gen_label_description
-
-type _ record_form =
-  | Legacy : record_representation record_form
-  | Unboxed_product : record_unboxed_product_representation record_form
-
-type record_form_packed =
-  | P : _ record_form -> record_form_packed
-
-let record_form_to_string (type rep) (record_form : rep record_form) =
-  match record_form with
-  | Legacy -> "record"
-  | Unboxed_product -> "unboxed record"
-
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
   | Base Value -> Value
@@ -974,55 +882,6 @@ let find_unboxed_type decl =
   | Type_abstract _ | Type_open ->
     None
 
-||||||| upstream-base
-
-(* Constructor and record label descriptions inserted held in typing
-   environments *)
-
-type constructor_description =
-  { cstr_name: string;                  (* Constructor name *)
-    cstr_res: type_expr;                (* Type of the result *)
-    cstr_existentials: type_expr list;  (* list of existentials *)
-    cstr_args: type_expr list;          (* Type of the arguments *)
-    cstr_arity: int;                    (* Number of arguments *)
-    cstr_tag: constructor_tag;          (* Tag for heap blocks *)
-    cstr_consts: int;                   (* Number of constant constructors *)
-    cstr_nonconsts: int;                (* Number of non-const constructors *)
-    cstr_generalized: bool;             (* Constrained return type? *)
-    cstr_private: private_flag;         (* Read-only constructor? *)
-    cstr_loc: Location.t;
-    cstr_attributes: Parsetree.attributes;
-    cstr_inlined: type_declaration option;
-    cstr_uid: Uid.t;
-   }
-
-and constructor_tag =
-    Cstr_constant of int                (* Constant constructor (an int) *)
-  | Cstr_block of int                   (* Regular constructor (a block) *)
-  | Cstr_unboxed                        (* Constructor of an unboxed type *)
-  | Cstr_extension of Path.t * bool     (* Extension constructor
-                                           true if a constant false if a block*)
-
-let equal_tag t1 t2 =
-  match (t1, t2) with
-  | Cstr_constant i1, Cstr_constant i2 -> i2 = i1
-  | Cstr_block i1, Cstr_block i2 -> i2 = i1
-  | Cstr_unboxed, Cstr_unboxed -> true
-  | Cstr_extension (path1, b1), Cstr_extension (path2, b2) ->
-      Path.same path1 path2 && b1 = b2
-  | (Cstr_constant _|Cstr_block _|Cstr_unboxed|Cstr_extension _), _ -> false
-
-let may_equal_constr c1 c2 =
-  c1.cstr_arity = c2.cstr_arity
-  && (match c1.cstr_tag,c2.cstr_tag with
-     | Cstr_extension _,Cstr_extension _ ->
-         (* extension constructors may be rebindings of each other *)
-         true
-     | tag1, tag2 ->
-         equal_tag tag1 tag2)
-
-=======
->>>>>>> upstream-incoming
 let item_visibility = function
   | Sig_value (_, _, vis)
   | Sig_type (_, _, _, vis)
@@ -1252,16 +1111,11 @@ module Transient_expr = struct
     | _ -> assert false);
     ty.desc <- d
   let set_level ty lv = ty.level <- lv
-<<<<<<< oxcaml
   let set_var_jkind ty jkind' =
     match ty.desc with
     | Tvar { name; _ } ->
       set_desc ty (Tvar { name; jkind = jkind' })
     | _ -> Misc.fatal_error "set_var_jkind called on non-var"
-||||||| upstream-base
-  let set_scope ty sc = ty.scope <- sc
-=======
->>>>>>> upstream-incoming
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
   let set_scope ty sc =
@@ -1330,7 +1184,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tfield (_, _, _, _)
         | Tnil
         | Tvariant _
-        | Tpackage (_, _)
+        | Tpackage _
         | Tarrow (_, _, _, _)
         | Tquote _
         | Tsplice _
@@ -1686,15 +1540,10 @@ let set_scope ty scope =
     if ty.id <= !last_snapshot then log_change (Cscope (ty, prev_scope));
     Transient_expr.set_scope ty scope
   end
-<<<<<<< oxcaml
 let set_var_jkind ty jkind =
   let ty = repr ty in
   log_type ty;
   Transient_expr.set_var_jkind ty jkind
-||||||| upstream-base
-=======
-
->>>>>>> upstream-incoming
 let set_univar rty ty =
   log_change (Cuniv (rty, !rty)); rty := Some ty
 let set_name nm v =

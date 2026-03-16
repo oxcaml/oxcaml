@@ -318,25 +318,13 @@ let extension_constructor sub x =
 
 let pat_extra sub = function
   | Tpat_unpack as d -> d
-<<<<<<< oxcaml
-  | Tpat_type (path,loc) -> Tpat_type (path, map_loc sub loc)
-  | Tpat_open (path,loc,env) ->
-      Tpat_open (path, map_loc sub loc, sub.env sub env)
+  | Tpat_type (path,lid) -> Tpat_type (path, map_loc_lid sub lid)
+  | Tpat_open (path,lid,env) ->
+      Tpat_open (path, map_loc_lid sub lid, sub.env sub env)
   | Tpat_constraint (ct, ma) ->
     Tpat_constraint (sub.typ sub ct, sub.modes sub ma)
   | Tpat_inspected_type (Label_disambiguation _) as d -> d
   | Tpat_inspected_type (Polymorphic_parameter (Param _)) as d -> d
-||||||| upstream-base
-  | Tpat_type (path,loc) -> Tpat_type (path, map_loc sub loc)
-  | Tpat_open (path,loc,env) ->
-      Tpat_open (path, map_loc sub loc, sub.env sub env)
-  | Tpat_constraint ct -> Tpat_constraint (sub.typ sub ct)
-=======
-  | Tpat_type (path,lid) -> Tpat_type (path, map_loc_lid sub lid)
-  | Tpat_open (path,lid,env) ->
-      Tpat_open (path, map_loc_lid sub lid, sub.env sub env)
-  | Tpat_constraint ct -> Tpat_constraint (sub.typ sub ct)
->>>>>>> upstream-incoming
 
 let pat
   : type k . mapper -> k general_pattern -> k general_pattern
@@ -348,7 +336,6 @@ let pat
   let pat_desc : k pattern_desc =
     match x.pat_desc with
     | Tpat_any
-<<<<<<< oxcaml
     | Tpat_constant _
     | Tpat_unboxed_unit
     | Tpat_unboxed_bool _ -> x.pat_desc
@@ -359,56 +346,26 @@ let pat
     | Tpat_unboxed_tuple l ->
       Tpat_unboxed_tuple
         (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
-    | Tpat_construct (loc, cd, l, vto) ->
-||||||| upstream-base
-    | Tpat_constant _ -> x.pat_desc
-    | Tpat_var (id, s) -> Tpat_var (id, map_loc sub s)
-    | Tpat_tuple l -> Tpat_tuple (List.map (sub.pat sub) l)
-    | Tpat_construct (loc, cd, l, vto) ->
-=======
-    | Tpat_constant _ -> x.pat_desc
-    | Tpat_var (id, s, uid) -> Tpat_var (id, map_loc sub s, uid)
-    | Tpat_tuple l ->
-        Tpat_tuple (List.map (fun (label, p) -> label, sub.pat sub p) l)
     | Tpat_construct (lid, cd, l, vto) ->
->>>>>>> upstream-incoming
         let vto = Option.map (fun (vl,cty) ->
-<<<<<<< oxcaml
           List.map
             (fun (v, jk) ->
                (map_loc sub v,
                 Option.map (sub.jkind_annotation sub) jk))
             vl, sub.typ sub cty) vto in
-        Tpat_construct (map_loc sub loc, cd, List.map (sub.pat sub) l, vto)
-||||||| upstream-base
-          List.map (map_loc sub) vl, sub.typ sub cty) vto in
-        Tpat_construct (map_loc sub loc, cd, List.map (sub.pat sub) l, vto)
-=======
-          List.map (map_loc sub) vl, sub.typ sub cty) vto in
         Tpat_construct (map_loc_lid sub lid, cd, List.map (sub.pat sub) l, vto)
->>>>>>> upstream-incoming
     | Tpat_variant (l, po, rd) ->
         Tpat_variant (l, Option.map (sub.pat sub) po, rd)
     | Tpat_record (l, closed) ->
-<<<<<<< oxcaml
-        Tpat_record (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
-    | Tpat_record_unboxed_product (l, closed) ->
-        Tpat_record_unboxed_product
-          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
-    | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
-    | Tpat_alias (p, id, s, uid, sort, m, ty) ->
-        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
-||||||| upstream-base
-        Tpat_record (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
-    | Tpat_array l -> Tpat_array (List.map (sub.pat sub) l)
-    | Tpat_alias (p, id, s) -> Tpat_alias (sub.pat sub p, id, map_loc sub s)
-=======
         Tpat_record
           (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, closed)
-    | Tpat_array (mut, l) -> Tpat_array (mut, List.map (sub.pat sub) l)
-    | Tpat_alias (p, id, s, uid, ty) ->
-        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, ty)
->>>>>>> upstream-incoming
+    | Tpat_record_unboxed_product (l, closed) ->
+        Tpat_record_unboxed_product
+          (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, closed)
+    | Tpat_array (am, arg_sort, l) ->
+        Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
+    | Tpat_alias (p, id, s, uid, sort, m, ty) ->
+        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -543,12 +500,12 @@ let expr sub x =
     Array.map (function
       | label, Kept (t, mut, uu) -> label, Kept (t, mut, uu)
       | label, Overridden (lid, exp) ->
-          label, Overridden (map_loc sub lid, sub.expr sub exp))
+          label, Overridden (map_loc_lid sub lid, sub.expr sub exp))
       fields
   in
   let map_block_access sub = function
     | Baccess_field (lid, ld) ->
-      Baccess_field (map_loc sub lid, ld)
+      Baccess_field (map_loc_lid sub lid, ld)
     | Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort } ->
       let index = sub.expr sub index in
       Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
@@ -557,20 +514,12 @@ let expr sub x =
   in
   let map_unboxed_access sub = function
     | Uaccess_unboxed_field (lid, ld) ->
-      Uaccess_unboxed_field (map_loc sub lid, ld)
+      Uaccess_unboxed_field (map_loc_lid sub lid, ld)
   in
   let exp_desc =
     match x.exp_desc with
-<<<<<<< oxcaml
     | Texp_ident (path, lid, vd, idk, uu, mode) ->
-        Texp_ident (path, map_loc sub lid, vd, idk, uu, mode)
-||||||| upstream-base
-    | Texp_ident (path, lid, vd) ->
-        Texp_ident (path, map_loc sub lid, vd)
-=======
-    | Texp_ident (path, lid, vd) ->
-        Texp_ident (path, map_loc_lid sub lid, vd)
->>>>>>> upstream-incoming
+        Texp_ident (path, map_loc_lid sub lid, vd, idk, uu, mode)
     | Texp_constant _ as d -> d
     | Texp_let (rec_flag, list, exp) ->
         let (rec_flag, list) = sub.value_bindings sub (rec_flag, list) in
@@ -587,25 +536,12 @@ let expr sub x =
     | Texp_apply (exp, list, pos, am, za) ->
         Texp_apply (
           sub.expr sub exp,
-<<<<<<< oxcaml
-          List.map (function
-            | (lbl, Arg (exp, sort)) -> (lbl, Arg (sub.expr sub exp, sort))
-            | (lbl, Omitted o) -> (lbl, Omitted o))
+          List.map
+            (tuple2 id (Typedtree.map_apply_arg (tuple2 (sub.expr sub) id)))
             list,
           pos, am, za
-||||||| upstream-base
-          List.map (tuple2 id (Option.map (sub.expr sub))) list
-=======
-          List.map (tuple2 id (Typedtree.map_apply_arg (sub.expr sub))) list
->>>>>>> upstream-incoming
         )
-<<<<<<< oxcaml
-    | Texp_match (exp, sort, cases, p) ->
-||||||| upstream-base
-    | Texp_match (exp, cases, p) ->
-=======
-    | Texp_match (exp, cases, eff_cases, p) ->
->>>>>>> upstream-incoming
+    | Texp_match (exp, sort, cases, eff_cases, p) ->
         Texp_match (
           sub.expr sub exp,
           sort,
@@ -619,7 +555,6 @@ let expr sub x =
           List.map (sub.case sub) exn_cases,
           List.map (sub.case sub) eff_cases
         )
-<<<<<<< oxcaml
     | Texp_unboxed_unit -> Texp_unboxed_unit
     | Texp_unboxed_bool b -> Texp_unboxed_bool b
     | Texp_tuple (list, am) ->
@@ -628,41 +563,11 @@ let expr sub x =
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
     | Texp_construct (lid, cd, args, am) ->
-        Texp_construct (map_loc sub lid, cd, List.map (sub.expr sub) args, am)
-||||||| upstream-base
-    | Texp_tuple list ->
-        Texp_tuple (List.map (sub.expr sub) list)
-    | Texp_construct (lid, cd, args) ->
-        Texp_construct (map_loc sub lid, cd, List.map (sub.expr sub) args)
-=======
-    | Texp_tuple list ->
-        Texp_tuple (List.map (fun (label, e) -> label, sub.expr sub e) list)
-    | Texp_construct (lid, cd, args) ->
-        Texp_construct (map_loc_lid sub lid, cd, List.map (sub.expr sub) args)
->>>>>>> upstream-incoming
+        Texp_construct
+          (map_loc_lid sub lid, cd, List.map (sub.expr sub) args, am)
     | Texp_variant (l, expo) ->
-<<<<<<< oxcaml
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
     | Texp_record { fields; representation; extended_expression; alloc_mode } ->
-||||||| upstream-base
-        Texp_variant (l, Option.map (sub.expr sub) expo)
-    | Texp_record { fields; representation; extended_expression } ->
-        let fields = Array.map (function
-            | label, Kept (t, mut) -> label, Kept (t, mut)
-            | label, Overridden (lid, exp) ->
-                label, Overridden (map_loc sub lid, sub.expr sub exp))
-            fields
-        in
-=======
-        Texp_variant (l, Option.map (sub.expr sub) expo)
-    | Texp_record { fields; representation; extended_expression } ->
-        let fields = Array.map (function
-            | label, Kept (t, mut) -> label, Kept (t, mut)
-            | label, Overridden (lid, exp) ->
-                label, Overridden (map_loc_lid sub lid, sub.expr sub exp))
-            fields
-        in
->>>>>>> upstream-incoming
         Texp_record {
           fields = map_fields fields; representation;
           extended_expression =
@@ -670,7 +575,6 @@ let expr sub x =
               extended_expression;
           alloc_mode
         }
-<<<<<<< oxcaml
     | Texp_record_unboxed_product
           { fields; representation; extended_expression } ->
         Texp_record_unboxed_product {
@@ -680,36 +584,20 @@ let expr sub x =
               (fun (exp, sort) -> (sub.expr sub exp, sort)) extended_expression
         }
     | Texp_field (exp, sort, lid, ld, float, ubr) ->
-        Texp_field (sub.expr sub exp, sort, map_loc sub lid, ld, float, ubr)
+        Texp_field (sub.expr sub exp, sort, map_loc_lid sub lid, ld, float, ubr)
     | Texp_unboxed_field (exp, sort, lid, ld, uu) ->
-        Texp_unboxed_field (sub.expr sub exp, sort, map_loc sub lid, ld, uu)
+        Texp_unboxed_field (sub.expr sub exp, sort, map_loc_lid sub lid, ld, uu)
     | Texp_setfield (exp1, am, lid, ld, exp2) ->
-||||||| upstream-base
-    | Texp_field (exp, lid, ld) ->
-        Texp_field (sub.expr sub exp, map_loc sub lid, ld)
-    | Texp_setfield (exp1, lid, ld, exp2) ->
-=======
-    | Texp_field (exp, lid, ld) ->
-        Texp_field (sub.expr sub exp, map_loc_lid sub lid, ld)
-    | Texp_setfield (exp1, lid, ld, exp2) ->
->>>>>>> upstream-incoming
         Texp_setfield (
           sub.expr sub exp1,
-<<<<<<< oxcaml
           am,
-          map_loc sub lid,
-||||||| upstream-base
-          map_loc sub lid,
-=======
           map_loc_lid sub lid,
->>>>>>> upstream-incoming
           ld,
           sub.expr sub exp2
         )
-<<<<<<< oxcaml
     | Texp_atomic_loc (exp, sort, lid, ld, alloc_mode) ->
         Texp_atomic_loc
-          (sub.expr sub exp, sort, map_loc sub lid, ld, alloc_mode)
+          (sub.expr sub exp, sort, map_loc_lid sub lid, ld, alloc_mode)
     | Texp_array (amut, sort, list, alloc_mode) ->
         Texp_array (amut, sort, List.map (sub.expr sub) list, alloc_mode)
     | Texp_idx (ba, uas) ->
@@ -719,15 +607,6 @@ let expr sub x =
         Texp_list_comprehension (map_comprehension comp)
     | Texp_array_comprehension (amut, sort, comp) ->
         Texp_array_comprehension (amut, sort, map_comprehension comp)
-||||||| upstream-base
-    | Texp_array list ->
-        Texp_array (List.map (sub.expr sub) list)
-=======
-    | Texp_atomic_loc (exp, lid, ld) ->
-        Texp_atomic_loc (sub.expr sub exp, map_loc sub lid, ld)
-    | Texp_array (mut, list) ->
-        Texp_array (mut, List.map (sub.expr sub) list)
->>>>>>> upstream-incoming
     | Texp_ifthenelse (exp1, exp2, expo) ->
         Texp_ifthenelse (
           sub.expr sub exp1,
@@ -759,17 +638,9 @@ let expr sub x =
     | Texp_new (path, lid, cd, apos) ->
         Texp_new (
           path,
-<<<<<<< oxcaml
-          map_loc sub lid,
+          map_loc_lid sub lid,
           cd,
           apos
-||||||| upstream-base
-          map_loc sub lid,
-          cd
-=======
-          map_loc_lid sub lid,
-          cd
->>>>>>> upstream-incoming
         )
     | Texp_instvar (path1, path2, id) ->
         Texp_instvar (
@@ -941,7 +812,7 @@ let module_type sub x =
     | Tmty_typeof mexpr ->
         Tmty_typeof (sub.module_expr sub mexpr)
     | Tmty_strengthen (mtype, p, lid) ->
-        Tmty_strengthen (sub.module_type sub mtype, p, lid)
+        Tmty_strengthen (sub.module_type sub mtype, p, map_loc_lid sub lid)
   in
   let mty_attributes = sub.attributes sub x.mty_attributes in
   {x with mty_loc; mty_desc; mty_env; mty_attributes}
@@ -988,6 +859,13 @@ let module_coercion sub = function
 let module_expr sub x =
   let mod_loc = sub.location sub x.mod_loc in
   let mod_env = sub.env sub x.mod_env in
+  let mod_mode =
+    match x.mod_mode with
+    | _, None -> x.mod_mode
+    | mode, Some (locks, txt, loc) ->
+      let { txt; loc } = map_loc_lid sub { txt; loc } in
+      mode, Some (locks, txt, loc)
+  in
   let mod_desc =
     match x.mod_desc with
     | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc_lid sub lid)
@@ -1020,7 +898,7 @@ let module_expr sub x =
           )
   in
   let mod_attributes = sub.attributes sub x.mod_attributes in
-  {x with mod_loc; mod_desc; mod_env; mod_attributes}
+  {x with mod_loc; mod_desc; mod_mode; mod_env; mod_attributes}
 
 let module_binding sub x =
   let mb_loc = sub.location sub x.mb_loc in
@@ -1055,16 +933,9 @@ let class_expr sub x =
     | Tcl_apply (cl, args) ->
         Tcl_apply (
           sub.class_expr sub cl,
-<<<<<<< oxcaml
-          List.map (function
-            | (lbl, Arg (exp, sort)) -> (lbl, Arg (sub.expr sub exp, sort))
-            | (lbl, Omitted o) -> (lbl, Omitted o))
+          List.map
+            (tuple2 id (Typedtree.map_apply_arg (tuple2 (sub.expr sub) id)))
             args
-||||||| upstream-base
-          List.map (tuple2 id (Option.map (sub.expr sub))) args
-=======
-          List.map (tuple2 id (Typedtree.map_apply_arg (sub.expr sub))) args
->>>>>>> upstream-incoming
         )
     | Tcl_let (rec_flag, value_bindings, ivars, cl) ->
         let (rec_flag, value_bindings) =
@@ -1136,7 +1007,6 @@ let typ sub x =
   let ctyp_env = sub.env sub x.ctyp_env in
   let ctyp_desc =
     match x.ctyp_desc with
-<<<<<<< oxcaml
     | (Ttyp_var (_,None) | Ttyp_call_pos) as d -> d
     | Ttyp_var (s, Some jkind) ->
         Ttyp_var (s, Some (sub.jkind_annotation sub jkind))
@@ -1148,20 +1018,6 @@ let typ sub x =
     | Ttyp_unboxed_tuple list ->
         Ttyp_unboxed_tuple
           (List.map (fun (label, t) -> label, sub.typ sub t) list)
-||||||| upstream-base
-    | Ttyp_any
-    | Ttyp_var _ as d -> d
-    | Ttyp_arrow (label, ct1, ct2) ->
-        Ttyp_arrow (label, sub.typ sub ct1, sub.typ sub ct2)
-    | Ttyp_tuple list -> Ttyp_tuple (List.map (sub.typ sub) list)
-=======
-    | Ttyp_any
-    | Ttyp_var _ as d -> d
-    | Ttyp_arrow (label, ct1, ct2) ->
-        Ttyp_arrow (label, sub.typ sub ct1, sub.typ sub ct2)
-    | Ttyp_tuple list ->
-        Ttyp_tuple (List.map (fun (label, t) -> label, sub.typ sub t) list)
->>>>>>> upstream-incoming
     | Ttyp_constr (path, lid, list) ->
         Ttyp_constr (path, map_loc_lid sub lid, List.map (sub.typ sub) list)
     | Ttyp_object (list, closed) ->
@@ -1182,18 +1038,12 @@ let typ sub x =
     | Ttyp_package pack ->
         Ttyp_package (sub.package_type sub pack)
     | Ttyp_open (path, mod_ident, t) ->
-<<<<<<< oxcaml
-        Ttyp_open (path, map_loc sub mod_ident, sub.typ sub t)
+        Ttyp_open (path, map_loc_lid sub mod_ident, sub.typ sub t)
     | Ttyp_repr (vars, ct) -> Ttyp_repr (vars, sub.typ sub ct)
     | Ttyp_of_kind jkind ->
         Ttyp_of_kind (sub.jkind_annotation sub jkind)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ttyp_splice (sub.typ sub t)
-||||||| upstream-base
-        Ttyp_open (path, map_loc sub mod_ident, sub.typ sub t)
-=======
-        Ttyp_open (path, map_loc_lid sub mod_ident, sub.typ sub t)
->>>>>>> upstream-incoming
   in
   let ctyp_attributes = sub.attributes sub x.ctyp_attributes in
   {x with ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes}
