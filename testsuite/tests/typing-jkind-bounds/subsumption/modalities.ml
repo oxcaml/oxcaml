@@ -632,3 +632,152 @@ Line 1, characters 29-38:
                                  ^^^^^^^^^
 Error: Unrecognized modality separable.
 |}]
+
+(* singleton unboxed types *)
+
+module M : sig
+  type ('a : bits64) t : bits64 mod portable with 'a @@ external_
+  (* CR layouts: the below type should also be [portable with 'a @@ external_]*)
+  type ('a : bits64) t2 : bits64 with 'a @@ external_
+end = struct
+  type ('a : bits64) t = { x : 'a } [@@unboxed]
+  type ('a : bits64) t2 = #{ x : 'a t }
+end
+
+type 'a check_m_t_always_external : bits64 = 'a M.t
+type 'a check_m_t2_always_external : bits64 = 'a M.t2
+[%%expect{|
+module M :
+  sig
+    type ('a : bits64) t : bits64 mod portable with 'a @@ external_
+    type ('a : bits64) t2 : bits64
+  end
+type ('a : bits64) check_m_t_always_external = 'a M.t
+type ('a : bits64) check_m_t2_always_external = 'a M.t2
+|}]
+
+type 'a check_m_t_not_always_portable : any mod portable = 'a M.t
+[%%expect{|
+Line 1, characters 0-65:
+1 | type 'a check_m_t_not_always_portable : any mod portable = 'a M.t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a M.t" is bits64 mod portable with 'a @@ external_
+         because of the definition of t at line 2, characters 2-65.
+       But the kind of type "'a M.t" must be a subkind of any mod portable
+         because of the definition of check_m_t_not_always_portable at line 1, characters 0-65.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a ≰ mod portable
+|}]
+
+type 'a check_m_t2_not_always_portable : any mod portable = 'a M.t2
+[%%expect{|
+Line 1, characters 0-67:
+1 | type 'a check_m_t2_not_always_portable : any mod portable = 'a M.t2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a M.t2" is bits64
+         because of the definition of t2 at line 4, characters 2-53.
+       But the kind of type "'a M.t2" must be a subkind of any mod portable
+         because of the definition of check_m_t2_not_always_portable at line 1, characters 0-67.
+|}]
+
+(* unboxed products *)
+
+module M : sig
+  type ('a : bits64) t : bits64 & bits64 mod portable with 'a @@ external_
+end = struct
+  type ('a : bits64) t = #('a * 'a)
+end
+
+type 'a check_m_t_always_external : bits64 & bits64 = 'a M.t
+[%%expect{|
+module M :
+  sig
+    type ('a : bits64) t
+      : bits64 mod portable with 'a @@ external_
+        & bits64 mod portable with 'a @@ external_
+  end
+type ('a : bits64) check_m_t_always_external = 'a M.t
+|}]
+
+type 'a check_m_t_not_always_portable : any mod portable = 'a M.t
+[%%expect{|
+Line 1, characters 0-65:
+1 | type 'a check_m_t_not_always_portable : any mod portable = 'a M.t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a M.t" is
+           bits64 mod portable with 'a @@ external_
+           & bits64 mod portable with 'a @@ external_
+         because of the definition of t at line 2, characters 2-74.
+       But the kind of type "'a M.t" must be a subkind of any mod portable
+         because of the definition of check_m_t_not_always_portable at line 1, characters 0-65.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a ≰ mod portable
+|}]
+
+
+(* inheriting a with-bound from a field *)
+type 'a t : value mod external_ portable with 'a @@ external_
+
+type 'a check : value & void mod external_ portable with 'a @@ external_
+  = #{ a : 'a t; u : unit# }
+[%%expect{|
+type 'a t : value mod portable external_ with 'a @@ external_
+type 'a check = #{ a : 'a t; u : unit#; }
+|}]
+
+type 'a not_always_portable : any mod portable
+  = #{ a : 'a t; u : unit# }
+[%%expect{|
+Lines 1-2, characters 0-28:
+1 | type 'a not_always_portable : any mod portable
+2 |   = #{ a : 'a t; u : unit# }
+Error: The kind of type "not_always_portable" is
+           immediate with 'a t & void mod everything with 'a t
+         because it is an unboxed record.
+       But the kind of type "not_always_portable" must be a subkind of
+           value_or_null mod portable & void mod portable
+         because of the annotation on the declaration of the type not_always_portable.
+|}]
+
+(* GADTs *)
+
+type 'a t : value mod external_ portable with 'a @@ external_
+[%%expect{|
+type 'a t : value mod portable external_ with 'a @@ external_
+|}]
+
+type packed : value mod external_ = T : 'a t -> packed [@@unboxed]
+[%%expect{|
+type packed = T : 'a t -> packed [@@unboxed]
+|}]
+
+type boxed_packed_not_external : value mod external_ = T : 'a t -> boxed_packed_not_external
+[%%expect{|
+Line 1, characters 0-92:
+1 | type boxed_packed_not_external : value mod external_ = T : 'a t -> boxed_packed_not_external
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "boxed_packed_not_external" is
+           immutable_data with (type : value) t
+         because it's a boxed variant type.
+       But the kind of type "boxed_packed_not_external" must be a subkind of
+           value mod external_
+         because of the annotation on the declaration of the type boxed_packed_not_external.
+|}]
+
+type packed_not_portable : value mod portable = T : 'a t -> packed_not_portable [@@unboxed]
+[%%expect{|
+Line 1, characters 0-91:
+1 | type packed_not_portable : value mod portable = T : 'a t -> packed_not_portable [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "packed_not_portable" is
+           value mod portable external_ with 'a @@ external_
+         because of the definition of t at line 1, characters 0-61.
+       But the kind of type "packed_not_portable" must be a subkind of
+           value mod portable
+         because of the annotation on the declaration of the type packed_not_portable.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a ≰ mod portable
+|}]
