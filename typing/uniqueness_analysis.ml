@@ -2350,6 +2350,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_ident _ as exp_desc ->
     let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
     UF.seq uf (Value.mark_maybe_unique value)
+  | Texp_apply_layout (exp, _) -> check_uniqueness_exp ~overwrite:None ienv exp
   | Texp_constant _ -> UF.unused
   | Texp_let (_, vbs, body) ->
     let ext, uf_vbs = check_uniqueness_value_bindings ienv vbs in

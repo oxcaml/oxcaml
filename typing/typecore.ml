@@ -300,7 +300,13 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Let_poly_not_yet_implemented
-  | Layout_poly_inst_not_yet_supported
+  | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+
+and invalid_layout_poly_inst_context =
+  | Ivar
+  | Mutvar
+  | Self
+  | Binding_op
 
 
 let not_principal fmt =
@@ -4601,6 +4607,7 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
 
 let rec is_nonexpansive exp =
   match exp.exp_desc with
+  | Texp_apply_layout (e, _) -> is_nonexpansive e
   | Texp_ident _
   | Texp_constant _
   | Texp_unboxed_unit
@@ -5286,6 +5293,7 @@ let check_partial_application ~statement exp =
                 check e; List.iter (fun {c_rhs; _} -> check c_rhs) cases
             | Texp_ifthenelse (_, e1, Some e2) ->
                 check e1; check e2
+            | Texp_apply_layout (e, _) -> check e
             | Texp_let (_, _, e) | Texp_letmutable(_, e)
             | Texp_sequence (_, _, e) | Texp_open (_, e)
             | Texp_letexception (_, e) | Texp_letmodule (_, _, _, _, e)
@@ -5967,6 +5975,10 @@ let rec type_exp ?recarg ?(overwrite=No_overwrite) env expected_mode sexp =
    at [generic_level] (but its variables no higher than [!current_level]).
  *)
 
+and check_layout_args_empty ~loc ~env layout_args ctx =
+  if not (List.is_empty layout_args) then
+    raise (Error (loc, env, Layout_poly_inst_not_yet_supported ctx))
+
 and type_expect ?recarg ?(overwrite=No_overwrite) env
       (expected_mode : expected_mode) sexp ty_expected_explained =
   let previous_saved_types = Cmt_format.get_saved_types () in
@@ -6283,12 +6295,13 @@ and type_expect_
   in
   match desc with
   | Pexp_ident lid ->
-      let path, actual_mode, desc, kind =
+      let path, actual_mode, layout_args, desc, kind =
         type_ident env ~recarg lid
       in
       let exp_desc =
         match desc.val_kind with
         | Val_ivar (_, cl_num) ->
+            check_layout_args_empty ~loc ~env layout_args Ivar;
             let (self_path, _) =
               Env.find_value_by_name_lazy
                 (Longident.Lident ("self-" ^ cl_num)) env
@@ -6298,6 +6311,7 @@ and type_expect_
                              Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
         | Val_mut (_m0, _) -> begin
+            check_layout_args_empty ~loc ~env layout_args Mutvar;
             match path with
             | Path.Pident id ->
               let modalities = Typemode.let_mutable_modalities in
@@ -6309,6 +6323,7 @@ and type_expect_
                 bad mutable variable identifier"
           end
         | Val_self (_, _, _, cl_num) ->
+            check_layout_args_empty ~loc ~env layout_args Self;
             let (path, _) =
               Env.find_value_by_name_lazy
                 (Longident.Lident ("self-" ^ cl_num))
@@ -6329,7 +6344,8 @@ and type_expect_
         exp_env = env }
       in
       submode ~loc ~env actual_mode expected_mode;
-      exp
+      if List.is_empty layout_args then exp
+      else { exp with exp_desc = Texp_apply_layout (exp, layout_args) }
   | Pexp_constant(Pconst_string (str, _, _) as cst) -> (
       let cst = constant_or_raise env loc cst in
       (* Terrible hack for format strings *)
@@ -8221,8 +8237,6 @@ and type_ident env ?(recarg=Rejected) lid =
 
   Therefore, we need to cross modes upon look-up. Ideally that should be done in
   [Env], but that is difficult due to cyclic dependency between jkind and env. *)
-  if not @@ List.is_empty (Lpoly.get_exn desc.val_lpoly) then
-    raise (Error (lid.loc, env, Layout_poly_inst_not_yet_supported));
   let mode = cross_left env desc.val_type mode in
   (* There can be locks between the definition and a use of a value. For
   example, if a function closes over a value, there will be Closure_lock between
@@ -8274,9 +8288,11 @@ and type_ident env ?(recarg=Rejected) lid =
       raise (Error (lid.loc, env, Inlined_record_escape))
   | false, Required, _  -> () (* will fail later *)
   end;
-  let val_type, kind =
+  let layout_args, val_type, kind =
     match desc.val_kind with
     | Val_prim prim ->
+       if not (List.is_empty (Lpoly.get_exn desc.val_lpoly)) then
+         Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
        begin match prim.prim_native_repr_res, mode with
@@ -8286,15 +8302,25 @@ and type_ident env ?(recarg=Rejected) lid =
            register_allocation_mode (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
        end;
-       ty, Id_prim (Option.map Locality.disallow_right mode, sort)
+       [], ty, Id_prim (Option.map Locality.disallow_right mode, sort)
     | _ ->
-       instance desc.val_type, Id_value in
-  path, actual_mode, { desc with val_type }, kind
+       let layout_args, val_type =
+         Jkind_types.Sort.instance_with ~level:(get_current_level ())
+           (Lpoly.get_exn desc.val_lpoly)
+           (fun () -> instance desc.val_type)
+       in
+       layout_args, val_type, Id_value
+  in
+  (* after layout instantiation, the value loses layout polymorphism. *)
+  let val_lpoly = Lpoly.determined [] in
+  path, actual_mode, layout_args,
+  { desc with val_type; val_lpoly }, kind
 
 and type_binding_op_ident env s =
   let loc = s.loc in
   let lid = Location.mkloc (Longident.Lident s.txt) loc in
-  let path, actual_mode, desc, kind = type_ident env lid in
+  let path, actual_mode, layout_args, desc, kind = type_ident env lid in
+  check_layout_args_empty ~loc ~env layout_args Binding_op;
   submode ~env ~loc:lid.loc ~reason:Other actual_mode mode_legacy;
   let path =
     match desc.val_kind with
@@ -12446,9 +12472,16 @@ let report_error ~loc env =
       Location.errorf ~loc
         "The %a annotation is not yet implemented."
         Style.inline_code "let poly_"
-  | Layout_poly_inst_not_yet_supported ->
+  | Layout_poly_inst_not_yet_supported ctx ->
+      let ctx_str = match ctx with
+        | Ivar -> "instance variables"
+        | Mutvar -> "mutable variables"
+        | Self -> "self variables"
+        | Binding_op -> "binding operators"
+      in
       Location.errorf ~loc
-        "Instantiation of layout-polymorphic values is not yet supported."
+        "Instantiation of layout-polymorphic values is not yet supported \
+         for %s." ctx_str
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env
