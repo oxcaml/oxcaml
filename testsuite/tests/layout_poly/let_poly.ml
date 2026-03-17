@@ -6,8 +6,8 @@
 (* CR-soon zqian: Layout poly currently raises in lambda and middle-end.
 Therefore, in the following typing tests, we intentionally write the wrong
 signature such that the inferred signature can be printed and inspected, and we
-never go to lambda. We should fix those tests once they can go through lambda
-and middle-end. *)
+never go to lambda. We should add the corresponding positive tests once they can
+go through lambda and middle-end. *)
 
 (* Simple let poly_ with a polymorphic function *)
 module _ : sig
