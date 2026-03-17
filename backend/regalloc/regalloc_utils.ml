@@ -64,6 +64,16 @@ let int_of_param ?(default = 0) param_name =
         Misc.fatal_errorf "the %s variable is %S but should be an integer"
           param_name value))
 
+let float_of_param ?(default = 0.) param_name =
+  lazy
+    (match find_param_value param_name with
+    | None -> default
+    | Some value -> (
+      try float_of_string value
+      with Failure _ ->
+        Misc.fatal_errorf "the %s variable is %S but should be a float"
+          param_name value))
+
 let debug = false
 
 let invariants : bool Lazy.t =
@@ -374,6 +384,22 @@ let update_live_fields : Cfg_with_layout.t -> liveness -> unit =
       DLL.iter block.body ~f:set_liveness;
       set_liveness block.terminator)
 
+module ArchSpillCosts : sig
+  val read_cost : float Lazy.t
+
+  val write_cost : float Lazy.t
+end = struct
+  let name prefix =
+    let suffix = if Target_system.is_arm () then "ARM" else "AMD" in
+    prefix ^ suffix
+
+  let read_cost =
+    float_of_param ~default:Arch.spill_read_cost (name "SPILL_READ_COST_")
+
+  let write_cost =
+    float_of_param ~default:Arch.spill_write_cost (name "SPILL_WRITE_COST_")
+end
+
 module SpillCosts = struct
   type block_costs =
     | Constant
@@ -411,8 +437,9 @@ module SpillCosts = struct
     in
     match Lazy.force param with None -> 1. | Some cost -> float_of_string cost
 
-  let compute : Cfg_with_infos.t -> block_costs -> t =
-   fun cfg_with_infos block_costs ->
+  let compute : Cfg_with_infos.t -> block_costs -> arch_costs:bool -> unit -> t
+      =
+   fun cfg_with_infos block_costs ~arch_costs () ->
     let costs = Reg.Tbl.create (List.length (Reg.all_relocatable_regs ())) in
     List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
         Reg.Tbl.replace costs reg 0.);
@@ -423,11 +450,18 @@ module SpillCosts = struct
     let update_array (cost : reg_cost) (regs : Reg.t array) : unit =
       Array.iter regs ~f:(fun reg -> update_reg cost reg)
     in
-    let update_instr (cost : reg_cost) (instr : _ Cfg.instruction) : unit =
-      update_array cost instr.arg;
-      update_array cost instr.res
+    let update_instr ~(read_multiplier : reg_cost)
+        ~(write_multiplier : reg_cost) (cost : reg_cost)
+        (instr : _ Cfg.instruction) : unit =
+      update_array (cost *. read_multiplier) instr.arg;
+      update_array (cost *. write_multiplier) instr.res
     in
     let cfg = Cfg_with_infos.cfg cfg_with_infos in
+    let get_multiplier param =
+      match arch_costs with false -> 1. | true -> Lazy.force param
+    in
+    let read_multiplier = get_multiplier ArchSpillCosts.read_cost in
+    let write_multiplier = get_multiplier ArchSpillCosts.write_cost in
     Cfg.iter_blocks cfg ~f:(fun label block ->
         let cost =
           match block_costs with
@@ -454,7 +488,10 @@ module SpillCosts = struct
             | None -> 1.
             | Some frequency -> frequency)
         in
-        DLL.iter ~f:(fun instr -> update_instr cost instr) block.body;
+        DLL.iter
+          ~f:(fun instr ->
+            update_instr ~read_multiplier ~write_multiplier cost instr)
+          block.body;
         (* Ignore probes *)
         match block.terminator.desc with
         | Prim { op = Probe _; _ } -> ()
@@ -462,7 +499,7 @@ module SpillCosts = struct
         | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
         | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
         | Tailcall_func _ | Call_no_return _ | Invalid _ | Call _ ->
-          update_instr cost block.terminator);
+          update_instr ~read_multiplier ~write_multiplier cost block.terminator);
     costs
 end
 

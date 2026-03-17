@@ -471,7 +471,10 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
             | Hierarchical_uses -> Loops
             | Static_frequencies -> Estimated_frequencies
           in
-          let costs = SpillCosts.compute cfg_with_infos block_costs in
+          let arch_costs = Lazy.force Arch_specific_spilling_costs.value in
+          let costs =
+            SpillCosts.compute cfg_with_infos block_costs ~arch_costs ()
+          in
           spill_costs := Some costs;
           costs
       in

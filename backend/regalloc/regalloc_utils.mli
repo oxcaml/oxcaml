@@ -145,7 +145,7 @@ module SpillCosts : sig
   (* The spill cost of a temporary is the sum of the cost of all its
      occurrences. Occurrences are wighted by the cost of the block they appear
      in (See the `block_costs` type above). *)
-  val compute : Cfg_with_infos.t -> block_costs -> t
+  val compute : Cfg_with_infos.t -> block_costs -> arch_costs:bool -> unit -> t
 end
 
 val check_length : string -> 'a array -> int -> unit

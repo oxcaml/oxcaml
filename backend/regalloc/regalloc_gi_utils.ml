@@ -160,6 +160,12 @@ module Spilling_heuristics = struct
             (available_heuristics ())))
 end
 
+module Arch_specific_spilling_costs = struct
+  type t = bool
+
+  let value = bool_of_param ~default:false "GI_ARCH_SPILLING_COSTS"
+end
+
 let iter_instructions_layout :
     Cfg_with_layout.t ->
     instruction:(trap_handler:bool -> Cfg.basic Cfg.instruction -> unit) ->

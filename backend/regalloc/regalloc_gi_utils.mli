@@ -64,6 +64,12 @@ module Spilling_heuristics : sig
   val value : t Lazy.t
 end
 
+module Arch_specific_spilling_costs : sig
+  type t = bool
+
+  val value : bool Lazy.t
+end
+
 val iter_instructions_layout :
   Cfg_with_layout.t ->
   instruction:(trap_handler:bool -> Cfg.basic Cfg.instruction -> unit) ->

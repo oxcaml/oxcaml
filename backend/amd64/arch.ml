@@ -709,3 +709,6 @@ let isomorphic_specific_operation op1 op2 =
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
      Illvm_intrinsic _), _ ->
     false
+
+let spill_read_cost = 2.
+let spill_write_cost = 1.
