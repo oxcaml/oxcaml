@@ -170,16 +170,14 @@ let k reg =
 
 module Spilling_heuristics = struct
   type t =
-    | Set_choose
     | Flat_uses
     | Hierarchical_uses
 
   let default = Flat_uses
 
-  let all = [Set_choose; Flat_uses; Hierarchical_uses]
+  let all = [Flat_uses; Hierarchical_uses]
 
   let to_string = function
-    | Set_choose -> "set_choose"
     | Flat_uses -> "flat_uses"
     | Hierarchical_uses -> "hierarchical_uses"
 
@@ -193,7 +191,6 @@ module Spilling_heuristics = struct
       | None -> default
       | Some id -> (
         match String.lowercase_ascii id with
-        | "set_choose" | "set-choose" -> Set_choose
         | "flat_uses" | "flat-uses" -> Flat_uses
         | "hierarchical_uses" | "hierarchical-uses" -> Hierarchical_uses
         | _ ->
