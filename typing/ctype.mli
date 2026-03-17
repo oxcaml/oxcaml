@@ -35,13 +35,14 @@ exception Incompatible
 (* All the following wrapper functions revert to the original level,
    even in case of exception. *)
 val with_local_level_generalize:
-    ?before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
+    before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
 val with_local_level_generalize_if:
-        bool -> ?before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
+        bool -> before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
 val with_local_level_generalize_structure: (unit -> 'a) -> 'a
 val with_local_level_generalize_structure_if: bool -> (unit -> 'a) -> 'a
 val with_local_level_generalize_structure_if_principal: (unit -> 'a) -> 'a
-val with_local_level_generalize_for_class: (unit -> 'a) -> 'a
+val with_local_level_generalize_for_class:
+    before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
 
 val with_local_level: ?post:('a -> unit) -> (unit -> 'a) -> 'a
         (* [with_local_level (fun () -> cmd) ~post] evaluates [cmd] at a
@@ -145,6 +146,8 @@ val merge_row_fields:
 val filter_row_fields:
         bool -> (label * row_field) list -> (label * row_field) list
 
+val generalize: type_expr -> unit
+(* Generalize in-place the given type *)
 val lower_contravariant: Env.t -> type_expr -> unit
         (* Lower level of type variables inside contravariant branches;
            to be used before generalize for expansive expressions *)
