@@ -16,8 +16,6 @@
 
 open! Stdlib
 
-[@@@ocaml.flambda_o3]
-
 (* Module [Seq]: functional iterators *)
 
 type ('a : value_or_null) node =
