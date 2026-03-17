@@ -62,7 +62,7 @@ type address = Persistent_env.address =
 
 type t
 
-type stage
+type stage = private int
 
 val empty: t
 
@@ -549,6 +549,10 @@ val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t
+
+(** Set the environment's stage to a fixed one in the far future.
+    Should only be used in cases where the stage is unknown. *)
+val enter_future : t -> t
 
 val check_no_open_quotations :
   Location.t -> t -> no_open_quotations_context -> unit
