@@ -167,20 +167,20 @@ let manager () =
 
 let n_managers = Atomic.make 0
 
-let[@inline] create_manager i =
+let[@inline never] rec create_manager_slow_path i =
   let n = Atomic.get n_managers in
   if n <= i then (
-    (* [n_managers] may end up being higher, but it should not overflow and
-       we do not create extra domains. *)
-    let n_before = ref (Atomic.fetch_and_add n_managers (i + 1 - n)) in
-    while !n_before <= i do
-      if !n_before = 0 then (
+    if Atomic.compare_and_set n_managers n (n + 1) then (
+      if n = 0 then (
         assert (0 = current_domain ());
         ignore (Thread.Portable.create manager ()))
       else
-        ignore (Domain.Safe.spawn manager);
-      incr n_before
-    done)
+        ignore (Domain.Safe.spawn manager));
+    create_manager_slow_path i)
+
+let[@inline] create_manager i =
+  let n = Atomic.get n_managers in
+  if n <= i then create_manager_slow_path i
 
 let spawn_on ~domain:i f a =
   if i < 0 || max_domains () <= i
