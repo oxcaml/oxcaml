@@ -3037,6 +3037,10 @@ let enter_splice ~loc env =
     raise (Error (Toplevel_splice loc));
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
 
+let enter_future env =
+  (* Reuse a very large number *)
+  { env with stage = Ident.highest_scope }
+
 let mark_toplevel_in_quotations ~scope env =
   { env with toplevel_scope = scope }
 
