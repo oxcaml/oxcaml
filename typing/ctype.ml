@@ -1877,6 +1877,12 @@ let instance_poly ?(keep_names=false) univars sch =
       ~keep_names ~fixed:false ~partial:false ~copy_var:None univars sch)
   )
 
+let maybe_instance_poly ty =
+  match get_desc ty with
+  | Tpoly (ty', tyvars) ->
+    instance_poly ~keep_names:true tyvars ty'
+  | _ -> ty
+
 (** The body of a [Tpoly] will likely have references to the [Tunivar]s bound in
     it. When asking for the jkind of a [Tpoly], we don't want to let those
     vars escape the scope. To resolve this, we substitute all occurrences of
