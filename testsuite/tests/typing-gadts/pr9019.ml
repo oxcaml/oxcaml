@@ -226,7 +226,7 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 `A (Some _)
 
-val f : 'a option a -> unit = <fun>
+val f : ('a : any). 'a option a -> unit = <fun>
 |}]
 
 let f (x : [> `A] a) = match x with `A `B -> ();;
