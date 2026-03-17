@@ -85,6 +85,17 @@ let equal_addr left right =
   && Option.equal String.equal left.sym right.sym
   && left.displ = right.displ
 
+let is_control_flow = function
+  | J _ | JMP _ | CALL _ | RET | HLT | LEAVE -> true
+  | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
+  | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
+  | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _ | CMOV _
+  | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _
+  | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _
+  | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ | ADC _
+  | SBB _ ->
+    false
+
 let is_hard_barrier = function
   | Directive d -> (
     match d with
@@ -120,7 +131,7 @@ let is_hard_barrier = function
     | Asm_targets.Asm_directives.Directive.External _
     | Asm_targets.Asm_directives.Directive.Reloc _ ->
       false)
-  | Ins _ -> false
+  | Ins instr -> is_control_flow instr
 
 let get_cells cell n =
   let rec loop acc remaining current_opt =
@@ -211,17 +222,6 @@ let reg_read_when_writing target arg =
      update. *)
   | Reg8L _ | Reg8H _ | Reg16 _ -> registers_alias target arg
   | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _ | Mem64_RIP _ -> false
-
-let is_control_flow = function
-  | J _ | JMP _ | CALL _ | RET | HLT | LEAVE -> true
-  | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
-  | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
-  | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _ | CMOV _
-  | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _
-  | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _
-  | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ | ADC _
-  | SBB _ ->
-    false
 
 let writes_to_arg target = function
   | MOV (_, dst)
@@ -345,20 +345,19 @@ let find_next_occurrence_of_register target start_cell =
   let rec loop cell_opt =
     match cell_opt with
     | None -> NotFound
-    | Some cell -> (
-      match DLL.value cell with
-      | Ins instr ->
-        if is_control_flow instr
-        then NotFound
-        else if reads_from_arg target instr
-        then ReadFound
-        else if writes_to_arg target instr
-        then WriteFound
-        else loop (DLL.next cell)
-      | Directive _ ->
-        if is_hard_barrier (DLL.value cell)
-        then NotFound
-        else loop (DLL.next cell))
+    | Some cell ->
+      let value = DLL.value cell in
+      if is_hard_barrier value
+      then NotFound
+      else (
+        match value with
+        | Ins instr ->
+          if reads_from_arg target instr
+          then ReadFound
+          else if writes_to_arg target instr
+          then WriteFound
+          else loop (DLL.next cell)
+        | Directive _ -> loop (DLL.next cell))
   in
   loop (DLL.next start_cell)
 

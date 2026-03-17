@@ -106,28 +106,24 @@ let find_redundant_cmp src dst start_cell =
   let rec loop cell_opt =
     match cell_opt with
     | None -> None
-    | Some cell -> (
-      match DLL.value cell with
-      | Ins instr -> (
-        if U.is_control_flow instr
-        then None
-        else
+    | Some cell ->
+      let value = DLL.value cell in
+      if U.is_hard_barrier value
+      then None
+      else (
+        match value with
+        | Ins instr -> (
           match instr with
-          | CMP (src2, dst2) when U.equal_args src src2 && U.equal_args dst dst2
-            ->
-            (* Found a redundant CMP! *)
+          | CMP (src2, dst2)
+            when U.equal_args src src2 && U.equal_args dst dst2 ->
             Some cell
           | _ ->
-            (* Check if this instruction invalidates the optimization *)
             if U.writes_flags instr
             then None
             else if U.writes_to_arg src instr || U.writes_to_arg dst instr
             then None
             else loop (DLL.next cell))
-      | Directive _ ->
-        if U.is_hard_barrier (DLL.value cell)
-        then None
-        else loop (DLL.next cell))
+        | Directive _ -> loop (DLL.next cell))
   in
   loop (DLL.next start_cell)
 
@@ -160,10 +156,18 @@ let remove_redundant_cmp stats cell =
 
 (* Apply all rewrite rules in sequence using a pipeline. *)
 let apply stats cell =
-  let[@inline always] if_no_match f result =
-    match result with U.Matched _ -> result | U.No_match -> f stats cell
+  let[@inline always] if_no_match ~enabled f result =
+    match result with
+    | U.Matched _ -> result
+    | U.No_match -> if enabled then f stats cell else U.No_match
   in
   U.No_match
-  |> if_no_match remove_mov_to_dead_register
-  |> if_no_match remove_redundant_cmp
-  |> if_no_match combine_add_rsp
+  |> if_no_match
+       ~enabled:!Oxcaml_flags.x86_peephole_remove_mov_to_dead_register
+       remove_mov_to_dead_register
+  |> if_no_match
+       ~enabled:!Oxcaml_flags.x86_peephole_remove_redundant_cmp
+       remove_redundant_cmp
+  |> if_no_match
+       ~enabled:!Oxcaml_flags.x86_peephole_combine_add_rsp
+       combine_add_rsp

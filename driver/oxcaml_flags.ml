@@ -31,6 +31,9 @@ let vectorize_max_block_size =
 let cfg_peephole_optimize = ref true    (* -[no-]cfg-peephole-optimize *)
 
 let x86_peephole_optimize = ref false   (* -[no-]x86-peephole-optimize *)
+let x86_peephole_remove_mov_to_dead_register = ref true
+let x86_peephole_remove_redundant_cmp = ref true
+let x86_peephole_combine_add_rsp = ref true
 
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
