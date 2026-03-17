@@ -3,11 +3,5 @@
 open X86_ast
 module DLL = Oxcaml_utils.Doubly_linked_list
 
-(** Optimize all code sections with peephole optimizations. This includes the
-    main code section and all additional sections, with profiling and counter
-    tracking. *)
-val optimize_all_sections :
-  asm_line DLL.t ->
-  asm_line DLL.t X86_section.Section_name.Tbl.t ->
-  asm_line DLL.t X86_section.Section_name.Tbl.t ->
-  unit
+(** Optimize starting from a given cell, walking forward through the DLL. *)
+val optimize_from_cell : asm_line DLL.cell option -> unit

@@ -401,12 +401,17 @@ let output_from pos =
   | None -> DLL.to_list asm_code
   | Some start_excl -> DLL.suffix start_excl
 
-let generate_code asm =
-  (* Apply peephole optimizations to all sections *)
+let peephole_optimize_from pos =
   if !Oxcaml_flags.x86_peephole_optimize
   then
-    X86_peephole_optimize.optimize_all_sections asm_code asm_code_by_section
-      delayed_sections;
+    let start =
+      match pos with
+      | None -> DLL.hd_cell asm_code
+      | Some start_excl -> DLL.next start_excl
+    in
+    X86_peephole_optimize.optimize_from_cell start
+
+let generate_code asm =
   (match asm with
   | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
   | None -> ());

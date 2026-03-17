@@ -2644,6 +2644,7 @@ let fundecl fundecl =
   then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
+  X86_proc.peephole_optimize_from fun_body_start;
   record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
     ~asm_start:fun_body_start;
   List.iter emit_call_gc !call_gc_sites;
