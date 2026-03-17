@@ -576,7 +576,7 @@ module Val_lpoly = struct
   type t = state ref
 
   let get_exn t = match !t with
-    | Pending _ -> Misc.fatal_error "layouts has not been generalized"
+    | Pending _ -> Misc.fatal_error "layout is pending generalization"
     | Determined l -> l
 
   let determined l = ref (Determined l)
