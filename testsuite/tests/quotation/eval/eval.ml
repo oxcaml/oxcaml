@@ -77,3 +77,24 @@ let test_warning =
   (* Unused variable *)
   [%eval: unit] <[ let a = () in $( if false then <[ a ]> else <[ () ]>) ]>;
   Printf.printf "Done\n"
+
+(* Checks that Simplify is being used rather than classic mode *)
+
+let test_simplify_being_used =
+  [%eval: Int64.t]
+  <[
+    let[@zero_alloc][@inline never][@local never] check_simplify () =
+      let[@inline] f () =
+        match
+          if (Sys.opaque_identity 4) = 0
+          then None
+          else Some (Int64.add 1L 2L)
+        with
+        | None -> 0L
+        | Some x -> Int64.add x 1L
+      in
+      f ()
+    in
+    check_simplify ()
+  ]>
+
