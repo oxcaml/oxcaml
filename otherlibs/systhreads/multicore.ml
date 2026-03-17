@@ -144,7 +144,8 @@ let rec manager_loop t =
        | exception exn ->
          (* This might fail if the user tries to create too many threads *)
          let bt = Printexc.get_raw_backtrace () in
-         req.spawn_result <- Failed (req.argument, exn, bt));
+         req.spawn_result <- Failed (req.argument, exn, bt);
+         Atomic.Loc.decr [%atomic.loc t.threads]);
       wakeup_spawn_result req)
       requests;
     manager_loop t
