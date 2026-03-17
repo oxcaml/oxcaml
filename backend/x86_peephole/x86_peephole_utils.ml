@@ -213,14 +213,14 @@ let reg_read_when_writing target arg =
   | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _ | Mem64_RIP _ -> false
 
 let is_control_flow = function
-  | J _ | JMP _ | CALL _ | RET -> true
+  | J _ | JMP _ | CALL _ | RET | HLT | LEAVE -> true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
   | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
   | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _ | CMOV _
   | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _
   | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _
-  | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE
-  | SIMD _ | ADC _ | SBB _ ->
+  | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ | ADC _
+  | SBB _ ->
     false
 
 let writes_to_arg target = function
@@ -245,29 +245,45 @@ let writes_to_arg target = function
     registers_alias target dst
   | INC dst | DEC dst | NEG dst | BSWAP dst | SET (_, dst) ->
     registers_alias target dst
-  | POP dst -> registers_alias target dst
+  | POP dst -> registers_alias target dst || registers_alias target (Reg64 RSP)
   | IMUL (_, Some dst) -> registers_alias target dst
-  | LOCK_XADD (_, dst) -> registers_alias target dst
+  | LOCK_XADD (src, dst) ->
+    registers_alias target src || registers_alias target dst
   | XCHG (op1, op2) -> registers_alias target op1 || registers_alias target op2
   | MUL _ | IMUL (_, None) ->
-    equal_args target (Reg64 RAX) || equal_args target (Reg64 RDX)
-  | IDIV _ -> equal_args target (Reg64 RAX) || equal_args target (Reg64 RDX)
-  | CDQ -> equal_args target (Reg32 RAX)
-  | CQO -> equal_args target (Reg64 RDX)
+    registers_alias target (Reg64 RAX) || registers_alias target (Reg64 RDX)
+  | IDIV _ ->
+    registers_alias target (Reg64 RAX) || registers_alias target (Reg64 RDX)
+  | CDQ -> registers_alias target (Reg32 RDX)
+  | CQO -> registers_alias target (Reg64 RDX)
   | LOCK_CMPXCHG (_, dst) ->
-    registers_alias target dst || equal_args target (Reg64 RAX)
-  | PUSH _ | CMP _ | TEST _ | J _ | JMP _ | CALL _ | RET | LOCK_ADD _
-  | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _
-  | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE ->
+    registers_alias target dst || registers_alias target (Reg64 RAX)
+  | LOCK_ADD (_, dst)
+  | LOCK_SUB (_, dst)
+  | LOCK_AND (_, dst)
+  | LOCK_OR (_, dst)
+  | LOCK_XOR (_, dst) ->
+    registers_alias target dst
+  | PUSH _ -> registers_alias target (Reg64 RSP)
+  | RDTSC | RDPMC ->
+    (* Rare instructions, let's be conservative. *)
+    true
+  | J _ | JMP _ | CALL _ | RET | HLT | LEAVE ->
+    (* These are all control flow operations, there is no point in assuming
+       anything. *)
+    true
+  | CMP _ | TEST _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | LFENCE | SFENCE
+  | MFENCE ->
     false
   | SIMD _ ->
-    (* CR xclerc: is this correct? *)
-    false
+    (* Conservative: assume any SIMD instruction may write to target. *)
+    true
 
 let reads_from_arg target = function
   | MOV (src, dst) | MOVSX (src, dst) | MOVSXD (src, dst) | MOVZX (src, dst) ->
     reg_appears_in_arg target src || reg_read_when_writing target dst
-  | PUSH src -> reg_appears_in_arg target src
+  | PUSH src ->
+    reg_appears_in_arg target src || registers_alias target (Reg64 RSP)
   | ADD (src, dst)
   | SUB (src, dst)
   | AND (src, dst)
@@ -287,22 +303,21 @@ let reads_from_arg target = function
   | INC dst | DEC dst | NEG dst | BSWAP dst -> reg_appears_in_arg target dst
   | IMUL (op1, Some op2) ->
     reg_appears_in_arg target op1 || reg_appears_in_arg target op2
-  | MUL op -> reg_appears_in_arg target op || equal_args target (Reg64 RAX)
+  | MUL op -> reg_appears_in_arg target op || registers_alias target (Reg64 RAX)
   | IMUL (op, None) ->
-    reg_appears_in_arg target op || equal_args target (Reg64 RAX)
+    reg_appears_in_arg target op || registers_alias target (Reg64 RAX)
   | IDIV op ->
     reg_appears_in_arg target op
-    || equal_args target (Reg64 RAX)
-    || equal_args target (Reg64 RDX)
-  | CDQ -> equal_args target (Reg32 RAX)
-  | CQO -> equal_args target (Reg64 RAX)
-  | CALL arg | JMP arg | J (_, arg) -> reg_appears_in_arg target arg
+    || registers_alias target (Reg64 RAX)
+    || registers_alias target (Reg64 RDX)
+  | CDQ -> registers_alias target (Reg32 RAX)
+  | CQO -> registers_alias target (Reg64 RAX)
   | XCHG (op1, op2) ->
     reg_appears_in_arg target op1 || reg_appears_in_arg target op2
   | LOCK_CMPXCHG (op1, op2) ->
     reg_appears_in_arg target op1
     || reg_appears_in_arg target op2
-    || equal_args target (Reg64 RAX)
+    || registers_alias target (Reg64 RAX)
   | LOCK_XADD (op1, op2)
   | LOCK_ADD (op1, op2)
   | LOCK_SUB (op1, op2)
@@ -311,14 +326,20 @@ let reads_from_arg target = function
   | LOCK_XOR (op1, op2) ->
     reg_appears_in_arg target op1 || reg_appears_in_arg target op2
   | SET (_, dst) -> reg_read_when_writing target dst
-  | POP dst -> reg_read_when_writing target dst
+  | POP dst ->
+    reg_read_when_writing target dst || registers_alias target (Reg64 RSP)
   | CLDEMOTE arg -> reg_appears_in_arg target arg
   | PREFETCH (_, _, arg) -> reg_appears_in_arg target arg
-  (* Conservative: assume SIMD, fences, and other instructions may read from
-     target *)
-  | RET | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE
-  | SIMD _ ->
+  | J _ | JMP _ | CALL _ | RET | HLT | LEAVE ->
+    (* These are all control flow operations, there is no point in assuming
+       anything. *)
     true
+  | RDTSC | RDPMC ->
+    (* Rare instructions, let's be conservative. *)
+    true
+  | NOP | PAUSE | LFENCE | SFENCE | MFENCE -> false
+  (* Conservative: assume SIMD instructions may read from target. *)
+  | SIMD _ -> true
 
 let find_next_occurrence_of_register target start_cell =
   let rec loop cell_opt =
@@ -348,7 +369,14 @@ let writes_flags = function
   | LOCK_CMPXCHG _ | ADC _ | SBB _ ->
     true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ | CQO
-  | SET _ | CMOV _ | BSWAP _ | J _ | JMP _ | CALL _ | RET | XCHG _ | CLDEMOTE _
-  | PREFETCH _ | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE
-  | MFENCE | SIMD _ ->
+  | SET _ | CMOV _ | BSWAP _ | XCHG _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE
+  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE ->
     false
+  | J _ | JMP _ | CALL _ | RET | HLT | LEAVE ->
+    (* These are all control flow operations, there is no point in assuming
+       anything. *)
+    true
+  | SIMD _ ->
+    (* Conservative: some SIMD instructions (e.g. comisd, ucomiss) write
+       flags. *)
+    true

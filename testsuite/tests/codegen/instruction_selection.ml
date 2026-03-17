@@ -369,3 +369,48 @@ small_constants:
   xorl  %eax, %eax
   ret
 |}]
+
+let loop n =
+  let acc = ref 0. in
+  let k = ref n in
+  while !k != 0 do
+    let a = float_of_int !k in
+    let b = !acc +. 1./. (a *. a) in
+    acc := 0. +. b;
+    k := !k - 1
+  done;
+  !acc
+[%%expect_asm X86_64{|
+loop:
+  subq  $8, %rsp
+  movq  %rax, %rbx
+  vxorpd %xmm0, %xmm0, %xmm0
+  movq  %rbx, %rdi
+  sarq  $1, %rdi
+  movq  camlTOP28__float913@GOTPCREL(%rip), %rax
+  cmpq  $1, %rbx
+  je    .L122
+.L112:
+  vcvtsi2sdq %rdi, %xmm1, %xmm1
+  vmulsd %xmm1, %xmm1, %xmm1
+  vmovsd .L129(%rip), %xmm2
+  vdivsd %xmm1, %xmm2, %xmm1
+  vaddsd %xmm1, %xmm0, %xmm0
+  vxorpd %xmm1, %xmm1, %xmm1
+  vaddsd %xmm0, %xmm1, %xmm0
+  addq  $-2, %rbx
+  subq  $16, %r15
+  cmpq  (%r14), %r15
+  jb    .L130
+.L132:
+  leaq  8(%r15), %rax
+  movq  $1277, -8(%rax)
+  vmovsd %xmm0, (%rax)
+  movq  %rbx, %rdi
+  sarq  $1, %rdi
+  cmpq  $1, %rbx
+  jne   .L112
+.L122:
+  addq  $8, %rsp
+  ret
+|}]
