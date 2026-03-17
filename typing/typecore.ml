@@ -10273,6 +10273,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           if is_recursive then
             List.iter (fun { pv_lpoly; _ } ->
               Val_lpoly.generalize
+                ~on_determined:(fun () -> ())
                 ~on_to_generalize:(fun loc ->
                   Location.prerr_warning loc Warnings.Useless_lpoly; [])
                 pv_lpoly

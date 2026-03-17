@@ -582,7 +582,7 @@ module Val_lpoly = struct
   let determined l = ref (Determined l)
   let pending ~loc = ref (Pending loc)
 
-  let generalize ?(on_determined = fun () -> ()) ~on_to_generalize t =
+  let generalize ~on_determined ~on_to_generalize t =
     match !t with
     | Pending loc -> t := Determined (on_to_generalize loc)
     | Determined _ -> on_determined ()
