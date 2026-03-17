@@ -92,9 +92,9 @@ let wait_spawn_result req =
 
 let wakeup_spawn_result req =
   let sender_domain_index = req.sender_domain_or_negative_if_spawned in
-  req.sender_domain_or_negative_if_spawned <- -1;
   let sender_domain = get sender_domain_index in
   Mutex.lock sender_domain.mutex;
+  req.sender_domain_or_negative_if_spawned <- -1;
   Mutex.unlock sender_domain.mutex;
   Condition.broadcast sender_domain.condition_spawn_result
 
