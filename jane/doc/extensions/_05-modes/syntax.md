@@ -137,9 +137,11 @@ include S @@ portable
 ## Expressions
 ```ocaml
 (expression : ty @ modes)
+(expression : @ modes)
 ```
 We don't support `(expression @ modes)` because `@` is already parsed as a binary operator.
-However, you can write `(expression : _ @ modes)` if you do not want to constrain the type.
+However, you can write `(expression : @ modes)` if you do not want to constrain the type,
+or `(expression : ty @ modes)` to combine both type and mode constraints.
 
 ## Modules
 Support for modules with modes is being worked on and not ready for wide adoption.
