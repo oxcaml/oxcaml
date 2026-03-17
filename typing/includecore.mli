@@ -84,6 +84,7 @@ type constructor_mismatch =
   | Kind of position
   | Explicit_return_type of position
   | Modality of int * Mode.Modality.equate_error
+  | Fixed_representation of position
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -92,7 +93,9 @@ type extension_constructor_mismatch =
                             * extension_constructor
                             * constructor_mismatch
 type variant_change =
-  (Types.constructor_declaration as 'cd, 'cd, constructor_mismatch)
+  (Types.constructor_declaration * Types.constructor_representation option
+     as 'cd,
+   'cd, constructor_mismatch)
     Diffing_with_keys.change
 
 type private_variant_mismatch =

@@ -973,7 +973,7 @@ let find_unboxed_type decl =
        Some (Record_inlined (_, _, Variant_unboxed)), _)
   | Type_record_unboxed_product
       ([{ld_type = arg; ld_modalities = ms; _ }],
-       Some (Record_unboxed_product _), _)
+       (Some (Record_unboxed_product _) | None), _)
   | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
     Some (arg, ms)

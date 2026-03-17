@@ -1032,7 +1032,7 @@ let transl_declaration env sdecl (id, uid) =
           in
           let jkind =
             Jkind.Builtin.product_of_any ~why:Unboxed_record
-              (List.length lbls)
+              (List.length lbls) Jkind_types.Scannable_axes.max
           in
           Ttype_record_unboxed_product lbls,
           Type_record_unboxed_product(lbls', Some rep, None), jkind
@@ -1068,7 +1068,7 @@ let transl_declaration env sdecl (id, uid) =
       match kind with
       | Type_record_unboxed_product _ ->
         begin match Jkind.get_layout env jkind with
-        | Some Any ->
+        | Some (Any _) ->
           (* [jkind_default] has just what we need here *)
           let default_layout =
             match Jkind.extract_layout env jkind_default with
@@ -1265,7 +1265,10 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
     in
     (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
     let jkind =
-      Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls) in
+      (* XXX Is this the correct scannable axes? *)
+      Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
+        Jkind_types.Scannable_axes.max
+    in
     let kind =
       Type_record_unboxed_product(lbls_unboxed, rep, umc)
     in
@@ -1953,12 +1956,28 @@ let update_record_kind (type rep) env loc (form : rep record_form)
     let types = List.map snd lbls in
     let sorts, jkinds = update_label_sorts env loc types ~form in
     let jkind =
-      let lbls_with_sorts =
-        List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
-      in
       match form with
-      | Legacy -> Jkind.for_boxed_record_with_updates lbls_with_sorts
-      | Unboxed_product -> Jkind.for_unboxed_record_with_updates lbls_with_sorts
+      | Legacy ->
+          let lbls_with_sorts =
+            List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
+          in
+          Jkind.for_boxed_record_with_updates lbls_with_sorts
+      | Unboxed_product ->
+        let lbls_with_layouts =
+          List.map2
+            (fun (lbl, ty) jkind ->
+               let layout =
+                 match Jkind.extract_layout env jkind with
+                 | Ok layout -> layout
+                 | Error _ ->
+                     (* XXX This means we couldn't expand the jkind. Safe to
+                        swallow this? *)
+                     Jkind.Layout.Any Jkind_types.Scannable_axes.max
+               in
+               lbl, ty, layout)
+            lbls jkinds
+        in
+        Jkind.for_unboxed_record_with_updates lbls_with_layouts
     in
     let reprs =
       List.map2
@@ -2735,7 +2754,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
     (* A type whose layout has [any] could contain all its parameters.
        CR layouts v11: update this function for [layout_of] layouts. *)
     let rec has_any : Jkind_types.Layout.Const.t -> bool = function
-      | Any -> true
+      | Any _ -> true
       | Base _ -> false
       | Product l -> List.exists has_any l
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
@@ -2762,7 +2781,8 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
           let jkind = (Env.find_type path env).type_jkind in
           let layout =
             match Jkind.get_layout env jkind with
-            | None -> Jkind_types.Layout.Const.Any
+            | None ->
+              Jkind_types.Layout.Const.Any Jkind_types.Scannable_axes.max
             | Some l -> l
           in
           Contained (contained_parameters tyl layout), parents

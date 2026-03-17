@@ -723,9 +723,9 @@ let tuple_pat_mode mode tuple_modes =
 let global_pat_mode {mode; _}=
   let mode =
     mode
-    |> Value.meet_with Areality Regionality.Const.Global
-    |> Value.meet_with Forkable Forkable.Const.Forkable
-    |> Value.meet_with Yielding Yielding.Const.Unyielding
+    |> Value.meet_const_with Areality Regionality.Const.Global
+    |> Value.meet_const_with Forkable Forkable.Const.Forkable
+    |> Value.meet_const_with Yielding Yielding.Const.Unyielding
   in
   simple_pat_mode mode
 
@@ -1584,7 +1584,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
     ty, mode
   in
   match p.pat_desc with
-    Tpat_alias(p1,_, _, _, _, _, _) -> build_as_type_and_mode env p1 ~mode
+    Tpat_alias { pattern = p1; _ } ->
+     build_as_type_and_mode env p1 ~mode
   | Tpat_tuple pl ->
       let labeled_tyl =
         List.map (fun (label, p) -> label, build_as_type env p) pl in
@@ -2732,23 +2733,47 @@ module Constructor = NameChoice (struct
   let in_env _ = true
 end)
 
-let representation_for_tuple_constructor env constr ty_args ~loc ~jkinds
-      ~containing_type =
+type unrepresentable_arg =
+  Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
+
+let representation_for_tuple_constructor env constr ty_args ~loc ~types
+      ~containing_type ~why : _ Result.t =
   match constr.cstr_shape with
-  | Some shape -> shape
+  | Some shape ->
+      begin match
+        Misc.Stdlib.List.map_option
+          (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
+          constr.cstr_args
+      with
+      | Some sorts -> Ok (shape, sorts)
+      | None -> Misc.fatal_error "representable constructor missing a sort"
+      end
   | None ->
       begin match
-        Typedecl.update_constructor_representation env (Cstr_tuple ty_args)
-          jkinds ~loc ~is_extension_constructor:false
-      with
-      | Ok shape -> shape
-      | Error (Unrepresentable_argument i) ->
-          raise (Error (loc, env,
-                        Indeterminate_constructor_layout(
-                          containing_type, constr.cstr_name, i)))
-      | Error (Unrepresentable_argument_field _) ->
-          (* Should be impossible because we passed [Cstr_tuple] *)
-          Misc.fatal_error "Unrepresentable_argument_field with Cstr_tuple"
+        Misc.Stdlib.List.mapi_result
+          (fun _ (ty, loc) ->
+             type_jkind_and_sort env ty ~why ~fixed:false
+             |> Result.map_error
+                  (fun err -> Unrepresentable_arg (loc, ty, err)))
+          types
+        with
+        | Ok jkinds_and_sorts ->
+            let jkinds, sorts = List.split jkinds_and_sorts in
+            begin match
+              Typedecl.update_constructor_representation env
+                (Cstr_tuple ty_args) jkinds ~loc ~is_extension_constructor:false
+            with
+            | Ok shape -> Ok (shape, sorts)
+            | Error (Unrepresentable_argument i) ->
+                (* XXX Impossible? *)
+                raise (Error (loc, env,
+                              Indeterminate_constructor_layout(
+                                containing_type, constr.cstr_name, i)))
+            | Error (Unrepresentable_argument_field _) ->
+                (* Should be impossible because we passed [Cstr_tuple] *)
+                Misc.fatal_error "Unrepresentable_argument_field with Cstr_tuple"
+            end
+        | Error err -> Error err
       end
 
 (* Typing of patterns *)
@@ -3151,7 +3176,7 @@ and type_pat_aux
         enter_variable tps loc name mode ~kind ty sp.ppat_attributes sort
       in
       rvp {
-        pat_desc = Tpat_var (id, name, uid, sort, alloc_mode);
+        pat_desc = Tpat_var { id; name; uid; sort; mode = alloc_mode };
         pat_loc = loc; pat_extra=[];
         pat_type = ty;
         pat_attributes = sp.ppat_attributes;
@@ -3180,7 +3205,8 @@ and type_pat_aux
               ~kind:(Val_reg sort) sp.ppat_attributes sort
           in
           rvp {
-            pat_desc = Tpat_var (id, v, uid, sort, alloc_mode.mode);
+            pat_desc = Tpat_var { id; name = v; uid; sort;
+                                  mode = alloc_mode.mode };
             pat_loc = sp.ppat_loc;
             pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
             pat_type = t;
@@ -3197,7 +3223,8 @@ and type_pat_aux
           ~kind:(Val_reg sort) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
-      rvp { pat_desc = Tpat_alias(q, id, name, uid, sort, mode, ty_var);
+      rvp { pat_desc = Tpat_alias { pattern = q; id; name; uid;
+                                    sort; mode; type_expr = ty_var };
             pat_loc = loc; pat_extra=[];
             pat_type = q.pat_type;
             pat_attributes = sp.ppat_attributes;
@@ -3364,7 +3391,7 @@ and type_pat_aux
         { containing = Constructor (constr.cstr_name, Modality);
           container = (loc, Pattern) }
       in
-      let jkinds, ctor_args =
+      let ctor_args =
         List.map2
           (fun p (arg : Types.constructor_argument) ->
              let alloc_mode =
@@ -3375,32 +3402,26 @@ and type_pat_aux
               Mode.Value.join [ alloc_mode; constructor_mode ]
              in
              let alloc_mode = simple_pat_mode alloc_mode in
-             let pat =
-               let sort =
-                 match arg.ca_sort with
-                 | Some sort -> Jkind.Sort.of_const sort
-                 | None -> Jkind.Sort.new_var ~level:(get_current_level ())
-               in
-               type_pat ~alloc_mode tps Value p arg.ca_type sort
+             let sort =
+               match arg.ca_sort with
+               | Some sort -> Jkind.Sort.of_const sort
+               | None -> Jkind.Sort.new_var ~level:(get_current_level ())
              in
-             let jkind, sort =
-               match
-                 type_jkind_and_sort !!penv pat.pat_type
-                   ~why:Constructor_arg_projection ~fixed:false
-               with
-               | Ok (jkind, sort) -> jkind, sort
-               | Error err -> raise (Error (p.ppat_loc, !!penv,
-                                            Constructor_arg_projection_not_rep(
-                                              pat.pat_type, err)))
-             in
-             jkind, (sort, pat))
+             type_pat ~alloc_mode tps Value p arg.ca_type sort)
           sargs args
-        |> List.split
       in
-      let repr =
-        representation_for_tuple_constructor !!penv constr args ~loc ~jkinds
-          ~containing_type:expected_ty
+      let repr, sorts =
+        let types = List.map (fun arg -> arg.pat_type, arg.pat_loc) ctor_args in
+        match
+          representation_for_tuple_constructor !!penv constr args ~loc ~types
+            ~containing_type:expected_ty ~why:Constructor_arg_projection
+        with
+        | Ok (repr, sorts) -> repr, sorts
+        | Error (Unrepresentable_arg (loc, ty, err)) ->
+            raise (Error (loc, !!penv,
+                          Constructor_arg_projection_not_rep(ty, err)))
       in
+      let ctor_args = List.combine sorts ctor_args in
       rvp { pat_desc =
               Tpat_construct(lid, constr, repr, ctor_args, existential_ctyp);
             pat_loc = loc;
@@ -3958,7 +3979,7 @@ let rec check_counter_example_pat
           in
           check_rec ~info:(decrease 5) tp expected_ty k
       end
-  | Tpat_alias (p, _, _, _, _, _, _) -> check_rec ~info p expected_ty k
+  | Tpat_alias { pattern = p; _ } -> check_rec ~info p expected_ty k
   | Tpat_unboxed_unit ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       k @@
@@ -5455,8 +5476,8 @@ let rec name_pattern default = function
           Shape.Uid.internal_not_actually_unique
   | p :: rem ->
     match p.pat_desc with
-      Tpat_var (id, _, uid, _, _) -> id, uid
-    | Tpat_alias(_, id, _, uid, _, _, _) -> id, uid
+      Tpat_var { id; uid; _ } -> id, uid
+    | Tpat_alias { id; uid; _ } -> id, uid
     | _ -> name_pattern default rem
 
 let name_cases default lst =
@@ -9353,8 +9374,9 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         in
         let exp_env = Env.add_value ~mode id desc env in
         let uu = unique_use ~loc:sarg.pexp_loc ~env mode mode in
-        {pat_desc = Tpat_var (id, mknoloc name, desc.val_uid, sort,
-          Value.disallow_right mode);
+        {pat_desc = Tpat_var { id; name = mknoloc name;
+                               uid = desc.val_uid; sort;
+                               mode = Value.disallow_right mode };
          pat_type = ty;
          pat_extra=[];
          pat_attributes = [];
@@ -9894,7 +9916,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
          ty_args)
       overwrite
   in
-  let jkinds, args =
+  let args =
     Misc.Stdlib.List.map3
       (fun e ({Types.ca_type=ty; ca_modalities=modalities; _},t0) overwrite ->
          let is_contained_by : Mode.Hint.is_contained_by =
@@ -9904,20 +9926,8 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
          let argument_mode =
           mode_is_contained_by is_contained_by ~modalities argument_mode
          in
-         let arg = type_argument ~recarg ~overwrite env argument_mode e ty t0 in
-         let jkind, sort =
-           match
-             type_jkind_and_sort env arg.exp_type ~fixed:false
-               ~why:Constructor_arg_assignment
-           with
-           | Ok sort -> sort
-           | Error err ->
-               raise (Error (loc, env,
-                             Constructor_arg_value_not_rep(arg.exp_type, err)))
-         in
-         jkind, (sort, arg))
+         type_argument ~recarg ~overwrite env argument_mode e ty t0)
       sargs (List.combine ty_args ty_args0) overwrites
-    |> List.split
   in
   if constr.cstr_private = Private then
     begin match constr.cstr_repr with
@@ -9928,10 +9938,17 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
     | Variant_with_null -> assert false
       (* [Variant_with_null] can't be made private due to [or_null_reexport]. *)
     end;
-  let shape =
-    representation_for_tuple_constructor env constr ty_args ~loc ~jkinds
-      ~containing_type:ty_res
+  let shape, sorts =
+    let types = List.map (fun arg -> arg.exp_type, arg.exp_loc) args in
+    match
+      representation_for_tuple_constructor env constr ty_args ~loc ~types
+        ~containing_type:ty_res ~why:Constructor_arg_assignment
+    with
+    | Ok (shape, sorts) -> shape, sorts
+    | Error (Unrepresentable_arg (loc, ty, err)) ->
+        raise (Error (loc, env, Constructor_arg_value_not_rep(ty, err)))
   in
+  let args = List.combine sorts args in
   (* NOTE: shouldn't we call "re" on this final expression? -- AF *)
   { texp with
     exp_desc = Texp_construct(lid, constr, shape, args, alloc_mode) }
@@ -10631,8 +10648,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
       let update_exp_jkind (_, p, _) (exp, _) =
         let pat_name =
           match p.pat_desc with
-            Tpat_var (id, _, _, _, _) -> Some id
-          | Tpat_alias(_, id, _, _, _, _, _) -> Some id
+            Tpat_var { id; _ } -> Some id
+          | Tpat_alias { id; _ } -> Some id
           | _ -> None in
         Ctype.check_and_update_generalized_ty_jkind
           ?name:pat_name ~loc:exp.exp_loc env exp.exp_type
@@ -11976,23 +11993,13 @@ let report_error ~loc env =
         "The instance variable %a is overridden several times"
         Style.inline_code v
   | Coercion_failure (ty_exp, err, b) ->
-      Location.error_of_printer ~loc (fun ppf () ->
-          (* Use deprecated_printer to defer prepare_expansion until after
-             reset() is called inside report_unification_error. This ensures
-             consistent type variable naming between the intro and trace. *)
-          let intro =
-            doc_printf "%t" (fun fmt_doc ->
-              deprecated_printer (fun fmt ->
-                let ty_exp = Printtyp.prepare_expansion ty_exp in
-                Format.fprintf fmt
-                  "This expression cannot be coerced to type@;<1 2>%a;@ \
-                   it has type"
-                  (Fmt.compat
-                     (Style.as_inline_code @@ Printtyp.type_expansion Type))
-                  ty_exp
-              ) fmt_doc
-            )
-          in
+    let intro =
+      let ty_exp = Printtyp.prepare_expansion ty_exp in
+      doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
+                  it has type"
+        (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
+    in
+    Location.error_of_printer ~loc (fun ppf () ->
         Printtyp.report_unification_error ppf env err
           intro
           (Fmt.doc_printf "but is here used with type");

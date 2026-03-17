@@ -145,3 +145,66 @@ val box_all : #('a * 'b) any_list -> ('a * 'b) any_list = <fun>
 val test : (int * int) any_list =
   (::) ((2, 4), (::) ((4, 6), (::) ((6, 8), [])))
 |}]
+
+module All_void_in_module = struct
+  type (_ : any, _ : any) type_equal =
+    | T : ('a : any). ('a, 'a) type_equal
+
+  module M : sig
+    type v : any
+    (* annotate [v] as [void] and the program works *)
+    type t = A of v | B
+    (* outside the module, [A] is a block *)
+    val a : t
+    val expose : (v, unit#) type_equal
+  end = struct
+    type v = unit#
+    (* inside the module, [A] is an immediate *)
+    type t = A of v | B
+    let a = A #()
+    let expose = T
+  end
+
+  let () =
+    let T = M.expose in
+    match M.a with
+    | A _ -> print_endline "ok"
+    | B -> assert false
+end
+
+[%%expect {|
+Lines 12-18, characters 8-5:
+12 | ........struct
+13 |     type v = unit#
+14 |     (* inside the module, [A] is an immediate *)
+15 |     type t = A of v | B
+16 |     let a = A #()
+17 |     let expose = T
+18 |   end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type v = unit#
+           type t = A of v | B
+           val a : t
+           val expose : ('a : any). ('a, 'a) type_equal
+         end
+       is not included in
+         sig
+           type v : any
+           type t = A of v | B
+           val a : t
+           val expose : (v, unit#) type_equal
+         end
+       Type declarations do not match:
+         type t = A of v | B
+       is not included in
+         type t = A of v | B
+       Constructors do not match:
+         "A of v"
+       is not the same as:
+         "A of v"
+       The first has a fixed representation and the second doesn't.
+       Hint: Is there a type that has layout any in the second
+         but not in the first?
+|}]

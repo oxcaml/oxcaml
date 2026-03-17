@@ -3330,8 +3330,8 @@ let_binding_body:
       { let p,e,c,modes = $2 in (p,e,c,modes,false,poly_flag) }
 /* BEGIN AVOID */
   | poly_flag = poly_flag val_ident %prec below_HASH
-      { (mkpatvar ~loc:$loc $2, ghexpvar ~loc:$loc $2, None, [], true,
-         poly_flag) }
+      { (mkpatvar ~loc:$loc($2) $2, ghexpvar ~loc:$loc($2) $2,
+         None, [], true, poly_flag) }
   (* The production that allows puns is marked so that [make list-parse-errors]
      does not attempt to exploit it. That would be problematic because it
      would then generate bindings such as [let x], which are rejected by the
@@ -4082,8 +4082,8 @@ jkind_desc:
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
     }
-  | mkrhs(type_longident) {
-      Pjk_abbreviation $1
+  | mkrhs(type_longident) mkrhs(LIDENT)* {
+      Pjk_abbreviation ($1, $2)
     }
   | KIND_OF ty=core_type {
       Pjk_kind_of ty
