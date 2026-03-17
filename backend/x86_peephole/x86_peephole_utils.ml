@@ -171,10 +171,20 @@ let underlying_reg64 = function
     | DH -> Some RDX)
   | Regf _ | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> None
 
+let underlying_freg = function
+  | Regf (XMM r | YMM r | ZMM r) -> Some r
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Mem _
+  | Mem64_RIP _ ->
+    None
+
 let registers_alias arg1 arg2 =
   match underlying_reg64 arg1, underlying_reg64 arg2 with
   | Some r1, Some r2 -> equal_reg64 r1 r2
-  | _ -> false
+  | _, _ -> begin
+    match underlying_freg arg1, underlying_freg arg2 with
+    | Some r1, Some r2 -> Int.equal r1 r2
+    | _, _ -> false
+  end
 
 let reg_appears_in_arg target arg =
   if registers_alias target arg
@@ -182,34 +192,21 @@ let reg_appears_in_arg target arg =
   else
     match arg with
     | Mem addr -> (
-      match target with
-      | Reg64 r | Reg32 r | Reg16 r | Reg8L r ->
-        (match addr.base with
-          | Some base when equal_reg64 r base -> true
-          | _ -> false)
-        || (addr.scale <> 0 && equal_reg_idx (Scalar r) addr.idx)
-      | Imm _ | Sym _ | Reg8H _ | Regf _ | Mem _ | Mem64_RIP _ -> false)
+      (match addr.base with
+        | Some r -> registers_alias target (Reg64 r)
+        | None -> false)
+      || addr.scale <> 0
+         &&
+         match addr.idx with
+         | Scalar r -> registers_alias target (Reg64 r)
+         | Vector r -> registers_alias target (Regf r))
     | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
     | Mem64_RIP _ ->
       false
 
-let reg_is_written_by_arg target arg =
-  match arg with
-  | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
-    registers_alias target arg
-  | Regf _ -> equal_args target arg
-  | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
-
 let reg_read_when_writing target arg =
   match arg with
-  | Mem addr -> (
-    match underlying_reg64 target with
-    | Some target_r64 ->
-      (match addr.base with
-        | Some base when equal_reg64 target_r64 base -> true
-        | _ -> false)
-      || (addr.scale <> 0 && equal_reg_idx (Scalar target_r64) addr.idx)
-    | None -> false)
+  | Mem _ -> reg_appears_in_arg arg target
   (* Writing to small registers implicitly reads the old register value to
      update. *)
   | Reg8L _ | Reg8H _ | Reg16 _ -> registers_alias target arg
@@ -245,21 +242,20 @@ let writes_to_arg target = function
   | CMOV (_, _, dst)
   | ADC (_, dst)
   | SBB (_, dst) ->
-    reg_is_written_by_arg target dst
+    registers_alias target dst
   | INC dst | DEC dst | NEG dst | BSWAP dst | SET (_, dst) ->
-    reg_is_written_by_arg target dst
-  | POP dst -> reg_is_written_by_arg target dst
-  | IMUL (_, Some dst) -> reg_is_written_by_arg target dst
-  | LOCK_XADD (_, dst) -> reg_is_written_by_arg target dst
-  | XCHG (op1, op2) ->
-    reg_is_written_by_arg target op1 || reg_is_written_by_arg target op2
+    registers_alias target dst
+  | POP dst -> registers_alias target dst
+  | IMUL (_, Some dst) -> registers_alias target dst
+  | LOCK_XADD (_, dst) -> registers_alias target dst
+  | XCHG (op1, op2) -> registers_alias target op1 || registers_alias target op2
   | MUL _ | IMUL (_, None) ->
     equal_args target (Reg64 RAX) || equal_args target (Reg64 RDX)
   | IDIV _ -> equal_args target (Reg64 RAX) || equal_args target (Reg64 RDX)
   | CDQ -> equal_args target (Reg32 RAX)
   | CQO -> equal_args target (Reg64 RDX)
   | LOCK_CMPXCHG (_, dst) ->
-    reg_is_written_by_arg target dst || equal_args target (Reg64 RAX)
+    registers_alias target dst || equal_args target (Reg64 RAX)
   | PUSH _ | CMP _ | TEST _ | J _ | JMP _ | CALL _ | RET | LOCK_ADD _
   | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _
   | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE ->
