@@ -2356,12 +2356,7 @@ let solve_Ppat_constraint tps loc env mode sty expected_ty =
   tps.tps_pattern_force <- force :: tps.tps_pattern_force;
   let ty, expected_ty' = instance ty, ty in
   unify_pat_types loc env ty (instance expected_ty);
-  let expected_ty' =
-    match get_desc expected_ty' with
-    | Tpoly (expected_ty', tl) ->
-        instance_poly ~keep_names:true tl expected_ty'
-    | _ -> expected_ty'
-  in
+  let expected_ty' = Ctype.maybe_instance_poly expected_ty' in
   (cty, ty, expected_ty')
 
 let solve_Ppat_variant loc env tag no_arg expected_ty =
@@ -4311,6 +4306,7 @@ let enter_nonsplit_or info =
 let rec check_counter_example_pat
     ~info ~(penv : Pattern_env.t) type_pat_state tp expected_ty k =
   assert (penv.in_counterexample = true);
+  assert (not (is_Tpoly expected_ty));
   let check_rec ?(info=info) ?(penv=penv) =
     check_counter_example_pat ~info ~penv type_pat_state in
   let loc = tp.pat_loc in
@@ -4508,6 +4504,9 @@ let check_counter_example_pat ~counter_example_args penv tp expected_ty =
      way -- one of the functions it calls writes an entry into
      [tps_pattern_forces] -- so we can just ignore module patterns. *)
   let type_pat_state = create_type_pat_state Modules_ignored in
+  let expected_ty =
+    with_level ~level:generic_level (fun () -> maybe_instance_poly expected_ty)
+  in
   wrap_trace_gadt_instances ~force:true !!penv
     (check_counter_example_pat ~info:counter_example_args ~penv
        type_pat_state tp expected_ty)

@@ -245,6 +245,12 @@ val instance_poly_fixed:
         (* Take an instance of a type scheme containing free univars for
            checking that an expression matches this scheme. *)
 
+val maybe_instance_poly: type_expr -> type_expr
+  (* If the type is a [Tpoly], we take an instance (replace
+     the corresponding [Tunivar] by [Tvar]) using
+     [instance_poly ~keep_names:true]; otherwise the
+     input type is returned unchanged. *)
+
 val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
 
 val instance_label:

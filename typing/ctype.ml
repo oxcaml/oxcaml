@@ -1880,6 +1880,12 @@ let instance_poly ?(keep_names=false) univars sch =
       ~keep_names ~fixed:false ~partial:false ~copy_var:None univars sch)
   )
 
+let maybe_instance_poly ty =
+  match get_desc ty with
+  | Tpoly (ty', tyvars) ->
+    instance_poly ~keep_names:true tyvars ty'
+  | _ -> ty
+
 (** The body of a [Tpoly] will likely have references to the [Tunivar]s bound in
     it. When asking for the jkind of a [Tpoly], we don't want to let those
     vars escape the scope. To resolve this, we substitute all occurrences of
@@ -2814,7 +2820,7 @@ let contained_without_boxing env ty =
     end
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
-  | Tpoly (ty, _) -> [ty]
+  | Tpoly (ty, univars) -> [instance_poly_for_jkind univars ty]
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _
