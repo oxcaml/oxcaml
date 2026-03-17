@@ -158,7 +158,7 @@ Error: Signature mismatch:
          val regular_id : 'a -> 'a
        is not included in
          val regular_id : layout_ l. ('a : l). 'a -> 'a
-       The RHS has 1 more layout parameter that is not used,
+       the second has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
 
@@ -201,7 +201,7 @@ end
 Line 2, characters 12-13:
 2 |   let poly_ f = 42
                 ^
-Warning 217: This "let poly_" binding generalizes no layout variables. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
 >> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
 Uncaught exception: Misc.Fatal_error
 
@@ -228,7 +228,7 @@ Error: Signature mismatch:
          val id : layout_ l. ('a : l). 'a -> 'a
        is not included in
          val id : 'a -> 'a
-       The LHS has 1 more layout parameter that is not used,
+       the first has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
 
@@ -314,7 +314,7 @@ end
 Line 4, characters 12-13:
 4 |   let poly_ f x = (x : (_ : value))
                 ^
-Warning 217: This "let poly_" binding generalizes no layout variables. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
 
 Lines 3-5, characters 6-3:
 3 | ......struct
@@ -380,7 +380,7 @@ end
 Line 4, characters 16-17:
 4 |   let rec poly_ f x = x
                     ^
-Warning 217: This "let poly_" binding generalizes no layout variables. Consider using a regular "let" instead.
+Warning 218: "poly_" has no effect in recursive bindings, which do not support layout polymorphism. Consider using a regular "let rec" instead.
 Uncaught exception: File "lambda/translcore.ml", line 2037, characters 19-25: Assertion failed
 
 |}]
@@ -395,7 +395,7 @@ end
 Line 4, characters 20-49:
 4 |   let rec poly_ f : layout_ l. ('a : l). 'a -> 'a = fun x -> x
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Sort polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in this context
 |}]
 
 (* CR-soon zqian: should be layout poly, once we support instantiation. *)
@@ -408,7 +408,7 @@ end
 Line 4, characters 20-49:
 4 |   let rec poly_ f : layout_ l. ('a : l). 'a -> 'a = fun x -> f x
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Sort polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in this context
 |}]
 
 (* CR-soon zqian: should be layout poly, once we support instantiation. *)
@@ -423,7 +423,7 @@ end
 Line 5, characters 20-49:
 5 |   let rec poly_ g : layout_ l. ('a : l). 'a -> 'a = fun x -> h x
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Sort polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in this context
 |}]
 
 (* either all poly, or none poly. *)
