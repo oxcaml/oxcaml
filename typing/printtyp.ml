@@ -866,9 +866,9 @@ let same_printing_env env =
   && Compilation_unit.Name.Set.equal !printing_pers used_pers
 
 let set_printing_env env =
-  printing_env := env;
+  printing_env := Env.enter_future env;
   if !Clflags.real_paths ||
-     !printing_env == Env.empty ||
+     env == Env.empty ||
      same_printing_env env then
     ()
   else begin
