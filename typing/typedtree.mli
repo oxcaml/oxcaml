@@ -239,7 +239,7 @@ and 'k pattern_desc =
             [lpoly] is [pending] during type-checking and guaranteed
             [determined] after [type_let] returns. It may be determined with
             an empty list of sort vars if no layout poly is actually inferred
-            (in which case a [Useless_poly] warning is emitted). *)
+            (in which case a [Useless_lpoly] warning is emitted). *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc
