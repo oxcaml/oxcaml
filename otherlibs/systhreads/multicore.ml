@@ -157,13 +157,12 @@ let manager () =
     Atomic.Loc.incr [%atomic.loc t.threads];
     manager_loop t)
   else
-    ((* CR vkarvonen: This means that something else has spawned a domain using
-        [Domain.spawn].
-
-        Calling [exit] here would make this non-portable and raising here would
-        mean that no error would be produced.
-
-        What should we do in this case? *))
+    let open struct
+      external caml_thread_fatal_spawn_outside_multicore
+        : unit -> 'a @@ portable
+        = "caml_thread_fatal_spawn_outside_multicore"
+    end in
+    caml_thread_fatal_spawn_outside_multicore ()
 
 let n_managers = Atomic.make 0
 
