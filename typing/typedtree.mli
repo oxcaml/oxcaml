@@ -236,7 +236,7 @@ and 'k pattern_desc =
       lpoly: Types.Val_lpoly.t;
     } -> value pattern_desc
         (** x with layout polymorphism, used in let poly_ bindings.
-            [lpoly] is [to_generalize] during type-checking and guaranteed
+            [lpoly] is [pending] during type-checking and guaranteed
             [determined] after [type_let] returns. It may be determined with
             an empty list of sort vars if no layout poly is actually inferred
             (in which case a [Useless_poly] warning is emitted). *)

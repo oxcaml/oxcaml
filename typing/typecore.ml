@@ -3079,7 +3079,7 @@ and type_pat_aux
       in
       let lpoly =
         if (penv : Pattern_env.t).is_lpoly
-        then Val_lpoly.to_generalize ~loc
+        then Val_lpoly.pending ~loc
         else Val_lpoly.determined []
       in
       let id, uid =
