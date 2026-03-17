@@ -2064,7 +2064,7 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
   CAMLlocal1(config);
   config = validated_config(entries);
 
-  if (!domain_sampling(domain)) {
+  if (!sampling(config)) {
     /* We're not in fact sampling. We shouldn't usually get here, but
        can if sampling has just been stopped by another domain. */
     caml_memprof_set_trigger(Caml_state);
@@ -2139,9 +2139,9 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
         ++ new_entries;
       }
 
-      if (entries->config != config) {
+      if (domain->entries.config != config) {
           /* The config has changed (possibly discarded); keep sampling? */
-          config = entries->config;
+          config = domain->entries.config;
           if (!sampling(config)) {
               alloc_ofs = trigger_ofs = 0;
               break;
