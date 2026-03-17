@@ -10225,10 +10225,10 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                 let bound_expr = vb_exp_constraint binding in
                 type_approx env bound_expr pat.pat_type)
               pat_list spat_sexp_list;
-          (* CR-someday zqian: if recursive, unify [pv_lpoly] with user
+          (* CR-someday zqian: Here, if recursive, unify [pv_lpoly] with user
              annotations of layout poly. *)
           (* If recursive, values don't enjoy layout polymorphism, unless
-             specified in its types (incorperated above). *)
+             specified in their types (incorporated  above). *)
           if is_recursive then
             List.iter (fun { pv_lpoly; _ } ->
               Val_lpoly.generalize
