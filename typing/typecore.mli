@@ -347,7 +347,13 @@ type error =
   | Unexpected_hole
   | Eval_format
   | Let_poly_not_yet_implemented
-  | Layout_poly_inst_not_yet_supported
+  | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+
+and invalid_layout_poly_inst_context =
+  | Ivar
+  | Mutvar
+  | Self
+  | Binding_op
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

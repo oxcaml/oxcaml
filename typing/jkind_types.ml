@@ -682,17 +682,19 @@ module Sort = struct
     | Base b -> Static.Const.of_base b
     | Product ts -> Product (List.map default_to_value_and_get ts)
     | Univar uv -> Univar uv
-    | Var r -> (
-      match r.contents with
-      | None when is_genvar r -> Genvar r
-      | None ->
-        set r Static.T_option.value;
-        Static.Const.value
-      | Some s ->
-        let result = default_to_value_and_get s in
-        set r (Static.T_option.of_const result);
-        (* path compression *)
-        result)
+    | Var r -> var_default_to_value_and_get r
+
+  and var_default_to_value_and_get r : Const.t =
+    match r.contents with
+    | None when is_genvar r -> Genvar r
+    | None ->
+      set r Static.T_option.value;
+      Static.Const.value
+    | Some s ->
+      let result = default_to_value_and_get s in
+      set r (Static.T_option.of_const result);
+      (* path compression *)
+      result
 
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_value_and_get s

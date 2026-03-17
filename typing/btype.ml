@@ -504,9 +504,23 @@ let copy_row f fixed row keep more =
 
 let copy_commu c = if is_commu_ok c then commu_ok else commu_var ()
 
+let instance_jkind (t : jkind_lr) : jkind_lr =
+  let rec instance_layout (l : Jkind_types.Sort.t Jkind_types.Layout.t)
+      : Jkind_types.Sort.t Jkind_types.Layout.t =
+    match l with
+    | Any _ -> l
+    | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
+    | Product ts -> Product (List.map instance_layout ts)
+  in
+  match t.jkind.base with
+  | Kconstr _ -> t
+  | Layout l ->
+    { t with jkind = { t.jkind with base = Layout (instance_layout l) } }
+
 let rec copy_type_desc ?(keep_names=false) f = function
-    Tvar { jkind; _ } as tv ->
-     if keep_names then tv else Tvar { name=None; jkind }
+    Tvar { name; jkind } ->
+     let jkind = instance_jkind jkind in
+     if keep_names then Tvar { name; jkind } else Tvar { name=None; jkind }
   | Tarrow (p, ty1, ty2, c)-> Tarrow (p, f ty1, f ty2, copy_commu c)
   | Ttuple l            -> Ttuple (List.map (fun (label, t) -> label, f t) l)
   | Tunboxed_tuple l    ->
@@ -2104,6 +2118,8 @@ module Jkind0 = struct
            ~quality:Best ~ran_out_of_fuel_during_normalize:false
 
     let get_const t = Jkind_desc.get_const t.jkind
+
+    let instance = instance_jkind
 
     let map_type_expr f t =
       if has_with_bounds t
