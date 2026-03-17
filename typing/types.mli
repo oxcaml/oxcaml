@@ -1034,7 +1034,7 @@ module type Wrap = sig
 end
 
 (** Tracks layout polymorphism state for a value binding. A value is either
-    pending generalization ([to_generalize]) or has a finalized list of layout
+    pending generalization ([pending]) or has a finalized list of layout
     vars ([determined]) at generic level. An empty list means the value is not
     layout-polymorphic.
 
@@ -1051,15 +1051,15 @@ module Val_lpoly : sig
       layout vars. Pass [[]] for a non-layout-polymorphic value. *)
   val determined : Jkind_types.Sort.var list -> t
 
-  (** [to_generalize ~loc] creates a value pending layout generalization,
+  (** [pending ~loc] creates a value pending layout generalization,
       where [loc] is the source location that requested polymorphism. *)
-  val to_generalize : loc:Location.t -> t
+  val pending : loc:Location.t -> t
 
   (** Assert that layout poly is determined and return the generalized vars. *)
   val get_exn : t -> Jkind_types.Sort.var list
 
   (** Dispatch on the state of [t]:
-      - If pending ([to_generalize loc]), call [on_to_generalize loc],
+      - If pending ([pending loc]), call [on_to_generalize loc],
         transition to finalized with the returned vars.
       - If finalized ([determined _]), call [on_determined] (default: no-op). *)
   val generalize

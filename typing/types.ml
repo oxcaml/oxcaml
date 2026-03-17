@@ -569,21 +569,21 @@ end
 
 module Val_lpoly = struct
   type state =
-    | To_generalize of Location.t
+    | Pending of Location.t
     | Determined of Jkind_types.Sort.var list
 
   type t = state ref
 
   let get_exn t = match !t with
-    | To_generalize _ -> Misc.fatal_error "layouts has not been generalized"
+    | Pending _ -> Misc.fatal_error "layouts has not been generalized"
     | Determined l -> l
 
   let determined l = ref (Determined l)
-  let to_generalize ~loc = ref (To_generalize loc)
+  let pending ~loc = ref (Pending loc)
 
   let generalize ?(on_determined = fun () -> ()) ~on_to_generalize t =
     match !t with
-    | To_generalize loc -> t := Determined (on_to_generalize loc)
+    | Pending loc -> t := Determined (on_to_generalize loc)
     | Determined _ -> on_determined ()
 end
 
