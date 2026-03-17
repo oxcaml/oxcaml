@@ -10275,7 +10275,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
               Val_lpoly.generalize
                 ~on_determined:(fun () -> ())
                 ~on_to_generalize:(fun loc ->
-                  Location.prerr_warning loc Warnings.Useless_lpoly; [])
+                  Location.prerr_warning loc Warnings.Lpoly_in_letrec; [])
                 pv_lpoly
             ) pvs;
           (* If recursive, all pattern variables must have layout value. This
