@@ -1770,35 +1770,14 @@ module Magic_number = struct
             | Truncated _ -> "is truncated"
             | Not_a_magic_number _ -> "has a different format")
 
-  (* Parse the "ox<len>:<version>" or "ox0" suffix starting at [start]
-     in string [s]. Returns [Some version] on success. *)
+  (* Parse "ox<len>:<version>" suffix starting at [start] in [s]. *)
   let parse_ox_version s start =
-    let len = String.length s in
-    if start + 2 > len
-       || s.[start] <> 'o' || s.[start + 1] <> 'x'
-    then None
-    else
-      let digit_start = start + 2 in
-      let pos = ref digit_start in
-      while !pos < len
-            && s.[!pos] >= '0' && s.[!pos] <= '9' do
-        incr pos
-      done;
-      if !pos = digit_start then None
-      else
-        match int_of_string
-                (String.sub s digit_start (!pos - digit_start))
-        with
-        | exception _ -> None
-        | 0 when !pos = len -> Some ""
-        | 0 -> None
-        | version_len ->
-          if !pos >= len || s.[!pos] <> ':' then None
-          else
-            let version_start = !pos + 1 in
-            if version_start + version_len = len
-            then Some (String.sub s version_start version_len)
-            else None
+    let suffix = String.sub s start (String.length s - start) in
+    match Scanf.sscanf_opt suffix "ox%d:%s%!" (fun len ver -> (len, ver))
+    with
+    | Some (len, ver) when len = String.length ver ->
+      Some ver
+    | _ -> None
 
   let parse s : (info, parse_error) result =
     let len = String.length s in
@@ -1825,9 +1804,8 @@ module Magic_number = struct
     end
 
   let raw { kind; version } =
-    let rk = raw_kind kind in
-    if String.length version = 0 then rk ^ "ox0"
-    else Printf.sprintf "%sox%d:%s" rk (String.length version) version
+    Printf.sprintf "%sox%d:%s"
+      (raw_kind kind) (String.length version) version
 
   let current_raw kind =
     let open Config in
@@ -1847,12 +1825,25 @@ module Magic_number = struct
   let magic_length = String.length (current_raw Exec)
 
   let read_info ic =
-    let header = Buffer.create magic_length in
-    begin
-      try Buffer.add_channel header ic magic_length
-      with End_of_file -> ()
+    let buf = Buffer.create 32 in
+    begin try
+      Buffer.add_string buf (really_input_string ic (kind_length + 2));
+      let c = ref (input_char ic) in
+      while !c <> ':' do
+        Buffer.add_char buf !c;
+        c := input_char ic
+      done;
+      Buffer.add_char buf ':';
+      let s = Buffer.contents buf in
+      let version_len =
+        int_of_string
+          (String.sub s (kind_length + 2)
+             (String.length s - kind_length - 3))
+      in
+      Buffer.add_string buf (really_input_string ic version_len)
+    with End_of_file -> ()
     end;
-    parse (Buffer.contents header)
+    parse (Buffer.contents buf)
 
   let current_version kind =
     match parse (current_raw kind) with

@@ -301,7 +301,7 @@ AC_ARG_WITH([magic-number-version],
     [magic number version for compiled file formats])])
 
 AS_IF([test -z "$with_magic_number_version"],
-  [magic_number_version="ox0"],
+  [magic_number_version="ox0:"],
   [AS_CASE([$with_magic_number_version],
     [*@<:@!a-zA-Z0-9._-@:>@*],
     [AC_MSG_ERROR(

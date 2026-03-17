@@ -912,7 +912,7 @@ module Magic_number : sig
       (e.g. [I] for .cmi), and [ox<len>:<version>] is a length-prefixed
       version string from [./configure --with-magic-number-version].
       For example, [Caml1999Iox3:999] is a .cmi file with version "999".
-      When the version is empty, the suffix is just [ox0] with no colon.
+      When the version is empty, the suffix is [ox0:].
 
       All magic numbers produced by a given compiler have the same byte
       length, [magic_length], and this is important for users as it gives
