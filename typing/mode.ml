@@ -326,10 +326,24 @@ module Lattices = struct
   end
   [@@inline]
 
-  module type Partial = sig
+  module type Diamond = sig
     (** A lattice is a partial order, if for any [a] [b], either:
         - [a <= b] or [b <= a]
-        - [a] and [b] are incomparable. *)
+        - [a] and [b] are incomparable.
+
+        This interface and the [Diamond] functor below are specialized to
+        partial lattices of the form
+        {v
+            Max
+            / \
+          Fst Snd
+            \ /
+            Min
+        v}
+        where [Fst] and [Snd] are incomparable.
+
+        The [Diamond] functor relies on the representation of immediate variant
+        types to efficiently implement bitwise operations over such lattices. *)
 
     type t [@@immediate]
 
@@ -342,7 +356,7 @@ module Lattices = struct
     val max : t
   end
 
-  module Partial (L : Partial) = struct
+  module Diamond (L : Diamond) = struct
     open struct
       external l_to_int : L.t -> int = "%identity"
 
@@ -369,18 +383,20 @@ module Lattices = struct
 
     let le a b = meet a b = a
 
-    (* We can treat [read] and [write] as independent axes.
+    (* We can treat [fst] and [snd] as independent axes.
        0b0 land (lnot 0b0) = 0b0 (min = min => min)
        0b0 land (lnot 0b1) = 0b0 (min < max => min)
        0b1 land (lnot 0b0) = 0b1 (max > min => max)
        0b1 land (lnot 0b1) = 0b0 (max = max => min) *)
-    let subtract a c = l_of_int (l_to_int a land lnot (l_to_int c) land mask)
+    let subtract a c = l_of_int (l_to_int a land lnot (l_to_int c))
 
-    (* We can treat [read] and [write] as independent axes.
+    (* We can treat [fst] and [snd] as independent axes.
        (lnot 0b0) lor 0b0 = 0b1 (min = min => max)
        (lnot 0b0) lor 0b1 = 0b1 (min < max => max)
        (lnot 0b1) lor 0b0 = 0b0 (max > min => min)
-       (lnot 0b1) lor 0b1 = 0b1 (max = max => max) *)
+       (lnot 0b1) lor 0b1 = 0b1 (max = max => max)
+
+       [lnot c lor b] sets the top 61 bits to 1, so we must mask them out. *)
     let imply c b = l_of_int (lnot (l_to_int c) lor l_to_int b land mask)
   end
   [@@inline]
@@ -582,14 +598,14 @@ module Lattices = struct
   end
 
   module Statefulness = struct
-    (* Changes to this type must consider the implementation of [Partial]. *)
+    (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
       | Stateless (* 0b00 *)
       | Observable (* 0b01 *)
       | Reading (* 0b10 *)
       | Stateful (* 0b11 *)
 
-    include Partial (struct
+    include Diamond (struct
       type nonrec t = t
 
       let min = Stateless
@@ -611,14 +627,14 @@ module Lattices = struct
   end
 
   module Visibility = struct
-    (* Changes to this type must consider the implementation of [Partial]. *)
+    (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
       | Read_write (* 0b00 *)
       | Read (* 0b01 *)
       | Write (* 0b10 *)
       | Immutable (* 0b11 *)
 
-    include Partial (struct
+    include Diamond (struct
       type nonrec t = t
 
       let min = Read_write
