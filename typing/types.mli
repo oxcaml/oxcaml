@@ -1061,9 +1061,9 @@ module Val_lpoly : sig
   (** Dispatch on the state of [t]:
       - If pending ([pending loc]), call [on_to_generalize loc],
         transition to finalized with the returned vars.
-      - If finalized ([determined _]), call [on_determined] (default: no-op). *)
+      - If finalized ([determined _]), call [on_determined]. *)
   val generalize
-    :  ?on_determined:(unit -> unit)
+    :  on_determined:(unit -> unit)
     -> on_to_generalize:(Location.t -> Jkind_types.Sort.var list)
     -> t
     -> unit
