@@ -10252,7 +10252,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
             List.iter (fun { pv_lpoly; _ } ->
               Val_lpoly.generalize
                 ~on_to_generalize:(fun loc ->
-                  Location.prerr_warning loc Warnings.Useless_poly; [])
+                  Location.prerr_warning loc Warnings.Useless_lpoly; [])
                 pv_lpoly
             ) pvs;
           (* If recursive, all pattern variables must have layout value. This
@@ -10368,7 +10368,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                 Jkind_types.Sort.generalize_with (fun () -> generalize ty)
               in
               if List.is_empty univars then
-                Location.prerr_warning loc Warnings.Useless_poly;
+                Location.prerr_warning loc Warnings.Useless_lpoly;
               univars)
             pv_lpoly)
         ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
