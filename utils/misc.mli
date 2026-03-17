@@ -905,15 +905,19 @@ end
 (** {1 Handling of magic numbers} *)
 
 module Magic_number : sig
-  (** a typical magic number is "Caml1999I011"; it is formed of an
-      alphanumeric prefix, here Caml1990I, followed by a version,
-      here 011. The prefix identifies the kind of the versioned data:
-      here the I indicates that it is the magic number for .cmi files.
+  (** Magic numbers identify compiled file formats.
 
-      All magic numbers have the same byte length, [magic_length], and
-      this is important for users as it gives them the number of bytes
-      to read to obtain the byte sequence that should be a magic
-      number. Typical user code will look like:
+      A magic number has the format [Caml1999<kind>ox<len>:<version>],
+      where [<kind>] is a single character identifying the file type
+      (e.g. [I] for .cmi), and [ox<len>:<version>] is a length-prefixed
+      version string from [./configure --with-magic-number-version].
+      For example, [Caml1999Iox3:999] is a .cmi file with version "999".
+      When the version is empty, the suffix is just [ox0] with no colon.
+
+      All magic numbers produced by a given compiler have the same byte
+      length, [magic_length], and this is important for users as it gives
+      them the number of bytes to read to obtain the byte sequence that
+      should be a magic number. Typical user code will look like:
       {[
         let ic = open_in_bin path in
         let magic =
@@ -924,25 +928,6 @@ module Magic_number : sig
         | Ok info -> ...
       ]}
 
-      A given compiler version expects one specific version for each
-      kind of object file, and will fail if given an unsupported
-      version. Because versions grow monotonically, you can compare
-      the parsed version with the expected "current version" for
-      a kind, to tell whether the wrong-magic object file comes from
-      the past or from the future.
-
-      An example of code block that expects the "currently supported version"
-      of a given kind of magic numbers, here [Cmxa], is as follows:
-      {[
-        let ic = open_in_bin path in
-        begin
-          try Magic_number.(expect_current Cmxa (get_info ic)) with
-          | Parse_error error -> ...
-          | Unexpected error -> ...
-        end;
-        ...
-      ]}
-
       Parse errors distinguish inputs that are [Not_a_magic_number str],
       which are likely to come from the file being completely
       different, and [Truncated str], raised by headers that are the
@@ -950,16 +935,16 @@ module Magic_number : sig
 
       Unexpected errors correspond to valid magic numbers that are not
       the one expected, either because it corresponds to a different
-      kind, or to a newer or older version.
+      kind, or to a different version.
 
-      The helper functions [explain_parse_error] and [explain_unexpected_error]
-      will generate a textual explanation of each error,
-      for use in error messages.
+      The helper functions [explain_parse_error] and
+      [explain_unexpected_error] will generate a textual explanation
+      of each error, for use in error messages.
 
       @since 4.11
   *)
 
-  type version = int
+  type version = string
 
   type kind =
     | Exec
@@ -971,15 +956,11 @@ module Magic_number : sig
   type info = {
     kind: kind;
     version: version;
-    (** Note: some versions of the compiler use the same [version] suffix
-        for all kinds, but others use different versions counters for different
-        kinds. We may only assume that versions are growing monotonically
-        (not necessarily always by one) between compiler versions. *)
   }
 
   type raw = string
   (** the type of raw magic numbers,
-      such as "Caml1999A027" for the .cma files of OCaml 4.10 *)
+      such as "Caml1999Aox3:999" *)
 
   (** {3 Parsing magic numbers} *)
 
@@ -1011,7 +992,7 @@ module Magic_number : sig
    *)
 
   val magic_length : int
-  (** all magic numbers take the same number of bytes *)
+  (** the byte length of magic numbers produced by this compiler *)
 
 
   (** {3 Checking that magic numbers are current} *)

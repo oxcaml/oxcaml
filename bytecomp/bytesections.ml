@@ -109,7 +109,8 @@ let write_toc_and_trailer t =
 exception Bad_magic_number
 
 let read_toc ic =
-  let pos_trailer = in_channel_length ic - 16 in
+  let trailer_size = 4 + String.length Config.exec_magic_number in
+  let pos_trailer = in_channel_length ic - trailer_size in
   seek_in ic pos_trailer;
   let num_sections = input_binary_int ic in
   let header =
