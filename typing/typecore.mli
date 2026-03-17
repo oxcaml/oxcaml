@@ -72,7 +72,8 @@ type pattern_variable =
     pv_attributes: Typedtree.attributes;
     pv_sort: Jkind.Sort.t;
     pv_lpoly: Types.Val_lpoly.t;
-    (** Not yet determined; gets determined during generalization in [type_let]. *)
+    (** Not yet determined; gets determined during generalization in
+        [type_let]. *)
   }
 
 val mk_expected:
