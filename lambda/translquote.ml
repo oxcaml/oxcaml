@@ -3706,7 +3706,14 @@ and quote_expression_desc ~scopes ~transl stage e =
       then
         let exp = quote_expression ~scopes ~transl (stage - 1) exp in
         Exp_desc.antiquote loc exp
-      else Exp_desc.splice loc (Code.inject (transl exp))
+      else
+        let exp =
+          (* Local allocations are not expected to escape from this expression.
+             If they did, the [ret_mode] on the corresponding [lfunction] would
+             need to indicate local mode. *)
+          Lregion (transl exp, layout_any_value)
+        in
+        Exp_desc.splice loc (Code.inject exp)
     | Texp_new (path, _, _, _) ->
       Exp_desc.new_ loc (quote_value_ident_path loc env path Id_value)
     | Texp_pack m -> Exp_desc.pack loc (quote_module_exp ~transl stage loc m)
