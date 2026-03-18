@@ -87,7 +87,11 @@ let rec fracture_lam lambda : slambda =
          1. [body_r == body] implies that body_r doesn't reference def in
             slambda (as it has no slambda), body_c may reference it.
          2. [def_r == def] implies def_r contains no compile-time effects (again
-            as it contains no slambda). *)
+            as it contains no slambda).
+
+         {[
+           { c = let <def_id> = <fdef> in <body_c>; r = <lambda> >> }
+         ]} *)
       let sval_comptime =
         match body_c with
         | SLmissing ->
@@ -118,52 +122,40 @@ let rec fracture_lam lambda : slambda =
             (let def_r =
                Lsplice (try_to_find_location def, SLproj_runtime (SLvar def_id))
              in
-             slet_local_slam "body" fbody (try_to_find_location body)
-               (fun body_c body_r ->
+             slet_local_slam "body" fbody body (fun body_c body_r ->
                  SLhalves
                    { sval_comptime = body_c;
                      sval_runtime = Llet (str, layout, id, duid, def_r, body_r)
                    }))
         })
-  | Lmutlet (layout, id, duid, def, body) -> (
+  | Lmutlet (layout, id, duid, def, body) ->
     (* let mutable always binds dynamically, but we might still need to execute
        the compile-time effects in def and those need to happen before any
        effects in body, so we can't use [fracture_dynamic].
 
+       If this was a normal let we'd have to bind def to
+       [Slambdaident.of_ident def], however we can get away with a local binding
+       here because we know that nothing refers to the compile time part of def
+       because it's dynamic.
+
        [{
-         let <id> = <fracture def> in
+         let def = <fracture def> in
          let body = <fracture body> in
-         { c = body.c; r = << let mutable id = $(<id>.r) in $(body.r) >> }
-       }]
-       The code below here attempts to omit the let bindings where possible
-       like [slet_local] does. *)
-    let fdef = fracture_lam def in
-    match fdef with
-    | SLhalves { sval_comptime = _; sval_runtime = def_r } ->
-      (* We're using the fact that the compile-time half has no effects. *)
-      slet_local "body" body (fun body_c body_r ->
-          SLhalves
-            { sval_comptime = body_c;
-              sval_runtime =
-                (if def_r == def && body_r == body
-                 then lambda
-                 else Lmutlet (layout, id, duid, def_r, body_r))
-            })
-    | _ ->
-      let def_id = Slambdaident.of_ident id in
-      let def_r =
-        Lsplice (try_to_find_location def, SLproj_runtime (SLvar def_id))
-      in
-      SLlet
-        { slet_name = def_id;
-          slet_value = fdef;
-          slet_body =
-            slet_local "body" body (fun body_c body_r ->
-                SLhalves
-                  { sval_comptime = body_c;
-                    sval_runtime = Lmutlet (layout, id, duid, def_r, body_r)
-                  })
-        })
+         { c = body.c; r = << let mutable id = $(def.r) in $(body.r) >> }
+       }]. *)
+    slet_local "def" def (fun def_c def_r ->
+        (* [slet_local] promises [def_c] contains no effects so it's safe to
+           ignore and, as described above, def is dynamic so nothing uses its
+           value. *)
+        ignore def_c;
+        slet_local "body" body (fun body_c body_r ->
+            SLhalves
+              { sval_comptime = body_c;
+                sval_runtime =
+                  (if def_r == def && body_r == body
+                   then lambda
+                   else Lmutlet (layout, id, duid, def_r, body_r))
+              }))
   | Lletrec (bindings, body) ->
     (* This only works because functions currently have no static part.
 
@@ -256,6 +248,8 @@ let rec fracture_lam lambda : slambda =
        ]}
        Note this discards [left.c]. *)
     slet_local "left" left (fun left_c left_r ->
+        (* [slet_local] promises [left_c] contains no effects so it's safe to
+           ignore and, because this is sequence, we just discard its value. *)
         ignore left_c;
         slet_local "right" right (fun right_c right_r ->
             SLhalves
@@ -414,15 +408,17 @@ and fracture_prim lambda prim args loc =
 
     [body] is a function, called as [body comptime runtime], where [comptime]
     and [runtime] evaluate to the compile-time and run-time halves of the
-    fractured [value]. [comptime] is guaranteed to not contain any effects and
-    [runtime] is physically equal to [value] where possible. *)
+    fractured [value]. [comptime] and [runtime] are guaranteed to not contain
+    any effects and [runtime] is physically equal to [value] where possible. *)
 and slet_local name value body =
-  slet_local_slam name (fracture_lam value) (try_to_find_location value) body
+  slet_local_slam name (fracture_lam value) value body
 
 (** Same as [slet_local] but useful when you've already fractured [value]. *)
-and slet_local_slam name value value_loc body =
+and slet_local_slam name value value_lam body =
+  let loc = try_to_find_location value_lam in
   match value with
-  | SLhalves { sval_comptime = comptime; sval_runtime = runtime } ->
+  | SLhalves { sval_comptime = comptime; sval_runtime = runtime }
+    when value_lam == runtime ->
     body comptime runtime
   | _ ->
     let name = Slambdaident.create_local name in
@@ -431,7 +427,7 @@ and slet_local_slam name value value_loc body =
         slet_value = value;
         slet_body =
           body (SLproj_comptime (SLvar name))
-            (Lsplice (value_loc, SLproj_runtime (SLvar name)))
+            (Lsplice (loc, SLproj_runtime (SLvar name)))
       }
 
 (** Helper function fracture [lambda] where we only need the dynamic part of the
