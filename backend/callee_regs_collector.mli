@@ -25,3 +25,7 @@
 
     If the function is not a leaf function, no information is recorded. *)
 val cfg : Cfg_with_layout.t -> unit
+
+(** [value_to_phys_regs value] returns the list of physical registers encoded
+    in [value]. *)
+val value_to_phys_regs : Callee_regs_info.value -> Regs.Phys_reg.t list
