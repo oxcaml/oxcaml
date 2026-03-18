@@ -84,6 +84,9 @@ let test_simplify_being_used =
   [%eval: Int64.t]
   <[
     let[@zero_alloc][@inline never][@local never] check_simplify () =
+      (* This relies on simplification of inlined bodies, variant unboxing,
+         and simplification of addition - none of which are done in
+         classic mode *)
       let[@inline] f () =
         match
           if (Sys.opaque_identity 4) = 0
