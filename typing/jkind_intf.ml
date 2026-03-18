@@ -161,12 +161,16 @@ module type Sort = sig
   end
 
   module Var : sig
-    type id = private int
-    (* the [private int] allows the debugger to print it *)
+    type id = int
 
-    (** Extract the unique id for a [var]; this should be used only for
-        debugging or printing, not for decision making *)
+    (** Extract the unique id for a [var]. *)
     val get_id : var -> id
+
+    (** Extract the variable contents. *)
+    val get_contents : var -> t option
+
+    (** Extract the variable level. *)
+    val get_level : var -> int
 
     (** Get the number of an [id], useful for printing. These numbers get
         allocated only when an [id] gets printed, and so they are less brittle
@@ -230,6 +234,12 @@ module type Sort = sig
 
   (** Returns [true] iff the variable was created by {!new_genvar}. *)
   val is_genvar : var -> bool
+
+  (** Create a polymorphic sort variable with given level and id. Since [id] is
+      used to determined sort variable equality, [new_genvar] is the preferred
+      option in almost all cases. Currently, [create_var] is only used in the
+      context of saving signatures, where [id] is a negative number. *)
+  val create_var : level:int -> id:int -> t option -> var
 
   (** [sub_with vars f] calls [f] and returns, for each var in [vars], the sort
       it was equated to during [f] (or [None] if it was not equated), together

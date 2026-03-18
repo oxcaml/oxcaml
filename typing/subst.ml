@@ -41,7 +41,7 @@ type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
         prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr;
-        prepare_modality : Mode.Modality.t -> Mode.Modality.t
+        prepare_modality : Mode.Modality.t -> Mode.Modality.t;
       }
     (* The [prepare_jkind] function should be applied to all jkinds when
        saving; this commons them up, truncates their histories, and runs
@@ -60,6 +60,7 @@ type s =
     jkinds: kind_replacement Path.Map.t;
 
     additional_action: additional_action;
+    sort_var_mapping: (int, Jkind_types.Sort.var) Hashtbl.t;
 
     loc: Location.t option;
     mutable last_compose: (s * s) option  (* Memoized composition *)
@@ -77,6 +78,7 @@ let identity =
     modtypes = Path.Map.empty;
     jkinds = Path.Map.empty;
     additional_action = No_action;
+    sort_var_mapping = Hashtbl.create 0;
     loc = None;
     last_compose = None;
   }
@@ -275,7 +277,11 @@ let with_additional_action =
         in
         Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality }
   in
-  { s with additional_action; last_compose = None }
+  { s with
+    additional_action;
+    sort_var_mapping = Hashtbl.create 17;
+    last_compose = None;
+  }
 
 let change_locs s loc = { s with loc = Some loc; last_compose = None }
 
@@ -389,15 +395,23 @@ let to_subst_by_type_function s p =
   | Type_function _ -> true
   | exception Not_found -> false
 
-(* Special type ids for saved signatures *)
+(* Special type and sort ids for saved signatures *)
 
-let new_id = s_ref (-1)
-let reset_additional_action_type_id () = new_id := -1
+let new_type_id = s_ref (-1)
+let new_sort_id = s_ref (-1)
+let reset_additional_action_id () =
+  new_type_id := -1;
+  new_sort_id := -1
 
 let newpersty desc =
-  decr new_id;
+  decr new_type_id;
   create_expr
-    desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_id
+    desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_type_id
+
+let newsortvar desc =
+  decr new_sort_id;
+  Jkind_types.Sort.create_var
+    desc ~level:generic_level ~id:!new_sort_id
 
 (* CR layouts: remove this. While we're still developing, though, it might
    be nice to get the location of this kind of error. *)
@@ -474,6 +488,41 @@ let apply_type_function params args body =
     copy body)
 
 
+let rec sort s srt =
+  let open Jkind_types.Sort in
+  match srt with
+  | Base _ | Univar _ -> srt
+  | Product sorts -> Product (List.map (sort s) sorts)
+  | Var var ->
+    let id = Var.get_id var in
+    let var' =
+      match Hashtbl.find_opt s.sort_var_mapping id with
+      | Some var -> var
+      | None ->
+        let desc = Var.get_contents var in
+        let level = Var.get_level var in
+        let var = match s.additional_action with
+          | Prepare_for_saving _ | Duplicate_variables -> newsortvar desc
+          | No_action ->
+            if id < 0 then new_var ~level
+            else var
+        in
+        Hashtbl.add s.sort_var_mapping id var;
+        var
+    in
+    if var == var' then srt
+    else Var var'
+
+let rec layout s l =
+  let open Jkind_types.Layout in
+  match l with
+  | Any _ -> l
+  | Product sorts -> Product (List.map (layout s) sorts)
+  | Sort (sort_l, ax) ->
+    let sort_l' = sort s sort_l in
+    if sort_l == sort_l' then l
+    else Sort (sort_l', ax)
+
 let jkind_desc s jkind =
   match jkind.base with
   | Kconstr p ->
@@ -491,7 +540,10 @@ let jkind_desc s jkind =
       in
       Jkind.Base_and_axes.map_layout Jkind_types.Layout.of_const const
     end
-  | Layout _ -> jkind
+  | Layout l ->
+    let l' = layout s l in
+    if l == l' then jkind
+    else { jkind with base = Layout l' }
 
 let jkind_const_desc s
       ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
@@ -1183,6 +1235,7 @@ and compose s1 s2 =
             | (Prepare_for_saving _ as prepare1), Prepare_for_saving _
                 -> prepare1
           end;
+          sort_var_mapping = Hashtbl.create 17;
           loc = keep_latest_loc s1.loc s2.loc;
           last_compose = None
         }
