@@ -2295,7 +2295,7 @@ static void domain_terminate (void)
   call_timing_hook(&caml_domain_terminated_hook);
 
   /* Reset the tick interval back to 0, since we no longer want ticks */
-  atomic_store_relaxed(&domain_self->tick_interval_usec, 0);
+  caml_domain_set_tick_interval_usec(0);
 
   while (!finished) {
     caml_finish_sweeping();
