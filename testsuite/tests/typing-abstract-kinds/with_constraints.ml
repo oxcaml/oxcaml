@@ -169,6 +169,35 @@ Error: This type "X.t" should be an instance of type "('a : bits64)"
          because of the definition of t at line 2, characters 2-22.
 |}]
 
+(*******************************************************************)
+(* Test: RHS of kind substitution can refer to sibling kinds in sig *)
+
+module type S = sig
+  kind_ k2
+  kind_ k1
+  type t : k1
+end
+
+(* CR jujacobs: These should resolve [k2] in the constrained signature
+   environment, but [with kind_] constraints currently resolve it in the outer
+   environment and report it as unbound. *)
+module type S' = S with kind_ k1 = k2
+[%%expect{|
+module type S = sig kind_ k2 kind_ k1 type t : k1 end
+Line 10, characters 35-37:
+10 | module type S' = S with kind_ k1 = k2
+                                        ^^
+Error: Unbound kind "k2"
+|}]
+
+module type S' = S with kind_ k1 := k2
+[%%expect{|
+Line 1, characters 36-38:
+1 | module type S' = S with kind_ k1 := k2
+                                        ^^
+Error: Unbound kind "k2"
+|}]
+
 (*************************************************************************)
 (* Test: Destructive substitutions update other places kinds can appear. *)
 
