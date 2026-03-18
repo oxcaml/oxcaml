@@ -648,7 +648,16 @@ end = struct
   let machine_width { source_env; _ } = TE.machine_width source_env
 
   let exists_in_source_env { source_env } var =
-    if TE.mem ~min_name_mode:Name_mode.in_types source_env (Name.var var)
+    (* [TE.mem] returns [false] for variables imported from missing cmxes, even
+       though we want to treat them as existing in the source environment.
+
+       Generally speaking, everything that comes from another compilation unit
+       is OK to use in the source environment, so we never return [None] in that
+       case (prefer checking [TE.mem] first, because the common case is that the
+       variable is defined in the current compilation unit). *)
+    if
+      TE.mem ~min_name_mode:Name_mode.in_types source_env (Name.var var)
+      || not (Compilation_unit.is_current (Variable.compilation_unit var))
     then Some (Variable_in_source_env.create var)
     else None
 
@@ -1211,7 +1220,11 @@ module Joined_envs : sig
 
   val keys : t -> Index.Set.t
 
-  val alias_types_of :
+  (** Returns the aliases of a variable in all the environments where it exists.
+
+      The provided variable {b must} be defined in the current compilation unit.
+  *)
+  val alias_types_of_local_var :
     t ->
     K.t ->
     Variable_in_one_joined_env.t ->
@@ -1266,7 +1279,20 @@ end = struct
                 simple))
       simples_in_joined_envs
 
-  let alias_types_of t kind var =
+  let alias_types_of_local_var t kind var =
+    if Flambda_features.check_light_invariants ()
+    then
+      if
+        not
+          (Compilation_unit.is_current
+             (Variable.compilation_unit
+                (var : Variable_in_one_joined_env.t :> Variable.t)))
+      then
+        Misc.fatal_errorf
+          "Cannot re-define variable %a defined in another compilation unit \
+           into the target environment of join"
+          Variable.print
+          (var : Variable_in_one_joined_env.t :> Variable.t);
     Index.Map.filter_map
       (fun _index (env, _) ->
         if
@@ -1609,7 +1635,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
         (fun (definition : Bindings_in_target_env.definition_in_joined_envs) ->
           match definition with
           | Imported_var (var, kind) ->
-            Joined_envs.alias_types_of joined_envs kind var
+            Joined_envs.alias_types_of_local_var joined_envs kind var
           | These_canonicals (simples, kind) ->
             Index.Map.map
               (fun simple -> Type_in_one_joined_env.alias_type_of kind simple)
