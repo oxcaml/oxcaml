@@ -19,15 +19,12 @@ type ('a : value_or_null) spawn_result =
   | Spawned
   | Failed of 'a * exn @@ aliased many * Printexc.raw_backtrace @@ aliased many
 
-type ('a : value_or_null) request_inner : value mod contended portable  =
+type ('a : value_or_null) request_inner : value mod contended portable =
   { action : 'a @ contended once portable unique -> unit @@ portable
   ; argument : 'a @@ contended portable
-  ; mutable spawn_result : 'a spawn_result @@ contended portable
-  ; mutable sender_domain_or_negative_if_spawned : int
+  ; mutable spawn_result : 'a spawn_result Modes.Portended.t or_null [@atomic]
+  ; sender_domain : int
   }
-[@@unsafe_allow_any_mode_crossing
-   (* The mutable fields are synchronized via a per domain [mutex] and
-      [condition_spawn_result]. *)]
 
 type request : value mod contended portable =
     Request : ('a : value_or_null). 'a request_inner -> request
@@ -80,21 +77,29 @@ let wakeup_incoming t =
   Mutex.unlock t.mutex;
   Condition.broadcast t.condition_incoming
 
+external magic_unique__contended_portable
+  :  ('a : value_or_null).
+     'a @ contended portable
+  -> 'a @ contended portable unique @@ portable
+  = "%identity"
+
 let wait_spawn_result req =
-  let sender_domain_index = req.sender_domain_or_negative_if_spawned in
-  if sender_domain_index >= 0 then (
-    let sender_domain = get sender_domain_index in
-    Mutex.lock sender_domain.mutex;
-    while req.sender_domain_or_negative_if_spawned >= 0 do
-      Condition.wait sender_domain.condition_spawn_result sender_domain.mutex
-    done;
-    Mutex.unlock sender_domain.mutex)
+  let sender_domain = get req.sender_domain in
+  Mutex.lock sender_domain.mutex;
+  let rec loop () =
+    match req.spawn_result with
+    | This result ->
+      Mutex.unlock sender_domain.mutex;
+      magic_unique__contended_portable result.portended
+    | Null ->
+      Condition.wait sender_domain.condition_spawn_result sender_domain.mutex;
+      loop ()
+  in
+  loop ()
 
 let wakeup_spawn_result req =
-  let sender_domain_index = req.sender_domain_or_negative_if_spawned in
-  let sender_domain = get sender_domain_index in
+  let sender_domain = get req.sender_domain in
   Mutex.lock sender_domain.mutex;
-  req.sender_domain_or_negative_if_spawned <- -1;
   Mutex.unlock sender_domain.mutex;
   Condition.broadcast sender_domain.condition_spawn_result
 
@@ -107,12 +112,6 @@ let[@inline] push t request =
   do
     backoff := Backoff.once !backoff
   done
-
-external magic_unique__contended_portable
-  :  ('a : value_or_null).
-     'a @ contended portable
-  -> 'a @ contended portable unique @@ portable
-  = "%identity"
 
 (** Run some function on a new thread. *)
 let thread (Request { action; argument; _ })=
@@ -139,13 +138,16 @@ let rec manager_loop t =
   | _ ->
     let requests = Atomic.Loc.exchange [%atomic.loc t.incoming] [] in
     List.iter (fun ((Request req) as request) ->
-      (match Thread.Portable.create thread request with
-       | _ -> ()
-       | exception exn ->
-         (* This might fail if the user tries to create too many threads *)
-         let bt = Printexc.get_raw_backtrace () in
-         req.spawn_result <- Failed (req.argument, exn, bt);
-         Atomic.Loc.decr [%atomic.loc t.threads]);
+      let spawn_result =
+        match Thread.Portable.create thread request with
+        | _ -> Spawned
+        | exception exn ->
+          (* This might fail if the user tries to create too many threads *)
+          let bt = Printexc.get_raw_backtrace () in
+          Atomic.Loc.decr [%atomic.loc t.threads];
+          Failed (req.argument, exn, bt)
+      in
+      req.spawn_result <- This { portended = spawn_result };
       wakeup_spawn_result req)
       requests;
     manager_loop t
@@ -200,20 +202,16 @@ let spawn_on ~domain:i f a =
   let a = magic_many__contended_portable a in
   let target_domain = get i in
   Atomic.Loc.incr [%atomic.loc target_domain.threads];
-  let sender_domain_index = current_domain () in
   let req =
     { action = f;
       argument = a;
-      spawn_result = Spawned;
-      sender_domain_or_negative_if_spawned = sender_domain_index }
+      spawn_result = Null;
+      sender_domain = current_domain () }
   in
   push target_domain (Request req);
   (* We have added incoming work and must wakeup the manager thread. *)
   wakeup_incoming target_domain;
-  wait_spawn_result req;
-  (* SAFETY: We know that if we got an error here, the thread failed to spawn
-     and hence no longer has a reference to [a]. *)
-  magic_unique__contended_portable req.spawn_result
+  wait_spawn_result req
 
 let spawn f =
   let i =
