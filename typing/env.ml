@@ -3249,7 +3249,7 @@ let persistent_structures_of_dir dir =
 let save_signature_with_transform cmi_transform ~alerts sg modname kind
       cmi_info =
   Btype.cleanup_abbrev ();
-  Subst.reset_additional_action_type_id ();
+  Subst.reset_additional_action_id ();
   let sg = Subst.Lazy.of_signature sg
     |> Subst.Lazy.signature Make_local
         (Subst.with_additional_action Prepare_for_saving Subst.identity)
