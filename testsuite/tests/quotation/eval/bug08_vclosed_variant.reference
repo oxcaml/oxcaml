@@ -1,0 +1,1 @@
+fun (x : [< `A of int | `B > `A ]) -> x
