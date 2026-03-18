@@ -183,6 +183,12 @@ let mk_i f =
 let mk_I f =
   "-I", Arg.String f, "<dir>  Add <dir> to the list of include directories"
 
+let mk_Ix f =
+  "-Ix", Arg.String f,
+  "<dir>  Add <dir> to the list of include directories\n\
+ \     (Like -I, but indicates that cmx files for modules in <dir> are\n\
+ \     always available)"
+
 let mk_H f =
   "-H", Arg.String f,
   "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
@@ -1108,6 +1114,7 @@ module type Common_options = sig
   val _ikinds : unit -> unit
   val _ikinds_debug : unit -> unit
   val _I : string -> unit
+  val _Ix : string -> unit
   val _H : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
@@ -1469,6 +1476,7 @@ struct
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
     mk_I F._I;
+    mk_Ix F._Ix;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
@@ -1594,6 +1602,7 @@ struct
     mk_no_locs F._no_locs;
     mk_alert F._alert;
     mk_I F._I;
+    mk_Ix F._Ix;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
@@ -1728,6 +1737,7 @@ struct
     mk_no_probes_optimized F._no_probes_optimized;
     mk_i F._i;
     mk_I F._I;
+    mk_Ix F._Ix;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
@@ -1902,6 +1912,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_alert F._alert;
     mk_compact F._compact;
     mk_I F._I;
+    mk_Ix F._Ix;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
@@ -2052,6 +2063,7 @@ struct
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
     mk_I F._I;
+    mk_Ix F._Ix;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
@@ -2189,6 +2201,7 @@ struct
     mk_no_locs F._no_locs;
     mk_alert F._alert;
     mk_I F._I;
+    mk_Ix F._Ix;
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
@@ -2352,7 +2365,10 @@ module Default = struct
 
   module Core = struct
     include Common
-    let _I dir = include_dirs := dir :: (!include_dirs)
+    let _I path =
+      include_dirs := { Clflags.path; cmx_guaranteed = false } :: !include_dirs
+    let _Ix path =
+      include_dirs := { Clflags.path; cmx_guaranteed = true } :: !include_dirs
     let _H dir = hidden_include_dirs := dir :: (!hidden_include_dirs)
     let _I_manifest file = include_manifests := file :: !include_manifests
     let _H_manifest file =
@@ -2668,6 +2684,8 @@ module Default = struct
       (* placeholder:
          Odoc_global.include_dirs := (s :: (!Odoc_global.include_dirs))
       *) ()
+    let _Ix(_:string) =
+      (* placeholder: same as _I for now *) ()
     let _H(_:string) =
       (* placeholder:
          Odoc_global.hidden_include_dirs :=

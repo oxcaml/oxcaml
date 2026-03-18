@@ -763,14 +763,18 @@ let set_paths () =
      but keep the directories that user code linked in with ocamlmktop
      may have added to load_path. *)
   let expand = Misc.expand_directory Config.standard_library in
+  let expand_entry (e : Clflags.visible_include) : Clflags.visible_include =
+    { path = expand e.path; cmx_guaranteed = e.cmx_guaranteed }
+  in
+  let include_no_cmx path = { Clflags.path ; cmx_guaranteed = false } in
   let Load_path.{ visible; hidden } = Load_path.get_paths () in
   let visible = List.concat [
-      [ "" ];
-      List.map expand (List.rev !Compenv.first_include_dirs);
-      List.map expand (List.rev !Clflags.include_dirs);
-      List.map expand (List.rev !Compenv.last_include_dirs);
+      [ include_no_cmx "" ];
+      List.map expand_entry (List.rev !Compenv.first_include_dirs);
+      List.map expand_entry (List.rev !Clflags.include_dirs);
+      List.map expand_entry (List.rev !Compenv.last_include_dirs);
       visible;
-      [expand "+camlp4"];
+      [ include_no_cmx (expand "+camlp4") ];
     ]
   in
   let hidden = List.concat [
