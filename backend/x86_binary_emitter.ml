@@ -846,8 +846,19 @@ type simple_encoding = {
   reg : int;
 }
 
+(* CR claude: emit_simple_encoding is missing 16-bit register-to-register/
+   memory variants and the al_imm8 shortcut encoding. *)
 let emit_simple_encoding enc b dst src =
   match (enc, dst, src) with
+  (* 8 bit encodings *)
+  | ( { rm8_r8 = opcodes },
+      ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
+      ((Reg8L _ | Reg8H _) as reg) ) ->
+      emit_mod_rm_reg b 0 opcodes rm (rd_of_reg8 reg)
+  | ( { r8_rm8 = opcodes },
+      ((Reg8L _ | Reg8H _) as reg),
+      ((Mem _ | Mem64_RIP _) as rm) ) ->
+      emit_mod_rm_reg b 0 opcodes rm (rd_of_reg8 reg)
   (* 64 bits encodings *)
   | { rm64_r64 = opcodes }, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm), Reg64 reg
     ->
@@ -938,8 +949,18 @@ let emit_XOR = emit_simple_encoding 0x30 6
 
 let emit_CMP = emit_simple_encoding 0x38 7
 
+(* CR claude: emit_test is missing Reg16 vs Imm (TEST r/m16, imm16, opcode
+   0x66 0xF7 /0) and the Reg16 RAX shortcut (TEST AX, imm16, opcode
+   0x66 0xA9). *)
 let emit_test b dst src =
   match (dst, src) with
+  | ( ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
+      ((Reg8L _ | Reg8H _) as reg) ) ->
+      let reg = rd_of_reg8 reg in
+      emit_mod_rm_reg b 0 [ 0x84 ] rm reg
+  | ((Reg16 _ | Mem _ | Mem64_RIP _) as rm), Reg16 reg ->
+      let reg = rd_of_reg64 reg in
+      emit_mod_rm_reg b 0 [ 0x66; 0x85 ] rm reg
   | ((Reg32 _ | Mem _ | Mem64_RIP _) as rm), Reg32 reg ->
       let reg = rd_of_reg64 reg in
       emit_mod_rm_reg b 0 [ 0x85 ] rm reg
@@ -964,7 +985,22 @@ let emit_test b dst src =
       assert (is_imm8L n);
       emit_mod_rm_reg b 0 [ 0xF6 ] rm 0;
       buf_int8L b n
-  | _ -> assert false
+  | _ ->
+      let string_of_arg = function
+        | Imm n -> Printf.sprintf "Imm %Ld" n
+        | Sym s -> Printf.sprintf "Sym %s" s
+        | Reg8L r -> Printf.sprintf "Reg8L %s" (string_of_reg64 r)
+        | Reg8H r -> Printf.sprintf "Reg8H %s" (string_of_reg8h r)
+        | Reg16 r -> Printf.sprintf "Reg16 %s" (string_of_reg64 r)
+        | Reg32 r -> Printf.sprintf "Reg32 %s" (string_of_reg64 r)
+        | Reg64 r -> Printf.sprintf "Reg64 %s" (string_of_reg64 r)
+        | Regf r -> Printf.sprintf "Regf %s" (string_of_regf r)
+        | Mem _ -> "Mem _"
+        | Mem64_RIP (_, s, d) -> Printf.sprintf "Mem64_RIP(%s, %d)" s d
+      in
+      Misc.fatal_errorf
+        "x86_binary_emitter: emit_test: unexpected operand combination \
+         dst=%s src=%s" (string_of_arg dst) (string_of_arg src)
 
 (* 3-390 -> 452 *)
 let emit_imul b dst src =
@@ -1543,7 +1579,21 @@ let assemble_line b loc ins =
 
 let add_patch b pos size v = b.patches <- (pos, size, v) :: b.patches
 
-let assemble_section arch section =
+let rec assemble_section arch section =
+  try assemble_section0 arch section
+  with Misc.Fatal_error ->
+    let bt = Printexc.get_raw_backtrace () in
+    Format.eprintf
+      "\nContext is: x86 binary emission of section %s:\n%!"
+      section.sec_name;
+    let dll =
+      Oxcaml_utils.Doubly_linked_list.of_list
+        (Array.to_list section.sec_instrs)
+    in
+    X86_gas.generate_asm Out_channel.stderr dll;
+    Printexc.raise_with_backtrace Misc.Fatal_error bt
+
+and assemble_section0 arch section =
   (match arch with X86 -> instr_size := 5 | X64 -> instr_size := 6);
   forced_long_jumps := IntSet.empty;
   String.Tbl.clear local_labels;
