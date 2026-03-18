@@ -1460,9 +1460,9 @@ module Ast = struct
       | Some id -> pp fmt "{%s|%s|%s}" id s id)
     | Float s -> pp fmt "%s" s
     | Float32 s -> pp fmt "%ss" s
-    | Int32 n -> pp fmt "%ld" n
-    | Int64 n -> pp fmt "%Ld" n
-    | Nativeint n -> pp fmt "%nd" n
+    | Int32 n -> pp fmt "%ldl" n
+    | Int64 n -> pp fmt "%LdL" n
+    | Nativeint n -> pp fmt "%ndn" n
     | UnboxedFloat s -> pp fmt "#%s" s
     | UnboxedFloat32 s -> pp fmt "#%ss" s
     | UnboxedInt32 n -> pp fmt "#%ldl" n
@@ -1485,8 +1485,22 @@ module Ast = struct
     | FBasic s -> pp fmt "%s" s
     | FIdent id -> print_raw_ident_field env fmt id
 
+  and is_negative_const = function
+    | Int n -> n < 0
+    | Int32 n -> n < 0l
+    | Int64 n -> n < 0L
+    | Nativeint n -> n < 0n
+    | Float s | Float32 s | UnboxedFloat s | UnboxedFloat32 s ->
+      String.length s > 0 && s.[0] = '-'
+    | UnboxedInt32 n -> n < 0l
+    | UnboxedInt64 n -> n < 0L
+    | UnboxedNativeint n -> n < 0n
+    | Char _ | String _ -> false
+
   and print_pat_with_parens env fmt pat =
     match pat with
+    | PatConstant c when is_negative_const c ->
+      pp fmt "(@[%a@])" (print_pat env) pat
     | PatAny | PatVar _ | PatConstant _ | PatTuple _ | PatUnboxedUnit
     | PatUnboxedBool _ | PatUnboxedTuple _ | PatVariant (_, Some _)
     | PatRecord _ | PatUnboxedRecord _ | PatArray _ ->
@@ -1563,6 +1577,8 @@ module Ast = struct
 
   and print_exp_with_parens env fmt exp =
     match exp.desc with
+    | Constant c when is_negative_const c ->
+      pp fmt "(@[%a@])" (print_exp env) exp
     | Ident _ | Constant _ | Tuple _
     | Construct (_, None)
     | Variant (_, None)
@@ -1579,7 +1595,7 @@ module Ast = struct
     pp fmt "@ |@ %a" (print_pat env) lhs;
     (match guard with
     | None -> ()
-    | Some guard -> pp fmt "@ with@ %a" (print_exp_with_parens env) guard);
+    | Some guard -> pp fmt "@ when@ %a" (print_exp_with_parens env) guard);
     pp fmt "@ ->@ ";
     match rhs with None -> pp fmt "." | Some rhs -> print_exp env fmt rhs
 
@@ -1664,19 +1680,10 @@ module Ast = struct
           | NolabelTup -> print_core_type_with_parens env fmt ty)
         ts
     | TypeTuple [] -> () (* fatal_error "Invalid tuple type" *)
-    | TypeUnboxedTuple ((tl, ty) :: ts) ->
-      (match tl with
-      | LabelledTup l -> pp fmt "%s:%a" l (print_core_type_with_parens env) ty
-      | NolabelTup -> print_core_type_with_parens env fmt ty);
-      List.iter
-        (fun (tl, ty) ->
-          pp fmt " * ";
-          match tl with
-          | LabelledTup l ->
-            pp fmt "%s:%a" l (print_core_type_with_parens env) ty
-          | NolabelTup -> print_core_type_with_parens env fmt ty)
-        ts (* possibly incorrect way of displaying unboxed tuples *)
-    | TypeUnboxedTuple [] -> () (* fatal_error "Invalid unboxed tuple type" *)
+    | TypeUnboxedTuple ts ->
+      pp fmt "#(%a)"
+        (print_tuple_like " *" "" "" (print_label_tup (print_core_type env)))
+        ts
     | TypeConstr (ident, []) -> print_raw_ident_type env fmt ident
     | TypeConstr (ident, [ty]) ->
       pp fmt "%a@ %a"
@@ -1699,7 +1706,7 @@ module Ast = struct
       print_tuple_like "," "[" "]" (print_core_type env) fmt (ty :: tys);
       pp fmt "@ %a" Name.print name
     | TypeAlias (ty, tv) ->
-      pp fmt "%a@ as@ %a" (print_core_type env) ty Name.print tv
+      pp fmt "%a@ as@ '%a" (print_core_type env) ty Name.print tv
     | TypeVariant ([], _) -> () (* fatal_error "Invalid variant type" *)
     | TypeVariant (rf :: row_fields, variant_form) ->
       (match variant_form with
@@ -1708,6 +1715,11 @@ module Ast = struct
       | VClosed _ -> pp fmt "[< ");
       print_row_field env false fmt rf;
       List.iter (print_row_field env true fmt) row_fields;
+      (match variant_form with
+      | VClosed (_ :: _ as tags) ->
+        pp fmt " > %a" (print_tuple_like "" "" "" (fun fmt s ->
+          pp fmt "`%s" s)) tags
+      | _ -> ());
       pp fmt " ]"
     | TypePoly ([], ty) -> print_core_type env fmt ty
     | TypePoly ((_ :: _) as tvs, ty) ->
@@ -1856,12 +1868,14 @@ module Ast = struct
       match body with
       | Pfunction_body exp ->
         Option.iter (print_type_constraint env fmt) constraint_;
-        pp fmt "%a@]" (print_exp env) exp
+        (match params with _::_ -> pp fmt "%a@]" (print_exp env) exp
+        | [] -> pp fmt "%a" (print_exp env) exp)
       | Pfunction_cases cases ->
-        pp fmt "function@[";
+        pp fmt "@[<2>function";
         List.iter (print_case env fmt) cases;
         Option.iter (print_type_constraint env fmt) constraint_;
-        pp fmt "@]")
+        pp fmt "@]";
+        (match params with _::_ -> pp fmt "@]" | [] -> ()))
     | Let (_, [], _) ->
       failwith "Cannot create empty let-expressions. This should not happen."
     | Let (rec_flag, vb :: vbs, body) ->
@@ -1993,7 +2007,8 @@ module Ast = struct
     | Immutable_array_comprehension compr ->
       pp fmt "@[<2>[:@ %a@ :]@]" (print_comprehension env) compr
     | Eval typ -> pp fmt "@[<2>[%%eval:@ %a]@]" (print_core_type env) typ
-    | Unreachable | Src_pos -> pp fmt "."
+    | Unreachable -> pp fmt "."
+    | Src_pos -> pp fmt "[%%src_pos]"
 
   and print_exp env fmt exp =
     if exp.attributes <> [] then pp fmt "(@[";
