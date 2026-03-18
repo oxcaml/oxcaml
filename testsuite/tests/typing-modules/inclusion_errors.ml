@@ -1862,9 +1862,6 @@ Error: Signature mismatch:
        The value "x" is required but not provided
        The value "y" is required but not provided
 |}];;
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
 
 
 module Eq_label: sig
@@ -2048,4 +2045,3 @@ Error: Signature mismatch:
        The type "'a -> unit" is not compatible with the type "?x:int -> unit"
        A label "?x" was expected
 |}]
->>>>>>> upstream-incoming
