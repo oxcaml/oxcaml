@@ -26,6 +26,8 @@
     If the function is not a leaf function, no information is recorded. *)
 val cfg : Cfg_with_layout.t -> unit
 
-(** [value_to_phys_regs value] returns the list of physical registers encoded
-    in [value]. *)
-val value_to_phys_regs : Callee_regs_info.value -> Regs.Phys_reg.t list
+(** [value_to_phys_regs value] returns, for each register class, the list of
+    physical registers encoded in [value]. Classes with no clobbered registers
+    are omitted from the result. *)
+val value_to_phys_regs :
+  Callee_regs_info.value -> (Regs.Reg_class.t * Regs.Phys_reg.t list) list

@@ -2,16 +2,20 @@
 
 module DLL = Oxcaml_utils.Doubly_linked_list
 
-let value_to_phys_regs (value : Callee_regs_info.value) : Regs.Phys_reg.t list =
-  List.concat_map
+let value_to_phys_regs (value : Callee_regs_info.value) :
+    (Regs.Reg_class.t * Regs.Phys_reg.t list) list =
+  List.filter_map
     (fun cls ->
       let cls_idx = Regs.Reg_class.hash cls in
       let bitmask = value.(cls_idx) in
-      Array.fold_left
-        (fun acc phys_reg ->
-          let bit = Regs.index_in_class phys_reg in
-          if bitmask land (1 lsl bit) <> 0 then phys_reg :: acc else acc)
-        [] (Regs.available_registers cls))
+      let regs =
+        Array.fold_left
+          (fun acc phys_reg ->
+            let bit = Regs.index_in_class phys_reg in
+            if bitmask land (1 lsl bit) <> 0 then phys_reg :: acc else acc)
+          [] (Regs.available_registers cls)
+      in
+      if regs = [] then None else Some (cls, regs))
     Regs.Reg_class.all
 
 let add_phys_reg value phys_reg =
