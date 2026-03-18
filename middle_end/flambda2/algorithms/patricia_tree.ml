@@ -16,6 +16,13 @@
 
 type key = int
 
+module Builtins = struct
+  external select_value :
+    'a. bool -> ('a[@local_opt]) -> ('a[@local_opt]) -> ('a[@local_opt])
+    = "caml_csel_value"
+  [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
+end
+
 external int_clz : int -> (int[@untagged])
   = "caml_int_clz_tagged_to_tagged" "caml_int_clz_tagged_to_untagged"
 [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
@@ -101,11 +108,9 @@ module Set = struct
     | Branch (pbit, t0, t1) ->
       let bit = pbit_bit pbit in
       let x = i lxor pbit in
-      if x land -(bit lsl 1) <> 0
-      then false
-      else if x land bit <> 0
-      then mem i t0
-      else mem i t1
+      if x land -(bit lsl 1) = 0
+      then mem i (Builtins.select_value (x land bit <> 0) t0 t1)
+      else false
 
   let rec add i t =
     match t with
@@ -643,11 +648,9 @@ module Map = struct
     | Branch (pbit, t0, t1) ->
       let bit = pbit_bit pbit in
       let x = i lxor pbit in
-      if x land -(bit lsl 1) <> 0
-      then false
-      else if x land bit <> 0
-      then mem i t0
-      else mem i t1
+      if x land -(bit lsl 1) = 0
+      then mem i (Builtins.select_value (x land bit <> 0) t0 t1)
+      else false
 
   let rec find i t =
     match t with
@@ -656,11 +659,9 @@ module Map = struct
     | Branch (pbit, t0, t1) ->
       let bit = pbit_bit pbit in
       let x = i lxor pbit in
-      if x land -(bit lsl 1) <> 0
-      then raise_notrace Not_found
-      else if x land bit <> 0
-      then find i t0
-      else find i t1
+      if x land -(bit lsl 1) = 0
+      then find i (Builtins.select_value (x land bit <> 0) t0 t1)
+      else raise_notrace Not_found
 
   let[@inline always] find_opt key t =
     match find key t with exception Not_found -> None | datum -> Some datum

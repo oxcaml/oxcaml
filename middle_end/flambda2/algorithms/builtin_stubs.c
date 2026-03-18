@@ -10,6 +10,10 @@
 // Use weak symbols in order to allow compiler-libs and ocaml_intrinsics_kernel
 // to be shared dependencies of the same program.
 
+CAMLprim value caml_csel_value(value cond, value ifso, value ifnot) {
+    return cond == Val_false ? ifnot : ifso;
+}
+
 CAMLweakdef intnat caml_int_clz_tagged_to_untagged(value i) {
     // Do not use Long_val(v1) conversion, instead preserving the tag.
     // It guarantees that the input to builtin_clz / _BitScanReverse is
