@@ -472,6 +472,12 @@ module Exp_attribute : sig
   val tail_mod_cons : t
 end
 
+module Vb_attribute : sig
+  type t
+
+  val mk : string -> string option -> t
+end
+
 module rec Case : sig
   type t
 
@@ -560,7 +566,7 @@ and Exp_desc : sig
 
   val let_rec_simple :
     Loc.t ->
-    (Name.t * Type.t option) list ->
+    (Name.t * Type.t option * Vb_attribute.t list) list ->
     (Var.Value.t list -> Exp.t list * Exp.t) lam ->
     t
 
@@ -569,6 +575,7 @@ and Exp_desc : sig
     Name.t list ->
     Name.t list ->
     Exp.t list ->
+    Vb_attribute.t list list ->
     (Var.Value.t list -> Var.Module.t list -> Pat.t * Exp.t) lam ->
     t
 

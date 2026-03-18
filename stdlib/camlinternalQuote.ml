@@ -1281,6 +1281,11 @@ module Ast = struct
     | Loop -> "loop"
     | Tail_mod_cons -> "tail_mod_cons"
 
+  type vb_attribute =
+    { vb_attr_name : string;
+      vb_attr_payload : string option
+    }
+
   type expression =
     { desc : expression_desc;
       attributes : expression_attribute list
@@ -1342,7 +1347,8 @@ module Ast = struct
 
   and value_binding =
     { pat : pattern;
-      expr : expression
+      expr : expression;
+      attrs : vb_attribute list
     }
 
   and function_body =
@@ -1438,16 +1444,20 @@ module Ast = struct
   let print_obj_closed fmt closed_flag =
     pp fmt "%s" (match closed_flag with OOpen -> "; .." | OClosed -> "")
 
-  let print_prefix fmt rec_flag =
-    match rec_flag with
-    | Nonrecursive -> pp fmt "let"
-    | Recursive -> pp fmt "let@ rec"
 
   let print_dir fmt = function
     | Upto -> pp fmt "to"
     | Downto -> pp fmt "downto"
 
-  let rec print_vb env fmt ({ pat; expr } : value_binding) =
+  let print_vb_attribute fmt { vb_attr_name; vb_attr_payload } =
+    match vb_attr_payload with
+    | None -> pp fmt "[@%s]@ " vb_attr_name
+    | Some s -> pp fmt "[@%s %s]@ " vb_attr_name s
+
+  let print_vb_attributes fmt attrs =
+    List.iter (print_vb_attribute fmt) attrs
+
+  let rec print_vb env fmt ({ pat; expr; _ } : value_binding) =
     pp fmt "%a@ =@ @[<2>%a@]"
       (print_pat ~with_parens:false env) pat (print_exp_with_parens env) expr
 
@@ -1460,9 +1470,9 @@ module Ast = struct
       | Some id -> pp fmt "{%s|%s|%s}" id s id)
     | Float s -> pp fmt "%s" s
     | Float32 s -> pp fmt "%ss" s
-    | Int32 n -> pp fmt "%ld" n
-    | Int64 n -> pp fmt "%Ld" n
-    | Nativeint n -> pp fmt "%nd" n
+    | Int32 n -> pp fmt "%ldl" n
+    | Int64 n -> pp fmt "%LdL" n
+    | Nativeint n -> pp fmt "%ndn" n
     | UnboxedFloat s -> pp fmt "#%s" s
     | UnboxedFloat32 s -> pp fmt "#%ss" s
     | UnboxedInt32 n -> pp fmt "#%ldl" n
@@ -1865,8 +1875,18 @@ module Ast = struct
     | Let (_, [], _) ->
       failwith "Cannot create empty let-expressions. This should not happen."
     | Let (rec_flag, vb :: vbs, body) ->
-      pp fmt "@[@[%a@ %a@]@ " print_prefix rec_flag (print_vb env) vb;
-      List.iter (fun vb -> pp fmt "@[and@ %a@]@ " (print_vb env) vb) vbs;
+      let print_rec_suffix fmt = function
+        | Nonrecursive -> ()
+        | Recursive -> pp fmt "rec@ "
+      in
+      pp fmt "@[@[let@ %a%a%a@]@ "
+        print_vb_attributes vb.attrs
+        print_rec_suffix rec_flag (print_vb env) vb;
+      List.iter
+        (fun (vb : value_binding) ->
+          pp fmt "@[and@ %a%a@]@ "
+            print_vb_attributes vb.attrs (print_vb env) vb)
+        vbs;
       pp fmt "in@;@[<2>%a@]@]" (print_exp env) body
     | Let_op ([], _, _) ->
       failwith "Cannot create empty let-expressions. This should not happen."
@@ -2275,6 +2295,13 @@ module Exp_attribute = struct
   let loop = Ast.Loop
 
   let tail_mod_cons = Ast.Tail_mod_cons
+end
+
+module Vb_attribute = struct
+  type t = Ast.vb_attribute
+
+  let mk name payload : t =
+    { vb_attr_name = name; vb_attr_payload = payload }
 end
 
 
@@ -2691,7 +2718,7 @@ module Exp_desc = struct
 
   let return = With_free_vars.return
 
-  let mk_vb pat expr : Ast.value_binding = { pat; expr }
+  let mk_vb pat expr attrs : Ast.value_binding = { pat; expr; attrs }
 
   let ident id =
     let+ id = id in
@@ -2699,28 +2726,43 @@ module Exp_desc = struct
 
   let constant (const : Constant.t) = return (Ast.Constant const)
 
-  let let_rec_simple loc names_with_cstrs f =
+  let let_rec_simple loc names_with_cstrs_attrs f =
+    let names_with_cstrs =
+      List.map (fun (name, cstr, _attrs) -> (name, cstr))
+        names_with_cstrs_attrs
+    in
+    let attrs_per_vb =
+      List.map (fun (_name, _cstr, attrs) -> attrs)
+        names_with_cstrs_attrs
+    in
     With_free_vars.value_bindings_with_constraints
       loc names_with_cstrs
       (fun (vars_with_cstrs : (Var.Value.t * Type.t option) list) ->
         let vars, _ = List.split vars_with_cstrs in
         let defs, body = f vars in
+        let rec map3 f l1 l2 l3 =
+          match l1, l2, l3 with
+          | [], [], [] -> []
+          | a :: l1, b :: l2, c :: l3 ->
+            f a b c :: map3 f l1 l2 l3
+          | _ -> failwith "map3: lists of different lengths"
+        in
         let+ vbs =
-          List.map2
-            (fun (var, cstr) def ->
+          map3
+            (fun (var, cstr) def attrs ->
               let+ cstr = optional cstr and+ def = def in
               let pat =
                 match cstr with
                 | None -> Ast.PatVar var
                 | Some ct -> Ast.PatConstraint (Ast.PatVar var, ct)
               in
-              mk_vb pat def)
-            vars_with_cstrs defs
+              mk_vb pat def attrs)
+            vars_with_cstrs defs attrs_per_vb
           |> all
         and+ body = body in
         Ast.Let (Recursive, vbs, body))
 
-  let let_ loc names_values names_modules defs f =
+  let let_ loc names_values names_modules defs attrs_list f =
     let+ defs = all defs
     and+ pats, body =
       With_free_vars.complex_bindings loc ~extra:Binding_error.duplicate
@@ -2729,7 +2771,18 @@ module Exp_desc = struct
     in
     match pats with
     | Ast.PatTuple pats ->
-      let vbs = List.map2 (fun (_, pat) def -> mk_vb pat def) pats defs in
+      let rec map3 f l1 l2 l3 =
+        match l1, l2, l3 with
+        | [], [], [] -> []
+        | a :: l1, b :: l2, c :: l3 ->
+          f a b c :: map3 f l1 l2 l3
+        | _ -> failwith "map3: lists of different lengths"
+      in
+      let vbs =
+        map3
+          (fun (_, pat) def attrs -> mk_vb pat def attrs)
+          pats defs attrs_list
+      in
       Ast.Let (Nonrecursive, vbs, body)
     | _ -> failwith "Cannot use non-tuple patterns in building let-expressions."
 
