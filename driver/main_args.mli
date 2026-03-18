@@ -23,6 +23,7 @@ module type Common_options = sig
   val _no_locs : unit -> unit
   val _alert : string -> unit
   val _I : string -> unit
+  val _Ix : string -> unit
   val _H : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
