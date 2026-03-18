@@ -38,17 +38,15 @@ let run_expect_test ~get_module_info ~extension:_ ~filename
   let comp_unit = Unit_info.modname unit_info in
   Env.set_unit_name (Some unit_info);
   let before_fl = Fexpr_to_flambda.conv comp_unit before in
-  check_invariants before_fl;
+  check_invariants before_fl.unit;
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
-  (* CR gbury/lmaurer: add a proper traversal to compute the actual
-     code_slot_offsets here (as well as free_names) *)
   (* CR ncourant: test reaper as well *)
   let ({ unit = actual_fl; _ } : Simplify.simplify_result) =
-    Simplify.run ~cmx_loader ~round:0 before_fl
-      ~code_slot_offsets:Code_id.Map.empty ~machine_width:Sixty_four
+    Simplify.run ~cmx_loader ~round:0 before_fl.unit
+      ~code_slot_offsets:before_fl.code_slot_offsets ~machine_width:Sixty_four
   in
   let expected_fl = Fexpr_to_flambda.conv comp_unit expected in
-  match Compare.flambda_units actual_fl expected_fl with
+  match Compare.flambda_units actual_fl expected_fl.unit with
   | Equivalent -> Pass
   | Different { approximant = actual' } ->
     let actual_fexpr = Flambda_to_fexpr.conv actual' in

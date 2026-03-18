@@ -251,7 +251,7 @@ let flambda_to_flambda0 : type m.
   | Some cmx -> Compilenv.set_export_info cmx);
   { flambda; offsets; reachable_names; all_code }
 
-let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width
+let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width ~code_slot_offsets
     (unit : Flambda_unit.t) =
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   let mode, close_prog_metadata =
@@ -261,8 +261,7 @@ let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width
       Misc.fatal_error "Unsupported classic mode in standalone middle-end pass"
   in
   flambda_to_flambda0 ~ppf_dump ~prefixname ~cmx_loader ~machine_width ~mode
-    ~close_prog_metadata
-    ~code_slot_offsets:Flambda2_identifiers.Code_id.Map.empty unit
+    ~close_prog_metadata ~code_slot_offsets unit
 
 let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     (program : Lambda.program) =
