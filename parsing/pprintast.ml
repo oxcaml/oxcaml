@@ -1042,7 +1042,8 @@ and sugar_expr ctxt f e =
                   i1 :: i2 :: i3 :: rest ->
             print ".{" "," "}" (simple_expr ctxt) [i1; i2; i3] rest
           | Ldot ({txt=Lident "Bigarray";_}, {txt="Genarray";_}),
-            {pexp_desc = Pexp_array (_, indexes); pexp_attributes = []} :: rest ->
+            {pexp_desc = Pexp_array (_, indexes); pexp_attributes = []}
+            :: rest ->
               print ".{" "," "}" (simple_expr ctxt) indexes rest
           | _ -> false
         end
