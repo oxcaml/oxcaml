@@ -1254,7 +1254,6 @@ let abbreviations = ref (ref Mnil)
 (* partial: we may not wish to copy the non generic types
    before we call type_pat *)
 let rec copy ?partial ?keep_names copy_scope ty =
-  let copy = copy ?partial ?keep_names copy_scope in
   match get_desc ty with
     Tsubst (ty, _) -> ty
   | desc ->
@@ -1296,10 +1295,13 @@ let rec copy ?partial ?keep_names copy_scope ty =
              ation can be released by changing the content of just
              one reference.
           *)
-              Tconstr (p, List.map copy tl,
-                       ref (match !(!abbreviations) with
-                              Mcons _ -> Mlink !abbreviations
-                            | abbrev  -> abbrev))
+              Tconstr
+                (p,
+                 List.map (copy ?partial ?keep_names copy_scope) tl,
+                 ref
+                   (match !(!abbreviations) with
+                   | Mcons _ -> Mlink !abbreviations
+                   | abbrev -> abbrev))
           end
       | Tvariant row ->
           let more = row_more row in
@@ -1321,15 +1323,15 @@ let rec copy ?partial ?keep_names copy_scope ty =
                   (* TODO: is this case possible?
                      possibly an interaction with (copy more) below? *)
                 | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
-                    copy more
+                    copy ?partial ?keep_names copy_scope more
                 | Tvar _ | Tunivar _ ->
                     if keep then more else newty mored
-                |  _ -> assert false
+                | _ -> assert false
               in
               let row =
                 match get_desc more' with (* PR#6163 *)
-                  Tconstr (x,_,_) when not (is_fixed row) ->
-                    let Row {fields; more; closed; name} = row_repr row in
+                  Tconstr (x, _, _) when not (is_fixed row) ->
+                    let Row { fields; more; closed; name } = row_repr row in
                     create_row ~fields ~more ~closed ~name
                       ~fixed:(Some (Reified x))
                 | _ -> row
@@ -1347,7 +1349,9 @@ let rec copy ?partial ?keep_names copy_scope ty =
                     if row_closed row && not (is_fixed row)
                     && TypeSet.is_empty (free_univars ty)
                     && not (List.for_all not_reither fields) then
-                      let more' = newvar (Jkind.Builtin.value ~why:Row_variable) in
+                      let more' =
+                        newvar (Jkind.Builtin.value ~why:Row_variable)
+                      in
                       (more',
                        create_row ~fields:(List.filter not_reither fields)
                          ~more:more' ~closed:false ~fixed:None ~name:None)
@@ -1356,13 +1360,20 @@ let rec copy ?partial ?keep_names copy_scope ty =
               in
               (* Register new type first for recursion *)
               For_copy.redirect_desc copy_scope more
-                (Tsubst(more', Some t));
+                (Tsubst (more', Some t));
               (* Return a new copy *)
-              Tvariant (copy_row copy true row keep more')
+              Tvariant
+                (copy_row
+                   (copy ?partial ?keep_names copy_scope)
+                   true row keep more')
           end
       | Tobject (ty1, _) when partial <> None ->
-          Tobject (copy ty1, ref None)
-      | _ -> copy_type_desc ?keep_names copy desc
+          Tobject (copy ?partial ?keep_names copy_scope ty1, ref None)
+      | _ ->
+          copy_type_desc
+            ?keep_names
+            (copy ?partial ?keep_names copy_scope)
+            desc
     in
     Transient_expr.set_stub_desc t desc';
     t

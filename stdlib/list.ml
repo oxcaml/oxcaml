@@ -16,7 +16,7 @@
 
 open! Stdlib
 
-[@@@ocaml.flambda_o3]
+[@@@ocaml.flambda_oclassic]
 
 (* An alias for the type of lists. *)
 type ('a : value_or_null) t = 'a list = [] | (::) of 'a * 'a list

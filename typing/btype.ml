@@ -27,15 +27,14 @@ let print_raw =
 
 (**** Sets, maps and hashtables of types ****)
 
-let wrap_repr f ty = f (Transient_expr.repr ty)
 let wrap_type_expr f tty = f (Transient_expr.type_expr tty)
 
 module TransientTypeSet = Set.Make(TransientTypeOps)
 module TypeSet = struct
   include TransientTypeSet
-  let add = wrap_repr add
-  let mem = wrap_repr mem
-  let singleton = wrap_repr singleton
+  let add ty set = TransientTypeSet.add (Transient_expr.repr ty) set
+  let mem ty set = TransientTypeSet.mem (Transient_expr.repr ty) set
+  let singleton ty = TransientTypeSet.singleton (Transient_expr.repr ty)
   let exists p = TransientTypeSet.exists (wrap_type_expr p)
   let elements set =
     List.map Transient_expr.type_expr (TransientTypeSet.elements set)
@@ -50,19 +49,23 @@ end
 module TransientTypeMap = Map.Make(TransientTypeOps)
 module TypeMap = struct
   include TransientTypeMap
-  let add ty = wrap_repr add ty
-  let find ty = wrap_repr find ty
-  let singleton ty = wrap_repr singleton ty
+  let add ty data map = TransientTypeMap.add (Transient_expr.repr ty) data map
+  let find ty map = TransientTypeMap.find (Transient_expr.repr ty) map
+  let singleton ty data =
+    TransientTypeMap.singleton (Transient_expr.repr ty) data
   let fold f = TransientTypeMap.fold (wrap_type_expr f)
 end
 module TypeHash = struct
   include TransientTypeHash
-  let mem hash = wrap_repr (mem hash)
-  let add hash = wrap_repr (add hash)
-  let replace hash = wrap_repr (replace hash)
-  let remove hash = wrap_repr (remove hash)
-  let find hash = wrap_repr (find hash)
-  let find_opt hash = wrap_repr (find_opt hash)
+  let mem hash ty = TransientTypeHash.mem hash (Transient_expr.repr ty)
+  let add hash ty data =
+    TransientTypeHash.add hash (Transient_expr.repr ty) data
+  let replace hash ty data =
+    TransientTypeHash.replace hash (Transient_expr.repr ty) data
+  let remove hash ty = TransientTypeHash.remove hash (Transient_expr.repr ty)
+  let find hash ty = TransientTypeHash.find hash (Transient_expr.repr ty)
+  let find_opt hash ty =
+    TransientTypeHash.find_opt hash (Transient_expr.repr ty)
   let iter f = TransientTypeHash.iter (wrap_type_expr f)
 end
 module TransientTypePairs =
