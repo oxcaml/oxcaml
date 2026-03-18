@@ -131,6 +131,9 @@ stdlib.cmx: stdlib.ml
 	$(CAMLOPT) $(COMPFLAGS) $(OPTCOMPFLAGS) \
 	 -pp "$(AWK) -f ./expand_module_aliases.awk" -c $<
 
+seq.cmx stdlib__seq.cmx: OPTCOMPFLAGS := \
+  $(filter-out -O3,$(OPTCOMPFLAGS)) -O2
+
 %.cmi: %.mli
 	$(V_OCAMLC)$(CAMLC) $(COMPFLAGS) -c $<
 
