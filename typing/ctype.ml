@@ -24,6 +24,9 @@ open Mode
 open Local_store
 module Int = Misc.Stdlib.Int
 
+let debug_ikind_crossing_mismatch =
+  Sys.getenv_opt "OXCAML_IKIND_CROSSING_MISMATCH" <> None
+
 (*
    Type manipulation after type inference
    ======================================
@@ -1253,124 +1256,123 @@ let abbreviations = ref (ref Mnil)
 
 (* partial: we may not wish to copy the non generic types
    before we call type_pat *)
-let rec copy ?partial ?keep_names copy_scope ty =
-  let copy = copy ?partial ?keep_names copy_scope in
-  match get_desc ty with
-    Tsubst (ty, _) -> ty
-  | desc ->
-    let level = get_level ty in
-    if level <> generic_level && partial = None then ty else
-    (* We only forget types that are non generic and do not contain
-       free univars *)
-    let forget =
-      if level = generic_level then generic_level else
-      match partial with
-        None -> assert false
-      | Some (free_univars, keep) ->
-          if not (is_Tpoly ty) && TypeSet.is_empty (free_univars ty) then
-            if keep then level else !current_level
-          else generic_level
-    in
-    if forget <> generic_level then
-      (* Using jkind "any" is ok here: We're forgetting the type because it
-         will be unified with the original later. *)
-      newty2 ~level:forget
-        (Tvar { name = None; jkind = Jkind.Builtin.any ~why:Dummy_jkind })
-    else
-    let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
-    For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
-    let desc' =
-      match desc with
-      | Tconstr (p, tl, _) ->
-          let abbrevs = proper_abbrevs tl !abbreviations in
-          begin match find_repr p !abbrevs with
-            Some ty when not (eq_type ty t) ->
-              Tlink ty
-          | _ ->
-          (*
-             One must allocate a new reference, so that abbrevia-
-             tions belonging to different branches of a type are
-             independent.
-             Moreover, a reference containing a [Mcons] must be
-             aliased, so that the memorized expansion of an abbrevi-
-             ation can be released by changing the content of just
-             one reference.
-          *)
-              Tconstr (p, List.map copy tl,
-                       ref (match !(!abbreviations) with
-                              Mcons _ -> Mlink !abbreviations
-                            | abbrev  -> abbrev))
-          end
-      | Tvariant row ->
-          let more = row_more row in
-          let mored = get_desc more in
-          (* We must substitute in a subtle way *)
-          (* Tsubst takes a tuple containing the row var and the variant *)
-          begin match mored with
-            Tsubst (_, Some ty2) ->
-              (* This variant type has been already copied *)
-              (* Change the stub to avoid Tlink in the new type *)
-              For_copy.redirect_desc copy_scope ty (Tsubst (ty2, None));
-              Tlink ty2
-          | _ ->
-              (* If the row variable is not generic, we must keep it *)
-              let keep = get_level more <> generic_level && partial = None in
-              let more' =
-                match mored with
-                  Tsubst (ty, None) -> ty
-                  (* TODO: is this case possible?
-                     possibly an interaction with (copy more) below? *)
-                | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
-                    copy more
-                | Tvar _ | Tunivar _ ->
-                    if keep then more else newty mored
-                |  _ -> assert false
-              in
-              let row =
-                match get_desc more' with (* PR#6163 *)
-                  Tconstr (x,_,_) when not (is_fixed row) ->
-                    let Row {fields; more; closed; name} = row_repr row in
-                    create_row ~fields ~more ~closed ~name
-                      ~fixed:(Some (Reified x))
-                | _ -> row
-              in
-              (* Open row if partial for pattern and contains Reither *)
-              let more', row =
-                match partial with
-                  Some (free_univars, false) ->
-                    let not_reither (_, f) =
-                      match row_field_repr f with
-                        Reither _ -> false
-                      | _ -> true
-                    in
-                    let fields = row_fields row in
-                    if row_closed row && not (is_fixed row)
-                    && TypeSet.is_empty (free_univars ty)
-                    && not (List.for_all not_reither fields) then
-                      let more' = newvar (Jkind.Builtin.value ~why:Row_variable) in
-                      (more',
-                       create_row ~fields:(List.filter not_reither fields)
-                         ~more:more' ~closed:false ~fixed:None ~name:None)
-                    else (more', row)
-                | _ -> (more', row)
-              in
-              (* Register new type first for recursion *)
-              For_copy.redirect_desc copy_scope more
-                (Tsubst(more', Some t));
-              (* Return a new copy *)
-              Tvariant (copy_row copy true row keep more')
-          end
-      | Tvar { name; jkind } ->
-          let name = if keep_names = Some true then name else None in
-          Tvar { name; jkind = Jkind.instance jkind }
-      | Tunivar { name; jkind } ->
-          Tunivar { name; jkind = Jkind.instance jkind }
-      | Tobject (ty1, _) when partial <> None ->
-          Tobject (copy ty1, ref None)
-      | _ -> copy_type_desc ?keep_names copy desc
-    in
-    Transient_expr.set_stub_desc t desc';
-    t
+let copy ?partial ?keep_names copy_scope ty =
+  let rec copy ty =
+    match get_desc ty with
+    | Tsubst (ty, _) -> ty
+    | desc ->
+      let level = get_level ty in
+      if level <> generic_level && partial = None then ty else
+      (* We only forget types that are non generic and do not contain
+         free univars *)
+      let forget =
+        if level = generic_level then generic_level else
+        match partial with
+          None -> assert false
+        | Some (free_univars, keep) ->
+            if not (is_Tpoly ty) && TypeSet.is_empty (free_univars ty) then
+              if keep then level else !current_level
+            else generic_level
+      in
+      if forget <> generic_level then
+        (* Using jkind "any" is ok here: We're forgetting the type because it
+           will be unified with the original later. *)
+        newty2 ~level:forget
+          (Tvar { name = None; jkind = Jkind.Builtin.any ~why:Dummy_jkind })
+      else
+      let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
+      For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
+      let desc' =
+        match desc with
+        | Tconstr (p, tl, _) ->
+            let abbrevs = proper_abbrevs tl !abbreviations in
+            begin match find_repr p !abbrevs with
+              Some ty when not (eq_type ty t) ->
+                Tlink ty
+            | _ ->
+            (*
+               One must allocate a new reference, so that abbrevia-
+               tions belonging to different branches of a type are
+               independent.
+               Moreover, a reference containing a [Mcons] must be
+               aliased, so that the memorized expansion of an abbrevi-
+               ation can be released by changing the content of just
+               one reference.
+            *)
+                Tconstr (p, List.map copy tl,
+                         ref (match !(!abbreviations) with
+                                Mcons _ -> Mlink !abbreviations
+                              | abbrev  -> abbrev))
+            end
+        | Tvariant row ->
+            let more = row_more row in
+            let mored = get_desc more in
+            (* We must substitute in a subtle way *)
+            (* Tsubst takes a tuple containing the row var and the variant *)
+            begin match mored with
+              Tsubst (_, Some ty2) ->
+                (* This variant type has been already copied *)
+                (* Change the stub to avoid Tlink in the new type *)
+                For_copy.redirect_desc copy_scope ty (Tsubst (ty2, None));
+                Tlink ty2
+            | _ ->
+                (* If the row variable is not generic, we must keep it *)
+                let keep = get_level more <> generic_level && partial = None in
+                let more' =
+                  match mored with
+                    Tsubst (ty, None) -> ty
+                    (* TODO: is this case possible?
+                       possibly an interaction with (copy more) below? *)
+                  | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
+                      copy more
+                  | Tvar _ | Tunivar _ ->
+                      if keep then more else newty mored
+                  |  _ -> assert false
+                in
+                let row =
+                  match get_desc more' with (* PR#6163 *)
+                    Tconstr (x,_,_) when not (is_fixed row) ->
+                      let Row {fields; more; closed; name} = row_repr row in
+                      create_row ~fields ~more ~closed ~name
+                        ~fixed:(Some (Reified x))
+                  | _ -> row
+                in
+                (* Open row if partial for pattern and contains Reither *)
+                let more', row =
+                  match partial with
+                    Some (free_univars, false) ->
+                      let not_reither (_, f) =
+                        match row_field_repr f with
+                          Reither _ -> false
+                        | _ -> true
+                      in
+                      let fields = row_fields row in
+                      if row_closed row && not (is_fixed row)
+                      && TypeSet.is_empty (free_univars ty)
+                      && not (List.for_all not_reither fields) then
+                        let more' =
+                          newvar (Jkind.Builtin.value ~why:Row_variable)
+                        in
+                        (more',
+                         create_row ~fields:(List.filter not_reither fields)
+                           ~more:more' ~closed:false ~fixed:None ~name:None)
+                      else (more', row)
+                  | _ -> (more', row)
+                in
+                (* Register new type first for recursion *)
+                For_copy.redirect_desc copy_scope more
+                  (Tsubst(more', Some t));
+                (* Return a new copy *)
+                Tvariant (copy_row copy true row keep more')
+            end
+        | Tobject (ty1, _) when partial <> None ->
+            Tobject (copy ty1, ref None)
+        | _ -> copy_type_desc ?keep_names copy desc
+      in
+      Transient_expr.set_stub_desc t desc';
+      t
+  in
+  copy ty
 
 (**** Variants of instantiations ****)
 
@@ -1420,6 +1422,7 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_arity = 0;
     type_kind = Type_abstract origin;
     type_jkind = Jkind.disallow_right jkind;
+    type_ikind = Types.ikinds_todo "new_local_type";
     type_private = Public;
     type_manifest = manifest;
     type_variance = [];
@@ -1431,14 +1434,6 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_unboxed_default = false;
     type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
     type_unboxed_version = None;
-  }
-
-let new_local_jkind ?(loc = Location.none) ?manifest () =
-  {
-    jkind_manifest = manifest;
-    jkind_attributes = [];
-    jkind_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
-    jkind_loc = loc;
   }
 
 let existential_name name_counter ty =
@@ -1738,6 +1733,8 @@ let instance_poly_for_jkind univars sch =
     in
     ty
   )
+
+let () = Ikind.instance_poly_for_jkind' := instance_poly_for_jkind
 
 let instance_label ~fixed lbl =
   For_copy.with_scope (fun copy_scope ->
@@ -2428,7 +2425,15 @@ let mk_is_abstract env p =
   -> false
 
 let mk_jkind_context env jkind_of_type =
-  { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
+  let lookup_type p =
+    match Env.find_type p env with
+    | decl -> Some decl
+    | exception Not_found -> None
+  in
+  { Jkind.jkind_of_type;
+    is_abstract = mk_is_abstract env;
+    lookup_type;
+  }
 
 (* We parameterize [estimate_type_jkind] by a function
    [expand_component] because some callers want expansion of types and others
@@ -2647,10 +2652,29 @@ let constrain_type_jkind ~fixed env ty jkind =
       loop ~fuel ~expanded:false t ty's_jkind jkind
 
     | _ ->
-       match
-         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level env
+       if !Clflags.ikinds_debug
+       then
+         Format.eprintf
+           "@[<v>[ikind-ctype] constrain_type_jkind: sub_or_intersect call@,\
+            [ikind-ctype]   lhs(ty_jkind)=%a@,\
+            [ikind-ctype]   rhs(bound)=%a@]@."
+           (Format_doc.compat (Jkind.format env))
+           ty's_jkind
+           (Format_doc.compat (Jkind.format env))
+           jkind;
+       let sub_result =
+         Ikind.sub_or_intersect ~type_equal ~context ~level:!current_level env
            ty's_jkind jkind
-       with
+       in
+       if !Clflags.ikinds_debug
+       then
+         Format.eprintf
+           "[ikind-ctype] constrain_type_jkind: sub_or_intersect=%s@."
+           (match sub_result with
+            | Sub -> "Sub"
+            | Disjoint _ -> "Disjoint"
+            | May_have_intersection _ -> "May_have_intersection");
+       match sub_result with
        | Sub -> Ok ()
        | Disjoint sub_failure_reasons ->
           (* Reporting that [ty's_jkind] must be a subjkind of [jkind] is not
@@ -2664,7 +2688,49 @@ let constrain_type_jkind ~fixed env ty jkind =
           Error (Jkind.Violation.of_ ~context env
                    (Not_a_subjkind (ty's_jkind, jkind,
                                     Nonempty_list.to_list sub_failure_reasons)))
-       | May_have_intersection sub_failure_reasons ->
+        | May_have_intersection sub_failure_reasons ->
+           if !Clflags.ikinds_debug
+           then begin
+             let verbosity =
+               Jkind.Format_verbosity.Expanded_with_all_mod_bounds
+             in
+             Format.eprintf
+               "@[<v>[ikind-ctype] constrain_type_jkind: may_intersect \
+                reasons=[%s]@,\
+                [ikind-ctype]   lhs(verbose)=%a@,\
+                [ikind-ctype]   rhs(verbose)=%a@,\
+                [ikind-ctype]   lhs.mod_bounds=%a@,\
+                [ikind-ctype]   rhs.mod_bounds=%a@,\
+                [ikind-ctype]   lhs.with_bounds=%a@,\
+                [ikind-ctype]   rhs.with_bounds=%a@]@."
+               (String.concat ", "
+                  (List.map
+                     (fun (reason : Jkind.Sub_failure_reason.t) ->
+                        match reason with
+                        | Axis_disagreement (Jkind_axis.Axis.Pack axis) ->
+                          "Axis_disagreement("
+                          ^ Jkind_axis.Axis.name axis
+                          ^ ")"
+                        | Layout_disagreement -> "Layout_disagreement"
+                        | With_bounds_on_left -> "With_bounds_on_left"
+                        | Constrain_ran_out_of_fuel ->
+                          "Constrain_ran_out_of_fuel")
+                     (Misc.Nonempty_list.to_list sub_failure_reasons)))
+               (Format_doc.compat
+                  (Jkind.format_verbose ~verbosity env))
+               ty's_jkind
+               (Format_doc.compat
+                  (Jkind.format_verbose ~verbosity env))
+               jkind
+               Jkind.Mod_bounds.debug_print
+               ty's_jkind.jkind.mod_bounds
+               Jkind.Mod_bounds.debug_print
+               jkind.jkind.mod_bounds
+               Jkind.With_bounds.debug_print
+               ty's_jkind.jkind.with_bounds
+               Jkind.With_bounds.debug_print
+               jkind.jkind.with_bounds;
+           end;
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
            let product ~fuel tys =
              let num_components = List.length tys in
@@ -5373,15 +5439,37 @@ let zap_modalities_to_floor_if_at_least level =
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
-  Jkind.get_mode_crossing ~context env jkind
+  Ikind.crossing_of_jkind ~context env jkind
 
 let crossing_of_ty env ?modalities ty =
+  let principal = is_principal ty in
   let crossing =
-    if not (is_principal ty)
-      then Crossing.max
+    if not principal
+    then Crossing.max
     else
-      let jkind = type_jkind_purely env ty in
-      crossing_of_jkind env jkind
+      let jkind_crossing () =
+        let jkind = type_jkind_purely env ty in
+        crossing_of_jkind env jkind
+      in
+      if !Clflags.ikinds
+      then (
+        let ikind_crossing = Ikind.crossing_of_type env ty in
+        if debug_ikind_crossing_mismatch then (
+          let old_jkind_crossing = jkind_crossing () in
+          if not (Crossing.equal ikind_crossing old_jkind_crossing)
+          then
+            Format.eprintf
+              "@[<v>[ikind-crossing-mismatch]@ \
+               type=%a@ \
+               ikind=%a@ \
+               jkind=%a@]@."
+              !Btype.print_raw ty
+              (Format_doc.compat Crossing.print) ikind_crossing
+              (Format_doc.compat Crossing.print) old_jkind_crossing
+        );
+        ikind_crossing)
+      else
+        jkind_crossing ()
   in
   match modalities with
   | None -> crossing
@@ -5728,7 +5816,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    Usually, the subject is given by the user, and the pattern
    is unimportant.  So, no need to propagate abbreviations.
 *)
-let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
+let moregeneral env inst_nongen pat_sch subj_sch =
   let old_level = !current_level in
   current_level := generic_level - 1;
   (*
@@ -5737,42 +5825,17 @@ let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
      then copied with [duplicate_type].  That way, its levels won't be
      changed.
   *)
-  let (subj_sorts, subj_inst) =
-    Jkind_types.Sort.instance_with ~level:!current_level subj_sort_vars
-      (fun () -> instance subj_sch)
-  in
+  let subj_inst = instance subj_sch in
   let subj = duplicate_type subj_inst in
   current_level := generic_level;
   (* Duplicate generic variables *)
-  let (pat_sorts, patt) =
-    Jkind_types.Sort.instance_with ~level:!current_level pat_sort_vars
-      (fun () -> instance pat_sch)
-  in
+  let patt = instance pat_sch in
   Misc.try_finally
     (fun () ->
        try
          Misc.protect_refs [R (univar_pairs, [])] begin fun () ->
          let type_pairs = fresh_moregen_pairs () in
-         let (pat_sort_refs, ()) =
-           Jkind_types.Sort.sub_with pat_sorts (fun () ->
-             moregen inst_nongen Covariant type_pairs env patt subj)
-         in
-         (* [subj_sorts] are ephemeral rigid vars created by
-            [instance_with] to stand for [subj_sort_vars] during moregen.
-            Replace them back with the originals so that the returned
-            [pat_sort_refs] refer to [subj_sort_vars], not to the
-            short-lived rigid instances. *)
-         let subst_map = List.combine subj_sorts subj_sort_vars in
-         let rec subst_sort (s : Jkind_types.Sort.t) =
-           match s with
-           | Var v ->
-             (match List.assq_opt v subst_map with
-              | Some v' -> Jkind_types.Sort.Var v'
-              | None -> s)
-           | Base _ | Univar _ -> s
-           | Product ts -> Jkind_types.Sort.Product (List.map subst_sort ts)
-         in
-         List.map (Option.map subst_sort) pat_sort_refs
+         moregen inst_nongen Covariant type_pairs env patt subj
          end
        with Moregen_trace trace ->
          (* Moregen splits the generic level into two finer levels:
@@ -5789,8 +5852,8 @@ let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
     ~always:(fun () -> current_level := old_level)
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
-  match moregeneral env inst_nongen [] [] pat_sch subj_sch with
-  | _ -> true
+  match moregeneral env inst_nongen pat_sch subj_sch with
+  | () -> true
   | exception Moregen _ -> false
 
 let all_distinct_vars env vars =
@@ -7492,6 +7555,7 @@ let rec nondep_type_decl env mid is_covariant decl =
       type_arity = decl.type_arity;
       type_kind = tk;
       type_jkind = jkind;
+      type_ikind = Types.ikinds_todo "nondep_type_decl";
       type_manifest = tm;
       type_private = priv;
       type_variance = decl.type_variance;
@@ -7743,8 +7807,10 @@ let check_decl_jkind env decl jkind =
     | _ -> decl.type_jkind
   in
   match
-    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
-      decl_jkind jkind
+    Ikind.sub_jkind_l
+      ~origin:
+        (Format.asprintf "ctype:decl %a" Location.print_loc decl.type_loc)
+      ~type_equal ~context ~level:!current_level env decl_jkind jkind
   with
   | Ok () -> Ok ()
   | Error _ as err ->
@@ -7753,8 +7819,11 @@ let check_decl_jkind env decl jkind =
     | Some ty ->
       let ty_jkind = type_jkind env ty in
       match
-        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
-          ty_jkind jkind
+        Ikind.sub_jkind_l
+          ~origin:
+            (Format.asprintf "ctype:manifest %a"
+               Location.print_loc decl.type_loc)
+          ~type_equal ~context ~level:!current_level env ty_jkind jkind
       with
       | Ok () -> Ok ()
       | Error _ as err -> err
@@ -7766,12 +7835,15 @@ let constrain_decl_jkind env decl jkind =
   (* This case is sad, because it can't refine type variables. Hence
      the need for reimplementation. Hopefully no one hits this for
      a while. *)
-  | None -> check_decl_jkind env decl jkind
+  | None ->
+    check_decl_jkind env decl jkind
   | Some jkind ->
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      Jkind.sub_or_error ~type_equal ~context ~level:!current_level env
+      (* Use Ikind when enabled so axis constraints are checked; it falls
+         back to [Jkind.sub_or_error] when ikinds are disabled. *)
+      Ikind.sub_or_error ~type_equal ~context ~level:!current_level env
         decl.type_jkind jkind
     with
     | Ok () as ok -> ok
