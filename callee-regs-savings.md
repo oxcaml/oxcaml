@@ -98,3 +98,29 @@ than being spilled — provided the allocator were given and exploited the calle
 actual clobber set.  This is a conservative lower bound on the potential benefit,
 since it counts only calls to leaf callees for which clobber information is
 available.
+
+## Effect of Higher Optimisation (`O3`)
+
+The same experiment was repeated with `OCAMLPARAM=_,O3=1` and
+`BUILD_OCAMLPARAM=_,O3=1` (still 1,234 compilation units):
+
+| Metric | Default | O3 |
+|--------|---------|----|
+| `callee_regs_live` (total) | 49,539 | 38,914 |
+| `callee_regs_savings` (total) | 34,801 | 15,585 |
+| Savings ratio | **70.2 %** | **40.0 %** |
+
+Two effects combine here.  First, `callee_regs_live` falls from 49,539 to
+38,914: O3 inlines more aggressively, eliminating a significant number of direct
+call sites altogether and therefore reducing the pool of live-across-call
+registers that the measurement even considers.  Second, and more striking, the
+savings ratio drops from 70 % to 40 %: the call sites that survive inlining tend
+to be the harder cases — callees that clobber a larger fraction of the available
+registers, leaving fewer safe havens for live values.
+
+The combined result is that the absolute savings estimate falls from 34,801 to
+15,585, a reduction of roughly 55 %.  This suggests that a meaningful share of
+the potential benefit identified at the default optimisation level is already
+addressed implicitly by inlining at O3, but a substantial residual opportunity
+(~15,000 register saves per compiler self-build) remains even at the higher
+level.
