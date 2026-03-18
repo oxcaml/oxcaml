@@ -204,11 +204,15 @@ Caml_inline void domain_set_pending(dom_internal *d)
 { atomic_store_release(&d->pending, 1); }
 
 static struct {
-  _Atomic pthread_t thread_id;
-  atomic_bool running;
+  /* This mutex protects mutation of `thread_id` and `running` */
+  caml_plat_mutex mutex;
+  pthread_t thread_id;
+  bool running;
+
   atomic_bool disabled;
   atomic_bool stop;
 } tick_thread = {
+  CAML_PLAT_MUTEX_INITIALIZER,
   0,
   false,
   false,
@@ -2022,16 +2026,16 @@ void caml_process_tick(void)
 
 CAMLextern void caml_stop_tick_thread(void)
 {
-  /* If multiple threads try to stop the tick thread at the same time, only one
-     should join it. This means that subsequent callers will return while the
-     tick thread is still running. */
-  if (atomic_exchange(&tick_thread.running, false)) {
+  caml_plat_lock_non_blocking(&tick_thread.mutex);
+  if (tick_thread.running) {
+    tick_thread.running = false;
     atomic_store_release(&tick_thread.stop, true);
-    pthread_t thread = atomic_load_relaxed(&tick_thread.thread_id);
+    pthread_t thread = tick_thread.thread_id;
     CAMLassert(thread);
     pthread_join(thread, NULL);
     atomic_store_release(&tick_thread.stop, false);
   }
+  caml_plat_unlock(&tick_thread.mutex);
 }
 
 /* Compute the interval at which the tick thread will tick. This takes the
@@ -2104,9 +2108,11 @@ CAMLextern int caml_start_tick_thread(void)
   if (atomic_load_acquire(&tick_thread.disabled))
     return 0;
 
-  bool expected = false;
-  if (!atomic_compare_exchange_strong(&tick_thread.running, &expected, true))
+  caml_plat_lock_non_blocking(&tick_thread.mutex);
+  if (tick_thread.running) {
+    caml_plat_unlock(&tick_thread.mutex);
     return 0;
+  }
 
 #ifdef POSIX_SIGNALS
   sigset_t mask, old_mask;
@@ -2125,11 +2131,15 @@ CAMLextern int caml_start_tick_thread(void)
 #endif
 
   if (err != 0) {
-    atomic_store_release(&tick_thread.running, false);
+    caml_plat_unlock(&tick_thread.mutex);
     return err;
   }
 
-  atomic_store_relaxed(&tick_thread.thread_id, thread);
+  tick_thread.running = true;
+  tick_thread.thread_id = thread;
+
+  caml_plat_unlock(&tick_thread.mutex);
+
   return 0;
 }
 
