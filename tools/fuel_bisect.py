@@ -53,8 +53,8 @@ def load_record():
     with open(RECORD_FILE) as f:
         for line in f:
             parts = line.strip().rsplit(" ", 1)
-            if len(parts) == 2:
-                entries.append((parts[0], int(parts[1])))
+            assert len(parts) == 2
+            entries.append((parts[0], int(parts[1])))
     total = sum(c for _, c in entries)
     return entries, total
 
@@ -75,11 +75,7 @@ def cmd_record():
     if os.path.exists(RECORD_FILE):
         os.remove(RECORD_FILE)
 
-    rc = clean_build(env={"OPT_FUEL_RECORD": RECORD_FILE})
-    if rc != 0:
-        print("ERROR: build failed during recording")
-        sys.exit(1)
-
+    clean_build(env={"OPT_FUEL_RECORD": RECORD_FILE})
     if not os.path.exists(RECORD_FILE):
         print("ERROR: no record file produced")
         sys.exit(1)
@@ -134,6 +130,7 @@ def cmd_bisect(test_cmd):
     lo, hi = 0, total
 
     while hi - lo > 1:
+        print(f"=== Bisecting: step range {lo} - {hi} ===")
         mid = (lo + hi) // 2
         if test_threshold(mid, test_cmd):
             lo = mid
@@ -160,20 +157,13 @@ def cmd_fail(threshold):
     print(f"=== Identifying critical step at threshold={threshold} ===")
     env = {
         "OPT_FUEL_RECORD": RECORD_FILE,
-        "OPT_FUEL_THRESHOLD": str(threshold),
-        "OPT_FUEL_FAIL": str(threshold - 1),
+        "OPT_FUEL_FAIL": str(threshold),
     }
     rc = clean_build(env=env)
     if rc == 0:
         print(
             "Build succeeded. The critical step doesn't cause a build "
             "failure."
-        )
-        print("Try running the test manually:")
-        print(
-            f"  OPT_FUEL_RECORD={RECORD_FILE} "
-            f"OPT_FUEL_THRESHOLD={threshold} "
-            f"OPT_FUEL_FAIL={threshold - 1} <test>"
         )
 
 
