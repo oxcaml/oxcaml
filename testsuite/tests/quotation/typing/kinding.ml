@@ -64,10 +64,10 @@ type t : value & float64 = <[#(bytes * float#)]>
 type t = <[#(bytes * float#)]>
 |}]
 
-type t : value = <[int64#]> (* error! *)
+type t : value = <[int64#]> (* should error! *)
 [%%expect {|
 Line 1, characters 0-27:
-1 | type t : value = <[int64#]> (* error! *)
+1 | type t : value = <[int64#]> (* should error! *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "<[int64#]>" is bits64
          because it is the unboxed version of the primitive type int64.
@@ -87,10 +87,10 @@ type ('a : float64) t : value & float64 = <[#(bytes * $('a))]>
 type ('a : float64) t = <[#(bytes * $('a))]>
 |}]
 
-type t : value = <[$(int64#)]> (* error! *)
+type t : value = <[$(int64#)]> (* should error! *)
 [%%expect {|
 Line 1, characters 0-30:
-1 | type t : value = <[$(int64#)]> (* error! *)
+1 | type t : value = <[$(int64#)]> (* should error! *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "int64#" is bits64
          because it is the unboxed version of the primitive type int64.
@@ -118,10 +118,10 @@ type ('a : value & float64) t : value & float64 = 'a eval
 type ('a : value & float64) t = 'a eval
 |}]
 
-type t : value = i64 eval (* error! *)
+type t : value = i64 eval (* should error! *)
 [%%expect {|
 Line 1, characters 0-25:
-1 | type t : value = i64 eval (* error! *)
+1 | type t : value = i64 eval (* should error! *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "i64 eval" is bits64
          because of the definition of i64 at line 3, characters 0-17.
