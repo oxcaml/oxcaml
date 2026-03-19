@@ -3797,6 +3797,8 @@ and quote_expression_desc ~scopes ~transl stage e =
       fatal_errorf "Translquote [at %a]: Texp_idx" Location.print_loc
         (to_location loc)
     | Texp_eval (typ, _) -> Exp_desc.eval loc (quote_core_type ~scopes typ)
+    | Texp_then_call _ ->
+      fatal_error "Cannot quote Texp_then_call constructs yet"
   in
   List.iter (update_env_without_extra ~loc) e.exp_extra;
   List.fold_right

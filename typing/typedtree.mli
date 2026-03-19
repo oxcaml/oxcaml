@@ -608,6 +608,10 @@ and expression_desc =
   | Texp_quotation of expression
   | Texp_antiquotation of expression
   | Texp_eval of core_type * Jkind.sort
+  | Texp_then_call of expression * expression
+        (** [e [@then_call f]] -- calls f on the result of e, discards f's
+            result, and returns e's result. f must have type 'a -> unit for all
+            'a. *)
 
 and function_curry =
   | More_args of { partial_mode : Mode.Alloc.l }

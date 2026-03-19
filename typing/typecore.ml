@@ -298,7 +298,7 @@ type error =
   | Unexpected_hole
   | Eval_format
   | Let_poly_not_yet_implemented
-
+  | Then_call_not_polymorphic of type_expr
 
 let not_principal fmt =
   Format_doc.Doc.kmsg (fun x -> Warnings.Not_principal x) fmt
@@ -4553,6 +4553,9 @@ let rec is_nonexpansive exp =
       is_nonexpansive body
   | Texp_letmutable(pat_exp, body) ->
       is_nonexpansive pat_exp.vb_expr && is_nonexpansive body
+  | Texp_then_call(e, f) ->
+      (* [f] has type ['a -> unit] so its application is nonexpansive. *)
+      is_nonexpansive e && is_nonexpansive f
   | Texp_apply(e, (_,Omitted _)::el, _, _, _) ->
       is_nonexpansive e && List.for_all is_nonexpansive_arg (List.map snd el)
   | Texp_match(e, _, cases, _) ->
@@ -5130,7 +5133,7 @@ let check_partial_application ~statement exp =
             | Texp_extension_constructor _ | Texp_ifthenelse (_, _, None)
             | Texp_probe _ | Texp_probe_is_enabled _ | Texp_src_pos
             | Texp_function _ | Texp_quotation _ | Texp_antiquotation _
-            | Texp_eval _ ->
+            | Texp_eval _ | Texp_then_call _ ->
                 (* CR metaprogramming mshinwell: make sure this is correct for
                    Texp_eval *)
                 check_statement ()
@@ -6145,6 +6148,12 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   in
+  match Builtin_attributes.then_call_attr sexp.pexp_attributes with
+  | Some (then_call, remaining_attrs) ->
+      let sexp = { sexp with pexp_attributes = remaining_attrs } in
+      type_then_call ~recarg ~overwrite env expected_mode sexp then_call
+        ty_expected_explained
+  | None ->
   match desc with
   | Pexp_ident lid ->
       let path, actual_mode, desc, kind =
@@ -9687,6 +9696,66 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
   { texp with
     exp_desc = Texp_construct(lid, constr, args, alloc_mode) }
 
+and type_then_call ?recarg ?overwrite env expected_mode sexp sexp_then_call
+    ty_expected_explained =
+  (* Pre-process [@then_call f]: type the callback in a local level, verify
+     its type is 'a -> unit for all 'a, and narrow the expected mode so that
+     the expression's inferred mode is compatible with the callback's argument
+     mode, without special-casing any particular expression form. *)
+  let loc = sexp_then_call.pexp_loc in
+  let then_call =
+    with_local_level
+      ~post:(fun then_call -> generalize then_call.exp_type)
+      (fun () -> type_exp env mode_legacy sexp_then_call)
+  in
+  (* Check that f has type 'a -> unit with 'a at generic level.
+      Note: [filter_arrow] wraps the argument type in [Tpoly(t, [])] when
+      [force_tpoly] is true (the default for unlabelled arguments), so we
+      unwrap that before checking. *)
+  let ty_f = expand_head env then_call.exp_type in
+  let arg_mode =
+    match get_desc ty_f with
+    | Tarrow ((Nolabel, arg_mode, _), ty_arg, ty_ret, _) ->
+      let inner_arg =
+        match get_desc (expand_head env ty_arg) with
+        | Tpoly (ty, []) -> expand_head env ty
+        | _ -> expand_head env ty_arg
+      in
+      (match get_desc inner_arg with
+        | Tvar _ when get_level inner_arg = generic_level -> ()
+        | _ ->
+          raise (Error (loc, env, Then_call_not_polymorphic then_call.exp_type)));
+      (* Check that the return type is unit.  We instantiate [ty_ret] and
+          then check it is concretely unit (not just a free type variable
+          that could unify with anything). *)
+      let ty_ret_inst = expand_head env (instance ty_ret) in
+      (match get_desc ty_ret_inst with
+        | Tconstr (path, [], _) when Path.same path Predef.path_unit -> ()
+        | _ ->
+          raise (Error (loc, env, Then_call_not_polymorphic then_call.exp_type)));
+      arg_mode
+    | _ ->
+      raise (Error (loc, env, Then_call_not_polymorphic then_call.exp_type))
+  in
+  (* Narrow the expected mode to be at most [arg_mode].  The expression's
+      inferred mode must fit within the callback's argument mode; narrowing
+      here ensures any mode-asserting expression (e.g. [stack_]) will fail
+      appropriately if its mode is incompatible with the callback's mode. *)
+  let expected_mode =
+    mode_coerce (Value.disallow_left (alloc_as_value arg_mode)) expected_mode
+  in
+  let exp =
+    type_expect ?recarg ?overwrite env expected_mode sexp ty_expected_explained
+  in
+  { exp_desc = Texp_then_call (exp, then_call);
+    exp_type = exp.exp_type;
+    exp_loc = sexp.pexp_loc;
+    exp_env = env;
+    exp_extra = [];
+    exp_attributes = [];
+  }
+
+
 (* Typing of statements (expressions whose values are discarded) *)
 
 and type_statement ?explanation ?(position=RNontail) env sexp =
@@ -12310,6 +12379,14 @@ let report_error ~loc env =
       Location.errorf ~loc
         "The %a annotation is not yet implemented."
         Style.inline_code "let poly_"
+  | Then_call_not_polymorphic ty_f ->
+      Location.errorf ~loc
+        "The function argument to %a must have type %a for all %a,@ \
+         but here it has type %a."
+        Style.inline_code "[@then_call]"
+        Style.inline_code "'a -> unit"
+        Style.inline_code "'a"
+        (Style.as_inline_code Printtyp.type_expr) ty_f
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

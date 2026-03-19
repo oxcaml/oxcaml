@@ -524,6 +524,7 @@ let call_pos_extension = Location.mknoloc "call_pos_extension", PStr []
 let expression sub exp =
   let loc = sub.location sub exp.exp_loc in
   let attrs = sub.attributes sub exp.exp_attributes in
+  let attrs = ref attrs in
   let desc =
     match exp.exp_desc with
       Texp_ident (_path, lid, _, _, _, _) -> Pexp_ident (map_loc sub lid)
@@ -802,7 +803,18 @@ let expression sub exp =
     | Texp_antiquotation exp -> Pexp_splice (sub.expr sub exp)
     | Texp_eval (typ, _) ->
         Pexp_extension ({ txt = "ocaml.eval"; loc}, PTyp (sub.typ sub typ))
+    | Texp_then_call (e, f) ->
+        let sexp = sub.expr sub e in
+        let f_sexp = sub.expr sub f in
+        let attr =
+          Ast_helper.Attr.mk
+            (Location.mkloc "then_call" loc)
+            (PStr [Ast_helper.Str.eval f_sexp])
+        in
+        attrs := attr :: sexp.pexp_attributes;
+        sexp.pexp_desc
   in
+  let attrs = !attrs in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)
 

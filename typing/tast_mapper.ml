@@ -712,6 +712,8 @@ let expr sub x =
         Texp_antiquotation (sub.expr sub exp)
     | Texp_eval (typ, sort) ->
         Texp_eval (sub.typ sub typ, sort)
+    | Texp_then_call (e, f) ->
+        Texp_then_call (sub.expr sub e, sub.expr sub f)
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}

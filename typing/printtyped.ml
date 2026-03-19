@@ -858,6 +858,10 @@ and expression i ppf x =
   | Texp_eval (typ, _) ->
     line i ppf "Texp_eval";
     core_type i ppf typ;
+  | Texp_then_call (e, f) ->
+      line i ppf "Texp_then_call\n";
+      expression (i+1) ppf e;
+      expression (i+1) ppf f
 
 and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_ident x.val_id fmt_location
