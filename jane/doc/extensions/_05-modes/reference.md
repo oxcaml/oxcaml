@@ -125,3 +125,124 @@ let () = bar foo (* prints "foo" *)
 ```
 
 Exceptions also cross statefulness and visibility with identical restrictions.
+
+# Modalities
+Modalities, as described in the [syntax](./syntax) section, can be though of as functions
+from mode to mode. For example, let's imagine one defines a record type with some modality
+`m`:
+
+```ocaml
+type 'a t = { field : 'a @@ m }
+```
+
+Then, if we have a value `(t : _ t @ n)` then what's the mode of `t.field`? The answer has
+to do with what applying the modality `m` to the mode `n` yields. Generally speaking, for
+"future" or "comonadic" axes, the result is the stronger of the two. For example:
+
+```ocaml
+type 'a t = { field : 'a @@ shareable }
+
+let f : 'a t @ nonportable -> 'a @ shareable = fun t -> t.field
+let g : 'a t @ shareable -> 'a @ shareable = fun t -> t.field
+let h : 'a t @ portable -> 'a @ portable = fun t -> t.field
+```
+
+For "past" or "monadic" axes, the result is usually the weaker of the two. For example:
+
+```ocaml
+type 'a t = { field : 'a @@ shared }
+
+let f : 'a t @ uncontended -> 'a @ shared = fun t -> t.field
+let g : 'a t @ shared -> 'a @ shared = fun t -> t.field
+let h : 'a t @ contended -> 'a @ contended = fun t -> t.field
+```
+
+However, things are more complex for diamond-shaped "axes", such as visibility and
+statefulness. In these cases, applying comonadic modalities to comonadic modes results
+in the _greatest common submode_, while applying monadic modalities to monadic modes
+results in the _least common supermode_. Mathematically, this corresponds to the meet
+and join of the two modes, respectively.
+
+For example, if the least common supermode of `read` and `write` is `immutable`:
+
+```ocaml
+type 'a t = { field : 'a @@ write }
+
+let f : 'a t @ read -> 'a @ immutable = fun t -> t.field
+```
+
+On the other hand, the greatest common submode of `observing` and `observable` is
+`stateless`:
+
+```ocaml
+type 'a t = { field : 'a @@ observing }
+
+let f : 'a t @ observable -> 'a @ stateless shareable = fun t -> t.field
+```
+
+The addition of `shared` here is potentially surprising, but in fact necessary. Recall
+from the [syntax](./syntax) section that `observing` implies `shareable`, but `observable`
+implies `nonportable`, because we have no analogous notion of "function that only writes
+mutable fields" on the portability axis. Thus, while applying the `observing` modality to
+`observable` yields `stateless`, applying the `shareable` modality to `nonportable` only
+yields `shareable` and not `portable`.
+
+# Mode crossing
+In the [intro](./intro) to modes, we saw the idea of "mode crossing", in which values of
+types with particular properties can cross from some supermode to some submode for free.
+For example, immutable data crosses most modes: a `string @ immutable` can always be
+treated as a `string @ read_write` (because there are no mutable fields to read or write),
+and a `string @ stateful` can always be treated as a `string @ stateless` (because it
+contains no functions closing over mutable data).
+
+But beyond concrete types, we have a generic facility for capturing mode crossing, using
+`mod` syntax. This allows us to express behavior such as the following:
+
+```ocaml
+let cross_contended : type (a : value mod contended). a @ contended -> a @ uncontended =
+  fun x -> x
+;;
+
+let cross_shared : type (a : value mod shared). a @ shared -> a @ uncontended =
+  fun x -> x
+;;
+
+let cross_portable : type (a : value mod portable). a @ nonportable -> a @ portable =
+  fun x -> x
+;;
+
+let cross_shareable : type (a : value mod shareable). a @ nonportable -> a @ shareable =
+  fun x -> x
+;;
+```
+
+Like modalities, diamond-shape modal lattices allow for more interesting kinds of mode
+crossing. In particular, because visibility allows us to cross `read` separately from
+`write`, and statefulness allows us to cross `observing` separately from `observable`, we
+can strengthen `read`-crossing values from `immutable` to `write` (and vice-versa), and
+strengthen `observing`-crossing values from `observable` to `stateless` (and vice-versa):
+
+```ocaml
+let f : type (a : value mod read). a @ immutable shared -> a @ write =
+  fun x -> x
+;;
+
+let f : type (a : value mod write). a @ immutable shared -> a @ read =
+  fun x -> x
+;;
+
+let f : type (a : value mod observing). a @ observable -> a @ stateless shareable =
+  fun x -> x
+;;
+
+let f : type (a : value mod observable). a @ observing -> a @ stateless shareable =
+  fun x -> x
+;;
+```
+
+And again, like modalities, there is a tricky interaction here between statefulness,
+visibility, portability, and contention. Because the latter two axes are not themselves
+diamonds, only `read` and `observing` carry any information with regard to portability
+and contention. Thus, we cannot talk about a value's ability to cross from `contended` to
+`shared` but not `uncontended`, nor a value's ability to cross to `portable` from
+`shareable` but not `nonportable`.

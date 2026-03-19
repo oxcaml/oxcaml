@@ -288,16 +288,20 @@ exist, all to lower users' annotation burden, all applying both to modes
 and modalities, according to this table:
 
 
-| this          | implies this |
-|---------------|--------------|
-| `global`      | `forkable`   |
-| `local`       | `unforkable` |
-| `global`      | `unyielding` |
-| `local`       | `yielding`   |
-| `stateless`   | `portable`   |
-| `reading`     | `shareable`  |
-| `immutable`   | `contended`  |
-| `read`        | `shared`     |
+| this          | implies this  |
+|---------------|---------------|
+| `global`      | `forkable`    |
+| `local`       | `unforkable`  |
+| `global`      | `unyielding`  |
+| `local`       | `yielding`    |
+| `stateless`   | `portable`    |
+| `reading`     | `shareable`   |
+| `observable`  | `nonportable` |
+| `stateful`    | `nonportable` |
+| `immutable`   | `contended`   |
+| `read`        | `shared`      |
+| `write`       | `uncontended` |
+| `read_write`  | `uncontended` |
 
 These implications exist only in the surface syntax for mode and modality
 expressions. Mode inference does not necessarily follow these implications.

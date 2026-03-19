@@ -5,8 +5,9 @@
 (** In this file, we test the dual relationship between [visibility] and [statefulness]
     axes, [visibility] requirements over mutable record fields, and the kind [sync_data]. *)
 
-(* CR nmatschke: This file has some claims about which mode errors are printed first that
-   are no longer true. *)
+(* CR nmatschke: It seems the below claim about which mode errors are printed
+   first is no longer true. We could remove some portability and contention
+   annotations from this file. *)
 
 (* Visibility requirements over mutable record fields.
    [uncontended] to avoid contention errors printed first. *)
@@ -108,7 +109,7 @@ Error: This value is "immutable"
          because its mutable field "a" is being read.
 |}]
 
-(* Errors when mutating a record field prints contention before visibility errors *)
+(* Errors when mutating a record field print visibility before contention errors *)
 
 let foo (x @ read contended) a = x.a <- a
 [%%expect{|
@@ -150,7 +151,7 @@ Error: This value is "immutable"
          because its mutable field "a" is being read.
 |}]
 
-(* Errors when reading a record field prints contention before visibility errors *)
+(* Errors when reading a record field print visibility before contention errors *)
 
 let foo (x @ write contended) = x.a
 [%%expect{|
@@ -1223,7 +1224,7 @@ Error: This value is "read"
          because its mutable field "contents" is being written.
 |}]
 
-(* Forcing a [write] lazy returns a [read] value.*)
+(* Forcing a [write] lazy returns a [write] value.*)
 let zig () @ write uncontended = lazy (ref 42)
 
 [%%expect{|
@@ -1277,26 +1278,6 @@ let f : 'a @ write -> 'a @ immutable = fun x -> x
 val f : 'a @ write -> 'a @ immutable = <fun>
 |}]
 
-(* Lattice structure: [read] and [write] are incomparable. *)
-
-let f : 'a @ read -> 'a @ write = fun x -> x
-
-[%%expect{|
-Line 1, characters 43-44:
-1 | let f : 'a @ read -> 'a @ write = fun x -> x
-                                               ^
-Error: This value is "read" but is expected to be "write" or "read_write".
-|}]
-
-let f : 'a @ write -> 'a @ read = fun x -> x
-
-[%%expect{|
-Line 1, characters 43-44:
-1 | let f : 'a @ write -> 'a @ read = fun x -> x
-                                               ^
-Error: This value is "write" but is expected to be "read" or "read_write".
-|}]
-
 (* Lattice structure: [stateless = 0] and [stateful = 1]. *)
 
 let f : 'a @ stateless -> 'a @ reading = fun x -> x
@@ -1329,6 +1310,26 @@ let f : 'a @ observable -> 'a @ stateful = fun x -> x
 val f : 'a @ observable -> 'a = <fun>
 |}]
 
+(* Lattice structure: [read] and [write] are incomparable. *)
+
+let f : 'a @ read -> 'a @ write = fun x -> x
+
+[%%expect{|
+Line 1, characters 43-44:
+1 | let f : 'a @ read -> 'a @ write = fun x -> x
+                                               ^
+Error: This value is "read" but is expected to be "write" or "read_write".
+|}]
+
+let f : 'a @ write -> 'a @ read = fun x -> x
+
+[%%expect{|
+Line 1, characters 43-44:
+1 | let f : 'a @ write -> 'a @ read = fun x -> x
+                                               ^
+Error: This value is "write" but is expected to be "read" or "read_write".
+|}]
+
 (* Lattice structure: [reading] and [observable] are incomparable. *)
 
 let f : 'a @ reading -> 'a @ observable = fun x -> x
@@ -1347,4 +1348,880 @@ Line 1, characters 51-52:
 1 | let f : 'a @ observable -> 'a @ reading = fun x -> x
                                                        ^
 Error: This value is "observable" but is expected to be "reading".
+|}]
+
+(* Lattice structure: [read] and [write] join to become [immutable].
+
+   We use module inclusion to check what the compiler infers without any
+   mode annotations.
+
+   The type the compiler gives up at depends on the order of the modes of the
+   arguments. *)
+
+module _ : sig
+  val f : 'a @ read -> 'b @ write -> 'a * 'b @ immutable
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+|}]
+
+module _ : sig
+  val f : 'a @ read -> 'b @ write -> 'a * 'b @ write
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
+       is not included in
+         sig val f : 'a @ read -> 'b @ write -> 'a * 'b @ write end
+       Values do not match:
+         val f : 'a -> 'b @ write -> 'a * 'b @ write
+       is not included in
+         val f : 'a @ read -> 'b @ write -> 'a * 'b @ write
+       The type "'a -> 'b @ write -> 'a * 'b @ write"
+       is not compatible with the type
+         "'a @ read -> 'b @ write -> 'a * 'b @ write"
+|}]
+
+module _ : sig
+  val f : 'a @ read -> 'b @ write -> 'a * 'b @ read
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
+       is not included in
+         sig val f : 'a @ read -> 'b @ write -> 'a * 'b @ read end
+       Values do not match:
+         val f : 'a -> 'b @ write -> 'a * 'b @ write
+       is not included in
+         val f : 'a @ read -> 'b @ write -> 'a * 'b @ read
+       The type "'a -> 'b @ write -> 'a * 'b @ write"
+       is not compatible with the type
+         "'a @ read -> 'b @ write -> 'a * 'b @ read"
+       Type "'b @ write -> 'a * 'b @ write" is not compatible with type
+         "'b @ write -> 'a * 'b @ read"
+|}]
+
+module _ : sig
+  val f : 'a @ read -> 'b @ write -> 'a * 'b @ read_write
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
+       is not included in
+         sig val f : 'a @ read -> 'b @ write -> 'a * 'b end
+       Values do not match:
+         val f : 'a -> 'b @ write -> 'a * 'b @ write
+       is not included in
+         val f : 'a @ read -> 'b @ write -> 'a * 'b
+       The type "'a -> 'b @ write -> 'a * 'b @ write"
+       is not compatible with the type "'a @ read -> 'b @ write -> 'a * 'b"
+       Type "'b @ write -> 'a * 'b @ write" is not compatible with type
+         "'b @ write -> 'a * 'b"
+|}]
+
+module _ : sig
+  val f : 'a @ write -> 'b @ read -> 'a * 'b @ write
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
+       is not included in
+         sig val f : 'a @ write -> 'b @ read -> 'a * 'b @ write end
+       Values do not match:
+         val f : 'a -> 'b @ read -> 'a * 'b @ read
+       is not included in
+         val f : 'a @ write -> 'b @ read -> 'a * 'b @ write
+       The type "'a -> 'b @ read -> 'a * 'b @ read"
+       is not compatible with the type
+         "'a @ write -> 'b @ read -> 'a * 'b @ write"
+       Type "'b @ read -> 'a * 'b @ read" is not compatible with type
+         "'b @ read -> 'a * 'b @ write"
+|}]
+
+module _ : sig
+  val f : 'a @ write -> 'b @ read -> 'a * 'b @ read
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
+       is not included in
+         sig val f : 'a @ write -> 'b @ read -> 'a * 'b @ read end
+       Values do not match:
+         val f : 'a -> 'b @ read -> 'a * 'b @ read
+       is not included in
+         val f : 'a @ write -> 'b @ read -> 'a * 'b @ read
+       The type "'a -> 'b @ read -> 'a * 'b @ read"
+       is not compatible with the type
+         "'a @ write -> 'b @ read -> 'a * 'b @ read"
+|}]
+
+module _ : sig
+  val f : 'a @ write -> 'b @ read -> 'a * 'b @ read_write
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
+       is not included in
+         sig val f : 'a @ write -> 'b @ read -> 'a * 'b end
+       Values do not match:
+         val f : 'a -> 'b @ read -> 'a * 'b @ read
+       is not included in
+         val f : 'a @ write -> 'b @ read -> 'a * 'b
+       The type "'a -> 'b @ read -> 'a * 'b @ read"
+       is not compatible with the type "'a @ write -> 'b @ read -> 'a * 'b"
+       Type "'b @ read -> 'a * 'b @ read" is not compatible with type
+         "'b @ read -> 'a * 'b"
+|}]
+
+(* Lattice structure: [reading] and [observable] join to become [stateful].
+
+   We use module inclusion to check what the compiler infers without any
+   mode annotations.
+
+   The type the compiler gives up at depends on the order of the modes of the
+   arguments. *)
+
+module _ : sig
+  val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ stateful
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+|}]
+
+module _ : sig
+  val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ observable
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val f : 'a @ observable -> 'b @ observable -> 'a * 'b @ observable
+         end
+       is not included in
+         sig
+           val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ observable
+         end
+       Values do not match:
+         val f : 'a @ observable -> 'b @ observable -> 'a * 'b @ observable
+       is not included in
+         val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ observable
+       The type "'a @ observable -> 'b @ observable -> 'a * 'b @ observable"
+       is not compatible with the type
+         "'a @ reading -> 'b @ observable -> 'a * 'b @ observable"
+|}]
+
+module _ : sig
+  val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ reading
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b -> 'a * 'b end
+       is not included in
+         sig val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ reading end
+       Values do not match:
+         val f : 'a -> 'b -> 'a * 'b
+       is not included in
+         val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ reading
+       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
+         "'a @ reading -> 'b @ observable -> 'a * 'b @ reading"
+       Type "'b -> 'a * 'b" is not compatible with type
+         "'b @ observable -> 'a * 'b @ reading"
+|}]
+
+module _ : sig
+  val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ stateless
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b -> 'a * 'b end
+       is not included in
+         sig
+           val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ stateless
+         end
+       Values do not match:
+         val f : 'a -> 'b -> 'a * 'b
+       is not included in
+         val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ stateless
+       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
+         "'a @ reading -> 'b @ observable -> 'a * 'b @ stateless"
+       Type "'b -> 'a * 'b" is not compatible with type
+         "'b @ observable -> 'a * 'b @ stateless"
+|}]
+
+module _ : sig
+  val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ observable
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b -> 'a * 'b end
+       is not included in
+         sig
+           val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ observable
+         end
+       Values do not match:
+         val f : 'a -> 'b -> 'a * 'b
+       is not included in
+         val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ observable
+       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
+         "'a @ observable -> 'b @ reading -> 'a * 'b @ observable"
+       Type "'b -> 'a * 'b" is not compatible with type
+         "'b @ reading -> 'a * 'b @ observable"
+|}]
+
+module _ : sig
+  val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ reading
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading end
+       is not included in
+         sig val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ reading end
+       Values do not match:
+         val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading
+       is not included in
+         val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ reading
+       The type "'a @ reading -> 'b @ reading -> 'a * 'b @ reading"
+       is not compatible with the type
+         "'a @ observable -> 'b @ reading -> 'a * 'b @ reading"
+|}]
+
+module _ : sig
+  val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ stateless
+end = struct
+  let f a b = (a, b)
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f a b = (a, b)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b -> 'a * 'b end
+       is not included in
+         sig
+           val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ stateless
+         end
+       Values do not match:
+         val f : 'a -> 'b -> 'a * 'b
+       is not included in
+         val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ stateless
+       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
+         "'a @ observable -> 'b @ reading -> 'a * 'b @ stateless"
+       Type "'b -> 'a * 'b" is not compatible with type
+         "'b @ reading -> 'a * 'b @ stateless"
+|}]
+
+(* Lattice structure: [read] and [write] meet to become [read_write].
+
+   We use module inclusion to check what the compiler infers without any
+   mode annotations. *)
+
+type 'a read = { read : 'a @@ read } [@@unboxed]
+type 'a write = { write : 'a @@ write } [@@unboxed]
+
+[%%expect{|
+type 'a read = { read : 'a @@ read; } [@@unboxed]
+type 'a write = { write : 'a @@ write; } [@@unboxed]
+|}]
+
+module _ : sig
+  val f : 'a * 'b @ read_write -> 'a read * 'b write
+end = struct
+  let f (a, b) = { read = a }, { write = b }
+end
+
+[%%expect{|
+|}]
+
+module _ : sig
+  val f : 'a * 'b @ read -> 'a read * 'b write
+end = struct
+  let f (a, b) = { read = a }, { write = b }
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f (a, b) = { read = a }, { write = b }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a * 'b @ read -> 'a read * 'b write @ read end
+       is not included in
+         sig val f : 'a * 'b @ read -> 'a read * 'b write end
+       Values do not match:
+         val f : 'a * 'b @ read -> 'a read * 'b write @ read
+       is not included in
+         val f : 'a * 'b @ read -> 'a read * 'b write
+       The type "'a * 'b @ read -> 'a read * 'b write @ read"
+       is not compatible with the type "'a * 'b @ read -> 'a read * 'b write"
+|}]
+
+module _ : sig
+  val f : 'a * 'b @ write -> 'a read * 'b write
+end = struct
+  let f (a, b) = { read = a }, { write = b }
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f (a, b) = { read = a }, { write = b }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a * 'b @ write -> 'a read * 'b write @ write end
+       is not included in
+         sig val f : 'a * 'b @ write -> 'a read * 'b write end
+       Values do not match:
+         val f : 'a * 'b @ write -> 'a read * 'b write @ write
+       is not included in
+         val f : 'a * 'b @ write -> 'a read * 'b write
+       The type "'a * 'b @ write -> 'a read * 'b write @ write"
+       is not compatible with the type "'a * 'b @ write -> 'a read * 'b write"
+|}]
+
+module _ : sig
+  val f : 'a * 'b @ immutable -> 'a read * 'b write
+end = struct
+  let f (a, b) = { read = a }, { write = b }
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f (a, b) = { read = a }, { write = b }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val f : 'a * 'b @ immutable -> 'a read * 'b write @ immutable
+         end
+       is not included in
+         sig val f : 'a * 'b @ immutable -> 'a read * 'b write end
+       Values do not match:
+         val f : 'a * 'b @ immutable -> 'a read * 'b write @ immutable
+       is not included in
+         val f : 'a * 'b @ immutable -> 'a read * 'b write
+       The type "'a * 'b @ immutable -> 'a read * 'b write @ immutable"
+       is not compatible with the type
+         "'a * 'b @ immutable -> 'a read * 'b write"
+|}]
+
+(* Lattice structure: [reading] and [observable] meet to become [stateless].
+
+   We use module inclusion to check what the compiler infers without any
+   mode annotations. *)
+
+type 'a reading = { reading : 'a @@ reading } [@@unboxed]
+type 'a observable = { observable : 'a @@ observable } [@@unboxed]
+
+[%%expect{|
+type 'a reading = { reading : 'a @@ reading; } [@@unboxed]
+type 'a observable = { observable : 'a @@ observable; } [@@unboxed]
+|}]
+
+module _ : sig
+  val f : 'a * 'b @ stateless -> 'a reading * 'b observable
+end = struct
+  let f (a, b) = { reading = a }, { observable = b }
+end
+
+[%%expect{|
+|}]
+
+module _ : sig
+  val f : 'a * 'b @ reading -> 'a reading * 'b observable
+end = struct
+  let f (a, b) = { reading = a }, { observable = b }
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f (a, b) = { reading = a }, { observable = b }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a * 'b @ stateless -> 'a reading * 'b observable end
+       is not included in
+         sig val f : 'a * 'b @ reading -> 'a reading * 'b observable end
+       Values do not match:
+         val f : 'a * 'b @ stateless -> 'a reading * 'b observable
+       is not included in
+         val f : 'a * 'b @ reading -> 'a reading * 'b observable
+       The type "'a * 'b @ stateless -> 'a reading * 'b observable"
+       is not compatible with the type
+         "'a * 'b @ reading -> 'a reading * 'b observable"
+|}]
+
+module _ : sig
+  val f : 'a * 'b @ observable -> 'a reading * 'b observable
+end = struct
+  let f (a, b) = { reading = a }, { observable = b }
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f (a, b) = { reading = a }, { observable = b }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a * 'b @ stateless -> 'a reading * 'b observable end
+       is not included in
+         sig val f : 'a * 'b @ observable -> 'a reading * 'b observable end
+       Values do not match:
+         val f : 'a * 'b @ stateless -> 'a reading * 'b observable
+       is not included in
+         val f : 'a * 'b @ observable -> 'a reading * 'b observable
+       The type "'a * 'b @ stateless -> 'a reading * 'b observable"
+       is not compatible with the type
+         "'a * 'b @ observable -> 'a reading * 'b observable"
+|}]
+
+module _ : sig
+  val f : 'a * 'b @ stateful -> 'a reading * 'b observable
+end = struct
+  let f (a, b) = { reading = a }, { observable = b }
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f (a, b) = { reading = a }, { observable = b }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a * 'b @ stateless -> 'a reading * 'b observable end
+       is not included in
+         sig val f : 'a * 'b -> 'a reading * 'b observable end
+       Values do not match:
+         val f : 'a * 'b @ stateless -> 'a reading * 'b observable
+       is not included in
+         val f : 'a * 'b -> 'a reading * 'b observable
+       The type "'a * 'b @ stateless -> 'a reading * 'b observable"
+       is not compatible with the type "'a * 'b -> 'a reading * 'b observable"
+|}]
+
+(* Modality composition: visibility. *)
+
+type 'a read_write = { read_write : 'a @@ read_write }
+type 'a immutable = { immutable : 'a @@ immutable }
+
+[%%expect{|
+type 'a read_write = { read_write : 'a; }
+type 'a immutable = { immutable : 'a @@ immutable; }
+|}]
+
+let f ({ read_write } @ read_write) = read_write
+
+[%%expect{|
+val f : 'a read_write -> 'a = <fun>
+|}]
+
+let f ({ read_write } @ read) = read_write
+
+[%%expect{|
+val f : 'a read_write @ read -> 'a @ read = <fun>
+|}]
+
+let f ({ read_write } @ write) = read_write
+
+[%%expect{|
+val f : 'a read_write @ write -> 'a @ write = <fun>
+|}]
+
+let f ({ read_write } @ immutable) = read_write
+
+[%%expect{|
+val f : 'a read_write @ immutable -> 'a @ immutable = <fun>
+|}]
+
+let f ({ read } @ read_write) = read
+
+[%%expect{|
+val f : 'a read -> 'a @ read = <fun>
+|}]
+
+let f ({ read } @ read) = read
+
+[%%expect{|
+val f : 'a read @ read -> 'a @ read = <fun>
+|}]
+
+let f ({ read } @ write) = read
+
+[%%expect{|
+val f : 'a read @ write -> 'a @ immutable = <fun>
+|}]
+
+let f ({ read } @ immutable) = read
+
+[%%expect{|
+val f : 'a read @ immutable -> 'a @ immutable = <fun>
+|}]
+
+let f ({ write } @ read_write) = write
+
+[%%expect{|
+val f : 'a write -> 'a @ write = <fun>
+|}]
+
+let f ({ write } @ read) = write
+
+[%%expect{|
+val f : 'a write @ read -> 'a @ immutable = <fun>
+|}]
+
+let f ({ write } @ write) = write
+
+[%%expect{|
+val f : 'a write @ write -> 'a @ write = <fun>
+|}]
+
+let f ({ write } @ immutable) = write
+
+[%%expect{|
+val f : 'a write @ immutable -> 'a @ immutable = <fun>
+|}]
+
+let f ({ immutable } @ read_write) = immutable
+
+[%%expect{|
+val f : 'a immutable -> 'a @ immutable = <fun>
+|}]
+
+let f ({ immutable } @ read) = immutable
+
+[%%expect{|
+val f : 'a immutable @ read -> 'a @ immutable = <fun>
+|}]
+
+let f ({ immutable } @ write) = immutable
+
+[%%expect{|
+val f : 'a immutable @ write -> 'a @ immutable = <fun>
+|}]
+
+let f ({ immutable } @ immutable) = immutable
+
+[%%expect{|
+val f : 'a immutable @ immutable -> 'a @ immutable = <fun>
+|}]
+
+(* Modality composition: statefulness.
+
+   Note the return mode gets zapped to stateful without an annotation. *)
+
+type 'a stateful = { stateful : 'a @@ stateful }
+type 'a stateless = { stateless : 'a @@ stateless }
+
+[%%expect{|
+type 'a stateful = { stateful : 'a; }
+type 'a stateless = { stateless : 'a @@ stateless; }
+|}]
+
+let f ({ stateful } @ stateful) = (stateful : @ stateful)
+
+[%%expect{|
+val f : 'a stateful -> 'a = <fun>
+|}]
+
+let f ({ stateful } @ reading) = (stateful : @ reading)
+
+[%%expect{|
+val f : 'a stateful @ reading -> 'a = <fun>
+|}]
+
+let f ({ stateful } @ observable) = (stateful : @ observable)
+
+[%%expect{|
+val f : 'a stateful @ observable -> 'a = <fun>
+|}]
+
+let f ({ stateful } @ stateless) = (stateful : @ stateless)
+
+[%%expect{|
+val f : 'a stateful @ stateless -> 'a = <fun>
+|}]
+
+let f ({ reading } @ stateful) = (reading : @ reading)
+
+[%%expect{|
+val f : 'a reading -> 'a = <fun>
+|}]
+
+let f ({ reading } @ reading) = (reading : @ reading)
+
+[%%expect{|
+val f : 'a reading @ reading -> 'a = <fun>
+|}]
+
+(* CR nmatschke: We compute [reading /\ observable = stateless], but
+   [shareable /\ nonportable = shareable], so portability gets stuck there. *)
+
+let f ({ reading } @ observable) = (reading : @ stateless)
+
+[%%expect{|
+Line 1, characters 36-43:
+1 | let f ({ reading } @ observable) = (reading : @ stateless)
+                                        ^^^^^^^
+Error: This value is "shareable"
+         because it is the field "reading" (with some modality) of the record at line 1, characters 7-18.
+       However, the highlighted expression is expected to be "portable".
+|}]
+
+let f ({ reading } @ observable) = (reading : @ stateless shareable)
+
+[%%expect{|
+val f : 'a reading @ observable -> 'a = <fun>
+|}]
+
+(* CR nmatschke: This failure demonstrates that [stateless] is meaningful. *)
+
+let f ({ reading } @ stateful) = (reading : @ stateless shareable)
+
+[%%expect{|
+Line 1, characters 34-41:
+1 | let f ({ reading } @ stateful) = (reading : @ stateless shareable)
+                                      ^^^^^^^
+Error: This value is "reading"
+         because it is the field "reading" (with some modality) of the record at line 1, characters 7-18.
+       However, the highlighted expression is expected to be "stateless".
+|}]
+
+let f ({ reading } @ stateless) = (reading : @ stateless)
+
+[%%expect{|
+val f : 'a reading @ stateless -> 'a = <fun>
+|}]
+
+let f ({ observable } @ stateful) = (observable : @ observable)
+
+[%%expect{|
+val f : 'a observable -> 'a = <fun>
+|}]
+
+(* CR nmatschke: We compute [observable /\ reading = stateless], but
+   [nonportable /\ shareable = shareable], so portability gets stuck there. *)
+
+let f ({ observable } @ reading) = (observable : @ stateless)
+
+[%%expect{|
+Line 1, characters 36-46:
+1 | let f ({ observable } @ reading) = (observable : @ stateless)
+                                        ^^^^^^^^^^
+Error: This value is "shareable"
+         because it is the field "observable" of the record at line 1, characters 7-21
+         which is "shareable".
+       However, the highlighted expression is expected to be "portable".
+|}]
+
+let f ({ observable } @ reading) = (observable : @ stateless shareable)
+
+[%%expect{|
+val f : 'a observable @ reading -> 'a = <fun>
+|}]
+
+(* CR nmatschke: This failure demonstrates that [stateless] is meaningful. *)
+
+let f ({ observable } @ stateful) = (observable : @ stateless shareable)
+
+[%%expect{|
+Line 1, characters 37-47:
+1 | let f ({ observable } @ stateful) = (observable : @ stateless shareable)
+                                         ^^^^^^^^^^
+Error: This value is "observable"
+         because it is the field "observable" (with some modality) of the record at line 1, characters 7-21.
+       However, the highlighted expression is expected to be "stateless".
+|}]
+
+let f ({ observable } @ observable) = (observable : @ observable)
+
+[%%expect{|
+val f : 'a observable @ observable -> 'a = <fun>
+|}]
+
+let f ({ observable } @ stateless) = (observable : @ stateless)
+
+[%%expect{|
+val f : 'a observable @ stateless -> 'a = <fun>
+|}]
+
+let f ({ stateless } @ stateful) = (stateless : @ stateless)
+
+[%%expect{|
+val f : 'a stateless -> 'a = <fun>
+|}]
+
+let f ({ stateless } @ reading) = (stateless : @ stateless)
+
+[%%expect{|
+val f : 'a stateless @ reading -> 'a = <fun>
+|}]
+
+let f ({ stateless } @ observable) = (stateless : @ stateless)
+
+[%%expect{|
+val f : 'a stateless @ observable -> 'a = <fun>
+|}]
+
+let f ({ stateless } @ stateless) = (stateless : @ stateless)
+
+[%%expect{|
+val f : 'a stateless @ stateless -> 'a = <fun>
+|}]
+
+(* Mode crossing: visibility. *)
+
+(* CR nmatschke: The interaction with contention is tricky. Recall we have
+   - [immutable => contended]
+   - [read => shared]
+   - [write => uncontended]
+
+   In the [value mod read] case, we have [immutable - read = write], but
+   [contended - shared = contended], so we need to weaken it to
+   [shared - shared = uncontended].
+
+   In the [value mod write] case, we have [immutable - write = read], but
+   [contended - uncontended = contended], so we need to weaken it to
+   [shared - uncontended = shared]. *)
+
+let f : type (a : value mod read). a @ immutable shared -> a @ write =
+  fun x -> x
+
+[%%expect{|
+val f : ('a : value mod read). 'a @ shared immutable -> 'a @ write = <fun>
+|}]
+
+let f : type (a : value mod write). a @ immutable shared -> a @ read =
+  fun x -> x
+
+[%%expect{|
+val f : ('a : value mod write). 'a @ shared immutable -> 'a @ read = <fun>
+|}]
+
+(* Mode crossing: statefulness. *)
+
+(* CR nmatschke: The interaction with portability is tricky. Recall we have
+   - [stateless => portable]
+   - [reading => shareable]
+   - [observable => nonportable]
+
+   In the [value mod reading] case, we have
+   [observable ⊢ reading => stateless], but only
+   [nonportable ⊢ shareable => shareable]
+
+   In the [value mod observable] case, we have
+   [reading ⊢ observable => stateless], but only
+   [shareable ⊢ nonportable => shareable]. *)
+
+let f : type (a : value mod reading). a @ observable -> a @ stateless shareable =
+  fun x -> x
+
+[%%expect{|
+val f : ('a : value mod reading). 'a @ observable -> 'a @ shareable stateless =
+  <fun>
+|}]
+
+let f : type (a : value mod observable). a @ reading -> a @ stateless shareable =
+  fun x -> x
+
+[%%expect{|
+val f : ('a : value mod observable). 'a @ reading -> 'a @ shareable stateless =
+  <fun>
 |}]

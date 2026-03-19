@@ -356,6 +356,9 @@ module Lattices = struct
         The [Diamond] functor relies on the representation of immediate variant
         types to efficiently implement bitwise operations over such lattices. *)
 
+    (** This must be an enumeration with four constructors, in the order of
+        [min], [fst], [snd], and [max]. Anything else will fail in the [Diamond]
+        functor. *)
     type t [@@immediate]
 
     val min : t
