@@ -20,7 +20,11 @@
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
-  | Int
+  | Tagged_int
+  | Int64
+  | Int32
+  | Int16
+  | Int8
   | Float
   | Vec128
   | Vec256
@@ -64,7 +68,15 @@ val typ_val : machtype
 
 val typ_addr : machtype
 
-val typ_int : machtype
+val typ_tagged_int : machtype
+
+val typ_int64 : machtype
+
+val typ_int32 : machtype
+
+val typ_int16 : machtype
+
+val typ_int8 : machtype
 
 val typ_float : machtype
 
@@ -703,7 +715,7 @@ val caml_flambda2_invalid : string
 
 val is_val : machtype_component -> bool
 
-val is_int : machtype_component -> bool
+val is_tagged_int : machtype_component -> bool
 
 val is_addr : machtype_component -> bool
 

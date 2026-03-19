@@ -40,7 +40,11 @@ let reg ppf r =
     (match (r.typ : Cmm.machtype_component) with
     | Val -> "V"
     | Addr -> "A"
-    | Int -> "I"
+    | Tagged_int -> "I"
+    | Int64 -> "Q"
+    | Int32 -> "D"
+    | Int16 -> "W"
+    | Int8 -> "B"
     | Float -> "F"
     | Vec128 -> "X"
     | Vec256 -> "Y"
@@ -92,7 +96,9 @@ let regsetaddr' ?(print_reg = reg) ppf s =
       match r.typ with
       | Val -> fprintf ppf "*"
       | Addr -> fprintf ppf "!"
-      | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> ())
+      | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Vec128 | Vec256
+      | Vec512 | Float32 | Valx2 ->
+        ())
     s
 
 let regsetaddr ppf s = regsetaddr' ppf s
