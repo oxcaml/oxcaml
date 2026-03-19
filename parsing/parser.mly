@@ -4065,7 +4065,7 @@ jkind_desc_gen(self):
   | mkrhs(type_longident) mkrhs(LIDENT)* {
       Pjk_abbreviation ($1, $2)
     }
-  | LPAREN KIND_OF ty=core_type RPAREN {
+  | KIND_OF ty=core_type %prec below_LBRACKETAT {
       Pjk_kind_of ty
     }
   | UNDERSCORE {

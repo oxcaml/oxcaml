@@ -1362,21 +1362,37 @@ module type S1 = sig kind_ k = value mod portable end
 module type S2 = sig end
 |}]
 
+module type Nested = sig
+  module M : sig kind_ k end
+  module N : sig kind_ k end
+end
+module K = struct kind_ k = value end
+module type Nested1 = Nested with kind_ M.k = value mod portable
+module type Nested2 = Nested with kind_ N.k := K.k
+[%%expect{|
+module type Nested =
+  sig module M : sig kind_ k end module N : sig kind_ k end end
+module K : sig kind_ k = value end
+module type Nested1 =
+  sig module M : sig kind_ k = value mod portable end module N : sig kind_ k end end
+module type Nested2 = sig module M : sig kind_ k end module N : sig end end
+|}]
+
 (* not yet supported *)
 module _ : sig
-  type 'a gel : (kind_of_ 'a) mod global
+  type 'a gel : kind_of_ 'a mod global
   type 'a t : _
 end = struct
-  type 'a gel : (kind_of_ 'a) mod global
+  type 'a gel : kind_of_ 'a mod global
   type 'a t : _
 end
 
 (* CR layouts: Expect this output to change once `kind_of_` is   supported.
    Internal ticket 2912. *)
 [%%expect{|
-Line 5, characters 16-29:
-5 |   type 'a gel : (kind_of_ 'a) mod global
-                    ^^^^^^^^^^^^^
+Line 5, characters 16-27:
+5 |   type 'a gel : kind_of_ 'a mod global
+                    ^^^^^^^^^^^
 Error: Unimplemented kind syntax
 |}]
 

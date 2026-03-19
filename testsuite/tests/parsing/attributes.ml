@@ -56,18 +56,24 @@ let _ = (module Int : T [@foo])
 
 let _ = (module Int : T with type t = int [@foo])
 
+module type K = sig kind_ k end
+
+module _ = (Int : K with kind_ k = kind_of_ int [@foo])
+
+module _ = (Int : (K with kind_ k = kind_of_ int) [@foo])
+
 let f (x [@foo]) : unit -> unit [@foo] = function [@foo]
   | (()[@foo]) -> ()[@foo]
 
 (* TEST
- flags = "-dparsetree";
+ flags = "-stop-after parsing -dparsetree";
  setup-ocamlc.byte-build-env;
  ocamlc.byte;
  check-ocamlc.byte-output;
 *)
 
 (* TEST
- flags = "-dparsetree";
+ flags = "-stop-after parsing -dparsetree";
  setup-ocamlc.byte-build-env;
  ocamlc.byte;
  check-ocamlc.byte-output;
