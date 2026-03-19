@@ -2259,10 +2259,10 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in
          val f : unit -> unit @@ stateless (* in a structure at stateful *)
-       The first is weaker than "writing"
-         because it contains a usage (of the value "r" at line 5, characters 25-26)
-         which is expected to be "write" or "read_write"
-         because its mutable field "contents" is being written.
+       The first is weaker than "reading"
+         because it contains a usage (of the value "r" at line 5, characters 13-14)
+         which is expected to be "read" or "read_write"
+         because its mutable field "contents" is being read.
        However, the second is "stateless".
 |}]
 
