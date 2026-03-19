@@ -197,9 +197,10 @@ and 'k pattern_desc =
       id: Ident.t;
       name: string loc;
       uid: Uid.t;
-      sort: Jkind_types.Sort.t;
-      mode: Mode.Value.l;
+      ret_sort: Jkind_types.Sort.t;
+      ret_mode: Mode.Value.l;
       lpoly: Lpoly.t;
+      alloc_mode: Mode.Value.Comonadic.r;
     } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
@@ -1212,8 +1213,8 @@ let rec iter_bound_idents
   match pat.pat_desc with
   | Tpat_var { id; name = s; uid; sort; _ } ->
       f (id, s, pat.pat_type, sort, uid)
-  | Tpat_fun_layout { id; name = s; uid; sort; _ } ->
-      f (id, s, pat.pat_type, sort, uid)
+  | Tpat_fun_layout { id; name = s; uid; ret_sort; _ } ->
+      f (id, s, pat.pat_type, ret_sort, uid)
   | Tpat_alias { pattern = p; id; name = s; uid; sort; type_expr = ty; _ } ->
       iter_bound_idents f p;
       f (id, s, ty, sort, uid)
@@ -1251,8 +1252,8 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
          bind an ident *)
       | Tpat_var { id; name = s; uid; sort; mode } ->
           f id s pat.pat_type uid mode (of_sort sort)
-      | Tpat_fun_layout { id; name = s; uid; sort; mode; _ } ->
-          f id s pat.pat_type uid mode (of_sort sort)
+      | Tpat_fun_layout { id; name = s; uid; ret_sort; ret_mode; _ } ->
+          f id s pat.pat_type uid ret_mode (of_sort ret_sort)
       | Tpat_alias { pattern = p; id; name = s; uid; sort; mode;
                      type_expr = ty } ->
           loop f p;

@@ -536,6 +536,11 @@ val enter_unbound_module : string -> module_unbound_reason -> t -> t
 val add_closure_lock : Mode.Hint.pinpoint
   -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
 
+(** Like [add_closure_lock] but only checks comonadic modes; monadic modes are
+    not constrained. Used during closure conversion. *)
+val add_closure_conversion_lock : Mode.Hint.pinpoint
+  -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
+
 (** A variant of [add_closure_lock] where the mode of the closure is a constant
 due to the nature of the pinpoint. As a result, the mode is not printed in error
 messages. [ghost = true] means the closure is not a value (such as

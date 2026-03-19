@@ -154,6 +154,7 @@ type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
       Mode.Value.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
+  | Closure_conversion_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
@@ -3022,6 +3023,13 @@ let add_closure_lock closure_context comonadic env =
   in
   add_lock lock env
 
+let add_closure_conversion_lock closure_context comonadic env =
+  let lock = Closure_conversion_lock
+    (closure_context,
+     Mode.Value.Comonadic.disallow_left comonadic)
+  in
+  add_lock lock env
+
 let add_region_lock env = add_lock Region_lock env
 
 let add_exclave_lock env = add_lock Exclave_lock env
@@ -3602,6 +3610,16 @@ let closure_mode ~loc ~item ~lid
   in
   {Mode.monadic; comonadic}
 
+let closure_conversion_mode ~loc ~item ~lid
+  {Mode.monadic; comonadic} closure_context comonadic0 =
+  let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
+  let hint_comonadic : _ Mode.Hint.morph =
+    Is_closed_by (Comonadic, {closure = closure_context; closed = pp})
+  in
+  Mode.Value.Comonadic.submode_err pp
+    comonadic (Mode.Value.Comonadic.apply_hint hint_comonadic comonadic0);
+  {Mode.monadic; comonadic}
+
 let const_closure_mode ~loc ~item ~lid {Mode.monadic; comonadic}
   closure_context comonadic0 =
   let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
@@ -3662,6 +3680,8 @@ let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
           const_closure_mode ~loc ~item ~lid vmode closure_context comonadic
       | Closure_lock (closure_context, comonadic) ->
           closure_mode ~loc ~item ~lid vmode closure_context comonadic
+      | Closure_conversion_lock (closure_context, comonadic) ->
+          closure_conversion_mode ~loc ~item ~lid vmode closure_context comonadic
       | Exclave_lock ->
           exclave_mode ~errors ~env ~loc ~item ~lid vmode
       | Unboxed_lock ->
@@ -3700,7 +3720,8 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
       | Const_closure_lock (true, _, _) ->
           mode
-      | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
+      | Const_closure_lock (false, pp, _) | Closure_lock (pp, _)
+      | Closure_conversion_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)
       | Unboxed_lock -> mode

@@ -192,10 +192,11 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       allow_recursive_equations : bool;
       (* true iff checking counter examples *)
-      is_lpoly : bool;
-      (* true iff the pattern is under let poly_ *)
+      is_lpoly : Mode.Value.Comonadic.r option;
+      (* [Some comonadic] iff the pattern is under let poly_, where [comonadic]
+         is the comonadic mode of the captured environment *)
     }
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+  val make: ?is_lpoly:Mode.Value.Comonadic.r option -> Env.t -> equations_scope:int
     -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
