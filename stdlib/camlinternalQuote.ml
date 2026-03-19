@@ -2026,7 +2026,8 @@ module Ast = struct
     | Unboxed_record_product (ts, exp_opt) ->
       pp fmt "#%a" (print_record env) (ts, exp_opt)
     | Unboxed_field (exp, rec_field) ->
-      pp fmt "%a.#%a" (print_exp_with_parens env) exp (print_field env) rec_field
+      pp fmt "%a.#%a" (print_exp_with_parens env) exp (print_field env)
+        rec_field
     | Quote exp -> pp fmt "@[<2><[@,%a@,@]]>" (print_exp env) exp
     | Antiquote exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
     | List_comprehension compr ->
