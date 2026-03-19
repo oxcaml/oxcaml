@@ -1034,6 +1034,8 @@ module Identifier = struct
 
     let expr = TBuiltin "expr" |> mk
 
+    let eval = TBuiltin "eval" |> mk
+
     let unboxed_float = TBuiltin "float#" |> mk
 
     let unboxed_nativeint = TBuiltin "nativeint#" |> mk

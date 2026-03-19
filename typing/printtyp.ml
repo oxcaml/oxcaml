@@ -720,6 +720,8 @@ and raw_type_desc ppf = function
       fprintf ppf "@[Tquote@ %a@]" raw_type t
   | Tsplice t ->
       fprintf ppf "@[Tsplice@ %a@]" raw_type t
+  | Tquote_eval t ->
+      fprintf ppf "@[Tquote_eval@ %a@]" raw_type t
   | Tfield (f, k, t1, t2) ->
       fprintf ppf "@[<hov1>Tfield(@,%s,@,%s,@,%a,@;<0 -1>%a)@]" f
         (string_of_field_kind k)
@@ -750,7 +752,7 @@ and raw_type_desc ppf = function
       fprintf ppf "@[<hov1>Tpackage(@,%a,@,%a)@]" path p
         raw_lid_type_list fl
   | Tof_kind jkind ->
-    fprintf ppf "(type@ :@ %a)" (Jkind.format !printing_env) jkind
+    fprintf ppf "Tof_kind@ %a" (Jkind.format !printing_env) jkind
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"
@@ -1382,6 +1384,10 @@ let add_type_to_preparation = prepare_type
 (* Disabled in classic mode when printing an unification error *)
 let print_labels = ref true
 
+(* Whether to expand [eval] in types for reductions before printing.
+   Disabled when printing errors, as they usually contain an expansion trace. *)
+let print_reduced_evals = ref true
+
 let out_jkind_of_const_jkind env jkind =
   Ojkind_const (Jkind.Const.to_out_jkind_const env jkind)
 
@@ -1541,6 +1547,7 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_ret (Orm_any (tree_of_modes mode), tree)
     | Other _ -> tree
   in
+  let ty = Ctype.reduce_head ~expand_eval:!print_reduced_evals ty in
   let px = proxy ty in
   if List.memq px !printed_aliases && not (List.memq px !delayed) then
    let non_gen = is_non_gen mode (Transient_expr.type_expr px) in
@@ -1623,6 +1630,13 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_quote (tree_of_typexp mode alloc_mode ty)
     | Tsplice ty ->
         Otyp_splice (tree_of_typexp mode alloc_mode ty)
+    | Tquote_eval ty ->
+        (* We use [Predef]'s [eval] as the syntax, so we need to quote [ty]. *)
+        let ty = newgenty (Tquote ty) in
+        let p', s = best_type_path Predef.path_eval in
+        let tyl = apply_subst s [ty] in
+        Internal_names.add p';
+        Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl)
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->
@@ -3036,7 +3050,9 @@ let trees_of_type_expansion'
     let t' = if proxy t == proxy t' then unalias t' else t' in
     (* beware order matter due to side effect,
        e.g. when printing object types *)
+    print_reduced_evals := false; (* preserve unreduced eval in types *)
     let first = tree_of_typexp' t in
+    print_reduced_evals := true;
     let second = tree_of_typexp' t' in
     if first = second then Same first
     else Diff(first,second)
@@ -3497,6 +3513,7 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
       print_labels := true
     with exn ->
       print_labels := true;
+      print_reduced_evals := true;
       raise exn
 
 let report_error trace_format ppf mode env tr
