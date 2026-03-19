@@ -5,8 +5,8 @@
 
 #syntax quotations on
 
-(* CR quoted-kinds jbachurski: A lot of the kinds that appear in these tests
-   should be quoted. *)
+(* CR-soon quoted-kinds jbachurski: Many kind annotations that appear
+   in these tests should be quoted (e.g. <[value]> as opposed to value). *)
 
 (** Expr kinding **)
 
