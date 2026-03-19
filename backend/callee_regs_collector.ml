@@ -50,7 +50,11 @@ let is_leaf_function (cfg : Cfg.t) =
 
 let cfg (cfg_with_layout : Cfg_with_layout.t) =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  if is_leaf_function cfg
+  (* CR xclerc for xclerc: we (temporarily?) disable the feature if in
+    "opaque" mode, to please the CI (there is test ensuring that two
+    different implementations sharing the same interface result in
+    equivalent cmx files). *)
+  if (not !Clflags.opaque) && is_leaf_function cfg
   then begin
     let num_classes = List.length Regs.Reg_class.all in
     let value = Array.make num_classes 0 in
