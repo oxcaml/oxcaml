@@ -1,12 +1,6 @@
 (* TEST
-<<<<<<< oxcaml
  ocamlrunparam += ",d=129";
- runtime5;
- multidomain;
-||||||| upstream-base
-=======
- ocamlrunparam += ",d=129";
->>>>>>> upstream-incoming
+ multicore;
  { native; }
 *)
 

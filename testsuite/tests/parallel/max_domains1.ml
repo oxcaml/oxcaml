@@ -1,13 +1,6 @@
 (* TEST
-<<<<<<< oxcaml
  ocamlrunparam += ",d=1";
- runtime5;
- multidomain;
  { native; }
-||||||| upstream-base
-=======
- ocamlrunparam += ",d=1";
->>>>>>> upstream-incoming
 *)
 
 let _ =

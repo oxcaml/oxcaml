@@ -1,18 +1,9 @@
 (* TEST
-<<<<<<< oxcaml
- runtime5;
- multidomain;
- { bytecode; }
- { native; }
-*)
-||||||| upstream-base
-(* TEST *)
-=======
+  multicore;
   include unix;
   hasunix;
   { bytecode; } { native; }
- *)
->>>>>>> upstream-incoming
+*)
 
 open Domain
 

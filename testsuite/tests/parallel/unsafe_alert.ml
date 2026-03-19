@@ -1,7 +1,5 @@
 (* TEST
- flags += "-alert +unsafe_multidomain";
- runtime5;
- multidomain;
+ multicore;
  { bytecode; }
  { native; }
 *)

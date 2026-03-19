@@ -10,8 +10,7 @@ not-windows;
 not-target-windows;
 >>>>>>> upstream-incoming
 no-tsan;
-runtime5;
-multidomain;
+multicore;
 {
   bytecode;
 }{

@@ -1,7 +1,6 @@
 (* TEST
  include systhreads;
- runtime5;
- multidomain;
+ multicore;
  { bytecode; }
  { native; }
 *)

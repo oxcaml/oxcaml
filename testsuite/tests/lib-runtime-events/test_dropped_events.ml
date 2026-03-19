@@ -16,8 +16,7 @@
    skip;
  }{
    include runtime_events;
-   runtime5;
-   multidomain;
+   multicore;
    include unix;
    set OCAMLRUNPARAM = "e=6";
    hasunix;

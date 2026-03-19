@@ -1,12 +1,6 @@
 (* TEST
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
  multicore;
->>>>>>> upstream-incoming
  no-tsan; (* TSan detects the intentional data race *)
- runtime5;
- multidomain;
  { bytecode; }
  { native; }
 *)

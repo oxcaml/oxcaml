@@ -1,16 +1,8 @@
 (* TEST
  modules = "opt.ml barrier.ml hist.ml shared.ml run.ml outcome.ml";
-<<<<<<< oxcaml
-||||||| upstream-base
- no-tsan; (* tsan detects data races and fails *)
-=======
  multicore;
  no-tsan; (* tsan detects data races and fails *)
->>>>>>> upstream-incoming
  not-bsd;
- no-tsan; (* tsan detects data races and fails *)
- runtime5;
- multidomain;
  {
    not-windows;
    bytecode;

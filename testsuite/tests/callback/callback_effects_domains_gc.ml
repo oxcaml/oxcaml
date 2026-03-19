@@ -1,6 +1,6 @@
 (* TEST
- runtime5;
- multidomain;
+ flags += "-alert -do_not_spawn_domains";
+ multicore;
  native;
 *)
 

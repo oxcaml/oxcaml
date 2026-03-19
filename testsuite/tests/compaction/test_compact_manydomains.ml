@@ -1,12 +1,7 @@
 (* TEST
-<<<<<<< oxcaml
- runtime5;
- multidomain;
+ multicore;
  { bytecode; }
  { native; }
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
 *)
 
 let num_domains = 20
