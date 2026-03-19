@@ -1364,19 +1364,19 @@ module type S2 = sig end
 
 (* not yet supported *)
 module _ : sig
-  type 'a gel : (kind_of_ 'a) mod global
+  type 'a gel : kind_of_ 'a mod global
   type 'a t : _
 end = struct
-  type 'a gel : (kind_of_ 'a) mod global
+  type 'a gel : kind_of_ 'a mod global
   type 'a t : _
 end
 
 (* CR layouts: Expect this output to change once `kind_of_` is   supported.
    Internal ticket 2912. *)
 [%%expect{|
-Line 5, characters 16-29:
-5 |   type 'a gel : (kind_of_ 'a) mod global
-                    ^^^^^^^^^^^^^
+Line 5, characters 16-27:
+5 |   type 'a gel : kind_of_ 'a mod global
+                    ^^^^^^^^^^^
 Error: Unimplemented kind syntax
 |}]
 
