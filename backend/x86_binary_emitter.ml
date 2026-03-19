@@ -1004,6 +1004,8 @@ let emit_test b dst src =
       emit_mod_rm_reg b 0 [ 0xF6 ] rm 0;
       buf_int8L b n
   | _ ->
+      (* CR mshinwell/xclerc: move this next to the type definition, but this
+         will require adding x86_ast.ml *)
       let string_of_arg = function
         | Imm n -> Printf.sprintf "Imm %Ld" n
         | Sym s -> Printf.sprintf "Sym %s" s
