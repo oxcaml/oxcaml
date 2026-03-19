@@ -211,8 +211,8 @@ let value_descriptions ~loc env name
   | Ok () -> ()
   | Error e -> raise (Dont_match (Mode e))
   end;
-  let val_lpoly1 = Val_lpoly.get_exn vd1.val_lpoly in
-  let val_lpoly2 = Val_lpoly.get_exn vd2.val_lpoly in
+  let val_lpoly1 = Lpoly.get_exn vd1.val_lpoly in
+  let val_lpoly2 = Lpoly.get_exn vd2.val_lpoly in
   match vd1.val_kind with
   | Val_prim p1 -> begin
      assert (List.is_empty val_lpoly1);

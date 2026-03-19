@@ -199,7 +199,7 @@ and 'k pattern_desc =
       uid: Uid.t;
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
-      lpoly: Val_lpoly.t;
+      lpoly: Lpoly.t;
     } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc

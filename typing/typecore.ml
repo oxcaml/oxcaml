@@ -1283,7 +1283,7 @@ type pattern_variable =
     pv_as_var: bool;
     pv_attributes: attributes;
     pv_sort: Jkind_types.Sort.t;
-    pv_lpoly: Val_lpoly.t;
+    pv_lpoly: Lpoly.t;
   }
 
 type module_variable =
@@ -1438,7 +1438,7 @@ let add_module_variables env module_variables =
   ) env module_variables_as_list
 
 let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
-    ?(lpoly=Val_lpoly.determined [])
+    ?(lpoly=Lpoly.determined [])
     ~kind ty attrs sort =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
       tps.tps_pattern_variables
@@ -2120,7 +2120,7 @@ let type_for_loop_index ~loc ~env ~param =
                 pv_type; pv_loc; pv_as_var;
                 pv_attributes;
                 pv_sort = Jkind.Sort.(of_const Const.for_loop_index);
-                pv_lpoly = Val_lpoly.determined [];
+                pv_lpoly = Lpoly.determined [];
                 }
             in
             (pv_id, pv_uid), add_pattern_variables ~check ~check_as:check env [pv])
@@ -3079,8 +3079,8 @@ and type_pat_aux
       in
       let lpoly =
         if (penv : Pattern_env.t).is_lpoly
-        then Val_lpoly.pending ~loc
-        else Val_lpoly.determined []
+        then Lpoly.pending ~loc
+        else Lpoly.determined []
       in
       let id, uid =
         enter_variable ~lpoly tps loc name mode ~kind ty sp.ppat_attributes sort
@@ -3578,7 +3578,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
           Env.add_value ~mode:Mode.Value.legacy pv_id
             { val_type = pv_type
             ; val_kind = Val_reg pv_sort
-            ; val_lpoly = Val_lpoly.determined []
+            ; val_lpoly = Lpoly.determined []
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.undefined
@@ -3591,7 +3591,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
           Env.add_value ~mode:Mode.Value.legacy id' ~check
             { val_type = pv_type
             ; val_kind = Val_ivar (Immutable, cl_num)
-            ; val_lpoly = Val_lpoly.determined []
+            ; val_lpoly = Lpoly.determined []
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.undefined
@@ -8081,7 +8081,7 @@ and type_ident env ?(recarg=Rejected) lid =
 
   Therefore, we need to cross modes upon look-up. Ideally that should be done in
   [Env], but that is difficult due to cyclic dependency between jkind and env. *)
-  if not @@ List.is_empty (Val_lpoly.get_exn desc.val_lpoly) then
+  if not @@ List.is_empty (Lpoly.get_exn desc.val_lpoly) then
     raise (Error (lid.loc, env, Layout_poly_inst_not_yet_supported));
   let mode = cross_left env desc.val_type mode in
   (* There can be locks between the definition and a use of a value. For
@@ -9078,7 +9078,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         let id = Ident.create_local name in
         let desc =
           { val_type = ty; val_kind = Val_reg sort;
-            val_lpoly = Val_lpoly.determined [];
+            val_lpoly = Lpoly.determined [];
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.undefined;
@@ -10231,7 +10231,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
              specified in their types (incorporated  above). *)
           if is_recursive then
             List.iter (fun { pv_lpoly; _ } ->
-              Val_lpoly.generalize
+              Lpoly.generalize
                 ~on_determined:(fun () -> ())
                 ~on_to_generalize:(fun loc ->
                   Location.prerr_warning loc Warnings.Lpoly_in_letrec; [])
@@ -10343,7 +10343,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         mode_pat_typ_list exp_list;
       iter_pattern_variables_type_mut
         ~f_immut:(fun pv_lpoly ty ->
-          Val_lpoly.generalize
+          Lpoly.generalize
             ~on_determined:(fun () -> generalize ty)
             ~on_to_generalize:(fun loc ->
               let _, univars =
