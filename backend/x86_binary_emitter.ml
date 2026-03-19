@@ -1395,6 +1395,11 @@ let emit_XCHG b src dst =
   | Reg16 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       (* r16, r/m16 *)
       buf_int8 b 0x66;
+      (* CR mshinwell/claude:
+      emit_XCHG r16 uses rex (0x40) as rex_always (line 1398). This forces a
+      bare REX prefix on every 16-bit XCHG, even when unnecessary. It's harmless
+      (a bare 0x40 REX is valid and has no effect) but adds a wasted byte. The
+      32-bit XCHG correctly uses no_rex. *)
       emit_mod_rm_reg b rex [ 0x87 ] rm (rd_of_reg64 reg)
   (* See comment in emit_simple_encoding re Reg8H + Reg8L RSP/RBP/RSI/RDI.
      emit_prefix_modrm handles forced REX for the rm operand. *)
