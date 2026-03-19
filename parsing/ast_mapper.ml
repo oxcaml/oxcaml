@@ -388,6 +388,8 @@ module MT = struct
         type_ ~loc rf (List.map (sub.type_declaration sub) l)
     | Psig_typesubst l ->
         type_subst ~loc (List.map (sub.type_declaration sub) l)
+    | Psig_jkindsubst x ->
+        jkind_subst ~loc (sub.jkind_declaration sub x)
     | Psig_typext te -> type_extension ~loc (sub.type_extension sub te)
     | Psig_exception ed -> exception_ ~loc (sub.type_exception sub ed)
     | Psig_module x -> module_ ~loc (sub.module_declaration sub x)

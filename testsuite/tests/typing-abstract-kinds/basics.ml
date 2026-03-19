@@ -53,6 +53,31 @@ module M : sig kind_ k = float64 type t : float64 end
 module M' : S
 |}]
 
+(***************************************************************)
+(* Test: local kind substitutions in signatures are substituted away *)
+
+module type Local_subst = sig
+  kind_ k := value
+  type t : k
+end
+
+[%%expect{|
+module type Local_subst = sig type t end
+|}]
+
+(*********************************************************************)
+(* Test: local kind substitutions compose through path substitutions *)
+
+module type Local_subst_compose = sig
+  kind_ k1 := value
+  kind_ k2 := k1
+  type t : k2
+end
+
+[%%expect{|
+module type Local_subst_compose = sig type t end
+|}]
+
 (***********************************************************)
 (* Test: Abstract kinds are no concrete kind in particular *)
 

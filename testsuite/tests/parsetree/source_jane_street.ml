@@ -1366,6 +1366,38 @@ module type S1 = sig kind_ k = value mod portable end
 module type S2 = sig end
 |}]
 
+module type Local_subst = sig
+  kind_ k := value
+  type t : k
+end
+module type Local_subst_compose = sig
+  kind_ k1 := value
+  kind_ k2 := k1
+  type t : k2
+end
+[%%expect{|
+module type Local_subst = sig type t end
+module type Local_subst_compose = sig type t end
+|}]
+
+module type Nested = sig
+  module M : sig kind_ k end
+  module N : sig kind_ k end
+end
+module K = struct kind_ k = value end
+module type Nested1 = Nested with kind_ M.k = value mod portable
+module type Nested2 = Nested with kind_ N.k := K.k
+[%%expect{|
+module type Nested =
+  sig module M : sig kind_ k end module N : sig kind_ k end end
+module K : sig kind_ k = value end @@ stateless
+module type Nested1 =
+  sig
+    module M : sig kind_ k = value mod portable end
+    module N : sig kind_ k end
+  end
+module type Nested2 = sig module M : sig kind_ k end module N : sig end end
+|}]
 (* not yet supported *)
 module _ : sig
   type 'a gel : kind_of_ 'a mod global
