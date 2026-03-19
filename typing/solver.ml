@@ -969,6 +969,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let vars = ref (0, [])
 
+  let debug_modes = ref true
+
   let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper ~level obj =
     let id, l = !vars in
     let upper, upper_hint =
@@ -987,6 +989,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     in
     let vlower = Option.value vlower ~default:VarMap.empty in
     let vupper = Option.value vupper ~default:VarMap.empty in
+    let level = if !debug_modes then id mod 5 else level in
     let var =
       { level; upper; upper_hint; lower; lower_hint; vlower; vupper; id }
     in
