@@ -180,7 +180,7 @@ let map_on_rows f = List.map (map_on_row f)
 module Non_empty_row = Patterns.Non_empty_row
 
 let fatal_var_lpoly lpoly =
-  let n = List.length (Types.Val_lpoly.get_exn lpoly) in
+  let n = List.length (Types.Lpoly.get_exn lpoly) in
   Misc.fatal_errorf
     "Matching: layout-poly patterns not yet supported (%d sort var(s))" n
 

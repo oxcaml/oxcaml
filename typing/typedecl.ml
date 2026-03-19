@@ -4050,7 +4050,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       in
       { val_type = ty;
         val_kind = Val_reg sort;
-        val_lpoly = Val_lpoly.determined lpoly;
+        val_lpoly = Lpoly.determined lpoly;
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
@@ -4095,7 +4095,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
       { val_type = ty; val_kind = Val_prim prim;
-        val_lpoly = Val_lpoly.determined lpoly;
+        val_lpoly = Lpoly.determined lpoly;
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;

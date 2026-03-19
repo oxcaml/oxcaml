@@ -1044,7 +1044,7 @@ end
     value description uses a mutable cell that is filled in during
     generalization. After filling, layout poly is determined and should not be
     mutated again. We explicitly distinguish the two stages for extra safety. *)
-module Val_lpoly : sig
+module Lpoly : sig
   type t
 
   (** [determined vars] creates a finalized value with the given generalized
@@ -1084,10 +1084,10 @@ module type Wrapped = sig
       have been applied and we have the real mode of the value. The original
       modalities shouldn't be looked again and is replaced by [undefined]. *)
       val_kind: value_kind;
-      val_lpoly: Val_lpoly.t;
+      val_lpoly: Lpoly.t;
       (** Guaranteed [determined] for all values visible outside [type_let].
           May be [to_generalize] during intermediate stages of typing a
-          [let poly_] binding. See [Val_lpoly]. *)
+          [let poly_] binding. See [Lpoly]. *)
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;

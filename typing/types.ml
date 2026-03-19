@@ -567,7 +567,7 @@ module type Wrap = sig
   type 'a t
 end
 
-module Val_lpoly = struct
+module Lpoly = struct
   type state =
     | Pending of Location.t
     | Determined of Jkind_types.Sort.var list
@@ -594,7 +594,7 @@ module type Wrapped = sig
     { val_type: type_expr wrapped;                (* Type of the value *)
       val_modalities : Mode.Modality.t;     (* Modalities on the value *)
       val_kind: value_kind;
-      val_lpoly: Val_lpoly.t;
+      val_lpoly: Lpoly.t;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
