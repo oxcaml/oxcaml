@@ -1417,6 +1417,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       if !cnt mod 10 = 0 then update_level (!cnt mod 3) obj a ~log;
       if !cnt mod 15 = 0 then update_level (!cnt mod 5) obj b ~log
     end;
+    if !debug_modes && !cnt mod 29 = 0
+    then begin
+      let current_level = !cnt mod 13 in
+      generalize ~current_level ~log obj a
+    end;
     let submode_cc ~log:_ _pp obj left left_hint right right_hint =
       if C.le obj left right
       then Ok ()
