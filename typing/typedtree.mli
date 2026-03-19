@@ -233,7 +233,7 @@ and 'k pattern_desc =
       uid: Uid.t;
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
-      lpoly: Types.Val_lpoly.t;
+      lpoly: Types.Lpoly.t;
     } -> value pattern_desc
         (** x with layout polymorphism, used in let poly_ bindings.
             [lpoly] is [pending] during type-checking and guaranteed
