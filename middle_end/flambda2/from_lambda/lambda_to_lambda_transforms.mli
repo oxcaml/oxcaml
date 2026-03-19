@@ -24,17 +24,6 @@ val rec_catch_for_while_loop :
   Lambda.lambda ->
   Lambda_to_flambda_env.t * Lambda.lambda
 
-val rec_catch_for_for_loop :
-  Lambda_to_flambda_env.t ->
-  Lambda.scoped_location ->
-  Ident.t ->
-  Lambda.debug_uid ->
-  Lambda.lambda ->
-  Lambda.lambda ->
-  Asttypes.direction_flag ->
-  Lambda.lambda ->
-  Lambda_to_flambda_env.t * Lambda.lambda
-
 val switch_for_if_then_else :
   loc:Lambda.scoped_location ->
   cond:Lambda.lambda ->

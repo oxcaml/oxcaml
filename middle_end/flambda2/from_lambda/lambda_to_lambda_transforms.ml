@@ -18,9 +18,6 @@ module Env = Lambda_to_flambda_env
 module L = Lambda
 module P = Flambda_primitive
 
-let int_scalar : _ Scalar.Maybe_naked.t =
-  Value (Scalar.Integral.Width.Taggable Int)
-
 type primitive_transform_result =
   | Primitive of L.primitive * L.lambda list * L.scoped_location
   | Transformed of L.lambda
@@ -120,62 +117,6 @@ let rec_catch_for_while_loop env cond body =
   in
   env, lam
 
-let rec_catch_for_for_loop env loc ident duid start stop
-    (dir : Asttypes.direction_flag) body =
-  let cont = L.next_raise_count () in
-  let env = Env.mark_as_recursive_static_catch env cont in
-  let start_ident = Ident.create_local "for_start" in
-  let start_ident_duid = Lambda.debug_uid_none in
-  let stop_ident = Ident.create_local "for_stop" in
-  let stop_ident_duid = Lambda.debug_uid_none in
-  let first_test : L.lambda =
-    match dir with
-    | Upto -> L.icmp Cle L.int (Lvar start_ident) (Lvar stop_ident) ~loc
-    | Downto -> L.icmp Cge L.int (Lvar start_ident) (Lvar stop_ident) ~loc
-  in
-  let subsequent_test : L.lambda =
-    L.icmp Cne L.int (Lvar ident) (Lvar stop_ident) ~loc
-  in
-  let next_value_of_counter : L.lambda =
-    match dir with
-    | Upto -> L.succ int_scalar (Lvar ident) ~loc
-    | Downto -> L.pred int_scalar (Lvar ident) ~loc
-  in
-  let lam : L.lambda =
-    (* Care needs to be taken here not to cause overflow if, for an incrementing
-       for-loop, the upper bound is [max_int]; likewise, for a decrementing
-       for-loop, if the lower bound is [min_int]. *)
-    Llet
-      ( Strict,
-        L.layout_int,
-        start_ident,
-        start_ident_duid,
-        start,
-        Llet
-          ( Strict,
-            L.layout_int,
-            stop_ident,
-            stop_ident_duid,
-            stop,
-            Lifthenelse
-              ( first_test,
-                Lstaticcatch
-                  ( Lstaticraise (cont, [L.Lvar start_ident]),
-                    (cont, [ident, duid, L.layout_int]),
-                    Lsequence
-                      ( body,
-                        Lifthenelse
-                          ( subsequent_test,
-                            Lstaticraise (cont, [next_value_of_counter]),
-                            L.lambda_unit,
-                            L.layout_unit ) ),
-                    Same_region,
-                    L.layout_unit ),
-                L.lambda_unit,
-                L.layout_unit ) ) )
-  in
-  env, lam
-
 type packed_array_element_width =
   | Eight
   | Sixteen
@@ -227,16 +168,22 @@ let initialize_array0 env loc ~length array_set_kind width ~init creation_expr =
           L.lambda_unit,
           L.layout_unit )
   in
-  let env, initialize =
+  let initialize =
     let index = Ident.create_local "index" in
     let index_duid = Lambda.debug_uid_none in
-    rec_catch_for_for_loop env loc index index_duid (L.tagged_immediate 0)
-      (L.pred L.int (Lvar length) ~loc)
-      Upto
-      (Lprim
-         ( Parraysetu (array_set_kind, Ptagged_int_index),
-           [Lvar array; Lvar index; Lvar init],
-           loc ))
+    L.Lfor
+      { for_id = index;
+        for_debug_uid = index_duid;
+        for_loc = loc;
+        for_from = L.tagged_immediate 0;
+        for_to = L.pred L.int (Lvar length) ~loc;
+        for_dir = Upto;
+        for_body =
+          Lprim
+            ( Parraysetu (array_set_kind, Ptagged_int_index),
+              [Lvar array; Lvar index; Lvar init],
+              loc )
+      }
   in
   let term =
     L.Llet
@@ -678,7 +625,7 @@ let arrayblit_expanded env ~(src_mutability : L.mutable_flag)
     let must_copy_backwards =
       L.icmp Cgt L.int (Lvar dst_start_pos) (Lvar src_start_pos) ~loc
     in
-    let make_loop env (direction : Asttypes.direction_flag) =
+    let make_loop (direction : Asttypes.direction_flag) =
       let src_index = Ident.create_local "index" in
       let src_index_duid = Lambda.debug_uid_none in
       let start_pos, end_pos =
@@ -686,25 +633,32 @@ let arrayblit_expanded env ~(src_mutability : L.mutable_flag)
         | Upto -> L.Lvar src_start_pos, src_end_pos_inclusive
         | Downto -> src_end_pos_inclusive, L.Lvar src_start_pos
       in
-      rec_catch_for_for_loop env loc src_index src_index_duid start_pos end_pos
-        direction
-        (Lprim
-           ( Parraysetu (dst_array_set_kind, Ptagged_int_index),
-             [ Lvar dst;
-               addint (Lvar src_index) dst_start_pos_minus_src_start_pos;
-               Lprim
-                 ( Parrayrefu
-                     ( src_array_ref_kind,
-                       Ptagged_int_index,
-                       match src_mutability with
-                       | Immutable | Immutable_unique -> Immutable
-                       | Mutable -> Mutable ),
-                   [Lvar src; Lvar src_index],
-                   loc ) ],
-             loc ))
+      L.Lfor
+        { for_id = src_index;
+          for_debug_uid = src_index_duid;
+          for_loc = loc;
+          for_from = start_pos;
+          for_to = end_pos;
+          for_dir = direction;
+          for_body =
+            Lprim
+              ( Parraysetu (dst_array_set_kind, Ptagged_int_index),
+                [ Lvar dst;
+                  addint (Lvar src_index) dst_start_pos_minus_src_start_pos;
+                  Lprim
+                    ( Parrayrefu
+                        ( src_array_ref_kind,
+                          Ptagged_int_index,
+                          match src_mutability with
+                          | Immutable | Immutable_unique -> Immutable
+                          | Mutable -> Mutable ),
+                      [Lvar src; Lvar src_index],
+                      loc ) ],
+                loc )
+        }
     in
-    let env, copy_backwards = make_loop env Downto in
-    let env, copy_forwards = make_loop env Upto in
+    let copy_backwards = make_loop Downto in
+    let copy_forwards = make_loop Upto in
     let body =
       (* The region is expected to be redundant (see comment above about
          modes). *)

@@ -1032,11 +1032,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         for_dir = dir;
         for_body = body
       } ->
-    let env, loop =
-      Lambda_to_lambda_transforms.rec_catch_for_for_loop env loc ident duid
-        start stop dir body
-    in
-    cps acc env ccenv loop k k_exn
+    cps_for_loop acc env ccenv loc ident duid start stop dir body k k_exn
   | Lassign (being_assigned, new_value) ->
     if not (Env.is_mutable env being_assigned)
     then
@@ -1612,6 +1608,123 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ~calling_convention ~return_continuation:body_cont ~exn_continuation
     ~my_region ~my_ghost_region ~body ~attr ~loc ~free_idents_of_body recursive
     ~closure_alloc_mode:mode ~first_complex_local_param ~result_mode:ret_mode
+
+and cps_for_loop acc env ccenv loc ident duid start stop
+    (dir : Asttypes.direction_flag) body k k_exn =
+  let dbg = Debuginfo.from_location loc in
+  let close_let_prim region ghost_region acc ccenv name prim args ~body =
+    let id = Ident.create_local name in
+    CC.close_let acc ccenv
+      [id, Flambda_debug_uid.none, Flambda_kind.With_subkind.tagged_immediate]
+      Not_user_visible
+      (Prim { prim; args; loc; exn_continuation = None; region; ghost_region })
+      ~body:(fun acc ccenv -> body id acc ccenv)
+  in
+  let close_if acc ccenv ~cond ~if_true ~if_false =
+    let true_cont = Continuation.create () in
+    let false_cont = Continuation.create () in
+    let switch : IR.switch =
+      { numconsts = 2;
+        consts = [0, false_cont, dbg, None, []; 1, true_cont, dbg, None, []];
+        failaction = None
+      }
+    in
+    CC.close_let_cont acc ccenv ~name:false_cont ~is_exn_handler:false
+      ~params:[] ~recursive:Nonrecursive
+      ~body:(fun acc ccenv ->
+        CC.close_let_cont acc ccenv ~name:true_cont ~is_exn_handler:false
+          ~params:[] ~recursive:Nonrecursive
+          ~body:(fun acc ccenv ->
+            CC.close_switch acc ccenv ~condition_dbg:dbg cond switch)
+          ~handler:if_true)
+      ~handler:if_false
+  in
+  let apply_unit acc env ccenv k =
+    apply_cont_with_extra_args acc env ccenv ~dbg k None [IR.Const L.const_unit]
+  in
+  let build_loop_step close_let_prim stop_var loop_cont k acc env ccenv =
+    let subsequent_test_prim : L.primitive =
+      Pscalar (Binary (Icmp (L.int, Cne)))
+    in
+    close_let_prim acc ccenv "subsequent_test" subsequent_test_prim
+      [[IR.Var ident]; [IR.Var stop_var]]
+      ~body:(fun subsequent_test_var acc ccenv ->
+        close_if acc ccenv ~cond:subsequent_test_var
+          ~if_false:(fun acc ccenv -> apply_unit acc env ccenv k)
+          ~if_true:(fun acc ccenv ->
+            let next_prim : L.primitive =
+              match dir with
+              | Upto -> Pscalar (Unary (Integral (L.int, Succ)))
+              | Downto -> Pscalar (Unary (Integral (L.int, Pred)))
+            in
+            close_let_prim acc ccenv "next_for" next_prim [[IR.Var ident]]
+              ~body:(fun next_var acc ccenv ->
+                apply_cont_with_extra_args acc env ccenv ~dbg loop_cont None
+                  [IR.Var next_var])))
+  in
+  let build_loop close_let_prim env start_var stop_var k acc ccenv =
+    let loop_cont = Continuation.create () in
+    let { Env.body_env; handler_env; extra_params } =
+      Env.add_continuation env loop_cont ~push_to_try_stack:false
+        ~pop_region:false Recursive
+    in
+    let params =
+      ( ident,
+        Flambda_debug_uid.of_lambda_debug_uid duid,
+        is_user_visible env ident,
+        Flambda_kind.With_subkind.tagged_immediate )
+      :: List.map
+           (fun (id, duid, kind) -> id, duid, IR.Not_user_visible, kind)
+           extra_params
+    in
+    let handler acc ccenv =
+      let ccenv = CCenv.set_not_at_toplevel ccenv in
+      cps_non_tail_simple acc handler_env ccenv body
+        (fun acc env ccenv _body_result _arity ->
+          build_loop_step close_let_prim stop_var loop_cont k acc env ccenv)
+        k_exn
+    in
+    let body acc ccenv =
+      apply_cont_with_extra_args acc body_env ccenv ~dbg loop_cont None
+        [IR.Var start_var]
+    in
+    CC.close_let_cont acc ccenv ~name:loop_cont ~is_exn_handler:false ~params
+      ~recursive:Recursive ~body ~handler
+  in
+  let build_for_body close_let_prim env start_var stop_var k acc ccenv =
+    (* Compute first test: start <= stop for Upto, start >= stop for Downto *)
+    let first_test_prim : L.primitive =
+      match dir with
+      | Upto -> Pscalar (Binary (Icmp (L.int, Cle)))
+      | Downto -> Pscalar (Binary (Icmp (L.int, Cge)))
+    in
+    close_let_prim acc ccenv "first_test" first_test_prim
+      [[IR.Var start_var]; [IR.Var stop_var]]
+      ~body:(fun first_test_var acc ccenv ->
+        close_if acc ccenv ~cond:first_test_var
+          ~if_false:(fun acc ccenv -> apply_unit acc env ccenv k)
+          ~if_true:(fun acc ccenv ->
+            build_loop close_let_prim env start_var stop_var k acc ccenv))
+  in
+  maybe_insert_let_cont "for_result" L.layout_unit k acc env ccenv
+    (fun acc env ccenv k ->
+      cps_non_tail_var "for_start" acc env ccenv start
+        Flambda_kind.With_subkind.tagged_immediate
+        (fun acc env ccenv start_var _arity ->
+          cps_non_tail_var "for_stop" acc env ccenv stop
+            Flambda_kind.With_subkind.tagged_immediate
+            (fun acc env ccenv stop_var _arity ->
+              let current_region = Env.current_region env in
+              let region =
+                Option.map Env.Region_stack_element.region current_region
+              in
+              let ghost_region =
+                Option.map Env.Region_stack_element.ghost_region current_region
+              in
+              let close_let_prim = close_let_prim region ghost_region in
+              build_for_body close_let_prim env start_var stop_var k acc ccenv)
+            k_exn)
+        k_exn)
 
 and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
     ~scrutinee (k : Continuation.t) (k_exn : Continuation.t) : Expr_with_acc.t =
