@@ -2351,10 +2351,10 @@ let rec try_reduce env ty =
 
 (* [Predef]'s [eval] is special -- we want to always expand it in [reduce_head],
    so we special-case its abbreviation expansion there. *)
-let expand_eval_abbrev _env ty =
+let expand_eval_abbrev env ty =
   match get_desc ty with
-  | Tconstr (path, [ty], _) when Path.same path Predef.path_eval ->
-    new_quote_eval_ty (new_splice_ty ty)
+  | Tconstr (path, [_], _) when Path.same path Predef.path_eval ->
+    try_expand_once env ty
   | _ -> raise Cannot_expand
 
 let try_expand_eval_once = try_expand_once_gen expand_eval_abbrev
