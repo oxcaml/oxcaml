@@ -579,7 +579,7 @@ module Sort = struct
 
   let new_var ~level =
     incr last_var_uid;
-    Var { contents = None; uid = !last_var_uid; level }
+    { contents = None; uid = !last_var_uid; level }
 
   let new_genvar () =
     incr last_var_uid;
@@ -795,7 +795,7 @@ module Sort = struct
       true
 
   let decompose_into_product ~level t n =
-    let ts = List.init n (fun _ -> new_var ~level) in
+    let ts = List.init n (fun _ -> of_var (new_var ~level)) in
     if equate t (Product ts) then Some ts else None
 
   (*** pretty printing ***)
@@ -979,6 +979,6 @@ module Layout = struct
   let get_const t = get_const Const.of_sort t
 
   let of_new_sort_var ~level =
-    let sort = Sort.new_var ~level in
+    let sort = Sort.(of_var (new_var ~level)) in
     Sort (sort, Scannable_axes.max), sort
 end
