@@ -691,17 +691,26 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   | Empty_array _ | Mutable_string _ | Immutable_string _ -> sc
 
 let rebuild_named_default_case env (named : Named.t) =
-  let[@local] rewrite_field_access base field =
+  let[@local] rewrite_field_access ?(mut : Mutability.t = Immutable) base field
+      =
     let arg = get_simple_unboxable env base in
     match Field.Map.find field arg with
     | Not_unboxed var -> Named.create_simple (Simple.var var)
     | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
-    | exception Not_found ->
-      Misc.fatal_errorf
-        "@[<v>@[%a@]@;<1 2>@[%a@]@ @[%a@]@;<1 2>@[%a@]@ @[%a@]@]@."
-        Format.pp_print_text "Trying to rewrite access to field:" Field.print
-        field Format.pp_print_text "from variable" Simple.print base
-        Format.pp_print_text "but it was not tracked."
+    | exception Not_found -> (
+      match mut with
+      | Immutable | Immutable_unique ->
+        Misc.fatal_errorf
+          "In [rewrite_field_access], an immutable field load for field %a did \
+           not appear in the fields. This case should have been excluded by \
+           the no_source check previously.@.Block is: %a@.Expected fields are: \
+           %a@."
+          Field.print field Simple.print base Field.Set.print
+          (Field.Map.keys arg)
+      | Mutable ->
+        Named.create_prim
+          (P.Nullary (Invalid (Field.kind field)))
+          Debuginfo.none)
   in
   let[@local] rewrite_field_access_chg_repr ?(mut : Mutability.t = Immutable)
       arg field dbg =
@@ -751,11 +760,11 @@ let rebuild_named_default_case env (named : Named.t) =
   in
   match[@ocaml.warning "-fragile-match"] named with
   | Simple simple -> Named.create_simple (rewrite_simple env simple)
-  | Prim (Unary (Block_load { kind; field; _ }, arg), _dbg)
+  | Prim (Unary (Block_load { kind; field; mut; _ }, arg), _dbg)
     when simple_is_unboxable env arg ->
     let kind = P.Block_access_kind.element_kind_for_load kind in
     let field = Field.block (Target_ocaml_int.to_int field) kind in
-    rewrite_field_access arg field
+    rewrite_field_access ~mut arg field
   | Prim (Unary (Project_value_slot { value_slot; _ }, arg), _dbg)
     when simple_is_unboxable env arg ->
     rewrite_field_access arg (Field.value_slot value_slot)
