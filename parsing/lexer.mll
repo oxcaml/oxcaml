@@ -42,102 +42,19 @@ exception Error of error * Location.t
 
 (* The table of keywords *)
 
-<<<<<<< oxcaml
-let keyword_table =
-  create_hashtable 149 [
-    "and", AND;
-    "as", AS;
-    "assert", ASSERT;
-    "begin", BEGIN;
-    "class", CLASS;
-    "constraint", CONSTRAINT;
-    "do", DO;
-    "done", DONE;
-    "downto", DOWNTO;
-    "else", ELSE;
-    "end", END;
-    "exception", EXCEPTION;
-    "exclave_", EXCLAVE;
-    "external", EXTERNAL;
-    "false", FALSE;
-    "for", FOR;
-    "fun", FUN;
-    "function", FUNCTION;
-    "functor", FUNCTOR;
-    "global_", GLOBAL;
-    "if", IF;
-    "in", IN;
-    "include", INCLUDE;
-    "inherit", INHERIT;
-    "initializer", INITIALIZER;
-    "kind_abbrev_", KIND_ABBREV;
-    "kind_of_", KIND_OF;
-    "lazy", LAZY;
-    "let", LET;
-    "local_", LOCAL;
-    "match", MATCH;
-    "method", METHOD;
-    "mod", MOD;
-    "module", MODULE;
-    "mutable", MUTABLE;
-    "new", NEW;
-    "nonrec", NONREC;
-    "object", OBJECT;
-    "of", OF;
-    "once_", ONCE;
-    "open", OPEN;
-    "or", OR;
-    "overwrite_", OVERWRITE;
-||||||| upstream-base
-let keyword_table =
-  create_hashtable 149 [
-    "and", AND;
-    "as", AS;
-    "assert", ASSERT;
-    "begin", BEGIN;
-    "class", CLASS;
-    "constraint", CONSTRAINT;
-    "do", DO;
-    "done", DONE;
-    "downto", DOWNTO;
-    "else", ELSE;
-    "end", END;
-    "exception", EXCEPTION;
-    "external", EXTERNAL;
-    "false", FALSE;
-    "for", FOR;
-    "fun", FUN;
-    "function", FUNCTION;
-    "functor", FUNCTOR;
-    "if", IF;
-    "in", IN;
-    "include", INCLUDE;
-    "inherit", INHERIT;
-    "initializer", INITIALIZER;
-    "lazy", LAZY;
-    "let", LET;
-    "match", MATCH;
-    "method", METHOD;
-    "module", MODULE;
-    "mutable", MUTABLE;
-    "new", NEW;
-    "nonrec", NONREC;
-    "object", OBJECT;
-    "of", OF;
-    "open", OPEN;
-    "or", OR;
-=======
 let all_keywords =
   let v5_3 = Some (5,3) in
   let v1_0 = Some (1,0) in
   let v1_6 = Some (1,6) in
   let v4_2 = Some (4,2) in
   let always = None in
+  let oxcaml = None in
   [
     "and", AND, always;
     "as", AS, always;
     "assert", ASSERT, v1_6;
     "begin", BEGIN, always;
+    "borrow_", BORROW, oxcaml;
     "class", CLASS, v1_0;
     "constraint", CONSTRAINT, v1_0;
     "do", DO, always;
@@ -147,116 +64,64 @@ let all_keywords =
     "else", ELSE, always;
     "end", END, always;
     "exception", EXCEPTION, always;
+    "exclave_", EXCLAVE, oxcaml;
     "external", EXTERNAL, always;
     "false", FALSE, always;
     "for", FOR, always;
     "fun", FUN, always;
     "function", FUNCTION, always;
     "functor", FUNCTOR, always;
+    "global_", GLOBAL, oxcaml;
     "if", IF, always;
     "in", IN, always;
     "include", INCLUDE, always;
     "inherit", INHERIT, v1_0;
     "initializer", INITIALIZER, v1_0;
+    "kind_abbrev_", KIND_ABBREV, oxcaml;
+    "kind_of_", KIND_OF, oxcaml;
     "lazy", LAZY, v1_6;
     "let", LET, always;
+    "local_", LOCAL, oxcaml;
     "match", MATCH, always;
     "method", METHOD, v1_0;
+    "mod", MOD, always;
     "module", MODULE, always;
     "mutable", MUTABLE, always;
     "new", NEW, v1_0;
     "nonrec", NONREC, v4_2;
     "object", OBJECT, v1_0;
     "of", OF, always;
+    "once_", ONCE, oxcaml;
     "open", OPEN, always;
     "or", OR, always;
->>>>>>> upstream-incoming
+    "overwrite_", OVERWRITE, oxcaml;
 (*  "parser", PARSER; *)
-<<<<<<< oxcaml
-    "private", PRIVATE;
-    "rec", REC;
-    "repr_", REPR;
-    "sig", SIG;
-    "stack_", STACK;
-    "borrow_", BORROW;
-    "struct", STRUCT;
-    "then", THEN;
-    "to", TO;
-    "true", TRUE;
-    "try", TRY;
-    "type", TYPE;
-    "unique_", UNIQUE;
-    "val", VAL;
-    "virtual", VIRTUAL;
-    "when", WHEN;
-    "while", WHILE;
-    "with", WITH;
-||||||| upstream-base
-    "private", PRIVATE;
-    "rec", REC;
-    "sig", SIG;
-    "struct", STRUCT;
-    "then", THEN;
-    "to", TO;
-    "true", TRUE;
-    "try", TRY;
-    "type", TYPE;
-    "val", VAL;
-    "virtual", VIRTUAL;
-    "when", WHEN;
-    "while", WHILE;
-    "with", WITH;
-=======
     "private", PRIVATE, v1_0;
     "rec", REC, always;
+    "repr_", REPR, oxcaml;
     "sig", SIG, always;
+    "stack_", STACK, oxcaml;
     "struct", STRUCT, always;
     "then", THEN, always;
     "to", TO, always;
     "true", TRUE, always;
     "try", TRY, always;
     "type", TYPE, always;
+    "unique_", UNIQUE, oxcaml;
     "val", VAL, always;
     "virtual", VIRTUAL, v1_0;
     "when", WHEN, always;
     "while", WHILE, always;
     "with", WITH, always;
->>>>>>> upstream-incoming
 
-<<<<<<< oxcaml
-    "lor", INFIXOP3("lor"); (* Should be INFIXOP2 *)
-    "lxor", INFIXOP3("lxor"); (* Should be INFIXOP2 *)
-    "land", INFIXOP3("land");
-    "lsl", INFIXOP4("lsl");
-    "lsr", INFIXOP4("lsr");
-    "asr", INFIXOP4("asr")
-||||||| upstream-base
-    "lor", INFIXOP3("lor"); (* Should be INFIXOP2 *)
-    "lxor", INFIXOP3("lxor"); (* Should be INFIXOP2 *)
-    "mod", INFIXOP3("mod");
-    "land", INFIXOP3("land");
-    "lsl", INFIXOP4("lsl");
-    "lsr", INFIXOP4("lsr");
-    "asr", INFIXOP4("asr")
-=======
     "lor", INFIXOP3("lor"), always; (* Should be INFIXOP2 *)
     "lxor", INFIXOP3("lxor"), always; (* Should be INFIXOP2 *)
-    "mod", INFIXOP3("mod"), always;
     "land", INFIXOP3("land"), always;
     "lsl", INFIXOP4("lsl"), always;
     "lsr", INFIXOP4("lsr"), always;
     "asr", INFIXOP4("asr"), always
->>>>>>> upstream-incoming
 ]
 
-<<<<<<< oxcaml
-let lookup_keyword name =
-  match Hashtbl.find keyword_table name with
-  | kw -> kw
-  | exception Not_found ->
-     LIDENT name
-||||||| upstream-base
-=======
 
 let keyword_table = Hashtbl.create 149
 
@@ -278,7 +143,6 @@ let populate_keywords (version,keywords) =
     | exception Not_found -> Hashtbl.replace tbl name None
     ) keywords
 
->>>>>>> upstream-incoming
 
 (* To buffer string literals *)
 
@@ -568,19 +432,10 @@ let uchar_for_uchar_escape lexbuf =
       illegal_escape lexbuf
         (Printf.sprintf "%X is not a Unicode scalar value" cp)
 
-<<<<<<< oxcaml
-let is_keyword name =
-  match lookup_keyword name with
-  | LIDENT _ -> false
-  | _ -> true
-||||||| upstream-base
-let is_keyword name = Hashtbl.mem keyword_table name
-=======
 let validate_encoding lexbuf raw_name =
   match Utf8_lexeme.normalize raw_name with
   | Error _ -> error lexbuf (Invalid_encoding raw_name)
   | Ok name -> name
->>>>>>> upstream-incoming
 
 let ident_for_extended lexbuf raw_name =
   let name = validate_encoding lexbuf raw_name in
@@ -847,68 +702,37 @@ rule token = parse
   | "?" (lowercase identchar * as name) ':'
       { check_label_name lexbuf name;
         OPTLABEL name }
-<<<<<<< oxcaml
-  | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
-      { warn_latin1 lexbuf;
-        OPTLABEL name }
+  | "?" (raw_ident_escape? as escape) (ident_ext as raw_name) ':'
+      { let name = ident_for_extended lexbuf raw_name in
+        check_label_name ~raw_escape:(escape<>"") lexbuf name;
+        OPTLABEL name
+      }
   (* Lowercase identifiers are split into 3 cases, and the order matters
      (longest to shortest).
   *)
   | (lowercase identchar * as name) ('#' symbolchar_or_hash+ as hashop)
       (* See Note [Lexing hack for hash operators] *)
       { enqueue_hashop_from_end_of_lexbuf_window lexbuf ~hashop;
-        lookup_keyword name }
+        find_keyword lexbuf name }
   | (lowercase identchar * as name) '#'
       (* See Note [Lexing hack for float#] *)
       { enqueue_hash_suffix_from_end_of_lexbuf_window lexbuf;
-        lookup_keyword name }
-  | raw_ident_escape (lowercase identchar * as name)
-      { LIDENT name }
-||||||| upstream-base
-  | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
-      { warn_latin1 lexbuf;
-        OPTLABEL name }
-  | raw_ident_escape (lowercase identchar * as name)
-      { LIDENT name }
-=======
-  | "?" (raw_ident_escape? as escape) (ident_ext as raw_name) ':'
-      { let name = ident_for_extended lexbuf raw_name in
-        check_label_name ~raw_escape:(escape<>"") lexbuf name;
-        OPTLABEL name
-      }
->>>>>>> upstream-incoming
+        find_keyword lexbuf name }
   | lowercase identchar * as name
-<<<<<<< oxcaml
-      { lookup_keyword name }
-  (* Lowercase latin1 identifiers are split into 3 cases, and the order matters
-     (longest to shortest).
-  *)
-  | (lowercase_latin1 identchar_latin1 * as name)
-      ('#' symbolchar_or_hash+ as hashop)
-      (* See Note [Lexing hack for hash operators] *)
-      { warn_latin1 lexbuf;
-        enqueue_hashop_from_end_of_lexbuf_window lexbuf ~hashop;
-        LIDENT name }
-  | (lowercase_latin1 identchar_latin1 * as name) '#'
-      (* See Note [Lexing hack for float#] *)
-      { warn_latin1 lexbuf;
-        enqueue_hash_suffix_from_end_of_lexbuf_window lexbuf;
-        LIDENT name }
-  | lowercase_latin1 identchar_latin1 * as name
-      { warn_latin1 lexbuf; LIDENT name }
-||||||| upstream-base
-      { try Hashtbl.find keyword_table name
-        with Not_found -> LIDENT name }
-  | lowercase_latin1 identchar_latin1 * as name
-      { warn_latin1 lexbuf; LIDENT name }
-=======
       { find_keyword lexbuf name }
->>>>>>> upstream-incoming
   | uppercase identchar * as name
       { UIDENT name } (* No capitalized keywords *)
-<<<<<<< oxcaml
-  | uppercase_latin1 identchar_latin1 * as name
-      { warn_latin1 lexbuf; UIDENT name }
+  | (raw_ident_escape? as escape) (ident_ext as raw_name)
+      { let name = ident_for_extended lexbuf raw_name in
+        if Utf8_lexeme.is_capitalized name then begin
+            if escape="" then UIDENT name
+            else
+              (* we don't have capitalized keywords, and thus no needs for
+                 capitalized raw identifiers. *)
+              error lexbuf (Capitalized_raw_identifier name)
+        end else
+          LIDENT name
+      } (* No non-ascii keywords *)
   (* This matches either an integer literal or a directive. If the text "#2"
      appears at the beginning of a line that lexes as a directive, then it
      should be treated as a directive and not an unboxed int. This is acceptable
@@ -931,38 +755,6 @@ rule token = parse
     (float_literal | hex_float_literal as lit) (literal_modifier as modif)
       { float ~maybe_hash lit (Some modif) }
   | '#'? (float_literal | hex_float_literal | int_literal) identchar+ as invalid
-||||||| upstream-base
-  | uppercase_latin1 identchar_latin1 * as name
-      { warn_latin1 lexbuf; UIDENT name }
-  | int_literal as lit { INT (lit, None) }
-  | (int_literal as lit) (literal_modifier as modif)
-      { INT (lit, Some modif) }
-  | float_literal | hex_float_literal as lit
-      { FLOAT (lit, None) }
-  | (float_literal | hex_float_literal as lit) (literal_modifier as modif)
-      { FLOAT (lit, Some modif) }
-  | (float_literal | hex_float_literal | int_literal) identchar+ as invalid
-=======
-  | (raw_ident_escape? as escape) (ident_ext as raw_name)
-      { let name = ident_for_extended lexbuf raw_name in
-        if Utf8_lexeme.is_capitalized name then begin
-            if escape="" then UIDENT name
-            else
-              (* we don't have capitalized keywords, and thus no needs for
-                 capitalized raw identifiers. *)
-              error lexbuf (Capitalized_raw_identifier name)
-        end else
-          LIDENT name
-      } (* No non-ascii keywords *)
-  | int_literal as lit { INT (lit, None) }
-  | (int_literal as lit) (literal_modifier as modif)
-      { INT (lit, Some modif) }
-  | float_literal | hex_float_literal as lit
-      { FLOAT (lit, None) }
-  | (float_literal | hex_float_literal as lit) (literal_modifier as modif)
-      { FLOAT (lit, Some modif) }
-  | (float_literal | hex_float_literal | int_literal) identchar+ as invalid
->>>>>>> upstream-incoming
       { error lexbuf (Invalid_literal invalid) }
   | "\""
       { let s, loc = wrap_string_lexer string lexbuf in

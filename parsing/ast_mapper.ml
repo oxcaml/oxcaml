@@ -115,41 +115,21 @@ let map_loc_lid sub {loc; txt} =
 module C = struct
   (* Constants *)
 
-<<<<<<< oxcaml
-  let map sub c = match c with
-    | Pconst_integer _
-    | Pconst_unboxed_integer _
-    | Pconst_char _
-    | Pconst_untagged_char _
-    | Pconst_float _
-    | Pconst_unboxed_float _
-      -> c
-    | Pconst_string (s, loc, quotation_delimiter) ->
-        let loc = sub.location sub loc in
-        Const.string ~loc ?quotation_delimiter s
-||||||| upstream-base
-  let map sub c = match c with
-    | Pconst_integer _
-    | Pconst_char _
-    | Pconst_float _
-      -> c
-    | Pconst_string (s, loc, quotation_delimiter) ->
-        let loc = sub.location sub loc in
-        Const.string ~loc ?quotation_delimiter s
-=======
   let map sub { pconst_desc; pconst_loc } =
     let loc = sub.location sub pconst_loc in
     let desc =
       match pconst_desc with
       | Pconst_integer _
+      | Pconst_unboxed_integer _
       | Pconst_char _
-      | Pconst_float _ ->
+      | Pconst_untagged_char _
+      | Pconst_float _
+      | Pconst_unboxed_float _ ->
           pconst_desc
       | Pconst_string (s, loc, quotation_delimiter) ->
           Pconst_string (s, sub.location sub loc, quotation_delimiter)
     in
     Const.mk ~loc desc
->>>>>>> upstream-incoming
 end
 
 module T = struct
@@ -190,14 +170,11 @@ module T = struct
 
   let map_bound_vars sub bound_vars = List.map (var_jkind sub) bound_vars
 
-  let map_labeled_tuple sub tl = List.map (map_snd (sub.typ sub)) tl
-
   let map sub {ptyp_desc = desc; ptyp_loc = loc; ptyp_attributes = attrs} =
     let open Typ in
     let loc = sub.location sub loc in
     let attrs = sub.attributes sub attrs in
     match desc with
-<<<<<<< oxcaml
     | Ptyp_any jkind ->
         let jkind = map_opt (sub.jkind_annotation sub) jkind in
         any ~loc ~attrs jkind
@@ -206,48 +183,23 @@ module T = struct
         var ~loc ~attrs s jkind
     | Ptyp_arrow (lab, t1, t2, m1, m2) ->
         arrow ~loc ~attrs lab (sub.typ sub t1) (sub.typ sub t2) (sub.modes sub m1) (sub.modes sub m2)
-    | Ptyp_tuple tyl -> tuple ~loc ~attrs (map_labeled_tuple sub tyl)
-    | Ptyp_unboxed_tuple tyl ->
-        unboxed_tuple ~loc ~attrs (map_labeled_tuple sub tyl)
-||||||| upstream-base
-    | Ptyp_any -> any ~loc ~attrs ()
-    | Ptyp_var s -> var ~loc ~attrs s
-    | Ptyp_arrow (lab, t1, t2) ->
-        arrow ~loc ~attrs lab (sub.typ sub t1) (sub.typ sub t2)
-    | Ptyp_tuple tyl -> tuple ~loc ~attrs (List.map (sub.typ sub) tyl)
-=======
-    | Ptyp_any -> any ~loc ~attrs ()
-    | Ptyp_var s -> var ~loc ~attrs s
-    | Ptyp_arrow (lab, t1, t2) ->
-        arrow ~loc ~attrs lab (sub.typ sub t1) (sub.typ sub t2)
     | Ptyp_tuple tyl ->
         tuple ~loc ~attrs (List.map (fun (l, t) -> l, sub.typ sub t) tyl)
->>>>>>> upstream-incoming
+    | Ptyp_unboxed_tuple tyl ->
+        unboxed_tuple ~loc ~attrs
+          (List.map (fun (l, t) -> l, sub.typ sub t) tyl)
     | Ptyp_constr (lid, tl) ->
         constr ~loc ~attrs (map_loc_lid sub lid) (List.map (sub.typ sub) tl)
     | Ptyp_object (l, o) ->
         object_ ~loc ~attrs (List.map (object_field sub) l) o
     | Ptyp_class (lid, tl) ->
-<<<<<<< oxcaml
-        class_ ~loc ~attrs (map_loc sub lid) (List.map (sub.typ sub) tl)
+        class_ ~loc ~attrs (map_loc_lid sub lid) (List.map (sub.typ sub) tl)
     | Ptyp_alias (t, s, jkind) ->
         let s = map_opt (map_loc sub) s in
         let jkind = map_opt (sub.jkind_annotation sub) jkind in
         alias ~loc ~attrs (sub.typ sub t) s jkind
-||||||| upstream-base
-        class_ ~loc ~attrs (map_loc sub lid) (List.map (sub.typ sub) tl)
-    | Ptyp_alias (t, s) ->
-        let s = map_loc sub s in
-        alias ~loc ~attrs (sub.typ sub t) s
-=======
-        class_ ~loc ~attrs (map_loc_lid sub lid) (List.map (sub.typ sub) tl)
-    | Ptyp_alias (t, s) ->
-        let s = map_loc sub s in
-        alias ~loc ~attrs (sub.typ sub t) s
->>>>>>> upstream-incoming
     | Ptyp_variant (rl, b, ll) ->
         variant ~loc ~attrs (List.map (row_field sub) rl) b ll
-<<<<<<< oxcaml
     | Ptyp_poly (sl, t) ->
         let sl =
           List.map (fun (var, jkind) ->
@@ -257,24 +209,10 @@ module T = struct
         in
         let t = sub.typ sub t in
         poly ~loc ~attrs sl t
-    | Ptyp_package (lid, l) ->
-        package ~loc ~attrs (map_loc sub lid)
-          (List.map (map_tuple (map_loc sub) (sub.typ sub)) l)
-||||||| upstream-base
-    | Ptyp_poly (sl, t) -> poly ~loc ~attrs
-                             (List.map (map_loc sub) sl) (sub.typ sub t)
-    | Ptyp_package (lid, l) ->
-        package ~loc ~attrs (map_loc sub lid)
-          (List.map (map_tuple (map_loc sub) (sub.typ sub)) l)
-=======
-    | Ptyp_poly (sl, t) -> poly ~loc ~attrs
-                             (List.map (map_loc sub) sl) (sub.typ sub t)
     | Ptyp_package ptyp ->
         package ~loc ~attrs (sub.package_type sub ptyp)
->>>>>>> upstream-incoming
     | Ptyp_open (mod_ident, t) ->
-<<<<<<< oxcaml
-        open_ ~loc ~attrs (map_loc sub mod_ident) (sub.typ sub t)
+        open_ ~loc ~attrs (map_loc_lid sub mod_ident) (sub.typ sub t)
     | Ptyp_quote t ->
         quote ~loc ~attrs (sub.typ sub t)
     | Ptyp_splice t ->
@@ -283,11 +221,6 @@ module T = struct
         of_kind ~loc ~attrs (sub.jkind_annotation sub jkind)
     | Ptyp_repr (lvars, t) ->
         repr ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
-||||||| upstream-base
-        open_ ~loc ~attrs (map_loc sub mod_ident) (sub.typ sub t)
-=======
-        open_ ~loc ~attrs (map_loc_lid sub mod_ident) (sub.typ sub t)
->>>>>>> upstream-incoming
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
 
   let map_type_declaration sub
@@ -596,12 +529,12 @@ module E = struct
     }
 
   let map_block_access sub = function
-    | Baccess_field lid -> Baccess_field (map_loc sub lid)
+    | Baccess_field lid -> Baccess_field (map_loc_lid sub lid)
     | Baccess_array (mut, ik, e) -> Baccess_array (mut, ik, sub.expr sub e)
     | Baccess_block (mut, e) -> Baccess_block (mut, sub.expr sub e)
 
   let map_unboxed_access sub = function
-    | Uaccess_unboxed_field lid -> Uaccess_unboxed_field (map_loc sub lid)
+    | Uaccess_unboxed_field lid -> Uaccess_unboxed_field (map_loc_lid sub lid)
 
   let map_iterator sub = function
     | Pcomp_range { start; stop; direction } ->
@@ -631,7 +564,6 @@ module E = struct
     | Pcomp_array_comprehension (mut, comp) ->
       Pcomp_array_comprehension (mut, map_comp sub comp)
 
-  let map_ltexp sub el = List.map (map_snd (sub.expr sub)) el
   let map sub {pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} =
     let open Exp in
     let loc = sub.location sub loc in
@@ -652,19 +584,13 @@ module E = struct
     | Pexp_match (e, pel) ->
         match_ ~loc ~attrs (sub.expr sub e) (sub.cases sub pel)
     | Pexp_try (e, pel) -> try_ ~loc ~attrs (sub.expr sub e) (sub.cases sub pel)
-<<<<<<< oxcaml
     | Pexp_unboxed_unit -> unboxed_unit ~loc ~attrs ()
     | Pexp_unboxed_bool b -> unboxed_bool ~loc ~attrs b
     | Pexp_tuple el ->
-        tuple ~loc ~attrs (map_ltexp sub el)
-    | Pexp_unboxed_tuple el ->
-        unboxed_tuple ~loc ~attrs (map_ltexp sub el)
-||||||| upstream-base
-    | Pexp_tuple el -> tuple ~loc ~attrs (List.map (sub.expr sub) el)
-=======
-    | Pexp_tuple el ->
         tuple ~loc ~attrs (List.map (fun (l, e) -> l, sub.expr sub e) el)
->>>>>>> upstream-incoming
+    | Pexp_unboxed_tuple el ->
+        unboxed_tuple ~loc ~attrs
+          (List.map (fun (l, e) -> l, sub.expr sub e) el)
     | Pexp_construct (lid, arg) ->
         construct ~loc ~attrs (map_loc_lid sub lid) (map_opt (sub.expr sub) arg)
     | Pexp_variant (lab, eo) ->
@@ -675,18 +601,12 @@ module E = struct
           (map_opt (sub.expr sub) eo)
     | Pexp_record_unboxed_product (l, eo) ->
         record_unboxed_product ~loc ~attrs
-          (List.map (map_tuple (map_loc sub) (sub.expr sub)) l)
+          (List.map (map_tuple (map_loc_lid sub) (sub.expr sub)) l)
           (map_opt (sub.expr sub) eo)
     | Pexp_field (e, lid) ->
-<<<<<<< oxcaml
-        field ~loc ~attrs (sub.expr sub e) (map_loc sub lid)
-    | Pexp_unboxed_field (e, lid) ->
-        unboxed_field ~loc ~attrs (sub.expr sub e) (map_loc sub lid)
-||||||| upstream-base
-        field ~loc ~attrs (sub.expr sub e) (map_loc sub lid)
-=======
         field ~loc ~attrs (sub.expr sub e) (map_loc_lid sub lid)
->>>>>>> upstream-incoming
+    | Pexp_unboxed_field (e, lid) ->
+        unboxed_field ~loc ~attrs (sub.expr sub e) (map_loc_lid sub lid)
     | Pexp_setfield (e1, lid, e2) ->
         setfield ~loc ~attrs (sub.expr sub e1) (map_loc_lid sub lid)
           (sub.expr sub e2)
@@ -711,16 +631,8 @@ module E = struct
         constraint_ ~loc ~attrs (sub.expr sub e) (Option.map (sub.typ sub) t) (sub.modes sub m)
     | Pexp_send (e, s) ->
         send ~loc ~attrs (sub.expr sub e) (map_loc sub s)
-<<<<<<< oxcaml
-    | Pexp_new lid -> new_ ~loc ~attrs (map_loc sub lid)
-    | Pexp_setvar (s, e) ->
-||||||| upstream-base
-    | Pexp_new lid -> new_ ~loc ~attrs (map_loc sub lid)
-    | Pexp_setinstvar (s, e) ->
-=======
     | Pexp_new lid -> new_ ~loc ~attrs (map_loc_lid sub lid)
-    | Pexp_setinstvar (s, e) ->
->>>>>>> upstream-incoming
+    | Pexp_setvar (s, e) ->
         setinstvar ~loc ~attrs (map_loc sub s) (sub.expr sub e)
     | Pexp_override sel ->
         override ~loc ~attrs
@@ -737,23 +649,13 @@ module E = struct
     | Pexp_poly (e, t) ->
         poly ~loc ~attrs (sub.expr sub e) (map_opt (sub.typ sub) t)
     | Pexp_object cls -> object_ ~loc ~attrs (sub.class_structure sub cls)
-<<<<<<< oxcaml
     | Pexp_newtype (s, jkind, e) ->
         newtype ~loc ~attrs (map_loc sub s)
           (map_opt (sub.jkind_annotation sub) jkind)
           (sub.expr sub e)
-    | Pexp_pack me -> pack ~loc ~attrs (sub.module_expr sub me)
-||||||| upstream-base
-    | Pexp_newtype (s, e) ->
-        newtype ~loc ~attrs (map_loc sub s) (sub.expr sub e)
-    | Pexp_pack me -> pack ~loc ~attrs (sub.module_expr sub me)
-=======
-    | Pexp_newtype (s, e) ->
-        newtype ~loc ~attrs (map_loc sub s) (sub.expr sub e)
     | Pexp_pack (me, optyp) ->
         let optyp = Option.map (sub.package_type sub) optyp in
         pack ~loc ~attrs (sub.module_expr sub me) optyp
->>>>>>> upstream-incoming
     | Pexp_open (o, e) ->
         open_ ~loc ~attrs (sub.open_declaration sub o) (sub.expr sub e)
     | Pexp_letop {let_; ands; body} ->
@@ -782,8 +684,6 @@ end
 module P = struct
   (* Patterns *)
 
-  let map_ltpat sub pl = List.map (map_snd (sub.pat sub)) pl
-
   let map sub {ppat_desc = desc; ppat_loc = loc; ppat_attributes = attrs} =
     let open Pat in
     let loc = sub.location sub loc in
@@ -795,18 +695,13 @@ module P = struct
     | Ppat_constant c -> constant ~loc ~attrs (sub.constant sub c)
     | Ppat_interval (c1, c2) ->
         interval ~loc ~attrs (sub.constant sub c1) (sub.constant sub c2)
-<<<<<<< oxcaml
     | Ppat_unboxed_unit -> unboxed_unit ~loc ~attrs ()
     | Ppat_unboxed_bool b -> unboxed_bool ~loc ~attrs b
-    | Ppat_tuple (pl, c) -> tuple ~loc ~attrs (map_ltpat sub pl) c
-    | Ppat_unboxed_tuple (pl, c) ->
-        unboxed_tuple ~loc ~attrs (map_ltpat sub pl) c
-||||||| upstream-base
-    | Ppat_tuple pl -> tuple ~loc ~attrs (List.map (sub.pat sub) pl)
-=======
     | Ppat_tuple (pl,c) ->
         tuple ~loc ~attrs (List.map (fun (l, p) -> l, sub.pat sub p) pl) c
->>>>>>> upstream-incoming
+    | Ppat_unboxed_tuple (pl, c) ->
+        unboxed_tuple ~loc ~attrs
+          (List.map (fun (l, p) -> l, sub.pat sub p) pl) c
     | Ppat_construct (l, p) ->
         construct ~loc ~attrs (map_loc_lid sub l)
           (map_opt
@@ -820,33 +715,15 @@ module P = struct
     | Ppat_variant (l, p) -> variant ~loc ~attrs l (map_opt (sub.pat sub) p)
     | Ppat_record (lpl, cf) ->
         record ~loc ~attrs
-<<<<<<< oxcaml
-               (List.map (map_tuple (map_loc sub) (sub.pat sub)) lpl) cf
+               (List.map (map_tuple (map_loc_lid sub) (sub.pat sub)) lpl) cf
     | Ppat_record_unboxed_product (lpl, cf) ->
         record_unboxed_product ~loc ~attrs
                (List.map (map_tuple (map_loc sub) (sub.pat sub)) lpl) cf
     | Ppat_array (mut, pl) -> array ~loc ~attrs mut (List.map (sub.pat sub) pl)
-||||||| upstream-base
-               (List.map (map_tuple (map_loc sub) (sub.pat sub)) lpl) cf
-    | Ppat_array pl -> array ~loc ~attrs (List.map (sub.pat sub) pl)
-=======
-               (List.map (map_tuple (map_loc_lid sub) (sub.pat sub)) lpl) cf
-    | Ppat_array pl -> array ~loc ~attrs (List.map (sub.pat sub) pl)
->>>>>>> upstream-incoming
     | Ppat_or (p1, p2) -> or_ ~loc ~attrs (sub.pat sub p1) (sub.pat sub p2)
-<<<<<<< oxcaml
     | Ppat_constraint (p, t, m) ->
         constraint_ ~loc ~attrs (sub.pat sub p) (Option.map (sub.typ sub) t) (sub.modes sub m)
-    | Ppat_type s -> type_ ~loc ~attrs (map_loc sub s)
-||||||| upstream-base
-    | Ppat_constraint (p, t) ->
-        constraint_ ~loc ~attrs (sub.pat sub p) (sub.typ sub t)
-    | Ppat_type s -> type_ ~loc ~attrs (map_loc sub s)
-=======
-    | Ppat_constraint (p, t) ->
-        constraint_ ~loc ~attrs (sub.pat sub p) (sub.typ sub t)
     | Ppat_type s -> type_ ~loc ~attrs (map_loc_lid sub s)
->>>>>>> upstream-incoming
     | Ppat_lazy p -> lazy_ ~loc ~attrs (sub.pat sub p)
     | Ppat_unpack s -> unpack ~loc ~attrs (map_loc sub s)
     | Ppat_open (lid,p) ->
@@ -1179,23 +1056,11 @@ let extension_of_error {kind; main; sub} =
   let extension_of_sub sub =
     { loc = sub.loc; txt = "ocaml.error" },
     PStr ([Str.eval (Exp.constant
-<<<<<<< oxcaml
-                       (Pconst_string (str_of_msg sub.txt, sub.loc, None)))])
-||||||| upstream-base
-                       (Pconst_string (str_of_pp sub.txt, sub.loc, None)))])
-=======
                        (Const.string ~loc:sub.loc (str_of_msg sub.txt)))])
->>>>>>> upstream-incoming
   in
   { loc = main.loc; txt = "ocaml.error" },
   PStr (Str.eval (Exp.constant
-<<<<<<< oxcaml
-                    (Pconst_string (str_of_msg main.txt, main.loc, None))) ::
-||||||| upstream-base
-                    (Pconst_string (str_of_pp main.txt, main.loc, None))) ::
-=======
                     (Const.string ~loc:main.loc (str_of_msg main.txt))) ::
->>>>>>> upstream-incoming
         List.map (fun msg -> Str.extension (extension_of_sub msg)) sub)
 
 let attribute_of_warning loc s =
@@ -1234,14 +1099,8 @@ module PpxContext = struct
   let rec make_list f lst =
     match lst with
     | x :: rest ->
-<<<<<<< oxcaml
-      Exp.construct (lid "::") (Some (Exp.tuple [None, f x; None, make_list f rest]))
-||||||| upstream-base
-      Exp.construct (lid "::") (Some (Exp.tuple [f x; make_list f rest]))
-=======
       Exp.construct (lid "::")
         (Some (Exp.tuple [None, f x; None, make_list f rest]))
->>>>>>> upstream-incoming
     | [] ->
       Exp.construct (lid "[]") None
 
@@ -1319,14 +1178,8 @@ module PpxContext = struct
       and get_list elem = function
         | {pexp_desc =
              Pexp_construct ({txt = Longident.Lident "::"},
-<<<<<<< oxcaml
-                             Some {pexp_desc = Pexp_tuple [None, exp; None, rest]}) } ->
-||||||| upstream-base
-                             Some {pexp_desc = Pexp_tuple [exp; rest]}) } ->
-=======
                              Some {pexp_desc = Pexp_tuple [None, exp;
                                                            None, rest]}) } ->
->>>>>>> upstream-incoming
             elem exp :: get_list elem rest
         | {pexp_desc =
              Pexp_construct ({txt = Longident.Lident "[]"}, None)} ->
