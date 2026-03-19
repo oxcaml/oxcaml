@@ -513,6 +513,9 @@ and add_sig_item (bv, m) item =
   | Psig_type (_, dcls)
   | Psig_typesubst dcls->
       List.iter (add_type_declaration bv) dcls; (bv, m)
+  | Psig_jkindsubst d ->
+      add_jkind_declaration bv d;
+      (bv, m)
   | Psig_typext te ->
       add_type_extension bv te; (bv, m)
   | Psig_exception te ->

@@ -753,6 +753,8 @@ let signature_item sub x =
     | Tsig_typesubst list ->
         let (_, list) = sub.type_declarations sub (Nonrecursive, list) in
         Tsig_typesubst list
+    | Tsig_jkindsubst jd ->
+        Tsig_jkindsubst (sub.jkind_declaration sub jd)
     | Tsig_typext te ->
         Tsig_typext (sub.type_extension sub te)
     | Tsig_exception ext ->

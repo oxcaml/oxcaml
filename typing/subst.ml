@@ -899,7 +899,12 @@ let type_replacement s = function
      Type_function { params; body })
 
 let jkind_replacement s = function
-  | Jkind_path p -> Jkind_path (jkind_path s p)
+  | Jkind_path p ->
+    begin match Path.Map.find p s.jkinds with
+    | exception Not_found -> Jkind_path (jkind_path s p)
+    | Jkind_path p -> Jkind_path p
+    | Jkind_const jk -> Jkind_const (jkind_const_desc s jk)
+    end
   | Jkind_const jk -> Jkind_const (jkind_const_desc s jk)
 
 type scoping =

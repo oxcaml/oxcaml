@@ -838,6 +838,8 @@ let signature_item sub item =
         Psig_type (rec_flag, List.map (sub.type_declaration sub) list)
     | Tsig_typesubst list ->
         Psig_typesubst (List.map (sub.type_declaration sub) list)
+    | Tsig_jkindsubst jd ->
+        Psig_jkindsubst (sub.jkind_declaration sub jd)
     | Tsig_typext tyext ->
         Psig_typext (sub.type_extension sub tyext)
     | Tsig_exception ext ->

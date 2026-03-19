@@ -1525,6 +1525,13 @@ and approx_sig_items env ssg=
           map_rec_type ~rec_flag
             (fun rs (id, info) -> Sig_type(id, info, rs, Exported)) decls rem
       | Psig_typesubst _ -> approx_sig_items env srem
+      | Psig_jkindsubst sdecl ->
+          let jkind_decl = Typedecl.approx_jkind_decl sdecl in
+          let scope = Ctype.create_scope () in
+          let (_id, newenv) =
+            Env.enter_jkind ~scope sdecl.pjkind_name.txt jkind_decl env
+          in
+          approx_sig_items newenv srem
       | Psig_module { pmd_name = { txt = None; _ }; _ } ->
           approx_sig_items env srem
       | Psig_module pmd ->
@@ -2287,6 +2294,32 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           Signature_names.check_type ?info names td.typ_loc td.typ_id
         ) decls;
         mksig (Tsig_typesubst decls) env loc, [], newenv
+    | Psig_jkindsubst sdecl ->
+        let _id, newenv, decl = Typedecl.transl_jkind_decl env sdecl in
+        let manifest =
+          match decl.jkind_jkind.jkind_manifest with
+          | Some jk -> jk
+          | None ->
+              Misc.fatal_error "Typemod.transl_sig_item: no jkind manifest"
+        in
+        let subst =
+          match kind_decl_is_alias sdecl with
+          | Some lid ->
+              let replacement, _ =
+                try Env.find_jkind_by_name lid.txt env
+                with Not_found ->
+                  Misc.fatal_error
+                    "Typemod.transl_sig_item: jkind alias not found"
+              in
+              Subst.Unsafe.add_jkind_path (Pident decl.jkind_id) replacement
+                Subst.identity
+          | None ->
+              Subst.Unsafe.add_jkind (Pident decl.jkind_id) manifest
+                Subst.identity
+        in
+        let info = `Substituted_away subst in
+        Signature_names.check_jkind ~info names decl.jkind_loc decl.jkind_id;
+        mksig (Tsig_jkindsubst decl) env loc, [], newenv
     | Psig_typext styext ->
         let (tyext, newenv, _shapes) =
           Typedecl.transl_type_extension false env item.psig_loc styext

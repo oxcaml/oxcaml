@@ -1170,6 +1170,9 @@ and signature_item i ppf x =
   | Tsig_typesubst l ->
       line i ppf "Tsig_typesubst\n";
       list i type_declaration ppf l;
+  | Tsig_jkindsubst jd ->
+      line i ppf "Tsig_jkindsubst";
+      jkind_declaration i ppf jd
   | Tsig_typext e ->
       line i ppf "Tsig_typext\n";
       type_extension i ppf e;

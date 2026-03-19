@@ -1133,6 +1133,8 @@ and signature_item_desc =
       (** [type t1 = ... and ... and tn  = ...] *)
   | Psig_typesubst of type_declaration list
       (** [type t1 := ... and ... and tn := ...]  *)
+  | Psig_jkindsubst of jkind_declaration
+      (** [kind_ k := ...] *)
   | Psig_typext of type_extension  (** [type t1 += ...] *)
   | Psig_exception of type_exception  (** [exception C of T] *)
   | Psig_module of module_declaration  (** [module X = M] and [module X : MT] *)
