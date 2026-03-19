@@ -300,7 +300,7 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 [%%expect {|
 - : <[int -> ($('a) -> $('a) * $('a)) -> (int -> $('a)) -> $('a) * $('a)]>
     expr
-= <[fun x (type a) (f : a -> (a) * (a)) (g : int -> a) -> f (g x)]>
+= <[fun x (type a) (f : a -> a * a) (g : int -> a) -> f (g x)]>
 |}];;
 
 <[ fun (f : 'a. 'a -> 'a) -> f f ]>;;
@@ -926,8 +926,8 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[int * int -> int]> expr =
 <[
-  let rec add : (int) * (int) -> int =
-  (fun (x, y) -> x + y : (int) * (int) -> int) in add
+  let rec add : int * int -> int = (fun (x, y) -> x + y : int * int -> int)
+  in add
 ]>
 |}];;
 
@@ -997,7 +997,7 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[('a. 'a -> 'a) -> int * string]> expr =
 <[(fun (f : 'a. 'a -> 'a) -> ((f 42), (f "abc")) : ('a__1. 'a__1 -> 'a__1) ->
-  (int) * (string))
+  int * string)
 ]>
 |}];;
 
@@ -1014,4 +1014,70 @@ Line 1, characters 43-44:
 Error: Identifier "x" is used at line 1, characters 43-44,
        inside a quotation (<[ ... ]>);
        it is introduced at line 1, characters 4-5, outside any quotations.
+|}];;
+
+(* The following bug numbers are from
+   https://github.com/oxcaml/oxcaml/pull/5649 *)
+
+(* Bug 1: Int32 constants must include the 'l' suffix *)
+<[ 42l ]>;;
+[%%expect {|
+- : <[int32]> expr = <[42l]>
+|}];;
+
+(* Bug 2: Int64 constants must include the 'L' suffix *)
+<[ 42L ]>;;
+[%%expect {|
+- : <[int64]> expr = <[42L]>
+|}];;
+
+(* Bug 3: Nativeint constants must include the 'n' suffix *)
+<[ 42n ]>;;
+[%%expect {|
+- : <[nativeint]> expr = <[42n]>
+|}];;
+
+(* Bug 4: Guard keyword must be "when", not "with" *)
+<[ fun x -> match x with y when y > 0 -> y | _ -> 0 ]>;;
+[%%expect {|
+- : <[int -> int]> expr =
+<[fun x -> match x with | y when (y > 0) -> y | _ -> 0]>
+|}];;
+
+(* Bug 5: Negative constants must be parenthesized in argument positions *)
+<[ Some (-42) ]>;;
+[%%expect {|
+- : <[int option]> expr = <[Some (-42)]>
+|}];;
+
+(* Bug 6: Type alias variable must include the tick *)
+<[ fun (x : int as 'a) -> (x : 'a) ]>;;
+[%%expect {|
+- : <[int -> int]> expr = <[fun (x : int as 'a) -> (x : 'a)]>
+|}];;
+
+(* Bug 7: Unboxed tuple types must print with '#' prefix *)
+<[ fun (x : #(int * string)) -> x ]>;;
+[%%expect {|
+- : <[#(int * string) -> #(int * string)]> expr =
+<[fun (x : #(int * string)) -> x]>
+|}];;
+
+(* Bug 8: Closed variant types must preserve "present" tags *)
+<[ fun (x : [< `A of int | `B > `A ]) -> x ]>;;
+[%%expect {|
+- : <[([< `A of int | `B > `A ] as '_weak12) -> '_weak12]> expr =
+<[fun (x : [< `A of int | `B > `A ]) -> x]>
+|}];;
+
+(* Bug 9: Fun with function cases must have balanced format boxes *)
+<[ fun x -> function | 0 -> x | n -> n + x ]>;;
+[%%expect {|
+- : <[int -> int -> int]> expr = <[fun x -> function | 0 -> x | n -> n + x]>
+|}];;
+
+(* Bug 10: Src_pos must not print as "." *)
+<[ [%src_pos] ]>;;
+[%%expect {|
+- : <[lexing_position]> expr = <[[%src_pos]]>
 |}];;
