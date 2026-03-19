@@ -515,7 +515,7 @@ let foo (t : ('a : immutable_data) t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type 'a t = Foo of { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -548,7 +548,7 @@ let foo (t : _ t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type ('a : immutable_data) t = Foo of { x : 'a; } | Bar of 'a
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -1028,6 +1028,7 @@ and 'a t2 = Base of 'a | T1 of 'a t1
 
 type 'a t = Degen of ('a * 'a) t | Leaf
 let f (x : int t) = cross_portable x
+(* CR layouts v2.8: This should be accepted. *)
 [%%expect {|
 type 'a t = Degen of ('a * 'a) t | Leaf
 Line 2, characters 35-36:

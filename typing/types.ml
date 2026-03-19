@@ -18,6 +18,79 @@
 open Allowance
 open Asttypes
 
+module Rigid_name = struct
+  type unknown_id = Shape.Uid.t
+
+  type t =
+    | Atom of
+        { constr : Path.t;
+          arg_index : int
+        }
+    | KAtom of Path.t
+    | Param of int
+    | Unknown of unknown_id
+
+  let compare a b =
+    if a == b
+    then 0
+    else
+      match a, b with
+      | Atom a1, Atom a2 ->
+        let h = Path.compare a1.constr a2.constr in
+        if h != 0 then h else Int.compare a1.arg_index a2.arg_index
+      | KAtom p1, KAtom p2 -> Path.compare p1 p2
+      | Param x, Param y -> Int.compare x y
+      | Atom _, _ -> -1
+      | _, Atom _ -> 1
+      | KAtom _, _ -> -1
+      | _, KAtom _ -> 1
+      | Unknown x, Unknown y -> Shape.Uid.compare x y
+      | Unknown _, _ -> 1
+      | _, Unknown _ -> -1
+
+  let to_string = function
+    | Atom { constr; arg_index } ->
+      let constr_s = Format_doc.asprintf "%a" Path.print constr in
+      Printf.sprintf "%s.%d" constr_s arg_index
+    | KAtom path ->
+      let path_s = Format_doc.asprintf "%a" Path.print path in
+      Printf.sprintf "katom[%s]" path_s
+    | Param i -> Printf.sprintf "param[%d]" i
+    | Unknown id ->
+      Format.asprintf "unknown[%a]" Shape.Uid.print id
+
+  let atomic constr arg_index = Atom { constr; arg_index }
+
+  let katom path = KAtom path
+
+  let param i = Param i
+
+  let unknown uid = Unknown uid
+end
+
+module Ldd = struct
+  module Name = Rigid_name
+
+  include (Ldd.Make (Rigid_name) :
+             Ldd_intf.S with module Name := Rigid_name)
+end
+
+type constructor_ikind =
+  { base : Ldd.node;
+    coeffs : Ldd.node array;
+  }
+
+type constructor_ikind_entry =
+  | Constructor_ikind of constructor_ikind
+  | No_constructor_ikind of string
+
+type type_ikind = constructor_ikind_entry
+
+let ikinds_todo (message : string) : type_ikind =
+  if !Clflags.ikinds_debug then
+    Format.eprintf "[ikinds-todo] %s@." message;
+  No_constructor_ikind message
+
 type atomic =
   | Nonatomic
   | Atomic
@@ -364,6 +437,7 @@ type type_declaration =
     type_arity: int;
     type_kind: type_decl_kind;
     type_jkind: jkind_l;
+    type_ikind: constructor_ikind_entry;
     type_private: private_flag;
     type_manifest: type_expr option;
     type_variance: Variance.t list;

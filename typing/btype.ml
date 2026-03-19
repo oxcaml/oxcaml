@@ -1042,6 +1042,53 @@ module Jkind0 = struct
       in
       create crossing ~externality ~nullability ~separability
 
+    let extract_monadic axis t =
+      let (Crossing.Monadic.Atom.Modality
+             (Mode.Modality.Monadic.Atom.Join_const value)) = modal axis t
+      in
+      value
+
+    let extract_comonadic axis t =
+      let (Crossing.Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_const value)) = modal axis t
+      in
+      value
+
+    let areality_const t = extract_comonadic areality t
+
+    let linearity_const t = extract_comonadic linearity t
+
+    let uniqueness_const t = extract_monadic uniqueness t
+
+    let portability_const t = extract_comonadic portability t
+
+    let contention_const t = extract_monadic contention t
+
+    let forkable_const t = extract_comonadic forkable t
+
+    let yielding_const t = extract_comonadic yielding t
+
+    let statefulness_const t = extract_comonadic statefulness t
+
+    let visibility_const t = extract_monadic visibility t
+
+    let staticity_const t = extract_monadic staticity t
+
+    let to_axis_lattice (t : t) : Axis_lattice.t =
+      Axis_lattice.create ~areality:(areality_const t)
+        ~linearity:(linearity_const t) ~uniqueness:(uniqueness_const t)
+        ~portability:(portability_const t) ~contention:(contention_const t)
+        ~forkable:(forkable_const t) ~yielding:(yielding_const t)
+        ~statefulness:(statefulness_const t) ~visibility:(visibility_const t)
+        ~staticity:(staticity_const t) ~externality:(externality t)
+        ~nullability:(nullability t) ~separability:(separability t)
+
+    let of_axis_lattice (x : Axis_lattice.t) : t =
+      let crossing = Axis_lattice.to_mode_crossing x in
+      create crossing ~externality:(Axis_lattice.externality x)
+        ~nullability:(Axis_lattice.nullability x)
+        ~separability:(Axis_lattice.separability x)
+
     (* Returns the set of axes that is relevant under a given modality. For
        example, under the [global] modality, the areality axis is *not*
        relevant. *)

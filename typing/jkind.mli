@@ -123,7 +123,15 @@ module Layout : sig
 end
 
 module Mod_bounds : sig
-  val debug_print : Format.formatter -> Types.mod_bounds -> unit
+  type t = Types.mod_bounds
+
+  val to_axis_lattice : t -> Axis_lattice.t
+
+  val of_axis_lattice : Axis_lattice.t -> t
+
+  val to_mode_crossing : t -> Mode.Crossing.t
+
+  val debug_print : Format.formatter -> t -> unit
 end
 
 module With_bounds : sig
@@ -137,6 +145,10 @@ module With_bounds : sig
     ('l * 'r) Types.with_bounds
 
   val format : Format_doc.formatter -> ('l * 'r) Types.with_bounds -> unit
+
+  val to_seq :
+    ('l * 'r) Types.with_bounds ->
+    (Types.type_expr * Types.With_bounds_type_info.t) Seq.t
 end
 
 module Base_and_axes : sig
@@ -192,8 +204,11 @@ end
 (** Context for jkind operations. *)
 type jkind_context =
   { jkind_of_type : Types.type_expr -> Types.jkind_l option;
-    is_abstract : Path.t -> bool
+    is_abstract : Path.t -> bool;
         (* Check if a type path refers to an abstract type *)
+    lookup_type : Path.t -> Types.type_declaration option
+        (* Lookup a type in the environment. Returns the full
+           [Types.type_declaration] if found, or [None] otherwise. *)
   }
 
 (******************************)
@@ -780,8 +795,8 @@ val sub :
   context:jkind_context ->
   level:int ->
   Env.t ->
-  Types.jkind_l ->
-  Types.jkind_r ->
+  (allowed * 'r) Types.jkind ->
+  ('l * allowed) Types.jkind ->
   bool
 
 type sub_or_intersect =
@@ -821,8 +836,8 @@ val sub_layout_or_error :
   context:jkind_context ->
   level:int ->
   Env.t ->
-  Types.jkind_l ->
-  Types.jkind_l ->
+  (allowed * 'r1) Types.jkind ->
+  ('l2 * 'r2) Types.jkind ->
   (unit, Violation.t) result
 
 (** Like [sub], but compares a left jkind against another left jkind.

@@ -1913,6 +1913,8 @@ let tree_of_type_scheme ty =
 
 let () =
   Env.print_type_expr := type_expr;
+  Env.report_jkind_violation_with_offender :=
+    Jkind.Violation.report_with_offender;
   Jkind.set_outcometrees_of_types (fun tys ->
     prepare_for_printing tys;
     List.map (tree_of_typexp Type) tys);
@@ -2654,6 +2656,7 @@ let dummy =
     type_arity = 0;
     type_kind = Type_abstract Definition;
     type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+    type_ikind = Types.ikinds_todo "print dummy";
     type_private = Public;
     type_manifest = None;
     type_variance = [];

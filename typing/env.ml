@@ -24,7 +24,7 @@ open Types
 
 open Local_store
 
-module Jkind = Btype.Jkind0
+module Jkind0 = Btype.Jkind0
 module String = Misc.Stdlib.String
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
@@ -857,7 +857,7 @@ type lookup_error =
       }
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
-  | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
+  | Non_value_used_in_object of Longident.t * type_expr * Jkind0.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
@@ -1574,6 +1574,9 @@ and find_type_unboxed_version path env seen =
       type_arity = decl.type_arity;
       type_kind = decl.type_kind;
       type_jkind = jkind;
+      type_ikind =
+        Types.ikinds_todo
+          (Format_doc.asprintf "env unboxed alias path=%a" Path.print path);
       type_private = decl.type_private;
       type_manifest = Some man;
       type_variance = decl.type_variance;
@@ -3232,7 +3235,23 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
   let with_imports cmi = { cmi with cmi_crcs = imports } in
   save_signature_with_transform with_imports ~alerts sg modname cu cmi
 
-(* Make the initial environment, without language extensions *)
+let add_language_extension_types env =
+  let add ext lvl f env  =
+    match Language_extension.is_at_least ext lvl with
+    | true ->
+      (* CR-someday poechsel: Pass a correct shape here *)
+      f (add_type ?shape:None ~check:false) env
+    | false -> env
+  in
+  Language_extension.(env
+  |> add SIMD Stable Predef.add_simd_stable_extension_types
+  |> add SIMD Beta Predef.add_simd_beta_extension_types
+  |> add SIMD Alpha Predef.add_simd_alpha_extension_types
+  |> add Small_numbers Stable Predef.add_small_number_extension_types
+  |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
+  |> add Layouts Stable Predef.add_or_null)
+
+(* Make the initial environment. *)
 let initial () =
   let add_type_and_remember_decl (type_ident : Ident.t) decl env =
     match !Clflags.shape_format with
@@ -3252,23 +3271,7 @@ let initial () =
       empty
   in
   initial_env
-
-let add_language_extension_types env =
-  let add ext lvl f env  =
-    match Language_extension.is_at_least ext lvl with
-    | true ->
-      (* CR-someday poechsel: Pass a correct shape here *)
-      f (add_type ?shape:None ~check:false) env
-    | false -> env
-  in
-  lazy
-    Language_extension.(env ()
-    |> add SIMD Stable Predef.add_simd_stable_extension_types
-    |> add SIMD Beta Predef.add_simd_beta_extension_types
-    |> add SIMD Alpha Predef.add_simd_alpha_extension_types
-    |> add Small_numbers Stable Predef.add_small_number_extension_types
-    |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
-    |> add Layouts Stable Predef.add_or_null)
+  |> add_language_extension_types
 
 (* Some predefined types are part of language extensions, and we don't want to
    make them available in the initial environment if those extensions are not
@@ -3278,7 +3281,7 @@ let add_language_extension_types env =
    If language extensions are adjusted after [initial] is forced, these
    environments may be inaccurate.
 *)
-let initial = add_language_extension_types initial
+let initial = lazy (initial ())
 
 (* Tracking usage *)
 
@@ -3641,7 +3644,7 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
        not a specific instance of that variable. *)
     match
       !constrain_type_jkind env ty
-        Jkind.Builtin.(value_or_null ~why:Captured_in_object)
+        Jkind0.Builtin.(value_or_null ~why:Captured_in_object)
     with
     | Ok () -> ()
     | Result.Error err ->
@@ -4860,7 +4863,7 @@ let env_of_only_summary env_from_summary env =
 let report_jkind_violation_with_offender =
   ref ((fun ~offender:_ ~level:_ _ _ _ -> assert false)
        : offender:(Format_doc.formatter -> unit) -> level:int -> t ->
-         Format_doc.formatter -> Jkind.Violation.t -> unit)
+         Format_doc.formatter -> Jkind0.Violation.t -> unit)
 
 (* Error report *)
 
