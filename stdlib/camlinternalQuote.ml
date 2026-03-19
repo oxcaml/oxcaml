@@ -1485,6 +1485,7 @@ module Ast = struct
     | FBasic s -> pp fmt "%s" s
     | FIdent id -> print_raw_ident_field env fmt id
 
+  (* Used to check whether the expression should be parenthesised *)
   and is_negative_const = function
     | Int n -> n < 0
     | Int32 n -> n < 0l
@@ -1667,19 +1668,10 @@ module Ast = struct
       pp fmt "%a%a@ ->@ %a" print_arrow_arg_lab arg_label
         (print_core_type_with_arrow env)
         ty1 (print_core_type env) ty2
-    | TypeTuple ((tl, ty) :: ts) ->
-      (match tl with
-      | LabelledTup l -> pp fmt "%s:%a" l (print_core_type_with_parens env) ty
-      | NolabelTup -> print_core_type_with_parens env fmt ty);
-      List.iter
-        (fun (tl, ty) ->
-          pp fmt " * ";
-          match tl with
-          | LabelledTup l ->
-            pp fmt "%s:%a" l (print_core_type_with_parens env) ty
-          | NolabelTup -> print_core_type_with_parens env fmt ty)
+    | TypeTuple ts ->
+      pp fmt "%a"
+        (print_tuple_like " *" "" "" (print_label_tup (print_core_type env)))
         ts
-    | TypeTuple [] -> () (* fatal_error "Invalid tuple type" *)
     | TypeUnboxedTuple ts ->
       pp fmt "#(%a)"
         (print_tuple_like " *" "" "" (print_label_tup (print_core_type env)))
@@ -1914,7 +1906,7 @@ module Ast = struct
         match ident with
         | CIdent (CBuiltin "::") -> print_list_exp env fmt exp
         | _ ->
-          pp fmt "%a@ %a"
+          pp fmt "@[<2>%a@ %a@]"
             (print_constr env) ident (print_exp_with_parens env) e
       )
     | Variant (s, exp_opt) -> (

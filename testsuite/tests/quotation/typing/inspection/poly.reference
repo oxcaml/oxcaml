@@ -71,7 +71,7 @@ Stdlib.ignore
 
 Stdlib.ignore
   ((fun x -> x) (fun (f : 'a. < x : 'a; .. > -> 'a) -> (42, "abc")) :
-  ('a__1. < x : 'a__1; .. > -> 'a__1) -> (int) * (string))
+  ('a__1. < x : 'a__1; .. > -> 'a__1) -> int * string)
 
 Stdlib.ignore
   ((fun x -> x)

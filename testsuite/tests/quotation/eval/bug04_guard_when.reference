@@ -1,1 +1,0 @@
-fun x -> match x with | y when (y > 0) -> y | _ -> 0
