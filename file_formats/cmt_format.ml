@@ -253,6 +253,7 @@ let iter_on_occurrences
             modifs
       | Texp_extension_constructor (lid, path) ->
           f ~namespace:Extension_constructor exp_env path lid
+      | Texp_apply_layout _
       | Texp_constant _ | Texp_let _ | Texp_letmutable _ | Texp_function _
       | Texp_apply _ | Texp_match _ | Texp_try _ | Texp_unboxed_unit
       | Texp_unboxed_bool _ | Texp_tuple _ | Texp_unboxed_tuple _

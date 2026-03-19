@@ -518,6 +518,8 @@ let expr sub x =
     match x.exp_desc with
     | Texp_ident r ->
         Texp_ident { r with lid = map_loc sub r.lid }
+    | Texp_apply_layout (exp, args) ->
+        Texp_apply_layout (sub.expr sub exp, args)
     | Texp_constant _ as d -> d
     | Texp_let (rec_flag, list, exp) ->
         let (rec_flag, list) = sub.value_bindings sub (rec_flag, list) in
