@@ -226,47 +226,47 @@ globalize_int_iarray
 - : int iarray = [:1; 20; 21; 300; 301; 302:]
 |}];;
 
-Iarray.sub iarray 0 2, Iarray.sub iarray 2 3;;
+Iarray.sub iarray ~pos:0 ~len:2, Iarray.sub iarray ~pos:2 ~len:3;;
 [%%expect{|
 - : int iarray * int iarray = ([:1; 2:], [:3; 4; 5:])
 |}];;
 
-Iarray.sub iarray (-1) 3;;
+Iarray.sub iarray ~pos:(-1) ~len:3;;
 [%%expect{|
 Exception: Invalid_argument "Iarray.sub".
 |}];;
 
-Iarray.sub iarray 1 (-3);;
+Iarray.sub iarray ~pos:1 ~len:(-3);;
 [%%expect{|
 Exception: Invalid_argument "Iarray.sub".
 |}];;
 
-Iarray.sub iarray 3 10;;
+Iarray.sub iarray ~pos:3 ~len:10;;
 [%%expect{|
 Exception: Invalid_argument "Iarray.sub".
 |}];;
 
 let iarray = iarray_local () in
-globalize_int_iarray (Iarray.sub_local iarray 0 2),
-globalize_int_iarray (Iarray.sub_local iarray 2 3);;
+globalize_int_iarray (Iarray.sub_local iarray ~pos:0 ~len:2),
+globalize_int_iarray (Iarray.sub_local iarray ~pos:2 ~len:3);;
 [%%expect{|
 - : int iarray * int iarray = ([:1; 2:], [:3; 4; 5:])
 |}];;
 
 let iarray = iarray_local () in
-globalize_int_iarray (Iarray.sub_local iarray (-1) 3);;
+globalize_int_iarray (Iarray.sub_local iarray ~pos:(-1) ~len:3);;
 [%%expect{|
 Exception: Invalid_argument "Iarray.sub".
 |}];;
 
 let iarray = iarray_local () in
-globalize_int_iarray (Iarray.sub_local iarray 1 (-3));;
+globalize_int_iarray (Iarray.sub_local iarray ~pos:1 ~len:(-3));;
 [%%expect{|
 Exception: Invalid_argument "Iarray.sub".
 |}];;
 
 let iarray = iarray_local () in
-globalize_int_iarray (Iarray.sub_local iarray 3 10);;
+globalize_int_iarray (Iarray.sub_local iarray ~pos:3 ~len:10);;
 [%%expect{|
 Exception: Invalid_argument "Iarray.sub".
 |}];;
