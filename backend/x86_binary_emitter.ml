@@ -856,11 +856,14 @@ type simple_encoding = {
    memory variants and the al_imm8 shortcut encoding. *)
 let emit_simple_encoding enc b dst src =
   match (enc, dst, src) with
-  (* 8 bit encodings.  Note: combining Reg8H in the rm field with
-     Reg8L (RSP|RBP|RSI|RDI) in the reg field is architecturally illegal
+  (* 8 bit encodings.  Note: combining Reg8H in either field with
+     Reg8L (RSP|RBP|RSI|RDI) in the other is architecturally illegal
      (the REX prefix needed for SPL/BPL/SIL/DIL makes AH/CH/DH/BH
      unreachable).  We assume the compiler never generates such a
-     combination. *)
+     combination.
+     The forced REX for SPL/BPL/SIL/DIL in the rm position is handled
+     inside emit_prefix_modrm (called via emit_mod_rm_reg); we only need
+     to force REX for the reg operand here. *)
   | ( { rm8_r8 = opcodes },
       ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
       ((Reg8L _ | Reg8H _) as reg) ) ->
@@ -965,12 +968,13 @@ let emit_CMP = emit_simple_encoding 0x38 7
    0x66 0xA9). *)
 let emit_test b dst src =
   match (dst, src) with
-  (* See comment in emit_simple_encoding re Reg8H + Reg8L RSP/RBP/RSI/RDI. *)
+  (* See comment in emit_simple_encoding re Reg8H + Reg8L RSP/RBP/RSI/RDI.
+     emit_prefix_modrm handles forced REX for the rm operand. *)
   | ( ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
       ((Reg8L _ | Reg8H _) as reg) ) ->
-      let rex_reg = rex_of_reg8 reg in
+      let forced_rex = rex_of_reg8 reg in
       let reg = rd_of_reg8 reg in
-      emit_mod_rm_reg b rex_reg [ 0x84 ] rm reg
+      emit_mod_rm_reg b forced_rex [ 0x84 ] rm reg
   | ((Reg16 _ | Mem _ | Mem64_RIP _) as rm), Reg16 reg ->
       let reg = rd_of_reg64 reg in
       buf_int8 b 0x66;
@@ -1390,7 +1394,8 @@ let emit_XCHG b src dst =
       (* r16, r/m16 *)
       buf_int8 b 0x66;
       emit_mod_rm_reg b rex [ 0x87 ] rm (rd_of_reg64 reg)
-  (* See comment in emit_simple_encoding re Reg8H + Reg8L RSP/RBP/RSI/RDI. *)
+  (* See comment in emit_simple_encoding re Reg8H + Reg8L RSP/RBP/RSI/RDI.
+     emit_prefix_modrm handles forced REX for the rm operand. *)
   | ( ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
       ((Reg8L _ | Reg8H _) as reg) )
   | ((Reg8L _ | Reg8H _) as reg), ((Mem _ | Mem64_RIP _) as rm) ->
