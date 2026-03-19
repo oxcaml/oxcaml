@@ -249,7 +249,7 @@ integers (we promise the other examples are more substantial) would be this:
 
 <a id="code-add4"></a>
 ```ocaml
-let add4 (par : Parallel.t) a b c d =
+let add4 (par : Parallel.t @ local) a b c d =
   let #(a_plus_b, c_plus_d) =
     Parallel.fork_join2 par
       (fun _par -> a + b)
@@ -258,17 +258,18 @@ let add4 (par : Parallel.t) a b c d =
   a_plus_b + c_plus_d
 ```
 
+
 The call to `Parallel.fork_join2` will schedule the calculations of `a + b` and
 `c + d` as independent *tasks*, returning both once they're both done, and then
 `add4` finishes by adding the results from the tasks. The `par` argument
 parameterizes `fork_join2` (and, in turn, `add4`) by a particular implementation
 of parallelism. It is also passed to the tasks so that they can spawn sub-tasks.
 
-To run `add4`, we need to get our hands on a *scheduler,* a component that takes
-in all the tasks that we want to run, decides how to dole them out into domains,
-and tracks who is waiting for what to be computed. Each scheduler is provided by
-a library. For this tutorial, we'll use `parallel.scheduler.work_stealing`,
-which implements the popular [work-stealing] strategy.
+To run `add4`, we need to get our hands on a *scheduler,* a component that takes in all
+the tasks that we want to run, decides how to dole them out into domains, and tracks who
+is waiting for what to be computed. Each scheduler is provided by a library. For this
+tutorial, we'll use `parallel.scheduler`, which implements the popular [work-stealing]
+strategy.
 
 [work-stealing]: https://en.wikipedia.org/wiki/Work_stealing
 
@@ -278,13 +279,12 @@ a real program will want to be more thoughtful (see the [`parallel` library]
 for details).
 
 ```ocaml
-let test_add4 par = add4 par 1 10 100 1000
+let test_add4 (par @ local) = add4 par 1 10 100 1000
 
 let run_one_test ~(f : Parallel.t @ local -> 'a) : 'a =
-  let module Scheduler = Parallel_scheduler_work_stealing in
+  let module Scheduler = Parallel_scheduler in
   let scheduler = Scheduler.create () in
-  let monitor = Parallel.Monitor.create_root () in
-  let result = Scheduler.schedule scheduler ~monitor ~f in
+  let result = Scheduler.parallel scheduler ~f in
   Scheduler.stop scheduler;
   result
 ;;
@@ -301,9 +301,8 @@ result: 1111
 This uses a work-stealing scheduler, but you can also use the `parallel`
 library's own `Parallel.Scheduler.Sequential`, which simply runs everything on
 the primary domain. This is handy for testing or debugging when you want to
-eliminate nondeterminism. To do so, simply replace
-`Parallel_scheduler_work_stealing` with `Parallel.Scheduler.Sequential` in
-`run_one_test`.
+eliminate nondeterminism. To do so, simply replace `Parallel_scheduler` with
+`Parallel.Scheduler.Sequential` in `run_one_test`.
 
 ## Averaging over binary trees
 
@@ -580,7 +579,7 @@ understand once we've covered `contended` and `uncontended`, so we begin there.
 
 We said [before](#what-is-a-data-race) that a data race needs four things.
 
-1. Code running in parallel, which is to say in two different domains
+1. Code running in parallel, which is to say in two different _domains_
 2. A memory location that may be accessed by both domains simultaneously
 3. At least one of the accesses is a write
 4. The location isn't atomic
@@ -619,10 +618,10 @@ let price (t @ contended) =
 let cheer_up (t @ contended) =
   t.mood <- Happy (* error! *)
 ```
-
-```
-Error: This value is contended but expected to be
-uncontended.
+```mdx-error
+Line 4, characters 5-6:
+Error: This value is contended but is expected to be uncontended
+       because its mutable field mood is being written.
 ```
 
 This is of course [rule 2](#rule-contended-mutable). To see why this has to be
@@ -654,10 +653,10 @@ Note that rule 2 forbids even _reading_ the mutable state:
 ```ocaml
 let mood (t @ contended) = t.mood (* error! *)
 ```
-
-```
-Error: This value is contended but expected to be shared or
-uncontended.
+```mdx-error
+Line 1, characters 28-29:
+Error: This value is contended but is expected to be shared or uncontended
+       because its mutable field mood is being read.
 ```
 
 This is dangerous for the same reason `cheer_up` was: someone else could be
@@ -689,17 +688,14 @@ let beat_the_system par =
   let t = { price = 42.0; mood = Neutral } in
   let #((), ()) =
     Parallel.fork_join2 par
-      (fun _par -> cheer_up t)
       (fun _par -> bum_out t)
+      (fun _par -> cheer_up t)
   in
   ()
 ```
-
-Fortunately:
-
-```
-Error: This value is contended but expected to be
-uncontended.
+```mdx-error
+Line 6, characters 31-32:
+Error: This value is contended but is expected to be uncontended.
 ```
 
 When we cover the `portable` mode [next], we'll be able to explain precisely
@@ -761,6 +757,10 @@ let cheer_up_sneakily (t_in_a_trenchcoat @ contended) =
   in
   cheer_up t (* cue the ominous music again *)
 ```
+```mdx-error
+Line 7, characters 7-32:
+Error: This value is contended but is expected to be uncontended.
+```
 
 If not for rule 4, we could also write `bum_out_sneakily` and then call
 `cheer_up_sneakily` and `bum_out_sneakily` on the same argument in parallel,
@@ -813,26 +813,30 @@ race by it, adding a few things for illustration:
 
 ```ocaml
 let beat_the_system par =
-  let t @ uncontended = { price = 42.0; mood = Neutral }
+  let t @ uncontended = { price = 42.0; mood = Neutral } in
   cheer_up t; (* line A *)
   let #((), ()) =
     Parallel.fork_join2 par
-      (fun _par -> cheer_up t) (* line B *)
-      (fun _par -> bum_out t) (* line C *)
+      (fun _par -> bum_out t) (* line B *)
+      (fun _par -> cheer_up t) (* line C *)
   in
   ()
+```
+```mdx-error
+Line 7, characters 31-32:
+Error: This value is contended but is expected to be uncontended.
 ```
 
 Firstly, the new annotation on `t` should be uncontroversial: we just created
 `t`, so clearly there aren't any parallel accesses at all, much less
 `uncontended` accesses. Accordingly, the access on line A is fine: it sees `t`
-as `uncontended` and it is. On the other hand, the access from line B is clearly
+as `uncontended` and it is. On the other hand, the access from line C is clearly
 bad: that code might[^or-same-domain] be running in parallel (in particular, in
-parallel with line C), and it's still assuming `t` is `uncontended` (as is line
-C).
+parallel with line B), and it's still assuming `t` is `uncontended` (as is line
+B).
 
 [^or-same-domain]: We say “might” because `Parallel.fork_join2` may choose not
-    to run the tasks in parallel. The compiler, as usual, has to be pessimistic.
+to run the tasks in parallel. The compiler, as usual, has to be pessimistic.
 
 In summary, the arguments to `fork_join2`
 
@@ -961,7 +965,7 @@ in it, it can ignore portability requirements altogether for values of `t`.
 We'll cover the specifics when we get to [mode crossing].
 
 [^other-code-types]: Note that some other types are secretly function types,
-    notably `Lazy.t`, so `portable` is also a concern for them.
+notably `Lazy.t`, so `portable` is also a concern for them.
 
 [in a trenchcoat]: #code-cheer_up_sneakily
 [mode crossing]: #mode-crossing
@@ -1003,8 +1007,7 @@ module Mood : sig
     | Sad
 end
 
-val create : price:float -> mood:Mood.t -> t @ portable
-  @@ portable
+val create : price:float -> mood:Mood.t -> t @ portable @@ portable
 val price : t @ contended -> float @@ portable
 val mood : t -> Mood.t @@ portable
 val cheer_up : t -> unit @@ portable
@@ -1031,8 +1034,7 @@ val price : t @ contended -> float
 val mood : t -> Mood.t
 val cheer_up : t -> unit
 val bum_out : t -> unit
-val do_something_involving_shared_state : unit -> unit
-  @@ nonportable
+val do_something_involving_shared_state : unit -> unit @@ nonportable
 ```
 
 ## Mode crossing
@@ -1082,7 +1084,7 @@ irrelevant for that type: a `nonportable` value can be used as though it were
 
 ```ocaml
 let always_portable (a : float_and_int @ nonportable)
-  : float_and_int @ portable
+  : float_and_int
   =
   let a' @ portable =
     a (* ok because [float_and_int] crosses portability *)
@@ -1134,7 +1136,7 @@ Any type variable can be given a kind, so we can write a version of
 
 ```ocaml
 let always_portable' (a : ('a : mutable_data) @ nonportable)
-  : 'a @ portable
+  : 'a
   =
   let a' @ portable =
     a (* ok because ['a] crosses portability *)
@@ -1171,7 +1173,7 @@ module Thing = struct
       | Sad
   end
 
-  type t : immutable_data =
+  type t : sync_data =
     { price : float
     ; mood : Mood.t Atomic.t
     }
@@ -1297,7 +1299,7 @@ Parallelizing this directly is possible but fussy even in this simple case. The
 ```ocaml
 let add_many_par par arr =
   let seq = Parallel.Sequence.of_iarray arr in
-  Parallel.Sequence.reduce par seq ~f:(fun a b -> a + b)
+  Parallel.Sequence.reduce par seq ~f:(fun _ a b -> a + b)
   |> Option.value ~default:0
 ```
 
@@ -1354,17 +1356,17 @@ let average_par (par : Parallel.t) tree =
   let rec (total @ portable) par tree =
     match tree with
     | Tree.Leaf x -> ~total:(Thing.price x), ~count:1
-    | Tree.Node arr ->
+    | Tree.Nodes arr ->
       let seq = Parallel.Sequence.of_iarray arr in
-      Parallel.Sequence.fold' par
+      Parallel.Sequence.fold
+        par
         seq
-        ~f:(fun par subtree -> total par subtree)
-        ~init:(~total:0.0, ~count:0)
-        ~combine:(fun _par (~total, ~count)
-                           (~total:total2, ~count:count2) ->
-                    ( ~total:(total +. total2),
-                      ~count:(count + count2) ))
-      [@nontail]
+        ~init:(fun () : (total:float * count:int) -> ~total:0.0, ~count:0)
+        ~f:(fun par (~total:total1, ~count:count1) subtree ->
+          let ~total:total2, ~count:count2 = total par subtree in
+          ~total:(total1 +. total2), ~count:(count1 + count2))
+        ~combine:(fun _par (~total, ~count) (~total:total2, ~count:count2) ->
+          ~total:(total +. total2), ~count:(count + count2)) [@nontail]
   in
   let ~total, ~count = total par tree in
   total /. (count |> Float.of_int)
