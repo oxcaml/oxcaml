@@ -231,15 +231,41 @@ and 'k pattern_desc =
       id: Ident.t;
       name: string loc;
       uid: Uid.t;
-      sort: Jkind_types.Sort.t;
-      mode: Mode.Value.l;
+      ret_sort: Jkind_types.Sort.t;
+      ret_mode: Mode.Value.l;
       lpoly: Types.Lpoly.t;
+      (** The sort variables abstracted over by this compile-time function.
+          [pending] during type-checking; guaranteed [determined] of generic
+          sort variables after [type_let] returns.  May be determined with an
+          empty list if no layout polymorphism is actually inferred (in which
+          case a [Useless_lpoly] warning is emitted). *)
+      alloc_mode: Mode.Value.Comonadic.r;
+      (** the allocation mode of the captured environment.
+
+      [let poly_ f = .. x ..]
+
+      get translate to runtime:
+
+      [let f__float = fun env -> let {x; ..} = env in .. x ..
+
+      let f_env = {x = x; ..}]
+
+      where [f__float] is some top-level function and [f_env] is the captured
+      environment (containing the example variable [x]) and is passed to [f__float]. Only [f_env] is put in the place
+      of [f] (that is, if [f] is defined in a structure, only [f_env] is in the
+      structure).
+
+      Observe the following constraints:
+      - By the containing relation, [x <= f_env] for comonadic axes, and [x >=
+        f_env] for monadic axes.
+      - If [f] is in a structure [M], then [f_env <= M] for comonadic axes.
+
+      For simplicity, we say [f_env.monadic = min], and [f_env.comonadic] will be
+      inferred. *)
     } -> value pattern_desc
-        (** x with layout polymorphism, used in let poly_ bindings.
-            [lpoly] is [pending] during type-checking and guaranteed
-            [determined] after [type_let] returns. It may be determined with
-            an empty list of sort vars if no layout poly is actually inferred
-            (in which case a [Useless_lpoly] warning is emitted). *)
+        (** [let poly_ f = exp] creates a compile-time function [f] abstracted
+        over the layouts in [lpoly], and returns [exp] at [ret_sort] and
+         [ret_mode]. Note that [exp] is not necessarily a function. *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc

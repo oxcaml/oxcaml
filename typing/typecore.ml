@@ -3080,18 +3080,21 @@ and type_pat_aux
             let kind = Val_mut (m0, sort) in
             mode, kind
       in
-      let lpoly =
-        if (penv : Pattern_env.t).is_lpoly
-        then Lpoly.pending ~loc
-        else Lpoly.determined []
+      let lpoly, env_comonadic =
+        match (penv : Pattern_env.t).is_lpoly with
+        | Some comonadic -> Lpoly.pending ~loc, Some comonadic
+        | None -> Lpoly.determined [], None
       in
       let id, uid =
         enter_variable ~lpoly tps loc name mode ~kind ty sp.ppat_attributes sort
       in
       let pat_desc =
-        if (penv : Pattern_env.t).is_lpoly
-        then Tpat_fun_layout { id; name; uid; sort; mode = alloc_mode; lpoly }
-        else Tpat_var { id; name; uid; sort; mode = alloc_mode }
+        match env_comonadic with
+        | Some env_comonadic ->
+          Tpat_fun_layout { id; name; uid; ret_sort = sort;
+                            ret_mode = alloc_mode; lpoly;
+                            alloc_mode = env_comonadic }
+        | None -> Tpat_var { id; name; uid; sort; mode = alloc_mode }
       in
       rvp {
         pat_desc;
@@ -5773,7 +5776,14 @@ let vb_pat_constraint
   in
   vb.pvb_attributes, spat
 
-let pat_modes ~force_toplevel rec_mode_var (attrs, spat) =
+let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
+  let constrain_comonadic mode =
+    match is_lpoly with
+    | None -> ()
+    | Some comonadic ->
+      Value.Comonadic.submode_err (spat.ppat_loc, Pattern)
+        mode.Mode.comonadic comonadic
+  in
   let pat_mode, exp_mode =
     if force_toplevel
     then simple_pat_mode Value.legacy, mode_legacy
@@ -5782,14 +5792,18 @@ let pat_modes ~force_toplevel rec_mode_var (attrs, spat) =
         match pat_tuple_arity spat with
         | Not_local_tuple | Maybe_local_tuple ->
             let mode = Value.newvar () in
+            constrain_comonadic mode;
             simple_pat_mode mode, mode_default mode
         | Local_tuple locs ->
             let modes = List.map (fun loc -> Value.newvar (), loc) locs in
             let modes_pat = List.map fst modes in
             let mode = Value.newvar () in
+            constrain_comonadic mode;
+            List.iter (fun (m, _) -> constrain_comonadic m) modes;
             tuple_pat_mode mode modes_pat, mode_tuple mode modes
       end
     | Some mode ->
+        constrain_comonadic mode;
         simple_pat_mode mode, mode_default mode
   in
   attrs, pat_mode, exp_mode, spat
@@ -10198,7 +10212,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   (* Check that all bindings are either all poly or all non-poly *)
   let is_lpoly =
     match spat_sexp_list with
-    | [] -> false
+    | [] -> None
     | first :: rest ->
       if first.pvb_is_poly then
         Language_extension.assert_enabled ~loc:first.pvb_loc
@@ -10207,7 +10221,9 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         if binding.pvb_is_poly <> first.pvb_is_poly then
           raise (Error(binding.pvb_loc, env, Mixed_poly_nonpoly_bindings))
       ) rest;
-      first.pvb_is_poly
+      if first.pvb_is_poly
+      then Some (Value.Comonadic.newvar ())
+      else None
   in
   let rec sexp_is_fun sexp =
     match sexp.pexp_desc with
@@ -10235,7 +10251,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     | Nonrecursive -> None
   in
   let spatl = List.map vb_pat_constraint spat_sexp_list in
-  let spatl = List.map (pat_modes ~force_toplevel rec_mode_var) spatl in
+  let spatl = List.map (pat_modes ~force_toplevel rec_mode_var ~is_lpoly) spatl in
   let attrs_list = List.map (fun (attrs, _, _, _) -> attrs) spatl in
   let is_recursive = (rec_flag = Recursive) in
 
@@ -10346,7 +10362,14 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         type_let_def_wrap_warnings ?check ?check_strict ~is_recursive
           ~entirely_functions
           ~exp_env ~new_env ~spat_sexp_list ~attrs_list ~mode_pat_typ_list ~pvs
-          (fun exp_env ({pvb_attributes; _} as vb) mode expected_ty ->
+          (fun exp_env ({pvb_attributes; pvb_loc; _} as vb) mode expected_ty ->
+            let exp_env =
+              match is_lpoly with
+              | None -> exp_env
+              | Some comonadic ->
+                Env.add_closure_conversion_lock
+                  (pvb_loc, Pattern) comonadic exp_env
+            in
             let sexp = vb_exp_constraint vb in
             match get_desc expected_ty with
             | Tpoly (ty, tl) ->

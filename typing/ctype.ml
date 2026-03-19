@@ -294,8 +294,8 @@ module Pattern_env : sig
     { mutable env : Env.t;
       equations_scope : int;
       allow_recursive_equations : bool;
-      is_lpoly : bool; }
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+      is_lpoly : Mode.Value.Comonadic.r option; }
+  val make: ?is_lpoly:Mode.Value.Comonadic.r option -> Env.t -> equations_scope:int
     -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
@@ -304,8 +304,8 @@ end = struct
     { mutable env : Env.t;
       equations_scope : int;
       allow_recursive_equations : bool;
-      is_lpoly : bool; }
-  let make ?(is_lpoly=false) env ~equations_scope ~allow_recursive_equations =
+      is_lpoly : Mode.Value.Comonadic.r option; }
+  let make ?(is_lpoly=None) env ~equations_scope ~allow_recursive_equations =
     { env;
       equations_scope;
       allow_recursive_equations;
