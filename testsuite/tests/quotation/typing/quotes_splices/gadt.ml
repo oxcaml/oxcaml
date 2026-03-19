@@ -96,8 +96,13 @@ val maybe_non_negative : <[int]> t -> bool = <fun>
    There are four interesting variables:
    * [S_proof]: The stage of the *proof* value.
    * [T_proof]: The stage of the *target* in the *proof*'s equation.
-   * [S_subj]:  The stage of the *subject* value.
+   * [S_min]:   The earliest stage we entered since the *proof* was introduced.
    * [T_subj]:  The stage of the *target* in the *subject*'s type.
+
+   Note [S_min] is upper-bounded by the stage of the *subject* value
+   [S_subj >= S_min], at which we instantiate the proof.
+   Similarly to [S_min], we have the latest stage entered [S_subj <= S_max],
+   Some tests sanity-check this value does not influence results.
 
    We have these constraints for GADT inference to be sound with staging
    and mechanisms that ensure them:
@@ -105,7 +110,7 @@ val maybe_non_negative : <[int]> t -> bool = <fun>
      For example, [t = s] at stage 1 <=/=> [t = s] at stage 0.
      We can only say that [t = s] at stage 1 <=> <[t]> = <[s]> at stage 0.
      Mechanism: Local constraints track a stage.
-   * [S_proof <= S_subj]: Proofs cannot time travel (go to the past).
+   * [S_proof <= S_subj*]: Proofs cannot time travel (go to the past).
      If a proof only exists at stage [n], we must only use it at [m >= n].
      Mechanism: Unification tracks initial stage.
    * [S_proof <= T_proof]: Proofs cannot mention types that might not exist
@@ -114,6 +119,9 @@ val maybe_non_negative : <[int]> t -> bool = <fun>
      Mechanism: Splices are non-instantiable.
 
    We annotate tests in the format [S_proof ~~> S_subj @ T_proof <=> T_subj].
+
+   In cases when it's significant that [S_min =/= S_subj] or [S_max =/= S_subj],
+   we extend the notation to [S_proof ~~> x ~~> S_subj] for x in {S_min, S_max}.
 
    For [t] we use either a locally abstract type or the top-level [M.t],
    and for [s] we usually use a simple top-level type: [int] or [bool]. *)
