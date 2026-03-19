@@ -1255,8 +1255,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           update_level_v ~log obj level v)
         mvs
 
+  let cnt = ref 0
+
   let submode (type a r l) (pp : H.Pinpoint.t) (obj : a C.obj)
       (a : (a, allowed * r) mode) (b : (a, l * allowed) mode) ~log =
+    if !debug_modes
+    then begin
+      if !cnt mod 10 = 0 then update_level (!cnt mod 3) obj a ~log;
+      if !cnt mod 15 = 0 then update_level (!cnt mod 5) obj b ~log
+    end;
     let submode_cc ~log:_ _pp obj left left_hint right right_hint =
       if C.le obj left right
       then Ok ()
