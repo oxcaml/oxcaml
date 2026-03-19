@@ -2137,37 +2137,18 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
-(* Cancel out all pairs of $ and <[_]>, or <[_]> and $.
-   This ensures type unification works correctly. *)
-let rec quote_splice_cancel ty =
-  (* CR metaprogramming aivaskovic: try to remove type_desc mutation here *)
-  match get_desc ty with
-  | Tquote t -> begin
-      match get_desc t with
-      | Tsplice t' -> t'
-      | Tquote _ -> set_type_desc ty (Tquote (quote_splice_cancel t)); ty
-      | _ -> raise Cannot_expand
-    end
-  | Tsplice t -> begin
-      match get_desc t with
-      | Tquote t' -> t'
-      | Tsplice _ -> set_type_desc t (Tsplice (quote_splice_cancel t)); ty
-      | _ -> raise Cannot_expand
-    end
-  | _ -> raise Cannot_expand
-
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
 let rec try_expand_once env ty =
-  let expand_and_cancel t =
-    match try_expand_once env t with
-    | _ | exception Cannot_expand -> quote_splice_cancel ty
-  in
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
-  | Tsplice t -> expand_and_cancel t
-  | Tquote t -> expand_and_cancel t
+  | Tsplice t ->
+      let t = try_expand_once env t in
+      newty2 ~level:(get_level t) (Tsplice t)
+  | Tquote t ->
+      let t = try_expand_once env t in
+      newty2 ~level:(get_level t) (Tquote t)
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2177,12 +2158,44 @@ let try_expand_safe env ty =
   with Escape _ ->
     Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
 
-(* Fully expand the head of a type. *)
-let rec try_expand_head
-    (try_once : Env.t -> type_expr -> type_expr) env ty =
-  let ty' = try_once env ty in
-  try try_expand_head try_once env ty'
+(* Cancel out a head-position pair of $ and <[_]>, or <[_]> and $. *)
+let rec try_quote_splice_cancel_once ty =
+  match get_desc ty with
+  | Tquote t -> begin
+      match get_desc t with
+      | Tsplice t' -> t'
+      | _ ->
+          let t = try_quote_splice_cancel_once t in
+          (* New types are only constructed whenever we expand the subterm *)
+          newty2 ~level:(get_level t) (Tquote t)
+    end
+  | Tsplice t -> begin
+      match get_desc t with
+      | Tquote t' -> t'
+      | _ ->
+          let t = try_quote_splice_cancel_once t in
+          newty2 ~level:(get_level t) (Tsplice t)
+    end
+  | _ -> raise Cannot_expand
+
+(* Cancel out all head-position pairs of $ and <[_]>, or <[_]> and $. *)
+let rec try_quote_splice_cancel ty =
+  let ty' = try_quote_splice_cancel_once ty in
+  try try_quote_splice_cancel ty'
   with Cannot_expand -> ty'
+
+(* Fully expand the head of a type. *)
+let try_expand_head
+    (try_once : Env.t -> type_expr -> type_expr) env ty =
+  let rec loop try_once env ty =
+    let ty' = try_once env ty in
+    try loop try_once env ty'
+    with Cannot_expand ->
+      try try_quote_splice_cancel ty'
+      with Cannot_expand -> ty'
+  in
+  try loop try_once env ty
+  with Cannot_expand -> try_quote_splice_cancel ty
 
 (* Unsafe full expansion, may raise [Unify [Escape _]]. *)
 let expand_head_unif env ty =
@@ -2256,8 +2269,12 @@ let safe_abbrev_opt env ty =
 let rec try_expand_once_opt env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev_opt env ty
-  | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
-  | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
+  | Tsplice t ->
+      let t = try_expand_once_opt env t in
+      newty2 ~level:(get_level t) (Tsplice t)
+  | Tquote t ->
+      let t = try_expand_once_opt env t in
+      newty2 ~level:(get_level t) (Tquote t)
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -3480,6 +3497,24 @@ let is_instantiable env ~for_jkind_eqn p =
     (for_jkind_eqn || not (non_aliasable p decl))
   with Not_found -> false
 
+(* Checks if a type is a type variable under some quotes or splices *)
+let rec is_flexible_ty ty =
+  match get_desc ty with
+  | Tvar _ -> true
+  | Tquote ty' -> is_flexible_ty ty'
+  | Tsplice ty' -> is_flexible_ty ty'
+  | _ -> false
+
+let is_aliasable p decl =
+  not (non_aliasable p decl) && not (is_datatype decl)
+
+(* Checks if a type is an aliasable type under some quotes or splices *)
+let rec is_aliasable_ty env ty =
+  match get_desc ty with
+  | Tconstr (p, _, _) -> Env.find_type p env |> is_aliasable p
+  | Tquote ty' -> is_aliasable_ty env ty'
+  | Tsplice ty' -> is_aliasable_ty env ty'
+  | _ -> false
 
 let compatible_paths p1 p2 =
   let open Predef in
@@ -3541,15 +3576,37 @@ let rec mcomp type_pairs env t1 t2 =
       if eq_type t1' t2' then () else
       if not (TypePairs.mem type_pairs (t1', t2')) then begin
         TypePairs.add type_pairs (t1', t2');
+        (* [target1] indicates we should unwrap all quotes/splices from [t1'].
+            Analogously [target2] and [t2'].
+            We choose the target so that it is flexible if possible,
+            and aliasable otherwise. If both are flexible (or aliasable),
+            then we arbitrarily choose [t1'].
+            If both types are not flexible nor aliasable, they are rigid
+            and we compare them structurally. *)
+        let flexible1 = is_flexible_ty t1' in
+        let flexible2 = is_flexible_ty t2' in
+        let aliasable1 = is_aliasable_ty env t1' in
+        let aliasable2 = is_aliasable_ty env t2' in
+        let neither_flexible = not flexible1 && not flexible2 in
+        let target1 = flexible1 || (neither_flexible && aliasable1) in
+        let target2 = not target1 && (flexible2 || aliasable2) in
         match (get_desc t1', get_desc t2', t1', t2') with
+        | (Tquote s1, _, _, _)  when target1 ->
+          mcomp type_pairs env s1 (new_splice_ty t2')
+        | (Tsplice s1, _, _, _) when target1 ->
+          mcomp type_pairs env s1 (new_quote_ty t2')
+        | (_, Tquote s2, _, _)  when target2 ->
+          mcomp type_pairs env (new_splice_ty t1') s2
+        | (_, Tsplice s2, _, _) when target2 ->
+          mcomp type_pairs env (new_quote_ty t1') s2
+        (* Flexible cases *)
+        (* - If [flexible1], then [t1'] is now a [Tvar].
+           - If [flexible2], then [t2'] is now a [Tvar]. *)
         | (Tvar { jkind }, _, _, other)
         | (_, Tvar { jkind }, other, _)  -> check_jkinds other jkind
-        | (Tarrow ((l1,_,_), t1, u1, _), Tarrow ((l2,_,_), t2, u2, _), _, _)
-          when equivalent_with_nolabels l1 l2 ->
-            mcomp type_pairs env t1 t2;
-            mcomp type_pairs env u1 u2;
-        | (Ttuple tl1, Ttuple tl2, _, _) ->
-            mcomp_labeled_list type_pairs env tl1 tl2
+        (* Aliasable cases *)
+        (* - If [aliasable1], then [is_aliasable t1'] and [t1'] is [Tconstr]. *)
+        (* - If [aliasable2], then [is_aliasable t2'] and [t2'] is [Tconstr]. *)
         | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _), _, _) ->
             mcomp_type_decl type_pairs env p1 p2 tl1 tl2
         | (Tconstr (_, [], _), _, _, _) when has_injective_univars env t2' ->
@@ -3559,12 +3616,19 @@ let rec mcomp type_pairs env t1 t2 =
         | (Tconstr (p, _, _), _, _, other) | (_, Tconstr (p, _, _), other, _) ->
             begin try
               let decl = Env.find_type p env in
-              if non_aliasable p decl || is_datatype decl ||
-                 not (may_have_jkind_intersection_tk ~level:!current_level env
+              if not (is_aliasable p decl &&
+                      may_have_jkind_intersection_tk ~level:!current_level env
                         other decl.type_jkind)
               then raise Incompatible
             with Not_found -> ()
             end
+        (* Rigid cases -- neither side is flexible nor aliasable *)
+        | (Tarrow ((l1,_,_), t1, u1, _), Tarrow ((l2,_,_), t2, u2, _), _, _)
+          when equivalent_with_nolabels l1 l2 ->
+            mcomp type_pairs env t1 t2;
+            mcomp type_pairs env u1 u2;
+        | (Ttuple tl1, Ttuple tl2, _, _) ->
+            mcomp_labeled_list type_pairs env tl1 tl2
         (*
         | (Tpackage (p1, n1, tl1), Tpackage (p2, n2, tl2)) when n1 = n2 ->
             mcomp_list type_pairs env tl1 tl2
@@ -3576,6 +3640,10 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp_fields type_pairs env fi1 fi2
         | (Tfield _, Tfield _, _, _) ->       (* Actually unused *)
             mcomp_fields type_pairs env t1' t2'
+        | (Tquote t1, Tquote t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tsplice t1, Tsplice t2, _, _) ->
+            mcomp type_pairs env t1 t2
         | (Tnil, Tnil, _, _) ->
             ()
         | (Tpoly (t1, []), Tpoly (t2, []), _, _) ->
@@ -3596,18 +3664,6 @@ let rec mcomp type_pairs env t1 t2 =
         | (Tunivar {jkind=jkind1}, Tunivar {jkind=jkind2}, _, _) ->
             (try unify_univar env t1' t2' jkind1 jkind2 !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
-        | (Tquote t1, Tquote t2, _, _) ->
-            mcomp type_pairs env t1 t2
-        | (Tsplice t1, Tsplice t2, _, _) ->
-            mcomp type_pairs env t1 t2
-        | (Tsplice t1, _, _, _) ->
-            mcomp type_pairs env t1 t2'
-        | (_, Tsplice t2, _, _) ->
-            mcomp type_pairs env t1' t2
-        | (Tquote t1, _, _, _) ->
-            mcomp type_pairs env t1 t2'
-        | (_, Tquote t2, _, _) ->
-            mcomp type_pairs env t1' t2
         | (_, _, _, _) ->
             raise Incompatible
       end
@@ -3976,13 +4032,31 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | res -> res
   | exception Exit -> raise Not_found
 
-(* Checks if a type is a type variable under some quotes or splices *)
-let rec is_flexible ty =
+(* Checks if a type is an instantiable type under some quotes or splices *)
+let rec is_instantiable_ty env ty =
   match get_desc ty with
-  | Tvar _ -> true
-  | Tquote ty' -> is_flexible ty'
-  | Tsplice ty' -> is_flexible ty'
+  | Tconstr (path, [], _) ->
+      is_instantiable env ~for_jkind_eqn:false path
+  | Tquote ty' -> is_instantiable_ty env ty'
+  | Tsplice ty' -> is_instantiable_ty env ty'
   | _ -> false
+
+(* Checks if a type is equatable under some quotes or splices *)
+let rec is_equatable_ty ty =
+  match get_desc ty with
+  | Tconstr (_, _, _) -> true
+  | Tquote ty' -> is_equatable_ty ty'
+  | Tsplice ty' -> is_equatable_ty ty'
+  | _ -> false
+
+(* Gives the scope at which the type can be instantiated. Returns -1 if
+   the type is not instantiable. *)
+let rec instantiable_scope ty =
+  match get_desc ty with
+  | Tconstr (path, [], _) -> Path.scope path
+  | Tquote ty' -> instantiable_scope ty'
+  | Tsplice ty' -> instantiable_scope ty'
+  | _ -> -1
 
 (* raise Not_found rather than Unify if the module types are incompatible *)
 let unify_package env unify_list lv1 p1 fl1 lv2 p2 fl2 =
@@ -4101,15 +4175,15 @@ let rec unify uenv t1 t2 =
     begin match (get_desc t1, get_desc t2) with
       (Tconstr _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tquote _) when deep_occur t1 t2 ->
+    | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tquote _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tsplice _) when deep_occur t1 t2 ->
+    | (Tvar _, Tquote _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tsplice _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
+    | (Tvar _, Tsplice _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tvar _, _) ->
         if unify1_var uenv t1 t2 then () else unify2 uenv t1 t2
@@ -4209,6 +4283,17 @@ and unify3 uenv t1 t1' t2 t2' =
       unify3_var uenv jkind t1' t2 t2'
   | (_, Tvar { jkind }) ->
       unify3_var uenv jkind t2' t1 t1'
+  | (Tquote t1, Tquote t2)
+  | (Tsplice t1, Tsplice t2) ->
+      unify uenv t1 t2
+  | (Tsplice s1, _) when is_flexible_ty s1 ->
+      unify uenv s1 (new_quote_ty t2')
+  | (Tquote s1, _) when is_flexible_ty s1 ->
+      unify uenv s1 (new_splice_ty t2')
+  | (_, Tsplice s2) when is_flexible_ty s2 ->
+      unify uenv (new_quote_ty t1') s2
+  | (_, Tquote s2) when is_flexible_ty s2 ->
+      unify uenv (new_splice_ty t1') s2
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -4291,7 +4376,33 @@ and unify3 uenv t1 t1' t2 t2' =
           reify uenv t1';
           record_equation uenv t1' t2';
           add_gadt_equation uenv path t1'
-      | (Tconstr (_,_,_), _) | (_, Tconstr (_,_,_)) when in_pattern_mode uenv ->
+      (* Ordering of scopes is asymmetric to ensure we consistently
+         move quotes/splices to the same side *)
+      | (Tsplice s1, _)
+        when is_instantiable_ty (get_env uenv) s1
+          && instantiable_scope s1 > instantiable_scope t2'
+          && can_generate_equations uenv ->
+          unify uenv s1 (new_quote_ty t2')
+      | (Tquote s1, _)
+        when is_instantiable_ty (get_env uenv) s1
+          && instantiable_scope s1 > instantiable_scope t2'
+          && can_generate_equations uenv ->
+          unify uenv s1 (new_splice_ty t2')
+      | (_, Tsplice s2)
+        when is_instantiable_ty (get_env uenv) s2
+          && instantiable_scope s2 >= instantiable_scope t1'
+          && can_generate_equations uenv ->
+          unify uenv (new_quote_ty t1') s2
+      | (_, Tquote s2)
+        when is_instantiable_ty (get_env uenv) s2
+          && instantiable_scope s2 >= instantiable_scope t1'
+          && can_generate_equations uenv ->
+          unify uenv (new_splice_ty t1') s2
+      | (Tconstr (_,_,_), _) | (_, Tconstr (_,_,_))
+      | (Tquote _, _) | (Tsplice _, _)
+      | (_, Tquote _) | (_, Tsplice _)
+        when in_pattern_mode uenv
+          && (is_equatable_ty t1 || is_equatable_ty t2) ->
           reify uenv t1';
           reify uenv t2';
           if can_generate_equations uenv then (
@@ -4366,33 +4477,6 @@ and unify3 uenv t1 t1' t2 t2' =
           raise_for Unify (Obj (Abstract_row Second))
       | (Tconstr _,  Tnil ) ->
           raise_for Unify (Obj (Abstract_row First))
-      | (Tquote t1, Tquote t2)
-      | (Tsplice t1, Tsplice t2) ->
-          unify uenv t1 t2
-      | (Tsplice s1, _) when is_flexible s1 ->
-          set_type_desc t2' d2;
-          let t =
-            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
-          in
-          unify uenv s1 t
-      | (Tquote s1, _) when is_flexible s1 ->
-          set_type_desc t2' d2;
-          let t =
-            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tsplice t2')
-          in
-          unify uenv s1 t
-      | (_, Tsplice s2) when is_flexible s2 ->
-          set_type_desc t1' d1;
-          let t =
-            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
-          in
-          unify uenv s2 t
-      | (_, Tquote s2) when is_flexible s2 ->
-          set_type_desc t1' d1;
-          let t =
-            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
-          in
-          unify uenv s2 t
       | (_, _) -> raise_unexplained_for Unify
       end;
       (* XXX Commentaires + changer "create_recursion"
@@ -5442,10 +5526,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
 
   try
     match (get_desc t1, get_desc t2) with
-      (Tvar { jkind }, _) when may_instantiate inst_nongen t1 ->
+      (Tvar { jkind }, _) when may_instantiate inst_nongen t1
+                            && not (deep_occur t1 t2) ->
         moregen_occur env (get_level t1) t2;
         update_scope_for Moregen (get_scope t1) t2;
-        occur_for Moregen (Expression {env; in_subst = false}) t1 t2;
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
         check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
@@ -5533,16 +5617,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               with Invalid_argument _ -> raise_unexplained_for Moregen)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen env t1' t2' k1 k2 !univar_pairs
-          | (Tquote t1, Tquote t2) ->
-              moregen inst_nongen variance type_pairs env t1 t2
-          | (Tsplice t1, Tsplice t2) ->
-              moregen inst_nongen variance type_pairs env t1 t2
           | (Tquote t1, _) ->
-              let t2 = newty2 ~level:(get_level t2) (Tsplice t2) in
-              moregen inst_nongen variance type_pairs env t1 t2
+              moregen inst_nongen variance type_pairs env t1 (new_splice_ty t2)
           | (Tsplice t1, _) ->
-              let t2 = newty2 ~level:(get_level t2) (Tquote t2) in
-              moregen inst_nongen variance type_pairs env t1 t2
+              moregen inst_nongen variance type_pairs env t1 (new_quote_ty t2)
           | (_, _) ->
               raise_unexplained_for Moregen
         end
