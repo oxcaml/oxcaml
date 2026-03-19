@@ -597,9 +597,12 @@ let emit_mod_rm_reg b rex_always opcodes rm reg =
 
 let emit_bsf b ~dst ~src =
   match (dst, src) with
-  | Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm)
+  | Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm) ->
+    (* BSF r16, r/m16 *)
+    buf_int8 b 0x66;
+    emit_mod_rm_reg b 0 [ 0x0F; 0xBC ] rm (rd_of_reg64 reg)
   | Reg32 reg, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm) ->
-    (* BSF r16, r/m16 and BSF r32, r/m32 *)
+    (* BSF r32, r/m32 *)
     emit_mod_rm_reg b 0 [ 0x0F; 0xBC ] rm (rd_of_reg64 reg)
   | Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm) ->
     (* BSF r64, r/m64 *)
@@ -608,9 +611,12 @@ let emit_bsf b ~dst ~src =
 
 let emit_bsr b ~dst ~src =
   match (dst, src) with
-  | Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm)
+  | Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm) ->
+    (* BSR r16, r/m16 *)
+    buf_int8 b 0x66;
+    emit_mod_rm_reg b 0 [ 0x0F; 0xBD ] rm (rd_of_reg64 reg)
   | Reg32 reg, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm) ->
-    (* BSR r16, r/m16 and BSR r32, r/m32 *)
+    (* BSR r32, r/m32 *)
     emit_mod_rm_reg b 0 [ 0x0F; 0xBD ] rm (rd_of_reg64 reg)
   | Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm) ->
     (* BSR r64, r/m64 *)
@@ -854,11 +860,11 @@ let emit_simple_encoding enc b dst src =
   | ( { rm8_r8 = opcodes },
       ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
       ((Reg8L _ | Reg8H _) as reg) ) ->
-      emit_mod_rm_reg b 0 opcodes rm (rd_of_reg8 reg)
+      emit_mod_rm_reg b (rex_of_reg8 reg) opcodes rm (rd_of_reg8 reg)
   | ( { r8_rm8 = opcodes },
       ((Reg8L _ | Reg8H _) as reg),
       ((Mem _ | Mem64_RIP _) as rm) ) ->
-      emit_mod_rm_reg b 0 opcodes rm (rd_of_reg8 reg)
+      emit_mod_rm_reg b (rex_of_reg8 reg) opcodes rm (rd_of_reg8 reg)
   (* 64 bits encodings *)
   | { rm64_r64 = opcodes }, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm), Reg64 reg
     ->
@@ -900,6 +906,7 @@ let emit_simple_encoding enc b dst src =
       ((Reg16 _ | Mem { typ = WORD })
       as rm),
       (Imm _ as n) ) ->
+      buf_int8 b 0x66;
       emit_mod_rm_reg b 0 opcodes rm reg;
       buf_int16_imm b n
   | ( { rm64_imm32 = opcodes; reg },
@@ -956,11 +963,13 @@ let emit_test b dst src =
   match (dst, src) with
   | ( ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
       ((Reg8L _ | Reg8H _) as reg) ) ->
+      let rex_reg = rex_of_reg8 reg in
       let reg = rd_of_reg8 reg in
-      emit_mod_rm_reg b 0 [ 0x84 ] rm reg
+      emit_mod_rm_reg b rex_reg [ 0x84 ] rm reg
   | ((Reg16 _ | Mem _ | Mem64_RIP _) as rm), Reg16 reg ->
       let reg = rd_of_reg64 reg in
-      emit_mod_rm_reg b 0 [ 0x66; 0x85 ] rm reg
+      buf_int8 b 0x66;
+      emit_mod_rm_reg b 0 [ 0x85 ] rm reg
   | ((Reg32 _ | Mem _ | Mem64_RIP _) as rm), Reg32 reg ->
       let reg = rd_of_reg64 reg in
       emit_mod_rm_reg b 0 [ 0x85 ] rm reg
@@ -1029,7 +1038,9 @@ let emit_mul b ~src =
   match src with
   | ((Reg8H _ | Reg8L _ | Mem {typ = BYTE; _} | Mem64_RIP (BYTE, _, _)) as rm) ->
     emit_mod_rm_reg b rex [ 0xF6 ] rm opcode_extension
-  | ((Reg16 _ | Mem {typ = WORD; _} | Mem64_RIP (WORD, _, _)) as rm)
+  | ((Reg16 _ | Mem {typ = WORD; _} | Mem64_RIP (WORD, _, _)) as rm) ->
+    buf_int8 b 0x66;
+    emit_mod_rm_reg b no_rex [ 0xF7 ] rm opcode_extension
   | ((Reg32 _ | Mem {typ = DWORD; _} | Mem64_RIP (DWORD, _, _)) as rm) ->
     emit_mod_rm_reg b no_rex [ 0xF7 ] rm opcode_extension
   | ((Reg64 _ | Mem {typ = QWORD; _} | Mem64_RIP (QWORD, _, _)) as rm) ->
@@ -1334,7 +1345,8 @@ let emit_DEC b = function
       emit_mod_rm_reg b no_rex [ 0xFE ] rm 1
   (* FF /1 DEC r/m16 M Valid Valid *)
   | [ ((Reg16 _ | Mem { typ = WORD }) as rm) ] ->
-      emit_mod_rm_reg b no_rex [ 0x66; 0xFF ] rm 1
+      buf_int8 b 0x66;
+      emit_mod_rm_reg b no_rex [ 0xFF ] rm 1
   (* FF /1 DEC r/m32 M Valid Valid *)
   | [ ((Reg32 _ | Mem { typ = DWORD }) as rm) ] ->
       emit_mod_rm_reg b no_rex [ 0xFF ] rm 1
@@ -1371,12 +1383,13 @@ let emit_XCHG b src dst =
   | ((Reg16 _ | Mem _ | Mem64_RIP _) as rm), Reg16 reg
   | Reg16 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       (* r16, r/m16 *)
-      emit_mod_rm_reg b rex [ 0x66; 0x87 ] rm (rd_of_reg64 reg)
+      buf_int8 b 0x66;
+      emit_mod_rm_reg b rex [ 0x87 ] rm (rd_of_reg64 reg)
   | ( ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
       ((Reg8L _ | Reg8H _) as reg) )
   | ((Reg8L _ | Reg8H _) as reg), ((Mem _ | Mem64_RIP _) as rm) ->
       (* r8, r/m8 *)
-      emit_mod_rm_reg b no_rex [ 0x86 ] rm (rd_of_reg8 reg)
+      emit_mod_rm_reg b (rex_of_reg8 reg) [ 0x86 ] rm (rd_of_reg8 reg)
   | _ -> assert false
 
 let assemble_instr b loc = function
