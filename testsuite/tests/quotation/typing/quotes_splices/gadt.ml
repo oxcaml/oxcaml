@@ -110,7 +110,7 @@ val maybe_non_negative : <[int]> t -> bool = <fun>
      For example, [t = s] at stage 1 <=/=> [t = s] at stage 0.
      We can only say that [t = s] at stage 1 <=> <[t]> = <[s]> at stage 0.
      Mechanism: Local constraints track a stage.
-   * [S_proof <= S_subj*]: Proofs cannot time travel (go to the past).
+   * [S_proof <= S_min]: Proofs cannot time travel (go to the past).
      If a proof only exists at stage [n], we must only use it at [m >= n].
      Mechanism: Unification tracks initial stage.
    * [S_proof <= T_proof]: Proofs cannot mention types that might not exist
@@ -118,7 +118,7 @@ val maybe_non_negative : <[int]> t -> bool = <fun>
      stage 0, since $t is erased.
      Mechanism: Splices are non-instantiable.
 
-   We annotate tests in the format [S_proof ~~> S_subj @ T_proof <=> T_subj].
+   We annotate tests in the format [S_proof ~~> S_min @ T_proof <=> T_subj].
 
    In cases when it's significant that [S_min =/= S_subj] or [S_max =/= S_subj],
    we extend the notation to [S_proof ~~> x ~~> S_subj] for x in {S_min, S_max}.
@@ -127,7 +127,7 @@ val maybe_non_negative : <[int]> t -> bool = <fun>
    and for [s] we usually use a simple top-level type: [int] or [bool]. *)
 
 (* Evidence stays in the same stage -- should always succeed:
-   [S_proof = S_subj] and [T_proof = T_subj] *)
+   [S_proof = S_min] and [T_proof = T_subj] *)
 
 (* 0 ~~> 1 ~~> 0  @  0 <=> 0 *)
 let _ = fun (type t) (Equal : (t, int) Type.eq) (x : t) ->
@@ -280,7 +280,7 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
    See ticket 6726. *)
 
 (* Evidence stays in the same *wrong* stage -- should always fail:
-   [S_proof = S_subj] and [T_proof =/= T_subj] *)
+   [S_proof = S_min] and [T_proof =/= T_subj] *)
 
 (* CR metaprogramming jbachurski: Tests succeed until constraints are staged. *)
 
@@ -387,7 +387,7 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
 |}]
 
 (* Evidence travels to the right stage in the future -- should always succeed:
-   [S_proof < S_subj] and [T_proof = T_subj] *)
+   [S_proof < S_min] and [T_proof = T_subj] *)
 
 (* 0 ~~> 1  @  1 <=> 1 *)
 let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
@@ -465,7 +465,7 @@ let _ = <[ <[
 |}]
 
 (* Evidence travels to the wrong stage in the future -- should always fail:
-   [S_proof < S_subj] and [T_proof =/= T_subj] *)
+   [S_proof < S_min] and [T_proof =/= T_subj] *)
 
 (* CR metaprogramming jbachurski: Tests succeed until constraints are staged. *)
 
@@ -567,7 +567,7 @@ let _ = <[
 |}]
 
 (* Evidence travels to the right stage in the past -- should always fail:
-   [S_proof > S_subj], [T_proof = T_subj] *)
+   [S_proof > S_min], [T_proof = T_subj] *)
 
 (* 1 ~~> 0  @  1 <=> 1 *)
 let _ = fun (x : <[M.t]> expr) ->
@@ -604,7 +604,7 @@ let _ =
 
 (* Evidence travels to the right stage in the past, but the target is spliced
    -- should always fail.
-   [S_proof > S_subj], [S_proof > T_proof = T_subj]. *)
+   [S_proof > S_min], [S_proof > T_proof = T_subj]. *)
 
 (* CR metaprogramming jbachurski: Tests succeed until splices are rigid. *)
 (* CR quoted-kinds jbachurski: Annotate [t : <[value]>]. *)
@@ -632,7 +632,7 @@ Error: Identifier "sorry1" is used at line 4, characters 8-14,
 |}]
 
 (* Evidence travels to the wrong stage in the past -- should always fail:
-   [S_proof > S_subj], [T_proof =/= T_subj] *)
+   [S_proof > S_min], [T_proof =/= T_subj] *)
 (* This is also time travel, but should fail due to the mis-staged equation. *)
 
 (* CR metaprogramming jbachurski: Tests succeed until time travel is banned
