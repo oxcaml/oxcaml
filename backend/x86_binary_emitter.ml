@@ -856,7 +856,11 @@ type simple_encoding = {
    memory variants and the al_imm8 shortcut encoding. *)
 let emit_simple_encoding enc b dst src =
   match (enc, dst, src) with
-  (* 8 bit encodings *)
+  (* 8 bit encodings.  Note: combining Reg8H in the rm field with
+     Reg8L (RSP|RBP|RSI|RDI) in the reg field is architecturally illegal
+     (the REX prefix needed for SPL/BPL/SIL/DIL makes AH/CH/DH/BH
+     unreachable).  We assume the compiler never generates such a
+     combination. *)
   | ( { rm8_r8 = opcodes },
       ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
       ((Reg8L _ | Reg8H _) as reg) ) ->
@@ -961,6 +965,7 @@ let emit_CMP = emit_simple_encoding 0x38 7
    0x66 0xA9). *)
 let emit_test b dst src =
   match (dst, src) with
+  (* See comment in emit_simple_encoding re Reg8H + Reg8L RSP/RBP/RSI/RDI. *)
   | ( ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
       ((Reg8L _ | Reg8H _) as reg) ) ->
       let rex_reg = rex_of_reg8 reg in
@@ -1385,6 +1390,7 @@ let emit_XCHG b src dst =
       (* r16, r/m16 *)
       buf_int8 b 0x66;
       emit_mod_rm_reg b rex [ 0x87 ] rm (rd_of_reg64 reg)
+  (* See comment in emit_simple_encoding re Reg8H + Reg8L RSP/RBP/RSI/RDI. *)
   | ( ((Reg8L _ | Reg8H _ | Mem _ | Mem64_RIP _) as rm),
       ((Reg8L _ | Reg8H _) as reg) )
   | ((Reg8L _ | Reg8H _) as reg), ((Mem _ | Mem64_RIP _) as rm) ->
