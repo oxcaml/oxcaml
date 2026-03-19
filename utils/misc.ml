@@ -1841,7 +1841,9 @@ module Magic_number = struct
              (String.length s - kind_length - 3))
       in
       Buffer.add_string buf (really_input_string ic version_len)
-    with End_of_file -> ()
+    with
+    | End_of_file -> ()
+    | Failure _ -> ()
     end;
     parse (Buffer.contents buf)
 
