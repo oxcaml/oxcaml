@@ -61,7 +61,7 @@ let () =
     alloc_some ())
   in
   let mp = start ~counts in
-  M.participate_globally mp;
+  M.enlist_all_domains mp;
   go ();
   ignore (alloc_some ());
   Domain.join d;
