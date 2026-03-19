@@ -71,7 +71,7 @@ type pattern_variable =
     pv_as_var: bool;
     pv_attributes: Typedtree.attributes;
     pv_sort: Jkind.Sort.t;
-    pv_lpoly: Types.Val_lpoly.t;
+    pv_lpoly: Types.Lpoly.t;
     (** Not yet determined; gets determined during generalization in
         [type_let]. *)
   }
