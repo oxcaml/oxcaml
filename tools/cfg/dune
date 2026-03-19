@@ -1,0 +1,6 @@
+(executable
+ (name cfg_tool)
+ (modes native)
+ (flags
+  (:standard -w +a-30-40-41-42))
+ (libraries ocamloptcomp))
