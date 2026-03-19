@@ -20,6 +20,7 @@ let default_regalloc_linscan_threshold = 100_000
 let regalloc_linscan_threshold = ref max_int (* -regalloc-linscan-threshold *)
 let regalloc_params = ref ([] : string list)  (* -regalloc-param *)
 let regalloc_validate = ref true        (* -[no-]regalloc-validate *)
+let regalloc_leaf_functions = ref false (* -[no-]regalloc-leaf-functions *)
 
 let vectorize = ref false                (* -[no-]vectorize *)
 let dump_vectorize = ref false          (* -dvectorize *)

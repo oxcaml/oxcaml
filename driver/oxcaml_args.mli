@@ -37,6 +37,8 @@ module type Oxcaml_options = sig
   val regalloc_param : string -> unit
   val regalloc_validate : unit -> unit
   val no_regalloc_validate : unit -> unit
+  val regalloc_leaf_functions : unit -> unit
+  val no_regalloc_leaf_functions : unit -> unit
   val vectorize : unit -> unit
   val no_vectorize : unit -> unit
   val vectorize_max_block_size : int -> unit

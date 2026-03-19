@@ -75,6 +75,16 @@ let mk_regalloc_validate f =
 let mk_no_regalloc_validate f =
   ("-no-regalloc-validate", Arg.Unit f, " Do not validate register allocation")
 
+let mk_regalloc_leaf_functions f =
+  ( "-regalloc-leaf-functions",
+    Arg.Unit f,
+    " Use the information about leaf functions" )
+
+let mk_no_regalloc_leaf_functions f =
+  ( "-no-regalloc-leaf-functions",
+    Arg.Unit f,
+    " Do not use the information about leaf functions" )
+
 let mk_vectorize f =
   ("-vectorize", Arg.Unit f, " Enable vectorizer (EXPERIMENTAL)")
 
@@ -1179,6 +1189,8 @@ module type Oxcaml_options = sig
   val regalloc_param : string -> unit
   val regalloc_validate : unit -> unit
   val no_regalloc_validate : unit -> unit
+  val regalloc_leaf_functions : unit -> unit
+  val no_regalloc_leaf_functions : unit -> unit
   val vectorize : unit -> unit
   val no_vectorize : unit -> unit
   val vectorize_max_block_size : int -> unit
@@ -1346,6 +1358,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_regalloc_param F.regalloc_param;
       mk_regalloc_validate F.regalloc_validate;
       mk_no_regalloc_validate F.no_regalloc_validate;
+      mk_regalloc_leaf_functions F.regalloc_leaf_functions;
+      mk_no_regalloc_leaf_functions F.no_regalloc_leaf_functions;
       mk_vectorize F.vectorize;
       mk_no_vectorize F.no_vectorize;
       mk_vectorize_max_block_size F.vectorize_max_block_size;
@@ -1549,6 +1563,8 @@ module Oxcaml_options_impl = struct
 
   let regalloc_validate = set' Oxcaml_flags.regalloc_validate
   let no_regalloc_validate = clear' Oxcaml_flags.regalloc_validate
+  let regalloc_leaf_functions = set' Oxcaml_flags.regalloc_leaf_functions
+  let no_regalloc_leaf_functions = clear' Oxcaml_flags.regalloc_leaf_functions
   let vectorize = set' Oxcaml_flags.vectorize
   let no_vectorize = clear' Oxcaml_flags.vectorize
   let vectorize_max_block_size n = Oxcaml_flags.vectorize_max_block_size := n
@@ -2095,6 +2111,7 @@ module Extra_params = struct
         set_int' Oxcaml_flags.regalloc_linscan_threshold
     | "regalloc-param" -> add_string Oxcaml_flags.regalloc_params
     | "regalloc-validate" -> set' Oxcaml_flags.regalloc_validate
+    | "regalloc-leaf-functions" -> set' Oxcaml_flags.regalloc_leaf_functions
     | "vectorize" -> set' Oxcaml_flags.vectorize
     | "dump-vectorize" -> set' Oxcaml_flags.dump_vectorize
     | "vectorize-max-block-size" ->

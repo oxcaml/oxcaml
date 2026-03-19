@@ -23,6 +23,7 @@ val default_regalloc_linscan_threshold : int
 val regalloc_linscan_threshold : int ref
 val regalloc_params : string list ref
 val regalloc_validate : bool ref
+val regalloc_leaf_functions : bool ref
 
 val vectorize : bool ref
 val dump_vectorize : bool ref
