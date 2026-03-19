@@ -852,8 +852,8 @@ type simple_encoding = {
   reg : int;
 }
 
-(* CR claude: emit_simple_encoding is missing 16-bit register-to-register/
-   memory variants and the al_imm8 shortcut encoding. *)
+(* CR claude: emit_simple_encoding is missing the al_imm8 shortcut
+   encoding. *)
 let emit_simple_encoding enc b dst src =
   match (enc, dst, src) with
   (* 8 bit encodings.  Note: combining Reg8H in either field with
@@ -882,6 +882,14 @@ let emit_simple_encoding enc b dst src =
   | { r64_rm64 = opcodes }, Reg64 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       emit_mod_rm_reg b rexw opcodes rm (rd_of_reg64 reg)
   | { r64_rm64 = opcodes }, Reg32 reg, ((Mem _ | Mem64_RIP _) as rm) ->
+      emit_mod_rm_reg b 0 opcodes rm (rd_of_reg64 reg)
+  (* 16 bits encodings — same opcodes as 32-bit, with 0x66 prefix *)
+  | { rm64_r64 = opcodes }, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm), Reg16 reg
+    ->
+      buf_int8 b 0x66;
+      emit_mod_rm_reg b 0 opcodes rm (rd_of_reg64 reg)
+  | { r64_rm64 = opcodes }, Reg16 reg, ((Mem _ | Mem64_RIP _) as rm) ->
+      buf_int8 b 0x66;
       emit_mod_rm_reg b 0 opcodes rm (rd_of_reg64 reg)
   | ( { rm64_imm8 = opcodes; reg },
       ((Reg64 _ | Mem { typ = NONE | QWORD | REAL8; arch = X64 }) as rm),
@@ -963,9 +971,6 @@ let emit_XOR = emit_simple_encoding 0x30 6
 
 let emit_CMP = emit_simple_encoding 0x38 7
 
-(* CR claude: emit_test is missing Reg16 vs Imm (TEST r/m16, imm16, opcode
-   0x66 0xF7 /0) and the Reg16 RAX shortcut (TEST AX, imm16, opcode
-   0x66 0xA9). *)
 let emit_test b dst src =
   match (dst, src) with
   (* See comment in emit_simple_encoding re Reg8H + Reg8L RSP/RBP/RSI/RDI.
@@ -992,6 +997,15 @@ let emit_test b dst src =
   | Reg32 RAX, ((Imm _ | Sym _) as n) ->
       buf_opcodes b [ 0xA9 ];
       buf_int32_imm b n
+  | Reg16 RAX, ((Imm _) as n) ->
+      buf_int8 b 0x66;
+      buf_opcodes b [ 0xA9 ];
+      buf_int16_imm b n
+  | ( ((Reg16 _ | Mem { typ = WORD } | Mem64_RIP (WORD, _, _)) as rm),
+      ((Imm _) as n) ) ->
+      buf_int8 b 0x66;
+      emit_mod_rm_reg b 0 [ 0xF7 ] rm 0;
+      buf_int16_imm b n
   | ((Reg32 _ | Reg64 _ | Mem _ | Mem64_RIP _) as rm), ((Imm _ | Sym _) as n) ->
       emit_mod_rm_reg b rexw [ 0xF7 ] rm 0;
       buf_int32_imm b n
