@@ -31,7 +31,7 @@ val sorry1 : <[($('a) -> $('b)) -> $('b)]> expr =
 type _ t =
   | Int : int -> <[int]> t
   | Add : <[int]> t * <[int]> t -> <[int]> t
-  | IsZero : <[int]> t -> <[bool]> t
+  | Is_zero : <[int]> t -> <[bool]> t
   | Bool : bool -> <[bool]> t
   | If : <[bool]> t * 'a t * 'a t -> 'a t
   | Pair : <['a]> t * <['b]> t -> <['a * 'b]> t
@@ -41,7 +41,7 @@ type _ t =
 type _ t =
     Int : int -> <[int]> t
   | Add : <[int]> t * <[int]> t -> <[int]> t
-  | IsZero : <[int]> t -> <[bool]> t
+  | Is_zero : <[int]> t -> <[bool]> t
   | Bool : bool -> <[bool]> t
   | If : <[bool]> t * 'a t * 'a t -> 'a t
   | Pair : 'a t * 'b t -> <[$('a) * $('b)]> t
@@ -53,7 +53,7 @@ type _ t =
 let rec compile : type a. a t -> a expr = function
   | Int i -> Quote.Expr.int i
   | Add (e, e') -> <[ $(compile e) + $(compile e') ]>
-  | IsZero e -> <[ Int.equal $(compile e) 0 ]>
+  | Is_zero e -> <[ Int.equal $(compile e) 0 ]>
   | Bool b -> Quote.Expr.bool b
   | If (c, t, f) -> <[ if $(compile c) then $(compile t) else $(compile f) ]>
   | Pair (e, e') -> <[ $(compile e), $(compile e') ]>
@@ -64,7 +64,7 @@ val compile : 'a t -> 'a expr = <fun>
 |}];;
 
 compile (
-  If (If (IsZero (Add (Int 3, Int (-3))), Bool false, Bool true),
+  If (If (Is_zero (Add (Int 3, Int (-3))), Bool false, Bool true),
       Pair (Int 1, Bool true), Pair (Int 0, Bool false)))
 [%%expect {|
 - : <[int * bool]> expr =
