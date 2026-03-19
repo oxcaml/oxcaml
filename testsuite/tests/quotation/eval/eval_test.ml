@@ -1,4 +1,5 @@
 (* TEST
+  include eval;
   flags = "-extension runtime_metaprogramming -gno-upstream-dwarf -g";
   native;
 *)
@@ -11,14 +12,15 @@
 
 let test_simple_eval =
   Printf.printf "\nTest simple eval\n";
-  let eval : <[int]> expr -> int = [%eval: int] in
-  let output = eval <[ 42 ]> in
+  let output : int = Eval.eval <[ 42 ]> in
   Printf.printf "Output: %d\n" output;
 ;;
 
 let test_complex_return_type =
   Printf.printf "\nTest complex return type\n";
-  let compiled = [%eval: int -> int list] <[ fun x -> [ x ; x + 1 ] ]> in
+  let compiled : int -> int list =
+    Eval.eval <[ fun x -> [ x ; x + 1 ] ]>
+  in
   let output = compiled 42 in
   Printf.printf
   "Output: [%s]\n"
@@ -28,7 +30,8 @@ let test_complex_return_type =
 let test_side_effects =
   Printf.printf "\nTest side effects\n";
   Printf.printf "Compiling...\n";
-  let compiled = [%eval: unit -> unit]
+  let compiled : unit -> unit =
+    Eval.eval
     <[ print_endline "Outside";
        fun () -> print_endline "Inside" ]>
   in
@@ -44,8 +47,8 @@ let test_side_effects =
    lookup that resolves to Stdlib__Buffer). *)
 let test_reference_to_global =
   Printf.printf "\nTest reference to global\n";
-  let eval = [%eval: Buffer.t] in
-  let output : Buffer.t = eval
+  let output : Buffer.t =
+    Eval.eval
     <[ let b = Buffer.create 42 in Buffer.add_string b "Hello world!" ; b ]>
   in
   Printf.printf "Output: %s\n" (Buffer.contents output);
@@ -67,7 +70,7 @@ let test_late_compilation_error =
      to trigger this."
   ]> in
   (try
-    let output = [%eval: string] quote in
+    let output : string = Eval.eval quote in
     Printf.printf "Output: %s\n" output;
   with _ -> Printf.printf "Error during eval (expected)\n")
 ;;
@@ -75,7 +78,10 @@ let test_late_compilation_error =
 let test_warning =
   Printf.printf "\nTest warnings emitted during eval\n";
   (* Unused variable *)
-  [%eval: unit] <[ let a = () in $( if false then <[ a ]> else <[ () ]>) ]>;
+  let (_ : unit) =
+    Eval.eval
+      <[ let a = () in $( if false then <[ a ]> else <[ () ]>) ]>
+  in
   Printf.printf "Done\n"
 
 (* Checks that Simplify is being used rather than classic mode *)

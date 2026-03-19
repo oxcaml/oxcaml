@@ -27,11 +27,8 @@
 
 (* CR metaprogramming jrickard: This file has not been code reviewed *)
 
-(* [eval] must be the first item in this file as transl emits lambda referencing
-   it as element 0 in this module. *)
-
 (** Evaluate a quoted OCaml expression at runtime. *)
-val eval : CamlinternalQuote.Code.t -> Obj.t
+val eval : 'a expr -> 'a eval
 
 module type Jit_intf = sig
   val jit_load :

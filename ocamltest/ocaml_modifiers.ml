@@ -102,6 +102,11 @@ let runtime_events =
   make_library_modifier
     "runtime_events" [compiler_subdir ["otherlibs"; "runtime_events"]]
 
+let eval =
+  append Ocaml_variables.ocamlopt_flags ["-uses-metaprogramming"]
+  :: make_library_modifier "eval" [compiler_subdir ["otherlibs"; "eval"]]
+
+
 let compilerlibs_subdirs =
 [
   "asmcomp";
@@ -147,6 +152,7 @@ let init () =
   register_modifiers "unix" unix;
   register_modifiers "dynlink" dynlink;
   register_modifiers "str" str;
+  register_modifiers "eval" eval;
   List.iter
     (fun name -> register_modifiers name (extension_universe_lib name))
     [
