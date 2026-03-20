@@ -1003,10 +1003,8 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 
 let x = <[ "foo" ]> in <[ let y = (borrow_ $x) in (fun (a @ local) -> ()) y ]>
 [%%expect{|
->> Fatal error: Translquote [at Line 1, characters 60-65]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[unit]> expr =
+<[let y = (borrow_ "foo") in (fun (a : _ @ local) -> ()) y]>
 |}];;
 
 let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
@@ -1153,67 +1151,73 @@ Warning 10 [non-unit-statement]: this expression should have type unit.
 (* Pattern constraints *)
 <[ let (x @ unique portable) = "abc" in x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 4, characters 12-18]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[string]> expr = <[let x = ("abc" : _ @ unique portable) in x]>
 |}];;
 
 (* Expression constraints *)
 <[ fun x -> (x : _  @ unique portable)]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 22-28]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) @ unique portable -> $('a)]> expr =
+<[fun x -> (x : _ @ unique portable)]>
 |}];;
 
 <[ fun x -> exclave_ (x : _  @ local)]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 31-36]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) -> $('a) @ local]> expr = <[fun x -> exclave_ (x : _ @ local)]>
 |}];;
 
 (* Function definitions *)
 <[ fun (x @ local unique) @ local unique -> x]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 28-33]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[fun (x : _ @ local unique) -> (x : _ @ local unique)]>
 |}];;
 
 <[ let (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 50-55]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[
+  let f =
+  (fun (x : _ @ local unique) -> (x : _ @ local unique) :
+    _ @ unique portable)
+  in f
+]>
+|}];;
 
+<[ let rec f (x @ local unique) @ local unique = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[let rec f = (fun (x : _ @ local unique) -> (x : _ @ local unique)) in f]>
+|}];;
+
+<[ let rec (f @ unique portable) (x @ local unique) = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local]> expr =
+<[let rec f = (fun (x : _ @ local unique) -> x : _ @ unique portable) in f]>
 |}];;
 
 <[ let rec (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 54-59]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[
+  let rec f =
+  (fun (x : _ @ local unique) -> (x : _ @ local unique) :
+    _ @ unique portable)
+  in f
+]>
 |}];;
 
 <[ let local_ f x = x in f "abc" ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 7-13]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[string]> expr = <[let f = (fun x -> x : _ @ local) in f "abc"]>
 |}];;
 
 (* Function types *)
 <[ fun (f : _ @ local unique -> _ @ local unique) -> f]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 16-21]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[
+     ($('a) @ local unique -> $('b) @ local unique) ->
+     $('a) @ local unique -> $('b) @ local unique]>
+    expr
+= <[fun (f : _ @ local unique -> _ @ local unique) -> f]>
 |}];;
