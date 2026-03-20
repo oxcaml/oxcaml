@@ -604,6 +604,8 @@ let record_frame_label env live dbg =
       | { typ = Vec256 | Vec512; _ } ->
         Misc.fatal_error "arm64: got 256/512 bit vector")
     live;
+  (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
+     of linear labels. *)
   record_frame_descr ~label:lbl ~frame_size:(env_frame_size env)
     ~live_offset:!live_offset dbg;
   label_to_asm_label ~section:Text lbl
