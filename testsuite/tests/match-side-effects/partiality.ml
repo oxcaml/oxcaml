@@ -1,12 +1,6 @@
 (* TEST
-<<<<<<< oxcaml
- flags = "-dlambda";
- stack-allocation;
-||||||| upstream-base
- flags = "-dlambda";
-=======
  flags = "-dlambda -dcanonical-ids";
->>>>>>> upstream-incoming
+ stack-allocation;
  expect;
 *)
 

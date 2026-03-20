@@ -1,13 +1,7 @@
 (* TEST
  readonly_files = "contexts_1.ml contexts_2.ml contexts_3.ml";
-<<<<<<< oxcaml
- flags = "-dsource -dlambda";
- stack-allocation;
-||||||| upstream-base
- flags = "-dsource -dlambda";
-=======
  flags = "-dsource -dlambda -dcanonical-ids";
->>>>>>> upstream-incoming
+ stack-allocation;
  expect;
 *)
 

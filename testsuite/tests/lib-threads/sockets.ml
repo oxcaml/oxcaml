@@ -1,14 +1,8 @@
 (* TEST
  include systhreads;
  hassysthreads;
-<<<<<<< oxcaml
  not-macos;
- libunix;
-||||||| upstream-base
- libunix; (* Broken on Windows (missing join?), needs to be fixed *)
-=======
  not-target-windows; (* Broken on Windows (missing join?), needs to be fixed *)
->>>>>>> upstream-incoming
  {
    bytecode;
  }{

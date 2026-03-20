@@ -1,14 +1,8 @@
 (* TEST
 hassysthreads;
 include systhreads;
-<<<<<<< oxcaml
-not-windows;
-poll-insertion;
-||||||| upstream-base
-not-windows;
-=======
 not-target-windows;
->>>>>>> upstream-incoming
+poll-insertion;
 no-tsan;
 multicore;
 {

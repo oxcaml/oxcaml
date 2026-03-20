@@ -1,16 +1,4 @@
 (* TEST
-<<<<<<< oxcaml
-||||||| upstream-base
- include runtime_events;
- include unix;
- set OCAMLRUNPARAM = "e=6";
- hasunix;
-=======
- include runtime_events;
- include unix;
- ocamlrunparam += ",e=6";
- hasunix;
->>>>>>> upstream-incoming
  {
    runtime4;
    skip;
@@ -18,7 +6,7 @@
    include runtime_events;
    multicore;
    include unix;
-   set OCAMLRUNPARAM = "e=6";
+   ocamlrunparam += ",e=6";
    hasunix;
    { bytecode; }
    {
