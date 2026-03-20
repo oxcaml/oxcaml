@@ -1981,30 +1981,38 @@ type relaxed_instruction =
   | Condbranch of Operation.test * Cmm.label
   | Branch of Cmm.label
 
+let emit_relaxed_instruction (relaxed : relaxed_instruction)
+    (instr : Linear.instruction) =
+  let m =
+    Emitaux.with_snapshot ~f:(fun () ->
+        D.with_measuring ~f:(fun () ->
+            A.with_measuring ~f:(fun () ->
+                match relaxed with
+                | Far_poll ->
+                  let _gc_lbl, _gc_return_lbl =
+                    assembly_code_for_poll0 ~far:true ~return_label:None
+                  in
+                  ()
+                | Far_alloc { num_bytes; dbginfo = _ } ->
+                  let _gc_lbl, _gc_return_lbl =
+                    assembly_code_for_fast_heap_allocation0 ~n:num_bytes
+                      ~far:true
+                      ~res_reg:(H.reg_x instr.res.(0))
+                  in
+                  ()
+                | Condbranch (test, lbl) -> emit_condbranch instr.arg test lbl
+                | Branch lbl -> emit_branch lbl)))
+  in
+  { Branch_relaxation_intf.size = m.count;
+    max_displacement = m.min_max_displacement
+  }
+
 let relaxed_instruction_desc = function
   | Far_poll -> Linear.Lop (Specific Ifar_poll)
   | Far_alloc { num_bytes; dbginfo } ->
     Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
   | Condbranch (test, lbl) -> Lcondbranch (test, lbl)
   | Branch lbl -> Lbranch lbl
-
-let _emit_relaxed_instruction (relaxed : relaxed_instruction)
-    (instr : Linear.instruction) =
-  measure_instruction_count (fun () ->
-      match relaxed with
-      | Far_poll ->
-        let _gc_lbl, _gc_return_lbl =
-          assembly_code_for_poll0 ~far:true ~return_label:None
-        in
-        ()
-      | Far_alloc { num_bytes; dbginfo = _ } ->
-        let _gc_lbl, _gc_return_lbl =
-          assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
-            ~res_reg:(H.reg_x instr.res.(0))
-        in
-        ()
-      | Condbranch (test, lbl) -> emit_condbranch instr.arg test lbl
-      | Branch lbl -> emit_branch lbl)
 
 let branch_relax env body =
   (* Make a copy of [env] so the sizing pass can mutate it without affecting
@@ -2024,11 +2032,7 @@ let branch_relax env body =
 
     let offset_pc_at_branch = 0
 
-    let relaxed_instruction_size _ri instr =
-      let m = measure_emit_instr (Env.copy sizing_env) instr in
-      { Branch_relaxation_intf.size = m.count;
-        max_displacement = m.min_max_displacement
-      }
+    let relaxed_instruction_size ri instr = emit_relaxed_instruction ri instr
 
     let relaxed_instruction_desc = relaxed_instruction_desc
 
