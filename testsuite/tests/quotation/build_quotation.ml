@@ -319,6 +319,7 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 <[fun (f : 'a. 'a -> 'a) -> f f]>
 |}];;
 
+(* CR metaprogramming jbachurski: This should fail gracefully. *)
 <[ let f : type a. a -> a = fun x -> x in f ]>
 [%%expect {|
 Uncaught exception: Stdlib.Exit
