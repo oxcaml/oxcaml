@@ -64,6 +64,8 @@ val save_frame_descriptors : unit -> frame_descr_snapshot
 
 val restore_frame_descriptors : frame_descr_snapshot -> unit
 
+val with_snapshot : f:(unit -> 'a) -> 'a
+
 type emit_frame_actions =
   { efa_code_label : Label.t -> unit;
     efa_data_label : Label.t -> unit;

@@ -1801,15 +1801,9 @@ let emit_instr env i =
 (* Branch relaxation, including instruction size computation pass *)
 
 let measure_emit_instr env i =
-  let saved_frame_descriptors = Emitaux.save_frame_descriptors () in
-  let saved_debug_info = Emitaux.save_debug_info () in
-  let m =
-    D.with_measuring ~f:(fun () ->
-        A.with_measuring ~f:(fun () -> emit_instr env i))
-  in
-  Emitaux.restore_debug_info saved_debug_info;
-  Emitaux.restore_frame_descriptors saved_frame_descriptors;
-  m
+  Emitaux.with_snapshot ~f:(fun () ->
+      D.with_measuring ~f:(fun () ->
+          A.with_measuring ~f:(fun () -> emit_instr env i)))
 
 let compute_instruction_sizes env code =
   let sizes = ref [] in
@@ -1834,11 +1828,10 @@ let compute_instruction_sizes env code =
   List.rev !sizes
 
 let measure_instruction_count f =
-  let saved_frame_descriptors = Emitaux.save_frame_descriptors () in
-  let saved_debug_info = Emitaux.save_debug_info () in
-  let m = D.with_measuring ~f:(fun () -> A.with_measuring ~f) in
-  Emitaux.restore_debug_info saved_debug_info;
-  Emitaux.restore_frame_descriptors saved_frame_descriptors;
+  let m =
+    Emitaux.with_snapshot ~f:(fun () ->
+        D.with_measuring ~f:(fun () -> A.with_measuring ~f))
+  in
   m.count
 
 let out_of_line_code_block_sizes env =

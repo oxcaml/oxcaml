@@ -396,6 +396,14 @@ let restore_debug_info snapshot =
   file_pos_nums := snapshot.fpn;
   file_pos_num_cnt := snapshot.fpnc
 
+let with_snapshot ~f =
+  let saved_frame_descriptors = !frame_descriptors in
+  let saved_debug_info = save_debug_info () in
+  let result = f () in
+  restore_debug_info saved_debug_info;
+  frame_descriptors := saved_frame_descriptors;
+  result
+
 let get_file_num ~file_emitter file_name =
   try List.assoc file_name !file_pos_nums
   with Not_found ->
