@@ -21,6 +21,7 @@ open Solver
 open Mode_intf
 module Hint = Mode_hint
 module Fmt = Format_doc
+module Modal_bit_layout = Misc.Modal_bit_layout
 
 module Hint_for_solver (* : Solver_intf.Hint *) = struct
   module Pinpoint = struct
@@ -333,6 +334,10 @@ module Lattices = struct
 
     include Heyting with type t := t
 
+    val encode_raw_level : t -> int
+
+    val decode_raw_level : int -> t
+
     val _is_areality : unit
   end
 
@@ -356,6 +361,13 @@ module Lattices = struct
     let print ppf = function
       | Global -> Fmt.fprintf ppf "global"
       | Local -> Fmt.fprintf ppf "local"
+
+    let encode_raw_level = function Global -> 0 | Local -> 2
+
+    let decode_raw_level = function
+      | 0 -> Global
+      | 2 -> Local
+      | _ -> Misc.fatal_error "Mode.Locality.decode_raw_level"
 
     let _is_areality = ()
   end
@@ -382,6 +394,14 @@ module Lattices = struct
       | Global -> Fmt.fprintf ppf "global"
       | Regional -> Fmt.fprintf ppf "regional"
       | Local -> Fmt.fprintf ppf "local"
+
+    let encode_raw_level = function Global -> 0 | Regional -> 1 | Local -> 2
+
+    let decode_raw_level = function
+      | 0 -> Global
+      | 1 -> Regional
+      | 2 -> Local
+      | _ -> Misc.fatal_error "Mode.Regionality.decode_raw_level"
 
     let _is_areality = ()
   end
@@ -592,13 +612,6 @@ module Lattices = struct
       | Static -> Fmt.fprintf ppf "static"
   end
 
-  type monadic_repr =
-    { uniqueness : Uniqueness.t;
-      contention : Contention.t;
-      visibility : Visibility.t;
-      staticity : Staticity.t
-    }
-
   type 'areality comonadic_with_repr =
     { areality : 'areality;
       linearity : Linearity.t;
@@ -608,132 +621,260 @@ module Lattices = struct
       statefulness : Statefulness.t
     }
 
-  type monadic = { value : monadic_repr } [@@unboxed]
+  type monadic_repr =
+    { uniqueness : Uniqueness.t;
+      contention : Contention.t;
+      visibility : Visibility.t;
+      staticity : Staticity.t
+    }
 
-  let[@inline] encode_monadic (m : monadic_repr) : monadic = { value = m }
+  module Monadic_bits = struct
+    let max = Modal_bit_layout.monadic_mask
 
-  let[@inline] decode_monadic (m : monadic) : monadic_repr = m.value
+    let[@inline] level_of_uniqueness = function
+      | Uniqueness.Unique -> 0
+      | Uniqueness.Aliased -> 1
+
+    let[@inline] level_of_contention = function
+      | Contention.Uncontended -> 0
+      | Contention.Shared -> 1
+      | Contention.Contended -> 2
+
+    let[@inline] level_of_visibility = function
+      | Visibility.Read_write -> 0
+      | Visibility.Read -> 1
+      | Visibility.Immutable -> 2
+
+    let[@inline] level_of_staticity = function
+      | Staticity.Static -> 0
+      | Staticity.Dynamic -> 1
+
+    let[@inline] uniqueness_of_level = function
+      | 0 -> Uniqueness.Unique
+      | 1 -> Uniqueness.Aliased
+      | _ -> Misc.fatal_error "Mode.Monadic_bits.uniqueness_of_level"
+
+    let[@inline] contention_of_level = function
+      | 0 -> Contention.Uncontended
+      | 1 -> Contention.Shared
+      | 2 -> Contention.Contended
+      | _ -> Misc.fatal_error "Mode.Monadic_bits.contention_of_level"
+
+    let[@inline] visibility_of_level = function
+      | 0 -> Visibility.Read_write
+      | 1 -> Visibility.Read
+      | 2 -> Visibility.Immutable
+      | _ -> Misc.fatal_error "Mode.Monadic_bits.visibility_of_level"
+
+    let[@inline] staticity_of_level = function
+      | 0 -> Staticity.Static
+      | 1 -> Staticity.Dynamic
+      | _ -> Misc.fatal_error "Mode.Monadic_bits.staticity_of_level"
+
+    let[@inline] uniqueness m =
+      uniqueness_of_level
+        (Modal_bit_layout.get_level Modal_bit_layout.Uniqueness m)
+
+    let[@inline] contention m =
+      contention_of_level
+        (Modal_bit_layout.get_level Modal_bit_layout.Contention m)
+
+    let[@inline] visibility m =
+      visibility_of_level
+        (Modal_bit_layout.get_level Modal_bit_layout.Visibility m)
+
+    let[@inline] staticity m =
+      staticity_of_level
+        (Modal_bit_layout.get_level Modal_bit_layout.Staticity m)
+
+    let[@inline] set_uniqueness u m =
+      Modal_bit_layout.set_level_unsafe Modal_bit_layout.Uniqueness
+        (level_of_uniqueness u) m
+
+    let[@inline] set_contention c m =
+      Modal_bit_layout.set_level_unsafe Modal_bit_layout.Contention
+        (level_of_contention c) m
+
+    let[@inline] set_visibility v m =
+      Modal_bit_layout.set_level_unsafe Modal_bit_layout.Visibility
+        (level_of_visibility v) m
+
+    let[@inline] set_staticity s m =
+      Modal_bit_layout.set_level_unsafe Modal_bit_layout.Staticity
+        (level_of_staticity s) m
+
+    let[@inline] co_sub left right = Modal_bit_layout.co_sub left right
+  end
+
+  type monadic = { bits : Modal_bit_layout.t } [@@unboxed]
+
+  let[@inline] encode_monadic
+      ({ uniqueness; contention; visibility; staticity } : monadic_repr) :
+      monadic =
+    { bits =
+        0
+        |> Monadic_bits.set_uniqueness uniqueness
+        |> Monadic_bits.set_contention contention
+        |> Monadic_bits.set_visibility visibility
+        |> Monadic_bits.set_staticity staticity
+    }
+
+  let[@inline] decode_monadic (m : monadic) : monadic_repr =
+    { uniqueness = Monadic_bits.uniqueness m.bits;
+      contention = Monadic_bits.contention m.bits;
+      visibility = Monadic_bits.visibility m.bits;
+      staticity = Monadic_bits.staticity m.bits
+    }
 
   module Monadic = struct
     type t = monadic
 
-    let[@inline] uniqueness (m : t) = (decode_monadic m).uniqueness
+    let[@inline] uniqueness (m : t) = Monadic_bits.uniqueness m.bits
 
-    let[@inline] contention (m : t) = (decode_monadic m).contention
+    let[@inline] contention (m : t) = Monadic_bits.contention m.bits
 
-    let[@inline] visibility (m : t) = (decode_monadic m).visibility
+    let[@inline] visibility (m : t) = Monadic_bits.visibility m.bits
 
-    let[@inline] staticity (m : t) = (decode_monadic m).staticity
+    let[@inline] staticity (m : t) = Monadic_bits.staticity m.bits
 
     let[@inline] set_uniqueness uniqueness m =
-      encode_monadic { (decode_monadic m) with uniqueness }
+      { bits = Monadic_bits.set_uniqueness uniqueness m.bits }
 
     let[@inline] set_contention contention m =
-      encode_monadic { (decode_monadic m) with contention }
+      { bits = Monadic_bits.set_contention contention m.bits }
 
     let[@inline] set_visibility visibility m =
-      encode_monadic { (decode_monadic m) with visibility }
+      { bits = Monadic_bits.set_visibility visibility m.bits }
 
     let[@inline] set_staticity staticity m =
-      encode_monadic { (decode_monadic m) with staticity }
+      { bits = Monadic_bits.set_staticity staticity m.bits }
 
-    let min =
-      let uniqueness = Uniqueness.min in
-      let contention = Contention.min in
-      let visibility = Visibility.min in
-      let staticity = Staticity.min in
-      encode_monadic { uniqueness; contention; visibility; staticity }
+    let min = { bits = 0 }
 
-    let max =
-      let uniqueness = Uniqueness.max in
-      let contention = Contention.max in
-      let visibility = Visibility.max in
-      let staticity = Staticity.max in
-      encode_monadic { uniqueness; contention; visibility; staticity }
+    let max = { bits = Monadic_bits.max }
 
     let legacy =
-      let uniqueness = Uniqueness.legacy in
-      let contention = Contention.legacy in
-      let visibility = Visibility.legacy in
-      let staticity = Staticity.legacy in
-      encode_monadic { uniqueness; contention; visibility; staticity }
+      encode_monadic
+        { uniqueness = Uniqueness.legacy;
+          contention = Contention.legacy;
+          visibility = Visibility.legacy;
+          staticity = Staticity.legacy
+        }
 
-    let le m1 m2 =
-      let m1 = decode_monadic m1 in
-      let m2 = decode_monadic m2 in
-      let { uniqueness = uniqueness1;
-            contention = contention1;
-            visibility = visibility1;
-            staticity = staticity1
-          } =
-        m1
-      in
-      let { uniqueness = uniqueness2;
-            contention = contention2;
-            visibility = visibility2;
-            staticity = staticity2
-          } =
-        m2
-      in
-      Uniqueness.le uniqueness1 uniqueness2
-      && Contention.le contention1 contention2
-      && Visibility.le visibility1 visibility2
-      && Staticity.le staticity1 staticity2
+    let le m1 m2 = m1.bits land m2.bits = m1.bits
 
-    let equal m1 m2 =
-      let m1 = decode_monadic m1 in
-      let m2 = decode_monadic m2 in
-      let { uniqueness = uniqueness1;
-            contention = contention1;
-            visibility = visibility1;
-            staticity = staticity1
-          } =
-        m1
-      in
-      let { uniqueness = uniqueness2;
-            contention = contention2;
-            visibility = visibility2;
-            staticity = staticity2
-          } =
-        m2
-      in
-      Uniqueness.equal uniqueness1 uniqueness2
-      && Contention.equal contention1 contention2
-      && Visibility.equal visibility1 visibility2
-      && Staticity.equal staticity1 staticity2
+    let equal (m1 : t) m2 = m1.bits = m2.bits
 
-    let join m1 m2 =
-      let m1 = decode_monadic m1 in
-      let m2 = decode_monadic m2 in
-      let uniqueness = Uniqueness.join m1.uniqueness m2.uniqueness in
-      let contention = Contention.join m1.contention m2.contention in
-      let visibility = Visibility.join m1.visibility m2.visibility in
-      let staticity = Staticity.join m1.staticity m2.staticity in
-      encode_monadic { uniqueness; contention; visibility; staticity }
+    let join (m1 : t) m2 = { bits = m1.bits lor m2.bits }
 
-    let meet m1 m2 =
-      let m1 = decode_monadic m1 in
-      let m2 = decode_monadic m2 in
-      let uniqueness = Uniqueness.meet m1.uniqueness m2.uniqueness in
-      let contention = Contention.meet m1.contention m2.contention in
-      let visibility = Visibility.meet m1.visibility m2.visibility in
-      let staticity = Staticity.meet m1.staticity m2.staticity in
-      encode_monadic { uniqueness; contention; visibility; staticity }
+    let meet (m1 : t) m2 = { bits = m1.bits land m2.bits }
 
-    let subtract m1 m2 =
-      let m1 = decode_monadic m1 in
-      let m2 = decode_monadic m2 in
-      let uniqueness = Uniqueness.subtract m1.uniqueness m2.uniqueness in
-      let contention = Contention.subtract m1.contention m2.contention in
-      let visibility = Visibility.subtract m1.visibility m2.visibility in
-      let staticity = Staticity.subtract m1.staticity m2.staticity in
-      encode_monadic { uniqueness; contention; visibility; staticity }
+    let subtract (m1 : t) m2 = { bits = Monadic_bits.co_sub m1.bits m2.bits }
 
     let print ppf m =
-      let m = decode_monadic m in
-      Fmt.fprintf ppf "%a,%a,%a,%a" Uniqueness.print m.uniqueness
-        Contention.print m.contention Visibility.print m.visibility
-        Staticity.print m.staticity
+      let { uniqueness; contention; visibility; staticity } =
+        decode_monadic m
+      in
+      Fmt.fprintf ppf "%a,%a,%a,%a" Uniqueness.print uniqueness Contention.print
+        contention Visibility.print visibility Staticity.print staticity
+  end
+
+  module Comonadic_bits (Areality : Areality) = struct
+    let[@inline] level_of_linearity = function
+      | Linearity.Many -> 0
+      | Linearity.Once -> 1
+
+    let[@inline] level_of_portability = function
+      | Portability.Portable -> 0
+      | Portability.Shareable -> 1
+      | Portability.Nonportable -> 2
+
+    let[@inline] level_of_forkable = function
+      | Forkable.Forkable -> 0
+      | Forkable.Unforkable -> 1
+
+    let[@inline] level_of_yielding = function
+      | Yielding.Unyielding -> 0
+      | Yielding.Yielding -> 1
+
+    let[@inline] level_of_statefulness = function
+      | Statefulness.Stateless -> 0
+      | Statefulness.Observing -> 1
+      | Statefulness.Stateful -> 2
+
+    let[@inline] linearity_of_level = function
+      | 0 -> Linearity.Many
+      | 1 -> Linearity.Once
+      | _ -> Misc.fatal_error "Mode.Comonadic_bits.linearity_of_level"
+
+    let[@inline] portability_of_level = function
+      | 0 -> Portability.Portable
+      | 1 -> Portability.Shareable
+      | 2 -> Portability.Nonportable
+      | _ -> Misc.fatal_error "Mode.Comonadic_bits.portability_of_level"
+
+    let[@inline] forkable_of_level = function
+      | 0 -> Forkable.Forkable
+      | 1 -> Forkable.Unforkable
+      | _ -> Misc.fatal_error "Mode.Comonadic_bits.forkable_of_level"
+
+    let[@inline] yielding_of_level = function
+      | 0 -> Yielding.Unyielding
+      | 1 -> Yielding.Yielding
+      | _ -> Misc.fatal_error "Mode.Comonadic_bits.yielding_of_level"
+
+    let[@inline] statefulness_of_level = function
+      | 0 -> Statefulness.Stateless
+      | 1 -> Statefulness.Observing
+      | 2 -> Statefulness.Stateful
+      | _ -> Misc.fatal_error "Mode.Comonadic_bits.statefulness_of_level"
+
+    let[@inline] areality m =
+      Areality.decode_raw_level
+        (Modal_bit_layout.get_level Modal_bit_layout.Areality m)
+
+    let[@inline] linearity m =
+      linearity_of_level
+        (Modal_bit_layout.get_level Modal_bit_layout.Linearity m)
+
+    let[@inline] portability m =
+      portability_of_level
+        (Modal_bit_layout.get_level Modal_bit_layout.Portability m)
+
+    let[@inline] forkable m =
+      forkable_of_level (Modal_bit_layout.get_level Modal_bit_layout.Forkable m)
+
+    let[@inline] yielding m =
+      yielding_of_level (Modal_bit_layout.get_level Modal_bit_layout.Yielding m)
+
+    let[@inline] statefulness m =
+      statefulness_of_level
+        (Modal_bit_layout.get_level Modal_bit_layout.Statefulness m)
+
+    let[@inline] set_areality a m =
+      Modal_bit_layout.set_level_unsafe Modal_bit_layout.Areality
+        (Areality.encode_raw_level a)
+        m
+
+    let[@inline] set_linearity l m =
+      Modal_bit_layout.set_level_unsafe Modal_bit_layout.Linearity
+        (level_of_linearity l) m
+
+    let[@inline] set_portability p m =
+      Modal_bit_layout.set_level_unsafe Modal_bit_layout.Portability
+        (level_of_portability p) m
+
+    let[@inline] set_forkable f m =
+      Modal_bit_layout.set_level_unsafe Modal_bit_layout.Forkable
+        (level_of_forkable f) m
+
+    let[@inline] set_yielding y m =
+      Modal_bit_layout.set_level_unsafe Modal_bit_layout.Yielding
+        (level_of_yielding y) m
+
+    let[@inline] set_statefulness s m =
+      Modal_bit_layout.set_level_unsafe Modal_bit_layout.Statefulness
+        (level_of_statefulness s) m
   end
 
   type 'areality comonadic_with = { value : 'areality comonadic_with_repr }
@@ -781,34 +922,34 @@ module Lattices = struct
     let[@inline] decode (m : t) : repr = m.value
 
     let min =
-      let areality = Areality.min in
-      let linearity = Linearity.min in
-      let portability = Portability.min in
-      let forkable = Forkable.min in
-      let yielding = Yielding.min in
-      let statefulness = Statefulness.min in
       encode
-        { areality; linearity; portability; forkable; yielding; statefulness }
+        { areality = Areality.min;
+          linearity = Linearity.min;
+          portability = Portability.min;
+          forkable = Forkable.min;
+          yielding = Yielding.min;
+          statefulness = Statefulness.min
+        }
 
     let max =
-      let areality = Areality.max in
-      let linearity = Linearity.max in
-      let portability = Portability.max in
-      let forkable = Forkable.max in
-      let yielding = Yielding.max in
-      let statefulness = Statefulness.max in
       encode
-        { areality; linearity; portability; forkable; yielding; statefulness }
+        { areality = Areality.max;
+          linearity = Linearity.max;
+          portability = Portability.max;
+          forkable = Forkable.max;
+          yielding = Yielding.max;
+          statefulness = Statefulness.max
+        }
 
     let legacy =
-      let areality = Areality.legacy in
-      let linearity = Linearity.legacy in
-      let portability = Portability.legacy in
-      let forkable = Forkable.legacy in
-      let yielding = Yielding.legacy in
-      let statefulness = Statefulness.legacy in
       encode
-        { areality; linearity; portability; forkable; yielding; statefulness }
+        { areality = Areality.legacy;
+          linearity = Linearity.legacy;
+          portability = Portability.legacy;
+          forkable = Forkable.legacy;
+          yielding = Yielding.legacy;
+          statefulness = Statefulness.legacy
+        }
 
     let le m1 m2 =
       let m1 = decode m1 in
@@ -893,14 +1034,14 @@ module Lattices = struct
     let imply m1 m2 =
       let m1 = decode m1 in
       let m2 = decode m2 in
-      let areality = Areality.imply m1.areality m2.areality in
-      let linearity = Linearity.imply m1.linearity m2.linearity in
-      let portability = Portability.imply m1.portability m2.portability in
-      let forkable = Forkable.imply m1.forkable m2.forkable in
-      let yielding = Yielding.imply m1.yielding m2.yielding in
-      let statefulness = Statefulness.imply m1.statefulness m2.statefulness in
       encode
-        { areality; linearity; portability; forkable; yielding; statefulness }
+        { areality = Areality.imply m1.areality m2.areality;
+          linearity = Linearity.imply m1.linearity m2.linearity;
+          portability = Portability.imply m1.portability m2.portability;
+          forkable = Forkable.imply m1.forkable m2.forkable;
+          yielding = Yielding.imply m1.yielding m2.yielding;
+          statefulness = Statefulness.imply m1.statefulness m2.statefulness
+        }
 
     let print ppf m =
       let { areality; linearity; portability; forkable; yielding; statefulness }
@@ -1381,6 +1522,8 @@ module Lattices_mono = struct
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
+  let[@inline] map_comonadic _src _dst f = Map_comonadic f
+
   include Magic_allow_disallow (struct
     type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph constraint 'd = 'l * 'r
 
@@ -1583,9 +1726,8 @@ module Lattices_mono = struct
         | None -> None
         | Some Refl -> Some Refl))
     | Map_comonadic f, Map_comonadic g -> (
-      match equal_morph (proj_obj Areality _dst) f g with
-      | Some Refl -> Some Refl
-      | None -> None)
+      let dst0 = proj_obj Areality _dst in
+      match equal_morph dst0 f g with Some Refl -> Some Refl | None -> None)
     | ( ( Id | Proj _ | Max_with _ | Min_with _ | Meet_const _
         | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
         | Monadic_to_comonadic_max | Comonadic_to_monadic_max _
@@ -1774,17 +1916,16 @@ module Lattices_mono = struct
   let monadic_to_comonadic_min : type a.
       a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
    fun obj m ->
-    let m = decode_monadic m in
     let areality : a =
       match obj with
       | Comonadic_with_locality -> Locality.min
       | Comonadic_with_regionality -> Regionality.min
     in
-    let linearity = unique_to_linear m.uniqueness in
-    let portability = contended_to_portable m.contention in
+    let linearity = unique_to_linear (Monadic.uniqueness m) in
+    let portability = contended_to_portable (Monadic.contention m) in
     let forkable = Forkable.min in
     let yielding = Yielding.min in
-    let statefulness = visibility_to_statefulness m.visibility in
+    let statefulness = visibility_to_statefulness (Monadic.visibility m) in
     match obj with
     | Comonadic_with_locality ->
       let module M = Comonadic_with (Locality) in
@@ -1834,17 +1975,16 @@ module Lattices_mono = struct
   let monadic_to_comonadic_max : type a.
       a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
    fun obj m ->
-    let m = decode_monadic m in
     let areality : a =
       match obj with
       | Comonadic_with_locality -> Locality.max
       | Comonadic_with_regionality -> Regionality.max
     in
-    let linearity = unique_to_linear m.uniqueness in
-    let portability = contended_to_portable m.contention in
+    let linearity = unique_to_linear (Monadic.uniqueness m) in
+    let portability = contended_to_portable (Monadic.contention m) in
     let forkable = Forkable.max in
     let yielding = Yielding.max in
-    let statefulness = visibility_to_statefulness m.visibility in
+    let statefulness = visibility_to_statefulness (Monadic.visibility m) in
     match obj with
     | Comonadic_with_locality ->
       let module M = Comonadic_with (Locality) in
@@ -1879,8 +2019,8 @@ module Lattices_mono = struct
     | Regional_to_global -> regional_to_global a
     | Global_to_regional -> global_to_regional a
     | Map_comonadic f ->
-      let dst0 = proj_obj Areality dst in
       let a0 = Axis.proj Areality a in
+      let dst0 = proj_obj Areality dst in
       set_areality (apply dst0 f a0) a
 
   module For_hint = struct
@@ -2063,18 +2203,20 @@ module Lattices_mono = struct
            Locality_as_regionality)
     | Map_comonadic f, Meet_const c ->
       let dst0 = proj_obj Areality dst in
+      let src0 = src dst0 f in
       let areality = Axis.proj Areality c in
       Some
         (compose dst
            (Meet_const (set_areality (max dst0) c))
-           (Map_comonadic (compose dst0 f (Meet_const areality))))
+           (map_comonadic src0 dst0 (compose dst0 f (Meet_const areality))))
     | Map_comonadic f, Imply_const c ->
       let dst0 = proj_obj Areality dst in
+      let src0 = src dst0 f in
       let areality = Axis.proj Areality c in
       Some
         (compose dst
            (Imply_const (set_areality (max dst0) c))
-           (Map_comonadic (compose dst0 f (Imply_const areality))))
+           (map_comonadic src0 dst0 (compose dst0 f (Imply_const areality))))
     | Regional_to_global, Locality_as_regionality -> Some Id
     | Regional_to_global, Local_to_regional -> Some (Meet_const Locality.Global)
     | Local_to_regional, Regional_to_local -> None
@@ -2140,8 +2282,9 @@ module Lattices_mono = struct
     | Regional_to_local -> Local_to_regional
     | Map_comonadic f ->
       let dst0 = proj_obj Areality dst in
+      let src0 = src dst0 f in
       let f' = left_adjoint dst0 f in
-      Map_comonadic f'
+      map_comonadic dst0 src0 f'
 
   and right_adjoint : type a b r.
       b obj -> (a, b, allowed * r) morph -> (b, a, disallowed * allowed) morph =
@@ -2164,8 +2307,9 @@ module Lattices_mono = struct
     | Regional_to_global -> Global_to_regional
     | Map_comonadic f ->
       let dst0 = proj_obj Areality dst in
+      let src0 = src dst0 f in
       let f' = right_adjoint dst0 f in
-      Map_comonadic f'
+      map_comonadic dst0 src0 f'
 end
 
 module C = Lattices_mono
@@ -2180,7 +2324,7 @@ type monadic_repr = C.monadic_repr =
     staticity : C.Staticity.t
   }
 
-type monadic = C.monadic = { value : monadic_repr } [@@unboxed]
+type monadic = C.monadic = { bits : Misc.Modal_bit_layout.t } [@@unboxed]
 
 let encode_monadic = C.encode_monadic
 
@@ -3396,6 +3540,8 @@ end
 module Lattice_Product (L : Lattice) = struct
   open L
 
+  let set = Axis.set
+
   let min_with ax c = Axis.set ax c min
 
   let max_with ax c = Axis.set ax c max
@@ -3763,45 +3909,76 @@ module Value_with (Areality : Areality) = struct
       staticity : 'j
     }
 
-  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
-    ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes_repr
+  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes = int
 
-  let encode (m : ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes_repr) :
-      ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
-    m
+  module Packed_comonadic = C.Comonadic_bits (Areality.Const)
 
-  let decode (m : ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes) :
-      ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes_repr =
-    m
+  let encode_comonadic
+      ({ areality; linearity; portability; forkable; yielding; statefulness } :
+        Areality.Const.t comonadic_with_repr) =
+    0
+    |> Packed_comonadic.set_areality areality
+    |> Packed_comonadic.set_linearity linearity
+    |> Packed_comonadic.set_portability portability
+    |> Packed_comonadic.set_forkable forkable
+    |> Packed_comonadic.set_yielding yielding
+    |> Packed_comonadic.set_statefulness statefulness
 
-  let split
-      { areality;
-        linearity;
-        portability;
-        forkable;
-        yielding;
-        statefulness;
-        uniqueness;
-        contention;
-        visibility;
-        staticity
-      } =
-    let monadic : Monadic.Const.t =
-      encode_monadic { uniqueness; contention; visibility; staticity }
-    in
-    let comonadic : Comonadic.Const.t =
-      Comonadic.encode
-        { areality; linearity; portability; forkable; yielding; statefulness }
-    in
-    { comonadic; monadic }
+  let decode_comonadic_bits bits : Areality.Const.t comonadic_with_repr =
+    { areality = Packed_comonadic.areality bits;
+      linearity = Packed_comonadic.linearity bits;
+      portability = Packed_comonadic.portability bits;
+      forkable = Packed_comonadic.forkable bits;
+      yielding = Packed_comonadic.yielding bits;
+      statefulness = Packed_comonadic.statefulness bits
+    }
 
-  let merge { comonadic; monadic } =
+  let encode
+      ({ areality;
+         linearity;
+         portability;
+         forkable;
+         yielding;
+         statefulness;
+         uniqueness;
+         contention;
+         visibility;
+         staticity
+       } :
+        ( Areality.Const.t,
+          Linearity.Const.t,
+          Uniqueness.Const.t,
+          Portability.Const.t,
+          Contention.Const.t,
+          Forkable.Const.t,
+          Yielding.Const.t,
+          Statefulness.Const.t,
+          Visibility.Const.t,
+          Staticity.Const.t )
+        modes_repr) =
+    encode_comonadic
+      { areality; linearity; portability; forkable; yielding; statefulness }
+    lor (encode_monadic { uniqueness; contention; visibility; staticity }).bits
+
+  let decode
+      (m :
+        ( Areality.Const.t,
+          Linearity.Const.t,
+          Uniqueness.Const.t,
+          Portability.Const.t,
+          Contention.Const.t,
+          Forkable.Const.t,
+          Yielding.Const.t,
+          Statefulness.Const.t,
+          Visibility.Const.t,
+          Staticity.Const.t )
+        modes) =
     let ({ areality; linearity; portability; forkable; yielding; statefulness }
-          : Comonadic.repr) =
-      Comonadic.decode comonadic
+          : Areality.Const.t comonadic_with_repr) =
+      decode_comonadic_bits m
     in
     let ({ uniqueness; contention; visibility; staticity } : monadic_repr) =
-      decode_monadic monadic
+      decode_monadic { bits = m land Modal_bit_layout.monadic_mask }
     in
     { areality;
       linearity;
@@ -3814,6 +3991,16 @@ module Value_with (Areality : Areality) = struct
       visibility;
       staticity
     }
+
+  let split m =
+    { comonadic =
+        m land Modal_bit_layout.comonadic_mask
+        |> decode_comonadic_bits |> Comonadic.Const.encode;
+      monadic = { bits = m land Modal_bit_layout.monadic_mask }
+    }
+
+  let merge { comonadic; monadic } =
+    encode_comonadic (Comonadic.Const.decode comonadic) lor monadic.bits
 
   let print ?verbose () ppf { monadic; comonadic } =
     Fmt.fprintf ppf "%a;%a"
@@ -3853,8 +4040,6 @@ module Value_with (Areality : Areality) = struct
     module Monadic = Monadic.Const
     module Comonadic = Comonadic.Const
 
-    (* CR-soon zqian: make a functor [Mode.Value.Const.Make] to generalize over any type
-       operator applied on each mode constants. *)
     type repr =
       ( Areality.Const.t,
         Linearity.Const.t,
@@ -3889,16 +4074,9 @@ module Value_with (Areality : Areality) = struct
 
     let max = merge { comonadic = Comonadic.max; monadic = Monadic.max }
 
-    let le m1 m2 =
-      let m1 = split m1 in
-      let m2 = split m2 in
-      Comonadic.le m1.comonadic m2.comonadic && Monadic.le m1.monadic m2.monadic
+    let le m1 m2 = m1 land m2 = m1
 
-    let equal m1 m2 =
-      let m1 = split m1 in
-      let m2 = split m2 in
-      Comonadic.equal m1.comonadic m2.comonadic
-      && Monadic.equal m1.monadic m2.monadic
+    let equal (m1 : t) m2 = m1 = m2
 
     let print ppf m =
       let { monadic; comonadic } = split m in
@@ -3907,19 +4085,27 @@ module Value_with (Areality : Areality) = struct
     let legacy =
       merge { comonadic = Comonadic.legacy; monadic = Monadic.legacy }
 
-    let meet m1 m2 =
-      let m1 = split m1 in
-      let m2 = split m2 in
-      let monadic = Monadic.meet m1.monadic m2.monadic in
-      let comonadic = Comonadic.meet m1.comonadic m2.comonadic in
-      merge { monadic; comonadic }
+    let meet (m1 : t) m2 = m1 land m2
 
-    let join m1 m2 =
-      let m1 = split m1 in
-      let m2 = split m2 in
-      let monadic = Monadic.join m1.monadic m2.monadic in
-      let comonadic = Comonadic.join m1.comonadic m2.comonadic in
-      merge { monadic; comonadic }
+    let join (m1 : t) m2 = m1 lor m2
+
+    let proj (type a) (ax : a Axis.t) (m : t) : a =
+      match ax with
+      | Monadic ax ->
+        let { monadic; _ } = split m in
+        Monadic.proj ax monadic
+      | Comonadic ax ->
+        let { comonadic; _ } = split m in
+        Comonadic.proj ax comonadic
+
+    let set (type a) (ax : a Axis.t) (a : a) (m : t) : t =
+      match ax with
+      | Monadic ax ->
+        let { comonadic; monadic } = split m in
+        merge { comonadic; monadic = Monadic.set ax a monadic }
+      | Comonadic ax ->
+        let { comonadic; monadic } = split m in
+        merge { monadic; comonadic = Comonadic.set ax a comonadic }
 
     module Option = struct
       type some = t
@@ -3951,6 +4137,7 @@ module Value_with (Areality : Areality) = struct
         }
 
       let value opt ~default =
+        let default = decode default in
         let areality = Option.value opt.areality ~default:default.areality in
         let uniqueness =
           Option.value opt.uniqueness ~default:default.uniqueness
@@ -3971,17 +4158,18 @@ module Value_with (Areality : Areality) = struct
           Option.value opt.visibility ~default:default.visibility
         in
         let staticity = Option.value opt.staticity ~default:default.staticity in
-        { areality;
-          uniqueness;
-          linearity;
-          portability;
-          contention;
-          forkable;
-          yielding;
-          statefulness;
-          visibility;
-          staticity
-        }
+        encode
+          { areality;
+            uniqueness;
+            linearity;
+            portability;
+            contention;
+            forkable;
+            yielding;
+            statefulness;
+            visibility;
+            staticity
+          }
 
       let proj (type a) (ax : a Axis.t) (t : t) : a option =
         match ax with
@@ -4057,6 +4245,8 @@ module Value_with (Areality : Areality) = struct
     end
 
     let diff m1 m2 =
+      let m1 = decode m1 in
+      let m2 = decode m2 in
       let diff le a1 a2 = if le a1 a2 && le a2 a1 then None else Some a1 in
       let areality = diff Areality.Const.le m1.areality m2.areality in
       let linearity = diff Linearity.Const.le m1.linearity m2.linearity in
@@ -4356,31 +4546,34 @@ module Value = Value_with (Regionality)
 module Alloc = Value_with (Locality)
 
 module Const = struct
-  let alloc_as_value
-      ({ areality;
-         linearity;
-         portability;
-         uniqueness;
-         contention;
-         forkable;
-         yielding;
-         statefulness;
-         visibility;
-         staticity
-       } :
-        Alloc.Const.t) : Value.Const.t =
+  let alloc_as_value (c : Alloc.Const.t) : Value.Const.t =
+    let ({ areality;
+           linearity;
+           portability;
+           uniqueness;
+           contention;
+           forkable;
+           yielding;
+           statefulness;
+           visibility;
+           staticity
+         }
+          : Alloc.Const.repr) =
+      Alloc.Const.decode c
+    in
     let areality = C.locality_as_regionality areality in
-    { areality;
-      linearity;
-      portability;
-      uniqueness;
-      contention;
-      forkable;
-      yielding;
-      statefulness;
-      visibility;
-      staticity
-    }
+    Value.Const.encode
+      { areality;
+        linearity;
+        portability;
+        uniqueness;
+        contention;
+        forkable;
+        yielding;
+        statefulness;
+        visibility;
+        staticity
+      }
 
   module Axis = struct
     let is_areality (type a) :
@@ -4411,11 +4604,13 @@ end
    operate on [Unhint] so they can be composed and assigned hint as a whole. *)
 
 let comonadic_locality_as_regionality comonadic =
-  S.Unhint.apply Value.Comonadic.Obj.obj (Map_comonadic Locality_as_regionality)
+  S.Unhint.apply Value.Comonadic.Obj.obj
+    (C.map_comonadic C.Locality C.Regionality C.Locality_as_regionality)
     comonadic
 
 let comonadic_regional_to_local comonadic =
-  S.Unhint.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local)
+  S.Unhint.apply Alloc.Comonadic.Obj.obj
+    (C.map_comonadic C.Regionality C.Locality C.Regional_to_local)
     comonadic
 
 let alloc_as_value_unhint m =
@@ -4429,7 +4624,8 @@ let alloc_as_value m =
 let alloc_to_value_l2r_unhint m =
   let { comonadic; monadic } = m in
   let comonadic =
-    S.Unhint.apply Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional)
+    S.Unhint.apply Value.Comonadic.Obj.obj
+      (C.map_comonadic C.Locality C.Regionality C.Local_to_regional)
       comonadic
   in
   { comonadic; monadic }
@@ -4441,7 +4637,8 @@ let alloc_to_value_l2r m =
 let value_to_alloc_r2g_unhint m =
   let { comonadic; monadic } = m in
   let comonadic =
-    S.Unhint.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
+    S.Unhint.apply Alloc.Comonadic.Obj.obj
+      (C.map_comonadic C.Regionality C.Locality C.Regional_to_global)
       comonadic
   in
   { comonadic; monadic }
@@ -5186,7 +5383,7 @@ module Crossing = struct
         ~statefulness:(Atom.Modality (Meet_const statefulness)) =
       Modality
         (Meet_const
-           (Mode.encode
+           (Mode.Const.encode
               { areality;
                 linearity;
                 portability;
@@ -5241,6 +5438,22 @@ module Crossing = struct
 
     type packed = P : 'a t -> packed
 
+    type with_slot = A : 'a t * Misc.Modal_bit_layout.slot -> with_slot
+
+    let all_with_slots =
+      [ A (Comonadic Areality, Areality);
+        A (Monadic Uniqueness, Uniqueness);
+        A (Comonadic Linearity, Linearity);
+        A (Monadic Contention, Contention);
+        A (Comonadic Portability, Portability);
+        A (Comonadic Forkable, Forkable);
+        A (Comonadic Yielding, Yielding);
+        A (Comonadic Statefulness, Statefulness);
+        A (Monadic Visibility, Visibility);
+        A (Monadic Staticity, Staticity) ]
+
+    let all = List.map (fun (A (ax, _)) -> P ax) all_with_slots
+
     let of_modality : Modality.Axis.packed -> packed = function
       | P (Monadic ax) -> P (Monadic ax)
       | P (Comonadic ax) -> P (Comonadic ax)
@@ -5280,6 +5493,31 @@ module Crossing = struct
      fun ppf -> function
       | Monadic ax -> Axis.print ppf ax
       | Comonadic ax -> Axis.print ppf ax
+
+    let slot : type a. a t -> Misc.Modal_bit_layout.slot =
+     fun ax ->
+      let rec loop : type b. b t -> with_slot list -> Misc.Modal_bit_layout.slot
+          =
+       fun ax all_with_slots ->
+        match all_with_slots with
+        | [] -> invalid_arg "Mode.Crossing.Axis.slot"
+        | A (ax', slot) :: rest -> (
+          match equal ax ax' with Some Refl -> slot | None -> loop ax rest)
+      in
+      loop ax all_with_slots
+
+    let index : type a. a t -> int =
+     fun ax ->
+      let rec loop : type b. int -> b t -> with_slot list -> int =
+       fun i ax all_with_slots ->
+        match all_with_slots with
+        | [] -> invalid_arg "Mode.Crossing.Axis.index"
+        | A (ax', _) :: rest -> (
+          match equal ax ax' with
+          | Some Refl -> i
+          | None -> loop (i + 1) ax rest)
+      in
+      loop 0 ax all_with_slots
   end
 
   module Per_axis = struct
@@ -5447,7 +5685,7 @@ module Crossing = struct
       Comonadic.create ~regionality ~linearity ~portability ~yielding ~forkable
         ~statefulness
     in
-    pack ~monadic ~comonadic
+    { monadic; comonadic }
 
   let print ppf t =
     let l =

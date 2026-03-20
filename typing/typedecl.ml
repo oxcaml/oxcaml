@@ -4024,13 +4024,13 @@ let transl_value_decl env loc ~modal ~why valdecl =
         let modes = List.map modality_to_mode valdecl.pval_modalities in
         let modes = Typemode.transl_mode_annots modes in
         let mode =
+          let staticity_ax : Mode.Staticity.Const.t Mode.Alloc.Axis.t =
+            Mode.Alloc.Axis.Monadic Staticity
+          in
           modes.mode_modes
-          |> Mode.Alloc.Const.Option.value
-               ~default:
-                 (Mode.Alloc.Const.encode
-                    { (Mode.Alloc.Const.decode Mode.Alloc.Const.legacy) with
-                      staticity = Mode.Staticity.Static
-                    })
+          |> Mode.Alloc.Const.(
+              Option.value
+                ~default:(set staticity_ax Mode.Staticity.Static legacy))
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in

@@ -49,6 +49,10 @@ module type Const_product = sig
 
   type 'a axis
 
+  val proj : 'a axis -> t -> 'a
+
+  val set : 'a axis -> 'a -> t -> t
+
   (** [min_with ax elt] returns [min] but with the axis [ax] set to [elt]. *)
   val min_with : 'a axis -> 'a -> t
 
@@ -522,7 +526,7 @@ module type S = sig
      type. Callers should treat this as abstract and prefer
      [encode_monadic]/[decode_monadic] rather than inspecting the wrapper
      directly. *)
-  type monadic = private { value : monadic_repr } [@@unboxed]
+  type monadic = private { bits : Misc.Modal_bit_layout.t } [@@unboxed]
 
   val encode_monadic : monadic_repr -> monadic
 
@@ -656,6 +660,10 @@ module type S = sig
       val encode : repr -> t
 
       val decode : t -> repr
+
+      val proj : 'a Axis.t -> t -> 'a
+
+      val set : 'a Axis.t -> 'a -> t -> t
 
       module Option : sig
         type some = t
@@ -1123,6 +1131,14 @@ module type S = sig
 
       type packed = P : 'a t -> packed
 
+      (** All modal axes in the shared packed-layout order. *)
+      val all : packed list
+
+      (** Index in the shared packed-layout order. *)
+      val index : 'a t -> int
+
+      val slot : 'a t -> Misc.Modal_bit_layout.slot
+
       val of_modality : Modality.Axis.packed -> packed
 
       val to_modality : packed -> Modality.Axis.packed
@@ -1134,10 +1150,8 @@ module type S = sig
 
     (** Convenience for creating a mode crossing capability on all axes, using a
         boolean for each axis where [true] means full crossing and [false] means
-        no crossing. Alternatively, call [Monadic.create] and [Comonadic.create]
-        and pack the results using [pack]. *)
-    val pack : monadic:Monadic.t -> comonadic:Comonadic.t -> t
-
+        no crossing. Alternatively, call [Monadic.create] and
+        [Comonadic.create], then [pack] the results. *)
     val create :
       regionality:bool ->
       linearity:bool ->
@@ -1150,6 +1164,8 @@ module type S = sig
       visibility:bool ->
       staticity:bool ->
       t
+
+    val pack : monadic:Monadic.t -> comonadic:Comonadic.t -> t
 
     (** Project a mode crossing (of all axes) onto the specified axis. *)
     val proj : 'a Axis.t -> t -> 'a
