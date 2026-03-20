@@ -52,7 +52,7 @@ module InstrWorkList : sig
 end
 
 module Color : sig
-  type t = int
+  type t = Regs.Phys_reg.t
 end
 
 module Edge = Regalloc_interf_graph.Edge
@@ -67,7 +67,6 @@ val k : Reg.t -> int
 
 module Spilling_heuristics : sig
   type t =
-    | Set_choose
     | Flat_uses
     | Hierarchical_uses
 

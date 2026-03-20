@@ -83,6 +83,7 @@ and type_desc =
   | Tfield of string * field_kind * type_expr * type_expr
   | Tquote of type_expr
   | Tsplice of type_expr
+  | Tquote_eval of type_expr
   | Tnil
   | Tlink of type_expr
   | Tsubst of type_expr * type_expr option
@@ -574,6 +575,7 @@ module type Wrapped = sig
     { val_type: type_expr wrapped;                (* Type of the value *)
       val_modalities : Mode.Modality.t;     (* Modalities on the value *)
       val_kind: value_kind;
+      val_lpoly: Jkind_types.Sort.var list;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
@@ -679,12 +681,13 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       | Unit -> To.Unit
       | Named (id,mty,mm) -> To.Named (id, module_type m mty,mm)
 
-  let value_description m {val_type; val_modalities; val_kind; val_zero_alloc;
-                           val_attributes; val_loc; val_uid} =
+  let value_description m {val_type; val_modalities; val_kind; val_lpoly;
+                           val_zero_alloc; val_attributes; val_loc; val_uid} =
     To.{
       val_type = m.map_type_expr m val_type;
       val_modalities;
       val_kind;
+      val_lpoly;
       val_zero_alloc;
       val_attributes;
       val_loc;
@@ -939,6 +942,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Void
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
+  | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
 let find_unboxed_type decl =
   match decl.type_kind with
@@ -1267,6 +1271,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tarrow (_, _, _, _)
         | Tquote _
         | Tsplice _
+        | Tquote_eval _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in

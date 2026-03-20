@@ -338,8 +338,8 @@ let pat
     | Tpat_constant _
     | Tpat_unboxed_unit
     | Tpat_unboxed_bool _ -> x.pat_desc
-    | Tpat_var (id, s, uid, sort, m) ->
-      Tpat_var (id, map_loc sub s, uid, sort, m)
+    | Tpat_var { id; name; uid; sort; mode } ->
+      Tpat_var { id; name = map_loc sub name; uid; sort; mode }
     | Tpat_tuple l ->
         Tpat_tuple (List.map (fun (label, p) -> label, sub.pat sub p) l)
     | Tpat_unboxed_tuple l ->
@@ -361,8 +361,10 @@ let pat
         Tpat_record_unboxed_product
           (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
     | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
-    | Tpat_alias (p, id, s, uid, sort, m, ty) ->
-        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
+    | Tpat_alias { pattern; id; name; uid; sort; mode; type_expr } ->
+        Tpat_alias { pattern = sub.pat sub pattern; id;
+                     name = map_loc sub name; uid;
+                     sort; mode; type_expr }
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -503,9 +505,6 @@ let expr sub x =
   let map_block_access sub = function
     | Baccess_field (lid, ld) ->
       Baccess_field (map_loc sub lid, ld)
-    | Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort } ->
-      let index = sub.expr sub index in
-      Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
     | Baccess_block (mut, idx) ->
       Baccess_block (mut, sub.expr sub idx)
   in
@@ -515,8 +514,8 @@ let expr sub x =
   in
   let exp_desc =
     match x.exp_desc with
-    | Texp_ident (path, lid, vd, idk, uu, mode) ->
-        Texp_ident (path, map_loc sub lid, vd, idk, uu, mode)
+    | Texp_ident r ->
+        Texp_ident { r with lid = map_loc sub r.lid }
     | Texp_constant _ as d -> d
     | Texp_let (rec_flag, list, exp) ->
         let (rec_flag, list) = sub.value_bindings sub (rec_flag, list) in
@@ -1030,6 +1029,7 @@ let typ sub x =
     | Ttyp_open (path, mod_ident, t) ->
         Ttyp_open (path, map_loc sub mod_ident, sub.typ sub t)
     | Ttyp_repr (vars, ct) -> Ttyp_repr (vars, sub.typ sub ct)
+    | Ttyp_newlayout (vars, ct) -> Ttyp_newlayout (vars, sub.typ sub ct)
     | Ttyp_of_kind jkind ->
         Ttyp_of_kind (sub.jkind_annotation sub jkind)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)

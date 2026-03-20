@@ -46,11 +46,15 @@ let print_compact_location ppf (loc : Location.t) =
     if startchar >= 0 then Format.fprintf ppf ",%i--%i" startchar endchar
 
 let name_for_function (func : Lambda.lfunction) =
-  (* Name anonymous functions by their source location, if known. *)
+  let mangling_scheme_locates_anonymous_functions =
+    match Config.name_mangling_scheme with Flat -> false
+  in
   match func.loc with
   | Loc_unknown -> "fn"
   | Loc_known { loc; _ } ->
-    if Flambda_features.Expert.shorten_symbol_names ()
+    if
+      Flambda_features.Expert.shorten_symbol_names ()
+      || mangling_scheme_locates_anonymous_functions
     then "fn"
     else Format.asprintf "fn[%a]" print_compact_location loc
 
@@ -613,7 +617,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
             match layout with
             | Ptop | Pbottom ->
               Misc.fatal_error "Cannot bind layout [Ptop] or [Pbottom]"
-            | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
+            | Psplicevar ident ->
+              Lambda.fatal_error_unevaluated_splice_var ident
             | Pvalue _ | Punboxed_or_untagged_integer _ | Punboxed_float _
             | Punboxed_vector _ ->
               ( env,
@@ -759,7 +764,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       | Ptop | Pbottom ->
         Misc.fatal_errorf "Invalid result layout %a for primitive %a"
           Printlambda.layout result_layout Printlambda.primitive prim
-      | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ());
+      | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident);
       cps acc env ccenv
         (L.Llet (Strict, result_layout, id, id_duid, lam, L.Lvar id))
         k k_exn)
@@ -1185,7 +1190,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Lsplice _ -> Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
     Acc.t ->
@@ -1449,7 +1454,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         (Debuginfo.Scoped_location.to_location loc)
         Warnings.Unboxing_impossible;
       None
-    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
   in
   let params_arity =
     Flambda_arity.from_lambda_list
@@ -1682,7 +1687,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lsplice _ -> Misc.splices_should_not_exist_after_eval ())
+        | Lsplice _ -> Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in
   cps_non_tail_var "scrutinee" acc env ccenv scrutinee

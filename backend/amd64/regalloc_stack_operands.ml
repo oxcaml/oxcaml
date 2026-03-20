@@ -170,7 +170,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     | _, Res_none ->
       (* Res_none implies one argument is already an address. *)
       May_still_have_spilled_registers
-    | 1, First_arg -> May_still_have_spilled_registers
+    | 1, Arg _ -> May_still_have_spilled_registers
     | 1, Res [| { loc = res_loc; _ } |] ->
       let arg_mem = Simd.loc_allows_mem simd.args.(0).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
@@ -180,11 +180,11 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       else if res_mem
       then may_use_stack_operand_for_result map instr ~num_args:1
       else May_still_have_spilled_registers
-    | num_args, First_arg ->
+    | num_args, Arg rr ->
       if Simd.loc_allows_mem simd.args.(1).loc
       then
         may_use_stack_operand_for_second_argument map instr ~num_args
-          ~res_is_fst:true
+          ~res_is_fst:(rr.(0) = 0)
       else May_still_have_spilled_registers
     | num_args, Res rr ->
       (* We don't attempt to allow spilling additional result regs. *)
@@ -244,12 +244,12 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       && Nativeint.compare n (-0x80000000n) >= 0
     then may_use_stack_operand_for_only_result map instr
     else May_still_have_spilled_registers
-  | Op (Intop (Iadd | Isub | Iand | Ior | Ixor)) ->
+  | Op (Intop (Isub | Iand | Ior | Ixor)) ->
     binary_operation map instr Result_can_be_on_stack
   | Op (Intop (Icomp _)) -> binary_operation map instr Result_cannot_be_on_stack
   | Op (Intop_imm (Icomp _, _)) ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
-  | Op (Intop_imm (Iadd, _)) ->
+  | Op (Intop Iadd) | Op (Intop_imm (Iadd, _)) ->
     (* Conservatively assume it will be turned into a `lea` instruction, and ask
        for everything to be in registers. *)
     May_still_have_spilled_registers
@@ -266,7 +266,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Intop (Ipopcnt | Iclz _ | Ictz _))
   | Op (Intop_atomic _)
   | Op
-      ( Move | Spill | Reload
+      ( Move | Spill | Reload | Dummy_use
       | Floatop (_, (Inegf | Iabsf | Icompf _))
       | Const_float _ | Const_float32 _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Name_for_debugger _

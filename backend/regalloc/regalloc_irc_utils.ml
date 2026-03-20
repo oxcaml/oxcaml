@@ -109,7 +109,7 @@ module InstrWorkList = struct
 end
 
 module Color = struct
-  type t = int
+  type t = Regs.Phys_reg.t
 end
 
 module Edge = Regalloc_interf_graph.Edge
@@ -127,6 +127,7 @@ let is_move_basic : Cfg.basic -> bool =
     | Static_cast _ -> false
     | Spill -> false
     | Reload -> false
+    | Dummy_use -> false
     | Const_int _ -> false
     | Const_float32 _ -> false
     | Const_float _ -> false
@@ -165,20 +166,18 @@ let is_move_instruction : Cfg.basic Cfg.instruction -> bool =
 let all_precolored_regs = Proc.precolored_regs
 
 let k reg =
-  Reg_class.num_available_registers (Reg_class.of_machtype reg.Reg.typ)
+  Regs.num_available_registers (Regs.Reg_class.of_machtype reg.Reg.typ)
 
 module Spilling_heuristics = struct
   type t =
-    | Set_choose
     | Flat_uses
     | Hierarchical_uses
 
   let default = Flat_uses
 
-  let all = [Set_choose; Flat_uses; Hierarchical_uses]
+  let all = [Flat_uses; Hierarchical_uses]
 
   let to_string = function
-    | Set_choose -> "set_choose"
     | Flat_uses -> "flat_uses"
     | Hierarchical_uses -> "hierarchical_uses"
 
@@ -192,7 +191,6 @@ module Spilling_heuristics = struct
       | None -> default
       | Some id -> (
         match String.lowercase_ascii id with
-        | "set_choose" | "set-choose" -> Set_choose
         | "flat_uses" | "flat-uses" -> Flat_uses
         | "hierarchical_uses" | "hierarchical-uses" -> Hierarchical_uses
         | _ ->

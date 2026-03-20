@@ -300,7 +300,7 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 [%%expect {|
 - : <[int -> ($('a) -> $('a) * $('a)) -> (int -> $('a)) -> $('a) * $('a)]>
     expr
-= <[fun x (type a) (f : a -> (a) * (a)) (g : int -> a) -> f (g x)]>
+= <[fun x (type a) (f : a -> a * a) (g : int -> a) -> f (g x)]>
 |}];;
 
 <[ fun (f : 'a. 'a -> 'a) -> f f ]>;;
@@ -926,8 +926,8 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[int * int -> int]> expr =
 <[
-  let rec add : (int) * (int) -> int =
-  (fun (x, y) -> x + y : (int) * (int) -> int) in add
+  let rec add : int * int -> int = (fun (x, y) -> x + y : int * int -> int)
+  in add
 ]>
 |}];;
 
@@ -997,7 +997,7 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[('a. 'a -> 'a) -> int * string]> expr =
 <[(fun (f : 'a. 'a -> 'a) -> ((f 42), (f "abc")) : ('a__1. 'a__1 -> 'a__1) ->
-  (int) * (string))
+  int * string)
 ]>
 |}];;
 
@@ -1014,4 +1014,133 @@ Line 1, characters 43-44:
 Error: Identifier "x" is used at line 1, characters 43-44,
        inside a quotation (<[ ... ]>);
        it is introduced at line 1, characters 4-5, outside any quotations.
+|}];;
+
+(* The following bug numbers are from
+   https://github.com/oxcaml/oxcaml/pull/5649 *)
+
+(* Bug 1: Int32 constants must include the 'l' suffix *)
+<[ 42l ]>;;
+[%%expect {|
+- : <[int32]> expr = <[42l]>
+|}];;
+
+(* Bug 2: Int64 constants must include the 'L' suffix *)
+<[ 42L ]>;;
+[%%expect {|
+- : <[int64]> expr = <[42L]>
+|}];;
+
+(* Bug 3: Nativeint constants must include the 'n' suffix *)
+<[ 42n ]>;;
+[%%expect {|
+- : <[nativeint]> expr = <[42n]>
+|}];;
+
+(* Bug 4: Guard keyword must be "when", not "with" *)
+<[ fun x -> match x with y when y > 0 -> y | _ -> 0 ]>;;
+[%%expect {|
+- : <[int -> int]> expr =
+<[fun x -> match x with | y when (y > 0) -> y | _ -> 0]>
+|}];;
+
+(* Bug 5: Negative constants must be parenthesized in argument positions *)
+<[ Some (-42) ]>;;
+[%%expect {|
+- : <[int option]> expr = <[Some (-42)]>
+|}];;
+
+(* Bug 6: Type alias variable must include the tick *)
+<[ fun (x : int as 'a) -> (x : 'a) ]>;;
+[%%expect {|
+- : <[int -> int]> expr = <[fun (x : int as 'a) -> (x : 'a)]>
+|}];;
+
+(* Bug 7: Unboxed tuple types must print with '#' prefix *)
+<[ fun (x : #(int * string)) -> x ]>;;
+[%%expect {|
+- : <[#(int * string) -> #(int * string)]> expr =
+<[fun (x : #(int * string)) -> x]>
+|}];;
+
+(* Bug 8: Closed variant types must preserve "present" tags *)
+<[ fun (x : [< `A of int | `B > `A ]) -> x ]>;;
+[%%expect {|
+- : <[([< `A of int | `B > `A ] as '_weak12) -> '_weak12]> expr =
+<[fun (x : [< `A of int | `B > `A ]) -> x]>
+|}];;
+
+(* Bug 9: Fun with function cases must have balanced format boxes *)
+<[ fun x -> function | 0 -> x | n -> n + x ]>;;
+[%%expect {|
+- : <[int -> int -> int]> expr = <[fun x -> function | 0 -> x | n -> n + x]>
+|}];;
+
+(* Bug 10: Src_pos must not print as "." *)
+<[ [%src_pos] ]>;;
+[%%expect {|
+- : <[lexing_position]> expr = <[[%src_pos]]>
+|}];;
+
+(* Bug 2.0: assert/lazy args must be parenthesized *)
+<[ assert (if true then true else false) ]>;;
+[%%expect {|
+- : <[unit]> expr = <[assert (if true then true else false)]>
+|}];;
+
+<[ lazy (if true then 1 else 2) ]>;;
+[%%expect {|
+- : <[int lazy_t]> expr = <[lazy (if true then 1 else 2)]>
+|}];;
+
+(* Bug 2.1: PatVariant argument must be parenthesized *)
+<[ fun x -> match x with | `A (Some y) -> y | _ -> 0 ]>;;
+[%%expect {|
+- : <[([> `A of int option ] as '_weak13) -> int]> expr =
+<[fun x -> match x with | `A (Some (y)) -> y | _ -> 0]>
+|}];;
+
+(* Bug 2.2: Match/try in case RHS must be parenthesized *)
+<[ fun x y -> match x with | true -> (match y with | 0 -> "a" | _ -> "b") | false -> "c" ]>;;
+[%%expect {|
+- : <[bool -> int -> string]> expr =
+<[
+  fun x y ->
+    match x with | true -> (match y with | 0 -> "a" | _ -> "b") | false ->
+      "c"
+]>
+|}];;
+
+<[ fun x -> match x with | true -> (try raise Exit with _ -> 0) | false -> 1 ]>;;
+[%%expect {|
+- : <[bool -> int]> expr =
+<[
+  fun x ->
+    match x with | true -> (try Stdlib.raise Exit with  | _ -> 0) | false ->
+      1
+]>
+|}];;
+
+(* Bug 2.3: Sequence elements must parenthesize let *)
+<[ (let x = 1 in x); 2 ]>;;
+[%%expect {|
+Line 1, characters 17-18:
+1 | <[ (let x = 1 in x); 2 ]>;;
+                     ^
+Warning 10 [non-unit-statement]: this expression should have type unit.
+
+- : <[int]> expr = <[(let x = 1 in x); 2]>
+|}];;
+
+(* Bug 2.4: If-then-else else branch must parenthesize let and sequence *)
+<[ if true then 1 else (let x = 2 in x) ]>;;
+[%%expect {|
+- : <[int]> expr = <[if true then 1 else (let x = 2 in x)]>
+|}];;
+
+(* Bug 2.5: Unboxed_field sub-expression must be parenthesized *)
+<[ (List.hd [{contents = 42}]).contents ]>;;
+[%%expect {|
+- : <[int]> expr =
+<[(Stdlib.List.hd ([{ Stdlib.contents = 42; }])).Stdlib.contents]>
 |}];;

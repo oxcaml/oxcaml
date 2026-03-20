@@ -1,0 +1,13 @@
+let code main_0 deleted in
+let code loopify(never) size(4) newer_version_of(main_0)
+      main_0_1 (x)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %is_null (x) in
+  let tagged_scrutinee = %tag_imm (prim) in
+  cont k (tagged_scrutinee)
+in
+let $camlN_way_join_null__main_1 = closure main_0_1 @main in
+let $camlN_way_join_null = Block 0 ($camlN_way_join_null__main_1) in
+cont done ($camlN_way_join_null)

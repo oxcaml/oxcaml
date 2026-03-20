@@ -1138,15 +1138,15 @@ let select_operation_cfg ~dbg op args =
   |> or_else select_operation_f16c
   |> or_else select_operation_fma
 
-let rax = Proc.phys_reg Int 0
+let rax = Proc.phys_reg Int (P RAX)
 
-let rdi = Proc.phys_reg Int 2
+let rdi = Proc.phys_reg Int (P RDI)
 
-let rcx = Proc.phys_reg Int 5
+let rcx = Proc.phys_reg Int (P RCX)
 
-let rdx = Proc.phys_reg Int 4
+let rdx = Proc.phys_reg Int (P RDX)
 
-let xmm0v = Proc.phys_reg Vec128 100
+let xmm0v = Proc.phys_reg Vec128 (P MM0)
 
 let to_phys_reg (pinned_reg : Simd.reg) =
   match pinned_reg with
@@ -1165,14 +1165,30 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
   Array.iteri
     (fun i ({ loc; _ } : Simd.arg) -> maybe_pin arg_regs i loc)
     simd.args;
-  (match simd.res with
-  | Res_none -> ()
-  | First_arg ->
-    assert (not (Reg.is_preassigned arg_regs.(0)));
-    arg_regs.(0) <- res_regs.(0)
+  match simd.res with
+  | Res_none -> arg_regs, res_regs
+  | Arg rr ->
+    let res_regs = ref res_regs in
+    Array.fold_left
+      (fun r a ->
+        let len = Simd.loc_reg_count simd.args.(a).loc in
+        let a = Simd.unarized_reg_index simd.args a in
+        (* CR-someday mslater: we should require binding all overwritten args *)
+        (if r = Array.length !res_regs
+         then
+           let fresh = Reg.createv_with_typs (Array.sub arg_regs a len) in
+           res_regs := Array.append !res_regs fresh);
+        for idx = 0 to len - 1 do
+          assert (not (Reg.is_preassigned arg_regs.(a + idx)));
+          arg_regs.(a + idx) <- !res_regs.(r + idx)
+        done;
+        r + len)
+      0 rr
+    |> ignore;
+    arg_regs, !res_regs
   | Res rr ->
-    Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr);
-  arg_regs, res_regs
+    Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr;
+    arg_regs, res_regs
 
 let pseudoregs_for_operation (simd : Simd.operation) arg res =
   let arg_regs = Array.copy arg in
@@ -1397,11 +1413,12 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       match op with
       | Const_int n -> Int64.of_nativeint n
       | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Specific _ | Alloc _
-      | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_float32 _
-      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Int128op _ | Intop_atomic _ | Floatop _
-      | Csel _ | Probe_is_enabled _ | Opaque | Begin_region | End_region | Pause
-      | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll ->
+      | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Dummy_use
+      | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
+      | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
+      | Begin_region | End_region | Pause | Name_for_debugger _ | Dls_get
+      | Tls_get | Domain_index | Poll ->
         assert false
     in
     assert (arg_count = 0 && res_count = 1);
@@ -1452,12 +1469,12 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       match op with
       | Intop_imm (_, n) -> Int64.of_int n
       | Move | Load _ | Store _ | Intop _ | Specific _ | Alloc _
-      | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
-      | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
-      | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-      | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
-      | Domain_index | Poll | Pause ->
+      | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Dummy_use
+      | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+      | Int128op _ | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _
+      | Opaque | Begin_region | End_region | Name_for_debugger _ | Dls_get
+      | Tls_get | Domain_index | Poll | Pause ->
         assert false
     in
     let consts = List.map extract_intop_imm_int cfg_ops in
@@ -1495,12 +1512,12 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | Icldemote _ | Illvm_intrinsic _ ->
             assert false)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
-        | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
-        | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-        | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
-        | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-        | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
-        | Domain_index | Poll | Pause ->
+        | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Dummy_use
+        | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+        | Int128op _ | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _
+        | Opaque | Begin_region | End_region | Name_for_debugger _ | Dls_get
+        | Tls_get | Domain_index | Poll | Pause ->
           assert false
       in
       let get_scale op =
@@ -1629,11 +1646,12 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               | Izextend32 | Illvm_intrinsic _ )
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Int128op _
           | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
-          | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-          | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-          | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
-          | Domain_index | Poll | Pause ->
+          | Dummy_use | Const_int _ | Const_float32 _ | Const_float _
+          | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+          | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _
+          | Probe_is_enabled _ | Opaque | Begin_region | End_region
+          | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
+          | Pause ->
             assert false
         in
         let consts = List.map extract_store_int_imm cfg_ops in
@@ -1734,7 +1752,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       Misc.fatal_errorf
         "Simd_selection: Unexpected llvm_intrinsic %s: not using LLVM backend"
         intr)
-  | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
+  | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Dummy_use
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
   | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
   | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Pause

@@ -30,7 +30,7 @@ val max_domains : unit -> int
       of the other domains managed by this library. *)
 val current_domain : unit -> int
 
-type 'a spawn_result =
+type ('a : value_or_null) spawn_result =
   | Spawned
   | Failed of 'a * exn @@ aliased many * Printexc.raw_backtrace @@ aliased many
 
@@ -47,7 +47,8 @@ type 'a spawn_result =
 
     @raise Sys_error in case the system fails to create a new thread. *)
 val spawn_on
-  :   domain:int
+  :  ('a : value_or_null).
+     domain:int
   -> ('a @ contended once portable unique -> unit) @ once portable unyielding
   -> 'a @ contended once portable unique
   -> 'a spawn_result @ contended once portable unique
@@ -63,6 +64,7 @@ val spawn_on
 
     @raise Sys_error in case the system fails to create a new thread. *)
 val spawn
-  :  ('a @ contended once portable unique -> unit) @ once portable unyielding
+  :  ('a : value_or_null).
+     ('a @ contended once portable unique -> unit) @ once portable unyielding
   -> 'a @ contended once portable unique
   -> 'a spawn_result @ contended once portable unique

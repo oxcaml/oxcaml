@@ -40,8 +40,11 @@ val cfg_prologue_validate : bool ref
 val cfg_prologue_shrink_wrap : bool ref
 val cfg_prologue_shrink_wrap_threshold : int ref
 
+val cfg_merge_blocks : bool ref
+
 val cfg_value_propagation : bool ref
 val cfg_value_propagation_float : bool ref
+val cfg_value_propagation_flow : bool ref
 
 val reorder_blocks_random : int option ref
 val basic_block_sections : bool ref
@@ -98,7 +101,7 @@ val caml_apply_inline_fast_path : bool ref
 type function_result_types = Never | Functors_only | All_functions
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type join_algorithm = Binary | N_way | Checked
-type opt_level = Oclassic | O2 | O3
+type opt_level = Oclassic | O2 | O3 | O4
 type 'a or_default = Set of 'a | Default
 
 val dump_inlining_paths : bool ref
@@ -142,6 +145,7 @@ module Flambda2 : sig
     val reaper_preserve_direct_calls : reaper_preserve_direct_calls
     val reaper_local_fields : bool
     val reaper_unbox : bool
+    val reaper_max_unbox_size : int
     val reaper_change_calling_conventions : bool
     val unicode : bool
     val kind_checks : bool
@@ -163,6 +167,7 @@ module Flambda2 : sig
     reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     reaper_local_fields : bool;
     reaper_unbox : bool;
+    reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
     unicode : bool;
     kind_checks : bool;
@@ -183,6 +188,7 @@ module Flambda2 : sig
   val reaper_preserve_direct_calls : reaper_preserve_direct_calls or_default ref
   val reaper_local_fields : bool or_default ref
   val reaper_unbox : bool or_default ref
+  val reaper_max_unbox_size : int or_default ref
   val reaper_change_calling_conventions : bool or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
@@ -190,7 +196,7 @@ module Flambda2 : sig
   module Dump : sig
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
     type pass = Last_pass | This_pass of string
-    
+
     val rawfexpr : target ref
     val fexpr : target ref
     val fexpr_after : pass ref

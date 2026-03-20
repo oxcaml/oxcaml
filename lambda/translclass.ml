@@ -155,8 +155,8 @@ let create_object cl obj init =
 
 let name_pattern default p =
   match p.pat_desc with
-  | Tpat_var (id, _, _, _, _) -> id
-  | Tpat_alias(_, id, _, _, _, _, _) -> id
+  | Tpat_var { id; _ } -> id
+  | Tpat_alias { id; _ } -> id
   | _ -> Ident.create_local default
 
 let rec build_object_init ~scopes cl_table obj params inh_init obj_init cl =
@@ -787,8 +787,7 @@ let free_methods l =
     | Lifthenelse _ | Lsequence _ | Lwhile _
     | Levent _ | Lifused _ | Lregion _ | Lexclave _ -> ()
     | Lsplice _ ->
-      (* CR layout poly: we could definitely do better here. *)
-      Misc.fatal_error "Layout polymorphism is not supported in classes"
+      fatal_error_invalid_constructor l
   in free l; !fv
 
 let transl_class ~scopes ids cl_id pub_meths cl vflag =

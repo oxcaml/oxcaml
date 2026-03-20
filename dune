@@ -282,13 +282,11 @@
   mixed_block_shape
   mixed_product_bytes
   printlambda
-  printslambda0
-  printslambda
   runtimedef
   runtimetags
   tmc
   simplif
-  slambda0
+  slambda_fracture
   slambda
   slambdaeval
   switch
@@ -600,8 +598,8 @@
   stack_check
   sub_cfg
   reg
-  reg_class
-  reg_class_utils
+  regs
+  regs_utils
   relocation_entry
   relocation_table
   section_table
@@ -643,6 +641,7 @@
   cfg_polling
   cfg_simplify
   cfg_prologue
+  cfg_merge_blocks
   extra_debug
   label
   linear_utils

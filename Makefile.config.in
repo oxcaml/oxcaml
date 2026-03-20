@@ -67,7 +67,7 @@ TOOLPREF=@ac_tool_prefix@
 CC=@CC@
 
 CC_HAS_DEBUG_PREFIX_MAP=@cc_has_debug_prefix_map@
-AS_HAS_DEBUG_PREFIX_MAP=@as_has_debug_prefix_map@
+AS_DEBUG_PREFIX_MAP_FLAG=@as_debug_prefix_map_flag@
 
 LDFLAGS?=@LDFLAGS@
 
@@ -201,6 +201,7 @@ ASM_CFI_SUPPORTED=@asm_cfi_supported@
 WITH_FRAME_POINTERS=@frame_pointers@
 WITH_ADDRESS_SANITIZER=@address_sanitizer@
 WITH_CPP_MANGLING=@cpp_mangling@
+NAME_MANGLING_SCHEME=@name_mangling_scheme@
 WITH_PROFINFO=@profinfo@
 PROFINFO_WIDTH=@profinfo_width@
 HEADER_RESERVED_BITS=@reserved_header_bits@

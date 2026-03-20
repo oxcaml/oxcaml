@@ -5,7 +5,7 @@ module DLL = Oxcaml_utils.Doubly_linked_list
 
 type t
 
-val for_fatal : t -> Interval.t DLL.t * ClassIntervals.t Reg_class.Tbl.t
+val for_fatal : t -> Interval.t DLL.t * ClassIntervals.t Regs.Reg_class_tbl.t
 
 val make :
   stack_slots:Regalloc_stack_slots.t -> affinity:Regalloc_affinity.t -> t
@@ -18,9 +18,9 @@ val fold_intervals : t -> f:('a -> Interval.t -> 'a) -> init:'a -> 'a
 
 val release_expired_intervals : t -> pos:int -> unit
 
-val active : t -> reg_class:Reg_class.t -> ClassIntervals.t
+val active : t -> reg_class:Regs.Reg_class.t -> ClassIntervals.t
 
-val active_classes : t -> ClassIntervals.t Reg_class.Tbl.t
+val active_classes : t -> ClassIntervals.t Regs.Reg_class_tbl.t
 
 val stack_slots : t -> Regalloc_stack_slots.t
 

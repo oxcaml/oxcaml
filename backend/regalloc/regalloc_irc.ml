@@ -10,10 +10,9 @@ let filter_unavailable : Reg.t array -> Reg.t array =
   let is_available (reg : Reg.t) : bool =
     match reg.loc with
     | Unknown -> true
-    | Reg r ->
-      let reg_class = Reg_class.of_machtype reg.typ in
-      r - Reg_class.first_available_register reg_class
-      < Reg_class.num_available_registers reg_class
+    | Reg phys_reg ->
+      let reg_class = Regs.Reg_class.of_machtype reg.typ in
+      Regs.index_in_class phys_reg < Regs.num_available_registers reg_class
     | Stack _ -> true
   in
   let num_available =
@@ -258,19 +257,6 @@ let select_spilling_register_using_heuristics : State.t -> SpillCosts.t -> Reg.t
     =
  fun state costs ->
   match Lazy.force Spilling_heuristics.value with
-  | Set_choose -> (
-    (* This is the "heuristics" from the IRC paper: pick any candidate, just try
-       to avoid any of the temporaries introduces for spilling. *)
-    let spill_work_list = State.spill_work_list state in
-    match
-      Reg.Set.choose_opt
-        (State.diff_all_introduced_temporaries state spill_work_list)
-    with
-    | Some reg -> reg
-    | None -> (
-      match Reg.Set.choose_opt spill_work_list with
-      | Some reg -> reg
-      | None -> fatal "spill_work_list is empty"))
   | Flat_uses | Hierarchical_uses -> (
     (* note: this assumes that `Reg.spill_cost` has been updated as needed (only
        when `rewrite` is called); the value computed here can however not be
@@ -327,9 +313,8 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
       then (
         log "%a" Printreg.reg n;
         indent ());
-      let reg_class = Reg_class.of_machtype n.typ in
-      let reg_num_avail = Reg_class.num_available_registers reg_class in
-      let reg_first_avail = Reg_class.first_available_register reg_class in
+      let reg_class = Regs.Reg_class.of_machtype n.typ in
+      let reg_num_avail = Regs.num_available_registers reg_class in
       let ok_colors = Array.make reg_num_avail true in
       let counter = ref reg_num_avail in
       (* returns the index of the first available physical register in the
@@ -349,7 +334,7 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
       let rec get_available = function
         | [] -> get_first_available ()
         | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
-          let idx = phys_reg - reg_first_avail in
+          let idx = Regs.index_in_class phys_reg in
           if idx >= 0 && idx < reg_num_avail && Array.unsafe_get ok_colors idx
           then idx
           else get_available tl
@@ -364,10 +349,11 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
             match State.color state alias with
             | None -> assert false
             | Some color ->
-              if debug then log "color %d is not available" color;
-              if Array.unsafe_get ok_colors (color - reg_first_avail)
+              if debug
+              then log "color %a is not available" Regs.Phys_reg.print color;
+              if Array.unsafe_get ok_colors (Regs.index_in_class color)
               then (
-                Array.unsafe_set ok_colors (color - reg_first_avail) false;
+                Array.unsafe_set ok_colors (Regs.index_in_class color) false;
                 decr counter;
                 if !counter > 0
                 then mark_adjacent_colors_and_get_available tl
@@ -384,8 +370,8 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
         State.add_spilled_nodes state n)
       else (
         State.add_colored_nodes state n;
-        let c = first_avail + reg_first_avail in
-        if debug then log "coloring with %d" c;
+        let c = (Regs.registers reg_class).(first_avail) in
+        if debug then log "coloring with %a" Regs.Phys_reg.print c;
         State.set_color state n (Some c));
       if debug then dedent ());
   State.iter_coalesced_nodes state ~f:(fun n ->
@@ -400,10 +386,9 @@ let rewrite :
     State.t ->
     Cfg_with_infos.t ->
     spilled_nodes:Reg.t list ->
-    reset:bool ->
     block_temporaries:bool ->
     bool =
- fun state cfg_with_infos ~spilled_nodes ~reset ~block_temporaries ->
+ fun state cfg_with_infos ~spilled_nodes ~block_temporaries ->
   let new_inst_temporaries, new_block_temporaries, block_inserted =
     Regalloc_rewrite.rewrite_gen
       (module State)
@@ -415,15 +400,10 @@ let rewrite :
   match new_inst_temporaries, new_block_temporaries with
   | [], [] -> false
   | _ ->
-    (Cfg_with_infos.invalidate_liveness cfg_with_infos;
-     State.add_inst_temporaries_list state new_inst_temporaries;
-     State.add_block_temporaries_list state new_block_temporaries;
-     match reset with
-     | true -> State.reset state ~new_inst_temporaries ~new_block_temporaries
-     | false ->
-       State.clear_spilled_nodes state;
-       State.add_initial_list state new_block_temporaries;
-       State.add_initial_list state new_inst_temporaries);
+    Cfg_with_infos.invalidate_liveness cfg_with_infos;
+    State.add_inst_temporaries_list state new_inst_temporaries;
+    State.add_block_temporaries_list state new_block_temporaries;
+    State.reset state ~new_inst_temporaries ~new_block_temporaries;
     true
 
 (* CR xclerc for xclerc: could probably be lower; the compiler distribution
@@ -491,9 +471,6 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
         | None ->
           let costs =
             match Lazy.force Spilling_heuristics.value with
-            | Set_choose ->
-              (* note: `spill_cost` will not be used by the heuristics *)
-              SpillCosts.empty ()
             | Flat_uses -> SpillCosts.compute cfg_with_infos ~flat:true ()
             | Hierarchical_uses ->
               SpillCosts.compute cfg_with_infos ~flat:false ()
@@ -518,8 +495,7 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
       List.iter spilled_nodes ~f:(fun reg ->
           log "/!\\ register %a needs to be spilled" Printreg.reg reg);
     match
-      rewrite state cfg_with_infos ~spilled_nodes ~reset:true
-        ~block_temporaries:(round = 1)
+      rewrite state cfg_with_infos ~spilled_nodes ~block_temporaries:(round = 1)
     with
     | false -> if debug then log "(end of main)"
     | true ->
@@ -545,18 +521,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
       ~initial:(Reg.Set.elements all_temporaries)
       ~stack_slots ~affinity ()
   in
-  let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
-  (match Reg.Set.elements spilling_because_unused with
-  | [] -> ()
-  | _ :: _ as spilled_nodes ->
-    List.iter spilled_nodes ~f:(fun reg -> State.add_spilled_nodes state reg);
-    (* note: rewrite will remove the `spilling` registers from the "spilled"
-       work list and set the field to unknown. *)
-    let (_ : bool) =
-      rewrite state cfg_with_infos ~spilled_nodes ~reset:false
-        ~block_temporaries:false
-    in
-    ());
+  Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
   main ~round:1 state cfg_with_infos;
   if debug then log_cfg_with_infos cfg_with_infos;
   Regalloc_rewrite.postlude

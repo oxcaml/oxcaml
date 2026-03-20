@@ -48,6 +48,8 @@ type t3''' =
   ('a. 'a -> (module T with type t = 'a)) ->
   (module T with type t = int) * (module T with type t = string)
 
+type t3'''' = ('a. 'a expr -> 'a eval) -> int * string
+
 type t4 = (('a : immediate). 'a -> 'a) -> int * bool
 
 

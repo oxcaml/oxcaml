@@ -26,8 +26,7 @@ Error: allocation of 24 bytes
 File "fail19.ml", line 20, characters 2-26:
 Error: allocation of 24 bytes
 
-File "fail19.ml", line 20, characters 5-26:
+File "dep19.ml", line 1, characters 38-74:
 Error: called function may allocate (external call to caml_array_make)
 inlined from
-dep19.ml:1,38--74[Dep19.inline_always][camlDep19.inline_always_HIDE_STAMP]
 fail19.ml:20,5--26[Fail19.foo]

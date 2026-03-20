@@ -128,15 +128,6 @@ let fmt_private_flag f x =
   | Private -> fprintf f "Private";
 ;;
 
-let fmt_index_kind f = function
-  | Index_int -> fprintf f "Index_int"
-  | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
-  | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
-  | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
-  | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
-  | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
-;;
-
 let line i f s (*...*) =
   fprintf f "%s" (String.make ((2*i) mod 72) ' ');
   fprintf f s (*...*)
@@ -266,6 +257,10 @@ let rec core_type i ppf x =
   | Ptyp_repr (lv, ct) ->
       line i ppf "Ptyp_repr\n";
       list i reprvar ppf lv;
+      core_type i ppf ct;
+  | Ptyp_newlayout (lv, ct) ->
+      line i ppf "Ptyp_newlayout\n";
+      list i string_loc ppf lv;
       core_type i ppf ct;
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i+1)) jkind
@@ -536,10 +531,6 @@ and expression i ppf x =
 and block_access i ppf = function
   | Baccess_field lid ->
       line i ppf "Baccess_field %a\n" fmt_longident_loc lid
-  | Baccess_array (mut, index_kind, index) ->
-      line i ppf "Baccess_array %a %a\n"
-        fmt_mutable_flag mut fmt_index_kind index_kind;
-      expression i ppf index
   | Baccess_block (mut, idx) ->
     line i ppf "Baccess_block %a\n"
       fmt_mutable_flag mut;
@@ -595,8 +586,10 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
   line i ppf "jkind %a\n" fmt_location jkind.pjka_loc;
   match jkind.pjka_desc with
   | Pjk_default -> line i ppf "Pjk_default\n"
-  | Pjk_abbreviation jkind ->
-      line i ppf "Pjk_abbreviation %a\n" fmt_longident_loc jkind
+  | Pjk_abbreviation (abbrev, sa) ->
+      line i ppf "Pjk_abbreviation %a\n" fmt_longident_loc abbrev;
+      List.iter
+        (fun a -> line (i+1) ppf "scannable_axis %a\n" fmt_string_loc a) sa
   | Pjk_mod (jkind, m) ->
       line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;

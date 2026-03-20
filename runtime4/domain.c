@@ -117,6 +117,11 @@ CAMLprim value caml_recommended_domain_count(void)
   caml_failwith("Domains not supported on runtime4");
 }
 
+CAMLprim value caml_max_domain_count(void)
+{
+  return Val_int(1);
+}
+
 CAMLprim value caml_init_domain_self(void)
 {
   caml_failwith("Domains not supported on runtime4");

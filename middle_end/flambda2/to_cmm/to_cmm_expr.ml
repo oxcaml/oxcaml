@@ -110,28 +110,34 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
        2. All of the [machtype_component]s are singleton arrays. *)
     Array.map (fun machtype -> [| machtype |]) return_ty
   in
-  (* Returned small integer values need to be sign-extended because it's not
-     clear whether C code that returns a small integer returns one that is sign
-     extended or not. There is no need to wrap other return arities. *)
+  (* Small integer arguments need to be sign-extended to 32 bits because it's
+     not clear whether C code that accepts small integer arguments expects them
+     sign-extended or not. *)
   let maybe_sign_extend kind dbg cmm =
-    match Flambda_kind.With_subkind.kind kind with
-    | Naked_number Naked_int8 -> C.sign_extend ~bits:8 ~dbg cmm
-    | Naked_number Naked_int16 -> C.sign_extend ~bits:16 ~dbg cmm
-    | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
+    match (kind : K.t) with
+    | Naked_number Naked_int8 ->
+      C.sign_extend_to ~source_bits:8 ~target_bits:32 ~dbg cmm
+    | Naked_number Naked_int16 ->
+      C.sign_extend_to ~source_bits:16 ~target_bits:32 ~dbg cmm
     | Naked_number
-        ( Naked_float | Naked_immediate | Naked_int64 | Naked_nativeint
-        | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_float32 )
+        ( Naked_float | Naked_immediate | Naked_int32 | Naked_int64
+        | Naked_nativeint | Naked_vec128 | Naked_vec256 | Naked_vec512
+        | Naked_float32 )
     | Value | Rec_info | Region ->
       cmm
   in
-  let ty_args =
-    List.map C.exttype_of_kind
-      (Flambda_arity.unarize (Apply.args_arity apply)
-      |> List.map K.With_subkind.kind)
+  let kind_args =
+    Flambda_arity.unarize (Apply.args_arity apply)
+    |> List.map K.With_subkind.kind
+  in
+  let ty_args = List.map C.exttype_of_kind kind_args in
+  let args =
+    List.map2 (fun arg kind -> maybe_sign_extend kind dbg arg) args kind_args
   in
   let effects = To_cmm_effects.transl_c_call_effects effects in
   let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
-  let extcall =
+  (* CR jrayman: ignore [builtin_sign_extends]? *)
+  let { extcall; builtin_sign_extends = _ } : Cmm_builtins.t =
     C.extcall ~dbg ~alloc:needs_caml_c_call ~is_c_builtin ~effects ~coeffects
       ~returns ~ty_args callee return_ty args
   in
@@ -147,7 +153,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
          returns from extcalls *)
       (* Extcalls of arity 0 are allowed (these never return). *)
       return_values
-    | [kind] -> maybe_sign_extend kind dbg return_values
+    | [_] -> return_values
     | [_; _] as kinds ->
       (* CR xclerc: we currently support only pairs as unboxed return values. *)
       (* CR mshinwell: we also currently only support 64 bit integer and float
@@ -206,11 +212,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
         C.tuple_field exp ~component_tys n dbg
       in
       C.make_tuple
-        (List.mapi
-           (fun i kind ->
-             maybe_sign_extend kind dbg
-               (get_unarized_return_value return_values i))
-           kinds)
+        (List.mapi (fun i _ -> get_unarized_return_value return_values i) kinds)
     | _ ->
       Misc.fatal_errorf
         "C functions are currently limited to a single return value or a pair \

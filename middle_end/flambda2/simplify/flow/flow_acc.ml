@@ -34,6 +34,7 @@ let empty () =
     { stack = [];
       map = Continuation.Map.empty;
       extra = Continuation.Map.empty;
+      lifted_constants = Lifted_constant_state.empty;
       dummy_toplevel_cont = wrong_dummy_toplevel_cont
     }
   in
@@ -154,67 +155,76 @@ let record_ref_named named_rewrite_id ~bound_to ~original_prim ~prim (t : t) =
       in
       { cont_info with mutable_let_prims_rev })
 
+let record_symbol_projection_aux var name_occurrences (elt : cont_info) =
+  let bindings =
+    Name.Map.update (Name.var var)
+      (function
+        | None -> Some name_occurrences
+        | Some prior_occurences as original ->
+          if Name_occurrences.equal prior_occurences name_occurrences
+          then original
+          else
+            Misc.fatal_errorf
+              "@[<v>The following projection has been bound to different \
+               symbols:%a@ previously bound to:@ %a@ and now to@ %a@]"
+              Variable.print var Name_occurrences.print prior_occurences
+              Name_occurrences.print name_occurrences)
+      elt.bindings
+  in
+  { elt with bindings }
+
 let record_symbol_projection var name_occurrences t =
-  update_top_of_stack ~t ~f:(fun elt ->
-      let bindings =
-        Name.Map.update (Name.var var)
-          (function
-            | None -> Some name_occurrences
-            | Some prior_occurences as original ->
-              if Name_occurrences.equal prior_occurences name_occurrences
-              then original
-              else
-                Misc.fatal_errorf
-                  "@[<v>The following projection has been bound to different \
-                   symbols:%a@ previously bound to:@ %a@ and now to@ %a@]"
-                  Variable.print var Name_occurrences.print prior_occurences
-                  Name_occurrences.print name_occurrences)
-          elt.bindings
-      in
-      { elt with bindings })
+  update_top_of_stack ~t ~f:(record_symbol_projection_aux var name_occurrences)
+
+let record_symbol_binding_aux symbol name_occurrences (elt : cont_info) =
+  let bindings =
+    Name.Map.update (Name.symbol symbol)
+      (function
+        | None -> Some name_occurrences
+        | Some _ ->
+          Misc.fatal_errorf "The following symbol has been bound twice: %a"
+            Symbol.print symbol)
+      elt.bindings
+  in
+  { elt with bindings }
 
 let record_symbol_binding symbol name_occurrences t =
-  update_top_of_stack ~t ~f:(fun elt ->
-      let bindings =
-        Name.Map.update (Name.symbol symbol)
-          (function
-            | None -> Some name_occurrences
-            | Some _ ->
-              Misc.fatal_errorf "The following symbol has been bound twice: %a"
-                Symbol.print symbol)
-          elt.bindings
-      in
-      { elt with bindings })
+  update_top_of_stack ~t ~f:(record_symbol_binding_aux symbol name_occurrences)
+
+let record_code_id_binding_aux code_id name_occurrences (elt : cont_info) =
+  let code_ids =
+    Code_id.Map.update code_id
+      (function
+        | None -> Some name_occurrences
+        | Some _ ->
+          Misc.fatal_errorf "The following code_id has been bound twice: %a"
+            Code_id.print code_id)
+      elt.code_ids
+  in
+  { elt with code_ids }
 
 let record_code_id_binding code_id name_occurrences t =
-  update_top_of_stack ~t ~f:(fun elt ->
-      let code_ids =
-        Code_id.Map.update code_id
-          (function
-            | None -> Some name_occurrences
-            | Some _ ->
-              Misc.fatal_errorf "The following code_id has been bound twice: %a"
-                Code_id.print code_id)
-          elt.code_ids
-      in
-      { elt with code_ids })
+  update_top_of_stack ~t
+    ~f:(record_code_id_binding_aux code_id name_occurrences)
+
+let record_value_slot_aux src value_slot dst (elt : cont_info) =
+  let value_slots =
+    Value_slot.Map.update value_slot
+      (function
+        | None -> Some (Name.Map.singleton src dst)
+        | Some map ->
+          Some
+            (Name.Map.update src
+               (function
+                 | None -> Some dst
+                 | Some dst' -> Some (Name_occurrences.union dst dst'))
+               map))
+      elt.value_slots
+  in
+  { elt with value_slots }
 
 let record_value_slot src value_slot dst t =
-  update_top_of_stack ~t ~f:(fun elt ->
-      let value_slots =
-        Value_slot.Map.update value_slot
-          (function
-            | None -> Some (Name.Map.singleton src dst)
-            | Some map ->
-              Some
-                (Name.Map.update src
-                   (function
-                     | None -> Some dst
-                     | Some dst' -> Some (Name_occurrences.union dst dst'))
-                   map))
-          elt.value_slots
-      in
-      { elt with value_slots })
+  update_top_of_stack ~t ~f:(record_value_slot_aux src value_slot dst)
 
 let add_used_in_current_handler name_occurrences t =
   update_top_of_stack ~t ~f:(fun elt ->
@@ -396,6 +406,91 @@ let record_let_binding ~rewrite_id ~generate_phantom_lets ~let_bound
           let t = record_defined_var var t in
           add_used_in_current_handler free_names t))
 
+(* Lifted symbols *)
+
+let record_lifted_function_slot_aux ~free_names ~value_slots _ (symbol, _) elt =
+  let elt = record_symbol_binding_aux symbol free_names elt in
+  Value_slot.Map.fold
+    (fun value_slot simple elt ->
+      record_value_slot_aux (Name.symbol symbol) value_slot
+        (Simple.free_names simple) elt)
+    value_slots elt
+
+let record_lifted_constant_definition_aux ~being_defined elt definition =
+  let module D = Lifted_constant.Definition in
+  match D.descr definition with
+  | Code code_id ->
+    record_code_id_binding_aux code_id
+      (Name_occurrences.union being_defined (D.free_names definition))
+      elt
+  | Block_like { symbol; _ } ->
+    let free_names =
+      Name_occurrences.union being_defined (D.free_names definition)
+    in
+    record_symbol_binding_aux symbol free_names elt
+  | Set_of_closures { closure_symbols_with_types; _ } -> (
+    let expr = D.defining_expr definition in
+    match Rebuilt_static_const.to_const expr with
+    | Some (Static_const const) ->
+      let set_of_closures = Static_const.must_be_set_of_closures const in
+      let free_names =
+        Name_occurrences.union being_defined
+          (Function_declarations.free_names
+             (Set_of_closures.function_decls set_of_closures))
+      in
+      let value_slots = Set_of_closures.value_slots set_of_closures in
+      Function_slot.Lmap.fold
+        (record_lifted_function_slot_aux ~free_names ~value_slots)
+        closure_symbols_with_types elt
+    | None | Some (Code _ | Deleted_code) ->
+      let free_names =
+        Name_occurrences.union being_defined (D.free_names definition)
+      in
+      Function_slot.Lmap.fold
+        (fun _ (symbol, _) elt ->
+          record_symbol_binding_aux symbol free_names elt)
+        closure_symbols_with_types elt)
+
+let normalize_lifted_constant_aux lifted_constant (elt : cont_info) =
+  let being_defined =
+    let bound_static = Lifted_constant.bound_static lifted_constant in
+    (* Note: We're not registering code IDs in the set, because we can actually
+       delete code bindings individually. In particular, code IDs that are only
+       used in the newer_version_of field of another binding will be deleted as
+       expected. *)
+    let symbols = Bound_static.symbols_being_defined bound_static in
+    Name_occurrences.empty
+    |> Symbol.Set.fold
+         (fun symbol acc ->
+           Name_occurrences.add_symbol acc symbol Name_mode.normal)
+         symbols
+  in
+  (* Record all projections as potential dependencies. *)
+  let elt =
+    Variable.Map.fold
+      (fun var proj elt ->
+        record_symbol_projection_aux var (Symbol_projection.free_names proj) elt)
+      (Lifted_constant.symbol_projections lifted_constant)
+      elt
+  in
+  let elt =
+    ListLabels.fold_left ~init:elt
+      (Lifted_constant.definitions lifted_constant)
+      ~f:(record_lifted_constant_definition_aux ~being_defined)
+  in
+  elt
+
+let normalize_lifted_constants_aux lifted_constants elt =
+  Lifted_constant_state.fold lifted_constants ~init:elt
+    ~f:(fun elt lifted_constant ->
+      normalize_lifted_constant_aux lifted_constant elt)
+
+let record_lifted_constants lifted_constants (t : t) =
+  { t with
+    lifted_constants =
+      Lifted_constant_state.union lifted_constants t.lifted_constants
+  }
+
 (* Normalisation *)
 (* ************* *)
 
@@ -528,5 +623,15 @@ let normalize_acc ~specialization_map (t : T.Acc.t) =
         in
         Continuation.Map.add cont elt map)
       t.extra map
+  in
+  let map =
+    Continuation.Map.update t.dummy_toplevel_cont
+      (function
+        | None ->
+          Misc.fatal_errorf
+            "Data_flow: missing continuation info for top-level expression"
+        | Some elt ->
+          Some (normalize_lifted_constants_aux t.lifted_constants elt))
+      map
   in
   { t with map; extra = Continuation.Map.empty }

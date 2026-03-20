@@ -202,6 +202,8 @@ module T = struct
         of_kind ~loc ~attrs (sub.jkind_annotation sub jkind)
     | Ptyp_repr (lvars, t) ->
         repr ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
+    | Ptyp_newlayout (lvars, t) ->
+        newlayout ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
 
   let map_type_declaration sub
@@ -497,7 +499,6 @@ module E = struct
 
   let map_block_access sub = function
     | Baccess_field lid -> Baccess_field (map_loc sub lid)
-    | Baccess_array (mut, ik, e) -> Baccess_array (mut, ik, sub.expr sub e)
     | Baccess_block (mut, e) -> Baccess_block (mut, sub.expr sub e)
 
   let map_unboxed_access sub = function
@@ -971,7 +972,8 @@ let default_mapper =
       let pjka_desc =
         match pjka_desc with
         | Pjk_default -> Pjk_default
-        | Pjk_abbreviation lid -> Pjk_abbreviation (map_loc this lid)
+        | Pjk_abbreviation (lid, sa) ->
+          Pjk_abbreviation (map_loc this lid, List.map (map_loc this) sa)
         | Pjk_mod (t, mode_list) ->
           Pjk_mod (this.jkind_annotation this t, this.modes this mode_list)
         | Pjk_with (t, ty, modalities) ->

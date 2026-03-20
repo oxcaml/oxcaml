@@ -628,6 +628,8 @@ and raise_kind =
   | Raise_reraise
   | Raise_notrace
 
+val equal_raise_kind : raise_kind -> raise_kind -> bool
+
 val equal_value_kind : value_kind -> value_kind -> bool
 
 val equal_layout : layout -> layout -> bool
@@ -648,6 +650,8 @@ val generic_value : value_kind
    [layout_unboxed_float].
 *)
 val layout_of_extern_repr : extern_repr -> layout
+
+val element_layout_of_array_kind : array_kind -> layout
 
 val extern_repr_involves_unboxed_products : extern_repr -> bool
 
@@ -851,6 +855,24 @@ type pop_region =
   | Popped_region
   | Same_region
 
+(** The lambda type is shared across multiple phases of compilation, where some
+  constructors are invalid at different stages.
+
+  Compilation looks like: {[
+    typedtree
+    ---transl--> tlambda
+    --fracture-> slambda
+    ----eval---> rawlambda
+    ---simplif-> lambda
+  ]}
+  where [tlambda], [slambda], [rawlambda], and [lambda] are all represented
+  using this type.
+
+  Most constructors are valid at all stages, the constructors that aren't
+  document this. The only other difference is that [layout] can contain
+  variables before eval ([tlambda] and [slambda]) and not after eval
+  ([rawlambda] and [lambda]).
+*)
 type lambda =
     Lvar of Ident.t
   | Lmutvar of Ident.t
@@ -898,9 +920,17 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
-  | Lsplice of lambda_splice
+  (* [Lsplice] should only exist in the slambda stage. *)
+  | Lsplice of scoped_location * slambda
 
-and slambda = lambda Slambda0.t0
+and slambda =
+  | SLmissing
+  | SLhalves of slambda_halves
+
+and slambda_halves =
+  { sval_comptime: slambda;
+    sval_runtime: lambda
+  }
 
 and rec_binding = {
   id : Ident.t;
@@ -970,8 +1000,6 @@ and lambda_event_kind =
   | Lev_after of Types.type_expr
   | Lev_function
   | Lev_pseudo
-
-  and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
 
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)
@@ -1182,6 +1210,10 @@ val iter_head_constructor: (lambda -> unit) -> lambda -> unit
 (** [iter_head_constructor f lam] apply [f] to only the first level of
     sub expressions of [lam]. It does not recursively traverse the
     expression.
+
+    Callers should note that you will need to handle stage specific
+    constructors ([Lsplice], etc) depending on what stage you are calling this
+    from.
 *)
 
 val shallow_iter:
@@ -1189,7 +1221,12 @@ val shallow_iter:
   non_tail:(lambda -> unit) ->
   lambda -> unit
 (** Same as [iter_head_constructor], but use a different callback for
-    sub-terms which are in tail position or not. *)
+    sub-terms which are in tail position or not.
+
+    Callers should note that you will need to handle stage specific
+    constructors ([Lsplice], etc) depending on what stage you are calling this
+    from.
+*)
 
 val transl_prim: string -> string -> lambda
 (** Translate a value from a persistent module. For instance:
@@ -1344,6 +1381,11 @@ val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> unit mixed_block_element
 
+(** Returns the element at the given path in a mixed block shape.
+    The path is a list of field indices for navigating into nested products. *)
+val project_from_mixed_block_shape
+  : 'a mixed_block_element array -> path:int list -> 'a mixed_block_element
+
 (** [Pintval] if a type of [value] jkind is GC-ignorable based on its provided
     externality, and [Pgenval] otherwise. *)
 val value_kind_of_value_with_externality
@@ -1437,3 +1479,11 @@ val static_cast
   -> lambda
   -> loc:scoped_location
   -> lambda
+
+type error =
+  | Slambda_unsupported of string
+
+val error : ?loc:Location.t -> error -> 'a
+
+val fatal_error_unevaluated_splice_var : Ident.t -> 'a
+val fatal_error_invalid_constructor : lambda -> 'a

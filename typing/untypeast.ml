@@ -337,7 +337,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
       { pat_extra=[Tpat_unpack, loc, _attrs]; pat_desc = Tpat_any; _ } ->
         Ppat_unpack { txt = None; loc  }
     | { pat_extra=[Tpat_unpack, _, _attrs];
-        pat_desc = Tpat_var (_,name, _, _, _); _ } ->
+        pat_desc = Tpat_var { name; _ }; _ } ->
         Ppat_unpack { name with txt = Some name.txt }
     | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
         Ppat_type (map_loc sub lid)
@@ -350,7 +350,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
-    | Tpat_var (id, name,_,_,_) ->
+    | Tpat_var { id; name; _ } ->
         begin
           match (Ident.name id).[0] with
             'A'..'Z' ->
@@ -364,11 +364,12 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
        This avoids transforming a warning 27 into a 26.
      *)
     | Tpat_alias
-      ({pat_desc = Tpat_any; pat_loc}, _id, name, _uid, _sort, _mode, _ty)
+      { pattern = {pat_desc = Tpat_any; pat_loc};
+        name; _ }
          when pat_loc = pat.pat_loc ->
        Ppat_var name
 
-    | Tpat_alias (pat, _id, name, _uid, _sort, _mode, _ty) ->
+    | Tpat_alias { pattern = pat; name; _ } ->
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
     | Tpat_unboxed_unit -> Ppat_unboxed_unit
@@ -472,10 +473,6 @@ let value_binding sub vb =
 let block_access sub : block_access -> Parsetree.block_access = function
   | Baccess_field (lid, _) ->
     Baccess_field (map_loc sub lid)
-  | Baccess_array
-      { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort = _ } ->
-    let index = sub.expr sub index in
-    Baccess_array (mut, index_kind, index)
   | Baccess_block (mut, idx) ->
     Baccess_block (mut, sub.expr sub idx)
 
@@ -526,7 +523,7 @@ let expression sub exp =
   let attrs = sub.attributes sub exp.exp_attributes in
   let desc =
     match exp.exp_desc with
-      Texp_ident (_path, lid, _, _, _, _) -> Pexp_ident (map_loc sub lid)
+      Texp_ident { lid; _ } -> Pexp_ident (map_loc sub lid)
     | Texp_constant cst -> Pexp_constant (constant cst)
     | Texp_let (rec_flag, list, exp) ->
         Pexp_let (Immutable, rec_flag,
@@ -1102,6 +1099,8 @@ let core_type sub ct =
     | Ttyp_repr (list, ct) ->
         let bound_vars = List.map (fun v -> mkloc v loc) list in
         Ptyp_repr (bound_vars, sub.typ sub ct)
+    | Ttyp_newlayout (list, ct) ->
+        Ptyp_newlayout (list, sub.typ sub ct)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension
@@ -1110,7 +1109,7 @@ let core_type sub ct =
 
 let class_structure sub cs =
   let rec remove_self = function
-    | { pat_desc = Tpat_alias (p, id, _s, _uid, _sort, _mode, _ty) }
+    | { pat_desc = Tpat_alias { pattern = p; id; _ } }
       when string_is_prefix "selfpat-" (Ident.name id) ->
         remove_self p
     | p -> p
@@ -1140,7 +1139,7 @@ let object_field sub {of_loc; of_desc; of_attributes;} =
   Of.mk ~loc ~attrs desc
 
 and is_self_pat = function
-  | { pat_desc = Tpat_alias(_pat, id, _, _uid, _sort, _mode, _ty) } ->
+  | { pat_desc = Tpat_alias { id; _ } } ->
       string_is_prefix "self-" (Ident.name id)
   | _ -> false
 

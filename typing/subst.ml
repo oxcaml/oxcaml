@@ -167,8 +167,8 @@ end = struct
         ~ran_out_of_fuel_during_normalize
         ~annotation:
           (Some { pjka_loc = Location.none;
-                  pjka_desc = Pjk_abbreviation { loc = Location.none;
-                                                 txt = name } })
+                  pjka_desc = Pjk_abbreviation ({ loc = Location.none;
+                                                  txt = name }, []) })
         ~why:Jkind_intf.History.Imported)
       (const_builtins @ const_predefs)
 
@@ -1012,6 +1012,7 @@ let rec subst_lazy_value_description s descr =
   { val_type = Wrap.substitute ~compose Keep s descr.val_type;
     val_modalities;
     val_kind = descr.val_kind;
+    val_lpoly = descr.val_lpoly;
     val_loc = loc s descr.val_loc;
     val_zero_alloc =
       (* When saving a cmi file, we replace zero_alloc variables with constants.

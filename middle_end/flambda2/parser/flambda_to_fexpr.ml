@@ -36,6 +36,8 @@ let const c : Fexpr.const =
        |> Targetint_32_64.to_string)
   | Naked_float f -> Naked_float (f |> float)
   | Naked_float32 f -> Naked_float32 (f |> float32)
+  | Naked_int8 i -> Naked_int8 i
+  | Naked_int16 i -> Naked_int16 i
   | Naked_int32 i -> Naked_int32 i
   | Naked_int64 i -> Naked_int64 i
   | Naked_vec128 bits ->
@@ -45,8 +47,6 @@ let const c : Fexpr.const =
   | Naked_vec512 bits ->
     Naked_vec512 (Vector_types.Vec512.Bit_pattern.to_bits bits)
   | Naked_nativeint i -> Naked_nativeint (i |> targetint)
-  | Naked_int8 _ | Naked_int16 _ ->
-    Misc.fatal_error "small integers not supported in fexpr"
   | Null -> Null
 
 let depth_or_infinity (d : int Or_infinity.t) : Fexpr.rec_info =

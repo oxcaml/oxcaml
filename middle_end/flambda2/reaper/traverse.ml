@@ -99,11 +99,12 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     List.iter
       (fun var -> Acc.add_any_usage acc (Code_id_or_name.var var))
       ((my_closure :: params) @ (exn :: return));
+    Acc.add_zero_alloc_source acc (Code_id_or_name.var my_closure);
     List.iter
       (fun param ->
         let param = Code_id_or_name.var param in
         Acc.add_any_source acc param)
-      (my_closure :: params));
+      params);
   if never_delete then Acc.add_any_usage acc (Code_id_or_name.code_id code_id);
   Acc.add_code code_id code_dep acc
 
@@ -202,7 +203,10 @@ and traverse_let denv acc let_expr : rev_expr =
       let bound_static =
         match bound_pattern with
         | Static b -> b
-        | Singleton _ | Set_of_closures _ -> assert false
+        | Singleton _ | Set_of_closures _ ->
+          Misc.fatal_errorf
+            "Expected [Static] bound pattern for [Static_consts], got %a"
+            Bound_pattern.print bound_pattern
       in
       let rev_group =
         Static_const_group.match_against_bound_static group bound_static
@@ -326,7 +330,11 @@ and traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
     let bound_vars =
       match bound_pattern with
       | Set_of_closures set -> set
-      | Static _ | Singleton _ -> assert false
+      | Static _ | Singleton _ ->
+        Misc.fatal_errorf
+          "Expected [Set_of_closures] bound pattern in \
+           [traverse_set_of_closures], got %a"
+          Bound_pattern.print bound_pattern
     in
     let funs =
       Function_declarations.funs_in_order
@@ -345,7 +353,10 @@ and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
   let bound_static =
     match bound_pattern with
     | Static b -> b
-    | Singleton _ | Set_of_closures _ -> assert false
+    | Singleton _ | Set_of_closures _ ->
+      Misc.fatal_errorf
+        "Expected [Static] bound pattern in [traverse_static_consts], got %a"
+        Bound_pattern.print bound_pattern
   in
   Static_const_group.match_against_bound_static group bound_static ~init:()
     ~code:(fun () -> prepare_code acc)
@@ -368,7 +379,10 @@ and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
         | Block (_, _, shape, _) ->
           Flambda_kind.Scannable_block_shape.element_kind shape i
         | Immutable_value_array _ -> Flambda_kind.value
-        | _ -> assert false
+        | _ ->
+          Misc.fatal_errorf
+            "Unexpected static const %a in [block_field_kind] for symbol %a"
+            Static_const.print static_const Symbol.print symbol
       in
       match[@ocaml.warning "-4"] static_const with
       | Block (_, _, _, fields) | Immutable_value_array fields ->
@@ -390,7 +404,11 @@ and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
           ~base:(Code_id_or_name.name name)
           Field.get_tag
           ~from:(Code_id_or_name.name denv.all_constants)
-      | Set_of_closures _ -> assert false
+      | Set_of_closures _ ->
+        Misc.fatal_errorf
+          "Unexpected [Set_of_closures] in block_like static const traversal \
+           for symbol %a"
+          Symbol.print symbol
       | _ ->
         Acc.add_alias acc
           ~to_:(Code_id_or_name.name name)
@@ -545,7 +563,10 @@ and traverse_apply denv acc apply : rev_expr =
       Continuation.Map.find (Exn_continuation.exn_handler exn) denv.conts
     in
     match exn_params with
-    | [] -> assert false
+    | [] ->
+      Misc.fatal_errorf
+        "Empty exception continuation parameters in [traverse_apply] for %a"
+        Apply.print apply
     | exn_param :: extra_params ->
       List.iter2
         (fun param (arg, _kind) ->
@@ -651,8 +672,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
     | None -> add_apply acc ~only_if_closure_any_source:false
     | Some callee -> (
       let closure = Acc.simple_to_node acc ~denv callee in
-      Acc.add_accessor_dep acc ~to_:call_widget
-        (Field.code_of_closure Known_arity_code_pointer)
+      Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
         ~base:closure;
       match denv.should_preserve_direct_calls with
       | Yes -> add_apply acc ~only_if_closure_any_source:false
@@ -672,8 +692,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
     let closure =
       Acc.simple_to_node acc ~denv (Option.get (Apply.callee apply))
     in
-    Acc.add_accessor_dep acc ~to_:call_widget
-      (Field.code_of_closure Known_arity_code_pointer)
+    Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
       ~base:closure
   | Function { function_call = Indirect_unknown_arity; _ } ->
     let call_widget =
@@ -684,8 +703,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
     let closure =
       Acc.simple_to_node acc ~denv (Option.get (Apply.callee apply))
     in
-    Acc.add_accessor_dep acc ~to_:call_widget
-      (Field.code_of_closure Unknown_arity_code_pointer)
+    Acc.add_accessor_dep acc ~to_:call_widget Field.unknown_arity_call_witness
       ~base:closure
   | Method _ | C_call _ | Effect _ -> default_acc acc
 

@@ -161,6 +161,7 @@ module T = struct
     | Ptyp_of_kind jkind ->
         sub.jkind_annotation sub jkind
     | Ptyp_repr (_, t) -> sub.typ sub t
+    | Ptyp_newlayout (_, t) -> sub.typ sub t
     | Ptyp_extension x -> sub.extension sub x
 
   let iter_type_declaration sub
@@ -460,7 +461,6 @@ module E = struct
 
   let iter_block_access sub = function
     | Baccess_field lid -> iter_loc sub lid
-    | Baccess_array (_, _, index) -> sub.expr sub index
     | Baccess_block (_, idx) -> sub.expr sub idx
 
   let iter_unboxed_access sub = function
@@ -865,7 +865,9 @@ let default_iterator =
          this.location this pjka_loc;
          match pjka_desc with
          | Pjk_default -> ()
-         | Pjk_abbreviation lid -> iter_loc this lid
+         | Pjk_abbreviation (lid, sa_annot) ->
+           iter_loc this lid;
+           List.iter (iter_loc this) sa_annot
          | Pjk_mod (t, mode_list) ->
              this.jkind_annotation this t;
              this.modes this mode_list

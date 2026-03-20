@@ -396,7 +396,7 @@ AC_SUBST([ocamltest_libunix])
 AC_SUBST([unix_library])
 AC_SUBST([unix_directory])
 AC_SUBST([cc_has_debug_prefix_map])
-AC_SUBST([as_has_debug_prefix_map])
+AC_SUBST([as_debug_prefix_map_flag])
 AC_SUBST([with_debugger]) # TODO: rename this variable
 AC_SUBST([build_ocamldebug])
 AC_SUBST([build_ocamltex])
@@ -435,6 +435,7 @@ AC_SUBST([no_partial_inlining_cflags])
 AC_SUBST([frame_pointers])
 AC_SUBST([address_sanitizer])
 AC_SUBST([cpp_mangling])
+AC_SUBST([name_mangling_scheme])
 AC_SUBST([flambda])
 AC_SUBST([flambda2])
 AC_SUBST([flambda_invariants])
@@ -682,6 +683,15 @@ AC_ARG_ENABLE([address-sanitizer],
 AC_ARG_ENABLE([cpp-mangling],
   [AS_HELP_STRING([--enable-cpp-mangling],
     [use cpp mangling for exported symbols])])
+
+AC_ARG_ENABLE([name-mangling],
+  [AS_HELP_STRING([--enable-name-mangling=SCHEME],
+    [specify name mangling scheme [default=flat]])],
+  [AS_CASE([$enable_name_mangling],
+    [flat], [name_mangling_scheme=flat],
+    [*], [AC_MSG_ERROR(m4_normalize([Invalid or missing name mangling scheme:
+      must be 'flat']))])],
+  [name_mangling_scheme=flat])
 
 AC_ARG_ENABLE([naked-pointers], [],
   [AS_IF([test "x$enableval" != 'xno'],
@@ -2814,7 +2824,7 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
   AC_MSG_NOTICE([the threads library is supported])])
 
 ## Does the assembler support debug prefix map and CFI directives
-as_has_debug_prefix_map=false
+as_debug_prefix_map_flag=""
 asm_cfi_supported=false
 as_compress_debug_sections_flag=""
 cc_compress_debug_sections_flag=""
@@ -2883,6 +2893,11 @@ AS_IF([test x"$enable_cpp_mangling" = "xyes"],
   [cpp_mangling=true
     AC_DEFINE([WITH_CPP_MANGLING])],
   [cpp_mangling=false])
+
+## Name mangling scheme
+
+AS_CASE([$name_mangling_scheme],
+  [flat], [AC_DEFINE([NAME_MANGLING_FLAT])])
 
 ## Check for mmap support for huge pages and contiguous heap
 OCAML_MMAP_SUPPORTS_HUGE_PAGES
@@ -3045,11 +3060,6 @@ AS_IF([test x"$with_afl" = "xyes"],
 AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
   [oxcaml_dwarf_flags_for_compiler="-g -gno-upstream-dwarf -bin-annot-cms -shape-format debugging-shapes"],
   [oxcaml_dwarf_flags_for_compiler=""])
-
-# Ensure compatibility: oxcaml-dwarf-on-compiler requires function-sections to be disabled
-AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
-  [AS_IF([test x"$function_sections" = "xtrue"],
-    [AC_MSG_ERROR([--enable-oxcaml-dwarf-on-compiler requires --disable-function-sections to be passed])])])
 
 # Configure assembly emission flag for compiler
 AS_IF([test x"$enable_keep_compiler_asm" = "xyes"],

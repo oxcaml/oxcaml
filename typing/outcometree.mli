@@ -99,7 +99,7 @@ type out_ret_mode =
 (** Represents a constant jkind *)
 type out_jkind_const =
   | Ojkind_const_default
-  | Ojkind_const_abbreviation of string
+  | Ojkind_const_abbreviation of string * string list
   (** The base of [Ojkind_const_mod] is optional to enable printing individual axes *)
   | Ojkind_const_mod of out_jkind_const option * string list
   | Ojkind_const_with of out_jkind_const * out_type * out_modality list
@@ -108,11 +108,14 @@ type out_jkind_const =
 
 and out_jkind =
   | Ojkind_const of out_jkind_const
-  | Ojkind_var of string
+  | Ojkind_var of string * string list
+  (** The [string list] represents the scannable axes on the variable *)
   | Ojkind_product of out_jkind list
 
 (* should be empty if all the jkind annotations are missing *)
 and out_vars_jkinds = (string * out_jkind option) list
+
+and out_sort_genvar = string
 
 and out_type_param = {
     ot_non_gen: bool;
@@ -146,6 +149,7 @@ and out_type =
   | Otyp_splice of out_type
   | Otyp_poly of out_vars_jkinds * out_type
   | Otyp_repr of string list * out_type
+  | Otyp_newlayout of out_sort_genvar list * out_type
   | Otyp_module of out_ident * (string * out_type) list
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind

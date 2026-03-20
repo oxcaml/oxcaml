@@ -14,6 +14,7 @@
 
 val for_fundecl :
   get_file_id:(string -> int) ->
+  value_type_proto_die:Dwarf_high.Proto_die.t option ->
   Dwarf_state.t ->
   Linear.fundecl ->
   fun_end_label:Asm_targets.Asm_label.t ->

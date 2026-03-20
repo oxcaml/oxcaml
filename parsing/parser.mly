@@ -385,9 +385,13 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
       mk ~loc (Pexp_coerce(e, t1, t2))
      | _ :: _ -> not_expecting loc "mode annotations"
 
-let mkexp_opt_type_constraint_with_modes ?ghost ~loc ~modes e = function
-  | None -> e
-  | Some c -> mkexp_type_constraint_with_modes ?ghost ~loc ~modes e c
+let mkexp_opt_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
+  match t, modes with
+  | None, [] -> e
+  | None, _ :: _ ->
+     let mk = if ghost then ghexp_constraint else mkexp_constraint in
+     mk ~loc ~exp:e ~cty:None ~modes
+  | Some c, _ -> mkexp_type_constraint_with_modes ~ghost ~loc ~modes e c
 
 (* Helper functions for desugaring array indexing operators *)
 type paren_kind = Paren | Brace | Bracket
@@ -1097,6 +1101,7 @@ let maybe_pmod_constraint mode expr =
 %token HASH_SUFFIX            "# "
 %token <string> HASHOP        "##" (* just an example *)
 %token SIG                    "sig"
+%token LAYOUT                 "layout_"
 %token STACK                  "stack_"
 %token STAR                   "*"
 %token <string * Location.t * string option>
@@ -2940,9 +2945,10 @@ spliceable_expr:
       { reloc_exp ~loc:$sloc $2 }
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
-  | LPAREN seq_expr type_constraint_with_modes RPAREN
+  | LPAREN seq_expr opt_type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
-        mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
+        mkexp_opt_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2
+          t }
   | mkrhs(val_longident)
       { mkexp ~loc:$sloc (Pexp_ident ($1)) }
   | error
@@ -2954,9 +2960,10 @@ simple_expr:
       { reloc_exp ~loc:$sloc $2 }
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
-  | LPAREN seq_expr type_constraint_with_modes RPAREN
+  | LPAREN seq_expr opt_type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
-        mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
+        mkexp_opt_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2
+          t }
   | indexop_expr(DOT, seq_expr, { None })
       { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
   (* Immutable array indexing is a regular operator, so it doesn't need its own
@@ -3087,35 +3094,11 @@ comprehension_clause:
 block_access:
   | DOT mkrhs(label_longident)
     { Baccess_field $2 }
-  | DOT _p=LPAREN i=seq_expr RPAREN
-    { Baccess_array (Mutable, Index_int, i) }
-  | DOTOP _p=LPAREN i=seq_expr RPAREN
-    {
-      match $1 with
-      | ":" -> Baccess_array (Immutable, Index_int, i)
-      | _ -> raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
-    }
   | DOT ident _p=LPAREN i=seq_expr RPAREN
     {
       match $2 with
-      | "L" -> Baccess_array (Mutable, Index_unboxed_int64, i)
-      | "l" -> Baccess_array (Mutable, Index_unboxed_int32, i)
-      | "S" -> Baccess_array (Mutable, Index_unboxed_int16, i)
-      | "s" -> Baccess_array (Mutable, Index_unboxed_int8, i)
-      | "n" -> Baccess_array (Mutable, Index_unboxed_nativeint, i)
       | "idx_imm" -> Baccess_block (Immutable, i)
       | "idx_mut" -> Baccess_block (Mutable, i)
-      | _ ->
-        raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
-    }
-  | DOTOP ident _p=LPAREN i=seq_expr RPAREN
-    {
-      match $1, $2 with
-      | ":", "L" -> Baccess_array (Immutable, Index_unboxed_int64, i)
-      | ":", "l" -> Baccess_array (Immutable, Index_unboxed_int32, i)
-      | ":", "S" -> Baccess_array (Immutable, Index_unboxed_int16, i)
-      | ":", "s" -> Baccess_array (Immutable, Index_unboxed_int8, i)
-      | ":", "n" -> Baccess_array (Immutable, Index_unboxed_nativeint, i)
       | _ ->
         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
     }
@@ -3616,6 +3599,13 @@ type_constraint:
   | COLONGREATER error                          { syntax_error() }
 ;
 
+%inline opt_type_constraint_with_modes:
+  | type_constraint_with_modes
+    { let ty, modes = $1 in
+      Some ty, modes }
+  | COLON at_mode_expr
+    { None, $2 }
+
 %inline constraint_:
   | type_constraint_with_modes
     { let ty, modes = $1 in
@@ -4082,8 +4072,8 @@ jkind_desc:
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
     }
-  | mkrhs(type_longident) {
-      Pjk_abbreviation $1
+  | mkrhs(type_longident) mkrhs(LIDENT)* {
+      Pjk_abbreviation ($1, $2)
     }
   | KIND_OF ty=core_type {
       Pjk_kind_of ty
@@ -4422,21 +4412,31 @@ with_type_binder:
   nonempty_llist(typevar_repr)
     { $1 }
 ;
+%inline newlayouts:
+  (* : string with_loc list *)
+  nonempty_llist(mkrhs(ident))
+    { $1 }
+;
 %inline poly(X):
   typevar_list DOT X
-    { ($1, $3) }
+    { let bound_vars, inner_type = $1, $3 in
+      mktyp ~loc:$sloc (Ptyp_poly (bound_vars, inner_type)) }
 ;
 %inline repr(X):
   typevar_repr_list DOT X
-    { ($1, $3) }
+    { let bound_vars, inner_type = $1, $3 in
+      mktyp ~loc:$sloc (Ptyp_repr (bound_vars, inner_type)) }
+;
+%inline lpoly(X):
+  LAYOUT newlayouts DOT X
+    { let bound_vars, inner_type = $2, $4 in
+      mktyp ~loc:$sloc (Ptyp_newlayout (bound_vars, inner_type)) }
 ;
 %inline strictly_poly(X):
-| poly(X)
-    { let bound_vars, inner_type = $1 in
-      mktyp ~loc:$sloc (Ptyp_poly (bound_vars, inner_type)) }
-| repr(X)
-    { let bound_vars, inner_type = $1 in
-      mktyp ~loc:$sloc (Ptyp_repr (bound_vars, inner_type)) }
+| poly(X) { $1 }
+| repr(X) { $1 }
+| lpoly(X) { $1 }
+| lpoly(poly(X)) { $1 }
 ;
 
 possibly_poly(X):
@@ -4714,6 +4714,11 @@ optional_atat_modalities_expr:
   | mktyp(
     LPAREN bound_vars = typevar_repr_list DOT inner_type = core_type RPAREN
       { Ptyp_repr (bound_vars, inner_type) }
+    )
+    { $1 }
+  | mktyp(
+    LPAREN LAYOUT bound_vars = newlayouts DOT inner_type = core_type RPAREN
+      { Ptyp_newlayout (bound_vars, inner_type) }
     )
     { $1 }
   | ty = tuple_type
@@ -5350,6 +5355,7 @@ single_attr_id:
   | INCLUDE { "include" }
   | INHERIT { "inherit" }
   | INITIALIZER { "initializer" }
+  | LAYOUT { "layout_" }
   | LAZY { "lazy" }
   | LET { "let" }
   | LOCAL { "local_" }
@@ -5366,6 +5372,7 @@ single_attr_id:
   | POLY { "poly_" }
   | PRIVATE { "private" }
   | REC { "rec" }
+  | REPR { "repr_" }
   | SIG { "sig" }
   | STRUCT { "struct" }
   | THEN { "then" }

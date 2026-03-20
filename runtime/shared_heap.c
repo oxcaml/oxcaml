@@ -664,6 +664,8 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
 
     while (p + wh <= end) {
       header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
+      /* TODO: optimize prefetch displacement; possibly a multiple of wh? */
+      caml_prefetchr((char*)p + caml_plat_pagesize);
       if (hd == 0) {
         /* already on freelist */
         all_used = 0;
