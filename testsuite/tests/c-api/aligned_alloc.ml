@@ -1,6 +1,5 @@
 (* TEST
  modules = "aligned_alloc_stubs.c";
- flags = "-alert -unsafe_multidomain";
  {
    runtime4;
    skip;
