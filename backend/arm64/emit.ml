@@ -1909,9 +1909,12 @@ let branch_relax env body =
 
     let relax_allocation ~num_bytes ~dbginfo = Far_alloc { num_bytes; dbginfo }
 
+    (* [Lcondbranch3] is expanded into individual [Lcondbranch]
+       instructions by [Branch_relaxation] before this is called. *)
     let[@warning "-4"] relax_condbranch = function
       | Linear.Lcondbranch (test, lbl) -> Condbranch (test, lbl)
-      | _ -> Misc.fatal_error "relax_condbranch: not a Lcondbranch"
+      | Lcondbranch3 _ | _ ->
+        Misc.fatal_error "relax_condbranch: not a Lcondbranch"
 
     let[@warning "-4"] relax_branch = function
       | Linear.Lbranch lbl -> Branch lbl
