@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension labeled_tuples -dsource";
+ flags = "-dsource";
  expect;
 *)
 let x = ~x:1, ~y:2
