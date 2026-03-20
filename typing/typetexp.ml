@@ -393,7 +393,7 @@ end = struct
     let original_jkind =
       match Env.find_implicit_jkind name env with
       | Some jkind -> jkind
-      | None -> Jkind.Builtin.value ~why:Univar
+      | None -> { (Jkind.Builtin.value ~why:Univar) with annotation = None }
     in
     let jkind_info =
       { original_jkind; defaulted = true }
