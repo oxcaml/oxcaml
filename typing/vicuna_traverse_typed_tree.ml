@@ -296,7 +296,7 @@ and value_kind_variant env subst ~visited ~depth
     (cstrs : Types.constructor_declaration list) rep =
   match rep with
   | Variant_extensible -> raise (Vicuna_unsupported Extensible_variants)
-  | Variant_with_null -> raise (Vicuna_unsupported With_null_variants)
+  | Variant_erased _ -> raise (Vicuna_unsupported With_null_variants)
   | Variant_unboxed -> (
     match cstrs with
     | [{ cd_args = Cstr_tuple [{ ca_type = ty; _ }]; _ }]

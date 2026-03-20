@@ -2002,13 +2002,12 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
          make_field_access str ca_sort ~field:i ~pos:i)
       cstr.cstr_args
         @ rem
-    | Variant_unboxed | Variant_with_null ->
+    | Variant_unboxed | Variant_erased _ ->
       if cstr.cstr_constant then
         rem (* [Null] constructor case. *)
       else
         (arg, str, sort, layout) :: rem
-        (* the unboxed variant constructor, or the [This] constructor
-           for [Variant_with_null]. *)
+        (* the unboxed variant constructor or an erased payload constructor. *)
     | Variant_extensible ->
         List.mapi
           (fun i { ca_sort } ->
@@ -2415,7 +2414,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
             in
             Lprim (Pmixedfield ([lbl.lbl_pos], shape, sem), [ arg ], loc),
             lbl.lbl_sort, lbl_layout
-        | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_inlined (_, _, Variant_erased _) -> assert false
       in
       let str = if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias in
       let str = add_barrier_to_let_kind ubr str in
@@ -3277,13 +3276,13 @@ let split_cases tag_lambda_list =
     | ({cstr_tag; cstr_repr; cstr_constant}, act) :: rem -> (
         let consts, nonconsts, null = split_rec rem in
         match cstr_tag, cstr_repr with
-        | Ordinary _, (Variant_unboxed | Variant_with_null) ->
+        | Ordinary _, (Variant_unboxed | Variant_erased _) ->
           (consts, (0, act) :: nonconsts, null)
         | Ordinary {runtime_tag}, Variant_boxed _ when cstr_constant ->
           ((runtime_tag, act) :: consts, nonconsts, null)
         | Ordinary {runtime_tag}, Variant_boxed _ ->
           (consts, (runtime_tag, act) :: nonconsts, null)
-        | Null, Variant_with_null ->
+        | Null, Variant_erased _ ->
           (match null with
           | None -> (consts, nonconsts, Some act)
           | Some _ -> Misc.fatal_error
@@ -3432,7 +3431,7 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
                 transl_match_on_option value_kind arg loc
                   ~if_none:act1 ~if_some:act2
             | 1, 1, [], [(_, act2)], Some act1 ->
-                (* The [Variant_with_null] case. *)
+                (* The erased-null case. *)
                 transl_match_on_or_null value_kind arg loc
                   ~if_null:act1 ~if_this:act2
             | _, _, _, _, Some _ ->

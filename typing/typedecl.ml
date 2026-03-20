@@ -1083,7 +1083,25 @@ let transl_declaration env sdecl (id, uid) =
         let rep, jkind =
           if custom_or_null then
             match params with
-            | [param] -> Variant_with_null, custom_or_null_jkind path param
+            | [param] ->
+              let erased =
+                Array.of_list
+                  (List.map
+                     (fun cstr ->
+                        match cstr.Types.cd_args with
+                        | Cstr_tuple [] -> Types.Erased_null
+                        | Cstr_tuple [_] -> Types.Erased_value
+                        | Cstr_record [_] ->
+                          Misc.fatal_error
+                            "Invalid custom [@@or_null] declaration"
+                        | Cstr_tuple (_ :: _ :: _)
+                        | Cstr_record []
+                        | Cstr_record (_ :: _ :: _) ->
+                          Misc.fatal_error
+                            "Invalid custom [@@or_null] declaration")
+                     cstrs)
+              in
+              Variant_erased erased, custom_or_null_jkind path param
             | _ -> assert false
           else if unbox then
             Variant_unboxed,
@@ -2182,19 +2200,19 @@ let rec update_decl_jkind env dpath decl =
   let update_variant_kind loc cstrs rep =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
-    | _, Variant_with_null ->
+    | [], Variant_erased _ ->
+      Misc.fatal_error "Typedecl.update_variant_kind: empty erased variant"
+    | _, Variant_erased erased
+      when Array.exists (( = ) Types.Erased_value) erased ->
       let payload =
         List.find_opt
-          (fun cd ->
-             match cd.Types.cd_args with
-             | Cstr_tuple [_] -> true
-             | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
-               false)
-          cstrs
+          (fun (erased_repr, _cd) -> erased_repr = Types.Erased_value)
+          (List.combine (Array.to_list erased) cstrs)
       in
       begin match payload with
       | Some
-          ({ Types.cd_uid;
+          ( _,
+            { Types.cd_uid;
              cd_args =
                Cstr_tuple
                  [{ ca_type = ty; ca_modalities = modality }];
@@ -2214,7 +2232,7 @@ let rec update_decl_jkind env dpath decl =
                        Cstr_tuple
                          [{ ca_type; ca_sort; ca_modalities; ca_loc }] }
                  | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
-                   Misc.fatal_error "Invalid constructor for Variant_with_null"
+                   Misc.fatal_error "Invalid erased value constructor"
                else cstr)
             cstrs
         in
@@ -2225,12 +2243,15 @@ let rec update_decl_jkind env dpath decl =
         | Ok type_jkind -> cstrs, rep, type_jkind
         | Error () ->
           Misc.fatal_error
-            "Typedecl.update_variant_kind: Variant_with_null payload is \
+            "Typedecl.update_variant_kind: erased value payload is \
              already maybe-null"
         end
       | Some _ | None ->
-        Misc.fatal_error "Invalid constructor for Variant_with_null"
+        Misc.fatal_error "Invalid erased value constructor"
       end
+    | _, Variant_erased _ ->
+      Misc.fatal_error
+        "Typedecl.update_variant_kind: unsupported erased representation"
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin
         match cd_args with
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin

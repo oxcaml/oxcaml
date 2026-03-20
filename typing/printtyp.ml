@@ -2150,7 +2150,7 @@ let tree_of_type_decl id decl =
         let unboxed =
           match rep with
           | Variant_unboxed -> true
-          | Variant_boxed _ | Variant_extensible | Variant_with_null -> false
+          | Variant_boxed _ | Variant_extensible | Variant_erased _ -> false
         in
         let or_null_attribute =
           if Builtin_attributes.has_or_null decl.type_attributes then

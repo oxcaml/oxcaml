@@ -2339,23 +2339,23 @@ let unbox_once env ty =
                                    modality = ld.ld_modalities }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
-        | Type_variant (cstrs, Variant_with_null, _) ->
+        | Type_variant (cstrs, Variant_erased erased, _) ->
           let payload =
             List.find_opt
-              (fun cd ->
-                 match cd.cd_args with
-                 | Cstr_tuple [_] -> true
-                 | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
-                   false)
-              cstrs
+              (fun (erased_repr, _cd) -> erased_repr = Erased_value)
+              (List.combine (Array.to_list erased) cstrs)
           in
           begin match payload with
-          | Some { cd_args = Cstr_tuple [arg]; _ } ->
+          | Some (_, { cd_args = Cstr_tuple [arg]; _ }) ->
             Stepped_or_null
               { ty = apply arg.ca_type ~extra_substs:[];
                 modality = arg.ca_modalities }
-          | Some _ | None ->
-            Misc.fatal_error "Invalid constructor for Variant_with_null"
+          | Some (_, { cd_args = Cstr_record [{ ld_type = ty; ld_modalities = modality; _ }]; _ }) ->
+            Stepped_or_null { ty = apply ty ~extra_substs:[]; modality }
+          | None ->
+            Final_result
+          | Some _ ->
+            Misc.fatal_error "Invalid erased constructor representation"
           end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
           Final_result
@@ -7714,7 +7714,7 @@ let check_decl_jkind env decl jkind =
     | Type_abstract _, Some inner_ty ->
       (* CR layouts v3.3: Ad-hoc solution, this time due to the magic
          interaction of [or_null] with separability. Special-cases [or_null]
-         and other [Variant_with_null] types.
+         and other null-like erased variants.
 
          Normally, this would be handled in [constrain_type_jkind]. *)
       begin match unbox_once env inner_ty with
@@ -7725,7 +7725,7 @@ let check_decl_jkind env decl jkind =
           | Ok decl_jkind -> decl_jkind
           | Error () ->
             Misc.fatal_error "Ctype.check_decl_jkind: \
-              the constructor argument inside a Variant_with_null \
+              the constructor argument inside an erased null-like variant \
               is already maybe-null."
           end
       | Final_result | Stepped _ | Stepped_record_unboxed_product _

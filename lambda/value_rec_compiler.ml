@@ -244,7 +244,7 @@ let compute_static_size lam =
         | Record_mixed shape ->
             Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
         | Record_unboxed | Record_ufloat
-        | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
+        | Record_inlined (_, _, (Variant_unboxed | Variant_erased _)) ->
             Misc.fatal_error "size_of_primitive"
         end
     | Pmakeblock (_, _, shape, _) ->
