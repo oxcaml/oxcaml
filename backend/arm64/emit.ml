@@ -110,24 +110,6 @@ let global_maybe_protected sym =
   if (not macosx) && !Oxcaml_flags.symbol_visibility_protected
   then D.protected sym
 
-(* Layout of the stack frame *)
-
-let frame_size ~stack_offset ~contains_calls ~num_stack_slots =
-  Proc.frame_size ~stack_offset ~contains_calls ~num_stack_slots
-
-let slot_offset ~stack_offset ~contains_calls ~num_stack_slots loc stack_class =
-  let offset =
-    Proc.slot_offset loc ~stack_class ~stack_offset
-      ~fun_contains_calls:contains_calls ~fun_num_stack_slots:num_stack_slots
-  in
-  match offset with
-  | Bytes_relative_to_stack_pointer n -> n
-  | Bytes_relative_to_domainstate_pointer _ ->
-    Misc.fatal_errorf "Not a stack slot"
-
-let stack ~stack_offset ~contains_calls ~num_stack_slots r =
-  H.stack ~stack_offset ~contains_calls ~num_stack_slots r
-
 (* Convenience functions for symbols and labels *)
 let symbol ?offset reloc s = O.symbol (Ast.Symbol.create_symbol reloc ?offset s)
 
@@ -573,8 +555,6 @@ module Env : sig
 
   val set_stack_offset : t -> int -> unit
 
-  val num_stack_slots : t -> int Stack_class.Tbl.t
-
   val prologue_required : t -> bool
 
   val contains_calls : t -> bool
@@ -594,6 +574,15 @@ module Env : sig
   val function_name : t -> string
 
   val tailrec_entry_point : t -> L.t option
+
+  val frame_size : t -> int
+
+  val slot_offset : t -> Reg.stack_location -> Stack_class.t -> int
+
+  val stack_operand :
+    t ->
+    Reg.t ->
+    [`Mem of Ast.Addressing_mode.single] Ast.Operand.t H.stack_result
 
   val find_or_add_float32_literal : t -> int32 -> L.t
 
@@ -660,8 +649,6 @@ end = struct
 
   let set_stack_offset env v = env.stack_offset <- v
 
-  let num_stack_slots env = env.num_stack_slots
-
   let prologue_required env = env.prologue_required
 
   let contains_calls env = env.contains_calls
@@ -682,6 +669,25 @@ end = struct
 
   let tailrec_entry_point env = env.tailrec_entry_point
 
+  let frame_size env =
+    Proc.frame_size ~stack_offset:env.stack_offset
+      ~contains_calls:env.contains_calls ~num_stack_slots:env.num_stack_slots
+
+  let slot_offset env loc stack_class =
+    let offset =
+      Proc.slot_offset loc ~stack_class ~stack_offset:env.stack_offset
+        ~fun_contains_calls:env.contains_calls
+        ~fun_num_stack_slots:env.num_stack_slots
+    in
+    match offset with
+    | Bytes_relative_to_stack_pointer n -> n
+    | Bytes_relative_to_domainstate_pointer _ ->
+      Misc.fatal_errorf "Not a stack slot"
+
+  let stack_operand env r =
+    H.stack ~stack_offset:env.stack_offset ~contains_calls:env.contains_calls
+      ~num_stack_slots:env.num_stack_slots r
+
   let find_or_add_literal literals f =
     match List.assoc_opt f !literals with
     | Some lbl -> lbl
@@ -698,8 +704,7 @@ end = struct
   let find_or_add_float32_literal env f =
     find_or_add_literal env.float32_literals f
 
-  let find_or_add_float_literal env f =
-    find_or_add_literal env.float_literals f
+  let find_or_add_float_literal env f = find_or_add_literal env.float_literals f
 
   let find_or_add_vec128_literal env f =
     find_or_add_literal env.vec128_literals f
@@ -717,21 +722,6 @@ end = struct
   let clear_vec128_literals env = env.vec128_literals := []
 end
 
-let env_frame_size env =
-  frame_size ~stack_offset:(Env.stack_offset env)
-    ~contains_calls:(Env.contains_calls env)
-    ~num_stack_slots:(Env.num_stack_slots env)
-
-let env_slot_offset env loc stack_class =
-  slot_offset ~stack_offset:(Env.stack_offset env)
-    ~contains_calls:(Env.contains_calls env)
-    ~num_stack_slots:(Env.num_stack_slots env) loc stack_class
-
-let env_stack env r =
-  stack ~stack_offset:(Env.stack_offset env)
-    ~contains_calls:(Env.contains_calls env)
-    ~num_stack_slots:(Env.num_stack_slots env) r
-
 (* Record live pointers at call points *)
 
 let record_frame_label env live dbg =
@@ -743,7 +733,7 @@ let record_frame_label env live dbg =
         live_offset := ((Regs.index_in_class r lsl 1) + 1) :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
-          := env_slot_offset env s (Stack_class.of_machtype reg.typ)
+          := Env.slot_offset env s (Stack_class.of_machtype reg.typ)
              :: !live_offset
       | { typ = Addr; _ } as r ->
         Misc.fatal_errorf "bad GC root %a" Printreg.reg r
@@ -758,7 +748,7 @@ let record_frame_label env live dbg =
     live;
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of linear labels. *)
-  record_frame_descr ~label:lbl ~frame_size:(env_frame_size env)
+  record_frame_descr ~label:lbl ~frame_size:(Env.frame_size env)
     ~live_offset:!live_offset dbg;
   label_to_asm_label ~section:Text lbl
 
@@ -945,7 +935,7 @@ let emit_str_sp_offset reg offset = emit_load_store_sp_offset STR reg offset
 (* Generic load/store with stack register that handles large offsets. Works with
    any instruction (LDR, STR, LDR_simd_and_fp, STR_simd_and_fp). *)
 let emit_stack_load_store env instr reg (r : Reg.t) =
-  match env_stack env r with
+  match Env.stack_operand env r with
   | Stack_operand operand -> A.ins2 instr reg operand
   | Stack_large_offset_sp { bytes } ->
     A.ins_mov_from_sp ~dst:reg_x_tmp1;
@@ -1014,13 +1004,11 @@ let emit_vec128_literal (({ word0; word1 } : Cmm.vec128_bits), lbl) =
 
 let emit_literals env =
   (* Align float32 literals to [size_float]=8 bytes, not 4. *)
-  emit_literals_list (Env.float32_literals env) size_float
-    emit_float32_literal;
+  emit_literals_list (Env.float32_literals env) size_float emit_float32_literal;
   Env.clear_float32_literals env;
   emit_literals_list (Env.float_literals env) size_float emit_float_literal;
   Env.clear_float_literals env;
-  emit_literals_list (Env.vec128_literals env) size_vec128
-    emit_vec128_literal;
+  emit_literals_list (Env.vec128_literals env) size_vec128 emit_vec128_literal;
   Env.clear_vec128_literals env
 
 (* Emit code to load the address of a symbol *)
@@ -1380,18 +1368,18 @@ let emit_instr env i =
   | Lend -> ()
   | Lprologue ->
     assert (Env.prologue_required env);
-    let n = env_frame_size env in
+    let n = Env.frame_size env in
     if n > 0 then emit_stack_adjustment (-n);
     if Env.contains_calls env
     then (
       D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
       emit_str_sp_offset O.lr (n - 8))
   | Lepilogue_open ->
-    let n = env_frame_size env in
+    let n = Env.frame_size env in
     if Env.contains_calls env then emit_ldr_sp_offset O.lr (n - 8);
     if n > 0 then emit_stack_adjustment n
   | Lepilogue_close ->
-    let n = env_frame_size env in
+    let n = Env.frame_size env in
     if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Intop_atomic _) ->
     Misc.fatal_errorf
