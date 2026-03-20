@@ -1,10 +1,5 @@
 (* TEST
  include systhreads;
-<<<<<<< oxcaml
- flags = "-alert -unsafe_multidomain";
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
  hassysthreads;
  {
    bytecode;

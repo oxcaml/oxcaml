@@ -51,6 +51,8 @@ let runtime_flags env backend c_files =
       end in
   rt_flags ^ " " ^ runtime_library_flags
 
-let toplevel_default_flags = "-noinit -no-version -noprompt"
+let toplevel_default_flags =
+  "-noinit -no-version -noprompt \
+   -alert -unsafe_multidomain -alert -do_not_spawn_domains"
 
 let ocamlobjinfo_default_flags = "-null-crc"

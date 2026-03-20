@@ -1,7 +1,6 @@
 (* TEST
  include unix;
 <<<<<<< oxcaml
- flags = "-alert -unsafe_multidomain";
  libunix;
 ||||||| upstream-base
  libunix;
