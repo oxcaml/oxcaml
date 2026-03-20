@@ -2898,10 +2898,6 @@ and type_pat_aux
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
       | Ttuple labeled_tl when is_principal expected_ty ->
-        begin match closed with
-        | Open -> Language_extension.assert_enabled ~loc Labeled_tuples ()
-        | Closed -> ()
-        end;
         reorder_pat loc penv spl closed labeled_tl expected_ty
       (* If not, it's not allowed to be open (partial) *)
       | _ ->
@@ -2912,11 +2908,10 @@ and type_pat_aux
     let spl_ann =
       solve_Ppat_tuple ~refine:false ~alloc_mode loc penv args expected_ty
     in
+    Typetexp.check_no_repeated_labels_unless_extension_enabled ~loc
+      (fun (lbl, _, _, _) -> lbl) spl_ann;
     let pl =
       List.map (fun (lbl, p, t, alloc_mode) ->
-        Option.iter (fun _ ->
-            Language_extension.assert_enabled ~loc Labeled_tuples ())
-          lbl;
         lbl,
         type_pat tps Value ~alloc_mode p t
           Jkind.Sort.(of_const Const.for_tuple_element))
@@ -2937,10 +2932,6 @@ and type_pat_aux
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
       | Tunboxed_tuple labeled_tl when is_principal expected_ty ->
-                begin match closed with
-        | Open -> Language_extension.assert_enabled ~loc Labeled_tuples ()
-        | Closed -> ()
-        end;
         reorder_pat loc penv spl closed labeled_tl expected_ty
       (* If not, it's not allowed to be open (partial) *)
       | _ ->
@@ -2952,11 +2943,10 @@ and type_pat_aux
       solve_Ppat_unboxed_tuple ~refine:false ~alloc_mode loc penv args
         expected_ty
     in
+    Typetexp.check_no_repeated_labels_unless_extension_enabled ~loc
+      (fun (lbl, _, _, _, _) -> lbl) spl_ann;
     let pl =
       List.map (fun (lbl, p, t, alloc_mode, sort) ->
-        Option.iter (fun _ ->
-            Language_extension.assert_enabled ~loc Labeled_tuples ())
-          lbl;
         lbl, type_pat tps Value ~alloc_mode p t sort, sort)
         spl_ann
     in
@@ -9430,12 +9420,10 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
         labeled_subtypes)
     overwrite
   in
+  Typetexp.check_no_repeated_labels_unless_extension_enabled ~loc fst sexpl;
   let expl =
     Misc.Stdlib.List.map3
       (fun (label, body) ((_, ty), argument_mode) overwrite ->
-        Option.iter (fun _ ->
-             Language_extension.assert_enabled ~loc Labeled_tuples ())
-          label;
         let argument_mode = mode_default argument_mode in
         let argument_mode = expect_mode_cross env ty argument_mode in
           (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
@@ -9494,12 +9482,10 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   let types_sorts_and_modes =
     List.combine labels_types_and_sorts argument_modes
   in
+  Typetexp.check_no_repeated_labels_unless_extension_enabled ~loc fst sexpl;
   let expl =
     List.map2
       (fun (label, body) ((_, ty, sort), argument_mode) ->
-        Option.iter (fun _ ->
-             Language_extension.assert_enabled ~loc Labeled_tuples ())
-          label;
         let argument_mode = mode_default argument_mode in
         let argument_mode = expect_mode_cross env ty argument_mode in
           (label, type_expect env argument_mode body (mk_expected ty), sort))
