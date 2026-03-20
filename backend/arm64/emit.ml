@@ -553,6 +553,7 @@ type stack_realloc =
   }
 
 module Env : sig
+  (* Values of type [t] are mutable *)
   type t
 
   val create :
@@ -594,11 +595,23 @@ module Env : sig
 
   val tailrec_entry_point : t -> L.t option
 
-  val float32_literals : t -> (int32 * L.t) list ref
+  val find_or_add_float32_literal : t -> int32 -> L.t
 
-  val float_literals : t -> (int64 * L.t) list ref
+  val find_or_add_float_literal : t -> int64 -> L.t
 
-  val vec128_literals : t -> (Cmm.vec128_bits * L.t) list ref
+  val find_or_add_vec128_literal : t -> Cmm.vec128_bits -> L.t
+
+  val float32_literals : t -> (int32 * L.t) list
+
+  val clear_float32_literals : t -> unit
+
+  val float_literals : t -> (int64 * L.t) list
+
+  val clear_float_literals : t -> unit
+
+  val vec128_literals : t -> (Cmm.vec128_bits * L.t) list
+
+  val clear_vec128_literals : t -> unit
 end = struct
   type t =
     { fastcode_flag : bool;
@@ -669,11 +682,39 @@ end = struct
 
   let tailrec_entry_point env = env.tailrec_entry_point
 
-  let float32_literals env = env.float32_literals
+  let find_or_add_literal literals f =
+    match List.assoc_opt f !literals with
+    | Some lbl -> lbl
+    | None ->
+      (* CR sspies: The [Text] section here is incorrect. We should be in the
+         respective section of the literal type (i.e., 16 or 8 bytes). The code
+         below uses the [Text] section, because that is the section that we are
+         in when we emit literals in the function body. Only macOS currently
+         switches to a dedicated section. *)
+      let lbl = L.create Text in
+      literals := (f, lbl) :: !literals;
+      lbl
 
-  let float_literals env = env.float_literals
+  let find_or_add_float32_literal env f =
+    find_or_add_literal env.float32_literals f
 
-  let vec128_literals env = env.vec128_literals
+  let find_or_add_float_literal env f =
+    find_or_add_literal env.float_literals f
+
+  let find_or_add_vec128_literal env f =
+    find_or_add_literal env.vec128_literals f
+
+  let float32_literals env = !(env.float32_literals)
+
+  let clear_float32_literals env = env.float32_literals := []
+
+  let float_literals env = !(env.float_literals)
+
+  let clear_float_literals env = env.float_literals := []
+
+  let vec128_literals env = !(env.vec128_literals)
+
+  let clear_vec128_literals env = env.vec128_literals := []
 end
 
 let env_frame_size env =
@@ -926,28 +967,15 @@ let emit_stack_str_simd_and_fp env reg r =
   emit_stack_load_store env STR_simd_and_fp reg r
 
 (* Label a floating-point literal *)
-(* CR sspies: The [Text] section here is incorrect. We should be in the
-   respective section of the literal type (i.e., 16 or 8 bytes). The code
-   below uses the [Text] section, because that is the section that we are in
-   when we emit literals in the function body. Only macOS currently switches
-   to a dedicated section. *)
-let find_or_add_literal literals f =
-  match List.assoc_opt f !literals with
-  | Some lbl -> lbl
-  | None ->
-    let lbl = L.create Text in
-    literals := (f, lbl) :: !literals;
-    lbl
+let float32_literal env f = Env.find_or_add_float32_literal env f
 
-let float32_literal env f = find_or_add_literal (Env.float32_literals env) f
+let float_literal env f = Env.find_or_add_float_literal env f
 
-let float_literal env f = find_or_add_literal (Env.float_literals env) f
-
-let vec128_literal env f = find_or_add_literal (Env.vec128_literals env) f
+let vec128_literal env f = Env.find_or_add_vec128_literal env f
 
 (* Emit all pending literals *)
 let emit_literals_list literals align emit_literal =
-  if not (Misc.Stdlib.List.is_empty !literals)
+  if not (Misc.Stdlib.List.is_empty literals)
   then (
     if macosx
     then
@@ -967,8 +995,7 @@ let emit_literals_list literals align emit_literal =
        the section mechanism. *)
     D.unsafe_set_internal_section_ref Text;
     D.align ~fill:Nop ~bytes:align;
-    List.iter emit_literal !literals;
-    literals := [])
+    List.iter emit_literal literals)
 
 let emit_float32_literal (f, lbl) =
   D.define_label lbl;
@@ -987,9 +1014,14 @@ let emit_vec128_literal (({ word0; word1 } : Cmm.vec128_bits), lbl) =
 
 let emit_literals env =
   (* Align float32 literals to [size_float]=8 bytes, not 4. *)
-  emit_literals_list (Env.float32_literals env) size_float emit_float32_literal;
+  emit_literals_list (Env.float32_literals env) size_float
+    emit_float32_literal;
+  Env.clear_float32_literals env;
   emit_literals_list (Env.float_literals env) size_float emit_float_literal;
-  emit_literals_list (Env.vec128_literals env) size_vec128 emit_vec128_literal
+  Env.clear_float_literals env;
+  emit_literals_list (Env.vec128_literals env) size_vec128
+    emit_vec128_literal;
+  Env.clear_vec128_literals env
 
 (* Emit code to load the address of a symbol *)
 
@@ -1930,8 +1962,7 @@ let with_measuring ~f =
   Emitaux.with_snapshot ~f:(fun () ->
       D.with_measuring ~f:(fun () -> A.with_measuring ~f))
 
-let measure_emit_instr env i =
-  with_measuring ~f:(fun () -> emit_instr env i)
+let measure_emit_instr env i = with_measuring ~f:(fun () -> emit_instr env i)
 
 let compute_instruction_sizes env code =
   let sizes = ref [] in
