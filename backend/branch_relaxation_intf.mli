@@ -32,8 +32,9 @@ module type S = sig
 
   (** Compute the size of a relaxed instruction.  The [Linear.instruction]
       must have its [desc] already set to the result of
-      [relaxed_instruction_desc].  The returned size must not depend on
-      any mutable sizing environment state. *)
+      [relaxed_instruction_desc].  This function must restore any sizing
+      environment state it modifies; the returned size must be stable
+      across repeated calls. *)
   val relaxed_instruction_size
      : relaxed_instruction
     -> Linear.instruction
