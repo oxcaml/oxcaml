@@ -135,7 +135,9 @@ from mode to mode. For example, let's imagine one defines a record type with som
 type 'a t = { field : 'a @@ m }
 ```
 
-Then, if we have a value `(t : _ t @ n)` then what's the mode of `t.field`? The answer: apply the `m`. For future axes, the modality acts as a `min` between the record mode and the written modality. For example:
+Then, if we have a value `(t : _ t @ n)` then what's the mode of `t.field`? The answer:
+apply the `m`. For future axes, the modality acts as a `min` between the record mode and
+the written modality. For example:
 
 ```ocaml
 type 'a t = { field : 'a @@ shareable }
@@ -152,7 +154,7 @@ type 'a t = { field : 'a @@ shared }
 
 let f : 'a t @ uncontended -> 'a @ shared = fun t -> t.field   (* uncontended < shared *)
 let g : 'a t @ shared -> 'a @ shared = fun t -> t.field        (* shared = shared *)
-let h : 'a t @ contended -> 'a @ contended = fun t -> t.field  (* shared < contented *)
+let h : 'a t @ contended -> 'a @ contended = fun t -> t.field  (* shared < contended *)
 ```
 
 However, things are more complex for diamond-shaped axes, such as visibility and
@@ -178,7 +180,7 @@ type 'a t = { field : 'a @@ observing }
 let f : 'a t @ observable -> 'a @ stateless shareable = fun t -> t.field
 ```
 
-The addition of `shared` here is potentially surprising, but in fact necessary. Recall
+The addition of `shareable` here is potentially surprising, but in fact necessary. Recall
 from the [syntax](./syntax) section that `observing` implies `shareable`, but `observable`
 implies `nonportable`, because we have no analogous notion of "function that only writes
 mutable fields" on the portability axis. Thus, while applying the `observing` modality to
@@ -214,7 +216,7 @@ let cross_shareable : type (a : value mod shareable). a @ nonportable -> a @ sha
 ;;
 ```
 
-Like modalities, diamond-shape modal lattices allow for more interesting kinds of mode
+Like modalities, diamond-shape modal axes allow for more interesting kinds of mode
 crossing. In particular, because visibility allows us to cross `read` separately from
 `write`, and statefulness allows us to cross `observing` separately from `observable`, we
 can strengthen `read`-crossing values from `immutable` to `write` (and vice-versa), and
