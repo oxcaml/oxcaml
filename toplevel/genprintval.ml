@@ -492,15 +492,15 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                         | Variant_erased erased ->
                           let desired =
                             if tag = -1 then
-                              [ Types.Erased_null ]
+                              [ Types.Constructor_null ]
                             else if constant then
-                              [ Types.Erased_immediate;
-                                Types.Erased_value;
-                                Types.Erased_unboxed ]
+                              [ Types.Constructor_immediate;
+                                Types.Constructor_value;
+                                Types.Constructor_unboxed ]
                             else
-                              [ Types.Erased_pointer;
-                                Types.Erased_value;
-                                Types.Erased_unboxed ]
+                              [ Types.Constructor_pointer;
+                                Types.Constructor_value;
+                                Types.Constructor_unboxed ]
                           in
                           let rec find_repr = function
                             | [] -> raise Datarepr.Constr_not_found
@@ -541,11 +541,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                                else None)
                             constr_list
                         with
-                        | Some Types.Erased_null -> false
+                        | Some Types.Constructor_null -> false
                         | Some
-                            (Types.Erased_value | Types.Erased_immediate
-                            | Types.Erased_pointer | Types.Erased_unboxed) ->
+                            ( Types.Constructor_value
+                            | Types.Constructor_immediate
+                            | Types.Constructor_pointer
+                            | Types.Constructor_unboxed ) ->
                           true
+                        | Some (Types.Constructor_boxed _) -> false
                         | None -> false
                         end
                       | Variant_boxed _ | Variant_extensible -> false

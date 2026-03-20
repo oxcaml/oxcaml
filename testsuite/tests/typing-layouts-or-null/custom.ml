@@ -162,3 +162,118 @@ Error: The layout of type "'a" is float64
        But the layout of type "'a" must be a sublayout of value
          because the type argument of wrong_payload_kind has layout value.
 |}]
+
+type t_immediate =
+  | Nullish [@repr null]
+  | Int of int [@repr immediate]
+
+[%%expect{|
+type t_immediate = Nullish [@repr null] | Int of int [@repr immediate]
+|}]
+
+let map_immediate = function
+  | Nullish -> Nullish
+  | Int n -> Int (n + 1)
+
+[%%expect{|
+val map_immediate : t_immediate -> t_immediate = <fun>
+|}]
+
+type with_boxed =
+  | Nullish_boxed [@repr null]
+  | Int_boxed of int [@repr immediate]
+  | Boxed of string
+
+[%%expect{|
+type with_boxed =
+    Nullish_boxed
+  [@repr null]
+  | Int_boxed of int
+  [@repr immediate]
+  | Boxed of string
+|}]
+
+let classify = function
+  | Nullish_boxed -> "null"
+  | Int_boxed _ -> "int"
+  | Boxed _ -> "boxed"
+
+[%%expect{|
+val classify : with_boxed -> string = <fun>
+|}]
+
+type ('a : value pointer) pointer_or_null =
+  | Null_ptr [@repr null]
+  | Ptr of 'a [@repr pointer]
+
+[%%expect{|
+type ('a : value pointer) pointer_or_null =
+    Null_ptr
+  [@repr null]
+  | Ptr of 'a
+  [@repr pointer]
+|}]
+
+type ('a : value pointer) null_immediate_pointer =
+  | NIP [@repr null]
+  | IIP of int [@repr immediate]
+  | PIP of 'a [@repr pointer]
+
+[%%expect{|
+type ('a : value pointer) null_immediate_pointer =
+    NIP
+  [@repr null]
+  | IIP of int
+  [@repr immediate]
+  | PIP of 'a
+  [@repr pointer]
+|}]
+
+let classify_nip = function
+  | NIP -> 0
+  | IIP n -> n
+  | PIP _ -> -1
+
+[%%expect{|
+val classify_nip : ('a : value pointer). 'a null_immediate_pointer -> int =
+  <fun>
+|}]
+
+type bad_immediate =
+  | K
+  | I of int [@repr immediate]
+
+[%%expect{|
+Lines 1-3, characters 0-30:
+1 | type bad_immediate =
+2 |   | K
+3 |   | I of int [@repr immediate]
+Error: Invalid [@repr] declaration:
+       [@repr immediate] must not coexist with ordinary constant constructors.
+|}]
+
+type dup_immediate =
+  | I1 of int [@repr immediate]
+  | I2 of int [@repr immediate]
+
+[%%expect{|
+Lines 1-3, characters 0-31:
+1 | type dup_immediate =
+2 |   | I1 of int [@repr immediate]
+3 |   | I2 of int [@repr immediate]
+Error: Invalid [@repr] declaration:
+       there may be at most one [@repr immediate] constructor.
+|}]
+
+type ('a : value pointer) bad_pointer =
+  | P of 'a [@repr pointer]
+  | B of string
+
+[%%expect{|
+Lines 1-3, characters 0-15:
+1 | type ('a : value pointer) bad_pointer =
+2 |   | P of 'a [@repr pointer]
+3 |   | B of string
+Error: Invalid [@repr] declaration:
+       [@repr pointer] may only coexist with [@repr null] and [@repr immediate].
+|}]

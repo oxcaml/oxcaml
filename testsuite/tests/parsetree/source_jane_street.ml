@@ -221,6 +221,28 @@ module Repr_unboxed : sig type t = Wrap of string or_null [@repr unboxed] end
   @@ stateless
 |}]
 
+module Repr_runtime = struct
+  type t =
+    | Nullish [@repr null]
+    | Immediate of int [@repr immediate]
+
+  type ('a : value pointer) ptr =
+    | Null_ptr [@repr null]
+    | Ptr of 'a [@repr pointer]
+end
+
+[%%expect{|
+module Repr_runtime :
+  sig
+    type t = Nullish [@repr null] | Immediate of int [@repr immediate]
+    type ('a : value pointer) ptr =
+        Null_ptr
+      [@repr null]
+      | Ptr of 'a
+      [@repr pointer]
+  end @@ stateless
+|}]
+
 external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
 
 [%%expect{|

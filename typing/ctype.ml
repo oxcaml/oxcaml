@@ -2342,7 +2342,8 @@ let unbox_once env ty =
         | Type_variant (cstrs, Variant_erased erased, _) ->
           let payload =
             List.find_opt
-              (fun (erased_repr, _cd) -> erased_repr = Erased_value)
+              (fun (runtime_repr, _cd) ->
+                runtime_repr = Constructor_value)
               (List.combine (Array.to_list erased) cstrs)
           in
           begin match payload with

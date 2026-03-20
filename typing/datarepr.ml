@@ -111,20 +111,25 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
   let cstr_shapes_and_arg_jkinds, is_unboxed =
-    let erased_shape erased cstr =
-      match erased, cstr.cd_args with
-      | Erased_null, Cstr_tuple [] -> Constructor_uniform_value, [| |]
-      | ((Erased_value | Erased_immediate | Erased_pointer | Erased_unboxed),
+    let runtime_shape runtime_repr cstr =
+      match runtime_repr, cstr.cd_args with
+      | Constructor_boxed (shape, arg_sorts), _ -> shape, arg_sorts
+      | Constructor_null, Cstr_tuple [] -> Constructor_uniform_value, [| |]
+      | ((Constructor_value | Constructor_immediate | Constructor_pointer
+         | Constructor_unboxed),
          Cstr_tuple [{ ca_sort = sort }]) ->
         Constructor_uniform_value, [| sort |]
-      | ((Erased_value | Erased_immediate | Erased_pointer | Erased_unboxed),
+      | ((Constructor_value | Constructor_immediate | Constructor_pointer
+         | Constructor_unboxed),
          Cstr_record [{ ld_sort = sort }]) ->
         Constructor_uniform_value, [| sort |]
-      | Erased_null, (Cstr_tuple (_ :: _) | Cstr_record _) ->
-        Misc.fatal_error "Invalid erased null constructor"
-      | ((Erased_value | Erased_immediate | Erased_pointer | Erased_unboxed),
-         (Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _))) ->
-        Misc.fatal_error "Invalid erased constructor"
+      | Constructor_null, (Cstr_tuple (_ :: _) | Cstr_record _) ->
+        Misc.fatal_error "Invalid null constructor"
+      | ((Constructor_value | Constructor_immediate | Constructor_pointer
+         | Constructor_unboxed),
+         ( Cstr_tuple ([] | _ :: _ :: _)
+         | Cstr_record ([] | _ :: _ :: _) )) ->
+        Misc.fatal_error "Invalid runtime-represented constructor"
     in
     match rep, cstrs with
     | Variant_extensible, _ -> assert false
@@ -150,7 +155,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       Misc.fatal_error "Multiple or 0 constructors in [@@unboxed] variant"
     | Variant_erased erased, _ ->
       Array.mapi
-        (fun i cstr -> erased_shape erased.(i) cstr)
+        (fun i cstr -> runtime_shape erased.(i) cstr)
         (Array.of_list cstrs),
       false
   in
@@ -185,15 +190,23 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       match rep, cd_args with
       | Variant_erased erased, _ ->
         begin match erased.(src_index), cd_args with
-        | Erased_null, Cstr_tuple [] -> Null
-        | (Erased_value | Erased_immediate | Erased_pointer | Erased_unboxed),
-          (Cstr_tuple [_] | Cstr_record [_]) ->
+        | Constructor_null, Cstr_tuple [] -> Null
+        | ( Constructor_boxed _ | Constructor_value | Constructor_immediate
+          | Constructor_pointer | Constructor_unboxed ),
+          (Cstr_tuple [_] | Cstr_record [_] | Cstr_tuple []) ->
           Ordinary {src_index; runtime_tag}
-        | Erased_null, (Cstr_tuple (_ :: _) | Cstr_record _) ->
-          Misc.fatal_error "Invalid erased null constructor"
-        | (Erased_value | Erased_immediate | Erased_pointer | Erased_unboxed),
-          (Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _)) ->
-          Misc.fatal_error "Invalid erased constructor"
+        | Constructor_null, (Cstr_tuple (_ :: _) | Cstr_record _) ->
+          Misc.fatal_error "Invalid null constructor"
+        | ( Constructor_boxed _ | Constructor_value | Constructor_immediate
+          | Constructor_pointer | Constructor_unboxed ),
+          (Cstr_tuple (_ :: _ :: _) | Cstr_record (_ :: _ :: _)) ->
+          Misc.fatal_error "Invalid constructor representation"
+        | Constructor_boxed _, Cstr_record [] ->
+          Misc.fatal_error "Invalid boxed constructor"
+        | ( Constructor_value | Constructor_immediate | Constructor_pointer
+          | Constructor_unboxed ),
+          Cstr_record [] ->
+          Misc.fatal_error "Invalid constructor representation"
         end
       | _, _ -> Ordinary {src_index; runtime_tag}
     in

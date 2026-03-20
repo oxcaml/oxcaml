@@ -3296,6 +3296,76 @@ let split_cases tag_lambda_list =
   let const, nonconst, null = split_rec tag_lambda_list in
   (sort_int_lambda_list const, sort_int_lambda_list nonconst, null)
 
+let split_runtime_cases tag_lambda_list =
+  let rec split_rec = function
+    | [] -> ([], [], None, None, None, None)
+    | ({ cstr_constant; _ } as cstr, act) :: rem -> (
+        let consts, boxed_nonconsts, null, immediate, pointer, payload =
+          split_rec rem
+        in
+        match Types.constructor_runtime_representation_of_constructor cstr with
+        | Some (Types.Constructor_boxed _) ->
+          let runtime_tag =
+            match cstr.cstr_tag with
+            | Ordinary { runtime_tag } -> runtime_tag
+            | Null | Extension _ -> assert false
+          in
+          if cstr_constant
+          then
+            ( (runtime_tag, act) :: consts,
+              boxed_nonconsts,
+              null,
+              immediate,
+              pointer,
+              payload )
+          else
+            ( consts,
+              (runtime_tag, act) :: boxed_nonconsts,
+              null,
+              immediate,
+              pointer,
+              payload )
+        | Some Types.Constructor_null -> begin
+            match null with
+            | None ->
+              (consts, boxed_nonconsts, Some act, immediate, pointer, payload)
+            | Some _ ->
+              Misc.fatal_error "Multiple null cases in Matching"
+          end
+        | Some Types.Constructor_immediate -> begin
+            match immediate with
+            | None ->
+              (consts, boxed_nonconsts, null, Some act, pointer, payload)
+            | Some _ ->
+              Misc.fatal_error "Multiple immediate cases in Matching"
+          end
+        | Some Types.Constructor_pointer -> begin
+            match pointer with
+            | None ->
+              (consts, boxed_nonconsts, null, immediate, Some act, payload)
+            | Some _ ->
+              Misc.fatal_error "Multiple pointer cases in Matching"
+          end
+        | Some (Types.Constructor_value | Types.Constructor_unboxed) -> begin
+            match payload with
+            | None ->
+              (consts, boxed_nonconsts, null, immediate, pointer, Some act)
+            | Some _ ->
+              Misc.fatal_error "Multiple payload cases in Matching"
+          end
+        | None -> assert false
+      )
+  in
+  let consts, boxed_nonconsts, null, immediate, pointer, payload =
+    split_rec tag_lambda_list
+  in
+  ( sort_int_lambda_list consts,
+    sort_int_lambda_list boxed_nonconsts,
+    null,
+    immediate,
+    pointer,
+    payload )
+
 (* The bool tracks whether the constructor is constant, because we don't have a
    constructor_description available for polymorphic variants *)
 let split_variant_cases (tag_lambda_list : ((int * bool) * lambda) list) =
@@ -3394,7 +3464,19 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
           mk_failaction_pos partial constrs ctx def
       in
       let descr_lambda_list = fails @ descr_lambda_list in
-      let consts, nonconsts, null = split_cases descr_lambda_list in
+      let use_runtime_split =
+        match cstr.cstr_repr with
+        | Variant_erased erased ->
+          Array.exists
+            (function
+              | Types.Constructor_boxed _
+              | Types.Constructor_null
+              | Types.Constructor_immediate
+              | Types.Constructor_pointer -> true
+              | Types.Constructor_value | Types.Constructor_unboxed -> false)
+            erased
+        | Variant_boxed _ | Variant_unboxed | Variant_extensible -> false
+      in
       (* Our duty below is to generate code, for matching on a list of
          constructor+action cases, that is good for both bytecode and
          native-code compilation. (Optimizations that only work well
@@ -3422,7 +3504,71 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
         | None, Some act ->
             (* Identical actions, no failure: 0 control-flow instructions. *)
             act
+        | _ when use_runtime_split -> (
+            let consts, boxed_nonconsts, null, immediate, pointer, payload =
+              split_runtime_cases descr_lambda_list
+            in
+            let boxed_branch () =
+              match pointer, boxed_nonconsts with
+              | Some act, [] -> act
+              | None, [] ->
+                begin match fail_opt with
+                | Some fail -> fail
+                | None -> begin match immediate, payload with
+                  | Some act, _ -> act
+                  | None, Some act -> act
+                  | None, None -> assert false
+                  end
+                end
+              | None, _ ->
+                let v = Ident.create_local "variant" in
+                let v_duid = Lambda.debug_uid_none in
+                let ubr = Translmode.transl_unique_barrier pat_barrier in
+                let str = add_barrier_to_let_kind ubr Alias in
+                Llet
+                  ( str,
+                    Lambda.layout_int,
+                    v,
+                    v_duid,
+                    Lprim (nonconstant_variant_field ubr 0, [ arg ], loc),
+                    call_switcher value_kind loc fail_opt (Lvar v) min_int
+                      max_int boxed_nonconsts )
+              | Some _, _ ->
+                Misc.fatal_error
+                  "Pointer case cannot coexist with boxed constructors"
+            in
+            let nonnull_branch =
+              match payload, immediate, consts with
+              | Some act, None, [] ->
+                act
+              | None, Some act, [] ->
+                Lifthenelse
+                  (Lprim (Pisint { variant_only = true }, [ arg ], loc), act,
+                   boxed_branch (), value_kind)
+              | None, None, [] ->
+                boxed_branch ()
+              | None, None, _ ->
+                Lifthenelse
+                  ( Lprim (Pisint { variant_only = true }, [ arg ], loc),
+                    call_switcher value_kind loc fail_opt arg 0
+                      (cstr.cstr_consts - 1) consts,
+                    boxed_branch (), value_kind )
+              | None, Some act, _ ->
+                Lifthenelse
+                  (Lprim (Pisint { variant_only = true }, [ arg ], loc), act,
+                   boxed_branch (), value_kind)
+              | Some _, Some _, _
+              | Some _, None, _ ->
+                Misc.fatal_error "Invalid runtime-represented variant match"
+            in
+            begin match null with
+            | None -> nonnull_branch
+            | Some if_null ->
+              transl_match_on_or_null value_kind arg loc ~if_null
+                ~if_this:nonnull_branch
+            end )
         | _ -> (
+            let consts, nonconsts, null = split_cases descr_lambda_list in
             match
               (cstr.cstr_consts, cstr.cstr_nonconsts, consts, nonconsts, null)
             with
