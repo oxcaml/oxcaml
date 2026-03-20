@@ -552,14 +552,10 @@ end = struct
          register allocation specific instruction"
         InstructionId.format id
     | None, false -> (
-      match[@ocaml.warning "-4"] instr.desc with
+      match instr.desc with
       | Op Move ->
         (* A move instruction, while no regalloc-specific, can be inserted
            because of phi moves in split/rename. *)
-        successor_id
-      | Op (Specific _) ->
-        (* Specific instructions (including push/pop) may be inserted by the
-           push-pop-around-calls optimization. *)
         successor_id
       | _ ->
         Regalloc_utils.fatal
@@ -1213,13 +1209,9 @@ module Transfer (Desc_val : Description_value) :
   let basic t instr () : (domain, error) result =
     match Description.find_basic description instr with
     | None -> (
-      match[@ocaml.warning "-4"] instr.desc with
+      match instr.desc with
       | Op (Spill | Reload | Move) ->
         Result.ok @@ rename_location t ~loc_instr:instr
-      | Op (Specific _) ->
-        (* Specific instructions (including push/pop) may be inserted by the
-           push-pop-around-calls optimization. *)
-        Result.ok t
       | _ -> assert false)
     | Some instr_before -> (
       match instr.desc with
