@@ -886,12 +886,14 @@ and record_unboxed_product_representation =
      encapsulated by their label's jkinds. We keep this variant for uniformity with boxed
      records, and to make it easier to support different representations in the future. *)
 
-and erased_constructor_representation =
-  | Erased_null
-  | Erased_value
-  | Erased_immediate
-  | Erased_pointer
-  | Erased_unboxed
+and constructor_runtime_representation =
+  | Constructor_boxed of constructor_representation *
+      Jkind_types.Sort.Const.t array
+  | Constructor_null
+  | Constructor_value
+  | Constructor_immediate
+  | Constructor_pointer
+  | Constructor_unboxed
 
 and variant_representation =
   | Variant_unboxed
@@ -907,7 +909,7 @@ and variant_representation =
      [Constructor_mixed] if the inlined record has any unboxed fields.
   *)
   | Variant_extensible
-  | Variant_erased of erased_constructor_representation array
+  | Variant_erased of constructor_runtime_representation array
   (* Constructors whose representation is determined by metadata rather than the
      usual boxed-tag encoding. *)
 
@@ -1184,8 +1186,8 @@ val equal_record_unboxed_product_representation :
 val equal_variant_representation :
   variant_representation -> variant_representation -> bool
 
-val erased_constructor_representation_of_constructor :
-  constructor_description -> erased_constructor_representation option
+val constructor_runtime_representation_of_constructor :
+  constructor_description -> constructor_runtime_representation option
 
 type 'a gen_label_description =
   { lbl_name: string;                   (* Short name *)

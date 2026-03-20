@@ -524,15 +524,17 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let ll =
         List.map (fun (e, sort) -> transl_exp ~scopes sort e) args_with_sorts
       in
+      let runtime_repr =
+        Types.constructor_runtime_representation_of_constructor cstr
+      in
       if cstr.cstr_inlined <> None then begin match ll with
         | [x] -> x
         | _ -> assert false
-      end else begin match cstr.cstr_tag, cstr.cstr_repr with
-      | Null, Variant_erased _ -> Lconst Const_null
-      | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
-        assert false
-      | Ordinary {runtime_tag},
-        (Variant_boxed _ | Variant_extensible) when cstr.cstr_constant ->
+      end else begin match runtime_repr, cstr.cstr_tag, cstr.cstr_repr with
+      | Some Types.Constructor_null, Null, Variant_erased _ -> Lconst Const_null
+      | Some (Types.Constructor_boxed _), Ordinary {runtime_tag},
+        (Variant_boxed _ | Variant_erased _ | Variant_extensible)
+        when cstr.cstr_constant ->
           assert (
             List.for_all
               (fun (_, s) -> Jkind.Sort.Const.all_void s) args_with_sorts);
@@ -540,9 +542,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
             ((tagged_immediate runtime_tag) : lambda)
             ll
-      | Ordinary _, (Variant_unboxed | Variant_erased _) ->
+      | ( Some
+            ( Types.Constructor_value | Types.Constructor_immediate
+            | Types.Constructor_pointer | Types.Constructor_unboxed ),
+          Ordinary _, (Variant_unboxed | Variant_erased _) ) ->
           (match ll with [v] -> v | _ -> assert false)
-      | Ordinary {runtime_tag}, Variant_boxed _ ->
+      | Some (Types.Constructor_boxed _), Ordinary {runtime_tag},
+        (Variant_boxed _ | Variant_erased _) ->
           let constant =
             match List.map extract_constant ll with
             | exception Not_constant -> None
@@ -587,7 +593,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
           end
-      | Extension path, Variant_extensible ->
+      | None, Extension path, Variant_extensible ->
           let lam = transl_extension_path
                       (of_location ~scopes e.exp_loc) e.exp_env path in
           if cstr.cstr_constant
@@ -629,8 +635,34 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Pmakeblock(0, Immutable, Shape shape, alloc_mode)
             in
             Lprim (makeblock, lam :: ll, of_location ~scopes e.exp_loc)
-      | Extension _, (Variant_boxed _ | Variant_unboxed | Variant_erased _)
-      | Ordinary _, Variant_extensible -> assert false
+      | ( None, Null, _
+        | None, Ordinary _,
+          (Variant_boxed _ | Variant_unboxed | Variant_erased _)
+        | None, Extension _,
+          (Variant_boxed _ | Variant_unboxed | Variant_erased _)
+        | None, Ordinary _, Variant_extensible
+        | Some Types.Constructor_null, Null,
+          (Variant_boxed _ | Variant_unboxed | Variant_extensible)
+        | Some Types.Constructor_null, Extension _, _
+        | Some Types.Constructor_null, Ordinary _, _
+        | Some (Types.Constructor_boxed _), Null, _
+        | Some (Types.Constructor_boxed _), Ordinary _, Variant_extensible
+        | Some (Types.Constructor_boxed _), Ordinary _, Variant_unboxed
+        | Some (Types.Constructor_boxed _), Extension _, Variant_unboxed
+        | Some
+            ( Types.Constructor_value | Types.Constructor_immediate
+            | Types.Constructor_pointer | Types.Constructor_unboxed ),
+          Ordinary _, (Variant_boxed _ | Variant_extensible)
+        | Some
+            ( Types.Constructor_value | Types.Constructor_immediate
+            | Types.Constructor_pointer | Types.Constructor_unboxed ),
+          Extension _, _
+        | Some
+            ( Types.Constructor_value | Types.Constructor_immediate
+            | Types.Constructor_pointer | Types.Constructor_unboxed ),
+          Null, _
+        | Some Types.Constructor_boxed _, Extension _, _ ) ->
+        assert false
       end
   | Texp_extension_constructor (_, path) ->
       transl_extension_path (of_location ~scopes e.exp_loc) e.exp_env path

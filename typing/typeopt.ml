@@ -819,9 +819,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
   match rep with
   | Variant_extensible -> assert false
   | Variant_erased erased -> begin
+    let has_null =
+      Array.exists (( = ) Types.Constructor_null) erased
+    in
     match
       List.find_opt
-        (fun (erased_repr, _cd) -> erased_repr = Types.Erased_value)
+        (fun (runtime_repr, _cd) -> runtime_repr = Types.Constructor_value)
         (List.combine (Array.to_list erased) cstrs)
     with
     | Some (_, ({ Types.cd_args = Cstr_tuple [{ Types.ca_type = ty; _ }]; _ }
@@ -836,7 +839,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       num_nodes_visited + 1, { kind with nullable = Nullable }
-    | None -> assert false
+    | None ->
+      num_nodes_visited,
+      if has_null then nullable Pgenval else non_nullable Pgenval
     | Some _ -> assert false
     end
   | Variant_unboxed -> begin
