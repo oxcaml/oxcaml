@@ -124,23 +124,18 @@ module Make (T : Branch_relaxation_intf.S) = struct
           ( did_fix,
             { Branch_relaxation_intf.size; max_displacement } :: rest_sizes )
         else
+          let relax_instr ri =
+            instr.desc <- T.relaxed_instruction_desc ri;
+            let new_size = T.relaxed_instruction_size ri instr in
+            let did_fix, rest_sizes =
+              fixup true (pc + new_size.size) instr.next rest
+            in
+            did_fix, new_size :: rest_sizes
+          in
           match instr.desc with
-          | Lop Poll ->
-            let ri = T.relax_poll () in
-            instr.desc <- T.relaxed_instruction_desc ri;
-            let new_size = T.relaxed_instruction_size ri instr in
-            let did_fix, rest_sizes =
-              fixup true (pc + new_size.size) instr.next rest
-            in
-            did_fix, new_size :: rest_sizes
+          | Lop Poll -> relax_instr (T.relax_poll ())
           | Lop (Alloc { bytes = num_bytes; dbginfo; _ }) ->
-            let ri = T.relax_allocation ~num_bytes ~dbginfo in
-            instr.desc <- T.relaxed_instruction_desc ri;
-            let new_size = T.relaxed_instruction_size ri instr in
-            let did_fix, rest_sizes =
-              fixup true (pc + new_size.size) instr.next rest
-            in
-            did_fix, new_size :: rest_sizes
+            relax_instr (T.relax_allocation ~num_bytes ~dbginfo)
           | Lcondbranch (test, lbl) ->
             let lbl2 = Cmm.new_label () in
             let llabel = Llabel { label = lbl2; section_name = None } in
