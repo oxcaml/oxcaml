@@ -492,6 +492,12 @@ let is_at_least (type a) (extn : a t) (value : a) =
   in
   check !extensions
 
+(* special checking for mode polymorphism to turn it on by default *)
+let debug = ref false
+
+let is_at_least_mode_poly (value : maturity) =
+  if !debug then true else is_at_least Mode_polymorphism value
+
 let is_enabled extn =
   let rec check : extn_pair list -> bool = function
     | [] -> false

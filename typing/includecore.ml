@@ -249,7 +249,7 @@ let value_descriptions ~loc env name
         let mode_l1 =
           Option.map
             (fun m ->
-              if Language_extension.(is_at_least Mode_polymorphism Beta)
+              if Language_extension.(is_at_least_mode_poly Beta)
               then fst (Mode.Locality.newvar_above 0 m)
               else m) mode_l1
         in
