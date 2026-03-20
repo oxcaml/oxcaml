@@ -34,7 +34,7 @@ Error: This value is "read"
 
 let foo (x @ write uncontended) a = x.a <- a
 [%%expect{|
-val foo : 'a myref @ write -> 'a -> unit = <fun>
+val foo : 'a myref @ uncontended write -> 'a -> unit = <fun>
 |}]
 
 let foo (x @ immutable uncontended) a = x.a <- a
@@ -80,7 +80,8 @@ val foo : 'a myref @ uncontended read -> 'a -> 'a myref @ uncontended read =
 
 let foo (x @ write uncontended) upd = { x with a = upd }
 [%%expect{|
-val foo : 'a myref @ write -> 'a -> 'a myref @ write = <fun>
+val foo : 'a myref @ uncontended write -> 'a -> 'a myref @ uncontended write =
+  <fun>
 |}]
 
 let foo (x @ immutable uncontended) upd = { x with a = upd }
@@ -847,7 +848,7 @@ let fails : 'a @ writing -> 'a @ shareable = fun x -> x
 Line 1, characters 54-55:
 1 | let fails : 'a @ writing -> 'a @ shareable = fun x -> x
                                                           ^
-Error: This value is "nonportable" but is expected to be "shareable".
+Error: This value is "poisoning" but is expected to be "shareable".
 |}]
 
 let succeeds : 'a @ writing shareable -> 'a @ shareable = fun x -> x
@@ -875,7 +876,7 @@ let fails : 'a @ writing -> 'a @ portable = fun x -> x
 Line 1, characters 53-54:
 1 | let fails : 'a @ writing -> 'a @ portable = fun x -> x
                                                          ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "poisoning" but is expected to be "portable".
 |}]
 
 let succeeds : 'a @ writing portable -> 'a @ portable = fun x -> x
@@ -981,7 +982,7 @@ let fails : 'a @ contended -> ('a @ write -> 'b) -> 'b = fun x f -> f x
 Line 1, characters 70-71:
 1 | let fails : 'a @ contended -> ('a @ write -> 'b) -> 'b = fun x f -> f x
                                                                           ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "poisoned" or "uncontended".
 |}]
 
 let fails : 'a @ shared -> ('a @ write -> 'b) -> 'b = fun x f -> f x
@@ -989,7 +990,7 @@ let fails : 'a @ shared -> ('a @ write -> 'b) -> 'b = fun x f -> f x
 Line 1, characters 67-68:
 1 | let fails : 'a @ shared -> ('a @ write -> 'b) -> 'b = fun x f -> f x
                                                                        ^
-Error: This value is "shared" but is expected to be "uncontended".
+Error: This value is "shared" but is expected to be "poisoned" or "uncontended".
 |}]
 
 let succeeds : 'a @ contended -> ('a @ write contended -> 'b) -> 'b = fun x f -> f x
@@ -1228,7 +1229,7 @@ Error: This value is "read"
 let zig () @ write uncontended = lazy (ref 42)
 
 [%%expect{|
-val zig : unit -> int ref lazy_t @ write = <fun>
+val zig : unit -> int ref lazy_t @ uncontended write = <fun>
 |}]
 
 let () =
@@ -2047,12 +2048,7 @@ val f : 'a reading @ reading -> 'a = <fun>
 let f ({ reading } @ writing) = (reading : @ stateless)
 
 [%%expect{|
-Line 1, characters 33-40:
-1 | let f ({ reading } @ writing) = (reading : @ stateless)
-                                     ^^^^^^^
-Error: This value is "shareable"
-         because it is the field "reading" (with some modality) of the record at line 1, characters 7-18.
-       However, the highlighted expression is expected to be "portable".
+val f : 'a reading @ writing -> 'a = <fun>
 |}]
 
 let f ({ reading } @ writing) = (reading : @ stateless shareable)
@@ -2092,13 +2088,7 @@ val f : 'a writing -> 'a = <fun>
 let f ({ writing } @ reading) = (writing : @ stateless)
 
 [%%expect{|
-Line 1, characters 33-40:
-1 | let f ({ writing } @ reading) = (writing : @ stateless)
-                                     ^^^^^^^
-Error: This value is "shareable"
-         because it is the field "writing" of the record at line 1, characters 7-18
-         which is "shareable".
-       However, the highlighted expression is expected to be "portable".
+val f : 'a writing @ reading -> 'a = <fun>
 |}]
 
 let f ({ writing } @ reading) = (writing : @ stateless shareable)

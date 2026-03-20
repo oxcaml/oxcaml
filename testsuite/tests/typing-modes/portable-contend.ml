@@ -397,3 +397,105 @@ Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* CR zqian: add portable/uncontended modality and test. *)
+
+(* TESTING poisoned mode *)
+
+(* poisoned and shared are incomparable *)
+let foo (x @ poisoned) = (x : _ @ shared)
+[%%expect{|
+Line 1, characters 26-27:
+1 | let foo (x @ poisoned) = (x : _ @ shared)
+                              ^
+Error: This value is "poisoned" but is expected to be "shared" or "uncontended".
+|}]
+
+let foo (x @ shared) = (x : _ @ poisoned)
+[%%expect{|
+Line 1, characters 24-25:
+1 | let foo (x @ shared) = (x : _ @ poisoned)
+                            ^
+Error: This value is "shared" but is expected to be "poisoned" or "uncontended".
+|}]
+
+(* poisoned submodes to contended *)
+let foo (x @ poisoned) = (x : _ @ contended)
+[%%expect{|
+val foo : 'a @ poisoned -> 'a @ contended = <fun>
+|}]
+
+(* uncontended submodes to poisoned *)
+let foo (x @ uncontended) = (x : _ @ poisoned)
+[%%expect{|
+val foo : 'a -> 'a @ poisoned = <fun>
+|}]
+
+(* Writing to a mutable field from a poisoned record requires uncontended *)
+let foo (r @ poisoned) = r.a <- best_bytes ()
+[%%expect{|
+Line 1, characters 25-26:
+1 | let foo (r @ poisoned) = r.a <- best_bytes ()
+                             ^
+Error: This value is "poisoned"
+       but is expected to be "uncontended"
+         because its mutable field "a" is being written.
+|}]
+
+(* Reading a mutable field from a poisoned record is rejected *)
+let foo (r @ poisoned) = r.a
+[%%expect{|
+Line 1, characters 25-26:
+1 | let foo (r @ poisoned) = r.a
+                             ^
+Error: This value is "poisoned"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "a" is being read.
+|}]
+
+(* Reading an immutable field from a poisoned record is fine *)
+let foo (r @ poisoned) = r.b
+[%%expect{|
+val foo : r @ poisoned -> bytes @ poisoned = <fun>
+|}]
+
+(* TESTING poisoning mode *)
+
+(* poisoning and shareable are incomparable *)
+let foo (x @ poisoning) = (x : _ @ shareable)
+[%%expect{|
+Line 1, characters 27-28:
+1 | let foo (x @ poisoning) = (x : _ @ shareable)
+                               ^
+Error: This value is "poisoning" but is expected to be "shareable".
+|}]
+
+let foo (x @ shareable) = (x : _ @ poisoning)
+[%%expect{|
+Line 1, characters 27-28:
+1 | let foo (x @ shareable) = (x : _ @ poisoning)
+                               ^
+Error: This value is "shareable" but is expected to be "poisoning".
+|}]
+
+(* portable submodes to poisoning *)
+let foo (x @ portable) = (x : _ @ poisoning)
+[%%expect{|
+val foo : 'a @ portable -> 'a = <fun>
+|}]
+
+(* poisoning submodes to nonportable *)
+let foo (x @ poisoning) = (x : _ @ nonportable)
+[%%expect{|
+val foo : 'a @ poisoning -> 'a = <fun>
+|}]
+
+(* TESTING cross-axis: write implies poisoned (annotation default) *)
+let foo (r @ write) = (r : _ @ poisoned)
+[%%expect{|
+val foo : 'a @ write -> 'a @ write = <fun>
+|}]
+
+(* TESTING cross-axis: observable implies poisoning (annotation default) *)
+let foo (f @ observable) = (f : _ @ poisoning)
+[%%expect{|
+val foo : 'a @ observable -> 'a = <fun>
+|}]
