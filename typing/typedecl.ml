@@ -138,6 +138,7 @@ type error =
   | Unexpected_layout_any_in_primitive of string
   | Useless_layout_poly
   | Bad_or_null_attribute of string
+  | Bad_constructor_repr_attribute of string
   | Zero_alloc_attr_unsupported of Builtin_attributes.zero_alloc_attribute
   | Zero_alloc_attr_non_function
   | Zero_alloc_attr_bad_user_arity
@@ -179,6 +180,49 @@ let get_or_null_from_attributes sdecl =
       Bad_or_null_attribute
         "it cannot be both [@@or_null] and [@@or_null_reexport]"));
   or_null
+
+type constructor_repr_annotation =
+  | Repr_unboxed
+  | Repr_null
+  | Repr_value
+  | Repr_immediate
+  | Repr_pointer
+
+let constructor_repr_of_string loc = function
+  | "unboxed" -> Repr_unboxed
+  | "null" -> Repr_null
+  | "value" -> Repr_value
+  | "immediate" -> Repr_immediate
+  | "pointer" -> Repr_pointer
+  | repr ->
+    raise (Error (loc, Bad_constructor_repr_attribute
+      ("unknown constructor representation " ^ repr)))
+
+let constructor_repr_of_attributes
+    ({ pcd_attributes; pcd_loc; _ } : Parsetree.constructor_declaration) =
+  match Builtin_attributes.repr_attribute pcd_attributes with
+  | None -> None
+  | Some repr -> Some (constructor_repr_of_string pcd_loc repr)
+
+let get_constructor_repr_annotations sdecl scstrs =
+  let reprs = List.map constructor_repr_of_attributes scstrs in
+  if List.for_all Option.is_none reprs then
+    None
+  else begin
+    let bad msg =
+      raise (Error (sdecl.ptype_loc, Bad_constructor_repr_attribute msg))
+    in
+    begin match get_unboxed_from_attributes sdecl with
+    | None -> ()
+    | Some _ ->
+      bad "it must not also use [@@boxed] or [@@unboxed]"
+    end;
+    if Builtin_attributes.has_or_null sdecl.ptype_attributes
+       || Builtin_attributes.has_or_null_reexport sdecl.ptype_attributes
+    then
+      bad "it must not also use [@@or_null] or [@@or_null_reexport]";
+    Some reprs
+  end
 
 let check_or_null_variant_shape _path params sdecl scstrs =
   let bad msg =
@@ -931,6 +975,13 @@ let transl_declaration env sdecl (id, uid) =
     sdecl.ptype_cstrs
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
+  let constructor_repr_annotations =
+    match sdecl.ptype_kind with
+    | Ptype_variant scstrs -> get_constructor_repr_annotations sdecl scstrs
+    | Ptype_abstract | Ptype_record _ | Ptype_record_unboxed_product _
+    | Ptype_open ->
+      None
+  in
   let unbox, unboxed_default =
     match sdecl.ptype_kind with
     | Ptype_variant [{pcd_args = Pcstr_tuple [_]; _}]
@@ -942,6 +993,29 @@ let transl_declaration env sdecl (id, uid) =
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
   verify_unboxed_attr unboxed_attr sdecl;
+  let constructor_unboxed =
+    match constructor_repr_annotations with
+    | None -> false
+    | Some [Some Repr_unboxed] ->
+      verify_unboxed_attr (Some true) sdecl;
+      true
+    | Some [] -> false
+    | Some [None] ->
+      raise (Error (sdecl.ptype_loc, Bad_constructor_repr_attribute
+        "it must annotate the constructor that uses [@repr]"))
+    | Some reprs ->
+      let supported =
+        List.for_all
+          (function None | Some Repr_unboxed -> true | Some _ -> false)
+          reprs
+      in
+      if not supported then
+        raise (Error (sdecl.ptype_loc, Bad_constructor_repr_attribute
+          "only [@repr unboxed] is supported in this declaration"))
+      else
+        raise (Error (sdecl.ptype_loc, Bad_constructor_repr_attribute
+          "[@repr unboxed] requires a type with exactly one constructor"))
+  in
   let transl_type sty =
     let cty =
       Ctype.with_local_level begin fun () ->
@@ -1103,6 +1177,10 @@ let transl_declaration env sdecl (id, uid) =
               in
               Variant_erased erased, custom_or_null_jkind path param
             | _ -> assert false
+          else if constructor_unboxed then
+            Variant_erased [| Erased_unboxed |],
+            Jkind.of_new_sort ~why:Old_style_unboxed_type
+              ~level:(Ctype.get_current_level ())
           else if unbox then
             Variant_unboxed,
             Jkind.of_new_sort ~why:Old_style_unboxed_type
@@ -2248,6 +2326,25 @@ let rec update_decl_jkind env dpath decl =
         end
       | Some _ | None ->
         Misc.fatal_error "Invalid erased value constructor"
+      end
+    | [{ Types.cd_args } as cstr], Variant_erased [| Erased_unboxed |] -> begin
+        match cd_args with
+        | Cstr_tuple [{ ca_type = ty; _ } as arg] ->
+          let jkind = Ctype.type_jkind env ty in
+          let sort = Jkind.sort_of_jkind env jkind in
+          let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+          [{ cstr with Types.cd_args = Cstr_tuple [{ arg with ca_sort }] }],
+          rep, jkind
+        | Cstr_record [{ ld_type } as lbl] ->
+          let jkind = Ctype.type_jkind env ld_type in
+          let sort = Jkind.sort_of_jkind env jkind in
+          let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+          [{ cstr with Types.cd_args = Cstr_record [{ lbl with ld_sort }] }],
+          rep, jkind
+        | Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _) ->
+          Misc.fatal_error
+            "Typedecl.update_variant_kind: \
+             invalid erased unboxed constructor"
       end
     | _, Variant_erased _ ->
       Misc.fatal_error
@@ -5255,6 +5352,8 @@ let report_error_doc ppf = function
         Style.inline_code "[@layout_poly]"
   | Bad_or_null_attribute msg ->
       fprintf ppf "@[Invalid [@@or_null] declaration:@ %s.@]" msg
+  | Bad_constructor_repr_attribute msg ->
+      fprintf ppf "@[Invalid [@repr] declaration:@ %s.@]" msg
   | Zero_alloc_attr_unsupported ca ->
       let variety = match ca with
         | Default_zero_alloc  | Check _ -> assert false

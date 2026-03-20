@@ -2532,7 +2532,11 @@ let unbox_once env ty =
             Stepped_or_null
               { ty = apply arg.ca_type ~extra_substs:[];
                 modality = arg.ca_modalities }
-          | Some (_, { cd_args = Cstr_record [{ ld_type = ty; ld_modalities = modality; _ }]; _ }) ->
+          | Some (_,
+              { cd_args =
+                  Cstr_record [{ ld_type = ty; ld_modalities = modality; _ }];
+                _
+              }) ->
             Stepped_or_null { ty = apply ty ~extra_substs:[]; modality }
           | None ->
             Final_result

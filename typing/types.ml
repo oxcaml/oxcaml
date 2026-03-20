@@ -969,8 +969,18 @@ let find_unboxed_type decl =
       ([{ld_type = arg; ld_modalities = ms; _ }], Record_inlined (_, _, Variant_unboxed), _)
   | Type_record_unboxed_product
       ([{ld_type = arg; ld_modalities = ms; _ }], Record_unboxed_product, _)
-  | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
-  | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
+  | Type_variant
+      ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}],
+       Variant_unboxed, _)
+  | Type_variant
+      ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}],
+       Variant_unboxed, _)
+  | Type_variant
+      ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}],
+       Variant_erased [| Erased_unboxed |], _)
+  | Type_variant
+      ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}],
+       Variant_erased [| Erased_unboxed |], _) ->
     Some (arg, ms)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed _ | Record_float | Record_ufloat

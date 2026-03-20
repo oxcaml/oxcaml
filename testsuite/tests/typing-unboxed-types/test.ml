@@ -14,6 +14,32 @@ type t1 = A of string [@@ocaml.unboxed];;
 type t1 = A of string [@@unboxed]
 |}];;
 
+type t1_repr = A_repr of string [@repr unboxed];;
+[%%expect{|
+type t1_repr = A_repr of string [@repr unboxed]
+|}];;
+
+let x = A_repr "foo" in
+Obj.repr x == Obj.repr (match x with A_repr s -> s)
+;;
+[%%expect{|
+- : bool = true
+|}];;
+
+type t1_or_null = A_or_null of string or_null [@repr unboxed];;
+[%%expect{|
+type t1_or_null = A_or_null of string or_null [@repr unboxed]
+|}];;
+
+let x = A_or_null Null in
+match x with
+| A_or_null Null -> true
+| A_or_null (This _) -> false
+;;
+[%%expect{|
+- : bool = true
+|}];;
+
 let x = A "foo" in
 Obj.repr x == Obj.repr (match x with A s -> s)
 ;;
@@ -81,11 +107,26 @@ Line 1, characters 0-29:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because its constructor has no argument.
 |}];;
+type t4_repr = C [@repr unboxed];;
+[%%expect{|
+Line 1, characters 0-32:
+1 | type t4_repr = C [@repr unboxed];;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because its constructor has no argument.
+|}];;
 type t5 = D of int * string [@@ocaml.unboxed];; (* more than one argument *)
 [%%expect{|
 Line 1, characters 0-45:
 1 | type t5 = D of int * string [@@ocaml.unboxed];; (* more than one argument *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       its constructor has more than one argument.
+|}];;
+type t5_repr = D of int * string [@repr unboxed];;
+[%%expect{|
+Line 1, characters 0-48:
+1 | type t5_repr = D of int * string [@repr unboxed];;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        its constructor has more than one argument.
 |}];;
@@ -95,6 +136,14 @@ Line 1, characters 0-33:
 1 | type t5 = E | F [@@ocaml.unboxed];;          (* more than one constructor *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because it has more than one constructor.
+|}];;
+type t5_repr = E [@repr unboxed] | F;;
+[%%expect{|
+Line 1, characters 0-36:
+1 | type t5_repr = E [@repr unboxed] | F;;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Invalid [@repr] declaration:
+       [@repr unboxed] requires a type with exactly one constructor.
 |}];;
 type t6 = G of int | H [@@ocaml.unboxed];;
 [%%expect{|
