@@ -5294,7 +5294,7 @@ module Comonadic_gen (Obj : Obj) = struct
   let allow_right m = S.allow_right m
 
   let choose_level level =
-    if Language_extension.(is_at_least Mode_polymorphism Beta) then level else 0
+    if Language_extension.(is_at_least_mode_poly Beta) then level else 0
 
   let newvar level =
     let level = choose_level level in
@@ -5332,12 +5332,12 @@ module Comonadic_gen (Obj : Obj) = struct
   let update_level i a = with_log (S.update_level i obj a)
 
   let generalize ~current_level a =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if Language_extension.(is_at_least_mode_poly Alpha)
     then S.generalize ~log:None ~current_level obj a
     else S.generalize_structure ~log:None ~current_level obj a
 
   let generalize_structure ~current_level a =
-    if Language_extension.(is_at_least Mode_polymorphism Beta)
+    if Language_extension.(is_at_least_mode_poly Beta)
     then S.generalize_structure ~log:None ~current_level obj a
 
   let instantiate ~copy_scope ~current_level a =
@@ -5465,7 +5465,7 @@ module Monadic_gen (Obj : Obj) = struct
   let allow_right m = S.allow_left m
 
   let choose_level level =
-    if Language_extension.(is_at_least Mode_polymorphism Beta) then level else 0
+    if Language_extension.(is_at_least_mode_poly Beta) then level else 0
 
   let newvar level =
     let level = choose_level level in
@@ -5501,12 +5501,12 @@ module Monadic_gen (Obj : Obj) = struct
   let update_level i a = S.update_level ~log:None i obj a
 
   let generalize ~current_level a =
-    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    if Language_extension.(is_at_least_mode_poly Alpha)
     then S.generalize ~log:None ~current_level obj a
     else S.generalize_structure ~log:None ~current_level obj a
 
   let generalize_structure ~current_level a =
-    if Language_extension.(is_at_least Mode_polymorphism Beta)
+    if Language_extension.(is_at_least_mode_poly Beta)
     then S.generalize_structure ~log:None ~current_level obj a
 
   let instantiate ~copy_scope ~current_level a =
