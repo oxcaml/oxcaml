@@ -16,7 +16,7 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
-type instruction_size = private
+type instruction_size =
   { size : int;
     max_displacement : int option
   }
