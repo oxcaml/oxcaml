@@ -508,7 +508,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                               begin match
                                 List.find_mapi
                                   (fun i cd ->
-                                     if erased.(i) = repr then Some cd else None)
+                                     if erased.(i) = repr
+                                     then Some cd
+                                     else None)
                                   constr_list
                               with
                               | Some cd -> cd

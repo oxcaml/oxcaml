@@ -149,7 +149,9 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     | Variant_unboxed, ([] | _ :: _) ->
       Misc.fatal_error "Multiple or 0 constructors in [@@unboxed] variant"
     | Variant_erased erased, _ ->
-      Array.mapi (fun i cstr -> erased_shape erased.(i) cstr) (Array.of_list cstrs),
+      Array.mapi
+        (fun i cstr -> erased_shape erased.(i) cstr)
+        (Array.of_list cstrs),
       false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in

@@ -123,6 +123,7 @@ let builtin_attrs =
   ; "layout_poly"
   ; "or_null"
   ; "or_null_reexport"
+  ; "repr"
   ; "no_recursive_modalities"
   ; "jane.non_erasable.instances"
   ; "cold"
@@ -691,6 +692,16 @@ let has_or_null attrs =
 
 let has_or_null_reexport attrs =
   has_attribute "or_null_reexport" attrs
+
+let repr_attribute attrs =
+  match select_attributes ["repr", Return] attrs with
+  | [] -> None
+  | [{ attr_payload; _ }] ->
+    begin match ident_of_payload attr_payload with
+    | Some repr -> Some repr
+    | None -> string_of_payload attr_payload
+    end
+  | _ -> None
 
 let curry_attr loc =
   Ast_helper.Attr.mk ~loc:Location.none (Location.mkloc curry_attr_name loc) (PStr [])

@@ -210,6 +210,15 @@ module Or_null_names : sig type 'a t = Nope | Yep of 'a [@@or_null] end @@
 val y : unit -> #('a Or_null_names.t * string Or_null_names.t) = <fun>
 |}]
 
+module Repr_unboxed = struct
+  type t = Wrap of string or_null [@repr unboxed]
+end
+
+[%%expect{|
+module Repr_unboxed : sig type t = Wrap of string or_null [@repr unboxed] end
+  @@ stateless
+|}]
+
 external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
 
 [%%expect{|
