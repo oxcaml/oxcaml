@@ -214,6 +214,22 @@ type ('a : value pointer) pointer_or_null =
   [@repr pointer]
 |}]
 
+type ('a : value) repr_value =
+  | Null_value [@repr null]
+  | Value of 'a [@repr value]
+
+[%%expect{|
+type 'a repr_value = Null_value [@repr null] | Value of 'a [@repr value]
+|}]
+
+let to_option_value = function
+  | Null_value -> None
+  | Value x -> Some x
+
+[%%expect{|
+val to_option_value : 'a repr_value -> 'a option = <fun>
+|}]
+
 type ('a : value pointer) null_immediate_pointer =
   | NIP [@repr null]
   | IIP of int [@repr immediate]
@@ -276,4 +292,19 @@ Lines 1-3, characters 0-15:
 3 |   | B of string
 Error: Invalid [@repr] declaration:
        [@repr pointer] may only coexist with [@repr null] and [@repr immediate].
+|}]
+
+type ('a : value) bad_value_mix =
+  | N [@repr null]
+  | V of 'a [@repr value]
+  | I of int [@repr immediate]
+
+[%%expect{|
+Lines 1-4, characters 0-30:
+1 | type ('a : value) bad_value_mix =
+2 |   | N [@repr null]
+3 |   | V of 'a [@repr value]
+4 |   | I of int [@repr immediate]
+Error: Invalid [@repr] declaration:
+       [@repr value] may only coexist with [@repr null].
 |}]

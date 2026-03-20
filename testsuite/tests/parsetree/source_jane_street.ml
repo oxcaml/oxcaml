@@ -229,6 +229,10 @@ module Repr_runtime = struct
   type ('a : value pointer) ptr =
     | Null_ptr [@repr null]
     | Ptr of 'a [@repr pointer]
+
+  type ('a : value) valueish =
+    | Null_value [@repr null]
+    | Value of 'a [@repr value]
 end
 
 [%%expect{|
@@ -240,6 +244,7 @@ module Repr_runtime :
       [@repr null]
       | Ptr of 'a
       [@repr pointer]
+    type 'a valueish = Null_value [@repr null] | Value of 'a [@repr value]
   end @@ stateless
 |}]
 
