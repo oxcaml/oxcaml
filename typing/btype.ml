@@ -915,7 +915,7 @@ module Jkind0 = struct
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
           ~forkable ~statefulness
       in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
+      let crossing : Mode.Crossing.t = Mode.Crossing.pack ~monadic ~comonadic in
       {
         crossing;
         externality;
@@ -964,7 +964,7 @@ module Jkind0 = struct
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
           ~forkable ~statefulness
       in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
+      let crossing : Mode.Crossing.t = Mode.Crossing.pack ~monadic ~comonadic in
       {
         crossing;
         externality;

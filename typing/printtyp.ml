@@ -1447,37 +1447,38 @@ let tree_of_modalities mut t =
       Fmt.asprintf "%a" (Modality.Per_axis.print ax) m)
 
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
+  let modes_repr = Mode.Alloc.Const.decode modes in
   (* Step 1: Compute the modes to print *)
   let diff =
 
     (* [forkable] has implied defaults depending on [areality]: *)
     let forkable =
-      match modes.areality, modes.forkable with
+      match modes_repr.areality, modes_repr.forkable with
       | Local, Unforkable | Global, Forkable -> None
-      | _, _ -> Some modes.forkable
+      | _, _ -> Some modes_repr.forkable
     in
 
     (* [yielding] has implied defaults depending on [areality]: *)
     let yielding =
-      match modes.areality, modes.yielding with
+      match modes_repr.areality, modes_repr.yielding with
       | Local, Yielding | Global, Unyielding -> None
-      | _, _ -> Some modes.yielding
+      | _, _ -> Some modes_repr.yielding
     in
 
     (* [contention] has implied defaults based on [visibility]: *)
     let contention =
-      match modes.visibility, modes.contention with
+      match modes_repr.visibility, modes_repr.contention with
       | Immutable, Contended | Read, Shared | Read_write, Uncontended -> None
-      | _, _ -> Some modes.contention
+      | _, _ -> Some modes_repr.contention
     in
 
     (* [portability] has implied defaults based on [statefulness]: *)
     let portability =
-      match modes.statefulness, modes.portability with
+      match modes_repr.statefulness, modes_repr.portability with
       | Stateless, Portable
       | Observing, Shareable
       | Stateful, Nonportable -> None
-      | _, _ -> Some modes.portability
+      | _, _ -> Some modes_repr.portability
     in
 
     let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in

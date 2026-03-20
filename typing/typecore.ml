@@ -494,10 +494,15 @@ let check_tail_call_local_returning loc env ap_mode {region_mode; _} =
 
 let meet_regional ?hint:h mode =
   let mode = Value.disallow_left mode in
-  Value.meet [Value.(of_const ?hint_comonadic:h {
-    Const.max with
-    areality = Regional
-  }); mode]
+  Value.meet
+    [ Value.(
+        of_const ?hint_comonadic:h
+          (Const.encode
+             { (Const.decode Const.max) with
+               areality = Regionality.Const.Regional
+             }));
+      mode
+    ]
 
 let mode_default mode =
   { position = RNontail;
@@ -620,11 +625,12 @@ let mode_coerce mode expected_mode =
 
 let mode_lazy expected_mode =
   let mode =
-    Value.{
-      Const.max with
-      areality = Regionality.Const.Global;
-      forkable = Forkable.Const.Forkable;
-      yielding = Yielding.Const.Unyielding }
+    Value.Const.encode
+      { (Value.Const.decode Value.Const.max) with
+        areality = Regionality.Const.Global;
+        forkable = Forkable.Const.Forkable;
+        yielding = Yielding.Const.Unyielding
+      }
   in
   let expected_mode =
     mode_coerce (Value.of_const ~hint_comonadic:Lazy_allocated_on_heap mode)
@@ -678,7 +684,10 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
      mode_default vmode, vmode
   | _, _, Tail -> begin
     Value.submode_exn vmode Value.(of_const ~hint_comonadic:Tailcall_argument
-      { Const.max with areality = Regional});
+      (Const.encode
+         { (Const.decode Const.max) with
+           areality = Regionality.Const.Regional
+         }));
     mode_default vmode, vmode
   end
 
@@ -1140,9 +1149,11 @@ let mutvar_mode ~loc ~env m0 exp_mode =
 (** The [expected_mode] of the record when projecting a mutable field. *)
 let mode_project_mutable mut_name =
   let mode =
-    { Value.Const.max with
-      visibility = Visibility.Const.Read;
-      contention = Contention.Const.Shared }
+    Value.Const.encode
+      { (Value.Const.decode Value.Const.max) with
+        visibility = Visibility.Const.Read;
+        contention = Contention.Const.Shared
+      }
     |> Value.of_const ~hint_monadic:(Mutable_read mut_name)
   in
   mode_default mode
@@ -1150,9 +1161,11 @@ let mode_project_mutable mut_name =
 (** The [expected_mode] of the record when mutating a mutable field. *)
 let mode_mutate_mutable mut_name =
   let mode =
-    { Value.Const.max with
-      visibility = Read_write;
-      contention = Uncontended }
+    Value.Const.encode
+      { (Value.Const.decode Value.Const.max) with
+        visibility = Visibility.Const.Read_write;
+        contention = Contention.Const.Uncontended
+      }
     |> Value.of_const ~hint_monadic:(Mutable_write mut_name)
   in
   mode_default mode
@@ -1160,8 +1173,10 @@ let mode_mutate_mutable mut_name =
 (** The [expected_mode] of the lazy expression when forcing it. *)
 let mode_force_lazy =
   let mode =
-    { Value.Const.max with
-      contention = Uncontended }
+    Value.Const.encode
+      { (Value.Const.decode Value.Const.max) with
+        contention = Contention.Const.Uncontended
+      }
     |> Value.of_const ~hint_monadic:Lazy_forced
   in
   mode_default mode
@@ -5439,10 +5454,19 @@ let unique_use ~loc ~env mode_l mode_r  =
     (* if unique extension is not enabled, we will not run uniqueness analysis;
        instead, we force all uses to be aliased and many. This is equivalent to
        running a UA which forces everything *)
-    submode ~loc ~env Value.(of_const {Const.min with uniqueness = Aliased})
+    submode ~loc ~env
+      Value.(of_const
+        (Const.encode
+           { (Const.decode Const.min) with
+             uniqueness = Uniqueness.Const.Aliased
+           }))
       (mode_default mode_r);
-    submode ~loc ~env mode_l (mode_default Value.(of_const
-      {Const.max with linearity = Many}));
+    submode ~loc ~env mode_l
+      (mode_default Value.(of_const
+         (Const.encode
+            { (Const.decode Const.max) with
+              linearity = Linearity.Const.Many
+            })));
     (Uniqueness.disallow_left Uniqueness.aliased,
      Linearity.disallow_right Linearity.many)
   end
@@ -6385,7 +6409,10 @@ and type_expect_
   | Pexp_borrow body ->
     let hint_comonadic = Hint.Borrowed (loc, Comonadic) in
     let mode =
-      { Mode.Value.Const.min with areality = Local }
+      Mode.Value.Const.encode
+        { (Mode.Value.Const.decode Mode.Value.Const.min) with
+          areality = Regionality.Const.Local
+        }
       |> Value.of_const ~hint_comonadic
     in
     submode ~loc ~env mode expected_mode;
@@ -6420,7 +6447,10 @@ and type_expect_
           let mode, _ =
             Value.(newvar_below
               (of_const ~hint_comonadic:Tailcall_function
-                { Const.max with areality = Regional }))
+                (Const.encode
+                   { (Const.decode Const.max) with
+                     areality = Regionality.Const.Regional
+                   })))
           in
           mode
         | Nontail | Default -> Value.newvar ()
@@ -6970,9 +7000,13 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_while(scond, sbody) ->
-      let env =
-        Env.add_const_closure_lock ~ghost:true (loc, Loop)
-          {Value.Comonadic.Const.max with linearity = Many} env
+    let env =
+      Env.add_const_closure_lock ~ghost:true (loc, Loop)
+        (Value.Comonadic.encode
+           { (Value.Comonadic.decode Value.Comonadic.Const.max) with
+             linearity = Linearity.Const.Many
+           })
+        env
       in
       let cond_env = Env.add_region_lock env in
       let mode = mode_region Value.max in
@@ -7009,7 +7043,11 @@ and type_expect_
       in
       let env =
         Env.add_const_closure_lock ~ghost:true (loc, Loop)
-          {Value.Comonadic.Const.max with linearity = Many} env
+          (Value.Comonadic.encode
+             { (Value.Comonadic.decode Value.Comonadic.Const.max) with
+               linearity = Linearity.Const.Many
+             })
+          env
       in
       let (for_id, for_uid), new_env =
         type_for_loop_index ~loc ~env ~param
@@ -7690,11 +7728,17 @@ and type_expect_
         begin
           submode ~loc ~env
             Value.(of_const ~hint_comonadic:Stack_expression
-              { Const.min with areality = Local })
+              (Const.encode
+                 { (Const.decode Const.min) with
+                   areality = Regionality.Const.Local
+                 }))
             expected_mode;
           let local =
             Alloc.(of_const ~hint_comonadic:Stack_expression
-              { Const.min with areality = Local })
+              (Const.encode
+                 { (Const.decode Const.min) with
+                   areality = Locality.Const.Local
+                 }))
           in
           Alloc.submode_err (exp.exp_loc, Allocation) local alloc_mode
         end
@@ -7737,7 +7781,11 @@ and type_expect_
            and should have the areality expected here: *)
         Value.newvar_below
           (Value.meet [
-            Value.of_const {Value.Const.max with uniqueness = Unique};
+            Value.of_const
+              (Value.Const.encode
+                 { (Value.Const.decode Value.Const.max) with
+                   uniqueness = Uniqueness.Const.Unique
+                 });
             Value.max_with_comonadic Areality
               (Value.proj_comonadic Areality expected_mode.mode)])
       in
@@ -7751,10 +7799,12 @@ and type_expect_
            We enforce that here, by asking the allocation to be global.
            This makes the block alloc_heap, but we ignore that information anyway. *)
         (* CR uniqueness: this shouldn't mention yielding *)
-        { Value.Comonadic.Const.max with
-          areality = Regionality.Const.Global
-        ; forkable = Forkable.Const.Forkable
-        ; yielding = Yielding.Const.Unyielding }
+        Value.Comonadic.encode
+          { (Value.Comonadic.decode Value.Comonadic.Const.max) with
+            areality = Regionality.Const.Global;
+            forkable = Forkable.Const.Forkable;
+            yielding = Yielding.Const.Unyielding
+          }
       in
       let exp2 =
         let exp2_mode =
@@ -10170,7 +10220,10 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
            heap-allocated. *)
         (* CR zqian: the multiple allocations should enjoy their own modes. *)
         let m, _ =
-          {Value.Const.max with areality = Global}
+          Value.Const.encode
+            { (Value.Const.decode Value.Const.max) with
+              areality = Regionality.Const.Global
+            }
           |> Value.of_const
           |> Value.newvar_below
         in
