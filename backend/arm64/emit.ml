@@ -1069,8 +1069,8 @@ let assembly_code_for_local_allocation env i ~n =
   Env.set_local_realloc_sites env
     ({ lr_lbl; lr_dbg = i.dbg; lr_return_lbl } :: Env.local_realloc_sites env)
 
-let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
-  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc dbginfo) in
+let assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg =
+  (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
   let gc_return_lbl = L.create Text in
   let gc_lbl = L.create Text in
   (* n is at most Max_young_whsize * 8, i.e. currently 0x808, so it is
@@ -1086,9 +1086,15 @@ let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
      A.ins1 (B_cond (Branch_cond.Int CS)) (local_label lbl);
      A.ins1 B (local_label gc_lbl);
      D.define_label lbl);
-  labelled_ins4 gc_return_lbl ADD_immediate
-    (H.reg_x i.res.(0))
-    reg_x_alloc_ptr (O.imm 8) O.optional_none;
+  labelled_ins4 gc_return_lbl ADD_immediate res_reg reg_x_alloc_ptr (O.imm 8)
+    O.optional_none;
+  gc_lbl, gc_return_lbl
+
+let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
+  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc dbginfo) in
+  let gc_lbl, gc_return_lbl =
+    assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg:(H.reg_x i.res.(0))
+  in
   Env.set_call_gc_sites env
     ({ gc_lbl; gc_return_lbl; gc_frame_lbl } :: Env.call_gc_sites env)
 
@@ -1115,6 +1121,7 @@ let assembly_code_for_allocation env i ~local ~n ~far ~dbginfo =
 (* Output the assembly code for a poll. *)
 
 let assembly_code_for_poll0 ~far ~return_label =
+  (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
   let gc_lbl = L.create Text in
   let gc_return_lbl =
     match return_label with None -> L.create Text | Some lbl -> lbl
@@ -1307,6 +1314,31 @@ let emit_static_cast (cast : Cmm.static_cast) i =
       if distinct then A.ins2 FMOV_fp (H.reg_d_of_vec128 dst) (H.reg_d src))
   | V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
+
+let emit_branch lbl =
+  let lbl = label_to_asm_label ~section:Text lbl in
+  A.ins1 B (local_label lbl)
+
+let emit_condbranch arg tst lbl =
+  let lbl = label_to_asm_label ~section:Text lbl |> local_label in
+  match tst with
+  | Itruetest -> A.ins2 CBNZ (H.reg_x arg.(0)) lbl
+  | Ifalsetest -> A.ins2 CBZ (H.reg_x arg.(0)) lbl
+  | Iinttest cmp ->
+    A.ins_cmp_reg (H.reg_x arg.(0)) (H.reg_x arg.(1)) O.optional_none;
+    A.ins1 (B_cond (Branch_cond.Int (cond_for_comparison cmp))) lbl
+  | Iinttest_imm (cmp, n) ->
+    emit_cmpimm (H.reg_x arg.(0)) n;
+    A.ins1 (B_cond (Branch_cond.Int (cond_for_comparison cmp))) lbl
+  | Ifloattest (Float64, cmp) ->
+    A.ins2 FCMP (H.reg_d arg.(0)) (H.reg_d arg.(1));
+    A.ins1 (B_cond (Branch_cond.Float (cond_for_float_comparison cmp))) lbl
+  | Ifloattest (Float32, cmp) ->
+    let cond = cond_for_float_comparison cmp in
+    A.ins2 FCMP (H.reg_s arg.(0)) (H.reg_s arg.(1));
+    A.ins1 (B_cond (Branch_cond.Float cond)) lbl
+  | Ioddtest -> A.ins3 TBNZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
+  | Ieventest -> A.ins3 TBZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
 
 (* Output the assembly code for an instruction *)
 
@@ -1797,29 +1829,8 @@ let emit_instr env i =
   | Llabel { label = lbl; _ } ->
     let lbl = label_to_asm_label ~section:Text lbl in
     D.define_label lbl
-  | Lbranch lbl ->
-    let lbl = label_to_asm_label ~section:Text lbl in
-    A.ins1 B (local_label lbl)
-  | Lcondbranch (tst, lbl) -> (
-    let lbl = label_to_asm_label ~section:Text lbl |> local_label in
-    match tst with
-    | Itruetest -> A.ins2 CBNZ (H.reg_x i.arg.(0)) lbl
-    | Ifalsetest -> A.ins2 CBZ (H.reg_x i.arg.(0)) lbl
-    | Iinttest cmp ->
-      A.ins_cmp_reg (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1)) O.optional_none;
-      A.ins1 (B_cond (Branch_cond.Int (cond_for_comparison cmp))) lbl
-    | Iinttest_imm (cmp, n) ->
-      emit_cmpimm (H.reg_x i.arg.(0)) n;
-      A.ins1 (B_cond (Branch_cond.Int (cond_for_comparison cmp))) lbl
-    | Ifloattest (Float64, cmp) ->
-      A.ins2 FCMP (H.reg_d i.arg.(0)) (H.reg_d i.arg.(1));
-      A.ins1 (B_cond (Branch_cond.Float (cond_for_float_comparison cmp))) lbl
-    | Ifloattest (Float32, cmp) ->
-      let cond = cond_for_float_comparison cmp in
-      A.ins2 FCMP (H.reg_s i.arg.(0)) (H.reg_s i.arg.(1));
-      A.ins1 (B_cond (Branch_cond.Float cond)) lbl
-    | Ioddtest -> A.ins3 TBNZ (H.reg_x i.arg.(0)) (O.imm_six 0) lbl
-    | Ieventest -> A.ins3 TBZ (H.reg_x i.arg.(0)) (O.imm_six 0) lbl)
+  | Lbranch lbl -> emit_branch lbl
+  | Lcondbranch (tst, lbl) -> emit_condbranch i.arg tst lbl
   | Lcondbranch3 (lbl0, lbl1, lbl2) ->
     let section = Asm_targets.Asm_section.Text in
     let ins_cond cond lbl =
@@ -1977,7 +1988,8 @@ let relaxed_instruction_desc = function
   | Condbranch (test, lbl) -> Lcondbranch (test, lbl)
   | Branch lbl -> Lbranch lbl
 
-let _emit_relaxed_instruction (relaxed : relaxed_instruction) =
+let _emit_relaxed_instruction (relaxed : relaxed_instruction)
+    (instr : Linear.instruction) =
   measure_instruction_count (fun () ->
       match relaxed with
       | Far_poll ->
@@ -1985,7 +1997,14 @@ let _emit_relaxed_instruction (relaxed : relaxed_instruction) =
           assembly_code_for_poll0 ~far:true ~return_label:None
         in
         ()
-      | Far_alloc _ | Condbranch _ | Branch _ -> assert false)
+      | Far_alloc { num_bytes; dbginfo = _ } ->
+        let _gc_lbl, _gc_return_lbl =
+          assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
+            ~res_reg:(H.reg_x instr.res.(0))
+        in
+        ()
+      | Condbranch (test, lbl) -> emit_condbranch instr.arg test lbl
+      | Branch lbl -> emit_branch lbl)
 
 let branch_relax env body =
   (* Make a copy of [env] so the sizing pass can mutate it without affecting
