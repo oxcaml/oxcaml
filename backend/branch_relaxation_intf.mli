@@ -30,8 +30,6 @@ module type S = sig
 
   val offset_pc_at_branch : distance
 
-  val instr_size : Linear.instruction -> instruction_size
-
   (** Compute the size of a relaxed instruction.  The [Linear.instruction]
       must have its [desc] already set to the result of
       [relaxed_instruction_desc].  The returned size must not depend on

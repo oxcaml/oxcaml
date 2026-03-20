@@ -1893,12 +1893,6 @@ let branch_relax env body =
 
     let offset_pc_at_branch = 0
 
-    let instr_size instr =
-      let m = measure_emit_instr sizing_env instr in
-      { Branch_relaxation_intf.size = m.count;
-        max_displacement = m.min_max_displacement
-      }
-
     let relaxed_instruction_size _ri instr =
       let saved_stack_offset = sizing_env.stack_offset in
       let saved_call_gc_sites = sizing_env.call_gc_sites in
