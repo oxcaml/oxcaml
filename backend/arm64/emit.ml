@@ -1865,13 +1865,13 @@ let relaxed_instruction_desc = function
 let branch_relax env body =
   (* Record copy so the sizing pass can mutate its own mutable fields
      (stack_offset, call_gc_sites, etc.) without affecting [env], which is used
-     later by [emit_all].  Note: [num_stack_slots] is a mutable hash table
-     shared between [env] and [sizing_env], but it is only read during sizing
-     (it is written once before [branch_relax] is called).
-     After [compute_instruction_sizes], [sizing_env.stack_offset] reflects
-     the end-of-function state; [relaxed_instruction_size] saves and restores
-     it around each call.  This is correct because relaxed instructions
-     (far branches, far polls, conditional branches) do not depend on
+     later by [emit_all]. Note: [num_stack_slots] is a mutable hash table shared
+     between [env] and [sizing_env], but it is only read during sizing (it is
+     written once before [branch_relax] is called). After
+     [compute_instruction_sizes], [sizing_env.stack_offset] reflects the
+     end-of-function state; [relaxed_instruction_size] saves and restores it
+     around each call. This is correct because relaxed instructions (far
+     branches, far polls, conditional branches) do not depend on
      [stack_offset]. *)
   let sizing_env = { env with stack_offset = env.stack_offset } in
   let initial_sizes = compute_instruction_sizes sizing_env body in
@@ -1909,8 +1909,8 @@ let branch_relax env body =
 
     let relax_allocation ~num_bytes ~dbginfo = Far_alloc { num_bytes; dbginfo }
 
-    (* [Lcondbranch3] is expanded into individual [Lcondbranch]
-       instructions by [Branch_relaxation] before this is called. *)
+    (* [Lcondbranch3] is expanded into individual [Lcondbranch] instructions by
+       [Branch_relaxation] before this is called. *)
     let[@warning "-4"] relax_condbranch = function
       | Linear.Lcondbranch (test, lbl) -> Condbranch (test, lbl)
       | Lcondbranch3 _ | _ ->
