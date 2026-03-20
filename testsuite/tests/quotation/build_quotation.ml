@@ -7,9 +7,9 @@
 
 (* Preamble types for use in tests *)
 
-type existential = Exists : ('a : immediate). 'a -> existential;;
+type existential = Exists : 'a -> existential
 [%%expect {|
-type existential = Exists : ('a : immediate). 'a -> existential
+type existential = Exists : 'a -> existential
 |}];;
 #mark_toplevel_in_quotations;;
 
@@ -317,6 +317,18 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 [%%expect {|
 - : <[('a. 'a -> 'a) -> $('b) -> $('b)]> expr =
 <[fun (f : 'a. 'a -> 'a) -> f f]>
+|}];;
+
+<[ let f : type a. a -> a = fun x -> x in f ]>
+[%%expect {|
+Uncaught exception: Stdlib.Exit
+
+|}];;
+
+<[ function Exists (type a) (x : a) -> ignore (x : a) ]>
+[%%expect {|
+Uncaught exception: Stdlib.Exit
+
 |}];;
 
 <[ fun x -> fun x -> fun x -> 42 ]>;;
