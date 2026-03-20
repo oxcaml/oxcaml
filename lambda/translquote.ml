@@ -2693,7 +2693,9 @@ let maybe_constrain_pat_with_type loc typ exp =
 let assert_no_modes modes =
   List.iter
     (fun mode ->
-      fatal_errorf "Translquote [at %a]: no support for mode annotations."
+      fatal_errorf
+        "Translquote [at %a]:@ no support for mode annotations in this \
+         position."
         Location.print_loc (Location.get_loc mode))
     modes.mode_desc
 
@@ -3228,6 +3230,7 @@ and quote_newtype ~scopes loc ident sloc rest =
   |> Function.wrap
 
 and fun_param_binding ~scopes ~transl stage loc param frest =
+  assert_no_modes param.fp_mode;
   let with_newtypes =
     List.fold_right
       (fun (ident, sloc, _, _) rest ->
@@ -3282,6 +3285,7 @@ and fun_param_binding ~scopes ~transl stage loc param frest =
 and quote_function ~scopes ~transl stage loc fn extras =
   match fn with
   | Texp_function fn ->
+    assert_no_modes fn.ret_mode;
     List.iter with_new_param fn.params;
     let fn_body =
       match fn.body with
@@ -3448,7 +3452,9 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
   | Texp_poly _ ->
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
-  | Texp_mode _ -> lambda (* FIXME: add modes to quotation representation *)
+  | Texp_mode modes ->
+    assert_no_modes modes;
+    lambda
   | Texp_inspected_type (Label_disambiguation ambiguity) ->
     lambda
     |> maybe_constrain_exp_desc_with_type loc
