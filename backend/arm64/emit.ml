@@ -1114,8 +1114,7 @@ let assembly_code_for_allocation env i ~local ~n ~far ~dbginfo =
 
 (* Output the assembly code for a poll. *)
 
-let assembly_code_for_poll env i ~far ~return_label =
-  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc []) in
+let assembly_code_for_poll0 ~far ~return_label =
   let gc_lbl = L.create Text in
   let gc_return_lbl =
     match return_label with None -> L.create Text | Some lbl -> lbl
@@ -1142,6 +1141,11 @@ let assembly_code_for_poll env i ~far ~return_label =
        A.ins1 (B_cond (Branch_cond.Int LS)) (local_label lbl);
        A.ins1 B (local_label return_label);
        labelled_ins1 lbl B (local_label gc_lbl));
+  gc_lbl, gc_return_lbl
+
+let assembly_code_for_poll env i ~far ~return_label =
+  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc []) in
+  let gc_lbl, gc_return_lbl = assembly_code_for_poll0 ~far ~return_label in
   Env.set_call_gc_sites env
     ({ gc_lbl; gc_return_lbl; gc_frame_lbl } :: Env.call_gc_sites env)
 
@@ -1972,6 +1976,16 @@ let relaxed_instruction_desc = function
     Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
   | Condbranch (test, lbl) -> Lcondbranch (test, lbl)
   | Branch lbl -> Lbranch lbl
+
+let _emit_relaxed_instruction (relaxed : relaxed_instruction) =
+  measure_instruction_count (fun () ->
+      match relaxed with
+      | Far_poll ->
+        let _gc_lbl, _gc_return_lbl =
+          assembly_code_for_poll0 ~far:true ~return_label:None
+        in
+        ()
+      | Far_alloc _ | Condbranch _ | Branch _ -> assert false)
 
 let branch_relax env body =
   (* Make a copy of [env] so the sizing pass can mutate it without affecting
