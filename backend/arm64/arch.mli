@@ -130,6 +130,10 @@ val operation_allocates : specific_operation -> bool
 
 val isomorphic_specific_operation : specific_operation -> specific_operation -> bool
 
+val specific_operation_stack_offset_delta : specific_operation -> int
+
+val call_stack_alignment : int
+
 (* See `amd64/arch.mli`. *)
 val equal_addressing_mode_without_displ : addressing_mode -> addressing_mode -> bool
 

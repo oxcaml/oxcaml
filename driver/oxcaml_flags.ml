@@ -30,6 +30,8 @@ let vectorize_max_block_size =
 
 let cfg_peephole_optimize = ref true    (* -[no-]cfg-peephole-optimize *)
 
+let cfg_push_pop_around_calls = ref true (* -[no-]cfg-push-pop-around-calls *)
+
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
