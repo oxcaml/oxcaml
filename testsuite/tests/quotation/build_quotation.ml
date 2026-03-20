@@ -1144,3 +1144,53 @@ Warning 10 [non-unit-statement]: this expression should have type unit.
 - : <[int]> expr =
 <[(Stdlib.List.hd ([{ Stdlib.contents = 42; }])).Stdlib.contents]>
 |}];;
+
+(** Mode annotations **)
+
+(* Pattern constraints *)
+<[ let (x @ unique portable) = "abc" in x ]>
+[%%expect {|
+- : <[string]> expr = <[let x = "abc" in x]>
+|}];;
+
+(* Expression constraints *)
+<[ fun x -> (x : _  @ unique portable)]>
+[%%expect {|
+- : <[$('a) @ unique portable -> $('a)]> expr = <[fun x -> (x : _)]>
+|}];;
+
+<[ fun x -> exclave_ (x : _  @ local)]>
+[%%expect {|
+- : <[$('a) -> $('a) @ local]> expr = <[fun x -> exclave_ (x : _)]>
+|}];;
+
+(* Function definitions *)
+<[ fun (x @ local unique) @ local unique -> x]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr = <[fun x -> x]>
+|}];;
+
+<[ let (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[let f = (fun x -> x) in f]>
+|}];;
+
+<[ let rec (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[let rec f = (fun x -> x) in f]>
+|}];;
+
+<[ let local_ f x = x in f "abc" ]>
+[%%expect {|
+- : <[string]> expr = <[let f = (fun x -> x) in f "abc"]>
+|}];;
+
+(* Function types *)
+<[ fun (f : _ @ local unique -> _ @ local unique) -> f]>
+[%%expect {|
+>> Fatal error: Translquote [at Line 1, characters 16-21]: no support for mode annotations.
+Uncaught exception: Misc.Fatal_error
+
+|}];;
