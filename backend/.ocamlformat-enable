@@ -38,6 +38,8 @@ asm_targets/**/*.ml
 asm_targets/**/*.mli
 branch_relaxation.ml
 branch_relaxation.mli
+callee_regs_collector.ml
+callee_regs_collector.mli
 cfg/**/*.ml
 cfg/**/*.mli
 cfg/vectorize.ml

@@ -574,6 +574,38 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        be clobbered in the middle. *)
     destroyed_r10
 
+let get_callee_regs_info
+  : Cmm.symbol -> Callee_regs_info.value option
+  = fun symb ->
+  match !Oxcaml_flags.regalloc_leaf_functions with
+  | false -> None
+  | true ->
+    let callee_name = symb.sym_name in
+    let current_unit_info =
+      (Compilenv.current_unit_infos ()).ui_callee_regs_info
+    in
+    match Callee_regs_info.get_value current_unit_info callee_name with
+    | Some _ as v -> v
+    | None ->
+      Callee_regs_info.get_value Compilenv.cached_callee_regs_info callee_name
+
+(* CR xclerc for xclerc: copied for the time being, because of circular dependencies *)
+let value_to_phys_regs (value : Callee_regs_info.value) :
+    (Regs.Reg_class.t * Regs.Phys_reg.t list) list =
+  List.filter_map
+    (fun cls ->
+      let cls_idx = Regs.Reg_class.hash cls in
+      let bitmask = value.(cls_idx) in
+      let regs =
+        Array.fold_left
+          (fun acc phys_reg ->
+            let bit = Regs.index_in_class phys_reg in
+            if bitmask land (1 lsl bit) <> 0 then phys_reg :: acc else acc)
+          [] (Regs.available_registers cls)
+      in
+      if List.is_empty regs then None else Some (cls, regs))
+    Regs.Reg_class.all
+
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   match terminator with
@@ -594,7 +626,38 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
     assert (stack_ofs >= 0);
     if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
-  | Call {op = Indirect _ | Direct _; _} -> all_phys_regs
+  | Call {op = Indirect _; _} -> all_phys_regs
+  | Call {op = Direct callee; _} ->
+    let callee_regs_info =
+      get_callee_regs_info callee
+    in
+    match callee_regs_info with
+    | None -> all_phys_regs
+    | Some callee_regs ->
+      let clobbered_regs : (Regs.reg_class * Regs.phys_reg list) list =
+        value_to_phys_regs callee_regs
+      in
+      let gpr =
+        let regs =
+        match List.assoc_opt Regs.GPR clobbered_regs with
+        | None -> []
+        | Some (regs : Regs.phys_reg list) -> regs
+         in
+         let regs = (Regs.P Regs.R11) :: regs in
+          (* CR xclerc for xclerc: probably wrong when !Clflags.llvm_backend (See `phys_reg` above) *)
+          List.map (fun reg -> phys_reg Val reg) regs
+      in
+      let simd =
+        match List.assoc_opt Regs.SIMD clobbered_regs with
+        | None -> []
+        | Some (regs : Regs.phys_reg list) ->
+        List.concat_map (fun reg ->
+          [phys_reg Float reg; phys_reg Float32 reg; phys_reg Vec128 reg]
+          @ (if Arch.Extension.enabled_vec256 () then [phys_reg Vec256 reg] else [])
+          @ (if Arch.Extension.enabled_vec512 () then [phys_reg Vec512 reg] else [])
+        ) regs
+      in
+      Array.of_list (gpr @ simd)
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -620,8 +683,11 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
     else
       if alloc || stack_ofs > 0 then true else false
   | Invalid _ -> more_destruction_points
-  | Call {op = Indirect _ | Direct _; _} ->
+  | Call {op = Indirect _ ; _} ->
     true
+  | Call {op =  Direct callee; _} ->
+    Option.is_none (get_callee_regs_info callee)
+
 
 (* Layout of the stack frame *)
 

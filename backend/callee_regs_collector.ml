@@ -13,7 +13,8 @@ let value_to_phys_regs (value : Callee_regs_info.value) :
           (fun acc phys_reg ->
             let bit = Regs.index_in_class phys_reg in
             if bitmask land (1 lsl bit) <> 0 then phys_reg :: acc else acc)
-          [] (Regs.available_registers cls)
+          []
+          (Regs.available_registers cls)
       in
       if regs = [] then None else Some (cls, regs))
     Regs.Reg_class.all
@@ -31,6 +32,8 @@ let add_reg value (reg : Reg.t) =
 
 let add_regs value regs = Array.iter (add_reg value) regs
 
+(* CR xclerc for xclerc: consider renaming, given it is use for `Raise` in
+   `is_leaf_function` below *)
 exception Has_ocaml_call
 
 (* A "leaf function" for our purposes is one that contains no [Call] or
@@ -41,30 +44,33 @@ exception Has_ocaml_call
 let is_leaf_function (cfg : Cfg.t) =
   match
     Cfg.iter_blocks cfg ~f:(fun _label block ->
-      (match[@ocaml.warning "-4"] block.Cfg.terminator.desc with
-      | Cfg.Call _ | Cfg.Tailcall_func _ -> raise Has_ocaml_call
-      | _ -> ()))
+        match[@ocaml.warning "-4"] block.Cfg.terminator.desc with
+        | Cfg.Call _ | Cfg.Tailcall_func _
+        | Cfg.Raise (Raise_regular | Raise_reraise) ->
+          (* CR xclerc for xclerc: double check `Raise_notrace` is ok *)
+          raise Has_ocaml_call
+        | _ -> ())
   with
   | () -> true
   | exception Has_ocaml_call -> false
 
 let cfg (cfg_with_layout : Cfg_with_layout.t) =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  (* CR xclerc for xclerc: we (temporarily?) disable the feature if in
-    "opaque" mode, to please the CI (there is test ensuring that two
-    different implementations sharing the same interface result in
-    equivalent cmx files). *)
+  (* CR xclerc for xclerc: we (temporarily?) disable the feature if in "opaque"
+     mode, to please the CI (there is test ensuring that two different
+     implementations sharing the same interface result in equivalent cmx
+     files). *)
   if (not !Clflags.opaque) && is_leaf_function cfg
   then begin
     let num_classes = List.length Regs.Reg_class.all in
     let value = Array.make num_classes 0 in
     Cfg.iter_blocks cfg ~f:(fun _label block ->
-      DLL.iter block.Cfg.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
-        add_regs value instr.res;
-        add_regs value (Proc.destroyed_at_basic instr.desc));
-      let term = block.Cfg.terminator in
-      add_regs value term.res;
-      add_regs value (Proc.destroyed_at_terminator term.desc));
+        DLL.iter block.Cfg.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+            add_regs value instr.res;
+            add_regs value (Proc.destroyed_at_basic instr.desc));
+        let term = block.Cfg.terminator in
+        add_regs value term.res;
+        add_regs value (Proc.destroyed_at_terminator term.desc));
     let info = (Compilenv.current_unit_infos ()).ui_callee_regs_info in
     Callee_regs_info.set_value info cfg.Cfg.fun_name value
   end
