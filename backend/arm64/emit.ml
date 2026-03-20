@@ -1926,10 +1926,12 @@ let emit_instr env i =
 
 (* Branch relaxation, including instruction size computation pass *)
 
-let measure_emit_instr env i =
+let with_measuring ~f =
   Emitaux.with_snapshot ~f:(fun () ->
-      D.with_measuring ~f:(fun () ->
-          A.with_measuring ~f:(fun () -> emit_instr env i)))
+      D.with_measuring ~f:(fun () -> A.with_measuring ~f))
+
+let measure_emit_instr env i =
+  with_measuring ~f:(fun () -> emit_instr env i)
 
 let compute_instruction_sizes env code =
   let sizes = ref [] in
@@ -1953,12 +1955,7 @@ let compute_instruction_sizes env code =
   walk code;
   List.rev !sizes
 
-let measure_instruction_count f =
-  let m =
-    Emitaux.with_snapshot ~f:(fun () ->
-        D.with_measuring ~f:(fun () -> A.with_measuring ~f))
-  in
-  m.count
+let measure_instruction_count f = (with_measuring ~f).count
 
 let out_of_line_code_block_sizes env =
   List.map
@@ -1984,24 +1981,21 @@ type relaxed_instruction =
 let emit_relaxed_instruction (relaxed : relaxed_instruction)
     (instr : Linear.instruction) =
   let m =
-    Emitaux.with_snapshot ~f:(fun () ->
-        D.with_measuring ~f:(fun () ->
-            A.with_measuring ~f:(fun () ->
-                match relaxed with
-                | Far_poll ->
-                  let _gc_lbl, _gc_return_lbl =
-                    assembly_code_for_poll0 ~far:true ~return_label:None
-                  in
-                  ()
-                | Far_alloc { num_bytes; dbginfo = _ } ->
-                  let _gc_lbl, _gc_return_lbl =
-                    assembly_code_for_fast_heap_allocation0 ~n:num_bytes
-                      ~far:true
-                      ~res_reg:(H.reg_x instr.res.(0))
-                  in
-                  ()
-                | Condbranch (test, lbl) -> emit_condbranch instr.arg test lbl
-                | Branch lbl -> emit_branch lbl)))
+    with_measuring ~f:(fun () ->
+        match relaxed with
+        | Far_poll ->
+          let _gc_lbl, _gc_return_lbl =
+            assembly_code_for_poll0 ~far:true ~return_label:None
+          in
+          ()
+        | Far_alloc { num_bytes; dbginfo = _ } ->
+          let _gc_lbl, _gc_return_lbl =
+            assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
+              ~res_reg:(H.reg_x instr.res.(0))
+          in
+          ()
+        | Condbranch (test, lbl) -> emit_condbranch instr.arg test lbl
+        | Branch lbl -> emit_branch lbl)
   in
   { Branch_relaxation_intf.size = m.count;
     max_displacement = m.min_max_displacement
