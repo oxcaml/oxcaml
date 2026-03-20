@@ -62,6 +62,9 @@ val type_open:
    Longident.t Asttypes.loc -> Path.t * Env.t)
     ref
 
+val check_no_repeated_labels_unless_extension_enabled :
+  loc:Location.t -> ('a -> string option) -> 'a list -> unit
+
 val valid_tyvar_name : string -> bool
 
 (** [transl_label lbl ty] produces a Typedtree argument label for an argument
