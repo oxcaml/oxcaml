@@ -158,8 +158,8 @@ let h : 'a t @ contended -> 'a @ contended = fun t -> t.field  (* shared < conte
 ```
 
 However, things are more complex for diamond-shaped axes, such as visibility and
-statefulness. In these cases, applying modalities to future modes results
-in the _greatest common submode_, while applying modalities to past modes
+statefulness, contention and portability. In these cases, applying modalities to future
+modes results in the _greatest common submode_, while applying modalities to past modes
 results in the _least common supermode_. Mathematically, this corresponds to the meet
 and join of the two modes, respectively.
 
@@ -176,15 +176,11 @@ On the other hand, the greatest common submode of `reading` and `writing` is `st
 ```ocaml
 type 'a t = { field : 'a @@ reading }
 
-let f : 'a t @ writing -> 'a @ stateless shareable = fun t -> t.field
+let f : 'a t @ writing -> 'a @ stateless = fun t -> t.field
 ```
 
-The addition of `shareable` here is potentially surprising, but in fact necessary. Recall
-from the [syntax](./syntax) section that `reading` implies `shareable`, but `writing`
-implies `nonportable`, because we have no analogous notion of "function that only writes
-mutable fields" on the portability axis. Thus, while applying the `reading` modality to
-`writing` yields `stateless`, applying the `shareable` modality to `nonportable` only
-yields `shareable` and not `portable`.
+Similarly, the least common supermode of `poisoned` and `shared` is `contended`, and
+the greatest common submode of `shareable` and `poisoning` is `portable`.
 
 # Mode crossing
 In the [intro](./intro) to modes, we saw the idea of "mode crossing", in which values of
@@ -239,9 +235,7 @@ let f : type (a : value mod writing). a @ reading -> a @ stateless shareable =
 ;;
 ```
 
-And again, like modalities, there is a tricky interaction here between statefulness,
-visibility, portability, and contention. Because the latter two axes are not themselves
-diamonds, only `read` and `reading` carry any information with regard to portability
-and contention. Thus, we cannot talk about a value's ability to cross from `contended` to
-`shared` but not `uncontended`, nor a value's ability to cross to `portable` from
-`shareable` but not `nonportable`.
+Like statefulness and visibility, contention and portability are also diamond-shaped
+lattices. Mode crossing works analogously: for example, crossing `poisoned` allows
+weakening from `shared` to `contended` (and vice-versa), and crossing `poisoning` allows
+strengthening from `shareable` to `portable` (and vice-versa).
