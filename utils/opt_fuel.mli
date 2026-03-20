@@ -20,9 +20,9 @@
       only apply steps whose global index is below the threshold
     - [OPT_FUEL_FAIL=n]: fail compilation when global step [n] is reached *)
 
-(** [add_arg arg] adds a non-flag command-line argument (e.g. a source file)
-    to the identifier used for this compilation run in the fuel record.
-    All arguments have to be added before should_do_opt_step is called. *)
+(** [add_arg arg] adds a non-flag command-line argument (e.g. a source file) to
+    the identifier used for this compilation run in the fuel record. All
+    arguments have to be added before should_do_opt_step is called. *)
 val add_arg : string -> unit
 
 (** [should_do_opt_step ~message:(fun () -> "...") ()] returns [true] if the
