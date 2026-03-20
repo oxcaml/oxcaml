@@ -1999,22 +1999,24 @@ type relaxed_instruction =
 
 let emit_relaxed_instruction (relaxed : relaxed_instruction)
     (instr : Linear.instruction) =
+  match relaxed with
+  | Far_poll ->
+    let _gc_lbl, _gc_return_lbl =
+      assembly_code_for_poll0 ~far:true ~return_label:None
+    in
+    ()
+  | Far_alloc { num_bytes; dbginfo = _ } ->
+    let _gc_lbl, _gc_return_lbl =
+      assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
+        ~res_reg:(H.reg_x instr.res.(0))
+    in
+    ()
+  | Condbranch (test, lbl) -> emit_condbranch instr.arg test lbl
+  | Branch lbl -> emit_branch lbl
+
+let measure_relaxed_instruction ri instr =
   let m =
-    with_measuring ~f:(fun () ->
-        match relaxed with
-        | Far_poll ->
-          let _gc_lbl, _gc_return_lbl =
-            assembly_code_for_poll0 ~far:true ~return_label:None
-          in
-          ()
-        | Far_alloc { num_bytes; dbginfo = _ } ->
-          let _gc_lbl, _gc_return_lbl =
-            assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
-              ~res_reg:(H.reg_x instr.res.(0))
-          in
-          ()
-        | Condbranch (test, lbl) -> emit_condbranch instr.arg test lbl
-        | Branch lbl -> emit_branch lbl)
+    with_measuring ~f:(fun () -> emit_relaxed_instruction ri instr)
   in
   { Branch_relaxation_intf.size = m.count;
     max_displacement = m.min_max_displacement
@@ -2045,7 +2047,8 @@ let branch_relax env body =
 
     let offset_pc_at_branch = 0
 
-    let relaxed_instruction_size ri instr = emit_relaxed_instruction ri instr
+    let relaxed_instruction_size ri instr =
+      measure_relaxed_instruction ri instr
 
     let relaxed_instruction_desc = relaxed_instruction_desc
 
