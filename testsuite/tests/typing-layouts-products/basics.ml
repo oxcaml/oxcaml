@@ -105,6 +105,20 @@ Error: The layout of type "t2_wrong" is value & (float64 & value)
          because of the annotation on the declaration of the type t2_wrong.
 |}]
 
+type t2_wrong_group : value & float64 & value =
+  #{ so : string option; t1 : t1 }
+and t2_wrong_group_boxed = Box of t2_wrong_group
+[%%expect{|
+Lines 1-2, characters 0-34:
+1 | type t2_wrong_group : value & float64 & value =
+2 |   #{ so : string option; t1 : t1 }
+Error: The layout of type "t2_wrong_group" is value & (float64 & value)
+         because it is an unboxed record.
+       But the layout of type "t2_wrong_group" must be a sublayout of
+           value & float64 & value
+         because of the annotation on the declaration of the type t2_wrong_group.
+|}]
+
 type ('a : value & bits64) t3 = 'a
 type t4 = #(int * int64#) t3
 type t5 = t4 t3
