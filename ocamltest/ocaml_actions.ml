@@ -261,9 +261,9 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
         c_headers_flags;
         Ocaml_flags.stdlib;
         directory_flags env;
-        flags env;
         libraries;
         backend_default_flags env Compiler.target;
+        flags env;
         backend_flags env Compiler.target;
         compile_flags;
         output;
@@ -309,9 +309,9 @@ let compile_module (compiler : Ocaml_compilers.compiler) module_ log env =
     Ocaml_flags.stdlib;
     c_headers_flags;
     directory_flags env;
-    flags env;
     libraries Compiler.target env;
     backend_default_flags env Compiler.target;
+    flags env;
     backend_flags env Compiler.target;
     compile_only_flag_opt;
     module_;
