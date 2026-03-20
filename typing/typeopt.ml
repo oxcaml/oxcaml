@@ -818,22 +818,26 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       (cstrs : Types.constructor_declaration list) rep =
   match rep with
   | Variant_extensible -> assert false
-  | Variant_with_null -> begin
+  | Variant_erased erased -> begin
     match
       List.find_opt
-        (fun ({ Types.cd_args; _ } : Types.constructor_declaration) ->
-           match cd_args with
-           | Cstr_tuple [_] -> true
-           | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ -> false)
-        cstrs
+        (fun (erased_repr, _cd) -> erased_repr = Types.Erased_value)
+        (List.combine (Array.to_list erased) cstrs)
     with
-    | Some ({ Types.cd_args = Cstr_tuple [{ Types.ca_type = ty; _ }]; _ }
-        : Types.constructor_declaration) ->
+    | Some (_, ({ Types.cd_args = Cstr_tuple [{ Types.ca_type = ty; _ }]; _ }
+        : Types.constructor_declaration)) ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       num_nodes_visited + 1, { kind with nullable = Nullable }
-    | Some _ | None -> assert false
+    | Some (_, ({ Types.cd_args = Cstr_record [{ Types.ld_type = ty; _ }]; _ }
+        : Types.constructor_declaration)) ->
+      let num_nodes_visited, kind =
+        value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
+      in
+      num_nodes_visited + 1, { kind with nullable = Nullable }
+    | None -> assert false
+    | Some _ -> assert false
     end
   | Variant_unboxed -> begin
       (* CR layouts v1.5: This should only be reachable in the case of a missing
@@ -969,7 +973,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type
       | [] | _ :: _ :: _ -> assert false
     end
-  | Record_inlined (_, _, Variant_with_null) -> assert false
+  | Record_inlined (_, _, Variant_erased _) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
   | Record_boxed _ | Record_float | Record_ufloat | Record_mixed _ -> begin
       let is_mutable =

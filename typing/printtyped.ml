@@ -235,7 +235,7 @@ let variant_representation i ppf = let open Types in function
          sort_array (i+1) ppf sorts))
       cstrs
   | Variant_extensible -> line i ppf "Variant_inlined\n"
-  | Variant_with_null -> line i ppf "Variant_with_null\n"
+  | Variant_erased _ -> line i ppf "Variant_erased\n"
 
 let mixed_block_element i ppf mixed_block_element =
   line i ppf "%s\n" (Types.mixed_block_element_to_string mixed_block_element)

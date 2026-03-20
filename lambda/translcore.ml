@@ -50,7 +50,7 @@ let field_offset_for_label lbl =
   match lbl.lbl_repres with
   | Record_boxed _
   | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
-  | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
+  | Record_inlined (_, Constructor_uniform_value, Variant_erased _) ->
       lbl.lbl_pos
   | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
       lbl.lbl_pos + 1
@@ -65,7 +65,7 @@ let field_offset_for_label lbl =
   | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
       fatal_error "Mixed inlined records not supported for extensible variants"
   | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
-  | Record_inlined (_, Constructor_mixed _, Variant_with_null)
+  | Record_inlined (_, Constructor_mixed _, Variant_erased _)
   | Record_mixed _ ->
       lbl.lbl_pos
 
@@ -528,7 +528,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         | [x] -> x
         | _ -> assert false
       end else begin match cstr.cstr_tag, cstr.cstr_repr with
-      | Null, Variant_with_null -> Lconst Const_null
+      | Null, Variant_erased _ -> Lconst Const_null
       | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
         assert false
       | Ordinary {runtime_tag},
@@ -540,7 +540,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
             ((tagged_immediate runtime_tag) : lambda)
             ll
-      | Ordinary _, (Variant_unboxed | Variant_with_null) ->
+      | Ordinary _, (Variant_unboxed | Variant_erased _) ->
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
           let constant =
@@ -629,7 +629,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Pmakeblock(0, Immutable, Shape shape, alloc_mode)
             in
             Lprim (makeblock, lam :: ll, of_location ~scopes e.exp_loc)
-      | Extension _, (Variant_boxed _ | Variant_unboxed | Variant_with_null)
+      | Extension _, (Variant_boxed _ | Variant_unboxed | Variant_erased _)
       | Ordinary _, Variant_extensible -> assert false
       end
   | Texp_extension_constructor (_, path) ->
@@ -742,7 +742,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               shape
           in
           Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
-        | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_inlined (_, _, Variant_erased _) -> assert false
       in
       begin match prim_and_args with
       | None -> targ
@@ -824,7 +824,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           shape.(lbl.lbl_pos) <- field_shape;
           Psetmixedfield([lbl.lbl_pos], shape, mode),
           [arg_lambda; newval_lambda]
-        | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_inlined (_, _, Variant_erased _) -> assert false
       in
       Lprim(prim, args, of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
@@ -2119,7 +2119,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 shape.(lbl.lbl_pos) <- field_shape;
                 Psetmixedfield
                   ([lbl.lbl_pos], shape, Assignment modify_heap)
-            | Record_inlined (_, _, Variant_with_null) -> assert false
+            | Record_inlined (_, _, Variant_erased _) -> assert false
           in
           Lsequence(Lprim(upd, [Lvar copy_id;
                                 transl_exp ~scopes lbl.lbl_sort expr],
@@ -2200,7 +2200,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                       shape
                    in
                    Pmixedfield ([i], shape, sem)
-                 | Record_inlined (_, _, Variant_with_null) -> assert false
+                 | Record_inlined (_, _, Variant_erased _) -> assert false
                in
                Lprim(access, [Lvar init_id],
                      of_location ~scopes loc),
@@ -2243,7 +2243,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                blocks containing unboxed float literals.
             *)
             raise Not_constant
-        | Record_inlined (_, _, (Variant_extensible | Variant_with_null))
+        | Record_inlined (_, _, (Variant_extensible | Variant_erased _))
         | Record_inlined ((Extension _ | Null), _, _) ->
             raise Not_constant
       with Not_constant ->
@@ -2295,7 +2295,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             let shape = Lambda.transl_mixed_product_shape shape in
             Lprim (Pmakeblock (runtime_tag, mut, Shape shape, Option.get mode),
                    ll, loc)
-        | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_inlined (_, _, Variant_erased _) -> assert false
         | Record_inlined (Null, _, _) -> assert false
     in
     begin match opt_init_expr with
@@ -2319,7 +2319,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl =
   | Record_boxed _
   | Record_inlined (_, _, ( Variant_boxed _
                           | Variant_extensible
-                          | Variant_with_null))
+                          | Variant_erased _))
     -> ()
   end;
   let field_offset = field_offset_for_label lbl in
