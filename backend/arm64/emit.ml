@@ -1992,54 +1992,49 @@ type relaxed_instruction =
   | Far_poll
   | Far_alloc of
       { num_bytes : int;
-        dbginfo : Cmm.alloc_dbginfo
+        dbginfo : Cmm.alloc_dbginfo;
+        res : Reg.t
       }
-  | Condbranch of Operation.test * Cmm.label
+  | Condbranch of
+      { test : Operation.test;
+        lbl : Cmm.label;
+        arg : Reg.t array
+      }
   | Branch of Cmm.label
 
-let emit_relaxed_instruction (relaxed : relaxed_instruction)
-    (instr : Linear.instruction) =
+let emit_relaxed_instruction (relaxed : relaxed_instruction) =
   match relaxed with
   | Far_poll ->
     let _gc_lbl, _gc_return_lbl =
       assembly_code_for_poll0 ~far:true ~return_label:None
     in
     ()
-  | Far_alloc { num_bytes; dbginfo = _ } ->
+  | Far_alloc { num_bytes; res; dbginfo = _ } ->
     let _gc_lbl, _gc_return_lbl =
       assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
-        ~res_reg:(H.reg_x instr.res.(0))
+        ~res_reg:(H.reg_x res)
     in
     ()
-  | Condbranch (test, lbl) -> emit_condbranch instr.arg test lbl
+  | Condbranch { test; lbl; arg } -> emit_condbranch arg test lbl
   | Branch lbl -> emit_branch lbl
 
-let measure_relaxed_instruction ri instr =
-  let m =
-    with_measuring ~f:(fun () -> emit_relaxed_instruction ri instr)
-  in
+let measure_relaxed_instruction ri =
+  let m = with_measuring ~f:(fun () -> emit_relaxed_instruction ri) in
   { Branch_relaxation_intf.size = m.count;
     max_displacement = m.min_max_displacement
   }
 
-let relaxed_instruction_desc = function
-  | Far_poll -> Linear.Lop (Specific Ifar_poll)
-  | Far_alloc { num_bytes; dbginfo } ->
-    Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
-  | Condbranch (test, lbl) -> Lcondbranch (test, lbl)
-  | Branch lbl -> Lbranch lbl
-
 let branch_relax env body =
-  (* Make a copy of [env] so the sizing pass can mutate it without affecting
-     [env] itself, which is used later by [emit_all]. After
-     [compute_instruction_sizes], [sizing_env.stack_offset] reflects the
-     end-of-function state; [relaxed_instruction_size] saves and restores it
-     around each call. This is correct because relaxed instructions (far
-     branches, far polls, conditional branches) do not depend on
-     [stack_offset]. *)
-  let sizing_env = Env.copy env in
-  let initial_sizes = compute_instruction_sizes sizing_env body in
-  let out_of_line_code_block_sizes = out_of_line_code_block_sizes sizing_env in
+  let initial_sizes, out_of_line_code_block_sizes, num_call_gc_sites =
+    (* Take a copy of [sizing_env] so we don't disturb the caller's [env] *)
+    let sizing_env = Env.copy env in
+    let initial_sizes = compute_instruction_sizes sizing_env body in
+    let out_of_line_code_block_sizes =
+      out_of_line_code_block_sizes sizing_env
+    in
+    let num_call_gc_sites = List.length (Env.call_gc_sites sizing_env) in
+    initial_sizes, out_of_line_code_block_sizes, num_call_gc_sites
+  in
   let module BR = Branch_relaxation.Make (struct
     type distance = int
 
@@ -2047,28 +2042,26 @@ let branch_relax env body =
 
     let offset_pc_at_branch = 0
 
-    let relaxed_instruction_size ri instr =
-      measure_relaxed_instruction ri instr
+    let relaxed_instruction_size ri = measure_relaxed_instruction ri
 
-    let relaxed_instruction_desc = relaxed_instruction_desc
+    let relaxed_instruction_desc = function
+      | Far_poll -> Linear.Lop (Specific Ifar_poll)
+      | Far_alloc { num_bytes; dbginfo; _ } ->
+        Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
+      | Condbranch { test; lbl; _ } -> Lcondbranch (test, lbl)
+      | Branch lbl -> Lbranch lbl
 
     let relax_poll () = Far_poll
 
-    let relax_allocation ~num_bytes ~dbginfo = Far_alloc { num_bytes; dbginfo }
+    let relax_allocation ~num_bytes ~dbginfo ~res =
+      Far_alloc { num_bytes; dbginfo; res }
 
-    (* [Lcondbranch3] is expanded into individual [Lcondbranch] instructions by
-       [Branch_relaxation] before this is called. *)
-    let[@warning "-4"] relax_condbranch = function
-      | Linear.Lcondbranch (test, lbl) -> Condbranch (test, lbl)
-      | Lcondbranch3 _ | _ ->
-        Misc.fatal_error "relax_condbranch: not a Lcondbranch"
+    let relax_condbranch test lbl ~arg = Condbranch { test; lbl; arg }
 
-    let[@warning "-4"] relax_branch = function
-      | Linear.Lbranch lbl -> Branch lbl
-      | _ -> Misc.fatal_error "relax_branch: not a Lbranch"
+    let relax_branch lbl = Branch lbl
   end) in
   BR.relax body ~initial_sizes ~out_of_line_code_block_sizes;
-  List.length (Env.call_gc_sites sizing_env)
+  num_call_gc_sites
 
 (* Emission of an instruction sequence *)
 
