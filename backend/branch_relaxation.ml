@@ -151,8 +151,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
                 ~available_across:Reg_availability_set.Unreachable
             in
             let ri_inverted =
-              T.relax_condbranch (Operation.invert_test test) lbl2
-                ~arg:instr.arg
+              T.relax_condbranch
+                (Operation.invert_test test)
+                lbl2 ~arg:instr.arg
             in
             instr.desc <- T.relaxed_instruction_desc ri_inverted;
             instr.next <- branch_instr;
@@ -184,10 +185,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
                   | Lcondbranch (test, lbl) ->
                     T.relax_condbranch test lbl ~arg:i.arg
                   | Lprologue | Lepilogue_open | Lepilogue_close | Lend
-                  | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-                  | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
-                  | Lcondbranch3 _ | Lswitch _ | Ladjust_stack_offset _
-                  | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
+                  | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _ | Lop _
+                  | Lcall_op _ | Llabel _ | Lbranch _ | Lcondbranch3 _
+                  | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+                  | Lstackcheck _ ->
                     assert false
                 in
                 let s = T.relaxed_instruction_size ri in
