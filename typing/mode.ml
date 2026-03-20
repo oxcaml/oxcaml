@@ -2188,20 +2188,14 @@ module Report = struct
       (* CR-someday zqian: in the case where [x = y], we currently arbitrarily choose from
          [x] and [y], which are unordered anyway. In the future we might want to keep an
          order for better error messages. For example, order them by occurrence in the
-         source code such that the more recent hint is returned. *)
-      match b with
-      | Join ->
-        if C.le a_obj x y
-        then `Second
-        else if C.le a_obj y x
-        then `First
-        else Misc.fatal_error "A single axis should be a total ordering."
-      | Meet ->
-        if C.le a_obj x y
-        then `First
-        else if C.le a_obj y x
-        then `Second
-        else Misc.fatal_error "A single axis should be a total ordering."
+         source code such that the more recent hint is returned.
+
+         nmatschke: Likewise for [x <> y] (middle modes of diamonds). *)
+      if
+        begin match b with Join -> C.le a_obj y x | Meet -> C.le a_obj x y
+      end
+      then `First
+      else `Second
 
     (** Given a solver hint on a product lattice, and an axis in that product
         that we are interested in, returns a human-readible hint.*)
