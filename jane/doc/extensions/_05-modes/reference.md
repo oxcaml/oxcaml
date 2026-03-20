@@ -135,35 +135,33 @@ from mode to mode. For example, let's imagine one defines a record type with som
 type 'a t = { field : 'a @@ m }
 ```
 
-Then, if we have a value `(t : _ t @ n)` then what's the mode of `t.field`? The answer has
-to do with what applying the modality `m` to the mode `n` yields. Generally speaking, for
-"future" or "comonadic" axes, the result is the stronger of the two. For example:
+Then, if we have a value `(t : _ t @ n)` then what's the mode of `t.field`? The answer: apply the `m`. For future axes, the modality acts as a `min` between the record mode and the written modality. For example:
 
 ```ocaml
 type 'a t = { field : 'a @@ shareable }
 
-let f : 'a t @ nonportable -> 'a @ shareable = fun t -> t.field
-let g : 'a t @ shareable -> 'a @ shareable = fun t -> t.field
-let h : 'a t @ portable -> 'a @ portable = fun t -> t.field
+let f : 'a t @ nonportable -> 'a @ shareable = fun t -> t.field  (* shareable < nonportable *)
+let g : 'a t @ shareable -> 'a @ shareable = fun t -> t.field    (* shareable = shareable *)
+let h : 'a t @ portable -> 'a @ portable = fun t -> t.field      (* portable < shareable *)
 ```
 
-For "past" or "monadic" axes, the result is usually the weaker of the two. For example:
+For past axes, the modality acts as a `max`. For example:
 
 ```ocaml
 type 'a t = { field : 'a @@ shared }
 
-let f : 'a t @ uncontended -> 'a @ shared = fun t -> t.field
-let g : 'a t @ shared -> 'a @ shared = fun t -> t.field
-let h : 'a t @ contended -> 'a @ contended = fun t -> t.field
+let f : 'a t @ uncontended -> 'a @ shared = fun t -> t.field   (* uncontended < shared *)
+let g : 'a t @ shared -> 'a @ shared = fun t -> t.field        (* shared = shared *)
+let h : 'a t @ contended -> 'a @ contended = fun t -> t.field  (* shared < contented *)
 ```
 
-However, things are more complex for diamond-shaped "axes", such as visibility and
-statefulness. In these cases, applying comonadic modalities to comonadic modes results
-in the _greatest common submode_, while applying monadic modalities to monadic modes
+However, things are more complex for diamond-shaped axes, such as visibility and
+statefulness. In these cases, applying modalities to future modes results
+in the _greatest common submode_, while applying modalities to past modes
 results in the _least common supermode_. Mathematically, this corresponds to the meet
 and join of the two modes, respectively.
 
-For example, if the least common supermode of `read` and `write` is `immutable`:
+For example, the least common supermode of `read` and `write` is `immutable`:
 
 ```ocaml
 type 'a t = { field : 'a @@ write }
