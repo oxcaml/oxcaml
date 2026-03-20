@@ -2701,7 +2701,7 @@ let check_nongen_signature env sg =
 let remove_functor_mode_variables ~zap_scope = function
   | Mty_functor (arg_opt, _, mres) ->
       let zap_mode mode =
-        if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
+        if Language_extension.(is_at_least_mode_poly Alpha) then begin
           Alloc.add_mode_to_zap_scope mode zap_scope
          end else begin
           Alloc.zap_to_legacy_force mode |> ignore
