@@ -120,10 +120,9 @@ allocation](../../stack-allocation/intro).
 
 Contention is a past axis that tracks whether a value has been shared between
 threads. A value is *contended* if another thread can both read and write to it,
-*shared* if multiple threads have read-only access to it, *poisoned* if another
-thread can write to it but not read from it, and *uncontended* otherwise.
-Note that *poisoned* and *shared* are incomparable: neither is a submode of the
-other.
+*shared* if multiple threads have read-only access to it, *poisoned* if multiple
+threads have write-only access to it, and *uncontended* otherwise. Note that *poisoned*
+and *shared* are incomparable: neither is a submode of the other.
 
 To enforce data race freedom, the typechecker does not permit reading or writing
 unprotected mutable portions of contended values. (Types like `Atomic.t` protect

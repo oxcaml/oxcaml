@@ -218,24 +218,24 @@ can strengthen `read`-crossing values from `immutable` to `write` (and vice-vers
 strengthen `reading`-crossing values from `writing` to `stateless` (and vice-versa):
 
 ```ocaml
-let f : type (a : value mod read). a @ immutable shared -> a @ write =
+let f : type (a : value mod read). a @ immutable -> a @ write =
   fun x -> x
 ;;
 
-let f : type (a : value mod write). a @ immutable shared -> a @ read =
+let f : type (a : value mod write). a @ immutable -> a @ read =
   fun x -> x
 ;;
 
-let f : type (a : value mod reading). a @ writing -> a @ stateless shareable =
+let f : type (a : value mod reading). a @ writing -> a @ stateless =
   fun x -> x
 ;;
 
-let f : type (a : value mod writing). a @ reading -> a @ stateless shareable =
+let f : type (a : value mod writing). a @ reading -> a @ stateless =
   fun x -> x
 ;;
 ```
 
 Like statefulness and visibility, contention and portability are also diamond-shaped
 lattices. Mode crossing works analogously: for example, crossing `poisoned` allows
-weakening from `shared` to `contended` (and vice-versa), and crossing `poisoning` allows
-strengthening from `shareable` to `portable` (and vice-versa).
+strengthening from `contended` to `shared` (and vice-versa), and crossing `poisoning`
+allows strengthening from `shareable` to `portable` (and vice-versa).
