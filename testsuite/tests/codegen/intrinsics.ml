@@ -549,6 +549,16 @@ module Int16_u = struct
     = "%nativeint_of_int16#"
   external to_nativeint_u : t -> nativeint# @@ portable
     = "%nativeint#_of_int16#"
+
+  external popcount : t -> t = "" "caml_popcnt_int16"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  external ctz : t -> t = "" "caml_lzcnt_int16"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  external clz : t -> t = "" "caml_bmi_tzcnt_int16"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external select : bool -> t -> t -> t = "" "caml_csel_int16_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 end
 
 module Int8_u = struct
@@ -623,6 +633,16 @@ module Int8_u = struct
   external to_nativeint : t -> (nativeint[@local_opt]) @@ portable
     = "%nativeint_of_int8#"
   external to_nativeint_u : t -> nativeint# @@ portable = "%nativeint#_of_int8#"
+
+  external popcount : t -> t = "" "caml_int8_popcnt_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  external ctz : t -> t = "" "caml_int8_ctz_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+  external clz : t -> t = "" "caml_int8_clz_untagged_to_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external select : bool -> t -> t -> t = "" "caml_csel_int8_untagged"
+  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 end
 
 module Bytes = struct

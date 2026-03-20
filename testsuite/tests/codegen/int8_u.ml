@@ -615,3 +615,47 @@ let to_nativeint_u x = Int8_u.to_nativeint_u x
 to_nativeint_u:
   ret
 |}]
+
+let popcount x = Int8_u.popcount x
+[%%expect_asm X86_64{|
+popcount:
+  andl  $255, %eax
+  popcnt %rax, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  ret
+|}]
+
+let ctz x = Int8_u.ctz x
+[%%expect_asm X86_64{|
+ctz:
+  movl  $256, %ebx
+  orq   %rbx, %rax
+  tzcnt %rax, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  ret
+|}]
+
+let clz x = Int8_u.clz x
+[%%expect_asm X86_64{|
+clz:
+  andl  $255, %eax
+  lzcnt %rax, %rax
+  addq  $-56, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  ret
+|}]
+
+let select x y z = Int8_u.select x y z
+[%%expect_asm X86_64{|
+select:
+  movq  %rax, %rsi
+  movq  %rdi, %rax
+  cmpq  $1, %rsi
+  cmovne %rbx, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  ret
+|}]

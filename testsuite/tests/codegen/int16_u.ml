@@ -628,3 +628,42 @@ let to_nativeint_u x = Int16_u.to_nativeint_u x
 to_nativeint_u:
   ret
 |}]
+
+let popcount x = Int16_u.popcount x
+[%%expect_asm X86_64{|
+popcount:
+  popcnt %ax, %ax
+  salq  $48, %rax
+  sarq  $48, %rax
+  ret
+|}]
+
+let ctz x = Int16_u.ctz x
+[%%expect_asm X86_64{|
+ctz:
+  lzcnt %ax, %ax
+  salq  $48, %rax
+  sarq  $48, %rax
+  ret
+|}]
+
+let clz x = Int16_u.clz x
+[%%expect_asm X86_64{|
+clz:
+  tzcnt %ax, %ax
+  salq  $48, %rax
+  sarq  $48, %rax
+  ret
+|}]
+
+let select x y z = Int16_u.select x y z
+[%%expect_asm X86_64{|
+select:
+  movq  %rax, %rsi
+  movq  %rdi, %rax
+  cmpq  $1, %rsi
+  cmovne %rbx, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
+  ret
+|}]
