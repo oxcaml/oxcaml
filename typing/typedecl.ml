@@ -1246,9 +1246,10 @@ let transl_declaration env sdecl (id, uid) =
               List.exists
                 (function
                   | Some
-                      (Repr_null | Repr_immediate | Repr_pointer) ->
+                      (Repr_null | Repr_value | Repr_immediate
+                       | Repr_pointer) ->
                     true
-                  | None | Some Repr_value | Some Repr_unboxed -> false)
+                  | None | Some Repr_unboxed -> false)
                 reprs
             in
             if has_unboxed && has_non_unboxed then
@@ -1276,14 +1277,17 @@ let transl_declaration env sdecl (id, uid) =
               in
               if count Repr_null > 1 then
                 bad "there may be at most one [@repr null] constructor";
+              if count Repr_value > 1 then
+                bad "there may be at most one [@repr value] constructor";
               if count Repr_immediate > 1 then
                 bad "there may be at most one [@repr immediate] constructor";
               if count Repr_pointer > 1 then
                 bad "there may be at most one [@repr pointer] constructor";
+              let has_value = count Repr_value = 1 in
               let has_immediate = count Repr_immediate = 1 in
               let has_pointer = count Repr_pointer = 1 in
-              if count Repr_value > 0 then
-                bad "[@repr value] is not supported yet";
+              if has_value && (has_immediate || has_pointer) then
+                bad "[@repr value] may only coexist with [@repr null]";
               let has_unannotated_constant =
                 Array.exists2
                   (fun repr cstr ->
@@ -1337,8 +1341,9 @@ let transl_declaration env sdecl (id, uid) =
                     | Some Repr_null, Cstr_tuple [] -> Types.Constructor_null
                     | Some Repr_null, _ ->
                       bad "[@repr null] requires a nullary constructor"
+                    | Some Repr_value, Cstr_tuple [_] -> Types.Constructor_value
                     | Some Repr_value, _ ->
-                      bad "[@repr value] is not supported yet"
+                      bad "[@repr value] requires a unary tuple constructor"
                     | Some Repr_immediate, Cstr_tuple [_] ->
                       Types.Constructor_immediate
                     | Some Repr_immediate, _ ->
