@@ -563,9 +563,9 @@ type env =
     mutable stack_realloc : stack_realloc option;
     function_name : string;
     tailrec_entry_point : L.t option;
-    mutable float32_literals : (int32 * L.t) list;
-    mutable float_literals : (int64 * L.t) list;
-    mutable vec128_literals : (Cmm.vec128_bits * L.t) list
+    float32_literals : (int32 * L.t) list ref;
+    float_literals : (int64 * L.t) list ref;
+    vec128_literals : (Cmm.vec128_bits * L.t) list ref
   }
 
 let env_frame_size env =
@@ -815,38 +815,28 @@ let emit_stack_str_simd_and_fp env reg r =
   emit_stack_load_store env STR_simd_and_fp reg r
 
 (* Label a floating-point literal *)
-let float32_literal env f =
-  match List.assoc_opt f env.float32_literals with
+(* CR sspies: The [Text] section here is incorrect. We should be in the
+   respective section of the literal type (i.e., 16 or 8 bytes). The code
+   below uses the [Text] section, because that is the section that we are in
+   when we emit literals in the function body. Only macOS currently switches
+   to a dedicated section. *)
+let find_or_add_literal literals f =
+  match List.assoc_opt f !literals with
   | Some lbl -> lbl
   | None ->
-    (* CR sspies: The [Text] section here is incorrect. We should be in the
-       respective section of the literal type (i.e., 16 or 8 bytes). The code
-       below uses the [Text] section, because that is the section that we are in
-       when we emit literals in the function body. Only macOS currently switches
-       to a dedicated section. *)
     let lbl = L.create Text in
-    env.float32_literals <- (f, lbl) :: env.float32_literals;
+    literals := (f, lbl) :: !literals;
     lbl
 
-let float_literal env f =
-  match List.assoc_opt f env.float_literals with
-  | Some lbl -> lbl
-  | None ->
-    let lbl = L.create Text in
-    env.float_literals <- (f, lbl) :: env.float_literals;
-    lbl
+let float32_literal env f = find_or_add_literal env.float32_literals f
 
-let vec128_literal env f =
-  match List.assoc_opt f env.vec128_literals with
-  | Some lbl -> lbl
-  | None ->
-    let lbl = L.create Text in
-    env.vec128_literals <- (f, lbl) :: env.vec128_literals;
-    lbl
+let float_literal env f = find_or_add_literal env.float_literals f
+
+let vec128_literal env f = find_or_add_literal env.vec128_literals f
 
 (* Emit all pending literals *)
 let emit_literals_list literals align emit_literal =
-  if not (Misc.Stdlib.List.is_empty literals)
+  if not (Misc.Stdlib.List.is_empty !literals)
   then (
     if macosx
     then
@@ -866,7 +856,8 @@ let emit_literals_list literals align emit_literal =
        the section mechanism. *)
     D.unsafe_set_internal_section_ref Text;
     D.align ~fill:Nop ~bytes:align;
-    List.iter emit_literal literals)
+    List.iter emit_literal !literals;
+    literals := [])
 
 let emit_float32_literal (f, lbl) =
   D.define_label lbl;
@@ -886,11 +877,8 @@ let emit_vec128_literal (({ word0; word1 } : Cmm.vec128_bits), lbl) =
 let emit_literals env =
   (* Align float32 literals to [size_float]=8 bytes, not 4. *)
   emit_literals_list env.float32_literals size_float emit_float32_literal;
-  env.float32_literals <- [];
   emit_literals_list env.float_literals size_float emit_float_literal;
-  env.float_literals <- [];
-  emit_literals_list env.vec128_literals size_vec128 emit_vec128_literal;
-  env.vec128_literals <- []
+  emit_literals_list env.vec128_literals size_vec128 emit_vec128_literal
 
 (* Emit code to load the address of a symbol *)
 
@@ -1907,17 +1895,17 @@ let branch_relax env body =
       let saved_call_gc_sites = sizing_env.call_gc_sites in
       let saved_local_realloc_sites = sizing_env.local_realloc_sites in
       let saved_stack_realloc = sizing_env.stack_realloc in
-      let saved_float32_literals = sizing_env.float32_literals in
-      let saved_float_literals = sizing_env.float_literals in
-      let saved_vec128_literals = sizing_env.vec128_literals in
+      let saved_float32_literals = !(sizing_env.float32_literals) in
+      let saved_float_literals = !(sizing_env.float_literals) in
+      let saved_vec128_literals = !(sizing_env.vec128_literals) in
       let m = measure_emit_instr sizing_env instr in
       sizing_env.stack_offset <- saved_stack_offset;
       sizing_env.call_gc_sites <- saved_call_gc_sites;
       sizing_env.local_realloc_sites <- saved_local_realloc_sites;
       sizing_env.stack_realloc <- saved_stack_realloc;
-      sizing_env.float32_literals <- saved_float32_literals;
-      sizing_env.float_literals <- saved_float_literals;
-      sizing_env.vec128_literals <- saved_vec128_literals;
+      sizing_env.float32_literals := saved_float32_literals;
+      sizing_env.float_literals := saved_float_literals;
+      sizing_env.vec128_literals := saved_vec128_literals;
       { Branch_relaxation_intf.size = m.count;
         max_displacement = m.min_max_displacement
       }
@@ -1971,9 +1959,9 @@ let fundecl fundecl =
         Option.map
           (label_to_asm_label ~section:Text)
           fundecl.fun_tailrec_entry_point_label;
-      float32_literals = [];
-      float_literals = [];
-      vec128_literals = []
+      float32_literals = ref [];
+      float_literals = ref [];
+      vec128_literals = ref []
     }
   in
   Stack_class.Tbl.copy_values ~from:fundecl.fun_num_stack_slots
