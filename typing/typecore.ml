@@ -744,12 +744,12 @@ let register_allocation_mode alloc_mode =
   allocations := alloc_mode :: !allocations
 
 let newvar_below_if_modepoly level m =
-  if Language_extension.(is_at_least Mode_polymorphism Beta)
+  if Language_extension.(is_at_least_mode_poly Beta)
   then fst (Locality.newvar_below level m)
   else m
 
 let newvar_above_if_modepoly level m =
-  if Language_extension.(is_at_least Mode_polymorphism Beta)
+  if Language_extension.(is_at_least_mode_poly Beta)
   then fst (Locality.newvar_above level m)
   else m
 

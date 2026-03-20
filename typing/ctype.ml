@@ -584,7 +584,7 @@ let remove_mode_and_jkind_variables ~zap_scope ty =
       | Tvar { jkind } -> Jkind.default_to_value jkind
       | Tunivar { jkind } -> Jkind.default_to_value jkind
       | Tarrow ((_,marg,mret),targ,tret,_) ->
-         if Language_extension.(is_at_least Mode_polymorphism Beta) then begin
+         if Language_extension.(is_at_least_mode_poly Beta) then begin
           Alloc.add_mode_to_zap_scope marg zap_scope;
           Alloc.add_mode_to_zap_scope mret zap_scope
          end else begin

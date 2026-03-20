@@ -138,6 +138,10 @@ val is_enabled : 'a t -> bool
 (** Check if a language extension is enabled at least at the given level *)
 val is_at_least : 'a t -> 'a -> bool
 
+(* CR ageorges: TODO: remove *)
+(** Check if mode polymorphism is enabled at the given level: used for debugging *)
+val is_at_least_mode_poly : maturity -> bool
+
 (** Tooling support: Temporarily enable and disable language extensions; these
     operations are idempotent. Calls to [set], [enable], [disable] inside the
     body of the function argument will also be rolled back when the function
