@@ -434,51 +434,44 @@ let check_stack_offset t label (block : Cfg.basic_block) =
              instruction is %d, but expected %d.\n"
             (Label.to_string label) InstructionId.print basic.id Cfg.dump_basic
             basic.desc basic.stack_offset cur_stack_offset;
-        match basic.desc with
-        | Pushtrap { lbl_handler } ->
-          let handler_block = Cfg.get_block_exn t.cfg lbl_handler in
-          if not (Int.equal cur_stack_offset handler_block.stack_offset)
-          then
-            report t
-              "Wrong stack offset in block %s: the offset of [(id:%a) %a] \
-               instruction is %d, the offset of block %s is %d.\n"
-              (Label.to_string label) InstructionId.print basic.id
-              Cfg.dump_basic basic.desc cur_stack_offset
-              (Label.to_string lbl_handler)
-              handler_block.stack_offset;
-          cur_stack_offset + Proc.trap_size_in_bytes ()
-        | Poptrap { lbl_handler = _ } ->
-          let new_stack_offset =
+        let new_stack_offset =
+          match basic.desc with
+          | Pushtrap { lbl_handler } ->
+            let handler_block = Cfg.get_block_exn t.cfg lbl_handler in
+            if not (Int.equal cur_stack_offset handler_block.stack_offset)
+            then
+              report t
+                "Wrong stack offset in block %s: the offset of [(id:%a) %a] \
+                 instruction is %d, the offset of block %s is %d.\n"
+                (Label.to_string label) InstructionId.print basic.id
+                Cfg.dump_basic basic.desc cur_stack_offset
+                (Label.to_string lbl_handler)
+                handler_block.stack_offset;
+            cur_stack_offset + Proc.trap_size_in_bytes ()
+          | Poptrap { lbl_handler = _ } ->
             cur_stack_offset - Proc.trap_size_in_bytes ()
-          in
-          if Int.compare new_stack_offset 0 < 0
-          then
-            report t
-              "Negative stack offset in block %s: the offset after [(id:%a) \
-               %a] instruction is %d\n"
-              (Label.to_string label) InstructionId.print basic.id
-              Cfg.dump_basic basic.desc new_stack_offset;
-          new_stack_offset
-        | Op (Stackoffset n) ->
-          let new_stack_offset = cur_stack_offset + n in
-          if Int.compare new_stack_offset 0 < 0
-          then
-            report t
-              "Negative stack offset in block %s: the offset after [(id:%a) \
-               %a] instruction is %d\n"
-              (Label.to_string label) InstructionId.print basic.id
-              Cfg.dump_basic basic.desc new_stack_offset;
-          new_stack_offset
-        | Op
-            ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float _
-            | Const_float32 _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-            | Const_vec512 _ | Load _ | Store _ | Intop _ | Int128op _
-            | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
-            | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
-            | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
-            | Domain_index | Poll | Pause | Alloc _ )
-        | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
-          cur_stack_offset)
+          | Op (Specific op) ->
+            cur_stack_offset + Arch.specific_operation_stack_offset_delta op
+          | Op (Stackoffset n) -> cur_stack_offset + n
+          | Op
+              ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float _
+              | Const_float32 _ | Const_symbol _ | Const_vec128 _
+              | Const_vec256 _ | Const_vec512 _ | Load _ | Store _ | Intop _
+              | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
+              | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _ | Opaque
+              | Begin_region | End_region | Name_for_debugger _ | Dls_get
+              | Tls_get | Domain_index | Poll | Pause | Alloc _ )
+          | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
+            cur_stack_offset
+        in
+        if new_stack_offset < 0
+        then
+          report t
+            "Negative stack offset in block %s: the offset after [(id:%a) %a] \
+             instruction is %d\n"
+            (Label.to_string label) InstructionId.print basic.id Cfg.dump_basic
+            basic.desc new_stack_offset;
+        new_stack_offset)
   in
   if not (Int.equal stack_offset_after_body terminator_stack_offset)
   then

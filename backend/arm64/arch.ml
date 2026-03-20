@@ -355,6 +355,10 @@ let operation_allocates = function
       (* Used by the zero_alloc checker that runs before the Llvmize. *)
       false
 
+let specific_operation_stack_offset_delta _op = 0
+
+let call_stack_alignment = 16
+
 (* See `amd64/arch.ml`. *)
 let equal_addressing_mode_without_displ (addressing_mode_1: addressing_mode)
       (addressing_mode_2 : addressing_mode) =

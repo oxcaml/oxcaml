@@ -1,6 +1,8 @@
 ; CR-soon gyorsh: format all files under arm64/amd64
 amd64/cfg_selection.ml
 amd64/emit.ml
+amd64/push_pop_around_calls.ml
+amd64/push_pop_around_calls.mli
 amd64/regs.ml
 amd64/regs.mli
 amd64/selection.ml
@@ -16,6 +18,8 @@ arm64/cfg_selection.ml
 arm64/dsl_helpers.ml
 arm64/dsl_helpers.mli
 arm64/emit.ml
+arm64/push_pop_around_calls.ml
+arm64/push_pop_around_calls.mli
 arm64/regs.ml
 arm64/regs.mli
 arm64/selection.ml
