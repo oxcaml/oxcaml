@@ -1852,10 +1852,10 @@ let measure_instruction_count f =
   m.count
 
 let out_of_line_code_block_sizes env =
-  List.rev_map
+  List.map
     (fun gc -> measure_instruction_count (fun () -> emit_call_gc gc))
     env.call_gc_sites
-  @ List.rev_map
+  @ List.map
       (fun lr -> measure_instruction_count (fun () -> emit_local_realloc lr))
       env.local_realloc_sites
   @
