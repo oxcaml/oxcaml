@@ -8,7 +8,7 @@ Subcommands:
 
 The compiler reads OPT_FUEL_RECORD (path to record file),
 OPT_FUEL_THRESHOLD (global step limit), and OPT_FUEL_FAIL (global step
-at which to fail with a diagnostic). All builds are clean.
+at which to fail with a diagnostic).
 
 Example workflow:
   python3 tools/fuel_bisect.py bisect /tmp/test_cmd
@@ -76,6 +76,12 @@ def load_record():
             assert len(parts) == 2
             entries.append((parts[0], int(parts[1])))
     total = sum(c for _, c in entries)
+    seen = set()
+    for file_path, _ in entries:
+        if file_path in seen:
+            print(f"ERROR: duplicate file in record: {file_path}")
+            sys.exit(1)
+        seen.add(file_path)
     return entries, total
 
 

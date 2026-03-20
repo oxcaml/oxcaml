@@ -65,7 +65,7 @@
    (:include %{project_root}/ocamlopt_flags.sexp)
    -O3))
  (libraries ocamlcommon)
- (modules doubly_linked_list file_sections lru opt_fuel))
+ (modules doubly_linked_list file_sections lru))
 
 (install
  (files
