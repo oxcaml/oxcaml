@@ -2225,3 +2225,72 @@ let f : type (a : value mod observable). a @ reading -> a @ stateless shareable 
 val f : ('a : value mod observable). 'a @ reading -> 'a @ shareable stateless =
   <fun>
 |}]
+
+(* CR nmatschke: These error messages are not very useful. At least you get better ones by
+   annotating the function in the structure. *)
+
+(* Force the compiler to pick a mode hint. This serves as a regression test for code which
+   assumes axes are total orderings. *)
+module _ : sig
+  val f : unit -> unit @@ stateless
+end = struct
+  let r = ref ()
+  let f () = r.contents; r.contents <- ()
+end
+
+[%%expect{|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   let r = ref ()
+5 |   let f () = r.contents; r.contents <- ()
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val r : unit ref val f : unit -> unit end @ stateful
+       is not included in
+         sig val f : unit -> unit @@ stateless end @ stateful
+       Values do not match:
+         val f : unit -> unit (* in a structure at stateful *)
+       is not included in
+         val f : unit -> unit @@ stateless (* in a structure at stateful *)
+       The first is "stateful"
+         because it is allocated at line 5, characters 8-41 containing data.
+       However, the second is "stateless".
+|}]
+
+(* The same, but purely comonadic. *)
+module _ : sig
+  val f : unit -> unit @@ stateless
+end = struct
+  let r = ref ()
+  let get () = r.contents
+  let set () = r.contents <- ()
+  let f () = get (); set ()
+end
+
+[%%expect{|
+Lines 3-8, characters 6-3:
+3 | ......struct
+4 |   let r = ref ()
+5 |   let get () = r.contents
+6 |   let set () = r.contents <- ()
+7 |   let f () = get (); set ()
+8 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val r : unit ref
+           val get : unit -> unit
+           val set : unit -> unit
+           val f : unit -> unit
+         end @ stateful
+       is not included in
+         sig val f : unit -> unit @@ stateless end @ stateful
+       Values do not match:
+         val f : unit -> unit (* in a structure at stateful *)
+       is not included in
+         val f : unit -> unit @@ stateless (* in a structure at stateful *)
+       The first is "stateful"
+         because it is allocated at line 7, characters 8-27 containing data.
+       However, the second is "stateless".
+|}]
