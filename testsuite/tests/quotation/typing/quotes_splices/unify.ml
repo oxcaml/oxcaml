@@ -312,7 +312,7 @@ val f : <[$('a) expr -> ($('a), $('a)) Type.eq -> $('a) expr]> expr =
   <[
     fun (type a) (x : _ expr) (eq : (_, a) Stdlib.Type.eq) ->
       (fun (x__1 : 'a expr) (y : ('a, _) Stdlib.Type.eq) -> ()) x eq;
-      match eq with | (Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) -> x
+      (match eq with | (Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) -> x)
   ]>
 |}]
 (* $t ~ s  equates s to t when s instantiable -- $0 escapes! *)
@@ -342,7 +342,7 @@ val f : <[$('a) expr -> ($('a), $('a)) Type.eq -> $('a) expr]> expr =
   <[
     fun (type a) (x : _ expr) (eq : (a, _) Stdlib.Type.eq) ->
       (fun (x__1 : 'a expr) (y : (_, 'a) Stdlib.Type.eq) -> ()) x eq;
-      match eq with | (Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) -> x
+      (match eq with | (Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) -> x)
   ]>
 |}]
 (* s ~ $t  equates s to t when s instantiable -- $0 escapes! *)

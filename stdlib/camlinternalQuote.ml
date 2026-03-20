@@ -1515,7 +1515,7 @@ module Ast = struct
     | PatConstant c when is_negative_const c ->
       pp fmt "(@[%a@])" (print_pat env) pat
     | PatAny | PatVar _ | PatConstant _ | PatTuple _ | PatUnboxedUnit
-    | PatUnboxedBool _ | PatUnboxedTuple _ | PatVariant (_, Some _)
+    | PatUnboxedBool _ | PatUnboxedTuple _ | PatVariant (_, None)
     | PatRecord _ | PatUnboxedRecord _ | PatArray _ ->
       print_pat env fmt pat
     | _ -> pp fmt "(@[%a@])" (print_pat env) pat
@@ -1544,7 +1544,8 @@ module Ast = struct
     | PatVariant (variant, pat_opt) -> (
       match pat_opt with
       | None -> Variant.print fmt variant
-      | Some pat -> pp fmt "%a@ %a" Variant.print variant (print_pat env) pat)
+      | Some pat ->
+        pp fmt "%a@ %a" Variant.print variant (print_pat_with_parens env) pat)
     | PatRecord (entries, rec_flag) ->
       pp fmt "{@[";
       List.iter
@@ -1582,10 +1583,10 @@ module Ast = struct
     | PatException pat -> pp fmt "(exception@ %a)" (print_pat env) pat
 
   and print_type_constraint env fmt = function
-    | Constraint ty -> pp fmt "%@ :@ @[%a@]" (print_core_type env) ty
-    | Coerce (None, ty) -> pp fmt "%@ :>@ @[%a@]" (print_core_type env) ty
+    | Constraint ty -> pp fmt "@ : @[%a@]" (print_core_type env) ty
+    | Coerce (None, ty) -> pp fmt "@ :> @[%a@]" (print_core_type env) ty
     | Coerce (Some ty_constr, ty) ->
-      pp fmt "%@ :@ @[%a@]@ :>@ @[%a@]" (print_core_type env) ty_constr
+      pp fmt "@ : @[%a@]@ :> @[%a@]" (print_core_type env) ty_constr
         (print_core_type env) ty
 
   and print_exp_with_parens env fmt exp =
@@ -1604,13 +1605,24 @@ module Ast = struct
       (print_exp env) fmt exp
     | _ -> pp fmt "(@[%a@])" (print_exp env) exp
 
+  and print_exp_pipe_semi env fmt exp =
+    match exp.desc with
+    | Match _ | Try _
+    | Fun { body = Pfunction_cases _; params = []; _ }
+    | Let _ | Let_op _ | Letmodule _ | Let_exception _
+    | Sequence _ ->
+      pp fmt "(@[%a@])" (print_exp env) exp
+    | _ -> print_exp env fmt exp
+
   and print_case env fmt { lhs; guard; rhs } =
     pp fmt "@ |@ %a" (print_pat env) lhs;
     (match guard with
     | None -> ()
     | Some guard -> pp fmt "@ when@ %a" (print_exp_with_parens env) guard);
     pp fmt "@ ->@ ";
-    match rhs with None -> pp fmt "." | Some rhs -> print_exp env fmt rhs
+    match rhs with
+    | None -> pp fmt "."
+    | Some rhs -> print_exp_pipe_semi env fmt rhs
 
   and print_row_field env with_or fmt rf =
     if with_or then pp fmt "@ |@ ";
@@ -1866,18 +1878,19 @@ module Ast = struct
       (match params with
       | _::_ ->
         pp fmt "@[<2>fun";
-        List.iter (print_param env fmt) params;
-        pp fmt "@ ->@ "
+        List.iter (print_param env fmt) params
       | [] -> ());
       match body with
       | Pfunction_body exp ->
         Option.iter (print_type_constraint env fmt) constraint_;
-        (match params with _::_ -> pp fmt "%a@]" (print_exp env) exp
+        (match params with
+        | _::_ -> pp fmt "@ ->@ %a@]" (print_exp env) exp
         | [] -> pp fmt "%a" (print_exp env) exp)
       | Pfunction_cases cases ->
+        Option.iter (print_type_constraint env fmt) constraint_;
+        (match params with _::_ -> pp fmt "@ ->@ " | [] -> ());
         pp fmt "@[<2>function";
         List.iter (print_case env fmt) cases;
-        Option.iter (print_type_constraint env fmt) constraint_;
         pp fmt "@]";
         (match params with _::_ -> pp fmt "@]" | [] -> ()))
     | Let (_, [], _) ->
@@ -1945,10 +1958,12 @@ module Ast = struct
         (print_exp_with_parens env)
         cond (print_exp_with_parens env) then_;
       match else_ with
-      | Some else_ -> pp fmt "@ @[<2>else@ %a@]@]" (print_exp env) else_
+      | Some else_ ->
+        pp fmt "@ @[<2>else@ %a@]@]" (print_exp_pipe_semi env) else_
       | None -> pp fmt "@]")
     | Sequence (exp1, exp2) ->
-      pp fmt "%a;@ @,%a" (print_exp env) exp1 (print_exp env) exp2
+      pp fmt "%a;@ @,%a"
+        (print_exp_pipe_semi env) exp1 (print_exp_pipe_semi env) exp2
     | While (cond, body) ->
       pp fmt "@[<2>while@ %a@ do@; @[%a@]@]@;done" (print_exp env) cond
         (print_exp_with_parens env)
@@ -1992,8 +2007,10 @@ module Ast = struct
     | Letmodule (Some modvar, module_exp, exp) ->
       pp fmt "@[<2>let@ module@ %a@ =@ @[%a@]@ in@ %a@]" (Var.Module.print env)
         modvar (print_module_exp env) module_exp (print_exp env) exp
-    | Assert exp -> pp fmt "@[<2>assert@ %a@]" (print_exp env) exp
-    | Lazy exp -> pp fmt "@[<2>lazy@ %a@]" (print_exp env) exp
+    | Assert exp ->
+      pp fmt "@[<2>assert@ %a@]" (print_exp_with_parens env) exp
+    | Lazy exp ->
+      pp fmt "@[<2>lazy@ %a@]" (print_exp_with_parens env) exp
     | Pack module_exp ->
       pp fmt "(@[<2>module@ %a@])" (print_module_exp env) module_exp
     | New ident -> pp fmt "@[<2>new@ %a@]" (print_raw_ident_value env) ident
@@ -2011,7 +2028,8 @@ module Ast = struct
     | Unboxed_record_product (ts, exp_opt) ->
       pp fmt "#%a" (print_record env) (ts, exp_opt)
     | Unboxed_field (exp, rec_field) ->
-      pp fmt "%a.#%a" (print_exp env) exp (print_field env) rec_field
+      pp fmt "%a.#%a" (print_exp_with_parens env) exp (print_field env)
+        rec_field
     | Quote exp -> pp fmt "@[<2><[@,%a@,@]]>" (print_exp env) exp
     | Antiquote exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
     | List_comprehension compr ->
