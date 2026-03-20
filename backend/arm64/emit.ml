@@ -568,6 +568,14 @@ type env =
     vec128_literals : (Cmm.vec128_bits * L.t) list ref
   }
 
+let copy_env env =
+  { env with
+    num_stack_slots = Stack_class.Tbl.copy env.num_stack_slots;
+    float32_literals = ref !(env.float32_literals);
+    float_literals = ref !(env.float_literals);
+    vec128_literals = ref !(env.vec128_literals)
+  }
+
 let env_frame_size env =
   frame_size ~stack_offset:env.stack_offset ~contains_calls:env.contains_calls
     ~num_stack_slots:env.num_stack_slots
@@ -1865,15 +1873,12 @@ let relaxed_instruction_desc = function
 let branch_relax env body =
   (* Record copy so the sizing pass can mutate its own mutable fields
      (stack_offset, call_gc_sites, etc.) without affecting [env], which is used
-     later by [emit_all]. Note: [num_stack_slots] is a mutable hash table shared
-     between [env] and [sizing_env], but it is only read during sizing (it is
-     written once before [branch_relax] is called). After
-     [compute_instruction_sizes], [sizing_env.stack_offset] reflects the
-     end-of-function state; [relaxed_instruction_size] saves and restores it
-     around each call. This is correct because relaxed instructions (far
-     branches, far polls, conditional branches) do not depend on
-     [stack_offset]. *)
-  let sizing_env = { env with stack_offset = env.stack_offset } in
+     later by [emit_all]. After [compute_instruction_sizes],
+     [sizing_env.stack_offset] reflects the end-of-function state;
+     [relaxed_instruction_size] saves and restores it around each call. This is
+     correct because relaxed instructions (far branches, far polls, conditional
+     branches) do not depend on [stack_offset]. *)
+  let sizing_env = copy_env env in
   let initial_sizes = compute_instruction_sizes sizing_env body in
   let out_of_line_code_block_sizes = out_of_line_code_block_sizes sizing_env in
   let module BR = Branch_relaxation.Make (struct
