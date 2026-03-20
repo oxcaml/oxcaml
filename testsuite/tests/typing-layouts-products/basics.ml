@@ -37,6 +37,18 @@ type t4_inner = #{ i : int; t4_inner2 : t4_inner2; co : char option; }
 type t4 = #{ s : string; t4_inner : t4_inner; }
 |}]
 
+type t = #{ u : u }
+and u = #{ x : #(unit * unit); y : unit }
+[%%expect{|
+Line 2, characters 0-41:
+2 | and u = #{ x : #(unit * unit); y : unit }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "u" is (value & value) & value
+         because it is an unboxed record.
+       But the layout of type "u" must be a sublayout of value & value
+         because it is an unboxed record.
+|}]
+
 (* But you can't put unboxed products into normal tuples (yet) *)
 type t_nope = string * #(string * bool)
 [%%expect{|
@@ -103,6 +115,20 @@ Error: The layout of type "t2_wrong" is value & (float64 & value)
        But the layout of type "t2_wrong" must be a sublayout of
            value & float64 & value
          because of the annotation on the declaration of the type t2_wrong.
+|}]
+
+type t2_wrong_group : value & float64 & value =
+  #{ so : string option; t1 : t1 }
+and t2_wrong_group_boxed = Box of t2_wrong_group
+[%%expect{|
+Lines 1-2, characters 0-34:
+1 | type t2_wrong_group : value & float64 & value =
+2 |   #{ so : string option; t1 : t1 }
+Error: The layout of type "t2_wrong_group" is value & (float64 & value)
+         because it is an unboxed record.
+       But the layout of type "t2_wrong_group" must be a sublayout of
+           value & float64 & value
+         because of the annotation on the declaration of the type t2_wrong_group.
 |}]
 
 type ('a : value & bits64) t3 = 'a
