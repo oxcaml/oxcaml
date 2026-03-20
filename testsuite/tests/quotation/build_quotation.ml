@@ -5,6 +5,16 @@
 
 #syntax quotations on
 
+(* Preamble types for use in tests *)
+
+type existential = Exists : ('a : immediate). 'a -> existential;;
+[%%expect {|
+type existential = Exists : ('a : immediate). 'a -> existential
+|}];;
+#mark_toplevel_in_quotations;;
+
+(* Tests *)
+
 <[ 42 ]>;;
 [%%expect {|
 - : <[int]> expr = <[42]>
@@ -1143,4 +1153,81 @@ Warning 10 [non-unit-statement]: this expression should have type unit.
 [%%expect {|
 - : <[int]> expr =
 <[(Stdlib.List.hd ([{ Stdlib.contents = 42; }])).Stdlib.contents]>
+|}];;
+
+(** Jkind annotations **)
+
+(* Variable *)
+<[ fun (x : ('a : immediate)) -> x ]>
+[%%expect {|
+- : <[$('a) -> $('a)]> expr = <[fun (x : 'a) -> x]>
+|}];;
+(* Alias *)
+<[ fun (x : ('a as ('b : immediate))) -> x ]>
+[%%expect {|
+- : <[$('a) -> $('a)]> expr = <[fun (x : 'a as 'b) -> x]>
+|}];;
+(* Universal quantifier *)
+<[ let f : ('a : immediate). 'a -> 'a = fun x -> x in f ]>
+[%%expect {|
+- : <[$('a) -> $('a)]> expr = <[let f : 'a. 'a -> 'a = (fun x -> x) in f]>
+|}];;
+<[ let f : ('a : value) ('b : immediate). #('a * 'b) -> 'a =
+    fun #(x, y) -> x
+   in f ]>
+[%%expect {|
+- : <[#($('a) * $('b)) -> $('a)]> expr =
+<[let f : 'a 'b. #('a * 'b) -> 'a = (fun #(x, y) -> x) in f]>
+|}];;
+(* Locally abstract type *)
+(* handled differently depending if [type] is the initial parameter *)
+<[ fun (type t : immediate) (x : t) -> x ]> (* initial *)
+[%%expect {|
+- : <[$('t) -> $('t)]> expr = <[fun (type t) (x : t) -> x]>
+|}];;
+<[ fun () (type t : immediate) (x : t) -> x ]> (* non-initial *)
+[%%expect {|
+- : <[unit -> $('t) -> $('t)]> expr = <[fun () (type t) (x : t) -> x]>
+|}];;
+<[ fun (type s : value) (x : s)
+       (type t : immediate) (y : t) -> #(x, y) ]> (* both *)
+[%%expect {|
+- : <[$('s) -> $('t) -> #($('s) * $('t))]> expr =
+<[fun (type s) (x : s) (type t) (y : t) -> #(x, y)]>
+|}];;
+<[ fun (type (s : immediate) (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* double initial *)
+[%%expect {|
+- : <[$('s) -> $('t) -> #($('s) * $('t))]> expr =
+<[fun (type s) (type t) (x : s) (y : t) -> #(x, y)]>
+|}];;
+<[ fun (type (s : immediate)) (type (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* split double initial *)
+[%%expect {|
+- : <[$('s) -> $('t) -> #($('s) * $('t))]> expr =
+<[fun (type s) (type t) (x : s) (y : t) -> #(x, y)]>
+|}];;
+<[ fun () (type (s : immediate)) (type (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* double non-initial *)
+[%%expect {|
+- : <[unit -> $('s) -> $('t) -> #($('s) * $('t))]> expr =
+<[fun () (type s) (type t) (x : s) (y : t) -> #(x, y)]>
+|}];;
+<[ fun () (type (s : immediate) (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* split double non-initial *)
+[%%expect {|
+- : <[unit -> $('s) -> $('t) -> #($('s) * $('t))]> expr =
+<[fun () (type s) (type t) (x : s) (y : t) -> #(x, y)]>
+|}];;
+(* Universally quantified locally abstract type *)
+<[ let f : type (a : immediate). a -> a = fun x -> x in f ]>
+[%%expect {|
+Uncaught exception: Stdlib.Exit
+
+|}];;
+(* Constructor with locally abstract type *)
+<[ function Exists (type a : immediate) (x : a) -> ignore (x : a) ]>
+[%%expect {|
+Uncaught exception: Stdlib.Exit
+
 |}];;
