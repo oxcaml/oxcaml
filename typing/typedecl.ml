@@ -213,8 +213,12 @@ let check_or_null_variant_shape _path params sdecl scstrs =
       check_no_gadt c1;
       check_no_gadt c2;
       begin match c1.pcd_args, c2.pcd_args with
-      | Pcstr_tuple [], Pcstr_tuple [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }]
-      | Pcstr_tuple [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }], Pcstr_tuple [] ->
+      | Pcstr_tuple [],
+        Pcstr_tuple
+          [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }]
+      | Pcstr_tuple
+          [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }],
+        Pcstr_tuple [] ->
         if String.equal name (fst param_name)
         then snd param_name
         else bad "its payload constructor must carry the sole type parameter"
@@ -239,8 +243,8 @@ let custom_or_null_jkind path param =
       { parent_path = path; position = 1; arity = 1 }
   in
   Jkind.Builtin.value_or_null ~why
-  |> Jkind.add_with_bounds
-       ~modality:Mode.Modality.Value.Const.id
+  |> Btype.Jkind0.add_with_bounds
+       ~modality:Mode.Modality.Const.id
        ~type_expr:param
   |> Jkind.mark_best
 
@@ -1007,14 +1011,22 @@ let transl_declaration env sdecl (id, uid) =
         if custom_or_null then begin
           check_or_null_variant_shape path params sdecl scstrs;
           match sdecl.ptype_params, params with
-          | [({ ptyp_loc; _ }, _)], [param] -> begin
-            match
-              Ctype.constrain_type_jkind env param
-                (Jkind.for_or_null_argument id)
-            with
+          | [({ ptyp_desc = Ptyp_var (_, jkind_annot);
+                ptyp_loc;
+                _
+              }, _)],
+            [param] ->
+            let required = Btype.Jkind0.for_or_null_argument id in
+            let check =
+              match jkind_annot with
+              | None -> Ctype.constrain_type_jkind env param required
+              | Some _ -> Ctype.check_type_jkind env param required
+            in
+            begin match check with
             | Ok () -> ()
             | Error err ->
-              raise (Error (ptyp_loc, Jkind_mismatch_of_type (param, err)))
+              raise
+                (Error (ptyp_loc, Jkind_mismatch_of_type (env, param, err)))
             end
           | _ -> assert false
         end;
@@ -2181,10 +2193,15 @@ let rec update_decl_jkind env dpath decl =
           cstrs
       in
       begin match payload with
-      | Some ({ Types.cd_uid; cd_args = Cstr_tuple [{ ca_type = ty;
-                                                      ca_modalities = modality }]; _ } as _payload) ->
+      | Some
+          ({ Types.cd_uid;
+             cd_args =
+               Cstr_tuple
+                 [{ ca_type = ty; ca_modalities = modality }];
+             _
+           } as _payload) ->
         let jkind = Ctype.type_jkind env ty in
-        let sort = Jkind.sort_of_jkind jkind in
+        let sort = Jkind.sort_of_jkind env jkind in
         let ca_sort = Jkind.Sort.default_to_value_and_get sort in
         let cstrs =
           List.map

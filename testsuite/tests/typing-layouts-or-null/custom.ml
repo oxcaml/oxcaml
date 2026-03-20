@@ -118,5 +118,47 @@ type ('a : value_or_null) bad_jkind =
 [@@or_null]
 
 [%%expect{|
-type ('a : value_or_null mod non_null) bad_jkind = A | B of 'a [@@or_null]
+Line 1, characters 6-24:
+1 | type ('a : value_or_null) bad_jkind =
+          ^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a" is value_or_null
+         because of the annotation on 'a in the declaration of the type
+                                      bad_jkind.
+       But the kind of type "'a" must be a subkind of
+           value_or_null mod non_null
+         because the type argument of bad_jkind has kind value.
+|}]
+
+type ('a : value) wrong_result_kind : value =
+  | A
+  | B of 'a
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type ('a : value) wrong_result_kind : value =
+2 |   | A
+3 |   | B of 'a
+4 | [@@or_null]
+Error: The kind of type "wrong_result_kind" is value_or_null
+         because of the annotation on 'a in the declaration of the type
+                                      wrong_result_kind.
+       But the kind of type "wrong_result_kind" must be a subkind of value
+         because of the annotation on the declaration of the type wrong_result_kind.
+|}]
+
+type ('a : float64) wrong_payload_kind : value_or_null =
+  | A
+  | B of 'a
+[@@or_null]
+
+[%%expect{|
+Line 1, characters 6-18:
+1 | type ('a : float64) wrong_payload_kind : value_or_null =
+          ^^^^^^^^^^^^
+Error: The layout of type "'a" is float64
+         because of the annotation on 'a in the declaration of the type
+                                      wrong_payload_kind.
+       But the layout of type "'a" must be a sublayout of value
+         because the type argument of wrong_payload_kind has layout value.
 |}]
