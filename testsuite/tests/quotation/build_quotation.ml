@@ -327,7 +327,9 @@ Uncaught exception: Stdlib.Exit
 
 <[ function Exists (type a) (x : a) -> ignore (x : a) ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-35]:
+Constructor patterns introducing locally abstract types are not supported in quotes.
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 
@@ -1240,6 +1242,8 @@ Uncaught exception: Stdlib.Exit
 (* Constructor with locally abstract type *)
 <[ function Exists (type a : immediate) (x : a) -> ignore (x : a) ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-47]:
+Constructor patterns introducing locally abstract types are not supported in quotes.
+Uncaught exception: Misc.Fatal_error
 
 |}];;
