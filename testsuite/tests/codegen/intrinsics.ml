@@ -475,6 +475,156 @@ module Int64_u = struct
     if x' >= y' then x else y
 end
 
+module Int16_u = struct
+  type t = int16#
+
+  external add : t -> t -> t @@ portable = "%int16#_add"
+  external succ : t -> t @@ portable = "%int16#_succ"
+  external mul : t -> t -> t @@ portable = "%int16#_mul"
+  external equal : t -> t -> bool @@ portable = "%int16#_equal"
+  external notequal : t -> t -> bool @@ portable = "%int16#_notequal"
+  external shift_left : t -> int -> t @@ portable = "%int16#_asr"
+  external shift_right : t -> int -> t @@ portable = "%int16#_lsl"
+  external logical_shift_right : t -> int -> t @@ portable = "%int16#_lsr"
+  external bit_and : t -> t -> t @@ portable = "%int16#_and"
+  external bit_or : t -> t -> t @@ portable = "%int16#_or"
+  external bit_xor : t -> t -> t @@ portable = "%int16#_xor"
+  external bswap : t -> t @@ portable = "%int16#_bswap"
+  external neg : t -> t @@ portable = "%int16#_neg"
+  external pred : t -> t @@ portable = "%int16#_pred"
+  external sub : t -> t -> t @@ portable = "%int16#_sub"
+  external div : t -> t -> t @@ portable = "%int16#_div"
+  external rem : t -> t -> t @@ portable = "%int16#_mod"
+  external unsafe_div : t -> t -> t @@ portable = "%int16#_unsafe_div"
+  external unsafe_rem : t -> t -> t @@ portable = "%int16#_unsafe_mod"
+  external compare : t -> t -> int @@ portable = "%int16#_compare"
+  external greaterequal : t -> t -> bool @@ portable = "%int16#_greaterequal"
+  external greaterthan : t -> t -> bool @@ portable = "%int16#_greaterthan"
+  external lessequal : t -> t -> bool @@ portable = "%int16#_lessequal"
+  external lessthan : t -> t -> bool @@ portable = "%int16#_lessthan"
+  external unsigned_compare : t -> t -> int @@ portable
+    = "%int16#_unsigned_compare"
+  external unsigned_greaterequal : t -> t -> bool @@ portable
+    = "%int16#_unsigned_greaterequal"
+  external unsigned_greaterthan : t -> t -> bool @@ portable
+    = "%int16#_unsigned_greaterthan"
+  external unsigned_lessequal : t -> t -> bool @@ portable
+    = "%int16#_unsigned_lessequal"
+  external unsigned_lessthan : t -> t -> bool @@ portable
+    = "%int16#_unsigned_lessthan"
+  external of_float : (float[@local_opt]) -> t @@ portable
+    = "%int16#_of_float"
+  external of_float_u : float# -> t @@ portable = "%int16#_of_float#"
+  external of_float32 : (float32[@local_opt]) -> t @@ portable
+    = "%int16#_of_float32"
+  external of_float32_u : float32# -> t @@ portable = "%int16#_of_float32#"
+  external of_int : int -> t @@ portable = "%int16#_of_int"
+  external of_int_u : int# -> t @@ portable = "%int16#_of_int#"
+  external of_int16 : int16 -> t @@ portable = "%int16#_of_int16"
+  external of_int32 : (int32[@local_opt]) -> t @@ portable = "%int16#_of_int32"
+  external of_int32_u : int32# -> t @@ portable = "%int16#_of_int32#"
+  external of_int64 : (int64[@local_opt]) -> t @@ portable = "%int16#_of_int64"
+  external of_int64_u : int64# -> t @@ portable = "%int16#_of_int64#"
+  external of_int8 : int8 -> t @@ portable = "%int16#_of_int8"
+  external of_int8_u : int8# -> t @@ portable = "%int16#_of_int8#"
+  external of_nativeint : (nativeint[@local_opt]) -> t @@ portable
+    = "%int16#_of_nativeint"
+  external of_nativeint_u : nativeint# -> t @@ portable
+    = "%int16#_of_nativeint#"
+  external to_float : t -> (float[@local_opt]) @@ portable = "%float_of_int16#"
+  external to_float_u : t -> float# @@ portable = "%float#_of_int16#"
+  external to_float32 : t -> (float32[@local_opt]) @@ portable
+    = "%float32_of_int16#"
+  external to_float32_u : t -> float32# @@ portable = "%float32#_of_int16#"
+  external to_int : t -> int @@ portable = "%int_of_int16#"
+  external to_int_u : t -> int# @@ portable = "%int#_of_int16#"
+  external to_int16 : t -> int16 @@ portable = "%int16_of_int16#"
+  external to_int32 : t -> (int32[@local_opt]) @@ portable = "%int32_of_int16#"
+  external to_int32_u : t -> int32# @@ portable = "%int32#_of_int16#"
+  external to_int64 : t -> (int64[@local_opt]) @@ portable = "%int64_of_int16#"
+  external to_int64_u : t -> int64# @@ portable = "%int64#_of_int16#"
+  external to_int8 : t -> int8 @@ portable = "%int8_of_int16#"
+  external to_int8_u : t -> int8# @@ portable = "%int8#_of_int16#"
+  external to_nativeint : t -> (nativeint[@local_opt]) @@ portable
+    = "%nativeint_of_int16#"
+  external to_nativeint_u : t -> nativeint# @@ portable
+    = "%nativeint#_of_int16#"
+end
+
+module Int8_u = struct
+  type t = int8#
+
+  external add : t -> t -> t @@ portable = "%int8#_add"
+  external succ : t -> t @@ portable = "%int8#_succ"
+  external mul : t -> t -> t @@ portable = "%int8#_mul"
+  external equal : t -> t -> bool @@ portable = "%int8#_equal"
+  external notequal : t -> t -> bool @@ portable = "%int8#_notequal"
+  external shift_left : t -> int -> t @@ portable = "%int8#_asr"
+  external shift_right : t -> int -> t @@ portable = "%int8#_lsl"
+  external logical_shift_right : t -> int -> t @@ portable = "%int8#_lsr"
+  external bit_and : t -> t -> t @@ portable = "%int8#_and"
+  external bit_or : t -> t -> t @@ portable = "%int8#_or"
+  external bit_xor : t -> t -> t @@ portable = "%int8#_xor"
+  external bswap : t -> t @@ portable = "%int8#_bswap"
+  external neg : t -> t @@ portable = "%int8#_neg"
+  external pred : t -> t @@ portable = "%int8#_pred"
+  external sub : t -> t -> t @@ portable = "%int8#_sub"
+  external div : t -> t -> t @@ portable = "%int8#_div"
+  external rem : t -> t -> t @@ portable = "%int8#_mod"
+  external unsafe_div : t -> t -> t @@ portable = "%int8#_unsafe_div"
+  external unsafe_rem : t -> t -> t @@ portable = "%int8#_unsafe_mod"
+  external compare : t -> t -> int @@ portable = "%int8#_compare"
+  external greaterequal : t -> t -> bool @@ portable = "%int8#_greaterequal"
+  external greaterthan : t -> t -> bool @@ portable = "%int8#_greaterthan"
+  external lessequal : t -> t -> bool @@ portable = "%int8#_lessequal"
+  external lessthan : t -> t -> bool @@ portable = "%int8#_lessthan"
+  external unsigned_compare : t -> t -> int @@ portable
+    = "%int8#_unsigned_compare"
+  external unsigned_greaterequal : t -> t -> bool @@ portable
+    = "%int8#_unsigned_greaterequal"
+  external unsigned_greaterthan : t -> t -> bool @@ portable
+    = "%int8#_unsigned_greaterthan"
+  external unsigned_lessequal : t -> t -> bool @@ portable
+    = "%int8#_unsigned_lessequal"
+  external unsigned_lessthan : t -> t -> bool @@ portable
+    = "%int8#_unsigned_lessthan"
+  external of_float : (float[@local_opt]) -> t @@ portable
+    = "%int8#_of_float"
+  external of_float_u : float# -> t @@ portable = "%int8#_of_float#"
+  external of_float32 : (float32[@local_opt]) -> t @@ portable
+    = "%int8#_of_float32"
+  external of_float32_u : float32# -> t @@ portable = "%int8#_of_float32#"
+  external of_int : int -> t @@ portable = "%int8#_of_int"
+  external of_int_u : int# -> t @@ portable = "%int8#_of_int#"
+  external of_int16 : int16 -> t @@ portable = "%int8#_of_int16"
+  external of_int16_u : int16# -> t @@ portable = "%int8#_of_int16#"
+  external of_int32 : (int32[@local_opt]) -> t @@ portable = "%int8#_of_int32"
+  external of_int32_u : int32# -> t @@ portable = "%int8#_of_int32#"
+  external of_int64 : (int64[@local_opt]) -> t @@ portable = "%int8#_of_int64"
+  external of_int64_u : int64# -> t @@ portable = "%int8#_of_int64#"
+  external of_int8 : int8 -> t @@ portable = "%int8#_of_int8"
+  external of_nativeint : (nativeint[@local_opt]) -> t @@ portable
+    = "%int8#_of_nativeint"
+  external of_nativeint_u : nativeint# -> t @@ portable = "%int8#_of_nativeint#"
+  external to_float : t -> (float[@local_opt]) @@ portable = "%float_of_int8#"
+  external to_float_u : t -> float# @@ portable = "%float#_of_int8#"
+  external to_float32 : t -> (float32[@local_opt]) @@ portable
+    = "%float32_of_int8#"
+  external to_float32_u : t -> float32# @@ portable = "%float32#_of_int8#"
+  external to_int : t -> int @@ portable = "%int_of_int8#"
+  external to_int_u : t -> int# @@ portable = "%int#_of_int8#"
+  external to_int16 : t -> int16 @@ portable = "%int16_of_int8#"
+  external to_int16_u : t -> int16# @@ portable = "%int16#_of_int8#"
+  external to_int32 : t -> (int32[@local_opt]) @@ portable = "%int32_of_int8#"
+  external to_int32_u : t -> int32# @@ portable = "%int32#_of_int8#"
+  external to_int64 : t -> (int64[@local_opt]) @@ portable = "%int64_of_int8#"
+  external to_int64_u : t -> int64# @@ portable = "%int64#_of_int8#"
+  external to_int8 : t -> int8 @@ portable = "%int8_of_int8#"
+  external to_nativeint : t -> (nativeint[@local_opt]) @@ portable
+    = "%nativeint_of_int8#"
+  external to_nativeint_u : t -> nativeint# @@ portable = "%nativeint#_of_int8#"
+end
+
 module Bytes = struct
   external unsafe_get : (bytes[@local_opt]) -> int -> int
     @@ portable = "%bytes_unsafe_get"
