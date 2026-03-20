@@ -486,6 +486,14 @@ let is_at_least (type a) (extn : a t) (value : a) =
   in
   check !extensions
 
+let mode_polymorphism_debug_enabled () =
+  Sys.getenv_opt "OXCAML_MODE_POLYMORPHISM_DEBUG" = Some "1"
+
+let is_at_least_mode_poly (value : maturity) =
+  if mode_polymorphism_debug_enabled ()
+  then true
+  else is_at_least Mode_polymorphism value
+
 let is_enabled extn =
   let rec check : extn_pair list -> bool = function
     | [] -> false
