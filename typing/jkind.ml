@@ -1186,7 +1186,9 @@ module Base_and_axes = struct
                   ~statefulness:
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
               in
-              let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
+              let crossing : Mod_bounds.Crossing.t =
+                Mod_bounds.Crossing.pack ~monadic ~comonadic
+              in
               Mod_bounds.create crossing
                 ~externality:(value_for_axis ~axis:(Nonmodal Externality))
                 ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
@@ -2342,8 +2344,10 @@ let for_object =
   fresh_jkind
     { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
       mod_bounds =
-        Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
-          ~nullability:Non_null ~separability:Separability.Non_float;
+        Mod_bounds.create
+          (Mod_bounds.Crossing.pack ~monadic ~comonadic)
+          ~externality:Externality.max ~nullability:Non_null
+          ~separability:Separability.Non_float;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)

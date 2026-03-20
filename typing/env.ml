@@ -1191,18 +1191,19 @@ let components_of_module ~alerts ~uid env ps path addr mty mode shape =
 let mode_unit =
   let hint : _ Mode.Hint.const = Legacy Compilation_unit in
   Mode.Value.of_const
-    { areality = Global;
-      linearity = Many;
-      uniqueness = Aliased;
-      portability = Nonportable;
-      contention = Uncontended;
-      forkable = Forkable;
-      yielding = Unyielding;
-      statefulness = Stateful;
-      visibility = Read_write;
-      staticity = Dynamic;
-      (* CR-soon zqian: persistent modules are always static *)
-    }
+    (Mode.Value.Const.encode
+       { areality = Global;
+         linearity = Many;
+         uniqueness = Aliased;
+         portability = Nonportable;
+         contention = Uncontended;
+         forkable = Forkable;
+         yielding = Unyielding;
+         statefulness = Stateful;
+         visibility = Read_write;
+         staticity = Dynamic;
+         (* CR-soon zqian: persistent modules are always static *)
+       })
     ~hint_monadic:hint ~hint_comonadic:hint
 
 let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =

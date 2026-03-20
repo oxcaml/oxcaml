@@ -4025,8 +4025,12 @@ let transl_value_decl env loc ~modal ~why valdecl =
         let modes = Typemode.transl_mode_annots modes in
         let mode =
           modes.mode_modes
-          |> Mode.Alloc.Const.(
-              Option.value ~default:{legacy with staticity = Static})
+          |> Mode.Alloc.Const.Option.value
+               ~default:
+                 (Mode.Alloc.Const.encode
+                    { (Mode.Alloc.Const.decode Mode.Alloc.Const.legacy) with
+                      staticity = Mode.Staticity.Static
+                    })
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in

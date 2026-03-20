@@ -118,7 +118,10 @@ let register_allocation () =
   let m, _ =
     Value.(newvar_below (of_const
       ~hint_comonadic:Module_allocated_on_heap
-      { Const.max with areality = Global }))
+      (Const.encode
+         { (Const.decode Const.max) with
+           areality = Mode.Regionality.Const.Global
+         })))
   in
   value_to_alloc_r2g m, m
 

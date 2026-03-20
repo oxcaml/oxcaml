@@ -1783,10 +1783,12 @@ let with_locality_and_forkable_yielding (locality, fy) m =
   Forkable.equate_exn (Alloc.proj_comonadic Forkable m') forkable;
   Yielding.equate_exn (Alloc.proj_comonadic Yielding m') yielding;
   let c =
-    { Alloc.Comonadic.Const.max with
-      areality = Locality.Const.min;
-      forkable = Forkable.Const.min;
-      yielding = Yielding.Const.min}
+    Alloc.Comonadic.encode
+      { (Alloc.Comonadic.decode Alloc.Comonadic.Const.max) with
+        areality = Locality.Const.min;
+        forkable = Forkable.Const.min;
+        yielding = Yielding.Const.min
+      }
   in
   Alloc.submode_exn (Alloc.meet_const c m') m;
   Alloc.submode_exn (Alloc.meet_const c m) m';

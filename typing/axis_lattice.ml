@@ -489,7 +489,7 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
            (Mode.Modality.Comonadic.Atom.Meet_const
               (statefulness x)))
   in
-  { monadic; comonadic }
+  Mode.Crossing.pack ~monadic ~comonadic
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention
     ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality
@@ -598,8 +598,8 @@ let immediate : t =
 
 let object_legacy : t =
   let ({ linearity; areality; portability; forkable; yielding; statefulness }
-        : Mode.Value.Comonadic.Const.t) =
-    Mode.Value.Comonadic.Const.legacy
+        : Mode.Value.Comonadic.repr) =
+    Mode.Value.Comonadic.decode Mode.Value.Comonadic.Const.legacy
   in
   create ~linearity ~areality
     ~uniqueness:Mode.Uniqueness.Const.Aliased

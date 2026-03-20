@@ -495,7 +495,7 @@ module type S = sig
     include Common_axis_neg with type Const.t = const
   end
 
-  type 'a comonadic_with =
+  type 'a comonadic_with_repr =
     { areality : 'a;
       linearity : Linearity.Const.t;
       portability : Portability.Const.t;
@@ -504,12 +504,29 @@ module type S = sig
       statefulness : Statefulness.Const.t
     }
 
-  type monadic =
+  (* Exposed as a nominal wrapper so GADT matches can still recover the type
+     parameter. Callers should treat this as abstract and prefer
+     [Value.Comonadic.encode]/[decode] or [Alloc.Comonadic.encode]/[decode]
+     rather than inspecting the wrapper directly. *)
+  type 'a comonadic_with = private { value : 'a comonadic_with_repr }
+  [@@unboxed]
+
+  type monadic_repr =
     { uniqueness : Uniqueness.Const.t;
       contention : Contention.Const.t;
       visibility : Visibility.Const.t;
       staticity : Staticity.Const.t
     }
+
+  (* Exposed as a nominal wrapper so GADT matches can still recover the product
+     type. Callers should treat this as abstract and prefer
+     [encode_monadic]/[decode_monadic] rather than inspecting the wrapper
+     directly. *)
+  type monadic = private { value : monadic_repr } [@@unboxed]
+
+  val encode_monadic : monadic_repr -> monadic
+
+  val decode_monadic : monadic -> monadic_repr
 
   module Axis : sig
     (** ('p, 'r) t represents a projection from a product of type ['p] to an
@@ -564,6 +581,12 @@ module type S = sig
            and type 'd hint_morph := 'd pos_hint_morph
            and type 'd hint_const := 'd pos_hint_const
 
+      type repr = Areality.Const.t comonadic_with_repr
+
+      val encode : repr -> Const.t
+
+      val decode : Const.t -> repr
+
       val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) mode
 
       (** For interfacing with the user only; potentially slow. *)
@@ -586,7 +609,7 @@ module type S = sig
       include Axis with type 'a t := 'a t
     end
 
-    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
+    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes_repr =
       { areality : 'a;
         linearity : 'b;
         uniqueness : 'c;
@@ -598,6 +621,8 @@ module type S = sig
         visibility : 'i;
         staticity : 'j
       }
+
+    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes
 
     module Const : sig
       include
@@ -615,6 +640,23 @@ module type S = sig
               Staticity.Const.t )
             modes
 
+      type repr =
+        ( Areality.Const.t,
+          Linearity.Const.t,
+          Uniqueness.Const.t,
+          Portability.Const.t,
+          Contention.Const.t,
+          Forkable.Const.t,
+          Yielding.Const.t,
+          Statefulness.Const.t,
+          Visibility.Const.t,
+          Staticity.Const.t )
+        modes_repr
+
+      val encode : repr -> t
+
+      val decode : t -> repr
+
       module Option : sig
         type some = t
 
@@ -629,7 +671,7 @@ module type S = sig
             Statefulness.Const.t option,
             Visibility.Const.t option,
             Staticity.Const.t option )
-          modes
+          modes_repr
 
         val none : t
 
@@ -1070,7 +1112,7 @@ module type S = sig
 
     (** The mode crossing capability on all axes, split into monadic and
         comonadic fragments. *)
-    type t = (Monadic.t, Comonadic.t) monadic_comonadic
+    type t
 
     module Axis : sig
       (** ['a t] specifies an axis whose mode crossing capability is represented
@@ -1093,7 +1135,9 @@ module type S = sig
     (** Convenience for creating a mode crossing capability on all axes, using a
         boolean for each axis where [true] means full crossing and [false] means
         no crossing. Alternatively, call [Monadic.create] and [Comonadic.create]
-        and pack the results into a record of type [t]. *)
+        and pack the results using [pack]. *)
+    val pack : monadic:Monadic.t -> comonadic:Comonadic.t -> t
+
     val create :
       regionality:bool ->
       linearity:bool ->
