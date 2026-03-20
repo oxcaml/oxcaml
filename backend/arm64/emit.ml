@@ -552,41 +552,144 @@ type stack_realloc =
     sc_max_frame_size_in_bytes : int (* Size for reallocation. *)
   }
 
-type env =
-  { fastcode_flag : bool;
-    mutable stack_offset : int;
-    num_stack_slots : int Stack_class.Tbl.t;
-    prologue_required : bool;
-    contains_calls : bool;
-    mutable call_gc_sites : gc_call list;
-    mutable local_realloc_sites : local_realloc_call list;
-    mutable stack_realloc : stack_realloc option;
-    function_name : string;
-    tailrec_entry_point : L.t option;
-    float32_literals : (int32 * L.t) list ref;
-    float_literals : (int64 * L.t) list ref;
-    vec128_literals : (Cmm.vec128_bits * L.t) list ref
-  }
+module Env : sig
+  type t
 
-let copy_env env =
-  { env with
-    num_stack_slots = Stack_class.Tbl.copy env.num_stack_slots;
-    float32_literals = ref !(env.float32_literals);
-    float_literals = ref !(env.float_literals);
-    vec128_literals = ref !(env.vec128_literals)
-  }
+  val create :
+    fastcode_flag:bool ->
+    num_stack_slots:int Stack_class.Tbl.t ->
+    prologue_required:bool ->
+    contains_calls:bool ->
+    function_name:string ->
+    tailrec_entry_point:L.t option ->
+    t
+
+  val copy : t -> t
+
+  val fastcode_flag : t -> bool
+
+  val stack_offset : t -> int
+
+  val set_stack_offset : t -> int -> unit
+
+  val num_stack_slots : t -> int Stack_class.Tbl.t
+
+  val prologue_required : t -> bool
+
+  val contains_calls : t -> bool
+
+  val call_gc_sites : t -> gc_call list
+
+  val set_call_gc_sites : t -> gc_call list -> unit
+
+  val local_realloc_sites : t -> local_realloc_call list
+
+  val set_local_realloc_sites : t -> local_realloc_call list -> unit
+
+  val stack_realloc : t -> stack_realloc option
+
+  val set_stack_realloc : t -> stack_realloc option -> unit
+
+  val function_name : t -> string
+
+  val tailrec_entry_point : t -> L.t option
+
+  val float32_literals : t -> (int32 * L.t) list ref
+
+  val float_literals : t -> (int64 * L.t) list ref
+
+  val vec128_literals : t -> (Cmm.vec128_bits * L.t) list ref
+end = struct
+  type t =
+    { fastcode_flag : bool;
+      mutable stack_offset : int;
+      num_stack_slots : int Stack_class.Tbl.t;
+      prologue_required : bool;
+      contains_calls : bool;
+      mutable call_gc_sites : gc_call list;
+      mutable local_realloc_sites : local_realloc_call list;
+      mutable stack_realloc : stack_realloc option;
+      function_name : string;
+      tailrec_entry_point : L.t option;
+      float32_literals : (int32 * L.t) list ref;
+      float_literals : (int64 * L.t) list ref;
+      vec128_literals : (Cmm.vec128_bits * L.t) list ref
+    }
+
+  let create ~fastcode_flag ~num_stack_slots ~prologue_required ~contains_calls
+      ~function_name ~tailrec_entry_point =
+    { fastcode_flag;
+      stack_offset = 0;
+      num_stack_slots;
+      prologue_required;
+      contains_calls;
+      call_gc_sites = [];
+      local_realloc_sites = [];
+      stack_realloc = None;
+      function_name;
+      tailrec_entry_point;
+      float32_literals = ref [];
+      float_literals = ref [];
+      vec128_literals = ref []
+    }
+
+  let copy env =
+    { env with
+      num_stack_slots = Stack_class.Tbl.copy env.num_stack_slots;
+      float32_literals = ref !(env.float32_literals);
+      float_literals = ref !(env.float_literals);
+      vec128_literals = ref !(env.vec128_literals)
+    }
+
+  let fastcode_flag env = env.fastcode_flag
+
+  let stack_offset env = env.stack_offset
+
+  let set_stack_offset env v = env.stack_offset <- v
+
+  let num_stack_slots env = env.num_stack_slots
+
+  let prologue_required env = env.prologue_required
+
+  let contains_calls env = env.contains_calls
+
+  let call_gc_sites env = env.call_gc_sites
+
+  let set_call_gc_sites env v = env.call_gc_sites <- v
+
+  let local_realloc_sites env = env.local_realloc_sites
+
+  let set_local_realloc_sites env v = env.local_realloc_sites <- v
+
+  let stack_realloc env = env.stack_realloc
+
+  let set_stack_realloc env v = env.stack_realloc <- v
+
+  let function_name env = env.function_name
+
+  let tailrec_entry_point env = env.tailrec_entry_point
+
+  let float32_literals env = env.float32_literals
+
+  let float_literals env = env.float_literals
+
+  let vec128_literals env = env.vec128_literals
+end
 
 let env_frame_size env =
-  frame_size ~stack_offset:env.stack_offset ~contains_calls:env.contains_calls
-    ~num_stack_slots:env.num_stack_slots
+  frame_size ~stack_offset:(Env.stack_offset env)
+    ~contains_calls:(Env.contains_calls env)
+    ~num_stack_slots:(Env.num_stack_slots env)
 
 let env_slot_offset env loc stack_class =
-  slot_offset ~stack_offset:env.stack_offset ~contains_calls:env.contains_calls
-    ~num_stack_slots:env.num_stack_slots loc stack_class
+  slot_offset ~stack_offset:(Env.stack_offset env)
+    ~contains_calls:(Env.contains_calls env)
+    ~num_stack_slots:(Env.num_stack_slots env) loc stack_class
 
 let env_stack env r =
-  stack ~stack_offset:env.stack_offset ~contains_calls:env.contains_calls
-    ~num_stack_slots:env.num_stack_slots r
+  stack ~stack_offset:(Env.stack_offset env)
+    ~contains_calls:(Env.contains_calls env)
+    ~num_stack_slots:(Env.num_stack_slots env) r
 
 (* Record live pointers at call points *)
 
@@ -647,7 +750,7 @@ let emit_local_realloc lr =
 (* Local stack reallocation *)
 
 let emit_stack_realloc env =
-  match env.stack_realloc with
+  match Env.stack_realloc env with
   | None -> ()
   | Some { sc_label; sc_return; sc_max_frame_size_in_bytes } ->
     D.define_label sc_label;
@@ -836,11 +939,11 @@ let find_or_add_literal literals f =
     literals := (f, lbl) :: !literals;
     lbl
 
-let float32_literal env f = find_or_add_literal env.float32_literals f
+let float32_literal env f = find_or_add_literal (Env.float32_literals env) f
 
-let float_literal env f = find_or_add_literal env.float_literals f
+let float_literal env f = find_or_add_literal (Env.float_literals env) f
 
-let vec128_literal env f = find_or_add_literal env.vec128_literals f
+let vec128_literal env f = find_or_add_literal (Env.vec128_literals env) f
 
 (* Emit all pending literals *)
 let emit_literals_list literals align emit_literal =
@@ -884,9 +987,9 @@ let emit_vec128_literal (({ word0; word1 } : Cmm.vec128_bits), lbl) =
 
 let emit_literals env =
   (* Align float32 literals to [size_float]=8 bytes, not 4. *)
-  emit_literals_list env.float32_literals size_float emit_float32_literal;
-  emit_literals_list env.float_literals size_float emit_float_literal;
-  emit_literals_list env.vec128_literals size_vec128 emit_vec128_literal
+  emit_literals_list (Env.float32_literals env) size_float emit_float32_literal;
+  emit_literals_list (Env.float_literals env) size_float emit_float_literal;
+  emit_literals_list (Env.vec128_literals env) size_vec128 emit_vec128_literal
 
 (* Emit code to load the address of a symbol *)
 
@@ -963,8 +1066,8 @@ let assembly_code_for_local_allocation env i ~n =
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_top);
   A.ins4 ADD_shifted_register r r reg_x_tmp1 O.optional_none;
   A.ins4 ADD_immediate r r (O.imm 8) O.optional_none;
-  env.local_realloc_sites
-    <- { lr_lbl; lr_dbg = i.dbg; lr_return_lbl } :: env.local_realloc_sites
+  Env.set_local_realloc_sites env
+    ({ lr_lbl; lr_dbg = i.dbg; lr_return_lbl } :: Env.local_realloc_sites env)
 
 let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
   let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc dbginfo) in
@@ -986,8 +1089,8 @@ let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
   labelled_ins4 gc_return_lbl ADD_immediate
     (H.reg_x i.res.(0))
     reg_x_alloc_ptr (O.imm 8) O.optional_none;
-  env.call_gc_sites
-    <- { gc_lbl; gc_return_lbl; gc_frame_lbl } :: env.call_gc_sites
+  Env.set_call_gc_sites env
+    ({ gc_lbl; gc_return_lbl; gc_frame_lbl } :: Env.call_gc_sites env)
 
 let assembly_code_for_slow_heap_allocation env i ~n ~dbginfo =
   let lbl_frame = record_frame_label env i.live (Dbg_alloc dbginfo) in
@@ -1005,7 +1108,7 @@ let assembly_code_for_slow_heap_allocation env i ~n ~dbginfo =
 let assembly_code_for_allocation env i ~local ~n ~far ~dbginfo =
   if local
   then assembly_code_for_local_allocation env i ~n
-  else if env.fastcode_flag
+  else if Env.fastcode_flag env
   then assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo
   else assembly_code_for_slow_heap_allocation env i ~n ~dbginfo
 
@@ -1039,8 +1142,8 @@ let assembly_code_for_poll env i ~far ~return_label =
        A.ins1 (B_cond (Branch_cond.Int LS)) (local_label lbl);
        A.ins1 B (local_label return_label);
        labelled_ins1 lbl B (local_label gc_lbl));
-  env.call_gc_sites
-    <- { gc_lbl; gc_return_lbl; gc_frame_lbl } :: env.call_gc_sites
+  Env.set_call_gc_sites env
+    ({ gc_lbl; gc_return_lbl; gc_frame_lbl } :: Env.call_gc_sites env)
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
@@ -1208,16 +1311,16 @@ let emit_instr env i =
   match i.desc with
   | Lend -> ()
   | Lprologue ->
-    assert env.prologue_required;
+    assert (Env.prologue_required env);
     let n = env_frame_size env in
     if n > 0 then emit_stack_adjustment (-n);
-    if env.contains_calls
+    if Env.contains_calls env
     then (
       D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
       emit_str_sp_offset O.lr (n - 8))
   | Lepilogue_open ->
     let n = env_frame_size env in
-    if env.contains_calls then emit_ldr_sp_offset O.lr (n - 8);
+    if Env.contains_calls env then emit_ldr_sp_offset O.lr (n - 8);
     if n > 0 then emit_stack_adjustment n
   | Lepilogue_close ->
     let n = env_frame_size env in
@@ -1286,9 +1389,9 @@ let emit_instr env i =
     record_frame env i.live (Dbg_other i.dbg)
   | Lcall_op Ltailcall_ind -> A.ins1 BR (H.reg_x i.arg.(0))
   | Lcall_op (Ltailcall_imm { func }) ->
-    if String.equal func.sym_name env.function_name
+    if String.equal func.sym_name (Env.function_name env)
     then
-      match env.tailrec_entry_point with
+      match Env.tailrec_entry_point env with
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point -> A.ins1 B (local_label tailrec_entry_point)
     else A.ins1 B (symbol (Needs_reloc JUMP26) (symbol_of_cmm_symbol func))
@@ -1324,7 +1427,7 @@ let emit_instr env i =
   | Lop (Stackoffset n) ->
     assert (n mod 16 = 0);
     emit_stack_adjustment (-n);
-    env.stack_offset <- env.stack_offset + n
+    Env.set_stack_offset env (Env.stack_offset env + n)
   | Lop (Load { memory_chunk; addressing_mode; is_atomic; _ }) -> (
     assert (
       Cmm.equal_memory_chunk memory_chunk Word_int
@@ -1754,11 +1857,11 @@ let emit_instr env i =
   | Lentertrap -> ()
   | Ladjust_stack_offset { delta_bytes } ->
     D.cfi_adjust_cfa_offset ~bytes:delta_bytes;
-    env.stack_offset <- env.stack_offset + delta_bytes
+    Env.set_stack_offset env (Env.stack_offset env + delta_bytes)
   | Lpushtrap { lbl_handler } ->
     let lbl_handler = label_to_asm_label ~section:Text lbl_handler in
     A.ins2 ADR reg_x_tmp1 (label Same_section_and_unit lbl_handler);
-    env.stack_offset <- env.stack_offset + 16;
+    Env.set_stack_offset env (Env.stack_offset env + 16);
     A.ins3 (STP X) reg_x_trap_ptr reg_x_tmp1
       (O.mem_pre_pair ~base:R.sp ~offset:(-16));
     D.cfi_adjust_cfa_offset ~bytes:16;
@@ -1766,7 +1869,7 @@ let emit_instr env i =
   | Lpoptrap _ ->
     A.ins2 LDR reg_x_trap_ptr (O.mem_post ~base:R.sp ~offset:16);
     D.cfi_adjust_cfa_offset ~bytes:(-16);
-    env.stack_offset <- env.stack_offset - 16
+    Env.set_stack_offset env (Env.stack_offset env - 16)
   | Lraise k -> (
     match k with
     | Raise_regular ->
@@ -1793,8 +1896,8 @@ let emit_instr env i =
     A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
     A.ins1 (B_cond (Branch_cond.Int CC)) (local_label sc_label);
     D.define_label sc_return;
-    env.stack_realloc
-      <- Some { sc_label; sc_return; sc_max_frame_size_in_bytes }
+    Env.set_stack_realloc env
+      (Some { sc_label; sc_return; sc_max_frame_size_in_bytes })
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
@@ -1845,12 +1948,12 @@ let measure_instruction_count f =
 let out_of_line_code_block_sizes env =
   List.map
     (fun gc -> measure_instruction_count (fun () -> emit_call_gc gc))
-    env.call_gc_sites
+    (Env.call_gc_sites env)
   @ List.map
       (fun lr -> measure_instruction_count (fun () -> emit_local_realloc lr))
-      env.local_realloc_sites
+      (Env.local_realloc_sites env)
   @
-  match env.stack_realloc with
+  match Env.stack_realloc env with
   | None -> []
   | Some _ -> [measure_instruction_count (fun () -> emit_stack_realloc env)]
 
@@ -1871,14 +1974,14 @@ let relaxed_instruction_desc = function
   | Branch lbl -> Lbranch lbl
 
 let branch_relax env body =
-  (* Record copy so the sizing pass can mutate its own mutable fields
-     (stack_offset, call_gc_sites, etc.) without affecting [env], which is used
-     later by [emit_all]. After [compute_instruction_sizes],
-     [sizing_env.stack_offset] reflects the end-of-function state;
-     [relaxed_instruction_size] saves and restores it around each call. This is
-     correct because relaxed instructions (far branches, far polls, conditional
-     branches) do not depend on [stack_offset]. *)
-  let sizing_env = copy_env env in
+  (* Make a copy of [env] so the sizing pass can mutate it without affecting
+     [env] itself, which is used later by [emit_all]. After
+     [compute_instruction_sizes], [sizing_env.stack_offset] reflects the
+     end-of-function state; [relaxed_instruction_size] saves and restores it
+     around each call. This is correct because relaxed instructions (far
+     branches, far polls, conditional branches) do not depend on
+     [stack_offset]. *)
+  let sizing_env = Env.copy env in
   let initial_sizes = compute_instruction_sizes sizing_env body in
   let out_of_line_code_block_sizes = out_of_line_code_block_sizes sizing_env in
   let module BR = Branch_relaxation.Make (struct
@@ -1889,21 +1992,7 @@ let branch_relax env body =
     let offset_pc_at_branch = 0
 
     let relaxed_instruction_size _ri instr =
-      let saved_stack_offset = sizing_env.stack_offset in
-      let saved_call_gc_sites = sizing_env.call_gc_sites in
-      let saved_local_realloc_sites = sizing_env.local_realloc_sites in
-      let saved_stack_realloc = sizing_env.stack_realloc in
-      let saved_float32_literals = !(sizing_env.float32_literals) in
-      let saved_float_literals = !(sizing_env.float_literals) in
-      let saved_vec128_literals = !(sizing_env.vec128_literals) in
-      let m = measure_emit_instr sizing_env instr in
-      sizing_env.stack_offset <- saved_stack_offset;
-      sizing_env.call_gc_sites <- saved_call_gc_sites;
-      sizing_env.local_realloc_sites <- saved_local_realloc_sites;
-      sizing_env.stack_realloc <- saved_stack_realloc;
-      sizing_env.float32_literals := saved_float32_literals;
-      sizing_env.float_literals := saved_float_literals;
-      sizing_env.vec128_literals := saved_vec128_literals;
+      let m = measure_emit_instr (Env.copy sizing_env) instr in
       { Branch_relaxation_intf.size = m.count;
         max_displacement = m.min_max_displacement
       }
@@ -1926,7 +2015,7 @@ let branch_relax env body =
       | _ -> Misc.fatal_error "relax_branch: not a Lbranch"
   end) in
   BR.relax body ~initial_sizes ~out_of_line_code_block_sizes;
-  List.length sizing_env.call_gc_sites
+  List.length (Env.call_gc_sites sizing_env)
 
 (* Emission of an instruction sequence *)
 
@@ -1946,28 +2035,19 @@ let fundecl fundecl =
     | None -> None, fundecl
     | Some { fun_end_label; fundecl } -> Some fun_end_label, fundecl
   in
-  let env =
-    { fastcode_flag = fundecl.fun_fast;
-      stack_offset = 0;
-      num_stack_slots = Stack_class.Tbl.make 0;
-      prologue_required = fundecl.fun_prologue_required;
-      contains_calls = fundecl.fun_contains_calls;
-      call_gc_sites = [];
-      local_realloc_sites = [];
-      stack_realloc = None;
-      function_name = fundecl.fun_name;
-      tailrec_entry_point =
-        Option.map
-          (label_to_asm_label ~section:Text)
-          fundecl.fun_tailrec_entry_point_label;
-      float32_literals = ref [];
-      float_literals = ref [];
-      vec128_literals = ref []
-    }
-  in
+  let num_stack_slots = Stack_class.Tbl.make 0 in
   Stack_class.Tbl.copy_values ~from:fundecl.fun_num_stack_slots
-    ~to_:env.num_stack_slots;
-  emit_named_text_section env.function_name;
+    ~to_:num_stack_slots;
+  let env =
+    Env.create ~fastcode_flag:fundecl.fun_fast ~num_stack_slots
+      ~prologue_required:fundecl.fun_prologue_required
+      ~contains_calls:fundecl.fun_contains_calls ~function_name:fundecl.fun_name
+      ~tailrec_entry_point:
+        (Option.map
+           (label_to_asm_label ~section:Text)
+           fundecl.fun_tailrec_entry_point_label)
+  in
+  emit_named_text_section (Env.function_name env);
   let fun_sym = S.create_global fundecl.fun_name in
   D.align ~fill:Nop ~bytes:8;
   global_maybe_protected fun_sym;
@@ -1978,10 +2058,10 @@ let fundecl fundecl =
   D.cfi_startproc ();
   let num_call_gc = branch_relax env fundecl.fun_body in
   emit_all env fundecl.fun_body;
-  List.iter emit_call_gc env.call_gc_sites;
-  List.iter emit_local_realloc env.local_realloc_sites;
+  List.iter emit_call_gc (Env.call_gc_sites env);
+  List.iter emit_local_realloc (Env.local_realloc_sites env);
   emit_stack_realloc env;
-  assert (List.length env.call_gc_sites = num_call_gc);
+  assert (List.length (Env.call_gc_sites env) = num_call_gc);
   (match fun_end_label with
   | None -> ()
   | Some fun_end_label ->
