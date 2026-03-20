@@ -471,7 +471,7 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
            (Mode.Modality.Comonadic.Atom.Meet_const
               (statefulness x)))
   in
-  Mode.Crossing.pack ~monadic ~comonadic
+  pack ~monadic ~comonadic
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention
     ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality

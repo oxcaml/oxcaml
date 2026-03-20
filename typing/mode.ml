@@ -4741,8 +4741,6 @@ module Modality = struct
 
       let id = Join_const Mode.Const.min
 
-      let is_id t = t = id
-
       let max = Join_const Mode.Const.max
 
       let sub left right : (_, error) Result.t =
@@ -4886,8 +4884,6 @@ module Modality = struct
       type t = Meet_const of Mode.Const.t [@@unboxed]
 
       let id = Meet_const Mode.Const.max
-
-      let is_id t = t = id
 
       let max = Meet_const Mode.Const.max
 
@@ -5086,14 +5082,26 @@ module Modality = struct
     module Monadic = Monadic.Const
     module Comonadic = Comonadic.Const
 
-    type t = (Monadic.t, Comonadic.t) monadic_comonadic
+    type repr = (Monadic.t, Comonadic.t) monadic_comonadic
 
-    let id = { monadic = Monadic.id; comonadic = Comonadic.id }
+    type t = Value.Const.t
 
-    let is_id { monadic; comonadic } =
-      Monadic.is_id monadic && Comonadic.is_id comonadic
+    let encode
+        ({ monadic = Join_const monadic; comonadic = Meet_const comonadic } :
+          repr) : t =
+      Value.Const.merge { monadic; comonadic }
+
+    let split (t : t) : repr =
+      let { monadic; comonadic } = Value.Const.split t in
+      { monadic = Join_const monadic; comonadic = Meet_const comonadic }
+
+    let id = encode { monadic = Monadic.id; comonadic = Comonadic.id }
+
+    let is_id t = t = id
 
     let sub t1 t2 : (unit, error) Result.t =
+      let t1 = split t1 in
+      let t2 = split t2 in
       match Monadic.sub t1.monadic t2.monadic with
       | Error (Error (ax, e)) -> Error (Error (Monadic ax, e))
       | Ok () -> (
@@ -5104,6 +5112,7 @@ module Modality = struct
     let equate = equate_from_submode' sub
 
     let apply ?hint t { monadic; comonadic } =
+      let t = split t in
       let monadic =
         Monadic.apply
           ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
@@ -5117,19 +5126,24 @@ module Modality = struct
       { monadic; comonadic }
 
     let concat ~then_ t =
+      let then_ = split then_ in
+      let t = split t in
       let monadic = Monadic.concat ~then_:then_.monadic t.monadic in
       let comonadic = Comonadic.concat ~then_:then_.comonadic t.comonadic in
-      { monadic; comonadic }
+      encode { monadic; comonadic }
 
-    let proj (type a) (ax : a Axis.t) { monadic; comonadic } : a =
+    let proj (type a) (ax : a Axis.t) (t : t) : a =
+      let { monadic; comonadic } = split t in
       match ax with
       | Monadic ax -> Monadic.proj ax monadic
       | Comonadic ax -> Comonadic.proj ax comonadic
 
-    let set (type a) (ax : a Axis.t) (a : a) { monadic; comonadic } : t =
+    let set (type a) (ax : a Axis.t) (a : a) (t : t) : t =
+      let { monadic; comonadic } = split t in
       match ax with
-      | Monadic ax -> { monadic = Monadic.set ax a monadic; comonadic }
-      | Comonadic ax -> { monadic; comonadic = Comonadic.set ax a comonadic }
+      | Monadic ax -> encode { monadic = Monadic.set ax a monadic; comonadic }
+      | Comonadic ax ->
+        encode { monadic; comonadic = Comonadic.set ax a comonadic }
 
     let diff t1 t2 =
       List.filter_map
@@ -5140,7 +5154,8 @@ module Modality = struct
           if a1 = a2 then None else Some (Atom (ax, a2)))
         Value.Axis.all
 
-    let print ppf { monadic; comonadic } =
+    let print ppf t =
+      let { monadic; comonadic } = split t in
       Fmt.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
   end
 
@@ -5194,23 +5209,24 @@ module Modality = struct
     let { monadic; comonadic } = t in
     let comonadic = Comonadic.zap_to_id comonadic in
     let monadic = Monadic.zap_to_id monadic in
-    { monadic; comonadic }
+    Const.encode { monadic; comonadic }
 
   let zap_to_floor t =
     let { monadic; comonadic } = t in
     let comonadic = Comonadic.zap_to_floor comonadic in
     let monadic = Monadic.zap_to_floor monadic in
-    { monadic; comonadic }
+    Const.encode { monadic; comonadic }
 
   let to_const_opt t =
     let { monadic; comonadic } = t in
     Option.bind (Comonadic.to_const_opt comonadic) (fun comonadic ->
         Option.bind (Monadic.to_const_opt monadic) (fun monadic ->
-            Some { monadic; comonadic }))
+            Some (Const.encode { monadic; comonadic })))
 
   let to_const_exn t = t |> to_const_opt |> Option.get
 
-  let of_const { monadic; comonadic } =
+  let of_const c =
+    let { monadic; comonadic } = Const.split c in
     let comonadic = Comonadic.of_const comonadic in
     let monadic = Monadic.of_const monadic in
     { monadic; comonadic }
@@ -5571,14 +5587,29 @@ module Crossing = struct
     let compare_obj = Axis.compare
   end
 
-  type t = (Monadic.t, Comonadic.t) monadic_comonadic
+  type repr = (Monadic.t, Comonadic.t) monadic_comonadic
 
-  let modality m { monadic; comonadic } =
+  type t = Value.Const.t
+
+  let pack ~monadic:(Monadic.Modality (Join_const monadic))
+      ~comonadic:(Comonadic.Modality (Meet_const comonadic)) : t =
+    Value.Const.merge { monadic; comonadic }
+
+  let split (t : t) : repr =
+    let { monadic; comonadic } = Value.Const.split t in
+    { monadic = Monadic.Modality (Join_const monadic);
+      comonadic = Comonadic.Modality (Meet_const comonadic)
+    }
+
+  let modality (m : Modality.Const.t) t =
+    let m = Modality.Const.split m in
+    let { monadic; comonadic } = split t in
     let monadic = Monadic.modality m.monadic monadic in
     let comonadic = Comonadic.modality m.comonadic comonadic in
-    { monadic; comonadic }
+    pack ~monadic ~comonadic
 
   let apply_left_unhint t { monadic; comonadic } =
+    let t = split t in
     let monadic = Monadic.apply_left t.monadic monadic in
     let comonadic = Comonadic.apply_left t.comonadic comonadic in
     { monadic; comonadic }
@@ -5588,6 +5619,7 @@ module Crossing = struct
     |> Value.hint ~monadic:Crossing ~comonadic:Crossing
 
   let apply_right_unhint t { monadic; comonadic } =
+    let t = split t in
     let monadic = Monadic.apply_right t.monadic monadic in
     let comonadic = Comonadic.apply_right t.comonadic comonadic in
     { monadic; comonadic }
@@ -5621,6 +5653,7 @@ module Crossing = struct
 
   let apply_left_right_alloc t m =
     let { monadic; comonadic } = Alloc.unhint m in
+    let t = split t in
     let monadic = Monadic.apply_right t.monadic monadic in
     let comonadic =
       comonadic |> comonadic_locality_as_regionality
@@ -5630,40 +5663,44 @@ module Crossing = struct
     in
     Alloc.hint ~monadic:Crossing ~comonadic:Crossing { monadic; comonadic }
 
-  let pack ~monadic ~comonadic : t = { monadic; comonadic }
-
   let le t1 t2 =
+    let t1 = split t1 in
+    let t2 = split t2 in
     Monadic.le t1.monadic t2.monadic && Comonadic.le t1.comonadic t2.comonadic
 
-  let max = { monadic = Monadic.max; comonadic = Comonadic.max }
+  let max = pack ~monadic:Monadic.max ~comonadic:Comonadic.max
 
-  let min = { monadic = Monadic.min; comonadic = Comonadic.min }
+  let min = pack ~monadic:Monadic.min ~comonadic:Comonadic.min
 
   let join t1 t2 =
-    { monadic = Monadic.join t1.monadic t2.monadic;
-      comonadic = Comonadic.join t1.comonadic t2.comonadic
-    }
+    let t1 = split t1 in
+    let t2 = split t2 in
+    pack
+      ~monadic:(Monadic.join t1.monadic t2.monadic)
+      ~comonadic:(Comonadic.join t1.comonadic t2.comonadic)
 
   let meet t1 t2 =
-    { monadic = Monadic.meet t1.monadic t2.monadic;
-      comonadic = Comonadic.meet t1.comonadic t2.comonadic
-    }
+    let t1 = split t1 in
+    let t2 = split t2 in
+    pack
+      ~monadic:(Monadic.meet t1.monadic t2.monadic)
+      ~comonadic:(Comonadic.meet t1.comonadic t2.comonadic)
 
   let equal t1 t2 = le t1 t2 && le t2 t1
 
-  let[@inline available] proj (type a) (ax : a Axis.t) { monadic; comonadic } :
-      a =
+  let[@inline available] proj (type a) (ax : a Axis.t) (t : t) : a =
+    let { monadic; comonadic } = split t in
     match ax with
     | Monadic ax -> (Monadic.proj [@inlined hint]) ax monadic
     | Comonadic ax -> (Comonadic.proj [@inlined hint]) ax comonadic
 
-  let[@inline available] set (type a) (ax : a Axis.t) (a : a)
-      { monadic; comonadic } : t =
+  let[@inline available] set (type a) (ax : a Axis.t) (a : a) (t : t) : t =
+    let { monadic; comonadic } = split t in
     match ax with
     | Monadic ax ->
-      { monadic = (Monadic.set [@inlined hint]) ax a monadic; comonadic }
+      pack ~monadic:((Monadic.set [@inlined hint]) ax a monadic) ~comonadic
     | Comonadic ax ->
-      { monadic; comonadic = (Comonadic.set [@inlined hint]) ax a comonadic }
+      pack ~monadic ~comonadic:((Comonadic.set [@inlined hint]) ax a comonadic)
 
   let create ~regionality ~linearity ~uniqueness ~portability ~contention
       ~forkable ~yielding ~statefulness ~visibility ~staticity =
@@ -5690,7 +5727,7 @@ module Crossing = struct
       Comonadic.create ~regionality ~linearity ~portability ~yielding ~forkable
         ~statefulness
     in
-    { monadic; comonadic }
+    pack ~monadic ~comonadic
 
   let print ppf t =
     let l =
@@ -5705,9 +5742,11 @@ module Crossing = struct
     in
     Fmt.(pp_print_list ~pp_sep:pp_print_space pp_print_string ppf l)
 
-  let to_modality
-      { monadic = Monadic.Modality monadic;
-        comonadic = Comonadic.Modality comonadic
-      } =
-    { monadic; comonadic }
+  let to_modality (t : t) =
+    let { monadic = Monadic.Modality monadic;
+          comonadic = Comonadic.Modality comonadic
+        } =
+      split t
+    in
+    Modality.Const.encode { monadic; comonadic }
 end
