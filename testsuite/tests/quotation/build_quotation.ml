@@ -1399,7 +1399,7 @@ Uncaught exception: Misc.Fatal_error
     fun #(x, y) -> x
    in f ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 17-22]: no support for jkind annotations in this position.
+>> Fatal error: Translquote [at Line 1, characters 30-39]: no support for jkind annotations in this position.
 Uncaught exception: Misc.Fatal_error
 
 |}];;

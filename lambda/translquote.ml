@@ -2736,11 +2736,15 @@ let assert_no_modes modes =
 
 let assert_no_jkinds jkind =
   Option.iter
-    (fun ({ pjka_loc; pjka_desc = _ } : Parsetree.jkind_annotation) ->
-      fatal_errorf
-        "Translquote [at %a]: no support for jkind annotations in this \
-         position."
-        Location.print_loc pjka_loc)
+    (fun ({ pjka_loc; pjka_desc } : Parsetree.jkind_annotation) ->
+      (* Naively check if the jkind annotation is trivial *)
+      match pjka_desc with
+      | Pjk_abbreviation ({ loc = _; txt = Lident "value" }, []) -> ()
+      | _ ->
+        fatal_errorf
+          "Translquote [at %a]: no support for jkind annotations in this \
+           position."
+          Location.print_loc pjka_loc)
     jkind
 
 let rec quote_module_path loc = function
@@ -2766,7 +2770,9 @@ let rec quote_module_path loc = function
 let type_for_annotation ~env ~loc typ =
   let unwrap_univar ty =
     match get_desc ty with
-    | Tunivar { name = Some name; jkind } -> Some (name, jkind.annotation)
+    | Tunivar { name = Some name; jkind } ->
+      assert_no_jkinds jkind.annotation;
+      Some (name, jkind.annotation)
     | Tunivar { name = None; jkind = _ } -> None
     | _ ->
       fatal_errorf
@@ -2778,13 +2784,17 @@ let type_for_annotation ~env ~loc typ =
     match get_desc ty with Tvar _ | Tunivar _ -> false | _ -> true
   in
   let rec go aliased ty =
+    (* CR metaprogramming jbachurski: Once jkind annotations are supported
+       in quotes, we should use [any] wildcards. *)
     let ctyp_desc =
       if aliasable ty && List.memq ty aliased
-      then Ttyp_var (None, (Jkind.Builtin.any ~why:Wildcard).annotation)
+      then Ttyp_var (None, None)
+      (* then Ttyp_var (None, (Jkind.Builtin.any ~why:Wildcard).annotation) *)
       else
         let go = go (ty :: aliased) in
         match get_desc ty with
         | Tvar { name = _; jkind } | Tof_kind jkind ->
+          assert_no_jkinds jkind.annotation;
           Ttyp_var (None, jkind.annotation)
         | Tunivar _ ->
           let name, jkind_annotation = unwrap_univar ty |> Option.get in
