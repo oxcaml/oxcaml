@@ -13,6 +13,11 @@ type t : value non_pointer
 type t : value non_pointer
 |}]
 
+type t : value pointer
+[%%expect{|
+type t : value pointer
+|}]
+
 type t : immutable_data non_pointer
 [%%expect{|
 type t : immutable_data non_pointer
@@ -21,6 +26,11 @@ type t : immutable_data non_pointer
 type ('a : any non_pointer, 'b : any maybe_pointer, 'c : any) t;;
 [%%expect{|
 type ('a : any non_pointer, 'b : any, 'c : any) t
+|}]
+
+type ('a : any pointer, 'b : any maybe_pointer, 'c : any) t;;
+[%%expect{|
+type ('a : any pointer, 'b : any, 'c : any) t
 |}]
 
 type t : value non_pointer & value maybe_pointer & float64
@@ -36,41 +46,53 @@ type t : value non_pointer & value & float64
 
 type t_maybeptr : any maybe_pointer
 type t_nonptr : any non_pointer
+type t_ptr : any pointer
 [%%expect{|
 type t_maybeptr : any
 type t_nonptr : any non_pointer
+type t_ptr : any pointer
 |}]
 
 type t_maybeptr_val : value maybe_pointer
 type t_nonptr_val : value non_pointer
+type t_ptr_val : value pointer
 [%%expect{|
 type t_maybeptr_val
 type t_nonptr_val : value non_pointer
+type t_ptr_val : value pointer
 |}]
 
 type ('a : any maybe_pointer) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
+type ('a : any pointer) accepts_ptr
 [%%expect{|
 type ('a : any) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
+type ('a : any pointer) accepts_ptr
 |}]
 
 type ('a : value maybe_pointer) accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
+type ('a : value pointer) accepts_ptr_val
 [%%expect{|
 type 'a accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
+type ('a : value pointer) accepts_ptr_val
 |}]
 
 type succeeds = t_maybeptr accepts_maybeptr
 type succeeds = t_nonptr accepts_maybeptr
+type succeeds = t_ptr accepts_maybeptr
 type succeeds = t_maybeptr_val accepts_maybeptr_val
 type succeeds = t_nonptr_val accepts_maybeptr_val
+type succeeds = t_ptr_val accepts_maybeptr_val
 [%%expect{|
 type succeeds = t_maybeptr accepts_maybeptr
 type succeeds = t_nonptr accepts_maybeptr
+type succeeds = t_ptr accepts_maybeptr
 type succeeds = t_maybeptr_val accepts_maybeptr_val
 type succeeds = t_nonptr_val accepts_maybeptr_val
+type succeeds = t_ptr_val accepts_maybeptr_val
 |}]
 
 type fails = t_maybeptr accepts_nonptr
@@ -88,6 +110,35 @@ Error: This type "t_maybeptr" should be an instance of type
 type succeeds = t_nonptr accepts_nonptr
 [%%expect{|
 type succeeds = t_nonptr accepts_nonptr
+|}]
+
+type succeeds = t_ptr accepts_ptr
+[%%expect{|
+type succeeds = t_ptr accepts_ptr
+|}]
+
+type fails = t_ptr accepts_nonptr
+[%%expect{|
+Line 1, characters 13-18:
+1 | type fails = t_ptr accepts_nonptr
+                 ^^^^^
+Error: This type "t_ptr" should be an instance of type "('a : any non_pointer)"
+       The layout of t_ptr is any pointer
+         because of the definition of t_ptr at line 3, characters 0-24.
+       But the layout of t_ptr must be a sublayout of any non_pointer
+         because of the definition of accepts_nonptr at line 2, characters 0-42.
+|}]
+
+type fails = t_nonptr accepts_ptr
+[%%expect{|
+Line 1, characters 13-21:
+1 | type fails = t_nonptr accepts_ptr
+                 ^^^^^^^^
+Error: This type "t_nonptr" should be an instance of type "('a : any pointer)"
+       The layout of t_nonptr is any non_pointer
+         because of the definition of t_nonptr at line 2, characters 0-31.
+       But the layout of t_nonptr must be a sublayout of any pointer
+         because of the definition of accepts_ptr at line 3, characters 0-35.
 |}]
 
 type fails = t_maybeptr_val accepts_nonptr_val
@@ -108,6 +159,11 @@ type succeeds = t_nonptr_val accepts_nonptr_val
 type succeeds = t_nonptr_val accepts_nonptr_val
 |}]
 
+type succeeds = t_ptr_val accepts_ptr_val
+[%%expect{|
+type succeeds = t_ptr_val accepts_ptr_val
+|}]
+
 type succeeds = t_nonptr_val accepts_nonptr
 type fails = t_nonptr accepts_nonptr_val
 [%%expect{|
@@ -121,6 +177,32 @@ Error: This type "t_nonptr" should be an instance of type
          because of the definition of t_nonptr at line 2, characters 0-31.
        But the layout of t_nonptr must be a sublayout of value non_pointer
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
+|}]
+
+type fails = t_ptr_val accepts_nonptr_val
+[%%expect{|
+Line 1, characters 13-22:
+1 | type fails = t_ptr_val accepts_nonptr_val
+                 ^^^^^^^^^
+Error: This type "t_ptr_val" should be an instance of type
+         "('a : value non_pointer)"
+       The layout of t_ptr_val is value pointer
+         because of the definition of t_ptr_val at line 3, characters 0-30.
+       But the layout of t_ptr_val must be a sublayout of value non_pointer
+         because of the definition of accepts_nonptr_val at line 2, characters 0-48.
+|}]
+
+type fails = t_nonptr_val accepts_ptr_val
+[%%expect{|
+Line 1, characters 13-25:
+1 | type fails = t_nonptr_val accepts_ptr_val
+                 ^^^^^^^^^^^^
+Error: This type "t_nonptr_val" should be an instance of type
+         "('a : value pointer)"
+       The layout of t_nonptr_val is value non_pointer
+         because of the definition of t_nonptr_val at line 2, characters 0-37.
+       But the layout of t_nonptr_val must be a sublayout of value pointer
+         because of the definition of accepts_ptr_val at line 3, characters 0-41.
 |}]
 
 (* when the layout is not value, the scannable axes should not be relevant *)

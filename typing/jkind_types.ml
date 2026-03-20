@@ -877,6 +877,9 @@ module Layout = struct
       let value_non_pointer =
         Base (Sort.Value, { pointerness = Pointerness.Non_pointer })
 
+      let value_pointer =
+        Base (Sort.Value, { pointerness = Pointerness.Pointer })
+
       let value_maybe_pointer =
         Base (Sort.Value, { pointerness = Pointerness.Maybe_pointer })
 
@@ -907,6 +910,7 @@ module Layout = struct
       let of_base (b : Sort.base) (sa : Scannable_axes.t) =
         match b, sa with
         | Value, { pointerness = Pointerness.Non_pointer } -> value_non_pointer
+        | Value, { pointerness = Pointerness.Pointer } -> value_pointer
         | Value, { pointerness = Pointerness.Maybe_pointer } ->
           value_maybe_pointer
         | Void, _ -> void

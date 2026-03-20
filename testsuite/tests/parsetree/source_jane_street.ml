@@ -171,10 +171,12 @@ type ('a, 'b : float64, 'c : any, 'd, 'e, 'f, 'g, 'h, 'i, 'j : bits64, 'k,
 type t15 : any non_pointer
 type t16 : value non_pointer
 type t17 : value & value non_pointer
+type t18 : value pointer
 [%%expect{|
 type t15 : any non_pointer
 type t16 : value non_pointer
 type t17 : value & value non_pointer
+type t18 : value pointer
 |}]
 
 type t = #(int * float#)
