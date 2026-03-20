@@ -2933,7 +2933,7 @@ and quote_value_pattern ~scopes p =
           pats
       in
       Pat.tuple loc pats
-    | Tpat_construct (lid, constr, args, _) ->
+    | Tpat_construct (lid, constr, args, None) ->
       let constr = quote_constructor env (of_location ~scopes lid.loc) constr in
       let args =
         match args with
@@ -2948,6 +2948,11 @@ and quote_value_pattern ~scopes p =
           Some (Pat.tuple loc with_labels |> Pat.wrap)
       in
       Pat.construct loc constr args
+    | Tpat_construct (_, _, _, Some _) ->
+      fatal_errorf
+        "Translquote [at %a]:@ Constructor patterns introducing locally \
+         abstract types are not supported in quotes."
+        Location.print_loc (to_location loc)
     | Tpat_variant (variant, argo, _) ->
       let argo = Option.map (quote_value_pattern ~scopes) argo in
       Pat.variant loc (Variant.of_string loc variant |> Variant.wrap) argo
