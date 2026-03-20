@@ -18,7 +18,7 @@ Error: This variant or record definition does not match that of type
          "'a or_null"
        Their internal representations differ:
        the original definition has a constructor represented as a null pointer.
-       Hint: add [@@or_null_reexport].
+       Hint: add [@@or_null] or [@@or_null_reexport].
 |}]
 
 module Or_null = struct
