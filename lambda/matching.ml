@@ -1995,25 +1995,36 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
   if cstr.cstr_inlined <> None then
     (arg, str, sort, layout) :: rem
   else
-    match cstr.cstr_repr with
-    | Variant_boxed _ ->
+    match Types.constructor_runtime_representation_of_constructor cstr with
+    | Some (Types.Constructor_boxed _) ->
       List.mapi
       (fun i { ca_sort } ->
          make_field_access str ca_sort ~field:i ~pos:i)
       cstr.cstr_args
         @ rem
-    | Variant_unboxed | Variant_erased _ ->
+    | Some
+        ( Types.Constructor_unboxed
+        | Types.Constructor_value
+        | Types.Constructor_immediate
+        | Types.Constructor_pointer ) ->
       if cstr.cstr_constant then
         rem (* [Null] constructor case. *)
       else
         (arg, str, sort, layout) :: rem
         (* the unboxed variant constructor or an erased payload constructor. *)
-    | Variant_extensible ->
+    | Some Types.Constructor_null ->
+      rem
+    | None ->
+      begin match cstr.cstr_repr with
+      | Variant_extensible ->
         List.mapi
           (fun i { ca_sort } ->
              make_field_access str ca_sort ~field:i ~pos:(i+1))
           cstr.cstr_args
         @ rem
+      | Variant_boxed _ | Variant_unboxed | Variant_erased _ ->
+        assert false
+      end
 
 let divide_constructor ~scopes ctx pm =
   divide
