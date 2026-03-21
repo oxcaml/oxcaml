@@ -124,6 +124,16 @@ let check_of_axis_set () =
              (to_string actual)))
     all_axis_sets
 
+let check_value_comonadic_roundtrip repr =
+  let encoded = Mode.Value.Comonadic.encode repr in
+  let decoded = Mode.Value.Comonadic.decode encoded in
+  if decoded <> repr then failwith "value comonadic roundtrip failed"
+
+let check_alloc_comonadic_roundtrip repr =
+  let encoded = Mode.Alloc.Comonadic.encode repr in
+  let decoded = Mode.Alloc.Comonadic.decode encoded in
+  if decoded <> repr then failwith "alloc comonadic roundtrip failed"
+
 let () =
   check_values "areality"
     (fun sample areality -> { sample with areality })
@@ -178,4 +188,44 @@ let () =
     [ Jkind_axis.Separability.Non_float;
       Jkind_axis.Separability.Separable;
       Jkind_axis.Separability.Maybe_separable ];
-  check_of_axis_set ()
+  check_of_axis_set ();
+  check_value_comonadic_roundtrip
+    { areality = Mode.Regionality.Const.Global;
+      linearity = Mode.Linearity.Const.Many;
+      portability = Mode.Portability.Const.Portable;
+      forkable = Mode.Forkable.Const.Forkable;
+      yielding = Mode.Yielding.Const.Unyielding;
+      statefulness = Mode.Statefulness.Const.Stateless
+    };
+  check_value_comonadic_roundtrip
+    { areality = Mode.Regionality.Const.Regional;
+      linearity = Mode.Linearity.Const.Once;
+      portability = Mode.Portability.Const.Shareable;
+      forkable = Mode.Forkable.Const.Unforkable;
+      yielding = Mode.Yielding.Const.Yielding;
+      statefulness = Mode.Statefulness.Const.Observing
+    };
+  check_value_comonadic_roundtrip
+    { areality = Mode.Regionality.Const.Local;
+      linearity = Mode.Linearity.Const.Once;
+      portability = Mode.Portability.Const.Nonportable;
+      forkable = Mode.Forkable.Const.Unforkable;
+      yielding = Mode.Yielding.Const.Yielding;
+      statefulness = Mode.Statefulness.Const.Stateful
+    };
+  check_alloc_comonadic_roundtrip
+    { areality = Mode.Locality.Const.Global;
+      linearity = Mode.Linearity.Const.Many;
+      portability = Mode.Portability.Const.Portable;
+      forkable = Mode.Forkable.Const.Forkable;
+      yielding = Mode.Yielding.Const.Unyielding;
+      statefulness = Mode.Statefulness.Const.Stateless
+    };
+  check_alloc_comonadic_roundtrip
+    { areality = Mode.Locality.Const.Local;
+      linearity = Mode.Linearity.Const.Once;
+      portability = Mode.Portability.Const.Nonportable;
+      forkable = Mode.Forkable.Const.Unforkable;
+      yielding = Mode.Yielding.Const.Yielding;
+      statefulness = Mode.Statefulness.Const.Stateful
+    }

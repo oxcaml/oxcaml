@@ -737,6 +737,10 @@ module Lattices = struct
 
     let[@inline] staticity (m : t) = Monadic_bits.staticity m.bits
 
+    let[@inline] of_bits bits : t = { bits }
+
+    let[@inline] to_bits ({ bits } : t) = bits
+
     let[@inline] set_uniqueness uniqueness m =
       { bits = Monadic_bits.set_uniqueness uniqueness m.bits }
 
@@ -877,49 +881,41 @@ module Lattices = struct
         (level_of_statefulness s) m
   end
 
-  type 'areality comonadic_with = { value : 'areality comonadic_with_repr }
-  [@@unboxed]
+  module Comonadic_locality_bits = Comonadic_bits (Locality)
+  module Comonadic_regionality_bits = Comonadic_bits (Regionality)
 
-  let[@inline] comonadic_areality (m : 'a comonadic_with) = m.value.areality
-
-  let[@inline] comonadic_linearity (m : 'a comonadic_with) = m.value.linearity
-
-  let[@inline] comonadic_portability (m : 'a comonadic_with) =
-    m.value.portability
-
-  let[@inline] comonadic_forkable (m : 'a comonadic_with) = m.value.forkable
-
-  let[@inline] comonadic_yielding (m : 'a comonadic_with) = m.value.yielding
-
-  let[@inline] comonadic_statefulness (m : 'a comonadic_with) =
-    m.value.statefulness
-
-  let[@inline] set_comonadic_areality areality m =
-    { value = { m.value with areality } }
-
-  let[@inline] set_comonadic_linearity linearity m =
-    { value = { m.value with linearity } }
-
-  let[@inline] set_comonadic_portability portability m =
-    { value = { m.value with portability } }
-
-  let[@inline] set_comonadic_forkable forkable m =
-    { value = { m.value with forkable } }
-
-  let[@inline] set_comonadic_yielding yielding m =
-    { value = { m.value with yielding } }
-
-  let[@inline] set_comonadic_statefulness statefulness m =
-    { value = { m.value with statefulness } }
+  type 'areality comonadic_with = { bits : Modal_bit_layout.t } [@@unboxed]
 
   module Comonadic_with (Areality : Areality) = struct
     type t = Areality.t comonadic_with
 
     type repr = Areality.t comonadic_with_repr
 
-    let[@inline] encode (m : repr) : t = { value = m }
+    let[@inline] encode
+        ({ areality; linearity; portability; forkable; yielding; statefulness } :
+          repr) : t =
+      let module Bits = Comonadic_bits (Areality) in
+      { bits =
+          Modal_bit_layout.empty |> Bits.set_areality areality
+          |> Bits.set_linearity linearity
+          |> Bits.set_portability portability
+          |> Bits.set_forkable forkable |> Bits.set_yielding yielding
+          |> Bits.set_statefulness statefulness
+      }
 
-    let[@inline] decode (m : t) : repr = m.value
+    let[@inline] decode ({ bits } : t) : repr =
+      let module Bits = Comonadic_bits (Areality) in
+      { areality = Bits.areality bits;
+        linearity = Bits.linearity bits;
+        portability = Bits.portability bits;
+        forkable = Bits.forkable bits;
+        yielding = Bits.yielding bits;
+        statefulness = Bits.statefulness bits
+      }
+
+    let[@inline] of_bits bits : t = { bits }
+
+    let[@inline] to_bits ({ bits } : t) = bits
 
     let min =
       encode
@@ -951,85 +947,16 @@ module Lattices = struct
           statefulness = Statefulness.legacy
         }
 
-    let le m1 m2 =
-      let m1 = decode m1 in
-      let m2 = decode m2 in
-      let { areality = areality1;
-            linearity = linearity1;
-            portability = portability1;
-            forkable = forkable1;
-            yielding = yielding1;
-            statefulness = statefulness1
-          } =
-        m1
-      in
-      let { areality = areality2;
-            linearity = linearity2;
-            portability = portability2;
-            forkable = forkable2;
-            yielding = yielding2;
-            statefulness = statefulness2
-          } =
-        m2
-      in
-      Areality.le areality1 areality2
-      && Linearity.le linearity1 linearity2
-      && Portability.le portability1 portability2
-      && Forkable.le forkable1 forkable2
-      && Yielding.le yielding1 yielding2
-      && Statefulness.le statefulness1 statefulness2
+    let le ({ bits = m1 } : t) ({ bits = m2 } : t) = Modal_bit_layout.le m1 m2
 
-    let equal m1 m2 =
-      let m1 = decode m1 in
-      let m2 = decode m2 in
-      let { areality = areality1;
-            linearity = linearity1;
-            portability = portability1;
-            forkable = forkable1;
-            yielding = yielding1;
-            statefulness = statefulness1
-          } =
-        m1
-      in
-      let { areality = areality2;
-            linearity = linearity2;
-            portability = portability2;
-            forkable = forkable2;
-            yielding = yielding2;
-            statefulness = statefulness2
-          } =
-        m2
-      in
-      Areality.equal areality1 areality2
-      && Linearity.equal linearity1 linearity2
-      && Portability.equal portability1 portability2
-      && Forkable.equal forkable1 forkable2
-      && Yielding.equal yielding1 yielding2
-      && Statefulness.equal statefulness1 statefulness2
+    let equal ({ bits = m1 } : t) ({ bits = m2 } : t) =
+      Modal_bit_layout.equal m1 m2
 
-    let join m1 m2 =
-      let m1 = decode m1 in
-      let m2 = decode m2 in
-      let areality = Areality.join m1.areality m2.areality in
-      let linearity = Linearity.join m1.linearity m2.linearity in
-      let portability = Portability.join m1.portability m2.portability in
-      let forkable = Forkable.join m1.forkable m2.forkable in
-      let yielding = Yielding.join m1.yielding m2.yielding in
-      let statefulness = Statefulness.join m1.statefulness m2.statefulness in
-      encode
-        { areality; linearity; portability; forkable; yielding; statefulness }
+    let join ({ bits = m1 } : t) ({ bits = m2 } : t) =
+      { bits = Modal_bit_layout.union m1 m2 }
 
-    let meet m1 m2 =
-      let m1 = decode m1 in
-      let m2 = decode m2 in
-      let areality = Areality.meet m1.areality m2.areality in
-      let linearity = Linearity.meet m1.linearity m2.linearity in
-      let portability = Portability.meet m1.portability m2.portability in
-      let forkable = Forkable.meet m1.forkable m2.forkable in
-      let yielding = Yielding.meet m1.yielding m2.yielding in
-      let statefulness = Statefulness.meet m1.statefulness m2.statefulness in
-      encode
-        { areality; linearity; portability; forkable; yielding; statefulness }
+    let meet ({ bits = m1 } : t) ({ bits = m2 } : t) =
+      { bits = Modal_bit_layout.inter m1 m2 }
 
     let imply m1 m2 =
       let m1 = decode m1 in
@@ -1440,33 +1367,93 @@ module Lattices_mono = struct
       | Staticity, _ -> .
       | _, Staticity -> .
 
-    let proj : type p r. (p, r) t -> p -> r =
-     fun ax t ->
+    let proj : type p r. p obj -> (p, r) t -> p -> r =
+     fun obj ax t ->
       match ax with
-      | Areality -> comonadic_areality t
-      | Linearity -> comonadic_linearity t
-      | Portability -> comonadic_portability t
-      | Forkable -> comonadic_forkable t
-      | Yielding -> comonadic_yielding t
-      | Statefulness -> comonadic_statefulness t
-      | Uniqueness -> Monadic.uniqueness t
-      | Contention -> Monadic.contention t
-      | Visibility -> Monadic.visibility t
-      | Staticity -> Monadic.staticity t
+      | Areality -> (
+        match obj with
+        | Comonadic_with_locality ->
+          Locality.decode_raw_level
+            (Modal_bit_layout.get_level Modal_bit_layout.Areality t.bits)
+        | Comonadic_with_regionality ->
+          Regionality.decode_raw_level
+            (Modal_bit_layout.get_level Modal_bit_layout.Areality t.bits))
+      | Linearity -> (
+        match obj with
+        | Comonadic_with_locality -> Comonadic_locality_bits.linearity t.bits
+        | Comonadic_with_regionality ->
+          Comonadic_regionality_bits.linearity t.bits)
+      | Portability -> (
+        match obj with
+        | Comonadic_with_locality -> Comonadic_locality_bits.portability t.bits
+        | Comonadic_with_regionality ->
+          Comonadic_regionality_bits.portability t.bits)
+      | Forkable -> (
+        match obj with
+        | Comonadic_with_locality -> Comonadic_locality_bits.forkable t.bits
+        | Comonadic_with_regionality ->
+          Comonadic_regionality_bits.forkable t.bits)
+      | Yielding -> (
+        match obj with
+        | Comonadic_with_locality -> Comonadic_locality_bits.yielding t.bits
+        | Comonadic_with_regionality ->
+          Comonadic_regionality_bits.yielding t.bits)
+      | Statefulness -> (
+        match obj with
+        | Comonadic_with_locality -> Comonadic_locality_bits.statefulness t.bits
+        | Comonadic_with_regionality ->
+          Comonadic_regionality_bits.statefulness t.bits)
+      | Uniqueness -> ( match obj with Monadic_op -> Monadic.uniqueness t)
+      | Contention -> ( match obj with Monadic_op -> Monadic.contention t)
+      | Visibility -> ( match obj with Monadic_op -> Monadic.visibility t)
+      | Staticity -> ( match obj with Monadic_op -> Monadic.staticity t)
 
-    let set : type p r. (p, r) t -> r -> p -> p =
-     fun ax r t ->
+    let set : type p r. p obj -> (p, r) t -> r -> p -> p =
+     fun obj ax r t ->
       match ax with
-      | Areality -> set_comonadic_areality r t
-      | Linearity -> set_comonadic_linearity r t
-      | Portability -> set_comonadic_portability r t
-      | Forkable -> set_comonadic_forkable r t
-      | Yielding -> set_comonadic_yielding r t
-      | Statefulness -> set_comonadic_statefulness r t
-      | Uniqueness -> Monadic.set_uniqueness r t
-      | Contention -> Monadic.set_contention r t
-      | Visibility -> Monadic.set_visibility r t
-      | Staticity -> Monadic.set_staticity r t
+      | Areality -> (
+        match obj with
+        | Comonadic_with_locality ->
+          { bits = Comonadic_locality_bits.set_areality r t.bits }
+        | Comonadic_with_regionality ->
+          { bits = Comonadic_regionality_bits.set_areality r t.bits })
+      | Linearity -> (
+        match obj with
+        | Comonadic_with_locality ->
+          { bits = Comonadic_locality_bits.set_linearity r t.bits }
+        | Comonadic_with_regionality ->
+          { bits = Comonadic_regionality_bits.set_linearity r t.bits })
+      | Portability -> (
+        match obj with
+        | Comonadic_with_locality ->
+          { bits = Comonadic_locality_bits.set_portability r t.bits }
+        | Comonadic_with_regionality ->
+          { bits = Comonadic_regionality_bits.set_portability r t.bits })
+      | Forkable -> (
+        match obj with
+        | Comonadic_with_locality ->
+          { bits = Comonadic_locality_bits.set_forkable r t.bits }
+        | Comonadic_with_regionality ->
+          { bits = Comonadic_regionality_bits.set_forkable r t.bits })
+      | Yielding -> (
+        match obj with
+        | Comonadic_with_locality ->
+          { bits = Comonadic_locality_bits.set_yielding r t.bits }
+        | Comonadic_with_regionality ->
+          { bits = Comonadic_regionality_bits.set_yielding r t.bits })
+      | Statefulness -> (
+        match obj with
+        | Comonadic_with_locality ->
+          { bits = Comonadic_locality_bits.set_statefulness r t.bits }
+        | Comonadic_with_regionality ->
+          { bits = Comonadic_regionality_bits.set_statefulness r t.bits })
+      | Uniqueness -> (
+        match obj with Monadic_op -> Monadic.set_uniqueness r t)
+      | Contention -> (
+        match obj with Monadic_op -> Monadic.set_contention r t)
+      | Visibility -> (
+        match obj with Monadic_op -> Monadic.set_visibility r t)
+      | Staticity -> ( match obj with Monadic_op -> Monadic.set_staticity r t)
   end
 
   type ('a, 'b, 'd) morph =
@@ -1619,8 +1606,14 @@ module Lattices_mono = struct
         Map_comonadic f
   end)
 
-  let set_areality : type a1 a2. a2 -> a1 comonadic_with -> a2 comonadic_with =
-   fun areality t -> set_comonadic_areality areality t
+  let set_areality : type a1 a2.
+      a2 comonadic_with obj -> a2 -> a1 comonadic_with -> a2 comonadic_with =
+   fun obj areality t ->
+    match obj with
+    | Comonadic_with_locality ->
+      { bits = Comonadic_locality_bits.set_areality areality t.bits }
+    | Comonadic_with_regionality ->
+      { bits = Comonadic_regionality_bits.set_areality areality t.bits }
 
   let proj_obj : type t r. (t, r) Axis.t -> t obj -> r obj =
    fun ax obj ->
@@ -1909,9 +1902,9 @@ module Lattices_mono = struct
     | Visibility.Read -> Statefulness.Observing
     | Visibility.Read_write -> Statefulness.Stateful
 
-  let min_with dst ax a = Axis.set ax a (min dst)
+  let min_with dst ax a = Axis.set dst ax a (min dst)
 
-  let max_with dst ax a = Axis.set ax a (max dst)
+  let max_with dst ax a = Axis.set dst ax a (max dst)
 
   let monadic_to_comonadic_min : type a.
       a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
@@ -2004,7 +1997,7 @@ module Lattices_mono = struct
       let f' = apply dst f in
       f' (g' a)
     | Id -> a
-    | Proj (_, ax) -> Axis.proj ax a
+    | Proj (src, ax) -> Axis.proj src ax a
     | Max_with ax -> max_with dst ax a
     | Min_with ax -> min_with dst ax a
     | Meet_const c -> meet dst c a
@@ -2019,9 +2012,11 @@ module Lattices_mono = struct
     | Regional_to_global -> regional_to_global a
     | Global_to_regional -> global_to_regional a
     | Map_comonadic f ->
-      let a0 = Axis.proj Areality a in
       let dst0 = proj_obj Areality dst in
-      set_areality (apply dst0 f a0) a
+      let src0 = src dst0 f in
+      let src = comonadic_with_obj src0 in
+      let a0 = Axis.proj src Areality a in
+      set_areality dst (apply dst0 f a0) a
 
   module For_hint = struct
     (** Describes the portion of the input that's responsible for a portion of
@@ -2163,7 +2158,7 @@ module Lattices_mono = struct
       | Some m -> Some (compose dst m g2)
       | None -> None)
     | Proj (mid, ax), Meet_const c ->
-      Some (compose dst (Meet_const (Axis.proj ax c)) (Proj (mid, ax)))
+      Some (compose dst (Meet_const (Axis.proj mid ax c)) (Proj (mid, ax)))
     | Proj (_, ax1), Max_with ax2 -> (
       match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Id)
     | Proj (_, ax1), Min_with ax2 -> (
@@ -2204,18 +2199,20 @@ module Lattices_mono = struct
     | Map_comonadic f, Meet_const c ->
       let dst0 = proj_obj Areality dst in
       let src0 = src dst0 f in
-      let areality = Axis.proj Areality c in
+      let src = comonadic_with_obj src0 in
+      let areality = Axis.proj src Areality c in
       Some
         (compose dst
-           (Meet_const (set_areality (max dst0) c))
+           (Meet_const (set_areality dst (max dst0) c))
            (map_comonadic src0 dst0 (compose dst0 f (Meet_const areality))))
     | Map_comonadic f, Imply_const c ->
       let dst0 = proj_obj Areality dst in
       let src0 = src dst0 f in
-      let areality = Axis.proj Areality c in
+      let src = comonadic_with_obj src0 in
+      let areality = Axis.proj src Areality c in
       Some
         (compose dst
-           (Imply_const (set_areality (max dst0) c))
+           (Imply_const (set_areality dst (max dst0) c))
            (map_comonadic src0 dst0 (compose dst0 f (Imply_const areality))))
     | Regional_to_global, Locality_as_regionality -> Some Id
     | Regional_to_global, Local_to_regional -> Some (Meet_const Locality.Global)
@@ -2340,7 +2337,7 @@ type 'a comonadic_with_repr = 'a C.comonadic_with_repr =
   }
 
 type 'a comonadic_with = 'a C.comonadic_with =
-  { value : 'a comonadic_with_repr }
+  { bits : Misc.Modal_bit_layout.t }
 [@@unboxed]
 
 module Axis = C.Axis
@@ -2430,8 +2427,8 @@ module Report = struct
       | Const c -> Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
         let chosen_hint =
-          let proj1 = Axis.proj ax a1 in
-          let proj2 = Axis.proj ax a2 in
+          let proj1 = Axis.proj obj ax a1 in
+          let proj2 = Axis.proj obj ax a2 in
           let obj = C.proj_obj ax obj in
           match choose_branch_axis b obj proj1 proj2 with
           | `First -> hint1
@@ -2442,7 +2439,7 @@ module Report = struct
     and ahint_prod : type t a l r.
         t C.obj -> (t, a) Axis.t -> (t, l * r) S.ahint -> (a, l * r) ahint =
      fun obj ax (t, hint) ->
-      let a = Axis.proj ax t in
+      let a = Axis.proj obj ax t in
       let hint = hint_prod obj ax hint in
       a, hint
 
@@ -3537,14 +3534,15 @@ module type Areality = sig
   val zap_to_legacy : (Const.t, allowed * 'r) S.mode -> Const.t
 end
 
-module Lattice_Product (L : Lattice) = struct
+module Lattice_Product (Obj : Obj) (L : Lattice with type t = Obj.const) =
+struct
   open L
 
-  let set = Axis.set
+  let set ax c t = Axis.set Obj.obj ax c t
 
-  let min_with ax c = Axis.set ax c min
+  let min_with ax c = Axis.set Obj.obj ax c min
 
-  let max_with ax c = Axis.set ax c max
+  let max_with ax c = Axis.set Obj.obj ax c max
 end
 
 module Comonadic_with (Areality : Areality) = struct
@@ -3565,8 +3563,6 @@ module Comonadic_with (Areality : Areality) = struct
 
     let compare = Axis.compare
 
-    let proj = Axis.proj
-
     let all =
       [ P Areality;
         P Linearity;
@@ -3582,9 +3578,9 @@ module Comonadic_with (Areality : Areality) = struct
 
   module Const = struct
     include C.Comonadic_with (Areality.Const)
-    include Lattice_Product (C.Comonadic_with (Areality.Const))
+    include Lattice_Product (Obj) (C.Comonadic_with (Areality.Const))
 
-    let proj = Axis.proj
+    let proj ax t = C.Axis.proj Obj.obj ax t
 
     module Per_axis = struct
       let print ax ppf a =
@@ -3721,8 +3717,6 @@ module Monadic = struct
 
     let print = Axis.print
 
-    let proj = Axis.proj
-
     let all =
       [P Uniqueness; P Contention; P Visibility; P Staticity]
       |> List.sort (fun (P ax1) (P ax2) ->
@@ -3733,9 +3727,9 @@ module Monadic = struct
 
   module Const = struct
     include C.Monadic
-    include Lattice_Product (C.Monadic)
+    include Lattice_Product (Obj) (C.Monadic)
 
-    let proj = Axis.proj
+    let proj ax t = C.Axis.proj Obj.obj ax t
 
     module Per_axis = struct
       let print ax ppf a =
@@ -3996,16 +3990,17 @@ module Value_with (Areality : Areality) = struct
 
   let split m =
     { comonadic =
-        Modal_bit_layout.inter m Modal_bit_layout.comonadic_mask
-        |> decode_comonadic_bits |> Comonadic.Const.encode;
+        Comonadic.Const.of_bits
+          (Modal_bit_layout.inter m Modal_bit_layout.comonadic_mask);
       monadic =
-        { bits = Modal_bit_layout.inter m Modal_bit_layout.monadic_mask }
+        Monadic.Const.of_bits
+          (Modal_bit_layout.inter m Modal_bit_layout.monadic_mask)
     }
 
   let merge { comonadic; monadic } =
     Modal_bit_layout.union
-      (encode_comonadic (Comonadic.Const.decode comonadic))
-      monadic.bits
+      (Comonadic.Const.to_bits comonadic)
+      (Monadic.Const.to_bits monadic)
 
   let print ?verbose () ppf { monadic; comonadic } =
     Fmt.fprintf ppf "%a;%a"
@@ -4763,10 +4758,10 @@ module Modality = struct
        fun ?(hint = Hint.Unknown) t x ->
         match t with Join_const c -> Mode.join_const ~hint c x
 
-      let proj ax (Join_const c) : _ Atom.t = Join_const (Axis.proj ax c)
+      let proj ax (Join_const c) : _ Atom.t = Join_const (Mode.Const.proj ax c)
 
       let set ax (Join_const a : _ Atom.t) (Join_const c) =
-        Join_const (Axis.set ax a c)
+        Join_const (Mode.Const.set ax a c)
 
       let print ppf = function
         | Join_const c -> Fmt.fprintf ppf "join_const(%a)" Mode.Const.print c
@@ -4791,8 +4786,9 @@ module Modality = struct
           Error
             (Error
                ( ax,
-                 { left = Join_const left; right = Join_const (Axis.proj ax c) }
-               )))
+                 { left = Join_const left;
+                   right = Join_const (Mode.Const.proj ax c)
+                 } )))
       | Diff (_, _m1), Diff (_, _m2) ->
         (* [m1] is a left mode so it cannot appear on the right. So we can't do
            a proper check. However, this branch is only hit by
@@ -4907,10 +4903,10 @@ module Modality = struct
        fun ?(hint = Hint.Unknown) t x ->
         match t with Meet_const c -> Mode.meet_const ~hint c x
 
-      let proj ax (Meet_const c) : _ Atom.t = Meet_const (Axis.proj ax c)
+      let proj ax (Meet_const c) : _ Atom.t = Meet_const (Mode.Const.proj ax c)
 
       let set ax (Meet_const a : _ Atom.t) (Meet_const c) =
-        Meet_const (Axis.set ax a c)
+        Meet_const (Mode.Const.set ax a c)
 
       let print ppf = function
         | Meet_const c -> Fmt.fprintf ppf "meet_const(%a)" Mode.Const.print c
@@ -4939,8 +4935,9 @@ module Modality = struct
           Error
             (Error
                ( ax,
-                 { left = Meet_const left; right = Meet_const (Axis.proj ax c) }
-               )))
+                 { left = Meet_const left;
+                   right = Meet_const (Mode.Const.proj ax c)
+                 } )))
       | Exactly (_, _m1), Exactly (_, _m2) ->
         (* [m1] is a left mode, so there is no good way to check.
            However, this branch only hit by [wrap_constraint_with_shape],
@@ -5335,11 +5332,11 @@ module Crossing = struct
 
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Join_const c)) : a Atom.t
         =
-      Modality (Join_const ((Axis.proj [@inlined hint]) ax c))
+      Modality (Join_const ((Mode.Const.proj [@inlined hint]) ax c))
 
     let set (type a) (ax : a Mode.Axis.t) (Modality (Join_const a) : a Atom.t)
         (Modality (Join_const c)) =
-      Modality (Join_const ((Axis.set [@inlined hint]) ax a c))
+      Modality (Join_const ((Mode.Const.set [@inlined hint]) ax a c))
 
     let le (Modality (Join_const c1)) (Modality (Join_const c2)) =
       Mode.Const.le c2 c1
@@ -5417,11 +5414,11 @@ module Crossing = struct
 
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Meet_const c)) : a Atom.t
         =
-      Modality (Meet_const ((Axis.proj [@inlined hint]) ax c))
+      Modality (Meet_const ((Mode.Const.proj [@inlined hint]) ax c))
 
     let set (type a) (ax : a Mode.Axis.t) (Modality (Meet_const a) : a Atom.t)
         (Modality (Meet_const c)) =
-      Modality (Meet_const ((Axis.set [@inlined hint]) ax a c))
+      Modality (Meet_const ((Mode.Const.set [@inlined hint]) ax a c))
 
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
