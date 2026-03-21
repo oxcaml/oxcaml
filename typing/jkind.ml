@@ -2337,7 +2337,7 @@ let for_boxed_row row =
 
 let for_arrow =
   fresh_jkind
-    { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
+    { base = Layout (Sort (Base Value, { pointerness = Pointer }));
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
@@ -2361,7 +2361,7 @@ let for_object =
       ~staticity:(Crossing.Per_axis.max (Crossing.Axis.Monadic Staticity))
   in
   fresh_jkind
-    { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
+    { base = Layout (Sort (Base Value, { pointerness = Pointer }));
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
           ~nullability:Non_null ~separability:Separability.Non_float;

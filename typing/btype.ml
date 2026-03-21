@@ -1351,6 +1351,18 @@ module Jkind0 = struct
           name = "immutable_data"
         }
 
+      let immutable_data_pointer =
+        { jkind =
+            { immutable_data.jkind with
+              base =
+                Layout
+                  (Base
+                     ( Value,
+                       { pointerness = Jkind_axis.Pointerness.Pointer } ))
+            };
+          name = "immutable_data_pointer"
+        }
+
       let exn =
         let open Mod_bounds in
         { jkind =
@@ -1406,6 +1418,18 @@ module Jkind0 = struct
               with_bounds = No_with_bounds
             };
           name = "mutable_data"
+        }
+
+      let mutable_data_pointer =
+        { jkind =
+            { mutable_data.jkind with
+              base =
+                Layout
+                  (Base
+                     ( Value,
+                       { pointerness = Jkind_axis.Pointerness.Pointer } ))
+            };
+          name = "mutable_data_pointer"
         }
 
       let void =
@@ -1763,8 +1787,10 @@ module Jkind0 = struct
           value_or_null;
           value;
           immutable_data;
+          immutable_data_pointer;
           sync_data;
           mutable_data;
+          mutable_data_pointer;
           void;
           immediate;
           immediate_or_null;
@@ -1844,9 +1870,15 @@ module Jkind0 = struct
 
       let immutable_data = of_const Const.Builtin.immutable_data.jkind
 
+      let immutable_data_pointer =
+        of_const Const.Builtin.immutable_data_pointer.jkind
+
       let sync_data = of_const Const.Builtin.sync_data.jkind
 
       let mutable_data = of_const Const.Builtin.mutable_data.jkind
+
+      let mutable_data_pointer =
+        of_const Const.Builtin.mutable_data_pointer.jkind
 
       let void = of_const Const.Builtin.void.jkind
 
@@ -2034,6 +2066,12 @@ module Jkind0 = struct
           ~annotation:(mk_annot "immutable_data")
           ~why:(Value_creation why)
 
+      let immutable_data_pointer
+          ~(why : Jkind_intf.History.value_creation_reason) =
+        fresh_jkind Jkind_desc.Builtin.immutable_data_pointer
+          ~annotation:(mk_annot "immutable_data_pointer")
+          ~why:(Value_creation why)
+
       let sync_data ~(why : Jkind_intf.History.value_creation_reason) =
         fresh_jkind Jkind_desc.Builtin.sync_data
           ~annotation:(mk_annot "sync_data") ~why:(Value_creation why)
@@ -2041,6 +2079,12 @@ module Jkind0 = struct
       let mutable_data ~(why : Jkind_intf.History.value_creation_reason) =
         fresh_jkind Jkind_desc.Builtin.mutable_data
           ~annotation:(mk_annot "mutable_data") ~why:(Value_creation why)
+
+      let mutable_data_pointer
+          ~(why : Jkind_intf.History.value_creation_reason) =
+        fresh_jkind Jkind_desc.Builtin.mutable_data_pointer
+          ~annotation:(mk_annot "mutable_data_pointer")
+          ~why:(Value_creation why)
 
       let immediate ~why =
         fresh_jkind Jkind_desc.Builtin.immediate
@@ -2119,6 +2163,14 @@ module Jkind0 = struct
             ~relevant_for_shallow:`Irrelevant ~type_expr ~modality t.jkind
       }
 
+    let set_root_pointerness pointerness t =
+      { t with
+        jkind =
+          { t.jkind with
+            base = Layout (Sort (Base Value, { pointerness }))
+          }
+      }
+
     let jkind_of_mutability mutability ~why =
       (match mutability with
       | Immutable -> Builtin.immutable_data
@@ -2147,6 +2199,7 @@ module Jkind0 = struct
           |> List.map (fun (ld : label_declaration) -> ld.ld_mutable)
           |> List.fold_left combine_mutability Immutable
           |> jkind_of_mutability ~why:Boxed_record
+          |> set_root_pointerness Jkind_axis.Pointerness.Pointer
           |> mark_best
         in
         add_labels_as_with_bounds lbls base

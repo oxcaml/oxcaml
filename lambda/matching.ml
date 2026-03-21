@@ -1937,6 +1937,23 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
   let loc = head_loc ~scopes head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let sem = add_barrier_to_read ubr Reads_agree in
+  let erased_payload_layout
+      ({ ca_type; ca_sort; _ } : Types.constructor_argument) =
+    match get_desc ca_type with
+    | Tarrow (_, _, _, _) -> Lambda.layout_function
+    | Tobject _ -> Lambda.layout_object
+    | Tconstr (path, _, _) when Path.same path Predef.path_string ->
+      Lambda.layout_string
+    | Tconstr (path, _, _) when Path.same path Predef.path_bytes ->
+      Lambda.layout_string
+    | Tconstr (path, _, _) when Path.same path Predef.path_array ->
+      Lambda.layout_array Pgenarray
+    | Tconstr (path, _, _) when Path.same path Predef.path_iarray ->
+      Lambda.layout_array Pgenarray
+    | Tconstr (path, _, _) when Path.same path Predef.path_lazy_t ->
+      Lambda.layout_lazy
+    | _ -> Typeopt.layout_of_sort head.pat_loc ca_sort
+  in
   let make_void_access binding_kind sort pos =
     (* Constructors whose arguments are all void, e.g.
        [A of #(void * void) * void], are immediate. Accesses to their arguments
@@ -2010,7 +2027,12 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
       if cstr.cstr_constant then
         rem (* [Null] constructor case. *)
       else
-        (arg, str, sort, layout) :: rem
+        begin match cstr.cstr_args with
+        | [ca] ->
+          let layout = erased_payload_layout ca in
+          (Lprim (Popaque layout, [arg], loc), str, ca.ca_sort, layout) :: rem
+        | _ -> assert false
+        end
         (* the unboxed variant constructor or an erased payload constructor. *)
     | Some Types.Constructor_null ->
       rem

@@ -144,6 +144,24 @@ let () =
   | PIP _ -> assert false
 ;;
 
+type int_or_err =
+  | Int_or_err of int [@repr immediate]
+  | Error of string [@repr pointer]
+
+let classify_int_or_err = function
+  | Int_or_err n -> n
+  | Error s -> String.length s
+;;
+
+let () =
+  assert (classify_int_or_err (Int_or_err 17) = 17);
+  assert (classify_int_or_err (Error "boom") = 4);
+  match Error "boom" with
+  | Int_or_err _ -> assert false
+  | Error "boom" -> ()
+  | Error _ -> assert false
+;;
+
 type ('a : value) repr_value =
   | Null_value [@repr null]
   | Value of 'a [@repr value]

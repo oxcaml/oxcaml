@@ -469,6 +469,9 @@ module Jkind0 : sig
       (** Immutable non-float values that don't contain functions. *)
       val immutable_data : t
 
+      (** Immutable non-float values that are definitely pointers. *)
+      val immutable_data_pointer : t
+
       (** Exceptions; crossing portability, contention, statelessness and
           visibility. *)
       val exn : t
@@ -478,6 +481,9 @@ module Jkind0 : sig
 
       (** Mutable non-float values that don't contain functions. *)
       val mutable_data : t
+
+      (** Mutable non-float values that are definitely pointers. *)
+      val mutable_data_pointer : t
 
       (** Values of types of this jkind are immediate on 64-bit platforms; on
           other platforms, we know nothing other than that it's a value. *)
@@ -661,8 +667,12 @@ module Jkind0 : sig
       val value : why:Jkind_intf.History.value_creation_reason -> 'd jkind
       val immutable_data :
         why:Jkind_intf.History.value_creation_reason -> 'd jkind
+      val immutable_data_pointer :
+        why:Jkind_intf.History.value_creation_reason -> 'd jkind
       val sync_data : why:Jkind_intf.History.value_creation_reason -> 'd jkind
       val mutable_data :
+        why:Jkind_intf.History.value_creation_reason -> 'd jkind
+      val mutable_data_pointer :
         why:Jkind_intf.History.value_creation_reason -> 'd jkind
       val immediate :
         why:Jkind_intf.History.immediate_creation_reason ->
