@@ -1821,14 +1821,19 @@ and bindings ctxt f (mf,rf,l) =
         (list ~sep:"@," (binding "and" Immutable Nonrecursive)) xs
 
 and binding_op ctxt f x =
-  match x.pbop_pat, x.pbop_exp with
+  match x.pbop_pat, x.pbop_exp, x.pbop_modes with
   | {ppat_desc = Ppat_var { txt=pvar; _ }; ppat_attributes = []; _},
-    {pexp_desc = Pexp_ident { txt=Lident evar; _}; pexp_attributes = []; _}
+    {pexp_desc = Pexp_ident { txt=Lident evar; _}; pexp_attributes = []; _},
+    []
        when pvar = evar ->
      pp f "@[<2>%s %s@]" x.pbop_op.txt evar
-  | pat, exp ->
+  | pat, exp, [] ->
      pp f "@[<2>%s %a@;=@;%a@]"
        x.pbop_op.txt (pattern ctxt) pat (expression ctxt) exp
+  | pat, exp, modes ->
+     pp f "@[<2>%s (%a%a)@;=@;%a@]"
+       x.pbop_op.txt (pattern ctxt) pat optional_at_modes modes
+       (expression ctxt) exp
 
 and structure_item ctxt f x =
   match x.pstr_desc with

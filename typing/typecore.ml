@@ -7529,7 +7529,8 @@ and type_expect_
         mode_default (alloc_as_value andops_arg_mode)
       in
       let exp, exp_sort, ands =
-        type_andops env andops_mode slet.pbop_exp sands sort_andops ty_andops
+        type_andops env andops_mode slet.pbop_exp slet.pbop_modes
+          sands sort_andops ty_andops
       in
       let body_closure_value_mode =
         alloc_as_value body_mode
@@ -10591,17 +10592,27 @@ and type_let_def_wrap_warnings
   end;
   exp_list
 
-and type_andops env let_mode sarg sands expected_sort expected_ty =
+and type_andops env let_mode sarg let_modes sands
+    expected_sort expected_ty =
   (* Pass arguments to [loop] to avoid allocating closure; [env] and [let_sarg]
      get passed down unchanged. *)
   let rec loop env let_sarg rev_sands expected_sort expected_ty =
     match rev_sands with
     | [] ->
-        type_expect env let_mode let_sarg
+        let exp_mode = match let_modes with
+          | [] -> let_mode
+          | modes ->
+            let loc = let_sarg.pexp_loc in
+            let modes = Typemode.transl_mode_annots modes in
+            type_expect_mode ~loc ~env ~modes:modes.mode_modes
+              let_mode
+        in
+        type_expect env exp_mode let_sarg
           (mk_expected expected_ty),
         expected_sort,
         []
-    | { pbop_op = sop; pbop_exp = sexp; pbop_loc = loc; _ } :: rest ->
+    | { pbop_op = sop; pbop_exp = sexp; pbop_modes;
+        pbop_loc = loc; _ } :: rest ->
         let op_path, op_desc, op_type, ty_arg, sort_arg, ty_rest, sort_rest,
             ty_result, op_result_sort, andop_arg_mode =
           with_local_level_iter_if_principal begin fun () ->
@@ -10642,7 +10653,14 @@ and type_andops env let_mode sarg sands expected_sort expected_ty =
         let andop_exp_mode =
           mode_default (alloc_as_value andop_arg_mode)
         in
-        let exp = type_expect env andop_exp_mode sexp (mk_expected ty_arg) in
+        let exp_mode = match pbop_modes with
+          | [] -> andop_exp_mode
+          | modes ->
+            let modes = Typemode.transl_mode_annots modes in
+            type_expect_mode ~loc ~env ~modes:modes.mode_modes
+              andop_exp_mode
+        in
+        let exp = type_expect env exp_mode sexp (mk_expected ty_arg) in
         begin try
           unify env (instance ty_result) (instance expected_ty)
         with Unify err ->

@@ -1256,6 +1256,7 @@ and binding_op i ppf x =
   line i ppf "<binding_op> %a %a"
     fmt_string_loc x.pbop_op fmt_location x.pbop_loc;
   pattern (i+1) ppf x.pbop_pat;
+  modes (i+1) ppf x.pbop_modes;
   expression (i+1) ppf x.pbop_exp;
   )
 

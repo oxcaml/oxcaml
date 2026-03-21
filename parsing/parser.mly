@@ -2843,10 +2843,10 @@ fun_expr:
   | let_bindings(ext) IN seq_expr
       { expr_of_let_bindings ~loc:$sloc $1 $3 }
   | pbop_op = mkrhs(LETOP) bindings = letop_bindings IN body = seq_expr
-      { let (pbop_pat, pbop_exp, rev_ands) = bindings in
+      { let (pbop_pat, pbop_modes, pbop_exp, rev_ands) = bindings in
         let ands = List.rev rev_ands in
         let pbop_loc = make_loc $sloc in
-        let let_ = {pbop_op; pbop_pat; pbop_exp; pbop_loc} in
+        let let_ = {pbop_op; pbop_pat; pbop_modes; pbop_exp; pbop_loc} in
         mkexp ~loc:$sloc (Pexp_letop{ let_; ands; body}) }
   | fun_expr COLONCOLON expr
       { mkexp_cons ~loc:$sloc $loc($2)
@@ -3352,27 +3352,28 @@ and_let_binding:
 ;
 letop_binding_body:
     pat = let_ident exp = strict_binding
-      { (pat, exp) }
+      { (pat, [], exp) }
   | val_ident
       (* Let-punning *)
-      { (mkpatvar ~loc:$loc $1, ghexpvar ~loc:$loc $1) }
-  (* CR zqian: support mode annotation on letop. *)
+      { (mkpatvar ~loc:$loc $1, [], ghexpvar ~loc:$loc $1) }
+  | LPAREN let_ident at_mode_expr RPAREN exp = strict_binding
+      { ($2, $3, exp) }
   | pat = simple_pattern COLON typ = core_type EQUAL exp = seq_expr
       { let loc = ($startpos(pat), $endpos(typ)) in
-        (ghpat_with_modes ~loc ~pat ~cty:(Some typ) ~modes:[], exp) }
+        (ghpat_with_modes ~loc ~pat ~cty:(Some typ) ~modes:[], [], exp) }
   | pat = pattern_no_exn EQUAL exp = seq_expr
-      { (pat, exp) }
+      { (pat, [], exp) }
 ;
 letop_bindings:
     body = letop_binding_body
-      { let let_pat, let_exp = body in
-        let_pat, let_exp, [] }
+      { let let_pat, let_modes, let_exp = body in
+        let_pat, let_modes, let_exp, [] }
   | bindings = letop_bindings pbop_op = mkrhs(ANDOP) body = letop_binding_body
-      { let let_pat, let_exp, rev_ands = bindings in
-        let pbop_pat, pbop_exp = body in
+      { let let_pat, let_modes, let_exp, rev_ands = bindings in
+        let pbop_pat, pbop_modes, pbop_exp = body in
         let pbop_loc = make_loc $sloc in
-        let and_ = {pbop_op; pbop_pat; pbop_exp; pbop_loc} in
-        let_pat, let_exp, and_ :: rev_ands }
+        let and_ = {pbop_op; pbop_pat; pbop_modes; pbop_exp; pbop_loc} in
+        let_pat, let_modes, let_exp, and_ :: rev_ands }
 ;
 strict_binding_modes:
     EQUAL seq_expr

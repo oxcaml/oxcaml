@@ -233,7 +233,8 @@ module Exp:
     val hole : ?loc:loc -> ?attrs:attrs -> unit -> expression
 
     val case: pattern -> ?guard:expression -> expression -> case
-    val binding_op: str -> pattern -> expression -> loc -> binding_op
+    val binding_op:
+      str -> pattern -> modes:modes -> expression -> loc -> binding_op
     val borrow : ?loc:loc -> ?attrs:attrs -> expression -> expression
   end
 

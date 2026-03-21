@@ -561,9 +561,10 @@ module E = struct
     | Pexp_hole -> ()
     | Pexp_borrow e -> sub.expr sub e
 
-  let iter_binding_op sub {pbop_op; pbop_pat; pbop_exp; pbop_loc} =
+  let iter_binding_op sub {pbop_op; pbop_pat; pbop_modes; pbop_exp; pbop_loc} =
     iter_loc sub pbop_op;
     sub.pat sub pbop_pat;
+    sub.modes sub pbop_modes;
     sub.expr sub pbop_exp;
     sub.location sub pbop_loc
 

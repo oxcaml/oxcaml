@@ -565,10 +565,11 @@ and letop =
 
 and binding_op =
   {
-    pbop_op : string loc;
-    pbop_pat : pattern;
-    pbop_exp : expression;
-    pbop_loc : Location.t;
+    pbop_op    : string loc;
+    pbop_pat   : pattern;
+    pbop_modes : modes;
+    pbop_exp   : expression;
+    pbop_loc   : Location.t;
   }
 
 and function_param_desc =

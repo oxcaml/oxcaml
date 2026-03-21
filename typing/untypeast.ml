@@ -808,7 +808,7 @@ let binding_op sub bop pat =
   let pbop_pat = sub.pat sub pat in
   let pbop_exp = sub.expr sub bop.bop_exp in
   let pbop_loc = bop.bop_loc in
-  {pbop_op; pbop_pat; pbop_exp; pbop_loc}
+  {pbop_op; pbop_pat; pbop_modes = []; pbop_exp; pbop_loc}
 
 let package_type sub pack =
   (map_loc sub pack.pack_txt,

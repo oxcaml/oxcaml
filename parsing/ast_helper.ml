@@ -283,10 +283,11 @@ module Exp = struct
      pc_rhs = rhs;
     }
 
-  let binding_op op pat exp loc =
+  let binding_op op pat ~modes exp loc =
     {
       pbop_op = op;
       pbop_pat = pat;
+      pbop_modes = modes;
       pbop_exp = exp;
       pbop_loc = loc;
     }
