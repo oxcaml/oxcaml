@@ -191,16 +191,20 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Variant_erased erased, _ ->
         begin match erased.(src_index), cd_args with
         | Constructor_null, Cstr_tuple [] -> Null
-        | ( Constructor_boxed _ | Constructor_value | Constructor_immediate
-          | Constructor_pointer | Constructor_unboxed ),
+        | Constructor_boxed _, (Cstr_tuple [] | Cstr_tuple (_ :: _)) ->
+          Ordinary {src_index; runtime_tag}
+        | ( Constructor_value | Constructor_immediate | Constructor_pointer
+          | Constructor_unboxed ),
           (Cstr_tuple [_] | Cstr_record [_] | Cstr_tuple []) ->
           Ordinary {src_index; runtime_tag}
         | Constructor_null, (Cstr_tuple (_ :: _) | Cstr_record _) ->
           Misc.fatal_error "Invalid null constructor"
-        | ( Constructor_boxed _ | Constructor_value | Constructor_immediate
-          | Constructor_pointer | Constructor_unboxed ),
+        | ( Constructor_value | Constructor_immediate | Constructor_pointer
+          | Constructor_unboxed ),
           (Cstr_tuple (_ :: _ :: _) | Cstr_record (_ :: _ :: _)) ->
           Misc.fatal_error "Invalid constructor representation"
+        | Constructor_boxed _, Cstr_record (_ :: _) ->
+          Misc.fatal_error "Invalid boxed constructor"
         | Constructor_boxed _, Cstr_record [] ->
           Misc.fatal_error "Invalid boxed constructor"
         | ( Constructor_value | Constructor_immediate | Constructor_pointer
