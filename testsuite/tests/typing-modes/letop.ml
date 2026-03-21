@@ -99,3 +99,55 @@ Lines 2-5, characters 17-5:
 5 |     )
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
+
+(* Mode annotation on let*: parses correctly, constrains expression *)
+let ( let@ ) (with_ @ local once) (f : (_ @ local -> _) @ local) =
+  with_ f [@nontail]
+[%%expect{|
+val ( let@ ) :
+  ('a : any) ('b : any) 'c.
+    (('a @ local -> 'b) @ local -> 'c) @ local once ->
+    ('a @ local -> 'b) @ local -> 'c =
+  <fun>
+|}]
+
+(* Basic mode annotation on let@ - expression is constrained to local *)
+let foo () =
+    let@ (a @ local) = fun (f @ local) -> f "hello" in
+    String.length a
+[%%expect{|
+val foo : unit -> int = <fun>
+|}]
+
+(* Mode annotation allows passing a local expression *)
+let foo () =
+    let@ (a @ local) =
+      local_ (fun (f @ local) -> f "hello")
+    in
+    String.length a
+[%%expect{|
+val foo : unit -> int = <fun>
+|}]
+
+(* Without mode annotation on legacy operator, local expression is rejected *)
+let foo () =
+    let* a = local_ (Some "hello") in
+    Some (String.length a)
+[%%expect{|
+Line 2, characters 13-34:
+2 |     let* a = local_ (Some "hello") in
+                 ^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+(* Mode annotation with the standard option let* - legacy operators
+   don't benefit from mode annotations *)
+let foo () =
+    let* (a @ local) = Some "hello" in
+    Some (String.length a)
+[%%expect{|
+Line 2, characters 23-35:
+2 |     let* (a @ local) = Some "hello" in
+                           ^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]

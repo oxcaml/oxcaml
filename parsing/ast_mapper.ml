@@ -635,13 +635,14 @@ module E = struct
     | Pexp_hole -> hole ~loc ~attrs ()
     | Pexp_borrow e -> borrow ~loc ~attrs (sub.expr sub e)
 
-  let map_binding_op sub {pbop_op; pbop_pat; pbop_exp; pbop_loc} =
+  let map_binding_op sub {pbop_op; pbop_pat; pbop_modes; pbop_exp; pbop_loc} =
     let open Exp in
     let op = map_loc sub pbop_op in
     let pat = sub.pat sub pbop_pat in
+    let modes = sub.modes sub pbop_modes in
     let exp = sub.expr sub pbop_exp in
     let loc = sub.location sub pbop_loc in
-    binding_op op pat exp loc
+    binding_op op pat ~modes exp loc
 
 end
 

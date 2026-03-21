@@ -353,6 +353,8 @@ and expression_desc =
       body : value case;
       body_sort : Jkind.sort;
       partial : partial;
+      param_mode : Mode.Alloc.lr;
+      body_mode : Mode.Alloc.lr;
     }
   | Texp_unreachable
   | Texp_extension_constructor of Longident.t loc * Path.t
