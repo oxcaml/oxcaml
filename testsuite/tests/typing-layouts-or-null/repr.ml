@@ -381,7 +381,7 @@ Error: This type "string option" should be an instance of type
        The layout of string option is value
          because it's a boxed variant type.
        But the layout of string option must be a sublayout of value pointer
-         because of the definition of ptr_id at line 1, characters 0-42.
+         because of the definition of ptr_id at line 79, characters 0-53.
 |}]
 
 type ('a : value) bad_value_mix =
