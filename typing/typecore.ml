@@ -7470,7 +7470,9 @@ and type_expect_
       in
       let op_path, op_desc, op_type, spat_params, ty_params, param_sort,
           ty_func_result, body_sort, ty_result, op_result_sort,
-          ty_andops, sort_andops =
+          ty_andops, sort_andops,
+          param_mode, body_ret_mode, body_mode,
+          andops_arg_mode =
         with_local_level_iter_if_principal
           ~post:generalize_structure begin fun () ->
           let let_loc = slet.pbop_op.loc in
@@ -7487,16 +7489,27 @@ and type_expect_
             loop slet.pbop_pat (newvar initial_jkind) initial_sort sands
           in
           let ty_func_result, body_sort = new_rep_var ~why:Function_result () in
-          let arrow_desc = Nolabel, Alloc.legacy, Alloc.legacy in
+          let param_mode = Alloc.newvar () in
+          let body_ret_mode = Alloc.newvar () in
+          let body_arrow_desc = Nolabel, param_mode, body_ret_mode in
+          let body_mode = Alloc.newvar () in
+          let andops_arg_mode = Alloc.newvar () in
+          let andops_arrow_desc =
+            Nolabel, andops_arg_mode, Alloc.newvar ()
+          in
+          let func_arrow_desc =
+            Nolabel, body_mode, Alloc.newvar ()
+          in
           let ty_func =
-            newty (Tarrow(arrow_desc, newmono ty_params, ty_func_result,
+            newty (Tarrow(body_arrow_desc, newmono ty_params, ty_func_result,
                           commu_ok))
           in
           let ty_result, op_result_sort = new_rep_var ~why:Function_result () in
           let ty_andops, sort_andops = new_rep_var ~why:Function_argument () in
           let ty_op =
-            newty (Tarrow(arrow_desc, newmono ty_andops,
-              newty (Tarrow(arrow_desc, newmono ty_func, ty_result, commu_ok)),
+            newty (Tarrow(andops_arrow_desc, newmono ty_andops,
+              newty (Tarrow(func_arrow_desc, newmono ty_func, ty_result,
+                            commu_ok)),
                      commu_ok))
           in
           begin try
@@ -7506,21 +7519,37 @@ and type_expect_
           end;
           ((op_path, op_desc, op_type, spat_params, ty_params, param_sort,
             ty_func_result, body_sort, ty_result, op_result_sort,
-            ty_andops, sort_andops),
+            ty_andops, sort_andops,
+            param_mode, body_ret_mode, body_mode,
+            andops_arg_mode),
            [ty_andops; ty_params; ty_func_result; ty_result])
         end
       in
+      let andops_mode =
+        mode_default (alloc_as_value andops_arg_mode)
+      in
       let exp, exp_sort, ands =
-        type_andops env slet.pbop_exp sands sort_andops ty_andops
+        type_andops env andops_mode slet.pbop_exp sands sort_andops ty_andops
+      in
+      let body_closure_value_mode =
+        alloc_as_value body_mode
       in
       let body_env =
-        Env.add_const_closure_lock (loc, Letop) Value.Comonadic.Const.legacy
+        Env.add_closure_lock (loc, Letop)
+          body_closure_value_mode.comonadic
           env
+      in
+      let body_arg_value_mode =
+        alloc_to_value_l2r param_mode
+      in
+      let body_ret_value_mode =
+        alloc_as_value body_ret_mode
       in
       let scase = Ast_helper.Exp.case spat_params sbody in
       let cases, partial =
         type_cases Value body_env
-          (simple_pat_mode Value.legacy) (mode_return Value.legacy)
+          (simple_pat_mode body_arg_value_mode)
+          (mode_return body_ret_value_mode)
           ty_params param_sort (mk_expected ty_func_result)
           ~check_if_total:true loc [scase]
       in
@@ -7542,7 +7571,8 @@ and type_expect_
       in
       let desc =
         Texp_letop{let_; ands; param; param_debug_uid; param_sort; body;
-                   body_sort; partial}
+                   body_sort; partial;
+                   param_mode; body_mode}
       in
       rue { exp_desc = desc;
             exp_loc = sexp.pexp_loc;
@@ -10561,13 +10591,13 @@ and type_let_def_wrap_warnings
   end;
   exp_list
 
-and type_andops env sarg sands expected_sort expected_ty =
+and type_andops env let_mode sarg sands expected_sort expected_ty =
   (* Pass arguments to [loop] to avoid allocating closure; [env] and [let_sarg]
      get passed down unchanged. *)
   let rec loop env let_sarg rev_sands expected_sort expected_ty =
     match rev_sands with
     | [] ->
-        type_expect env mode_legacy let_sarg
+        type_expect env let_mode let_sarg
           (mk_expected expected_ty),
         expected_sort,
         []

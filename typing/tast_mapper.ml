@@ -679,7 +679,8 @@ let expr sub x =
     | Texp_pack mexpr ->
         Texp_pack (sub.module_expr sub mexpr)
     | Texp_letop {let_; ands; param; param_debug_uid; param_sort;
-                  body; body_sort; partial} ->
+                  body; body_sort; partial;
+                  param_mode; body_mode} ->
         Texp_letop{
           let_ = sub.binding_op sub let_;
           ands = List.map (sub.binding_op sub) ands;
@@ -689,6 +690,8 @@ let expr sub x =
           body = sub.case sub body;
           body_sort;
           partial;
+          param_mode;
+          body_mode;
         }
     | Texp_unreachable ->
         Texp_unreachable
