@@ -752,11 +752,10 @@ and b : any & any & any = #{ i : int ; j : int }
 Line 2, characters 0-48:
 2 | and b : any & any & any = #{ i : int ; j : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of b is any & any & any
+Error: The layout of type "b" is value & value
+         because it is an unboxed record.
+       But the layout of type "b" must be a sublayout of any & any & any
          because of the annotation on the declaration of the type b.
-       But the layout of b must be representable
-         because it's the type of a constructor field.
 |}]
 
 type q : any mod portable = #{ x : int -> int; y : int -> q }

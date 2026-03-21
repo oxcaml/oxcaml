@@ -2866,8 +2866,11 @@ let constrain_type_jkind ~fixed env ty jkind =
                else Error (Jkind.Violation.of_ ~context env
                       (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              in
-             begin match Jkind.decompose_product env ty's_jkind,
-                         Jkind.decompose_product env jkind with
+             let decompose jkind =
+               Jkind.decompose_product_with_arity
+                 ~level:!current_level env jkind num_components
+             in
+             begin match decompose ty's_jkind, decompose jkind with
              | Some ty's_jkinds, Some jkinds
                   when List.length ty's_jkinds = num_components
                        && List.length jkinds = num_components ->

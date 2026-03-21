@@ -611,12 +611,11 @@ type a = B of b
 and b : any & any & any = r#
 and r = { i : int ; j : int }
 [%%expect{|
-Line 2, characters 0-28:
-2 | and b : any & any & any = r#
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of b is '_representable_layout_3 & '_representable_layout_4
+Line 3, characters 0-29:
+3 | and r = { i : int ; j : int }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "r#" is value & value
          because it is an unboxed record.
-       But the layout of b must be representable
-         because it's the type of a constructor field.
+       But the layout of type "r#" must be representable
+         because it's an [@@unboxed] type.
 |}]

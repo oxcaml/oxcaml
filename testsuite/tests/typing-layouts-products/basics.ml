@@ -40,13 +40,8 @@ type t4 = #{ s : string; t4_inner : t4_inner; }
 type t = #{ u : u }
 and u = #{ x : #(unit * unit); y : unit }
 [%%expect{|
-Line 2, characters 0-41:
-2 | and u = #{ x : #(unit * unit); y : unit }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "u" is (value & value) & value
-         because it is an unboxed record.
-       But the layout of type "u" must be a sublayout of value & value
-         because it is an unboxed record.
+type t = #{ u : u; }
+and u = #{ x : #(unit * unit); y : unit; }
 |}]
 
 (* But you can't put unboxed products into normal tuples (yet) *)

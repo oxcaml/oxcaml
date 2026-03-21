@@ -2414,8 +2414,30 @@ let extract_layout : 'l 'r. _ -> ('l * 'r) jkind -> _ =
 
 let extract_layout_opt env t = extract_layout env t |> Result.to_option
 
+let rec layout_const_defaulting_to_value_without_mutation :
+    _ Layout.t -> Layout.Const.t = function
+  | Any sa -> Jkind_types.Layout.Const.Any sa
+  | Product layouts ->
+    Jkind_types.Layout.Const.Product
+      (List.map layout_const_defaulting_to_value_without_mutation layouts)
+  | Sort (sort, sa) ->
+    let rec default_sort_to_value_without_mutation sort =
+      match (Sort.get sort : Jkind_types.Sort.t) with
+      | Jkind_types.Sort.Var _ -> Sort.Const.value
+      | Jkind_types.Sort.Base b -> Jkind_types.Sort.Const.Base b
+      | Jkind_types.Sort.Product sorts ->
+        Jkind_types.Sort.Const.Product
+          (List.map default_sort_to_value_without_mutation sorts)
+      | Jkind_types.Sort.Univar uv -> Jkind_types.Sort.Const.Univar uv
+    in
+    Layout.Const.of_sort_const (default_sort_to_value_without_mutation sort) sa
+
 let get_layout_defaulting_to_value env jkind =
   extract_layout_opt env jkind |> Option.map Layout.default_to_value_and_get
+
+let get_layout_defaulting_to_value_without_mutation env jkind =
+  extract_layout_opt env jkind
+  |> Option.map layout_const_defaulting_to_value_without_mutation
 
 let get_layout env jk : Layout.Const.t option =
   Option.bind (extract_layout_opt env jk) Layout.get_const
@@ -2444,6 +2466,15 @@ let sort_of_jkind env (t : jkind_l) : sort =
       Misc.fatal_error "Jkind.sort_of_jkind: unable to expand jkind abbrev"
   in
   sort_of_layout layout
+
+let rec default_sort_to_value_without_mutation sort =
+  match (Sort.get sort : Jkind_types.Sort.t) with
+  | Jkind_types.Sort.Var _ -> Sort.Const.value
+  | Jkind_types.Sort.Base b -> Jkind_types.Sort.Const.Base b
+  | Jkind_types.Sort.Product sorts ->
+    Jkind_types.Sort.Const.Product
+      (List.map default_sort_to_value_without_mutation sorts)
+  | Jkind_types.Sort.Univar uv -> Jkind_types.Sort.Const.Univar uv
 
 let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
   let jk, _ =
@@ -2617,6 +2648,29 @@ let decompose_product env jk =
       Some (List.map mk_jkind layouts)
     | Sort (s, _) -> deal_with_sort (Sort.get s))
 
+let decompose_product_with_arity ~level env jk arity =
+  let mk_jkind layout = set_layout jk layout in
+  let deal_with_sort s =
+    let sorts =
+      match Sort.get s with
+      | Product sorts -> Some sorts
+      | Var _ -> Sort.decompose_into_product ~level s arity
+      | Base _ -> None
+      | Univar _ ->
+        Misc.fatal_error "Jkind.decompose_product_with_arity: Univar in product"
+    in
+    Option.map
+      (List.map (fun sort -> mk_jkind (Sort (sort, Scannable_axes.max))))
+      sorts
+  in
+  match extract_layout env jk with
+  | Error _ -> None
+  | Ok layout -> (
+    match layout with
+    | Any _ -> None
+    | Product layouts -> Some (List.map mk_jkind layouts)
+    | Sort (s, _) -> deal_with_sort s)
+
 (*********************************)
 (* pretty printing *)
 
@@ -2749,6 +2803,7 @@ module Format_history = struct
          representable at call sites)"
     | Peek_or_poke ->
       fprintf ppf "it's the type being used for a peek or poke primitive"
+    | Unboxed_record -> fprintf ppf "it is an unboxed record"
     | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
     | Array_element -> fprintf ppf "it's the type of an array element"
     | Idx_element ->
@@ -3689,6 +3744,7 @@ module Debug_printers = struct
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
+    | Unboxed_record -> fprintf ppf "Unboxed_record"
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"

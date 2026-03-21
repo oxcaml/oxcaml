@@ -90,6 +90,7 @@ type g = unit gg#
 and 'a gg = 'a hh
 and 'a hh = float
 |}]
+
 (* If a type with an unboxed version is shadowed by another, [#]
    also points to the new type. *)
 type float = int32
@@ -510,7 +511,7 @@ Line 3, characters 0-10:
     ^^^^^^^^^^
 Error:
        The kind of q is value_or_null & float64
-         because it is an unboxed record.
+         because it's an [@@unboxed] type.
        But the kind of q must be a subkind of value & float64
          because of the definition of t at line 1, characters 0-29.
 |}]
