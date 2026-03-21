@@ -1152,6 +1152,8 @@ module type S = sig
         boolean for each axis where [true] means full crossing and [false] means
         no crossing. Alternatively, call [Monadic.create] and
         [Comonadic.create], then [pack] the results. *)
+    val pack : monadic:Monadic.t -> comonadic:Comonadic.t -> t
+
     val create :
       regionality:bool ->
       linearity:bool ->
@@ -1164,8 +1166,6 @@ module type S = sig
       visibility:bool ->
       staticity:bool ->
       t
-
-    val pack : monadic:Monadic.t -> comonadic:Comonadic.t -> t
 
     (** Project a mode crossing (of all axes) onto the specified axis. *)
     val proj : 'a Axis.t -> t -> 'a
