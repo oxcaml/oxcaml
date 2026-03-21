@@ -574,7 +574,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
        ~separability:Separability.Ind
        ~param_jkind:Jkind.for_array_argument
        ~jkind:(fun param ->
-         Jkind.Builtin.mutable_data_pointer ~why:(Primitive ident_array) |>
+         Jkind.Builtin.mutable_data ~why:(Primitive ident_array) |>
          Jkind.add_with_bounds
            ~modality:Mode.Modality.Const.id
            ~type_expr:param)
@@ -583,7 +583,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
        ~separability:Separability.Ind
        ~param_jkind:Jkind.for_array_argument
        ~jkind:(fun param ->
-         Jkind.Builtin.immutable_data_pointer ~why:(Primitive ident_iarray) |>
+         Jkind.Builtin.immutable_data ~why:(Primitive ident_iarray) |>
          Jkind.add_with_bounds
            ~modality:Mode.Modality.Const.id
            ~type_expr:param)
@@ -614,8 +614,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
           It might also cross portability, linearity, uniqueness subject to its
           parameter. But I'm also fine not doing that for now (and wait until
           users complains). Internal ticket 5103. *)
-       ~jkind:(fun _ ->
-         Jkind.Builtin.immutable_data_pointer ~why:(Primitive ident_lazy_t))
+       ~jkind:(fun _ -> Jkind.for_non_float ~why:(Primitive ident_lazy_t))
   |> add_type1 ident_list
        ~variance:Variance.covariant
        ~separability:Separability.Ind
@@ -723,12 +722,8 @@ let build_initial_env add_type add_extension add_jkind empty_env =
          Jkind.add_with_bounds
            ~modality:Mode.Modality.Const.id
            ~type_expr:param)
-  |> add_type_with_jkind ident_string
-       ~jkind:(Jkind.Builtin.immutable_data_pointer
-                 ~why:(Primitive ident_string))
-  |> add_type_with_jkind ident_bytes
-       ~jkind:(Jkind.Builtin.mutable_data_pointer
-                 ~why:(Primitive ident_bytes))
+  |> add_type ident_string ~jkind:Jkind.Const.Builtin.immutable_data
+  |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit
        ~kind:(variant [cstr ident_void []])
        ~jkind:Jkind.Const.Builtin.immediate

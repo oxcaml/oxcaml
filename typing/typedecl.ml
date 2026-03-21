@@ -1812,7 +1812,20 @@ let rec check_constraints_rec env loc visited ty =
         try Env.find_type path env
         with Not_found ->
           raise (Error(loc, Unavailable_type_constructor path)) in
-      let ty' = Ctype.newconstr path (Ctype.instance_list decl.type_params) in
+      let params = Ctype.instance_list decl.type_params in
+      List.iter2
+        (fun param arg ->
+          match get_desc param with
+          | Tvar { jkind; _ }
+            when Ctype.jkind_requires_definite_pointer env jkind
+                 && Ctype.is_definitely_pointer_value env arg ->
+            begin match Ctype.relax_required_pointerness env jkind with
+            | Some relaxed -> Types.set_var_jkind param relaxed
+            | None -> ()
+            end
+          | _ -> ())
+        params args;
+      let ty' = Ctype.newconstr path params in
       begin
         (* We don't expand the error trace because that produces types that
            *already* violate the constraints -- we need to report a problem with
@@ -2003,11 +2016,19 @@ let narrow_to_manifest_jkind env loc decl =
             decl.type_jkind
         with
         | Ok () -> ()
+        | Error _
+          when Ctype.jkind_requires_definite_pointer env decl.type_jkind
+               && Ctype.is_definitely_pointer_value env ty ->
+          ()
         | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
       end
     | Some type_jkind -> begin
         match Ctype.constrain_type_jkind env ty type_jkind with
         | Ok () -> ()
+        | Error _
+          when Ctype.jkind_requires_definite_pointer env type_jkind
+               && Ctype.is_definitely_pointer_value env ty ->
+          ()
         | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
       end
     end;
@@ -2628,6 +2649,9 @@ let rec update_decl_jkind env dpath decl =
                   in
                   begin match Ctype.check_type_jkind env ty required with
                   | Ok () -> ()
+                  | Error _ when runtime_repr = Types.Constructor_pointer
+                                 && Ctype.is_definitely_pointer_value env ty ->
+                    ()
                   | Error err ->
                     raise
                       (Error
@@ -2840,6 +2864,10 @@ let rec update_decl_jkind env dpath decl =
       env new_decl.type_jkind decl.type_jkind
   with
   | Ok () -> new_decl
+  | Error _
+    when Ctype.jkind_requires_definite_pointer env decl.type_jkind
+         && Ctype.is_definitely_pointer_decl env new_decl ->
+    new_decl
   | Error err ->
     raise (Error (decl.type_loc, Jkind_mismatch_of_path (env, dpath, err)))
 
@@ -3558,6 +3586,10 @@ let normalize_decl_jkinds env decls =
           in
           { decl with type_jkind; type_kind; }
         else decl
+      | Error _
+        when Ctype.jkind_requires_definite_pointer env original_decl.type_jkind
+             && Ctype.is_definitely_pointer_decl env decl ->
+        decl
       | Error err ->
         raise(Error(decl.type_loc, Jkind_mismatch_of_path (env, path, err)))
     end
