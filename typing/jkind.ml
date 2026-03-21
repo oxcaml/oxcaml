@@ -1782,15 +1782,19 @@ module Const = struct
           }
       | false, _ | _, None -> None
 
-    (** Select the out_jkind_const with the least number of modal bounds to
-        print *)
+    (** Select the out_jkind_const with the least amount of extra syntax to
+        print. We count scannable-axis modifiers as well as modal bounds. This
+        matters for cases like [immutable_data] versus
+        [immutable_data_pointer maybe_pointer], which are equivalent but where
+        the former is the intended canonical form. *)
+    let score out =
+      List.length out.scannable_axes
+      + List.length out.modal_bounds
+      + List.length out.printable_with_bounds
+
     let rec select_simplest = function
       | a :: b :: tl ->
-        let simpler =
-          if List.length a.modal_bounds < List.length b.modal_bounds
-          then a
-          else b
-        in
+        let simpler = if score a <= score b then a else b in
         select_simplest (simpler :: tl)
       | [out] -> Some out
       | [] -> None
