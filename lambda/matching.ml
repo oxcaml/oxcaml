@@ -3532,18 +3532,17 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
                   end
                 end
               | None, _ ->
-                let v = Ident.create_local "variant" in
-                let v_duid = Lambda.debug_uid_none in
-                let ubr = Translmode.transl_unique_barrier pat_barrier in
-                let str = add_barrier_to_let_kind ubr Alias in
-                Llet
-                  ( str,
-                    Lambda.layout_int,
-                    v,
-                    v_duid,
-                    Lprim (nonconstant_variant_field ubr 0, [ arg ], loc),
-                    call_switcher value_kind loc fail_opt (Lvar v) min_int
-                      max_int boxed_nonconsts )
+                let sw =
+                  { sw_numconsts = 0;
+                    sw_consts = [];
+                    sw_numblocks = cstr.cstr_nonconsts;
+                    sw_blocks = boxed_nonconsts;
+                    sw_failaction = fail_opt
+                  }
+                in
+                let hs, sw = share_actions_sw value_kind sw in
+                let sw = reintroduce_fail sw in
+                hs (Lswitch (arg, sw, loc, value_kind))
               | Some _, _ ->
                 Misc.fatal_error
                   "Pointer case cannot coexist with boxed constructors"
@@ -3556,6 +3555,9 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
                 Lifthenelse
                   (Lprim (Pisint { variant_only = true }, [ arg ], loc), act,
                    boxed_branch (), value_kind)
+              | None, None, _ when boxed_nonconsts = [] && pointer = None ->
+                call_switcher value_kind loc fail_opt arg 0
+                  (cstr.cstr_consts - 1) consts
               | None, None, [] ->
                 boxed_branch ()
               | None, None, _ ->

@@ -32,7 +32,8 @@ let classify = function
 (let
   (classify =
      (function {nlocal = 0} param? : int
-       (if (isnull param) 0 (if (isint param) param -1))))
+       (if (isnull param) 0
+         (if (isint param) param (switch* param case tag 1: -1)))))
   (apply (field_imm 1 (global Toploop!)) "classify" classify))
 val classify : with_boxed -> int = <fun>
 |}]
@@ -49,8 +50,10 @@ let classify_const_boxed = function
      (function {nlocal = 0} param? : int
        (if (isnull param) 0
          (if (isint param) 1
-           (stringswitch (field_imm 0 param) case "boxed": 2
-                                             default: 3)))))
+           (switch* param
+            case tag 1:
+             (stringswitch (field_imm 0 param) case "boxed": 2
+                                               default: 3))))))
   (apply (field_imm 1 (global Toploop!)) "classify_const_boxed"
     classify_const_boxed))
 val classify_const_boxed : with_boxed -> int = <fun>

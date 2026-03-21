@@ -747,6 +747,8 @@ val prove_unique_fully_constructed_immutable_heap_block :
 
 val prove_is_int : Typing_env.t -> t -> bool proof_of_property
 
+val meet_is_int_variant_only : Typing_env.t -> t -> bool meet_shortcut
+
 (* Either a tagged integer or a null poitner. *)
 val prove_is_not_a_pointer : Typing_env.t -> t -> bool proof_of_property
 

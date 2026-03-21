@@ -9606,12 +9606,20 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       Mode.Value.meet [ expected_mode.mode; constructor_mode ] }
   in
   let (argument_mode, alloc_mode) =
-    match constr.cstr_repr with
-    | Variant_unboxed | Variant_erased _ -> expected_mode, None
-    | Variant_boxed _ when constr.cstr_constant -> expected_mode, None
-    | Variant_boxed _ | Variant_extensible ->
-       let alloc_mode, argument_mode = register_allocation ~loc expected_mode in
-       argument_mode, Some alloc_mode
+    match Types.constructor_runtime_representation_of_constructor constr with
+    | Some
+        ( Types.Constructor_null | Types.Constructor_value
+        | Types.Constructor_immediate | Types.Constructor_pointer
+        | Types.Constructor_unboxed ) ->
+      expected_mode, None
+    | Some (Types.Constructor_boxed _) | None ->
+      if constr.cstr_constant
+      then expected_mode, None
+      else
+        let alloc_mode, argument_mode =
+          register_allocation ~loc expected_mode
+        in
+        argument_mode, Some alloc_mode
   in
   begin match overwrite, constr.cstr_repr with
   | Overwriting(_, _, _), Variant_unboxed ->
