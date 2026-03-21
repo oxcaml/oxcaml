@@ -124,7 +124,7 @@ module Prefix_ones_bitfield : sig
 end
 
 module Modal_bit_layout : sig
-  type t = int
+  type t
 
   type slot =
     | Areality
@@ -141,11 +141,16 @@ module Modal_bit_layout : sig
   val width : slot -> int
   val offset : slot -> int
   val modal_width : int
+  val empty : t
   val low_mask : slot -> t
   val mask : slot -> t
   val monadic_mask : t
   val comonadic_mask : t
   val modal_mask : t
+  val equal : t -> t -> bool
+  val le : t -> t -> bool
+  val union : t -> t -> t
+  val inter : t -> t -> t
   val get_level : slot -> t -> int
   val set_level : slot -> int -> t -> t
   val set_level_unsafe : slot -> int -> t -> t

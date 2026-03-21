@@ -198,6 +198,8 @@ module Modal_bit_layout = struct
 
   let modal_width = 15
 
+  let empty = 0
+
   let low_mask slot = Prefix_ones_bitfield.low_mask ~offset:(offset slot)
 
   let mask slot =
@@ -217,6 +219,14 @@ module Modal_bit_layout = struct
     lor mask Yielding lor mask Statefulness
 
   let modal_mask = monadic_mask lor comonadic_mask
+
+  let[@inline] equal (left : t) right = left = right
+
+  let[@inline] inter (left : t) right = left land right
+
+  let[@inline] le left right = equal (inter left right) left
+
+  let[@inline] union (left : t) right = left lor right
 
   let[@inline] get_level slot t =
     Prefix_ones_bitfield.get_level

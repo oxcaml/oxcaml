@@ -91,7 +91,9 @@ let lo_mask =
   Array.mapi
     (fun i offset ->
       if i < Array.length modal_slots
-      then Modal_bit_layout.low_mask modal_slots.(i)
+      then
+        Prefix_ones_bitfield.low_mask
+          ~offset:(Modal_bit_layout.offset modal_slots.(i))
       else Prefix_ones_bitfield.low_mask ~offset)
     offsets
 
@@ -99,7 +101,10 @@ let axis_mask =
   Array.mapi
     (fun i off ->
       if i < Array.length modal_slots
-      then Modal_bit_layout.mask modal_slots.(i)
+      then
+        Prefix_ones_bitfield.mask
+          ~offset:off
+          ~width:(Modal_bit_layout.width modal_slots.(i))
       else Prefix_ones_bitfield.mask ~offset:off ~width:widths.(i))
     offsets
 

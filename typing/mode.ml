@@ -712,7 +712,7 @@ module Lattices = struct
       ({ uniqueness; contention; visibility; staticity } : monadic_repr) :
       monadic =
     { bits =
-        0
+        Modal_bit_layout.empty
         |> Monadic_bits.set_uniqueness uniqueness
         |> Monadic_bits.set_contention contention
         |> Monadic_bits.set_visibility visibility
@@ -749,7 +749,7 @@ module Lattices = struct
     let[@inline] set_staticity staticity m =
       { bits = Monadic_bits.set_staticity staticity m.bits }
 
-    let min = { bits = 0 }
+    let min = { bits = Modal_bit_layout.empty }
 
     let max = { bits = Monadic_bits.max }
 
@@ -761,13 +761,13 @@ module Lattices = struct
           staticity = Staticity.legacy
         }
 
-    let le m1 m2 = m1.bits land m2.bits = m1.bits
+    let le m1 m2 = Modal_bit_layout.le m1.bits m2.bits
 
-    let equal (m1 : t) m2 = m1.bits = m2.bits
+    let equal (m1 : t) m2 = Modal_bit_layout.equal m1.bits m2.bits
 
-    let join (m1 : t) m2 = { bits = m1.bits lor m2.bits }
+    let join (m1 : t) m2 = { bits = Modal_bit_layout.union m1.bits m2.bits }
 
-    let meet (m1 : t) m2 = { bits = m1.bits land m2.bits }
+    let meet (m1 : t) m2 = { bits = Modal_bit_layout.inter m1.bits m2.bits }
 
     let subtract (m1 : t) m2 = { bits = Monadic_bits.co_sub m1.bits m2.bits }
 
@@ -3909,14 +3909,14 @@ module Value_with (Areality : Areality) = struct
       staticity : 'j
     }
 
-  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes = int
+  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes = Modal_bit_layout.t
 
   module Packed_comonadic = C.Comonadic_bits (Areality.Const)
 
   let encode_comonadic
       ({ areality; linearity; portability; forkable; yielding; statefulness } :
         Areality.Const.t comonadic_with_repr) =
-    0
+    Modal_bit_layout.empty
     |> Packed_comonadic.set_areality areality
     |> Packed_comonadic.set_linearity linearity
     |> Packed_comonadic.set_portability portability
@@ -3956,9 +3956,10 @@ module Value_with (Areality : Areality) = struct
           Visibility.Const.t,
           Staticity.Const.t )
         modes_repr) =
-    encode_comonadic
-      { areality; linearity; portability; forkable; yielding; statefulness }
-    lor (encode_monadic { uniqueness; contention; visibility; staticity }).bits
+    Modal_bit_layout.union
+      (encode_comonadic
+         { areality; linearity; portability; forkable; yielding; statefulness })
+      (encode_monadic { uniqueness; contention; visibility; staticity }).bits
 
   let decode
       (m :
@@ -3978,7 +3979,8 @@ module Value_with (Areality : Areality) = struct
       decode_comonadic_bits m
     in
     let ({ uniqueness; contention; visibility; staticity } : monadic_repr) =
-      decode_monadic { bits = m land Modal_bit_layout.monadic_mask }
+      decode_monadic
+        { bits = Modal_bit_layout.inter m Modal_bit_layout.monadic_mask }
     in
     { areality;
       linearity;
@@ -3994,13 +3996,16 @@ module Value_with (Areality : Areality) = struct
 
   let split m =
     { comonadic =
-        m land Modal_bit_layout.comonadic_mask
+        Modal_bit_layout.inter m Modal_bit_layout.comonadic_mask
         |> decode_comonadic_bits |> Comonadic.Const.encode;
-      monadic = { bits = m land Modal_bit_layout.monadic_mask }
+      monadic =
+        { bits = Modal_bit_layout.inter m Modal_bit_layout.monadic_mask }
     }
 
   let merge { comonadic; monadic } =
-    encode_comonadic (Comonadic.Const.decode comonadic) lor monadic.bits
+    Modal_bit_layout.union
+      (encode_comonadic (Comonadic.Const.decode comonadic))
+      monadic.bits
 
   let print ?verbose () ppf { monadic; comonadic } =
     Fmt.fprintf ppf "%a;%a"
@@ -4074,9 +4079,9 @@ module Value_with (Areality : Areality) = struct
 
     let max = merge { comonadic = Comonadic.max; monadic = Monadic.max }
 
-    let le m1 m2 = m1 land m2 = m1
+    let le m1 m2 = Modal_bit_layout.le m1 m2
 
-    let equal (m1 : t) m2 = m1 = m2
+    let equal (m1 : t) m2 = Modal_bit_layout.equal m1 m2
 
     let print ppf m =
       let { monadic; comonadic } = split m in
@@ -4085,9 +4090,9 @@ module Value_with (Areality : Areality) = struct
     let legacy =
       merge { comonadic = Comonadic.legacy; monadic = Monadic.legacy }
 
-    let meet (m1 : t) m2 = m1 land m2
+    let meet (m1 : t) m2 = Modal_bit_layout.inter m1 m2
 
-    let join (m1 : t) m2 = m1 lor m2
+    let join (m1 : t) m2 = Modal_bit_layout.union m1 m2
 
     let proj (type a) (ax : a Axis.t) (m : t) : a =
       match ax with
