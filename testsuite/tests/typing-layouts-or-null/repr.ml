@@ -93,6 +93,66 @@ type obj_or_int =
   | Int_obj of int [@repr immediate]
   | Obj_value of < x : int > [@repr pointer]
 
+type tuple_t = int * int
+
+type tuple_or_int_alias =
+  | Int_tuple_alias of int [@repr immediate]
+  | Tuple_alias of tuple_t [@repr pointer]
+
+type variant_t =
+  | Variant_a of int
+  | Variant_b of string
+
+type variant_or_int_alias =
+  | Int_variant_alias of int [@repr immediate]
+  | Variant_alias of variant_t [@repr pointer]
+
+type variant_alias_t = variant_t
+
+type variant_alias_or_int =
+  | Int_variant_alias2 of int [@repr immediate]
+  | Variant_alias2 of variant_alias_t [@repr pointer]
+
+type record_t = { x : int }
+
+type record_or_int_alias =
+  | Int_record_alias of int [@repr immediate]
+  | Record_alias of record_t [@repr pointer]
+
+type record_alias_t = record_t
+
+type record_alias_or_int =
+  | Int_record_alias2 of int [@repr immediate]
+  | Record_alias2 of record_alias_t [@repr pointer]
+
+type string_aliasp : value pointer = string
+
+type ('a : value_or_null) refp : value pointer = { mutable contents : 'a }
+
+type poly_t = [ `A of int | `B of string ]
+
+type poly_ptr : value pointer = poly_t
+
+module type S_pkg = sig
+  val x : int
+end
+
+type package_t = (module S_pkg)
+
+type package_ptr : value pointer = package_t
+
+type exn_ptr : value pointer = exn
+
+type ('a : value pointer) ptr_id : value pointer = 'a
+
+type generic_string_or_int =
+  | Int_generic_string of int [@repr immediate]
+  | Generic_string of string ptr_id [@repr pointer]
+
+type generic_variant_or_int =
+  | Int_generic_variant of int [@repr immediate]
+  | Generic_variant of variant_t ptr_id [@repr pointer]
+
 [%%expect{|
 type bytes_or_int =
     Int_bytes of int
@@ -124,6 +184,55 @@ type obj_or_int =
     Int_obj of int
   [@repr immediate]
   | Obj_value of < x : int >
+  [@repr pointer]
+type tuple_t = int * int
+type tuple_or_int_alias =
+    Int_tuple_alias of int
+  [@repr immediate]
+  | Tuple_alias of tuple_t
+  [@repr pointer]
+type variant_t = Variant_a of int | Variant_b of string
+type variant_or_int_alias =
+    Int_variant_alias of int
+  [@repr immediate]
+  | Variant_alias of variant_t
+  [@repr pointer]
+type variant_alias_t = variant_t
+type variant_alias_or_int =
+    Int_variant_alias2 of int
+  [@repr immediate]
+  | Variant_alias2 of variant_alias_t
+  [@repr pointer]
+type record_t = { x : int; }
+type record_or_int_alias =
+    Int_record_alias of int
+  [@repr immediate]
+  | Record_alias of record_t
+  [@repr pointer]
+type record_alias_t = record_t
+type record_alias_or_int =
+    Int_record_alias2 of int
+  [@repr immediate]
+  | Record_alias2 of record_alias_t
+  [@repr pointer]
+type string_aliasp = string
+type ('a : value_or_null) refp = { mutable contents : 'a; }
+type poly_t = [ `A of int | `B of string ]
+type poly_ptr = poly_t
+module type S_pkg = sig val x : int end
+type package_t = (module S_pkg)
+type package_ptr = package_t
+type exn_ptr = exn
+type ('a : value pointer) ptr_id = 'a
+type generic_string_or_int =
+    Int_generic_string of int
+  [@repr immediate]
+  | Generic_string of string ptr_id
+  [@repr pointer]
+type generic_variant_or_int =
+    Int_generic_variant of int
+  [@repr immediate]
+  | Generic_variant of variant_t ptr_id
   [@repr pointer]
 |}]
 
@@ -221,6 +330,58 @@ Lines 1-3, characters 0-5:
 3 |   | C
 Error: Invalid [@repr] declaration:
        [@repr pointer] may only coexist with [@repr null] and [@repr immediate].
+|}]
+
+type enum_t = X | Y
+
+type bad_pointer_enum_alias =
+  | I_enum of int [@repr immediate]
+  | E_enum of enum_t [@repr pointer]
+
+[%%expect{|
+type enum_t = X | Y
+Line 5, characters 14-20:
+5 |   | E_enum of enum_t [@repr pointer]
+                  ^^^^^^
+Error: The layout of type "enum_t" is value
+         because of the definition of enum_t at line 1, characters 0-19.
+       But the layout of type "enum_t" must be a sublayout of value pointer
+         because it's the type of a constructor field.
+|}]
+
+type mixed_t =
+  | Mixed_nullary
+  | Mixed_payload of int
+
+type bad_pointer_mixed_alias =
+  | I_mixed of int [@repr immediate]
+  | M_mixed of mixed_t [@repr pointer]
+
+[%%expect{|
+type mixed_t = Mixed_nullary | Mixed_payload of int
+Line 7, characters 15-22:
+7 |   | M_mixed of mixed_t [@repr pointer]
+                   ^^^^^^^
+Error: The layout of type "mixed_t" is value
+         because of the definition of mixed_t at lines 1-3, characters 0-24.
+       But the layout of type "mixed_t" must be a sublayout of value pointer
+         because it's the type of a constructor field.
+|}]
+
+type bad_generic_option_or_int =
+  | I_bad_gen of int [@repr immediate]
+  | Bad_gen of string option ptr_id [@repr pointer]
+
+[%%expect{|
+Line 3, characters 15-28:
+3 |   | Bad_gen of string option ptr_id [@repr pointer]
+                   ^^^^^^^^^^^^^
+Error: This type "string option" should be an instance of type
+         "('a : value pointer)"
+       The layout of string option is value
+         because it's a boxed variant type.
+       But the layout of string option must be a sublayout of value pointer
+         because of the definition of ptr_id at line 1, characters 0-42.
 |}]
 
 type ('a : value) bad_value_mix =

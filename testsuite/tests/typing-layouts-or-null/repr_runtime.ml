@@ -162,6 +162,42 @@ let () =
   | Error _ -> assert false
 ;;
 
+type poly = [ `A of int | `B of string ]
+
+type poly_or_int =
+  | Int_poly of int [@repr immediate]
+  | Poly of poly [@repr pointer]
+
+let classify_poly_or_int = function
+  | Int_poly n -> n
+  | Poly (`A n) -> n
+  | Poly (`B s) -> String.length s
+;;
+
+let () =
+  assert (classify_poly_or_int (Int_poly 8) = 8);
+  assert (classify_poly_or_int (Poly (`A 12)) = 12);
+  assert (classify_poly_or_int (Poly (`B "poly")) = 4)
+;;
+
+exception E of string
+
+type exn_or_int =
+  | Int_exn of int [@repr immediate]
+  | Exn_value of exn [@repr pointer]
+
+let classify_exn_or_int = function
+  | Int_exn n -> n
+  | Exn_value (E s) -> String.length s
+  | Exn_value _ -> 100
+;;
+
+let () =
+  assert (classify_exn_or_int (Int_exn 19) = 19);
+  assert (classify_exn_or_int (Exn_value (E "boom")) = 4);
+  assert (classify_exn_or_int (Exn_value Exit) = 100)
+;;
+
 type ('a : value) repr_value =
   | Null_value [@repr null]
   | Value of 'a [@repr value]

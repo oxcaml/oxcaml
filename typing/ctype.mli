@@ -675,6 +675,15 @@ val check_type_jkind :
 val constrain_type_jkind :
   Env.t -> type_expr -> ('l * allowed) jkind -> (unit, Jkind.Violation.t) result
 
+val is_definitely_pointer_value : Env.t -> type_expr -> bool
+
+val is_definitely_pointer_decl : Env.t -> type_declaration -> bool
+
+val jkind_requires_definite_pointer : Env.t -> 'd Types.jkind -> bool
+
+val relax_required_pointerness :
+  Env.t -> 'd Types.jkind -> 'd Types.jkind option
+
 (* Check whether a type's externality's upper bound is less than some target.
    Potentially cheaper than just calling [type_jkind], because this can stop
    expansion once it succeeds. *)

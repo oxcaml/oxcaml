@@ -2163,14 +2163,6 @@ module Jkind0 = struct
             ~relevant_for_shallow:`Irrelevant ~type_expr ~modality t.jkind
       }
 
-    let set_root_pointerness pointerness t =
-      { t with
-        jkind =
-          { t.jkind with
-            base = Layout (Sort (Base Value, { pointerness }))
-          }
-      }
-
     let jkind_of_mutability mutability ~why =
       (match mutability with
       | Immutable -> Builtin.immutable_data
@@ -2199,7 +2191,6 @@ module Jkind0 = struct
           |> List.map (fun (ld : label_declaration) -> ld.ld_mutable)
           |> List.fold_left combine_mutability Immutable
           |> jkind_of_mutability ~why:Boxed_record
-          |> set_root_pointerness Jkind_axis.Pointerness.Pointer
           |> mark_best
         in
         add_labels_as_with_bounds lbls base

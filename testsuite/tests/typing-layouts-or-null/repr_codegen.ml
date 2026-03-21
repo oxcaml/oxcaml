@@ -32,7 +32,7 @@ let classify = function
 (let
   (classify =
      (function {nlocal = 0} param? : int
-       (if (isnull param) 0 (if (isint param) param -1))))
+       (if (isnull param) 0 (if (isint param) (opaque param) -1))))
   (apply (field_imm 1 (global Toploop!)) "classify" classify))
 val classify : with_boxed -> int = <fun>
 |}]
@@ -78,7 +78,7 @@ type ('a : value pointer) null_immediate_pointer =
 (let
   (classify_nip =
      (function {nlocal = 0} param? : int
-       (if (isnull param) 0 (if (isint param) param -1))))
+       (if (isnull param) 0 (if (isint param) (opaque param) -1))))
   (apply (field_imm 1 (global Toploop!)) "classify_nip" classify_nip))
 val classify_nip : ('a : value pointer). 'a null_immediate_pointer -> int =
   <fun>
