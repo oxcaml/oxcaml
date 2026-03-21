@@ -112,6 +112,145 @@ let rec last = function
   | [x] -> Some x
   | _ :: tl -> last tl
 
+module Prefix_ones_bitfield = struct
+  let width_of_size = function
+    | 2 -> 1
+    | 3 -> 2
+    | _ -> invalid_arg "Prefix_ones_bitfield.width_of_size"
+
+  let[@inline] low_mask ~offset = 1 lsl offset
+
+  let[@inline] mask ~offset ~width = ((1 lsl width) - 1) lsl offset
+
+  let[@inline] encode_level level = level lor (level lsr 1)
+
+  let[@inline] decode_level ~width bits =
+    match width with
+    | 1 -> bits land 0b1
+    | 2 ->
+      let bits = bits land 0b11 in
+      (bits land 0b1) + ((bits lsr 1) land 0b1)
+    | _ -> invalid_arg "Prefix_ones_bitfield.decode_level"
+
+  let[@inline] get_level ~offset ~width t =
+    decode_level ~width (t lsr offset)
+
+  let max_level ~width =
+    match width with
+    | 1 -> 1
+    | 2 -> 2
+    | _ -> invalid_arg "Prefix_ones_bitfield.max_level"
+
+  let[@inline] set_level_unsafe ~offset ~width level t =
+    let cleared = t land lnot (mask ~offset ~width) in
+    cleared lor (encode_level level lsl offset)
+
+  let[@inline] set_level ~offset ~width level t =
+    if level < 0 || level > max_level ~width
+    then invalid_arg "Prefix_ones_bitfield.set_level"
+    else set_level_unsafe ~offset ~width level t
+
+  let[@inline] co_sub ~lows left right =
+    let diff = left land lnot right in
+    diff lor ((diff lsr 1) land lnot (lows lsr 1))
+end
+
+module Modal_bit_layout = struct
+  type t = int
+
+  type slot =
+    | Areality
+    | Uniqueness
+    | Linearity
+    | Contention
+    | Portability
+    | Forkable
+    | Yielding
+    | Statefulness
+    | Visibility
+    | Staticity
+
+  let size = function
+    | Areality -> 3
+    | Uniqueness -> 2
+    | Linearity -> 2
+    | Contention -> 3
+    | Portability -> 3
+    | Forkable -> 2
+    | Yielding -> 2
+    | Statefulness -> 3
+    | Visibility -> 3
+    | Staticity -> 2
+
+  let width slot = Prefix_ones_bitfield.width_of_size (size slot)
+
+  let offset = function
+    | Areality -> 0
+    | Uniqueness -> 2
+    | Linearity -> 3
+    | Contention -> 4
+    | Portability -> 6
+    | Forkable -> 8
+    | Yielding -> 9
+    | Statefulness -> 10
+    | Visibility -> 12
+    | Staticity -> 14
+
+  let modal_width = 15
+
+  let empty = 0
+
+  let low_mask slot = Prefix_ones_bitfield.low_mask ~offset:(offset slot)
+
+  let mask slot =
+    Prefix_ones_bitfield.mask ~offset:(offset slot) ~width:(width slot)
+
+  let lows =
+    low_mask Areality lor low_mask Uniqueness lor low_mask Linearity
+    lor low_mask Contention lor low_mask Portability lor low_mask Forkable
+    lor low_mask Yielding lor low_mask Statefulness lor low_mask Visibility
+    lor low_mask Staticity
+
+  let monadic_mask =
+    mask Uniqueness lor mask Contention lor mask Visibility lor mask Staticity
+
+  let comonadic_mask =
+    mask Areality lor mask Linearity lor mask Portability lor mask Forkable
+    lor mask Yielding lor mask Statefulness
+
+  let modal_mask = monadic_mask lor comonadic_mask
+
+  let[@inline] equal (left : t) right = left = right
+
+  let[@inline] inter (left : t) right = left land right
+
+  let[@inline] le left right = equal (inter left right) left
+
+  let[@inline] union (left : t) right = left lor right
+
+  let[@inline] get_level slot t =
+    Prefix_ones_bitfield.get_level
+      ~offset:(offset slot)
+      ~width:(width slot)
+      t
+
+  let[@inline] set_level slot level t =
+    Prefix_ones_bitfield.set_level
+      ~offset:(offset slot)
+      ~width:(width slot)
+      level
+      t
+
+  let[@inline] set_level_unsafe slot level t =
+    Prefix_ones_bitfield.set_level_unsafe
+      ~offset:(offset slot)
+      ~width:(width slot)
+      level
+      t
+
+  let[@inline] co_sub left right = Prefix_ones_bitfield.co_sub ~lows left right
+end
+
 module Stdlib = struct
   module List = struct
     include List

@@ -111,6 +111,52 @@ val create_hashtable: int -> ('a * 'b) list -> ('a, 'b) Hashtbl.t
        (** Create a hashtable with the given initial size and fills it
            with the given bindings. *)
 
+(** {1 Bitfield helpers} *)
+
+module Prefix_ones_bitfield : sig
+  val width_of_size : int -> int
+  val low_mask : offset:int -> int
+  val mask : offset:int -> width:int -> int
+  val get_level : offset:int -> width:int -> int -> int
+  val set_level : offset:int -> width:int -> int -> int -> int
+  val set_level_unsafe : offset:int -> width:int -> int -> int -> int
+  val co_sub : lows:int -> int -> int -> int
+end
+
+module Modal_bit_layout : sig
+  type t
+
+  type slot =
+    | Areality
+    | Uniqueness
+    | Linearity
+    | Contention
+    | Portability
+    | Forkable
+    | Yielding
+    | Statefulness
+    | Visibility
+    | Staticity
+
+  val width : slot -> int
+  val offset : slot -> int
+  val modal_width : int
+  val empty : t
+  val low_mask : slot -> t
+  val mask : slot -> t
+  val monadic_mask : t
+  val comonadic_mask : t
+  val modal_mask : t
+  val equal : t -> t -> bool
+  val le : t -> t -> bool
+  val union : t -> t -> t
+  val inter : t -> t -> t
+  val get_level : slot -> t -> int
+  val set_level : slot -> int -> t -> t
+  val set_level_unsafe : slot -> int -> t -> t
+  val co_sub : t -> t -> t
+end
+
 (** {1 Extensions to the standard library} *)
 
 module Stdlib : sig

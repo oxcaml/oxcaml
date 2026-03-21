@@ -12,6 +12,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Prefix_ones_bitfield = Misc.Prefix_ones_bitfield
+module Modal_bit_layout = Misc.Modal_bit_layout
+
 (* Axis lattice: efficient bitfield encoding of jkind axes.
 
    This module packs 13 axes into an OCaml immediate-sized integer, where each
@@ -54,59 +57,56 @@
 
 let axis_by_number = Array.of_list Jkind_axis.Axis.all
 
+let modal_slots =
+  Mode.Crossing.Axis.all
+  |> List.map (fun (Mode.Crossing.Axis.P axis) -> Mode.Crossing.Axis.slot axis)
+  |> Array.of_list
+
 let axis_sizes =
-  let open Jkind_axis.Axis in
-  let open Mode.Axis in
-  let open Mode.Crossing.Axis in
-  Array.map
-    (fun (Pack axis) ->
-      match axis with
-      | Modal (Comonadic Areality) -> 3
-      | Modal (Monadic Uniqueness) -> 2
-      | Modal (Comonadic Linearity) -> 2
-      | Modal (Monadic Contention) -> 3
-      | Modal (Comonadic Portability) -> 3
-      | Modal (Comonadic Forkable) -> 2
-      | Modal (Comonadic Yielding) -> 2
-      | Modal (Comonadic Statefulness) -> 3
-      | Modal (Monadic Visibility) -> 3
-      | Modal (Monadic Staticity) -> 2
-      | Nonmodal Externality -> 3
-      | Nonmodal Nullability -> 2
-      | Nonmodal Separability -> 3)
-    axis_by_number
+  let modal_sizes =
+    Array.map (fun slot -> Modal_bit_layout.width slot + 1) modal_slots
+  in
+  Array.append modal_sizes [| 3; 2; 3 |]
 
 let num_axes = Array.length axis_sizes
 
 (* widths[i] = 2 for size-3 axes, 1 for size-2 *)
 let widths =
-  Array.map
-    (function 3 -> 2 | 2 -> 1 | _ -> invalid_arg "bad axis size")
+  Array.mapi
+    (fun i size ->
+      if i < Array.length modal_slots
+      then Modal_bit_layout.width modal_slots.(i)
+      else Prefix_ones_bitfield.width_of_size size)
     axis_sizes
 
-(* consecutive packing offsets *)
 let offsets =
-  let _, offs =
-    Array.fold_left_map (fun acc width -> acc + width, acc) 0 widths
-  in
-  offs
+  Array.append
+    (Array.map Modal_bit_layout.offset modal_slots)
+    [| Modal_bit_layout.modal_width;
+       Modal_bit_layout.modal_width + widths.(10);
+       Modal_bit_layout.modal_width + widths.(10) + widths.(11)
+    |]
 
-(* 1 if axis i has a high bit (i.e. width=2), else 0 *)
-let has_hi =
-  Array.init num_axes (fun i ->
-      match axis_sizes.(i) with
-      | 3 -> 1
-      | 2 -> 0
-      | _ -> invalid_arg "bad axis size")
-
-let lo_mask = Array.map (fun off -> 1 lsl off) offsets
-
-let hi_mask =
+let lo_mask =
   Array.mapi
-    (fun i off -> if has_hi.(i) = 1 then 1 lsl (off + 1) else 0)
+    (fun i offset ->
+      if i < Array.length modal_slots
+      then
+        Prefix_ones_bitfield.low_mask
+          ~offset:(Modal_bit_layout.offset modal_slots.(i))
+      else Prefix_ones_bitfield.low_mask ~offset)
     offsets
 
-let axis_mask = Array.map2 (fun lo hi -> lo lor hi) lo_mask hi_mask
+let axis_mask =
+  Array.mapi
+    (fun i off ->
+      if i < Array.length modal_slots
+      then
+        Prefix_ones_bitfield.mask
+          ~offset:off
+          ~width:(Modal_bit_layout.width modal_slots.(i))
+      else Prefix_ones_bitfield.mask ~offset:off ~width:widths.(i))
+    offsets
 
 (* OR of all low bits (for size-2 axes that’s their only bit).
    For this layout: 0x6D75D. *)
@@ -129,25 +129,11 @@ let equal (a : t) (b : t) : bool = a = b
 
 let hash = Hashtbl.hash
 
-(* Branchless get: for 3-ary axes level = lo + hi (00→0, 01→1, 11→2).
-    For 2-ary axes hi=0 (masked by has_hi). *)
 let get_axis (v : t) ~axis:i : int =
-  let off = offsets.(i) in
-  let lo = (v lsr off) land 1 in
-  let hi = (v lsr (off + 1)) land has_hi.(i) in
-  lo + hi
+  Prefix_ones_bitfield.get_level ~offset:offsets.(i) ~width:widths.(i) v
 
-(* Branchless set:
-    low_bit  = (lev | (lev >> 1)) & 1  (0→0, 1→1, 2→1)
-    high_bit = (lev >> 1) & has_hi
-      (0→0, 1→0, 2→1; zeroed for 1-bit axes)
-    No range checks—caller keeps lev in-range. *)
 let set_axis (v : t) ~axis:i ~level:lev : t =
-  let off = offsets.(i) in
-  let cleared = v land lnot axis_mask.(i) in
-  let lo = lev lor (lev lsr 1) land 1 in
-  let hi = (lev lsr 1) land has_hi.(i) in
-  cleared lor (lo lsl off) lor (hi lsl (off + 1))
+  Prefix_ones_bitfield.set_level ~offset:offsets.(i) ~width:widths.(i) lev v
 
 let decode (v : t) : int array =
   Array.init num_axes (fun i -> get_axis v ~axis:i)
@@ -175,11 +161,7 @@ let to_string = pp
     AND with ~ (lows >> 1) kills spillovers from low bits into neighbors;
     OR repairs 10 -> 11. *)
 
-let lnot_lsr_1_lows = lnot (lows lsr 1)
-
-let co_sub (a : t) (b : t) : t =
-  let r = a land lnot b in
-  r lor ((r lsr 1) land lnot_lsr_1_lows)
+let co_sub (a : t) (b : t) : t = Prefix_ones_bitfield.co_sub ~lows a b
 
 (* Build a mask from a set of relevant axes. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =

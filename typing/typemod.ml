@@ -115,13 +115,13 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   mode
 
 let register_allocation () =
+  let areality_ax : Mode.Regionality.Const.t Value.Axis.t =
+    Value.Axis.Comonadic Areality
+  in
   let m, _ =
     Value.(newvar_below (of_const
       ~hint_comonadic:Module_allocated_on_heap
-      (Const.encode
-         { (Const.decode Const.max) with
-           areality = Mode.Regionality.Const.Global
-         })))
+      (Const.set areality_ax Mode.Regionality.Const.Global Const.max)))
   in
   value_to_alloc_r2g m, m
 

@@ -231,20 +231,12 @@ module Axis = struct
   type packed = Pack : 'a t -> packed [@@unboxed]
 
   let all =
-    [ Pack (Modal (Comonadic Areality));
-      Pack (Modal (Monadic Uniqueness));
-      Pack (Modal (Comonadic Linearity));
-      Pack (Modal (Monadic Contention));
-      Pack (Modal (Comonadic Portability));
-      Pack (Modal (Comonadic Forkable));
-      Pack (Modal (Comonadic Yielding));
-      Pack (Modal (Comonadic Statefulness));
-      Pack (Modal (Monadic Visibility));
-      Pack (Modal (Monadic Staticity));
-      (* CR-soon zqian: call [Mode.Crossing.Axis.all] for modal axes *)
-      Pack (Nonmodal Externality);
-      Pack (Nonmodal Nullability);
-      Pack (Nonmodal Separability) ]
+    List.map
+      (fun (Mode.Crossing.Axis.P axis) -> Pack (Modal axis))
+      Mode.Crossing.Axis.all
+    @ [ Pack (Nonmodal Externality);
+        Pack (Nonmodal Nullability);
+        Pack (Nonmodal Separability) ]
 
   let name (type a) : a t -> string = function
     | Modal ax ->
@@ -389,17 +381,7 @@ module Axis_set = struct
   type t = int
 
   let[@inline] axis_index (type a) : a Axis.t -> _ = function
-    | Modal (Comonadic Areality) -> 0
-    | Modal (Monadic Uniqueness) -> 1
-    | Modal (Comonadic Linearity) -> 2
-    | Modal (Monadic Contention) -> 3
-    | Modal (Comonadic Portability) -> 4
-    | Modal (Comonadic Forkable) -> 5
-    | Modal (Comonadic Yielding) -> 6
-    | Modal (Comonadic Statefulness) -> 7
-    | Modal (Monadic Visibility) -> 8
-    | Modal (Monadic Staticity) -> 9
-    (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
+    | Modal axis -> Mode.Crossing.Axis.index axis
     | Nonmodal Externality -> 10
     | Nonmodal Nullability -> 11
     | Nonmodal Separability -> 12
@@ -416,22 +398,15 @@ module Axis_set = struct
   let[@inline] add t axis = set ~axis ~to_:true t
 
   let[@inline] create ~f =
-    (* PERF: this is manually unrolled because flambda2 doesn't unroll for us, and this
-       function is quite hot *)
     let[@inline] set_axis axis t =
       if f ~axis:(Axis.Pack axis) then t lor axis_mask axis else t
     in
-    0
-    |> set_axis (Modal (Comonadic Areality))
-    |> set_axis (Modal (Monadic Uniqueness))
-    |> set_axis (Modal (Comonadic Linearity))
-    |> set_axis (Modal (Monadic Contention))
-    |> set_axis (Modal (Comonadic Portability))
-    |> set_axis (Modal (Comonadic Forkable))
-    |> set_axis (Modal (Comonadic Yielding))
-    |> set_axis (Modal (Comonadic Statefulness))
-    |> set_axis (Modal (Monadic Visibility))
-    |> set_axis (Modal (Monadic Staticity))
+    let t =
+      List.fold_left
+        (fun t (Mode.Crossing.Axis.P axis) -> set_axis (Modal axis) t)
+        0 Mode.Crossing.Axis.all
+    in
+    t
     |> set_axis (Nonmodal Externality)
     |> set_axis (Nonmodal Nullability)
     |> set_axis (Nonmodal Separability)
