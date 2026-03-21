@@ -1221,11 +1221,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           cl_attributes = [];
          }
   | Texp_letop{let_; ands; param; param_debug_uid; param_sort; body; body_sort;
-               partial} ->
+               partial; param_mode; body_mode; body_ret_mode} ->
       let body_sort = Jkind.Sort.default_for_transl_and_get body_sort in
       event_after ~scopes e
         (transl_letop ~scopes e.exp_loc e.exp_env let_ ands
-           param param_debug_uid param_sort body body_sort partial)
+           param param_debug_uid param_sort body body_sort partial
+           ~param_mode ~body_mode ~body_ret_mode)
   | Texp_unreachable ->
       raise (Error (e.exp_loc, Unreachable_reached))
   | Texp_open (od, e) ->
@@ -2808,7 +2809,21 @@ and transl_handler ~scopes ~return_sort ~body_sort e body
         of_location ~scopes e.exp_loc)
 
 and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
-      case_sort partial =
+      case_sort partial ~param_mode ~body_mode ~body_ret_mode =
+  (* Extract the return mode from the last arrow of a 2-argument function type.
+     Used to determine the ap_mode for and* operator applications. *)
+  let function2_return_mode env ty =
+    let ty = Ctype.expand_head env ty in
+    match Types.get_desc ty with
+    | Tarrow (_, _, ty2, _) ->
+      let ty2 = Ctype.expand_head env ty2 in
+      begin match Types.get_desc ty2 with
+      | Tarrow ((_, _, ret_mode), _, _, _) ->
+        transl_alloc_mode_r ret_mode
+      | _ -> alloc_heap
+      end
+    | _ -> alloc_heap
+  in
   let rec loop prev_layout prev_lam = function
     | [] -> prev_lam
     | and_ :: rest ->
@@ -2864,30 +2879,37 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
     loop (layout_exp let_bop_exp_sort let_.bop_exp)
       (transl_exp ~scopes let_bop_exp_sort let_.bop_exp) ands
   in
+  let closure_mode = transl_alloc_mode_l body_mode in
   let func =
-    let return_mode = alloc_heap (* XXX fixme: use result of is_function_type *) in
-    let (kind, params, return, _region, ret_mode), body =
+    let return_mode = transl_alloc_mode_l body_ret_mode in
+    let (kind, params, return, region, ret_mode), body =
       event_function ~scopes case.c_rhs
         (function repr ->
            let loc = case.c_rhs.exp_loc in
            let ghost_loc = { loc with loc_ghost = true } in
            transl_function_without_attributes ~scopes ~region:true
-             ~return_sort:case_sort ~mode:alloc_heap ~return_mode
+             ~return_sort:case_sort ~mode:closure_mode ~return_mode
              loc repr []
              (Tfunction_cases
                 { fc_cases = [case]; fc_param = param;
                   fc_param_debug_uid = param_debug_uid; fc_partial = partial;
                   fc_loc = ghost_loc; fc_exp_extra = []; fc_attributes = [];
-                  fc_arg_mode = Mode.Alloc.disallow_right Mode.Alloc.legacy;
+                  fc_arg_mode = Mode.Alloc.disallow_right param_mode;
                   fc_arg_sort = param_sort; fc_env = env;
                   fc_ret_type = case.c_rhs.exp_type;
                 }))
     in
     let attr = function_attribute_disallowing_arity_fusion in
     let loc = of_location ~scopes case.c_rhs.exp_loc in
-    let body = maybe_region_layout return body in
+    let body = if region then maybe_region_layout return body else body in
     lfunction ~kind ~params ~return ~body ~attr ~loc
-              ~mode:alloc_heap ~ret_mode
+              ~mode:closure_mode ~ret_mode
+  in
+  let ap_mode = function2_return_mode env let_.bop_op_type in
+  let region_close =
+    if is_alloc_heap closure_mode && is_alloc_heap ap_mode
+    then Rc_normal
+    else Rc_nontail
   in
   Lapply{
     ap_loc = of_location ~scopes loc;
@@ -2896,8 +2918,8 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
     ap_result_layout=
       function2_return_layout env let_.bop_loc let_bop_op_return_sort
         let_.bop_op_type;
-    ap_region_close=Rc_normal;
-    ap_mode=alloc_heap;
+    ap_region_close=region_close;
+    ap_mode;
     ap_tailcall = Default_tailcall;
     ap_inlined = Default_inlined;
     ap_specialised = Default_specialise;
