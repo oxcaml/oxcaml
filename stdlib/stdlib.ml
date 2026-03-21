@@ -248,7 +248,7 @@ external snd : ('a * 'b[@local_opt]) -> ('b[@local_opt]) @@ portable = "%field1_
 
 (* References *)
 
-type ('a : value_or_null) ref = { mutable contents : 'a }
+type ('a : value_or_null) ref : value pointer = { mutable contents : 'a }
 external ref : ('a : value_or_null) . 'a -> ('a ref[@local_opt]) @@ portable = "%makemutable"
 external ( ! ) : ('a : value_or_null) . ('a ref[@local_opt]) -> 'a @@ portable = "%field0"
 external ( := ) : ('a : value_or_null) . ('a ref[@local_opt]) -> 'a -> unit @@ portable = "%setfield0"

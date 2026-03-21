@@ -1173,11 +1173,18 @@ module Variant_diffing = struct
       | [cstr] -> cstr.Types.cd_attributes
       | _ -> []
     in
+    let equal_erased erased1 erased2 =
+      Array.length erased1 = Array.length erased2
+      && Array.for_all2 ( = ) erased1 erased2
+    in
     match err, rep1, rep2 with
     | None, Variant_unboxed, Variant_unboxed
     | None, Variant_boxed _, Variant_boxed _
-    | None, Variant_extensible, Variant_extensible
-    | None, Variant_with_null, Variant_with_null -> None
+    | None, Variant_extensible, Variant_extensible ->
+      None
+    | None, Variant_erased erased1, Variant_erased erased2
+      when equal_erased erased1 erased2 ->
+      None
     | Some err, _, _ ->
         Some (Variant_mismatch err)
     | None, Variant_unboxed, Variant_boxed _ ->
@@ -1188,9 +1195,9 @@ module Variant_diffing = struct
       Some (Extensible_representation First)
     | None, _, Variant_extensible ->
       Some (Extensible_representation Second)
-    | None, Variant_with_null, _ ->
+    | None, Variant_erased _, _ ->
       Some (With_null_representation First)
-    | None, _, Variant_with_null ->
+    | None, _, Variant_erased _ ->
       Some (With_null_representation Second)
 end
 

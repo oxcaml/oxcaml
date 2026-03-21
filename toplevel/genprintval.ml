@@ -475,7 +475,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                       else
                         true, O.obj obj
                     in
-                    let {cd_id;cd_args;cd_res} =
+                    let ({cd_id;cd_args;cd_res;cd_uid = selected_cd_uid} :
+                          Types.constructor_declaration) =
                       try
                         (* CR dkalinichenko: this is broken for unboxed variants:
                            unless the tag of the inner value just happens to be 0,
@@ -488,16 +489,35 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                       with
                       | Datarepr.Constr_not_found | Not_found ->
                         match rep with
-                        | Variant_with_null ->
-                          List.find
-                            (fun ({ cd_args; _ } :
-                                   Types.constructor_declaration) ->
-                               match cd_args with
-                               | Cstr_tuple [_] | Cstr_record [_] -> true
-                               | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _)
-                               | Cstr_record [] | Cstr_record (_ :: _ :: _) ->
-                                 false)
-                            constr_list
+                        | Variant_erased erased ->
+                          let desired =
+                            if tag = -1 then
+                              [ Types.Constructor_null ]
+                            else if constant then
+                              [ Types.Constructor_immediate;
+                                Types.Constructor_value;
+                                Types.Constructor_unboxed ]
+                            else
+                              [ Types.Constructor_pointer;
+                                Types.Constructor_value;
+                                Types.Constructor_unboxed ]
+                          in
+                          let rec find_repr = function
+                            | [] -> raise Datarepr.Constr_not_found
+                            | repr :: rest ->
+                              begin match
+                                List.find_mapi
+                                  (fun i cd ->
+                                     if erased.(i) = repr
+                                     then Some cd
+                                     else None)
+                                  constr_list
+                              with
+                              | Some cd -> cd
+                              | None -> find_repr rest
+                              end
+                          in
+                          find_repr desired
                         | _ -> raise Datarepr.Constr_not_found
                     in
                     let type_params =
@@ -512,8 +532,25 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     let unbx =
                       match rep with
                       | Variant_unboxed -> true
-                      | Variant_with_null when tag = -1 -> false
-                      | Variant_with_null -> true
+                      | Variant_erased erased ->
+                        begin match
+                          List.find_mapi
+                            (fun i { cd_uid; _ } ->
+                               if Uid.equal cd_uid selected_cd_uid then
+                                 Some erased.(i)
+                               else None)
+                            constr_list
+                        with
+                        | Some Types.Constructor_null -> false
+                        | Some
+                            ( Types.Constructor_value
+                            | Types.Constructor_immediate
+                            | Types.Constructor_pointer
+                            | Types.Constructor_unboxed ) ->
+                          true
+                        | Some (Types.Constructor_boxed _) -> false
+                        | None -> false
+                        end
                       | Variant_boxed _ | Variant_extensible -> false
                     in
                     begin

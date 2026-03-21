@@ -965,8 +965,25 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
            | _ -> ()
            end;
            try unify_param env ty' cty.ctyp_type with Unify err ->
-             let err = Errortrace.swap_unification_error err in
-             raise (Error(sty.ptyp_loc, env, Type_mismatch err))
+             begin match Types.get_desc ty' with
+             | Tvar { jkind; _ }
+               when Ctype.jkind_requires_definite_pointer env jkind
+                    && Ctype.is_definitely_pointer_value env cty.ctyp_type ->
+               begin match Ctype.relax_required_pointerness env jkind with
+               | Some relaxed ->
+                 Types.set_var_jkind ty' relaxed;
+                 begin try unify_param env ty' cty.ctyp_type with Unify _ ->
+                   let err = Errortrace.swap_unification_error err in
+                   raise (Error(sty.ptyp_loc, env, Type_mismatch err))
+                 end
+               | None ->
+                 let err = Errortrace.swap_unification_error err in
+                 raise (Error(sty.ptyp_loc, env, Type_mismatch err))
+               end
+             | _ ->
+               let err = Errortrace.swap_unification_error err in
+               raise (Error(sty.ptyp_loc, env, Type_mismatch err))
+             end
         )
         (List.combine (List.combine stl args) params);
       let constr =

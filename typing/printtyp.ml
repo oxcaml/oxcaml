@@ -2025,10 +2025,16 @@ let tree_of_constructor_args_and_ret_type args ret_type =
 let tree_of_single_constructor cd =
   let name = Ident.name cd.cd_id in
   let args, ret = tree_of_constructor_args_and_ret_type cd.cd_args cd.cd_res in
+  let attrs =
+    match Builtin_attributes.repr_attribute cd.cd_attributes with
+    | None -> []
+    | Some repr -> [{ oattr_name = "repr " ^ repr }]
+  in
   {
       ocstr_name = name;
       ocstr_args = args;
       ocstr_return_type = ret;
+      ocstr_attributes = attrs;
   }
 
 (* When printing GADT constructor, we need to forget the naming decision we took
@@ -2164,7 +2170,7 @@ let tree_of_type_decl id decl =
         let unboxed =
           match rep with
           | Variant_unboxed -> true
-          | Variant_boxed _ | Variant_extensible | Variant_with_null -> false
+          | Variant_boxed _ | Variant_extensible | Variant_erased _ -> false
         in
         let or_null_attribute =
           if Builtin_attributes.has_or_null decl.type_attributes then
@@ -2379,6 +2385,7 @@ let extension_only_constructor id ppf ext =
       ocstr_name = name;
       ocstr_args = args;
       ocstr_return_type = ret;
+      ocstr_attributes = [];
     }
 
 (* Print a value declaration *)

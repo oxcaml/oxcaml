@@ -173,6 +173,7 @@ end
 module Pointerness = struct
   type t =
     | Non_pointer
+    | Pointer
     | Maybe_pointer
 
   let max = Maybe_pointer
@@ -182,33 +183,50 @@ module Pointerness = struct
   let equal p1 p2 =
     match p1, p2 with
     | Non_pointer, Non_pointer -> true
+    | Pointer, Pointer -> true
     | Maybe_pointer, Maybe_pointer -> true
-    | (Non_pointer | Maybe_pointer), _ -> false
+    | (Non_pointer | Pointer | Maybe_pointer), _ -> false
 
   let less_or_equal p1 p2 : Misc.Le_result.t =
     match p1, p2 with
     | Non_pointer, Non_pointer -> Equal
+    | Pointer, Pointer -> Equal
     | Non_pointer, Maybe_pointer -> Less
+    | Pointer, Maybe_pointer -> Less
     | Maybe_pointer, Non_pointer -> Not_le
+    | Maybe_pointer, Pointer -> Not_le
+    | Non_pointer, Pointer -> Not_le
+    | Pointer, Non_pointer -> Not_le
     | Maybe_pointer, Maybe_pointer -> Equal
 
   let le p1 p2 = Misc.Le_result.is_le (less_or_equal p1 p2)
 
-  let meet p1 p2 =
+  let intersection p1 p2 =
     match p1, p2 with
-    | Non_pointer, (Non_pointer | Maybe_pointer) | Maybe_pointer, Non_pointer ->
-      Non_pointer
-    | Maybe_pointer, Maybe_pointer -> Maybe_pointer
+    | Non_pointer, Non_pointer -> Some Non_pointer
+    | Pointer, Pointer -> Some Pointer
+    | Non_pointer, Maybe_pointer | Maybe_pointer, Non_pointer ->
+      Some Non_pointer
+    | Pointer, Maybe_pointer | Maybe_pointer, Pointer -> Some Pointer
+    | Non_pointer, Pointer | Pointer, Non_pointer -> None
+    | Maybe_pointer, Maybe_pointer -> Some Maybe_pointer
+
+  let meet p1 p2 =
+    match intersection p1 p2 with Some p -> p | None -> Non_pointer
 
   let join p1 p2 =
     match p1, p2 with
-    | Maybe_pointer, (Maybe_pointer | Non_pointer) | Non_pointer, Maybe_pointer
-      ->
+    | Maybe_pointer, (Maybe_pointer | Non_pointer | Pointer)
+    | Non_pointer, Maybe_pointer
+    | Pointer, Maybe_pointer ->
       Maybe_pointer
+    | Pointer, Non_pointer | Non_pointer, Pointer -> Maybe_pointer
+    | Pointer, Pointer -> Pointer
     | Non_pointer, Non_pointer -> Non_pointer
 
   let to_string = function
     | Non_pointer -> "non_pointer"
+    | Pointer -> "pointer"
     | Maybe_pointer -> "maybe_pointer"
 
   let print ppf t = Fmt.fprintf ppf "%s" (to_string t)

@@ -71,7 +71,9 @@ module Scannable_axes = struct
   include Jkind_types.Scannable_axes
 
   let meet { pointerness = p1 } { pointerness = p2 } =
-    { pointerness = Pointerness.meet p1 p2 }
+    match Pointerness.intersection p1 p2 with
+    | None -> None
+    | Some pointerness -> Some { pointerness }
 
   let less_or_equal { pointerness = p1 } { pointerness = p2 } =
     Pointerness.less_or_equal p1 p2
@@ -274,9 +276,10 @@ module Layout = struct
   (* only meets at the root, meaning products are left unchanged. *)
   let meet_root_scannable_axes t sa =
     match t with
-    | Any sa' -> Any (Scannable_axes.meet sa sa')
-    | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
-    | Product _ -> t
+    | Any sa' -> Option.map (fun sa -> Any sa) (Scannable_axes.meet sa sa')
+    | Sort (s, sa') ->
+      Option.map (fun sa -> Sort (s, sa)) (Scannable_axes.meet sa sa')
+    | Product _ -> Some t
 
   let sub ~level t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
@@ -334,11 +337,11 @@ module Layout = struct
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
     in
     match t1, t2 with
-    | _, Any sa2 -> Some (meet_root_scannable_axes t1 sa2)
-    | Any sa1, _ -> Some (meet_root_scannable_axes t2 sa1)
+    | _, Any sa2 -> meet_root_scannable_axes t1 sa2
+    | Any sa1, _ -> meet_root_scannable_axes t2 sa1
     | Sort (s1, sa1), Sort (s2, sa2) ->
       if Sort.equate s1 s2
-      then Some (Sort (s1, Scannable_axes.meet sa1 sa2))
+      then Option.map (fun sa -> Sort (s1, sa)) (Scannable_axes.meet sa1 sa2)
       else None
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
@@ -1779,15 +1782,19 @@ module Const = struct
           }
       | false, _ | _, None -> None
 
-    (** Select the out_jkind_const with the least number of modal bounds to
-        print *)
+    (** Select the out_jkind_const with the least amount of extra syntax to
+        print. We count scannable-axis modifiers as well as modal bounds. This
+        matters for cases like [immutable_data] versus
+        [immutable_data_pointer maybe_pointer], which are equivalent but where
+        the former is the intended canonical form. *)
+    let score out =
+      List.length out.scannable_axes
+      + List.length out.modal_bounds
+      + List.length out.printable_with_bounds
+
     let rec select_simplest = function
       | a :: b :: tl ->
-        let simpler =
-          if List.length a.modal_bounds < List.length b.modal_bounds
-          then a
-          else b
-        in
+        let simpler = if score a <= score b then a else b in
         select_simplest (simpler :: tl)
       | [out] -> Some out
       | [] -> None
@@ -1964,6 +1971,7 @@ module Const = struct
         match txt with
         | "non_pointer" ->
           set_or_warn ~loc ~to_:Pointerness.Non_pointer pointerness
+        | "pointer" -> set_or_warn ~loc ~to_:Pointerness.Pointer pointerness
         | "maybe_pointer" ->
           set_or_warn ~loc ~to_:Pointerness.Maybe_pointer pointerness
         | _ -> raise ~loc (Unknown_kind_modifier txt))

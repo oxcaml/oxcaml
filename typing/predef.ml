@@ -826,7 +826,8 @@ let or_null_kind tvar =
     [ cstr ident_null [];
       cstr ident_this [unrestricted tvar or_null_argument_sort]]
   in
-  Type_variant (cstrs, Variant_with_null, None)
+  Type_variant
+    (cstrs, Variant_erased [| Constructor_null; Constructor_value |], None)
 
 let or_null_jkind param =
   Jkind.Const.Builtin.value_or_null_mod_everything

@@ -2521,23 +2521,28 @@ let unbox_once env ty =
                                    modality = ld.ld_modalities }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
-        | Type_variant (cstrs, Variant_with_null, _) ->
+        | Type_variant (cstrs, Variant_erased erased, _) ->
           let payload =
             List.find_opt
-              (fun cd ->
-                 match cd.cd_args with
-                 | Cstr_tuple [_] -> true
-                 | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
-                   false)
-              cstrs
+              (fun (runtime_repr, _cd) ->
+                runtime_repr = Constructor_value)
+              (List.combine (Array.to_list erased) cstrs)
           in
           begin match payload with
-          | Some { cd_args = Cstr_tuple [arg]; _ } ->
+          | Some (_, { cd_args = Cstr_tuple [arg]; _ }) ->
             Stepped_or_null
               { ty = apply arg.ca_type ~extra_substs:[];
                 modality = arg.ca_modalities }
-          | Some _ | None ->
-            Misc.fatal_error "Invalid constructor for Variant_with_null"
+          | Some (_,
+              { cd_args =
+                  Cstr_record [{ ld_type = ty; ld_modalities = modality; _ }];
+                _
+              }) ->
+            Stepped_or_null { ty = apply ty ~extra_substs:[]; modality }
+          | None ->
+            Final_result
+          | Some _ ->
+            Misc.fatal_error "Invalid erased constructor representation"
           end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
           Final_result
@@ -2974,6 +2979,119 @@ let constrain_type_jkind ~fixed env ty jkind =
     (Jkind.disallow_left jkind)
 
 let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
+
+let is_definitely_pointer_value env ty =
+  let has_nonconstant_constructors cstrs =
+    List.for_all
+      (fun cstr ->
+        match cstr.cd_args with
+        | Cstr_tuple [] | Cstr_record [] -> false
+        | Cstr_tuple (_ :: _) | Cstr_record (_ :: _) -> true)
+      cstrs
+  in
+  let has_nonconstant_row_fields row =
+    row_closed row
+    && List.for_all
+         (fun (_, field) ->
+           match row_field_repr field with
+           | Rpresent (Some _) -> true
+           | Reither (false, _ :: _, _) -> true
+           | Rpresent None | Reither _ | Rabsent -> false)
+         (row_fields row)
+  in
+  let rec loop fuel ty =
+    if fuel < 0 then false
+    else
+      let ty' = expand_head_opt env ty in
+      if ty' != ty then loop (fuel - 1) ty'
+      else
+        match get_desc ty' with
+        | Tarrow _ | Tobject _ | Ttuple _ | Tpackage _ -> true
+        | Tconstr (p, args, _) ->
+          if Path.same p Predef.path_string
+             || Path.same p Predef.path_bytes
+             || Path.same p Predef.path_array
+             || Path.same p Predef.path_iarray
+             || Path.same p Predef.path_lazy_t
+             || Path.same p Predef.path_exn
+          then true
+          else
+            let decl = Env.find_type p env in
+            begin match decl.type_kind with
+            | Type_abstract _ -> begin
+                match decl.type_manifest with
+                | Some ty ->
+                  let ty =
+                    apply ~use_current_level:true env decl.type_params ty args
+                  in
+                  loop (fuel - 1) ty
+                | None -> false
+              end
+            | Type_record (_, repres, _) ->
+              begin match repres with
+              | Record_unboxed | Record_inlined _ -> false
+              | Record_boxed _ | Record_float | Record_ufloat
+                | Record_mixed _ ->
+                true
+              end
+            | Type_record_unboxed_product _ -> false
+            | Type_variant (cstrs, Variant_boxed _, _) ->
+              has_nonconstant_constructors cstrs
+            | Type_variant
+                ( _,
+                  (Variant_unboxed | Variant_erased _ | Variant_extensible),
+                  _ ) ->
+              false
+            | Type_open -> true
+            end
+        | Tvariant row -> has_nonconstant_row_fields row
+        | _ -> false
+  in
+  loop 20 ty
+
+let relax_required_pointerness env (jkind : 'd Types.jkind) =
+  match Jkind.get_layout env jkind with
+  | Some (Jkind_types.Layout.Const.Base (base, axes))
+    when axes.pointerness = Jkind_axis.Pointerness.Pointer ->
+    let layout =
+      Jkind_types.Layout.of_const
+        (Jkind_types.Layout.Const.Base
+           ( base,
+             { pointerness = Jkind_axis.Pointerness.Maybe_pointer } ))
+    in
+    Some { jkind with jkind = { jkind.jkind with base = Layout layout } }
+  | _ -> None
+
+let jkind_requires_definite_pointer env jkind =
+  match Jkind.get_layout env jkind with
+  | Some (Jkind_types.Layout.Const.Base (_, axes)) ->
+    axes.pointerness = Jkind_axis.Pointerness.Pointer
+  | Some (Any _ | Product _ | Univar _ | Genvar _) | None -> false
+
+let is_definitely_pointer_decl env decl =
+  match decl.Types.type_kind with
+  | Type_abstract _ -> begin
+      match decl.type_manifest with
+      | Some ty -> is_definitely_pointer_value env ty
+      | None -> false
+    end
+  | Type_record (_, repres, _) ->
+    begin match repres with
+    | Record_unboxed | Record_inlined _ -> false
+    | Record_boxed _ | Record_float | Record_ufloat | Record_mixed _ -> true
+    end
+  | Type_record_unboxed_product _ -> false
+  | Type_variant (cstrs, Variant_boxed _, _) ->
+    List.for_all
+      (fun cstr ->
+        match cstr.cd_args with
+        | Cstr_tuple [] | Cstr_record [] -> false
+        | Cstr_tuple (_ :: _) | Cstr_record (_ :: _) -> true)
+      cstrs
+  | Type_variant
+      (_, (Variant_unboxed | Variant_erased _ | Variant_extensible), _)
+    -> false
+  | Type_open -> true
 
 let type_sort ~why ~fixed env ty =
   let jkind, sort = Jkind.of_new_sort_var ~level:!current_level ~why in
@@ -7959,6 +8077,18 @@ let check_decl_jkind env decl jkind =
   let type_equal = type_equal env in
   let type_jkind_purely = type_jkind_purely env in
   let context = mk_jkind_context_always_principal env in
+  let check_sub sub super =
+    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env sub super
+  in
+  let check_with_relaxed_pointerness sub super =
+    match relax_required_pointerness env super with
+    | Some relaxed when is_definitely_pointer_decl env decl ->
+      begin match check_sub sub relaxed with
+      | Ok () -> true
+      | Error _ -> false
+      end
+    | Some _ | None -> false
+  in
   (* CR layouts v2.8: When we have [layout_of], this logic should move to the
      place where [type_jkind] is set. But for now, it has to be here, because we
      want this in module inclusion but not other places (because substitutions
@@ -7972,7 +8102,7 @@ let check_decl_jkind env decl jkind =
     | Type_abstract _, Some inner_ty ->
       (* CR layouts v3.3: Ad-hoc solution, this time due to the magic
          interaction of [or_null] with separability. Special-cases [or_null]
-         and other [Variant_with_null] types.
+         and other null-like erased variants.
 
          Normally, this would be handled in [constrain_type_jkind]. *)
       begin match unbox_once env inner_ty with
@@ -7983,7 +8113,7 @@ let check_decl_jkind env decl jkind =
           | Ok decl_jkind -> decl_jkind
           | Error () ->
             Misc.fatal_error "Ctype.check_decl_jkind: \
-              the constructor argument inside a Variant_with_null \
+              the constructor argument inside an erased null-like variant \
               is already maybe-null."
           end
       | Final_result | Stepped _ | Stepped_record_unboxed_product _
@@ -8009,22 +8139,22 @@ let check_decl_jkind env decl jkind =
       Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
     | _ -> decl.type_jkind
   in
-  match
-    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
-      decl_jkind jkind
-  with
+  match check_sub decl_jkind jkind with
   | Ok () -> Ok ()
   | Error _ as err ->
-    match decl.type_manifest with
-    | None -> err
-    | Some ty ->
-      let ty_jkind = type_jkind env ty in
-      match
-        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
-          ty_jkind jkind
-      with
-      | Ok () -> Ok ()
-      | Error _ as err -> err
+    if check_with_relaxed_pointerness decl_jkind jkind
+    then Ok ()
+    else begin
+        match decl.type_manifest with
+        | None -> err
+        | Some ty ->
+          let ty_jkind = type_jkind env ty in
+          begin match check_sub ty_jkind jkind with
+          | Ok () -> Ok ()
+          | Error _ as err ->
+            if check_with_relaxed_pointerness ty_jkind jkind then Ok () else err
+          end
+    end
 
 let constrain_decl_jkind env decl jkind =
   (* CR layouts v2.8: This will need to be deeply reimplemented. Internal
@@ -8037,15 +8167,34 @@ let constrain_decl_jkind env decl jkind =
   | Some jkind ->
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
-    match
+    let check_sub sub super =
       Jkind.sub_or_error ~type_equal ~context ~level:!current_level env
-        decl.type_jkind jkind
-    with
+        sub super
+    in
+    let check_with_relaxed_pointerness sub super =
+      match relax_required_pointerness env super with
+      | Some relaxed when is_definitely_pointer_decl env decl ->
+        begin match check_sub sub relaxed with
+        | Ok () -> true
+        | Error _ -> false
+        end
+      | Some _ | None -> false
+    in
+    match check_sub decl.type_jkind jkind with
     | Ok () as ok -> ok
+    | Error _ when check_with_relaxed_pointerness decl.type_jkind jkind ->
+      Ok ()
     | Error _ as err ->
         match decl.type_manifest with
         | None -> err
-        | Some ty -> constrain_type_jkind env ty jkind
+        | Some ty ->
+          begin match constrain_type_jkind env ty jkind with
+          | Ok () as ok -> ok
+          | Error _
+            when check_with_relaxed_pointerness (type_jkind env ty) jkind ->
+            Ok ()
+          | Error _ as err -> err
+          end
 
 let exn_constructor_crossing env lid ~args locks =
   let vmode =

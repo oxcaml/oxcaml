@@ -438,12 +438,21 @@ and record_representation =
 and record_unboxed_product_representation =
   | Record_unboxed_product
 
+and constructor_runtime_representation =
+  | Constructor_boxed of constructor_representation *
+      Jkind_types.Sort.Const.t array
+  | Constructor_null
+  | Constructor_value
+  | Constructor_immediate
+  | Constructor_pointer
+  | Constructor_unboxed
+
 and variant_representation =
   | Variant_unboxed
   | Variant_boxed of (constructor_representation *
                       Jkind_types.Sort.Const.t array) array
   | Variant_extensible
-  | Variant_with_null
+  | Variant_erased of constructor_runtime_representation array
 
 and constructor_representation =
   | Constructor_uniform_value
@@ -855,9 +864,25 @@ let equal_variant_representation r1 r2 = r1 == r2 || match r1, r2 with
         cstrs_and_sorts2
   | Variant_extensible, Variant_extensible ->
       true
-  | Variant_with_null, Variant_with_null -> true
-  | (Variant_unboxed | Variant_boxed _ | Variant_extensible | Variant_with_null), _ ->
+  | Variant_erased erased1, Variant_erased erased2 ->
+      Misc.Stdlib.Array.equal ( = ) erased1 erased2
+  | (Variant_unboxed | Variant_boxed _ | Variant_extensible
+    | Variant_erased _), _ ->
       false
+
+let constructor_runtime_representation_of_constructor cstr =
+  match cstr.cstr_repr, cstr.cstr_tag with
+  | Variant_boxed boxed, Ordinary { src_index; _ } ->
+    let cstr_repr, sorts = boxed.(src_index) in
+    Some (Constructor_boxed (cstr_repr, sorts))
+  | Variant_erased _, Null -> Some Constructor_null
+  | Variant_erased erased, Ordinary { src_index; _ } -> Some erased.(src_index)
+  | Variant_unboxed, Ordinary _ -> Some Constructor_unboxed
+  | Variant_unboxed, (Null | Extension _) -> None
+  | Variant_erased _, Extension _
+  | (Variant_boxed _ | Variant_extensible),
+    (Ordinary _ | Extension _ | Null) ->
+    None
 
 let equal_record_representation r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
@@ -951,15 +976,25 @@ let find_unboxed_type decl =
       ([{ld_type = arg; ld_modalities = ms; _ }], Record_inlined (_, _, Variant_unboxed), _)
   | Type_record_unboxed_product
       ([{ld_type = arg; ld_modalities = ms; _ }], Record_unboxed_product, _)
-  | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
-  | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
+  | Type_variant
+      ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}],
+       Variant_unboxed, _)
+  | Type_variant
+      ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}],
+       Variant_unboxed, _)
+  | Type_variant
+      ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}],
+       Variant_erased [| Constructor_unboxed |], _)
+  | Type_variant
+      ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}],
+       Variant_erased [| Constructor_unboxed |], _) ->
     Some (arg, ms)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed _ | Record_float | Record_ufloat
                     | Record_mixed _), _)
   | Type_record_unboxed_product (_, Record_unboxed_product, _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed
-                     | Variant_extensible | Variant_with_null), _)
+                     | Variant_extensible | Variant_erased _), _)
   | Type_abstract _ | Type_open ->
     None
 

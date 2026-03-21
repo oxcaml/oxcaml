@@ -5933,7 +5933,7 @@ and type_expect_
         match record_form with
         | Legacy -> begin match rep with
           | Record_unboxed
-          | Record_inlined (_, _, (Variant_unboxed | Variant_with_null))
+          | Record_inlined (_, _, (Variant_unboxed | Variant_erased _))
             -> false
           | Record_boxed _ | Record_float | Record_ufloat | Record_mixed _
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
@@ -9628,12 +9628,20 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       Mode.Value.meet [ expected_mode.mode; constructor_mode ] }
   in
   let (argument_mode, alloc_mode) =
-    match constr.cstr_repr with
-    | Variant_unboxed | Variant_with_null -> expected_mode, None
-    | Variant_boxed _ when constr.cstr_constant -> expected_mode, None
-    | Variant_boxed _ | Variant_extensible ->
-       let alloc_mode, argument_mode = register_allocation ~loc expected_mode in
-       argument_mode, Some alloc_mode
+    match Types.constructor_runtime_representation_of_constructor constr with
+    | Some
+        ( Types.Constructor_null | Types.Constructor_value
+        | Types.Constructor_immediate | Types.Constructor_pointer
+        | Types.Constructor_unboxed ) ->
+      expected_mode, None
+    | Some (Types.Constructor_boxed _) | None ->
+      if constr.cstr_constant
+      then expected_mode, None
+      else
+        let alloc_mode, argument_mode =
+          register_allocation ~loc expected_mode
+        in
+        argument_mode, Some alloc_mode
   in
   begin match overwrite, constr.cstr_repr with
   | Overwriting(_, _, _), Variant_unboxed ->
@@ -9677,8 +9685,8 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
         raise(Error(loc, env, Private_constructor (constr, ty_res)))
     | Variant_boxed _ | Variant_unboxed ->
         raise (Error(loc, env, Private_type ty_res));
-    | Variant_with_null -> assert false
-      (* [Variant_with_null] can't be made private due to [or_null_reexport]. *)
+    | Variant_erased _ -> assert false
+      (* Erased variants can't be made private due to their representation. *)
     end;
   (* NOTE: shouldn't we call "re" on this final expression? -- AF *)
   { texp with

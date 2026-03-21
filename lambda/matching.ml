@@ -1937,6 +1937,23 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
   let loc = head_loc ~scopes head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let sem = add_barrier_to_read ubr Reads_agree in
+  let erased_payload_layout
+      ({ ca_type; ca_sort; _ } : Types.constructor_argument) =
+    match get_desc ca_type with
+    | Tarrow (_, _, _, _) -> Lambda.layout_function
+    | Tobject _ -> Lambda.layout_object
+    | Tconstr (path, _, _) when Path.same path Predef.path_string ->
+      Lambda.layout_string
+    | Tconstr (path, _, _) when Path.same path Predef.path_bytes ->
+      Lambda.layout_string
+    | Tconstr (path, _, _) when Path.same path Predef.path_array ->
+      Lambda.layout_array Pgenarray
+    | Tconstr (path, _, _) when Path.same path Predef.path_iarray ->
+      Lambda.layout_array Pgenarray
+    | Tconstr (path, _, _) when Path.same path Predef.path_lazy_t ->
+      Lambda.layout_lazy
+    | _ -> Typeopt.layout_of_sort head.pat_loc ca_sort
+  in
   let make_void_access binding_kind sort pos =
     (* Constructors whose arguments are all void, e.g.
        [A of #(void * void) * void], are immediate. Accesses to their arguments
@@ -1995,26 +2012,41 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
   if cstr.cstr_inlined <> None then
     (arg, str, sort, layout) :: rem
   else
-    match cstr.cstr_repr with
-    | Variant_boxed _ ->
+    match Types.constructor_runtime_representation_of_constructor cstr with
+    | Some (Types.Constructor_boxed _) ->
       List.mapi
       (fun i { ca_sort } ->
          make_field_access str ca_sort ~field:i ~pos:i)
       cstr.cstr_args
         @ rem
-    | Variant_unboxed | Variant_with_null ->
+    | Some
+        ( Types.Constructor_unboxed
+        | Types.Constructor_value
+        | Types.Constructor_immediate
+        | Types.Constructor_pointer ) ->
       if cstr.cstr_constant then
         rem (* [Null] constructor case. *)
       else
-        (arg, str, sort, layout) :: rem
-        (* the unboxed variant constructor, or the [This] constructor
-           for [Variant_with_null]. *)
-    | Variant_extensible ->
+        begin match cstr.cstr_args with
+        | [ca] ->
+          let layout = erased_payload_layout ca in
+          (Lprim (Popaque layout, [arg], loc), str, ca.ca_sort, layout) :: rem
+        | _ -> assert false
+        end
+        (* the unboxed variant constructor or an erased payload constructor. *)
+    | Some Types.Constructor_null ->
+      rem
+    | None ->
+      begin match cstr.cstr_repr with
+      | Variant_extensible ->
         List.mapi
           (fun i { ca_sort } ->
              make_field_access str ca_sort ~field:i ~pos:(i+1))
           cstr.cstr_args
         @ rem
+      | Variant_boxed _ | Variant_unboxed | Variant_erased _ ->
+        assert false
+      end
 
 let divide_constructor ~scopes ctx pm =
   divide
@@ -2415,7 +2447,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
             in
             Lprim (Pmixedfield ([lbl.lbl_pos], shape, sem), [ arg ], loc),
             lbl.lbl_sort, lbl_layout
-        | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_inlined (_, _, Variant_erased _) -> assert false
       in
       let str = if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias in
       let str = add_barrier_to_let_kind ubr str in
@@ -3277,13 +3309,13 @@ let split_cases tag_lambda_list =
     | ({cstr_tag; cstr_repr; cstr_constant}, act) :: rem -> (
         let consts, nonconsts, null = split_rec rem in
         match cstr_tag, cstr_repr with
-        | Ordinary _, (Variant_unboxed | Variant_with_null) ->
+        | Ordinary _, (Variant_unboxed | Variant_erased _) ->
           (consts, (0, act) :: nonconsts, null)
         | Ordinary {runtime_tag}, Variant_boxed _ when cstr_constant ->
           ((runtime_tag, act) :: consts, nonconsts, null)
         | Ordinary {runtime_tag}, Variant_boxed _ ->
           (consts, (runtime_tag, act) :: nonconsts, null)
-        | Null, Variant_with_null ->
+        | Null, Variant_erased _ ->
           (match null with
           | None -> (consts, nonconsts, Some act)
           | Some _ -> Misc.fatal_error
@@ -3296,6 +3328,76 @@ let split_cases tag_lambda_list =
   in
   let const, nonconst, null = split_rec tag_lambda_list in
   (sort_int_lambda_list const, sort_int_lambda_list nonconst, null)
+
+let split_runtime_cases tag_lambda_list =
+  let rec split_rec = function
+    | [] -> ([], [], None, None, None, None)
+    | ({ cstr_constant; _ } as cstr, act) :: rem -> (
+        let consts, boxed_nonconsts, null, immediate, pointer, payload =
+          split_rec rem
+        in
+        match Types.constructor_runtime_representation_of_constructor cstr with
+        | Some (Types.Constructor_boxed _) ->
+          let runtime_tag =
+            match cstr.cstr_tag with
+            | Ordinary { runtime_tag } -> runtime_tag
+            | Null | Extension _ -> assert false
+          in
+          if cstr_constant
+          then
+            ( (runtime_tag, act) :: consts,
+              boxed_nonconsts,
+              null,
+              immediate,
+              pointer,
+              payload )
+          else
+            ( consts,
+              (runtime_tag, act) :: boxed_nonconsts,
+              null,
+              immediate,
+              pointer,
+              payload )
+        | Some Types.Constructor_null -> begin
+            match null with
+            | None ->
+              (consts, boxed_nonconsts, Some act, immediate, pointer, payload)
+            | Some _ ->
+              Misc.fatal_error "Multiple null cases in Matching"
+          end
+        | Some Types.Constructor_immediate -> begin
+            match immediate with
+            | None ->
+              (consts, boxed_nonconsts, null, Some act, pointer, payload)
+            | Some _ ->
+              Misc.fatal_error "Multiple immediate cases in Matching"
+          end
+        | Some Types.Constructor_pointer -> begin
+            match pointer with
+            | None ->
+              (consts, boxed_nonconsts, null, immediate, Some act, payload)
+            | Some _ ->
+              Misc.fatal_error "Multiple pointer cases in Matching"
+          end
+        | Some (Types.Constructor_value | Types.Constructor_unboxed) -> begin
+            match payload with
+            | None ->
+              (consts, boxed_nonconsts, null, immediate, pointer, Some act)
+            | Some _ ->
+              Misc.fatal_error "Multiple payload cases in Matching"
+          end
+        | None -> assert false
+      )
+  in
+  let consts, boxed_nonconsts, null, immediate, pointer, payload =
+    split_rec tag_lambda_list
+  in
+  ( sort_int_lambda_list consts,
+    sort_int_lambda_list boxed_nonconsts,
+    null,
+    immediate,
+    pointer,
+    payload )
 
 (* The bool tracks whether the constructor is constant, because we don't have a
    constructor_description available for polymorphic variants *)
@@ -3395,7 +3497,19 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
           mk_failaction_pos partial constrs ctx def
       in
       let descr_lambda_list = fails @ descr_lambda_list in
-      let consts, nonconsts, null = split_cases descr_lambda_list in
+      let use_runtime_split =
+        match cstr.cstr_repr with
+        | Variant_erased erased ->
+          Array.exists
+            (function
+              | Types.Constructor_boxed _
+              | Types.Constructor_null
+              | Types.Constructor_immediate
+              | Types.Constructor_pointer -> true
+              | Types.Constructor_value | Types.Constructor_unboxed -> false)
+            erased
+        | Variant_boxed _ | Variant_unboxed | Variant_extensible -> false
+      in
       (* Our duty below is to generate code, for matching on a list of
          constructor+action cases, that is good for both bytecode and
          native-code compilation. (Optimizations that only work well
@@ -3423,7 +3537,74 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
         | None, Some act ->
             (* Identical actions, no failure: 0 control-flow instructions. *)
             act
+        | _ when use_runtime_split -> (
+            let consts, boxed_nonconsts, null, immediate, pointer, payload =
+              split_runtime_cases descr_lambda_list
+            in
+            let boxed_branch () =
+              match pointer, boxed_nonconsts with
+              | Some act, [] -> act
+              | None, [] ->
+                begin match fail_opt with
+                | Some fail -> fail
+                | None -> begin match immediate, payload with
+                  | Some act, _ -> act
+                  | None, Some act -> act
+                  | None, None -> assert false
+                  end
+                end
+              | None, [(_, act)] -> act
+              | None, _ ->
+                let sw =
+                  { sw_numconsts = 0;
+                    sw_consts = [];
+                    sw_numblocks = cstr.cstr_nonconsts;
+                    sw_blocks = boxed_nonconsts;
+                    sw_failaction = fail_opt
+                  }
+                in
+                let hs, sw = share_actions_sw value_kind sw in
+                let sw = reintroduce_fail sw in
+                hs (Lswitch (arg, sw, loc, value_kind))
+              | Some _, _ ->
+                Misc.fatal_error
+                  "Pointer case cannot coexist with boxed constructors"
+            in
+            let nonnull_branch =
+              match payload, immediate, consts with
+              | Some act, None, [] ->
+                act
+              | None, Some act, [] ->
+                Lifthenelse
+                  (Lprim (Pisint { variant_only = true }, [ arg ], loc), act,
+                   boxed_branch (), value_kind)
+              | None, None, _ when boxed_nonconsts = [] && pointer = None ->
+                call_switcher value_kind loc fail_opt arg 0
+                  (cstr.cstr_consts - 1) consts
+              | None, None, [] ->
+                boxed_branch ()
+              | None, None, _ ->
+                Lifthenelse
+                  ( Lprim (Pisint { variant_only = true }, [ arg ], loc),
+                    call_switcher value_kind loc fail_opt arg 0
+                      (cstr.cstr_consts - 1) consts,
+                    boxed_branch (), value_kind )
+              | None, Some act, _ ->
+                Lifthenelse
+                  (Lprim (Pisint { variant_only = true }, [ arg ], loc), act,
+                   boxed_branch (), value_kind)
+              | Some _, Some _, _
+              | Some _, None, _ ->
+                Misc.fatal_error "Invalid runtime-represented variant match"
+            in
+            begin match null with
+            | None -> nonnull_branch
+            | Some if_null ->
+              transl_match_on_or_null value_kind arg loc ~if_null
+                ~if_this:nonnull_branch
+            end )
         | _ -> (
+            let consts, nonconsts, null = split_cases descr_lambda_list in
             match
               (cstr.cstr_consts, cstr.cstr_nonconsts, consts, nonconsts, null)
             with
@@ -3432,7 +3613,7 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
                 transl_match_on_option value_kind arg loc
                   ~if_none:act1 ~if_some:act2
             | 1, 1, [], [(_, act2)], Some act1 ->
-                (* The [Variant_with_null] case. *)
+                (* The erased-null case. *)
                 transl_match_on_or_null value_kind arg loc
                   ~if_null:act1 ~if_this:act2
             | _, _, _, _, Some _ ->

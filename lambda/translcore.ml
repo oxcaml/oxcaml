@@ -50,7 +50,7 @@ let field_offset_for_label lbl =
   match lbl.lbl_repres with
   | Record_boxed _
   | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
-  | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
+  | Record_inlined (_, Constructor_uniform_value, Variant_erased _) ->
       lbl.lbl_pos
   | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
       lbl.lbl_pos + 1
@@ -65,7 +65,7 @@ let field_offset_for_label lbl =
   | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
       fatal_error "Mixed inlined records not supported for extensible variants"
   | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
-  | Record_inlined (_, Constructor_mixed _, Variant_with_null)
+  | Record_inlined (_, Constructor_mixed _, Variant_erased _)
   | Record_mixed _ ->
       lbl.lbl_pos
 
@@ -524,15 +524,17 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let ll =
         List.map (fun (e, sort) -> transl_exp ~scopes sort e) args_with_sorts
       in
+      let runtime_repr =
+        Types.constructor_runtime_representation_of_constructor cstr
+      in
       if cstr.cstr_inlined <> None then begin match ll with
         | [x] -> x
         | _ -> assert false
-      end else begin match cstr.cstr_tag, cstr.cstr_repr with
-      | Null, Variant_with_null -> Lconst Const_null
-      | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
-        assert false
-      | Ordinary {runtime_tag},
-        (Variant_boxed _ | Variant_extensible) when cstr.cstr_constant ->
+      end else begin match runtime_repr, cstr.cstr_tag, cstr.cstr_repr with
+      | Some Types.Constructor_null, Null, Variant_erased _ -> Lconst Const_null
+      | Some (Types.Constructor_boxed _), Ordinary {runtime_tag},
+        (Variant_boxed _ | Variant_erased _ | Variant_extensible)
+        when cstr.cstr_constant ->
           assert (
             List.for_all
               (fun (_, s) -> Jkind.Sort.Const.all_void s) args_with_sorts);
@@ -540,9 +542,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
             ((tagged_immediate runtime_tag) : lambda)
             ll
-      | Ordinary _, (Variant_unboxed | Variant_with_null) ->
+      | ( Some
+            ( Types.Constructor_value | Types.Constructor_immediate
+            | Types.Constructor_pointer | Types.Constructor_unboxed ),
+          Ordinary _, (Variant_unboxed | Variant_erased _) ) ->
           (match ll with [v] -> v | _ -> assert false)
-      | Ordinary {runtime_tag}, Variant_boxed _ ->
+      | Some (Types.Constructor_boxed _), Ordinary {runtime_tag},
+        (Variant_boxed _ | Variant_erased _) ->
           let constant =
             match List.map extract_constant ll with
             | exception Not_constant -> None
@@ -587,7 +593,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
           end
-      | Extension path, Variant_extensible ->
+      | None, Extension path, Variant_extensible ->
           let lam = transl_extension_path
                       (of_location ~scopes e.exp_loc) e.exp_env path in
           if cstr.cstr_constant
@@ -629,8 +635,34 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Pmakeblock(0, Immutable, Shape shape, alloc_mode)
             in
             Lprim (makeblock, lam :: ll, of_location ~scopes e.exp_loc)
-      | Extension _, (Variant_boxed _ | Variant_unboxed | Variant_with_null)
-      | Ordinary _, Variant_extensible -> assert false
+      | ( None, Null, _
+        | None, Ordinary _,
+          (Variant_boxed _ | Variant_unboxed | Variant_erased _)
+        | None, Extension _,
+          (Variant_boxed _ | Variant_unboxed | Variant_erased _)
+        | None, Ordinary _, Variant_extensible
+        | Some Types.Constructor_null, Null,
+          (Variant_boxed _ | Variant_unboxed | Variant_extensible)
+        | Some Types.Constructor_null, Extension _, _
+        | Some Types.Constructor_null, Ordinary _, _
+        | Some (Types.Constructor_boxed _), Null, _
+        | Some (Types.Constructor_boxed _), Ordinary _, Variant_extensible
+        | Some (Types.Constructor_boxed _), Ordinary _, Variant_unboxed
+        | Some (Types.Constructor_boxed _), Extension _, Variant_unboxed
+        | Some
+            ( Types.Constructor_value | Types.Constructor_immediate
+            | Types.Constructor_pointer | Types.Constructor_unboxed ),
+          Ordinary _, (Variant_boxed _ | Variant_extensible)
+        | Some
+            ( Types.Constructor_value | Types.Constructor_immediate
+            | Types.Constructor_pointer | Types.Constructor_unboxed ),
+          Extension _, _
+        | Some
+            ( Types.Constructor_value | Types.Constructor_immediate
+            | Types.Constructor_pointer | Types.Constructor_unboxed ),
+          Null, _
+        | Some Types.Constructor_boxed _, Extension _, _ ) ->
+        assert false
       end
   | Texp_extension_constructor (_, path) ->
       transl_extension_path (of_location ~scopes e.exp_loc) e.exp_env path
@@ -742,7 +774,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               shape
           in
           Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
-        | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_inlined (_, _, Variant_erased _) -> assert false
       in
       begin match prim_and_args with
       | None -> targ
@@ -824,7 +856,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           shape.(lbl.lbl_pos) <- field_shape;
           Psetmixedfield([lbl.lbl_pos], shape, mode),
           [arg_lambda; newval_lambda]
-        | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_inlined (_, _, Variant_erased _) -> assert false
       in
       Lprim(prim, args, of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
@@ -2119,7 +2151,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 shape.(lbl.lbl_pos) <- field_shape;
                 Psetmixedfield
                   ([lbl.lbl_pos], shape, Assignment modify_heap)
-            | Record_inlined (_, _, Variant_with_null) -> assert false
+            | Record_inlined (_, _, Variant_erased _) -> assert false
           in
           Lsequence(Lprim(upd, [Lvar copy_id;
                                 transl_exp ~scopes lbl.lbl_sort expr],
@@ -2200,7 +2232,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                       shape
                    in
                    Pmixedfield ([i], shape, sem)
-                 | Record_inlined (_, _, Variant_with_null) -> assert false
+                 | Record_inlined (_, _, Variant_erased _) -> assert false
                in
                Lprim(access, [Lvar init_id],
                      of_location ~scopes loc),
@@ -2243,7 +2275,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                blocks containing unboxed float literals.
             *)
             raise Not_constant
-        | Record_inlined (_, _, (Variant_extensible | Variant_with_null))
+        | Record_inlined (_, _, (Variant_extensible | Variant_erased _))
         | Record_inlined ((Extension _ | Null), _, _) ->
             raise Not_constant
       with Not_constant ->
@@ -2295,7 +2327,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             let shape = Lambda.transl_mixed_product_shape shape in
             Lprim (Pmakeblock (runtime_tag, mut, Shape shape, Option.get mode),
                    ll, loc)
-        | Record_inlined (_, _, Variant_with_null) -> assert false
+        | Record_inlined (_, _, Variant_erased _) -> assert false
         | Record_inlined (Null, _, _) -> assert false
     in
     begin match opt_init_expr with
@@ -2319,7 +2351,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl =
   | Record_boxed _
   | Record_inlined (_, _, ( Variant_boxed _
                           | Variant_extensible
-                          | Variant_with_null))
+                          | Variant_erased _))
     -> ()
   end;
   let field_offset = field_offset_for_label lbl in

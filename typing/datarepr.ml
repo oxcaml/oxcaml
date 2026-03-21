@@ -111,12 +111,25 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
   let cstr_shapes_and_arg_jkinds, is_unboxed =
-    let variant_with_null_shape cstr =
-      match cstr.cd_args with
-      | Cstr_tuple [] -> Constructor_uniform_value, [| |]
-      | Cstr_tuple [{ ca_sort = sort }] -> Constructor_uniform_value, [| sort |]
-      | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
-        Misc.fatal_error "Invalid constructor for Variant_with_null"
+    let runtime_shape runtime_repr cstr =
+      match runtime_repr, cstr.cd_args with
+      | Constructor_boxed (shape, arg_sorts), _ -> shape, arg_sorts
+      | Constructor_null, Cstr_tuple [] -> Constructor_uniform_value, [| |]
+      | ((Constructor_value | Constructor_immediate | Constructor_pointer
+         | Constructor_unboxed),
+         Cstr_tuple [{ ca_sort = sort }]) ->
+        Constructor_uniform_value, [| sort |]
+      | ((Constructor_value | Constructor_immediate | Constructor_pointer
+         | Constructor_unboxed),
+         Cstr_record [{ ld_sort = sort }]) ->
+        Constructor_uniform_value, [| sort |]
+      | Constructor_null, (Cstr_tuple (_ :: _) | Cstr_record _) ->
+        Misc.fatal_error "Invalid null constructor"
+      | ((Constructor_value | Constructor_immediate | Constructor_pointer
+         | Constructor_unboxed),
+         ( Cstr_tuple ([] | _ :: _ :: _)
+         | Cstr_record ([] | _ :: _ :: _) )) ->
+        Misc.fatal_error "Invalid runtime-represented constructor"
     in
     match rep, cstrs with
     | Variant_extensible, _ -> assert false
@@ -140,8 +153,11 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       end
     | Variant_unboxed, ([] | _ :: _) ->
       Misc.fatal_error "Multiple or 0 constructors in [@@unboxed] variant"
-    | Variant_with_null, _ ->
-      Array.of_list (List.map variant_with_null_shape cstrs), false
+    | Variant_erased erased, _ ->
+      Array.mapi
+        (fun i cstr -> runtime_shape erased.(i) cstr)
+        (Array.of_list cstrs),
+      false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
@@ -172,11 +188,30 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     in
     let cstr_tag =
       match rep, cd_args with
-      | Variant_with_null, Cstr_tuple [] -> Null
-      | Variant_with_null, (Cstr_tuple [_] | Cstr_record [_]) ->
-        Ordinary {src_index; runtime_tag}
-      | Variant_with_null, (Cstr_tuple (_ :: _ :: _) | Cstr_record []) ->
-        Misc.fatal_error "Invalid constructor for Variant_with_null"
+      | Variant_erased erased, _ ->
+        begin match erased.(src_index), cd_args with
+        | Constructor_null, Cstr_tuple [] -> Null
+        | Constructor_boxed _, (Cstr_tuple [] | Cstr_tuple (_ :: _)) ->
+          Ordinary {src_index; runtime_tag}
+        | ( Constructor_value | Constructor_immediate | Constructor_pointer
+          | Constructor_unboxed ),
+          (Cstr_tuple [_] | Cstr_record [_] | Cstr_tuple []) ->
+          Ordinary {src_index; runtime_tag}
+        | Constructor_null, (Cstr_tuple (_ :: _) | Cstr_record _) ->
+          Misc.fatal_error "Invalid null constructor"
+        | ( Constructor_value | Constructor_immediate | Constructor_pointer
+          | Constructor_unboxed ),
+          (Cstr_tuple (_ :: _ :: _) | Cstr_record (_ :: _ :: _)) ->
+          Misc.fatal_error "Invalid constructor representation"
+        | Constructor_boxed _, Cstr_record (_ :: _) ->
+          Misc.fatal_error "Invalid boxed constructor"
+        | Constructor_boxed _, Cstr_record [] ->
+          Misc.fatal_error "Invalid boxed constructor"
+        | ( Constructor_value | Constructor_immediate | Constructor_pointer
+          | Constructor_unboxed ),
+          Cstr_record [] ->
+          Misc.fatal_error "Invalid constructor representation"
+        end
       | _, _ -> Ordinary {src_index; runtime_tag}
     in
     let cstr_existentials, cstr_args, cstr_inlined =

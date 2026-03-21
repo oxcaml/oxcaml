@@ -138,6 +138,7 @@ type error =
   | Unexpected_layout_any_in_primitive of string
   | Useless_layout_poly
   | Bad_or_null_attribute of string
+  | Bad_constructor_repr_attribute of string
   | Zero_alloc_attr_unsupported of Builtin_attributes.zero_alloc_attribute
   | Zero_alloc_attr_non_function
   | Zero_alloc_attr_bad_user_arity
@@ -179,6 +180,57 @@ let get_or_null_from_attributes sdecl =
       Bad_or_null_attribute
         "it cannot be both [@@or_null] and [@@or_null_reexport]"));
   or_null
+
+type constructor_repr_annotation =
+  | Repr_unboxed
+  | Repr_null
+  | Repr_value
+  | Repr_immediate
+  | Repr_pointer
+
+type constructor_runtime_class =
+  | Null_class
+  | Value_class
+  | Immediate_class
+  | Pointer_class
+  | Ordinary_constant_class
+  | Ordinary_nonconstant_class
+
+let constructor_repr_of_string loc = function
+  | "unboxed" -> Repr_unboxed
+  | "null" -> Repr_null
+  | "value" -> Repr_value
+  | "immediate" -> Repr_immediate
+  | "pointer" -> Repr_pointer
+  | repr ->
+    raise (Error (loc, Bad_constructor_repr_attribute
+      ("unknown constructor representation " ^ repr)))
+
+let constructor_repr_of_attributes
+    ({ pcd_attributes; pcd_loc; _ } : Parsetree.constructor_declaration) =
+  match Builtin_attributes.repr_attribute pcd_attributes with
+  | None -> None
+  | Some repr -> Some (constructor_repr_of_string pcd_loc repr)
+
+let get_constructor_repr_annotations sdecl scstrs =
+  let reprs = List.map constructor_repr_of_attributes scstrs in
+  if List.for_all Option.is_none reprs then
+    None
+  else begin
+    let bad msg =
+      raise (Error (sdecl.ptype_loc, Bad_constructor_repr_attribute msg))
+    in
+    begin match get_unboxed_from_attributes sdecl with
+    | None -> ()
+    | Some _ ->
+      bad "it must not also use [@@boxed] or [@@unboxed]"
+    end;
+    if Builtin_attributes.has_or_null sdecl.ptype_attributes
+       || Builtin_attributes.has_or_null_reexport sdecl.ptype_attributes
+    then
+      bad "it must not also use [@@or_null] or [@@or_null_reexport]";
+    Some reprs
+  end
 
 let check_or_null_variant_shape _path params sdecl scstrs =
   let bad msg =
@@ -247,6 +299,94 @@ let custom_or_null_jkind path param =
        ~modality:Mode.Modality.Const.id
        ~type_expr:param
   |> Jkind.mark_best
+
+let mk_value_jkind ~why ~nullability ~pointerness =
+  let const =
+    let mod_bounds =
+      Btype.Jkind0.Mod_bounds.create Mode.Crossing.max
+        ~externality:Jkind_axis.Externality.max
+        ~nullability
+        ~separability:Jkind_axis.Separability.Maybe_separable
+    in
+    Types.
+      { base =
+          Layout
+            (Jkind_types.Layout.Const.Static.of_base Jkind_types.Sort.Value
+               { pointerness });
+        mod_bounds;
+        with_bounds = No_with_bounds
+      }
+  in
+  Btype.Jkind0.of_const ~annotation:None ~why ~quality:Not_best
+    ~ran_out_of_fuel_during_normalize:false const
+
+let pointer_value_jkind ~why ~nullable =
+  mk_value_jkind ~why
+    ~nullability:
+      (if nullable
+       then Jkind_axis.Nullability.Maybe_null
+       else Jkind_axis.Nullability.Non_null)
+    ~pointerness:Jkind_axis.Pointerness.Pointer
+
+let payload_runtime_jkind path ~position runtime_repr =
+  let jkind =
+    match runtime_repr with
+    | Types.Constructor_value ->
+      let ident =
+        match path with
+        | Path.Pident id -> id
+        | _ -> Ident.create_local "repr_value"
+      in
+      Btype.Jkind0.for_or_null_argument ident
+    | Types.Constructor_immediate ->
+      Misc.fatal_error "payload_runtime_jkind: immediate handled separately"
+    | Types.Constructor_pointer ->
+      let why : Jkind.History.creation_reason =
+        Concrete_creation (Constructor_declaration position)
+      in
+      pointer_value_jkind ~why ~nullable:false
+    | ( Types.Constructor_boxed _ | Types.Constructor_null
+      | Types.Constructor_unboxed ) ->
+      Misc.fatal_error "payload_runtime_jkind"
+  in
+  match Jkind.try_allow_r jkind with
+  | Some jkind -> jkind
+  | None -> Misc.fatal_error "payload_runtime_jkind: non-r-jkind"
+
+let type_jkind_for_variant_runtime_repr path reps =
+  let has runtime_repr =
+    Array.exists (( = ) runtime_repr) reps
+  in
+  match
+    has Types.Constructor_value,
+    has Types.Constructor_null,
+    has Types.Constructor_immediate,
+    has Types.Constructor_pointer
+  with
+  | true, _, _, _ ->
+    Jkind.Builtin.value_or_null
+      ~why:
+        (Type_argument { parent_path = path; position = 1; arity = 1 })
+  | false, has_null, false, true ->
+    let why : Jkind.History.creation_reason =
+      Concrete_creation (Constructor_declaration 1)
+    in
+    pointer_value_jkind ~why ~nullable:has_null
+  | false, false, true, false ->
+    Jkind.Builtin.immediate
+      ~why:(Primitive (Ident.create_local "repr_immediate"))
+  | false, true, true, false ->
+    Jkind.Builtin.immediate_or_null
+      ~why:(Primitive (Ident.create_local "repr_immediate_or_null"))
+  | false, has_null, _, _ ->
+    if has_null
+    then
+      Jkind.Builtin.value_or_null
+        ~why:
+          (Type_argument { parent_path = path; position = 1; arity = 1 })
+    else
+      Jkind.Builtin.value
+        ~why:(Type_argument { parent_path = path; position = 1; arity = 1 })
 
 (* [make_params] creates sort variables - these can be defaulted away (as in
    transl_type_decl) or unified with existing sort-variable-free types (as in
@@ -931,6 +1071,13 @@ let transl_declaration env sdecl (id, uid) =
     sdecl.ptype_cstrs
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
+  let constructor_repr_annotations =
+    match sdecl.ptype_kind with
+    | Ptype_variant scstrs -> get_constructor_repr_annotations sdecl scstrs
+    | Ptype_abstract | Ptype_record _ | Ptype_record_unboxed_product _
+    | Ptype_open ->
+      None
+  in
   let unbox, unboxed_default =
     match sdecl.ptype_kind with
     | Ptype_variant [{pcd_args = Pcstr_tuple [_]; _}]
@@ -1080,34 +1227,254 @@ let transl_declaration env sdecl (id, uid) =
             (fun () -> make_cstr scstr)
         in
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
+        let boxed_runtime_repr cstr =
+          let arg_sorts =
+            match Types.(cstr.cd_args) with
+            | Cstr_tuple args ->
+              Array.make (List.length args) Jkind.Sort.Const.void
+            | Cstr_record _ -> [| Jkind.Sort.Const.value |]
+          in
+          Types.Constructor_boxed (Constructor_uniform_value, arg_sorts)
+        in
+        let repr_runtime_reprs =
+          match constructor_repr_annotations with
+          | None -> None
+          | Some reprs ->
+            let bad msg =
+              raise
+                (Error
+                   (sdecl.ptype_loc, Bad_constructor_repr_attribute msg))
+            in
+            let has_unboxed =
+              List.exists
+                (function Some Repr_unboxed -> true | _ -> false)
+                reprs
+            in
+            let has_non_unboxed =
+              List.exists
+                (function
+                  | Some
+                      (Repr_null | Repr_value | Repr_immediate
+                       | Repr_pointer) ->
+                    true
+                  | None | Some Repr_unboxed -> false)
+                reprs
+            in
+            if has_unboxed && has_non_unboxed then
+              bad "[@repr unboxed] must not be mixed with other [@repr]s";
+            if has_unboxed then begin
+              match reprs, cstrs with
+              | [Some Repr_unboxed], [_] ->
+                verify_unboxed_attr (Some true) sdecl;
+                Some [| Types.Constructor_unboxed |]
+              | [None], _ ->
+                bad "it must annotate the constructor that uses [@repr]"
+              | _ ->
+                bad
+                  "[@repr unboxed] requires a type with exactly one \
+                   constructor"
+            end else begin
+              let reprs = Array.of_list reprs in
+              let cstrs_arr = Array.of_list cstrs in
+              (* The mixed constructor encodings are sound exactly when the
+                 constructors land in disjoint runtime classes under the tests
+                 used by [translcore] and [matching]: null, immediate,
+                 arbitrary pointer, arbitrary non-null value, ordinary constant
+                 constructor, and ordinary boxed constructor.  The declarations
+                 are tiny, so a simple pairwise compatibility check keeps this
+                 invariant explicit and avoids missing overlaps when we add new
+                 representation forms. *)
+              let count target =
+                Array.fold_left
+                  (fun acc -> function
+                    | Some repr when repr = target -> acc + 1
+                    | None | Some _ -> acc)
+                  0 reprs
+              in
+              if count Repr_null > 1 then
+                bad "there may be at most one [@repr null] constructor";
+              if count Repr_value > 1 then
+                bad "there may be at most one [@repr value] constructor";
+              if count Repr_immediate > 1 then
+                bad "there may be at most one [@repr immediate] constructor";
+              if count Repr_pointer > 1 then
+                bad "there may be at most one [@repr pointer] constructor";
+              let runtime_reprs =
+                Array.mapi
+                  (fun i repr ->
+                    let cstr = cstrs_arr.(i) in
+                    match repr, cstr.Types.cd_args with
+                    | None, Cstr_record _ ->
+                      bad
+                        "ordinary constructors in [@repr]-annotated variants \
+                         must use tuple arguments"
+                    | None, _ -> boxed_runtime_repr cstr
+                    | Some Repr_null, Cstr_tuple [] -> Types.Constructor_null
+                    | Some Repr_null, _ ->
+                      bad "[@repr null] requires a nullary constructor"
+                    | Some Repr_value, Cstr_tuple [_] -> Types.Constructor_value
+                    | Some Repr_value, _ ->
+                      bad "[@repr value] requires a unary tuple constructor"
+                    | Some Repr_immediate, Cstr_tuple [_] ->
+                      Types.Constructor_immediate
+                    | Some Repr_immediate, _ ->
+                      bad "[@repr immediate] requires a unary tuple constructor"
+                    | Some Repr_pointer, Cstr_tuple [_] ->
+                      Types.Constructor_pointer
+                    | Some Repr_pointer, _ ->
+                      bad "[@repr pointer] requires a unary tuple constructor"
+                    | Some Repr_unboxed, _ ->
+                      bad
+                        "[@repr unboxed] requires a type with exactly one \
+                         constructor")
+                  reprs
+              in
+              let runtime_class_of_constructor runtime_repr cstr =
+                match runtime_repr, cstr.Types.cd_args with
+                | Types.Constructor_null, Cstr_tuple [] -> Null_class
+                | Types.Constructor_value, Cstr_tuple [_] -> Value_class
+                | Types.Constructor_immediate, Cstr_tuple [_] ->
+                  Immediate_class
+                | Types.Constructor_pointer, Cstr_tuple [_] -> Pointer_class
+                | Types.Constructor_boxed _, Cstr_tuple [] ->
+                  Ordinary_constant_class
+                | Types.Constructor_boxed _,
+                  ( Cstr_tuple [_] | Cstr_tuple (_ :: _ :: _)
+                  | Cstr_record [_] | Cstr_record (_ :: _ :: _) ) ->
+                  Ordinary_nonconstant_class
+                | ( Types.Constructor_boxed _ | Types.Constructor_null
+                  | Types.Constructor_value | Types.Constructor_immediate
+                  | Types.Constructor_pointer ),
+                  Cstr_record [] ->
+                  Misc.fatal_error
+                    "Typedecl.runtime_class_of_constructor: empty record"
+                | Types.Constructor_unboxed, _ ->
+                  Misc.fatal_error
+                    "Typedecl.runtime_class_of_constructor: unboxed constructor"
+                | _ ->
+                  Misc.fatal_error
+                    "Typedecl.runtime_class_of_constructor: invalid constructor"
+              in
+              let incompatibility cls1 cls2 =
+                match cls1, cls2 with
+                | Null_class, _ | _, Null_class -> None
+                | Value_class, _
+                | _, Value_class ->
+                  Some "[@repr value] may only coexist with [@repr null]"
+                | Immediate_class, Ordinary_constant_class
+                | Ordinary_constant_class, Immediate_class ->
+                  Some
+                    "[@repr immediate] must not coexist with ordinary constant \
+                     constructors"
+                | Pointer_class, Ordinary_constant_class
+                | Ordinary_constant_class, Pointer_class
+                | Pointer_class, Ordinary_nonconstant_class
+                | Ordinary_nonconstant_class, Pointer_class ->
+                  Some
+                    "[@repr pointer] may only coexist with [@repr null] and \
+                     [@repr immediate]"
+                | Immediate_class, Immediate_class
+                | Pointer_class, Pointer_class
+                | Ordinary_constant_class, Ordinary_constant_class
+                | Ordinary_constant_class, Ordinary_nonconstant_class
+                | Ordinary_nonconstant_class, Ordinary_constant_class
+                | Ordinary_nonconstant_class, Ordinary_nonconstant_class
+                | Immediate_class, Ordinary_nonconstant_class
+                | Ordinary_nonconstant_class, Immediate_class
+                | Immediate_class, Pointer_class
+                | Pointer_class, Immediate_class ->
+                  None
+              in
+              let runtime_classes =
+                Array.mapi
+                  (fun i runtime_repr ->
+                    runtime_class_of_constructor runtime_repr cstrs_arr.(i))
+                  runtime_reprs
+              in
+              for i = 0 to Array.length runtime_classes - 1 do
+                for j = i + 1 to Array.length runtime_classes - 1 do
+                  match
+                    incompatibility runtime_classes.(i) runtime_classes.(j)
+                  with
+                  | None -> ()
+                  | Some msg -> bad msg
+                done
+              done;
+              if Array.for_all
+                   (function Types.Constructor_boxed _ -> false | _ -> true)
+                   runtime_reprs
+              then Some runtime_reprs
+              else if
+                Array.exists
+                  (function
+                    | Types.Constructor_null
+                    | Types.Constructor_immediate
+                    | Types.Constructor_pointer
+                    | Types.Constructor_value -> true
+                    | Types.Constructor_boxed _ | Types.Constructor_unboxed ->
+                      false)
+                  runtime_reprs
+              then Some runtime_reprs
+              else bad "it must annotate the constructor that uses [@repr]"
+            end
+        in
         let rep, jkind =
           if custom_or_null then
             match params with
-            | [param] -> Variant_with_null, custom_or_null_jkind path param
+            | [param] ->
+              let erased =
+                Array.of_list
+                  (List.map
+                     (fun cstr ->
+                        match cstr.Types.cd_args with
+                        | Cstr_tuple [] -> Types.Constructor_null
+                        | Cstr_tuple [_] -> Types.Constructor_value
+                        | Cstr_record [_] ->
+                          Misc.fatal_error
+                            "Invalid custom [@@or_null] declaration"
+                        | Cstr_tuple (_ :: _ :: _)
+                        | Cstr_record []
+                        | Cstr_record (_ :: _ :: _) ->
+                          Misc.fatal_error
+                            "Invalid custom [@@or_null] declaration")
+                     cstrs)
+              in
+              Variant_erased erased, custom_or_null_jkind path param
             | _ -> assert false
-          else if unbox then
-            Variant_unboxed,
-            Jkind.of_new_sort ~why:Old_style_unboxed_type
-              ~level:(Ctype.get_current_level ())
-          else
-            (* We mark all arg sorts "void" here.  They are updated later,
-               after the circular type checks make it safe to check sorts.
-               Likewise, [Constructor_uniform_value] is potentially wrong
-               and will be updated later.
-            *)
-            Variant_boxed (
-              Array.map
-                (fun cstr ->
-                   let sorts =
-                     match Types.(cstr.cd_args) with
-                     | Cstr_tuple args ->
-                       Array.make (List.length args) Jkind.Sort.Const.void
-                     | Cstr_record _ -> [| Jkind.Sort.Const.value |]
-                   in
-                   Constructor_uniform_value, sorts)
-                (Array.of_list cstrs)
-            ),
-          Jkind.for_non_float ~why:Boxed_variant
+          else begin
+            match repr_runtime_reprs with
+            | Some [| Types.Constructor_unboxed |] ->
+              Variant_erased [| Types.Constructor_unboxed |],
+              Jkind.of_new_sort ~why:Old_style_unboxed_type
+                ~level:(Ctype.get_current_level ())
+            | Some runtime_reprs ->
+              Variant_erased runtime_reprs,
+              type_jkind_for_variant_runtime_repr path runtime_reprs
+            | None ->
+              if unbox then
+                Variant_unboxed,
+                Jkind.of_new_sort ~why:Old_style_unboxed_type
+                  ~level:(Ctype.get_current_level ())
+              else
+                (* We mark all arg sorts "void" here.  They are updated later,
+                   after the circular type checks make it safe to check sorts.
+                   Likewise, [Constructor_uniform_value] is potentially wrong
+                   and will be updated later.
+                *)
+                Variant_boxed (
+                  Array.map
+                    (fun cstr ->
+                       let sorts =
+                         match Types.(cstr.cd_args) with
+                         | Cstr_tuple args ->
+                           Array.make (List.length args) Jkind.Sort.Const.void
+                         | Cstr_record _ -> [| Jkind.Sort.Const.value |]
+                       in
+                       Constructor_uniform_value, sorts)
+                    (Array.of_list cstrs)
+                ),
+              Jkind.for_non_float ~why:Boxed_variant
+          end
         in
           Ttype_variant tcstrs, Type_variant (cstrs, rep, None), jkind
       | Ptype_record lbls ->
@@ -1445,7 +1812,20 @@ let rec check_constraints_rec env loc visited ty =
         try Env.find_type path env
         with Not_found ->
           raise (Error(loc, Unavailable_type_constructor path)) in
-      let ty' = Ctype.newconstr path (Ctype.instance_list decl.type_params) in
+      let params = Ctype.instance_list decl.type_params in
+      List.iter2
+        (fun param arg ->
+          match get_desc param with
+          | Tvar { jkind; _ }
+            when Ctype.jkind_requires_definite_pointer env jkind
+                 && Ctype.is_definitely_pointer_value env arg ->
+            begin match Ctype.relax_required_pointerness env jkind with
+            | Some relaxed -> Types.set_var_jkind param relaxed
+            | None -> ()
+            end
+          | _ -> ())
+        params args;
+      let ty' = Ctype.newconstr path params in
       begin
         (* We don't expand the error trace because that produces types that
            *already* violate the constraints -- we need to report a problem with
@@ -1636,11 +2016,19 @@ let narrow_to_manifest_jkind env loc decl =
             decl.type_jkind
         with
         | Ok () -> ()
+        | Error _
+          when Ctype.jkind_requires_definite_pointer env decl.type_jkind
+               && Ctype.is_definitely_pointer_value env ty ->
+          ()
         | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
       end
     | Some type_jkind -> begin
         match Ctype.constrain_type_jkind env ty type_jkind with
         | Ok () -> ()
+        | Error _
+          when Ctype.jkind_requires_definite_pointer env type_jkind
+               && Ctype.is_definitely_pointer_value env ty ->
+          ()
         | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
       end
     end;
@@ -2182,55 +2570,155 @@ let rec update_decl_jkind env dpath decl =
   let update_variant_kind loc cstrs rep =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
-    | _, Variant_with_null ->
-      let payload =
-        List.find_opt
-          (fun cd ->
-             match cd.Types.cd_args with
-             | Cstr_tuple [_] -> true
-             | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
-               false)
+    | [], Variant_erased _ ->
+      Misc.fatal_error "Typedecl.update_variant_kind: empty erased variant"
+    | [{ Types.cd_args } as cstr], Variant_erased [| Constructor_unboxed |] ->
+      begin
+        match cd_args with
+        | Cstr_tuple [{ ca_type = ty; _ } as arg] ->
+          let jkind = Ctype.type_jkind env ty in
+          let sort = Jkind.sort_of_jkind env jkind in
+          let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+          [{ cstr with Types.cd_args = Cstr_tuple [{ arg with ca_sort }] }],
+          rep, jkind
+        | Cstr_record [{ ld_type } as lbl] ->
+          let jkind = Ctype.type_jkind env ld_type in
+          let sort = Jkind.sort_of_jkind env jkind in
+          let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+          [{ cstr with Types.cd_args = Cstr_record [{ lbl with ld_sort }] }],
+          rep, jkind
+        | Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _) ->
+          Misc.fatal_error
+            "Typedecl.update_variant_kind: \
+             invalid erased unboxed constructor"
+      end
+    | cstrs, Variant_erased runtime_reprs ->
+      let has runtime_repr =
+        Array.exists (( = ) runtime_repr) runtime_reprs
+      in
+      let updated_cstrs =
+        List.mapi
+          (fun idx cstr ->
+            match runtime_reprs.(idx) with
+            | Types.Constructor_boxed (_cstr_shape, arg_sorts) ->
+              let arg_sorts =
+                Array.copy arg_sorts
+              in
+              let cd_args, _all_void, jkinds =
+                update_constructor_arguments_sorts env cstr.Types.cd_loc
+                  cstr.Types.cd_args (Some arg_sorts)
+              in
+              let cstr_repr =
+                update_constructor_representation env cd_args jkinds
+                  ~is_extension_constructor:false
+                  ~loc:cstr.Types.cd_loc
+              in
+              runtime_reprs.(idx) <-
+                Types.Constructor_boxed (cstr_repr, arg_sorts);
+              { cstr with Types.cd_args }
+            | Types.Constructor_null -> begin
+              match cstr.Types.cd_args with
+              | Cstr_tuple [] -> cstr
+              | Cstr_tuple (_ :: _) | Cstr_record _ ->
+                Misc.fatal_error
+                  "Typedecl.update_variant_kind: invalid null constructor"
+            end
+            | (Types.Constructor_value | Types.Constructor_immediate
+              | Types.Constructor_pointer) as runtime_repr -> begin
+              match cstr.Types.cd_args with
+              | Cstr_tuple
+                  [{ ca_type = ty; ca_modalities = modality; ca_loc; _ }]
+                ->
+                begin match runtime_repr with
+                | Types.Constructor_immediate ->
+                  let is_immediate = Ctype.is_always_gc_ignorable env ty in
+                  let is_non_nullable =
+                    Ctype.check_type_nullability env ty Non_null
+                  in
+                  if not (is_immediate && is_non_nullable) then
+                    raise
+                      (Error
+                         ( ca_loc,
+                           Bad_constructor_repr_attribute
+                             "[@repr immediate] requires an immediate, \
+                              non-null payload" ))
+                | Types.Constructor_value | Types.Constructor_pointer ->
+                  let required =
+                    payload_runtime_jkind dpath ~position:(idx + 1)
+                      runtime_repr
+                  in
+                  begin match Ctype.check_type_jkind env ty required with
+                  | Ok () -> ()
+                  | Error _ when runtime_repr = Types.Constructor_pointer
+                                 && Ctype.is_definitely_pointer_value env ty ->
+                    ()
+                  | Error err ->
+                    raise
+                      (Error
+                         (ca_loc, Jkind_mismatch_of_type (env, ty, err)))
+                  end
+                | (Types.Constructor_boxed _ | Types.Constructor_null
+                  | Types.Constructor_unboxed) ->
+                  Misc.fatal_error
+                    "Typedecl.update_variant_kind: impossible payload repr"
+                end;
+                let jkind = Ctype.type_jkind env ty in
+                let sort = Jkind.sort_of_jkind env jkind in
+                let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+                { cstr with
+                  Types.cd_args =
+                    Cstr_tuple
+                      [{ ca_type = ty;
+                         ca_sort;
+                         ca_modalities = modality;
+                         ca_loc
+                       }]
+                }
+              | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
+                Misc.fatal_error
+                  "Typedecl.update_variant_kind: invalid represented \
+                   constructor"
+            end
+            | Types.Constructor_unboxed ->
+              Misc.fatal_error
+                "Typedecl.update_variant_kind: unexpected unboxed constructor"
+          )
           cstrs
       in
-      begin match payload with
-      | Some
-          ({ Types.cd_uid;
-             cd_args =
-               Cstr_tuple
-                 [{ ca_type = ty; ca_modalities = modality }];
-             _
-           } as _payload) ->
-        let jkind = Ctype.type_jkind env ty in
-        let sort = Jkind.sort_of_jkind env jkind in
-        let ca_sort = Jkind.Sort.default_to_value_and_get sort in
-        let cstrs =
-          List.map
-            (fun (cstr : Types.constructor_declaration) ->
-               if Uid.equal cstr.cd_uid cd_uid then
-                 match cstr.cd_args with
-                 | Cstr_tuple [{ ca_type; ca_modalities; ca_loc; _ }] ->
-                   { cstr with
-                     cd_args =
-                       Cstr_tuple
-                         [{ ca_type; ca_sort; ca_modalities; ca_loc }] }
-                 | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
-                   Misc.fatal_error "Invalid constructor for Variant_with_null"
-               else cstr)
-            cstrs
-        in
-        begin match
-          Jkind.apply_modality_l modality jkind
-          |> Jkind.apply_or_null_l
-        with
-        | Ok type_jkind -> cstrs, rep, type_jkind
-        | Error () ->
-          Misc.fatal_error
-            "Typedecl.update_variant_kind: Variant_with_null payload is \
-             already maybe-null"
-        end
-      | Some _ | None ->
-        Misc.fatal_error "Invalid constructor for Variant_with_null"
-      end
+      let type_jkind =
+        if has Types.Constructor_value then
+          let payload =
+            List.find_opt
+              (fun (runtime_repr, _cd) ->
+                runtime_repr = Types.Constructor_value)
+              (List.combine (Array.to_list runtime_reprs) updated_cstrs)
+          in
+          begin match payload with
+          | Some
+              ( _,
+                { Types.cd_args =
+                    Cstr_tuple
+                      [{ ca_type = ty; ca_modalities = modality; _ }];
+                  _
+                } ) ->
+            let jkind = Ctype.type_jkind env ty in
+            begin match
+              Jkind.apply_modality_l modality jkind
+              |> Jkind.apply_or_null_l
+            with
+            | Ok type_jkind -> type_jkind
+            | Error () ->
+              Misc.fatal_error
+                "Typedecl.update_variant_kind: value payload is already \
+                 maybe-null"
+            end
+          | Some _ | None ->
+            Misc.fatal_error "Invalid value constructor"
+          end
+        else
+          type_jkind_for_variant_runtime_repr dpath runtime_reprs
+      in
+      updated_cstrs, rep, type_jkind
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin
         match cd_args with
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
@@ -2376,6 +2864,10 @@ let rec update_decl_jkind env dpath decl =
       env new_decl.type_jkind decl.type_jkind
   with
   | Ok () -> new_decl
+  | Error _
+    when Ctype.jkind_requires_definite_pointer env decl.type_jkind
+         && Ctype.is_definitely_pointer_decl env new_decl ->
+    new_decl
   | Error err ->
     raise (Error (decl.type_loc, Jkind_mismatch_of_path (env, dpath, err)))
 
@@ -3094,6 +3586,10 @@ let normalize_decl_jkinds env decls =
           in
           { decl with type_jkind; type_kind; }
         else decl
+      | Error _
+        when Ctype.jkind_requires_definite_pointer env original_decl.type_jkind
+             && Ctype.is_definitely_pointer_decl env decl ->
+        decl
       | Error err ->
         raise(Error(decl.type_loc, Jkind_mismatch_of_path (env, path, err)))
     end
@@ -5234,6 +5730,8 @@ let report_error_doc ppf = function
         Style.inline_code "[@layout_poly]"
   | Bad_or_null_attribute msg ->
       fprintf ppf "@[Invalid [@@or_null] declaration:@ %s.@]" msg
+  | Bad_constructor_repr_attribute msg ->
+      fprintf ppf "@[Invalid [@repr] declaration:@ %s.@]" msg
   | Zero_alloc_attr_unsupported ca ->
       let variety = match ca with
         | Default_zero_alloc  | Check _ -> assert false

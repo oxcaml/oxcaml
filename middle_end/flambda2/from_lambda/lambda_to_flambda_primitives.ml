@@ -2117,7 +2117,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_inlined
           ( Ordinary _,
             _,
-            (Variant_unboxed | Variant_extensible | Variant_with_null) )
+            (Variant_unboxed | Variant_extensible | Variant_erased _) )
       | Record_unboxed
       | Record_inlined (Null, _, _) ->
         Misc.fatal_errorf "Cannot handle record kind for Pduprecord: %a"

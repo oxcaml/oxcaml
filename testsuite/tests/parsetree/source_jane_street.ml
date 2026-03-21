@@ -171,10 +171,12 @@ type ('a, 'b : float64, 'c : any, 'd, 'e, 'f, 'g, 'h, 'i, 'j : bits64, 'k,
 type t15 : any non_pointer
 type t16 : value non_pointer
 type t17 : value & value non_pointer
+type t18 : value pointer
 [%%expect{|
 type t15 : any non_pointer
 type t16 : value non_pointer
 type t17 : value & value non_pointer
+type t18 : value pointer
 |}]
 
 type t = #(int * float#)
@@ -208,6 +210,42 @@ let y () = #( Or_null_names.Nope, Or_null_names.Yep "hi" )
 module Or_null_names : sig type 'a t = Nope | Yep of 'a [@@or_null] end @@
   stateless
 val y : unit -> #('a Or_null_names.t * string Or_null_names.t) = <fun>
+|}]
+
+module Repr_unboxed = struct
+  type t = Wrap of string or_null [@repr unboxed]
+end
+
+[%%expect{|
+module Repr_unboxed : sig type t = Wrap of string or_null [@repr unboxed] end
+  @@ stateless
+|}]
+
+module Repr_runtime = struct
+  type t =
+    | Nullish [@repr null]
+    | Immediate of int [@repr immediate]
+
+  type ('a : value pointer) ptr =
+    | Null_ptr [@repr null]
+    | Ptr of 'a [@repr pointer]
+
+  type ('a : value) valueish =
+    | Null_value [@repr null]
+    | Value of 'a [@repr value]
+end
+
+[%%expect{|
+module Repr_runtime :
+  sig
+    type t = Nullish [@repr null] | Immediate of int [@repr immediate]
+    type ('a : value pointer) ptr =
+        Null_ptr
+      [@repr null]
+      | Ptr of 'a
+      [@repr pointer]
+    type 'a valueish = Null_value [@repr null] | Value of 'a [@repr value]
+  end @@ stateless
 |}]
 
 external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
