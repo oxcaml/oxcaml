@@ -188,6 +188,14 @@ type constructor_repr_annotation =
   | Repr_immediate
   | Repr_pointer
 
+type constructor_runtime_class =
+  | Null_class
+  | Value_class
+  | Immediate_class
+  | Pointer_class
+  | Ordinary_constant_class
+  | Ordinary_nonconstant_class
+
 let constructor_repr_of_string loc = function
   | "unboxed" -> Repr_unboxed
   | "null" -> Repr_null
@@ -1268,6 +1276,14 @@ let transl_declaration env sdecl (id, uid) =
             end else begin
               let reprs = Array.of_list reprs in
               let cstrs_arr = Array.of_list cstrs in
+              (* The mixed constructor encodings are sound exactly when the
+                 constructors land in disjoint runtime classes under the tests
+                 used by [translcore] and [matching]: null, immediate,
+                 arbitrary pointer, arbitrary non-null value, ordinary constant
+                 constructor, and ordinary boxed constructor.  The declarations
+                 are tiny, so a simple pairwise compatibility check keeps this
+                 invariant explicit and avoids missing overlaps when we add new
+                 representation forms. *)
               let count target =
                 Array.fold_left
                   (fun acc -> function
@@ -1283,51 +1299,6 @@ let transl_declaration env sdecl (id, uid) =
                 bad "there may be at most one [@repr immediate] constructor";
               if count Repr_pointer > 1 then
                 bad "there may be at most one [@repr pointer] constructor";
-              let has_value = count Repr_value = 1 in
-              let has_immediate = count Repr_immediate = 1 in
-              let has_pointer = count Repr_pointer = 1 in
-              if has_value && (has_immediate || has_pointer) then
-                bad "[@repr value] may only coexist with [@repr null]";
-              let has_unannotated_constant =
-                Array.exists2
-                  (fun repr cstr ->
-                    match repr, cstr.Types.cd_args with
-                    | None, Cstr_tuple [] -> true
-                    | ( Some _,
-                        (Cstr_tuple [] | Cstr_tuple [_] | Cstr_record [_]
-                        | Cstr_tuple (_ :: _ :: _) | Cstr_record []
-                        | Cstr_record (_ :: _ :: _))
-                      ) ->
-                      false
-                    | None, (Cstr_tuple [_] | Cstr_record [_]) -> false
-                    | None, (Cstr_tuple (_ :: _ :: _) | Cstr_record []
-                           | Cstr_record (_ :: _ :: _)) ->
-                      false)
-                  reprs cstrs_arr
-              in
-              let has_unannotated_nonconstant =
-                Array.exists2
-                  (fun repr cstr ->
-                    match repr, cstr.Types.cd_args with
-                    | None, (Cstr_tuple [_] | Cstr_record [_]
-                           | Cstr_tuple (_ :: _ :: _) | Cstr_record []
-                           | Cstr_record (_ :: _ :: _)) ->
-                      true
-                    | None, Cstr_tuple [] -> false
-                    | Some _, _ -> false)
-                  reprs cstrs_arr
-              in
-              if has_immediate && has_unannotated_constant then
-                bad
-                  "[@repr immediate] must not coexist with ordinary constant \
-                   constructors";
-              if
-                has_pointer
-                && (has_unannotated_constant || has_unannotated_nonconstant)
-              then
-                bad
-                  "[@repr pointer] may only coexist with [@repr null] and \
-                   [@repr immediate]";
               let runtime_reprs =
                 Array.mapi
                   (fun i repr ->
@@ -1358,6 +1329,77 @@ let transl_declaration env sdecl (id, uid) =
                          constructor")
                   reprs
               in
+              let runtime_class_of_constructor runtime_repr cstr =
+                match runtime_repr, cstr.Types.cd_args with
+                | Types.Constructor_null, Cstr_tuple [] -> Null_class
+                | Types.Constructor_value, Cstr_tuple [_] -> Value_class
+                | Types.Constructor_immediate, Cstr_tuple [_] ->
+                  Immediate_class
+                | Types.Constructor_pointer, Cstr_tuple [_] -> Pointer_class
+                | Types.Constructor_boxed _, Cstr_tuple [] ->
+                  Ordinary_constant_class
+                | Types.Constructor_boxed _,
+                  ( Cstr_tuple [_] | Cstr_tuple (_ :: _ :: _)
+                  | Cstr_record [_] | Cstr_record (_ :: _ :: _) ) ->
+                  Ordinary_nonconstant_class
+                | ( Types.Constructor_boxed _ | Types.Constructor_null
+                  | Types.Constructor_value | Types.Constructor_immediate
+                  | Types.Constructor_pointer ),
+                  Cstr_record [] ->
+                  Misc.fatal_error
+                    "Typedecl.runtime_class_of_constructor: empty record"
+                | Types.Constructor_unboxed, _ ->
+                  Misc.fatal_error
+                    "Typedecl.runtime_class_of_constructor: unboxed constructor"
+                | _ ->
+                  Misc.fatal_error
+                    "Typedecl.runtime_class_of_constructor: invalid constructor"
+              in
+              let incompatibility cls1 cls2 =
+                match cls1, cls2 with
+                | Null_class, _ | _, Null_class -> None
+                | Value_class, _
+                | _, Value_class ->
+                  Some "[@repr value] may only coexist with [@repr null]"
+                | Immediate_class, Ordinary_constant_class
+                | Ordinary_constant_class, Immediate_class ->
+                  Some
+                    "[@repr immediate] must not coexist with ordinary constant \
+                     constructors"
+                | Pointer_class, Ordinary_constant_class
+                | Ordinary_constant_class, Pointer_class
+                | Pointer_class, Ordinary_nonconstant_class
+                | Ordinary_nonconstant_class, Pointer_class ->
+                  Some
+                    "[@repr pointer] may only coexist with [@repr null] and \
+                     [@repr immediate]"
+                | Immediate_class, Immediate_class
+                | Pointer_class, Pointer_class
+                | Ordinary_constant_class, Ordinary_constant_class
+                | Ordinary_constant_class, Ordinary_nonconstant_class
+                | Ordinary_nonconstant_class, Ordinary_constant_class
+                | Ordinary_nonconstant_class, Ordinary_nonconstant_class
+                | Immediate_class, Ordinary_nonconstant_class
+                | Ordinary_nonconstant_class, Immediate_class
+                | Immediate_class, Pointer_class
+                | Pointer_class, Immediate_class ->
+                  None
+              in
+              let runtime_classes =
+                Array.mapi
+                  (fun i runtime_repr ->
+                    runtime_class_of_constructor runtime_repr cstrs_arr.(i))
+                  runtime_reprs
+              in
+              for i = 0 to Array.length runtime_classes - 1 do
+                for j = i + 1 to Array.length runtime_classes - 1 do
+                  match
+                    incompatibility runtime_classes.(i) runtime_classes.(j)
+                  with
+                  | None -> ()
+                  | Some msg -> bad msg
+                done
+              done;
               if Array.for_all
                    (function Types.Constructor_boxed _ -> false | _ -> true)
                    runtime_reprs

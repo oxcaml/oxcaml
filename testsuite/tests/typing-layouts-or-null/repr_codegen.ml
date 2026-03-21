@@ -37,6 +37,25 @@ let classify = function
 val classify : with_boxed -> int = <fun>
 |}]
 
+let classify_const_boxed = function
+  | Nullish_boxed -> 0
+  | Int_boxed _ -> 1
+  | Boxed "boxed" -> 2
+  | Boxed _ -> 3
+
+[%%expect{|
+(let
+  (classify_const_boxed =
+     (function {nlocal = 0} param? : int
+       (if (isnull param) 0
+         (if (isint param) 1
+           (stringswitch (field_imm 0 param) case "boxed": 2
+                                             default: 3)))))
+  (apply (field_imm 1 (global Toploop!)) "classify_const_boxed"
+    classify_const_boxed))
+val classify_const_boxed : with_boxed -> int = <fun>
+|}]
+
 type ('a : value pointer) null_immediate_pointer =
   | NIP [@repr null]
   | IIP of int [@repr immediate]
