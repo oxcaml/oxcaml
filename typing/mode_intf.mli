@@ -512,7 +512,7 @@ module type S = sig
      parameter. Callers should treat this as abstract and prefer
      [Value.Comonadic.encode]/[decode] or [Alloc.Comonadic.encode]/[decode]
      rather than inspecting the wrapper directly. *)
-  type 'a comonadic_with = private { value : 'a comonadic_with_repr }
+  type 'a comonadic_with = private { bits : Misc.Modal_bit_layout.t }
   [@@unboxed]
 
   type monadic_repr =
