@@ -230,8 +230,8 @@ let simplify_is_int ~variant_only dacc ~original_term ~arg:scrutinee
       let dacc = DA.add_variable dacc result_var ty in
       SPR.create original_term ~try_reify:false dacc
     | Need_meet ->
-      simplify_relational_primitive dacc ~original_term ~scrutinee
-        ~scrutinee_ty ~result_var ~add_relation:TE.add_is_int_relation
+      simplify_relational_primitive dacc ~original_term ~scrutinee ~scrutinee_ty
+        ~result_var ~add_relation:TE.add_is_int_relation
     | Invalid -> SPR.create_invalid dacc
   else
     match T.prove_is_int (DA.typing_env dacc) scrutinee_ty with

@@ -126,10 +126,10 @@ let prove_equals_to_simple_of_kind env t kind : Simple.t proof_of_property =
 (* Note: this function is used for simplifying Obj.is_int, so should not assume
    that the argument represents a variant, unless [variant_only] is [true].
 
-   However, [variant_only] only means that the test comes from variant
-   matching; with constructor-level erased representations, a variant inhabitant
-   may be represented directly as any non-immediate value (for example a string
-   for [@repr pointer]). In those cases the test is still meaningful and should
+   However, [variant_only] only means that the test comes from variant matching;
+   with constructor-level erased representations, a variant inhabitant may be
+   represented directly as any non-immediate value (for example a string for
+   [@repr pointer]). In those cases the test is still meaningful and should
    simplify to [false], not [Invalid]. *)
 let prove_is_int_generic_value ~variant_only env
     (value_head : TG.head_of_kind_value_non_null) : bool generic_proof =

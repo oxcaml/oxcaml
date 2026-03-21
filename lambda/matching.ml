@@ -3531,6 +3531,7 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
                   | None, None -> assert false
                   end
                 end
+              | None, [(_, act)] -> act
               | None, _ ->
                 let sw =
                   { sw_numconsts = 0;
