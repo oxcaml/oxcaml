@@ -306,12 +306,20 @@ module Builtin : sig
   (** This is suitable for records or variants without mutable fields. *)
   val immutable_data : why:History.value_creation_reason -> 'd Types.jkind
 
+  (** This is suitable for immutable heap objects that are definitely pointers.
+  *)
+  val immutable_data_pointer :
+    why:History.value_creation_reason -> 'd Types.jkind
+
   (** This is suitable for records or variants with atomically mutable fields.
   *)
   val sync_data : why:History.value_creation_reason -> 'd Types.jkind
 
   (** This is suitable for records or variants with mutable fields. *)
   val mutable_data : why:History.value_creation_reason -> 'd Types.jkind
+
+  (** This is suitable for mutable heap objects that are definitely pointers. *)
+  val mutable_data_pointer : why:History.value_creation_reason -> 'd Types.jkind
 
   (** We know for sure that values of types of this jkind are always immediate
   *)

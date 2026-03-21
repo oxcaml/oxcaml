@@ -53,6 +53,80 @@ type ('a : value pointer) pointer_or_null =
   [@repr pointer]
 |}]
 
+type int_or_err =
+  | Int_or_err of int [@repr immediate]
+  | Error of string [@repr pointer]
+
+[%%expect{|
+type int_or_err =
+    Int_or_err of int
+  [@repr immediate]
+  | Error of string
+  [@repr pointer]
+|}]
+
+type bytes_or_int =
+  | Int_bytes of int [@repr immediate]
+  | Bytes_value of bytes [@repr pointer]
+
+type array_or_int =
+  | Int_array of int [@repr immediate]
+  | Array_value of int array [@repr pointer]
+
+type ref_or_int =
+  | Int_ref of int [@repr immediate]
+  | Ref_value of int ref [@repr pointer]
+
+type lazy_or_int =
+  | Int_lazy of int [@repr immediate]
+  | Lazy_value of int lazy_t [@repr pointer]
+
+type fn_or_int =
+  | Int_fn of int [@repr immediate]
+  | Fn_value of (int -> int) [@repr pointer]
+
+class point (x : int) = object
+  method x = x
+end
+
+type obj_or_int =
+  | Int_obj of int [@repr immediate]
+  | Obj_value of < x : int > [@repr pointer]
+
+[%%expect{|
+type bytes_or_int =
+    Int_bytes of int
+  [@repr immediate]
+  | Bytes_value of bytes
+  [@repr pointer]
+type array_or_int =
+    Int_array of int
+  [@repr immediate]
+  | Array_value of int array
+  [@repr pointer]
+type ref_or_int =
+    Int_ref of int
+  [@repr immediate]
+  | Ref_value of int ref
+  [@repr pointer]
+type lazy_or_int =
+    Int_lazy of int
+  [@repr immediate]
+  | Lazy_value of int lazy_t
+  [@repr pointer]
+type fn_or_int =
+    Int_fn of int
+  [@repr immediate]
+  | Fn_value of (int -> int)
+  [@repr pointer]
+class point : int -> object method x : int end
+type obj_or_int =
+    Int_obj of int
+  [@repr immediate]
+  | Obj_value of < x : int >
+  [@repr pointer]
+|}]
+
 type ('a : value) repr_value =
   | Null_value [@repr null]
   | Value of 'a [@repr value]

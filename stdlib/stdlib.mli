@@ -1226,7 +1226,7 @@ module LargeFile :
 
 (** {1 References} *)
 
-type ('a : value_or_null) ref = { mutable contents : 'a }
+type ('a : value_or_null) ref : value pointer = { mutable contents : 'a }
 (** The type of references (mutable indirection cells) containing
    a value of type ['a]. *)
 
