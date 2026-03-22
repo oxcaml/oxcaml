@@ -2847,6 +2847,9 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
           function2_return_layout env and_.bop_loc and_bop_op_return_sort
             and_.bop_op_type
         in
+        let andop_result_mode =
+          function2_return_mode env and_.bop_op_type
+        in
         let lam =
           bind_with_layout Strict (right_id, right_id_duid, right_layout) exp
             (Lapply{
@@ -2855,7 +2858,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                ap_args=[Lvar left_id; Lvar right_id];
                ap_result_layout = result_layout;
                ap_region_close=Rc_normal;
-               ap_mode=alloc_heap;
+               ap_mode=andop_result_mode;
                ap_tailcall = Default_tailcall;
                ap_inlined = Default_inlined;
                ap_specialised = Default_specialise;
