@@ -1,0 +1,23 @@
+                       basic local param: OK
+                    capture outer locals: OK
+         adversarial gc before body call: OK
+                     adversarial gc loop: OK
+        large closure with many captures: OK
+                   tail position with gc: OK
+            tail position called in loop: OK
+            local stack offset increases: OK
+                   nested adversarial gc: OK
+            deeply nested adversarial gc: OK
+                  recursive tail with gc: OK
+            once operator adversarial gc: OK
+           tail match arm adversarial gc: OK
+           tail if branch adversarial gc: OK
+                use local param after gc: OK
+            heavy alloc before body call: OK
+             tail position returns value: OK
+                   100k iteration stress: OK
+               and* basic local bindings: OK
+                          and* gc stress: OK
+                     and* three bindings: OK
+                   and* in tail position: OK
+                   and* with heap allocs: OK
