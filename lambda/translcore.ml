@@ -2562,6 +2562,20 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
 
 and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
       case_sort partial ~param_mode ~body_mode =
+  (* Extract the return mode from the last arrow of a 2-argument function type.
+     Used to determine the ap_mode for and* operator applications. *)
+  let function2_return_mode env ty =
+    let ty = Ctype.expand_head env ty in
+    match Types.get_desc ty with
+    | Tarrow (_, _, ty2, _) ->
+      let ty2 = Ctype.expand_head env ty2 in
+      begin match Types.get_desc ty2 with
+      | Tarrow ((_, _, ret_mode), _, _, _) ->
+        transl_alloc_mode_r ret_mode
+      | _ -> alloc_heap
+      end
+    | _ -> alloc_heap
+  in
   let rec loop prev_layout prev_lam = function
     | [] -> prev_lam
     | and_ :: rest ->
@@ -2585,6 +2599,9 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
           function2_return_layout env and_.bop_loc and_bop_op_return_sort
             and_.bop_op_type
         in
+        let andop_result_mode =
+          function2_return_mode env and_.bop_op_type
+        in
         let lam =
           bind_with_layout Strict (right_id, right_id_duid, right_layout) exp
             (Lapply{
@@ -2593,7 +2610,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                ap_args=[Lvar left_id; Lvar right_id];
                ap_result_layout = result_layout;
                ap_region_close=Rc_normal;
-               ap_mode=alloc_heap;
+               ap_mode=andop_result_mode;
                ap_tailcall = Default_tailcall;
                ap_inlined = Default_inlined;
                ap_specialised = Default_specialise;

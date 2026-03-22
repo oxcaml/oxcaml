@@ -10603,7 +10603,7 @@ and type_andops env let_mode sarg sands expected_sort expected_ty =
         []
     | { pbop_op = sop; pbop_exp = sexp; pbop_loc = loc; _ } :: rest ->
         let op_path, op_desc, op_type, ty_arg, sort_arg, ty_rest, sort_rest,
-            ty_result, op_result_sort =
+            ty_result, op_result_sort, andop_arg_mode =
           with_local_level_iter_if_principal begin fun () ->
             let op_path, op_desc = type_binding_op_ident env sop in
             let op_type = op_desc.val_type in
@@ -10612,18 +10612,26 @@ and type_andops env let_mode sarg sands expected_sort expected_ty =
             let ty_result, op_result_sort =
               new_rep_var ~why:Function_result ()
             in
-            let arrow_desc = (Nolabel, Alloc.legacy, Alloc.legacy) in
+            let andop_arg_mode = Alloc.newvar () in
+            let arg_arrow_desc =
+              (Nolabel, andop_arg_mode, Alloc.newvar ())
+            in
+            let rest_arrow_desc =
+              (Nolabel, Alloc.newvar (), Alloc.newvar ())
+            in
             let ty_rest_fun =
-              newty (Tarrow(arrow_desc, newmono ty_arg, ty_result, commu_ok)) in
+              newty (Tarrow(arg_arrow_desc, newmono ty_arg, ty_result,
+                            commu_ok)) in
             let ty_op =
-              newty (Tarrow(arrow_desc, newmono ty_rest, ty_rest_fun, commu_ok)) in
+              newty (Tarrow(rest_arrow_desc, newmono ty_rest, ty_rest_fun,
+                            commu_ok)) in
             begin try
               unify env op_type ty_op
             with Unify err ->
               raise(Error(sop.loc, env, Andop_type_clash(sop.txt, err)))
             end;
             ((op_path, op_desc, op_type, ty_arg, sort_arg, ty_rest, sort_rest,
-              ty_result, op_result_sort),
+              ty_result, op_result_sort, andop_arg_mode),
              [ty_rest; ty_arg; ty_result])
           end
           ~post:generalize_structure
@@ -10631,7 +10639,10 @@ and type_andops env let_mode sarg sands expected_sort expected_ty =
         let let_arg, sort_let_arg, rest =
           loop env let_sarg rest sort_rest ty_rest
         in
-        let exp = type_expect env mode_legacy sexp (mk_expected ty_arg) in
+        let andop_exp_mode =
+          mode_default (alloc_as_value andop_arg_mode)
+        in
+        let exp = type_expect env andop_exp_mode sexp (mk_expected ty_arg) in
         begin try
           unify env (instance ty_result) (instance expected_ty)
         with Unify err ->

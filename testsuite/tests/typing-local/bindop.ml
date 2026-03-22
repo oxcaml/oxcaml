@@ -75,3 +75,27 @@ let () =
   print_endline foo
 [%%expect{|
 |}]
+
+(* and* with local/once args: standard monadic pattern *)
+let ( let* ) (x @ local once) (f @ local) = f x [@nontail]
+;;
+[%%expect{|
+val ( let* ) : 'a @ local once -> ('a @ local once -> 'b) @ local -> 'b =
+  <fun>
+|}]
+
+let ( and* ) (a @ local once) (b @ local once) = exclave_ (a, b)
+;;
+[%%expect{|
+val ( and* ) : 'a @ local once -> 'b @ local once -> 'a * 'b @ local once =
+  <fun>
+|}]
+
+(* Usage: binding expressions are local *)
+let () =
+  let* x = local_ (Sys.opaque_identity 1)
+  and* y = local_ (Sys.opaque_identity 2) in
+  Printf.printf "%d\n" (x + y)
+;;
+[%%expect{|
+|}]
