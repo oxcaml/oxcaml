@@ -439,10 +439,10 @@ value caml_do_pending_actions_flags_exn(int flags)
   check_async_exn(exn, "finaliser");
   if (Is_exception_result(exn)) goto exception;
 
-  /* Process external interrupts (e.g. preemptive systhread switching).
-     By doing this last, we do not need to set the action pending flag
-     in case a context switch happens: all actions have been processed
-     at this point. */
+  /* Process external interrupts (e.g. preemptive systhread switching). By doing
+     this after all other possibly exception-returning actions, we do not need
+     to set the action pending flag in case a context switch happens: all
+     actions have been processed at this point. */
   caml_process_tick();
 
   /* Check for a pending preemption
@@ -450,10 +450,15 @@ value caml_do_pending_actions_flags_exn(int flags)
      This sets up an *uninitialized* 3-word preemption continuation, so we can
      only do it if pending actions were checked from ocaml (in
      caml_garbage_collection)
+
+     It's important that after this function is called, we don't enter the gc
+     again before returning to OCaml. The continuation this allocates is
+     uninitialized, and should not be promoted before being initialized.
    */
   if (flags & CAML_FROM_CAML) {
     caml_domain_setup_preemption();
   }
+
 
   return Val_unit;
 
