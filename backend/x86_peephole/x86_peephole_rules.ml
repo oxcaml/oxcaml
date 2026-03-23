@@ -84,7 +84,11 @@ let remove_mov_to_dead_register stats cell =
            && U.is_reg64 dst1 -> (
       (* Pattern: mov A, x; mov x, y where x and y are registers *)
       (* Check if the next occurrence of x is a write *)
-      match U.find_next_occurrence_of_register dst1 cell2 with
+      match
+        U.find_next_occurrence_of_reg64
+          (U.underlying_reg64 dst1 |> Option.get)
+          cell2
+      with
       | WriteFound ->
         (* x is written before being read, so we can optimize *)
         (* Rewrite to: mov A, y *)
@@ -106,21 +110,23 @@ let find_redundant_cmp src dst start_cell =
   let rec loop cell_opt =
     match cell_opt with
     | None -> None
-    | Some cell ->
+    | Some cell -> (
       let value = DLL.value cell in
       if U.is_hard_barrier value
       then None
-      else (
+      else
         match value with
         | Ins instr -> (
           match instr with
-          | CMP (src2, dst2)
-            when U.equal_args src src2 && U.equal_args dst dst2 ->
+          | CMP (src2, dst2) when U.equal_args src src2 && U.equal_args dst dst2
+            ->
             Some cell
           | _ ->
             if U.writes_flags instr
             then None
-            else if U.writes_to_arg src instr || U.writes_to_arg dst instr
+            else if
+              U.writes_to_reg64 (U.underlying_reg64 src |> Option.get) instr
+              || U.writes_to_reg64 (U.underlying_reg64 dst |> Option.get) instr
             then None
             else loop (DLL.next cell))
         | Directive _ -> loop (DLL.next cell))
@@ -137,21 +143,17 @@ let find_redundant_cmp src dst start_cell =
    barriers between the CMPs *)
 let remove_redundant_cmp stats cell =
   match DLL.value cell with
-  | Ins (CMP (src, dst)) -> (
-    (* Only optimize register-register comparisons to avoid aliasing issues *)
-    match src, dst with
-    | ( (Reg64 _ | Reg32 _ | Reg16 _ | Reg8L _),
-        (Reg64 _ | Reg32 _ | Reg16 _ | Reg8L _) ) -> (
-      (* Search for a redundant CMP *)
-      match find_redundant_cmp src dst cell with
-      | Some redundant_cell ->
-        (* Delete the redundant CMP *)
-        DLL.delete_curr redundant_cell;
-        stats.remove_redundant_cmp <- stats.remove_redundant_cmp + 1;
-        (* Return the first CMP cell to allow iterative removal *)
-        U.Matched (Some cell)
-      | None -> U.No_match)
-    | _, _ -> U.No_match)
+  (* Only optimize register-register comparisons to avoid aliasing issues *)
+  | Ins (CMP (src, dst)) when U.is_register src && U.is_register dst -> (
+    (* Search for a redundant CMP *)
+    match find_redundant_cmp src dst cell with
+    | Some redundant_cell ->
+      (* Delete the redundant CMP *)
+      DLL.delete_curr redundant_cell;
+      stats.remove_redundant_cmp <- stats.remove_redundant_cmp + 1;
+      (* Return the first CMP cell to allow iterative removal *)
+      U.Matched (Some cell)
+    | None -> U.No_match)
   | _ -> U.No_match
 
 (* Apply all rewrite rules in sequence using a pipeline. *)

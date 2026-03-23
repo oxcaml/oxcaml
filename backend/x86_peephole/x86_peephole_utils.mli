@@ -33,15 +33,17 @@ val is_register : arg -> bool
 
 val is_reg64 : arg -> bool
 
+val underlying_reg64 : arg -> reg64 option
+
 (** Instruction analysis *)
 
-val writes_to_arg : arg -> instruction -> bool
+val writes_to_reg64 : reg64 -> instruction -> bool
 
-val reads_from_arg : arg -> instruction -> bool
+val reads_from_reg64 : reg64 -> instruction -> bool
 
 val writes_flags : instruction -> bool
 
 (** Liveness analysis *)
 
-val find_next_occurrence_of_register :
-  arg -> asm_line DLL.cell -> next_occurrence
+val find_next_occurrence_of_reg64 :
+  reg64 -> asm_line DLL.cell -> next_occurrence

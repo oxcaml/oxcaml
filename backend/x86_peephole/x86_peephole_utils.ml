@@ -182,48 +182,32 @@ let underlying_reg64 = function
     | DH -> Some RDX)
   | Regf _ | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> None
 
-let underlying_freg = function
-  | Regf (XMM r | YMM r | ZMM r) -> Some r
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Mem _
-  | Mem64_RIP _ ->
-    None
+let is_reg64_subregister reg arg =
+  match underlying_reg64 arg with Some r -> equal_reg64 reg r | None -> false
 
-let registers_alias arg1 arg2 =
-  match underlying_reg64 arg1, underlying_reg64 arg2 with
-  | Some r1, Some r2 -> equal_reg64 r1 r2
-  | _, _ -> begin
-    match underlying_freg arg1, underlying_freg arg2 with
-    | Some r1, Some r2 -> Int.equal r1 r2
-    | _, _ -> false
-  end
-
-let reg_appears_in_arg target arg =
-  if registers_alias target arg
-  then true
-  else
-    match arg with
-    | Mem addr -> (
-      (match addr.base with
-        | Some r -> registers_alias target (Reg64 r)
-        | None -> false)
-      || addr.scale <> 0
-         &&
-         match addr.idx with
-         | Scalar r -> registers_alias target (Reg64 r)
-         | Vector r -> registers_alias target (Regf r))
-    | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
-    | Mem64_RIP _ ->
-      false
-
-let reg_read_when_writing target arg =
+let arg_contains_reg64 target arg =
   match arg with
-  | Mem _ -> reg_appears_in_arg arg target
+  | Mem addr -> (
+    (match addr.base with Some r -> equal_reg64 target r | None -> false)
+    || addr.scale <> 0
+       &&
+       match addr.idx with
+       | Scalar r -> equal_reg64 target r
+       | Vector _ -> false)
+  | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
+    equal_reg64 target (underlying_reg64 arg |> Option.get)
+  | Imm _ | Sym _ | Regf _ | Mem64_RIP _ -> false
+
+let reg64_read_when_writing target arg =
+  match arg with
+  | Mem _ -> arg_contains_reg64 target arg
   (* Writing to small registers implicitly reads the old register value to
      update. *)
-  | Reg8L _ | Reg8H _ | Reg16 _ -> registers_alias target arg
+  | Reg8L _ | Reg8H _ | Reg16 _ ->
+    equal_reg64 target (underlying_reg64 arg |> Option.get)
   | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _ | Mem64_RIP _ -> false
 
-let writes_to_arg target = function
+let writes_to_reg64 target = function
   | MOV (_, dst)
   | MOVSX (_, dst)
   | MOVSXD (_, dst)
@@ -242,29 +226,28 @@ let writes_to_arg target = function
   | CMOV (_, _, dst)
   | ADC (_, dst)
   | SBB (_, dst) ->
-    registers_alias target dst
+    is_reg64_subregister target dst
   | INC dst | DEC dst | NEG dst | BSWAP dst | SET (_, dst) ->
-    registers_alias target dst
-  | POP dst -> registers_alias target dst || registers_alias target (Reg64 RSP)
-  | IMUL (_, Some dst) -> registers_alias target dst
+    is_reg64_subregister target dst
+  | POP dst -> is_reg64_subregister target dst || equal_reg64 target RSP
+  | IMUL (_, Some dst) -> is_reg64_subregister target dst
   | LOCK_XADD (src, dst) ->
-    registers_alias target src || registers_alias target dst
-  | XCHG (op1, op2) -> registers_alias target op1 || registers_alias target op2
-  | MUL _ | IMUL (_, None) ->
-    registers_alias target (Reg64 RAX) || registers_alias target (Reg64 RDX)
-  | IDIV _ ->
-    registers_alias target (Reg64 RAX) || registers_alias target (Reg64 RDX)
-  | CDQ -> registers_alias target (Reg32 RDX)
-  | CQO -> registers_alias target (Reg64 RDX)
+    is_reg64_subregister target src || is_reg64_subregister target dst
+  | XCHG (op1, op2) ->
+    is_reg64_subregister target op1 || is_reg64_subregister target op2
+  | MUL _ | IMUL (_, None) -> equal_reg64 target RAX || equal_reg64 target RDX
+  | IDIV _ -> equal_reg64 target RAX || equal_reg64 target RDX
+  | CDQ -> equal_reg64 target RDX
+  | CQO -> equal_reg64 target RDX
   | LOCK_CMPXCHG (_, dst) ->
-    registers_alias target dst || registers_alias target (Reg64 RAX)
+    is_reg64_subregister target dst || equal_reg64 target RAX
   | LOCK_ADD (_, dst)
   | LOCK_SUB (_, dst)
   | LOCK_AND (_, dst)
   | LOCK_OR (_, dst)
   | LOCK_XOR (_, dst) ->
-    registers_alias target dst
-  | PUSH _ -> registers_alias target (Reg64 RSP)
+    is_reg64_subregister target dst
+  | PUSH _ -> equal_reg64 target RSP
   | RDTSC | RDPMC ->
     (* Rare instructions, let's be conservative. *)
     true
@@ -279,11 +262,10 @@ let writes_to_arg target = function
     (* Conservative: assume any SIMD instruction may write to target. *)
     true
 
-let reads_from_arg target = function
+let reads_from_reg64 target = function
   | MOV (src, dst) | MOVSX (src, dst) | MOVSXD (src, dst) | MOVZX (src, dst) ->
-    reg_appears_in_arg target src || reg_read_when_writing target dst
-  | PUSH src ->
-    reg_appears_in_arg target src || registers_alias target (Reg64 RSP)
+    arg_contains_reg64 target src || reg64_read_when_writing target dst
+  | PUSH src -> arg_contains_reg64 target src || equal_reg64 target RSP
   | ADD (src, dst)
   | SUB (src, dst)
   | AND (src, dst)
@@ -293,43 +275,40 @@ let reads_from_arg target = function
   | TEST (src, dst)
   | ADC (src, dst)
   | SBB (src, dst) ->
-    reg_appears_in_arg target src || reg_appears_in_arg target dst
+    arg_contains_reg64 target src || arg_contains_reg64 target dst
   | LEA (src, dst) | BSF (src, dst) | BSR (src, dst) ->
-    reg_appears_in_arg target src || reg_read_when_writing target dst
+    arg_contains_reg64 target src || reg64_read_when_writing target dst
   | SAL (src, dst) | SAR (src, dst) | SHR (src, dst) ->
-    reg_appears_in_arg target src || reg_appears_in_arg target dst
+    arg_contains_reg64 target src || arg_contains_reg64 target dst
   | CMOV (_, src, dst) ->
-    reg_appears_in_arg target src || reg_appears_in_arg target dst
-  | INC dst | DEC dst | NEG dst | BSWAP dst -> reg_appears_in_arg target dst
+    arg_contains_reg64 target src || arg_contains_reg64 target dst
+  | INC dst | DEC dst | NEG dst | BSWAP dst -> arg_contains_reg64 target dst
   | IMUL (op1, Some op2) ->
-    reg_appears_in_arg target op1 || reg_appears_in_arg target op2
-  | MUL op -> reg_appears_in_arg target op || registers_alias target (Reg64 RAX)
-  | IMUL (op, None) ->
-    reg_appears_in_arg target op || registers_alias target (Reg64 RAX)
+    arg_contains_reg64 target op1 || arg_contains_reg64 target op2
+  | MUL op -> arg_contains_reg64 target op || equal_reg64 target RAX
+  | IMUL (op, None) -> arg_contains_reg64 target op || equal_reg64 target RAX
   | IDIV op ->
-    reg_appears_in_arg target op
-    || registers_alias target (Reg64 RAX)
-    || registers_alias target (Reg64 RDX)
-  | CDQ -> registers_alias target (Reg32 RAX)
-  | CQO -> registers_alias target (Reg64 RAX)
+    arg_contains_reg64 target op
+    || equal_reg64 target RAX || equal_reg64 target RDX
+  | CDQ -> equal_reg64 target RAX
+  | CQO -> equal_reg64 target RAX
   | XCHG (op1, op2) ->
-    reg_appears_in_arg target op1 || reg_appears_in_arg target op2
+    arg_contains_reg64 target op1 || arg_contains_reg64 target op2
   | LOCK_CMPXCHG (op1, op2) ->
-    reg_appears_in_arg target op1
-    || reg_appears_in_arg target op2
-    || registers_alias target (Reg64 RAX)
+    arg_contains_reg64 target op1
+    || arg_contains_reg64 target op2
+    || equal_reg64 target RAX
   | LOCK_XADD (op1, op2)
   | LOCK_ADD (op1, op2)
   | LOCK_SUB (op1, op2)
   | LOCK_AND (op1, op2)
   | LOCK_OR (op1, op2)
   | LOCK_XOR (op1, op2) ->
-    reg_appears_in_arg target op1 || reg_appears_in_arg target op2
-  | SET (_, dst) -> reg_read_when_writing target dst
-  | POP dst ->
-    reg_read_when_writing target dst || registers_alias target (Reg64 RSP)
-  | CLDEMOTE arg -> reg_appears_in_arg target arg
-  | PREFETCH (_, _, arg) -> reg_appears_in_arg target arg
+    arg_contains_reg64 target op1 || arg_contains_reg64 target op2
+  | SET (_, dst) -> reg64_read_when_writing target dst
+  | POP dst -> reg64_read_when_writing target dst || equal_reg64 target RSP
+  | CLDEMOTE arg -> arg_contains_reg64 target arg
+  | PREFETCH (_, _, arg) -> arg_contains_reg64 target arg
   | J _ | JMP _ | CALL _ | RET | HLT | LEAVE ->
     (* These are all control flow operations, there is no point in assuming
        anything. *)
@@ -341,20 +320,20 @@ let reads_from_arg target = function
   (* Conservative: assume SIMD instructions may read from target. *)
   | SIMD _ -> true
 
-let find_next_occurrence_of_register target start_cell =
+let find_next_occurrence_of_reg64 target start_cell =
   let rec loop cell_opt =
     match cell_opt with
     | None -> NotFound
-    | Some cell ->
+    | Some cell -> (
       let value = DLL.value cell in
       if is_hard_barrier value
       then NotFound
-      else (
+      else
         match value with
         | Ins instr ->
-          if reads_from_arg target instr
+          if reads_from_reg64 target instr
           then ReadFound
-          else if writes_to_arg target instr
+          else if writes_to_reg64 target instr
           then WriteFound
           else loop (DLL.next cell)
         | Directive _ -> loop (DLL.next cell))

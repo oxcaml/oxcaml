@@ -1374,8 +1374,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_x86_peephole_remove_mov_to_dead_register;
       mk_no_x86_peephole_remove_redundant_cmp
         F.no_x86_peephole_remove_redundant_cmp;
-      mk_no_x86_peephole_combine_add_rsp
-        F.no_x86_peephole_combine_add_rsp;
+      mk_no_x86_peephole_combine_add_rsp F.no_x86_peephole_combine_add_rsp;
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
@@ -1579,12 +1578,16 @@ module Oxcaml_options_impl = struct
   let no_cfg_peephole_optimize = clear' Oxcaml_flags.cfg_peephole_optimize
   let x86_peephole_optimize = set' Oxcaml_flags.x86_peephole_optimize
   let no_x86_peephole_optimize = clear' Oxcaml_flags.x86_peephole_optimize
+
   let no_x86_peephole_remove_mov_to_dead_register =
     clear' Oxcaml_flags.x86_peephole_remove_mov_to_dead_register
+
   let no_x86_peephole_remove_redundant_cmp =
     clear' Oxcaml_flags.x86_peephole_remove_redundant_cmp
+
   let no_x86_peephole_combine_add_rsp =
     clear' Oxcaml_flags.x86_peephole_combine_add_rsp
+
   let cfg_stack_checks = set' Oxcaml_flags.cfg_stack_checks
   let no_cfg_stack_checks = clear' Oxcaml_flags.cfg_stack_checks
 
