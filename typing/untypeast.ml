@@ -143,6 +143,8 @@ let constant = function
   | Const_unboxed_int32 i -> Pconst_unboxed_integer (Int32.to_string i, 'l')
   | Const_unboxed_int64 i -> Pconst_unboxed_integer (Int64.to_string i, 'L')
   | Const_unboxed_nativeint i -> Pconst_unboxed_integer (Nativeint.to_string i, 'n')
+  | Const_unboxed_unit -> Pconst_unboxed_unit
+  | Const_unboxed_bool b -> Pconst_unboxed_bool b
 
 let attribute sub a = {
     attr_name = map_loc sub a.attr_name;
@@ -372,8 +374,6 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_alias { pattern = pat; name; _ } ->
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
-    | Tpat_unboxed_unit -> Ppat_constant Pconst_unboxed_unit
-    | Tpat_unboxed_bool b -> Ppat_constant (Pconst_unboxed_bool b)
     | Tpat_tuple list ->
         Ppat_tuple
           ( List.map (fun (label, p) -> label, sub.pat sub p) list
@@ -624,8 +624,6 @@ let expression sub exp =
       Pexp_match (sub.expr sub exp, List.map (sub.case sub) cases)
     | Texp_try (exp, cases) ->
         Pexp_try (sub.expr sub exp, List.map (sub.case sub) cases)
-    | Texp_unboxed_unit -> Pexp_constant Pconst_unboxed_unit
-    | Texp_unboxed_bool b -> Pexp_constant (Pconst_unboxed_bool b)
     | Texp_tuple (list, _) ->
         Pexp_tuple (List.map (fun (lbl, e) -> lbl, sub.expr sub e) list)
     | Texp_unboxed_tuple list ->

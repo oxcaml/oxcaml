@@ -2351,6 +2351,11 @@ let quote_constant loc (const : Typedtree.constant) =
     | Const_unboxed_int32 x -> Constant.unboxed_int32 loc x
     | Const_unboxed_int64 x -> Constant.unboxed_int64 loc x
     | Const_unboxed_nativeint x -> Constant.unboxed_nativeint loc x
+    | Const_unboxed_unit | Const_unboxed_bool _ ->
+      (* CR metaprogramming lmaurer: Consider moving these into [Constant] *)
+      (* These should have been handled in [quote_expression_desc] *)
+      fatal_errorf "Translquote: unexpected constant %s"
+        (Printpat.pretty_const const)
     (* CR metaprogramming aivaskovic:
       consider implementing in CamlinternalQuote *)
     | Const_untagged_char _ | Const_int8 _ | Const_int16 _
@@ -2596,8 +2601,6 @@ let rec with_new_idents_pat pat =
     with_new_idents_values [id];
     with_new_idents_pat pat
   | Tpat_constant _ -> ()
-  | Tpat_unboxed_unit -> ()
-  | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> with_new_idents_pat pat) args
   | Tpat_construct (_, _, args, _) ->
     List.iter (fun pat -> with_new_idents_pat pat) args
@@ -2627,8 +2630,6 @@ let rec without_idents_pat pat =
     without_idents_values [id];
     without_idents_pat pat
   | Tpat_constant _ -> ()
-  | Tpat_unboxed_unit -> ()
-  | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> without_idents_pat pat) args
   | Tpat_construct (_, _, args, _) ->
     List.iter (fun pat -> without_idents_pat pat) args
@@ -2875,11 +2876,11 @@ and quote_value_pattern ~scopes p =
     | Tpat_alias { pattern = pat; id; _ } ->
       let pat = quote_value_pattern ~scopes pat in
       Pat.alias loc pat (Var.Value.mk (Lvar id))
+    | Tpat_constant Const_unboxed_unit -> Pat.unboxed_unit
+    | Tpat_constant (Const_unboxed_bool b) -> Pat.unboxed_bool loc b
     | Tpat_constant const ->
       let const = quote_constant loc const in
       Pat.constant loc const
-    | Tpat_unboxed_unit -> Pat.unboxed_unit
-    | Tpat_unboxed_bool b -> Pat.unboxed_bool loc b
     | Tpat_tuple pats ->
       let pats =
         List.map
@@ -3546,6 +3547,8 @@ and quote_expression_desc ~scopes ~transl stage e =
     match e.exp_desc with
     | Texp_ident { path; kind; _ } ->
       quote_value_ident_path_as_exp loc env path kind
+    | Texp_constant Const_unboxed_unit -> Exp_desc.unboxed_unit
+    | Texp_constant (Const_unboxed_bool b) -> Exp_desc.unboxed_bool loc b
     | Texp_constant const ->
       let const = quote_constant loc const in
       Exp_desc.constant loc const
@@ -3668,8 +3671,6 @@ and quote_expression_desc ~scopes ~transl stage e =
         List.map (quote_value_pattern_case ~scopes ~transl stage loc) cases
       in
       Exp_desc.try_ loc exp cases
-    | Texp_unboxed_unit -> Exp_desc.unboxed_unit
-    | Texp_unboxed_bool b -> Exp_desc.unboxed_bool loc b
     | Texp_tuple (exps, _) ->
       let exps =
         List.map

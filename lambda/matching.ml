@@ -273,7 +273,7 @@ end = struct
           | `Or _ as or_view -> stop orpat or_view
           | other_view -> continue orpat other_view
         )
-      | ( `Constant _ | `Unboxed_unit | `Unboxed_bool _ | `Tuple _
+      | ( `Constant _ | `Tuple _
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Lazy _ )
         as view -> stop p view
     in
@@ -309,8 +309,6 @@ end = struct
       match p.pat_desc with
       | `Any -> `Any
       | `Constant cst -> `Constant cst
-      | `Unboxed_unit -> `Unboxed_unit
-      | `Unboxed_bool b -> `Unboxed_bool b
       | `Tuple ps ->
           `Tuple (List.map (fun (label, p) -> label, alpha_pat env p) ps)
       | `Unboxed_tuple ps ->
@@ -467,8 +465,7 @@ let matcher discr (p : Simple.pattern) rem =
   match (discr.pat_desc, ph.pat_desc) with
   | Any, _ -> rem
   | ( ( Constant _ | Construct _ | Variant _ | Lazy | Array _ | Record _
-      | Record_unboxed_product _ | Unboxed_unit | Unboxed_bool _ | Tuple _
-      | Unboxed_tuple _ ), Any ) ->
+      | Record_unboxed_product _ | Tuple _ | Unboxed_tuple _ ), Any ) ->
       omegas @ rem
   | Constant cst, Constant cst' -> yesif (const_compare cst cst' = 0)
   | Construct cstr, Construct cstr' ->
@@ -479,8 +476,6 @@ let matcher discr (p : Simple.pattern) rem =
   | Variant { tag; has_arg }, Variant { tag = tag'; has_arg = has_arg' } ->
       yesif (tag = tag' && has_arg = has_arg')
   | Array (am1, _, n1), Array (am2, _, n2) -> yesif (am1 = am2 && n1 = n2)
-  | Unboxed_unit, Unboxed_unit -> yes ()
-  | Unboxed_bool b1, Unboxed_bool b2 -> yesif (Bool.equal b1 b2)
   | Tuple n1, Tuple n2 -> yesif (n1 = n2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
     yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
@@ -492,8 +487,7 @@ let matcher discr (p : Simple.pattern) rem =
       yesif (List.length l = List.length l')
   | Lazy, Lazy -> yes ()
   | ( Constant _ | Construct _ | Variant _ | Lazy | Array _ | Record _
-    | Record_unboxed_product _ | Unboxed_unit | Unboxed_bool _ | Tuple _
-    | Unboxed_tuple _), _ -> no ()
+    | Record_unboxed_product _ | Tuple _ | Unboxed_tuple _), _ -> no ()
 
 let ncols = function
   | [] -> 0
@@ -1258,7 +1252,9 @@ let can_group discr pat =
   | Constant (Const_untagged_int16 _), Constant (Const_untagged_int16 _)
   | Constant (Const_unboxed_int32 _), Constant (Const_unboxed_int32 _)
   | Constant (Const_unboxed_int64 _), Constant (Const_unboxed_int64 _)
-  | Constant (Const_unboxed_nativeint _), Constant (Const_unboxed_nativeint _)->
+  | Constant (Const_unboxed_nativeint _), Constant (Const_unboxed_nativeint _)
+  | Constant Const_unboxed_unit, (Constant Const_unboxed_unit | Any)
+  | Constant (Const_unboxed_bool _), Constant (Const_unboxed_bool _) ->
       true
   | Construct { cstr_tag = Extension _ as discr_tag }, Construct pat_cstr
     ->
@@ -1269,8 +1265,6 @@ let can_group discr pat =
          potentially-compatible submatrices below it).  *)
       Types.equal_tag discr_tag pat_cstr.cstr_tag
   | Construct _, Construct _
-  | Unboxed_unit, (Unboxed_unit | Any)
-  | Unboxed_bool _, Unboxed_bool _
   | Tuple _, (Tuple _ | Any)
   | Unboxed_tuple _, (Unboxed_tuple _ | Any)
   | Record _, (Record _ | Any)
@@ -1289,8 +1283,9 @@ let can_group discr pat =
           | Const_untagged_char _
           | Const_untagged_int8 _ | Const_untagged_int16 _
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
-          | Const_untagged_int _ | Const_unboxed_nativeint _ )
-      | Construct _ | Unboxed_unit | Unboxed_bool _ | Tuple _ | Unboxed_tuple _
+          | Const_untagged_int _ | Const_unboxed_nativeint _
+          | Const_unboxed_unit | Const_unboxed_bool _ )
+      | Construct _ | Tuple _ | Unboxed_tuple _
       | Record _ | Record_unboxed_product _ | Array _ | Variant _ | Lazy ) ) ->
       false
 
@@ -1898,23 +1893,6 @@ let divide_constant ctx m =
     (fun c d -> const_compare c d = 0)
     (get_key_constant "divide")
     get_pat_args_constant ctx m
-
-let get_key_unboxed_bool caller = function
-  | { pat_desc = Tpat_unboxed_bool b } -> b
-  | p ->
-      fatal_errorf "BAD(%s): %a"
-        caller
-        pretty_pat p
-
-let get_pat_args_unboxed_bool = drop_pat_arg
-let get_expr_args_unboxed_bool = drop_expr_arg
-
-let divide_unboxed_bool ctx m =
-  divide
-    get_expr_args_unboxed_bool
-    Bool.equal
-    (get_key_unboxed_bool "divide")
-    get_pat_args_unboxed_bool ctx m
 
 (* Matching against a constructor *)
 
@@ -3256,18 +3234,22 @@ let combine_constant value_kind loc arg cst partial ctx def
     | Const_unboxed_nativeint _ ->
         make_scalar_test_sequence
           (Scalar.integral (Naked (Boxable (Nativeint Any_locality_mode))))
-  in
-  (lambda1, Jumps.union local_jumps total)
-
-let combine_unboxed_bool value_kind loc arg partial ctx def
-    (bool_list, total, _pats) =
-  let fail, local_jumps = mk_failaction_neg partial ctx def in
-  let lambda1 =
-    make_test_sequence value_kind loc fail
-      (Scalar.integral (Naked (Taggable Int8)))
-      arg
-      (List.map (fun (b, l) -> Const_untagged_int8 (Bool.to_int b), l)
-         bool_list)
+    | Const_unboxed_unit ->
+        (* Should be caught in do_compile_matching. *)
+        Misc.fatal_error "Found unexpected unit literal pattern."
+    | Const_unboxed_bool _ ->
+        let bool_list =
+          List.map
+            (function
+              | Const_unboxed_bool b, l -> (b, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        make_test_sequence value_kind loc fail
+          (Scalar.integral (Naked (Taggable Int8)))
+          arg
+          (List.map (fun (b, l) -> Const_untagged_int8 (Bool.to_int b), l)
+             bool_list)
   in
   (lambda1, Jumps.union local_jumps total)
 
@@ -3953,16 +3935,10 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_no_test ~scopes value_kind
             divide_var
             Context.rshift repr partial ctx pm
-      | Unboxed_unit ->
+      | Constant Const_unboxed_unit ->
           compile_no_test ~scopes value_kind
             divide_var
             Context.rshift repr partial ctx pm
-      | Unboxed_bool _ ->
-          compile_test
-            (compile_match ~scopes value_kind repr partial)
-            partial divide_unboxed_bool
-            (combine_unboxed_bool value_kind ploc arg partial)
-            ctx pm
       | Tuple _ ->
           compile_no_test ~scopes value_kind
             (divide_tuple ~scopes ph)
@@ -4057,8 +4033,6 @@ let is_lazy_pat p =
   | Tpat_variant _
   | Tpat_record _
   | Tpat_record_unboxed_product _
-  | Tpat_unboxed_unit
-  | Tpat_unboxed_bool _
   | Tpat_tuple _
   | Tpat_unboxed_tuple _
   | Tpat_construct _
@@ -4081,8 +4055,6 @@ let is_record_with_mutable_field p =
   | Tpat_alias _
   | Tpat_variant _
   | Tpat_lazy _
-  | Tpat_unboxed_unit
-  | Tpat_unboxed_bool _
   | Tpat_tuple _
   | Tpat_unboxed_tuple _
   | Tpat_construct _
@@ -4453,8 +4425,6 @@ let flatten_simple_pattern size (p : Simple.pattern) =
   | `Lazy _
   | `Construct _
   | `Constant _
-  | `Unboxed_unit
-  | `Unboxed_bool _
   | `Unboxed_tuple _ ->
       (* All calls to this function originate from [do_for_multiple_match],
          where we know that the scrutinee is a tuple literal.

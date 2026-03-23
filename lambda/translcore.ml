@@ -388,6 +388,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
+  | Texp_constant Const_unboxed_unit ->
+      Lprim(Punbox_unit, [lambda_unit], of_location ~scopes e.exp_loc)
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
       let return_layout = layout_exp sort body in
@@ -489,10 +491,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
                  (transl_cases_try ~scopes sort pat_expr_list),
                return_layout)
-  | Texp_unboxed_unit ->
-      Lprim(Punbox_unit, [lambda_unit], of_location ~scopes e.exp_loc)
-  | Texp_unboxed_bool b ->
-      Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
   | Texp_tuple (el, alloc_mode) ->
       let ll, shape =
         transl_value_list_with_shape ~scopes

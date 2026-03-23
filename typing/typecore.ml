@@ -839,6 +839,8 @@ let type_constant: Typedtree.constant -> type_expr = function
   | Const_unboxed_int32 _ -> instance Predef.type_unboxed_int32
   | Const_unboxed_int64 _ -> instance Predef.type_unboxed_int64
   | Const_unboxed_nativeint _ -> instance Predef.type_unboxed_nativeint
+  | Const_unboxed_unit -> instance Predef.type_unboxed_unit
+  | Const_unboxed_bool _ -> instance Predef.type_unboxed_bool
 
 type constant_integer_result =
   | Int8 of int
@@ -958,11 +960,10 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
       | Error Unknown_constant_literal suffix ->
           Error (Unknown_literal (Misc.format_as_unboxed_literal i, suffix))
       end
-  | Pconst_unboxed_unit
-  | Pconst_unboxed_bool _ ->
-      (* CR-soon lmaurer: Add these to `Typedtree.constant` so they can be
-         handled here. *)
-      Misc.fatal_error "Typecore.constant: unsupported"
+  | Pconst_unboxed_unit ->
+      Ok Const_unboxed_unit
+  | Pconst_unboxed_bool b ->
+      Ok (Const_unboxed_bool b)
 
 let constant_or_raise env loc cst =
   match constant cst with
@@ -976,7 +977,9 @@ let constant_or_raise env loc cst =
        | Const_unboxed_int64 _
        | Const_unboxed_nativeint _
        | Const_unboxed_float _
-       | Const_unboxed_float32 _ ->
+       | Const_unboxed_float32 _
+       | Const_unboxed_unit
+       | Const_unboxed_bool _ ->
            Language_extension.assert_enabled ~loc Layouts
              Language_extension.Stable
        | Const_int _ | Const_char _ | Const_string _ | Const_float _
@@ -1659,7 +1662,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
           in
           ty, mode
       end
-  | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
+  | Tpat_constant _
   | Tpat_any | Tpat_var _
   | Tpat_array _ | Tpat_lazy _ ->
       p.pat_type, mode
@@ -3143,26 +3146,6 @@ and type_pat_aux
             pat_attributes = sp.ppat_attributes;
             pat_env = !!penv;
             pat_unique_barrier = Unique_barrier.not_computed () }
-  | Ppat_constant Pconst_unboxed_unit ->
-      (* CR-soon lmaurer: Fold into [Ppat_constant] case *)
-      Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      rvp @@ solve_expected {
-        pat_desc = Tpat_unboxed_unit;
-        pat_loc = loc; pat_extra=[];
-        pat_type = instance Predef.type_unboxed_unit;
-        pat_attributes = sp.ppat_attributes;
-        pat_env = !!penv;
-        pat_unique_barrier = Unique_barrier.not_computed () }
-  | Ppat_constant (Pconst_unboxed_bool b) ->
-      (* CR-soon lmaurer: Fold into [Ppat_constant] case *)
-      Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      rvp @@ solve_expected {
-        pat_desc = Tpat_unboxed_bool b;
-        pat_loc = loc; pat_extra=[];
-        pat_type = instance Predef.type_unboxed_bool;
-        pat_attributes = sp.ppat_attributes;
-        pat_env = !!penv;
-        pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constant cst ->
       let cst = constant_or_raise !!penv loc cst in
       rvp @@ solve_expected {
@@ -3878,16 +3861,6 @@ let rec check_counter_example_pat
           check_rec ~info:(decrease 5) tp expected_ty k
       end
   | Tpat_alias { pattern = p; _ } -> check_rec ~info p expected_ty k
-  | Tpat_unboxed_unit ->
-      Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      k @@
-      solve_expected
-        (mp Tpat_unboxed_unit ~pat_type:(instance Predef.type_unboxed_unit))
-  | Tpat_unboxed_bool b ->
-      Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      k @@
-      solve_expected
-        (mp (Tpat_unboxed_bool b) ~pat_type:(instance Predef.type_unboxed_bool))
   | Tpat_constant cst ->
       let cst = constant_or_raise !!penv loc (Untypeast.constant cst) in
       k @@ solve_expected (mp (Tpat_constant cst) ~pat_type:(type_constant cst))
@@ -4563,8 +4536,6 @@ let rec is_nonexpansive exp =
   match exp.exp_desc with
   | Texp_ident _
   | Texp_constant _
-  | Texp_unboxed_unit
-  | Texp_unboxed_bool _
   | Texp_unreachable
   | Texp_function _
   | Texp_probe_is_enabled _
@@ -5132,8 +5103,8 @@ let check_partial_application ~statement exp =
               | _ -> false) exp_extra then check_statement ()
           else begin
             match exp_desc with
-            | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit
-            | Texp_unboxed_bool _ | Texp_tuple _ | Texp_unboxed_tuple _
+            | Texp_ident _ | Texp_constant _
+            | Texp_tuple _ | Texp_unboxed_tuple _
             | Texp_construct _ | Texp_variant _ | Texp_record _
             | Texp_atomic_loc _
             | Texp_record_unboxed_product _ | Texp_unboxed_field _
@@ -6234,24 +6205,6 @@ and type_expect_
           exp_attributes = sexp.pexp_attributes;
           exp_env = env }
   )
-  | Pexp_constant Pconst_unboxed_unit ->
-      (* CR-soon lmaurer: Fold into [Pexp_constant] case *)
-      Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      rue {
-        exp_desc = Texp_unboxed_unit;
-        exp_loc = loc; exp_extra = [];
-        exp_type = instance Predef.type_unboxed_unit;
-        exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
-  | Pexp_constant (Pconst_unboxed_bool b) ->
-      (* CR-soon lmaurer: Fold into [Pexp_constant] case *)
-      Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      rue {
-        exp_desc = Texp_unboxed_bool b;
-        exp_loc = loc; exp_extra = [];
-        exp_type = instance Predef.type_unboxed_bool;
-        exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
   | Pexp_constant cst ->
       let cst = constant_or_raise env loc cst in
       rue {
