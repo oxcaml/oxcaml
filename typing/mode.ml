@@ -2245,6 +2245,7 @@ module Report = struct
     | Function -> Some (print_article_noun Consonant "function")
     | Functor -> Some (print_article_noun Consonant "functor")
     | Lazy -> Some (print_article_noun Consonant "lazy expression")
+    | Quote -> Some (print_article_noun Consonant "quoted expression")
     | Expression -> Some (print_article_noun Vowel "expression")
     | Allocation -> Some (print_article_noun Vowel "allocation")
     | Class -> Some (print_article_noun Consonant "class")

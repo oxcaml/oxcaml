@@ -61,7 +61,7 @@ val e : ('a : any). 'a expr @ unique -> 'a expr = <fun>
 (* Once spliced expression *)
 let e = fun (x @ once) -> <[ $x ]>
 [%%expect{|
-val e : ('a : any). 'a expr @ once -> 'a expr = <fun>
+val e : ('a : any). 'a expr @ once -> 'a expr @ once = <fun>
 |}]
 
 (* Portable spliced expression *)
@@ -154,18 +154,19 @@ Error: This value is "contended" but is expected to be "uncontended".
    Quotes in them capture values at non-legacy modes in their closure,
    and should be given a mode accordingly. *)
 
-(* CR metaprogramming jbachurski: For quote moding to be sound,
-   the following should fail.
-   Crossing a quotation-lock should be given a mode as a closure access
-   (i.e. as if [<[ ... ]>] was [fun () -> ...]). *)
-
 (* Local in closure *)
 (* The quote <[f x]> is local, as it references x @ local -- should error! *)
 let e = <[
   let x = stack_ (Some 42) in
   $(M.save <[let _ = x in ()]>; <[()]>)]>
 [%%expect{|
-val e : <[unit]> expr = <[let x = (stack_ (Some 42)) in ()]>
+Line 11, characters 21-22:
+11 |   $(M.save <[let _ = x in ()]>; <[()]>)]>
+                          ^
+Error: The value "x" is "local" because it is "stack_"-allocated.
+       However, the value "x" highlighted is expected to be "global"
+         because it is used inside the quoted expression at line 11, characters 11-30
+         which is expected to be "global".
 |}]
 
 (* Unique in closure *)
@@ -175,8 +176,15 @@ let e = <[
   $(let y = <[M.free x]> in
     <[$y; $y]>)]>
 [%%expect{|
-val e : <[unit]> expr = <[let x = ("abc" : _ @ unique) in M.free x; M.free x
-  ]>
+Line 4, characters 11-12:
+4 |     <[$y; $y]>)]>
+               ^
+Error: This value is used here,
+       but it is defined as once and has already been used at:
+Line 4, characters 7-8:
+4 |     <[$y; $y]>)]>
+           ^
+
 |}]
 
 (* Once in closure *)
@@ -186,8 +194,15 @@ let e = <[
   $(let y = <[x (); 2]> in
     <[$y + $y]>)]>
 [%%expect{|
-val e : <[int]> expr =
-  <[let x = (fun () -> () : _ @ once) in (x (); 2) + (x (); 2)]>
+Line 4, characters 12-13:
+4 |     <[$y + $y]>)]>
+                ^
+Error: This value is used here,
+       but it is defined as once and is also being used at:
+Line 4, characters 7-8:
+4 |     <[$y + $y]>)]>
+           ^
+
 |}]
 
 (* Uncontended in closure *)
@@ -196,10 +211,13 @@ let e = <[
   let x = ref 42 in
   $(M.send <[x := 0]>; <[!x]>)]>
 [%%expect{|
-Line 3, characters 11-21:
+Line 3, characters 13-14:
 3 |   $(M.send <[x := 0]>; <[!x]>)]>
-               ^^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
+                 ^
+Error: This value is "contended"
+         because it is used inside the quoted expression at line 3, characters 11-21
+         which is expected to be "portable".
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 (* Nonportable in closure *)
@@ -209,10 +227,15 @@ let e = <[
   let f = fun () -> x := 0 in
   $(M.send <[f ()]>; <[()]>)]>
 [%%expect{|
-Line 4, characters 11-19:
+Line 4, characters 13-14:
 4 |   $(M.send <[f ()]>; <[()]>)]>
-               ^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
+                 ^
+Error: The value "f" is "nonportable"
+         because it contains a usage (of the value "x" at line 3, characters 20-21)
+         which is expected to be "uncontended".
+       However, the value "f" highlighted is expected to be "portable"
+         because it is used inside the quoted expression at line 4, characters 11-19
+         which is expected to be "portable".
 |}]
 
 (** [expr] mode-crossing **)
