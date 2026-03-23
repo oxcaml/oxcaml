@@ -634,6 +634,7 @@
   cfg_liveness
   cfg_dominators
   cfg_loop_infos
+  cfg_block_frequency
   cfg_to_linear_desc
   cfg_cse
   cfg_cse_target_intf
