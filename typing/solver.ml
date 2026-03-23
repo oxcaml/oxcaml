@@ -421,9 +421,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       submode. Say we create a unconstrained variable [x], and invoke submode:
       [f x <= x] this would result in adding (f, x) into the [vlower] of [x].
       That is, there will be a self-loop on [x]. *)
-  let rec print_var : type a. ?traversed:VarSet.t -> a C.obj -> _ -> a var -> _
-      =
-   fun ?traversed obj ppf v ->
+  let rec print_var : type a.
+      ?traversed:VarSet.t -> indent:int -> a C.obj -> _ -> a var -> _ =
+   fun ?traversed ~indent obj ppf v ->
     Fmt.fprintf ppf "modevar#%x<%x>[%a .. %a]" v.id v.level (C.print obj)
       v.lower (C.print obj) v.upper;
     match traversed with
@@ -434,18 +434,36 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else if (not (VarMap.is_empty v.vlower)) || not (VarMap.is_empty v.vupper)
       then begin
         let traversed = VarSet.add v.id traversed in
-        Fmt.fprintf ppf "{%a--%a}"
-          (Fmt.pp_print_list (print_morphvar ~traversed obj))
-          (var_map_to_list v.vlower)
-          (Fmt.pp_print_list (print_morphvar ~traversed obj))
-          (var_map_to_list v.vupper)
+        let pad = String.make indent ' ' in
+        Fmt.fprintf ppf "\n%s{" pad;
+        List.iter
+          (fun mv ->
+            Fmt.fprintf ppf "\n%s  %a" pad
+              (print_morphvar ~traversed ~indent:(indent + 2) obj)
+              mv)
+          (var_map_to_list v.vlower);
+        Fmt.fprintf ppf "\n%s  --" pad;
+        List.iter
+          (fun mv ->
+            Fmt.fprintf ppf "\n%s  %a" pad
+              (print_morphvar ~traversed ~indent:(indent + 2) obj)
+              mv)
+          (var_map_to_list v.vupper);
+        Fmt.fprintf ppf "\n%s}" pad
       end
 
   and print_morphvar : type a l r.
-      ?traversed:VarSet.t -> a C.obj -> _ -> (a, l * r) morphvar -> _ =
-   fun ?traversed dst ppf (Amorphvar (v, f, _)) ->
+      ?traversed:VarSet.t ->
+      indent:int ->
+      a C.obj ->
+      _ ->
+      (a, l * r) morphvar ->
+      _ =
+   fun ?traversed ~indent dst ppf (Amorphvar (v, f, _)) ->
     let src = C.src dst f in
-    Fmt.fprintf ppf "%a(%a)" (C.print_morph dst) f (print_var ?traversed src) v
+    Fmt.fprintf ppf "%a(%a)" (C.print_morph dst) f
+      (print_var ?traversed ~indent src)
+      v
 
   let print_raw : type a l r.
       ?verbose:bool -> a C.obj -> Fmt.formatter -> (a, l * r) mode -> unit =
@@ -453,18 +471,18 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let traversed = if verbose then Some VarSet.empty else None in
     match m with
     | Amode (a, _, _) -> C.print obj ppf a
-    | Amodevar mv -> print_morphvar ?traversed obj ppf mv
+    | Amodevar mv -> print_morphvar ?traversed ~indent:0 obj ppf mv
     | Amodejoin (a, _, mvs) ->
       Fmt.fprintf ppf "join(%a,%a)" (C.print obj) a
         (Fmt.pp_print_list
            ~pp_sep:(fun ppf () -> Fmt.fprintf ppf ",")
-           (print_morphvar ?traversed obj))
+           (print_morphvar ?traversed ~indent:0 obj))
         (var_map_to_list mvs)
     | Amodemeet (a, _, mvs) ->
       Fmt.fprintf ppf "meet(%a,%a)" (C.print obj) a
         (Fmt.pp_print_list
            ~pp_sep:(fun ppf () -> Fmt.fprintf ppf ",")
-           (print_morphvar ?traversed obj))
+           (print_morphvar ?traversed ~indent:0 obj))
         (var_map_to_list mvs)
 
   module Morphvar = Magic_allow_disallow (struct
