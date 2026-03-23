@@ -2338,21 +2338,21 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
   CAMLreturn(config);
 }
 
-CAMLprim value caml_memprof_participate(value config)
+CAMLprim value caml_memprof_enlist(value config)
 {
   CAMLparam1(config);
   memprof_domain_t domain = Caml_state->memprof;
   CAMLassert(domain);
 
   if (Sampling(thread_config(domain->current))) {
-    caml_failwith("Gc.Memprof.participate: already profiling.");
+    caml_failwith("Gc.Memprof.enlist: already profiling.");
   }
 
   switch (Status(config)) {
   case CONFIG_STATUS_DISCARDED:
-    caml_failwith("Gc.Memprof.restart: profile already discarded.");
+    caml_failwith("Gc.Memprof.enlist: profile already discarded.");
   case CONFIG_STATUS_STOPPED:
-    caml_failwith("Gc.Memprof.restart: profile already stopped.");
+    caml_failwith("Gc.Memprof.enlist: profile already stopped.");
   case CONFIG_STATUS_SAMPLING:
     break;
   }

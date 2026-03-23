@@ -55,7 +55,7 @@ extern void caml_memprof_sample_young(uintnat wosize, int from_caml,
 extern void caml_memprof_update_suspended(_Bool);
 
 /* Returns true if Memprof needs to do work in response to interrupts
-   by other domains (via Gc.Memprof.participate_globally) */
+   by other domains (via Gc.Memprof.enlist_all_domains) */
 extern bool caml_memprof_pending_external_interrupt(caml_domain_state*);
 
 /*** GC interface ***/

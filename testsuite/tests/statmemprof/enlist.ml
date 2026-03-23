@@ -40,7 +40,7 @@ let () =
   let r = ref None in
   let d = Domain.spawn (fun () ->
     wait ();
-    M.participate (Option.get (!r)) ;
+    M.enlist (Option.get (!r)) ;
     alloc_some ())
   in
   r := Some (start ~counts);
