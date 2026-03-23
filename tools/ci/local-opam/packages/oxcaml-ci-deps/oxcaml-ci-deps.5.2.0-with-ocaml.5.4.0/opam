@@ -10,6 +10,8 @@ depends: [
   "ocaml-base-compiler" {= "5.4.0+oxcaml"}
   "menhir" {= "20231231"}
   "ocamlformat" {= "0.28.1"}
+  # This version should be the same as in default.nix
+  "dune" {= "3.20.2"}
   "re" {>= "1.10.0"}
   # js_of_ocaml-compiler dependencies
   "ppxlib" {>= "0.15"}
