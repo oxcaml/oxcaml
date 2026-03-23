@@ -46,6 +46,27 @@ def clean_build(env=None, target="install"):
     return run(f"make -s {target}", env=env)
 
 
+def dedup_record():
+    """Merge duplicate file entries, keeping first occurrence order with max count."""
+    entries = []
+    seen = {}
+    with open(RECORD_FILE) as f:
+        for line in f:
+            parts = line.strip().rsplit(" ", 1)
+            assert len(parts) == 2
+            path, count = parts[0], int(parts[1])
+            if path in seen:
+                idx = seen[path]
+                entries[idx] = (path, max(entries[idx][1], count))
+            else:
+                seen[path] = len(entries)
+                entries.append((path, count))
+    with open(RECORD_FILE, "w") as f:
+        for path, count in entries:
+            f.write(f"{path} {count}\n")
+    return entries
+
+
 def load_record():
     """Load record file. Returns list of (file, count) and total."""
     entries = []
@@ -109,6 +130,7 @@ def cmd_bisect(test_cmd):
         print("ERROR: no record file produced")
         sys.exit(1)
 
+    dedup_record()
     entries, total = load_record()
     print(f"=== Bisecting {total} steps across {len(entries)} files ===")
     print(f"Test: {test_cmd}")
