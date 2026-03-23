@@ -2,6 +2,15 @@
 
 module DLL = Oxcaml_utils.Doubly_linked_list
 
+(* [Leaf_only]: record clobbered registers only for leaf functions (functions
+   with no [Call] or [Tailcall_func] terminators).
+   [All_functions]: record clobbered registers for every function. *)
+type strategy =
+  | Leaf_only
+  | All_functions
+
+let strategy = Leaf_only
+
 let value_to_phys_regs (value : Callee_regs_info.value) :
     (Regs.Reg_class.t * Regs.Phys_reg.t list) list =
   List.filter_map
@@ -54,7 +63,12 @@ let cfg (cfg_with_layout : Cfg_with_layout.t) =
     "opaque" mode, to please the CI (there is test ensuring that two
     different implementations sharing the same interface result in
     equivalent cmx files). *)
-  if (not !Clflags.opaque) && is_leaf_function cfg
+  let should_record =
+    match strategy with
+    | Leaf_only -> is_leaf_function cfg
+    | All_functions -> true
+  in
+  if (not !Clflags.opaque) && should_record
   then begin
     let num_classes = List.length Regs.Reg_class.all in
     let value = Array.make num_classes 0 in
