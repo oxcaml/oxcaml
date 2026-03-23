@@ -2300,6 +2300,8 @@ module Report = struct
     | Toplevel -> print_article_noun Consonant "top-level clause"
     | Compilation_unit -> print_article_noun Consonant "compilation unit"
     | Class -> print_article_noun Consonant "class"
+    | Quoted -> print_article_noun Consonant "quoted expression"
+    | Unquoted -> print_article_noun Vowel "unquoted expression"
 
   let print_region_desc : region_desc -> _ = function
     | Borrow -> print_article_noun Consonant "borrow region"

@@ -1180,6 +1180,26 @@ let mode_force_lazy =
   in
   mode_default mode
 
+(** The [expected_mode] of the result of an expression in a quote. *)
+let mode_quoted : expected_mode =
+  let open Mode_hint in
+  let hint_monadic = Legacy Quoted
+  and hint_comonadic = Legacy Quoted in
+  let mode =
+    Value.Const.legacy |> Value.of_const ~hint_monadic ~hint_comonadic
+  in
+  mode_default mode
+
+(** The left-mode of the result of an expression that was quoted. *)
+let mode_unquoted : Value.l =
+  let open Mode_hint in
+  let hint_monadic = Legacy Unquoted
+  and hint_comonadic = Legacy Unquoted in
+  let mode =
+    Value.Const.legacy |> Value.of_const ~hint_monadic ~hint_comonadic
+  in
+  mode
+
 (** The [expected_mode] of a quoted expression value when it is spliced. *)
 let mode_splice =
   let open Mode_hint in
@@ -7825,7 +7845,7 @@ and type_expect_
       let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
       with_explanation (fun () ->
         unify_exp_types loc env expr_ty (generic_instance ty_expected));
-      let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
+      let arg = type_expect new_env mode_quoted exp (mk_expected ty) in
       re {
         exp_desc = Texp_quotation arg;
         exp_loc = loc; exp_extra = [];
@@ -7836,7 +7856,7 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
-      submode ~loc ~env ~reason:Other Value.legacy expected_mode;
+      submode ~loc ~env ~reason:Other mode_unquoted expected_mode;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
       let arg = type_expect new_env mode_splice exp (mk_expected ty) in

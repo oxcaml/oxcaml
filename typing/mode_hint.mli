@@ -61,6 +61,8 @@ type legacy =
   | Compilation_unit
   | Toplevel
   | Class
+  | Quoted
+  | Unquoted
 
 (* CR-soon zqian: add loop and function body to [region_desc] *)
 type region_desc = Borrow
