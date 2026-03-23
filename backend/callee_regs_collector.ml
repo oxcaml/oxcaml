@@ -65,6 +65,22 @@ let cfg (cfg_with_layout : Cfg_with_layout.t) =
       let term = block.Cfg.terminator in
       add_regs value term.res;
       add_regs value (Proc.destroyed_at_terminator term.desc));
-    let info = (Compilenv.current_unit_infos ()).ui_callee_regs_info in
-    Callee_regs_info.set_value info cfg.Cfg.fun_name value
+    let all_clobbered =
+      List.for_all
+        (fun cls ->
+          let cls_idx = Regs.Reg_class.hash cls in
+          let full_mask =
+            Array.fold_left
+              (fun acc phys_reg ->
+                acc lor (1 lsl Regs.index_in_class phys_reg))
+              0 (Regs.available_registers cls)
+          in
+          value.(cls_idx) = full_mask)
+        Regs.Reg_class.all
+    in
+    if not all_clobbered
+    then begin
+      let info = (Compilenv.current_unit_infos ()).ui_callee_regs_info in
+      Callee_regs_info.set_value info cfg.Cfg.fun_name value
+    end
   end
