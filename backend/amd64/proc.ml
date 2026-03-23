@@ -80,10 +80,10 @@ let win64 = Arch.win64
 let types_are_compatible (left : Reg.t)  (right : Reg.t) =
   match left.typ, right.typ with
   | (Tagged_int | Val | Addr), (Tagged_int | Val | Addr)
-  | Int64, Int64
-  | Int32, Int32
-  | Int16, Int16
-  | Int8, Int8
+  | Naked_int I64, Naked_int I64
+  | Naked_int I32, Naked_int I32
+  | Naked_int I16, Naked_int I16
+  | Naked_int I8, Naked_int I8
   | Float, Float
   | Float32, Float32
   | (Valx2 | Vec128), (Valx2 | Vec128) ->
@@ -92,7 +92,7 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
     true
   | Vec512, Vec512 ->
     true
-  | (Tagged_int | Int64 | Int32 | Int16 | Int8 | Val | Addr | Float | Float32 |
+  | (Tagged_int | Naked_int (I64 | I32 | I16 | I8) | Val | Addr | Float | Float32 |
      Vec128 | Vec256 | Vec512 | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
@@ -100,7 +100,7 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
 let hard_int64_reg =
   Regs.phys_gpr_regs
   |> Array.map (fun phys_gpr_reg ->
-     Reg.create_at_location Int64 (Reg phys_gpr_reg))
+     Reg.create_at_location (Naked_int I64) (Reg phys_gpr_reg))
 
 let hard_float_reg =
   Regs.phys_simd_regs
@@ -110,11 +110,11 @@ let hard_float_reg =
 let hard_tagged_int_reg =
   Array.map (Reg.create_alias ~typ:Tagged_int) hard_int64_reg
 let hard_int32_reg =
-  Array.map (Reg.create_alias ~typ:Int32) hard_int64_reg
+  Array.map (Reg.create_alias ~typ:(Naked_int I32)) hard_int64_reg
 let hard_int16_reg =
-  Array.map (Reg.create_alias ~typ:Int16) hard_int64_reg
+  Array.map (Reg.create_alias ~typ:(Naked_int I16)) hard_int64_reg
 let hard_int8_reg =
-  Array.map (Reg.create_alias ~typ:Int8) hard_int64_reg
+  Array.map (Reg.create_alias ~typ:(Naked_int I8)) hard_int64_reg
 let hard_vec128_reg =
   Array.map (Reg.create_alias ~typ:Vec128) hard_float_reg
 let hard_vec256_reg =
@@ -142,7 +142,7 @@ let all_phys_regs =
 let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   let index_in_class = Regs.index_in_class phys_reg in
   match (ty : machtype_component) with
-  | Int64 | Addr | Val ->
+  | Naked_int I64 | Addr | Val ->
     (* CR yusumez: We need physical registers to have the appropriate machtype
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
@@ -152,22 +152,22 @@ let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
     then Reg.create_alias ~typ:ty r
     else r
   | Tagged_int -> hard_tagged_int_reg.(index_in_class)
-  | Int32 -> hard_int32_reg.(index_in_class)
-  | Int16 -> hard_int16_reg.(index_in_class)
-  | Int8 -> hard_int8_reg.(index_in_class)
+  | Naked_int I32 -> hard_int32_reg.(index_in_class)
+  | Naked_int I16 -> hard_int16_reg.(index_in_class)
+  | Naked_int I8 -> hard_int8_reg.(index_in_class)
   | Float -> hard_float_reg.(index_in_class)
   | Float32 -> hard_float32_reg.(index_in_class)
   | Vec128 | Valx2 -> hard_vec128_reg.(index_in_class)
   | Vec256 -> hard_vec256_reg.(index_in_class)
   | Vec512 -> hard_vec512_reg.(index_in_class)
 
-let rax = phys_reg Int64 (P RAX)
-let rdi = phys_reg Int64 (P RDI)
-let rdx = phys_reg Int64 (P RDX)
-let rcx = phys_reg Int64 (P RCX)
-let r10 = phys_reg Int64 (P R10)
-let r11 = phys_reg Int64 (P R11)
-let rbp = phys_reg Int64 (P RBP)
+let rax = phys_reg (Naked_int I64) (P RAX)
+let rdi = phys_reg (Naked_int I64) (P RDI)
+let rdx = phys_reg (Naked_int I64) (P RDX)
+let rcx = phys_reg (Naked_int I64) (P RCX)
+let r10 = phys_reg (Naked_int I64) (P R10)
+let r11 = phys_reg (Naked_int I64) (P R11)
+let rbp = phys_reg (Naked_int I64) (P RBP)
 
 (* CSE needs to know that all versions of xmm15 are destroyed. *)
 let destroy_xmm =
@@ -217,7 +217,7 @@ let calling_conventions
     let ty : machtype_component = arg.(i) in
     let registers, size =
       match ty with
-      | Val | Tagged_int | Int64 | Int32 | Int16 | Int8 | Addr ->
+      | Val | Tagged_int | Naked_int _ | Addr ->
         int_registers, size_int
       | Float | Float32 -> float_registers, size_float
       | Vec128 -> float_registers, size_vec128
@@ -347,7 +347,7 @@ let win64_loc_external_arguments arg =
     let ty : machtype_component = arg.(i) in
     let arguments, size =
       match ty with
-      | Val | Tagged_int | Int64 | Int32 | Int16 | Int8 | Addr ->
+      | Val | Tagged_int | Naked_int _ | Addr ->
         win64_int_external_arguments, size_int (* CR jrayman: change size? *)
       | Float | Float32 -> win64_float_external_arguments, size_float
       | Vec128 | Vec256 | Vec512 ->
@@ -395,7 +395,7 @@ let int_regs_destroyed_at_c_call =
 
 let destroyed_at_c_call_win64 =
   (* Win64: rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15 preserved *)
-  [ Array.map (fun p -> phys_reg Int64 (P p))
+  [ Array.map (fun p -> phys_reg (Naked_int I64) (P p))
       int_regs_destroyed_at_c_call_win64;
     Array.sub hard_float_reg 0 6;
     Array.sub hard_float32_reg 0 6;
@@ -406,7 +406,7 @@ let destroyed_at_c_call_win64 =
 
 let destroyed_at_c_call_unix =
   (* Unix: rbx, rbp, r12-r15 preserved *)
-  [ Array.map (fun p -> phys_reg Int64 (P p)) int_regs_destroyed_at_c_call;
+  [ Array.map (fun p -> phys_reg (Naked_int I64) (P p)) int_regs_destroyed_at_c_call;
     hard_float_reg;
     hard_float32_reg;
     hard_vec128_reg ]

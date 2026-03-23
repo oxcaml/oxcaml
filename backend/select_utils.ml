@@ -268,7 +268,7 @@ let oper_result_type = function
    dependencies, because it uses [Arch]. *)
 let size_component : machtype_component -> int = function
   | Val | Addr -> Arch.size_addr
-  | Tagged_int | Int64 | Int32 | Int16 | Int8 ->
+  | Tagged_int | Naked_int _ ->
     assert (Int.equal Arch.size_int Arch.size_addr);
     Arch.size_int
   | Float -> Arch.size_float

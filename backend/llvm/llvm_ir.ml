@@ -156,10 +156,10 @@ module Type = struct
 
   let of_machtype_component (c : Cmm.machtype_component) =
     match c with
-    | Tagged_int | Int64 -> i64
-    | Int32 -> i32
-    | Int16 -> i16
-    | Int8 -> i8
+    | Tagged_int | Naked_int I64 -> i64
+    | Naked_int I32 -> i32
+    | Naked_int I16 -> i16
+    | Naked_int I8 -> i8
     | Val -> val_ptr
     | Addr ->
       val_ptr
