@@ -18,10 +18,13 @@ module M : sig type t type t' end
 
 let sorry0 = fun f -> f (Obj.magic Type.Equal)
 let sorry1 = <[ fun f -> f (Obj.magic Type.Equal) ]>
+let sorry2 = <[ <[ fun f -> f (Obj.magic Type.Equal) ]> ]>
 [%%expect {|
 val sorry0 : ('a -> 'b) -> 'b = <fun>
 val sorry1 : <[($('a) -> $('b)) -> $('b)]> expr =
   <[fun f -> f (Stdlib.Obj.magic Stdlib__Type.Equal)]>
+val sorry2 : <[<[($($('a)) -> $($('b))) -> $($('b))]> expr]> expr =
+  <[<[fun f -> f (Stdlib.Obj.magic Stdlib__Type.Equal)]>]>
 |}]
 
 
@@ -621,14 +624,17 @@ let _ = fun (type t) (x : t expr) -> <[
 let _ = <[ fun (type t) (x : t expr) -> <[
     (fun (Equal : ($t, int) Type.eq) ->
       $x + 1)
-    |> $sorry1 ]> ]>
+    |> $($sorry2) ]> ]>
 [%%expect{|
-Line 4, characters 8-14:
-4 |     |> $sorry1 ]> ]>
-            ^^^^^^
-Error: Identifier "sorry1" is used at line 4, characters 8-14,
-       inside a quotation (<[ ... ]>);
-       it is introduced at line 2, characters 4-10, outside any quotations.
+- : <[$('t) expr -> <[int]> expr]> expr =
+<[
+  fun (type t) (x : (t) expr) ->
+    <[
+      (fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, int)
+         Stdlib.Type.eq) -> ($x) + 1)
+        |> ($<[fun f -> f (Stdlib.Obj.magic Stdlib__Type.Equal)]>)
+      ]>
+]>
 |}]
 
 (* Evidence travels to the wrong stage in the past -- should always fail:
