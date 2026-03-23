@@ -364,11 +364,11 @@ let _ =
 (* Test 8: Labeled, reordered, and partial patterns *)
 
 type t_labeled_unboxed_tuple =
-  #(x:int * float# * x:float# * float * y:int64#)
+  #(x:int * float# * z:float# * float * y:int64#)
 
 let reverse_with_reordered_match (t : t_labeled_unboxed_tuple) =
   match t with
-  | #(~y, ~x:x1, uf, ~x:x2, bf) ->
+  | #(~y, ~x:x1, uf, ~z:x2, bf) ->
     #(y, bf, x2, uf, x1)
 
 let extract_y t =
@@ -376,7 +376,7 @@ let extract_y t =
   y
 
 let _ =
-  let t = #(~x:1, #2.2, ~x:#3.3, 4.4, ~y:#5L) in
+  let t = #(~x:1, #2.2, ~z:#3.3, 4.4, ~y:#5L) in
   let #(a,b,c,d,e) = (reverse_with_reordered_match[@inlined]) t in
   Printf.printf "Test 8, reverse (inlined): %d, %.2f, %.2f, %.2f, %d\n"
     (Int64_u.to_int a) b (Float_u.to_float c) (Float_u.to_float d) e;

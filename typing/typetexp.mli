@@ -62,6 +62,9 @@ val type_open:
    Longident.t Asttypes.loc -> Path.t * Env.t)
     ref
 
+val check_no_repeated_labels :
+  loc:Location.t -> ('a -> string option) -> 'a list -> unit
+
 val valid_tyvar_name : string -> bool
 
 (** [transl_label lbl ty] produces a Typedtree argument label for an argument
@@ -195,6 +198,7 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+  | Repeated_tuple_label of string
 
 exception Error of Location.t * Env.t * error
 

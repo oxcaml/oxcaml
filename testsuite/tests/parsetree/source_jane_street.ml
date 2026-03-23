@@ -1006,7 +1006,7 @@ val f : (x:int * int) -> int = <fun>
 type xy = (x:int * y:int)
 
 (* Reordering and partial matches *)
-let lt = (~x:1, ~y:2, ~x:3, 4)
+let lt = (~x:1, ~y:2, ~z:3, 4)
 
 let matches =
   let (~x, .. ) = lt in
@@ -1018,7 +1018,7 @@ let matches =
 
 [%%expect{|
 type xy = x:int * y:int
-val lt : x:int * y:int * x:int * int = (~x:1, ~y:2, ~x:3, 4)
+val lt : x:int * y:int * z:int * int = (~x:1, ~y:2, ~z:3, 4)
 val matches : int = 1
 val matches : int * int = (1, 2)
 |}]

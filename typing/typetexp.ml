@@ -105,9 +105,25 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+  | Repeated_tuple_label of string
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
+
+let check_no_repeated_labels ~loc f l =
+  let rec find_repeated seen = function
+    | [] -> None
+    | x :: rest ->
+      match f x with
+      | None -> find_repeated seen rest
+      | Some lbl ->
+        if List.mem lbl seen then Some lbl
+        else find_repeated (lbl :: seen) rest
+  in
+  match find_repeated [] l with
+  | None -> ()
+  | Some lbl ->
+    raise (Error (loc, Env.empty, Repeated_tuple_label lbl))
 
 (* Note [Global type variables]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1408,12 +1424,10 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
 
 and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
   assert (List.length stl >= 2);
+  check_no_repeated_labels ~loc fst stl;
   let ctys =
     List.map
       (fun (label, t) ->
-         Option.iter (fun _ ->
-             Language_extension.assert_enabled ~loc Labeled_tuples ())
-           label;
          label, transl_type env ~policy ~row_context Alloc.Const.legacy t)
       stl
   in
@@ -1915,6 +1929,10 @@ let report_error_doc env ppf =
   | Lpoly_unsupported ->
       fprintf ppf
         "@[Layout polymorphism is not supported in this context@]"
+  | Repeated_tuple_label lbl ->
+      fprintf ppf
+        "Label %a occurs more than once in this tuple type"
+        Style.inline_code ("~" ^ lbl)
 
 let () =
   Location.register_error_of_exn

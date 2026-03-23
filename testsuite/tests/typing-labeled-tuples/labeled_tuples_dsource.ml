@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension labeled_tuples -dsource";
+ flags = "-dsource";
  expect;
 *)
 let x = ~x:1, ~y:2
@@ -18,7 +18,10 @@ let z = 5;;
 val z : int = 5
 
 let y = (~z, ~z, ~z:((z)[@attr ]));;
-val y : z:int * z:int * z:int = (~z:5, ~z:5, ~z:5)
+Line 2, characters 8-32:
+2 | let y = ~z:z, ~z, ~z:(z [@attr])
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Label "~z" occurs more than once in this tuple type
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : x:int * s:string * y:int * string =
