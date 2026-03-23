@@ -603,7 +603,12 @@ let _ = fun (x : <[M.t]> expr) ->
      <[ fun (Equal : (M.t, int) Type.eq) ->
         $x + 1 ]>
 [%%expect{|
-- : <[M.t]> expr -> <[(M.t, int) Type.eq -> int]> expr = <fun>
+Line 3, characters 9-10:
+3 |         $x + 1 ]>
+             ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "M.t" is not compatible with type "int"
 |}]
 
 (* 2 ~~> 0  @  2 <=> 2 *)
@@ -611,8 +616,12 @@ let _ = fun (x : <[<[M.t]> expr]> expr) ->
   <[ <[ fun (Equal : (M.t, int) Type.eq) ->
         $($x) + 1 ]> ]>
 [%%expect{|
-- : <[<[M.t]> expr]> expr -> <[<[(M.t, int) Type.eq -> int]> expr]> expr =
-<fun>
+Line 3, characters 11-12:
+3 |         $($x) + 1 ]> ]>
+               ^
+Error: This expression has type "<[<[M.t]> expr]> expr"
+       but an expression was expected of type "<[<[int]> expr]> expr"
+       Type "M.t" is not compatible with type "int"
 |}]
 
 (* 2 ~~> 1  @  2 <=> 2 *)
@@ -621,14 +630,12 @@ let _ =
      <[ fun (Equal : (M.t, int) Type.eq) ->
         $x + 1 ]> ]>
 [%%expect{|
-- : <[<[M.t]> expr -> <[(M.t, int) Type.eq -> int]> expr]> expr =
-<[
-  fun (x : <[M.t]> expr) ->
-    <[
-      fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, int)
-        Stdlib.Type.eq) -> ($x) + 1
-      ]>
-]>
+Line 4, characters 9-10:
+4 |         $x + 1 ]> ]>
+             ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "M.t" is not compatible with type "int"
 |}]
 
 (* Evidence travels to the right stage in the past, but the target is spliced
@@ -765,9 +772,12 @@ let _ = fun (Equal : (M.t, string) Type.eq) ->
         fun (x : <[M.t]> expr) ->
      <[ fun (Equal : (M.t, int) Type.eq) -> $x + 0 ]>
 [%%expect {|
-- : (M.t, string) Type.eq ->
-    <[M.t]> expr -> <[(M.t, int) Type.eq -> int]> expr
-= <fun>
+Line 3, characters 45-46:
+3 |      <[ fun (Equal : (M.t, int) Type.eq) -> $x + 0 ]>
+                                                 ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "M.t" = "string" is not compatible with type "int"
 |}]
 (* fails, because we only instantiate stage 1 *)
 let _ = fun (Equal : (M.t, string) Type.eq) ->
@@ -790,8 +800,7 @@ Line 3, characters 45-46:
                                                  ^
 Error: This expression has type "<[M.t]> expr"
        but an expression was expected of type "<[string]> expr"
-       Type "<[M.t]>" = "<[int]>" is not compatible with type "<[string]>"
-       Type "int" is not compatible with type "string"
+       Type "M.t" = "string" is not compatible with type "string"
 |}]
 
 (* Conflicting proofs -- fails *)
@@ -876,8 +885,6 @@ Error: This expression has type "M.t" = "string"
 
 (** Time travel **)
 
-(* CR metaprogramming jbachurski: Tests succeed until time travel is banned. *)
-
 let time_traveller =
   <[ fun (type t) () ->
     $((fun (x : <[t]> expr) -> <[
@@ -885,7 +892,12 @@ let time_traveller =
           ($(x : <[int]> expr) : int) ]>) |> ignore;
         <[()]>) ]>
 [%%expect {|
-val time_traveller : <[unit -> unit]> expr = <[fun (type t) () -> ()]>
+Line 7, characters 13-14:
+7 |           ($(x : <[int]> expr) : int) ]>) |> ignore;
+                 ^
+Error: This expression has type "<[t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "t" is not compatible with type "int"
 |}]
 
 (* Magic *)
@@ -895,7 +907,12 @@ let weak_magic_with_time_travel (x : <[M.t]> expr) : <[M.t']> expr =
      $(result := Some x; x) ]> |> ignore;
   !result |> Option.get
 [%%expect {|
-val weak_magic_with_time_travel : <[M.t]> expr -> <[M.t']> expr = <fun>
+Line 4, characters 22-23:
+4 |      $(result := Some x; x) ]> |> ignore;
+                          ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[M.t']> expr"
+       Type "M.t" is not compatible with type "M.t'"
 |}]
 let magic_with_time_travel =
   <[ fun (type a b) (x : a) : b -> $(
@@ -905,8 +922,10 @@ let magic_with_time_travel =
       !result |> Option.get
   ) ]>
 [%%expect {|
-val magic_with_time_travel : <[$('a) -> $('b)]> expr =
-  <[fun (type a) (type b) (x : a) -> (x : b)]>
+Line 5, characters 27-28:
+5 |         $(result := Some <[x]>; <[x]>) ]> |> ignore;
+                               ^
+Error: This expression has type "a" but an expression was expected of type "b"
 |}]
 let magic_with_time_travel_and_past_types (type a b) (x : a) : b =
   let result = ref (None : b option) in

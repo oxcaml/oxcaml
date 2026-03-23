@@ -139,7 +139,13 @@ module NameMap = String.Map
 
 (** Runtime metaprogramming stage. Computed as the difference between the
     number of surrounding quotes minus the number of surrounding splices. *)
-type stage = int
+module Stage = struct
+  type t = int
+
+  module Map = StdlibMap.Make(Int)
+end
+
+type stage = Stage.t
 
 (** Occurence of a path at a specific stage.
     Used for local constraints, as they are only valid at a fixed stage. *)
@@ -203,7 +209,7 @@ type summary =
   | Env_cltype of summary * Ident.t * class_type_declaration
   | Env_open of summary * Path.t
   | Env_functor_arg of summary * Ident.t
-  | Env_constraints of summary * type_declaration StagedPath.Map.t
+  | Env_constraints of summary * (stage * type_declaration) StagedPath.Map.t
   | Env_copy_types of summary
   | Env_persistent of summary * Ident.t
   | Env_value_unbound of summary * string * value_unbound_reason
@@ -675,7 +681,8 @@ type t = {
   functor_args: unit Ident.tbl;
   jkinds : (empty, jkind_data, jkind_data) IdTbl.t;
   summary: summary;
-  local_constraints: type_declaration StagedPath.Map.t;
+  local_constraints: (stage * type_declaration) StagedPath.Map.t;
+  local_constraints_since: StagedPath.t list Stage.Map.t;
   implicit_jkinds: jkind_lr loc String.Map.t;
   flags: int;
   stage: stage;
@@ -977,7 +984,9 @@ let empty = {
   types = IdTbl.empty;
   modules = IdTbl.empty; modtypes = IdTbl.empty;
   classes = IdTbl.empty; cltypes = IdTbl.empty;
-  summary = Env_empty; local_constraints = StagedPath.Map.empty;
+  summary = Env_empty;
+  local_constraints = StagedPath.Map.empty;
+  local_constraints_since = Stage.Map.empty;
   implicit_jkinds = String.Map.empty;
   flags = 0;
   functor_args = Ident.empty;
@@ -1537,7 +1546,7 @@ let rec find_type_data path env seen =
   match
     StagedPath.Map.find (path_at_current_stage env path) env.local_constraints
   with
-  | decl ->
+  | _, decl ->
     {
       tda_declaration = decl;
       tda_descriptions = Type_abstract (Btype.type_origin decl);
@@ -2944,10 +2953,13 @@ let add_module_lazy ~update_summary id presence mty ?mode env =
 let add_module ?arg ?shape id presence mty ?mode env =
   add_module_declaration ~check:false ?arg ?shape id presence (md mty) ?mode env
 
-let add_local_constraint ~stage path info env =
+let add_local_constraint ~since_stage ~stage path info env =
+  let spath = { StagedPath.stage; path } in
   { env with
     local_constraints =
-      StagedPath.Map.add { stage; path } info env.local_constraints }
+      StagedPath.Map.add spath (since_stage, info) env.local_constraints;
+    local_constraints_since =
+      Stage.Map.add_to_list since_stage spath env.local_constraints_since }
 
 let add_implicit_jkind ~loc name jkind env =
   match String.Map.find_opt name env.implicit_jkinds with
@@ -3057,12 +3069,31 @@ let add_exclave_lock env = add_lock Exclave_lock env
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
 let enter_quotation env =
-  add_stage_lock Quotation_lock {env with stage = env.stage + 1}
+  let env = { env with stage = env.stage + 1 } in
+  add_stage_lock Quotation_lock env
 
 let enter_splice ~loc env =
   if env.stage = 0 then
     raise (Error (Toplevel_splice loc));
-  add_stage_lock Splice_lock {env with stage = env.stage - 1}
+  (* Find constraints to remove when leaving the current stage *)
+  let local_constraints_to_remove =
+    try Stage.Map.find env.stage env.local_constraints_since
+    with Not_found -> []
+  in
+  let env =
+    { env with local_constraints_since =
+        Stage.Map.remove env.stage env.local_constraints_since }
+  in
+  (* Remove the constraints going out of date *)
+  let env =
+    List.fold_left (fun env spath ->
+      { env with local_constraints =
+          StagedPath.Map.remove spath env.local_constraints })
+      env local_constraints_to_remove
+  in
+  (* Finally update the stage *)
+  let env = { env with stage = env.stage - 1 } in
+  add_stage_lock Splice_lock env
 
 let enter_future env =
   (* Reuse a very large number *)
