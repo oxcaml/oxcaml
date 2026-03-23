@@ -5,7 +5,7 @@
 *)
 
 module Array = Stdlib.Array
-open Stdlib_stable.Iarray
+open Stdlib_stable.IarrayLabels
 
 [%%expect {|
 0
@@ -101,7 +101,7 @@ val mut_arr : int array = [|1; 2; 3|]
 (let
   (mut_arr/403 =? (apply (field_imm 0 (global Toploop!)) "mut_arr")
    arr/404 =[value<intarray>]
-     (apply (field_imm 13 (global Stdlib_stable__Iarray!)) mut_arr/403))
+     (apply (field_imm 13 (global Stdlib_stable__IarrayLabels!)) mut_arr/403))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/404))
 val arr : int iarray = [:1; 2; 3:]
 |}];;
@@ -167,7 +167,7 @@ val mut_arr : int array = [|1; 2; 3|]
 (let
   (mut_arr/407 =? (apply (field_imm 0 (global Toploop!)) "mut_arr")
    arr/408 =[value<intarray>]
-     (apply (field_imm 13 (global Stdlib_stable__Iarray!)) mut_arr/407))
+     (apply (field_imm 13 (global Stdlib_stable__IarrayLabels!)) mut_arr/407))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/408))
 val arr : int iarray = [:1; 2; 3:]
 |}];;
@@ -233,7 +233,7 @@ val mut_arr : int array = [|1; 2; 3|]
 (let
   (mut_arr/411 =? (apply (field_imm 0 (global Toploop!)) "mut_arr")
    arr/412 =[value<intarray>]
-     (apply (field_imm 13 (global Stdlib_stable__Iarray!)) mut_arr/411))
+     (apply (field_imm 13 (global Stdlib_stable__IarrayLabels!)) mut_arr/411))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/412))
 val arr : int iarray = [:1; 2; 3:]
 |}];;
@@ -329,7 +329,7 @@ val arr : int iarray = [:1; 2; 3:]
 (let
   (arr/466 =? (apply (field_imm 0 (global Toploop!)) "arr")
    mut_arr/467 =[value<intarray>]
-     (apply (field_imm 12 (global Stdlib_stable__Iarray!)) arr/466))
+     (apply (field_imm 12 (global Stdlib_stable__IarrayLabels!)) arr/466))
   (apply (field_imm 1 (global Toploop!)) "mut_arr" mut_arr/467))
 val mut_arr : int array = [|1; 2; 3|]
 |}];;
