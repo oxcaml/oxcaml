@@ -623,8 +623,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (Comp_hint.Morph_hint.disallow_right f_hint, g_hint)
           in
           let mu = Amorphvar (u, fg, fg_hint) in
-          if u.level <> generic_level then iter u.id (Amodevar mu);
-          iter_covariant_morphvar ~visited dst iter mu)
+          if u.level <> generic_level then begin iter u.id (Amodevar mu);
+          iter_covariant_morphvar ~visited dst iter mu end)
         v.vlower
     end
 
@@ -662,8 +662,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (Comp_hint.Morph_hint.disallow_left f_hint, g_hint)
           in
           let mu = Amorphvar (u, fg, fg_hint) in
-          if u.level <> generic_level then iter u.id (Amodevar mu);
-          iter_contravariant_morphvar ~visited dst iter mu)
+          if u.level <> generic_level then begin iter u.id (Amodevar mu);
+          iter_contravariant_morphvar ~visited dst iter mu end)
         v.vupper
     end
 
