@@ -1886,10 +1886,8 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
   let dacc = DA.with_denv dacc denv_for_body in
   let dacc, handlers =
     if DE.has_seen_a_non_liftable_continuation (DA.denv dacc) then (
-      if debug () then Format.eprintf "-----> hanlders not liftable@.";
       dacc, Original_handlers.with_can_be_lifted false data.handlers
     ) else if not (Original_handlers.can_be_lifted handlers) then (
-      if debug () then Format.eprintf "-----> set has_seen_a_non_liftable_continuation@.";
       DA.map_denv dacc ~f:DE.set_has_seen_a_non_liftable_continuation, handlers
     ) else
       dacc, handlers
