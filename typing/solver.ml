@@ -990,7 +990,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let mv = Amorphvar (v, f', f'_hint) in
     let mlower = mlower dst mv in
     let mlower_hint = mlower_hint mv in
-    update_lower ~log dst u mlower mlower_hint
+    if not (C.le dst mlower u.lower)
+    then update_lower ~log dst u mlower mlower_hint
 
   (* Tighten the upper bound of [u] based on the upper bound of [f' v].
   No recursion into [u.vlowers] *)
@@ -1006,7 +1007,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let mv = Amorphvar (v, f', f'_hint) in
     let mupper = mupper dst mv in
     let mupper_hint = mupper_hint mv in
-    update_upper ~log dst u mupper mupper_hint
+    if not (C.le dst u.upper mupper)
+    then update_upper ~log dst u mupper mupper_hint
 
   let add_vlower_nocheck : type a b r.
       log:_ ->
@@ -1022,7 +1024,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (u, C.disallow_right f, Comp_hint.Morph_hint.disallow_right f_hint)
     in
     let key = get_key dst x in
-    if VarMap.mem key v.vupper
+    if VarMap.mem key v.vlower
     then ()
     else set_vlower ~log v (VarMap.add key x v.vlower)
 
