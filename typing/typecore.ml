@@ -763,19 +763,19 @@ let create_allocation_mode_l_arg :
     Alloc.lr -> alloc_mode_l = fun mode ->
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode = newvar_above_if_modepoly 0 locality_mode in
-  Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
+  Typedtree.create_alloc_mode_l (alloc_mode)
 
 let create_allocation_mode_l_ret :
     Alloc.lr -> alloc_mode_l = fun mode ->
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode = newvar_below_if_modepoly 0 locality_mode in
-  Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
+  Typedtree.create_alloc_mode_l (alloc_mode)
 
 let create_allocation_modes (mode : Alloc.lr) =
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode,_ = Locality.newvar_below 0 locality_mode in
   let alloc_mode_l =
-    Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
+    Typedtree.create_alloc_mode_l (alloc_mode)
   in
   let alloc_mode_r =
     Typedtree.create_alloc_mode_r (Locality.disallow_left alloc_mode)
@@ -8594,6 +8594,10 @@ and type_function
         | Some _ as x -> x
         | None ->
           let ret_mode = create_allocation_mode_l_ret ret_mode in
+          (match body with
+            | Tfunction_body { exp_desc = Texp_exclave _; _ } ->
+              Typedtree.force_local ret_mode
+            | _ -> ());
           let ret_mode =
             {ret_mode_annots with mode_modes = ret_mode }
           in
