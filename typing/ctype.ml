@@ -325,7 +325,7 @@ end
 
 type equations_generation =
   | Forbidden
-  | Allowed of { equated_types : TypePairs.t; initial_stage : Env.stage }
+  | Allowed of { equated_types : TypePairs.t; pattern_stage : Env.stage }
 
 type unification_environment =
   | Expression of
@@ -383,8 +383,8 @@ let in_subst_mode = function
 
 let can_generate_equations = function
   | Expression _ | Pattern { equations_generation = Forbidden } -> false
-  | Pattern { penv; equations_generation = Allowed { initial_stage } } ->
-    Int.compare (Env.stage penv.env :> int) (initial_stage :> int) >= 0
+  | Pattern { penv; equations_generation = Allowed { pattern_stage } } ->
+    Int.compare (Env.stage penv.env :> int) (pattern_stage :> int) >= 0
 
 (* Can only be called when generate_equations is true.  Tracks equations only to
    improve error messages. *)
@@ -5111,7 +5111,7 @@ let unify_gadt (penv : Pattern_env.t) ty1 ty2 =
   Misc.protect_refs [R (univar_pairs, [])] begin fun () ->
   let equated_types = TypePairs.create 0 in
   let equations_generation =
-    Allowed { equated_types; initial_stage = Env.stage penv.env }
+    Allowed { equated_types; pattern_stage = Env.stage penv.env }
   in
   let uenv = Pattern
       { penv;
