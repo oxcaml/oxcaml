@@ -2076,6 +2076,7 @@ module Const = struct
 
   let of_user_written_annotation ~use_abstract_jkinds env ~context
       (annot : Parsetree.jkind_annotation) =
+    Env.check_no_open_quotations annot.pjka_loc env Jkind_annotation_qt;
     let const =
       of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
         context annot
