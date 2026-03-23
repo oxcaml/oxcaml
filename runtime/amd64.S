@@ -1550,7 +1550,7 @@ CFI_STARTPROC
         testq   %rdx, %rdx /* Do we have a gc_regs? */
         jnz     LBL(resume_preemption)
         jmpq    *(%rbx)    /* no, just jump into the continuation */
-LBL(resume_preemption):
+LBL(resume_preemption): /* %rdx -> gc_regs */
         /* This continuation represents a preemption, meaning we have to restore
            its gc_regs before resuming */
         movq    %rdx, Caml_state(gc_regs)  /* Save gc_regs */
@@ -1564,7 +1564,6 @@ LBL(resume_preemption):
         SWITCH_OCAML_TO_C
         C_call  (GCALL(caml_redo_preempted_allocation))
         SWITCH_C_TO_OCAML
-        movq    Caml_state(gc_regs), %r15  /* Restore gc_regs */
         /* Jump into the second half of caml_do_call_gc, which will restore the
            registers and `ret` to resume */
         jmp     LBL(restore_regs_and_ret)
