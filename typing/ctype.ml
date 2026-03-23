@@ -384,7 +384,7 @@ let in_subst_mode = function
 let can_generate_equations = function
   | Expression _ | Pattern { equations_generation = Forbidden } -> false
   | Pattern { penv; equations_generation = Allowed { pattern_stage } } ->
-    Int.compare (Env.stage penv.env :> int) (pattern_stage :> int) >= 0
+    Env.stage penv.env >= pattern_stage
 
 (* Can only be called when generate_equations is true.  Tracks equations only to
    improve error messages. *)
