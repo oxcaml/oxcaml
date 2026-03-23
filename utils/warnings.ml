@@ -35,8 +35,6 @@ type constructor_usage_warning =
   | Only_exported_private
 
 type upstream_compat_warning =
-  | Immediate_erasure of string (* example: annotation in
-      [type ('a : immediate) t = int] can't be erased. *)
   | Non_value_sort of string (* example: abstract type
       [t : float64] is marked as unboxed. *)
   | Unboxed_attribute of string (* example: unboxed attribute
@@ -1297,11 +1295,6 @@ let message = function
   | Overridden_kind_modifier overridden_by ->
       "This kind modifier is overridden by \"" ^ overridden_by ^ "\" later."
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
-  | Incompatible_with_upstream (Immediate_erasure id)  ->
-      Printf.sprintf
-      "Usage of layout immediate/immediate64 in %s \n\
-       can't be erased for compatibility with upstream OCaml."
-      id
   | Incompatible_with_upstream (Non_value_sort layout) ->
       Printf.sprintf
       "External declaration here is not upstream compatible. \n\

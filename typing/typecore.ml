@@ -10354,7 +10354,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
       List.iter
         (fun pv ->
           Ctype.check_and_update_generalized_ty_jkind
-            ~name:pv.pv_id ~loc:pv.pv_loc env pv.pv_type)
+            ~name:pv.pv_id ~loc:pv.pv_loc pv.pv_type)
         pvs;
       List.iter2
         (fun (_, _, expected_ty) (exp, vars) ->
@@ -10383,7 +10383,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           | Tpat_alias { id; _ } -> Some id
           | _ -> None in
         Ctype.check_and_update_generalized_ty_jkind
-          ?name:pat_name ~loc:exp.exp_loc env exp.exp_type
+          ?name:pat_name ~loc:exp.exp_loc exp.exp_type
       in
       List.iter2 update_exp_jkind mode_pat_typ_list exp_list;
     end

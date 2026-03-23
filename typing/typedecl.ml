@@ -2228,12 +2228,12 @@ let rec update_decl_jkind env dpath decl =
   | Error err ->
     raise (Error (decl.type_loc, Jkind_mismatch_of_path (env, dpath, err)))
 
-let update_decls_jkind_reason env decls =
+let update_decls_jkind_reason decls =
   List.map
     (fun (id, decl) ->
        let update_generalized =
         Ctype.check_and_update_generalized_ty_jkind
-          ~name:id ~loc:decl.type_loc env
+          ~name:id ~loc:decl.type_loc
        in
        List.iter update_generalized decl.type_params;
        Btype.iter_type_expr_kind update_generalized decl.type_kind;
@@ -3172,7 +3172,7 @@ let transl_type_decl env rec_flag sdecl_list =
       if not (Path.Set.is_empty removed) then
         check_unboxed_paths decls
           ~unboxed_version_banned:(fun p -> Path.Set.mem p removed);
-      new_env, update_decls_jkind_reason new_env decls
+      new_env, update_decls_jkind_reason decls
     with
     | Typedecl_variance.Error (loc, err) ->
         raise (Error (loc, Variance err))
@@ -4105,7 +4105,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
     Env.enter_value ~mode valdecl.pval_name.txt v env
       ~check:(fun s -> Warnings.Unused_value_declaration s)
   in
-  Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc newenv ty;
+  Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc ty;
   let desc =
     {
      val_id = id;

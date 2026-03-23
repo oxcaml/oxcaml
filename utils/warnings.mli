@@ -40,7 +40,6 @@ type constructor_usage_warning =
   | Only_exported_private
 
 type upstream_compat_warning =
-  | Immediate_erasure of string
   | Non_value_sort of string
   | Unboxed_attribute of string
   | Immediate_void_variant
