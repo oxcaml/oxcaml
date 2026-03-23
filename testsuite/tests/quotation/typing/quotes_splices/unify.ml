@@ -164,6 +164,63 @@ let _ = <[ fun (Equal : (int NonInst1.t, <[Inst0.t]>) Type.eq)
 ]>
 |}]
 
+(* One side instantiable and the other under quotes/splices *)
+
+(* t ~ $s  when t instantiable *)
+let _ = <[ fun (Equal : (Inst0.t, $(int NonInst1.t)) Type.eq)
+               (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>
+[%%expect {|
+- : <[(Inst0.t, $(int NonInst1.t)) Type.eq -> Inst0.t -> $(int NonInst1.t)]>
+    expr
+=
+<[
+  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (Inst0.t, _)
+    Stdlib.Type.eq) (x : Inst0.t) -> (x : _)
+]>
+|}]
+(* $t ~ s  when s instantiable *)
+let _ = <[ fun (Equal : ($(int NonInst1.t), Inst0.t) Type.eq)
+               (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>
+[%%expect {|
+- : <[($(int NonInst1.t), Inst0.t) Type.eq -> Inst0.t -> $(int NonInst1.t)]>
+    expr
+=
+<[
+  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, Inst0.t)
+    Stdlib.Type.eq) (x : Inst0.t) -> (x : _)
+]>
+|}]
+(* t ~ <[s]>  when t instantiable *)
+let _ = <[ fun (Equal : (Inst1.t, <[int NonInst0.t]>) Type.eq)
+               (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
+[%%expect {|
+- : <[
+     (Inst1.t, <[int NonInst0.t]>) Type.eq ->
+     Inst1.t expr -> <[int NonInst0.t]> expr]>
+    expr
+=
+<[
+  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    (Inst1.t, <[(int) NonInst0.t]>) Stdlib.Type.eq) (x : (Inst1.t) expr) ->
+    (x : <[(int) NonInst0.t]> expr)
+]>
+|}]
+(* <[t]> ~ s  when s instantiable *)
+let _ = <[ fun (Equal : (<[int NonInst0.t]>, Inst1.t) Type.eq)
+               (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
+[%%expect {|
+- : <[
+     (<[int NonInst0.t]>, Inst1.t) Type.eq ->
+     Inst1.t expr -> <[int NonInst0.t]> expr]>
+    expr
+=
+<[
+  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    (<[(int) NonInst0.t]>, Inst1.t) Stdlib.Type.eq) (x : (Inst1.t) expr) ->
+    (x : <[(int) NonInst0.t]> expr)
+]>
+|}]
+
 (* Both sides instantiable and quotes/splices *)
 
 (* $t ~ $s  and t, s instantiable *)
