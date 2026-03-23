@@ -582,8 +582,7 @@ module Sort = struct
     { contents = None; uid = !last_var_uid; level }
 
   let new_genvar () =
-    incr last_var_uid;
-    { contents = None; uid = !last_var_uid; level = Ident.highest_scope }
+    new_var ~level:Ident.highest_scope
 
   let instance_map : (var * var) list ref = ref []
 
@@ -593,8 +592,7 @@ module Sort = struct
         (fun v ->
           assert (Option.is_none v.contents);
           assert (is_genvar v);
-          incr last_var_uid;
-          let v' = { contents = None; uid = !last_var_uid; level } in
+          let v' = new_var ~level in
           v, v')
         vars
     in
