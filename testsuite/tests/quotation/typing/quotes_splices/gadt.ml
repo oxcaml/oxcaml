@@ -69,7 +69,7 @@ compile (
 [%%expect {|
 - : <[int * bool]> expr =
 <[
-  if (if (Stdlib.Int.equal (3 + -3) 0) then false else true) then (1, true)
+  if (if (Stdlib.Int.equal (3 + (-3)) 0) then false else true) then (1, true)
   else (0, false)
 ]>
 |}]
