@@ -581,8 +581,7 @@ module Sort = struct
     incr last_var_uid;
     { contents = None; uid = !last_var_uid; level }
 
-  let new_genvar () =
-    new_var ~level:Ident.highest_scope
+  let new_genvar () = new_var ~level:Ident.highest_scope
 
   let instance_map : (var * var) list ref = ref []
 
