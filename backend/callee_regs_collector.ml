@@ -72,6 +72,8 @@ let cfg (cfg_with_layout : Cfg_with_layout.t) =
   then begin
     let num_classes = List.length Regs.Reg_class.all in
     let value = Array.make num_classes 0 in
+    (* CR xclerc for xclerc: when using the [All_functions] strategy, consider
+       stopping early as soon as all registers are known to be clobbered. *)
     Cfg.iter_blocks cfg ~f:(fun _label block ->
       DLL.iter block.Cfg.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
         add_regs value instr.res;
