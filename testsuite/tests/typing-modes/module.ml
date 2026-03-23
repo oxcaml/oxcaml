@@ -602,8 +602,8 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit @@ portable (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 (* Testing modalities on module aliases in signatures.
