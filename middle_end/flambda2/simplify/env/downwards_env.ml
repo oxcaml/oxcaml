@@ -95,13 +95,13 @@ type t =
         (* This cost is the number of parameters that would have to be created
            if we lifted all continuations that are defined in the current
            continuation's handler. *)
-    has_seen_a_non_liftable_continuation : bool;
-    (* This flag is used to mark as non-liftable any continuation that is
-       bound after a non-liftable continuation, since any continuation bound
-       after a non-liftable continuation may refer to it.
+    has_seen_a_non_liftable_continuation : bool
+        (* This flag is used to mark as non-liftable any continuation that is
+           bound after a non-liftable continuation, since any continuation bound
+           after a non-liftable continuation may refer to it.
 
-       CR gbury: we mauy not need to do this if we had free_names on handlers
-       that we have not explored yet. *)
+           CR gbury: we mauy not need to do this if we had free_names on
+           handlers that we have not explored yet. *)
   }
 
 let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
@@ -365,7 +365,7 @@ let enter_set_of_closures
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
-    has_seen_a_non_liftable_continuation = false;
+    has_seen_a_non_liftable_continuation = false
   }
 
 let define_symbol t sym kind =
@@ -732,11 +732,13 @@ let add_lifting_cost cost t =
         t.cost_of_lifting_continuations_out_of_current_one + cost
     }
 
-let has_seen_a_non_liftable_continuation t = t.has_seen_a_non_liftable_continuation
+let has_seen_a_non_liftable_continuation t =
+  t.has_seen_a_non_liftable_continuation
 
 let set_has_seen_a_non_liftable_continuation t =
-  if t.has_seen_a_non_liftable_continuation then t
-  else { t with has_seen_a_non_liftable_continuation = true; }
+  if t.has_seen_a_non_liftable_continuation
+  then t
+  else { t with has_seen_a_non_liftable_continuation = true }
 
 let must_inline t = Replay_history.must_inline t.replay_history
 
