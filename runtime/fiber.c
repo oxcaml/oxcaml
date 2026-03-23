@@ -659,6 +659,7 @@ void caml_scan_stack(
 
 void caml_ensure_gc_regs(void)
 {
+  CAMLnoalloc;
   if (Caml_state->gc_regs_buckets == NULL) {
     /* Ensure there is at least one gc_regs bucket available before
        running any OCaml code. See fiber.h for documentation. */
@@ -1306,10 +1307,10 @@ CAMLexport void caml_raise_unhandled_effect (value effect)
 static const value * _Atomic caml_preemption_effect = NULL;
 
 CAMLexport value caml_get_preemption_effect(void) {
-  CAMLparam0();
+  CAMLnoalloc;
   const value *eff =
     cache_named_effect(&caml_preemption_effect, "Effect.Preemption");
-  CAMLreturn(*eff);
+  return *eff;
 }
 
 /**** Dynamic Binding ****/
