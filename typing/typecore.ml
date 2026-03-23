@@ -1176,6 +1176,24 @@ let mode_force_lazy =
   in
   mode_default mode
 
+(** The [expected_mode] of a quoted expression value when it is spliced. *)
+let mode_splice =
+  let open Mode_hint in
+  let hint_monadic = Spliced Monadic
+  and hint_comonadic = Spliced Comonadic in
+  let mode =
+    { Value.Const.min with
+      linearity = Once;
+      statefulness = Stateful;
+      portability = Nonportable;
+      uniqueness = Aliased;
+      visibility = Immutable;
+      contention = Contended;
+      staticity = Dynamic }
+    |> Value.of_const ~hint_monadic ~hint_comonadic
+  in
+  mode_default mode
+
 let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
@@ -7846,7 +7864,7 @@ and type_expect_
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
-      let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
+      let arg = type_expect new_env mode_splice exp (mk_expected ty) in
       re {
         exp_desc = Texp_antiquotation arg;
         exp_loc = loc; exp_extra = [];

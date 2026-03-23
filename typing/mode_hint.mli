@@ -98,6 +98,7 @@ type 'd const =
           INVARIANT: The [pinpoint] cannot be [Unknown]. *)
   | Borrowed : Location.t * ('l * 'r, 'd) polarity -> 'd const
   | Escape_region : region -> (disallowed * 'r) const
+  | Spliced : ('l * 'r, 'd) polarity -> 'd const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 

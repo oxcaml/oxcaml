@@ -42,18 +42,14 @@ module M :
    above legacy (global/many/uncontended).
    The other cases pass. *)
 
-(* CR metaprogramming jbachurski: To admit expansive expressions as [once]
-   when quoted, splices should accept [once] quotes.
-   We can probably avoid constraining other modes, too.
-   Otherwise, quotes of expansive expressions cannot be eliminated. *)
-
 (* Local spliced expression -- should error! *)
 let e = fun (x @ local) ->  <[ $x ]>
 [%%expect{|
-Line 14, characters 32-33:
-14 | let e = fun (x @ local) ->  <[ $x ]>
-                                     ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Line 9, characters 32-33:
+9 | let e = fun (x @ local) ->  <[ $x ]>
+                                    ^
+Error: This value is "local" to the parent region
+       but is expected to be "global" because it is spliced.
 |}]
 
 (* Unique spliced expression *)
@@ -65,10 +61,7 @@ val e : ('a : any). 'a expr @ unique -> 'a expr = <fun>
 (* Once spliced expression *)
 let e = fun (x @ once) -> <[ $x ]>
 [%%expect{|
-Line 1, characters 30-31:
-1 | let e = fun (x @ once) -> <[ $x ]>
-                                  ^
-Error: This value is "once" but is expected to be "many".
+val e : ('a : any). 'a expr @ once -> 'a expr = <fun>
 |}]
 
 (* Portable spliced expression *)
@@ -80,10 +73,7 @@ val e : ('a : any). 'a expr @ portable -> 'a expr = <fun>
 (* Contended spliced expression *)
 let e = fun (x @ contended) -> <[ $x ]>
 [%%expect{|
-Line 1, characters 35-36:
-1 | let e = fun (x @ contended) -> <[ $x ]>
-                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+val e : ('a : any). 'a expr @ contended -> 'a expr = <fun>
 |}]
 
 (** Splicing expressions expecting a non-legacy result **)
