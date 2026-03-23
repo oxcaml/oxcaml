@@ -44,5 +44,7 @@ Test 23: Huge single allocation
   Huge allocation: PASSED
 Test 24: Multiple live continuations on heap
   Multiple live continuations: PASSED
+Test 25: Single fiber preempted 3 times
+  Single fiber 3 preemptions: PASSED
 
 All preemption tests PASSED!
