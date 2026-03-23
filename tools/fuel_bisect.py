@@ -2,8 +2,8 @@
 """Optimization fuel bisect script.
 
 Subcommands:
-  record              Clean build to record step counts
-  bisect <test_cmd>   Binary search for the critical global step
+  bisect <test_cmd>   Record step counts, then binary search for the
+                      critical global step that causes test_cmd to fail.
   fail <threshold>    Rebuild at threshold with OPT_FUEL_FAIL to identify step
 
 The compiler reads OPT_FUEL_RECORD (path to record file),
@@ -11,7 +11,6 @@ OPT_FUEL_THRESHOLD (global step limit), and OPT_FUEL_FAIL (global step
 at which to fail with a diagnostic). All builds are clean.
 
 Example workflow:
-  python3 tools/fuel_bisect.py record
   python3 tools/fuel_bisect.py bisect /tmp/test_cmd
   python3 tools/fuel_bisect.py fail 42
 """
@@ -69,26 +68,6 @@ def find_file_at_threshold(entries, threshold):
     return None, 0, 0
 
 
-def cmd_record():
-    """Record step counts per compiled file."""
-    print("=== Recording optimization steps ===")
-    if os.path.exists(RECORD_FILE):
-        os.remove(RECORD_FILE)
-
-    clean_build(env={"OPT_FUEL_RECORD": RECORD_FILE})
-    if not os.path.exists(RECORD_FILE):
-        print("ERROR: no record file produced")
-        sys.exit(1)
-
-    entries, total = load_record()
-    print(f"Record: {RECORD_FILE}")
-    print(f"  {len(entries)} files, {total} total steps")
-    for path, count in entries[:10]:
-        print(f"  {count:4d} steps: {os.path.basename(path)}")
-    if len(entries) > 10:
-        print(f"  ... ({len(entries) - 10} more)")
-
-
 def test_threshold(threshold, test_cmd):
     """Clean build at threshold, then run test. Returns True if pass."""
     print(f"\n--- threshold={threshold} ---")
@@ -108,23 +87,36 @@ def test_threshold(threshold, test_cmd):
 
 
 def cmd_bisect(test_cmd):
-    """Binary search for the critical threshold."""
+    """Record steps, then binary search for the critical threshold."""
+    # Record step counts with a full build + test command
+    print("=== Recording optimization steps ===")
+    if os.path.exists(RECORD_FILE):
+        os.remove(RECORD_FILE)
+
+    env = {"OPT_FUEL_RECORD": RECORD_FILE}
+    rc = clean_build(env=env)
+    if rc == 0:
+        rc = run(test_cmd, env=env)
+        if rc == 0:
+            print("Test passes with full optimization. Nothing to bisect.")
+            sys.exit(0)
+        else:
+            print("Build FAILS with full optimization. Bisecting...")
+    else:
+        print("Build FAILS with full optimization. Bisecting...")
+
     if not os.path.exists(RECORD_FILE):
-        print("ERROR: record file not found. Run 'record' first.")
+        print("ERROR: no record file produced")
         sys.exit(1)
 
     entries, total = load_record()
     print(f"=== Bisecting {total} steps across {len(entries)} files ===")
     print(f"Test: {test_cmd}")
 
-    # Verify endpoints
+    # Verify threshold=0 passes
     if not test_threshold(0, test_cmd):
         print("ERROR: fails with no optimization. Bug is elsewhere.")
         sys.exit(1)
-
-    if test_threshold(total, test_cmd):
-        print("Passes with full optimization. Nothing to bisect.")
-        sys.exit(0)
 
     # Binary search: lo passes, hi fails
     lo, hi = 0, total
@@ -173,14 +165,11 @@ def main():
         sys.exit(1)
 
     cmd = sys.argv[1]
-    if cmd == "record":
-        cmd_record()
-    elif cmd == "bisect":
-        test_cmd = sys.argv[2] if len(sys.argv) > 2 else None
-        if test_cmd is None:
+    if cmd == "bisect":
+        if len(sys.argv) < 3:
             print("Usage: fuel_bisect.py bisect <test_cmd>")
             sys.exit(1)
-        cmd_bisect(test_cmd)
+        cmd_bisect(sys.argv[2])
     elif cmd == "fail":
         if len(sys.argv) < 3:
             print("Usage: fuel_bisect.py fail <threshold>")
