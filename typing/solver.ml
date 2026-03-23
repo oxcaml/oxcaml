@@ -248,8 +248,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then c
       else
         match C.compare_obj obj1 obj2 with
-        | Less_than -> 1
-        | Greater_than -> -1
+        | Less_than -> -1
+        | Greater_than -> 1
         | Equal -> Misc.comparison_result (C.compare_morph obj1 m1 m2)
   end)
 
@@ -1002,7 +1002,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let unhint_var v =
     v.upper_hint <- Comp_hint.Unknown v.upper;
     v.lower_hint <- Comp_hint.Unknown v.lower;
-    v.vlower <- VarMap.map unhint_morphvar v.vlower
+    v.vlower <- VarMap.map unhint_morphvar v.vlower;
+    v.vupper <- VarMap.map unhint_morphvar v.vupper
 
   let erase_hints () =
     let _, l = !vars in
