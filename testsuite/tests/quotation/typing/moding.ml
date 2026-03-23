@@ -90,7 +90,9 @@ let e = fun x -> <[ M.free $x ]>
 Line 1, characters 27-29:
 1 | let e = fun x -> <[ M.free $x ]>
                                ^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+         because it is an unquoted expression and thus always at the legacy modes.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 (* Non-portable result of splicing *)
@@ -99,7 +101,9 @@ let e = fun x -> <[ M.send $x ]>
 Line 1, characters 27-29:
 1 | let e = fun x -> <[ M.send $x ]>
                                ^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+         because it is an unquoted expression and thus always at the legacy modes.
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (** Quoting expressions with non-legacy results **)
@@ -114,7 +118,9 @@ let e = <[ let x @ local = M.x in x ]>
 Line 8, characters 34-35:
 8 | let e = <[ let x @ local = M.x in x ]>
                                       ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local"
+       but is expected to be "global"
+         because it is a quoted expression and thus always at the legacy modes.
 |}]
 
 (* Unique result *)
@@ -130,7 +136,9 @@ let e = <[ let x @ once = M.x in x ]>
 Line 1, characters 33-34:
 1 | let e = <[ let x @ once = M.x in x ]>
                                      ^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once"
+       but is expected to be "many"
+         because it is a quoted expression and thus always at the legacy modes.
 |}]
 
 (* Portable result *)
@@ -145,7 +153,9 @@ let e = <[ let x @ contended = M.x in x ]>
 Line 1, characters 38-39:
 1 | let e = <[ let x @ contended = M.x in x ]>
                                           ^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+       but is expected to be "uncontended"
+         because it is a quoted expression and thus always at the legacy modes.
 |}]
 
 (** Quoting expressions with non-legacy closures **)
