@@ -923,15 +923,20 @@ static value thread_config(memprof_thread_t thread)
   return validated_config(&thread->entries);
 }
 
-/* Is the current thread currently actually sampling? */
+/* Is the current thread currently actually sampling?
+   Returns the config from which it is sampling if so, CONFIG_NONE otherwise */
 
-Caml_inline bool domain_sampling(memprof_domain_t domain)
+Caml_inline value domain_sampling(memprof_domain_t domain)
 {
   memprof_thread_t thread = domain->current;
 
-  return (thread &&
-          !thread->suspended &&
-          sampling(thread_config(thread)));
+  if (thread &&
+      !thread->suspended &&
+      sampling(thread_config(thread))) {
+    return thread->entries.config;
+  } else {
+    return CONFIG_NONE;
+  }
 }
 
 /* Is the current domain currently profiling (including at zero lambda)? */
@@ -1171,10 +1176,10 @@ Caml_inline float log_approx(uint32_t y)
 __attribute__((optimize("tree-vectorize")))
 #endif
 
-static void rand_batch(memprof_domain_t domain)
+static void rand_batch(memprof_domain_t domain, value config)
 {
   int i;
-  float one_log1m_lambda = One_log1m_lambda(domain->entries.config);
+  float one_log1m_lambda = One_log1m_lambda(config);
 
   /* Instead of using temporary buffers, we could use one big loop,
      but it turns out SIMD optimizations of compilers are more fragile
@@ -1209,12 +1214,12 @@ static void rand_batch(memprof_domain_t domain)
 /* Simulate a geometric random variable of parameter [lambda].
  * The result is clipped in [1..Max_long] */
 
-static uintnat rand_geom(memprof_domain_t domain)
+static uintnat rand_geom(memprof_domain_t domain, value config)
 {
   uintnat res;
-  CAMLassert(One_log1m_lambda(domain->entries.config) <= 0.);
+  CAMLassert(One_log1m_lambda(config) <= 0.);
   if (domain->rand_pos == RAND_BLOCK_SIZE)
-    rand_batch(domain);
+    rand_batch(domain, config);
   res = domain->rand_geom_buff[domain->rand_pos++];
   CAMLassert(1 <= res && res <= Max_long);
   return res;
@@ -1225,10 +1230,11 @@ static uintnat rand_geom(memprof_domain_t domain)
 static void rand_init(memprof_domain_t domain)
 {
   domain->rand_pos = RAND_BLOCK_SIZE;
-  if (domain_sampling(domain)) {
+  value config = domain_sampling(domain);
+  if (config != CONFIG_NONE) {
     /* next_rand_geom can be zero if the next word is to be sampled,
      * but rand_geom always returns a value >= 1. Subtract 1 to correct. */
-    domain->next_rand_geom = rand_geom(domain) - 1;
+    domain->next_rand_geom = rand_geom(domain, config) - 1;
   }
 }
 
@@ -1245,12 +1251,12 @@ static void rand_init(memprof_domain_t domain)
  *  Journal of statistical computation and simulation 46.1-2 (1993), pp101-110.
  */
 
-static uintnat rand_binom(memprof_domain_t domain, uintnat len)
+static uintnat rand_binom(memprof_domain_t domain, value config, uintnat len)
 {
   uintnat res;
   CAMLassert(len < Max_long);
   for (res = 0; domain->next_rand_geom < len; res++)
-    domain->next_rand_geom += rand_geom(domain);
+    domain->next_rand_geom += rand_geom(domain, config);
   domain->next_rand_geom -= len;
   return res;
 }
@@ -1717,11 +1723,11 @@ static void shrink_callstack_buffer(memprof_domain_t domain, size_t frames)
  * allocation callback. The callstack is returned as a Val_ptr value
  * (or an empty array, if allocation fails). */
 
-static value capture_callstack_no_GC(memprof_domain_t domain)
+static value capture_callstack_no_GC(memprof_domain_t domain, value config)
 {
   value res = Atom(0); /* empty array. */
   size_t frames =
-    caml_get_callstack(Callstack_size(domain->entries.config),
+    caml_get_callstack(Callstack_size(config),
                        &domain->callstack_buffer,
                        &domain->callstack_buffer_len, -1);
   if (frames) {
@@ -1745,12 +1751,13 @@ static value capture_callstack_no_GC(memprof_domain_t domain)
  * be called with [domain->current->suspended] set, as it allocates.
  * May cause a GC. */
 
-static value capture_callstack_GC(memprof_domain_t domain, int alloc_idx)
+static value capture_callstack_GC(memprof_domain_t domain, value config,
+                                  int alloc_idx)
 {
   CAMLassert(domain->current->suspended);
 
   size_t frames =
-    caml_get_callstack(Callstack_size(domain->entries.config),
+    caml_get_callstack(Callstack_size(config),
                        &domain->callstack_buffer,
                        &domain->callstack_buffer_len,
                        alloc_idx);
@@ -1990,13 +1997,13 @@ static value domain_run_callbacks_exn(memprof_domain_t domain)
  * [samples] samples. [src] is one of the [CAML_MEMPROF_SRC_] enum values
  * ([Gc.Memprof.allocation_source]). */
 
-static void maybe_track_block(memprof_domain_t domain,
+static void maybe_track_block(memprof_domain_t domain, value config,
                               value block, size_t samples,
                               size_t wosize, int src)
 {
   if (samples == 0) return;
 
-  value callstack = capture_callstack_no_GC(domain);
+  value callstack = capture_callstack_no_GC(domain, config);
   (void)new_entry(&domain->current->entries, block, callstack,
                   wosize, samples, src, Is_young(block), false);
   set_action_pending_as_needed(domain);
@@ -2017,8 +2024,9 @@ void caml_memprof_set_trigger(caml_domain_state *state)
   memprof_domain_t domain = state->memprof;
   CAMLassert(domain);
   value *trigger = state->young_start;
-  if (domain_sampling(domain)) {
-    uintnat geom = rand_geom(domain);
+  value config = domain_sampling(domain);
+  if (config != CONFIG_NONE) {
+    uintnat geom = rand_geom(domain, config);
     if (state->young_ptr - state->young_start > geom) {
       trigger = state->young_ptr - (geom - 1);
     }
@@ -2039,8 +2047,10 @@ void caml_memprof_sample_block(value block,
   memprof_domain_t domain = Caml_state->memprof;
   CAMLassert(domain);
   CAMLassert(sampled_words >= allocated_words);
-  if (domain_sampling(domain)) {
-    maybe_track_block(domain, block, rand_binom(domain, sampled_words),
+  value config = domain_sampling(domain);
+  if (config != CONFIG_NONE) {
+    maybe_track_block(domain, config, block,
+                      rand_binom(domain, config, sampled_words),
                       allocated_words, source);
   }
 }
@@ -2076,10 +2086,10 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
     /* Not coming from Caml, so this isn't a comballoc. We know we're
      * sampling at least once, but maybe more than once. */
     size_t samples = 1 +
-      rand_binom(domain,
+      rand_binom(domain, config,
                  Caml_state->memprof_young_trigger - 1 - Caml_state->young_ptr);
     CAMLassert(encoded_lens == NULL);
-    maybe_track_block(domain, Val_hp(Caml_state->young_ptr),
+    maybe_track_block(domain, config, Val_hp(Caml_state->young_ptr),
                       samples, wosize, CAML_MEMPROF_SRC_NORMAL);
     caml_memprof_set_trigger(Caml_state);
     caml_reset_young_limit(Caml_state);
@@ -2125,27 +2135,17 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
     size_t samples = 0;
     while (alloc_ofs < trigger_ofs) {
       ++ samples;
-      trigger_ofs -= rand_geom(domain);
+      trigger_ofs -= rand_geom(domain, config);
     }
 
     if (samples) {
-      /* May clear domain->entries.config */
-      value callstack = capture_callstack_GC(domain, sub_alloc);
+      value callstack = capture_callstack_GC(domain, config, sub_alloc);
       size_t entry =
         new_entry(entries, (value)alloc_ofs, callstack,
                   alloc_wosz, samples, CAML_MEMPROF_SRC_NORMAL,
                   true, true);
       if (entry != Invalid_index) {
         ++ new_entries;
-      }
-
-      if (domain->entries.config != config) {
-          /* The config has changed (possibly discarded); keep sampling? */
-          config = domain->entries.config;
-          if (!sampling(config)) {
-              alloc_ofs = trigger_ofs = 0;
-              break;
-          }
       }
     }
   } while (sub_alloc);
