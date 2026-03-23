@@ -1649,7 +1649,7 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
           in
           after_downwards_traversal_of_body_and_handlers data dacc
             ~simplify_expr ~down_to_up ~denv_for_join))
-  | Recursive { continuation_handlers; invariant_params; lifted_params } ->
+  | Recursive { continuation_handlers; invariant_params; lifted_params; can_be_lifted = _; } ->
     (* CR gbury: we currently do not lift any continuation out of a recursive
      * continuation. For instance it would be useful on the following example:
      * let rec f = function
@@ -1850,8 +1850,11 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
             Non_recursive_handler.with_handler new_handler non_rec_handler
           in
           Original_handlers.create_non_recursive new_non_rec_handler
-      | Recursive { invariant_params; lifted_params; continuation_handlers } ->
+      | Recursive { invariant_params; lifted_params; continuation_handlers; can_be_lifted; } ->
         assert (Lifted_cont_params.is_empty lifted_params);
+        if not can_be_lifted then
+          data.handlers
+        else
         let continuation_handlers =
           Continuation.Lmap.mapi
             (fun cont (one_recursive_handler : One_recursive_handler.t) ->
@@ -1881,6 +1884,16 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
         ret)
   in
   let dacc = DA.with_denv dacc denv_for_body in
+  let dacc, handlers =
+    if DE.has_seen_a_non_liftable_continuation (DA.denv dacc) then (
+      if debug () then Format.eprintf "-----> hanlders not liftable@.";
+      dacc, Original_handlers.with_can_be_lifted false data.handlers
+    ) else if not (Original_handlers.can_be_lifted handlers) then (
+      if debug () then Format.eprintf "-----> set has_seen_a_non_liftable_continuation@.";
+      DA.map_denv dacc ~f:DE.set_has_seen_a_non_liftable_continuation, handlers
+    ) else
+      dacc, handlers
+  in
   let body = data.body in
   let data : after_downwards_traversal_of_body_data =
     { denv_for_join; prior_lifted_constants; handlers }
