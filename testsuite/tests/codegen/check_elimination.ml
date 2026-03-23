@@ -48,8 +48,7 @@ arr_sum:
   salq  $8, %rdi
   shrq  $17, %rdi
   orq   $1, %rdi
-  movq  %rdi, %rsi
-  addq  $-2, %rsi
+  leaq  -2(%rdi), %rsi
   cmpq  $1, %rsi
   jl    .L135
   movl  $1, %eax

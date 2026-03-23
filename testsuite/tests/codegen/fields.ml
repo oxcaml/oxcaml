@@ -55,9 +55,8 @@ let set_b r v = r.b <- v
 [%%expect_asm X86_64{|
 set_b:
   subq  $8, %rsp
-  movq  %rax, %rdi
   movq  %rbx, %rsi
-  addq  $8, %rdi
+  leaq  8(%rax), %rdi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
