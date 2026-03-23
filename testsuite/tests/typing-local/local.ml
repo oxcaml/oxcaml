@@ -1752,6 +1752,8 @@ Error: This value is "local"
          because it is an element of the tuple at line 3, characters 8-10
          which is "local"
          because it is allocated at line 2, characters 11-15 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 11-12
          which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -1770,6 +1772,8 @@ Error: This value is "local"
          because it is an element of the tuple at line 4, characters 15-17
          which is "local"
          because it is allocated at line 2, characters 8-12 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 8-9
          which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
