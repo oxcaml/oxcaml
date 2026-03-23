@@ -1353,6 +1353,36 @@ end = struct
   kind_ abstract
 end
 [%%expect{|
+Line 8, characters 42-53:
+8 |   kind_ immediate = value mod global many uncontended
+                                              ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 9, characters 35-46:
+9 |   kind_ immutable_data = value mod uncontended many
+                                       ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 10, characters 30-41:
+10 |   kind_ immutable = value mod uncontended
+                                   ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 42-53:
+2 |   kind_ immediate = value mod global many uncontended
+                                              ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 35-46:
+3 |   kind_ immutable_data = value mod uncontended many
+                                       ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 4, characters 30-41:
+4 |   kind_ immutable = value mod uncontended
+                                  ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 module M :
   sig
     kind_ immediate = value mod global many
