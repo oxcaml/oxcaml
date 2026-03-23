@@ -33,6 +33,7 @@ type pinpoint_desc =
   | Functor  (** A functor definition *)
   | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
+  | Quote  (** A quoted expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
   | Class  (** A class declaration *)

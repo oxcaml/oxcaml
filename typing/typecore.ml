@@ -7844,8 +7844,12 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
-      submode ~loc ~env ~reason:Other Value.legacy expected_mode;
-      let new_env = Env.enter_quotation env in
+      let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
+      let new_env =
+        env
+        |> Env.enter_quotation
+        |> Env.add_closure_lock (loc, Quote) expected_comonadic_mode
+      in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
       let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
       with_explanation (fun () ->
