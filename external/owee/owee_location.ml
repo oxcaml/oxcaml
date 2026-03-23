@@ -1,7 +1,7 @@
 type t
 
 external extract : (_ -> _) -> t =
-  "ml_owee_code_pointer" "ml_owee_code_pointer" "noalloc"
+  "ml_owee_code_pointer" "ml_owee_code_pointer" [@@noalloc]
 
 let count_rows body ~pointers_to_other_sections =
   let open Owee_debug_line in
