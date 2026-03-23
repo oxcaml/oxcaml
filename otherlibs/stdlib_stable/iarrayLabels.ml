@@ -119,17 +119,17 @@ let[@inline always] unsafe_init_local l (local_ f : int -> local_ 'a) = exclave_
        function, and why it's not tail-recursive; if it were tail-recursive,
        then we wouldn't have anywhere to put the array elements during the whole
        process. *)
-    let rec go i = exclave_ begin
+    let rec go ~l ~f i = exclave_ begin
       let x = f i in
       if i = l - 1 then
         make_mutable_local l x
       else begin
-        let res = go (i+1) in
+        let res = go ~l ~f (i+1) in
         unsafe_set_local res i x;
         res
       end
     end in
-    unsafe_of_local_array (go 0)
+    unsafe_of_local_array (go ~l ~f 0)
 
 (* The implementation is copied from [Array] so that [f] can be [local_] *)
 let init l (local_ f) =
@@ -432,9 +432,9 @@ let fold_left_map_local f acc input_array = exclave_
   let len = length input_array in
   if len = 0 then (acc, unsafe_of_local_array [||]) else begin
     let rec go acc i = exclave_
-      let acc', elt = f acc (unsafe_get input_array i) in
+      let acc, elt = f acc (unsafe_get input_array i) in
       if i = len - 1 then
-        acc', make_mutable_local len elt
+        acc, make_mutable_local len elt
       else begin
         let (_, output_array) as res = go acc (i+1) in
         unsafe_set_local output_array i elt;
@@ -463,9 +463,9 @@ let fold_left_map_local_output f acc input_array = exclave_
   let len = length input_array in
   if len = 0 then (acc, unsafe_of_local_array [||]) else begin
     let rec go acc i = exclave_
-      let acc', elt = f acc (unsafe_get input_array i) in
+      let acc, elt = f acc (unsafe_get input_array i) in
       if i = len - 1 then
-        acc', make_mutable_local len elt
+        acc, make_mutable_local len elt
       else begin
         let (_, output_array) as res = go acc (i+1) in
         unsafe_set_local output_array i elt;
