@@ -185,6 +185,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lazy_forced -> Lazy_forced
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -203,6 +205,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -225,6 +229,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -247,6 +253,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
     end)
   end
 end
@@ -2365,6 +2373,7 @@ module Report = struct
     | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
     | Escape_region reg ->
       Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
+    | Spliced _ -> Fmt.fprintf ppf "it is spliced"
 
   let print_allocation_l : allocation -> Fmt.formatter -> unit =
    fun { txt; loc } ->
