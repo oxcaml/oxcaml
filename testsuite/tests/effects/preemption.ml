@@ -957,6 +957,25 @@ let test_multiple_live_continuations () =
   List.iter (fun v -> assert (!v > 0)) !values;
   print_endline "  Multiple live continuations: PASSED"
 
+(* Test 25: Single fiber preempted 3 times *)
+let test_single_fiber_three_preemptions () =
+  print_endline "Test 25: Single fiber preempted 3 times";
+  let count = ref 0 in
+
+  run_with_tick_handler
+    ~interval:0.01
+    ~repeating:true
+    ~on_preemption:(fun _resume -> incr count; Resume)
+    (fun () ->
+       let start_at = Sys.time () in
+       while !count < 3 do
+         if Sys.time () -. start_at > 10.
+         then failwith "Single fiber 3 preemptions timed out!"
+       done);
+
+  assert (!count >= 3);
+  print_endline "  Single fiber 3 preemptions: PASSED"
+
 (* Run all tests *)
 let () =
   test_basic ();
@@ -982,6 +1001,7 @@ let () =
   test_mixed_allocations ();
   test_huge_allocation ();
   test_multiple_live_continuations ();
+  test_single_fiber_three_preemptions ();
   (* Disable timer *)
   let _ = Unix.setitimer ITIMER_REAL { it_interval = 0.; it_value = 0. } in
   print_endline "\nAll preemption tests PASSED!"
