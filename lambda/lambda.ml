@@ -2650,7 +2650,7 @@ let constant_layout: constant -> layout = function
   | Const_int64 _ -> non_null_value (Pboxedintval Boxed_int64)
   | Const_nativeint _ -> non_null_value (Pboxedintval Boxed_nativeint)
   | Const_untagged_int _ -> Punboxed_or_untagged_integer Untagged_int
-  | Const_untagged_int8 _ | Const_untagged_char _ ->
+  | Const_untagged_int8 _ | Const_untagged_char _ | Const_unboxed_bool _ ->
     Punboxed_or_untagged_integer Untagged_int8
   | Const_untagged_int16 _ -> Punboxed_or_untagged_integer Untagged_int16
   | Const_unboxed_int32 _ -> Punboxed_or_untagged_integer Unboxed_int32
@@ -2660,6 +2660,7 @@ let constant_layout: constant -> layout = function
   | Const_float32 _ -> non_null_value (Pboxedfloatval Boxed_float32)
   | Const_unboxed_float _ -> Punboxed_float Unboxed_float64
   | Const_unboxed_float32 _ -> Punboxed_float Unboxed_float32
+  | Const_unboxed_unit -> Misc.fatal_error "Lambda.constant_layout"
 
 let structured_constant_layout = function
   | Const_base const -> constant_layout const

@@ -1220,6 +1220,10 @@ let rec struct_const ppf = function
       fprintf ppf "%sL" (Misc.format_as_unboxed_literal (Int64.to_string i))
   | Const_base(Const_unboxed_nativeint i) ->
       fprintf ppf "%sn" (Misc.format_as_unboxed_literal (Nativeint.to_string i))
+  | Const_base Const_unboxed_unit ->
+      fprintf ppf "#()"
+  | Const_base (Const_unboxed_bool b) ->
+      fprintf ppf "#%b" b
   | Const_block(tag, []) ->
       fprintf ppf "[%i]" tag
   | Const_block(tag, hd::tl) ->

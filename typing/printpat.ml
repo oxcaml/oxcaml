@@ -50,10 +50,8 @@ let pretty_const c = match c with
   Printf.sprintf "%sL" (Misc.format_as_unboxed_literal (Int64.to_string i))
 | Const_unboxed_nativeint i ->
   Printf.sprintf "%sn" (Misc.format_as_unboxed_literal (Nativeint.to_string i))
-
-let bool ppf = function
-  | false -> fprintf ppf "false"
-  | true -> fprintf ppf "true"
+| Const_unboxed_unit -> "#()"
+| Const_unboxed_bool b -> Printf.sprintf "#%b" b
 
 let pretty_extra ppf (cstr, _loc, _attrs) pretty_rest rest =
   match cstr with
@@ -96,8 +94,6 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   | Tpat_any -> fprintf ppf "_"
   | Tpat_var { id = x; _ } -> fprintf ppf "%s" (Ident.name x)
   | Tpat_constant c -> fprintf ppf "%s" (pretty_const c)
-  | Tpat_unboxed_unit -> fprintf ppf "#()"
-  | Tpat_unboxed_bool b -> fprintf ppf "#%a" bool b
   | Tpat_tuple vs ->
       fprintf ppf "@[(%a)@]" (pretty_list pretty_labeled_val ",") vs
   | Tpat_unboxed_tuple vs ->

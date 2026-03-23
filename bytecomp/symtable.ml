@@ -227,6 +227,8 @@ let rec transl_const = function
   | Const_base(Const_unboxed_int64 i) -> Obj.repr i
   | Const_base(Const_nativeint i)
   | Const_base(Const_unboxed_nativeint i) -> Obj.repr i
+  | Const_base Const_unboxed_unit -> Obj.repr ()
+  | Const_base(Const_unboxed_bool b) -> Obj.repr b
   | Const_immstring s -> Obj.repr s
   | Const_block(tag, fields) ->
       let block = Obj.new_block tag (List.length fields) in

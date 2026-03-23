@@ -49,6 +49,8 @@ type constant =
   | Const_unboxed_int32 of int32
   | Const_unboxed_int64 of int64
   | Const_unboxed_nativeint of nativeint
+  | Const_unboxed_unit
+  | Const_unboxed_bool of bool
 
 (* Value expressions for the core language *)
 
@@ -229,10 +231,6 @@ and 'k pattern_desc =
         (** P as a *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
-  | Tpat_unboxed_unit : value pattern_desc
-        (** #() *)
-  | Tpat_unboxed_bool : bool -> value pattern_desc
-        (** #false, #true *)
   | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
         (** (P1, ..., Pn)                  [(None,P1); ...; (None,Pn)])
             (L1:P1, ... Ln:Pn)             [(Some L1,P1); ...; (Some Ln,Pn)])
@@ -468,10 +466,6 @@ and expression_desc =
          *)
   | Texp_try of expression * value case list
         (** try E with P1 -> E1 | ... | PN -> EN *)
-  | Texp_unboxed_unit
-        (** #() *)
-  | Texp_unboxed_bool of bool
-        (** #false, #true *)
   | Texp_tuple of (string option * expression) list * alloc_mode
         (** [Texp_tuple(el)] represents
             - [(E1, ..., En)]

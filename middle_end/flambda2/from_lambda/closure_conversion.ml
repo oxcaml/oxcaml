@@ -165,6 +165,10 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     ( acc,
       reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn c)),
       "untagged_int8" )
+  | Const_base (Const_unboxed_bool b) ->
+    ( acc,
+      reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn (Bool.to_int b))),
+      "unboxed_bool" )
   | Const_base (Const_untagged_int16 c) ->
     ( acc,
       reg_width (RWC.naked_int16 (Numeric_types.Int16.of_int_exn c)),
@@ -179,6 +183,8 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       Targetint_32_64.of_int64 (Acc.machine_width acc) (Int64.of_nativeint c)
     in
     acc, reg_width (RWC.naked_nativeint c), "unboxed_nativeint"
+  | Const_base Const_unboxed_unit ->
+    Misc.fatal_error "unexpected unboxed unit in lambda"
   | Const_immstring c ->
     register_const acc dbg (SC.immutable_string c) "immstring"
   | Const_float_block c ->
@@ -250,7 +256,8 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
           | Const_int64 _ | Const_nativeint _ | Const_untagged_int _
           | Const_untagged_int8 _ | Const_untagged_int16 _
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
-          | Const_unboxed_nativeint _ )
+          | Const_unboxed_nativeint _ | Const_unboxed_unit
+          | Const_unboxed_bool _ )
       | Const_block _ | Const_mixed_block _ | Const_float_array _
       | Const_immstring _ | Const_float_block _ | Const_null ->
         Misc.fatal_errorf
