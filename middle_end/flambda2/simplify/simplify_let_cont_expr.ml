@@ -1785,6 +1785,10 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
      we need to add them to the handler's denv. *)
   let dacc, prior_lifted_constants = DA.get_and_clear_lifted_constants dacc in
   let denv_before_body = DA.denv dacc in
+  let can_be_lifted =
+    Original_handlers.can_be_lifted data.handlers
+    && not (DE.has_seen_a_non_liftable_continuation denv_before_body)
+  in
   (* About scopes: supposing we are at scope 'n' before the let-cont, we will:
 
      - use scope 'n + 2' to inspect the body
@@ -1808,13 +1812,17 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
       Original_handlers.bound_continuations data.handlers
     in
     DE.add_lifting_cost lifting_cost
-      (DE.define_continuations denv_for_body bound_continuations
-         ~can_be_lifted:(Original_handlers.can_be_lifted data.handlers))
+      (DE.define_continuations denv_for_body bound_continuations ~can_be_lifted)
   in
   (* During specialization, we must take care of correctly handling let-bound
      continuations that have been lifted during the first downwards pass, and
      whose handlers must be replaced on subsequent passes, so that they can
-     refer to the lifted ones. *)
+     refer to the lifted ones.
+
+     Note that the `can_be_lifted` of the `handlers` bound by this let-binding
+     does not matter: instead we use the `can_be_lifted` from the original
+     handlers and the denv to decide what we will simplify: either the original
+     handlers, or new handlers that are apply_conts toward the lifted ones. *)
   let handlers =
     match
       Replay_history.replay_continuation_mapping
@@ -1824,7 +1832,7 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     | Replayed continuation_mapping -> (
       match data.handlers with
       | Non_recursive non_rec_handler ->
-        if not non_rec_handler.can_be_lifted
+        if not can_be_lifted
         then
           (* wrapper continuations (such as the ones introduced for
              over-applications), are not lifted, and are duplicated.
@@ -1859,7 +1867,7 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
           { invariant_params;
             lifted_params;
             continuation_handlers;
-            can_be_lifted
+            can_be_lifted = _
           } ->
         assert (Lifted_cont_params.is_empty lifted_params);
         if not can_be_lifted
@@ -1889,18 +1897,15 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
           in
           let ret =
             Original_handlers.create_recursive ~invariant_params ~lifted_params
-              ~continuation_handlers
+              ~continuation_handlers ~can_be_lifted
           in
           ret)
   in
   let dacc = DA.with_denv dacc denv_for_body in
-  let dacc, handlers =
-    if DE.has_seen_a_non_liftable_continuation (DA.denv dacc)
-    then dacc, Original_handlers.with_can_be_lifted false data.handlers
-    else if not (Original_handlers.can_be_lifted handlers)
-    then
-      DA.map_denv dacc ~f:DE.set_has_seen_a_non_liftable_continuation, handlers
-    else dacc, handlers
+  let dacc =
+    if can_be_lifted
+    then dacc
+    else DA.map_denv dacc ~f:DE.set_has_seen_a_non_liftable_continuation
   in
   let body = data.body in
   let data : after_downwards_traversal_of_body_data =
@@ -1931,7 +1936,7 @@ let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
       in
       let original_handlers =
         Original_handlers.create_recursive ~invariant_params ~lifted_params
-          ~continuation_handlers
+          ~continuation_handlers ~can_be_lifted:true
       in
       body, original_handlers
   in
@@ -1957,6 +1962,7 @@ let simplify_as_recursive_let_cont ~simplify_expr dacc (body, handlers)
         Original_handlers.create_recursive
           ~invariant_params:Bound_parameters.empty
           ~lifted_params:Lifted_cont_params.empty ~continuation_handlers
+          ~can_be_lifted:true
     }
   in
   simplify_let_cont0 ~simplify_expr dacc data ~down_to_up

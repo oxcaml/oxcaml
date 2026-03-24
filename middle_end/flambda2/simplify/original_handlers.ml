@@ -39,13 +39,10 @@ let[@ocamlformat "disable"] print ppf t =
       (Continuation.Lmap.print One_recursive_handler.print)
       continuation_handlers
 
-let create_recursive ~invariant_params ~lifted_params ~continuation_handlers =
+let create_recursive ~invariant_params ~lifted_params ~continuation_handlers
+    ~can_be_lifted =
   Recursive
-    { invariant_params;
-      lifted_params;
-      continuation_handlers;
-      can_be_lifted = true
-    }
+    { invariant_params; lifted_params; continuation_handlers; can_be_lifted }
 
 let create_non_recursive non_rec_handler = Non_recursive non_rec_handler
 
@@ -57,12 +54,6 @@ let bound_continuations = function
 let can_be_lifted = function
   | Non_recursive { can_be_lifted; _ } -> can_be_lifted
   | Recursive { can_be_lifted; _ } -> can_be_lifted
-
-let with_can_be_lifted can_be_lifted = function
-  | Recursive t -> Recursive { t with can_be_lifted }
-  | Non_recursive handler ->
-    Non_recursive
-      (Non_recursive_handler.with_can_be_lifted can_be_lifted handler)
 
 let add_params_to_lift t params_to_lift =
   let lifted_params, renaming = Lifted_cont_params.rename params_to_lift in
