@@ -10,8 +10,6 @@ val create_peephole_stats : unit -> peephole_stats
 
 val peephole_stats_to_counters : peephole_stats -> Profile.Counters.t
 
-val peephole_stats_to_string : peephole_stats -> string
-
 (** Apply all peephole rewrite rules to a cell. Returns Matched with
     continuation cell if a rule was applied, No_match otherwise. *)
 val apply :

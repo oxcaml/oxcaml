@@ -26,12 +26,6 @@ let peephole_stats_to_counters stats =
        stats.remove_redundant_cmp
   |> Profile.Counters.set "x86_peephole.combine_add_rsp" stats.combine_add_rsp
 
-let peephole_stats_to_string stats =
-  Printf.sprintf
-    {|"remove_mov_to_dead_register":%d,"remove_redundant_cmp":%d,"combine_add_rsp":%d|}
-    stats.remove_mov_to_dead_register stats.remove_redundant_cmp
-    stats.combine_add_rsp
-
 (* Rewrite rule: combine adjacent ADD to RSP with CFI directives. Pattern: addq
    $n1, %rsp; .cfi_adjust_cfa_offset d1; addq $n2, %rsp; .cfi_adjust_cfa_offset
    d2 Rewrite: addq $(n1+n2), %rsp; .cfi_adjust_cfa_offset (d1+d2)
