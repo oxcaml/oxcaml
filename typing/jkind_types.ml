@@ -46,6 +46,23 @@ module Sort = struct
     univar_pairs := pairs @ old_univars;
     Misc.try_finally f ~always:(fun () -> univar_pairs := old_univars)
 
+  (* Special sentinel levels stored in [var.level] when [contents = None]:
+     - [level_generic]: a generalized sort variable (genvar), used for layout
+       polymorphism and must be quantified. That is, they can only appear under
+       [sub_map] or [instance_map], etc.)
+     - [level_rigid]: a rigid sort variable that cannot be unified.
+     - [level_fresh]: a freshly-created unifiable sort variable whose level has
+       not yet been set; it will be lowered via [update_level] as soon as it is
+       unified with another variable.
+     When [contents = Some t], [level] is meaningless. *)
+  (* CR-soon zqian: Add the invariant that, when [contents = Some v], we have
+    [level >= v.level]. This can improve performance. *)
+  let level_generic = Ident.highest_scope
+
+  let level_rigid = Ident.highest_scope - 1
+
+  let level_fresh = Ident.highest_scope - 2
+
   type t =
     | Var of var
     | Base of base
@@ -54,19 +71,13 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
-      mutable level : int;
-      (* When [contents = None], [level = Ident.highest_scope] indicates
-        generic sort variables, and [level = Ident.highest_scope - 1] indicates
-        rigid variables. When [contents = Some t], [level] is meaningless and
-        the variable means whatever [t] means. *)
-      (* CR-soon zqian: Add the invariant that, when [contents = Some v], we
-         have [level >= v.level]. This can improve performance. *)
+      mutable level : int;  (** See comments on [level_generic] *)
       uid : int (* For debugging / printing only *)
     }
 
-  let is_rigidvar var = var.level = Ident.highest_scope - 1
+  let is_rigidvar var = var.level = level_rigid
 
-  let is_genvar var = var.level = Ident.highest_scope
+  let is_genvar var = var.level = level_generic
 
   let equal_base b1 b2 =
     match b1, b2 with
@@ -396,11 +407,8 @@ module Sort = struct
     | Some t ->
       if is_genvar
       then begin
-        (* CR-soon zqian: unquantified genvar are nonsense and we should fatal
-           error. *)
-        match List.assq_opt v !sub_map with
-        | Some r -> r := Some t
-        | None -> ()
+        let r = List.assq v !sub_map in
+        r := Some t
       end;
       t_iter ~f:(fun u -> update_level u v) t
 
@@ -578,10 +586,17 @@ module Sort = struct
   let last_var_uid = ref 0
 
   let new_var ~level =
+    (* Guard against accidentally creating a genvar or rigidvar via this path:
+       those require special handling (sub_map/instance_map registration for
+       genvars; refusal to unify for rigidvars). [level_fresh] is intentionally
+       not guarded here — it behaves like any other unifiable variable and its
+       level is simply lowered by [update_level] upon unification. *)
+    if level >= level_rigid
+    then Misc.fatal_error "Jkind_types.new_var: level >= level_rigid";
     incr last_var_uid;
     { contents = None; uid = !last_var_uid; level }
 
-  let new_genvar () = new_var ~level:Ident.highest_scope
+  let new_genvar () = new_var ~level:level_generic
 
   let instance_map : (var * var) list ref = ref []
 
@@ -605,13 +620,7 @@ module Sort = struct
 
   let rec instance_var v =
     match v.contents with
-    | None when is_genvar v ->
-      (* CR-soon zqian: unquantified genvar are nonsense and we should fatal_error. *)
-      begin match List.assq_opt v !instance_map with
-      | Some v' -> Var v'
-      | None -> Var v
-      end
-    | None -> Var v
+    | None -> if is_genvar v then Var (List.assq v !instance_map) else Var v
     | Some t -> instance t
 
   and instance : t -> t = function
@@ -791,8 +800,8 @@ module Sort = struct
     | Equal_mutated_both ->
       true
 
-  let decompose_into_product ~level t n =
-    let ts = List.init n (fun _ -> of_var (new_var ~level)) in
+  let decompose_into_product t n =
+    let ts = List.init n (fun _ -> of_var (new_var ~level:level_fresh)) in
     if equate t (Product ts) then Some ts else None
 
   (*** pretty printing ***)

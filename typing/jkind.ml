@@ -244,7 +244,7 @@ module Layout = struct
     | Equal_mutated_both ->
       true
 
-  let rec equate_or_equal ~allow_mutation ~level t1 t2 =
+  let rec equate_or_equal ~allow_mutation t1 t2 =
     match t1, t2 with
     | Sort (s1, sa1), Sort (s2, sa2) ->
       sort_equal_result ~allow_mutation (Sort.equate_tracking_mutation s1 s2)
@@ -261,13 +261,13 @@ module Layout = struct
       then Scannable_axes.equal sa1 sa2
       else true
     | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
-      match Sort.decompose_into_product ~level sort (List.length ts) with
+      match Sort.decompose_into_product sort (List.length ts) with
       | None -> false
       | Some sorts ->
         let sorts = List.map (fun x -> Sort (x, Scannable_axes.max)) sorts in
-        List.equal (equate_or_equal ~allow_mutation ~level) ts sorts)
+        List.equal (equate_or_equal ~allow_mutation) ts sorts)
     | Product ts1, Product ts2 ->
-      List.equal (equate_or_equal ~allow_mutation ~level) ts1 ts2
+      List.equal (equate_or_equal ~allow_mutation) ts1 ts2
     | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
     | (Any _ | Sort _ | Product _), _ -> false
 
@@ -278,7 +278,7 @@ module Layout = struct
     | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
     | Product _ -> t
 
-  let sub ~level t1 t2 =
+  let sub t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
       | Any sa1, Any sa2 -> Scannable_axes.less_or_equal sa1 sa2
@@ -306,7 +306,7 @@ module Layout = struct
         then Misc.Le_result.combine_list (List.map2 sub ts1 ts2)
         else Not_le
       | Product ts1, Sort (s2, _) -> (
-        match Sort.decompose_into_product ~level s2 (List.length ts1) with
+        match Sort.decompose_into_product s2 (List.length ts1) with
         | None -> Not_le
         | Some ss2 ->
           Misc.Le_result.combine_list
@@ -314,7 +314,7 @@ module Layout = struct
                (fun t1 s2 -> sub t1 (Sort (s2, Scannable_axes.max)))
                ts1 ss2))
       | Sort (s1, _), Product ts2 -> (
-        match Sort.decompose_into_product ~level s1 (List.length ts2) with
+        match Sort.decompose_into_product s1 (List.length ts2) with
         | None -> Not_le
         | Some ss1 ->
           Misc.Le_result.combine_list
@@ -325,10 +325,10 @@ module Layout = struct
     Sub_result.of_le_result (sub t1 t2) ~failure_reason:(fun () ->
         [Layout_disagreement])
 
-  let rec intersection ~level t1 t2 =
+  let rec intersection t1 t2 =
     (* pre-condition to [products]: [ts1] and [ts2] have the same length *)
     let products ts1 ts2 =
-      let components = List.map2 (intersection ~level) ts1 ts2 in
+      let components = List.map2 intersection ts1 ts2 in
       Option.map
         (fun x -> Product x)
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
@@ -343,7 +343,7 @@ module Layout = struct
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
     | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
-      match Sort.decompose_into_product ~level sort (List.length ts) with
+      match Sort.decompose_into_product sort (List.length ts) with
       | None -> None
       | Some sorts ->
         products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts))
@@ -658,9 +658,9 @@ module Base = struct
   (* This is only correct on bases that have been fully expanded or that come
      from the output of [Base.expand_until_comparable]. See comment on
      that function. *)
-  let sub_expanded ~level base1 base2 =
+  let sub_expanded base1 base2 =
     match base1, base2 with
-    | Layout l1, Layout l2 -> Layout.sub ~level l1 l2
+    | Layout l1, Layout l2 -> Layout.sub l1 l2
     | Kconstr k1, Kconstr k2 when Path.same k1 k2 -> Sub_result.Equal
     | Kconstr _, Layout (Layout.Any sa)
       when Scannable_axes.equal sa Scannable_axes.max ->
@@ -670,9 +670,9 @@ module Base = struct
 
   (* This is only correct on bases that come from the output of
      [Base.expand_until_comparable]. See comment on that function. *)
-  let has_intersection_expanded ~level base1 base2 =
+  let has_intersection_expanded base1 base2 =
     match base1, base2 with
-    | Layout l1, Layout l2 -> Option.is_some (Layout.intersection ~level l1 l2)
+    | Layout l1, Layout l2 -> Option.is_some (Layout.intersection l1 l2)
     | Kconstr _, Kconstr _ -> true
     | Kconstr _, Layout (Layout.Any _) -> true
     | Layout (Layout.Any _), Kconstr _ -> true
@@ -1108,7 +1108,8 @@ module Base_and_axes = struct
                   skippable_axes = relevant_axes_when_seen
                 }
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tunivar _ | Tpackage _ | Tquote _ | Tsplice _ | Tof_kind _ ->
+          | Tunivar _ | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _
+          | Tof_kind _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
@@ -1363,7 +1364,7 @@ module Jkind_desc = struct
       let t2 = Base_and_axes.jkind_desc_of_const t2 in
       Some (t1, t2)
 
-  let rec equate_or_equal ~allow_mutation ~level env t1 t2 =
+  let rec equate_or_equal ~allow_mutation env t1 t2 =
     let { base = base1;
           mod_bounds = mod_bounds1;
           with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
@@ -1378,7 +1379,7 @@ module Jkind_desc = struct
     in
     match base1, base2 with
     | Layout l1, Layout l2 ->
-      Layout.equate_or_equal ~allow_mutation ~level l1 l2
+      Layout.equate_or_equal ~allow_mutation l1 l2
       && Mod_bounds.equal mod_bounds1 mod_bounds2
     | Kconstr p1, Kconstr p2
       when Path.same p1 p2 && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
@@ -1386,9 +1387,9 @@ module Jkind_desc = struct
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | None -> false
-      | Some (t1, t2) -> equate_or_equal ~allow_mutation ~level env t1 t2)
+      | Some (t1, t2) -> equate_or_equal ~allow_mutation env t1 t2)
 
-  let sub_expanded (type l r) ~level
+  let sub_expanded (type l r)
       ({ base = base1; mod_bounds = bounds1; with_bounds = with_bounds1 } :
         (allowed * r) jkind_desc)
       ({ base = base2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
@@ -1397,7 +1398,7 @@ module Jkind_desc = struct
        kinds are fully expanded, and that [sub] is Ignore_best normalized. See
        comment about [axes_max_on_right] in [sub] just below for why we do it
        this way. *)
-    let bases = Base.sub_expanded ~level base1 base2 in
+    let bases = Base.sub_expanded base1 base2 in
     match with_bounds1 with
     | No_with_bounds ->
       let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
@@ -1419,9 +1420,8 @@ module Jkind_desc = struct
         Sub_result.Less
       | _ -> Sub_result.combine bases (Sub_result.Not_le [With_bounds_on_left]))
 
-  let sub (type l r) ~type_equal:_ ~context ~level env
-      ~sub_previously_ran_out_of_fuel (sub : (allowed * r) jkind_desc)
-      (super : (l * allowed) jkind_desc) =
+  let sub (type l r) ~type_equal:_ ~context env ~sub_previously_ran_out_of_fuel
+      (sub : (allowed * r) jkind_desc) (super : (l * allowed) jkind_desc) =
     let super =
       (* The [axes_max_on_right] optimization just below is massively important
          for the speed of the compiler. In a quick test in Nov 2025, it brought
@@ -1449,9 +1449,9 @@ module Jkind_desc = struct
         ~previously_ran_out_of_fuel:sub_previously_ran_out_of_fuel
         ~mode:Ignore_best ~context env sub
     in
-    sub_expanded ~level sub super
+    sub_expanded sub super
 
-  let rec intersection ~level env
+  let rec intersection env
       ({ base = base1; mod_bounds = mod_bounds1; with_bounds = with_bounds1 } as
        t1)
       ({ base = base2; mod_bounds = mod_bounds2; with_bounds = with_bounds2 } as
@@ -1465,7 +1465,7 @@ module Jkind_desc = struct
     in
     match base1, base2 with
     | Layout l1, Layout l2 -> (
-      match Layout.intersection ~level l1 l2 with
+      match Layout.intersection l1 l2 with
       | None -> No_intersection
       | Some l -> make_intersection (Layout l))
     | Kconstr p1, Kconstr p2 when Path.same p1 p2 -> make_intersection base1
@@ -1475,14 +1475,14 @@ module Jkind_desc = struct
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | None -> Unknown
-      | Some (t1, t2) -> intersection ~level env t1 t2)
+      | Some (t1, t2) -> intersection env t1 t2)
 
-  let sub_layout ~level env t1 t2 =
+  let sub_layout env t1 t2 =
     match Base.expand_until_comparable env t1.base t2.base with
     | None -> Sub_result.Not_le [Layout_disagreement]
     | Some (t1, t2) -> (
       match t1, t2 with
-      | Layout l1, Layout l2 -> Layout.sub ~level l1 l2
+      | Layout l1, Layout l2 -> Layout.sub l1 l2
       | Kconstr _, Kconstr _ -> Sub_result.Equal
       | Kconstr _, Layout (Layout.Any sa)
         when Scannable_axes.equal sa Scannable_axes.max ->
@@ -1585,8 +1585,7 @@ module Const = struct
       | jkind -> get_layout_result env jkind)
 
   let equal env t1 t2 =
-    Jkind_desc.equate_or_equal ~allow_mutation:false ~level:Btype.generic_level
-      env
+    Jkind_desc.equate_or_equal ~allow_mutation:false env
       (Base_and_axes.jkind_desc_of_const t1)
       (Base_and_axes.jkind_desc_of_const t2)
 
@@ -2936,8 +2935,12 @@ module Format_history = struct
         "it's the type of an argument to a debugger printer function"
     | Quotation_result -> fprintf ppf "it's the result type of a quotation"
     | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
+    | Evaluation_result ->
+      fprintf ppf "it's the result of evaluating a quotation"
     | Tquote -> fprintf ppf "it's a staged type"
     | Tsplice -> fprintf ppf "it's a splice of a staged type"
+    | Tquote_eval ->
+      fprintf ppf "it's the result of evaluating a staged program"
     | Unknown s ->
       fprintf ppf
         "unknown @[(please alert the Jane Street@;\
@@ -3179,7 +3182,7 @@ module Violation = struct
     if first_ran_out then report_fuel_for_type "first";
     if second_ran_out then report_fuel_for_type "second"
 
-  let categorize_mismatch ~level env t =
+  let categorize_mismatch env t =
     let expand k1 k2 =
       (* We fully expand aliases here so that we can:
          - See if the bases are related, to decide whether to issue an error
@@ -3212,7 +3215,7 @@ module Violation = struct
       | Layout l1, Layout l2 -> (
         match t.violation with
         | Not_a_subjkind _ ->
-          if Sub_result.is_le (Layout.sub ~level l1 l2) then Kind else Layout
+          if Sub_result.is_le (Layout.sub l1 l2) then Kind else Layout
         | No_intersection _ -> Layout)
       | Kconstr _, Layout (Layout.Any _) -> Kind
       | Kconstr _, Layout _ | Layout _, Kconstr _ -> (
@@ -3222,8 +3225,8 @@ module Violation = struct
     in
     mismatch_type, missing_cmis
 
-  let report_general ~level env preamble pp_former former ppf t =
-    let mismatch_type, missing_cmis = categorize_mismatch ~level env t in
+  let report_general env preamble pp_former former ppf t =
+    let mismatch_type, missing_cmis = categorize_mismatch env t in
     let layout_or_kind =
       match mismatch_type with Kind -> "kind" | Layout -> "layout"
     in
@@ -3320,23 +3323,20 @@ module Violation = struct
 
   let pp_t ppf x = fprintf ppf "%t" x
 
-  let report_with_offender ~offender ~level env =
-    report_general ~level env "" pp_t offender
+  let report_with_offender ~offender env = report_general env "" pp_t offender
 
   let () = Env.report_jkind_violation_with_offender := report_with_offender
 
-  let report_with_offender_sort ~offender ~level env =
-    report_general ~level env "A representable layout was expected, but " pp_t
-      offender
+  let report_with_offender_sort ~offender env =
+    report_general env "A representable layout was expected, but " pp_t offender
 
-  let report_with_name ~name ~level env =
-    report_general ~level env "" pp_print_string name
+  let report_with_name ~name env = report_general env "" pp_print_string name
 end
 
 (******************************)
 (* relations *)
 
-let equate_or_equal ~allow_mutation ~level env
+let equate_or_equal ~allow_mutation env
     { jkind = jkind1;
       annotation = _;
       history = _;
@@ -3351,12 +3351,12 @@ let equate_or_equal ~allow_mutation ~level env
       ran_out_of_fuel_during_normalize = _;
       quality = _
     } =
-  Jkind_desc.equate_or_equal ~allow_mutation ~level env jkind1 jkind2
+  Jkind_desc.equate_or_equal ~allow_mutation env jkind1 jkind2
 
 (* CR layouts: Switch this back to ~allow_mutation:false. Internal ticket 5099. *)
-let equal ~level t1 t2 = equate_or_equal ~allow_mutation:true ~level t1 t2
+let equal env t1 t2 = equate_or_equal ~allow_mutation:true env t1 t2
 
-let equate ~level t1 t2 = equate_or_equal ~allow_mutation:true ~level t1 t2
+let equate env t1 t2 = equate_or_equal ~allow_mutation:true env t1 t2
 
 (* Not all jkind history reasons are created equal. Some are more helpful than
    others.  This function encodes that information.
@@ -3370,7 +3370,7 @@ let score_reason = function
   | Creation (Concrete_creation _ | Concrete_legacy_creation _) -> -1
   | _ -> 0
 
-let combine_histories ~type_equal ~context ~level env reason (Pack_jkind k1)
+let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
     (Pack_jkind k2) =
   if flattened_histories
   then
@@ -3381,8 +3381,8 @@ let combine_histories ~type_equal ~context ~level env reason (Pack_jkind k1)
     in
     let choose_subjkind_history k_a history_a roofdn_a k_b history_b =
       match
-        Jkind_desc.sub ~level ~type_equal
-          ~sub_previously_ran_out_of_fuel:roofdn_a ~context env k_a k_b
+        Jkind_desc.sub ~type_equal ~sub_previously_ran_out_of_fuel:roofdn_a
+          ~context env k_a k_b
       with
       | Less -> history_a
       | Not_le _ ->
@@ -3410,7 +3410,7 @@ let combine_histories ~type_equal ~context ~level env reason (Pack_jkind k1)
         history2 = k2.history
       }
 
-let may_have_intersection ~level env t1 t2 =
+let may_have_intersection env t1 t2 =
   (* Need to check only the bases: all the axes have bottom elements.
      [expand_until_comparable] produces bases that are comparable for [sub], and
      in particular says [None] in the case of [Any, Kconstr _], but that's fine
@@ -3418,15 +3418,15 @@ let may_have_intersection ~level env t1 t2 =
      and incomparable bases. *)
   match Base.expand_until_comparable env t1.jkind.base t2.jkind.base with
   | None -> true
-  | Some (base1, base2) -> Base.has_intersection_expanded ~level base1 base2
+  | Some (base1, base2) -> Base.has_intersection_expanded base1 base2
 
 type 'd intersection_result =
   | Intersection of 'd jkind
   | No_intersection of Violation.t
   | Unknown
 
-let intersection ~type_equal ~context ~reason ~level env t1 t2 =
-  match Jkind_desc.intersection ~level env t1.jkind t2.jkind with
+let intersection ~type_equal ~context ~reason env t1 t2 =
+  match Jkind_desc.intersection env t1.jkind t2.jkind with
   | Jkind_desc.No_intersection ->
     No_intersection
       (Violation.of_ ~context env (Violation.No_intersection (t1, t2)))
@@ -3436,8 +3436,8 @@ let intersection ~type_equal ~context ~reason ~level env t1 t2 =
       { jkind;
         annotation = None;
         history =
-          combine_histories ~type_equal ~context ~level env reason
-            (Pack_jkind t1) (Pack_jkind t2);
+          combine_histories ~type_equal ~context env reason (Pack_jkind t1)
+            (Pack_jkind t2);
         has_warned = t1.has_warned || t2.has_warned;
         ran_out_of_fuel_during_normalize =
           t1.ran_out_of_fuel_during_normalize
@@ -3446,8 +3446,8 @@ let intersection ~type_equal ~context ~reason ~level env t1 t2 =
           Not_best (* As required by the fact that this is a [jkind_r] *)
       }
 
-let intersection_or_error ~type_equal ~context ~reason ~level env t1 t2 =
-  match intersection ~type_equal ~context ~reason ~level env t1 t2 with
+let intersection_or_error ~type_equal ~context ~reason env t1 t2 =
+  match intersection ~type_equal ~context ~reason env t1 t2 with
   | No_intersection err -> Error err
   | Intersection jkind -> Ok jkind
   | Unknown ->
@@ -3475,46 +3475,46 @@ let round_up (type l r) ~context env (t : (allowed * r) jkind) :
 let check_sub ~context env sub super =
   Jkind_desc.sub ~context env sub.jkind super.jkind
 
-let sub_with_reason ~type_equal ~context ~level env sub super =
+let sub_with_reason ~type_equal ~context env sub super =
   Sub_result.require_le
     (check_sub ~type_equal
        ~sub_previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
-       ~context ~level env sub super)
+       ~context env sub super)
 
-let sub ~type_equal ~context ~level env sub super =
-  Result.is_ok (sub_with_reason ~type_equal ~context ~level env sub super)
+let sub ~type_equal ~context env sub super =
+  Result.is_ok (sub_with_reason ~type_equal ~context env sub super)
 
 type sub_or_intersect =
   | Sub
   | Disjoint of Violation.Sub_failure_reason.t Nonempty_list.t
   | May_have_intersection of Violation.Sub_failure_reason.t Nonempty_list.t
 
-let sub_or_intersect ~type_equal ~context ~level env t1 t2 =
-  match sub_with_reason ~type_equal ~context ~level env t1 t2 with
+let sub_or_intersect ~type_equal ~context env t1 t2 =
+  match sub_with_reason ~type_equal ~context env t1 t2 with
   | Ok () -> Sub
   | Error reason ->
-    if may_have_intersection ~level env t1 t2
+    if may_have_intersection env t1 t2
     then May_have_intersection reason
     else Disjoint reason
 
-let sub_or_error ~type_equal ~context ~level env t1 t2 =
-  match sub_or_intersect ~type_equal ~context ~level env t1 t2 with
+let sub_or_error ~type_equal ~context env t1 t2 =
+  match sub_or_intersect ~type_equal ~context env t1 t2 with
   | Sub -> Ok ()
   | Disjoint reason | May_have_intersection reason ->
     Error
       (Violation.of_ ~context env
          (Violation.Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
-let sub_layout_or_error ~context ~level env t1 t2 =
-  match Jkind_desc.sub_layout ~level env t1.jkind t2.jkind with
+let sub_layout_or_error ~context env t1 t2 =
+  match Jkind_desc.sub_layout env t1.jkind t2.jkind with
   | Equal | Less -> Ok ()
   | Not_le reason ->
     Error
       (Violation.of_ ~context env
          (Violation.Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
-let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) env
-    sub super =
+let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
+    =
   (* This function implements the "SUB" judgement from kind-inference.md. *)
   let open Misc.Stdlib.Monad.Result.Syntax in
   let require_le sub_result =
@@ -3537,7 +3537,7 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) env
   let super_jkind = Base_and_axes.fully_expand_aliases env super.jkind in
   let* () =
     (* Validate layouts *)
-    require_le (Base.sub_expanded ~level sub_jkind.base super_jkind.base)
+    require_le (Base.sub_expanded sub_jkind.base super_jkind.base)
   in
   match allow_any_crossing with
   | true -> Ok ()
@@ -3807,8 +3807,10 @@ module Debug_printers = struct
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
     | Quotation_result -> fprintf ppf "Quotation_result"
     | Antiquotation_result -> fprintf ppf "Antiquotation_result"
+    | Evaluation_result -> fprintf ppf "Evaluation_result"
     | Tquote -> fprintf ppf "Tquote"
     | Tsplice -> fprintf ppf "Tsplice"
+    | Tquote_eval -> fprintf ppf "Tquote_eval"
     | Unknown s -> fprintf ppf "Unknown %s" s
     | Array_type_kind -> fprintf ppf "Array_type_kind"
 

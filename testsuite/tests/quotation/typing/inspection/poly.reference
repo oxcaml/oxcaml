@@ -70,6 +70,11 @@ Stdlib.ignore
   : Poly_types.t3''')
 
 Stdlib.ignore
+  ((fun x -> x)
+     (fun (f : 'a. 'a expr -> 'a eval) -> ((f <[42]>), (f <["abc"]>)))
+  : Poly_types.t3'''')
+
+Stdlib.ignore
   ((fun x -> x) (fun (f : 'a. < x : 'a; .. > -> 'a) -> (42, "abc")) :
   ('a__1. < x : 'a__1; .. > -> 'a__1) -> int * string)
 

@@ -178,6 +178,8 @@ module Identifier : sig
 
     val expr : t
 
+    val eval : t
+
     val unboxed_float : t
 
     val unboxed_nativeint : t

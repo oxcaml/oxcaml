@@ -703,6 +703,8 @@ module Identifier : sig
 
     val expr : t'
 
+    val eval : t'
+
     val unboxed_float : t'
 
     val unboxed_nativeint : t'
@@ -901,6 +903,8 @@ end = struct
     let lexing_position = use "Identifier.Type" "lexing_position"
 
     let expr = use "Identifier.Type" "expr"
+
+    let eval = use "Identifier.Type" "eval"
 
     let unboxed_float = use "Identifier.Type" "unboxed_float"
 
@@ -2439,6 +2443,7 @@ let type_for_path loc = function
         | "floatarray" -> Identifier.Type.floatarray
         | "lexing_position" -> Identifier.Type.lexing_position
         | "expr" -> Identifier.Type.expr
+        | "eval" -> Identifier.Type.eval
         | "float#" -> Identifier.Type.unboxed_float
         | "nativeint#" -> Identifier.Type.unboxed_nativeint
         | "int32#" -> Identifier.Type.unboxed_int32
@@ -2795,6 +2800,10 @@ let type_for_annotation ~env ~loc typ =
             "Translquote [at %a]:@ Explicitly quantified type variables@ \
              cannot be spliced@ within quoted higher-rank function types"
             Location.print_loc_in_lowercase loc
+        | Tquote_eval _ ->
+          let lident = Untypeast.lident_of_path Predef.path_eval in
+          Ttyp_constr
+            (Predef.path_eval, mkloc lident loc, [go (Btype.new_quote_ty ty)])
         | Tpackage (pack_path, pack_fields) ->
           Ttyp_package
             { pack_path;
