@@ -414,6 +414,90 @@ let without_generating_equations uenv f =
   | Expression _ as uenv -> f uenv
   | Pattern r -> f (Pattern { r with equations_generation = Forbidden })
 
+(* In type checking, we only use [decr_stage] when we observe a spliced type.
+   [Env.enter_splice] only fails when the splice would be top-level. Hence,
+   no legitimate errors will ever be raised there and we can omit the [loc].
+
+   For sanity, we have an extra assertion here. It fails when we [decr_stage]
+   in a context where we lost track of the original stage or a bug in typing
+   resulted in a mis-staged type expression.
+   While unlikely, this can indicate a soundness bug if we have access to
+   a local constraint (GADT equation) from the wrong stage. *)
+let decr_stage env =
+  if Int.equal 0 (Env.stage env :> int) then
+    fatal_errorf "Ctype.decr_stage: Stage decreased below the meta stage";
+  Env.enter_splice ~loc:Location.none env
+
+let incr_stage env =
+  Env.enter_quotation env
+
+let iter_type_expr_with_stages f env ty =
+  match get_desc ty with
+  | Tquote ty ->
+    f (incr_stage env) ty
+  | Tsplice ty ->
+    f (decr_stage env) ty
+  | Tquote_eval ty ->
+    f (incr_stage env) ty
+  | _ ->
+    iter_type_expr (f env) ty
+
+let rec offset_stage n env =
+  if n < 0 then
+    offset_stage (n + 1) (decr_stage env)
+  else if n > 0 then
+    offset_stage (n - 1) (incr_stage env)
+  else
+    env
+
+(* CR metaprogramming jbachurski: We use this to adjust the environment while
+   printing error messages. The original type may have been well-staged,
+   but since we always print (non-unification) errors at stage 0, we should
+   at least make sure nothing explodes if we find a splice (that would have
+   been fine were the type at stage 1).
+
+   The right way to address this is to track the stage in errors. With that
+   done, this function can be removed, and some GADT-related errors improve. *)
+let contains_toplevel_splice stage ty =
+  let visited = ref TypeSet.empty in
+  let rec loop acc ty =
+    if TypeSet.mem ty !visited then false else begin
+      visited := TypeSet.add ty !visited;
+      let offset =
+        match get_desc ty with
+        | Tquote _ -> +1
+        | Tsplice _ -> -1
+        | Tquote_eval _ -> +1
+        | _ -> 0
+      in
+      fold_type_expr
+        (fun x y -> x || loop (acc + offset) y)
+        (acc < 0) ty
+    end
+  in
+  loop stage ty
+
+(* Update unification environment stage *)
+let unify_with_incr_stage uenv f =
+  match uenv with
+  | Expression e ->
+    f (Expression { e with env = incr_stage e.env })
+  | Pattern p ->
+    Pattern_env.set_env p.penv (incr_stage p.penv.env);
+    let x = f (Pattern p) in
+    Pattern_env.set_env p.penv (decr_stage p.penv.env);
+    x
+
+let unify_with_decr_stage uenv f =
+  match uenv with
+  | Expression e ->
+    f (Expression { e with env = decr_stage e.env })
+  | Pattern p ->
+    Pattern_env.set_env p.penv (decr_stage p.penv.env);
+    let x = f (Pattern p) in
+    Pattern_env.set_env p.penv (incr_stage p.penv.env);
+    x
+
 (* Unification generally must check that the jkinds of the two types being
    unified agree.  However, sometimes we need to delay these jkind
    checks, and this is tracked by the [jkind_unification_mode] in [lmode].
@@ -954,7 +1038,8 @@ let rec check_scope_escape mark env level ty =
         check_scope_escape mark env level
           (newty2 ~level:orig_level (Tpackage (p', fl)))
     | _ ->
-        iter_type_expr (check_scope_escape mark env level) ty
+        iter_type_expr_with_stages
+          (fun env -> check_scope_escape mark env level) env ty
     end;
   end
 
@@ -1041,7 +1126,8 @@ let rec update_level env level expand ty =
     | _ ->
         set_level ty level;
         (* XXX what about abbreviations in Tconstr ? *)
-        iter_type_expr (update_level env level expand) ty
+        iter_type_expr_with_stages
+          (fun env -> update_level env level expand) env ty
   end
 
 (* First try without expanding, then expand everything,
@@ -1107,7 +1193,8 @@ let rec lower_contravariant env var_level visited contra ty =
         lower_rec true t1;
         lower_rec contra t2
     | _ ->
-        iter_type_expr (lower_rec contra) ty
+        iter_type_expr_with_stages
+          (fun env -> lower_contravariant env var_level visited contra) env ty
   end
 
 let lower_variables_only env level ty =
@@ -2163,16 +2250,29 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
-let rec try_expand_once_gen expand_abbrev env ty =
-  match get_desc ty with
-    Tconstr _ -> expand_abbrev env ty
-  | Tsplice t ->
-      try_expand_once_gen expand_abbrev env t |> new_splice_ty
-  | Tquote t ->
-      try_expand_once_gen expand_abbrev env t |> new_quote_ty
-  | Tquote_eval t ->
-      try_expand_once_gen expand_abbrev env t |> new_quote_eval_ty
-  | _ -> raise Cannot_expand
+let try_expand_once_gen expand_abbrev env ty =
+  (* CR metaprogramming jbachurski: Sometimes, expansion deals with bad types
+     that contain cancellable top-level splices (e.g. $(<[unit]>) at stage 0).
+     This probably means another bit of the code was careless with splicing in
+     some non-trivial way.
+     We should probably find and fix the source: see ticket 6725.
+
+     It seems considerate to let this slide -- as those splices are cancelled
+     during [try_reduce] anyway. Hence, we track the stage here lazily to avoid
+     failing the assertion in [decr_stage]. *)
+  let rec loop acc ty =
+    match get_desc ty with
+    | Tconstr _ ->
+        expand_abbrev (offset_stage acc env) ty
+    | Tquote ty ->
+        loop (acc + 1) ty |> new_quote_ty
+    | Tsplice ty ->
+        loop (acc - 1) ty |> new_splice_ty
+    | Tquote_eval ty ->
+        loop (acc + 1) ty |> new_quote_eval_ty
+    | _ -> raise Cannot_expand
+  in
+  loop 0 ty
 
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
@@ -2426,9 +2526,9 @@ let rec extract_concrete_typedecl env ty =
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
   | Trepr _ -> Has_no_typedecl
-  | Tquote ty -> extract_concrete_typedecl env ty
-  | Tsplice ty -> extract_concrete_typedecl env ty
-  | Tquote_eval ty -> extract_concrete_typedecl env ty
+  | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
+  | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
+  | Tquote_eval ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -3210,7 +3310,9 @@ let rec occur_rec env visited allow_recursive parents ty0 ty =
     | _ ->
         if allow_recursive ||  TypeSet.mem ty parents then () else begin
           let parents = TypeSet.add ty parents in
-          iter_type_expr (occur_rec env visited allow_recursive parents ty0) ty
+          iter_type_expr_with_stages
+            (fun env -> occur_rec env visited allow_recursive parents ty0)
+            env ty
         end
     end;
     ignore (try_mark_node visited ty)
@@ -3278,8 +3380,10 @@ let rec local_non_recursive_abbrev ~allow_rec strict visited env p ty =
     | _ ->
         if strict || not allow_rec then (* PR#7374 *)
           let visited = get_id ty :: visited in
-          iter_type_expr
-            (local_non_recursive_abbrev ~allow_rec true visited env p) ty
+          iter_type_expr_with_stages
+            (fun env ->
+              local_non_recursive_abbrev ~allow_rec true visited env p)
+            env ty
   end
 
 let local_non_recursive_abbrev uenv p ty =
@@ -3339,31 +3443,31 @@ let unify_univar_for tr_exn env t1 t2 jkind1 jkind2 univar_pairs =
 let occur_univar ?(inj_only=false) env ty =
   let visited = ref TypeMap.empty in
   with_type_mark begin fun mark ->
-  let rec occur_rec bound ty =
+  let rec occur_rec env bound ty =
     if not_marked_node mark ty then
       if TypeSet.is_empty bound then
-        (ignore (try_mark_node mark ty); occur_desc bound ty)
+        (ignore (try_mark_node mark ty); occur_desc env bound ty)
       else try
         let bound' = TypeMap.find ty !visited in
         if not (TypeSet.subset bound' bound) then begin
           visited := TypeMap.add ty (TypeSet.inter bound bound') !visited;
-          occur_desc bound ty
+          occur_desc env bound ty
         end
       with Not_found ->
         visited := TypeMap.add ty bound !visited;
-        occur_desc bound ty
-  and occur_desc bound ty =
+        occur_desc env bound ty
+  and occur_desc env bound ty =
       match get_desc ty with
         Tunivar _ ->
           if not (TypeSet.mem ty bound) then
             raise_escape_exn (Univ ty)
       | Tpoly (ty, tyl) ->
           let bound = List.fold_right TypeSet.add tyl bound in
-          occur_rec bound  ty
+          occur_rec env bound ty
       | Trepr (ty, _sort_vars) ->
           (* Sort variables are not type expressions, so we don't add them
              to bound *)
-          occur_rec bound ty
+          occur_rec env bound ty
       | Tconstr (_, [], _) -> ()
       | Tconstr (p, tl, _) ->
           begin try
@@ -3378,14 +3482,14 @@ let occur_univar ?(inj_only=false) env ty =
                    would be costly here, since we need to check inside
                    object and variant types too. *)
                 if Variance.(if inj_only then mem Inj v else not (eq v null))
-                then occur_rec bound t)
+                then occur_rec env bound t)
               tl td.type_variance
           with Not_found ->
-            if not inj_only then List.iter (occur_rec bound) tl
+            if not inj_only then List.iter (occur_rec env bound) tl
           end
-      | _ -> iter_type_expr (occur_rec bound) ty
+      | _ -> iter_type_expr_with_stages (fun env -> occur_rec env bound) env ty
   in
-  occur_rec TypeSet.empty ty
+  occur_rec env TypeSet.empty ty
   end
 
 let has_free_univars env ty =
@@ -3418,12 +3522,12 @@ let get_univar_family univar_pairs univars =
 let univars_escape env univar_pairs vl ty =
   let family = get_univar_family univar_pairs vl in
   with_type_mark begin fun mark ->
-  let rec occur t =
+  let rec occur env t =
     if try_mark_node mark t then begin
       match get_desc t with
         Tpoly (t, tl) ->
           if List.exists (fun t -> TypeSet.mem t family) tl then ()
-          else occur t
+          else occur env t
       | Tunivar _ -> if TypeSet.mem t family then raise_escape_exn (Univ t)
       | Tconstr (_, [], _) -> ()
       | Tconstr (p, tl, _) ->
@@ -3431,16 +3535,16 @@ let univars_escape env univar_pairs vl ty =
             let td = Env.find_type p env in
             List.iter2
               (* see occur_univar *)
-              (fun t v -> if not Variance.(eq v null) then occur t)
+              (fun t v -> if not Variance.(eq v null) then occur env t)
               tl td.type_variance
           with Not_found ->
-            List.iter occur tl
+            List.iter (occur env) tl
           end
       | _ ->
-          iter_type_expr occur t
+          iter_type_expr_with_stages occur env t
     end
   in
-  occur ty
+  occur env ty
   end
 
 (* Wrapper checking that no variable escapes and updating univar_pairs *)
@@ -3513,6 +3617,15 @@ let rec has_cached_expansion p abbrev =
    but still might be nice. *)
 
 let expand_type env ty =
+  (* If the type contains top-level splices, then we enter some far-away future
+     stage where all splices are valid. *)
+  (* CR metaprogramming jbachurski: Remove [contains_toplevel_splice] and
+     track the stage in errors so we don't need this. *)
+  let env =
+    if contains_toplevel_splice (Env.stage env :> int) ty
+    then Env.enter_future env
+    else env
+  in
   { ty       = ty;
     expanded = full_expand ~may_forget_scope:true env ty }
 
@@ -3689,8 +3802,8 @@ let is_aliasable p decl =
 let rec is_aliasable_ty env ty =
   match get_desc ty with
   | Tconstr (p, _, _) -> Env.find_type p env |> is_aliasable p
-  | Tquote ty' -> is_aliasable_ty env ty'
-  | Tsplice ty' -> is_aliasable_ty env ty'
+  | Tquote ty' -> is_aliasable_ty (incr_stage env) ty'
+  | Tsplice ty' -> is_aliasable_ty (decr_stage env) ty'
   | _ -> false
 
 let compatible_paths p1 p2 =
@@ -3769,13 +3882,13 @@ let rec mcomp type_pairs env t1 t2 =
         let target2 = not target1 && (flexible2 || aliasable2) in
         match (get_desc t1', get_desc t2', t1', t2') with
         | (Tquote s1, _, _, _)  when target1 ->
-          mcomp type_pairs env s1 (new_splice_ty t2')
+          mcomp type_pairs (incr_stage env) s1 (new_splice_ty t2')
         | (Tsplice s1, _, _, _) when target1 ->
-          mcomp type_pairs env s1 (new_quote_ty t2')
+          mcomp type_pairs (decr_stage env) s1 (new_quote_ty t2')
         | (_, Tquote s2, _, _)  when target2 ->
-          mcomp type_pairs env (new_splice_ty t1') s2
+          mcomp type_pairs (incr_stage env) (new_splice_ty t1') s2
         | (_, Tsplice s2, _, _) when target2 ->
-          mcomp type_pairs env (new_quote_ty t1') s2
+          mcomp type_pairs (decr_stage env) (new_quote_ty t1') s2
         (* Flexible cases *)
         (* - If [flexible1], then [t1'] is now a [Tvar].
            - If [flexible2], then [t2'] is now a [Tvar]. *)
@@ -3818,11 +3931,11 @@ let rec mcomp type_pairs env t1 t2 =
         | (Tfield _, Tfield _, _, _) ->       (* Actually unused *)
             mcomp_fields type_pairs env t1' t2'
         | (Tquote t1, Tquote t2, _, _) ->
-            mcomp type_pairs env t1 t2
+            mcomp type_pairs (incr_stage env) t1 t2
         | (Tsplice t1, Tsplice t2, _, _) ->
-            mcomp type_pairs env t1 t2
+            mcomp type_pairs (decr_stage env) t1 t2
         | (Tquote_eval t1, Tquote_eval t2, _, _) ->
-            mcomp type_pairs env t1 t2
+            mcomp type_pairs (incr_stage env) t1 t2
         | (Tnil, Tnil, _, _) ->
             ()
         | (Tpoly (t1, []), Tpoly (t2, []), _, _) ->
@@ -4211,13 +4324,14 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | res -> res
   | exception Exit -> raise Not_found
 
-(* Checks if a type is an instantiable type under some quotes or splices *)
+(* Checks if a type is an instantiable type under some quotes.
+   Note that types under splices are not instantiable, as they are erased. *)
 let rec is_instantiable_ty env ty =
   match get_desc ty with
   | Tconstr (path, [], _) ->
       is_instantiable env ~for_jkind_eqn:false path
-  | Tquote ty' -> is_instantiable_ty env ty'
-  | Tsplice ty' -> is_instantiable_ty env ty'
+  | Tquote ty' -> is_instantiable_ty (incr_stage env) ty'
+  | Tsplice ty' -> is_instantiable_ty (decr_stage env) ty'
   | _ -> false
 
 (* Checks if a type is equatable under some quotes or splices *)
@@ -4463,19 +4577,19 @@ and unify3 uenv t1 t1' t2 t2' =
   | (_, Tvar { jkind }) ->
       unify3_var uenv jkind t2' t1 t1'
   | (Tquote t1, Tquote t2) ->
-      unify uenv t1 t2
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tsplice t1, Tsplice t2) ->
-      unify uenv t1 t2
+      unify_with_decr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tquote_eval t1, Tquote_eval t2) ->
-      unify uenv t1 t2
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tsplice s1, _) when is_flexible_ty s1 ->
-      unify uenv s1 (new_quote_ty t2')
+      unify_with_decr_stage uenv (fun uenv -> unify uenv s1 (new_quote_ty t2'))
   | (Tquote s1, _) when is_flexible_ty s1 ->
-      unify uenv s1 (new_splice_ty t2')
+      unify_with_incr_stage uenv (fun uenv -> unify uenv s1 (new_splice_ty t2'))
   | (_, Tsplice s2) when is_flexible_ty s2 ->
-      unify uenv (new_quote_ty t1') s2
+      unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
-      unify uenv (new_splice_ty t1') s2
+      unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -4564,22 +4678,26 @@ and unify3 uenv t1 t1' t2 t2' =
         when is_instantiable_ty (get_env uenv) s1
           && instantiable_scope s1 > instantiable_scope t2'
           && can_generate_equations uenv ->
-          unify uenv s1 (new_quote_ty t2')
+          unify_with_decr_stage uenv
+            (fun uenv -> unify uenv s1 (new_quote_ty t2'))
       | (Tquote s1, _)
         when is_instantiable_ty (get_env uenv) s1
           && instantiable_scope s1 > instantiable_scope t2'
           && can_generate_equations uenv ->
-          unify uenv s1 (new_splice_ty t2')
+          unify_with_incr_stage uenv
+            (fun uenv -> unify uenv s1 (new_splice_ty t2'))
       | (_, Tsplice s2)
         when is_instantiable_ty (get_env uenv) s2
           && instantiable_scope s2 >= instantiable_scope t1'
           && can_generate_equations uenv ->
-          unify uenv (new_quote_ty t1') s2
+          unify_with_decr_stage uenv
+            (fun uenv -> unify uenv (new_quote_ty t1') s2)
       | (_, Tquote s2)
         when is_instantiable_ty (get_env uenv) s2
           && instantiable_scope s2 >= instantiable_scope t1'
           && can_generate_equations uenv ->
-          unify uenv (new_splice_ty t1') s2
+          unify_with_incr_stage uenv
+            (fun uenv -> unify uenv (new_splice_ty t1') s2)
       | (Tconstr (_,_,_), _) | (_, Tconstr (_,_,_))
       | (Tquote _, _) | (Tsplice _, _)
       | (_, Tquote _) | (_, Tsplice _)
@@ -5801,11 +5919,14 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen env t1' t2' k1 k2 !univar_pairs
           | (Tquote t1, _) ->
-              moregen inst_nongen variance type_pairs env t1 (new_splice_ty t2)
+              moregen inst_nongen variance type_pairs
+                (incr_stage env) t1 (new_splice_ty t2)
           | (Tsplice t1, _) ->
-              moregen inst_nongen variance type_pairs env t1 (new_quote_ty t2)
+              moregen inst_nongen variance type_pairs
+                (decr_stage env) t1 (new_quote_ty t2)
           | (Tquote_eval t1, Tquote_eval t2) ->
-              moregen inst_nongen variance type_pairs env t1 t2
+              moregen inst_nongen variance type_pairs
+                (incr_stage env) t1 t2
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -6296,11 +6417,14 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Equality env t1' t2' k1 k2 !univar_pairs
           | (Tquote t1, Tquote t2) ->
-              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+              eqtype rename type_pairs subst
+                (incr_stage env) ~do_jkind_check t1 t2
           | (Tsplice t1, Tsplice t2) ->
-              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+              eqtype rename type_pairs subst
+                (decr_stage env) ~do_jkind_check t1 t2
           | (Tquote_eval t1, Tquote_eval t2) ->
-              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+              eqtype rename type_pairs subst
+                (incr_stage env) ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
         end
@@ -7005,15 +7129,21 @@ let rec build_subtype env (visited : transient_expr list)
       if c > Unchanged then (newty (Tfield(s, field_public, t1', t2')), c)
       else (t, Unchanged)
   | Tquote t1 ->
-      let (t1', c) = build_subtype env visited loops posi level t1 in
+      let (t1', c) =
+        build_subtype (incr_stage env) visited loops posi level t1
+      in
       if c > Unchanged then (newty (Tquote t1'), c)
       else (t, Unchanged)
   | Tsplice t1 ->
-      let (t1', c) = build_subtype env visited loops posi level t1 in
+      let (t1', c) =
+        build_subtype (decr_stage env) visited loops posi level t1
+      in
       if c > Unchanged then (newty (Tsplice t1'), c)
       else (t, Unchanged)
   | Tquote_eval t1 ->
-      let (t1', c) = build_subtype env visited loops posi level t1 in
+      let (t1', c) =
+        build_subtype (incr_stage env) visited loops posi level t1
+      in
       if c > Unchanged then (newty (Tquote_eval t1'), c)
       else (t, Unchanged)
   | Tnil ->
@@ -7220,9 +7350,11 @@ let rec subtype_rec env trace t1 t2 cstrs =
           (trace, t1, t2, !univar_pairs)::cstrs
         end
     | (Tquote t1, Tquote t2) ->
-         subtype_rec env trace t1 t2 cstrs
+         subtype_rec (incr_stage env) trace t1 t2 cstrs
     | (Tsplice t1, Tsplice t2) ->
-         subtype_rec env trace t1 t2 cstrs
+         subtype_rec (decr_stage env) trace t1 t2 cstrs
+    | (Tquote_eval t1, Tquote_eval t2) ->
+         subtype_rec (incr_stage env) trace t1 t2 cstrs
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end
@@ -7525,9 +7657,8 @@ let rec normalize_type_rec mark ty =
               let tyl' =
                 List.fold_left
                   (fun tyl ty ->
-                     if List.exists
-                          (fun ty' -> is_equal Env.empty false [ty] [ty'])
-                          tyl
+                     let eq = is_equal (Env.enter_future Env.empty) false in
+                     if List.exists (fun ty' -> eq [ty] [ty']) tyl
                      then tyl
                      else ty::tyl)
                   [ty] tyl
@@ -7904,7 +8035,7 @@ let rec collapse_conj env visited ty =
         (row_fields row);
       iter_row (collapse_conj env visited) row
   | _ ->
-      iter_type_expr (collapse_conj env visited) ty
+      iter_type_expr_with_stages (fun env -> collapse_conj env visited) env ty
 
 let collapse_conj_params env params =
   List.iter (collapse_conj env []) params
