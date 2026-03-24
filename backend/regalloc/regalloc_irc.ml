@@ -256,35 +256,31 @@ let freeze : State.t -> unit =
 let select_spilling_register_using_heuristics : State.t -> SpillCosts.t -> Reg.t
     =
  fun state costs ->
-  match Lazy.force Spilling_heuristics.value with
-  | Flat_uses | Hierarchical_uses -> (
-    (* note: this assumes that `Reg.spill_cost` has been updated as needed (only
-       when `rewrite` is called); the value computed here can however not be
-       similarly cached because it depends on the degree (which does not need a
-       call to `rewrite` to change). *)
-    let weighted_cost (reg : Reg.t) =
-      if debug
-      then
-        log "register %a has spill cost %d" Printreg.reg reg
-          (SpillCosts.for_reg costs reg);
-      (float (SpillCosts.for_reg costs reg) /. float (State.degree state reg))
-      (* note: while this magic constant is questionable, it is key to not favor
-         the introduced temporaries which, by construct, have very few
-         occurrences. *)
-      +. if State.mem_inst_temporaries state reg then 10_000. else 0.
-    in
-    match State.is_empty_spill_work_list state with
-    | true -> fatal "spill_work_list is empty"
-    | false ->
-      State.fold_spill_work_list state ~init:(Reg.dummy, Float.max_float)
-        ~f:(fun ((_curr_reg, curr_min_cost) as acc) reg ->
-          let reg_cost = weighted_cost reg in
-          if debug
-          then log "register %a has weighted cost %f" Printreg.reg reg reg_cost;
-          if Float.compare reg_cost curr_min_cost < 0
-          then reg, reg_cost
-          else acc)
-      |> fst)
+  (* note: this assumes that `Reg.spill_cost` has been updated as needed (only
+     when `rewrite` is called); the value computed here can however not be
+     similarly cached because it depends on the degree (which does not need a
+     call to `rewrite` to change). *)
+  let weighted_cost (reg : Reg.t) =
+    if debug
+    then
+      log "register %a has spill cost %g" Printreg.reg reg
+        (SpillCosts.for_reg costs reg);
+    (SpillCosts.for_reg costs reg /. float (State.degree state reg))
+    (* note: while this magic constant is questionable, it is key to not favor
+       the introduced temporaries which, by construct, have very few
+       occurrences. *)
+    +. if State.mem_inst_temporaries state reg then 10_000. else 0.
+  in
+  match State.is_empty_spill_work_list state with
+  | true -> fatal "spill_work_list is empty"
+  | false ->
+    State.fold_spill_work_list state ~init:(Reg.dummy, Float.max_float)
+      ~f:(fun ((_curr_reg, curr_min_cost) as acc) reg ->
+        let reg_cost = weighted_cost reg in
+        if debug
+        then log "register %a has weighted cost %f" Printreg.reg reg reg_cost;
+        if Float.compare reg_cost curr_min_cost < 0 then reg, reg_cost else acc)
+    |> fst
 
 let select_spill : State.t -> SpillCosts.t -> unit =
  fun state costs ->
@@ -469,12 +465,13 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
         match !spill_costs with
         | Some costs -> costs
         | None ->
-          let costs =
+          let block_costs : SpillCosts.block_costs =
             match Lazy.force Spilling_heuristics.value with
-            | Flat_uses -> SpillCosts.compute cfg_with_infos ~flat:true ()
-            | Hierarchical_uses ->
-              SpillCosts.compute cfg_with_infos ~flat:false ()
+            | Flat_uses -> Constant
+            | Hierarchical_uses -> Loops
+            | Static_frequencies -> Estimated_frequencies
           in
+          let costs = SpillCosts.compute cfg_with_infos block_costs in
           spill_costs := Some costs;
           costs
       in

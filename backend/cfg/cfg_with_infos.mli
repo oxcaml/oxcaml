@@ -43,6 +43,8 @@ val dominators : t -> Cfg_dominators.t
 
 val loop_infos : t -> Cfg_loop_infos.t
 
+val block_frequency : t -> Cfg_block_frequency.t
+
 val invalidate_loop_infos : t -> unit
 
 val invalidate_dominators_and_loop_infos : t -> unit

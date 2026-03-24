@@ -172,14 +172,16 @@ module Spilling_heuristics = struct
   type t =
     | Flat_uses
     | Hierarchical_uses
+    | Static_frequencies
 
   let default = Flat_uses
 
-  let all = [Flat_uses; Hierarchical_uses]
+  let all = [Flat_uses; Hierarchical_uses; Static_frequencies]
 
   let to_string = function
     | Flat_uses -> "flat_uses"
     | Hierarchical_uses -> "hierarchical_uses"
+    | Static_frequencies -> "static_frequencies"
 
   let value =
     let available_heuristics () =
@@ -193,6 +195,7 @@ module Spilling_heuristics = struct
         match String.lowercase_ascii id with
         | "flat_uses" | "flat-uses" -> Flat_uses
         | "hierarchical_uses" | "hierarchical-uses" -> Hierarchical_uses
+        | "static_frequencies" | "static-frequencies" -> Static_frequencies
         | _ ->
           fatal "unknown heuristics %S (possible values: %s)" id
             (available_heuristics ())))
