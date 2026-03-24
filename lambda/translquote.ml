@@ -2748,11 +2748,11 @@ let type_for_annotation ~env ~loc typ =
   in
   let rec go aliased ty =
     (* CR metaprogramming jbachurski: Once jkind annotations are supported
-       in quotes, we should use [any] wildcards. *)
+       in quotes, we should use [any] wildcards:
+       (Jkind.Builtin.any ~why:Wildcard).annotation *)
     let ctyp_desc =
       if aliasable ty && List.memq ty aliased
       then Ttyp_var (None, None)
-      (* then Ttyp_var (None, (Jkind.Builtin.any ~why:Wildcard).annotation) *)
       else
         let go = go (ty :: aliased) in
         match get_desc ty with
