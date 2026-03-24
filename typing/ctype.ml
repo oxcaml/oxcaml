@@ -321,7 +321,7 @@ end
 
 type equations_generation =
   | Forbidden
-  | Allowed of { equated_types : TypePairs.t }
+  | Allowed of { equated_types : TypePairs.t; pattern_stage : Env.stage }
 
 type unification_environment =
   | Expression of
@@ -332,7 +332,7 @@ type unification_environment =
       { penv : Pattern_env.t;
         equations_generation : equations_generation;
         assume_injective : bool;
-        unify_eq_set : TypePairs.t; }
+        unify_eq_set : TypePairs.t }
     (* GADT constraint unification mode:
        only used for type indices of GADT constructors
        during pattern matching.
@@ -379,7 +379,8 @@ let in_subst_mode = function
 
 let can_generate_equations = function
   | Expression _ | Pattern { equations_generation = Forbidden } -> false
-  | Pattern { equations_generation = Allowed _ } -> true
+  | Pattern { penv; equations_generation = Allowed { pattern_stage } } ->
+    Env.stage penv.env >= pattern_stage
 
 (* Can only be called when generate_equations is true.  Tracks equations only to
    improve error messages. *)
@@ -4326,12 +4327,17 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
 
 (* Checks if a type is an instantiable type under some quotes.
    Note that types under splices are not instantiable, as they are erased. *)
-let rec is_instantiable_ty env ty =
+let rec is_instantiable_ty uenv ty =
   match get_desc ty with
   | Tconstr (path, [], _) ->
-      is_instantiable env ~for_jkind_eqn:false path
-  | Tquote ty' -> is_instantiable_ty (incr_stage env) ty'
-  | Tsplice ty' -> is_instantiable_ty (decr_stage env) ty'
+      can_generate_equations uenv &&
+      is_instantiable (get_env uenv) ~for_jkind_eqn:false path
+  | Tquote ty' ->
+    unify_with_incr_stage uenv (fun uenv ->
+      is_instantiable_ty uenv ty')
+  | Tsplice ty' ->
+    unify_with_decr_stage uenv (fun uenv ->
+      is_instantiable_ty uenv ty')
   | _ -> false
 
 (* Checks if a type is equatable under some quotes or splices *)
@@ -4567,7 +4573,6 @@ and unify3 uenv t1 t1' t2 t2' =
   let d1 = tt1'.desc and d2 = get_desc t2' in
   let create_recursion =
     (not (eq_type t2 t2')) && (deep_occur t1'  t2) in
-
   begin match (d1, d2) with (* handle vars and univars specially *)
     (Tunivar { jkind = k1 }, Tunivar { jkind = k2 }) ->
       unify_univar_for Unify (get_env uenv) t1' t2' k1 k2 !univar_pairs;
@@ -4673,29 +4678,31 @@ and unify3 uenv t1 t1' t2 t2' =
           record_equation uenv t1' t2';
           add_gadt_equation uenv path t1'
       (* Ordering of scopes is asymmetric to ensure we consistently
-         move quotes/splices to the same side *)
+         move quotes/splices to the same side.
+         [is_instantiable_ty] will check if we [can_generate_equations]
+         at the stage of the instantiable type. *)
       | (Tsplice s1, _)
-        when is_instantiable_ty (get_env uenv) s1
-          && instantiable_scope s1 > instantiable_scope t2'
-          && can_generate_equations uenv ->
+        when is_instantiable_ty uenv t1'
+          && (not (is_instantiable_ty uenv t2')
+              || instantiable_scope s1 > instantiable_scope t2') ->
           unify_with_decr_stage uenv
             (fun uenv -> unify uenv s1 (new_quote_ty t2'))
       | (Tquote s1, _)
-        when is_instantiable_ty (get_env uenv) s1
-          && instantiable_scope s1 > instantiable_scope t2'
-          && can_generate_equations uenv ->
+        when is_instantiable_ty uenv t1'
+          && (not (is_instantiable_ty uenv t2')
+              || instantiable_scope s1 > instantiable_scope t2') ->
           unify_with_incr_stage uenv
             (fun uenv -> unify uenv s1 (new_splice_ty t2'))
       | (_, Tsplice s2)
-        when is_instantiable_ty (get_env uenv) s2
-          && instantiable_scope s2 >= instantiable_scope t1'
-          && can_generate_equations uenv ->
+        when is_instantiable_ty uenv t2'
+          && (not (is_instantiable_ty uenv t1')
+              || instantiable_scope s2 >= instantiable_scope t1') ->
           unify_with_decr_stage uenv
             (fun uenv -> unify uenv (new_quote_ty t1') s2)
       | (_, Tquote s2)
-        when is_instantiable_ty (get_env uenv) s2
-          && instantiable_scope s2 >= instantiable_scope t1'
-          && can_generate_equations uenv ->
+        when is_instantiable_ty uenv t2'
+          && (not (is_instantiable_ty uenv t1')
+              || instantiable_scope s2 >= instantiable_scope t1') ->
           unify_with_incr_stage uenv
             (fun uenv -> unify uenv (new_splice_ty t1') s2)
       | (Tconstr (_,_,_), _) | (_, Tconstr (_,_,_))
@@ -5096,7 +5103,9 @@ let unify uenv ty1 ty2 =
 let unify_gadt (penv : Pattern_env.t) ty1 ty2 =
   Misc.protect_refs [R (univar_pairs, [])] begin fun () ->
   let equated_types = TypePairs.create 0 in
-  let equations_generation = Allowed { equated_types } in
+  let equations_generation =
+    Allowed { equated_types; pattern_stage = Env.stage penv.env }
+  in
   let uenv = Pattern
       { penv;
         equations_generation;
