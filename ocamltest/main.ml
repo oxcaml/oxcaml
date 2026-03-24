@@ -323,14 +323,19 @@ let test_file test_filename =
            tsl_ast
        in
        let common_prefix = " ... testing '" ^ test_basename ^ "'" in
-       Printf.printf "%s => %s%s\n%!" common_prefix (string_of_summary summary)
-         (if Options.show_timings && summary = Pass then
-            let wall_clock_duration = Unix.gettimeofday () -. start in
-            Printf.sprintf " (wall clock: %.02fs)" wall_clock_duration
-          else "");
-       if summary = Fail then
-         List.iter (Printf.printf "%s with %s\n%!" common_prefix)
-           (List.rev !msgs);
+       let msgs = List.rev !msgs in
+       if summary = Skip && msgs <> [] then
+         List.iter (Printf.printf "%s with %s\n%!" common_prefix) msgs
+       else begin
+         Printf.printf "%s => %s%s\n%!" common_prefix
+           (string_of_summary summary)
+           (if Options.show_timings && summary = Pass then
+              let wall_clock_duration = Unix.gettimeofday () -. start in
+              Printf.sprintf " (wall clock: %.02fs)" wall_clock_duration
+            else "");
+         if summary = Fail then
+           List.iter (Printf.printf "%s with %s\n%!" common_prefix) msgs
+       end;
        Actions.clear_all_hooks();
        summary
     ) in
