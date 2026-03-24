@@ -21,6 +21,7 @@ let errorf ?(sub = 0) = __dummy2__ ()
 
 let[@local never][@inline] id x = x
 
+(* This is to prevent lambda_to_flambda from identifying the over-application. *)
 let errorf = id errorf
 
 let f s x =
