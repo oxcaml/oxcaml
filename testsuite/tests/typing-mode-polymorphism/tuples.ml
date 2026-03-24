@@ -89,7 +89,7 @@ let foo (x @ local) (y @ local) =
 Line 3, characters 13-20:
 3 |   use_global (fst p) (* but the elements of the product are local *)
                  ^^^^^^^
-Error: This value is "yielding" but is expected to be "unyielding".
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* [dupl] uses an argument twice and the polymorphic mode must be many *)
@@ -150,7 +150,7 @@ let foo (x @ global) (y @ local) =
 Line 3, characters 13-20:
 3 |   use_global (snd p)
                  ^^^^^^^
-Error: This value is "yielding" but is expected to be "unyielding".
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo (x @ global) (y @ global) =
