@@ -831,15 +831,13 @@ CAMLprim value caml_thread_new(value clos)
      it never will be, because all schedulers that set the tick interval will do
      so after systhreads is initialized */
   caml_domain_set_tick_interval_usec(Thread_timeout_usec);
-  st_retcode err = caml_start_tick_thread();
-  sync_check_error(err, "Thread.create");
 
   /* Create a thread info block */
   caml_thread_t th = thread_alloc_and_add();
   if (th == NULL) caml_raise_out_of_memory();
   th->descr = caml_thread_new_descriptor(clos);
 
-  err = st_thread_create(NULL, caml_thread_start, (void *) th);
+  st_retcode err = st_thread_create(NULL, caml_thread_start, (void *) th);
 
   if (err != 0) {
     /* Creation failed, remove thread info block from list of threads */

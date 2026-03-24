@@ -2182,7 +2182,7 @@ CAMLprim value caml_domain_set_tick_interval_usec(value v_interval_usec)
   }
   atomic_store_relaxed(&domain_self->tick_interval_usec, interval_usec);
   if (interval_usec != 0) {
-    caml_enable_tick_thread(Val_true);
+    caml_start_tick_thread();
   }
   CAMLreturn(Val_unit);
 }
