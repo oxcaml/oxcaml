@@ -138,7 +138,6 @@ Error: This expression has type "Inst1.t expr"
 (* <[t]> ~ s  when t instantiable *)
 let _ = <[ fun (Equal : (<[Inst0.t]>, int NonInst1.t) Type.eq)
                (x : <[Inst0.t]> expr) -> (x : int NonInst1.t expr) ]>
-
 [%%expect {|
 - : <[
      (<[Inst0.t]>, int NonInst1.t) Type.eq ->
