@@ -140,3 +140,6 @@ val addressing_offset_in_bytes
   -> 'a array
   -> 'a array
   -> int option
+
+val spill_read_cost : float
+val spill_write_cost : float

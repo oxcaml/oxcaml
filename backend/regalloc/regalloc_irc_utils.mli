@@ -77,3 +77,9 @@ module Spilling_heuristics : sig
 
   val value : t Lazy.t
 end
+
+module Arch_specific_spilling_costs : sig
+  type t = bool
+
+  val value : bool Lazy.t
+end

@@ -366,3 +366,6 @@ let equal_addressing_mode_without_displ (addressing_mode_1: addressing_mode)
 let addressing_offset_in_bytes (_addressing_mode_1: addressing_mode)
       (_addressing_mode_2 : addressing_mode) ~arg_offset_in_bytes:_ _ _ =
   None
+
+let spill_read_cost = 1.
+let spill_write_cost = 1.

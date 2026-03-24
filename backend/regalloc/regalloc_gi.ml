@@ -126,12 +126,16 @@ let spilling_heuristics () =
   | Random_for_testing -> Spilling_heuristics.random ()
 
 let compile_spill_costs state cfg_with_infos =
+  let arch_costs = Lazy.force Arch_specific_spilling_costs.value in
   let costs =
     match spilling_heuristics () with
-    | Flat_uses -> SpillCosts.compute cfg_with_infos SpillCosts.Constant
-    | Hierarchical_uses -> SpillCosts.compute cfg_with_infos SpillCosts.Loops
+    | Flat_uses ->
+      SpillCosts.compute cfg_with_infos SpillCosts.Constant ~arch_costs ()
+    | Hierarchical_uses ->
+      SpillCosts.compute cfg_with_infos SpillCosts.Loops ~arch_costs ()
     | Static_frequencies ->
       SpillCosts.compute cfg_with_infos SpillCosts.Estimated_frequencies
+        ~arch_costs ()
     | Random_for_testing ->
       fatal "unexpected random heuristics" Spilling_heuristics.random ()
   in

@@ -200,3 +200,9 @@ module Spilling_heuristics = struct
           fatal "unknown heuristics %S (possible values: %s)" id
             (available_heuristics ())))
 end
+
+module Arch_specific_spilling_costs = struct
+  type t = bool
+
+  let value = bool_of_param ~default:false "IRC_ARCH_SPILLING_COSTS"
+end
