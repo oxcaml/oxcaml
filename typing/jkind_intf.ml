@@ -231,10 +231,13 @@ module type Sort = sig
   (** Returns [true] iff the variable was created by {!new_genvar}. *)
   val is_genvar : var -> bool
 
-  (** [sub_with vars f] calls [f] and returns, for each var in [vars], the sort
-      it was equated to during [f] (or [None] if it was not equated), together
-      with the result of [f]. *)
-  val sub_with : var list -> (unit -> 'a) -> t option list * 'a
+  (** Get the concrete content of a variable. The returned sort must be
+      representable (including rigid sorts). *)
+  val get_representable_var : var -> t option
+
+  (** [subst s t] applies the variable substitution [s] to [t], replacing each
+      [Var v] where [(v, t')] is in [subst] with [t']. *)
+  val subst : (var * t) list -> t -> t
 
   (** [instance_with ~level vars f] creates a fresh sort var at [level] for each
       var in [vars], calls [f] with {!instance} configured to replace each var
