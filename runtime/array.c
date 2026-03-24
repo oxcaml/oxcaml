@@ -1030,7 +1030,7 @@ CAMLprim value caml_array_blit(value a1, value ofs1, value a2, value ofs2,
 /* In bytecode, an index is represented as a block containing a list of field
    positions. See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md].
 */
-CAMLprim value caml_unsafe_get_idx_bytecode(value base, value idx)
+CAMLprim value caml_get_idx_bytecode(value base, value idx)
 {
   CAMLparam2 (base, idx);
   CAMLassert (Tag_val(idx) == 0);
@@ -1058,7 +1058,7 @@ CAMLprim value caml_unsafe_get_idx_bytecode(value base, value idx)
   CAMLreturn (res);
 }
 
-CAMLprim value caml_unsafe_set_idx_bytecode(value base, value idx, value v)
+CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
 {
   CAMLparam3 (base, idx, v);
   CAMLassert (Tag_val(idx) == 0);

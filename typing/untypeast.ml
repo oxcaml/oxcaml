@@ -473,10 +473,6 @@ let value_binding sub vb =
 let block_access sub : block_access -> Parsetree.block_access = function
   | Baccess_field (lid, _) ->
     Baccess_field (map_loc sub lid)
-  | Baccess_array
-      { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort = _ } ->
-    let index = sub.expr sub index in
-    Baccess_array (mut, index_kind, index)
   | Baccess_block (mut, idx) ->
     Baccess_block (mut, sub.expr sub idx)
 
@@ -527,7 +523,7 @@ let expression sub exp =
   let attrs = sub.attributes sub exp.exp_attributes in
   let desc =
     match exp.exp_desc with
-      Texp_ident (_path, lid, _, _, _, _) -> Pexp_ident (map_loc sub lid)
+      Texp_ident { lid; _ } -> Pexp_ident (map_loc sub lid)
     | Texp_constant cst -> Pexp_constant (constant cst)
     | Texp_let (rec_flag, list, exp) ->
         Pexp_let (Immutable, rec_flag,
@@ -1103,6 +1099,8 @@ let core_type sub ct =
     | Ttyp_repr (list, ct) ->
         let bound_vars = List.map (fun v -> mkloc v loc) list in
         Ptyp_repr (bound_vars, sub.typ sub ct)
+    | Ttyp_newlayout (list, ct) ->
+        Ptyp_newlayout (list, sub.typ sub ct)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension

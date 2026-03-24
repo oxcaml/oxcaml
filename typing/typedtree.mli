@@ -399,8 +399,12 @@ and arg_label = Types.arg_label =
 *)
 and expression_desc =
     Texp_ident of
-      Path.t * Longident.t loc * Types.value_description * ident_kind *
-        unique_use * Mode.Value.l
+      { path : Path.t;
+        lid : Longident.t loc;
+        desc : Types.value_description;
+        kind : ident_kind;
+        unique_use : unique_use;
+        mode : Mode.Value.l }
         (** x
             M.x
          *)
@@ -702,14 +706,6 @@ and meth =
 
 and block_access =
   | Baccess_field of Longident.t loc * Types.label_description
-  | Baccess_array of {
-      mut: mutable_flag;
-      index_kind: index_kind;
-      index: expression;
-      base_ty: Types.type_expr;
-      elt_ty: Types.type_expr;
-      elt_sort: Jkind.Sort.t
-    }
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
@@ -1148,6 +1144,7 @@ and core_type_desc =
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
+  | Ttyp_newlayout of string loc list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position

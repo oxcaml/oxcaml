@@ -279,7 +279,8 @@ module Array1 = struct
 
   external change_layout
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ portable
+      (('a, 'b, 'c) t[@local_opt]) -> 'd layout -> (('a, 'b, 'd) t[@local_opt])
+    @@ portable
     = "caml_ba_change_layout"
 
   let size_in_bytes arr =
@@ -287,7 +288,8 @@ module Array1 = struct
 
   external sub
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, 'c) t -> int -> int -> ('a, 'b, 'c) t @@ portable
+      (('a, 'b, 'c) t[@local_opt]) -> int -> int -> (('a, 'b, 'c) t[@local_opt])
+    @@ portable
     = "caml_ba_sub"
 
   let slice (type (a : any) (b : any) (c : any)) (a : (a, b, c) Genarray.t) n =

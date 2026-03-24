@@ -1,5 +1,8 @@
 (* TEST
  flags += " -O3";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  only-default-codegen;
  expect.opt;
 *)
@@ -45,8 +48,7 @@ arr_sum:
   salq  $8, %rdi
   shrq  $17, %rdi
   orq   $1, %rdi
-  movq  %rdi, %rsi
-  addq  $-2, %rsi
+  leaq  -2(%rdi), %rsi
   cmpq  $1, %rsi
   jl    .L135
   movl  $1, %eax

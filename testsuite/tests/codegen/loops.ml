@@ -6,7 +6,10 @@
  ocamlopt.opt;
 
  only-default-codegen;
- flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
 *)
 
@@ -14,8 +17,8 @@ open Intrinsics
 
 
 (* CR ttebbi: What could have been a nice dense loop got
-   interrupted by the loop exit path. In addition, we could
-   consider loop rotation to remove the unconditional jump. *)
+   interrupted by the loop exit path. In addition, we should do
+   loop rotation to remove the unconditional jump. *)
 let loop_code_layout n =
   let[@cold] cold () = () in
   let sum = ref 0 in
@@ -48,6 +51,41 @@ loop_code_layout.cold:
   ret
 |}]
 
+(* CR ttebbi: For for loops, we could avoid the unconditional jumps even without
+   a general loop rotation optimization by just lowering them right. *)
+let for_loop_layout n f =
+  for i = 0 to n do
+    f()
+  done
+[%%expect_asm X86_64{|
+for_loop_layout:
+  cmpq  $1, %rax
+  jl    .L119
+  subq  $24, %rsp
+  movq  %rbx, 8(%rsp)
+  movq  %rax, (%rsp)
+  movl  $1, %eax
+.L108:
+  movq  %rax, 16(%rsp)
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  call  *%rdi
+.L123:
+  movq  (%rsp), %rdi
+  movq  8(%rsp), %rbx
+  movq  16(%rsp), %rax
+  cmpq  %rdi, %rax
+  je    .L115
+  addq  $2, %rax
+  jmp   .L108
+.L115:
+  movl  $1, %eax
+  addq  $24, %rsp
+  ret
+.L119:
+  movl  $1, %eax
+  ret
+|}]
 
 (* CR ttebbi: loop peeling could avoid repeating List.hd *)
 let loop_with_non_dominating_load x l =
@@ -98,14 +136,14 @@ f:
 .L107:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
-  movq  camlTOP4__do_work_9_13_code@GOTPCREL(%rip), %rdi
+  movq  camlTOP5__do_work_11_15_code@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rbx)
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
   movq  %rax, 16(%rbx)
   movl  $1, %eax
   addq  $8, %rsp
-  jmp   camlTOP4__do_work_9_13_code@PLT
+  jmp   camlTOP5__do_work_11_15_code@PLT
 
 f.do_work:
   movq  16(%rbx), %rax
@@ -123,7 +161,8 @@ f.do_work:
 |}]
 
 
-(* CR ttebbi: noop loop could be eliminated *)
+(* CR ttebbi: noop loop could be eliminated
+   https://github.com/oxcaml/oxcaml/issues/4752 *)
 let noop_loop lo hi = for i = lo to hi do () done
 [%%expect_asm X86_64{|
 noop_loop:

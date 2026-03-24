@@ -148,6 +148,7 @@ type module_unbound_reason =
 type stage_lock =
   | Quotation_lock
   | Splice_lock
+  | Toplevel_lock_for_directive
 
 type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
@@ -2969,6 +2970,12 @@ let enter_modtype ~scope name mtd env =
   let env = store_modtype id (Subst.Lazy.of_modtype_decl mtd) shape env in
   (id, env)
 
+let enter_jkind ~scope name decl env =
+  let id = Ident.create_scoped ~scope name in
+  let shape = Shape.leaf decl.jkind_uid in
+  let env = store_jkind ~check:false id decl shape env in
+  (id, env)
+
 let enter_class ~scope name desc env =
   let id = Ident.create_scoped ~scope name in
   let addr = class_declaration_address env id desc in
@@ -3029,6 +3036,9 @@ let enter_splice ~loc env =
     raise (Error (Toplevel_splice loc));
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
 
+let mark_toplevel_in_quotations env =
+  add_stage_lock Toplevel_lock_for_directive env
+
 let check_no_open_quotations loc env context =
   if env.stage = 0
   then ()
@@ -3041,9 +3051,9 @@ let stage_locks_offset locks =
     (fun lock rel_stage ->
        match lock with
        | Quotation_lock -> rel_stage + 1
-       | Splice_lock -> rel_stage - 1)
-    locks
-    0
+       | Splice_lock -> rel_stage - 1
+       | Toplevel_lock_for_directive -> 0)
+    locks 0
 
 (* Insertion of all components of a signature *)
 
@@ -3258,7 +3268,8 @@ let add_language_extension_types env =
     |> add SIMD Alpha Predef.add_simd_alpha_extension_types
     |> add Small_numbers Stable Predef.add_small_number_extension_types
     |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
-    |> add Layouts Stable Predef.add_or_null)
+    |> add Layouts Stable Predef.add_or_null
+    |> add Runtime_metaprogramming () Predef.add_runtime_metaprogramming_types)
 
 (* Some predefined types are part of language extensions, and we don't want to
    make them available in the initial environment if those extensions are not
@@ -4848,8 +4859,8 @@ let env_of_only_summary env_from_summary env =
 
 (* Forward declartions that must refer to type t *)
 let report_jkind_violation_with_offender =
-  ref ((fun ~offender:_ ~level:_ _ _ _ -> assert false)
-       : offender:(Format_doc.formatter -> unit) -> level:int -> t ->
+  ref ((fun ~offender:_ _ _ _ -> assert false)
+       : offender:(Format_doc.formatter -> unit) -> t ->
          Format_doc.formatter -> Jkind.Violation.t -> unit)
 
 (* Error report *)
@@ -4966,7 +4977,7 @@ let print_unbound_in_quotation ppf =
 
 let quoted_longident = Style.as_inline_code pp_longident
 
-let report_lookup_error_doc ~level _loc env ppf = function
+let report_lookup_error_doc _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
       fprintf ppf "Unbound value %a" quoted_longident lid;
       spellcheck ppf extract_values env lid;
@@ -5174,7 +5185,7 @@ let report_lookup_error_doc ~level _loc env ppf = function
         quoted_longident lid
         (fun v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
-           ~level env v)
+           env v)
         err
   | No_unboxed_version (lid, decl) ->
       fprintf ppf "@[The type %a has no unboxed version.@]"
@@ -5224,7 +5235,7 @@ let report_lookup_error_doc ~level _loc env ppf = function
         quoted_longident lid
         print_stage avail_stage
 
-let report_error_doc ~level ppf = function
+let report_error_doc ppf = function
   | Missing_module(_, path1, path2) ->
       fprintf ppf "@[@[<hov>";
       if Path.same path1 path2 then
@@ -5246,7 +5257,7 @@ let report_error_doc ~level ppf = function
         "@[<hov>The implicit kind for %a is already defined at %a.@]"
         Style.inline_code name
         (Location.Doc.loc ~capitalize_first:false) defined_at
-  | Lookup_error(loc, t, err) -> report_lookup_error_doc ~level loc t ppf err
+  | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t ppf err
   | Incomplete_instantiation { unset_param } ->
       fprintf ppf "@[<hov>Not enough instance arguments: the parameter@ %a@ is \
                    required.@]"
@@ -5285,7 +5296,7 @@ let () =
           in
           Some
             (error_of_printer
-               (report_error_doc ~level:Btype.generic_level) err)
+               report_error_doc err)
       | _ ->
           None
     )
@@ -5296,6 +5307,6 @@ let () =
   in
   Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
 
-let report_lookup_error ~level loc t =
-  Format_doc.compat (report_lookup_error_doc ~level loc t)
-let report_error ~level = Format_doc.compat (report_error_doc ~level)
+let report_lookup_error loc t =
+  Format_doc.compat (report_lookup_error_doc loc t)
+let report_error = Format_doc.compat report_error_doc

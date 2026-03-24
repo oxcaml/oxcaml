@@ -2,7 +2,6 @@
 layout: documentation-page
 collectionName: Kinds
 title: Non-modal bounds
-slug: non-modal
 ---
 
 # Non-modal bounds

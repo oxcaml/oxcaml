@@ -110,20 +110,6 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
        2. All of the [machtype_component]s are singleton arrays. *)
     Array.map (fun machtype -> [| machtype |]) return_ty
   in
-  (* Returned small integer values need to be sign-extended because it's not
-     clear whether C code that returns a small integer returns one that is sign
-     extended or not. There is no need to wrap other return arities. *)
-  let maybe_sign_extend kind dbg cmm =
-    match Flambda_kind.With_subkind.kind kind with
-    | Naked_number Naked_int8 -> C.sign_extend ~bits:8 ~dbg cmm
-    | Naked_number Naked_int16 -> C.sign_extend ~bits:16 ~dbg cmm
-    | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
-    | Naked_number
-        ( Naked_float | Naked_immediate | Naked_int64 | Naked_nativeint
-        | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_float32 )
-    | Value | Rec_info | Region ->
-      cmm
-  in
   let ty_args =
     List.map C.exttype_of_kind
       (Flambda_arity.unarize (Apply.args_arity apply)
@@ -131,9 +117,26 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
   in
   let effects = To_cmm_effects.transl_c_call_effects effects in
   let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
-  let extcall =
+  let { extcall; builtin_sign_extends } : Cmm_builtins.t =
     C.extcall ~dbg ~alloc:needs_caml_c_call ~is_c_builtin ~effects ~coeffects
       ~returns ~ty_args callee return_ty args
+  in
+  (* Returned small integer values need to be sign-extended because it's not
+     clear whether C code that returns a small integer returns one that is sign
+     extended or not. There is no need to wrap other return arities. *)
+  let maybe_sign_extend kind dbg cmm =
+    if builtin_sign_extends
+    then cmm
+    else
+      match Flambda_kind.With_subkind.kind kind with
+      | Naked_number Naked_int8 -> C.sign_extend ~bits:8 ~dbg cmm
+      | Naked_number Naked_int16 -> C.sign_extend ~bits:16 ~dbg cmm
+      | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
+      | Naked_number
+          ( Naked_float | Naked_immediate | Naked_int64 | Naked_nativeint
+          | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_float32 )
+      | Value | Rec_info | Region ->
+        cmm
   in
   let wrap return_values =
     let kinds = Flambda_arity.unarized_components return_arity in

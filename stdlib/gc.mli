@@ -723,11 +723,17 @@ module (Memprof @@ nonportable) :
        called on a profile which has not been stopped.
        *)
 
-    val participate : t -> unit
+    val enlist : t -> unit
     (** Cause the current domain to participate in the specified profile.
         Raises an exception if the current domain is currently sampling for
         any profile, or if the specified profile has been stopped or
         discarded. *)
+
+    val enlist_all_domains : t -> unit
+    (** Cause all running domains to participate in the specified profile.
+        Raises an exception if the specified profile has been stopped or
+        discarded. If other domains are currently sampling with other profiles,
+        those profiles are stopped (but not discarded). *)
 
     (** Submodule containing non-backwards-compatible functions which enforce thread
         safety via modes. *)

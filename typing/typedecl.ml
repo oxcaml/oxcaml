@@ -24,7 +24,7 @@ open Typetexp
 
 module String = Misc.Stdlib.String
 
-type native_repr_kind = Unboxed | Untagged
+type native_repr_kind = Unboxed | Untagged | Unpacked
 
 type jkind_sort_loc =
   | Cstr_tuple of { unboxed : bool }
@@ -39,10 +39,13 @@ type jkind_sort_loc =
    from a type declaration, by expansion of definitions or by the
    subterm relation (a type expression is syntactically contained
    in another). *)
-type reaching_type_path = reaching_type_step list
-and reaching_type_step =
-  | Expands_to of type_expr * type_expr
-  | Contains of type_expr * type_expr
+type ('a, 'b) reaching_path = ('a, 'b) reaching_path_step list
+and ('a, 'b) reaching_path_step =
+  | Expands_to of 'a * 'b
+  | Contains of 'b * 'a
+
+type reaching_type_path = (type_expr, type_expr) reaching_path
+type reaching_kind_path = (Path.t, Types.jkind_const_desc_lr) reaching_path
 
 module Mixed_product_kind = struct
   type t =
@@ -150,6 +153,7 @@ type error =
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
+  | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
 
 open Typedtree
 
@@ -1521,7 +1525,7 @@ let narrow_to_manifest_jkind env loc decl =
         let context = Ctype.mk_jkind_context_always_principal env in
         match
           Jkind.sub_jkind_l ~type_equal ~context
-            ~level:(Ctype.get_current_level ()) env manifest_jkind
+            env manifest_jkind
             decl.type_jkind
         with
         | Ok () -> ()
@@ -1765,6 +1769,7 @@ module Element_repr = struct
       | Product l ->
         Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
       | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
+      | Genvar _ -> Misc.fatal_error "sort_to_t: unexpected genvar"
       in
       sort_to_t sort
 
@@ -2216,7 +2221,7 @@ let rec update_decl_jkind env dpath decl =
      jkinds in transl_declaration]) *)
   let context = Ctype.mk_jkind_context_always_principal env in
   match
-    Jkind.sub_layout_or_error ~context ~level:(Ctype.get_current_level ())
+    Jkind.sub_layout_or_error ~context
       env new_decl.type_jkind decl.type_jkind
   with
   | Ok () -> new_decl
@@ -2533,6 +2538,53 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
     it.it_type_declaration it (Ctype.generic_instance_declaration decl)
   end
 
+let check_well_founded_jkind_decl env loc recmod_ids path decl =
+  (* This function is simpler than the type version because there is not
+     currently any relevant branching in jkinds (e.g., we don't have product
+     kinds) so it can just linearly traverse the kind definitions. In the future
+     this function will need to be more like the type version to deal with more
+     complex jkinds. *)
+  match decl.Types.jkind_manifest with
+  | None -> ()
+  | Some { base = Layout _; _ } -> ()
+  | Some ({ base = Kconstr kpath; mod_bounds = _; with_bounds = No_with_bounds }
+          as manifest) ->
+    if not (Path.exists_free recmod_ids kpath) then ()
+    else
+      let steps_of kind_path (manifest : Types.jkind_const_desc_lr) =
+        let expand = Expands_to (kind_path, manifest) in
+        (* We check to see if we'd print any mod bounds, in which case we want
+           to use the "a contains b" language rather than "a = b". In the
+           future, we'll have more ways for [Contains] to show up (e.g., product
+           kinds). *)
+        match Typemode.untransl_mod_bounds manifest.mod_bounds with
+        | [] -> [expand]
+        | _ :: _ ->
+          (match manifest.base with
+           | Kconstr base_path -> [Contains (manifest, base_path); expand]
+           | Layout _ -> assert false)
+      in
+      let rec follow current acc visited =
+        if Path.same current path then
+          Some (List.rev acc)
+        else if List.exists (Path.same current) visited then
+          (* This case may also be a cycle, but for a different path that will
+             be separately checked. *)
+          None
+        else
+          match (Env.find_jkind current env).jkind_manifest with
+          | Some ({ base = Kconstr next; mod_bounds = _;
+                    with_bounds = No_with_bounds } as m) ->
+            follow next ((steps_of current m) @ acc) (current :: visited)
+          | Some { base = Layout _; _ } | None -> None
+          | exception Not_found -> None
+      in
+      match follow kpath (steps_of path manifest) [path] with
+      | Some reaching_path ->
+        raise
+          (Error (loc, Recursive_jkind_definition (path, env, reaching_path)))
+      | None -> ()
+
 (* We only allow recursion in unboxed product types to occur through boxes,
    otherwise the type is uninhabitable and usually also infinite-size.
    See [typing-layouts-unboxed-records/recursive.ml].
@@ -2593,6 +2645,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Base _ -> false
       | Product l -> List.exists has_any l
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
+      | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
     in
     if has_any layout then tyl else []
   in
@@ -2861,7 +2914,6 @@ let normalize_decl_jkinds env decls =
           ~type_equal
           ~context
           ~allow_any_crossing
-          ~level:(Ctype.get_current_level ())
           env
           decl.type_jkind
           original_decl.type_jkind
@@ -3478,14 +3530,17 @@ let get_native_repr_attribute attrs ~global_repr =
   match
     Attr_helper.get_no_payload_attribute "unboxed"  attrs,
     Attr_helper.get_no_payload_attribute "untagged" attrs,
+    Attr_helper.get_no_payload_attribute "unpacked" attrs,
     global_repr
   with
-  | None, None, None -> Native_repr_attr_absent
-  | None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None -> Native_repr_attr_present Untagged
-  | Some { Location.loc }, _, _
-  | _, Some { Location.loc }, _ ->
+  | None, None, None, None -> Native_repr_attr_absent
+  | None, None, None, Some repr -> Native_repr_attr_present repr
+  | Some _, None, None, None -> Native_repr_attr_present Unboxed
+  | None, Some _, None, None -> Native_repr_attr_present Untagged
+  | None, None, Some _, None -> Native_repr_attr_present Unpacked
+  | Some { Location.loc }, _, _, _
+  | _, Some { Location.loc }, _, _
+  | _, _, Some { Location.loc }, _ ->
     raise (Error (loc, Multiple_native_repr_attributes))
 
 let is_upstream_compatible_non_value_unbox env ty =
@@ -3517,6 +3572,7 @@ let native_repr_of_type env kind ty sort_or_poly =
       | Sort (Base Value) -> true
       | Sort (Base _ | Product _) -> false
       | Sort (Univar _) -> Misc.fatal_error "typedecl: Univar in native repr"
+      | Sort (Genvar _) -> Misc.fatal_error "typedecl: Genvar in native repr"
     in
     if is_immediate && is_non_nullable && is_value
     then Some (Unboxed_or_untagged_integer Untagged_int)
@@ -3644,6 +3700,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
     Same_as_ocaml_repr base
   | Native_repr_attr_absent, Sort (Univar _) ->
     Misc.fatal_error "typedecl: Univar in concrete type"
+  | Native_repr_attr_absent, Sort (Genvar _) ->
+    Misc.fatal_error "typedecl: Genvar in concrete type"
   | Native_repr_attr_absent, (Sort (Base sort as c)) ->
     (if Language_extension.erasable_extensions_only ()
     then
@@ -3669,7 +3727,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
          (Warnings.Incompatible_with_upstream
             (Warnings.Non_value_sort sort)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_present kind, (Poly | Sort (Base Value))
+  | Native_repr_attr_present ((Unboxed | Untagged) as kind),
+    (Poly | Sort (Base Value))
   | Native_repr_attr_present (Untagged as kind), Sort _ ->
     begin match native_repr_of_type env kind ty sort_or_poly with
     | None ->
@@ -3678,6 +3737,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
     end
   | Native_repr_attr_present Unboxed, Sort (Univar _) ->
     Misc.fatal_error "typedecl: Univar in concrete type"
+  | Native_repr_attr_present Unboxed, Sort (Genvar _) ->
+    Misc.fatal_error "typedecl: Genvar in concrete type"
   | Native_repr_attr_present Unboxed, (Sort (Product _ | Base Void)) ->
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unboxed))
   | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
@@ -3708,6 +3769,17 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
         (Warnings.Incompatible_with_upstream
               (Warnings.Non_value_sort layout)));
     Same_as_ocaml_repr c
+  | Native_repr_attr_present Unpacked, Sort (Product _ as sort) ->
+    (if Language_extension.erasable_extensions_only ()
+     then
+       Location.prerr_warning core_type.ptyp_loc
+         (Warnings.Incompatible_with_upstream
+            Warnings.Unpacked_attribute));
+    Unpacked_product sort
+  | Native_repr_attr_present Unpacked, (Sort (Base _) | Poly) ->
+    raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unpacked))
+  | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
+    Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
 
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
@@ -3918,7 +3990,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         md_mode, modalities, Valmi_sig_value raw_modalities
   in
-  let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
+  let lpoly, cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let sort =
     match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
     | Ok sort -> sort
@@ -3977,6 +4049,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       in
       { val_type = ty;
         val_kind = Val_reg sort;
+        val_lpoly = lpoly;
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
@@ -4020,7 +4093,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
       && not (String.starts_with ~prefix:"%" prim.prim_name)
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
-      { val_type = ty; val_kind = Val_prim prim; Types.val_loc = loc;
+      { val_type = ty; val_kind = Val_prim prim; val_lpoly = lpoly;
+        Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -4357,6 +4431,12 @@ let approx_type_decl env sdecl_list =
        (id, abstract_type_decl ~injective ~jkind ~params))
     sdecl_list
 
+let approx_jkind_decl sdecl : Types.jkind_declaration =
+  { jkind_manifest = None;
+    jkind_attributes = sdecl.pjkind_attributes;
+    jkind_uid = Uid.internal_not_actually_unique;
+    jkind_loc = sdecl.pjkind_loc }
+
 (* Check the well-formedness conditions on type abbreviations defined
    within recursive modules. *)
 
@@ -4378,6 +4458,9 @@ let check_recmod_typedecl env loc recmod_ids path decl =
      with the intention of fixing the jkind soundness issue once the other soundness issue
      is resolved. *)
   check_kind_coherence env loc path decl
+
+let check_recmod_jkind_decl env loc recmod_ids path decl =
+  check_well_founded_jkind_decl env loc recmod_ids path decl
 
 let transl_jkind_decl env
       { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc=loc } =
@@ -4458,12 +4541,30 @@ let explain_unbound_single ppf tv ty =
   | _ -> trivial ty
 
 module Reaching_path = struct
-  type t = reaching_type_path
+  module Fmt = Format_doc
 
-  (* Simplify a reaching path before showing it in error messages. *)
+  let pp ~pp_root ~pp_body ppf reaching_path =
+    let pp_step ppf = function
+      | Expands_to (root, body) ->
+        Fmt.fprintf ppf "%a = %a"
+          (Style.as_inline_code pp_root) root
+          (Style.as_inline_code pp_body) body
+      | Contains (body, root) ->
+        Fmt.fprintf ppf "%a contains %a"
+          (Style.as_inline_code pp_body) body
+          (Style.as_inline_code pp_root) root
+    in
+    Fmt.(pp_print_list ~pp_sep:comma) pp_step ppf reaching_path
+
+  let pp_colon ~pp_root ~pp_body ppf path =
+    Fmt.fprintf ppf ":@;<1 2>@[<v>%a@]" (pp ~pp_root ~pp_body) path
+
+  (* Type-specific operations *)
+
+  (* Simplify a reaching type path before showing it in error messages. *)
   let simplify path =
     let is_tconstr ty = match get_desc ty with Tconstr _ -> true | _ -> false in
-    let rec simplify : t -> t = function
+    let rec simplify : reaching_type_path -> reaching_type_path = function
       | Contains (ty1, _ty2) :: Contains (ty2', ty3) :: rest
         when not (is_tconstr ty2') ->
           (* If t1 contains t2 and t2 contains t3, then t1 contains t3
@@ -4485,23 +4586,36 @@ module Reaching_path = struct
           List.iter Printtyp.add_type_to_preparation [ty1; ty2]
     ) path
 
-  module Fmt = Format_doc
+  let pp_type_colon =
+    pp_colon
+      ~pp_root:Printtyp.prepared_type_expr
+      ~pp_body:Printtyp.prepared_type_expr
 
-  let pp ppf reaching_path =
-    let pp_step ppf = function
-      | Expands_to (ty, body) ->
-          Fmt.fprintf ppf "%a = %a"
-            (Style.as_inline_code Printtyp.prepared_type_expr) ty
-            (Style.as_inline_code Printtyp.prepared_type_expr) body
-      | Contains (outer, inner) ->
-          Fmt.fprintf ppf "%a contains %a"
-            (Style.as_inline_code Printtyp.prepared_type_expr) outer
-            (Style.as_inline_code Printtyp.prepared_type_expr) inner
+  (* Kind-specific operations *)
+
+  (* Format a jkind manifest without expanding Kconstr paths, to avoid infinite
+     loops on the very cycles we're reporting. *)
+  let pp_kind_manifest ppf
+        ({ base; mod_bounds; with_bounds = No_with_bounds}
+         : jkind_const_desc_lr ) =
+    let pp_base ppf = function
+      | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)
+      | Kconstr p -> Printtyp.path ppf p
     in
-    Fmt.(pp_print_list ~pp_sep:comma) pp_step ppf reaching_path
+    let mod_strings =
+      Typemode.untransl_mod_bounds mod_bounds
+      |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
+    in
+    match mod_strings with
+    | [] -> pp_base ppf base
+    | _ ->
+      Fmt.fprintf ppf "%a mod %a" pp_base base
+        (Fmt.pp_print_list
+           ~pp_sep:(fun ppf () -> Fmt.fprintf ppf " ")
+           Fmt.pp_print_string)
+        mod_strings
 
-  let pp_colon ppf path =
-    Fmt.fprintf ppf ":@;<1 2>@[<v>%a@]" pp path
+  let pp_kind_colon = pp_colon ~pp_root:Printtyp.path ~pp_body:pp_kind_manifest
 end
 
 let report_jkind_mismatch_due_to_bad_inference ppf env ty violation loc =
@@ -4523,7 +4637,7 @@ let report_jkind_mismatch_due_to_bad_inference ppf env ty violation loc =
     loc
     (Jkind.Violation.report_with_offender
        ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-       ~level:(Ctype.get_current_level ()) env) violation
+       env) violation
 
 let quoted_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
 let report_error_doc ppf = function
@@ -4546,7 +4660,7 @@ let report_error_doc ppf = function
       Reaching_path.add_to_preparation reaching_path;
       fprintf ppf "@[<v>The type abbreviation %a is cyclic%a@]"
         Style.inline_code s
-        Reaching_path.pp_colon reaching_path
+        Reaching_path.pp_type_colon reaching_path
   | Cycle_in_def (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->
@@ -4554,7 +4668,7 @@ let report_error_doc ppf = function
       Reaching_path.add_to_preparation reaching_path;
       fprintf ppf "@[<v>The definition of %a contains a cycle%a@]"
         Style.inline_code s
-        Reaching_path.pp_colon reaching_path
+        Reaching_path.pp_type_colon reaching_path
   | Unboxed_recursion (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->
@@ -4562,7 +4676,7 @@ let report_error_doc ppf = function
       Reaching_path.add_to_preparation reaching_path;
       fprintf ppf "@[<v>The definition of %a is recursive without boxing%a@]"
         Style.inline_code s
-        Reaching_path.pp_colon reaching_path
+        Reaching_path.pp_type_colon reaching_path
   | Definition_mismatch (ty, _env, None) ->
       fprintf ppf "@[<v>@[<hov>%s@ %s@;<1 2>%a@]@]"
         "This variant or record definition" "does not match that of type"
@@ -4613,7 +4727,7 @@ let report_error_doc ppf = function
            let is_expansion = function Expands_to _ -> true | _ -> false in
            if List.exists is_expansion reaching_path then
              fprintf pp "@ after the following expansion(s)%a@ "
-             Reaching_path.pp_colon reaching_path
+             Reaching_path.pp_type_colon reaching_path
            else fprintf pp ".@ ")
   | Inconsistent_constraint (env, err) ->
       let msg = Format_doc.Doc.msg in
@@ -4779,9 +4893,10 @@ let report_error_doc ppf = function
   | Val_in_structure ->
       fprintf ppf "Value declarations are only allowed in signatures"
   | Multiple_native_repr_attributes ->
-      fprintf ppf "Too many %a/%a attributes"
+      fprintf ppf "Too many %a/%a/%a attributes"
         Style.inline_code "[@@unboxed]"
         Style.inline_code "[@@untagged]"
+        Style.inline_code "[@@unpacked]"
   | Cannot_unbox_or_untag_type Unboxed ->
       fprintf ppf "@[Don't know how to unbox this type.@ \
                    Only %a, %a, %a, %a, vector primitives, and@ \
@@ -4796,13 +4911,20 @@ let report_error_doc ppf = function
         Style.inline_code "int8"
         Style.inline_code "int16"
         Style.inline_code "int"
+  | Cannot_unbox_or_untag_type Unpacked ->
+      fprintf ppf "@[Don't know how to unpack this type.@ \
+                   Only types with product layouts can be marked %a.@]"
+        Style.inline_code "unpacked"
   | Deep_unbox_or_untag_attribute kind ->
       fprintf ppf
         "@[The attribute %a should be attached to@ \
          a direct argument or result of the primitive,@ \
          it should not occur deeply into its type.@]"
         Style.inline_code
-        (match kind with Unboxed -> "@unboxed" | Untagged -> "@untagged")
+        (match kind with
+         | Unboxed -> "@unboxed"
+         | Untagged -> "@untagged"
+         | Unpacked -> "@unpacked")
   | Jkind_mismatch_of_path (env, dpath, v) ->
     (* the type is always printed just above, so print out just the head of the
        path instead of something like [t/3] *)
@@ -4814,12 +4936,12 @@ let report_error_doc ppf = function
       fprintf ppf "type %a" Style.inline_code path_end
     in
     Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) env ppf v
+      env ppf v
   | Jkind_mismatch_of_type (env, ty, v) ->
     let offender ppf = fprintf ppf "type %a"
         (Style.as_inline_code Printtyp.type_expr) ty in
     Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) env ppf v
+      env ppf v
   | Jkind_sort {env; kloc; typ; err} ->
     let s =
       match kloc with
@@ -4846,7 +4968,7 @@ let report_error_doc ppf = function
       extra
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
-         ~level:(Ctype.get_current_level ()) env) err
+         env) err
   | Jkind_empty_record ->
     fprintf ppf "@[Records must contain at least one runtime value.@]"
   | Non_representable_in_module (env, err, ty) ->
@@ -4854,7 +4976,7 @@ let report_error_doc ppf = function
     fprintf ppf "@[The type of a module-level value must have a@ \
                    representable layout.@ %a@]"
       (Jkind.Violation.report_with_offender ~offender
-         ~level:(Ctype.get_current_level ()) env)
+         env)
       err
   | Invalid_jkind_in_block (typ, sort_const, lloc) ->
     let struct_desc =
@@ -5020,6 +5142,11 @@ let report_error_doc ppf = function
   | Layout_poly_unsupported ->
     fprintf ppf
       "@[Layout polymorphism is unsupported in this context.@]"
+  | Recursive_jkind_definition (path, env, reaching_path) ->
+    Printtyp.wrap_printing_env ~error:true env @@ fun () ->
+    fprintf ppf "@[<v>The kind %a is cyclic%a@]"
+      (Style.as_inline_code Printtyp.path) path
+      Reaching_path.pp_kind_colon reaching_path
 
 
 let () =

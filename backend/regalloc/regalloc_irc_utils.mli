@@ -67,7 +67,6 @@ val k : Reg.t -> int
 
 module Spilling_heuristics : sig
   type t =
-    | Set_choose
     | Flat_uses
     | Hierarchical_uses
 

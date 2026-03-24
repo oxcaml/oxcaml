@@ -592,6 +592,28 @@ end = struct
   let tail_mod_cons = use "Exp_attribute" "tail_mod_cons"
 end
 
+module Vb_attribute : sig
+  type s
+
+  type t' = s lazy_t
+
+  type t = s lam
+
+  val wrap : t' -> t
+
+  val mk : Debuginfo.Scoped_location.t -> lambda -> lambda -> t'
+end = struct
+  type s = lambda
+
+  type t' = s lazy_t
+
+  type t = s lam
+
+  let wrap = inject_force
+
+  let mk loc name payload = apply2 "Vb_attribute" "mk" loc name payload
+end
+
 module Identifier : sig
   module Module : sig
     type s
@@ -604,6 +626,8 @@ module Identifier : sig
 
     val global_module :
       Debuginfo.Scoped_location.t -> Global_module.Name.t -> t'
+
+    val toplevel_module : Debuginfo.Scoped_location.t -> string -> t'
 
     val dot : Debuginfo.Scoped_location.t -> t -> string -> t'
 
@@ -678,6 +702,8 @@ module Identifier : sig
     val lexing_position : t'
 
     val expr : t'
+
+    val eval : t'
 
     val unboxed_float : t'
 
@@ -795,6 +821,9 @@ end = struct
       let a1 = Global_module.Name.to_string a1 in
       apply1 "Identifier.Module" "global_module" loc (string ~loc a1)
 
+    let toplevel_module loc a1 =
+      apply1 "Identifier.Module" "global_module" loc (string ~loc a1)
+
     let dot loc a1 a2 =
       apply2 "Identifier.Module" "dot" loc (extract a1) (string ~loc a2)
 
@@ -874,6 +903,8 @@ end = struct
     let lexing_position = use "Identifier.Type" "lexing_position"
 
     let expr = use "Identifier.Type" "expr"
+
+    let eval = use "Identifier.Type" "eval"
 
     let unboxed_float = use "Identifier.Type" "unboxed_float"
 
@@ -1878,7 +1909,7 @@ and Exp_desc : sig
   val let_rec_simple :
     Debuginfo.Scoped_location.t ->
     Loc.t ->
-    (Name.t * Type.t option) list ->
+    (Name.t * Type.t option * Vb_attribute.t list) list ->
     (Var.Value.t list -> Exp.t list * Exp.t) lam ->
     t'
 
@@ -1888,6 +1919,7 @@ and Exp_desc : sig
     Name.t list ->
     Name.t list ->
     Exp.t list ->
+    Vb_attribute.t list list ->
     (Var.Value.t list -> (Var.Module.t list -> Pat.t * Exp.t) lam) lam ->
     t'
 
@@ -2022,17 +2054,22 @@ end = struct
     apply3 "Exp_desc" "let_rec_simple" loc (extract a1)
       (mk_list ~loc
          (List.map
-            (fun (name, typ) ->
-              pair ~loc (extract name, option ~loc (Option.map extract typ)))
+            (fun (name, typ, attrs) ->
+              triple ~loc
+                ( extract name,
+                  option ~loc (Option.map extract typ),
+                  mk_list ~loc (List.map extract attrs) ))
             a2))
       (extract a3)
 
-  let let_ loc a1 a2 a3 a4 a5 =
-    apply5 "Exp_desc" "let_" loc (extract a1)
+  let let_ loc a1 a2 a3 a4 a5 a6 =
+    apply6 "Exp_desc" "let_" loc (extract a1)
       (mk_list ~loc (List.map extract a2))
       (mk_list ~loc (List.map extract a3))
       (mk_list ~loc (List.map extract a4))
-      (extract a5)
+      (mk_list ~loc
+         (List.map (fun attrs -> mk_list ~loc (List.map extract attrs)) a5))
+      (extract a6)
 
   let function_ loc a1 = apply1 "Exp_desc" "function_" loc (extract a1)
 
@@ -2255,6 +2292,50 @@ let quote_attributes e =
   in
   List.map quoted_attr e.exp_attributes
 
+let translattribute_actions =
+  List.map
+    (fun name -> name, Builtin_attributes.Return)
+    [ "inline";
+      "specialise";
+      "local";
+      "loop";
+      "tail_mod_cons";
+      "poll";
+      "opaque";
+      "cold";
+      "unboxable";
+      "regalloc";
+      "regalloc_param";
+      "zero_alloc" ]
+
+let extract_attr_payload (attr : Parsetree.attribute) =
+  match attr.attr_payload with
+  | PStr [] -> None
+  | PStr
+      [ { pstr_desc =
+            Pstr_eval
+              ({ pexp_desc = Pexp_ident { txt = Longident.Lident s; _ }; _ }, _);
+          _
+        } ] ->
+    Some s
+  | _ -> None
+
+let quote_vb_attributes loc (attrs : Typedtree.attributes) =
+  let relevant =
+    Builtin_attributes.select_attributes translattribute_actions attrs
+  in
+  List.map
+    (fun (attr : Parsetree.attribute) ->
+      let name = attr.attr_name.txt in
+      if name = "zero_alloc"
+      then
+        Builtin_attributes.mark_zero_alloc_attribute_checked name
+          attr.attr_name.loc;
+      let payload = extract_attr_payload attr in
+      Vb_attribute.mk loc (string ~loc name) (string_option ~loc payload)
+      |> Vb_attribute.wrap)
+    relevant
+
 let quote_constant loc (const : Typedtree.constant) =
   (match const with
     | Const_int x -> Constant.int loc x
@@ -2315,7 +2396,10 @@ let rec module_for_path loc = function
       | None -> (
         match Ident.to_global id with
         | Some global -> Identifier.Module.global_module loc global
-        | None -> raise Exit))
+        | None ->
+          (* We must be in a [Toplevel_lock_for_directive] if we are quoting
+             a non-global module. *)
+          Ident.name id |> Identifier.Module.toplevel_module loc))
     |> Identifier.Module.wrap
   | Path.Pdot (p, s) ->
     Identifier.Module.dot loc (module_for_path loc p) s
@@ -2359,6 +2443,7 @@ let type_for_path loc = function
         | "floatarray" -> Identifier.Type.floatarray
         | "lexing_position" -> Identifier.Type.lexing_position
         | "expr" -> Identifier.Type.expr
+        | "eval" -> Identifier.Type.eval
         | "float#" -> Identifier.Type.unboxed_float
         | "nativeint#" -> Identifier.Type.unboxed_nativeint
         | "int32#" -> Identifier.Type.unboxed_int32
@@ -2715,6 +2800,10 @@ let type_for_annotation ~env ~loc typ =
             "Translquote [at %a]:@ Explicitly quantified type variables@ \
              cannot be spliced@ within quoted higher-rank function types"
             Location.print_loc_in_lowercase loc
+        | Tquote_eval _ ->
+          let lident = Untypeast.lident_of_path Predef.path_eval in
+          Ttyp_constr
+            (Predef.path_eval, mkloc lident loc, [go (Btype.new_quote_ty ty)])
         | Tpackage (pack_path, pack_fields) ->
           Ttyp_package
             { pack_path;
@@ -3014,6 +3103,8 @@ and quote_core_type ~scopes ty =
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ~scopes ty) |> Type.wrap
   | Ttyp_splice _ -> Type.var loc None |> Type.wrap
   | Ttyp_repr _ -> fatal_error "Translquote: Ttyp_repr not implemented."
+  | Ttyp_newlayout _ ->
+    fatal_error "Translquote: Ttyp_newlayout not implemented."
   | Ttyp_open _ ->
     fatal_errorf "Translquote [at %a]: Ttyp_open not implemented."
       Location.print_loc (to_location loc)
@@ -3453,8 +3544,8 @@ and quote_expression_desc ~scopes ~transl stage e =
   List.iter (update_env_with_extra ~loc) e.exp_extra;
   let body =
     match e.exp_desc with
-    | Texp_ident (path, _, _, ident_kind, _, _) ->
-      quote_value_ident_path_as_exp loc env path ident_kind
+    | Texp_ident { path; kind; _ } ->
+      quote_value_ident_path_as_exp loc env path kind
     | Texp_constant const ->
       let const = quote_constant loc const in
       Exp_desc.constant loc const
@@ -3491,6 +3582,9 @@ and quote_expression_desc ~scopes ~transl stage e =
         let names_lam = List.map (name_of_ident loc) idents in
         let defs_lam = List.map (quote_expression ~scopes ~transl stage) defs in
         let cstrs_lam = List.map (Option.map (quote_core_type ~scopes)) cstrs in
+        let attrs_lam =
+          List.map (fun vb -> quote_vb_attributes loc vb.vb_attributes) vbs
+        in
         let frest =
           Lam.list_param_binding ~loc Var_value
             (fun (defs, body) ->
@@ -3499,19 +3593,24 @@ and quote_expression_desc ~scopes ~transl stage e =
             (defs_lam, quote_expression ~scopes ~transl stage exp)
         in
         without_idents_values idents;
-        Exp_desc.let_rec_simple loc (quote_loc loc)
-          (List.combine names_lam cstrs_lam)
-          frest
+        let names_cstrs_attrs =
+          List.map2
+            (fun (name, cstr) attrs -> name, cstr, attrs)
+            (List.combine names_lam cstrs_lam)
+            attrs_lam
+        in
+        Exp_desc.let_rec_simple loc (quote_loc loc) names_cstrs_attrs frest
       | Nonrecursive ->
-        let val_l, _, pats, defs =
+        let val_l, _, pats, defs, attrs_l =
           List.fold_left
-            (fun (val_l, _, pats, defs) vb ->
+            (fun (val_l, _, pats, defs, attrs_l) vb ->
               let pat = vb.vb_pat in
               let idents = pat_bound_idents pat in
               let def = quote_expression ~scopes ~transl stage vb.vb_expr in
+              let attrs = quote_vb_attributes loc vb.vb_attributes in
               with_new_idents_values idents;
-              idents @ val_l, [], pat :: pats, def :: defs)
-            ([], [], [], []) (List.rev vbs)
+              idents @ val_l, [], pat :: pats, def :: defs, attrs :: attrs_l)
+            ([], [], [], [], []) (List.rev vbs)
         in
         let def_pat =
           Pat.tuple loc
@@ -3533,7 +3632,7 @@ and quote_expression_desc ~scopes ~transl stage e =
         List.iter
           (fun vb -> without_idents_values (pat_bound_idents vb.vb_pat))
           vbs;
-        Exp_desc.let_ loc (quote_loc loc) names_lam [] defs frest)
+        Exp_desc.let_ loc (quote_loc loc) names_lam [] defs attrs_l frest)
     | Texp_function fun_spec ->
       let fn =
         quote_function ~scopes ~transl stage loc (Texp_function fun_spec)
@@ -3696,7 +3795,14 @@ and quote_expression_desc ~scopes ~transl stage e =
       then
         let exp = quote_expression ~scopes ~transl (stage - 1) exp in
         Exp_desc.antiquote loc exp
-      else Exp_desc.splice loc (Code.inject (transl exp))
+      else
+        let exp =
+          (* Local allocations are not expected to escape from this expression.
+             If they did, the [ret_mode] on the corresponding [lfunction] would
+             need to indicate local mode. *)
+          Lregion (transl exp, layout_any_value)
+        in
+        Exp_desc.splice loc (Code.inject exp)
     | Texp_new (path, _, _, _) ->
       Exp_desc.new_ loc (quote_value_ident_path loc env path Id_value)
     | Texp_pack m -> Exp_desc.pack loc (quote_module_exp ~transl stage loc m)

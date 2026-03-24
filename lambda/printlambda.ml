@@ -230,8 +230,8 @@ and value_kind ppf vk =
       or_null_suffix nullable
       raw_value_kind raw_kind
 
-let rec layout ppf layout_ =
-  match layout_ with
+let rec layout ppf lay_ =
+  match lay_ with
   | Pvalue k -> value_kind ppf k
   | Ptop -> fprintf ppf "top"
   | Pbottom -> fprintf ppf "bottom"
@@ -245,12 +245,12 @@ let rec layout ppf layout_ =
       layouts
   | Psplicevar id -> fprintf ppf "$%a" Ident.print id
 
-let layout_annotation ppf layout_ =
-  match layout_ with
+let layout_annotation ppf lay_ =
+  match lay_ with
   | Pvalue { raw_kind = Pgenval; nullable = Non_nullable } -> ()
   | Pvalue { raw_kind = Pgenval; nullable = Nullable } ->
     fprintf ppf "?"
-  | _ -> fprintf ppf "[%a]" layout layout_
+  | _ -> fprintf ppf "[%a]" layout lay_
 
 let return_kind ppf (mode, kind) =
   let smode = locality_mode_if_local mode in
@@ -1425,8 +1425,14 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(region@ %a)@]" lam expr
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
-  | Lsplice { splice_loc = _;  slambda } ->
-      fprintf ppf "$(%a)" (Printslambda0.slambda0 lam) slambda
+  | Lsplice (_, slambda) ->
+      fprintf ppf "$(%a)" slam slambda
+
+and slam ppf = function
+  | SLmissing -> fprintf ppf "(missing)"
+  | SLhalves { sval_comptime; sval_runtime } ->
+    fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]"
+      slam sval_comptime lam sval_runtime
 
 and sequence ppf = function
   | Lsequence(l1, l2) ->
@@ -1469,5 +1475,6 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
 let structured_constant = struct_const
 
 let lambda = lam
+let slambda = slam
 
 let program ppf { code } = lambda ppf code

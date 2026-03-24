@@ -37,6 +37,12 @@ type primitive_mismatch =
   | Argument_repr of int
   | Layout_poly_attr
 
+type layout_poly_coercion =
+  | Extra_lhs of { extra: int }
+  | Extra_rhs of { extra: int }
+  | Instantiate_lhs_to_rhs of { index_lhs: int; index_rhs: int }
+  | Instantiate_lhs of { index_lhs: int; arg: Jkind_types.Sort.t option }
+
 type value_mismatch =
   | Primitive_mismatch of primitive_mismatch
   | Not_a_primitive
@@ -44,6 +50,7 @@ type value_mismatch =
   | Zero_alloc of Zero_alloc.error
   | Modality of Mode.Modality.error
   | Mode of Mode.Value.error
+  | Layout_poly_coercion of layout_poly_coercion
 
 exception Dont_match of value_mismatch
 
@@ -143,6 +150,42 @@ let primitive_descriptions pd1 pd2 =
   else
     native_repr_args pd1.prim_native_repr_args pd2.prim_native_repr_args
 
+let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
+  let pat_refs =
+    Ctype.moregeneral env true pat_lpoly subj_lpoly ty1 ty2
+  in
+  (* Map from RHS sort poly var to its 1-indexed position *)
+  let subj_index = List.mapi (fun i v -> (v, i + 1)) subj_lpoly in
+  let subj_rest =
+    List.fold_left
+      (fun (i, subj_rest) r ->
+        let i = i + 1 in
+        let v, subj_rest = match subj_rest with
+          | v :: rest -> v, rest
+          | [] ->
+            let extra = List.length pat_refs - i + 1 in
+            raise (Dont_match (Layout_poly_coercion (Extra_lhs { extra })))
+        in
+        (match r with
+        | Some (Jkind_types.Sort.Var v') when v' == v -> ()
+        | Some (Jkind_types.Sort.Var v') ->
+          let j = List.assq v' subj_index in
+          raise (Dont_match (Layout_poly_coercion
+            (Instantiate_lhs_to_rhs { index_lhs = i; index_rhs = j })))
+        | _ ->
+          raise (Dont_match (Layout_poly_coercion
+            (Instantiate_lhs { index_lhs = i; arg = r }))));
+        (i, subj_rest))
+      (0, subj_lpoly)
+      pat_refs
+    |> snd
+  in
+  match subj_rest with
+  | [] -> ()
+  | _ ->
+    raise (Dont_match (Layout_poly_coercion
+      (Extra_rhs { extra = List.length subj_rest })))
+
 let value_descriptions ~loc env name
     ~mmodes
     (vd1 : Types.value_description)
@@ -170,6 +213,7 @@ let value_descriptions ~loc env name
   end;
   match vd1.val_kind with
   | Val_prim p1 -> begin
+     assert (List.is_empty vd1.val_lpoly);
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
@@ -188,7 +232,7 @@ let value_descriptions ~loc env name
              Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              try
-               Ctype.moregeneral env true ty1 ty2
+               moregeneral_lpoly env vd1.val_lpoly vd2.val_lpoly ty1 ty2
              with Ctype.Moregen err ->
                raise (Dont_match (Type err))
            ) yielding
@@ -200,7 +244,7 @@ let value_descriptions ~loc env name
        end
      | _ ->
         let ty1, mode_l1, _, sort1 = Ctype.instance_prim env p1 vd1.val_type in
-        (try Ctype.moregeneral env true ty1 vd2.val_type
+        (try moregeneral_lpoly env vd1.val_lpoly vd2.val_lpoly ty1 vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
         let pc =
           {pc_desc = p1; pc_type = vd2.Types.val_type;
@@ -210,7 +254,8 @@ let value_descriptions ~loc env name
         Tcoerce_primitive pc
      end
   | _ ->
-     match Ctype.moregeneral env true vd1.val_type vd2.val_type with
+     match moregeneral_lpoly env
+             vd1.val_lpoly vd2.val_lpoly vd1.val_type vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
      | () -> begin
        match vd2.val_kind with
@@ -428,6 +473,33 @@ let report_value_mismatch first second env ppf err =
       let got = first ^ " is" in
       let expected = second ^ " is" in
       report_mode_sub_error got expected ppf e
+  | Layout_poly_coercion (Extra_lhs { extra }) ->
+      pr "%s has %d more layout parameter%s that %s not used,@ \
+          which is not supported yet."
+        first extra
+        (if extra = 1 then "" else "s")
+        (if extra = 1 then "is" else "are")
+  | Layout_poly_coercion (Extra_rhs { extra }) ->
+      pr "%s has %d more layout parameter%s that %s not used,@ \
+          which is not supported yet."
+        second extra
+        (if extra = 1 then "" else "s")
+        (if extra = 1 then "is" else "are")
+  | Layout_poly_coercion (Instantiate_lhs_to_rhs { index_lhs; index_rhs }) ->
+      pr "The layout parameter at position %d in %s@ \
+          corresponds to the parameter at position %d in %s,@ \
+          which is not supported yet."
+        index_lhs first index_rhs second
+  | Layout_poly_coercion (Instantiate_lhs { index_lhs; arg }) ->
+      let format_got ppf = match arg with
+        | None -> Fmt.fprintf ppf "an unconstrained layout variable"
+        | Some s ->
+          Fmt.fprintf ppf "layout %a"
+            (Style.as_inline_code Jkind_types.Sort.format) s
+      in
+      pr "The layout parameter at position %d in %s@ \
+          is instantiated with %t,@ \
+          which is not supported yet." index_lhs first format_got
 
 let report_type_inequality env ppf err =
   let msg = Fmt.Doc.msg in
@@ -691,7 +763,7 @@ let report_type_mismatch first second decl env ppf err =
       pr "The problem is in the kinds of a parameter:@,";
       Jkind.Violation.report_with_offender
         ~offender:(fun pp -> Printtyp.type_expr pp ty)
-        ~level:(Ctype.get_current_level ()) env ppf v
+        env ppf v
   | Private_variant (_ty1, _ty2, mismatch) ->
       report_private_variant_mismatch first second decl env ppf mismatch
   | Private_object (_ty1, _ty2, mismatch) ->
@@ -720,7 +792,7 @@ let report_type_mismatch first second decl env ppf err =
       pr "@ Hint: add [%@%@or_null_reexport]."
   | Jkind v ->
       Jkind.Violation.report_with_name ~name:first
-        ~level:(Ctype.get_current_level ()) env ppf v
+        env ppf v
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
       (fun ppf (first, second, mismatch) ->

@@ -148,14 +148,6 @@ let fmt_partiality f x =
   | Total -> ()
   | Partial -> fprintf f " (Partial)"
 
-let fmt_index_kind f = function
-  | Index_int -> fprintf f "Index_int"
-  | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
-  | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
-  | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
-  | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
-  | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
-
 let line i f s (*...*) =
   fprintf f "%s" (String.make (2*i) ' ');
   fprintf f s (*...*)
@@ -191,6 +183,9 @@ let arg_label i ppf = function
   | Optional s -> line i ppf "Optional \"%s\"\n" s
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
   | Position s -> line i ppf "Position \"%s\"\n" s
+
+let layout_var ppf {txt; _} =
+  fprintf ppf " %s" txt
 
 let typevar_no_jkind ~print_quote ppf v =
   let pptv =
@@ -414,6 +409,10 @@ let rec core_type i ppf x =
   | Ttyp_repr (lv, ct) ->
       line i ppf "Ttyp_repr%a\n"
         (fun ppf -> List.iter (typevar_no_jkind ~print_quote:true ppf)) lv;
+      core_type i ppf ct
+  | Ttyp_newlayout (lv, ct) ->
+      line i ppf "Ttyp_newlayout%a\n"
+        (fun ppf -> List.iter (layout_var ppf)) lv;
       core_type i ppf ct
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
@@ -647,7 +646,7 @@ and expression i ppf x =
     List.iter (fun (x, _, attrs) -> expression_extra (i+1) ppf x attrs) extra;
   end;
   match x.exp_desc with
-  | Texp_ident (li,_,_,_,_,_) -> line i ppf "Texp_ident %a\n" fmt_path li;
+  | Texp_ident { path; _ } -> line i ppf "Texp_ident %a\n" fmt_path path;
   | Texp_instvar (_, li,_) -> line i ppf "Texp_instvar %a\n" fmt_path li;
   | Texp_mutvar id -> line i ppf "Texp_mutvar %a\n" fmt_ident id.txt;
   | Texp_constant (c) -> line i ppf "Texp_constant %a\n" fmt_constant c;
@@ -1383,12 +1382,6 @@ and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ -> _ =
 and block_access i ppf = function
   | Baccess_field (li, _) ->
       line i ppf "Baccess_field %a\n" fmt_longident li
-  | Baccess_array
-        { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort } ->
-      line i ppf "Baccess_array %a %a %a\n"
-        fmt_mutable_flag mut fmt_index_kind index_kind
-        fmt_sort elt_sort;
-      expression i ppf index
   | Baccess_block (mut, index) ->
       line i ppf "Baccess_block %a\n"
         fmt_mutable_flag mut;

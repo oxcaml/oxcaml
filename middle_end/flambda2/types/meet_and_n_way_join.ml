@@ -415,6 +415,10 @@ let meet_code_id (env : ME.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
         code_id1 code_id2
     with
     | Bottom -> Bottom (New_result ())
+    | Unknown ->
+      (* CR bclement: We are kind of lying here -- using either input is
+         correct, but might lose different information. *)
+      Ok (Both_inputs, env)
     | Ok code_id ->
       if Code_id.equal code_id code_id1
       then Ok (Left_input, env)
@@ -2095,7 +2099,7 @@ and n_way_join_head_of_kind_value env
       List.map
         (fun ((id, head) : TG.head_of_kind_value Join_env.join_arg) ->
           match head.is_null with
-          | Not_null -> id, Simple.const_false machine_width
+          | Not_null -> id, Simple.untagged_const_false machine_width
           | Maybe_null { is_null = None } -> raise_notrace Cannot_track
           | Maybe_null { is_null = Some is_null } -> id, Simple.var is_null)
         heads

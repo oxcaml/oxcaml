@@ -45,6 +45,7 @@ type native_repr =
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Unpacked_product of Jkind_types.Sort.Const.t
 (* CR mshinwell/ccasinghino: should we actually use
    "any_locality_mode Scalar.Integral.Width.t" here rather than defining an
    additional unboxed_or_untagged_integer type? *)
@@ -159,6 +160,7 @@ type error =
   | Inconsistent_attributes_for_effects
   | Inconsistent_noalloc_attributes_for_effects
   | Invalid_representation_polymorphic_attribute
-  | Invalid_native_repr_for_primitive of string
+  | Invalid_native_repr_for_primitive of
+      { prim_name : string; has_product_arg : bool }
 
 exception Error of Location.t * error

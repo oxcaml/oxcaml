@@ -429,7 +429,7 @@ value caml_do_pending_actions_exn(void)
   if (Is_exception_result(exn)) goto exception;
 
   /* Call memprof callbacks */
-  exn = caml_memprof_run_callbacks_exn();
+  exn = caml_memprof_do_pending_exn();
   check_async_exn(exn, "memprof callback");
   if (Is_exception_result(exn)) goto exception;
 

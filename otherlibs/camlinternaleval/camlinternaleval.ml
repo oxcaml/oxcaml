@@ -163,6 +163,8 @@ let eval code =
   Clflags.dont_write_files := true;
   Clflags.shared := true;
   Clflags.dlcode := false;
+  Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
+  Clflags.set_o3 ();
   (* TODO: Set a bunch of flags to match the initial compile (like
      nopervasives) *)
   Location.reset ();
@@ -214,7 +216,7 @@ let eval code =
   let typed_impl =
     Typemod.type_implementation unit_info compilation_unit env ast
   in
-  let slambda_program =
+  let tlambda_program =
     Translmod.transl_implementation compilation_unit ~loc:(Location.curr lexbuf)
       ( typed_impl.structure,
         typed_impl.coercion,
@@ -225,16 +227,25 @@ let eval code =
   in
   Warnings.check_fatal () (* TODO: more error handling? *);
   (* TODO: assert program.arg_block_idx is none? *)
-  let raw_lambda_program = Slambdaeval.eval slambda_program in
-  let program =
-    { raw_lambda_program with
-      code =
-        Simplif.simplify_lambda
-          ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
-          ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
-          raw_lambda_program.code
-    }
+  (* We ignore the comptime bit here because eval'd stuff is dynamic, we could
+     consider packaging the comptime component up in the result if the quoted
+     mode is static, which would let us do something like:
+     [{
+      val eval : <[ 'a @ static ]> expr -> <[ 'a ]> eval with_static_data
+      val inject
+        :  (('a. 'a with_static_data -> <[ 'a @ static ]> expr) -> 'b expr)
+        -> 'b eval
+     }] *)
+  let { Lambda.sval_comptime = _; sval_runtime = raw_lambda } =
+    Slambda.eval Fun.id tlambda_program.code
   in
+  let lambda =
+    Simplif.simplify_lambda
+      ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+      ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
+      raw_lambda
+  in
+  let program = { tlambda_program with code = lambda } in
   let ppf = Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) in
   (match Jit.jit_load ~phrase_name:input_name ppf program with
   | Ok _ -> ()

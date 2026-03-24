@@ -189,3 +189,5 @@ type t =
 val is_pure : t -> bool
 
 val dump : Format.formatter -> t -> unit
+
+val equal : t -> t -> bool

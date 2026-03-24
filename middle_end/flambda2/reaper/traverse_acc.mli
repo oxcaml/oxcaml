@@ -98,11 +98,11 @@ val add_accessor_dep :
 val add_constructor_dep :
   t -> base:Code_id_or_name.t -> Field.t -> from:Code_id_or_name.t -> unit
 
-val add_coaccessor_dep :
-  t -> to_:Code_id_or_name.t -> Cofield.t -> base:Code_id_or_name.t -> unit
+val add_argument_dep :
+  t -> from:Code_id_or_name.t -> Cofield.t -> base:Code_id_or_name.t -> unit
 
-val add_coconstructor_dep :
-  t -> base:Code_id_or_name.t -> Cofield.t -> from:Code_id_or_name.t -> unit
+val add_parameter_dep :
+  t -> base:Code_id_or_name.t -> Cofield.t -> to_:Code_id_or_name.t -> unit
 
 val add_propagate_dep :
   t ->
@@ -121,6 +121,8 @@ val add_alias_if_any_source_dep :
 val add_any_usage : t -> Code_id_or_name.t -> unit
 
 val add_any_source : t -> Code_id_or_name.t -> unit
+
+val add_zero_alloc_source : t -> Code_id_or_name.t -> unit
 
 val add_code_id_my_closure : t -> Code_id.t -> Variable.t -> unit
 
