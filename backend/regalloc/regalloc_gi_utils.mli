@@ -52,13 +52,14 @@ module Spilling_heuristics : sig
   type t =
     | Flat_uses
     | Hierarchical_uses
+    | Static_frequencies
     | Random_for_testing
 
   val all : t list
 
   val to_string : t -> string
 
-  val random : unit -> bool
+  val random : unit -> t
 
   val value : t Lazy.t
 end

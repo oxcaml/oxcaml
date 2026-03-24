@@ -119,24 +119,38 @@ module For_testing = struct
   let rounds = ref (-1)
 end
 
-let compile_spill_costs state cfg_with_infos ~flat () =
-  let costs = SpillCosts.compute cfg_with_infos ~flat () in
+let spilling_heuristics () =
+  match Lazy.force Spilling_heuristics.value with
+  | (Flat_uses | Hierarchical_uses | Static_frequencies) as heuristics ->
+    heuristics
+  | Random_for_testing -> Spilling_heuristics.random ()
+
+let compile_spill_costs state cfg_with_infos =
+  let costs =
+    match spilling_heuristics () with
+    | Flat_uses -> SpillCosts.compute cfg_with_infos SpillCosts.Constant
+    | Hierarchical_uses -> SpillCosts.compute cfg_with_infos SpillCosts.Loops
+    | Static_frequencies ->
+      SpillCosts.compute cfg_with_infos SpillCosts.Estimated_frequencies
+    | Random_for_testing ->
+      fatal "unexpected random heuristics" Spilling_heuristics.random ()
+  in
   State.iter_introduced_temporaries state ~f:(fun (reg : Reg.t) ->
-      SpillCosts.add_to_reg costs reg 10_000);
+      SpillCosts.add_to_reg costs reg 10_000.);
   if debug
   then (
     log "spilling costs";
     indent ();
-    SpillCosts.iter costs ~f:(fun (reg : Reg.t) (cost : int) ->
-        log "%a: %d" Printreg.reg reg cost);
+    SpillCosts.iter costs ~f:(fun (reg : Reg.t) (cost : float) ->
+        log "%a: %g" Printreg.reg reg cost);
     dedent ());
   costs
 
 (* CR xclerc for xclerc: the `round` parameter is temporary; this is an hybrid
    version of "greedy" using the `rewrite` function from IRC when it needs to
    spill. *)
-let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
- fun ~round ~flat state cfg_with_infos ->
+let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
+ fun ~round state cfg_with_infos ->
   For_testing.rounds := round;
   if round > max_rounds
   then
@@ -154,7 +168,7 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
     log "main, round #%d" round;
     log_cfg_with_infos cfg_with_infos);
   if debug then log "updating spilling costs";
-  let costs = lazy (compile_spill_costs state cfg_with_infos ~flat ()) in
+  let costs = lazy (compile_spill_costs state cfg_with_infos) in
   let hardware_registers, prio_queue =
     make_hardware_registers_and_prio_queue cfg_with_infos
   in
@@ -256,7 +270,7 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
         ~spilled_nodes:(List.map spilled_nodes ~f:fst)
     with
     | false -> if debug then log "(end of main)"
-    | true -> main ~round:(succ round) ~flat state cfg_with_infos)
+    | true -> main ~round:(succ round) state cfg_with_infos)
 
 let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
@@ -275,13 +289,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   if debug then log "#temporaries=%d" initial_temporaries;
   let state = State.make ~stack_slots ~initial_temporaries ~affinity in
   Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
-  let flat =
-    match Lazy.force Spilling_heuristics.value with
-    | Flat_uses -> true
-    | Hierarchical_uses -> false
-    | Random_for_testing -> Spilling_heuristics.random ()
-  in
-  main ~round:1 ~flat state cfg_with_infos;
+  main ~round:1 state cfg_with_infos;
   if debug
   then (
     indent ();

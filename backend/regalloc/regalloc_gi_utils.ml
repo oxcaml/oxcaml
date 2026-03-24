@@ -120,18 +120,26 @@ module Spilling_heuristics = struct
   type t =
     | Flat_uses
     | Hierarchical_uses
+    | Static_frequencies
     | Random_for_testing
 
   let default = Flat_uses
 
-  let all = [Flat_uses; Hierarchical_uses; Random_for_testing]
+  let all =
+    [Flat_uses; Hierarchical_uses; Static_frequencies; Random_for_testing]
 
   let to_string = function
     | Flat_uses -> "flat_uses"
     | Hierarchical_uses -> "hierarchical_uses"
+    | Static_frequencies -> "static_frequencies"
     | Random_for_testing -> "random"
 
-  let random () = Random.State.bool gi_rng
+  let random () =
+    match Random.State.int gi_rng 3 with
+    | 0 -> Flat_uses
+    | 1 -> Hierarchical_uses
+    | 2 -> Static_frequencies
+    | _ -> assert false
 
   let value =
     let available_heuristics () =
@@ -145,6 +153,7 @@ module Spilling_heuristics = struct
         match String.lowercase_ascii id with
         | "flat_uses" | "flat-uses" -> Flat_uses
         | "hierarchical_uses" | "hierarchical-uses" -> Hierarchical_uses
+        | "static_frequencies" | "static-frequencies" -> Static_frequencies
         | "random" -> Random_for_testing
         | _ ->
           fatal "unknown heuristics %S (possible values: %s)" id
@@ -452,7 +461,7 @@ module Hardware_registers = struct
     let reg_class = Regs.Reg_class.of_machtype of_reg.typ in
     Array.fold_left (Regs.Reg_class_tbl.find t reg_class) ~f ~init
 
-  let actual_cost (costs : SpillCosts.t) (reg : Reg.t) : int =
+  let actual_cost (costs : SpillCosts.t) (reg : Reg.t) : SpillCosts.reg_cost =
     (* CR xclerc for xclerc: it could make sense to give a lower cost to reg
        already spilled (e.g. by the split preprocessing) since they already have
        a stack slot *)
@@ -549,13 +558,13 @@ module Hardware_registers = struct
             (match overlaping with
             | [] -> fatal "overlaping list should not be empty"
             | _ :: _ -> ());
-            let (cost, evictable) : int * bool =
-              List.fold_left overlaping ~init:(0, true)
+            let (cost, evictable) : SpillCosts.reg_cost * bool =
+              List.fold_left overlaping ~init:(0., true)
                 ~f:(fun
                     (acc_cost, acc_evictable)
                     { Hardware_register.pseudo_reg; interval = _; evictable }
                   ->
-                  ( acc_cost + actual_cost costs pseudo_reg,
+                  ( acc_cost +. actual_cost costs pseudo_reg,
                     acc_evictable && evictable ))
             in
             if debug then dedent ();
@@ -563,9 +572,11 @@ module Hardware_registers = struct
             then acc
             else
               let evict_cost =
-                match acc with None -> max_int | Some (_, _, c) -> c
+                match acc with None -> max_float | Some (_, _, c) -> c
               in
-              if cost < evict_cost && cost < actual_cost costs reg
+              if
+                Float.compare cost evict_cost < 0
+                && Float.compare cost (actual_cost costs reg) < 0
               then (
                 if debug
                 then

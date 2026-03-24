@@ -375,20 +375,28 @@ let update_live_fields : Cfg_with_layout.t -> liveness -> unit =
       set_liveness block.terminator)
 
 module SpillCosts = struct
-  type t = int Reg.Tbl.t
+  type block_costs =
+    | Constant
+    | Loops
+    | Estimated_frequencies
+
+  (* CR-someday xclerc for xclerc: consider fixed-point values *)
+  type reg_cost = float
+
+  type t = reg_cost Reg.Tbl.t
 
   let empty () = Reg.Tbl.create 1
 
   let iter costs ~f = Reg.Tbl.iter f costs
 
   let for_reg costs reg =
-    match Reg.Tbl.find_opt costs reg with None -> 0 | Some cost -> cost
+    match Reg.Tbl.find_opt costs reg with None -> 0. | Some cost -> cost
 
   let add_to_reg costs reg delta =
     let curr =
-      match Reg.Tbl.find_opt costs reg with None -> 0 | Some cost -> cost
+      match Reg.Tbl.find_opt costs reg with None -> 0. | Some cost -> cost
     in
-    Reg.Tbl.replace costs reg (curr + delta)
+    Reg.Tbl.replace costs reg (curr +. delta)
 
   let normal_cost = lazy (find_param_value "SPILL_NORMAL_COST")
 
@@ -396,54 +404,56 @@ module SpillCosts = struct
 
   let loop_cost = lazy (find_param_value "SPILL_LOOP_COST")
 
-  let cost_for_block : Cfg.basic_block -> int =
+  let cost_for_block : Cfg.basic_block -> float =
    fun block ->
     let param =
       match block.cold with false -> normal_cost | true -> cold_cost
     in
-    match Lazy.force param with None -> 1 | Some cost -> int_of_string cost
+    match Lazy.force param with None -> 1. | Some cost -> float_of_string cost
 
-  let compute : Cfg_with_infos.t -> flat:bool -> unit -> t =
-   fun cfg_with_infos ~flat () ->
+  let compute : Cfg_with_infos.t -> block_costs -> t =
+   fun cfg_with_infos block_costs ->
     let costs = Reg.Tbl.create (List.length (Reg.all_relocatable_regs ())) in
     List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
-        Reg.Tbl.replace costs reg 0);
-    let update_reg (cost : int) (reg : Reg.t) : unit =
+        Reg.Tbl.replace costs reg 0.);
+    let update_reg (cost : reg_cost) (reg : Reg.t) : unit =
       (* CR-soon xclerc for xclerc: consider adding an overflow check. *)
       add_to_reg costs reg cost
     in
-    let update_array (cost : int) (regs : Reg.t array) : unit =
+    let update_array (cost : reg_cost) (regs : Reg.t array) : unit =
       Array.iter regs ~f:(fun reg -> update_reg cost reg)
     in
-    let update_instr (cost : int) (instr : _ Cfg.instruction) : unit =
+    let update_instr (cost : reg_cost) (instr : _ Cfg.instruction) : unit =
       update_array cost instr.arg;
       update_array cost instr.res
     in
     let cfg = Cfg_with_infos.cfg cfg_with_infos in
-    let loops_depths : Cfg_loop_infos.loop_depths =
-      if flat
-      then Label.Map.empty
-      else (Cfg_with_infos.loop_infos cfg_with_infos).loop_depths
-    in
     Cfg.iter_blocks cfg ~f:(fun label block ->
-        let base_cost = cost_for_block block in
-        let cost_multiplier =
-          match Label.Map.find_opt label loops_depths with
-          | None ->
-            assert flat;
-            1
-          | Some depth ->
-            let base =
-              match Lazy.force loop_cost with
-              | None -> 10
-              | Some cost -> int_of_string cost
+        let cost =
+          match block_costs with
+          | Constant -> 1.
+          | Loops -> (
+            let loops_depths =
+              (Cfg_with_infos.loop_infos cfg_with_infos).loop_depths
             in
-            (* CR-soon xclerc for xclerc: consider adding an overflow check (See
-               tools/regalloc/regalloc.ml). Or better, share the code between
-               the tool and the allocators. *)
-            Misc.power ~base depth
+            match Label.Map.find_opt label loops_depths with
+            | None -> 1.
+            | Some depth ->
+              let base =
+                match Lazy.force loop_cost with
+                | None -> 10.
+                | Some cost -> float_of_string cost
+              in
+              let base_cost = cost_for_block block in
+              (* CR-soon xclerc for xclerc: consider capping the value. *)
+              let cost_multiplier = base ** float depth in
+              base_cost *. cost_multiplier)
+          | Estimated_frequencies -> (
+            let frequencies = Cfg_with_infos.block_frequency cfg_with_infos in
+            match Label.Tbl.find_opt frequencies label with
+            | None -> 1.
+            | Some frequency -> frequency)
         in
-        let cost = base_cost * cost_multiplier in
         DLL.iter ~f:(fun instr -> update_instr cost instr) block.body;
         (* Ignore probes *)
         match block.terminator.desc with

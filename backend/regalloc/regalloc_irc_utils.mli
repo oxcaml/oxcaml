@@ -69,6 +69,7 @@ module Spilling_heuristics : sig
   type t =
     | Flat_uses
     | Hierarchical_uses
+    | Static_frequencies
 
   val all : t list
 

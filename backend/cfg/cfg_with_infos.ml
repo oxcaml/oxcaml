@@ -21,14 +21,16 @@ type t =
   { cfg_with_layout : Cfg_with_layout.t;
     liveness : liveness option ref;
     dominators : Cfg_dominators.t option ref;
-    loop_infos : Cfg_loop_infos.t option ref
+    loop_infos : Cfg_loop_infos.t option ref;
+    block_frequency : Cfg_block_frequency.t option ref
   }
 
 let make cfg_with_layout =
   { cfg_with_layout;
     liveness = ref None;
     dominators = ref None;
-    loop_infos = ref None
+    loop_infos = ref None;
+    block_frequency = ref None
   }
 
 let cfg_with_layout t = t.cfg_with_layout
@@ -66,7 +68,14 @@ let loop_infos t =
   compute_if_necessary t.loop_infos ~f:(fun () ->
       Cfg_loop_infos.build (cfg t) (dominators t))
 
-let invalidate_loop_infos t = t.loop_infos := None
+let block_frequency t =
+  let loop_infos = loop_infos t in
+  compute_if_necessary t.block_frequency ~f:(fun () ->
+      Cfg_block_frequency.build (cfg t) loop_infos)
+
+let invalidate_loop_infos t =
+  t.loop_infos := None;
+  t.block_frequency := None
 
 let invalidate_dominators_and_loop_infos t =
   t.dominators := None;
