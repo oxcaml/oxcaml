@@ -30,7 +30,6 @@ depends: [
 # The upstream compiler used for building OxCaml should not be configured with
 # any of these options.
 conflicts: [
-  "dune" {= "3.22.0"} # See https://github.com/ocaml/dune/issues/13889
   "ocaml-option-32bit"
   "ocaml-option-address-sanitizer"
   "ocaml-option-afl"
