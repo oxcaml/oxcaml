@@ -150,11 +150,11 @@ let add_accessor_dep t ~to_ relation ~base =
 let add_constructor_dep t ~base relation ~from =
   Graph.add_constructor_dep t.deps ~base relation ~from
 
-let add_coaccessor_dep t ~to_ relation ~base =
-  Graph.add_coaccessor_dep t.deps ~to_ relation ~base
+let add_argument_dep t ~from relation ~base =
+  Graph.add_argument_dep t.deps ~from relation ~base
 
-let add_coconstructor_dep t ~base relation ~from =
-  Graph.add_coconstructor_dep t.deps ~base relation ~from
+let add_parameter_dep t ~base relation ~to_ =
+  Graph.add_parameter_dep t.deps ~base relation ~to_
 
 let add_propagate_dep t ~if_used ~to_ ~from =
   Graph.add_propagate_dep t.deps ~if_used ~to_ ~from
@@ -247,7 +247,7 @@ let add_set_of_closures_dep let_bound_name_of_the_closure closure_code_id
                     ╚═══╝               ╚═══╝
 
    For indirect calls, we have a series of call witnesses for each
-   complex parameter, each with coconstructors for each part of the
+   complex parameter, each with parameter relations for each part of the
    complex parameter, the code_id, and returning a value with the next call
    witness.
 *)
@@ -263,8 +263,8 @@ let create_known_arity_call_witness t code_id ~params ~returns ~exn =
   let witness = Code_id_or_name.var witness in
   List.iteri
     (fun i v ->
-      add_coconstructor_dep t ~base:witness (Cofield.param i)
-        ~from:(Code_id_or_name.var v))
+      add_parameter_dep t ~base:witness (Cofield.param i)
+        ~to_:(Code_id_or_name.var v))
     params;
   List.iteri
     (fun i v ->
@@ -285,8 +285,8 @@ let make_known_arity_apply_widget t ~(denv : Env.t) ~params ~returns ~exn =
   in
   List.iteri
     (fun i v ->
-      add_coaccessor_dep t ~base:witness (Cofield.param i)
-        ~to_:(simple_to_node t ~all_constants:denv.all_constants v))
+      add_argument_dep t ~base:witness (Cofield.param i)
+        ~from:(simple_to_node t ~all_constants:denv.all_constants v))
     params;
   List.iteri
     (fun i v ->
@@ -331,7 +331,7 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
     let untuple_var =
       Code_id_or_name.var (Variable.create "untuple_var" Flambda_kind.value)
     in
-    add_coconstructor_dep t ~base:witness (Cofield.param 0) ~from:untuple_var;
+    add_parameter_dep t ~base:witness (Cofield.param 0) ~to_:untuple_var;
     (* CR ncourant: this should be changed if we ever allow non-value tuples *)
     List.iteri
       (fun i v ->
@@ -347,8 +347,8 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
       | (first, witness) :: rest -> (
         List.iteri
           (fun i arg ->
-            add_coconstructor_dep t ~from:(Code_id_or_name.var arg)
-              (Cofield.param i) ~base:witness)
+            add_parameter_dep t ~to_:(Code_id_or_name.var arg) (Cofield.param i)
+              ~base:witness)
           first;
         add_constructor_dep t ~base:witness Field.code_id_of_call_witness
           ~from:(Code_id_or_name.code_id code_id);
@@ -401,8 +401,8 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
     | (first, witness) :: rest -> (
       List.iteri
         (fun i v ->
-          add_coaccessor_dep t ~base:witness (Cofield.param i)
-            ~to_:(simple_to_node t ~all_constants:denv.all_constants v))
+          add_argument_dep t ~base:witness (Cofield.param i)
+            ~from:(simple_to_node t ~all_constants:denv.all_constants v))
         first;
       add_accessor_dep t ~base:witness Field.exn_return_of_call
         ~to_:(Code_id_or_name.var exn);

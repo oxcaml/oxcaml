@@ -163,6 +163,8 @@ let eval code =
   Clflags.dont_write_files := true;
   Clflags.shared := true;
   Clflags.dlcode := false;
+  Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
+  Clflags.set_o3 ();
   (* TODO: Set a bunch of flags to match the initial compile (like
      nopervasives) *)
   Location.reset ();

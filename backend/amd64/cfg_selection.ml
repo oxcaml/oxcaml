@@ -121,7 +121,10 @@ let one_arg name args =
    [effects_of], below. *)
 let inline_ops = ["sqrt"]
 
-let int_is_immediate n = n <= 0x7FFF_FFFF && n >= -0x8000_0000
+(* While -0x8000_0000 is representable as a signed 32bit immediate, we make it
+   symmetric here so that we can negate the immediate when necessary, which is
+   needed to turn subtraction into lea. *)
+let int_is_immediate n = n <= 0x7FFF_FFFF && n >= -0x7FFF_FFFF
 
 let is_immediate_natint n =
   Nativeint.compare n 0x7FFF_FFFFn <= 0
@@ -155,7 +158,7 @@ let pseudoregs_for_operation op arg res =
     arg.(0) <- res.(0);
     arg, res
   (* One-address unary operations: arg.(0) and res.(0) must be the same *)
-  | Intop_imm ((Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
+  | Intop_imm ((Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
   | Floatop ((Float64 | Float32), (Iabsf | Inegf))
   | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour }) ->
     res, res
@@ -214,7 +217,10 @@ let pseudoregs_for_operation op arg res =
   (* Other instructions are regular *)
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
   | Intop (Ipopcnt | Iclz _ | Ictz _ | Icomp _ | Iadd)
-  | Intop_imm ((Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz _ | Ictz _), _)
+  | Intop_imm
+      ( ( Iadd | Isub | Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz _
+        | Ictz _ ),
+        _ )
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
       | Istore_int (_, _, _)

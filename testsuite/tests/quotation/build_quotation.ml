@@ -1081,3 +1081,66 @@ Error: Identifier "x" is used at line 1, characters 43-44,
 [%%expect {|
 - : <[lexing_position]> expr = <[[%src_pos]]>
 |}];;
+
+(* Bug 2.0: assert/lazy args must be parenthesized *)
+<[ assert (if true then true else false) ]>;;
+[%%expect {|
+- : <[unit]> expr = <[assert (if true then true else false)]>
+|}];;
+
+<[ lazy (if true then 1 else 2) ]>;;
+[%%expect {|
+- : <[int lazy_t]> expr = <[lazy (if true then 1 else 2)]>
+|}];;
+
+(* Bug 2.1: PatVariant argument must be parenthesized *)
+<[ fun x -> match x with | `A (Some y) -> y | _ -> 0 ]>;;
+[%%expect {|
+- : <[([> `A of int option ] as '_weak13) -> int]> expr =
+<[fun x -> match x with | `A (Some (y)) -> y | _ -> 0]>
+|}];;
+
+(* Bug 2.2: Match/try in case RHS must be parenthesized *)
+<[ fun x y -> match x with | true -> (match y with | 0 -> "a" | _ -> "b") | false -> "c" ]>;;
+[%%expect {|
+- : <[bool -> int -> string]> expr =
+<[
+  fun x y ->
+    match x with | true -> (match y with | 0 -> "a" | _ -> "b") | false ->
+      "c"
+]>
+|}];;
+
+<[ fun x -> match x with | true -> (try raise Exit with _ -> 0) | false -> 1 ]>;;
+[%%expect {|
+- : <[bool -> int]> expr =
+<[
+  fun x ->
+    match x with | true -> (try Stdlib.raise Exit with  | _ -> 0) | false ->
+      1
+]>
+|}];;
+
+(* Bug 2.3: Sequence elements must parenthesize let *)
+<[ (let x = 1 in x); 2 ]>;;
+[%%expect {|
+Line 1, characters 17-18:
+1 | <[ (let x = 1 in x); 2 ]>;;
+                     ^
+Warning 10 [non-unit-statement]: this expression should have type unit.
+
+- : <[int]> expr = <[(let x = 1 in x); 2]>
+|}];;
+
+(* Bug 2.4: If-then-else else branch must parenthesize let and sequence *)
+<[ if true then 1 else (let x = 2 in x) ]>;;
+[%%expect {|
+- : <[int]> expr = <[if true then 1 else (let x = 2 in x)]>
+|}];;
+
+(* Bug 2.5: Unboxed_field sub-expression must be parenthesized *)
+<[ (List.hd [{contents = 42}]).contents ]>;;
+[%%expect {|
+- : <[int]> expr =
+<[(Stdlib.List.hd ([{ Stdlib.contents = 42; }])).Stdlib.contents]>
+|}];;

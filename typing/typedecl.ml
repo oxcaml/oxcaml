@@ -1525,7 +1525,7 @@ let narrow_to_manifest_jkind env loc decl =
         let context = Ctype.mk_jkind_context_always_principal env in
         match
           Jkind.sub_jkind_l ~type_equal ~context
-            ~level:(Ctype.get_current_level ()) env manifest_jkind
+            env manifest_jkind
             decl.type_jkind
         with
         | Ok () -> ()
@@ -2221,7 +2221,7 @@ let rec update_decl_jkind env dpath decl =
      jkinds in transl_declaration]) *)
   let context = Ctype.mk_jkind_context_always_principal env in
   match
-    Jkind.sub_layout_or_error ~context ~level:(Ctype.get_current_level ())
+    Jkind.sub_layout_or_error ~context
       env new_decl.type_jkind decl.type_jkind
   with
   | Ok () -> new_decl
@@ -2914,7 +2914,6 @@ let normalize_decl_jkinds env decls =
           ~type_equal
           ~context
           ~allow_any_crossing
-          ~level:(Ctype.get_current_level ())
           env
           decl.type_jkind
           original_decl.type_jkind
@@ -4667,7 +4666,7 @@ let report_jkind_mismatch_due_to_bad_inference ppf env ty violation loc =
     loc
     (Jkind.Violation.report_with_offender
        ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-       ~level:(Ctype.get_current_level ()) env) violation
+       env) violation
 
 let quoted_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
 let report_error_doc ppf = function
@@ -4966,12 +4965,12 @@ let report_error_doc ppf = function
       fprintf ppf "type %a" Style.inline_code path_end
     in
     Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) env ppf v
+      env ppf v
   | Jkind_mismatch_of_type (env, ty, v) ->
     let offender ppf = fprintf ppf "type %a"
         (Style.as_inline_code Printtyp.type_expr) ty in
     Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) env ppf v
+      env ppf v
   | Jkind_sort {env; kloc; typ; err} ->
     let s =
       match kloc with
@@ -4998,7 +4997,7 @@ let report_error_doc ppf = function
       extra
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
-         ~level:(Ctype.get_current_level ()) env) err
+         env) err
   | Jkind_empty_record ->
     fprintf ppf "@[Records must contain at least one runtime value.@]"
   | Non_representable_in_module (env, err, ty) ->
@@ -5006,7 +5005,7 @@ let report_error_doc ppf = function
     fprintf ppf "@[The type of a module-level value must have a@ \
                    representable layout.@ %a@]"
       (Jkind.Violation.report_with_offender ~offender
-         ~level:(Ctype.get_current_level ()) env)
+         env)
       err
   | Invalid_jkind_in_block (typ, sort_const, lloc) ->
     let struct_desc =

@@ -62,8 +62,7 @@ let[@cold] reduce t =
 reduce:
   movq  (%rax), %rbx
   movq  8(%rax), %rdi
-  movq  %rbx, %rsi
-  addq  $2, %rsi
+  leaq  2(%rbx), %rsi
   movq  %rsi, (%rax)
   leaq  -1(%rbx,%rdi), %rax
   ret
@@ -212,15 +211,13 @@ spill_unspill_loop_movement.f:
   ret
 |}]
 
-(* CR ttebbi: The movq is unnecessary if incq was replaced with lea. *)
 let f a b c = if a > 10 then b - c else a - b
 [%%expect_asm X86_64{|
 f:
   cmpq  $21, %rax
   jle   .L107
-  movq  %rbx, %rax
-  subq  %rdi, %rax
-  incq  %rax
+  subq  %rdi, %rbx
+  leaq  1(%rbx), %rax
   ret
 .L107:
   subq  %rbx, %rax

@@ -73,6 +73,7 @@ let
   # Over time, we should probably define something like a "boot environment" and build
   # dune and the other dependencies with the patched system compiler.
   dune = pkgs.ocaml-ng.ocamlPackages_4_14.dune_3.overrideAttrs rec {
+    # This version should be the same as in tools/ci/local-opam/packages/oxcaml-ci-deps
     version = "3.20.2";
     src = pkgs.fetchurl {
       url = "https://github.com/ocaml/dune/releases/download/${version}/dune-${version}.tbz";

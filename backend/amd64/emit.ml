@@ -2247,6 +2247,9 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Intop_imm (Iadd, n))
     when not (Reg.equal_location i.arg.(0).loc i.res.(0).loc) ->
     I.lea (mem64 NONE n (arg_idx i 0)) (res i 0)
+  | Lop (Intop_imm (Isub, n))
+    when not (Reg.equal_location i.arg.(0).loc i.res.(0).loc) ->
+    I.lea (mem64 NONE (-n) (arg_idx i 0)) (res i 0)
   | Lop (Intop_imm (Iadd, 1) | Intop_imm (Isub, -1)) -> I.inc (res i 0)
   | Lop (Intop_imm (Iadd, -1) | Intop_imm (Isub, 1)) -> I.dec (res i 0)
   | Lop (Intop_imm (op, n)) ->
