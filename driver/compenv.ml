@@ -296,7 +296,7 @@ let read_one_param ppf position name v =
 
   | "compact" -> clear "compact" [ optimize_for_speed ] v
   | "no-app-funct" -> clear "no-app-funct" [ applicative_functors ] v
-  | "nodynlink" -> clear "nodynlink" [ dlcode ] v
+  | "nodynlink" -> ()
   | "short-paths" -> clear "short-paths" [ real_paths ] v
   | "trans-mod" -> set "trans-mod" [ transparent_modules ] v
   | "opaque" -> set "opaque" [ opaque ] v

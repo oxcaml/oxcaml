@@ -162,7 +162,7 @@ let eval code =
   Clflags.native_code := true;
   Clflags.dont_write_files := true;
   Clflags.shared := true;
-  Clflags.dlcode := false;
+  Clflags.dlcode := true;
   (* TODO: Set a bunch of flags to match the initial compile (like
      nopervasives) *)
   Location.reset ();

@@ -2572,7 +2572,7 @@ module Default = struct
       assert Config.function_sections;
       Compenv.first_ccopts := ("-ffunction-sections" ::(!Compenv.first_ccopts));
       function_sections := true
-    let _nodynlink = clear dlcode
+    let _nodynlink () = ()
     let _output_complete_obj () =
       set output_c_object (); set output_complete_object ()
     let _output_obj = set output_c_object
