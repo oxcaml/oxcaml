@@ -431,6 +431,17 @@ let decr_stage env =
 let incr_stage env =
   Env.enter_quotation env
 
+let iter_type_expr_with_stages f env ty =
+  match get_desc ty with
+  | Tquote ty ->
+    f (incr_stage env) ty
+  | Tsplice ty ->
+    f (decr_stage env) ty
+  | Tquote_eval ty ->
+    f (incr_stage env) ty
+  | _ ->
+    iter_type_expr (f env) ty
+
 let rec offset_stage n env =
   if n < 0 then
     offset_stage (n + 1) (decr_stage env)
@@ -1027,7 +1038,8 @@ let rec check_scope_escape mark env level ty =
         check_scope_escape mark env level
           (newty2 ~level:orig_level (Tpackage (p', fl)))
     | _ ->
-        iter_type_expr (check_scope_escape mark env level) ty
+        iter_type_expr_with_stages
+          (fun env -> check_scope_escape mark env level) env ty
     end;
   end
 
@@ -1114,7 +1126,8 @@ let rec update_level env level expand ty =
     | _ ->
         set_level ty level;
         (* XXX what about abbreviations in Tconstr ? *)
-        iter_type_expr (update_level env level expand) ty
+        iter_type_expr_with_stages
+          (fun env -> update_level env level expand) env ty
   end
 
 (* First try without expanding, then expand everything,
@@ -1180,7 +1193,8 @@ let rec lower_contravariant env var_level visited contra ty =
         lower_rec true t1;
         lower_rec contra t2
     | _ ->
-        iter_type_expr (lower_rec contra) ty
+        iter_type_expr_with_stages
+          (fun env -> lower_contravariant env var_level visited contra) env ty
   end
 
 let lower_variables_only env level ty =
@@ -3296,7 +3310,9 @@ let rec occur_rec env visited allow_recursive parents ty0 ty =
     | _ ->
         if allow_recursive ||  TypeSet.mem ty parents then () else begin
           let parents = TypeSet.add ty parents in
-          iter_type_expr (occur_rec env visited allow_recursive parents ty0) ty
+          iter_type_expr_with_stages
+            (fun env -> occur_rec env visited allow_recursive parents ty0)
+            env ty
         end
     end;
     ignore (try_mark_node visited ty)
@@ -3364,8 +3380,10 @@ let rec local_non_recursive_abbrev ~allow_rec strict visited env p ty =
     | _ ->
         if strict || not allow_rec then (* PR#7374 *)
           let visited = get_id ty :: visited in
-          iter_type_expr
-            (local_non_recursive_abbrev ~allow_rec true visited env p) ty
+          iter_type_expr_with_stages
+            (fun env ->
+              local_non_recursive_abbrev ~allow_rec true visited env p)
+            env ty
   end
 
 let local_non_recursive_abbrev uenv p ty =
@@ -3425,31 +3443,31 @@ let unify_univar_for tr_exn env t1 t2 jkind1 jkind2 univar_pairs =
 let occur_univar ?(inj_only=false) env ty =
   let visited = ref TypeMap.empty in
   with_type_mark begin fun mark ->
-  let rec occur_rec bound ty =
+  let rec occur_rec env bound ty =
     if not_marked_node mark ty then
       if TypeSet.is_empty bound then
-        (ignore (try_mark_node mark ty); occur_desc bound ty)
+        (ignore (try_mark_node mark ty); occur_desc env bound ty)
       else try
         let bound' = TypeMap.find ty !visited in
         if not (TypeSet.subset bound' bound) then begin
           visited := TypeMap.add ty (TypeSet.inter bound bound') !visited;
-          occur_desc bound ty
+          occur_desc env bound ty
         end
       with Not_found ->
         visited := TypeMap.add ty bound !visited;
-        occur_desc bound ty
-  and occur_desc bound ty =
+        occur_desc env bound ty
+  and occur_desc env bound ty =
       match get_desc ty with
         Tunivar _ ->
           if not (TypeSet.mem ty bound) then
             raise_escape_exn (Univ ty)
       | Tpoly (ty, tyl) ->
           let bound = List.fold_right TypeSet.add tyl bound in
-          occur_rec bound  ty
+          occur_rec env bound ty
       | Trepr (ty, _sort_vars) ->
           (* Sort variables are not type expressions, so we don't add them
              to bound *)
-          occur_rec bound ty
+          occur_rec env bound ty
       | Tconstr (_, [], _) -> ()
       | Tconstr (p, tl, _) ->
           begin try
@@ -3464,14 +3482,14 @@ let occur_univar ?(inj_only=false) env ty =
                    would be costly here, since we need to check inside
                    object and variant types too. *)
                 if Variance.(if inj_only then mem Inj v else not (eq v null))
-                then occur_rec bound t)
+                then occur_rec env bound t)
               tl td.type_variance
           with Not_found ->
-            if not inj_only then List.iter (occur_rec bound) tl
+            if not inj_only then List.iter (occur_rec env bound) tl
           end
-      | _ -> iter_type_expr (occur_rec bound) ty
+      | _ -> iter_type_expr_with_stages (fun env -> occur_rec env bound) env ty
   in
-  occur_rec TypeSet.empty ty
+  occur_rec env TypeSet.empty ty
   end
 
 let has_free_univars env ty =
@@ -3504,12 +3522,12 @@ let get_univar_family univar_pairs univars =
 let univars_escape env univar_pairs vl ty =
   let family = get_univar_family univar_pairs vl in
   with_type_mark begin fun mark ->
-  let rec occur t =
+  let rec occur env t =
     if try_mark_node mark t then begin
       match get_desc t with
         Tpoly (t, tl) ->
           if List.exists (fun t -> TypeSet.mem t family) tl then ()
-          else occur t
+          else occur env t
       | Tunivar _ -> if TypeSet.mem t family then raise_escape_exn (Univ t)
       | Tconstr (_, [], _) -> ()
       | Tconstr (p, tl, _) ->
@@ -3517,16 +3535,16 @@ let univars_escape env univar_pairs vl ty =
             let td = Env.find_type p env in
             List.iter2
               (* see occur_univar *)
-              (fun t v -> if not Variance.(eq v null) then occur t)
+              (fun t v -> if not Variance.(eq v null) then occur env t)
               tl td.type_variance
           with Not_found ->
-            List.iter occur tl
+            List.iter (occur env) tl
           end
       | _ ->
-          iter_type_expr occur t
+          iter_type_expr_with_stages occur env t
     end
   in
-  occur ty
+  occur env ty
   end
 
 (* Wrapper checking that no variable escapes and updating univar_pairs *)
@@ -8017,7 +8035,7 @@ let rec collapse_conj env visited ty =
         (row_fields row);
       iter_row (collapse_conj env visited) row
   | _ ->
-      iter_type_expr (collapse_conj env visited) ty
+      iter_type_expr_with_stages (fun env -> collapse_conj env visited) env ty
 
 let collapse_conj_params env params =
   List.iter (collapse_conj env []) params

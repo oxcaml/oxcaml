@@ -138,6 +138,9 @@ val merge_row_fields:
 val filter_row_fields:
         bool -> (label * row_field) list -> (label * row_field) list
 
+val iter_type_expr_with_stages:
+        (Env.t -> type_expr -> unit) -> (Env.t -> type_expr -> unit)
+
 val generalize: type_expr -> unit
         (* Generalize in-place the given type *)
 val lower_contravariant: Env.t -> type_expr -> unit
