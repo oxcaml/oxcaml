@@ -87,7 +87,7 @@ let test_warning =
 (* Checks that Simplify is being used rather than classic mode *)
 
 let test_simplify_being_used =
-  [%eval: Int64.t]
+  Eval.eval
   <[
     let[@zero_alloc][@inline never][@local never] check_simplify () =
       (* This relies on simplification of inlined bodies, variant unboxing,
@@ -106,4 +106,3 @@ let test_simplify_being_used =
     in
     check_simplify ()
   ]>
-
