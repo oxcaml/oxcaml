@@ -319,13 +319,15 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 <[fun (f : 'a. 'a -> 'a) -> f f]>
 |}];;
 
-(* CR metaprogramming jbachurski: This should fail gracefully. *)
+(* CR metaprogramming jbachurski: This should fail an assertion (ticket 6789).
+   We should also support this construct (ticket 6790). *)
 <[ let f : type a. a -> a = fun x -> x in f ]>
 [%%expect {|
 Uncaught exception: Stdlib.Exit
 
 |}];;
 
+(* CR metaprogramming jbachurski: We should support this (ticket 6791). *)
 <[ function Exists (type a) (x : a) -> ignore (x : a) ]>
 [%%expect {|
 >> Fatal error: Translquote [at Line 1, characters 12-35]:
