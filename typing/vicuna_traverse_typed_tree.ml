@@ -441,34 +441,24 @@ let argument_shape (ty, opt) =
 
 let extract_external_declaration outp (v : value_description) =
   (* Based on Primitive.parse_declaration in the compiler. *)
-  let cname, _native_cname, tail =
+  let cname, _native_cname =
     match v.val_prim with
     | [] ->
       (* The compiler does not allow it. *)
       Misc.fatal_errorf "Missing name at %s:%d, found %s"
         v.val_loc.loc_start.pos_fname v.val_loc.loc_start.pos_lnum
         v.val_name.txt
-    | name :: "noalloc" :: name2 :: "float" :: tail -> name, name2, tail
-    | name :: "noalloc" :: name2 :: tail -> name, name2, tail
-    | name :: name2 :: "float" :: tail -> name, name2, tail
-    | name :: "noalloc" :: tail -> name, name, tail
-    | name :: name2 :: tail -> name, name2, tail
-    | name :: tail -> name, name, tail
+    | name :: "noalloc" :: name2 :: "float" :: _ -> name, name2
+    | name :: "noalloc" :: name2 :: _ -> name, name2
+    | name :: name2 :: "float" :: _ -> name, name2
+    | name :: "noalloc" :: _ -> name, name
+    | name :: name2 :: _ -> name, name2
+    | name :: _ -> name, name
   in
   (* compiler intrinsics should not show up in the external declarations *)
   if String.starts_with ~prefix:"%" cname
   then ()
-  else (
-    (match tail with
-    | [] -> ()
-    | tail ->
-      (* The compiler should reject providing additional names in external
-         declarations. *)
-      Misc.fatal_errorf_doc "Unexpected names at %s:%d, found %a"
-        v.val_loc.loc_start.pos_fname v.val_loc.loc_start.pos_lnum
-        (Format_doc.pp_print_list ~pp_sep:Format_doc.pp_print_space
-           Format_doc.pp_print_string)
-        tail);
+  else
     (* TODO: Add support for extracting/checking the native code name. *)
     let args, ret = split_external_type v.val_desc in
     let arg_shapes = List.map argument_shape args in
@@ -476,7 +466,7 @@ let extract_external_declaration outp (v : value_description) =
     outp
       { name = cname;
         desc = { shape = Some { arguments = arg_shapes; return = ret_shape } }
-      })
+      }
 
 let extract_from_typed_tree tt =
   let open Tast_iterator in
