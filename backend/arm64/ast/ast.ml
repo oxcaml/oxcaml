@@ -3022,18 +3022,17 @@ module DSL = struct
       let count = ref 0 in
       let min_disp = ref None in
       emit_string := None;
-      emit_instruction
-        := Some
-             (fun instr ->
-               incr count;
-               match Instruction.max_displacement instr with
-               | None -> ()
-               | Some d ->
-                 min_disp
-                   := Some
-                        (match !min_disp with
-                        | None -> d
-                        | Some prev -> min prev d));
+      let emit_instruction_callback instr =
+        incr count;
+        match Instruction.max_displacement instr with
+        | None -> ()
+        | Some disp ->
+          let new_min_disp =
+            match !min_disp with None -> disp | Some prev -> min prev disp
+          in
+          min_disp := Some new_min_disp
+      in
+      emit_instruction := Some emit_instruction_callback;
       f ();
       emit_string := saved_emit_string;
       emit_instruction := saved_emit_instruction;
