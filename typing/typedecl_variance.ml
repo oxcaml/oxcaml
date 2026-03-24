@@ -148,7 +148,7 @@ let compute_variance_type env ~check (required, loc) decl tyl =
       (fun ty ->
         if Btype.is_Tvar ty || mem Inj (get_variance ty tvl) then () else
         let visited = ref TypeSet.empty in
-        let rec check ty =
+        let rec check env ty =
           if TypeSet.mem ty !visited then () else begin
             visited := TypeSet.add ty !visited;
             if mem Inj (get_variance ty tvl) then () else
@@ -157,16 +157,16 @@ let compute_variance_type env ~check (required, loc) decl tyl =
             | Tconstr _ ->
                 let old = !visited in
                 begin try
-                  Btype.iter_type_expr check ty
+                  Ctype.iter_type_expr_with_stages check env ty
                 with Exit ->
                   visited := old;
                   let ty' = Ctype.expand_head_opt env ty in
-                  if eq_type ty ty' then raise Exit else check ty'
+                  if eq_type ty ty' then raise Exit else check env ty'
                 end
-            | _ -> Btype.iter_type_expr check ty
+            | _ -> Ctype.iter_type_expr_with_stages check env ty
           end
         in
-        try check ty; compute_variance env tvl injective ty
+        try check env ty; compute_variance env tvl injective ty
         with Exit -> ())
       params;
   begin match check with
@@ -233,12 +233,7 @@ let compute_variance_type env ~check (required, loc) decl tyl =
                      , Bad_variance ( variance_error
                                     , (c1,n1,false)
                                     , (c2,n2,false))))
-        | None ->
-            match get_desc ty with
-            | Tquote ty -> check (Env.enter_quotation env) ty
-            | Tsplice ty -> check (Env.enter_splice ~loc:Location.none env) ty
-            | Tquote_eval ty -> check (Env.enter_quotation env) ty
-            | _ -> Btype.iter_type_expr (check env) ty
+        | None -> Ctype.iter_type_expr_with_stages check env ty
       end
     in
     List.iter (fun (_,ty) -> check env ty) tyl;
