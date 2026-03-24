@@ -267,7 +267,7 @@ shift_right_logical:
 |}]
 
 
-(* CR ttebbi: We should sing-extend after the subtraction. *)
+(* CR ttebbi: We should sign-extend after the subtraction. *)
 let compare (x : int) (y : int) = compare x y
 [%%expect_asm X86_64{|
 compare:

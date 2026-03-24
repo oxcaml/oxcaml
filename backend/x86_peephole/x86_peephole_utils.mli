@@ -41,6 +41,8 @@ val writes_to_reg64 : reg64 -> instruction -> bool
 
 val reads_from_reg64 : reg64 -> instruction -> bool
 
+val equal_reg64 : reg64 -> reg64 -> bool
+
 val writes_flags : instruction -> bool
 
 (** Liveness analysis *)

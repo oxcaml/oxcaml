@@ -410,7 +410,7 @@ module Directive : sig
       assembler or printer instead of using [print], below. Symbols that occur
       in values of type [t] are encoded as [string]s and have had all necessary
       prefixing, mangling, escaping and suffixing applied. *)
-  type t = private
+  type t =
     | Align of
         { bytes : int;
               (** The number of bytes to align to. This will be taken log2 by
@@ -500,10 +500,6 @@ module Directive : sig
   (** Emit a little-endian integer value of the given width to a buffer. *)
   val emit_int_le : Buffer.t -> width_bytes:int -> int64 -> unit
 end
-
-(** Helper function to construct CFI directive values for use in optimization
-    passes that need to create new directives. *)
-val make_cfi_adjust_cfa_offset_directive : int -> Directive.t
 
 (** To be called by the emitter at the very start of code generation.
     [big_endian] should always be [Arch.big_endian]. Calling the functions in

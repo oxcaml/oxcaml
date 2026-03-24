@@ -23,10 +23,14 @@ let peephole_stats_to_counters stats =
        stats.remove_mov_to_dead_register
   |> Profile.Counters.set "x86_peephole.remove_redundant_cmp"
        stats.remove_redundant_cmp
-  |> Profile.Counters.set "x86_peephole.combine_add_rsp" stats.combine_add_rsp
+  |> Profile.Counters.set "x86_peephole.combine_add_rsp"
+       stats.combine_add_rsp
 
-(* CR xclerc: check where the rules should set the "restart" cell to be sure we
-   always apply all rules. *)
+let peephole_stats_to_string stats =
+  Printf.sprintf
+    {|"remove_mov_to_dead_register":%d,"remove_redundant_cmp":%d,"combine_add_rsp":%d|}
+    stats.remove_mov_to_dead_register stats.remove_redundant_cmp
+    stats.combine_add_rsp
 
 (* Rewrite rule: combine adjacent ADD to RSP with CFI directives. Pattern: addq
    $n1, %rsp; .cfi_adjust_cfa_offset d1; addq $n2, %rsp; .cfi_adjust_cfa_offset
@@ -51,38 +55,49 @@ let combine_add_rsp stats cell =
       (* Combine the instructions *)
       let combined_imm = Int64.add n1 n2 in
       let combined_offset = d1 + d2 in
-      (* Update cells with combined values *)
-      DLL.set_value cell1 (Ins (ADD (Imm combined_imm, Reg64 RSP)));
-      DLL.set_value cell2
-        (Directive
-           (Asm_targets.Asm_directives.make_cfi_adjust_cfa_offset_directive
-              combined_offset));
-      (* Delete the redundant cells *)
-      DLL.delete_curr cell3;
-      DLL.delete_curr cell4;
-      stats.combine_add_rsp <- stats.combine_add_rsp + 1;
-      (* Return cell1 to allow iterative combination of multiple ADDs *)
-      U.Matched (Some cell1)
+      if combined_offset = 0
+      then begin
+        let next = DLL.next cell4 in
+        DLL.delete_curr cell1;
+        DLL.delete_curr cell2;
+        DLL.delete_curr cell3;
+        DLL.delete_curr cell4;
+        U.Matched next
+      end
+      else begin
+        (* Update cells with combined values *)
+        DLL.set_value cell1 (Ins (ADD (Imm combined_imm, Reg64 RSP)));
+        DLL.set_value cell2
+          (Directive
+             (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset
+                combined_offset));
+        (* Delete the redundant cells *)
+        DLL.delete_curr cell3;
+        DLL.delete_curr cell4;
+        stats.combine_add_rsp <- stats.combine_add_rsp + 1;
+        (* Return cell1 to allow iterative combination of multiple ADDs *)
+        U.Matched (Some cell1)
+      end
     | _, _, _, _ -> U.No_match)
   | _ -> U.No_match
 
 (* Rewrite rule: optimize MOV to register that is overwritten before use.
-   Pattern: mov A, x; mov x, y where the next occurrence of x is a write.
-   Rewrite: mov A, y
+   Pattern: mov A, x; mov x, B where the next occurrence of x is a write.
+   Rewrite: mov A, B
 
-   This is safe when both x and y are registers and x is not read before the
-   next write to x within the same basic block. The transformation preserves
-   semantics: y gets the value of A, and x is overwritten before being read.
+   This is safe when x is a register that not read before the next write to x
+   within the same basic block, and either A or B is a register, as memory to
+   memory moves don't exist.
 
-   We restrict x to Reg64 to avoid register aliasing issues. *)
+   We restrict x to Reg64 to avoid issues with aliasing or zeroed bits. *)
 let remove_mov_to_dead_register stats cell =
   match U.get_cells cell 2 with
   | [cell1; cell2] -> (
     match DLL.value cell1, DLL.value cell2 with
     | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2))
-      when U.equal_args dst1 src2 && U.is_register dst1 && U.is_register dst2
-           && U.is_reg64 dst1 -> (
-      (* Pattern: mov A, x; mov x, y where x and y are registers *)
+      when U.equal_args dst1 src2 && U.is_reg64 dst1
+           && (U.is_register src1 || U.is_register dst2) -> (
+      (* Pattern: mov A, x; mov x, B *)
       (* Check if the next occurrence of x is a write *)
       match
         U.find_next_occurrence_of_reg64
@@ -91,7 +106,7 @@ let remove_mov_to_dead_register stats cell =
       with
       | WriteFound ->
         (* x is written before being read, so we can optimize *)
-        (* Rewrite to: mov A, y *)
+        (* Rewrite to: mov A, B *)
         DLL.set_value cell1 (Ins (MOV (src1, dst2)));
         DLL.delete_curr cell2;
         stats.remove_mov_to_dead_register
@@ -139,11 +154,12 @@ let find_redundant_cmp src dst start_cell =
 
    This is safe when: - Both operands are registers (to avoid memory aliasing
    issues) - Neither operand is modified between the two CMPs - Flags are not
-   written between the two CMPs (but can be read) - No control flow or hard
-   barriers between the CMPs *)
+   written between the two CMPs (but can be read) - No hard barriers like
+   control flow between the CMPs *)
 let remove_redundant_cmp stats cell =
   match DLL.value cell with
-  (* Only optimize register-register comparisons to avoid aliasing issues *)
+  (* Only optimize register-register comparisons to avoid issues with mutable
+     memory *)
   | Ins (CMP (src, dst)) when U.is_register src && U.is_register dst -> (
     (* Search for a redundant CMP *)
     match find_redundant_cmp src dst cell with
