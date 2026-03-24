@@ -9,7 +9,7 @@ let stats = R.create_peephole_stats ()
 
 let () =
   at_exit (fun () ->
-      Sys.getenv_opt "X86_PEEPHOLE_STATS_FILE"
+      Sys.getenv_opt "OXCAML_X86_PEEPHOLE_STATS_FILE"
       |> Option.iter (fun path ->
           let oc =
             open_out_gen [Open_append; Open_creat; Open_text] 0o666 path
