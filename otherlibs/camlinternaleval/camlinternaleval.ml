@@ -124,6 +124,8 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_generic_fns = uir.uir_generic_fns;
             ui_export_info = export_info;
             ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
+            ui_callee_regs_info =
+              Callee_regs_info.of_raw uir.uir_callee_regs_info;
             ui_force_link = uir.uir_force_link;
             ui_external_symbols = uir.uir_external_symbols |> Array.to_list
           }
