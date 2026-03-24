@@ -100,8 +100,8 @@ type t =
            bound after a non-liftable continuation, since any continuation bound
            after a non-liftable continuation may refer to it.
 
-           CR gbury: we may not need to do this if we had free_names on
-           handlers that we have not explored yet. *)
+           CR gbury: we may not need to do this if we had free_names on handlers
+           that we have not explored yet. *)
   }
 
 let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
