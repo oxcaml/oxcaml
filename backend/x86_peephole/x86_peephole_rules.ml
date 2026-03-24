@@ -2,6 +2,7 @@
 
 open! Int_replace_polymorphic_compare [@@warning "-66"]
 open X86_ast
+open X86_ast_utils
 module DLL = Oxcaml_utils.Doubly_linked_list
 module U = X86_peephole_utils
 
@@ -23,8 +24,7 @@ let peephole_stats_to_counters stats =
        stats.remove_mov_to_dead_register
   |> Profile.Counters.set "x86_peephole.remove_redundant_cmp"
        stats.remove_redundant_cmp
-  |> Profile.Counters.set "x86_peephole.combine_add_rsp"
-       stats.combine_add_rsp
+  |> Profile.Counters.set "x86_peephole.combine_add_rsp" stats.combine_add_rsp
 
 let peephole_stats_to_string stats =
   Printf.sprintf
@@ -85,7 +85,7 @@ let combine_add_rsp stats cell =
    Pattern: mov A, x; mov x, B where the next occurrence of x is a write.
    Rewrite: mov A, B
 
-   This is safe when x is a register that not read before the next write to x
+   This is safe when x is a register that is not read before the next write to x
    within the same basic block, and either A or B is a register, as memory to
    memory moves don't exist.
 
@@ -94,16 +94,12 @@ let remove_mov_to_dead_register stats cell =
   match U.get_cells cell 2 with
   | [cell1; cell2] -> (
     match DLL.value cell1, DLL.value cell2 with
-    | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2))
-      when U.equal_args dst1 src2 && U.is_reg64 dst1
-           && (U.is_register src1 || U.is_register dst2) -> (
+    | Ins (MOV (src1, Reg64 dst1)), Ins (MOV (Reg64 src2, dst2))
+      when equal_reg64 dst1 src2 && (U.is_register src1 || U.is_register dst2)
+      -> (
       (* Pattern: mov A, x; mov x, B *)
       (* Check if the next occurrence of x is a write *)
-      match
-        U.find_next_occurrence_of_reg64
-          (U.underlying_reg64 dst1 |> Option.get)
-          cell2
-      with
+      match U.find_next_occurrence_of_reg64 dst1 cell2 with
       | WriteFound ->
         (* x is written before being read, so we can optimize *)
         (* Rewrite to: mov A, B *)
@@ -133,8 +129,7 @@ let find_redundant_cmp src dst start_cell =
         match value with
         | Ins instr -> (
           match instr with
-          | CMP (src2, dst2) when U.equal_args src src2 && U.equal_args dst dst2
-            ->
+          | CMP (src2, dst2) when equal_args src src2 && equal_args dst dst2 ->
             Some cell
           | _ ->
             if U.writes_flags instr

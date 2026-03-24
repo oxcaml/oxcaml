@@ -74,33 +74,9 @@ let get_cells cell n =
   in
   loop [] n (Some cell)
 
-let equal_args arg1 arg2 =
-  match arg1, arg2 with
-  | Imm i1, Imm i2 -> Int64.equal i1 i2
-  | Sym s1, Sym s2 -> String.equal s1 s2
-  | Reg8L r1, Reg8L r2 -> equal_reg64 r1 r2
-  | Reg8H r1, Reg8H r2 -> equal_reg8h r1 r2
-  | Reg16 r1, Reg16 r2 -> equal_reg64 r1 r2
-  | Reg32 r1, Reg32 r2 -> equal_reg64 r1 r2
-  | Reg64 r1, Reg64 r2 -> equal_reg64 r1 r2
-  | Regf rf1, Regf rf2 -> equal_regf rf1 rf2
-  | Mem addr1, Mem addr2 -> equal_addr addr1 addr2
-  | Mem64_RIP (t1, s1, i1), Mem64_RIP (t2, s2, i2) ->
-    equal_data_type t1 t2 && String.equal s1 s2 && i1 = i2
-  | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
-      | Mem _ | Mem64_RIP _ ),
-      _ ) ->
-    false
-
 let is_register = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true
   | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
-
-let is_reg64 = function
-  | Reg64 _ -> true
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Regf _ | Mem _
-  | Mem64_RIP _ ->
-    false
 
 let underlying_reg64 = function
   | Reg64 r | Reg32 r | Reg16 r | Reg8L r -> Some r

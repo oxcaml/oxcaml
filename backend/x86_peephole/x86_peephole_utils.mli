@@ -15,10 +15,6 @@ type rule_result =
   | No_match
   | Matched of asm_line DLL.cell option
 
-(** Equality functions for x86_ast types *)
-
-val equal_args : arg -> arg -> bool
-
 (** Navigation and inspection *)
 
 val get_cells : asm_line DLL.cell -> int -> asm_line DLL.cell list
@@ -31,8 +27,6 @@ val is_control_flow : instruction -> bool
 
 val is_register : arg -> bool
 
-val is_reg64 : arg -> bool
-
 val underlying_reg64 : arg -> reg64 option
 
 (** Instruction analysis *)
@@ -40,8 +34,6 @@ val underlying_reg64 : arg -> reg64 option
 val writes_to_reg64 : reg64 -> instruction -> bool
 
 val reads_from_reg64 : reg64 -> instruction -> bool
-
-val equal_reg64 : reg64 -> reg64 -> bool
 
 val writes_flags : instruction -> bool
 
