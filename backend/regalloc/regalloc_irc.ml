@@ -42,12 +42,20 @@ let build : State.t -> Cfg_with_infos.t -> unit =
     if debug && Reg.set_has_collisions live.across
     then fatal "live set has physical register collisions";
     if Array.length def > 0
-    then
+    then begin
       Reg.Set.iter
         (fun reg1 ->
           if move_src == Reg.dummy || not (Reg.same reg1 move_src)
           then Array.iter def ~f:(fun reg2 -> State.add_edge state reg1 reg2))
-        live.across;
+        live.across
+      (* Add interference edges between all pairs of results, since they are all
+         defined simultaneously and must be in different registers. *)
+      (*= for i = 0 to Array.length def - 2 do
+        for j = i + 1 to Array.length def - 1 do
+          State.add_edge state def.(i) def.(j)
+        done
+      done *)
+    end;
     if Array.length destroyed > 0
     then
       Reg.Set.iter
@@ -521,7 +529,6 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
       ~initial:(Reg.Set.elements all_temporaries)
       ~stack_slots ~affinity ()
   in
-  Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
   main ~round:1 state cfg_with_infos;
   if debug then log_cfg_with_infos cfg_with_infos;
   Regalloc_rewrite.postlude

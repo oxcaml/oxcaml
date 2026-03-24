@@ -282,7 +282,6 @@ type t =
   | Move
   | Spill
   | Reload
-  | Dummy_use
   | Const_int of nativeint (* CR-someday xclerc: change to `Targetint.t` *)
   | Const_float32 of int32
   | Const_float of int64
@@ -339,7 +338,6 @@ let is_pure = function
   | Move -> true
   | Spill -> true
   | Reload -> true
-  | Dummy_use -> true
   | Const_int _ -> true
   | Const_float32 _ -> true
   | Const_float _ -> true
@@ -427,7 +425,6 @@ let dump ppf op =
   | Move -> Format.fprintf ppf "mov"
   | Spill -> Format.fprintf ppf "spill"
   | Reload -> Format.fprintf ppf "reload"
-  | Dummy_use -> Format.fprintf ppf "dummy_use"
   | Const_int n -> Format.fprintf ppf "const_int %nd" n
   | Const_float32 f ->
     Format.fprintf ppf "const_float32 %Fs" (Int32.float_of_bits f)
@@ -610,7 +607,7 @@ let equal left right =
     && Option.equal Int.equal left_wp right_wp
     && Option.equal Backend_var.Provenance.equal left_prov right_prov
   | Dls_get, Dls_get | Tls_get, Tls_get | Poll, Poll | Pause, Pause -> true
-  | Dummy_use, Dummy_use | Domain_index, Domain_index -> true
+  | Domain_index, Domain_index -> true
   | Int128op left_op, Int128op right_op ->
     equal_int128_operation left_op right_op
   | ( Alloc { bytes = left_bytes; dbginfo = left_dbg; mode = left_mode },
@@ -618,12 +615,12 @@ let equal left right =
     Int.equal left_bytes right_bytes
     && Cmm.equal_alloc_dbginfo left_dbg right_dbg
     && Cmm.Alloc_mode.equal left_mode right_mode
-  | ( ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float32 _
-      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _
-      | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
-      | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
-      | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
-      | Poll | Pause | Alloc _ ),
+  | ( ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+      | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+      | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause
+      | Alloc _ ),
       _ ) ->
     false
