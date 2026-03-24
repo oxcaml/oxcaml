@@ -248,12 +248,11 @@ module Make (T : Branch_relaxation_intf.S) = struct
     let rec loop sizes =
       let code_size, map = label_map code sizes in
       if code_size >= min_of_max_branch_offsets
-      then begin
+      then
         let did_fix, new_sizes =
           fixup_branches ~code_size ~max_out_of_line_code_offset map code sizes
         in
         if did_fix then loop new_sizes
-      end
     in
     loop initial_sizes
 end

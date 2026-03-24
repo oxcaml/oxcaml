@@ -38,6 +38,7 @@ asm_targets/**/*.ml
 asm_targets/**/*.mli
 branch_relaxation.ml
 branch_relaxation.mli
+branch_relaxation_intf.mli
 cfg/**/*.ml
 cfg/**/*.mli
 cfg/vectorize.ml
