@@ -131,6 +131,8 @@ end = struct
   type t =
     { fastcode_flag : bool;
       mutable stack_offset : int;
+      (* CR mshinwell/xclerc: [num_stack_slots] is never modified, so we could
+         avoid the copy. Maybe try to make it immutable *)
       num_stack_slots : int Stack_class.Tbl.t;
       prologue_required : bool;
       contains_calls : bool;
