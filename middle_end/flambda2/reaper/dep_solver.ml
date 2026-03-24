@@ -2894,8 +2894,8 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
         | No_source -> None
         | One _ | Many -> (
           let new_name =
-            Flambda_colours.without_colours ~f:(fun () ->
-                Format.asprintf "%s_field_%a" name_prefix Field.print field)
+            Format.asprintf "%s_field_%a" name_prefix
+              Field.print_for_variable_name field
           in
           let[@local] default () =
             Some (Not_unboxed (mk (Field.kind field) new_name))
@@ -3007,15 +3007,15 @@ let fixpoint (graph : Global_flow_graph.graph) =
   if Flambda_features.debug_reaper "db"
   then Format.eprintf "%a@." Datalog.print db;
   let name_of_node =
-    if Flambda_features.debug_reaper "stamps"
+    if Flambda_features.debug_reaper "nostamps"
     then
-      fun node ->
-        Flambda_colours.without_colours ~f:(fun () ->
-            Format.asprintf "%a" Code_id_or_name.print node)
-    else
       fun node ->
         Code_id_or_name.pattern_match node ~code_id:Code_id.name
           ~symbol:Symbol.linkage_name_as_string ~var:Variable.name
+    else
+      fun node ->
+        Flambda_colours.without_colours ~f:(fun () ->
+            Format.asprintf "%a" Code_id_or_name.print node)
   in
   let has_to_be_unboxed code_or_name = has_to_be_unboxed [code_or_name] db in
   let unboxed =

@@ -1,6 +1,6 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper";
+   flags += "-flambda2-reaper -reaper-debug-flags=nostamps";
    { native with dump-raw, dump-simplify, dump-reaper; check-fexpr-dump; }
  *)
 
