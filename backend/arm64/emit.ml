@@ -1344,17 +1344,17 @@ let emit_condbranch arg tst lbl =
   | Ifalsetest -> A.ins2 CBZ (H.reg_x arg.(0)) lbl
   | Iinttest cmp ->
     A.ins_cmp_reg (H.reg_x arg.(0)) (H.reg_x arg.(1)) O.optional_none;
-    A.ins1 (B_cond (Branch_cond.Int (cond_for_comparison cmp))) lbl
+    A.ins1 (B_cond (Int (cond_for_comparison cmp))) lbl
   | Iinttest_imm (cmp, n) ->
     emit_cmpimm (H.reg_x arg.(0)) n;
-    A.ins1 (B_cond (Branch_cond.Int (cond_for_comparison cmp))) lbl
+    A.ins1 (B_cond (Int (cond_for_comparison cmp))) lbl
   | Ifloattest (Float64, cmp) ->
     A.ins2 FCMP (H.reg_d arg.(0)) (H.reg_d arg.(1));
-    A.ins1 (B_cond (Branch_cond.Float (cond_for_float_comparison cmp))) lbl
+    A.ins1 (B_cond (Float (cond_for_float_comparison cmp))) lbl
   | Ifloattest (Float32, cmp) ->
     let cond = cond_for_float_comparison cmp in
     A.ins2 FCMP (H.reg_s arg.(0)) (H.reg_s arg.(1));
-    A.ins1 (B_cond (Branch_cond.Float cond)) lbl
+    A.ins1 (B_cond (Float cond)) lbl
   | Ioddtest -> A.ins3 TBNZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
   | Ieventest -> A.ins3 TBZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
 
