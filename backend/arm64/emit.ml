@@ -635,58 +635,58 @@ end = struct
       vec128_literals = ref []
     }
 
-  let copy env =
-    { env with
-      num_stack_slots = Stack_class.Tbl.copy env.num_stack_slots;
-      float32_literals = ref !(env.float32_literals);
-      float_literals = ref !(env.float_literals);
-      vec128_literals = ref !(env.vec128_literals)
+  let copy t =
+    { t with
+      num_stack_slots = Stack_class.Tbl.copy t.num_stack_slots;
+      float32_literals = ref !(t.float32_literals);
+      float_literals = ref !(t.float_literals);
+      vec128_literals = ref !(t.vec128_literals)
     }
 
-  let fastcode_flag env = env.fastcode_flag
+  let fastcode_flag t = t.fastcode_flag
 
-  let stack_offset env = env.stack_offset
+  let stack_offset t = t.stack_offset
 
-  let set_stack_offset env v = env.stack_offset <- v
+  let set_stack_offset t v = t.stack_offset <- v
 
-  let prologue_required env = env.prologue_required
+  let prologue_required t = t.prologue_required
 
-  let contains_calls env = env.contains_calls
+  let contains_calls t = t.contains_calls
 
-  let call_gc_sites env = env.call_gc_sites
+  let call_gc_sites t = t.call_gc_sites
 
-  let set_call_gc_sites env v = env.call_gc_sites <- v
+  let set_call_gc_sites t v = t.call_gc_sites <- v
 
-  let local_realloc_sites env = env.local_realloc_sites
+  let local_realloc_sites t = t.local_realloc_sites
 
-  let set_local_realloc_sites env v = env.local_realloc_sites <- v
+  let set_local_realloc_sites t v = t.local_realloc_sites <- v
 
-  let stack_realloc env = env.stack_realloc
+  let stack_realloc t = t.stack_realloc
 
-  let set_stack_realloc env v = env.stack_realloc <- v
+  let set_stack_realloc t v = t.stack_realloc <- v
 
-  let function_name env = env.function_name
+  let function_name t = t.function_name
 
-  let tailrec_entry_point env = env.tailrec_entry_point
+  let tailrec_entry_point t = t.tailrec_entry_point
 
-  let frame_size env =
-    Proc.frame_size ~stack_offset:env.stack_offset
-      ~contains_calls:env.contains_calls ~num_stack_slots:env.num_stack_slots
+  let frame_size t =
+    Proc.frame_size ~stack_offset:t.stack_offset
+      ~contains_calls:t.contains_calls ~num_stack_slots:t.num_stack_slots
 
-  let slot_offset env loc stack_class =
+  let slot_offset t loc stack_class =
     let offset =
-      Proc.slot_offset loc ~stack_class ~stack_offset:env.stack_offset
-        ~fun_contains_calls:env.contains_calls
-        ~fun_num_stack_slots:env.num_stack_slots
+      Proc.slot_offset loc ~stack_class ~stack_offset:t.stack_offset
+        ~fun_contains_calls:t.contains_calls
+        ~fun_num_stack_slots:t.num_stack_slots
     in
     match offset with
     | Bytes_relative_to_stack_pointer n -> n
     | Bytes_relative_to_domainstate_pointer _ ->
       Misc.fatal_errorf "Not a stack slot"
 
-  let stack_operand env r =
-    H.stack ~stack_offset:env.stack_offset ~contains_calls:env.contains_calls
-      ~num_stack_slots:env.num_stack_slots r
+  let stack_operand t r =
+    H.stack ~stack_offset:t.stack_offset ~contains_calls:t.contains_calls
+      ~num_stack_slots:t.num_stack_slots r
 
   let find_or_add_literal literals f =
     match List.assoc_opt f !literals with
@@ -701,25 +701,23 @@ end = struct
       literals := (f, lbl) :: !literals;
       lbl
 
-  let find_or_add_float32_literal env f =
-    find_or_add_literal env.float32_literals f
+  let find_or_add_float32_literal t f = find_or_add_literal t.float32_literals f
 
-  let find_or_add_float_literal env f = find_or_add_literal env.float_literals f
+  let find_or_add_float_literal t f = find_or_add_literal t.float_literals f
 
-  let find_or_add_vec128_literal env f =
-    find_or_add_literal env.vec128_literals f
+  let find_or_add_vec128_literal t f = find_or_add_literal t.vec128_literals f
 
-  let float32_literals env = !(env.float32_literals)
+  let float32_literals t = !(t.float32_literals)
 
-  let clear_float32_literals env = env.float32_literals := []
+  let clear_float32_literals t = t.float32_literals := []
 
-  let float_literals env = !(env.float_literals)
+  let float_literals t = !(t.float_literals)
 
-  let clear_float_literals env = env.float_literals := []
+  let clear_float_literals t = t.float_literals := []
 
-  let vec128_literals env = !(env.vec128_literals)
+  let vec128_literals t = !(t.vec128_literals)
 
-  let clear_vec128_literals env = env.vec128_literals := []
+  let clear_vec128_literals t = t.vec128_literals := []
 end
 
 (* Record live pointers at call points *)
