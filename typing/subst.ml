@@ -33,11 +33,15 @@ type type_replacement =
   | Path of Path.t
   | Type_function of { params : type_expr list; body : type_expr }
 
+type kind_replacement =
+  | Jkind_path of Path.t
+  | Jkind_const of jkind_const_desc_lr
+
 type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
         prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr;
-        prepare_modality : Mode.Modality.t -> Mode.Modality.t
+        prepare_modality : Mode.Modality.t -> Mode.Modality.t;
       }
     (* The [prepare_jkind] function should be applied to all jkinds when
        saving; this commons them up, truncates their histories, and runs
@@ -53,9 +57,10 @@ type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
     modtypes: module_type Path.Map.t;
-    jkinds: Path.t Path.Map.t;
+    jkinds: kind_replacement Path.Map.t;
 
     additional_action: additional_action;
+    sort_var_mapping: (int, Jkind_types.Sort.var) Hashtbl.t;
 
     loc: Location.t option;
     mutable last_compose: (s * s) option  (* Memoized composition *)
@@ -73,6 +78,7 @@ let identity =
     modtypes = Path.Map.empty;
     jkinds = Path.Map.empty;
     additional_action = No_action;
+    sort_var_mapping = Hashtbl.create 0;
     loc = None;
     last_compose = None;
   }
@@ -117,7 +123,8 @@ let add_modtype_path p p' s = add_modtype_gen p (Mty_ident p') s
 let add_modtype id p s = add_modtype_path (Pident id) p s
 
 let add_jkind_path id p s =
-  { s with jkinds = Path.Map.add id p s.jkinds; last_compose = None }
+  { s with jkinds = Path.Map.add id (Jkind_path p) s.jkinds;
+           last_compose = None }
 let add_jkind id p s = add_jkind_path (Pident id) p s
 
 type additional_action_config =
@@ -270,7 +277,11 @@ let with_additional_action =
         in
         Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality }
   in
-  { s with additional_action; last_compose = None }
+  { s with
+    additional_action;
+    sort_var_mapping = Hashtbl.create 17;
+    last_compose = None;
+  }
 
 let change_locs s loc = { s with loc = Some loc; last_compose = None }
 
@@ -343,8 +354,10 @@ let modtype_path s path =
          | Pident _ -> path
 
 let jkind_path s path =
-  try Path.Map.find path s.jkinds
-  with Not_found ->
+  match Path.Map.find path s.jkinds with
+  | Jkind_path p -> p
+  | Jkind_const _ -> fatal_error "Subst.jkind_path: kind_const"
+  | exception Not_found ->
     match path with
     | Pident _ -> path
     | Pdot(p, n) ->
@@ -382,15 +395,23 @@ let to_subst_by_type_function s p =
   | Type_function _ -> true
   | exception Not_found -> false
 
-(* Special type ids for saved signatures *)
+(* Special type and sort ids for saved signatures *)
 
-let new_id = s_ref (-1)
-let reset_additional_action_type_id () = new_id := -1
+let new_type_id = s_ref (-1)
+let new_sort_id = s_ref (-1)
+let reset_additional_action_id () =
+  new_type_id := -1;
+  new_sort_id := -1
 
 let newpersty desc =
-  decr new_id;
+  decr new_type_id;
   create_expr
-    desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_id
+    desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_type_id
+
+let newsortvar desc =
+  decr new_sort_id;
+  Jkind_types.Sort.create_var
+    desc ~level:generic_level ~id:!new_sort_id
 
 (* CR layouts: remove this. While we're still developing, though, it might
    be nice to get the location of this kind of error. *)
@@ -466,6 +487,80 @@ let apply_type_function params args body =
     in
     copy body)
 
+
+let rec sort s srt =
+  let open Jkind_types.Sort in
+  match srt with
+  | Base _ | Univar _ -> srt
+  | Product sorts -> Product (List.map (sort s) sorts)
+  | Var var ->
+    let id = Var.get_id var in
+    let var' =
+      match Hashtbl.find_opt s.sort_var_mapping id with
+      | Some var -> var
+      | None ->
+        let desc = Var.get_contents var in
+        let level = Var.get_level var in
+        let var = match s.additional_action with
+          | Prepare_for_saving _ | Duplicate_variables -> newsortvar desc
+          | No_action ->
+            if id < 0 then new_var ~level
+            else var
+        in
+        Hashtbl.add s.sort_var_mapping id var;
+        var
+    in
+    if var == var' then srt
+    else Var var'
+
+let rec layout s l =
+  let open Jkind_types.Layout in
+  match l with
+  | Any _ -> l
+  | Product sorts -> Product (List.map (layout s) sorts)
+  | Sort (sort_l, ax) ->
+    let sort_l' = sort s sort_l in
+    if sort_l == sort_l' then l
+    else Sort (sort_l', ax)
+
+let jkind_desc s jkind =
+  match jkind.base with
+  | Kconstr p ->
+    begin match Path.Map.find p s.jkinds with
+    | exception Not_found ->
+      let p' = jkind_path s p in
+      if Path.compare p' p = 0 then jkind else
+        { jkind with base = Kconstr p' }
+    | Jkind_path p -> { jkind with base = Kconstr p }
+    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+      let const =
+        { base;
+          mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
+          with_bounds = jkind.with_bounds }
+      in
+      Jkind.Base_and_axes.map_layout Jkind_types.Layout.of_const const
+    end
+  | Layout l ->
+    let l' = layout s l in
+    if l == l' then jkind
+    else { jkind with base = Layout l' }
+
+let jkind_const_desc s
+      ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
+  match jkind.base with
+  | Kconstr p ->
+    begin match Path.Map.find p s.jkinds with
+    | exception Not_found ->
+      let p' = jkind_path s p in
+      if Path.compare p' p = 0 then jkind else
+        { jkind with base = Kconstr p' }
+    | Jkind_path p -> { jkind with base = Kconstr p }
+    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+      { base;
+        mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
+        with_bounds = jkind.with_bounds }
+    end
+  | Layout _ -> jkind
 
 (* Similar to [Ctype.nondep_type_rec]. *)
 let rec typexp copy_scope s ty =
@@ -613,14 +708,9 @@ let rec typexp copy_scope s ty =
 and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
   fun copy_scope s jkind ->
   let jkind =
-    match jkind.jkind.base with
-    | Kconstr p ->
-      let p' = jkind_path s p in
-      if Path.compare p p' = 0 then
-        jkind
-      else
-        { jkind with jkind = { jkind.jkind with base = Kconstr p'} }
-    | Layout _ -> jkind
+    let jkind_desc = jkind_desc s jkind.jkind in
+    if jkind_desc == jkind.jkind then jkind
+    else { jkind with jkind = jkind_desc }
   in
   let jkind = Jkind.map_type_expr (typexp copy_scope s) jkind in
   match s.additional_action with
@@ -693,21 +783,10 @@ let unsafe_mode_crossing copy_scope s loc
       Jkind.With_bounds.map_type_expr (typexp copy_scope s loc)
         unsafe_with_bounds }
 
-let jkind_const s
-      ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
-  let jkind =
-    match jkind.base with
-    | Kconstr p ->
-      let base = Kconstr (jkind_path s p) in
-      { jkind with base }
-    | Layout _ -> jkind
-  in
-  jkind
-
 let jkind_declaration s decl =
   { jkind_loc = loc s decl.jkind_loc;
     jkind_uid = decl.jkind_uid;
-    jkind_manifest = Option.map (jkind_const s) decl.jkind_manifest;
+    jkind_manifest = Option.map (jkind_const_desc s) decl.jkind_manifest;
     jkind_attributes = attrs s decl.jkind_attributes;
   }
 
@@ -870,6 +949,10 @@ let type_replacement s = function
      let params = List.map (typexp copy_scope s loc) params in
      let body = typexp copy_scope s loc body in
      Type_function { params; body })
+
+let jkind_replacement s = function
+  | Jkind_path p -> Jkind_path (jkind_path s p)
+  | Jkind_const jk -> Jkind_const (jkind_const_desc s jk)
 
 type scoping =
   | Keep
@@ -1131,7 +1214,7 @@ and compose s1 s2 =
         { types = merge_type_path_maps (type_replacement s2) s1.types s2.types;
           modules = merge_path_maps (module_path s2) s1.modules s2.modules;
           modtypes = merge_path_maps (modtype Keep s2) s1.modtypes s2.modtypes;
-          jkinds = merge_path_maps (jkind_path s2) s1.jkinds s2.jkinds;
+          jkinds = merge_path_maps (jkind_replacement s2) s1.jkinds s2.jkinds;
           additional_action = begin
             match s1.additional_action, s2.additional_action with
             | action, No_action | No_action, action -> action
@@ -1152,6 +1235,7 @@ and compose s1 s2 =
             | (Prepare_for_saving _ as prepare1), Prepare_for_saving _
                 -> prepare1
           end;
+          sort_var_mapping = Hashtbl.create 17;
           loc = keep_latest_loc s1.loc s2.loc;
           last_compose = None
         }
@@ -1239,6 +1323,12 @@ module Unsafe = struct
     { s with types; last_compose = None }
   let add_module_path id p s =
     { s with modules = Path.Map.add id p s.modules; last_compose = None }
+  let add_jkind_path id p s =
+    { s with jkinds = Path.Map.add id (Jkind_path p) s.jkinds;
+             last_compose = None }
+  let add_jkind id jk s =
+    { s with jkinds = Path.Map.add id (Jkind_const jk) s.jkinds;
+             last_compose = None }
 
   let wrap f : _ result = match f () with
     | x -> Ok x

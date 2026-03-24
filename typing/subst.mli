@@ -70,11 +70,11 @@ type additional_action_config =
 *)
 val with_additional_action: additional_action_config -> t -> t
 
-(* Any of the additional actions involve copying type variables. Calling
-   [reset_additional_action_type_id] resets the id counter used when the copying
-   of type variables needs to mint new type variable ids.
+(* Any of the additional actions involve copying type and sort variables.
+   Calling [reset_additional_action_id] resets the id counters used when saving
+   needs to mint new ids for copied type variables or sort variables.
 *)
-val reset_additional_action_type_id: unit -> unit
+val reset_additional_action_id: unit -> unit
 
 val change_locs: 'k subst -> Location.t -> 'k subst
 
@@ -134,6 +134,9 @@ module Unsafe: sig
   val add_type_function:
     Path.t -> params:type_expr list -> body:type_expr -> t -> t
   val add_module_path: Path.t -> Path.t -> t -> t
+
+  val add_jkind_path: Path.t -> Path.t -> t -> t
+  val add_jkind : Path.t -> jkind_const_desc_lr -> t -> t
 
   type error =
     | Fcm_type_substituted_away of Path.t * Types.module_type

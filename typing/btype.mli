@@ -174,6 +174,7 @@ type 'a type_iterators =
     it_class_declaration: 'a type_iterators -> class_declaration -> unit;
     it_class_type_declaration:
         'a type_iterators -> class_type_declaration -> unit;
+    it_jkind_declaration: 'a type_iterators -> jkind_declaration -> unit;
     it_functor_param: 'a type_iterators -> functor_parameter -> unit;
     it_module_type: 'a type_iterators -> module_type -> unit;
     it_class_type: 'a type_iterators -> class_type -> unit;
@@ -380,6 +381,7 @@ module Jkind0 : sig
 
     val equal : t -> t -> bool
     val join : t -> t -> t
+    val meet : t -> t -> t
 
     val relevant_axes_of_modality :
       relevant_for_shallow:[ `Irrelevant | `Relevant ] ->

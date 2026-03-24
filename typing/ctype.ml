@@ -1888,7 +1888,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
     let sort = match !new_sort with
     | Some sort -> sort
     | None ->
-      let sort = Jkind.Sort.new_var ~level:!current_level in
+      let sort = Jkind.Sort.(of_var (new_var ~level:!current_level)) in
       new_sort := Some sort;
       sort
     in

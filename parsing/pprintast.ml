@@ -424,7 +424,7 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
         (core_type ctxt) ty
         optional_space_atat_modalities modalities;
     ) f (t, ty, modalities)
-  | Pjk_kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
+  | Pjk_kind_of ty -> pp f "(kind_of_ %a)" (core_type ctxt) ty
   | Pjk_product ts ->
     Misc.pp_parens_if nested (fun f ts ->
       pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
@@ -1429,13 +1429,17 @@ and sig_include ctxt f incl moda =
 
 and jkind_declaration ctxt f jd =
   begin match jd.pjkind_manifest with
-  | None -> pp f "@[<hov2>kind_@ %a@]" string_loc jd.pjkind_name
-  | Some jkind ->
-     pp f "@[<hov2>kind_@ %a@ =@ %a@]"
-       string_loc jd.pjkind_name
-       (jkind_annotation ctxt) jkind
-  end;
-  item_attributes ctxt f jd.pjkind_attributes
+  | None -> ()
+  | Some jkind -> pp f "@;%a" (jkind_annotation ctxt) jkind
+  end
+
+and jkind_def ctxt f jd =
+  let eq = if jd.pjkind_manifest = None then "" else " =" in
+  pp f "@[<2>kind_@ %a%s%a@]%a"
+    string_loc jd.pjkind_name
+    eq
+    (jkind_declaration ctxt) jd
+    (item_attributes ctxt) jd.pjkind_attributes
 
 and module_type_with_optional_modes ctxt f (mty, mm) =
   match mm with
@@ -1486,6 +1490,8 @@ and with_constraint ctxt f = function
       pp f "module %a =@ %a" longident_loc li longident_loc li2;
   | Pwith_modtype (li, mty) ->
       pp f "module type %a =@ %a" longident_loc li (module_type ctxt) mty;
+  | Pwith_jkind (li, jd) ->
+      pp f "kind_ %a =@ %a" longident_loc li (jkind_declaration ctxt) jd;
   | Pwith_typesubst (li, ({ptype_params=ls;_} as td)) ->
       pp f "type@ %a %a :=@ %a"
         type_params ls
@@ -1495,6 +1501,8 @@ and with_constraint ctxt f = function
       pp f "module %a :=@ %a" longident_loc li longident_loc li2
   | Pwith_modtypesubst (li, mty) ->
       pp f "module type %a :=@ %a" longident_loc li (module_type ctxt) mty;
+  | Pwith_jkindsubst (li, jd) ->
+      pp f "kind_ %a :=@ %a" longident_loc li (jkind_declaration ctxt) jd;
 
 
 and module_type1 ctxt f x =
@@ -1625,7 +1633,7 @@ and signature_item ctxt f x : unit =
       item_extension ctxt f e;
       item_attributes ctxt f a
   | Psig_jkind kd ->
-      jkind_declaration ctxt f kd
+      jkind_def ctxt f kd
 
 and module_expr ctxt f x =
   if x.pmod_attributes <> [] then
@@ -1980,7 +1988,7 @@ and structure_item ctxt f x =
       item_extension ctxt f e;
       item_attributes ctxt f a
   | Pstr_jkind jd ->
-      jkind_declaration ctxt f jd
+      jkind_def ctxt f jd
 
 (* Don't just use [core_type] because we do not want parens around params
    with jkind annotations *)

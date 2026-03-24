@@ -71,13 +71,21 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
-      mutable level : int;  (** See comments on [level_generic] *)
-      uid : int (* For debugging / printing only *)
+      mutable level : int;
+      (* When [contents = None], [level = Ident.highest_scope] indicates
+        generic sort variables, and [level = Ident.highest_scope - 1] indicates
+        rigid variables. When [contents = Some t], [level] is meaningless and
+        the variable means whatever [t] means. *)
+      (* CR-soon zqian: Add the invariant that, when [contents = Some v], we
+         have [level >= v.level]. This can improve performance. *)
+      id : int
     }
 
   let is_rigidvar var = var.level = level_rigid
 
   let is_genvar var = var.level = level_generic
+
+  let create_var ~level ~id contents = { contents; level; id }
 
   let equal_base b1 b2 =
     match b1, b2 with
@@ -163,7 +171,7 @@ module Sort = struct
       | Base b1, Base b2 -> equal_base b1 b2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
-      | Genvar v1, Genvar v2 -> v1 == v2
+      | Genvar v1, Genvar v2 -> v1.id == v2.id
       | (Base _ | Product _ | Univar _ | Genvar _), _ -> false
 
     let format ppf c =
@@ -241,7 +249,7 @@ module Sort = struct
               cs
           | Univar { name = Some n } -> Format.fprintf ppf "Univar '%s" n
           | Univar { name = None } -> Format.fprintf ppf "Univar '_"
-          | Genvar v -> Format.fprintf ppf "Genvar %d" v.uid
+          | Genvar v -> Format.fprintf ppf "Genvar %d" v.id
         in
         pp_element ~nested:false ppf c
     end
@@ -302,24 +310,28 @@ module Sort = struct
   module Var = struct
     type id = int
 
-    let get_id { uid; _ } = uid
+    let get_id { id; _ } = id
 
-    (* Map var uids to smaller numbers for more consistent printing. *)
+    let get_contents { contents; _ } = contents
+
+    let get_level { level; _ } = level
+
+    (* Map var ids to smaller numbers for more consistent printing. *)
     let next_id = ref 1
 
     let names : (int, int) Hashtbl.t = Hashtbl.create 16
 
-    let get_print_number uid =
-      match Hashtbl.find_opt names uid with
+    let get_print_number id =
+      match Hashtbl.find_opt names id with
       | Some n -> n
       | None ->
-        let id = !next_id in
+        let counter = !next_id in
         incr next_id;
-        Hashtbl.add names uid id;
-        id
+        Hashtbl.add names id counter;
+        counter
 
-    let name { uid; _ } =
-      "'_representable_layout_" ^ Int.to_string (get_print_number uid)
+    let name { id; _ } =
+      "'_representable_layout_" ^ Int.to_string (get_print_number id)
   end
 
   (*** debug printing **)
@@ -358,7 +370,7 @@ module Sort = struct
       | None -> fprintf ppf "None"
 
     and var ppf v =
-      fprintf ppf "{@[@ contents = %a;@ uid = %d@ @]}" opt_t v.contents v.uid
+      fprintf ppf "{@[@ contents = %a;@ id = %d@ @]}" opt_t v.contents v.id
   end
 
   (* To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
@@ -418,6 +430,7 @@ module Sort = struct
         (fun v ->
           assert (Option.is_none v.contents);
           assert (is_genvar v);
+          assert (v.id > 0);
           v, ref None)
         vars
     in
@@ -583,7 +596,7 @@ module Sort = struct
 
   let of_var v = Var v
 
-  let last_var_uid = ref 0
+  let last_var_id = ref 0
 
   let new_var ~level =
     (* Guard against accidentally creating a genvar or rigidvar via this path:
@@ -593,12 +606,11 @@ module Sort = struct
        level is simply lowered by [update_level] upon unification. *)
     if level >= level_rigid
     then Misc.fatal_error "Jkind_types.new_var: level >= level_rigid";
-    incr last_var_uid;
-    Var { contents = None; uid = !last_var_uid; level }
+    incr last_var_id;
+    assert (!last_var_id > 0);
+    { contents = None; id = !last_var_id; level }
 
-  let new_genvar () =
-    incr last_var_uid;
-    { contents = None; uid = !last_var_uid; level = level_generic }
+  let new_genvar () = new_var ~level:level_generic
 
   let instance_map : (var * var) list ref = ref []
 
@@ -608,8 +620,8 @@ module Sort = struct
         (fun v ->
           assert (Option.is_none v.contents);
           assert (is_genvar v);
-          incr last_var_uid;
-          let v' = { contents = None; uid = !last_var_uid; level } in
+          assert (v.id > 0);
+          let v' = new_var ~level in
           v, v')
         vars
     in
@@ -737,7 +749,7 @@ module Sort = struct
     | Univar uv2 -> equate_var_univar v1 uv2
 
   and equate_var_var v1 v2 =
-    if v1 == v2
+    if v1.id == v2.id (* equal id means physical equality *)
     then Equal_no_mutation
     else
       match v1.contents, v2.contents with
@@ -804,7 +816,7 @@ module Sort = struct
       true
 
   let decompose_into_product t n =
-    let ts = List.init n (fun _ -> new_var ~level:level_fresh) in
+    let ts = List.init n (fun _ -> of_var (new_var ~level:level_fresh)) in
     if equate t (Product ts) then Some ts else None
 
   (*** pretty printing ***)
@@ -869,7 +881,7 @@ module Layout = struct
       | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
-      | Genvar v1, Genvar v2 -> v1 == v2
+      | Genvar v1, Genvar v2 -> v1.id == v2.id
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
 
     let rec get_sort : t -> Sort.Const.t option = function
@@ -988,6 +1000,6 @@ module Layout = struct
   let get_const t = get_const Const.of_sort t
 
   let of_new_sort_var ~level =
-    let sort = Sort.new_var ~level in
+    let sort = Sort.(of_var (new_var ~level)) in
     Sort (sort, Scannable_axes.max), sort
 end
