@@ -6145,6 +6145,11 @@ and type_expect_
       let path, actual_mode, desc, kind =
         type_ident env ~recarg lid
       in
+      (* the expected_mode to be used by the uniqueness analysis. We try to
+      relax [unique] to [aliased] so more code can pass UA. *)
+      let expected_mode_r =
+        cross_right env desc.val_type (as_single_mode expected_mode)
+      in
       let exp_desc =
         match desc.val_kind with
         | Val_ivar (_, cl_num) ->
@@ -6174,12 +6179,12 @@ and type_expect_
                 env
             in
             Texp_ident { path; lid; desc; kind;
-              unique_use = unique_use ~loc ~env actual_mode
-                (as_single_mode expected_mode); mode = actual_mode }
+              unique_use = unique_use ~loc ~env actual_mode expected_mode_r;
+              mode = actual_mode }
         | _ ->
             Texp_ident { path; lid; desc; kind;
-              unique_use = unique_use ~loc ~env actual_mode
-                (as_single_mode expected_mode); mode = actual_mode }
+              unique_use = unique_use ~loc ~env actual_mode expected_mode_r;
+              mode = actual_mode }
       in
       let exp = rue {
         exp_desc; exp_loc = loc; exp_extra = [];
