@@ -339,49 +339,87 @@ let main b =
   | 1 -> "one"
 ```
 
-### Match-in-Match
+### Match Forwarding (match-in-match)
 
-Match-in-Match is an optimization that triggers when some branches of a (outer)
-match contain themselves an (inner) match, and that inner match could be
-subject to Match Elimination if it was only reachable from one of the branches
-of the outer match. In such a case, the innter match is duplicated for each of
-the branches of the outer match that reaches it, and each of the new inner
-match is simplified using Match Elimination.
+**This optimization is currently experimental, and requires the
+`--flambda2-match-in-match` flag. That flag with also automatically
+enable the n-way join, or fail if the join is explicitly set to something
+other than the n-way join.**
 
-Match-in-Match's main interest is that it removes conditional jumps and join
-points in the control flow.
+Match Forwarding (colloquially known as ``match-in-match'') is an optimization
+where a `match` following a control flow construct is duplicated inside of that
+control flow construct. This optimization only triggers if Match Elimination is
+able to simplify the duplicated `match`, effectively eliminating the `match`.
 
-Match-in-Match is not enabled by default, and requires to use the option
-`-flambda2-match-in-match`. This also requires to use the n-way join: if the
-join algorithm is not explicitly set on the command line or in the env, using
-the `-flambda2-match-in-match` option will automatically set the join algorithm
-default to be the n-way join.
+**Note:** Unlike other match optimizations described in this document, Match
+Forwarding is a *control flow* optimization. It only triggers if the two
+control flow constructs directly follow each other; the presence of any
+non-trivial code in between will prevent the optimization here. This is
+indicated in the examples by a comment marker.
+
+In its simplest incarnation, the scrutinee itself is the result of the previous
+control flow construct.
 
 ```ocaml
-(* Before Match-in-Match *)
-let main b =
-  let x = if b then 0 else 1 in
-  match x with
-  | 0 -> "zero"
-  | 1 -> "one"
-  | _ -> failwith "not 0 or 1"
+(* Before Match Forwarding *)
+let main ~is_none ~is_some b x =
+  let y = if b then None else Some x in
+  (* any code here prevents optimization *)
+  match y with
+  | None -> is_none ()
+  | Some z -> is_some z
 
-(* After Match-in-Match, but before Match Elimination *)
-let main b =
+(* After Match Forwarding *)
+let main ~is_none ~is_some b x =
+  (* NB: branches are extracted to continuations and shared between the
+     duplicate copies, limiting code duplication. *)
+  let branch_none () = is_none () in
+  let branch_some z () = is_some z () in
   if b then
-    let x = 0 in
-    match x with
-    | 0 -> "zero"
-    | 1 -> "one"
-    | _ -> failwith "not 0 or 1"
+    match None with
+    | None -> branch_none ()
+    | Some z -> branch_some z ()
   else
-    let x = 1 in
-    match x with
-    | 0 -> "zero"
-    | 1 -> "one"
-    | _ -> failwith "not 0 or 1"
+    match Some x with
+    | None -> branch_none ()
+    | Some z -> branch_some z ()
 
-(** After Match-in-Match and Match Elimination *)
-let main b =
-  if b then "zero" else "one"
+(* After Match Forwarding and Match Elimination *)
+let main ~is_none ~is_some b x =
+  (* [branch_none] and [branch_some] are inlined again here *)
+  if b then is_none () else is_some x
 ```
+
+Match Forwarding also triggers on consecutive matches on the same variable. In
+this case, Canonicalization is used to learn the value of `b` in each branch,
+allowing Match Elimination to trigger.
+
+```ocaml
+(* Before Match Forwarding *)
+let main b x y =
+  let z = if b then None else Some x in
+  (* any code here prevents optimization *)
+  if b then (Some y, z) else (z, Some y)
+
+(* After Match Forwarding *)
+let main b x y =
+  let branch_true z () = (Some y, z) in
+  let branch_false z () = (z, Some y) in
+  if b then
+    (* b = true is known *)
+    let z = None in
+    if b then branch_true z ()
+    else branch_false z ()
+  else
+    (* b = false is known *)
+    let z = Some x in
+    if b then branch_true z ()
+    else branch_false z ()
+
+(* After Match Forwarding, Canonicalization, and Match Elimination *)
+let main b x y =
+  if b then
+    (Some y, None)
+  else
+    (Some x, Some y)
+
