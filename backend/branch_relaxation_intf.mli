@@ -22,14 +22,20 @@ type instruction_size =
   }
 
 module type S = sig
+  (* The distance between two instructions, in arbitrary units (typically
+     the natural word size of instructions). *)
   type distance = int
 
   (** Instructions produced during branch relaxation (e.g. far branches,
       inverted conditional branches). *)
   type relaxed_instruction
 
+  (* The value to be added to the program counter (in [distance] units)
+     when it is at a branch instruction, prior to calculating the distance
+     to a branch target. *)
   val offset_pc_at_branch : distance
 
+  (* The maximum size of a given instruction. *)
   val relaxed_instruction_size
      : relaxed_instruction
     -> instruction_size
@@ -37,6 +43,10 @@ module type S = sig
   val relaxed_instruction_desc
      : relaxed_instruction
     -> Linear.instruction_desc
+
+  (* Insertion of target-specific code to relax operations that cannot be
+     relaxed generically.  It is assumed that these rewrites do not change
+     the size of out-of-line code (cf. branch_relaxation.mli). *)
 
   val relax_poll : unit -> relaxed_instruction
 

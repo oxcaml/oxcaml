@@ -180,6 +180,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
             instr.desc <- cont.desc;
             instr.next <- cont.next;
             let rec measure_expanded i sizes =
+              (* As per comment in linear.ml, we rely on physical equality being
+                 precise here, which is ok because values of type
+                 [Linear.instruction] are mutable. *)
               if i == original_next
               then sizes
               else

@@ -72,6 +72,7 @@ module Env : sig
   val create :
     fastcode_flag:bool ->
     num_stack_slots:int Stack_class.Tbl.t ->
+    (* The [num_stack_slots] table will be copied by this function *)
     prologue_required:bool ->
     contains_calls:bool ->
     function_name:string ->
@@ -92,15 +93,15 @@ module Env : sig
 
   val call_gc_sites : t -> gc_call list
 
-  val set_call_gc_sites : t -> gc_call list -> unit
+  val add_call_gc_site : t -> gc_call -> unit
 
   val local_realloc_sites : t -> local_realloc_call list
 
-  val set_local_realloc_sites : t -> local_realloc_call list -> unit
+  val add_local_realloc_site : t -> local_realloc_call -> unit
 
   val stack_realloc : t -> stack_realloc option
 
-  val set_stack_realloc : t -> stack_realloc option -> unit
+  val set_stack_realloc : t -> stack_realloc -> unit
 
   val function_name : t -> string
 
@@ -147,7 +148,7 @@ end = struct
       ~function_name ~tailrec_entry_point =
     { fastcode_flag;
       stack_offset = 0;
-      num_stack_slots;
+      num_stack_slots = Stack_class.Tbl.copy num_stack_slots;
       prologue_required;
       contains_calls;
       call_gc_sites = [];
@@ -180,15 +181,16 @@ end = struct
 
   let call_gc_sites t = t.call_gc_sites
 
-  let set_call_gc_sites t v = t.call_gc_sites <- v
+  let add_call_gc_site t site = t.call_gc_sites <- site :: t.call_gc_sites
 
   let local_realloc_sites t = t.local_realloc_sites
 
-  let set_local_realloc_sites t v = t.local_realloc_sites <- v
+  let add_local_realloc_site t site =
+    t.local_realloc_sites <- site :: t.local_realloc_sites
 
   let stack_realloc t = t.stack_realloc
 
-  let set_stack_realloc t v = t.stack_realloc <- v
+  let set_stack_realloc t v = t.stack_realloc <- Some v
 
   let function_name t = t.function_name
 
@@ -710,12 +712,13 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
 (* Record live pointers at call points *)
 
 let record_frame_label env live dbg =
+  let encode_reg_offset n = (n lsl 1) + 1 in
   let lbl = Cmm.new_label () in
   let live_offset = ref [] in
   Reg.Set.iter
     (function
       | { typ = Val; loc = Reg r; _ } ->
-        live_offset := ((Regs.index_in_class r lsl 1) + 1) :: !live_offset
+        live_offset := encode_reg_offset (Regs.index_in_class r) :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
           := Env.slot_offset env s (Stack_class.of_machtype reg.typ)
@@ -1068,8 +1071,7 @@ let assembly_code_for_local_allocation env i ~n =
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_top);
   A.ins4 ADD_shifted_register r r reg_x_tmp1 O.optional_none;
   A.ins4 ADD_immediate r r (O.imm 8) O.optional_none;
-  Env.set_local_realloc_sites env
-    ({ lr_lbl; lr_dbg = i.dbg; lr_return_lbl } :: Env.local_realloc_sites env)
+  Env.add_local_realloc_site env { lr_lbl; lr_dbg = i.dbg; lr_return_lbl }
 
 let assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg =
   (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
@@ -1097,8 +1099,7 @@ let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
   let gc_lbl, gc_return_lbl =
     assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg:(H.reg_x i.res.(0))
   in
-  Env.set_call_gc_sites env
-    ({ gc_lbl; gc_return_lbl; gc_frame_lbl } :: Env.call_gc_sites env)
+  Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
 
 let assembly_code_for_slow_heap_allocation env i ~n ~dbginfo =
   let lbl_frame = record_frame_label env i.live (Dbg_alloc dbginfo) in
@@ -1155,8 +1156,7 @@ let assembly_code_for_poll0 ~far ~return_label =
 let assembly_code_for_poll env i ~far ~return_label =
   let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc []) in
   let gc_lbl, gc_return_lbl = assembly_code_for_poll0 ~far ~return_label in
-  Env.set_call_gc_sites env
-    ({ gc_lbl; gc_return_lbl; gc_frame_lbl } :: Env.call_gc_sites env)
+  Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
@@ -1914,7 +1914,7 @@ let emit_instr env i =
     A.ins1 (B_cond (Branch_cond.Int CC)) (local_label sc_label);
     D.define_label sc_return;
     Env.set_stack_realloc env
-      (Some { sc_label; sc_return; sc_max_frame_size_in_bytes })
+      { sc_label; sc_return; sc_max_frame_size_in_bytes }
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
@@ -1935,26 +1935,23 @@ let with_measuring ~f =
 let measure_emit_instr env i = with_measuring ~f:(fun () -> emit_instr env i)
 
 let compute_instruction_sizes env code =
-  let sizes = ref [] in
+  let sizes_rev = ref [] in
   let rec walk instr =
     match instr.Linear.desc with
     | Lend -> ()
     | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
     | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
-    | Lcondbranch (_, _)
-    | Lcondbranch3 (_, _, _)
-    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-    | Lstackcheck _ ->
+    | Lcondbranch _ | Lcondbranch3 _ | Lswitch _ | Ladjust_stack_offset _
+    | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
       let m = measure_emit_instr env instr in
-      sizes
-        := { Branch_relaxation_intf.size = m.count;
-             max_displacement = m.min_max_displacement
-           }
-           :: !sizes;
+      let size : Branch_relaxation_intf.instruction_size =
+        { size = m.count; max_displacement = m.min_max_displacement }
+      in
+      sizes_rev := size :: !sizes_rev;
       walk instr.next
   in
   walk code;
-  List.rev !sizes
+  List.rev !sizes_rev
 
 let measure_instruction_count f = (with_measuring ~f).count
 
@@ -2006,7 +2003,7 @@ let measure_relaxed_instruction ri =
     max_displacement = m.min_max_displacement
   }
 
-let branch_relax env body =
+let relax_branches env body =
   let initial_sizes, out_of_line_code_block_sizes, num_call_gc_sites =
     (* Take a copy of [sizing_env] so we don't disturb the caller's [env] *)
     let sizing_env = Env.copy env in
@@ -2026,11 +2023,12 @@ let branch_relax env body =
 
     let relaxed_instruction_size ri = measure_relaxed_instruction ri
 
-    let relaxed_instruction_desc = function
-      | Far_poll -> Linear.Lop (Specific Ifar_poll)
-      | Far_alloc { num_bytes; dbginfo; _ } ->
+    let relaxed_instruction_desc ri : Linear.instruction_desc =
+      match ri with
+      | Far_poll -> Lop (Specific Ifar_poll)
+      | Far_alloc { num_bytes; dbginfo; res = _ } ->
         Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
-      | Condbranch { test; lbl; _ } -> Lcondbranch (test, lbl)
+      | Condbranch { test; lbl; arg = _ } -> Lcondbranch (test, lbl)
       | Branch lbl -> Lbranch lbl
 
     let relax_poll () = Far_poll
@@ -2063,11 +2061,9 @@ let fundecl fundecl =
     | None -> None, fundecl
     | Some { fun_end_label; fundecl } -> Some fun_end_label, fundecl
   in
-  let num_stack_slots = Stack_class.Tbl.make 0 in
-  Stack_class.Tbl.copy_values ~from:fundecl.fun_num_stack_slots
-    ~to_:num_stack_slots;
   let env =
-    Env.create ~fastcode_flag:fundecl.fun_fast ~num_stack_slots
+    Env.create ~fastcode_flag:fundecl.fun_fast
+      ~num_stack_slots:fundecl.fun_num_stack_slots
       ~prologue_required:fundecl.fun_prologue_required
       ~contains_calls:fundecl.fun_contains_calls ~function_name:fundecl.fun_name
       ~tailrec_entry_point:
@@ -2086,12 +2082,12 @@ let fundecl fundecl =
   let fun_start_label = L.create_label_for_local_symbol Text fun_sym in
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
-  let num_call_gc = branch_relax env fundecl.fun_body in
+  let num_call_gc_sites = relax_branches env fundecl.fun_body in
   emit_all env fundecl.fun_body;
   List.iter emit_call_gc (Env.call_gc_sites env);
   List.iter emit_local_realloc (Env.local_realloc_sites env);
   emit_stack_realloc env;
-  assert (List.length (Env.call_gc_sites env) = num_call_gc);
+  assert (List.length (Env.call_gc_sites env) = num_call_gc_sites);
   (match fun_end_label with
   | None -> ()
   | Some fun_end_label ->
