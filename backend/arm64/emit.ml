@@ -592,15 +592,9 @@ module Env : sig
 
   val float32_literals : t -> (int32 * L.t) list
 
-  val clear_float32_literals : t -> unit
-
   val float_literals : t -> (int64 * L.t) list
 
-  val clear_float_literals : t -> unit
-
   val vec128_literals : t -> (Cmm.vec128_bits * L.t) list
-
-  val clear_vec128_literals : t -> unit
 end = struct
   type t =
     { fastcode_flag : bool;
@@ -709,15 +703,9 @@ end = struct
 
   let float32_literals t = !(t.float32_literals)
 
-  let clear_float32_literals t = t.float32_literals := []
-
   let float_literals t = !(t.float_literals)
 
-  let clear_float_literals t = t.float_literals := []
-
   let vec128_literals t = !(t.vec128_literals)
-
-  let clear_vec128_literals t = t.vec128_literals := []
 end
 
 (* Record live pointers at call points *)
@@ -1003,11 +991,8 @@ let emit_vec128_literal (({ word0; word1 } : Cmm.vec128_bits), lbl) =
 let emit_literals env =
   (* Align float32 literals to [size_float]=8 bytes, not 4. *)
   emit_literals_list (Env.float32_literals env) size_float emit_float32_literal;
-  Env.clear_float32_literals env;
   emit_literals_list (Env.float_literals env) size_float emit_float_literal;
-  Env.clear_float_literals env;
-  emit_literals_list (Env.vec128_literals env) size_vec128 emit_vec128_literal;
-  Env.clear_vec128_literals env
+  emit_literals_list (Env.vec128_literals env) size_vec128 emit_vec128_literal
 
 (* Emit code to load the address of a symbol *)
 
@@ -2096,6 +2081,8 @@ let fundecl fundecl =
   D.align ~fill:Nop ~bytes:8;
   global_maybe_protected fun_sym;
   D.type_symbol ~ty:Function fun_sym;
+  (* Define both a symbol and a label so the function can be referenced either
+     way. Local references use the label form to avoid ELF visibility issues. *)
   D.define_joint_label_and_symbol ~section:Text fun_sym;
   let fun_start_label = L.create_label_for_local_symbol Text fun_sym in
   emit_debug_info fundecl.fun_dbg;
@@ -2115,6 +2102,10 @@ let fundecl fundecl =
       ~start_label:fun_start_label ~end_label:fun_end_label
       ~offset_past_end_label:None);
   D.cfi_endproc ();
+  (* The type symbol and the size are system specific. They are not output on
+     macOS. The asm directives take care of correctly handling this distinction.
+     For the size, they automatically emit the size [. - symbol], meaning "this
+     minus symbol definition". *)
   D.type_symbol ~ty:Function fun_sym;
   D.size fun_sym;
   emit_literals env

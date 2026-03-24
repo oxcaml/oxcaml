@@ -1854,7 +1854,7 @@ module DSL : sig
     val ins :
       ('num, 'operands) Instruction_name.t -> ('num, 'operands) many -> unit
 
-    type measurement =
+    type measurement = private
       { count : int;
         min_max_displacement : int option
       }
