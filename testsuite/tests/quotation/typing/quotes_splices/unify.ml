@@ -137,26 +137,33 @@ Error: This expression has type "Inst1.t expr"
 (* Quoted types are instantiable: the following should succeed. *)
 (* <[t]> ~ s  when t instantiable *)
 let _ = <[ fun (Equal : (<[Inst0.t]>, int NonInst1.t) Type.eq)
-               (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>
+               (x : <[Inst0.t]> expr) -> (x : int NonInst1.t expr) ]>
+
 [%%expect {|
-- : <[(<[Inst0.t]>, int NonInst1.t) Type.eq -> Inst0.t -> $(int NonInst1.t)]>
+- : <[
+     (<[Inst0.t]>, int NonInst1.t) Type.eq ->
+     <[Inst0.t]> expr -> int NonInst1.t expr]>
     expr
 =
 <[
   fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[Inst0.t]>, (int) NonInst1.t) Stdlib.Type.eq) (x : Inst0.t) -> (x : _)
+    (<[Inst0.t]>, (int) NonInst1.t) Stdlib.Type.eq) (x : <[Inst0.t]> expr) ->
+    (x : ((int) NonInst1.t) expr)
 ]>
 |}]
 (* t ~ <[s]>  when s instantiable *)
 let _ = <[ fun (Equal : (int NonInst1.t, <[Inst0.t]>) Type.eq)
-               (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>
+               (x : <[Inst0.t]> expr) -> (x : int NonInst1.t expr) ]>
 [%%expect {|
-- : <[(int NonInst1.t, <[Inst0.t]>) Type.eq -> Inst0.t -> $(int NonInst1.t)]>
+- : <[
+     (int NonInst1.t, <[Inst0.t]>) Type.eq ->
+     <[Inst0.t]> expr -> int NonInst1.t expr]>
     expr
 =
 <[
   fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    ((int) NonInst1.t, <[Inst0.t]>) Stdlib.Type.eq) (x : Inst0.t) -> (x : _)
+    ((int) NonInst1.t, <[Inst0.t]>) Stdlib.Type.eq) (x : <[Inst0.t]> expr) ->
+    (x : ((int) NonInst1.t) expr)
 ]>
 |}]
 
