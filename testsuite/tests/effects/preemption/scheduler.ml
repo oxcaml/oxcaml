@@ -35,6 +35,8 @@ end
 
 type _ Effect.t += Yield : unit Effect.t
 
+let num_preemptions = Atomic.make 0
+
 module Scheduler = struct
   let rec worker ~work_queue ~stop =
     match Work_queue.pop work_queue with
@@ -47,6 +49,7 @@ module Scheduler = struct
     | Some task ->
       let effc (type a) : a t -> _ = function
         | Preemption -> Some (fun (k : (a, _) continuation) ->
+          Atomic.incr num_preemptions;
           Work_queue.push work_queue (fun () -> continue k ()))
         | Yield -> Some (fun (k : (a, _) continuation) ->
           Work_queue.push work_queue (fun () -> continue k ()))
@@ -153,4 +156,5 @@ let () =
     multidomain ();
     multithread ();
     multidomain_multithread ();
-    sequential ())
+    sequential ());
+  assert (Atomic.get num_preemptions > 0)
