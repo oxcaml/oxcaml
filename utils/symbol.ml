@@ -45,7 +45,7 @@ include Identifiable.Make (struct
   let print ppf t = Linkage_name.print ppf t.linkage_name
 end)
 
-let caml_symbol_prefix = "caml"
+let caml_symbol_prefix = Config.caml_symbol_prefix
 
 (* CR ocaml 5 all-runtime5: Remove this_is_ocamlc and force_runtime4_symbols
    once fully on runtime5 *)

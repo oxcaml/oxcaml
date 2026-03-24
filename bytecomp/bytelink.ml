@@ -196,14 +196,10 @@ let check_consistency file_name cu =
   end;
   begin try
     Array.iter
-      (fun import ->
-        let name = Import_info.name import in
-        let info = Import_info.Intf.info import in
+      (fun (name, info) ->
         interfaces := name :: !interfaces;
-        match info with
-          None -> ()
-        | Some (kind, crc) ->
-            Consistbl.check crc_interfaces name kind crc file_name)
+        Option.iter (fun (kind, crc) ->
+          Consistbl.check crc_interfaces name kind crc file_name) info)
       cu.cu_imports
   with Consistbl.Inconsistency {
       unit_name = name;
@@ -217,8 +213,6 @@ let check_consistency file_name cu =
 
 let extract_crc_interfaces () =
   Consistbl.extract !interfaces crc_interfaces
-  |> List.map (fun (name, crc_with_unit) ->
-       Import_info.Intf.create name crc_with_unit)
 
 let clear_crc_interfaces () =
   Consistbl.clear crc_interfaces;
