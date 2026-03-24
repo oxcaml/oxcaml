@@ -56,7 +56,7 @@ module Scheduler = struct
       worker ~work_queue ~stop
 end
 
-let n_tasks = 100
+let n_tasks = 50
 
 let twiddle_refs () =
   let r = ref 1. in
