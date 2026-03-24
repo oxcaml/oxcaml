@@ -51,12 +51,6 @@ type frame_descr =
 
 let frame_descriptors = ref ([] : frame_descr list)
 
-type frame_descr_snapshot = frame_descr list
-
-let save_frame_descriptors () = !frame_descriptors
-
-let restore_frame_descriptors saved = frame_descriptors := saved
-
 let is_none_dbg d = Debuginfo.Dbg.is_none (Debuginfo.get_dbg d)
 
 let get_flags debuginfo =
@@ -385,22 +379,13 @@ let reset_debug_info () =
   file_pos_nums := [];
   file_pos_num_cnt := 1
 
-type debug_info_snapshot =
-  { fpn : (string * int) list;
-    fpnc : int
-  }
-
-let save_debug_info () = { fpn = !file_pos_nums; fpnc = !file_pos_num_cnt }
-
-let restore_debug_info snapshot =
-  file_pos_nums := snapshot.fpn;
-  file_pos_num_cnt := snapshot.fpnc
-
 let with_snapshot ~f =
+  let saved_file_pos_nums = !file_pos_nums in
+  let saved_file_pos_num_cnt = !file_pos_num_cnt in
   let saved_frame_descriptors = !frame_descriptors in
-  let saved_debug_info = save_debug_info () in
   let result = f () in
-  restore_debug_info saved_debug_info;
+  file_pos_nums := saved_file_pos_nums;
+  file_pos_num_cnt := saved_file_pos_num_cnt;
   frame_descriptors := saved_frame_descriptors;
   result
 
