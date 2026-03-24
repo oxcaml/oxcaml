@@ -64,26 +64,29 @@ type v4h = [`Reg of [`Neon of [`Vector of [`V4H] * [`H]]]] Ast.Operand.t
 type v8h = [`Reg of [`Neon of [`Vector of [`V8H] * [`H]]]] Ast.Operand.t
 
 (* See [Proc.int_reg_name]. *)
-let[@ocamlformat "disable"] int_reg_name_to_arch_index =
-[| 0; 1; 2; 3; 4; 5; 6; 7;    (* 0 - 7 *)
-   8; 9; 10; 11; 12; 13; 14; 15; (* 8 - 15 *)
-   19; 20; 21; 22; 23; 24; 25;   (* 16 - 22 *)
-   26; 27; 28;                   (* 23 - 25 *)
-   16; 17; |]
-(* 26 - 27 *)
+let[@ocamlformat "disable"] phys_reg_to_arch_index : Regs.Phys_reg.t -> int =
+  function
+  | X0  -> 0  | X1  -> 1  | X2  -> 2  | X3  -> 3
+  | X4  -> 4  | X5  -> 5  | X6  -> 6  | X7  -> 7
+  | X8  -> 8  | X9  -> 9  | X10 -> 10 | X11 -> 11
+  | X12 -> 12 | X13 -> 13 | X14 -> 14 | X15 -> 15
+  | X16 -> 16 | X17 -> 17             | X19 -> 19
+  | X20 -> 20 | X21 -> 21 | X22 -> 22 | X23 -> 23
+  | X24 -> 24 | X25 -> 25 | X26 -> 26 | X27 -> 27
+  | X28 -> 28
 
-let reg_name_to_arch_index (reg_class : Reg_class.t) (name_index : int) =
-  match reg_class with
-  | Reg_class.Int64 (* general-purpose registers *) ->
-    int_reg_name_to_arch_index.(name_index)
-  | Reg_class.Float128 (* neon registers *) -> name_index
+  | D0  -> 0  | D1  -> 1  | D2  -> 2  | D3  -> 3
+  | D4  -> 4  | D5  -> 5  | D6  -> 6  | D7  -> 7
+  | D8  -> 8  | D9  -> 9  | D10 -> 10 | D11 -> 11
+  | D12 -> 12 | D13 -> 13 | D14 -> 14 | D15 -> 15
+  | D16 -> 16 | D17 -> 17 | D18 -> 18 | D19 -> 19
+  | D20 -> 20 | D21 -> 21 | D22 -> 22 | D23 -> 23
+  | D24 -> 24 | D25 -> 25 | D26 -> 26 | D27 -> 27
+  | D28 -> 28 | D29 -> 29 | D30 -> 30 | D31 -> 31
 
 let reg_index reg =
   match reg with
-  | { loc = Reg r; typ; _ } ->
-    let reg_class = Reg_class.of_machtype typ in
-    let name_index = r - Reg_class.first_available_register reg_class in
-    reg_name_to_arch_index reg_class name_index
+  | { loc = Reg phys_reg; _ } -> phys_reg_to_arch_index phys_reg
   | { loc = Stack _ | Unknown; _ } -> fatal_error "Dsl_helpers.reg_index"
 
 (* 128-bit vector types require Vec128 machtype *)

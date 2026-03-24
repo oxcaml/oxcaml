@@ -42,3 +42,13 @@ type 'a t : immutable_data with 'a
 [%%expect {|
 type 'a t : immutable_data with 'a
 |}]
+
+type ('a : immutable_data) t
+[%%expect {|
+type ('a : immutable_data) t
+|}]
+
+type ('a : value mod stateless) t
+[%%expect {|
+type ('a : value mod stateless) t
+|}]

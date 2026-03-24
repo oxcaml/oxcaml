@@ -114,7 +114,7 @@ let emit_probe_notes0 ~slot_offset =
       | Stack s ->
         Printf.sprintf "%d(%%rsp)"
           (slot_offset s (Stack_class.of_machtype arg.Reg.typ))
-      | Reg reg -> Reg_class.register_name arg.Reg.typ reg
+      | Reg reg -> Regs.register_name arg.Reg.typ reg
       | Unknown ->
         Misc.fatal_errorf "Cannot create probe: illegal argument: %a"
           Printreg.reg arg

@@ -1,0 +1,8 @@
+(ocamllex
+ (modules sexp_lexer))
+
+(menhir
+ (modules sexp_parser))
+
+(library
+ (name minisexp))

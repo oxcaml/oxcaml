@@ -2,6 +2,7 @@
 layout: documentation-page
 collectionName: Kinds
 title: Syntax
+slug: syntax
 ---
 
 # Syntax for kind annotations

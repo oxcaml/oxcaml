@@ -225,11 +225,26 @@ let raise_error compile_command =
   in
   let stdout = loop (Buffer.create 1024) (Bytes.create 1024) in
   match waitpid_non_intr pid with
-  | WEXITED 0 -> false
   | WEXITED _exitcode -> str_contains !error_str stdout
   | WSIGNALED _signum -> false
   | WSTOPPED _ ->
     failwith "internal error: waitpid returned WSTOPPED without WUNTRACED"
+
+let must_raise_error command =
+  if not (raise_error command)
+  then (
+    Format.eprintf "@[<v 2>*** Printing error ***";
+    Format.eprintf "@ @[%a@ %S;@ %a@]@ " Format.pp_print_text
+      "This command raises the error" !error_str Format.pp_print_text
+      "however, printing the contents from the cmt file does not raise that \
+       same error.";
+    Format.eprintf "@ @[%a@]@ @;<1 2>%s@ " Format.pp_print_text
+      "The following command does *NOT* raise the error:" command;
+    Format.eprintf "@ @[%a@]" Format.pp_print_text
+      "Hint: This is likely due to a missing feature in either untypeast.ml or \
+       pprintast.ml.";
+    Format.eprintf "@]@.";
+    exit 1)
 
 let generate_cmt typing_command (filenames : string list) =
   let params = List.fold_left (fun s output -> s ^ " " ^ output) "" filenames in
@@ -459,9 +474,12 @@ let fix s = rep_def (rep_predef (rep_opt (rep_sth s)))
 (** [add_def str] adds dummy1, dummy2 and ignore definitions, needed by some
     minmizers, in [str]*)
 let add_def str =
-  { str with
-    str_items = dummy1_def :: dummy2_def :: ignore_def :: str.str_items
-  }
+  match str.str_items with
+  | [] -> str
+  | _ ->
+    { str with
+      str_items = dummy1_def :: dummy2_def :: ignore_def :: str.str_items
+    }
 
 let write_structure oc str =
   let str = add_def str in
@@ -489,7 +507,9 @@ module E = struct
 
   let ignore e = app Dummy.ignore [e]
 
-  let unit = desc (mkTexp_tuple [])
+  let tuple ?id args = desc (mkTexp_tuple ?id args)
+
+  let unit = tuple []
 
   let rec list = function
     | [] -> unit

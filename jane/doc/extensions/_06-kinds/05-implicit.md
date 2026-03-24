@@ -2,6 +2,7 @@
 layout: documentation-page
 collectionName: Kinds
 title: Implicit Kind Declarations
+slug: implicit
 ---
 
 # Implicit Kind Declarations
