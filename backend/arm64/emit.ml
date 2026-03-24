@@ -6,7 +6,7 @@
 (*                 Benedikt Meurer, University of Siegen                  *)
 (*                        The OxCaml developers                           *)
 (*                                                                        *)
-(*   Copyright 2024--2025 Jane Street Group LLC                           *)
+(*   Copyright 2024--2026 Jane Street Group LLC                           *)
 (*   Copyright 2013 Institut National de Recherche en Informatique et     *)
 (*     en Automatique.                                                    *)
 (*   Copyright 2012 Benedikt Meurer.                                      *)
