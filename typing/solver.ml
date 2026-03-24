@@ -340,7 +340,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let get_key dst (Amorphvar (v, m, _)) = Key (dst, v.id, m)
 
-  module VarSet = Set.Make (Int)
+  module IntSet = Set.Make (Int)
+
+  module VarSet = Set.Make (struct
+    type t = anyvar
+
+    let compare (Var v1) (Var v2) = Int.compare v1.id v2.id
+  end)
 
   type change =
     | Cupper : 'a var * 'a * ('a, right_only) Comp_hint.t -> change
@@ -421,7 +427,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       submode. Say we create a unconstrained variable [x], and invoke submode:
       [f x <= x] this would result in adding (f, x) into the [vlower] of [x].
       That is, there will be a self-loop on [x]. *)
-  let rec print_var : type a. ?traversed:VarSet.t -> a C.obj -> _ -> a var -> _
+  let rec print_var : type a. ?traversed:IntSet.t -> a C.obj -> _ -> a var -> _
       =
    fun ?traversed obj ppf v ->
     Fmt.fprintf ppf "modevar#%x<%x>[%a .. %a]" v.id v.level (C.print obj)
@@ -429,11 +435,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     match traversed with
     | None -> ()
     | Some traversed ->
-      if VarSet.mem v.id traversed
+      if IntSet.mem v.id traversed
       then ()
       else if (not (VarMap.is_empty v.vlower)) || not (VarMap.is_empty v.vupper)
       then begin
-        let traversed = VarSet.add v.id traversed in
+        let traversed = IntSet.add v.id traversed in
         Fmt.fprintf ppf "{%a--%a}"
           (Fmt.pp_print_list (print_morphvar ~traversed obj))
           (var_map_to_list v.vlower)
@@ -442,7 +448,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       end
 
   and print_morphvar : type a l r.
-      ?traversed:VarSet.t -> a C.obj -> _ -> (a, l * r) morphvar -> _ =
+      ?traversed:IntSet.t -> a C.obj -> _ -> (a, l * r) morphvar -> _ =
    fun ?traversed dst ppf (Amorphvar (v, f, _)) ->
     let src = C.src dst f in
     Fmt.fprintf ppf "%a(%a)" (C.print_morph dst) f (print_var ?traversed src) v
@@ -450,7 +456,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let print_raw : type a l r.
       ?verbose:bool -> a C.obj -> Fmt.formatter -> (a, l * r) mode -> unit =
    fun ?(verbose = false) (obj : a C.obj) ppf m ->
-    let traversed = if verbose then Some VarSet.empty else None in
+    let traversed = if verbose then Some IntSet.empty else None in
     match m with
     | Amode (a, _, _) -> C.print obj ppf a
     | Amodevar mv -> print_morphvar ?traversed obj ppf mv
@@ -1318,7 +1324,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       update_level_finalize ~log dst level u
     end
 
-  let vars = ref (0, [])
+  let vars = ref (0, VarSet.empty)
 
   let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper ~level obj =
     let id, l = !vars in
@@ -1353,7 +1359,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         subst
       }
     in
-    vars := id + 1, Var var :: l;
+    vars := id + 1, VarSet.add (Var var) l;
     var
 
   let unhint_morphvar (Amorphvar (v, f, _)) =
@@ -1367,7 +1373,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let erase_hints () =
     let _, l = !vars in
-    List.iter (fun (Var v) -> unhint_var v) l
+    VarSet.iter (fun (Var v) -> unhint_var v) l
 
   type ('a, 'd) hint_raw = ('a, 'd) Comp_hint.t
 
@@ -1378,6 +1384,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       right_hint : ('a, right_only) hint_raw
     }
 
+  let remove_cached_var u =
+    let i, l = !vars in
+    vars := i, VarSet.remove (Var u) l
+
+  let add_cached_var u =
+    let i, l = !vars in
+    vars := i, VarSet.add (Var u) l
+
   (* Moves every reachable variable from [u] such that
   [current_level] < [u.level] < [generic_level] to
   [generic_level + (u.level - current_level)], preserving the exact topology *)
@@ -1387,6 +1401,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     if u.level <= current_level || u.level >= generic_level
     then ()
     else begin
+      remove_cached_var u;
       let new_level = generic_level + (u.level - current_level) in
       set_level ~log u new_level;
       let do_gen _ (Amorphvar (v, f, _f_hint)) =
@@ -1426,7 +1441,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       log:_ -> a C.obj -> current_level:int -> a var -> unit =
    fun ~log dst ~current_level u ->
     generalize_topology ~log dst ~current_level u;
-    update_level_v ~log dst generic_level u
+    update_level_v ~log dst generic_level u;
+    add_cached_var u
 
   (* generalize_structure first moves a variable generic_level.
      It then has three cases:
@@ -1450,6 +1466,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let old_level = u.level in
     generalize_topology ~log dst ~current_level u;
     update_level_v ~log dst generic_level u;
+    add_cached_var u;
     let vlower_above_current =
       VarMap.filter
         (fun _ (Amorphvar (v, _, _)) -> v.level >= current_level)
