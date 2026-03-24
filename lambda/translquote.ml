@@ -2697,6 +2697,19 @@ let assert_no_modes modes =
         Location.print_loc (Location.get_loc mode))
     modes.mode_desc
 
+let assert_no_jkinds jkind =
+  Option.iter
+    (fun ({ pjka_loc; pjka_desc } : Parsetree.jkind_annotation) ->
+      (* Naively check if the jkind annotation is trivial *)
+      match pjka_desc with
+      | Pjk_abbreviation ({ loc = _; txt = Lident "value" }, []) -> ()
+      | _ ->
+        fatal_errorf
+          "Translquote [at %a]: no support for jkind annotations in this \
+           position."
+          Location.print_loc pjka_loc)
+    jkind
+
 let rec quote_module_path loc = function
   (* CR metaprogramming jrickard: I think this should probably use
      [Env.find_module_address] at least it should do to register the globals
@@ -2720,7 +2733,9 @@ let rec quote_module_path loc = function
 let type_for_annotation ~env ~loc typ =
   let unwrap_univar ty =
     match get_desc ty with
-    | Tunivar { name = Some name; jkind } -> Some (name, jkind.annotation)
+    | Tunivar { name = Some name; jkind } ->
+      assert_no_jkinds jkind.annotation;
+      Some (name, jkind.annotation)
     | Tunivar { name = None; jkind = _ } -> None
     | _ ->
       fatal_errorf
@@ -2732,13 +2747,17 @@ let type_for_annotation ~env ~loc typ =
     match get_desc ty with Tvar _ | Tunivar _ -> false | _ -> true
   in
   let rec go aliased ty =
+    (* CR metaprogramming jbachurski: Once jkind annotations are supported
+       in quotes, we should use [any] wildcards:
+       (Jkind.Builtin.any ~why:Wildcard).annotation *)
     let ctyp_desc =
       if aliasable ty && List.memq ty aliased
-      then Ttyp_var (None, (Jkind.Builtin.any ~why:Wildcard).annotation)
+      then Ttyp_var (None, None)
       else
         let go = go (ty :: aliased) in
         match get_desc ty with
         | Tvar { name = _; jkind } | Tof_kind jkind ->
+          assert_no_jkinds jkind.annotation;
           Ttyp_var (None, jkind.annotation)
         | Tunivar _ ->
           let name, jkind_annotation = unwrap_univar ty |> Option.get in
@@ -2887,7 +2906,7 @@ and quote_value_pattern ~scopes p =
           pats
       in
       Pat.tuple loc pats
-    | Tpat_construct (lid, constr, args, _) ->
+    | Tpat_construct (lid, constr, args, None) ->
       let constr = quote_constructor env (of_location ~scopes lid.loc) constr in
       let args =
         match args with
@@ -2902,6 +2921,11 @@ and quote_value_pattern ~scopes p =
           Some (Pat.tuple loc with_labels |> Pat.wrap)
       in
       Pat.construct loc constr args
+    | Tpat_construct (_, _, _, Some _) ->
+      fatal_errorf
+        "Translquote [at %a]:@ Constructor patterns introducing locally \
+         abstract types are not supported in quotes."
+        Location.print_loc (to_location loc)
     | Tpat_variant (variant, argo, _) ->
       let argo = Option.map (quote_value_pattern ~scopes) argo in
       Pat.variant loc (Variant.of_string loc variant |> Variant.wrap) argo
@@ -2963,8 +2987,11 @@ and quote_value_pattern ~scopes p =
 and quote_core_type ~scopes ty =
   let loc = of_location ~scopes ty.ctyp_loc in
   match ty.ctyp_desc with
-  | Ttyp_var (None, _) -> Type.var loc None |> Type.wrap
-  | Ttyp_var (Some name, _) ->
+  | Ttyp_var (None, jkind) ->
+    assert_no_jkinds jkind;
+    Type.var loc None |> Type.wrap
+  | Ttyp_var (Some name, jkind) ->
+    assert_no_jkinds jkind;
     let var =
       match Hashtbl.find_opt vars_env.env_poly name with
       | Some (_, var) -> var
@@ -3031,7 +3058,8 @@ and quote_core_type ~scopes ty =
   | Ttyp_class (_, _, _) ->
     fatal_errorf "Translquote [at %a]: Ttyp_class not implemented."
       Location.print_loc_in_lowercase (to_location loc)
-  | Ttyp_alias (ty, alias_opt, _) -> (
+  | Ttyp_alias (ty, alias_opt, jkind) -> (
+    assert_no_jkinds jkind;
     let ty = quote_core_type ~scopes ty in
     match alias_opt with
     | None -> ty
@@ -3077,7 +3105,13 @@ and quote_core_type ~scopes ty =
       |> Variant_type.wrap)
     |> Type.wrap
   | Ttyp_poly (tvs, ty) ->
-    let names = List.map fst tvs in
+    let names =
+      List.map
+        (fun (name, jkind) ->
+          assert_no_jkinds jkind;
+          name)
+        tvs
+    in
     let names_lam = List.map (fun name -> Name.wrap (Name.mk loc name)) names in
     with_new_idents_poly names;
     let body =
@@ -3230,7 +3264,8 @@ and quote_newtype ~scopes loc ident sloc rest =
 and fun_param_binding ~scopes ~transl stage loc param frest =
   let with_newtypes =
     List.fold_right
-      (fun (ident, sloc, _, _) rest ->
+      (fun (ident, sloc, jkind, _) rest ->
+        assert_no_jkinds jkind;
         quote_newtype ~scopes loc ident sloc rest)
       param.fp_newtypes frest
   in
@@ -3306,7 +3341,8 @@ and quote_function ~scopes ~transl stage loc fn extras =
     List.fold_right
       (fun (extra, loc, _) fn ->
         match extra with
-        | Texp_newtype (id, sloc, _, _) ->
+        | Texp_newtype (id, sloc, jkind, _) ->
+          assert_no_jkinds jkind;
           let loc = of_location ~scopes loc in
           Function.newtype loc
             (quote_loc (of_location ~scopes sloc.loc))
