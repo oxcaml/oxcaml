@@ -31,16 +31,213 @@ open! Operation
 open Linear
 open Emitaux
 module Ast = Arm64_ast.Ast
-module I = Ast.Instruction_name
-module O = Ast.DSL
-module A = Ast.DSL.Acc
-module R = Ast.Reg
 module Cond = Ast.Cond
 module Float_cond = Ast.Float_cond
 module Simd_int_cmp = Ast.Simd_int_cmp
 module Branch_cond = Ast.Branch_cond
+module A = Ast.DSL.Acc
 module D = Asm_targets.Asm_directives
+module H = Dsl_helpers
+module I = Ast.Instruction_name
+module L = Asm_targets.Asm_label
+module O = Ast.DSL
+module R = Ast.Reg
 module S = Asm_targets.Asm_symbol
+open! Int_replace_polymorphic_compare
+
+(* Emitter environment *)
+
+type gc_call =
+  { gc_lbl : L.t; (* Entry label *)
+    gc_return_lbl : L.t; (* Where to branch after GC *)
+    gc_frame_lbl : L.t (* Label of frame descriptor *)
+  }
+
+type local_realloc_call =
+  { lr_lbl : L.t;
+    lr_return_lbl : L.t;
+    lr_dbg : Debuginfo.t
+  }
+
+type stack_realloc =
+  { sc_label : L.t; (* Label of the reallocation code. *)
+    sc_return : L.t; (* Label to return to after reallocation. *)
+    sc_max_frame_size_in_bytes : int (* Size for reallocation. *)
+  }
+
+module Env : sig
+  (* Values of type [t] are mutable *)
+  type t
+
+  val create :
+    fastcode_flag:bool ->
+    num_stack_slots:int Stack_class.Tbl.t ->
+    prologue_required:bool ->
+    contains_calls:bool ->
+    function_name:string ->
+    tailrec_entry_point:L.t option ->
+    t
+
+  val copy : t -> t
+
+  val fastcode_flag : t -> bool
+
+  val stack_offset : t -> int
+
+  val set_stack_offset : t -> int -> unit
+
+  val prologue_required : t -> bool
+
+  val contains_calls : t -> bool
+
+  val call_gc_sites : t -> gc_call list
+
+  val set_call_gc_sites : t -> gc_call list -> unit
+
+  val local_realloc_sites : t -> local_realloc_call list
+
+  val set_local_realloc_sites : t -> local_realloc_call list -> unit
+
+  val stack_realloc : t -> stack_realloc option
+
+  val set_stack_realloc : t -> stack_realloc option -> unit
+
+  val function_name : t -> string
+
+  val tailrec_entry_point : t -> L.t option
+
+  val frame_size : t -> int
+
+  val slot_offset : t -> Reg.stack_location -> Stack_class.t -> int
+
+  val stack_operand :
+    t ->
+    Reg.t ->
+    [`Mem of Ast.Addressing_mode.single] Ast.Operand.t H.stack_result
+
+  val find_or_add_float32_literal : t -> int32 -> L.t
+
+  val find_or_add_float_literal : t -> int64 -> L.t
+
+  val find_or_add_vec128_literal : t -> Cmm.vec128_bits -> L.t
+
+  val float32_literals : t -> (int32 * L.t) list
+
+  val float_literals : t -> (int64 * L.t) list
+
+  val vec128_literals : t -> (Cmm.vec128_bits * L.t) list
+end = struct
+  type t =
+    { fastcode_flag : bool;
+      mutable stack_offset : int;
+      num_stack_slots : int Stack_class.Tbl.t;
+      prologue_required : bool;
+      contains_calls : bool;
+      mutable call_gc_sites : gc_call list;
+      mutable local_realloc_sites : local_realloc_call list;
+      mutable stack_realloc : stack_realloc option;
+      function_name : string;
+      tailrec_entry_point : L.t option;
+      float32_literals : (int32 * L.t) list ref;
+      float_literals : (int64 * L.t) list ref;
+      vec128_literals : (Cmm.vec128_bits * L.t) list ref
+    }
+
+  let create ~fastcode_flag ~num_stack_slots ~prologue_required ~contains_calls
+      ~function_name ~tailrec_entry_point =
+    { fastcode_flag;
+      stack_offset = 0;
+      num_stack_slots;
+      prologue_required;
+      contains_calls;
+      call_gc_sites = [];
+      local_realloc_sites = [];
+      stack_realloc = None;
+      function_name;
+      tailrec_entry_point;
+      float32_literals = ref [];
+      float_literals = ref [];
+      vec128_literals = ref []
+    }
+
+  let copy t =
+    { t with
+      num_stack_slots = Stack_class.Tbl.copy t.num_stack_slots;
+      float32_literals = ref !(t.float32_literals);
+      float_literals = ref !(t.float_literals);
+      vec128_literals = ref !(t.vec128_literals)
+    }
+
+  let fastcode_flag t = t.fastcode_flag
+
+  let stack_offset t = t.stack_offset
+
+  let set_stack_offset t v = t.stack_offset <- v
+
+  let prologue_required t = t.prologue_required
+
+  let contains_calls t = t.contains_calls
+
+  let call_gc_sites t = t.call_gc_sites
+
+  let set_call_gc_sites t v = t.call_gc_sites <- v
+
+  let local_realloc_sites t = t.local_realloc_sites
+
+  let set_local_realloc_sites t v = t.local_realloc_sites <- v
+
+  let stack_realloc t = t.stack_realloc
+
+  let set_stack_realloc t v = t.stack_realloc <- v
+
+  let function_name t = t.function_name
+
+  let tailrec_entry_point t = t.tailrec_entry_point
+
+  let frame_size t =
+    Proc.frame_size ~stack_offset:t.stack_offset
+      ~contains_calls:t.contains_calls ~num_stack_slots:t.num_stack_slots
+
+  let slot_offset t loc stack_class =
+    let offset =
+      Proc.slot_offset loc ~stack_class ~stack_offset:t.stack_offset
+        ~fun_contains_calls:t.contains_calls
+        ~fun_num_stack_slots:t.num_stack_slots
+    in
+    match offset with
+    | Bytes_relative_to_stack_pointer n -> n
+    | Bytes_relative_to_domainstate_pointer _ ->
+      Misc.fatal_errorf "Not a stack slot"
+
+  let stack_operand t r =
+    H.stack ~stack_offset:t.stack_offset ~contains_calls:t.contains_calls
+      ~num_stack_slots:t.num_stack_slots r
+
+  let find_or_add_literal literals f =
+    match List.assoc_opt f !literals with
+    | Some lbl -> lbl
+    | None ->
+      (* CR sspies: The [Text] section here is incorrect. We should be in the
+         respective section of the literal type (i.e., 16 or 8 bytes). The code
+         below uses the [Text] section, because that is the section that we are
+         in when we emit literals in the function body. Only macOS currently
+         switches to a dedicated section. *)
+      let lbl = L.create Text in
+      literals := (f, lbl) :: !literals;
+      lbl
+
+  let find_or_add_float32_literal t f = find_or_add_literal t.float32_literals f
+
+  let find_or_add_float_literal t f = find_or_add_literal t.float_literals f
+
+  let find_or_add_vec128_literal t f = find_or_add_literal t.vec128_literals f
+
+  let float32_literals t = !(t.float32_literals)
+
+  let float_literals t = !(t.float_literals)
+
+  let vec128_literals t = !(t.vec128_literals)
+end
 
 (* CR mshinwell: maybe the following two functions should move to a new
    Cmm.Symbol module, which would include Cmm.symbol as the type "t"? *)
@@ -53,10 +250,6 @@ let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
 (* Create symbol from Cmm.symbol, preserving visibility *)
 let symbol_of_cmm_symbol (s : Cmm.symbol) : S.t =
   S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
-
-module L = Asm_targets.Asm_label
-open! Int_replace_polymorphic_compare
-module H = Dsl_helpers
 
 (* Scratch FP/SIMD register 7 in various widths. - S7: used for float32
    load/store conversions - D7, V8B_7, B7: used for popcnt emulation when CSSC
@@ -513,200 +706,6 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
     let rm = reg_d arg.(1) in
     ins2 FCMP (rn, rm);
     ins4 FCSEL (rd, rn, rm, O.cond Cond.GT)
-
-(* Emitter environment, to avoid global state *)
-
-type gc_call =
-  { gc_lbl : L.t; (* Entry label *)
-    gc_return_lbl : L.t; (* Where to branch after GC *)
-    gc_frame_lbl : L.t (* Label of frame descriptor *)
-  }
-
-type local_realloc_call =
-  { lr_lbl : L.t;
-    lr_return_lbl : L.t;
-    lr_dbg : Debuginfo.t
-  }
-
-type stack_realloc =
-  { sc_label : L.t; (* Label of the reallocation code. *)
-    sc_return : L.t; (* Label to return to after reallocation. *)
-    sc_max_frame_size_in_bytes : int (* Size for reallocation. *)
-  }
-
-module Env : sig
-  (* Values of type [t] are mutable *)
-  type t
-
-  val create :
-    fastcode_flag:bool ->
-    num_stack_slots:int Stack_class.Tbl.t ->
-    prologue_required:bool ->
-    contains_calls:bool ->
-    function_name:string ->
-    tailrec_entry_point:L.t option ->
-    t
-
-  val copy : t -> t
-
-  val fastcode_flag : t -> bool
-
-  val stack_offset : t -> int
-
-  val set_stack_offset : t -> int -> unit
-
-  val prologue_required : t -> bool
-
-  val contains_calls : t -> bool
-
-  val call_gc_sites : t -> gc_call list
-
-  val set_call_gc_sites : t -> gc_call list -> unit
-
-  val local_realloc_sites : t -> local_realloc_call list
-
-  val set_local_realloc_sites : t -> local_realloc_call list -> unit
-
-  val stack_realloc : t -> stack_realloc option
-
-  val set_stack_realloc : t -> stack_realloc option -> unit
-
-  val function_name : t -> string
-
-  val tailrec_entry_point : t -> L.t option
-
-  val frame_size : t -> int
-
-  val slot_offset : t -> Reg.stack_location -> Stack_class.t -> int
-
-  val stack_operand :
-    t ->
-    Reg.t ->
-    [`Mem of Ast.Addressing_mode.single] Ast.Operand.t H.stack_result
-
-  val find_or_add_float32_literal : t -> int32 -> L.t
-
-  val find_or_add_float_literal : t -> int64 -> L.t
-
-  val find_or_add_vec128_literal : t -> Cmm.vec128_bits -> L.t
-
-  val float32_literals : t -> (int32 * L.t) list
-
-  val float_literals : t -> (int64 * L.t) list
-
-  val vec128_literals : t -> (Cmm.vec128_bits * L.t) list
-end = struct
-  type t =
-    { fastcode_flag : bool;
-      mutable stack_offset : int;
-      num_stack_slots : int Stack_class.Tbl.t;
-      prologue_required : bool;
-      contains_calls : bool;
-      mutable call_gc_sites : gc_call list;
-      mutable local_realloc_sites : local_realloc_call list;
-      mutable stack_realloc : stack_realloc option;
-      function_name : string;
-      tailrec_entry_point : L.t option;
-      float32_literals : (int32 * L.t) list ref;
-      float_literals : (int64 * L.t) list ref;
-      vec128_literals : (Cmm.vec128_bits * L.t) list ref
-    }
-
-  let create ~fastcode_flag ~num_stack_slots ~prologue_required ~contains_calls
-      ~function_name ~tailrec_entry_point =
-    { fastcode_flag;
-      stack_offset = 0;
-      num_stack_slots;
-      prologue_required;
-      contains_calls;
-      call_gc_sites = [];
-      local_realloc_sites = [];
-      stack_realloc = None;
-      function_name;
-      tailrec_entry_point;
-      float32_literals = ref [];
-      float_literals = ref [];
-      vec128_literals = ref []
-    }
-
-  let copy t =
-    { t with
-      num_stack_slots = Stack_class.Tbl.copy t.num_stack_slots;
-      float32_literals = ref !(t.float32_literals);
-      float_literals = ref !(t.float_literals);
-      vec128_literals = ref !(t.vec128_literals)
-    }
-
-  let fastcode_flag t = t.fastcode_flag
-
-  let stack_offset t = t.stack_offset
-
-  let set_stack_offset t v = t.stack_offset <- v
-
-  let prologue_required t = t.prologue_required
-
-  let contains_calls t = t.contains_calls
-
-  let call_gc_sites t = t.call_gc_sites
-
-  let set_call_gc_sites t v = t.call_gc_sites <- v
-
-  let local_realloc_sites t = t.local_realloc_sites
-
-  let set_local_realloc_sites t v = t.local_realloc_sites <- v
-
-  let stack_realloc t = t.stack_realloc
-
-  let set_stack_realloc t v = t.stack_realloc <- v
-
-  let function_name t = t.function_name
-
-  let tailrec_entry_point t = t.tailrec_entry_point
-
-  let frame_size t =
-    Proc.frame_size ~stack_offset:t.stack_offset
-      ~contains_calls:t.contains_calls ~num_stack_slots:t.num_stack_slots
-
-  let slot_offset t loc stack_class =
-    let offset =
-      Proc.slot_offset loc ~stack_class ~stack_offset:t.stack_offset
-        ~fun_contains_calls:t.contains_calls
-        ~fun_num_stack_slots:t.num_stack_slots
-    in
-    match offset with
-    | Bytes_relative_to_stack_pointer n -> n
-    | Bytes_relative_to_domainstate_pointer _ ->
-      Misc.fatal_errorf "Not a stack slot"
-
-  let stack_operand t r =
-    H.stack ~stack_offset:t.stack_offset ~contains_calls:t.contains_calls
-      ~num_stack_slots:t.num_stack_slots r
-
-  let find_or_add_literal literals f =
-    match List.assoc_opt f !literals with
-    | Some lbl -> lbl
-    | None ->
-      (* CR sspies: The [Text] section here is incorrect. We should be in the
-         respective section of the literal type (i.e., 16 or 8 bytes). The code
-         below uses the [Text] section, because that is the section that we are
-         in when we emit literals in the function body. Only macOS currently
-         switches to a dedicated section. *)
-      let lbl = L.create Text in
-      literals := (f, lbl) :: !literals;
-      lbl
-
-  let find_or_add_float32_literal t f = find_or_add_literal t.float32_literals f
-
-  let find_or_add_float_literal t f = find_or_add_literal t.float_literals f
-
-  let find_or_add_vec128_literal t f = find_or_add_literal t.vec128_literals f
-
-  let float32_literals t = !(t.float32_literals)
-
-  let float_literals t = !(t.float_literals)
-
-  let vec128_literals t = !(t.vec128_literals)
-end
 
 (* Record live pointers at call points *)
 
