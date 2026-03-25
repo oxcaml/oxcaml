@@ -823,15 +823,6 @@ CAMLprim value caml_thread_new(value clos)
     caml_fatal_error("ocamldebug does not support multithreaded programs");
 #endif
 
-  /* Create the tick thread if not already done.
-     Because of PR#4666, we start the tick thread late, only when we create
-     the first additional thread in the current process */
-  /* CR-someday: It would be nice to find a way to recover the original tick
-     interval if it was nonzero before we set it here. But for now, in practice,
-     it never will be, because all schedulers that set the tick interval will do
-     so after systhreads is initialized */
-  caml_domain_set_tick_interval_usec(Thread_timeout_usec);
-
   /* Create a thread info block */
   caml_thread_t th = thread_alloc_and_add();
   if (th == NULL) caml_raise_out_of_memory();
@@ -852,6 +843,10 @@ CAMLprim value caml_thread_new(value clos)
 
 #define Dom_c_threads 0
 
+/* [Domain.Tick.t] for the current C thread registered via
+   [caml_c_thread_register], if any. 0 if unset. */
+static CAMLthread_local long c_thread_tick = 0;
+
 /* the thread lock is not held when entering */
 CAMLexport int caml_c_thread_register(void)
 {
@@ -871,14 +866,15 @@ CAMLexport int caml_c_thread_register(void)
   caml_init_domain_self(Dom_c_threads);
   caml_acquire_domain_lock();
 
-  /* Create tick thread if not already done */
-  uintnat prev_tick_interval =
-    Long_val(caml_domain_get_tick_interval_usec(Val_unit));
-  if (prev_tick_interval == 0) {
-    caml_domain_set_tick_interval_usec(Long_val(Thread_timeout_usec));
+  /* Acquire a tick, in case this is the only non-initial thread */
+  value* acquire_tick = caml_named_value("Domain.Tick.acquire");
+  if (!acquire_tick) {
+    fprintf(stderr, "Fatal error: named value Domain.Tick.acquire not found");
+    exit(2);
   }
-  st_retcode err = caml_start_tick_thread();
-  if (err != 0) goto out_err;
+  value tick = caml_callback_exn(*acquire_tick, Val_unit);
+  if (Is_exception_result(tick)) goto out_err;
+  c_thread_tick = Long_val(tick);
 
   /* Set a thread info block */
   caml_thread_t th = thread_alloc_and_add();
@@ -900,22 +896,40 @@ out_err:
 }
 
 /* Unregister a thread that was created from C and registered with
-   the function above */
+   the function above.
 
-/* the thread lock is not held when entering */
+   The thread lock is not held when entering */
 CAMLexport int caml_c_thread_unregister(void)
 {
+  value result = Val_unit;
   /* If [This_thread] is not set, then the thread was not registered */
   if (This_thread == NULL) return 0;
   /* Acquire the domain lock the regular way */
   caml_leave_blocking_section();
+
+  /* Release the tick */
+  if (c_thread_tick != 0) {
+    value* release_tick = caml_named_value("Domain.Tick.release");
+    if (!release_tick) {
+      fprintf(stderr, "Fatal error: named value Domain.Tick.release not found");
+      exit(2);
+    }
+    result = caml_callback_exn(*release_tick, Val_long(c_thread_tick));
+  }
+
   /* Detach thread from the OCaml runtime; note that this resets
      [Caml_state_opt] and [This_thread]. */
   thread_detach_from_runtime();
   struct caml_locking_scheme *s = atomic_load(&Locking_scheme(Dom_c_threads));
-  if (s->thread_stop != NULL)
+  if (s->thread_stop != NULL) {
     s->thread_stop(s->context, Thread_type_c_registered);
-  return 1;
+  }
+
+  if (Is_exception_result(result)) {
+    return 0;
+  } else {
+    return 1;
+  }
 }
 
 /* Return the current thread */

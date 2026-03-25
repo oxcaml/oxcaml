@@ -206,4 +206,3 @@ module Uniform_or_mixed : sig
   (** Returns the [scannable_prefix_len] without materializing the return
       value of [repr]. Raises if [is_mixed] is [false]. *)
 end
-

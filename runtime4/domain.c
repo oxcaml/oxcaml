@@ -176,3 +176,8 @@ CAMLprim value caml_domain_get_tick_interval_usec(void)
 {
   caml_failwith("Domains not supported on runtime4");
 }
+
+CAMLprim value caml_effective_tick_interval_usec_bytecode(void)
+{
+  caml_failwith("Domains not supported on runtime4");
+}

@@ -2040,9 +2040,16 @@ CAMLextern void caml_stop_tick_thread(void)
 
 /* Compute the interval at which the tick thread will tick. This takes the
  * minimum requested tick interval across all domains, which is currently a
- * (very loose) heuristic that avoids any especially involved GCD calculation
+ * (very loose) heuristic that avoids any especially involved GCD calculation.
  *
- * If this function returns 0, ticking is disabled.
+ * If no domains have requested a tick, this returns [Max_tick_interval_usec].
+ * We always (unless the ticker thread is disabled and not running) tick at
+ * least as frequently as the maximum interval (which is the previous runtime4
+ * default of 50ms) to provide an upper bound on how long it will take the tick
+ * thread to notice a newly requested faster tick interval. At some point in the
+ * future, this could be extended to interrupt the ticker thread's sleep instead
+ * (eg by doing something more involved like epolling on an eventfd and
+ * timerfd), in which case we can remove the maximum entirely.
  */
 CAMLextern uintnat caml_effective_tick_interval_usec(void) {
   if (atomic_load_relaxed(&tick_thread.disabled)) {
@@ -2063,7 +2070,7 @@ CAMLextern uintnat caml_effective_tick_interval_usec(void) {
   return res;
 }
 
-CAMLextern value caml_effective_tick_interval_usec_bytecode(value v_unit) {
+CAMLprim value caml_effective_tick_interval_usec_bytecode(value v_unit) {
   return Val_long(caml_effective_tick_interval_usec());
 }
 
@@ -2162,10 +2169,8 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
 /* Set the requested tick interval for the current domain
 
    If argument is 0, the current domain no longer wants ticks */
-CAMLprim value caml_domain_set_tick_interval_usec(value v_interval_usec)
+CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
 {
-  CAMLparam1(v_interval_usec);
-  uintnat interval_usec = Long_val(v_interval_usec);
   if (interval_usec > Max_tick_interval_usec) {
     caml_invalid_argument(
       "domain_set_tick_interval_usec: "
@@ -2184,6 +2189,13 @@ CAMLprim value caml_domain_set_tick_interval_usec(value v_interval_usec)
   if (interval_usec != 0) {
     caml_start_tick_thread();
   }
+
+  return 0;
+}
+
+CAMLprim value caml_domain_set_tick_interval_usec_bytecode(value v_interval_usec) {
+  CAMLparam1(v_interval_usec);
+  caml_domain_set_tick_interval_usec(Long_val(v_interval_usec));
   CAMLreturn(Val_unit);
 }
 
