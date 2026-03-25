@@ -1290,7 +1290,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       log:_ -> a C.obj -> current_level:int -> a var -> unit =
    fun ~log dst ~current_level u ->
     (* If bounds are already tight, there is no need to create a copy *)
-    if not (C.le dst u.upper u.lower)
+    if (not (C.le dst u.upper u.lower)) && u.level = generic_level
     then begin
       let copy = fresh ~upper:u.upper ~lower:u.lower ~level:current_level dst in
       let ok1 =
@@ -1304,6 +1304,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           (Amorphvar (copy, C.id, Comp_hint.Morph_hint.Id))
       in
       assert (Result.is_ok ok1 && Result.is_ok ok2);
+      set_gencopy ~log copy u.gencopy;
       set_gencopy ~log u (Some copy)
     end
 
@@ -1339,9 +1340,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       update_level_v ~log dst current_level u
     else begin
       (* the bounds are non-trivial *)
+      let old_level = u.level in
       generalize_topology ~log dst ~current_level u;
       update_level_v ~log dst generic_level u;
-      create_gencopy ~log dst ~current_level u
+      if old_level > current_level && old_level < generic_level
+      then begin
+        create_gencopy ~log dst ~current_level u
+      end
     end
 
   let generalize (type a l r) ~current_level (obj : a C.obj)
