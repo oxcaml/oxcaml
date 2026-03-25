@@ -627,14 +627,14 @@ module Tick = struct
       val add : t -> int -> int
       val remove : t -> int -> int or_null
     end = struct
-      (* NOTE this is extremely un-optimized; we assume that ticks are acquired and
-         released relatively infrequently so the performance of registry modification
-         doesn't matter. *)
+      (* NOTE this is extremely un-optimized; we assume that ticks are acquired
+         and released relatively infrequently so the performance of registry
+         modification doesn't matter. *)
 
       module Inner = struct
-        (* It would be better for this to be a decent min-heap, but there is not one around
-           that is convenient to use (and see above note about this not being tight-loop).
-        *)
+        (* It would be better for this to be a decent min-heap, but there is not
+           one around that is convenient to use (and see above note about this
+           not being tight-loop). *)
         include Map.MakePortable (Int)
 
         external magic_empty_stateless
@@ -655,8 +655,8 @@ module Tick = struct
 
       type t : sync_data =
         { mutable inner : int Inner.t
-        (* A bag, mapping the interval to the number of requesters of ticks with that
-           interval *)
+        (* A bag, mapping the interval to the number of requesters of ticks with
+           that interval *)
         ; mutex : Mutex.t
         }
       [@@unsafe_allow_any_mode_crossing "All accesses protected by mutex"]
@@ -693,14 +693,15 @@ module Tick = struct
         | exception Not_found -> Null)
     end
 
-    (* NOTE: st_stubs.c relies on this being an int (and in particular not scanned) *)
+    (* NOTE: st_stubs.c relies on this being an int (and in particular not
+       scanned) *)
     type t = int
 
     (* One registry per recommended_domain_count.
 
-       If more than recommended_domain_count domains are spawned (which in practice we
-       never do in OxCaml), multiple domains share a registry. This is fine since we have
-       to have synchronization for systreaads anyway
+       If more than recommended_domain_count domains are spawned (which in
+       practice we never do in OxCaml), multiple domains share a registry. This
+       is fine since we have to have synchronization for systhreads anyway
     *)
     let registry =
       (* CR ocaml-5.4: This should be an iarray *)
@@ -726,14 +727,14 @@ module Tick = struct
       | () -> interval_usec
       | exception exn ->
         let bt = Printexc.get_raw_backtrace () in
-        (* We might raise because we failed to start the tick thread, not just because the
-           interval was invalid. In that case, we don't want to leave the domain's min
-           requested tick interval in place - instead, we use the interval returned by
-           [Registry.remove] to set the tick interval again. This will probably (though
-           might not) fail because we fail to start the tick thread again; in that case,
-           it's fine to re-raise that exception as the state should be the same as we left
-           it before calling [acquire]
-        *)
+        (* We might raise because we failed to start the tick thread, not just
+           because the interval was invalid. In that case, we don't want to
+           leave the domain's min requested tick interval in place - instead, we
+           use the interval returned by [Registry.remove] to set the tick
+           interval again. This will probably (though might not) fail because we
+           fail to start the tick thread again; in that case, it's fine to
+           re-raise that exception as the state should be the same as we left it
+           before calling [acquire] *)
         (match Registry.remove registry interval_usec with
          | This interval -> set_tick_interval_usec interval
          | Null -> set_tick_interval_usec 0);
@@ -741,9 +742,9 @@ module Tick = struct
 
     let release interval_usec =
       let registry = local_registry () in
-      (* Note that the calls to [set_tick_interval_usec] can't raise here, as we're
-         neither setting the requested interval to a value we haven't successfully set it
-         to before, nor are we starting the tick thread. *)
+      (* Note that the calls to [set_tick_interval_usec] can't raise here, as
+         we're neither setting the requested interval to a value we haven't
+         successfully set it to before, nor are we starting the tick thread. *)
       match Registry.remove registry interval_usec with
       | Null -> set_tick_interval_usec 0
       | This interval -> set_tick_interval_usec interval
@@ -767,7 +768,8 @@ module Tick = struct
 
   external global_effective_interval_usec
     : (unit[@untagged]) -> (int[@untagged]) @@ portable
-    = "caml_effective_tick_interval_usec_bytecode" "caml_effective_tick_interval_usec"
+    = "caml_effective_tick_interval_usec_bytecode"
+        "caml_effective_tick_interval_usec"
   [@@noalloc]
 end
 

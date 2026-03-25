@@ -867,7 +867,7 @@ CAMLexport int caml_c_thread_register(void)
   caml_acquire_domain_lock();
 
   /* Acquire a tick, in case this is the only non-initial thread */
-  value* acquire_tick = caml_named_value("Domain.Tick.acquire");
+  const value* acquire_tick = caml_named_value("Domain.Tick.acquire");
   if (!acquire_tick) {
     fprintf(stderr, "Fatal error: named value Domain.Tick.acquire not found");
     exit(2);
@@ -909,7 +909,7 @@ CAMLexport int caml_c_thread_unregister(void)
 
   /* Release the tick */
   if (c_thread_tick != 0) {
-    value* release_tick = caml_named_value("Domain.Tick.release");
+    const value* release_tick = caml_named_value("Domain.Tick.release");
     if (!release_tick) {
       fprintf(stderr, "Fatal error: named value Domain.Tick.release not found");
       exit(2);
