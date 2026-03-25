@@ -968,12 +968,38 @@ type lambda =
   | Lsplice of scoped_location * slambda
 
 and slambda =
+  | SLlayout of layout
+  | SLglobal of Compilation_unit.t
+  | SLvar of Slambdaident.t
   | SLmissing
+  | SLrecord of slambda list
+  | SLfield of slambda * int
   | SLhalves of slambda_halves
+  | SLproj_comptime of slambda
+  | SLproj_runtime of slambda
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
 
 and slambda_halves =
   { sval_comptime: slambda;
     sval_runtime: lambda
+  }
+
+and slambda_function =
+  { sfun_params: Slambdaident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Slambdaident.t;
+    slet_value: slambda;
+    slet_body: slambda
   }
 
 and rec_binding = {
@@ -1694,18 +1720,11 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice (_, slambda) -> free_variables_slambda slambda
+  | Lsplice _ as l -> fatal_error_invalid_constructor l
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
     set exprs
-
-and free_variables_slambda = function
-  | SLmissing -> Ident.Set.empty
-  | SLhalves { sval_comptime; sval_runtime } ->
-      Ident.Set.union
-        (free_variables_slambda sval_comptime)
-        (free_variables sval_runtime)
 
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()
