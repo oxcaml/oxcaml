@@ -1292,23 +1292,19 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     (* If bounds are already tight, there is no need to create a copy *)
     if not (C.le dst u.upper u.lower)
     then begin
-      match u.gencopy with
-      | Some _ -> ()
-      | None ->
-        let copy = fresh ~upper:u.upper ~lower:u.lower ~level:u.level dst in
-        let ok1 =
-          submode_mvmv ~log H.Pinpoint.unknown dst
-            (Amorphvar (copy, C.id, Comp_hint.Morph_hint.Id))
-            (Amorphvar (u, C.id, Comp_hint.Morph_hint.Id))
-        in
-        let ok2 =
-          submode_mvmv ~log H.Pinpoint.unknown dst
-            (Amorphvar (u, C.id, Comp_hint.Morph_hint.Id))
-            (Amorphvar (copy, C.id, Comp_hint.Morph_hint.Id))
-        in
-        assert (Result.is_ok ok1 && Result.is_ok ok2);
-        update_level_v ~log dst current_level copy;
-        set_gencopy ~log u (Some copy)
+      let copy = fresh ~upper:u.upper ~lower:u.lower ~level:current_level dst in
+      let ok1 =
+        submode_mvmv ~log H.Pinpoint.unknown dst
+          (Amorphvar (copy, C.id, Comp_hint.Morph_hint.Id))
+          (Amorphvar (u, C.id, Comp_hint.Morph_hint.Id))
+      in
+      let ok2 =
+        submode_mvmv ~log H.Pinpoint.unknown dst
+          (Amorphvar (u, C.id, Comp_hint.Morph_hint.Id))
+          (Amorphvar (copy, C.id, Comp_hint.Morph_hint.Id))
+      in
+      assert (Result.is_ok ok1 && Result.is_ok ok2);
+      set_gencopy ~log u (Some copy)
     end
 
   let generalize_v : type a.
