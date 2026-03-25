@@ -818,11 +818,11 @@ let mk_flambda2_expert_cont_lifting_budget f =
       \ when lifting continuations (per function)" )
 
 let mk_flambda2_expert_cont_spec_threshold f =
-  ( "-flambda2-expert-cont-specialization-budget",
+  ( "-flambda2-expert-cont-specialization-threshold",
     Arg.Float f,
     Printf.sprintf
-      " Set the limit on the number of continuations \n\
-      \ copied/generated when specializing a continuation (per function)" )
+      " Aggressiveness of continuation specialization, similar to \
+      \ the inline threshold.")
 
 let mk_flambda2_debug_concrete_types_only_on_canonicals f =
   ( "-flambda2-debug-concrete-types-only-on-canonicals",
