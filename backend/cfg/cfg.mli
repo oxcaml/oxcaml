@@ -176,6 +176,11 @@ val fold_blocks : t -> f:(Label.t -> basic_block -> 'a -> 'a) -> init:'a -> 'a
 val fold_body_instructions :
   t -> f:('a -> basic instruction -> 'a) -> init:'a -> 'a
 
+(* CR-soon xclerc for xclerc: [register_predecessors_for_all_blocks] only adds
+   blocks to the predecessor sets, and does not clear the sets beforehand. This
+   looks like a mistake; at the very least a named boolean parameter should be
+   added so that the caller has to explicitly decide whether or not to clear
+   the sets before registration . *)
 val register_predecessors_for_all_blocks : t -> unit
 
 (** Printing *)
