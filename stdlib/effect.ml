@@ -126,7 +126,8 @@ module Deep = struct
 
   let continue k = of_continuation continue k
   let discontinue k = of_continuation discontinue k
-  let discontinue_with_backtrace k = of_continuation discontinue_with_backtrace k
+  let discontinue_with_backtrace k =
+    of_continuation discontinue_with_backtrace k
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =
