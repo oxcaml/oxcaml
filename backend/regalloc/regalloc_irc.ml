@@ -42,7 +42,7 @@ let build : State.t -> Cfg_with_infos.t -> unit =
     if debug && Reg.set_has_collisions live.across
     then fatal "live set has physical register collisions";
     if Array.length def > 0
-    then
+    then begin
       Reg.Set.iter
         (fun reg1 ->
           if move_src == Reg.dummy || not (Reg.same reg1 move_src)
