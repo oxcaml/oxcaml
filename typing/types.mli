@@ -1062,6 +1062,14 @@ module type Wrapped = sig
     md_loc: Location.t;
     md_uid: Uid.t;
     md_discourse: Discourse_types.t;
+    (** [md_discourse] stores the user written paths used in the description  of
+      the module. They will be added to the Discourse if the module is used.  *)
+    md_discourse_alias: (Longident.t loc * Discourse_types.Item.t) option;
+    (** If the user wrote a module alias [module Foo = Bar] with no signature
+        then [md_discourse_alias] is the path [Bar]. When Foo is used, this path
+        is added to the set of Used paths, not directly into the Discourse.
+        When the user wrothe module M = P.Q both items of Q and P should be
+        considered part of the domain of discourse, not only Q.  *)
   }
 
   and modtype_declaration =

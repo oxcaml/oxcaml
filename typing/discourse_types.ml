@@ -20,19 +20,17 @@ module Lid_set = Set.Make (struct
   let compare a b = compare_longidents a b
 end)
 
-module Paths = struct
-  module T = struct
-    type t = Shape.Sig_component_kind.t * Path.t
+module Item = struct
+  type t = Shape.Sig_component_kind.t * Path.t
 
-    (* Since we are versing these paths in a different structure (the
-        priority queue) before shortening, it does not seems useful tu use a
-        custom path comparison function here. *)
+  (* Since we are versing these paths in a different structure (the
+      priority queue) before shortening, it does not seems useful tu use a
+      custom path comparison function here. *)
 
-    let compare (_, p1) (_, p2) = Path.compare p1 p2
-  end
-
-  include Set.Make (T)
+  let compare (_, p1) (_, p2) = Path.compare p1 p2
 end
+
+module Paths = Set.Make (Item)
 
 let pp_paths ppf t =
   let pp_sep ppf () = Format.fprintf ppf ";@;" in
@@ -157,3 +155,12 @@ let union = Lid_trie.union
 let singleton lid path = Lid_trie.trie_of_lid lid (Paths.singleton path)
 
 let pp = Lid_trie.pp_seq
+
+type discourse = { paths : t; substs : Lid_set.t Path.Map.t }
+let empty_discourse = { paths = empty; substs = Path.Map.empty }
+let g = Local_store.s_ref empty_discourse
+
+let add_ident kind id =
+  let lid = Longident.Lident (Ident.name id) in
+  let path = Path.Pident id in
+  g := { !g with paths = add lid (kind, path) !g.paths }

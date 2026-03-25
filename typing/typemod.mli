@@ -35,7 +35,8 @@ by inspecting the returned mode. *)
 
 val type_module:
         Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.module_expr ->
-        Typedtree.module_expr * Shape.t * Discourse_types.t
+        Typedtree.module_expr * Shape.t * Discourse_types.t *
+        (Longident.t Location.loc * Discourse_types.Item.t) option
 val type_structure:
   Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.structure ->
   Typedtree.structure * Types.signature * Mode.Value.lr * Signature_names.t *

@@ -977,7 +977,8 @@ and subst_lazy_module_decl scoping s md =
     md_attributes = attrs s md.md_attributes;
     md_loc = loc s md.md_loc;
     md_uid = md.md_uid;
-    md_discourse = md.md_discourse; }
+    md_discourse = md.md_discourse;
+    md_discourse_alias = md.md_discourse_alias; }
 
 and subst_lazy_modtype scoping s = function
   | Mty_ident p ->

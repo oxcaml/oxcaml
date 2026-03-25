@@ -319,7 +319,8 @@ let error_of_filter_arrow_failure ~explanation ~first ty_fun
 let type_module =
   ref ((fun _env _md -> assert false) :
        Env.t -> Parsetree.module_expr ->
-         Typedtree.module_expr * Shape.t * Discourse_types.t)
+         Typedtree.module_expr * Shape.t *
+         Discourse_types.t * (Longident.t loc * Discourse_types.Item.t) option)
 
 (* Forward declaration, to be filled in by Typemod.type_open *)
 
@@ -1397,7 +1398,7 @@ let add_module_variables env module_variables =
          Here, on the other hand, we're calling [type_module] outside the
          raised level, so there's no extra step to take.
       *)
-      let modl, md_shape, md_discourse =
+      let modl, md_shape, md_discourse, md_discourse_alias =
         !type_module env
           Ast_helper.(
             Mod.unpack ~loc:mv_loc
@@ -1415,7 +1416,8 @@ let add_module_variables env module_variables =
           md_modalities = Mode.Modality.undefined;
           md_loc = mv_name.loc;
           md_uid = mv_uid;
-          md_discourse }
+          md_discourse;
+          md_discourse_alias }
       in
       let mode = Typedtree.mode_without_locks_exn modl.mod_mode in
       Env.add_module_declaration ~shape:md_shape ~check:true mv_id pres md
@@ -7128,7 +7130,9 @@ and type_expect_
         with_local_level begin fun () ->
           let modl, pres, id, new_env =
             Typetexp.TyVarEnv.with_local_scope begin fun () ->
-              let modl, md_shape, md_discourse = !type_module env smodl in
+              let modl, md_shape, md_discourse, md_discourse_alias =
+                !type_module env smodl
+              in
               Mtype.lower_nongen lv modl.mod_type;
               let pres =
                 match modl.mod_type with
@@ -7142,7 +7146,7 @@ and type_expect_
                 { md_type = modl.mod_type; md_attributes = [];
                   md_modalities = Modality.undefined;
                   md_loc = name.loc;
-                  md_uid; md_discourse}
+                  md_uid; md_discourse; md_discourse_alias}
               in
               let mode, locks = modl.mod_mode in
               let locks = Option.map (fun (a, _, _) -> a) locks in

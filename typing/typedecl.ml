@@ -3012,8 +3012,6 @@ let transl_type_decl env rec_flag sdecl_list =
       check_duplicates sdecl_list;
       (* Build the final env. *)
       let new_env = add_types_to_env ~shapes:None decls env in
-      List.iter (fun (id, _) ->
-        Discourse.define_type new_env (Longident.Lident (Ident.name id))) decls;
       (* Update stubs *)
       let delayed_jkind_checks =
         match rec_flag with
