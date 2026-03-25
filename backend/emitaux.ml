@@ -379,6 +379,16 @@ let reset_debug_info () =
   file_pos_nums := [];
   file_pos_num_cnt := 1
 
+let with_snapshot ~f =
+  let saved_file_pos_nums = !file_pos_nums in
+  let saved_file_pos_num_cnt = !file_pos_num_cnt in
+  let saved_frame_descriptors = !frame_descriptors in
+  let result = f () in
+  file_pos_nums := saved_file_pos_nums;
+  file_pos_num_cnt := saved_file_pos_num_cnt;
+  frame_descriptors := saved_frame_descriptors;
+  result
+
 let get_file_num ~file_emitter file_name =
   try List.assoc file_name !file_pos_nums
   with Not_found ->
