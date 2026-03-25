@@ -78,8 +78,10 @@ let with_handler cont valuec exnc (effc : 'a. ('a, _, _) effc) f x =
 
 module Deep = struct
 
-  type ('a,'b) continuation =
-    | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation [@@unboxed]
+  type nonrec ('a,'b) continuation = ('a,'b) continuation
+
+  type ('a,'b) continuation_ =
+    | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation_ [@@unboxed]
 
   let continue (Cont k) v = resume k (fun x-> x) v
 
@@ -98,12 +100,15 @@ module Deep = struct
 
   (* CR effect-syntax: Upstream the 3-parameter version of continuation and use
      it to maintain type safety here. *)
-  let burn f k = f (Obj.magic k)
+  let to_continuation (f : _ continuation -> 'a) (k : _ continuation_) =
+    f (Obj.magic k)
+  let of_continuation (f : _ continuation_ -> 'a) (k : _ continuation) =
+    f (Obj.magic k)
 
   let match_with comp arg handler =
     let effc eff k last_fiber =
       match handler.effc eff with
-      | Some f -> burn f (Cont k)
+      | Some f -> to_continuation f (Cont k)
       | None -> reperform eff k last_fiber
     in
     with_stack handler.retc handler.exnc effc comp arg
@@ -114,14 +119,14 @@ module Deep = struct
   let try_with comp arg handler =
     let effc' eff k last_fiber =
       match handler.effc eff with
-      | Some f -> burn f (Cont k)
+      | Some f -> to_continuation f (Cont k)
       | None -> reperform eff k last_fiber
     in
     with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
 
-  let continue k = burn continue k
-  let discontinue k = burn discontinue k
-  let discontinue_with_backtrace k = burn discontinue_with_backtrace k
+  let continue k = of_continuation continue k
+  let discontinue k = of_continuation discontinue k
+  let discontinue_with_backtrace k = of_continuation discontinue_with_backtrace k
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =
