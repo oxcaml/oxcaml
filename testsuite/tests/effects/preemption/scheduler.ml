@@ -10,7 +10,7 @@
 *)
 
 open Effect
-open Effect.Deep
+open Effect.Shallow
 open Preemption_util
 
 module Work_queue = struct
@@ -44,26 +44,40 @@ module Scheduler = struct
       if Atomic.get stop
       then ()
       else (
-        Thread.yield ();
+        Unix.sleepf 0.001;
         worker ~work_queue ~stop)
     | Some task ->
-      let effc (type a) : a t -> _ = function
-        | Preemption -> Some (fun (k : (a, _) continuation) ->
-          Atomic.incr num_preemptions;
-          Work_queue.push work_queue (fun () -> continue k ()))
-        | Yield -> Some (fun (k : (a, _) continuation) ->
-          Work_queue.push work_queue (fun () -> continue k ()))
-        | _ -> None
-      in
-      try_with task () { effc };
+      task ();
       worker ~work_queue ~stop
+
+  let spawn work_queue result completed f =
+    Work_queue.push work_queue (fun () ->
+      let k = fiber (fun () ->
+        let r = f () in
+        Atomic.add result (Int.of_float r);
+        Atomic.incr completed)
+      in
+      let rec run k =
+        continue_with k ()
+          { retc = (fun _result -> ());
+            exnc = raise;
+            effc = fun (type a) (e : a t) ->
+              match e with
+              | Preemption -> Some (fun (k : (a, _) continuation) ->
+                Atomic.incr num_preemptions;
+                Work_queue.push work_queue (fun () -> run k))
+              | Yield -> Some (fun (k : (a, _) continuation) ->
+                Work_queue.push work_queue (fun () -> run k))
+              | _ -> None }
+      in
+      run k)
 end
 
 let n_tasks = 50
 
 let twiddle_refs () =
   let r = ref 1. in
-  for _ = 0 to 100 do
+  for _ = 0 to 10_000 do
     r := !r *. 1.5;
     if !r > 10000. then r := !r *. 0.01;
     if Int.of_float (!r /. 2.) mod 2 == 0
@@ -81,12 +95,9 @@ let multidomain () =
   let result = Atomic.make 0 in
   let completed = Atomic.make 0 in
   for _ = 0 to n_tasks - 1 do
-    Work_queue.push work_queue (fun () ->
-      let r = twiddle_refs () in
-      Atomic.add result (Int.of_float r);
-      Atomic.incr completed)
+    Scheduler.spawn work_queue result completed twiddle_refs
   done;
-  while Atomic.get completed < n_tasks do Thread.yield () done;
+  while Atomic.get completed < n_tasks do Unix.sleepf 0.001 done;
   Atomic.set stop true;
   Array.iter Domain.join domains;
   Printf.printf "       Domain result: %d\n" (Atomic.get result)
@@ -101,12 +112,9 @@ let multithread () =
   let result = Atomic.make 0 in
   let completed = Atomic.make 0 in
   for _ = 0 to n_tasks - 1 do
-    Work_queue.push work_queue (fun () ->
-      let r = twiddle_refs () in
-      Atomic.add result (Int.of_float r);
-      Atomic.incr completed)
+    Scheduler.spawn work_queue result completed twiddle_refs
   done;
-  while Atomic.get completed < n_tasks do Thread.yield () done;
+  while Atomic.get completed < n_tasks do Unix.sleepf 0.001 done;
   Atomic.set stop true;
   Array.iter Thread.join threads;
   Printf.printf "       Thread result: %d\n" (Atomic.get result)
@@ -126,12 +134,9 @@ let multidomain_multithread () =
   let result = Atomic.make 0 in
   let completed = Atomic.make 0 in
   for _ = 0 to n_tasks - 1 do
-    Work_queue.push work_queue (fun () ->
-      let r = twiddle_refs () in
-      Atomic.add result (Int.of_float r);
-      Atomic.incr completed)
+    Scheduler.spawn work_queue result completed twiddle_refs
   done;
-  while Atomic.get completed < n_tasks do Thread.yield () done;
+  while Atomic.get completed < n_tasks do Unix.sleepf 0.001 done;
   Atomic.set stop true;
   Array.iter Domain.join domains;
   Printf.printf "Domain+Thread result: %d\n" (Atomic.get result)
@@ -139,20 +144,23 @@ let multidomain_multithread () =
 let sequential () =
   let result = ref 0 in
   for _ = 0 to n_tasks - 1 do
-    let r =
-      let effc (type a) : a t -> _ = function
-        | Yield -> Some (fun (k : (a, _) continuation) ->
-          continue k ())
-        | _ -> None
-      in
-      try_with twiddle_refs () { effc }
+    let k = fiber twiddle_refs in
+    let rec run k =
+      continue_with k ()
+        { retc = (fun r -> result := !result + (Int.of_float r));
+          exnc = raise;
+          effc = fun (type a) (e : a t) ->
+            match e with
+            | Yield -> Some (fun (k : (a, _) continuation) ->
+              run k)
+            | _ -> None }
     in
-    result := !result + (Int.of_float r)
+    run k
   done;
   Printf.printf "  Sequential result: %d\n" !result
 
 let () =
-  with_preemption_setup ~interval:0.01 ~repeating:true (fun () ->
+  with_preemption_setup ~interval:0.001 ~repeating:true (fun () ->
     multidomain ();
     multithread ();
     multidomain_multithread ();
