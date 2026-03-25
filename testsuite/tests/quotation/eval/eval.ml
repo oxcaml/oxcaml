@@ -11,7 +11,7 @@
 
 let test_simple_eval =
   Printf.printf "\nTest simple eval\n";
-  let eval : <[int]> expr -> int = [%eval: int] in
+  let eval : <[int]> expr @ once -> int = [%eval: int] in
   let output = eval <[ 42 ]> in
   Printf.printf "Output: %d\n" output;
 ;;
@@ -100,4 +100,3 @@ let test_simplify_being_used =
     in
     check_simplify ()
   ]>
-

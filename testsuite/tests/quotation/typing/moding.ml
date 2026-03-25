@@ -51,7 +51,7 @@ fun (x @ local) -> <[ $x ]>
 (* Unique spliced expression *)
 fun (x @ unique) -> <[ $x ]>
 [%%expect{|
-- : 'a expr @ unique -> 'a expr = <fun>
+- : 'a expr @ unique -> 'a expr @ once = <fun>
 |}];;
 
 (* Once spliced expression *)
@@ -63,13 +63,13 @@ fun (x @ once) -> <[ $x ]>
 (* Portable spliced expression *)
 fun (x @ portable) -> <[ $x ]>
 [%%expect{|
-- : 'a expr @ portable -> 'a expr = <fun>
+- : 'a expr @ portable -> 'a expr @ once = <fun>
 |}];;
 
 (* Contended spliced expression *)
 fun (x @ contended) -> <[ $x ]>
 [%%expect{|
-- : 'a expr @ contended -> 'a expr = <fun>
+- : 'a expr @ contended -> 'a expr @ once = <fun>
 |}];;
 
 (** Splicing expressions expecting a non-legacy result **)
@@ -77,7 +77,7 @@ fun (x @ contended) -> <[ $x ]>
 (* The mode of what is in quotes should be a submode of what can be in quotes *)
 fun x -> <[ $x ]>
 [%%expect{|
-- : 'a expr -> 'a expr = <fun>
+- : 'a expr -> 'a expr @ once = <fun>
 |}];;
 
 (* Non-unique result of splicing *)
@@ -289,7 +289,15 @@ let x = <[fun () -> 2]> in <[$x () + $x ()]>
    so these tests fail. *)
 let x = <[ref 0]> in <[!($x) + !($x)]>
 [%%expect{|
-- : <[int]> expr = <[(! (Stdlib.ref 0)) + (! (Stdlib.ref 0))]>
+Line 9, characters 34-35:
+9 | let x = <[ref 0]> in <[!($x) + !($x)]>
+                                      ^
+Error: This value is used here,
+       but it is defined as once and is also being used at:
+Line 9, characters 26-27:
+9 | let x = <[ref 0]> in <[!($x) + !($x)]>
+                              ^
+
 |}];;
 let x = <[raise Not_found]> in <[$x + $x]>
 [%%expect{|
@@ -300,15 +308,29 @@ let x = <[raise Not_found]> in <[$x + $x]>
     let x = <[r := !r + 1; !r]> in
     <[ $x + $x ]> ) ]>
 [%%expect{|
-- : <[int]> expr =
-<[let r = (Stdlib.ref 0) in (r := ((! r) + 1); ! r) + (r := ((! r) + 1); ! r)
-]>
+Line 4, characters 13-14:
+4 |     <[ $x + $x ]> ) ]>
+                 ^
+Error: This value is used here,
+       but it is defined as once and is also being used at:
+Line 4, characters 8-9:
+4 |     <[ $x + $x ]> ) ]>
+            ^
+
 |}];;
 
 (* Quoting pure expansive expressions still fails (over-approximation). *)
 let x = <[1 + 1]> in <[$x + $x]>
 [%%expect{|
-- : <[int]> expr = <[(1 + 1) + (1 + 1)]>
+Line 1, characters 29-30:
+1 | let x = <[1 + 1]> in <[$x + $x]>
+                                 ^
+Error: This value is used here,
+       but it is defined as once and is also being used at:
+Line 1, characters 24-25:
+1 | let x = <[1 + 1]> in <[$x + $x]>
+                            ^
+
 |}];;
 
 (* To use these expressions as [many], we re-build them explicitly.

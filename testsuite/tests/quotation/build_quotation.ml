@@ -924,7 +924,7 @@ Error: Adding attributes on tags in polymorphic variant types
 
 <[ fun () -> <[ $ (<[ 123 ]>) ]> ]>;;
 [%%expect {|
-- : <[unit -> <[int]> expr]> expr = <[fun () -> <[$<[123]>]>]>
+- : <[unit -> <[int]> expr @ once]> expr = <[fun () -> <[$<[123]>]>]>
 |}];;
 
 let x = <[ "foo" ]> and y = <[ "bar" ]> in <[ $x ^ $y ]>;;
@@ -934,13 +934,13 @@ let x = <[ "foo" ]> and y = <[ "bar" ]> in <[ $x ^ $y ]>;;
 
 <[ fun x -> <[ fun () -> <[ $($x) ]> ]> ]>;;
 [%%expect {|
-- : <[<[$($('a)) expr]> expr -> <[unit -> $($('a)) expr]> expr]> expr =
-<[fun x -> <[fun () -> <[$($x)]>]>]>
+- : <[<[$($('a)) expr]> expr -> <[unit -> $($('a)) expr @ once]> expr]> expr
+= <[fun x -> <[fun () -> <[$($x)]>]>]>
 |}];;
 
 let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
 [%%expect {|
-- : <[unit -> <[int]> expr]> expr = <[fun () -> <[$<[42]>]>]>
+- : <[unit -> <[int]> expr @ once]> expr = <[fun () -> <[$<[42]>]>]>
 |}];;
 
 <[ raise Out_of_fibers ]>;;

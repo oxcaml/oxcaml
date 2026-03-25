@@ -42,7 +42,7 @@ module M1'' : sig val foo : 'a expr -> <[$('a) -> int]> expr end
 
 (*  Simple functions with a type variable under a quote-splice *)
 module M2 = struct
-  let f (x : <[ 'a ]> expr) = <[ ($x, $x) ]>
+  let f (x : <[ 'a ]> expr) = Obj.magic_many <[ ($x, $x) ]>
 end
 
 [%%expect{|
