@@ -74,6 +74,8 @@ val cannot_specialize : reason -> t
 (** Add a primitive of the given size to the cost of specialization *)
 val add_prim : Bound_var.t -> Flambda_primitive.t -> t -> t
 
+val add_continuations : can_be_lifted:bool -> Original_handlers.t -> t -> t
+
 (** Add a set of closure containing [~num] closures to the cost of
     specialization. *)
 val add_set_of_closures : Set_of_closures.t -> t -> t

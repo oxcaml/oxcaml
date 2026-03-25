@@ -19,7 +19,10 @@ type reason =
   | Contains_static_consts
   | Contains_set_of_closures
 
-type cost = { primitives : (Bound_var.t * Flambda_primitive.t) list }
+type cost = {
+  primitives : (Bound_var.t * Flambda_primitive.t) list;
+  non_lifted_continuations : Original_handlers.t list;
+}
 
 type t =
   | Can_specialize of cost
@@ -42,11 +45,13 @@ let [@ocamlformat "disable"] print_prim ppf (bound_var, prim) =
 
 let [@ocamlformat "disable"] print ppf t =
   match t with
-  | Can_specialize { primitives } ->
+  | Can_specialize { primitives; non_lifted_continuations; } ->
     Format.fprintf ppf "@[<hv>(can_specialize@ \
-        @[<hv 1>(primitives@ %a)@]\
+        @[<hv 1>(primitives@ %a)@]@ \
+        @[<hv 1>(non_lifted_continuations@ %a)@]\
       )@]"
       (Format.pp_print_list print_prim) primitives
+      (Format.pp_print_list Original_handlers.print) non_lifted_continuations
   | Cannot_specialize { reason } ->
     Format.fprintf ppf "@[<hv>(cannot_specialize@ \
         @[<hv 1>(reason@ %a)@]\
@@ -59,7 +64,7 @@ let cannot_specialize reason = Cannot_specialize { reason }
 
 let can_specialize () =
   if Flambda_features.match_in_match ()
-  then Can_specialize { primitives = [] }
+  then Can_specialize { primitives = []; non_lifted_continuations = []; }
   else cannot_specialize Specialization_disabled
 
 (* Updating costs *)
@@ -75,12 +80,20 @@ let add_lifted_set_of_closures _soc _t =
   Cannot_specialize { reason = Contains_set_of_closures }
 
 let add_prim bound_var prim t =
-  update_cost t ~f:(fun { primitives } ->
+  update_cost t ~f:(fun ({ primitives; _ } as cost) ->
       (* CR gbury: we might want to limit the number of primitives we store, so
          that e.g. if there are more than <n> primitives, we stop storing them
          and decide that no specialization should take place *)
       let primitives = (bound_var, prim) :: primitives in
-      { primitives })
+      { cost with primitives })
+
+let add_continuations ~can_be_lifted handlers t =
+  if can_be_lifted then t
+  else
+    update_cost t ~f:(fun ({ non_lifted_continuations; _ } as cost) ->
+        let non_lifted_continuations = handlers :: non_lifted_continuations in
+        { cost with non_lifted_continuations; })
+
 
 (* Computing cost and benefits *)
 
@@ -123,40 +136,64 @@ let cost_metrics typing_env ~switch ~join_analysis ~specialized ~generic
   in
   (* For each primitive, and each specialized call site: 1) notify it removed if
      its value is known, 2) else add the prim to the code size *)
-  List.fold_left
-    (fun metrics (bound_var, prim) ->
-      let simple = Simple.var (Bound_var.var bound_var) in
-      let disappears, stays =
-        match
-          Join_analysis.simple_refined_at_join join_analysis typing_env simple
-        with
-        | Not_refined_at_join -> 0, n_total
-        | Invariant_in_all_uses _ ->
-          (* if the canonical is a simple already, then specialization does not
-             change much *)
-          0, 0
-        | Variable_refined_at_these_uses var_analysis ->
-          Join_analysis.Variable_refined_at_join.fold_values_at_uses
-            (fun id value (disappears, stays) ->
-              if Apply_cont_rewrite_id.Set.mem id specialized
-              then
-                match value with
-                | Known _ -> disappears + 1, stays
-                | Unknown -> disappears, stays + 1
-              else disappears, stays + 1)
-            var_analysis (0, 0)
-      in
-      let metrics =
-        repeat disappears metrics
-          ~f:
-            (Cost_metrics.notify_removed
-               ~operation:(Removed_operations.prim prim))
-      in
-      let metrics =
-        repeat stays metrics
-          ~f:
-            (Cost_metrics.notify_added
-               ~code_size:(Code_size.prim ~machine_width prim))
-      in
-      metrics)
-    metrics cost.primitives
+  let metrics =
+    List.fold_left
+      (fun metrics (bound_var, prim) ->
+         let simple = Simple.var (Bound_var.var bound_var) in
+         let disappears, stays =
+           match
+             Join_analysis.simple_refined_at_join join_analysis typing_env simple
+           with
+           | Not_refined_at_join -> 0, n_total
+           | Invariant_in_all_uses _ ->
+               (* if the canonical is a simple already, then specialization does not
+                  change much *)
+               0, 0
+           | Variable_refined_at_these_uses var_analysis ->
+               Join_analysis.Variable_refined_at_join.fold_values_at_uses
+                 (fun id value (disappears, stays) ->
+                    if Apply_cont_rewrite_id.Set.mem id specialized
+                    then
+                      match value with
+                      | Known _ -> disappears + 1, stays
+                      | Unknown -> disappears, stays + 1
+                    else disappears, stays + 1)
+                 var_analysis (0, 0)
+         in
+         let metrics =
+           repeat disappears metrics
+             ~f:
+               (Cost_metrics.notify_removed
+                  ~operation:(Removed_operations.prim prim))
+         in
+         let metrics =
+           repeat stays metrics
+             ~f:
+               (Cost_metrics.notify_added
+                  ~code_size:(Code_size.prim ~machine_width prim))
+         in
+         metrics)
+      metrics cost.primitives
+  in
+  (* Count the non lifted continuations. We currently cannot easily access the
+     size of handlers, since we have not yet done a downwards traversal on them,
+     so instead we just use an arbitrary size.
+
+     CR gbury: find a way to get an estimate of the code size of handlers/exprs *)
+  let handler_metrics (_handler : Flambda.Expr.t) =
+    Cost_metrics.from_size (Code_size.of_int 5)
+  in
+  let metrics =
+    List.fold_left (fun metrics handlers ->
+        match (handlers : Original_handlers.t) with
+        | Non_recursive { handler; _ } -> Cost_metrics.(+) metrics (handler_metrics handler)
+        | Recursive { continuation_handlers; _ } ->
+            Continuation.Lmap.fold (fun _cont one_rec_handler metrics ->
+                let handler = one_rec_handler.One_recursive_handler.handler in
+                Cost_metrics.(+) metrics (handler_metrics handler)
+              ) continuation_handlers metrics
+      ) metrics cost.non_lifted_continuations
+  in
+  (* Return *)
+  metrics
+

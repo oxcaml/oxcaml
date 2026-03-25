@@ -1805,9 +1805,12 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     let bound_continuations =
       Original_handlers.bound_continuations data.handlers
     in
-    DE.add_lifting_cost lifting_cost
+    DE.map_specialization_cost
+      ~f:(Specialization_cost.add_continuations data.handlers
+            ~can_be_lifted:(Original_handlers.can_be_lifted data.handlers))
+    (DE.add_lifting_cost lifting_cost
       (DE.define_continuations denv_for_body bound_continuations
-         ~can_be_lifted:(Original_handlers.can_be_lifted data.handlers))
+         ~can_be_lifted:(Original_handlers.can_be_lifted data.handlers)))
   in
   (* During specialization, we must take care of correctly handling let-bound
      continuations that have been lifted during the first downwards pass, and
