@@ -1214,8 +1214,8 @@ and f2 () : string @ local = exclave_ "hi"
 Line 2, characters 7-42:
 2 | and f2 () : string @ local = exclave_ "hi"
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function takes a parameter which is "local",
-       but was expected to take a parameter which is "global".
+Error: This function has a return value which is "local",
+       but was expected to have a return value which is "global".
 |}]
 
 (* Return mode must be greater than the type *)
