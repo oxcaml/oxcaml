@@ -1141,7 +1141,8 @@ let mutvar_mode ~loc ~env m0 exp_mode =
 (** The [expected_mode] of a top-level expression. *)
 let mode_toplevel_expression =
   let mode =
-    Value.Const.legacy
+    { Value.Const.legacy with
+      linearity = Once }
     |> Value.of_const ~hint_comonadic:Toplevel_expression
   in
   mode_default mode

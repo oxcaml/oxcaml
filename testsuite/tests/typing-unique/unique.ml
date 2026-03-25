@@ -211,11 +211,7 @@ val foo : unit -> string @ once = <fun>
 (* Top-level expressions (not bindings) can be once *)
 ("foo" : _ @ once);;
 [%%expect{|
-Line 1, characters 0-18:
-1 | ("foo" : _ @ once);;
-    ^^^^^^^^^^^^^^^^^^
-Error: This value is "once"
-       but is expected to be "many" because it is a top-level expression.
+- : string = "foo"
 |}]
 
 (* top-level must be aliased; the following unique is weakened to aliased *)
