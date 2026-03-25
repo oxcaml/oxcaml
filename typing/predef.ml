@@ -858,19 +858,31 @@ let add_runtime_metaprogramming_types add_type env =
        ~variance:Variance.covariant
        ~separability:Separability.Ind
        ~jkind:(fun param ->
-         Jkind.Builtin.immutable_data ~why:Tquote |>
+         Jkind.Builtin.immutable_data ~why:Quoted_expression |>
            Jkind.add_with_bounds
              ~modality:Mode.Modality.Const.id
              ~type_expr:param)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_code;
+           position = 1;
+           arity = 1;
+         }))
   |> add_type1 ident_eval
        ~variance:Variance.covariant
        ~separability:Separability.Ind
        ~manifest:type_eval
        ~jkind:(fun param ->
-         Jkind.Builtin.value ~why:Evaluation_result |>
+         Jkind.Builtin.any ~why:Evaluated_quote |>
            Jkind.add_with_bounds
              ~modality:Mode.Modality.Const.id
              ~type_expr:param)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_eval;
+           position = 1;
+           arity = 1;
+         }))
 
 let builtin_values =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns
