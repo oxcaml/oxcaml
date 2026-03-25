@@ -702,7 +702,8 @@ let ocaml_ignored_flags =
     "-manual-module-init";
     "-no-manual-module-init";
     "-dfexpr-annot";
-    "-dfexpr-annot-after"
+    "-dfexpr-annot-after";
+    "-linscan"
   ]
 
 let ocaml_ignored_parametrized_flags =
