@@ -585,6 +585,10 @@ module Sort = struct
 
   let last_var_uid = ref 0
 
+  let new_var_unsafe ~level =
+    incr last_var_uid;
+    { contents = None; uid = !last_var_uid; level }
+
   let new_var ~level =
     (* Guard against accidentally creating a genvar or rigidvar via this path:
        those require special handling (sub_map/instance_map registration for
@@ -593,12 +597,9 @@ module Sort = struct
        level is simply lowered by [update_level] upon unification. *)
     if level >= level_rigid
     then Misc.fatal_error "Jkind_types.new_var: level >= level_rigid";
-    incr last_var_uid;
-    { contents = None; uid = !last_var_uid; level }
+    new_var_unsafe ~level
 
-  let new_genvar () =
-    incr last_var_uid;
-    { contents = None; uid = !last_var_uid; level = level_generic }
+  let new_genvar () = new_var_unsafe ~level:level_generic
 
   let instance_map : (var * var) list ref = ref []
 
@@ -608,8 +609,7 @@ module Sort = struct
         (fun v ->
           assert (Option.is_none v.contents);
           assert (is_genvar v);
-          incr last_var_uid;
-          let v' = { contents = None; uid = !last_var_uid; level } in
+          let v' = new_var_unsafe ~level in
           v, v')
         vars
     in
