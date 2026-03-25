@@ -1437,6 +1437,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       ~finally:(fun () -> cleanup_mode_copy_scope scope)
       (fun () -> f scope)
 
+  let rec trace_gencopy ~copy_to_level v =
+    match v.gencopy with
+    | None -> None
+    | Some v' when v'.level = copy_to_level -> Some v'
+    | Some v' -> trace_gencopy ~copy_to_level v'
+
   let rec copy_v : type a.
       copy_scope:_ ->
       copy_from_level:int ->
@@ -1450,7 +1456,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     else begin
       (* generalize_structure might have already created a copy, cached in [gencopy].
          If such a copy exist, we return it *)
-      match v.gencopy with
+      match trace_gencopy ~copy_to_level v with
       | Some v' -> v'
       | None -> (
         match v.subst with
