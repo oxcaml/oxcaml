@@ -342,9 +342,10 @@ let main b =
 ### Match Forwarding (match-in-match)
 
 **This optimization is currently experimental, and requires the
-`--flambda2-match-in-match` flag. That flag with also automatically
-enable the n-way join, or fail if the join is explicitly set to something
-other than the n-way join.**
+`--flambda2-match-in-match` flag. For this optimization to trigger, join points
+need to be enabled (e.g. using `-O2` or `-O3`), and the flag will also
+automatically enable the n-way join, or fail if the join is explicitly set to
+something other than the n-way join.**
 
 Match Forwarding (colloquially known as ``match-in-match'') is an optimization
 where a `match` following a control flow construct is duplicated inside of that
@@ -422,4 +423,10 @@ let main b x y =
     (Some y, None)
   else
     (Some x, Some y)
+```
 
+**Limitations**: there are some known limitations of the current implementation
+of match forwarding:
+- matches on polymorphic variants will not be forwarded
+- some matches can be transformed into array lookups, in which case match forwarding
+  will not trigger
