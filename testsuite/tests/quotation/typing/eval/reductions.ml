@@ -45,7 +45,7 @@ val f : 'a eval -> 'a eval = <fun>
 
 (* [eval] stub *)
 open (struct
-  let eval = Obj.magic
+  let eval x = x |> Obj.magic_many |> Obj.magic
 end : sig
   val eval : 'a expr -> 'a eval
 end)
@@ -365,14 +365,15 @@ open (struct
   let eval1 = <[Obj.magic ()]>
   let eval2 = <[<[Obj.magic ()]>]>
 end : sig
-  val eval0 : 'a expr -> 'a eval
-  val eval1 : <[ $('a) expr -> $('a) eval ]> expr
-  val eval2 : <[ <[ $($('a)) expr -> $($('a)) eval ]> expr ]> expr
+  val eval0 : 'a expr @ once -> 'a eval
+  val eval1 : <[ $('a) expr @ once -> $('a) eval ]> expr
+  val eval2 : <[ <[ $($('a)) expr @ once -> $($('a)) eval ]> expr ]> expr
 end)
 [%%expect {|
-val eval0 : 'a expr -> 'a eval = <fun>
-val eval1 : <[$('a) expr -> $('a) eval]> expr = <[Stdlib.Obj.magic ()]>
-val eval2 : <[<[$($('a)) expr -> $($('a)) eval]> expr]> expr =
+val eval0 : 'a expr @ once -> 'a eval = <fun>
+val eval1 : <[$('a) expr @ once -> $('a) eval]> expr = <[Stdlib.Obj.magic ()
+  ]>
+val eval2 : <[<[$($('a)) expr @ once -> $($('a)) eval]> expr]> expr =
   <[<[Stdlib.Obj.magic ()]>]>
 |}]
 

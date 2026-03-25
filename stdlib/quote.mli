@@ -42,4 +42,4 @@ module Expr : sig
 end
 
 val print : Format.formatter -> 'a expr -> unit
-val string_of_expr : 'a expr -> string
+val string_of_expr : 'a expr @ once -> string

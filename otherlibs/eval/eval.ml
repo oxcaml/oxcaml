@@ -234,6 +234,7 @@ let eval (expr : 'a expr) =
 let compile_mutex = Mutex.create ()
 
 let eval code =
+  let code = Obj.magic_many code in
   Mutex.protect compile_mutex (fun () ->
       (* TODO: Consider if some warnings are important enough to show. *)
       try Warnings.without_warnings (fun () -> eval code)

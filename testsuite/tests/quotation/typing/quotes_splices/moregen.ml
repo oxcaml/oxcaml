@@ -42,7 +42,7 @@ module M1'' : sig val foo : 'a expr -> <[$('a) -> int]> expr end
 
 (*  Simple functions with a type variable under a quote-splice *)
 module M2 = struct
-  let f (x : <[ 'a ]> expr) = <[ ($x, $x) ]>
+  let f (x : <[ 'a ]> expr) = Obj.magic_many <[ ($x, $x) ]>
 end
 
 [%%expect{|
@@ -57,7 +57,7 @@ module M2' : sig
 end = M2
 
 [%%expect{|
-module M2' : sig val f : <[int]> expr -> <[int * int]> expr end
+module M2' : sig val f : <[int]> expr -> <[int * int]> expr @ once end
 |}]
 
 (*  [M3] is trickier, leading to the case $'a < t *)
@@ -69,7 +69,8 @@ module M3 = struct
 end
 
 [%%expect{|
-module M3 : sig val f : <[($('a) -> unit) * ($('a) -> unit)]> expr end
+module M3 :
+  sig val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once end
 |}]
 
 (*   $('a) = int  <=>  'a = <[int]> *)
@@ -78,7 +79,8 @@ module M3' : sig
 end = M3
 
 [%%expect{|
-module M3' : sig val f : <[(int -> unit) * (int -> unit)]> expr end
+module M3' :
+  sig val f : unit -> <[(int -> unit) * (int -> unit)]> expr @ once end
 |}]
 
 (*   [M3''] is a simple failure to check the error message when we end up with
@@ -94,16 +96,20 @@ Line 3, characters 6-8:
           ^^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : <[($('a) -> unit) * ($('a) -> unit)]> expr end
+         sig
+           val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once
+         end
        is not included in
-         sig val f : <[(string -> unit) * (int -> unit)]> expr end
+         sig
+           val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
+         end
        Values do not match:
-         val f : <[($('a) -> unit) * ($('a) -> unit)]> expr
+         val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once
        is not included in
-         val f : <[(string -> unit) * (int -> unit)]> expr
-       The type "<[(string -> unit) * (string -> unit)]> expr"
+         val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
+       The type "unit -> <[(string -> unit) * (string -> unit)]> expr @ once"
        is not compatible with the type
-         "<[(string -> unit) * (int -> unit)]> expr"
+         "unit -> <[(string -> unit) * (int -> unit)]> expr @ once"
        Type "(string -> unit) * (string -> unit)" is not compatible with type
          "(string -> unit) * (int -> unit)"
        Type "string" is not compatible with type "int"
