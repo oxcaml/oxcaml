@@ -166,18 +166,6 @@ let add_substring b s offset len =
     Bytes.unsafe_blit_string s offset buffer position len;
   b.position <- new_position
 
-let add_string b s =
-  let len = String.length s in
-  let position = b.position in
-  let {buffer; length} = b.inner in
-  let new_position = position + len in
-  if new_position > length then (
-    resize b len;
-    Bytes.blit_string s 0 b.inner.buffer b.position len;
-  ) else
-    Bytes.unsafe_blit_string s 0 buffer position len;
-  b.position <- new_position
-
 let add_subbytes b bytes offset len =
   if offset < 0 || len < 0 || offset > Bytes.length bytes - len
   then invalid_arg "Buffer.add_subbytes";
@@ -191,17 +179,19 @@ let add_subbytes b bytes offset len =
     Bytes.unsafe_blit bytes offset buffer position len;
   b.position <- new_position
 
+let add_string b s =
+  add_substring b s 0 (String.length s)
+  [@nontail]
+
 let add_bytes b bytes =
-  let len = Bytes.length bytes in
-  let position = b.position in
-  let {buffer; length} = b.inner in
-  let new_position = position + len in
-  if new_position > length then (
-    resize b len;
-    Bytes.blit bytes 0 b.inner.buffer b.position len;
-  ) else
-    Bytes.unsafe_blit bytes 0 buffer position len;
-  b.position <- new_position
+  add_subbytes b bytes 0 (Bytes.length bytes)
+  [@nontail]
+
+let add_substring b s offset len =
+  add_substring b s offset len
+
+let add_subbytes b bytes offset len =
+  add_subbytes b bytes offset len
 
 let add_buffer b bs =
   add_subbytes b bs.inner.buffer 0 bs.position
