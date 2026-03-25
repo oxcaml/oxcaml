@@ -6004,26 +6004,23 @@ let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
        try
          Misc.protect_refs [R (univar_pairs, [])] begin fun () ->
          let type_pairs = fresh_moregen_pairs () in
-         let (pat_sort_refs, ()) =
-           Jkind_types.Sort.sub_with pat_sorts (fun () ->
-             moregen inst_nongen Covariant type_pairs env patt subj)
-         in
-         (* [subj_sorts] are ephemeral rigid vars created by
+         moregen inst_nongen Covariant type_pairs env patt subj;
+         (* After [moregen], [pat_sorts] have been set to [subj_sorts].
+            [subj_sorts] are ephemeral rigid vars created by
             [instance_with] to stand for [subj_sort_vars] during moregen.
             Replace them back with the originals so that the returned
             [pat_sort_refs] refer to [subj_sort_vars], not to the
             short-lived rigid instances. *)
-         let subst_map = List.combine subj_sorts subj_sort_vars in
-         let rec subst_sort (s : Jkind_types.Sort.t) =
-           match s with
-           | Var v ->
-             (match List.assq_opt v subst_map with
-              | Some v' -> Jkind_types.Sort.Var v'
-              | None -> s)
-           | Base _ | Univar _ -> s
-           | Product ts -> Jkind_types.Sort.Product (List.map subst_sort ts)
+         let subj_sort_vars =
+          List.map (fun v -> Jkind_types.Sort.Var v) subj_sort_vars
          in
-         List.map (Option.map subst_sort) pat_sort_refs
+         let subst_map = List.combine subj_sorts subj_sort_vars in
+         List.map
+           (fun v ->
+             v
+             |> Jkind_types.Sort.get_representable_var
+             |> Option.map (Jkind_types.Sort.subst subst_map))
+           pat_sorts
          end
        with Moregen_trace trace ->
          (* Moregen splits the generic level into two finer levels:

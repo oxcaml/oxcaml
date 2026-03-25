@@ -49,7 +49,7 @@ module Sort = struct
   (* Special sentinel levels stored in [var.level] when [contents = None]:
      - [level_generic]: a generalized sort variable (genvar), used for layout
        polymorphism and must be quantified. That is, they can only appear under
-       [sub_map] or [instance_map], etc.)
+       [instance_map], etc.)
      - [level_rigid]: a rigid sort variable that cannot be unified.
      - [level_fresh]: a freshly-created unifiable sort variable whose level has
        not yet been set; it will be lowered via [update_level] as soon as it is
@@ -75,9 +75,13 @@ module Sort = struct
       uid : int (* For debugging / printing only *)
     }
 
-  let is_rigidvar var = var.level = level_rigid
+  let is_rigidvar var =
+    assert (Option.is_none var.contents);
+    var.level = level_rigid
 
-  let is_genvar var = var.level = level_generic
+  let is_genvar var =
+    assert (Option.is_none var.contents);
+    var.level = level_generic
 
   let equal_base b1 b2 =
     match b1, b2 with
@@ -395,39 +399,13 @@ module Sort = struct
       log_change (u, Clevel u.level);
       u.level <- new_level)
 
-  let sub_map : (var * t option ref) list ref = ref []
-
   let[@inline] set : var -> t option -> unit =
    fun v t_op ->
     log_change (v, Ccontents v.contents);
-    let is_genvar = is_genvar v && Option.is_none v.contents in
     v.contents <- t_op;
     match t_op with
     | None -> ()
-    | Some t ->
-      if is_genvar
-      then begin
-        let r = List.assq v !sub_map in
-        r := Some t
-      end;
-      t_iter ~f:(fun u -> update_level u v) t
-
-  let sub_with vars f =
-    let pairs =
-      List.map
-        (fun v ->
-          assert (Option.is_none v.contents);
-          assert (is_genvar v);
-          v, ref None)
-        vars
-    in
-    let old_map = !sub_map in
-    sub_map := pairs @ old_map;
-    Misc.try_finally
-      (fun () ->
-        let result = f () in
-        List.map (fun (_, r) -> !r) pairs, result)
-      ~always:(fun () -> sub_map := old_map)
+    | Some t -> t_iter ~f:(fun u -> update_level u v) t
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save
@@ -587,8 +565,8 @@ module Sort = struct
 
   let new_var ~level =
     (* Guard against accidentally creating a genvar or rigidvar via this path:
-       those require special handling (sub_map/instance_map registration for
-       genvars; refusal to unify for rigidvars). [level_fresh] is intentionally
+       those require special handling (instance_map registration for genvars;
+       refusal to unify for rigidvars). [level_fresh] is intentionally
        not guarded here — it behaves like any other unifiable variable and its
        level is simply lowered by [update_level] upon unification. *)
     if level >= level_rigid
@@ -606,7 +584,6 @@ module Sort = struct
     let new_vars =
       List.map
         (fun v ->
-          assert (Option.is_none v.contents);
           assert (is_genvar v);
           incr last_var_uid;
           let v' = { contents = None; uid = !last_var_uid; level } in
@@ -644,6 +621,40 @@ module Sort = struct
         if result != s then set r (Some result);
         (* path compression *)
         result)
+
+  let rec get_representable : t -> t option = function
+    | (Base _ | Univar _) as t -> Some t
+    | Product ts -> begin
+      match get_representable_product ts with
+      | None -> None
+      | Some ts' -> Some (Product ts')
+    end
+    | Var v -> get_representable_var v
+
+  and get_representable_product : t list -> t list option =
+   fun ts ->
+    List.fold_right
+      (fun t acc ->
+        match acc, get_representable t with
+        | None, _ | _, None -> None
+        | Some ts, Some t -> Some (t :: ts))
+      ts (Some [])
+
+  and get_representable_var : var -> t option =
+   fun v ->
+    match v.contents with
+    | None -> begin if is_rigidvar v then Some (Var v) else None end
+    | Some t -> get_representable t
+
+  let rec subst s t =
+    match t with
+    | Var v -> begin
+      match v.contents with
+      | None -> begin match List.assq_opt v s with Some t -> t | None -> t end
+      | Some t -> subst s t
+    end
+    | Base _ | Univar _ -> t
+    | Product ts -> Product (List.map (subst s) ts)
 
   let rec default_to_value_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
