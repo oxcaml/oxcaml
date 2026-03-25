@@ -866,16 +866,6 @@ CAMLexport int caml_c_thread_register(void)
   caml_init_domain_self(Dom_c_threads);
   caml_acquire_domain_lock();
 
-  /* Acquire a tick, in case this is the only non-initial thread */
-  const value* acquire_tick = caml_named_value("Domain.Tick.acquire");
-  if (!acquire_tick) {
-    fprintf(stderr, "Fatal error: named value Domain.Tick.acquire not found");
-    exit(2);
-  }
-  value tick = caml_callback_exn(*acquire_tick, Val_unit);
-  if (Is_exception_result(tick)) goto out_err;
-  c_thread_tick = Long_val(tick);
-
   /* Set a thread info block */
   caml_thread_t th = thread_alloc_and_add();
   /* If it fails, we release the lock and return an error. */
@@ -883,6 +873,22 @@ CAMLexport int caml_c_thread_register(void)
   thread_init_current(th);
   /* We can now allocate the thread descriptor on the major heap */
   th->descr = caml_thread_new_descriptor(Val_unit);  /* no closure */
+
+  /* Acquire a tick, in case this is the only non-initial thread.
+     This must happen after the thread is fully set up, since the tick
+     acquire may start the tick thread which sends interrupts to all
+     domains. */
+  const value* acquire_tick = caml_named_value("Domain.Tick.acquire");
+  if (!acquire_tick) {
+    fprintf(stderr, "Fatal error: named value Domain.Tick.acquire not found");
+    exit(2);
+  }
+  value tick = caml_callback_exn(*acquire_tick, Val_unit);
+  if (Is_exception_result(tick)) {
+    caml_thread_remove_and_free(th);
+    goto out_err;
+  }
+  c_thread_tick = Long_val(tick);
 
   /* Release the domain lock the regular way. Note: we cannot receive
      an exception here. */
