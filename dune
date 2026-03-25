@@ -1003,7 +1003,7 @@
    backend/asm_targets/.asm_targets.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files_rec backend/asm_targets/.asm_targets.objs/native/*.cmx)
   (glob_files
-   backend/binary_emitter_intf/.binary_emitter_intf.objs/byte/*.{cmi,cmo,cmt})
+   backend/binary_emitter_intf/.binary_emitter_intf.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files
    backend/binary_emitter_intf/.binary_emitter_intf.objs/native/*.cmx)
   (glob_files
