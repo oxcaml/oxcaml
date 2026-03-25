@@ -214,7 +214,8 @@ val foo : unit -> string @ once = <fun>
 Line 1, characters 0-18:
 1 | ("foo" : _ @ once);;
     ^^^^^^^^^^^^^^^^^^
-Error: This value is "once" but is expected to be "many".
+Error: This value is "once"
+       but is expected to be "many" because it is a top-level expression.
 |}]
 
 (* top-level must be aliased; the following unique is weakened to aliased *)

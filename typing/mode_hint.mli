@@ -82,6 +82,7 @@ type 'd const =
   | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
   | Lazy_allocated_on_heap : (disallowed * 'r) pos const
   | Legacy : legacy -> ('l * 'r) const
+  | Toplevel_expression : (disallowed * 'r) pos const
   | Tailcall_function : (disallowed * 'r) pos const
   | Tailcall_argument : (disallowed * 'r) pos const
   | Mutable_read : mutable_part -> (disallowed * 'r) neg const
