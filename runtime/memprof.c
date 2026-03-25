@@ -155,9 +155,9 @@
  *   those threads are serialized by `systhreads`).
  *
  * - The atomic root value `requested_global_config`, used to
- *   implement `caml_memprof_enlist_all_domains`. This is only ever
- *   set in that function, and used in `caml_memprof_scan_roots` and
- *   `caml_memprof_do_pending_exn`.
+ *   implement `caml_memprof_enlist_all_domains`. This is primarily
+ *   set in that function, and used in `caml_memprof_do_pending_exn`
+ *   (it's also scanned as a root, and tested for pending interrupts).
  *
  * 3. Interface with GC
  *
@@ -220,7 +220,7 @@
  *
  * We use a high-quality high-performance 32-bit uniform PRNG
  * (xoshiro128+), with per-domain state vectors. We initialize the
- * per-domain state vector with a low-quality PRNG (SplitMX64), seeded
+ * per-domain state vector with a low-quality PRNG (SplitMix64), seeded
  * separately for each domain.
  *
  * To convert from a uniform PRN `u` to a geometric PRN `g`, we compute
@@ -272,18 +272,19 @@
  * the `young_trigger`, usually triggering a garbage collection. When
  * profiling, we set the trigger at the next word which we want to
  * sample (see "Random Number Generation"), thus allowing us to enter
- * memprof code at the approporiate allocation point. However,
+ * memprof code at the appropriate allocation point. However,
  * sampling the allocation is more complex in this case for several
  * reasons:
  *
  * - Deferred allocation. A sampled block is not actually allocated
- *   until the runtime returns to the GC poll point in Caml code,
- *   after the memprof sampling code has run. So we have to predict
- *   the address of the sampled block for the entry record, to track
- *   its future promotion or collection. Until the allocation callback
- *   has run, instead of the allocated block address, the entry holds
- *   the offset in words of the block within the combined allocation,
- *   and the entry's `offset` field is set.
+ *   until after the allocation callback has run (so that it is
+ *   allocated by bumping the `young_ptr` allocation pointer
+ *   immediately before return to the allocation Caml function which
+ *   will then initialize it). So we create an entry for it using its
+ *   offset in words within the combined allocation, with the entry's
+ *   `offset` field set. After the allocation callbacks are run, and
+ *   no more allocation will take place before returning to Caml, we
+ *   can update those entries with the true allocation address.
  *
  * - Combined allocations. A single GC poll point in Caml code may
  *   combine the allocation of several distinct blocks, each of which
@@ -355,7 +356,7 @@
  * allocation, unless that thread terminates before running the
  * callback, in which case it is inherited by the domain.
  *
- * Callbacks are run by iterating through candidate entries in a entry
+ * Callbacks are run by iterating through candidate entries in an entry
  * table. See under "Entries" above. A single entry may have more than
  * one callback to run (if, for example, it has been promoted *and*
  * garbage collected since the last time callbacks for that entry were
@@ -455,15 +456,16 @@ typedef struct memprof_orphan_table_s memprof_orphan_table_s,
  * bits in the final word). */
 
 struct entry_s {
-  /* Memory block being sampled. This is a weak GC root. Note that
-   * during the allocation callback of a block allocated directly by OCaml,
-   * this may be a comballoc offset (and the `offset` flag set). */
+  /* Memory block being sampled, if still alive. If `offset` is set,
+     the block hasn't been allocated yet and this is actually the
+     offset in words from the comballoc base to the block's header
+     word. Otherwise, this is a weak GC root pointing to the block. */
   value block;
 
   /* The value returned by the previous callback for this block, or
-   * the callstack (as a value-tagged pointer to the C heap) if the
-   * alloc callback has not been called yet.  This is a strong GC
-   * root. */
+   * the callstack (either on the heap or as a value-tagged pointer to
+   * the C heap) if the alloc callback has not been called yet.  This
+   * is a strong GC root. */
   value user_data;
 
   /* Number of samples in this block. */
@@ -513,8 +515,8 @@ struct entries_s {
   entry_t t; /* Pointer to array of entry_s structures */
   size_t min_capacity, capacity, size; /* array allocation management */
 
-  /* Before this position, the [block] and [user_data] fields both
-   * point to the major heap ([young <= size]). */
+  /* Before this position, neither [block] nor [user_data] points
+   * to the minor heap ([young <= size]). */
   size_t young;
 
   /* There are no blocks to be evicted before this position
@@ -573,13 +575,13 @@ struct memprof_domain_s {
   /* The owning domain */
   caml_domain_state *caml_state;
 
-  /* Tracking entries for this domain. In the usual case these are
-   * entries allocated by a thread in this domain for which the
-   * allocation callback has returned: the entry is then transferred
-   * to this per-domain table. However, this table will also include
-   * entries for threads in this domain which terminated before
-   * calling the allocation callback.  entries.config is the current
-   * memprof configuration for this domain. */
+  /* Tracking entries for this domain.  These are entries allocated by
+   * a thread in this domain for which the allocation callback has
+   * returned (the entry is then transferred to this per-domain
+   * table), and also entries marked for deletion (for example, if a
+   * thread terminates before running an allocation callback).
+   * entries.config is the current memprof configuration for this
+   * domain. */
   entries_s entries;
 
   /* Orphaned entries - either from previous profiles run in this
@@ -669,7 +671,7 @@ static void entries_clear(entries_t es)
 
 /* Reallocate the [es] entries table if it is either too small or too
  * large. [grow] is the number of free cells needed.
- * Returns false if reallocation was necessary but failed, and truer
+ * Returns false if reallocation was necessary but failed, and true
  * otherwise. */
 
 static bool entries_ensure(entries_t es, size_t grow)
@@ -836,9 +838,12 @@ static void entries_clear_inactive(entries_t es)
 
 static value validated_config(entries_t es);
 
-/* Transfer all entries from one entries table to another, excluding
- * ones which have not run any callbacks (these are deleted).
- * Return `false` if allocation fails. */
+/* Transfer all entries from one entries table to another. Ones which
+ * have not run any callbacks are marked for deletion.
+ * Return `false` if allocation fails.
+ *
+ * There's room for optimisation here, avoiding allocation, if
+ * to->size == 0. */
 
 static bool entries_transfer(entries_t from, entries_t to)
 {
@@ -858,7 +863,7 @@ static bool entries_transfer(entries_t from, entries_t to)
   for (size_t i = 0; i < from->size; ++i) {
     if (from->t[i].callbacks == 0) {
       /* Very rare: transferring an entry which hasn't called its
-       * allocation callback. We just delete it. */
+       * allocation callback. We mark it for deletion. */
       entry_delete(from, i);
     }
     to->t[i + delta] = from->t[i];
@@ -870,14 +875,13 @@ static bool entries_transfer(entries_t from, entries_t to)
       runner->running_index = i + delta;
     }
   }
-
-  if (to->young == delta) {
+  if (to->young == delta) { /* `to` had no young entries */
     to->young = from->young + delta;
   }
-  if (to->evict == delta) {
+  if (to->evict == delta) { /* `to` had no evictable entries */
     to->evict = from->evict + delta;
   }
-  if (to->active == delta) {
+  if (to->active == delta) { /* `to` had no pending entries */
     to->active = from->active + delta;
   }
   /* Reset `from` to empty, and allow it to shrink */
@@ -911,8 +915,7 @@ static value thread_config(memprof_thread_t thread)
 
 /* Orphan any surviving entries from a domain or its threads (after
  * first discarding any deleted and offset entries), onto the domain's
- * orphans list. This copies the domain's table itself, to avoid
- * copying the potentially live array.
+ * orphans list.
  *
  * Returns false if allocation fails, true otherwise. */
 
@@ -1877,7 +1880,8 @@ static value entries_run_callbacks_exn(memprof_thread_t thread,
                              CB_PROMOTE);
       if (Is_exception_result(res)) break;
     } else if (e->deallocated && !(e->callbacks & CB_MASK(CB_DEALLOC))) {
-      /* deallocated entry; call dealloc callback */
+      /* deallocated entry: call dealloc callback.
+       * Major if either promoted or allocated major. */
       value cb = (e->promoted || !e->alloc_young) ?
         Dealloc_major(config) : Dealloc_minor(config);
       res = run_callback_exn(thread, es, i,
@@ -1977,15 +1981,19 @@ static void maybe_track_block(memprof_domain_t domain,
   set_action_pending_as_needed(domain);
 }
 
-/* Sets the trigger for the next sample in a domain's minor
- * heap. Could race with sampling and profile-stopping code, so do not
- * call from another domain unless the world is stopped (at the time
- * of writing, this is only actually called from this domain). Must be
- * called after each minor sample and after each minor collection. In
- * practice, this is called at each minor sample, at each minor
- * collection, and when sampling is suspended and unsuspended. Extra
- * calls do not change the statistical properties of the sampling
- * because of the memorylessness of the geometric distribution. */
+/* Sets the memprof_young_trigger for the next sample in a domain's
+ * minor heap. Must be followed by a call to caml_reset_young_limit
+ * before entering Caml.
+ *
+ * This could race with sampling and profile-stopping code, so do not
+ * call it from another domain unless the world is stopped (at the
+ * time of writing, this is only actually called from this
+ * domain). Must be called after each minor sample and after each
+ * minor collection. In practice, this is called at each minor sample,
+ * at each minor collection, and when sampling is suspended and
+ * unsuspended. Extra calls do not change the statistical properties
+ * of the sampling because of the memorylessness of the geometric
+ * distribution. */
 
 void caml_memprof_set_trigger(caml_domain_state *state)
 {
@@ -2232,7 +2240,8 @@ CAMLexport void caml_memprof_enter_thread(memprof_thread_t thread)
 
 /**** Pending actions ****/
 
-/* Set config of the domain and all its threads. */
+/* Set config of the domain and all its threads. All the entries
+ * tables (domain and threads) must be empty. */
 static void change_config(memprof_domain_t domain, value config)
 {
   CAMLassert(domain->entries.size == 0);
@@ -2260,9 +2269,10 @@ value caml_memprof_do_pending_exn(void)
   value existing_config = thread->entries.config;
   if (requested_config != CONFIG_NONE && existing_config != requested_config) {
     if (!Sampling(requested_config)) {
-        atomic_compare_exchange_strong(&requested_global_config, &requested_config, CONFIG_NONE);
+        atomic_compare_exchange_strong(&requested_global_config,
+                                       &requested_config, CONFIG_NONE);
     } else {
-      if (Sampling(existing_config)) /* stop any existing profile on this domain */
+      if (Sampling(existing_config)) /* stop existing profile */
           Set_status(existing_config, CONFIG_STATUS_STOPPED);
 
       if (!orphans_create(domain))
@@ -2398,7 +2408,7 @@ CAMLprim value caml_memprof_stop(value unit)
   CAMLassert(thread);
 
   /* Final attempt to run allocation callbacks; don't use
-   * caml_memprof_run_callbacks_exn as we only really need allocation
+   * domain_run_callbacks_exn as we only really need allocation
    * callbacks now. */
   if (!thread->suspended) {
     update_suspended(domain, true);

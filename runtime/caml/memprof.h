@@ -35,7 +35,7 @@ enum { CAML_MEMPROF_SRC_NORMAL = 0,
  * sampled. `allocated_words` is the number of words allocated, to be
  * passed to the allocation callback. `sampled_words` is the number of
  * words to use when computing the number of samples (this will
- * normally be one more than `allocated words` due to the header word,
+ * normally be one more than `allocated_words` due to the header word,
  * but may not be for out-of-heap memory). `source` is one of the
  * `CAML_MEMPROF_SRC_* constants above. */
 
@@ -81,7 +81,7 @@ extern void caml_memprof_scan_roots(scanning_action f,
 extern void caml_memprof_after_minor_gc(caml_domain_state *state);
 
 /* Update memprof data structures for the domain `state`, to reflect
- * survival, after a minor GC is completed. */
+ * survival, after a major GC is completed. */
 
 extern void caml_memprof_after_major_gc(caml_domain_state *state);
 
