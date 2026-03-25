@@ -548,11 +548,13 @@ val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t
-val mark_toplevel_in_quotations : t -> t
 
 val check_no_open_quotations :
   Location.t -> t -> no_open_quotations_context -> unit
 val stage : t -> stage
+
+val mark_toplevel_in_quotations : scope:int -> t -> t
+val path_is_toplevel_in_quotations : t -> Path.t -> bool
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit

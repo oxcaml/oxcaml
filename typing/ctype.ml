@@ -174,6 +174,12 @@ let create_scope () =
 
 let wrap_end_def f = Misc.try_finally f ~always:end_def
 
+let mark_toplevel_in_quotations env =
+  let scope = !current_level in
+  (* Create a new scope to make sure we only capture what came before *)
+  let _ = create_scope () in
+  Env.mark_toplevel_in_quotations ~scope env
+
 let with_local_level ?post f =
   begin_def ();
   let result = wrap_end_def f in
@@ -2212,7 +2218,12 @@ let try_expand_safe env ty =
 (* Perform one of the following head-position beta reductions via rewrites:
    * Reduce a quoted-eval through a concrete (top-level) type constructor.
    * Cancel a quote-splice pair. *)
-let rec try_reduce_once t =
+let rec try_reduce_once env t =
+  let path_must_be_toplevel path =
+    if not (Env.path_is_toplevel_in_quotations env path) then
+      raise Cannot_expand
+  in
+  let try_reduce_once t = try_reduce_once env t in
   let try_reduce_poly t = if is_Tpoly t then try_reduce_once t else t in
   match get_desc t with
   | Tquote_eval t -> begin
@@ -2231,9 +2242,8 @@ let rec try_reduce_once t =
     | Tunboxed_tuple tl ->
       Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
     (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
-    (* CR metaprogramming jbachurski: Path [p] might only be available inside
-       the quote. Thus, we should check if it is top-level here. *)
     | Tconstr (p, tl, a) ->
+      path_must_be_toplevel p;
       Tconstr (p, List.map new_quote_eval_ty tl, a)
     (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
     | Tobject (t, ct) ->
@@ -2251,8 +2261,9 @@ let rec try_reduce_once t =
         try_reduce_once (new_quote_eval_ty t),
         ref (
           Option.map
-            (* CR metaprogramming jbachurski: Only reduce top-level [p]. *)
-            (fun (p, tl) -> p, List.map new_quote_eval_ty tl)
+            (fun (p, tl) ->
+              path_must_be_toplevel p;
+              p, List.map new_quote_eval_ty tl)
             !ct))
     (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
     | Tfield (s, k, t_method, t_rest) ->
@@ -2302,7 +2313,7 @@ let rec try_reduce_once t =
     (*     [<[ module S with type typ = t ]> eval]
         ==> [module S with type typ = <[t]> eval] *)
     | Tpackage (p, fl) ->
-      (* CR metaprogramming jbachurski: Only reduce if [p] is top-level. *)
+      path_must_be_toplevel p;
       Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
     (* It is safe not to expand [Tof_kind], and we do not need to currently *)
     | Tof_kind _ -> raise Cannot_expand
@@ -2333,41 +2344,41 @@ let rec try_reduce_once t =
   | _ -> raise Cannot_expand
 
 (* Perform head-position reductions exhaustively til the normal form. *)
-let rec try_reduce ty =
-  let ty' = try_reduce_once ty in
-  try try_reduce ty'
+let rec try_reduce env ty =
+  let ty' = try_reduce_once env ty in
+  try try_reduce env ty'
   with Cannot_expand -> ty'
 
 (* [Predef]'s [eval] is special -- we want to always expand it in [reduce_head],
    so we special-case its abbreviation expansion there. *)
-let expand_eval_abbrev () ty =
+let expand_eval_abbrev env ty =
   match get_desc ty with
-  | Tconstr (path, [ty], _) when Path.same path Predef.path_eval ->
-    new_quote_eval_ty (new_splice_ty ty)
+  | Tconstr (path, [_], _) when Path.same path Predef.path_eval ->
+    try_expand_once env ty
   | _ -> raise Cannot_expand
 
 let try_expand_eval_once = try_expand_once_gen expand_eval_abbrev
 
 (* Fully expand the head of a type. *)
-let try_expand_head (type env)
-    (try_once : env -> type_expr -> type_expr) (env : env) ty =
+let try_expand_head
+    (try_once : Env.t -> type_expr -> type_expr) (env : Env.t) ty =
   let rec loop try_once env ty =
     let ty' = try_once env ty in
     try loop try_once env ty'
     with Cannot_expand ->
-      try try_reduce ty'
+      try try_reduce env ty'
       with Cannot_expand -> ty'
   in
   try loop try_once env ty
-  with Cannot_expand -> try_reduce ty
+  with Cannot_expand -> try_reduce env ty
 
-let reduce_head ~expand_eval ty =
+let reduce_head ~expand_eval env ty =
   let try_once =
     if expand_eval
     then try_expand_eval_once
-    else (fun () _ -> raise Cannot_expand)
+    else (fun _env _ty -> raise Cannot_expand)
   in
-  try try_expand_head try_once () ty
+  try try_expand_head try_once env ty
   with Cannot_expand -> ty
 
 (* Unsafe full expansion, may raise [Unify [Escape _]]. *)
@@ -5716,7 +5727,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           TypePairs.add pairs (t1', t2');
           match (get_desc t1', get_desc t2') with
             (Tvar { jkind }, _) when may_instantiate inst_nongen t1' ->
-              let t2 = reduce_head ~expand_eval:false t2 in
+              let t2 = reduce_head ~expand_eval:false env t2 in
               moregen_occur env (get_level t1') t2;
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
