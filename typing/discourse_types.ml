@@ -143,7 +143,7 @@ module Lid_trie = struct
     Format.fprintf ppf "%a %a" Pprintast.longident lid pp_paths paths
   let pp_seq fmt t =
     let pp_sep fmt () = Format.fprintf fmt ";@ " in
-    Format.fprintf fmt "%a"
+    Format.fprintf fmt "@[<hov>%a@]"
       (Format.pp_print_seq ~pp_sep pp_lid_paths)
       (to_seq t)
 end

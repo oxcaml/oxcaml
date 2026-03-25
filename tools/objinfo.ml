@@ -40,6 +40,7 @@ let shape = ref false
 let index = ref false
 let decls = ref false
 let uid_deps = ref false
+let discourse = ref false
 
 module Magic_number = Misc.Magic_number
 module String = Misc.Stdlib.String
@@ -153,6 +154,62 @@ let print_cma_infos (lib : Cmo_format.library) =
   List.iter print_spaced_string (List.rev lib.lib_dllibs);
   printf "\n";
   List.iter print_cmo_infos lib.lib_units
+
+let print_discourse_cmi (cmi : Cmi_format.cmi_infos_lazy) =
+  let pp_alias fmt ({ Location.txt; _ }, (_, path)) =
+    Format.fprintf fmt "alias: %a [%a]@ " Pprintast.longident txt Path.print path
+  in
+  let rec print_sig_item ?prefix ppf (item : Types.signature_item) =
+    let lid id = match prefix with
+      | None -> Longident.Lident (Ident.name id)
+      | Some lid -> Longident.Ldot (lid, Ident.name id)
+    in
+    match item with
+    | Sig_value (id, vd, _) ->
+      let prefix = lid id in
+      Format.fprintf ppf "@[<2>%a:@ %a@]"
+         Pprintast.longident prefix Discourse_types.pp vd.val_discourse
+    | Sig_type (id, td, _, _) ->
+      let prefix = lid id in
+      Format.fprintf ppf "@[<2>%a:@ %a@]"
+        Pprintast.longident prefix Discourse_types.pp td.type_discourse
+    | Sig_typext _ -> ()
+    | Sig_module (id, _, md, _, _) ->
+      let prefix = lid id in
+      Format.fprintf ppf "@[<2>%a:@ %a%a@]@ %a"
+        Pprintast.longident prefix
+        (Format.pp_print_option pp_alias) md.md_discourse_alias
+        Discourse_types.pp md.md_discourse
+        (print_modtype prefix) md.md_type
+    | Sig_modtype (id, mtd, _) ->
+      let prefix = lid id in
+      begin match mtd with
+      | { mtd_type = Some mt; _ } ->
+        Format.fprintf ppf "@[<2>%a:@ %a@]@ %a"
+          Pprintast.longident prefix Discourse_types.pp mtd.mtd_discourse
+          (print_modtype prefix) mt
+      | _ ->
+        Format.fprintf ppf "@[<2>%a:@ %a@]"
+          Pprintast.longident prefix Discourse_types.pp mtd.mtd_discourse
+      end
+    | Sig_class (id, cd, _, _) ->
+      let prefix = lid id in
+      Format.fprintf ppf "@[<2>%a:@ %a@]"
+        Pprintast.longident prefix Discourse_types.pp cd.cty_discourse
+    | Sig_class_type (id, ctd, _, _) ->
+      let prefix = lid id in
+      Format.fprintf ppf "@[<2>%a:@ %a@]"
+        Pprintast.longident prefix Discourse_types.pp ctd.clty_discourse
+  and print_modtype prefix ppf (mty : Types.module_type) =
+    match mty with
+    | Mty_signature items ->
+      Format.pp_print_list (print_sig_item ~prefix) ppf items
+    | Mty_functor _ | Mty_strengthen _
+    | Mty_ident _ | Mty_alias _ -> ()
+  in
+  let sg = Subst.Lazy.force_signature cmi.cmi_sign in
+  Format.printf "@[<v>%a@]@."
+    (Format.pp_print_list print_sig_item) sg
 
 let print_cmi_infos name crcs kind params global_name_bindings =
   if not !quiet then begin
@@ -496,7 +553,11 @@ let dump_obj_by_kind filename ic obj_kind =
          | Some cmi ->
             print_cmi_infos cmi.Cmi_format.cmi_name cmi.Cmi_format.cmi_crcs
               cmi.Cmi_format.cmi_kind cmi.Cmi_format.cmi_params
-              cmi.Cmi_format.cmi_globals
+              cmi.Cmi_format.cmi_globals;
+            if !discourse then begin
+              printf "Discourse:\n";
+              print_discourse_cmi cmi
+            end
        end;
        begin match cmt with
          | None -> ()
@@ -607,6 +668,8 @@ let arg_list = [
     " Print a list of all declarations in the module";
   "-uid-deps", Arg.Set uid_deps,
     " Print the declarations' uids dependencies of the module";
+  "-discourse", Arg.Set discourse,
+    " Print discourse information from .cmi signatures";
   "-null-crc", Arg.Set no_crc, " Print a null CRC for imported interfaces";
   "-args", Arg.Expand Arg.read_arg,
      "<file> Read additional newline separated command line arguments \n\
