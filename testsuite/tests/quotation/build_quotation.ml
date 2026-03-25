@@ -138,7 +138,7 @@
 - : <[[> `A of int ] as '_weak1]> expr = <[`A 42]>
 |}];;
 
-let _ = <[ `B 123 ]>;;
+<[ `B 123 ]>;;
 [%%expect {|
 - : <[[> `B of int ] as '_weak2]> expr = <[`B 123]>
 |}];;
@@ -803,39 +803,39 @@ let x = <[ 123 ]> in <[ $x ]>;;
 - : <[int]> expr = <[123]>
 |}];;
 
-let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 ] ]>;;
+<[ [ a * b for a = 1 to 10 for b = a to 10 ] ]>;;
 [%%expect {|
 - : <[int list]> expr = <[[ a * b for a = 1 to 10 for b = a to 10 ]]>
 |}];;
 
-let _ = <[ [ a * b for a = 1 to 10 and b = 1 to 10 ] ]>;;
+<[ [ a * b for a = 1 to 10 and b = 1 to 10 ] ]>;;
 [%%expect {|
 - : <[int list]> expr = <[[ a * b for a = 1 to 10 and b = 1 to 10 ]]>
 |}];;
 
-let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 ] ]>;;
+<[ [ a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 ] ]>;;
 [%%expect {|
 - : <[int list]> expr =
 <[[ a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 ]]>
 |}];;
 
-let _ = <[ [| a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 |] ]>;;
+<[ [| a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 |] ]>;;
 [%%expect {|
 - : <[int array]> expr =
 <[[| a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 |]]>
 |}];;
 
-let _ = <[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
+<[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
 [%%expect {|
 - : <[string array]> expr = <[[| a ^ "!" for a in [|"foo"; "bar"|] |]]>
 |}];;
 
-let _ = <[ [: a ^ "!" for a in [:"foo"; "bar":] :] ]>;;
+<[ [: a ^ "!" for a in [:"foo"; "bar":] :] ]>;;
 [%%expect {|
 - : <[string iarray]> expr = <[[: a ^ "!" for a in [|"foo"; "bar"|] :]]>
 |}];;
 
-let _ = <[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
+<[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
 [%%expect {|
 - : <[string list]> expr =
 <[[ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ]]>
@@ -922,9 +922,9 @@ Error: Adding attributes on tags in polymorphic variant types
 - : <[int]> expr = <[2 + 2]>
 |}];;
 
-<[ <[ $ (<[ 123 ]>) ]> ]>;;
+<[ fun () -> <[ $ (<[ 123 ]>) ]> ]>;;
 [%%expect {|
-- : <[<[int]> expr]> expr = <[<[$<[123]>]>]>
+- : <[unit -> <[int]> expr]> expr = <[fun () -> <[$<[123]>]>]>
 |}];;
 
 let x = <[ "foo" ]> and y = <[ "bar" ]> in <[ $x ^ $y ]>;;
@@ -932,15 +932,15 @@ let x = <[ "foo" ]> and y = <[ "bar" ]> in <[ $x ^ $y ]>;;
 - : <[string]> expr = <["foo" ^ "bar"]>
 |}];;
 
-<[ fun x -> <[ <[ $($x) ]> ]> ]>;;
+<[ fun x -> <[ fun () -> <[ $($x) ]> ]> ]>;;
 [%%expect {|
-- : <[<[$($('a)) expr]> expr -> <[$($('a)) expr]> expr]> expr =
-<[fun x -> <[<[$($x)]>]>]>
+- : <[<[$($('a)) expr]> expr -> <[unit -> $($('a)) expr]> expr]> expr =
+<[fun x -> <[fun () -> <[$($x)]>]>]>
 |}];;
 
-let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
+let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
 [%%expect {|
-- : <[<[int]> expr]> expr = <[<[$<[42]>]>]>
+- : <[unit -> <[int]> expr]> expr = <[fun () -> <[$<[42]>]>]>
 |}];;
 
 <[ raise Out_of_fibers ]>;;
