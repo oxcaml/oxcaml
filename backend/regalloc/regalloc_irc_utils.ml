@@ -200,3 +200,20 @@ module Spilling_heuristics = struct
           fatal "unknown heuristics %S (possible values: %s)" id
             (available_heuristics ())))
 end
+
+module Interf_threshold = struct
+  type t = int option
+
+  let default = None
+
+  let value =
+    lazy
+      (match find_param_value "IRC_INTERF_THRESHOLD" with
+      | None -> default
+      | Some threshold -> (
+        match int_of_string_opt threshold with
+        | None ->
+          fatal "invalid interference threshold %S (should be an integer)"
+            threshold
+        | Some value as threshold -> if value < 0 then None else threshold))
+end
