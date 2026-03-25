@@ -599,6 +599,178 @@ module TLS0 = struct
   end
 end
 
+module Tick = struct
+  module type S = sig @@ portable
+    type t : mutable_data mod external_ global
+
+    val acquire : interval_usec:int -> t @ unique
+    val release : t @ unique -> unit
+  end
+
+  module Runtime4 = struct
+    type t = |
+
+    let fail () =
+      failwith "[Domain.Tick] not supported in runtime4"
+
+    let acquire ~interval_usec:_ = fail ()
+    let release = function | (_ : t) -> .
+  end
+
+  module Runtime5 = struct
+    module Registry : sig @@ portable
+      type t : sync_data
+
+      val create : unit -> t
+
+      (** These two functions return the new min interval *)
+      val add : t -> int -> int
+      val remove : t -> int -> int or_null
+    end = struct
+      (* NOTE this is extremely un-optimized; we assume that ticks are acquired and
+         released relatively infrequently so the performance of registry modification
+         doesn't matter. *)
+
+      module Inner = struct
+        (* It would be better for this to be a decent min-heap, but there is not one around
+           that is convenient to use (and see above note about this not being tight-loop).
+        *)
+        include Map.MakePortable (Int)
+
+        external magic_empty_stateless
+          : ('a t[@local_opt])
+          -> ('a t[@local_opt]) @ stateless
+          @@ stateless
+          = "%identity"
+
+        external magic_empty_read_write
+          : ('a t[@local_opt]) @ immutable
+          -> ('a t[@local_opt])
+          @@ stateless
+          = "%identity"
+
+        let empty = magic_empty_stateless empty
+        let[@inline] empty () = magic_empty_read_write empty
+      end
+
+      type t : sync_data =
+        { mutable inner : int Inner.t
+        (* A bag, mapping the interval to the number of requesters of ticks with that
+           interval *)
+        ; mutex : Mutex.t
+        }
+      [@@unsafe_allow_any_mode_crossing "All accesses protected by mutex"]
+
+      let create () =
+        { inner = Inner.empty ()
+        ; mutex = Mutex.create ()
+        }
+
+      let protect t f = Mutex.protect t.mutex f
+
+      let add t tick = protect t (fun () ->
+        let inner' =
+          Inner.update tick
+            (function
+              | None -> Some 1
+              | Some i -> Some (i + 1))
+            t.inner
+        in
+        t.inner <- inner';
+        Inner.min_binding inner' |> fst)
+
+      let remove t tick = protect t (fun () ->
+        let inner' =
+          Inner.update tick
+            (function
+              | None | Some 0 | Some 1 -> None
+              | Some i -> Some (i - 1))
+            t.inner
+        in
+        t.inner <- inner';
+        match Inner.min_binding inner' with
+        | (interval, _) -> This interval
+        | exception Not_found -> Null)
+    end
+
+    (* NOTE: st_stubs.c relies on this being an int (and in particular not scanned) *)
+    type t = int
+
+    (* One registry per recommended_domain_count.
+
+       If more than recommended_domain_count domains are spawned (which in practice we
+       never do in OxCaml), multiple domains share a registry. This is fine since we have
+       to have synchronization for systreaads anyway
+    *)
+    let registry =
+      (* CR ocaml-5.4: This should be an iarray *)
+      Array.init (recommended_domain_count ()) (fun _ -> Registry.create ())
+
+    let local_registry () =
+      (* Safety: modulo ensures this is in bounds *)
+      Array.unsafe_get
+        (* Safety: Array is never mutated after creation *)
+        (Obj.magic_uncontended registry)
+        (self_index () mod recommended_domain_count ())
+
+    external set_tick_interval_usec
+      : (int[@untagged]) -> (unit[@untagged])
+      @@ portable
+      = "caml_domain_set_tick_interval_usec_bytecode"
+          "caml_domain_set_tick_interval_usec"
+
+    let acquire ~interval_usec =
+      let registry = local_registry () in
+      let interval = Registry.add registry interval_usec in
+      match set_tick_interval_usec interval with
+      | () -> interval_usec
+      | exception exn ->
+        let bt = Printexc.get_raw_backtrace () in
+        (* We might raise because we failed to start the tick thread, not just because the
+           interval was invalid. In that case, we don't want to leave the domain's min
+           requested tick interval in place - instead, we use the interval returned by
+           [Registry.remove] to set the tick interval again. This will probably (though
+           might not) fail because we fail to start the tick thread again; in that case,
+           it's fine to re-raise that exception as the state should be the same as we left
+           it before calling [acquire]
+        *)
+        (match Registry.remove registry interval_usec with
+         | This interval -> set_tick_interval_usec interval
+         | Null -> set_tick_interval_usec 0);
+        Printexc.raise_with_backtrace exn bt
+
+    let release interval_usec =
+      let registry = local_registry () in
+      (* Note that the calls to [set_tick_interval_usec] can't raise here, as we're
+         neither setting the requested interval to a value we haven't successfully set it
+         to before, nor are we starting the tick thread. *)
+      match Registry.remove registry interval_usec with
+      | Null -> set_tick_interval_usec 0
+      | This interval -> set_tick_interval_usec interval
+
+  end
+
+  let impl =
+    if runtime5 ()
+    then (module Runtime5 : S)
+    else (module Runtime4 : S)
+
+  include (val impl : S)
+
+  let () = Callback.Safe.register "Domain.Tick.acquire" acquire
+  let () = Callback.Safe.register "Domain.Tick.release" release
+
+  external local_requested_interval_usec
+    : unit -> int @@ portable
+    = "caml_domain_get_tick_interval_usec"
+  [@@noalloc]
+
+  external global_effective_interval_usec
+    : (unit[@untagged]) -> (int[@untagged]) @@ portable
+    = "caml_effective_tick_interval_usec_bytecode" "caml_effective_tick_interval_usec"
+  [@@noalloc]
+end
+
 module Safe = struct
   (* Note the exposed signature of [get] and [set] add modes for safety. *)
   module DLS = DLS

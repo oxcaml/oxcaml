@@ -209,6 +209,38 @@ module TLS : sig
     end
 end
 
+module Tick : sig @@ portable
+  (** A handle to a request that the tick thread tick at a given interval
+
+      In between calling [acquire] and calling [release], the tick thread will tick {i at
+      least as frequently} as the provided [interval_usec]. *)
+  type t : mutable_data mod external_ global
+
+  (** Request that the tick thread tick at least as frequently as [tick_interval] until
+      [release] is called on the returned handle. *)
+  val acquire : interval_usec:int -> t @ unique
+
+  (** Release a handle to a tick request.
+
+     It is unsound to call this on a domain other than the one that called [acquire]
+     (though it is fine to call it on a different thread on the same domain).
+  *)
+  val release : t @ unique -> unit
+
+  (** Returns the interval at which this domain has requested ticks.
+
+      This is the minimum of all [t]s which exist within this domain. *)
+  external local_requested_interval_usec
+    : unit -> int @@ portable
+    = "caml_domain_get_tick_interval_usec"
+  [@@noalloc]
+
+  external global_effective_interval_usec
+    : (unit[@untagged]) -> (int[@untagged]) @@ portable
+    = "caml_effective_tick_interval_usec_bytecode" "caml_effective_tick_interval_usec"
+  [@@noalloc]
+end
+
 (** Submodule containing non-backwards-compatible functions which enforce thread safety
     via modes. *)
 module Safe : sig @@ portable
