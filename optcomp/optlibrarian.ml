@@ -116,7 +116,6 @@ end) : S = struct
                 li_crc = crc;
                 li_defines = unit.ui_defines;
                 li_force_link = unit.ui_force_link;
-                li_requires_metaprogramming = unit.ui_requires_metaprogramming;
                 li_imports_cmi =
                   mk_bitmap cmis cmi_index unit.ui_imports_cmi
                     ~find:Compilation_unit.Name.Tbl.find

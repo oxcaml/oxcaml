@@ -107,7 +107,6 @@ type lib_unit_info =
     li_crc: Digest.t;
     li_defines: Compilation_unit.t list;
     li_force_link: bool;
-    li_requires_metaprogramming: bool;
     li_imports_cmi : Bitmap.t;  (* subset of lib_imports_cmi *)
     li_imports_cmx : Bitmap.t;  (* subset of lib_imports_cmx *)
     li_quoted_globals : Bitmap.t;    (* subset of lib_quoted_globals *)
