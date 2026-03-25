@@ -688,9 +688,8 @@ module Tick = struct
             t.inner
         in
         t.inner <- inner';
-        match Inner.min_binding inner' with
-        | (interval, _) -> This interval
-        | exception Not_found -> Null)
+        if Inner.is_empty inner' then Null
+        else This (Inner.min_binding inner' |> fst))
     end
 
     (* NOTE: st_stubs.c relies on this being an int (and in particular not
