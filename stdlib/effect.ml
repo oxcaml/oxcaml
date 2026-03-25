@@ -148,6 +148,11 @@ module Shallow = struct
       | M.Initial_setup__ ->
           cont_set_last_fiber k last_fiber;
           raise_notrace (E (Cont k))
+      (* We need to handle [Preemption] here since it's triggered automatically
+         on a timer, and might arrive while we're setting up the fiber *)
+      | Preemption ->
+          cont_set_last_fiber k last_fiber;
+          resume k (fun x -> x) ()
       | _ -> error ()
     in
     match with_stack error error effc f' () with
