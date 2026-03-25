@@ -711,6 +711,11 @@ let enter_continuation_handler lifted_params t =
     lifted;
     defined_variables_by_scope = lifted_params :: t.defined_variables_by_scope;
     cost_of_lifting_continuations_out_of_current_one = 0;
+    (* we only do shallow lifting : thus the question of whether a continuation
+       k' can be lifted out of the handler of a continuation k, does not depend
+       on whether k has been lifted or not (or was liftable or not). Therefore
+       we reset the `has_seen_a_non_liftable_continuation` when we enter a new
+       continuation handler *)
     has_seen_a_non_liftable_continuation = false;
     specialization_cost = Specialization_cost.can_specialize
   }
