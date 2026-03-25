@@ -262,8 +262,8 @@ module type Sort = sig
   val print_with_genvars : var list -> (string list -> 'a) -> 'a
 
   (** [generalize_with f] runs [f] with sort generalization enabled (for let
-      poly_ support). Returns the result of [f] and the list of generic sort
-      variables created during [f]. *)
+      poly_ support). Returns the result of [f] and the list of sort variables
+      lifted to generic during [f]. *)
   val generalize_with : (unit -> 'a) -> 'a * var list
 
   (** Generalize sort variables when in sort generalization context. Sets the
