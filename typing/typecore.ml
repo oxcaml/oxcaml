@@ -1199,14 +1199,7 @@ let mode_spliced =
   let hint_monadic = Spliced Monadic
   and hint_comonadic = Spliced Comonadic in
   let mode =
-    { Value.Const.min with
-      linearity = Once;
-      statefulness = Stateful;
-      portability = Nonportable;
-      uniqueness = Aliased;
-      visibility = Immutable;
-      contention = Contended;
-      staticity = Dynamic }
+    Value.Const.max
     |> Value.of_const ~hint_monadic ~hint_comonadic
   in
   mode_default mode

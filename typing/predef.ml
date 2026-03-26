@@ -858,7 +858,7 @@ let add_runtime_metaprogramming_types add_type env =
        ~variance:Variance.covariant
        ~separability:Separability.Ind
        ~jkind:(fun param ->
-         Jkind.Builtin.value ~why:Quoted_expression |>
+         Jkind.for_arrow ~why:Quoted_expression |>
            Jkind.add_with_bounds
              ~modality:Mode.Modality.Const.id
              ~type_expr:param)
