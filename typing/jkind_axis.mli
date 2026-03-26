@@ -51,6 +51,14 @@ module Separability : sig
   include Axis_ops with type t := t
 end
 
+module Unique_implies_uncontended : sig
+  type t =
+    | Holds
+    | Does_not_hold
+
+  include Axis_ops with type t := t
+end
+
 module Pointerness : sig
   type t =
     | Non_pointer
@@ -73,6 +81,7 @@ module Axis : sig
     type 'a t =
       | Externality : Externality.t t
       | Nullability : Nullability.t t
+      | Unique_implies_uncontended : Unique_implies_uncontended.t t
       | Separability : Separability.t t
   end
 

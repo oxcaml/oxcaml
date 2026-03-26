@@ -24,6 +24,7 @@ type t
           portable
           contended
           non_null
+          unique_implies_uncontended
           non_float
           local
           unique
@@ -46,6 +47,7 @@ type t
           contended
           external_
           non_null
+          unique_implies_uncontended
           non_float
           static
 |}]
@@ -56,6 +58,7 @@ type t
   : float64
       mod external_
           non_null
+          unique_implies_uncontended
           non_float
           local
           unforkable
@@ -85,6 +88,7 @@ type t
           static
           internal
           maybe_null
+          does_not_hold_unique_implies_uncontended
           maybe_separable
 |}]
 
@@ -105,6 +109,7 @@ type t
           uncontended
           static
           internal
+          does_not_hold_unique_implies_uncontended
 |}]
 
 type t : value mod stateless
@@ -124,6 +129,7 @@ type t
           uncontended
           static
           internal
+          does_not_hold_unique_implies_uncontended
 |}]
 
 type 'a t : immutable_data with 'a
@@ -138,6 +144,7 @@ type 'a t
           portable
           contended
           non_null
+          unique_implies_uncontended
           non_float
           local
           unique
@@ -158,6 +165,7 @@ type ('a
              portable
              contended
              non_null
+             unique_implies_uncontended
              non_float
              local
              unique
@@ -182,6 +190,7 @@ type ('a
              read_write
              uncontended
              static
-             internal)
+             internal
+             does_not_hold_unique_implies_uncontended)
      t
 |}]

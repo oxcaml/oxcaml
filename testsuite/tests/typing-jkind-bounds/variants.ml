@@ -151,6 +151,15 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
+         contention: mod contended with 'a ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
 type 'a t : immutable_data = Foo of { mutable x : 'a }
@@ -186,7 +195,8 @@ type t : immutable_data = Foo of (unit -> unit)
 Line 1, characters 0-47:
 1 | type t : immutable_data = Foo of (unit -> unit)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod immutable non_float
+Error: The kind of type "t" is
+           value mod immutable unique_implies_uncontended non_float
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -201,6 +211,15 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
+         contention: mod contended with 'a ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
 type t : immutable_data = Foo of int * int | Bar of { mutable z : int }
@@ -219,7 +238,8 @@ type t : mutable_data = Foo of { x : unit -> unit }
 Line 1, characters 0-51:
 1 | type t : mutable_data = Foo of { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod immutable non_float
+Error: The kind of type "t" is
+           value mod immutable unique_implies_uncontended non_float
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of mutable_data
          because of the annotation on the declaration of the type t.
@@ -234,6 +254,9 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod many
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
 |}]
 
 type ('a : value mod global) t : value mod global = Foo of 'a
@@ -245,6 +268,10 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod global
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
 |}]
 
 type ('a : value mod aliased) t : value mod aliased = Foo of 'a
@@ -256,6 +283,9 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod aliased
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         uniqueness: mod unique ≰ mod aliased
 |}]
 
 type ('a : value mod external_) t : value mod external_ = Foo of 'a
@@ -267,6 +297,9 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod external_
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         externality: mod internal ≰ mod external_
 |}]
 
 type t : sync_data = Foo of { mutable x : int ref [@atomic] }
@@ -340,7 +373,8 @@ type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
 Line 1, characters 0-60:
 1 | type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod immutable non_float
+Error: The kind of type "t" is
+           value mod immutable unique_implies_uncontended non_float
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data with 'a
          because of the annotation on the declaration of the type t.
@@ -355,6 +389,10 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod global with 'a
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global with 'a
+         uniqueness: mod unique ≰ mod aliased with 'a
 |}]
 
 type 'a t : value mod aliased with 'a = Foo of 'a
@@ -366,6 +404,9 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod aliased with 'a
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         uniqueness: mod unique ≰ mod aliased with 'a
 |}]
 
 type 'a t : value mod external_ with 'a = Foo of 'a
@@ -378,6 +419,9 @@ Error: The kind of type "t" is immutable_data with 'a
        But the kind of type "t" must be a subkind of
            value mod external_ with 'a
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         externality: mod internal ≰ mod external_ with 'a
 |}]
 
 (**** Test 3: Variant values cross when appropriate ****)
@@ -647,6 +691,9 @@ Error: This expression has type "int t" but an expression was expected of type
          because of the definition of t at line 1, characters 0-21.
        But the kind of int t must be a subkind of value mod many
          because of the definition of cross_many at line 11, characters 49-60.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with int ≰ mod many
 |}]
 
 let () = cross_aliased int
@@ -670,6 +717,9 @@ Error: This expression has type "int t" but an expression was expected of type
          because of the definition of t at line 1, characters 0-21.
        But the kind of int t must be a subkind of value mod aliased
          because of the definition of cross_aliased at line 8, characters 55-66.
+
+       The first mode-crosses less than the second along:
+         uniqueness: mod unique ≰ mod aliased
 |}]
 
 let () = cross_portable func
@@ -679,7 +729,8 @@ Line 1, characters 24-28:
                             ^^^^
 Error: This expression has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod portable)"
-       The kind of (unit -> unit) t is value mod immutable non_float
+       The kind of (unit -> unit) t is
+           value mod immutable unique_implies_uncontended non_float
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
            value mod portable
@@ -695,6 +746,9 @@ Error: This expression has type "(unit -> unit) t"
        But the kind of (unit -> unit) t must be a subkind of
            value mod portable
          because of the definition of cross_portable at line 10, characters 57-68.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with unit -> unit ≰ mod portable
 |}]
 
 let () = cross_external func
@@ -704,7 +758,8 @@ Line 1, characters 24-28:
                             ^^^^
 Error: This expression has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod external_)"
-       The kind of (unit -> unit) t is value mod immutable non_float
+       The kind of (unit -> unit) t is
+           value mod immutable unique_implies_uncontended non_float
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
            value mod external_
@@ -720,6 +775,9 @@ Error: This expression has type "(unit -> unit) t"
        But the kind of (unit -> unit) t must be a subkind of
            value mod external_
          because of the definition of cross_external at line 13, characters 58-69.
+
+       The first mode-crosses less than the second along:
+         externality: mod internal ≰ mod external_
 |}]
 
 type 'a t = Foo of 'a
@@ -748,6 +806,9 @@ Error: This type "int t" should be an instance of type "('a : value mod many)"
          because of the definition of t at line 1, characters 0-21.
        But the kind of int t must be a subkind of value mod many
          because of the definition of require_many at line 19, characters 0-39.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with int ≰ mod many
 |}]
 
 type t_test = int t require_global
@@ -769,6 +830,12 @@ Error: This type "int t" should be an instance of type "('a : value mod global)"
          because of the definition of t at line 1, characters 0-21.
        But the kind of int t must be a subkind of value mod global
          because of the definition of require_global at line 15, characters 0-43.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         forkable: mod forkable with int ≰ mod forkable
+         yielding: mod unyielding with int ≰ mod unyielding
 |}]
 
 type t_test = int t require_aliased
@@ -790,6 +857,9 @@ Error: This type "int t" should be an instance of type "('a : value mod aliased)
          because of the definition of t at line 1, characters 0-21.
        But the kind of int t must be a subkind of value mod aliased
          because of the definition of require_aliased at line 16, characters 0-45.
+
+       The first mode-crosses less than the second along:
+         uniqueness: mod unique ≰ mod aliased
 |}]
 
 type t_test = (unit -> unit) t require_portable
@@ -799,7 +869,8 @@ Line 1, characters 14-30:
                   ^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) t" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) t is value mod immutable non_float
+       The kind of (unit -> unit) t is
+           value mod immutable unique_implies_uncontended non_float
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
            value mod portable
@@ -815,6 +886,9 @@ Error: This type "(unit -> unit) t" should be an instance of type
        But the kind of (unit -> unit) t must be a subkind of
            value mod portable
          because of the definition of require_portable at line 18, characters 0-47.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with unit -> unit ≰ mod portable
 |}]
 
 type ('a : value mod contended) t_test = 'a t require_portable
@@ -827,6 +901,9 @@ Error: This type "'a t" should be an instance of type "('b : value mod portable)
          because of the definition of t at line 1, characters 0-21.
        But the kind of 'a t must be a subkind of value mod portable
          because of the definition of require_portable at line 18, characters 0-47.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a ≰ mod portable
 |}]
 
 type ('a : value mod external_) t_test = 'a t require_external
@@ -840,6 +917,9 @@ Error: This type "'a t" should be an instance of type
          because of the definition of t at line 1, characters 0-21.
        But the kind of 'a t must be a subkind of value mod external_
          because of the definition of require_external at line 21, characters 0-48.
+
+       The first mode-crosses less than the second along:
+         externality: mod internal ≰ mod external_
 |}]
 
 (**** Test 5: Module inclusion check ****)
@@ -993,6 +1073,15 @@ Error: Signature mismatch:
          because of the definition of t at line 4, characters 2-39.
        But the kind of the first must be a subkind of immutable_data
          because of the definition of t at line 2, characters 2-28.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
+         contention: mod contended with 'a ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
 module M : sig
@@ -1040,6 +1129,9 @@ Error: This expression has type "int t" but an expression was expected of type
          because of the definition of t at line 1, characters 0-39.
        But the kind of int t must be a subkind of value mod portable
          because of the definition of cross_portable at line 10, characters 57-68.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with (int * int) t ≰ mod portable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]

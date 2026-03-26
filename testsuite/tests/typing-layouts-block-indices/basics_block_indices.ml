@@ -691,7 +691,13 @@ Line 2, characters 2-36:
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
        The kind of float is
-           value mod forkable unyielding many stateless immutable
+           value
+             mod forkable
+                 unyielding
+                 many
+                 stateless
+                 immutable
+                 unique_implies_uncontended
          because it is the primitive type float.
        But the kind of float must be a subkind of value_or_null mod non_float
          because it's the layout polymorphic type in an external declaration
@@ -746,7 +752,13 @@ Line 1, characters 41-76:
 Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(float iarray, 'b) idx_imm"
        The kind of float is
-           value mod forkable unyielding many stateless immutable
+           value
+             mod forkable
+                 unyielding
+                 many
+                 stateless
+                 immutable
+                 unique_implies_uncontended
          because it is the primitive type float.
        But the kind of float must be a subkind of value_or_null mod non_float
          because it's the layout polymorphic type in an external declaration
@@ -765,7 +777,13 @@ Line 3, characters 16-17:
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
        The kind of float is
-           value mod forkable unyielding many stateless immutable
+           value
+             mod forkable
+                 unyielding
+                 many
+                 stateless
+                 immutable
+                 unique_implies_uncontended
          because it is the primitive type float.
        But the kind of float must be a subkind of value_or_null mod non_float
          because it's the layout polymorphic type in an external declaration

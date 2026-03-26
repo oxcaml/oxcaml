@@ -13,6 +13,7 @@ type sample =
     staticity : Mode.Staticity.const;
     externality : Jkind_axis.Externality.t;
     nullability : Jkind_axis.Nullability.t;
+    unique_implies_uncontended : Jkind_axis.Unique_implies_uncontended.t;
     separability : Jkind_axis.Separability.t
   }
 
@@ -29,6 +30,7 @@ let sample_of_lattice x =
     staticity = staticity x;
     externality = externality x;
     nullability = nullability x;
+    unique_implies_uncontended = unique_implies_uncontended x;
     separability = separability x
   }
 
@@ -39,6 +41,7 @@ let lattice_of_sample sample =
     ~yielding:sample.yielding ~statefulness:sample.statefulness
     ~visibility:sample.visibility ~staticity:sample.staticity
     ~externality:sample.externality ~nullability:sample.nullability
+    ~unique_implies_uncontended:sample.unique_implies_uncontended
     ~separability:sample.separability
 
 let base_samples = [sample_of_lattice bot; sample_of_lattice top]
@@ -100,6 +103,12 @@ let mask_of_axis : type a. a Jkind_axis.Axis.t -> t =
   | Nonmodal Nullability ->
     lattice_of_sample
       { sample with nullability = Jkind_axis.Nullability.Maybe_null }
+  | Nonmodal Unique_implies_uncontended ->
+    lattice_of_sample
+      { sample with
+        unique_implies_uncontended =
+          Jkind_axis.Unique_implies_uncontended.Does_not_hold
+      }
   | Nonmodal Separability ->
     lattice_of_sample
       { sample with separability = Jkind_axis.Separability.Maybe_separable }
@@ -173,6 +182,11 @@ let () =
   check_values "nullability"
     (fun sample nullability -> { sample with nullability })
     [Jkind_axis.Nullability.Non_null; Jkind_axis.Nullability.Maybe_null];
+  check_values "unique_implies_uncontended"
+    (fun sample unique_implies_uncontended ->
+      { sample with unique_implies_uncontended })
+    [ Jkind_axis.Unique_implies_uncontended.Holds;
+      Jkind_axis.Unique_implies_uncontended.Does_not_hold ];
   check_values "separability"
     (fun sample separability -> { sample with separability })
     [ Jkind_axis.Separability.Non_float;

@@ -76,6 +76,15 @@ Error: This expression has type "q" but an expression was expected of type
          because of the definition of q at line 1, characters 0-32.
        But the kind of q must be a subkind of immutable_data
          because of the definition of takes_only_immutable at line 1, characters 25-64.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with M.t ≰ mod many
+         contention: mod contended with M.t ≰ mod contended
+         portability: mod portable with M.t ≰ mod portable
+         forkable: mod forkable with M.t ≰ mod forkable
+         yielding: mod unyielding with M.t ≰ mod unyielding
+         statefulness: mod stateless with M.t ≰ mod stateless
+         visibility: mod immutable with M.t ≰ mod immutable
 |}]
 
 (***********************************************************************)
@@ -152,11 +161,18 @@ Lines 1-3, characters 0-61:
 1 | type 'a t : value mod contended portable =
 2 |   | Shared : ('b : value mod contended portable). 'b  -> 'b t
 3 |   | Unshared : (unit -> 'c) @@ portable               -> 'c t
-Error: The kind of type "t" is value mod portable immutable non_float with 'a
+Error: The kind of type "t" is
+           value
+             mod portable immutable unique_implies_uncontended non_float
+             with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of
            value mod portable contended
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with 'a ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
 |}]
 
 (***********************************************************************)
@@ -238,7 +254,7 @@ type 'x u : immediate =
 Lines 1-2, characters 0-27:
 1 | type 'x u : immediate =
 2 | | P1 : ('b, 'a1) t -> 'a1 u
-Error: The kind of type "u" is value mod non_float
+Error: The kind of type "u" is value mod unique_implies_uncontended non_float
          because it's a boxed variant type.
        But the kind of type "u" must be a subkind of immediate
          because of the annotation on the declaration of the type u.
@@ -250,7 +266,7 @@ type 'a u : immutable_data =
 Lines 1-2, characters 0-25:
 1 | type 'a u : immutable_data =
 2 | | P1 : ('b, 'a) t -> 'a u
-Error: The kind of type "u" is value mod non_float
+Error: The kind of type "u" is value mod unique_implies_uncontended non_float
          because it's a boxed variant type.
        But the kind of type "u" must be a subkind of immutable_data
          because of the annotation on the declaration of the type u.
@@ -270,7 +286,7 @@ type 'a t : immediate =
 Lines 1-2, characters 0-25:
 1 | type 'a t : immediate =
 2 |   | A : 'b -> 'b option t
-Error: The kind of type "t" is value mod non_float
+Error: The kind of type "t" is value mod unique_implies_uncontended non_float
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immediate
          because of the annotation on the declaration of the type t.
@@ -349,6 +365,26 @@ Error: The kind of type "existential_abstract" is
        But the kind of type "existential_abstract" must be a subkind of
            immediate
          because of the annotation on the declaration of the type existential_abstract.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         linearity: mod many with (type : value mod portable) abstract ≰
+           mod many
+         contention:
+           mod contended with (type : value mod portable) abstract ≰
+           mod contended
+         forkable: mod forkable with (type : value mod portable) abstract ≰
+           mod forkable
+         yielding: mod unyielding with (type : value mod portable) abstract ≰
+           mod unyielding
+         statefulness:
+           mod stateless with (type : value mod portable) abstract ≰
+           mod stateless
+         visibility:
+           mod immutable with (type : value mod portable) abstract ≰
+           mod immutable
+         externality: mod internal ≰ mod external_
 |}]
 
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
@@ -409,6 +445,20 @@ Error: Signature mismatch:
        But the kind of the first must be a subkind of
            immutable_data with (type : value) abstract
          because of the definition of t at line 2, characters 2-54.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with (type : immediate) abstract ≰
+           mod many with (type : value) abstract
+         contention: mod contended with (type : immediate) abstract ≰
+           mod contended with (type : value) abstract
+         forkable: mod forkable with (type : immediate) abstract ≰
+           mod forkable with (type : value) abstract
+         yielding: mod unyielding with (type : immediate) abstract ≰
+           mod unyielding with (type : value) abstract
+         statefulness: mod stateless with (type : immediate) abstract ≰
+           mod stateless with (type : value) abstract
+         visibility: mod immutable with (type : immediate) abstract ≰
+           mod immutable with (type : value) abstract
 |}]
 
 (* Some hard recursive types with existentials *)
@@ -557,6 +607,18 @@ Error: The kind of type "box" is immutable_data with _
          because it's a boxed variant type.
        But the kind of type "box" must be a subkind of immediate
          because of the annotation on the declaration of the type box.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         linearity: mod many with _ ≰ mod many
+         contention: mod contended with _ ≰ mod contended
+         portability: mod portable with _ ≰ mod portable
+         forkable: mod forkable with _ ≰ mod forkable
+         yielding: mod unyielding with _ ≰ mod unyielding
+         statefulness: mod stateless with _ ≰ mod stateless
+         visibility: mod immutable with _ ≰ mod immutable
+         externality: mod internal ≰ mod external_
 |}]
 
 (* Only the first type parameter matters *)
@@ -598,6 +660,23 @@ Error: The kind of type "t2" is immutable_data with (type : value) option t
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of immediate
          because of the annotation on the declaration of the type t2.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         linearity: mod many with (type : value) option t ≰ mod many
+         contention: mod contended with (type : value) option t ≰
+           mod contended
+         portability: mod portable with (type : value) option t ≰
+           mod portable
+         forkable: mod forkable with (type : value) option t ≰ mod forkable
+         yielding: mod unyielding with (type : value) option t ≰
+           mod unyielding
+         statefulness: mod stateless with (type : value) option t ≰
+           mod stateless
+         visibility: mod immutable with (type : value) option t ≰
+           mod immutable
+         externality: mod internal ≰ mod external_
 |}]
 
 (* Existential row variables *)
@@ -617,6 +696,23 @@ Error: The kind of type "exist_row1" is
          because of the definition of exist_row1 at line 1, characters 0-67.
        But the kind of type "exist_row1" must be a subkind of immediate
          because of the definition of show_me_the_kind at line 1, characters 0-46.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         linearity: mod many with [< `A | `B of int ref ] ≰ mod many
+         contention: mod contended with [< `A | `B of int ref ] ≰
+           mod contended
+         portability: mod portable with [< `A | `B of int ref ] ≰
+           mod portable
+         forkable: mod forkable with [< `A | `B of int ref ] ≰ mod forkable
+         yielding: mod unyielding with [< `A | `B of int ref ] ≰
+           mod unyielding
+         statefulness: mod stateless with [< `A | `B of int ref ] ≰
+           mod stateless
+         visibility: mod immutable with [< `A | `B of int ref ] ≰
+           mod immutable
+         externality: mod internal ≰ mod external_
 |}]
 
 let foo (x : exist_row1 @ nonportable) = use_portable x
@@ -651,6 +747,23 @@ Error: The kind of type "exist_row2" is
          because of the definition of exist_row2 at line 1, characters 0-67.
        But the kind of type "exist_row2" must be a subkind of immediate
          because of the definition of show_me_the_kind at line 1, characters 0-46.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         linearity: mod many with [> `A | `B of int ref ] ≰ mod many
+         contention: mod contended with [> `A | `B of int ref ] ≰
+           mod contended
+         portability: mod portable with [> `A | `B of int ref ] ≰
+           mod portable
+         forkable: mod forkable with [> `A | `B of int ref ] ≰ mod forkable
+         yielding: mod unyielding with [> `A | `B of int ref ] ≰
+           mod unyielding
+         statefulness: mod stateless with [> `A | `B of int ref ] ≰
+           mod stateless
+         visibility: mod immutable with [> `A | `B of int ref ] ≰
+           mod immutable
+         externality: mod internal ≰ mod external_
 |}]
 
 let foo (x : exist_row2 @ nonportable) = use_portable x
@@ -686,6 +799,23 @@ Error: The kind of type "'a option exist_row3" is
        But the kind of type "'a option exist_row3" must be a subkind of
            immediate
          because of the definition of show_me_the_kind at line 1, characters 0-59.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         linearity: mod many with [> `A | `B of int ref ] ≰ mod many
+         contention: mod contended with [> `A | `B of int ref ] ≰
+           mod contended
+         portability: mod portable with [> `A | `B of int ref ] ≰
+           mod portable
+         forkable: mod forkable with [> `A | `B of int ref ] ≰ mod forkable
+         yielding: mod unyielding with [> `A | `B of int ref ] ≰
+           mod unyielding
+         statefulness: mod stateless with [> `A | `B of int ref ] ≰
+           mod stateless
+         visibility: mod immutable with [> `A | `B of int ref ] ≰
+           mod immutable
+         externality: mod internal ≰ mod external_
 |}]
 
 let foo (x : [`A | `B of int ref] option exist_row3 @ contended) = use_uncontended x
@@ -765,6 +895,15 @@ Error: The kind of type "t" is immutable_data with (type : value) t
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with (type : value) t ≰ mod many
+         contention: mod contended with (type : value) t ≰ mod contended
+         portability: mod portable with (type : value) t ≰ mod portable
+         forkable: mod forkable with (type : value) t ≰ mod forkable
+         yielding: mod unyielding with (type : value) t ≰ mod unyielding
+         statefulness: mod stateless with (type : value) t ≰ mod stateless
+         visibility: mod immutable with (type : value) t ≰ mod immutable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
@@ -786,6 +925,15 @@ Error: The kind of type "t" is immutable_data with (type : value) t
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with (type : value) t ≰ mod many
+         contention: mod contended with (type : value) t ≰ mod contended
+         portability: mod portable with (type : value) t ≰ mod portable
+         forkable: mod forkable with (type : value) t ≰ mod forkable
+         yielding: mod unyielding with (type : value) t ≰ mod unyielding
+         statefulness: mod stateless with (type : value) t ≰ mod stateless
+         visibility: mod immutable with (type : value) t ≰ mod immutable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
@@ -807,6 +955,15 @@ Error: The kind of type "t" is immutable_data with (type : value) t
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with (type : value) t ≰ mod many
+         contention: mod contended with (type : value) t ≰ mod contended
+         portability: mod portable with (type : value) t ≰ mod portable
+         forkable: mod forkable with (type : value) t ≰ mod forkable
+         yielding: mod unyielding with (type : value) t ≰ mod unyielding
+         statefulness: mod stateless with (type : value) t ≰ mod stateless
+         visibility: mod immutable with (type : value) t ≰ mod immutable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
@@ -824,6 +981,9 @@ Error: The kind of type "t" is immutable_data with (type : value) t/2
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod portable
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with (type : value) t/2 ≰ mod portable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]

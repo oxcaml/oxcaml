@@ -261,4 +261,8 @@ Error: The kind of type "t" is
        But the kind of type "t" must be a subkind of
            value mod portable & value mod portable
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a contended with 'a portable ≰
+           mod portable
 |}]

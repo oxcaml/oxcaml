@@ -539,6 +539,43 @@ Error: The kind of type "int list list list list list list list list list list
                             list list list list list" must be a subkind of
            immutable_data
          because of the definition of t at line 1, characters 0-149.
+
+       The first mode-crosses less than the second along:
+         linearity:
+           mod many
+             with int list list list list list list list list list list list list list list
+                  list list list list list list list list list ≰
+           mod many
+         contention:
+           mod contended
+             with int list list list list list list list list list list list list list list
+                  list list list list list list list list list ≰
+           mod contended
+         portability:
+           mod portable
+             with int list list list list list list list list list list list list list list
+                  list list list list list list list list list ≰
+           mod portable
+         forkable:
+           mod forkable
+             with int list list list list list list list list list list list list list list
+                  list list list list list list list list list ≰
+           mod forkable
+         yielding:
+           mod unyielding
+             with int list list list list list list list list list list list list list list
+                  list list list list list list list list list ≰
+           mod unyielding
+         statefulness:
+           mod stateless
+             with int list list list list list list list list list list list list list list
+                  list list list list list list list list list ≰
+           mod stateless
+         visibility:
+           mod immutable
+             with int list list list list list list list list list list list list list list
+                  list list list list list list list list list ≰
+           mod immutable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
@@ -606,6 +643,15 @@ Error: The kind of type "t" is immutable_data with 'a t t
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a t t ≰ mod many
+         contention: mod contended with 'a t t ≰ mod contended
+         portability: mod portable with 'a t t ≰ mod portable
+         forkable: mod forkable with 'a t t ≰ mod forkable
+         yielding: mod unyielding with 'a t t ≰ mod unyielding
+         statefulness: mod stateless with 'a t t ≰ mod stateless
+         visibility: mod immutable with 'a t t ≰ mod immutable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
@@ -653,6 +699,15 @@ Error: The kind of type "t" is immutable_data with 'a t/2 t/2
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a t/2 t/2 ≰ mod many
+         contention: mod contended with 'a t/2 t/2 ≰ mod contended
+         portability: mod portable with 'a t/2 t/2 ≰ mod portable
+         forkable: mod forkable with 'a t/2 t/2 ≰ mod forkable
+         yielding: mod unyielding with 'a t/2 t/2 ≰ mod unyielding
+         statefulness: mod stateless with 'a t/2 t/2 ≰ mod stateless
+         visibility: mod immutable with 'a t/2 t/2 ≰ mod immutable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]

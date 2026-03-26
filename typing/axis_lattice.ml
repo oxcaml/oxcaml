@@ -14,8 +14,8 @@
 
 (* Axis lattice: efficient bitfield encoding of jkind axes.
 
-   This module packs 13 axes into an OCaml immediate-sized integer, where each
-   axis can have 2 or 3 possible values (levels). The axes are indexed 0-12 and
+   This module packs 14 axes into an OCaml immediate-sized integer, where each
+   axis can have 2 or 3 possible values (levels). The axes are indexed 0-13 and
    their values are ordered from most restrictive (0) to least restrictive
    (max).
 
@@ -32,11 +32,12 @@
    9. Staticity (monadic): Dynamic -> Static
    10. Externality: External -> External64 -> Internal
    11. Nullability: Non_null -> Maybe_null
-   12. Separability: Non_float -> Separable -> Maybe_separable
+   12. Unique_implies_uncontended: Holds -> Does_not_hold
+   13. Separability: Non_float -> Separable -> Maybe_separable
 
    Axes 0-9 are modal axes (affect mode-crossing).
-   Axes 10-12 are non-modal axes (externality and shallow axes).
-   Axes 11-12 are "shallow" axes (nullability and separability) that are
+   Axes 10-13 are non-modal axes (externality and shallow axes).
+   Axes 11 and 13 are "shallow" axes (nullability and separability) that are
    sometimes excluded from masking operations.
 
    Each 3-valued axis uses 2 bits, each 2-valued axis uses 1 bit.
@@ -73,6 +74,7 @@ let axis_sizes =
       | Modal (Monadic Staticity) -> 2
       | Nonmodal Externality -> 3
       | Nonmodal Nullability -> 2
+      | Nonmodal Unique_implies_uncontended -> 2
       | Nonmodal Separability -> 3)
     axis_by_number
 
@@ -183,17 +185,17 @@ let co_sub (a : t) (b : t) : t =
 
 (* Build a mask from a set of relevant axes. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
-  let set : int = Obj.magic set in
-  let lo =
-    (set land 0x001)
-    lor ((set land 0x00E) lsl 1)
-    lor ((set land 0x010) lsl 2)
-    lor ((set land 0x0E0) lsl 3)
-    lor ((set land 0x100) lsl 4)
-    lor ((set land 0x600) lsl 5)
-    lor ((set land 0x1800) lsl 6)
-  in
-  lo lor ((lo land 0x49451) lsl 1)
+  Jkind_axis.Axis_set.to_seq set
+  |> Seq.fold_left
+       (fun acc (Jkind_axis.Axis.Pack axis) ->
+         let rec find i =
+           let (Jkind_axis.Axis.Pack axis') = axis_by_number.(i) in
+           match Jkind_axis.Per_axis.equal_obj axis axis' with
+           | Some _ -> i
+           | None -> find (i + 1)
+         in
+         acc lor axis_mask.(find 0))
+       bot
 
 (* IK-only: compute relevant axes of a constant modality, mirroring
    Jkind.relevant_axes_of_modality. *)
@@ -213,13 +215,14 @@ let relevant_axes_of_modality
           (Mode.Modality.Per_axis.is_constant axis_for_modality
              modality_on_axis)
       | Nonmodal Externality -> true
+      | Nonmodal Unique_implies_uncontended -> false
       | Nonmodal (Separability | Nullability) -> (
         match relevant_for_shallow with
         | `Relevant -> true
         | `Irrelevant -> false))
 
 (* Mask that excludes the shallow axes (nullability and separability). *)
-let mask_shallow : t = co_sub top (join axis_mask.(11) axis_mask.(12))
+let mask_shallow : t = co_sub top (join axis_mask.(11) axis_mask.(13))
 
 (* Directly produce an axis-lattice mask from a constant modality. *)
 let mask_of_modality ~(relevant_for_shallow : [`Relevant | `Irrelevant])
@@ -286,6 +289,10 @@ module Levels = struct
 
   let level_of_nullability (x : Jkind_axis.Nullability.t) : int =
     match x with Non_null -> 0 | Maybe_null -> 1
+
+  let level_of_unique_implies_uncontended
+      (x : Jkind_axis.Unique_implies_uncontended.t) : int =
+    match x with Holds -> 0 | Does_not_hold -> 1
 
   let level_of_separability (x : Jkind_axis.Separability.t) : int =
     match x with Non_float -> 0 | Separable -> 1 | Maybe_separable -> 2
@@ -356,6 +363,11 @@ module Levels = struct
     | 1 -> Jkind_axis.Nullability.Maybe_null
     | _ -> invalid_arg "Axis_lattice.nullability_of_level"
 
+  let unique_implies_uncontended_of_level = function
+    | 0 -> Jkind_axis.Unique_implies_uncontended.Holds
+    | 1 -> Jkind_axis.Unique_implies_uncontended.Does_not_hold
+    | _ -> invalid_arg "Axis_lattice.unique_implies_uncontended_of_level"
+
   let separability_of_level = function
     | 0 -> Jkind_axis.Separability.Non_float
     | 1 -> Jkind_axis.Separability.Separable
@@ -399,8 +411,12 @@ let externality (x : t) : Jkind_axis.Externality.t =
 let nullability (x : t) : Jkind_axis.Nullability.t =
   Levels.nullability_of_level (get_axis x ~axis:11)
 
+let unique_implies_uncontended (x : t) :
+    Jkind_axis.Unique_implies_uncontended.t =
+  Levels.unique_implies_uncontended_of_level (get_axis x ~axis:12)
+
 let separability (x : t) : Jkind_axis.Separability.t =
-  Levels.separability_of_level (get_axis x ~axis:12)
+  Levels.separability_of_level (get_axis x ~axis:13)
 
 let set_areality (a : Mode.Regionality.Const.t) (x : t) : t =
   set_axis x ~axis:0 ~level:(Levels.level_of_areality a)
@@ -438,8 +454,12 @@ let set_externality (e : Jkind_axis.Externality.t) (x : t) : t =
 let set_nullability (n : Jkind_axis.Nullability.t) (x : t) : t =
   set_axis x ~axis:11 ~level:(Levels.level_of_nullability n)
 
+let set_unique_implies_uncontended
+    (u : Jkind_axis.Unique_implies_uncontended.t) (x : t) : t =
+  set_axis x ~axis:12 ~level:(Levels.level_of_unique_implies_uncontended u)
+
 let set_separability (s : Jkind_axis.Separability.t) (x : t) : t =
-  set_axis x ~axis:12 ~level:(Levels.level_of_separability s)
+  set_axis x ~axis:13 ~level:(Levels.level_of_separability s)
 
 let to_mode_crossing (x : t) : Mode.Crossing.t =
   let open Mode.Crossing in
@@ -489,11 +509,16 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
            (Mode.Modality.Comonadic.Atom.Meet_const
               (statefulness x)))
   in
-  { monadic; comonadic }
+  { crossing = { monadic; comonadic };
+    unique_implies_uncontended =
+      Jkind_axis.Unique_implies_uncontended.equal
+        (unique_implies_uncontended x)
+        Jkind_axis.Unique_implies_uncontended.Holds
+  }
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention
     ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality
-    ~nullability ~separability =
+    ~nullability ~unique_implies_uncontended ~separability =
   bot
   |> set_areality areality
   |> set_uniqueness uniqueness
@@ -507,6 +532,7 @@ let create ~areality ~linearity ~uniqueness ~portability ~contention
   |> set_staticity staticity
   |> set_externality externality
   |> set_nullability nullability
+  |> set_unique_implies_uncontended unique_implies_uncontended
   |> set_separability separability
 
 (* Canonical lattice constants used by ikinds. *)
@@ -520,6 +546,8 @@ let nonfloat_value : t =
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
+    ~unique_implies_uncontended:
+      Jkind_axis.Unique_implies_uncontended.Holds
     ~separability:Jkind_axis.Separability.Non_float
 
 let immutable_data : t =
@@ -532,6 +560,8 @@ let immutable_data : t =
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
+    ~unique_implies_uncontended:
+      Jkind_axis.Unique_implies_uncontended.Holds
     ~separability:Jkind_axis.Separability.Non_float
 
 let mutable_data : t =
@@ -544,6 +574,8 @@ let mutable_data : t =
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
+    ~unique_implies_uncontended:
+      Jkind_axis.Unique_implies_uncontended.Holds
     ~separability:Jkind_axis.Separability.Non_float
 
 let sync_data : t =
@@ -556,6 +588,7 @@ let sync_data : t =
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
+    ~unique_implies_uncontended:Jkind_axis.Unique_implies_uncontended.Holds
     ~separability:Jkind_axis.Separability.Non_float
 
 let value : t =
@@ -568,6 +601,7 @@ let value : t =
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
+    ~unique_implies_uncontended:Jkind_axis.Unique_implies_uncontended.Holds
     ~separability:Jkind_axis.Separability.Separable
 
 let arrow : t =
@@ -581,6 +615,8 @@ let arrow : t =
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
+    ~unique_implies_uncontended:
+      Jkind_axis.Unique_implies_uncontended.Does_not_hold
     ~separability:Jkind_axis.Separability.Non_float
 
 let immediate : t =
@@ -594,6 +630,7 @@ let immediate : t =
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.min
     ~nullability:Jkind_axis.Nullability.Non_null
+    ~unique_implies_uncontended:Jkind_axis.Unique_implies_uncontended.Holds
     ~separability:Jkind_axis.Separability.Non_float
 
 let object_legacy : t =
@@ -607,6 +644,7 @@ let object_legacy : t =
     ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
+    ~unique_implies_uncontended:Jkind_axis.Unique_implies_uncontended.Holds
     ~separability:Jkind_axis.Separability.Non_float
 
 let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =

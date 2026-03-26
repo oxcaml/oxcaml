@@ -125,6 +125,15 @@ Error: In this "with" constraint, the new definition of "abstract"
        But the kind of the first must be a subkind of
            immutable_data with 'a test
          because of the definition of abstract at line 4, characters 2-48.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many with 'a test
+         contention: mod contended with 'a ≰ mod contended with 'a test
+         portability: mod portable with 'a ≰ mod portable with 'a test
+         forkable: mod forkable with 'a ≰ mod forkable with 'a test
+         yielding: mod unyielding with 'a ≰ mod unyielding with 'a test
+         statefulness: mod stateless with 'a ≰ mod stateless with 'a test
+         visibility: mod immutable with 'a ≰ mod immutable with 'a test
 |}]
 
 (* When we give open polymorphic variants more precise kinds, we should make sure to give them not-best quality *)
@@ -170,7 +179,8 @@ type ('a, 'b) t : immutable_data with 'a = [< `X | `Y of 'a] as 'b
 Line 1, characters 0-66:
 1 | type ('a, 'b) t : immutable_data with 'a = [< `X | `Y of 'a] as 'b
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[< `X | `Y of 'a ]" is value mod non_float
+Error: The kind of type "[< `X | `Y of 'a ]" is
+           value mod unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of type "[< `X | `Y of 'a ]" must be a subkind of
            immutable_data with 'a
@@ -181,7 +191,8 @@ type ('a, 'b) u : immutable_data with 'a = [> `X | `Y of 'a] as 'b
 Line 1, characters 0-66:
 1 | type ('a, 'b) u : immutable_data with 'a = [> `X | `Y of 'a] as 'b
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[> `X | `Y of 'a ]" is value mod non_float
+Error: The kind of type "[> `X | `Y of 'a ]" is
+           value mod unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of type "[> `X | `Y of 'a ]" must be a subkind of
            immutable_data with 'a
@@ -211,7 +222,7 @@ Line 2, characters 2-83:
 2 |   type 'a t : immutable_data with 'a = private [< `A of 'a | `B of ('a * 'a) | `C ]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[< `A of 'a | `B of 'a * 'a | `C ]" is
-           value mod non_float
+           value mod unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of type "[< `A of 'a | `B of 'a * 'a | `C ]" must be a subkind of
          immutable_data with 'a
@@ -230,7 +241,8 @@ Line 1, characters 64-65:
                                                                     ^
 Error: This alias is bound to type "[> `Foo of int ]"
        but is used as an instance of type "('a : value mod portable)"
-       The kind of [> `Foo of int ] is value mod non_float
+       The kind of [> `Foo of int ] is
+           value mod unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of [> `Foo of int ] must be a subkind of
            value mod portable
@@ -245,7 +257,8 @@ Line 1, characters 64-65:
                                                                     ^
 Error: This alias is bound to type "[< `Foo of int ]"
        but is used as an instance of type "('a : value mod portable)"
-       The kind of [< `Foo of int ] is value mod non_float
+       The kind of [< `Foo of int ] is
+           value mod unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of [< `Foo of int ] must be a subkind of
            value mod portable
@@ -270,7 +283,7 @@ Line 1, characters 0-71:
 1 | type trec_fails : immutable_data = [ `C | `D of 'a * unit -> 'a ] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" is
-           value mod immutable non_float
+           value mod immutable unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" must be a subkind of
          immutable_data
@@ -291,7 +304,8 @@ Lines 1-2, characters 0-80:
 2 |   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
 Error: The kind of type "[ `X of
                             [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b
-                        | `Y of 'b ] as 'a" is value mod immutable non_float
+                        | `Y of 'b ] as 'a" is
+           value mod immutable unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `X of
                                 [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ]
@@ -439,7 +453,8 @@ type t2 : immediate with string = M1.t
 Line 1, characters 0-38:
 1 | type t2 : immediate with string = M1.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "M1.t" is value mod non_float
+Error: The kind of type "M1.t" is
+           value mod unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of type "M1.t" must be a subkind of immutable_data
          because of the definition of t2 at line 1, characters 0-38.
@@ -450,7 +465,8 @@ type t2 : value mod portable = M1.t
 Line 1, characters 0-35:
 1 | type t2 : value mod portable = M1.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "M1.t" is value mod non_float
+Error: The kind of type "M1.t" is
+           value mod unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of type "M1.t" must be a subkind of value mod portable
          because of the definition of t2 at line 1, characters 0-35.

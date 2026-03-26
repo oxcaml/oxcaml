@@ -328,12 +328,16 @@ module Jkind0 : sig
     module Crossing = Mode.Crossing
     module Externality = Jkind_axis.Externality
     module Nullability = Jkind_axis.Nullability
+    module Unique_implies_uncontended =
+      Jkind_axis.Unique_implies_uncontended
     module Separability = Jkind_axis.Separability
 
     type t = mod_bounds =
       { crossing : Mode.Crossing.t;
         externality: Jkind_axis.Externality.t;
         nullability: Jkind_axis.Nullability.t;
+        unique_implies_uncontended:
+          Jkind_axis.Unique_implies_uncontended.t;
         separability: Jkind_axis.Separability.t;
       }
 
@@ -341,17 +345,20 @@ module Jkind0 : sig
       Crossing.t->
       externality:Externality.t ->
       nullability:Nullability.t ->
+      unique_implies_uncontended:Unique_implies_uncontended.t ->
       separability:Separability.t ->
       t
 
     val crossing : t -> Crossing.t
     val externality : t -> Externality.t
     val nullability : t -> Nullability.t
+    val unique_implies_uncontended : t -> Unique_implies_uncontended.t
     val separability : t -> Separability.t
 
     val set_crossing : Crossing.t -> t -> t
     val set_externality : Externality.t -> t -> t
     val set_nullability : Nullability.t -> t -> t
+    val set_unique_implies_uncontended : Unique_implies_uncontended.t -> t -> t
     val set_separability : Separability.t -> t -> t
 
     (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max]
@@ -379,6 +386,9 @@ module Jkind0 : sig
     val relevant_axes_of_modality :
       relevant_for_shallow:[ `Irrelevant | `Relevant ] ->
       modality:Mode.Modality.Const.t -> Jkind_axis.Axis_set.t
+
+    val contribute_base_from_modality :
+      modality:Mode.Modality.Const.t -> t -> t
 
     val debug_print : Format.formatter -> t -> unit
   end

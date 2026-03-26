@@ -51,6 +51,15 @@ Error: The kind of type "'a option" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "'a option" must be a subkind of immutable_data
          because of the definition of t at line 1, characters 0-38.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
+         contention: mod contended with 'a ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
 type t : immutable_data = int ref option
@@ -85,6 +94,9 @@ Error: This type "int option" should be an instance of type
          because it's a boxed variant type.
        But the kind of int option must be a subkind of value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with int ≰ mod portable
 |}]
 
 type t_test = (unit -> unit) option require_portable
@@ -94,7 +106,8 @@ Line 1, characters 14-35:
                   ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) option" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) option is value mod immutable non_float
+       The kind of (unit -> unit) option is
+           value mod immutable unique_implies_uncontended non_float
          because it's a boxed variant type.
        But the kind of (unit -> unit) option must be a subkind of
            value mod portable
@@ -110,6 +123,9 @@ Error: This type "(unit -> unit) option" should be an instance of type
        But the kind of (unit -> unit) option must be a subkind of
            value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with unit -> unit ≰ mod portable
 |}]
 
 type t_test = int option require_global
@@ -133,6 +149,12 @@ Error: This type "int option" should be an instance of type
          because it's a boxed variant type.
        But the kind of int option must be a subkind of value mod global
          because of the definition of require_global at line 7, characters 0-43.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         forkable: mod forkable with int ≰ mod forkable
+         yielding: mod unyielding with int ≰ mod unyielding
 |}]
 
 let foo (t : int option @ contended portable once) =
@@ -273,6 +295,15 @@ Error: The kind of type "'a list" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "'a list" must be a subkind of immutable_data
          because of the definition of t at line 1, characters 0-36.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
+         contention: mod contended with 'a ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
 type t : immutable_data = int ref list
@@ -306,6 +337,9 @@ Error: This type "int list" should be an instance of type
          because it's a boxed variant type.
        But the kind of int list must be a subkind of value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with int ≰ mod portable
 |}]
 
 type t_test = (unit -> unit) list require_portable
@@ -315,7 +349,8 @@ Line 1, characters 14-33:
                   ^^^^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) list" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) list is value mod immutable non_float
+       The kind of (unit -> unit) list is
+           value mod immutable unique_implies_uncontended non_float
          because it's a boxed variant type.
        But the kind of (unit -> unit) list must be a subkind of
            value mod portable
@@ -331,6 +366,9 @@ Error: This type "(unit -> unit) list" should be an instance of type
        But the kind of (unit -> unit) list must be a subkind of
            value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with unit -> unit ≰ mod portable
 |}]
 
 type t_test = int list require_global
@@ -354,6 +392,12 @@ Error: This type "int list" should be an instance of type
          because it's a boxed variant type.
        But the kind of int list must be a subkind of value mod global
          because of the definition of require_global at line 7, characters 0-43.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         forkable: mod forkable with int ≰ mod forkable
+         yielding: mod unyielding with int ≰ mod unyielding
 |}]
 
 let foo (t : int list @ contended portable once) =
@@ -402,6 +446,13 @@ Error: The kind of type "'a array" is mutable_data with 'a
          because it is the primitive value type array.
        But the kind of type "'a array" must be a subkind of mutable_data
          because of the definition of t at line 1, characters 0-35.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
 |}]
 
 type t_test = int array require_portable
@@ -422,6 +473,9 @@ Error: This type "int array" should be an instance of type
          because it is the primitive value type array.
        But the kind of int array must be a subkind of value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with int ≰ mod portable
 |}]
 
 type t_test = int array require_contended
@@ -445,6 +499,9 @@ Error: This type "int array" should be an instance of type
          because it is the primitive value type array.
        But the kind of int array must be a subkind of value mod contended
          because of the definition of require_contended at line 9, characters 0-49.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
 |}]
 
 let foo (t : int array @ portable once) =
@@ -483,6 +540,15 @@ Error: The kind of type "'a iarray" is immutable_data with 'a
          because it is the primitive value type iarray.
        But the kind of type "'a iarray" must be a subkind of immutable_data
          because of the definition of t at line 1, characters 0-38.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
+         contention: mod contended with 'a ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
 type t : immutable_data = int ref iarray
@@ -517,6 +583,9 @@ Error: This type "int iarray" should be an instance of type
          because it is the primitive value type iarray.
        But the kind of int iarray must be a subkind of value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with int ≰ mod portable
 |}]
 
 type t_test = (unit -> unit) iarray require_portable
@@ -526,7 +595,8 @@ Line 1, characters 14-35:
                   ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) iarray" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) iarray is value mod immutable non_float
+       The kind of (unit -> unit) iarray is
+           value mod immutable unique_implies_uncontended non_float
          because it is the primitive value type iarray.
        But the kind of (unit -> unit) iarray must be a subkind of
            value mod portable
@@ -542,6 +612,9 @@ Error: This type "(unit -> unit) iarray" should be an instance of type
        But the kind of (unit -> unit) iarray must be a subkind of
            value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with unit -> unit ≰ mod portable
 |}]
 
 type t_test = int iarray require_global
@@ -565,6 +638,12 @@ Error: This type "int iarray" should be an instance of type
          because it is the primitive value type iarray.
        But the kind of int iarray must be a subkind of value mod global
          because of the definition of require_global at line 7, characters 0-43.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         forkable: mod forkable with int ≰ mod forkable
+         yielding: mod unyielding with int ≰ mod unyielding
 |}]
 
 let foo (t : int iarray @ contended portable once) =

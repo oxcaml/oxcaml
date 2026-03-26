@@ -29,6 +29,15 @@ Error: This type "'a * int" should be an instance of type "('b : immutable_data)
          because it's a tuple type.
        But the kind of 'a * int must be a subkind of immutable_data
          because of the definition of t at line 1, characters 0-28.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
+         contention: mod contended with 'a ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod immutable with 'a ≰ mod immutable
 |}, Principal{|
 type ('a : immutable_data) t
 Line 2, characters 13-21:
@@ -39,6 +48,15 @@ Error: This type "'a * int" should be an instance of type "('b : immutable_data)
          because it's a tuple type.
        But the kind of 'a * int must be a subkind of immutable_data
          because of the definition of t at line 1, characters 0-28.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a with int ≰ mod many
+         contention: mod contended with 'a with int ≰ mod contended
+         portability: mod portable with 'a with int ≰ mod portable
+         forkable: mod forkable with 'a with int ≰ mod forkable
+         yielding: mod unyielding with 'a with int ≰ mod unyielding
+         statefulness: mod stateless with 'a with int ≰ mod stateless
+         visibility: mod immutable with 'a with int ≰ mod immutable
 |}]
 
 (* Function types *)
@@ -47,7 +65,8 @@ type t : immutable_data = int -> int
 Line 1, characters 0-36:
 1 | type t : immutable_data = int -> int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int -> int" is value mod aliased immutable non_float
+Error: The kind of type "int -> int" is
+           value mod aliased immutable unique_implies_uncontended non_float
          because it's a function type.
        But the kind of type "int -> int" must be a subkind of immutable_data
          because of the definition of t at line 1, characters 0-36.

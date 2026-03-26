@@ -479,6 +479,18 @@ Error: This type "int * int" should be an instance of type "('a : immediate)"
          because it's a tuple type.
        But the kind of int * int must be a subkind of immediate
          because of the definition of t7 at line 1, characters 0-37.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         linearity: mod many with int ≰ mod many
+         contention: mod contended with int ≰ mod contended
+         portability: mod portable with int ≰ mod portable
+         forkable: mod forkable with int ≰ mod forkable
+         yielding: mod unyielding with int ≰ mod unyielding
+         statefulness: mod stateless with int ≰ mod stateless
+         visibility: mod immutable with int ≰ mod immutable
+         externality: mod internal ≰ mod external_
 |}]
 
 (**********************************************************)
@@ -1730,7 +1742,8 @@ Line 2, characters 19-31:
 2 | let f35 : 'a t35 = fun () -> ()
                        ^^^^^^^^^^^^
 Error:
-       The kind of 'a -> 'b is value mod aliased immutable non_float
+       The kind of 'a -> 'b is
+           value mod aliased immutable unique_implies_uncontended non_float
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of immediate
          because of the definition of t35 at line 1, characters 0-30.

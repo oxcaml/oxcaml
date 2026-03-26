@@ -191,6 +191,9 @@ Error: This expression has type "'b * 'c"
          because it's a tuple type.
        But the layout of 'a * 'b must be a sublayout of void
          because of the annotation on the type variable 'a.
+
+       The first mode-crosses less than the second along:
+         externality: mod internal ≰ mod external_
 |}];;
 
 (* Row_variable *)
@@ -210,6 +213,9 @@ Error: This expression has type "[ `A of int | `B ]"
          because it's a polymorphic variant type.
        But the layout of [ `A of int | `B ] must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
+
+       The first mode-crosses less than the second along:
+         externality: mod internal ≰ mod external_
 |}]
 
 (* Arrow *)

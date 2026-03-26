@@ -18,6 +18,9 @@ Error: This expression has type "'a * 'b"
          because it's a tuple type.
        But the kind of 'a * 'b must be a subkind of value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a with 'a ≰ mod portable
 |}]
 
 let f a b = require_portable (a, b, c, d, e)
@@ -33,6 +36,10 @@ Error: This expression has type "'a * 'b * 'c * 'd * 'e"
        But the kind of 'a * 'b * 'c * 'd * 'e must be a subkind of
            value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a with 'a with 'a with 'a with 'a ≰
+           mod portable
 |}]
 
 let f a b = require_portable ((a, b), (c, d))
@@ -46,6 +53,9 @@ Error: This expression has type "'a * 'b"
          because it's a tuple type.
        But the kind of 'a * 'b must be a subkind of value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a with 'a ≰ mod portable
 |}]
 
 type ('a, 'b) t = { a : 'a; b : 'b }
@@ -61,6 +71,9 @@ Error: This expression has type "'a * 'b"
          because it's a tuple type.
        But the kind of 'a * 'b must be a subkind of value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a with 'a ≰ mod portable
 |}]
 
 type ('a, 'b) t = Foo of 'a * 'b
@@ -76,6 +89,9 @@ Error: This expression has type "'a * 'b"
          because it's a tuple type.
        But the kind of 'a * 'b must be a subkind of value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a with 'a ≰ mod portable
 |}]
 
 let f (a : _ list) (b : _ option) = require_portable (a, b)
@@ -89,6 +105,9 @@ Error: This expression has type "'a * 'b"
          because it's a tuple type.
        But the kind of 'a * 'b must be a subkind of value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a with 'a ≰ mod portable
 |}]
 
 type 'a t_no_bound = unit
@@ -112,6 +131,9 @@ Error: This expression has type "'a t_no_bound * 'b t_with_bound"
        But the kind of 'a t_no_bound * 'b t_with_bound must be a subkind of
            value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a ≰ mod portable
 |}, Principal{|
 type 'a t_no_bound = unit
 type 'a t_with_bound = 'a option
@@ -127,4 +149,8 @@ Error: This expression has type "unit * 'a t_with_bound"
        But the kind of unit * 'a t_with_bound must be a subkind of
            value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a t_with_bound with unit ≰
+           mod portable
 |}]

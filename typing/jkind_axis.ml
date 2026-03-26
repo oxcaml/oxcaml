@@ -170,6 +170,47 @@ module Separability = struct
     | Maybe_separable -> Fmt.fprintf ppf "maybe_separable"
 end
 
+module Unique_implies_uncontended = struct
+  type t =
+    | Holds
+    | Does_not_hold
+
+  let max = Does_not_hold
+
+  let min = Holds
+
+  let equal u1 u2 =
+    match u1, u2 with
+    | Holds, Holds -> true
+    | Does_not_hold, Does_not_hold -> true
+    | (Holds | Does_not_hold), _ -> false
+
+  let less_or_equal u1 u2 : Misc.Le_result.t =
+    match u1, u2 with
+    | Holds, Holds -> Equal
+    | Holds, Does_not_hold -> Less
+    | Does_not_hold, Holds -> Not_le
+    | Does_not_hold, Does_not_hold -> Equal
+
+  let le u1 u2 = Misc.Le_result.is_le (less_or_equal u1 u2)
+
+  let meet u1 u2 =
+    match u1, u2 with
+    | Holds, (Holds | Does_not_hold) | Does_not_hold, Holds -> Holds
+    | Does_not_hold, Does_not_hold -> Does_not_hold
+
+  let join u1 u2 =
+    match u1, u2 with
+    | Does_not_hold, (Does_not_hold | Holds) | Holds, Does_not_hold ->
+      Does_not_hold
+    | Holds, Holds -> Holds
+
+  let print ppf = function
+    | Holds -> Fmt.fprintf ppf "unique_implies_uncontended"
+    | Does_not_hold ->
+      Fmt.fprintf ppf "does_not_hold_unique_implies_uncontended"
+end
+
 module Pointerness = struct
   type t =
     | Non_pointer
@@ -221,6 +262,7 @@ module Axis = struct
     type 'a t =
       | Externality : Externality.t t
       | Nullability : Nullability.t t
+      | Unique_implies_uncontended : Unique_implies_uncontended.t t
       | Separability : Separability.t t
   end
 
@@ -244,6 +286,7 @@ module Axis = struct
       (* CR-soon zqian: call [Mode.Crossing.Axis.all] for modal axes *)
       Pack (Nonmodal Externality);
       Pack (Nonmodal Nullability);
+      Pack (Nonmodal Unique_implies_uncontended);
       Pack (Nonmodal Separability) ]
 
   let name (type a) : a t -> string = function
@@ -254,6 +297,7 @@ module Axis = struct
       Fmt.asprintf "%a" Mode.Value.Axis.print ax
     | Nonmodal Externality -> "externality"
     | Nonmodal Nullability -> "nullability"
+    | Nonmodal Unique_implies_uncontended -> "unique_implies_uncontended"
     | Nonmodal Separability -> "separability"
 end
 
@@ -266,11 +310,13 @@ module Per_axis = struct
     let min : type a. a t -> a = function
       | Externality -> Externality.min
       | Nullability -> Nullability.min
+      | Unique_implies_uncontended -> Unique_implies_uncontended.min
       | Separability -> Separability.min
 
     let max : type a. a t -> a = function
       | Externality -> Externality.max
       | Nullability -> Nullability.max
+      | Unique_implies_uncontended -> Unique_implies_uncontended.max
       | Separability -> Separability.max
 
     let le : type a. a t -> a -> a -> bool =
@@ -278,6 +324,7 @@ module Per_axis = struct
       match ax with
       | Externality -> Externality.le a b
       | Nullability -> Nullability.le a b
+      | Unique_implies_uncontended -> Unique_implies_uncontended.le a b
       | Separability -> Separability.le a b
 
     let equal : type a. a t -> a -> a -> bool =
@@ -285,6 +332,7 @@ module Per_axis = struct
       match ax with
       | Externality -> Externality.equal a b
       | Nullability -> Nullability.equal a b
+      | Unique_implies_uncontended -> Unique_implies_uncontended.equal a b
       | Separability -> Separability.equal a b
 
     let meet : type a. a t -> a -> a -> a =
@@ -292,6 +340,7 @@ module Per_axis = struct
       match ax with
       | Externality -> Externality.meet a b
       | Nullability -> Nullability.meet a b
+      | Unique_implies_uncontended -> Unique_implies_uncontended.meet a b
       | Separability -> Separability.meet a b
 
     let join : type a. a t -> a -> a -> a =
@@ -299,11 +348,13 @@ module Per_axis = struct
       match ax with
       | Externality -> Externality.join a b
       | Nullability -> Nullability.join a b
+      | Unique_implies_uncontended -> Unique_implies_uncontended.join a b
       | Separability -> Separability.join a b
 
     let print : type a. a t -> Fmt.formatter -> a -> unit = function
       | Externality -> Externality.print
       | Nullability -> Nullability.print
+      | Unique_implies_uncontended -> Unique_implies_uncontended.print
       | Separability -> Separability.print
 
     let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
@@ -311,6 +362,7 @@ module Per_axis = struct
       match a, b with
       | Externality, Externality -> Some Refl
       | Nullability, Nullability -> Some Refl
+      | Unique_implies_uncontended, Unique_implies_uncontended -> Some Refl
       | Separability, Separability -> Some Refl
       | _ -> None
 
@@ -323,6 +375,9 @@ module Per_axis = struct
       | Nullability, Nullability -> Equal
       | Nullability, _ -> Less_than
       | _, Nullability -> Greater_than
+      | Unique_implies_uncontended, Unique_implies_uncontended -> Equal
+      | Unique_implies_uncontended, _ -> Less_than
+      | _, Unique_implies_uncontended -> Greater_than
       | Separability, Separability -> Equal
   end
 
@@ -402,7 +457,8 @@ module Axis_set = struct
     (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
     | Nonmodal Externality -> 10
     | Nonmodal Nullability -> 11
-    | Nonmodal Separability -> 12
+    | Nonmodal Unique_implies_uncontended -> 12
+    | Nonmodal Separability -> 13
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 
@@ -434,6 +490,7 @@ module Axis_set = struct
     |> set_axis (Modal (Monadic Staticity))
     |> set_axis (Nonmodal Externality)
     |> set_axis (Nonmodal Nullability)
+    |> set_axis (Nonmodal Unique_implies_uncontended)
     |> set_axis (Nonmodal Separability)
 
   let all = create ~f:(fun ~axis:_ -> true)

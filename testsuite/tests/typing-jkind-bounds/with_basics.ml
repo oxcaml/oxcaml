@@ -589,6 +589,10 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with 'a ≰ mod contended
+         visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
 (***************)
@@ -1023,6 +1027,15 @@ Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
+         contention: mod contended with 'a ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
 (**********************************)

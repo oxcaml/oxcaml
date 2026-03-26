@@ -770,7 +770,8 @@ Line 1, characters 26-40:
 1 | let fails = restricted [| fun () -> "no" |]
                               ^^^^^^^^^^^^^^
 Error:
-       The kind of 'a -> 'b is value mod aliased immutable non_float
+       The kind of 'a -> 'b is
+           value mod aliased immutable unique_implies_uncontended non_float
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of
            value_or_null mod portable contended separable

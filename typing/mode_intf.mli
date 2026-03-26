@@ -1069,8 +1069,12 @@ module type S = sig
     end
 
     (** The mode crossing capability on all axes, split into monadic and
-        comonadic fragments. *)
-    type t = (Monadic.t, Comonadic.t) monadic_comonadic
+        comonadic fragments, plus one extra conditional relaxation for
+        [unique_implies_uncontended]. *)
+    type t =
+      { crossing : (Monadic.t, Comonadic.t) monadic_comonadic;
+        unique_implies_uncontended : bool
+      }
 
     module Axis : sig
       (** ['a t] specifies an axis whose mode crossing capability is represented

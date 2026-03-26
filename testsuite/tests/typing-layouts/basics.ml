@@ -686,6 +686,18 @@ Error: This type "int * int" should be an instance of type "('a : immediate)"
          because it's a tuple type.
        But the kind of int * int must be a subkind of immediate
          because of the definition of t7 at line 1, characters 0-37.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         linearity: mod many with int ≰ mod many
+         contention: mod contended with int ≰ mod contended
+         portability: mod portable with int ≰ mod portable
+         forkable: mod forkable with int ≰ mod forkable
+         yielding: mod unyielding with int ≰ mod unyielding
+         statefulness: mod stateless with int ≰ mod stateless
+         visibility: mod immutable with int ≰ mod immutable
+         externality: mod internal ≰ mod external_
 |}]
 
 (**********************************************************)
@@ -1876,7 +1888,8 @@ Line 2, characters 19-31:
 2 | let f35 : 'a t35 = fun () -> ()
                        ^^^^^^^^^^^^
 Error:
-       The kind of 'a -> 'b is value mod aliased immutable non_float
+       The kind of 'a -> 'b is
+           value mod aliased immutable unique_implies_uncontended non_float
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of immediate
          because of the definition of t35 at line 1, characters 0-30.
@@ -2867,7 +2880,11 @@ Line 1, characters 28-32:
 Error: This function application uses an expression with type "'a"
        as a function, but that type has kind "bits64", which cannot
        be the kind of a function.
-       (Functions always have kind "value mod aliased immutable non_float".)
+       (Functions always have kind "value
+                                     mod aliased
+                                         immutable
+                                         unique_implies_uncontended
+                                         non_float".)
 |}]
 
 let f (x : ('a : value mod portable)) = x ()
@@ -2879,7 +2896,11 @@ Line 1, characters 40-44:
 Error: This function application uses an expression with type "'a"
        as a function, but that type has kind "value mod portable", which cannot
        be the kind of a function.
-       (Functions always have kind "value mod aliased immutable non_float".)
+       (Functions always have kind "value
+                                     mod aliased
+                                         immutable
+                                         unique_implies_uncontended
+                                         non_float".)
 |}]
 
 let f (x : ('a : value)) = x ()
@@ -2914,7 +2935,11 @@ Line 9, characters 10-22:
 Error: This function application uses an expression with type "'a"
        as a function, but that type has kind "immediate", which cannot
        be the kind of a function.
-       (Functions always have kind "value mod aliased immutable non_float".)
+       (Functions always have kind "value
+                                     mod aliased
+                                         immutable
+                                         unique_implies_uncontended
+                                         non_float".)
        Hint: Perhaps you have over-applied the function or used an incorrect label.
 |}]
 
@@ -2927,7 +2952,11 @@ Line 1, characters 10-22:
 Error: This function application uses an expression with type "'a"
        as a function, but that type has kind "immediate", which cannot
        be the kind of a function.
-       (Functions always have kind "value mod aliased immutable non_float".)
+       (Functions always have kind "value
+                                     mod aliased
+                                         immutable
+                                         unique_implies_uncontended
+                                         non_float".)
        Hint: Perhaps you have over-applied the function or used an incorrect label.
 |}]
 
@@ -2951,8 +2980,12 @@ Line 1, characters 10-12:
               ^^
 Error: This type "t1" should be an instance of type
          "('a : immediate & immediate)"
-       The kind of t1 is value mod non_float & value mod non_float
+       The kind of t1 is
+           value mod unique_implies_uncontended non_float
+           & value mod unique_implies_uncontended non_float
          because it is an unboxed tuple.
-       But the kind of t1 must be a subkind of immediate & immediate
+       But the kind of t1 must be a subkind of
+           value_or_null mod everything mod non_null non_float
+           & value_or_null mod everything mod non_null non_float
          because of the definition of t2 at line 2, characters 0-36.
 |}]

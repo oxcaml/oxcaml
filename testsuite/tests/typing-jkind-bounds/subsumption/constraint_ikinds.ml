@@ -203,4 +203,8 @@ Error: Signature mismatch:
          because of the definition of t at line 4, characters 2-64.
        But the kind of the first must be a subkind of immutable_data
          because of the definition of t at line 2, characters 2-69.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with 'b ≰ mod contended
+         visibility: mod immutable with 'b ≰ mod immutable
 |}]

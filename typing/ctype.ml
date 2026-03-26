@@ -2524,7 +2524,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
 let estimate_type_jkind_unwrapped
       ~expand_component env { ty; modality } =
   estimate_type_jkind ~expand_component ~ignore_mod_bounds:false env ty |>
-  Jkind.apply_modality_l modality
+  Jkind.apply_modality_l_with_base modality
 
 
 let type_jkind env ty =
@@ -2560,6 +2560,9 @@ let estimate_type_jkind =
 (* After type_jkind_purely_if_principal is defined, we can use it directly *)
 let mk_jkind_context_check_principal env =
   mk_jkind_context env (type_jkind_purely_if_principal env)
+
+let () =
+  Ikind.principal_jkind_of_type' := type_jkind_purely_if_principal
 
 (* For cases where we always want Some (type_jkind_purely env ty) *)
 let mk_jkind_context_always_principal env =
@@ -2808,11 +2811,30 @@ let constrain_type_jkind ~fixed env ty jkind =
                | Final_result ->
                  Error
                    (Jkind.Violation.of_ ~context env
-                      (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
                | Stepped { ty; modality } ->
-                 let jkind = Jkind.apply_modality_r modality jkind in
-                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false ty
-                    jkind
+                 let modality_bounds =
+                   Jkind0.Mod_bounds.contribute_base_from_modality
+                     ~modality Jkind0.Mod_bounds.min
+                 in
+                 let disables_uiu =
+                   Jkind0.Mod_bounds.Unique_implies_uncontended.equal
+                     (Jkind0.Mod_bounds.unique_implies_uncontended
+                        modality_bounds)
+                     Jkind0.Mod_bounds.Unique_implies_uncontended.max
+                 in
+                 if disables_uiu
+                    && (Jkind.get_mode_crossing ~context env jkind)
+                         .unique_implies_uncontended
+                 then
+                   Error
+                     (Jkind.Violation.of_ ~context env
+                        (Not_a_subjkind (ty's_jkind, jkind,
+                           sub_failure_reasons)))
+                 else
+                   let jkind = Jkind.apply_modality_r modality jkind in
+                   estimate_jkind_and_loop ~fuel:(fuel - 1)
+                     ~expanded:false ty jkind
                | Stepped_or_null { ty; modality } ->
                  or_null ~fuel:(fuel - 1) ty modality
                | Stepped_record_unboxed_product tys_modalities ->
@@ -5451,8 +5473,8 @@ let crossing_of_ty env ?modalities ty =
       then (
         let ikind_crossing = Ikind.crossing_of_type env ty in
         if debug_ikind_crossing_mismatch then (
-          let old_jkind_crossing = jkind_crossing () in
-          if not (Crossing.equal ikind_crossing old_jkind_crossing)
+          let jkind_crossing = jkind_crossing () in
+          if not (Crossing.equal ikind_crossing jkind_crossing)
           then
             Format.eprintf
               "@[<v>[ikind-crossing-mismatch]@ \
@@ -5461,7 +5483,7 @@ let crossing_of_ty env ?modalities ty =
                jkind=%a@]@."
               !Btype.print_raw ty
               (Format_doc.compat Crossing.print) ikind_crossing
-              (Format_doc.compat Crossing.print) old_jkind_crossing
+              (Format_doc.compat Crossing.print) jkind_crossing
         );
         ikind_crossing)
       else
@@ -7799,7 +7821,7 @@ let check_decl_jkind env decl jkind =
               Cstr_record [{ ld_type = inner_ty;
                              ld_modalities = modality }]) }],
         Variant_unboxed, None), _ ->
-      Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
+      type_jkind_purely inner_ty |> Jkind.apply_modality_l_with_base modality
     | _ -> decl.type_jkind
   in
   match

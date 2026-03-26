@@ -211,7 +211,13 @@ Line 1, characters 26-28:
 Error: This expression has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is
-           value mod forkable unyielding many stateless immutable
+           value
+             mod forkable
+                 unyielding
+                 many
+                 stateless
+                 immutable
+                 unique_implies_uncontended
          because it is the primitive type float.
        But the kind of float must be a subkind of value mod non_float
          because it's the type of an array element.
@@ -278,7 +284,13 @@ Line 1, characters 32-34:
 Error: This expression has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is
-           value mod forkable unyielding many stateless immutable
+           value
+             mod forkable
+                 unyielding
+                 many
+                 stateless
+                 immutable
+                 unique_implies_uncontended
          because it is the primitive type float.
        But the kind of float must be a subkind of value mod non_float
          because it's the type of an array element.
