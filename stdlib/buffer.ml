@@ -187,6 +187,7 @@ let add_bytes b bytes =
   add_subbytes b bytes 0 (Bytes.length bytes)
   [@nontail]
 
+(* These two functions have not been localised (yet) and so are re-exported *)
 let add_substring b s offset len =
   add_substring b s offset len
 
