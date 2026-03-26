@@ -50,17 +50,9 @@ module Typedtree_search =
 
     let iter_val_pattern = function
       | Typedtree.Tpat_any -> None
-<<<<<<< oxcaml
       | Typedtree.Tpat_var (name, _, _, _, _)
       | Typedtree.Tpat_alias (_, name, _, _, _, _, _) ->
         Some (Name.from_ident name)
-||||||| upstream-base
-      | Typedtree.Tpat_var (name, _)
-      | Typedtree.Tpat_alias (_, name, _)  -> Some (Name.from_ident name)
-=======
-      | Typedtree.Tpat_var (name, _, _)
-      | Typedtree.Tpat_alias (_, name, _, _, _)  -> Some (Name.from_ident name)
->>>>>>> upstream-incoming
       | Typedtree.Tpat_tuple _ -> None (* FIXME when we will handle tuples *)
       | _ -> None
 
@@ -261,26 +253,14 @@ module Analyser =
     let tt_param_info_from_pattern env f_desc pat =
       let rec iter_pattern pat =
         match pat.pat_desc with
-<<<<<<< oxcaml
           Typedtree.Tpat_var (ident, _, _, _, _) ->
-||||||| upstream-base
-          Typedtree.Tpat_var (ident, _) ->
-=======
-          Typedtree.Tpat_var (ident, _, _) ->
->>>>>>> upstream-incoming
             let name = Name.from_ident ident in
             Simple_name { sn_name = name ;
                           sn_text = f_desc name ;
                           sn_type = Odoc_env.subst_type env pat.pat_type
                         }
 
-<<<<<<< oxcaml
         | Typedtree.Tpat_alias (pat, _, _, _, _, _, _) ->
-||||||| upstream-base
-        | Typedtree.Tpat_alias (pat, _, _) ->
-=======
-        | Typedtree.Tpat_alias (pat, _, _, _, _) ->
->>>>>>> upstream-incoming
             iter_pattern pat
 
         | Typedtree.Tpat_tuple patlist ->
@@ -355,22 +335,10 @@ module Analyser =
      let tt_analyse_value env current_module_name comment_opt loc pat_exp rec_flag attrs =
        let (pat, exp) = pat_exp in
        let comment_opt = Odoc_sig.analyze_alerts comment_opt attrs in
-<<<<<<< oxcaml
        match (pat.pat_desc, exp.exp_desc) with
-         (Tpat_var (ident, _, _, _, _), Texp_function { params; body; _ }) ->
-||||||| upstream-base
-       match pat.pat_desc with
-       | Tpat_var (ident, _) | Tpat_alias (_, ident, _) ->
-          begin match exp.exp_desc with
-          | Texp_function (params, body) ->
-
-=======
-       match pat.pat_desc with
-       | Tpat_var (ident, _, _) | Tpat_alias (_, ident, _, _, _) ->
-          begin match exp.exp_desc with
-          | Texp_function (params, body) ->
-
->>>>>>> upstream-incoming
+       | (Tpat_var (ident, _, _, _, _), Texp_function { params; body; _ })
+       | (Tpat_alias (_, ident, _, _, _, _, _),
+          Texp_function { params; body; _ }) ->
            (* a new function is defined *)
            let name_pre = Name.from_ident ident in
            let name = Name.parens_if_infix name_pre in
@@ -705,29 +673,15 @@ module Analyser =
               a default value. In this case, we look for the good parameter pattern *)
            let (parameter, next_tt_class_exp) =
              match pat.Typedtree.pat_desc with
-<<<<<<< oxcaml
                Typedtree.Tpat_var (ident, _, _, _, _)
                when String.starts_with (Name.from_ident ident) ~prefix:"*opt*"
                 ->
-||||||| upstream-base
-               Typedtree.Tpat_var (ident, _) when Name.from_ident ident = "*opt*" ->
-=======
-               Typedtree.Tpat_var (ident, _, _) when Name.from_ident ident = "*opt*" ->
->>>>>>> upstream-incoming
                  (
                   (* there must be a Tcl_let just after *)
                   match tt_class_expr2.Typedtree.cl_desc with
-<<<<<<< oxcaml
                     Typedtree.Tcl_let (_,
                       {vb_pat={pat_desc = Typedtree.Tpat_var (id,_,_,_,_) };
                        vb_expr=exp} :: _, _, tt_class_expr3) ->
-||||||| upstream-base
-                    Typedtree.Tcl_let (_, {vb_pat={pat_desc = Typedtree.Tpat_var (id,_) };
-                                           vb_expr=exp} :: _, _, tt_class_expr3) ->
-=======
-                    Typedtree.Tcl_let (_, {vb_pat={pat_desc = Typedtree.Tpat_var (id,_,_) };
-                                           vb_expr=exp} :: _, _, tt_class_expr3) ->
->>>>>>> upstream-incoming
                       let name = Name.from_ident id in
                       let new_param = Simple_name
                           { sn_name = name ;
@@ -772,31 +726,13 @@ module Analyser =
                 |  _ ->
                     Odoc_messages.object_end
           in
-<<<<<<< oxcaml
-          let param_exps = List.fold_left
-              (fun acc -> fun (_, arg) ->
-                match arg with
-                | Omitted _ -> acc
-                | Arg e -> acc @ [e])
-              []
-              arg_list
+          let param_exps = List.filter_map (function
+              | _, Omitted _ -> None
+              | _, Arg e -> Some e)
+            arg_list
           in
           let param_types =
             List.map (fun (e, _) -> e.Typedtree.exp_type) param_exps
-||||||| upstream-base
-          let param_exps = List.fold_left
-              (fun acc -> fun (_, exp_opt) ->
-                match exp_opt with
-                  None -> acc
-                | Some e -> acc @ [e])
-              []
-              exp_opt_optional_list
-=======
-          let param_exps = List.filter_map (function
-              | _, Omitted () -> None
-              | _, Arg e -> Some e)
-            arg_list
->>>>>>> upstream-incoming
           in
           let params_code =
             List.map
