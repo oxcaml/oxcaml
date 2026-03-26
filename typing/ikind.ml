@@ -49,7 +49,8 @@ let intrinsic_axis_lattice_of_jkind :
     type l r. (l * r) Types.jkind -> Axis_lattice.t option =
  fun jkind ->
   match Jkind.Desc.get_const (Jkind.get jkind) with
-  | Some { base = Types.Layout (Jkind_types.Layout.Const.Base (Value, _)); _ } ->
+  | Some
+      { base = Types.Layout (Jkind_types.Layout.Const.Base (Value, _)); _ } ->
     Some Axis_lattice.value
  | Some _ | None ->
     None

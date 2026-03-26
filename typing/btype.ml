@@ -1154,7 +1154,8 @@ module Jkind0 = struct
           | Mode.Modality.Monadic.Atom.Join_const
               Mode.Contention.Const.Contended -> true
           | Mode.Modality.Monadic.Atom.Join_const
-              (Mode.Contention.Const.Uncontended | Mode.Contention.Const.Shared) ->
+              ( Mode.Contention.Const.Uncontended
+              | Mode.Contention.Const.Shared ) ->
             false
         then
         set_unique_implies_uncontended Unique_implies_uncontended.min t

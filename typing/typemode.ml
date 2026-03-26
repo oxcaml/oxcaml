@@ -367,8 +367,7 @@ let transl_mod_bounds annots =
       raw_modifiers.nullability
   in
   let unique_implies_uncontended =
-    Option.fold ~some:Location.get_txt
-      ~none:Unique_implies_uncontended.max
+    Option.fold ~some:Location.get_txt ~none:Unique_implies_uncontended.max
       raw_modifiers.unique_implies_uncontended
   in
   let separability =
@@ -605,8 +604,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     in
     [ mk_annot Externality.max Externality.print (externality bounds);
       mk_annot Nullability.max Nullability.print (nullability bounds);
-      mk_annot Unique_implies_uncontended.max
-        Unique_implies_uncontended.print
+      mk_annot Unique_implies_uncontended.max Unique_implies_uncontended.print
         (unique_implies_uncontended bounds);
       mk_annot Separability.max Separability.print (separability bounds) ]
     |> List.partition_map (fun (annot, only_when_verbose) ->

@@ -5195,8 +5195,7 @@ module Crossing = struct
     let comonadic = Comonadic.modality m.comonadic comonadic in
     { crossing = { monadic; comonadic }; unique_implies_uncontended }
 
-  let apply_left_unhint
-      { crossing = t; unique_implies_uncontended = _ }
+  let apply_left_unhint { crossing = t; unique_implies_uncontended = _ }
       { monadic = input_monadic; comonadic } =
     let monadic = Monadic.apply_left t.monadic input_monadic in
     let comonadic = Comonadic.apply_left t.comonadic comonadic in
@@ -5216,8 +5215,7 @@ module Crossing = struct
       |> Value.hint ~monadic:Crossing ~comonadic:Crossing
     else output
 
-  let apply_right_unhint
-      { crossing = t; unique_implies_uncontended = _ }
+  let apply_right_unhint { crossing = t; unique_implies_uncontended = _ }
       { monadic = input_monadic; comonadic } =
     let monadic = Monadic.apply_right t.monadic input_monadic in
     let comonadic = Comonadic.apply_right t.comonadic comonadic in

@@ -2507,8 +2507,8 @@ let sort_of_jkind env (t : jkind_l) : sort =
   in
   sort_of_layout layout
 
-let get_mod_bounds (type l r) ~mode ~context ~skip_axes env
-    (jk : (l * r) jkind) =
+let get_mod_bounds (type l r) ~mode ~context ~skip_axes env (jk : (l * r) jkind)
+    =
   let jk, _ =
     Base_and_axes.normalize ~mode ~skip_axes
       ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize ~context
@@ -2526,24 +2526,26 @@ let all_except_unique_implies_uncontended =
   Axis_set.singleton (Nonmodal Unique_implies_uncontended)
   |> Axis_set.complement
 
-let get_unique_implies_uncontended (type l r) ~context env
-    (jk : (l * r) jkind) =
+let get_unique_implies_uncontended (type l r) ~context env (jk : (l * r) jkind)
+    =
   let rec loop_l seen (jk : Types.jkind_l) =
     let jk, _ =
       Base_and_axes.normalize ~mode:Ignore_best
         ~skip_axes:all_except_unique_implies_uncontended
-        ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize
-        ~context env jk.jkind
+        ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize ~context
+        env jk.jkind
     in
     let base =
       Mod_bounds.get jk.mod_bounds ~axis:(Nonmodal Unique_implies_uncontended)
     in
     With_bounds.to_seq jk.with_bounds
     |> Seq.fold_left
-         (fun acc
-             (ty, ({ relevant_axes } : With_bounds_type_info.t)) ->
-           if not (Axis_set.mem relevant_axes
-                     (Nonmodal Unique_implies_uncontended))
+         (fun acc (ty, ({ relevant_axes } : With_bounds_type_info.t)) ->
+           if
+             not
+               (Axis_set.mem
+                  relevant_axes
+                  (Nonmodal Unique_implies_uncontended))
            then acc
            else
              let ty_bound =
@@ -2561,18 +2563,18 @@ let get_unique_implies_uncontended (type l r) ~context env
   let jk, _ =
     Base_and_axes.normalize ~mode:Ignore_best
       ~skip_axes:all_except_unique_implies_uncontended
-      ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize
-      ~context env jk.jkind
+      ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize ~context
+      env jk.jkind
   in
   let base =
     Mod_bounds.get jk.mod_bounds ~axis:(Nonmodal Unique_implies_uncontended)
   in
   With_bounds.to_seq jk.with_bounds
   |> Seq.fold_left
-       (fun acc
-           (ty, ({ relevant_axes } : With_bounds_type_info.t)) ->
-         if not (Axis_set.mem relevant_axes
-                   (Nonmodal Unique_implies_uncontended))
+       (fun acc (ty, ({ relevant_axes } : With_bounds_type_info.t)) ->
+         if
+           not
+             (Axis_set.mem relevant_axes (Nonmodal Unique_implies_uncontended))
          then acc
          else
            let ty_bound =
@@ -2699,8 +2701,7 @@ let apply_modality_r modality jk =
       ~relevant_for_shallow:`Relevant
   in
   let mod_bounds =
-    jk.jkind.mod_bounds
-    |> fun mod_bounds ->
+    jk.jkind.mod_bounds |> fun mod_bounds ->
     Mod_bounds.set_max_in_set mod_bounds (Axis_set.complement relevant_axes)
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
