@@ -4421,7 +4421,7 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let copy_generic ~copy_scope a =
     let copy_from_level = generic_level in
-    let copy_to_level = Stdlib.max_int in
+    let copy_to_level = generic_level in
     S.copy ~copy_scope ~copy_from_level ~copy_to_level obj a
 
   let duplicate ~copy_scope a =
@@ -4590,7 +4590,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   let copy_generic ~copy_scope a =
     let copy_from_level = generic_level in
-    let copy_to_level = Stdlib.max_int in
+    let copy_to_level = generic_level in
     S.copy ~copy_scope ~copy_from_level ~copy_to_level obj a
 
   let duplicate ~copy_scope a =
