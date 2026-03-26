@@ -90,8 +90,6 @@ let report_error loc e bt =
 
 type summary = Pass | Skip | Fail
 
-(* CR sspies: I'm not entirely convinced this is right, but I think we should
-   try.  *)
 let summary_of_status : Result.status -> summary = function
   | Pass | Predicate true -> Pass
   | Skip | Predicate false -> Skip
