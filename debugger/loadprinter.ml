@@ -95,9 +95,6 @@ let eval_value_path env path =
    {b and fallback if it fails} *)
  let install_printer lid =
   let env = Lazy.force Env.initial in
-  (* CR sspies: The semantics is now subtly different here, since [env] is used
-     in more places than it was before the 5.4 merge. I suspect this is fine.
-     Planning to delete this comment during review *)
   match Topprinters.find_printer env lid with
   | Error error -> raise (Error (error :> error))
   | Ok (path, kind) ->
