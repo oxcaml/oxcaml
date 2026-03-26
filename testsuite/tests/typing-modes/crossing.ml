@@ -206,7 +206,7 @@ let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
 Line 1, characters 64-65:
 1 | let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
                                                                     ^
-Error: This value is "poisoned" because it crosses with something
+Error: This value is "corrupted" because it crosses with something
          which is "contended".
        However, the highlighted expression is expected to be "shared" or "uncontended".
 |}]

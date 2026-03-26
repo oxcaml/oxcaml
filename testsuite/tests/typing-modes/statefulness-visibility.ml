@@ -174,11 +174,11 @@ Error: This value is "write"
          because its mutable field "a" is being read.
 |}]
 
-let foo (x @ write poisoned) = x.a
+let foo (x @ write corrupted) = x.a
 [%%expect{|
-Line 1, characters 31-32:
-1 | let foo (x @ write poisoned) = x.a
-                                   ^
+Line 1, characters 32-33:
+1 | let foo (x @ write corrupted) = x.a
+                                    ^
 Error: This value is "write"
        but is expected to be "read" or "read_write"
          because its mutable field "a" is being read.
@@ -216,11 +216,11 @@ Error: This value is "immutable"
          because its mutable field "contents" is being read.
 |}]
 
-let foo (x @ immutable poisoned) = x.contents
+let foo (x @ immutable corrupted) = x.contents
 [%%expect{|
-Line 1, characters 35-36:
-1 | let foo (x @ immutable poisoned) = x.contents
-                                       ^
+Line 1, characters 36-37:
+1 | let foo (x @ immutable corrupted) = x.contents
+                                        ^
 Error: This value is "immutable"
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
@@ -256,11 +256,11 @@ Error: This value is "write"
          because its mutable field "contents" is being read.
 |}]
 
-let foo (x @ write poisoned) = x.contents
+let foo (x @ write corrupted) = x.contents
 [%%expect{|
-Line 1, characters 31-32:
-1 | let foo (x @ write poisoned) = x.contents
-                                   ^
+Line 1, characters 32-33:
+1 | let foo (x @ write corrupted) = x.contents
+                                    ^
 Error: This value is "write"
        but is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
@@ -291,12 +291,12 @@ Error: This value is "contended"
          because its mutable field "contents" is being read.
 |}]
 
-let foo (x @ read poisoned) = x.contents
+let foo (x @ read corrupted) = x.contents
 [%%expect{|
-Line 1, characters 30-31:
-1 | let foo (x @ read poisoned) = x.contents
-                                  ^
-Error: This value is "poisoned"
+Line 1, characters 31-32:
+1 | let foo (x @ read corrupted) = x.contents
+                                   ^
+Error: This value is "corrupted"
        but is expected to be "shared" or "uncontended"
          because its mutable field "contents" is being read.
 |}]
@@ -321,12 +321,12 @@ Error: This value is "contended"
          because its mutable field "contents" is being read.
 |}]
 
-let foo (x @ read_write poisoned) = x.contents
+let foo (x @ read_write corrupted) = x.contents
 [%%expect{|
-Line 1, characters 36-37:
-1 | let foo (x @ read_write poisoned) = x.contents
-                                        ^
-Error: This value is "poisoned"
+Line 1, characters 37-38:
+1 | let foo (x @ read_write corrupted) = x.contents
+                                         ^
+Error: This value is "corrupted"
        but is expected to be "shared" or "uncontended"
          because its mutable field "contents" is being read.
 |}]
@@ -344,11 +344,11 @@ Line 1, characters 28-29:
 Error: This value is "immutable" but is expected to be "read_write".
 |}]
 
-let foo (x @ immutable poisoned) a = x := a
+let foo (x @ immutable corrupted) a = x := a
 [%%expect{|
-Line 1, characters 37-38:
-1 | let foo (x @ immutable poisoned) a = x := a
-                                         ^
+Line 1, characters 38-39:
+1 | let foo (x @ immutable corrupted) a = x := a
+                                          ^
 Error: This value is "immutable" but is expected to be "read_write".
 |}]
 
@@ -386,11 +386,11 @@ Line 1, characters 31-32:
 Error: This value is "write" but is expected to be "read_write".
 |}]
 
-let foo (x @ write poisoned) a = x := a
+let foo (x @ write corrupted) a = x := a
 [%%expect{|
-Line 1, characters 33-34:
-1 | let foo (x @ write poisoned) a = x := a
-                                     ^
+Line 1, characters 34-35:
+1 | let foo (x @ write corrupted) a = x := a
+                                      ^
 Error: This value is "write" but is expected to be "read_write".
 |}]
 
@@ -418,11 +418,11 @@ Line 1, characters 33-34:
 Error: This value is "read" but is expected to be "read_write".
 |}]
 
-let foo (x @ read poisoned) a = x := a
+let foo (x @ read corrupted) a = x := a
 [%%expect{|
-Line 1, characters 32-33:
-1 | let foo (x @ read poisoned) a = x := a
-                                    ^
+Line 1, characters 33-34:
+1 | let foo (x @ read corrupted) a = x := a
+                                     ^
 Error: This value is "read" but is expected to be "read_write".
 |}]
 
@@ -473,11 +473,11 @@ Line 1, characters 34-35:
 Error: This value is "immutable" but is expected to be "read_write".
 |}]
 
-let foo (x @ immutable poisoned) = !x
+let foo (x @ immutable corrupted) = !x
 [%%expect{|
-Line 1, characters 36-37:
-1 | let foo (x @ immutable poisoned) = !x
-                                        ^
+Line 1, characters 37-38:
+1 | let foo (x @ immutable corrupted) = !x
+                                         ^
 Error: This value is "immutable" but is expected to be "read_write".
 |}]
 
@@ -505,11 +505,11 @@ Line 1, characters 30-31:
 Error: This value is "write" but is expected to be "read_write".
 |}]
 
-let foo (x @ write poisoned) = !x
+let foo (x @ write corrupted) = !x
 [%%expect{|
-Line 1, characters 32-33:
-1 | let foo (x @ write poisoned) = !x
-                                    ^
+Line 1, characters 33-34:
+1 | let foo (x @ write corrupted) = !x
+                                     ^
 Error: This value is "write" but is expected to be "read_write".
 |}]
 
@@ -537,11 +537,11 @@ Line 1, characters 32-33:
 Error: This value is "read" but is expected to be "read_write".
 |}]
 
-let foo (x @ read poisoned) = !x
+let foo (x @ read corrupted) = !x
 [%%expect{|
-Line 1, characters 31-32:
-1 | let foo (x @ read poisoned) = !x
-                                   ^
+Line 1, characters 32-33:
+1 | let foo (x @ read corrupted) = !x
+                                    ^
 Error: This value is "read" but is expected to be "read_write".
 |}]
 
@@ -574,12 +574,12 @@ Line 1, characters 35-36:
 Error: This value is "shared" but is expected to be "uncontended".
 |}]
 
-let foo (x @ read_write poisoned) = !x
+let foo (x @ read_write corrupted) = !x
 [%%expect{|
-Line 1, characters 37-38:
-1 | let foo (x @ read_write poisoned) = !x
-                                         ^
-Error: This value is "poisoned" but is expected to be "uncontended".
+Line 1, characters 38-39:
+1 | let foo (x @ read_write corrupted) = !x
+                                          ^
+Error: This value is "corrupted" but is expected to be "uncontended".
 |}]
 
 (* API that uses the [sync_data] kind. *)
@@ -914,12 +914,12 @@ Line 1, characters 68-69:
 Error: This value is "shareable" but is expected to be "portable".
 |}]
 
-let override : 'a @ stateless poisoning -> 'a @ portable = fun x -> x
+let override : 'a @ stateless corruptable -> 'a @ portable = fun x -> x
 [%%expect{|
-Line 1, characters 68-69:
-1 | let override : 'a @ stateless poisoning -> 'a @ portable = fun x -> x
-                                                                        ^
-Error: This value is "poisoning" but is expected to be "portable".
+Line 1, characters 70-71:
+1 | let override : 'a @ stateless corruptable -> 'a @ portable = fun x -> x
+                                                                          ^
+Error: This value is "corruptable" but is expected to be "portable".
 |}]
 
 let override : 'a @ stateless nonportable -> 'a @ portable = fun x -> x
@@ -945,14 +945,14 @@ Line 1, characters 69-70:
 Error: This value is "nonportable" but is expected to be "shareable".
 |}]
 
-(* [writing] => [poisoning] *)
+(* [writing] => [corruptable] *)
 
 let fails : 'a @ writing -> 'a @ shareable = fun x -> x
 [%%expect{|
 Line 1, characters 54-55:
 1 | let fails : 'a @ writing -> 'a @ shareable = fun x -> x
                                                           ^
-Error: This value is "poisoning" but is expected to be "shareable".
+Error: This value is "corruptable" but is expected to be "shareable".
 |}]
 
 let succeeds : 'a @ writing shareable -> 'a @ shareable = fun x -> x
@@ -980,7 +980,7 @@ let fails : 'a @ writing -> 'a @ portable = fun x -> x
 Line 1, characters 53-54:
 1 | let fails : 'a @ writing -> 'a @ portable = fun x -> x
                                                          ^
-Error: This value is "poisoning" but is expected to be "portable".
+Error: This value is "corruptable" but is expected to be "portable".
 |}]
 
 let succeeds : 'a @ writing portable -> 'a @ portable = fun x -> x
@@ -1035,12 +1035,13 @@ Line 1, characters 84-85:
 Error: This value is "contended" but is expected to be "shared" or "uncontended".
 |}]
 
-let override : 'a @ contended -> ('a @ immutable poisoned -> 'b) -> 'b = fun x f -> f x
+let override : 'a @ contended -> ('a @ immutable corrupted -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-Line 1, characters 86-87:
-1 | let override : 'a @ contended -> ('a @ immutable poisoned -> 'b) -> 'b = fun x f -> f x
-                                                                                          ^
-Error: This value is "contended" but is expected to be "poisoned" or "uncontended".
+Line 1, characters 87-88:
+1 | let override : 'a @ contended -> ('a @ immutable corrupted -> 'b) -> 'b = fun x f -> f x
+                                                                                           ^
+Error: This value is "contended"
+       but is expected to be "corrupted" or "uncontended".
 |}]
 
 (* [read] => [shared]. *)
@@ -1071,11 +1072,11 @@ let override : 'a @ contended -> ('a @ read contended -> 'b) -> 'b = fun x f -> 
 val override : 'a @ contended -> ('a @ contended read -> 'b) -> 'b = <fun>
 |}]
 
-(* [write] => [poisoned] *)
+(* [write] => [corrupted] *)
 
-let default : 'a @ poisoned -> ('a @ write -> 'b) -> 'b = fun x f -> f x
+let default : 'a @ corrupted -> ('a @ write -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val default : 'a @ poisoned -> ('a @ write -> 'b) -> 'b = <fun>
+val default : 'a @ corrupted -> ('a @ write -> 'b) -> 'b = <fun>
 |}]
 
 let default : 'a @ contended -> ('a @ write -> 'b) -> 'b = fun x f -> f x
@@ -1083,7 +1084,8 @@ let default : 'a @ contended -> ('a @ write -> 'b) -> 'b = fun x f -> f x
 Line 1, characters 72-73:
 1 | let default : 'a @ contended -> ('a @ write -> 'b) -> 'b = fun x f -> f x
                                                                             ^
-Error: This value is "contended" but is expected to be "poisoned" or "uncontended".
+Error: This value is "contended"
+       but is expected to be "corrupted" or "uncontended".
 |}]
 
 let override : 'a @ contended -> ('a @ write uncontended -> 'b) -> 'b = fun x f -> f x
@@ -1155,7 +1157,7 @@ let get : 'a @ shared -> 'a t2 = fun y -> {y}
 
 type 'a t3 = { z : 'a @@ write }
 
-let get : 'a @ poisoned -> 'a t3 = fun z -> {z}
+let get : 'a @ corrupted -> 'a t3 = fun z -> {z}
 
 [%%expect{|
 type 'a t1 = { x : 'a @@ immutable; }
@@ -1163,7 +1165,7 @@ val get : 'a @ contended -> 'a t1 = <fun>
 type 'a t2 = { y : 'a @@ read; }
 val get : 'a @ shared -> 'a t2 = <fun>
 type 'a t3 = { z : 'a @@ write; }
-val get : 'a @ poisoned -> 'a t3 = <fun>
+val get : 'a @ corrupted -> 'a t3 = <fun>
 |}]
 
 (* Interactions with lazy values. *)

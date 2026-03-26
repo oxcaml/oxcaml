@@ -1153,7 +1153,7 @@ let mode_mutate_mutable mut_name =
   let mode =
     { Value.Const.max with
       visibility = Write;
-      contention = Poisoned }
+      contention = Corrupted }
     |> Value.of_const ~hint_monadic:(Mutable_write mut_name)
   in
   mode_default mode
