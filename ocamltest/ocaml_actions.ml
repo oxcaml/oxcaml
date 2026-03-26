@@ -601,7 +601,6 @@ let ocamlobjinfo =
        if Ocamltest_config.ocamlobjinfo then
          objinfo log env
        else
-         (* CR sspies: This is now silent failure following upstream. Should this be loud instead? *)
          Result.skip_with_reason "ocamlobjinfo not available", env
     )
 
