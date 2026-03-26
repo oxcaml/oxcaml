@@ -15,7 +15,8 @@
 
 (* Assign locations and numbers to globals and primitives *)
 
-open Dynlink_cmo_format
+open! Dynlink_compilerlibs
+open Cmo_format
 
 module Compunit : sig
   type t = compunit
