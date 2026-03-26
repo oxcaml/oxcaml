@@ -185,6 +185,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lazy_forced -> Lazy_forced
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -203,6 +205,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -225,6 +229,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -247,6 +253,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
     end)
   end
 end
@@ -2237,6 +2245,7 @@ module Report = struct
     | Function -> Some (print_article_noun Consonant "function")
     | Functor -> Some (print_article_noun Consonant "functor")
     | Lazy -> Some (print_article_noun Consonant "lazy expression")
+    | Quote -> Some (print_article_noun Consonant "quoted expression")
     | Expression -> Some (print_article_noun Vowel "expression")
     | Allocation -> Some (print_article_noun Vowel "allocation")
     | Class -> Some (print_article_noun Consonant "class")
@@ -2291,6 +2300,7 @@ module Report = struct
     | Toplevel -> print_article_noun Consonant "top-level clause"
     | Compilation_unit -> print_article_noun Consonant "compilation unit"
     | Class -> print_article_noun Consonant "class"
+    | Quoted -> print_article_noun Consonant "quoted expression's result"
 
   let print_region_desc : region_desc -> _ = function
     | Borrow -> print_article_noun Consonant "borrow region"
@@ -2365,6 +2375,7 @@ module Report = struct
     | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
     | Escape_region reg ->
       Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
+    | Spliced _ -> Fmt.fprintf ppf "it is spliced"
 
   let print_allocation_l : allocation -> Fmt.formatter -> unit =
    fun { txt; loc } ->
