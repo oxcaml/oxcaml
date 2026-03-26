@@ -473,12 +473,12 @@ Error: The value "f" is "stateful"
 
 let foo (f : (unit -> unit) @ reading portable) @ stateless = fun () -> f ()
 [%%expect{|
-Line 1, characters 74-75:
+Line 1, characters 72-73:
 1 | let foo (f : (unit -> unit) @ reading portable) @ stateless = fun () -> f ()
-                                                                              ^
+                                                                            ^
 Error: The value "f" is "reading"
        but is expected to be "stateless"
-         because it is used inside the function at line 1, characters 64-78
+         because it is used inside the function at line 1, characters 62-76
          which is expected to be "stateless".
 |}]
 
@@ -522,12 +522,12 @@ val foo : (unit -> unit) @ reading -> unit -> unit = <fun>
 
 let foo (f : (unit -> unit) @ stateful) @ reading = fun () -> f ()
 [%%expect{|
-Line 1, characters 64-65:
+Line 1, characters 62-63:
 1 | let foo (f : (unit -> unit) @ stateful) @ reading = fun () -> f ()
-                                                                    ^
+                                                                  ^
 Error: The value "f" is "stateful"
        but is expected to be "reading"
-         because it is used inside the function at line 1, characters 54-68
+         because it is used inside the function at line 1, characters 52-66
          which is expected to be "reading".
 |}]
 
@@ -565,9 +565,9 @@ val default : 'a @ reading -> 'a @ shareable = <fun>
 
 let override : 'a @ reading nonportable -> 'a @ shareable = fun x -> x
 [%%expect{|
-Line 1, characters 71-72:
+Line 1, characters 69-70:
 1 | let override : 'a @ reading nonportable -> 'a @ shareable = fun x -> x
-                                                                           ^
+                                                                         ^
 Error: This value is "nonportable" but is expected to be "shareable".
 |}]
 
@@ -575,9 +575,9 @@ Error: This value is "nonportable" but is expected to be "shareable".
 
 let fails : 'a @ reading -> 'a @ portable = fun x -> x
 [%%expect{|
-Line 1, characters 55-56:
+Line 1, characters 53-54:
 1 | let fails : 'a @ reading -> 'a @ portable = fun x -> x
-                                                           ^
+                                                         ^
 Error: This value is "shareable" but is expected to be "portable".
 |}]
 
@@ -755,11 +755,11 @@ Error: This value is "immutable"
 
 let bat (x : int ref) @ reading = lazy (x.contents <- 4)
 [%%expect{|
-Line 1, characters 42-43:
+Line 1, characters 40-41:
 1 | let bat (x : int ref) @ reading = lazy (x.contents <- 4)
-                                              ^
+                                            ^
 Error: This value is "read"
-         because it is used inside the lazy expression at line 1, characters 36-58
+         because it is used inside the lazy expression at line 1, characters 34-56
          which is expected to be "reading".
        However, the highlighted expression is expected to be "read_write"
          because its mutable field "contents" is being written.

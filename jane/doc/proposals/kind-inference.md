@@ -32,7 +32,7 @@ M ::= (* module name *)
 (* comonadic axes = prescriptive axes *)
 lm ::= global | local
 om ::= many | separate | once
-pm ::= portable | reading | nonportable
+pm ::= portable | shareable | nonportable
 em ::= external | external64 | internal
 
 (* monadic axes = descriptive axes *)
@@ -143,11 +143,11 @@ q ::= best | not_best   (* quality of an inferred kind; best < not_best *)
 
 Mode crossing is not covered in this design.
 
-However, it may be helpful to know that having e.g. `mod reading` in a kind
-means that `reading` is the upper bound for the locality mode of values whose
-types have that kind. For example, if `t : ... mod reading` and some
+However, it may be helpful to know that having e.g. `mod shareable` in a kind
+means that `shareable` is the upper bound for the portability mode of values whose
+types have that kind. For example, if `t : ... mod shareable` and some
 expression `e` of type `t` has mode `nonportable` (the top mode), it actually
-has mode `reading`.  If `e'` of type `t` has mode `portable` (the bottom
+has mode `shareable`.  If `e'` of type `t` has mode `portable` (the bottom
 mode), that `e` is completely unaffected by the mode-crossing.  Other comonadic
 axes work similarly.
 
@@ -736,7 +736,7 @@ Proof: TODO.
 (* To remind ourselves:
 lm ::= global | local
 om ::= many | separate | once
-pm ::= portable | reading | nonportable
+pm ::= portable | shareable | nonportable
 em ::= external | external64 | internal
 
 (* monadic axes = descriptive axes *)

@@ -3122,7 +3122,7 @@ module Portability = struct
 
   let legacy = of_const Const.legacy
 
-  (* CR dkalinichenko: ideally, [reading] should zap to [sharable]. *)
+  (* CR dkalinichenko: ideally, [reading] should zap to [shareable]. *)
   let zap_to_legacy ~statefulness =
     match statefulness with
     | Statefulness.Const.Stateful | Statefulness.Const.Reading -> zap_to_ceil
