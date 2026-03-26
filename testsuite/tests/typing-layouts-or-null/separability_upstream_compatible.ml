@@ -85,7 +85,7 @@ type 'a void_not_external : void with string
 type packed_void_not_external =
     P : 'a void_not_external -> packed_void_not_external [@@unboxed]
 [%%expect{|
-type 'a void_not_external : void mod non_float
+type 'a void_not_external : void mod unique_implies_uncontended non_float
 Lines 3-4, characters 0-68:
 3 | type packed_void_not_external =
 4 |     P : 'a void_not_external -> packed_void_not_external [@@unboxed]

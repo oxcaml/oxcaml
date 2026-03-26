@@ -78,6 +78,22 @@ Error: The kind of type "degenerate" is
        But the kind of type "degenerate" must be a subkind of
            immutable_data with 'a
          because of the annotation on the declaration of the type degenerate.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a with ('a * 'a) degenerate ≰
+           mod many with 'a
+         contention: mod contended with 'a with ('a * 'a) degenerate ≰
+           mod contended with 'a
+         portability: mod portable with 'a with ('a * 'a) degenerate ≰
+           mod portable with 'a
+         forkable: mod forkable with 'a with ('a * 'a) degenerate ≰
+           mod forkable with 'a
+         yielding: mod unyielding with 'a with ('a * 'a) degenerate ≰
+           mod unyielding with 'a
+         statefulness: mod stateless with 'a with ('a * 'a) degenerate ≰
+           mod stateless with 'a
+         visibility: mod immutable with 'a with ('a * 'a) degenerate ≰
+           mod immutable with 'a
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
@@ -268,6 +284,21 @@ Error: The kind of type "t2" is immutable_data with 'a with t1 t2
        But the kind of type "t2" must be a subkind of
            immutable_data with 'a with t1
          because of the annotation on the declaration of the type t2.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a with t1 t2 ≰ mod many with 'a with t1
+         contention: mod contended with 'a with t1 t2 ≰
+           mod contended with 'a with t1
+         portability: mod portable with 'a with t1 t2 ≰
+           mod portable with 'a with t1
+         forkable: mod forkable with 'a with t1 t2 ≰
+           mod forkable with 'a with t1
+         yielding: mod unyielding with 'a with t1 t2 ≰
+           mod unyielding with 'a with t1
+         statefulness: mod stateless with 'a with t1 t2 ≰
+           mod stateless with 'a with t1
+         visibility: mod immutable with 'a with t1 t2 ≰
+           mod immutable with 'a with t1
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]

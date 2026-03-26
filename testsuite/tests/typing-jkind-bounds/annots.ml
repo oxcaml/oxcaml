@@ -256,6 +256,18 @@ Error: This alias is bound to type "int list"
          because it's a boxed variant type.
        But the kind of int list must be a subkind of immediate
          because of the annotation on the type variable 'a.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         linearity: mod many with int ≰ mod many
+         contention: mod contended with int ≰ mod contended
+         portability: mod portable with int ≰ mod portable
+         forkable: mod forkable with int ≰ mod forkable
+         yielding: mod unyielding with int ≰ mod unyielding
+         statefulness: mod stateless with int ≰ mod stateless
+         visibility: mod immutable with int ≰ mod immutable
+         externality: mod internal ≰ mod external_
 |}]
 (* CR layouts: error message could be phrased better *)
 
@@ -280,6 +292,12 @@ Error: This alias is bound to type "int list"
          because it's a boxed variant type.
        But the kind of int list must be a subkind of value mod global
          because of the annotation on the type variable 'a.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         forkable: mod forkable with int ≰ mod forkable
+         yielding: mod unyielding with int ≰ mod unyielding
 |}]
 
 (****************************************)
@@ -1142,6 +1160,12 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod global
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         forkable: mod forkable with t_value ≰ mod forkable
+         yielding: mod unyielding with t_value ≰ mod unyielding
 |}]
 
 type t : value mod aliased = { x : t_value }
@@ -1153,6 +1177,9 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod aliased
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         uniqueness: mod unique ≰ mod aliased
 |}]
 
 type t : value mod many = { x : t_value }
@@ -1164,6 +1191,9 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod many
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with t_value ≰ mod many
 |}]
 
 type t : value mod portable = { x : t_value }
@@ -1175,6 +1205,9 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod portable
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with t_value ≰ mod portable
 |}]
 
 type t : value mod contended = { x : t_value }
@@ -1186,6 +1219,9 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod contended
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with t_value ≰ mod contended
 |}]
 
 type t : value mod external_ = { x : t_value }
@@ -1197,6 +1233,9 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod external_
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         externality: mod internal ≰ mod external_
 |}]
 
 (***************************************)
@@ -1281,6 +1320,12 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod global
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         forkable: mod forkable with t_value ≰ mod forkable
+         yielding: mod unyielding with t_value ≰ mod unyielding
 |}]
 
 type t : value mod aliased = Foo of t_value
@@ -1292,6 +1337,9 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod aliased
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         uniqueness: mod unique ≰ mod aliased
 |}]
 
 type t : value mod many = Foo of t_value
@@ -1303,6 +1351,9 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod many
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with t_value ≰ mod many
 |}]
 
 type t : value mod portable = Foo of t_value
@@ -1314,6 +1365,9 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod portable
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with t_value ≰ mod portable
 |}]
 
 type t : value mod contended = Foo of t_value
@@ -1325,6 +1379,9 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod contended
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with t_value ≰ mod contended
 |}]
 
 type t : value mod external_ = Foo of t_value
@@ -1336,6 +1393,9 @@ Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of value mod external_
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         externality: mod internal ≰ mod external_
 |}]
 
 (***************************************)

@@ -41,6 +41,11 @@ Error: The kind of type "bad" is immutable_data with unit_u
          because it's a boxed variant type.
        But the kind of type "bad" must be a subkind of immediate
          because of the annotation on the declaration of the type bad.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         externality: mod internal ≰ mod external_
 |}]
 
 (* With-bounds for all-void variants *)
@@ -65,6 +70,17 @@ Error: The kind of type "bad" is immediate with key
          because it's an enumeration variant type (all constructors are constant).
        But the kind of type "bad" must be a subkind of immediate
          because of the annotation on the declaration of the type bad.
+
+       The first mode-crosses less than the second along:
+         locality: mod global with key ≰ mod global
+         uniqueness: mod aliased with key ≰ mod aliased
+         linearity: mod many with key ≰ mod many
+         contention: mod contended with key ≰ mod contended
+         portability: mod portable with key ≰ mod portable
+         forkable: mod forkable with key ≰ mod forkable
+         yielding: mod unyielding with key ≰ mod unyielding
+         statefulness: mod stateless with key ≰ mod stateless
+         visibility: mod immutable with key ≰ mod immutable
 |}]
 type bad : immediate = A of #(unit_u * key r)
 [%%expect{|
@@ -75,6 +91,17 @@ Error: The kind of type "bad" is immediate with key with unit_u
          because it's an enumeration variant type (all constructors are constant).
        But the kind of type "bad" must be a subkind of immediate
          because of the annotation on the declaration of the type bad.
+
+       The first mode-crosses less than the second along:
+         locality: mod global with key with unit_u ≰ mod global
+         uniqueness: mod aliased with key with unit_u ≰ mod aliased
+         linearity: mod many with key with unit_u ≰ mod many
+         contention: mod contended with key with unit_u ≰ mod contended
+         portability: mod portable with key with unit_u ≰ mod portable
+         forkable: mod forkable with key with unit_u ≰ mod forkable
+         yielding: mod unyielding with key with unit_u ≰ mod unyielding
+         statefulness: mod stateless with key with unit_u ≰ mod stateless
+         visibility: mod immutable with key with unit_u ≰ mod immutable
 |}]
 
 
@@ -107,6 +134,25 @@ Error: The kind of type "bad" is immediate with unit_u with v1 with v2
          because it's an enumeration variant type (all constructors are constant).
        But the kind of type "bad" must be a subkind of immediate with v1
          because of the annotation on the declaration of the type bad.
+
+       The first mode-crosses less than the second along:
+         locality: mod global with unit_u with v1 with v2 ≰
+           mod global with v1
+         uniqueness: mod aliased with unit_u with v1 with v2 ≰
+           mod aliased with v1
+         linearity: mod many with unit_u with v1 with v2 ≰ mod many with v1
+         contention: mod contended with unit_u with v1 with v2 ≰
+           mod contended with v1
+         portability: mod portable with unit_u with v1 with v2 ≰
+           mod portable with v1
+         forkable: mod forkable with unit_u with v1 with v2 ≰
+           mod forkable with v1
+         yielding: mod unyielding with unit_u with v1 with v2 ≰
+           mod unyielding with v1
+         statefulness: mod stateless with unit_u with v1 with v2 ≰
+           mod stateless with v1
+         visibility: mod immutable with unit_u with v1 with v2 ≰
+           mod immutable with v1
 |}]
 
 type vme : void

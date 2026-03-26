@@ -48,6 +48,15 @@ Error: This expression has type "'a t" but an expression was expected of type
          because of the definition of t at line 1, characters 0-28.
        But the kind of 'a t must be a subkind of immutable_data
          because of the definition of require_immutable_data at line 2, characters 27-58.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'b. 'b t ≰ mod many
+         contention: mod contended with 'b. 'b t ≰ mod contended
+         portability: mod portable with 'b. 'b t ≰ mod portable
+         forkable: mod forkable with 'b. 'b t ≰ mod forkable
+         yielding: mod unyielding with 'b. 'b t ≰ mod unyielding
+         statefulness: mod stateless with 'b. 'b t ≰ mod stateless
+         visibility: mod immutable with 'b. 'b t ≰ mod immutable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
@@ -62,6 +71,15 @@ Error: The kind of type "t" is immutable_data with 'b. 'b t/2
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'b. 'b t/2 ≰ mod many
+         contention: mod contended with 'b. 'b t/2 ≰ mod contended
+         portability: mod portable with 'b. 'b t/2 ≰ mod portable
+         forkable: mod forkable with 'b. 'b t/2 ≰ mod forkable
+         yielding: mod unyielding with 'b. 'b t/2 ≰ mod unyielding
+         statefulness: mod stateless with 'b. 'b t/2 ≰ mod stateless
+         visibility: mod immutable with 'b. 'b t/2 ≰ mod immutable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
@@ -104,6 +122,15 @@ Error: This expression has type "t" but an expression was expected of type
          because of the definition of t at line 3, characters 0-47.
        But the kind of t must be a subkind of immutable_data
          because of the definition of require_immutable_data at line 2, characters 27-58.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with Abs.t ≰ mod many
+         contention: mod contended with Abs.t ≰ mod contended
+         portability: mod portable with Abs.t ≰ mod portable
+         forkable: mod forkable with Abs.t ≰ mod forkable
+         yielding: mod unyielding with Abs.t ≰ mod unyielding
+         statefulness: mod stateless with Abs.t ≰ mod stateless
+         visibility: mod immutable with Abs.t ≰ mod immutable
 |}]
 
 (******************************************)
@@ -121,6 +148,21 @@ Error: The kind of type "t" is immutable_data with 'a. 'a u
        But the kind of type "t" must be a subkind of
            immutable_data with (type : value) u
          because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a. 'a u ≰ mod many with (type : value) u
+         contention: mod contended with 'a. 'a u ≰
+           mod contended with (type : value) u
+         portability: mod portable with 'a. 'a u ≰
+           mod portable with (type : value) u
+         forkable: mod forkable with 'a. 'a u ≰
+           mod forkable with (type : value) u
+         yielding: mod unyielding with 'a. 'a u ≰
+           mod unyielding with (type : value) u
+         statefulness: mod stateless with 'a. 'a u ≰
+           mod stateless with (type : value) u
+         visibility: mod immutable with 'a. 'a u ≰
+           mod immutable with (type : value) u
 |}]
 
 (******************************************)

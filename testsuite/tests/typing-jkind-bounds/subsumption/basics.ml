@@ -130,6 +130,15 @@ Error: The kind of type "('a, 'b) u" is immutable_data with 'a with 'b
        But the kind of type "('a, 'b) u" must be a subkind of
            immutable_data with 'a
          because of the definition of t at line 2, characters 0-53.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a with 'b ≰ mod many with 'a
+         contention: mod contended with 'a with 'b ≰ mod contended with 'a
+         portability: mod portable with 'a with 'b ≰ mod portable with 'a
+         forkable: mod forkable with 'a with 'b ≰ mod forkable with 'a
+         yielding: mod unyielding with 'a with 'b ≰ mod unyielding with 'a
+         statefulness: mod stateless with 'a with 'b ≰ mod stateless with 'a
+         visibility: mod immutable with 'a with 'b ≰ mod immutable with 'a
 |}]
 
 type ('a, 'b) t : immutable_data with 'a with 'b
@@ -155,6 +164,15 @@ Error: In this "with" constraint, the new definition of "t"
          because of the definition of t at line 1, characters 0-48.
        But the kind of the first must be a subkind of immutable_data with 'a
          because of the definition of t at line 4, characters 2-42.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a with 'b ≰ mod many with 'a
+         contention: mod contended with 'a with 'b ≰ mod contended with 'a
+         portability: mod portable with 'a with 'b ≰ mod portable with 'a
+         forkable: mod forkable with 'a with 'b ≰ mod forkable with 'a
+         yielding: mod unyielding with 'a with 'b ≰ mod unyielding with 'a
+         statefulness: mod stateless with 'a with 'b ≰ mod stateless with 'a
+         visibility: mod immutable with 'a with 'b ≰ mod immutable with 'a
 |}]
 
 module M : sig
@@ -196,6 +214,8 @@ Error: Signature mismatch:
          linearity: mod many with 'a ≰ mod many
          forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
+         unique_implies_uncontended: mod unique_implies_uncontended with 'a ≰
+           mod unique_implies_uncontended
 |}]
 
 module M : sig
@@ -204,8 +224,29 @@ end = struct
   type 'a t : mutable_data with 'a @@ many unyielding forkable
 end
 [%%expect {|
-module M :
-  sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t : mutable_data with 'a @@ many unyielding forkable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
+       is not included in
+         sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
+       Type declarations do not match:
+         type 'a t : mutable_data with 'a @@ forkable unyielding many
+       is not included in
+         type 'a t : mutable_data with 'a @@ forkable unyielding many
+       The kind of the first is
+           mutable_data with 'a @@ forkable unyielding many
+         because of the definition of t at line 4, characters 2-62.
+       But the kind of the first must be a subkind of
+           mutable_data with 'a @@ forkable unyielding many
+         because of the definition of t at line 2, characters 2-40.
+
+       The first mode-crosses less than the second along:
+         unique_implies_uncontended: mod unique_implies_uncontended with 'a ≰
+           mod unique_implies_uncontended
 |}]
 
 (* CR layouts v2.8: 'a u's kind should get normalized to just immutable_data.
@@ -268,6 +309,15 @@ Error: The kind of type "v" is immutable_data with t
          because it's a boxed record type.
        But the kind of type "v" must be a subkind of immutable_data with u
          because of the annotation on the declaration of the type v.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with t ≰ mod many with u
+         contention: mod contended with t ≰ mod contended with u
+         portability: mod portable with t ≰ mod portable with u
+         forkable: mod forkable with t ≰ mod forkable with u
+         yielding: mod unyielding with t ≰ mod unyielding with u
+         statefulness: mod stateless with t ≰ mod stateless with u
+         visibility: mod immutable with t ≰ mod immutable with u
 |}]
 
 type t : value = private int
@@ -462,6 +512,22 @@ Error: Signature mismatch:
        But the kind of the first must be a subkind of
            immutable_data with 'a t1 t2 with unit t1
          because of the definition of t at line 4, characters 2-52.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a t2 t1 with unit t2 ≰
+           mod many with 'a t1 t2 with unit t1
+         contention: mod contended with 'a t2 t1 with unit t2 ≰
+           mod contended with 'a t1 t2 with unit t1
+         portability: mod portable with 'a t2 t1 with unit t2 ≰
+           mod portable with 'a t1 t2 with unit t1
+         forkable: mod forkable with 'a t2 t1 with unit t2 ≰
+           mod forkable with 'a t1 t2 with unit t1
+         yielding: mod unyielding with 'a t2 t1 with unit t2 ≰
+           mod unyielding with 'a t1 t2 with unit t1
+         statefulness: mod stateless with 'a t2 t1 with unit t2 ≰
+           mod stateless with 'a t1 t2 with unit t1
+         visibility: mod immutable with 'a t2 t1 with unit t2 ≰
+           mod immutable with 'a t1 t2 with unit t1
 |}]
 
 
@@ -504,6 +570,22 @@ Error: Signature mismatch:
        But the kind of the first must be a subkind of
            immutable_data with 'a t1 t2 with unit t2
          because of the definition of t at line 4, characters 2-52.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a t2 t1 with unit t1 ≰
+           mod many with 'a t1 t2 with unit t2
+         contention: mod contended with 'a t2 t1 with unit t1 ≰
+           mod contended with 'a t1 t2 with unit t2
+         portability: mod portable with 'a t2 t1 with unit t1 ≰
+           mod portable with 'a t1 t2 with unit t2
+         forkable: mod forkable with 'a t2 t1 with unit t1 ≰
+           mod forkable with 'a t1 t2 with unit t2
+         yielding: mod unyielding with 'a t2 t1 with unit t1 ≰
+           mod unyielding with 'a t1 t2 with unit t2
+         statefulness: mod stateless with 'a t2 t1 with unit t1 ≰
+           mod stateless with 'a t1 t2 with unit t2
+         visibility: mod immutable with 'a t2 t1 with unit t1 ≰
+           mod immutable with 'a t1 t2 with unit t2
 |}]
 
 (* Ben Peters' example failing version 2 *)
@@ -586,6 +668,21 @@ Error: Signature mismatch:
          because of the definition of rose at line 8, characters 2-52.
        But the kind of the first must be a subkind of immutable_data with 'a
          because of the definition of rose at line 2, characters 2-39.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a with ('a * 'a) rose ≰ mod many with 'a
+         contention: mod contended with 'a with ('a * 'a) rose ≰
+           mod contended with 'a
+         portability: mod portable with 'a with ('a * 'a) rose ≰
+           mod portable with 'a
+         forkable: mod forkable with 'a with ('a * 'a) rose ≰
+           mod forkable with 'a
+         yielding: mod unyielding with 'a with ('a * 'a) rose ≰
+           mod unyielding with 'a
+         statefulness: mod stateless with 'a with ('a * 'a) rose ≰
+           mod stateless with 'a
+         visibility: mod immutable with 'a with ('a * 'a) rose ≰
+           mod immutable with 'a
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
@@ -596,7 +693,8 @@ type fails : immutable_data = int -> int
 Line 1, characters 0-40:
 1 | type fails : immutable_data = int -> int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int -> int" is value mod aliased immutable non_float
+Error: The kind of type "int -> int" is
+           value mod aliased immutable unique_implies_uncontended non_float
          because it's a function type.
        But the kind of type "int -> int" must be a subkind of immutable_data
          because of the definition of fails at line 1, characters 0-40.
@@ -607,7 +705,8 @@ type should_fail : immutable_data = [`A of int -> int]
 Line 1, characters 0-54:
 1 | type should_fail : immutable_data = [`A of int -> int]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[ `A of int -> int ]" is value mod immutable non_float
+Error: The kind of type "[ `A of int -> int ]" is
+           value mod immutable unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `A of int -> int ]" must be a subkind of
            immutable_data
@@ -620,7 +719,7 @@ Line 1, characters 0-76:
 1 | type should_also_fail : immutable_data = [`A of int -> int | `B of 'a] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `A of int -> int | `B of 'a ] as 'a" is
-           value mod immutable non_float
+           value mod immutable unique_implies_uncontended non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `A of int -> int | `B of 'a ] as 'a" must be a subkind of
          immutable_data
@@ -647,7 +746,8 @@ type should_likewise_fail : immutable_data = (int ref * (int -> int))
 Line 1, characters 0-69:
 1 | type should_likewise_fail : immutable_data = (int ref * (int -> int))
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int ref * (int -> int)" is value mod non_float
+Error: The kind of type "int ref * (int -> int)" is
+           value mod unique_implies_uncontended non_float
          because it's a tuple type.
        But the kind of type "int ref * (int -> int)" must be a subkind of
            immutable_data
@@ -681,7 +781,8 @@ type this_fails : immutable_data = (int -> int) list
 Line 1, characters 0-52:
 1 | type this_fails : immutable_data = (int -> int) list
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "(int -> int) list" is value mod immutable non_float
+Error: The kind of type "(int -> int) list" is
+           value mod immutable unique_implies_uncontended non_float
          because it's a boxed variant type.
        But the kind of type "(int -> int) list" must be a subkind of
            immutable_data
@@ -721,6 +822,9 @@ Error: The kind of type "t3" is immutable_data with unit t3
          because it's a boxed variant type.
        But the kind of type "t3" must be a subkind of value mod portable
          because of the annotation on the declaration of the type t3.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with unit t3 ≰ mod portable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]

@@ -33,6 +33,36 @@ Error: The kind of type "int list list list list list list list list list list
                             list list list list" must be a subkind of
            immutable_data
          because of the definition of t at line 1, characters 0-94.
+
+       The first mode-crosses less than the second along:
+         linearity:
+           mod many
+             with int list list list list list list list list list list list list ≰
+           mod many
+         contention:
+           mod contended
+             with int list list list list list list list list list list list list ≰
+           mod contended
+         portability:
+           mod portable
+             with int list list list list list list list list list list list list ≰
+           mod portable
+         forkable:
+           mod forkable
+             with int list list list list list list list list list list list list ≰
+           mod forkable
+         yielding:
+           mod unyielding
+             with int list list list list list list list list list list list list ≰
+           mod unyielding
+         statefulness:
+           mod stateless
+             with int list list list list list list list list list list list list ≰
+           mod stateless
+         visibility:
+           mod immutable
+             with int list list list list list list list list list list list list ≰
+           mod immutable
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
@@ -51,6 +81,36 @@ Error: The kind of type "'a list list list list list list list list list list
                             list list list list" must be a subkind of
            immutable_data with 'a
          because of the definition of t at line 1, characters 0-104.
+
+       The first mode-crosses less than the second along:
+         linearity:
+           mod many
+             with 'a list list list list list list list list list list list list ≰
+           mod many with 'a
+         contention:
+           mod contended
+             with 'a list list list list list list list list list list list list ≰
+           mod contended with 'a
+         portability:
+           mod portable
+             with 'a list list list list list list list list list list list list ≰
+           mod portable with 'a
+         forkable:
+           mod forkable
+             with 'a list list list list list list list list list list list list ≰
+           mod forkable with 'a
+         yielding:
+           mod unyielding
+             with 'a list list list list list list list list list list list list ≰
+           mod unyielding with 'a
+         statefulness:
+           mod stateless
+             with 'a list list list list list list list list list list list list ≰
+           mod stateless with 'a
+         visibility:
+           mod immutable
+             with 'a list list list list list list list list list list list list ≰
+           mod immutable with 'a
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
