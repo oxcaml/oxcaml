@@ -1073,7 +1073,7 @@ module type S = sig
         [unique_implies_uncontended]. *)
     type t =
       { crossing : (Monadic.t, Comonadic.t) monadic_comonadic;
-        unique_implies_uncontended : bool;
+        unique_implies_uncontended : bool
       }
 
     module Axis : sig

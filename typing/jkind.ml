@@ -1217,8 +1217,7 @@ module Base_and_axes = struct
                 ~externality:(value_for_axis ~axis:(Nonmodal Externality))
                 ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
                 ~unique_implies_uncontended:
-                  (value_for_axis
-                     ~axis:(Nonmodal Unique_implies_uncontended))
+                  (value_for_axis ~axis:(Nonmodal Unique_implies_uncontended))
                 ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
             let found_jkind_for_ty ctl b_upper_bounds b_with_bounds quality
@@ -2002,15 +2001,11 @@ module Const = struct
       sa_annots None
 
   let unique_implies_uncontended_is_determined_by_modality modality =
-    let uniqueness =
-      Mode.Modality.Const.proj (Monadic Uniqueness) modality
-    in
+    let uniqueness = Mode.Modality.Const.proj (Monadic Uniqueness) modality in
     match uniqueness with
-    | Mode.Modality.Monadic.Atom.Join_const
-        Mode.Uniqueness.Const.Aliased ->
+    | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Aliased ->
       true
-    | Mode.Modality.Monadic.Atom.Join_const
-        Mode.Uniqueness.Const.Unique ->
+    | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Unique ->
       false
 
   let rec of_user_written_annotation_unchecked_level : type l r.
@@ -2093,9 +2088,7 @@ module Const = struct
         { base = base.base;
           mod_bounds =
             Mod_bounds.contribute_base_from_modality ~modality base.mod_bounds;
-          with_bounds =
-            With_bounds.add type_
-              { relevant_axes } base.with_bounds
+          with_bounds = With_bounds.add type_ { relevant_axes } base.with_bounds
         })
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
@@ -2309,14 +2302,10 @@ let for_unboxed_record lbls layouts =
   Builtin.product ~why:Unboxed_record tys_modalities layouts
 
 let unique_implies_uncontended_is_determined_by_modality modality =
-  let uniqueness =
-    Mode.Modality.Const.proj (Monadic Uniqueness) modality
-  in
+  let uniqueness = Mode.Modality.Const.proj (Monadic Uniqueness) modality in
   match uniqueness with
-  | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Aliased ->
-    true
-  | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Unique ->
-    false
+  | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Aliased -> true
+  | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Unique -> false
 
 let relevant_axes_of_modality_with_unique_implies_uncontended
     ~relevant_for_shallow ~modality =
@@ -2339,7 +2328,8 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
   in
   fresh_jkind_poly
     { base = jkind.jkind.base;
-      mod_bounds = Mod_bounds.contribute_base_from_modality ~modality Mod_bounds.min;
+      mod_bounds =
+        Mod_bounds.contribute_base_from_modality ~modality Mod_bounds.min;
       with_bounds = With_bounds with_bounds_types
     }
     ~annotation:None ~why:Abbreviation
@@ -2431,8 +2421,7 @@ let for_object =
           { crossing = { comonadic; monadic };
             unique_implies_uncontended = false
           }
-          ~externality:Externality.max
-          ~nullability:Non_null
+          ~externality:Externality.max ~nullability:Non_null
           ~unique_implies_uncontended:Unique_implies_uncontended.min
           ~separability:Separability.Non_float;
       with_bounds = No_with_bounds
@@ -2526,8 +2515,7 @@ let get_mod_bounds (type l r) ~mode ~context ~skip_axes env
       env jk.jkind
   in
   match jk with
-  | { base = Kconstr _; with_bounds = With_bounds _; mod_bounds } ->
-    mod_bounds
+  | { base = Kconstr _; with_bounds = With_bounds _; mod_bounds } -> mod_bounds
   | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds } ->
     mod_bounds
   | { base = Layout _; with_bounds = With_bounds _; _ } ->
@@ -2548,8 +2536,7 @@ let get_unique_implies_uncontended (type l r) ~context env
         ~context env jk.jkind
     in
     let base =
-      Mod_bounds.get jk.mod_bounds
-        ~axis:(Nonmodal Unique_implies_uncontended)
+      Mod_bounds.get jk.mod_bounds ~axis:(Nonmodal Unique_implies_uncontended)
     in
     With_bounds.to_seq jk.with_bounds
     |> Seq.fold_left
@@ -2561,12 +2548,12 @@ let get_unique_implies_uncontended (type l r) ~context env
            else
              let ty_bound =
                let id = Types.get_id ty in
-                 if List.mem id seen
-                 then Unique_implies_uncontended.max
-                 else
-                   match context.jkind_of_type ty with
-                   | None -> Unique_implies_uncontended.max
-                   | Some ty_jkind -> loop_l (id :: seen) ty_jkind
+               if List.mem id seen
+               then Unique_implies_uncontended.max
+               else
+                 match context.jkind_of_type ty with
+                 | None -> Unique_implies_uncontended.max
+                 | Some ty_jkind -> loop_l (id :: seen) ty_jkind
              in
              Unique_implies_uncontended.join acc ty_bound)
          base
@@ -2578,8 +2565,7 @@ let get_unique_implies_uncontended (type l r) ~context env
       ~context env jk.jkind
   in
   let base =
-    Mod_bounds.get jk.mod_bounds
-      ~axis:(Nonmodal Unique_implies_uncontended)
+    Mod_bounds.get jk.mod_bounds ~axis:(Nonmodal Unique_implies_uncontended)
   in
   With_bounds.to_seq jk.with_bounds
   |> Seq.fold_left
@@ -2685,8 +2671,7 @@ let apply_modality_l modality jk =
       ~relevant_for_shallow:`Relevant
   in
   let mod_bounds =
-    jk.jkind.mod_bounds
-    |> fun mod_bounds ->
+    jk.jkind.mod_bounds |> fun mod_bounds ->
     Mod_bounds.set_min_in_set mod_bounds (Axis_set.complement relevant_axes)
   in
   let with_bounds =

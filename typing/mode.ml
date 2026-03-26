@@ -5151,7 +5151,7 @@ module Crossing = struct
 
   type t =
     { crossing : (Monadic.t, Comonadic.t) monadic_comonadic;
-      unique_implies_uncontended : bool;
+      unique_implies_uncontended : bool
     }
 
   let value_mode_is_unique m =
@@ -5187,12 +5187,10 @@ module Crossing = struct
         ~yielding:(Per_axis.max (Comonadic Yielding))
         ~statefulness:(Per_axis.max (Comonadic Statefulness))
     in
-    { crossing = { monadic; comonadic };
-      unique_implies_uncontended = false
-    }
+    { crossing = { monadic; comonadic }; unique_implies_uncontended = false }
 
-  let modality m { crossing = { monadic; comonadic }; unique_implies_uncontended }
-      =
+  let modality m
+      { crossing = { monadic; comonadic }; unique_implies_uncontended } =
     let monadic = Monadic.modality m.monadic monadic in
     let comonadic = Comonadic.modality m.comonadic comonadic in
     { crossing = { monadic; comonadic }; unique_implies_uncontended }
@@ -5213,7 +5211,8 @@ module Crossing = struct
     in
     if t.unique_implies_uncontended && value_mode_is_unique input
     then
-      output |> Value.unhint |> apply_left_unhint contention_only_crossing
+      output |> Value.unhint
+      |> apply_left_unhint contention_only_crossing
       |> Value.hint ~monadic:Crossing ~comonadic:Crossing
     else output
 
@@ -5233,7 +5232,8 @@ module Crossing = struct
     in
     if t.unique_implies_uncontended && value_mode_is_unique input
     then
-      output |> Value.unhint |> apply_right_unhint contention_only_crossing
+      output |> Value.unhint
+      |> apply_right_unhint contention_only_crossing
       |> Value.hint ~monadic:Crossing ~comonadic:Crossing
     else output
 
@@ -5272,7 +5272,8 @@ module Crossing = struct
       |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
     else output
 
-  let apply_left_right_alloc_unhint { crossing = t; unique_implies_uncontended = _ } m =
+  let apply_left_right_alloc_unhint
+      { crossing = t; unique_implies_uncontended = _ } m =
     let input = m in
     let { monadic; comonadic } = Alloc.unhint m in
     let monadic = Monadic.apply_right t.monadic monadic in
@@ -5282,10 +5283,13 @@ module Crossing = struct
       |> comonadic_regional_to_local
       (* the left adjoint of [locality_as_regionality]*)
     in
-    let output = Alloc.hint ~monadic:Crossing ~comonadic:Crossing { monadic; comonadic } in
+    let output =
+      Alloc.hint ~monadic:Crossing ~comonadic:Crossing { monadic; comonadic }
+    in
     input, output
 
-  let apply_left_right_alloc ({ crossing = _; unique_implies_uncontended } as t) m =
+  let apply_left_right_alloc ({ crossing = _; unique_implies_uncontended } as t)
+      m =
     let input, output = apply_left_right_alloc_unhint t m in
     if unique_implies_uncontended && alloc_mode_is_unique input
     then snd (apply_left_right_alloc_unhint contention_only_crossing output)
@@ -5309,8 +5313,7 @@ module Crossing = struct
   let join t1 t2 =
     { crossing =
         { monadic = Monadic.join t1.crossing.monadic t2.crossing.monadic;
-          comonadic =
-            Comonadic.join t1.crossing.comonadic t2.crossing.comonadic
+          comonadic = Comonadic.join t1.crossing.comonadic t2.crossing.comonadic
         };
       unique_implies_uncontended =
         t1.unique_implies_uncontended && t2.unique_implies_uncontended
@@ -5319,8 +5322,7 @@ module Crossing = struct
   let meet t1 t2 =
     { crossing =
         { monadic = Monadic.meet t1.crossing.monadic t2.crossing.monadic;
-          comonadic =
-            Comonadic.meet t1.crossing.comonadic t2.crossing.comonadic
+          comonadic = Comonadic.meet t1.crossing.comonadic t2.crossing.comonadic
         };
       unique_implies_uncontended =
         t1.unique_implies_uncontended || t2.unique_implies_uncontended
@@ -5329,8 +5331,7 @@ module Crossing = struct
   let equal t1 t2 = le t1 t2 && le t2 t1
 
   let[@inline available] proj (type a) (ax : a Axis.t)
-      { crossing = { monadic; comonadic }; _ } :
-      a =
+      { crossing = { monadic; comonadic }; _ } : a =
     match ax with
     | Monadic ax -> (Monadic.proj [@inlined hint]) ax monadic
     | Comonadic ax -> (Comonadic.proj [@inlined hint]) ax comonadic

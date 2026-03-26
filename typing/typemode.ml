@@ -311,8 +311,8 @@ let transl_mod_bounds annots =
             nullability =
               Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
             unique_implies_uncontended =
-              Transled_modifiers.get
-                ~axis:(Nonmodal Unique_implies_uncontended) bounds_so_far;
+              Transled_modifiers.get ~axis:(Nonmodal Unique_implies_uncontended)
+                bounds_so_far;
             separability =
               Transled_modifiers.get ~axis:(Nonmodal Separability) bounds_so_far
           }
