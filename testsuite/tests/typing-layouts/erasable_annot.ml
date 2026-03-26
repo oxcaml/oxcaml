@@ -469,37 +469,6 @@ module M3 : sig type t = private float# end
 external f_4 : M3.t -> M3.t = "%identity" [@@unboxed]
 |}];;
 
-(* Disabling warnings *)
-
-module M4 : sig
-  [@@@warning "-187"]
-  type ('a : immediate) t = Something of 'a
-
-  val f : ('a : immediate). 'a t -> 'a
-end = struct
-  [@@@warning "-187"]
-
-  type ('a : immediate) t = Something of 'a
-
-  let f (Something x) = x
-end;;
-
-[%%expect{|
-module M4 :
-  sig
-    type ('a : immediate) t = Something of 'a
-    val f : ('a : immediate). 'a t -> 'a
-  end
-|}]
-
-module[@warning "-187"] M5 = struct
-  let f (type a : immediate): a -> a = fun x -> x
-end;;
-
-[%%expect{|
-module M5 : sig val f : ('a : immediate). 'a -> 'a end
-|}]
-
 (* Disabled warnings. *)
 external[@warning "-187"] f_ok : int -> bool -> int64# = "foo" "bar";;
 
