@@ -736,6 +736,10 @@ Make_alloc_fun(caml_alloc ## words, words, _sse) \
 Make_alloc_fun(caml_alloc ## words, words, _avx) \
 Make_alloc_fun(caml_alloc ## words, words, _avx512)
 
+Make_alloc_funs(1) /* caml_alloc1* */
+Make_alloc_funs(2) /* caml_alloc2* */
+Make_alloc_funs(3) /* caml_alloc3* */
+Make_alloc_funs(N) /* caml_allocN* */
 
 #define Make_call_local_realloc(suffix, simd)        \
     FUNCTION(G(caml_call_local_realloc ## suffix)) ; \
