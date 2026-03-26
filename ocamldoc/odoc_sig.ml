@@ -437,9 +437,8 @@ module Analyser =
     let get_field env name_comment_list
         {Types.ld_id=field_name;
          ld_mutable=mutable_flag;
-         ld_atomic=atomic_flag;
          ld_type=type_expr;
-         ld_attributes} =
+         ld_attributes; _} =
       let field_name = Ident.name field_name in
       let comment_opt =
         try List.assoc field_name name_comment_list
@@ -448,14 +447,8 @@ module Analyser =
       let comment_opt = analyze_alerts comment_opt ld_attributes in
       {
         rf_name = field_name ;
-<<<<<<< oxcaml
         rf_mutable = Types.is_mutable mutable_flag;
-||||||| upstream-base
-        rf_mutable = mutable_flag = Mutable ;
-=======
-        rf_mutable = mutable_flag = Mutable ;
-        rf_atomic = atomic_flag = Atomic ;
->>>>>>> upstream-incoming
+        rf_atomic = Types.is_atomic mutable_flag;
         rf_type = Odoc_env.subst_type env type_expr ;
         rf_text = comment_opt
       }
@@ -507,17 +500,11 @@ module Analyser =
     let get_cstr_args env pos_end =
       let tuple ct = Odoc_env.subst_type env ct.Typedtree.ctyp_type in
       let record comments
-          { Typedtree.ld_id; ld_mutable; ld_atomic; ld_type; ld_loc; ld_attributes } =
+          { Typedtree.ld_id; ld_mutable; ld_type; ld_loc; ld_attributes; _ } =
         get_field env comments @@
-<<<<<<< oxcaml
         {Types.ld_id; ld_mutable; ld_modalities = Mode.Modality.Const.id;
          ld_sort=Jkind.Sort.Const.void (* ignored *);
          ld_type=ld_type.Typedtree.ctyp_type;
-||||||| upstream-base
-        {Types.ld_id; ld_mutable; ld_type=ld_type.Typedtree.ctyp_type;
-=======
-        {Types.ld_id; ld_mutable; ld_atomic; ld_type=ld_type.Typedtree.ctyp_type;
->>>>>>> upstream-incoming
          ld_loc; ld_attributes; ld_uid=Types.Uid.internal_not_actually_unique} in
       let open Typedtree in
       function
