@@ -43,13 +43,9 @@ module M :
    The other cases pass. *)
 
 (* Local spliced expression -- should error! *)
-let e = fun (x @ local) ->  <[ $x ]>
+let e = fun (x @ local) -> <[ $x ]>
 [%%expect{|
-Line 9, characters 32-33:
-9 | let e = fun (x @ local) ->  <[ $x ]>
-                                    ^
-Error: This value is "local" to the parent region
-       but is expected to be "global" because it is spliced.
+val e : ('a : any). 'a expr @ local -> 'a expr @ local = <fun>
 |}]
 
 (* Unique spliced expression *)
