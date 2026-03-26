@@ -87,7 +87,7 @@ module Mode_axis_pair = struct
     | "yielding" -> comonadic Yielding Yielding
     | "unyielding" -> comonadic Yielding Unyielding
     | "stateless" -> comonadic Statefulness Stateless
-    | "observing" -> comonadic Statefulness Observing
+    | "reading" -> comonadic Statefulness Reading
     | "stateful" -> comonadic Statefulness Stateful
     | "immutable" -> monadic Visibility Immutable
     | "read" -> monadic Visibility Read
@@ -238,7 +238,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
     let b : Portability.Const.t =
       match a with
       | Stateless -> Portable
-      | Observing -> Shareable
+      | Reading -> Shareable
       | Stateful -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_const b)]
@@ -392,8 +392,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     match annots.portability, annots.statefulness with
     | (Some _ as p), _ | p, None -> p
     | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
-    | None, Some Statefulness.Const.Observing ->
-      Some Portability.Const.Shareable
+    | None, Some Statefulness.Const.Reading -> Some Portability.Const.Shareable
     | None, Some Statefulness.Const.Stateful ->
       Some Portability.Const.Nonportable
   in

@@ -20,7 +20,7 @@ portability ::= `portable` | `shareable` | `nonportable`
 contention ::= `uncontended` | `shared` | `contended`
 yield ::= `unyielding` | `yielding`
 fork ::= `forkable` | `unforkable`
-statefulness ::= `stateless` | `observing` | `stateful`
+statefulness ::= `stateless` | `reading` | `stateful`
 visibility ::= `read_write` | `read` | `immutable`
 
 modes ::= mode
@@ -295,7 +295,7 @@ and modalities, according to this table:
 | `global`      | `unyielding` |
 | `local`       | `yielding`   |
 | `stateless`   | `portable`   |
-| `observing`   | `shareable`  |
+| `reading`     | `shareable`  |
 | `immutable`   | `contended`  |
 | `read`        | `shared`     |
 

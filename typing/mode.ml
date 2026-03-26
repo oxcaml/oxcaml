@@ -525,7 +525,7 @@ module Lattices = struct
   module Statefulness = struct
     type t =
       | Stateless
-      | Observing
+      | Reading
       | Stateful
 
     include Total (struct
@@ -535,14 +535,14 @@ module Lattices = struct
 
       let max = Stateful
 
-      let ord = function Stateless -> 0 | Observing -> 1 | Stateful -> 2
+      let ord = function Stateless -> 0 | Reading -> 1 | Stateful -> 2
     end)
 
     let legacy = Stateful
 
     let print ppf = function
       | Stateless -> Fmt.fprintf ppf "stateless"
-      | Observing -> Fmt.fprintf ppf "observing"
+      | Reading -> Fmt.fprintf ppf "reading"
       | Stateful -> Fmt.fprintf ppf "stateful"
   end
 
@@ -1662,12 +1662,12 @@ module Lattices_mono = struct
 
   let statefulness_to_visibility = function
     | Statefulness.Stateless -> Visibility.Immutable
-    | Statefulness.Observing -> Visibility.Read
+    | Statefulness.Reading -> Visibility.Read
     | Statefulness.Stateful -> Visibility.Read_write
 
   let visibility_to_statefulness = function
     | Visibility.Immutable -> Statefulness.Stateless
-    | Visibility.Read -> Statefulness.Observing
+    | Visibility.Read -> Statefulness.Reading
     | Visibility.Read_write -> Statefulness.Stateful
 
   let min_with dst ax a = Axis.set ax a (min dst)
@@ -3078,7 +3078,7 @@ module Statefulness = struct
 
   let stateless = of_const Stateless
 
-  let observing = of_const Observing
+  let reading = of_const Reading
 
   let stateful = of_const Stateful
 
@@ -3122,10 +3122,10 @@ module Portability = struct
 
   let legacy = of_const Const.legacy
 
-  (* CR dkalinichenko: ideally, [observing] should zap to [sharable]. *)
+  (* CR dkalinichenko: ideally, [reading] should zap to [sharable]. *)
   let zap_to_legacy ~statefulness =
     match statefulness with
-    | Statefulness.Const.Stateful | Statefulness.Const.Observing -> zap_to_ceil
+    | Statefulness.Const.Stateful | Statefulness.Const.Reading -> zap_to_ceil
     | Statefulness.Const.Stateless -> zap_to_floor
 end
 
