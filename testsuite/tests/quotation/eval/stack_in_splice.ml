@@ -1,4 +1,5 @@
 (* TEST
+  include eval;
   flags = "-extension runtime_metaprogramming";
   native;
 *)
@@ -15,7 +16,7 @@
 
 let () =
   Printf.printf "\nTest stack_ tuple in splice\n";
-  let f = [%eval: unit -> int]
+  let f = Eval.eval
     <[ fun () -> $(
       let local_ _p : int * int =
         Sys.opaque_identity
@@ -28,7 +29,7 @@ let () =
 
 let () =
   Printf.printf "\nTest stack_ ref in splice\n";
-  let f = [%eval: unit -> int]
+  let f = Eval.eval
     <[ fun () -> $(
       let local_ r =
         Sys.opaque_identity
@@ -41,7 +42,7 @@ let () =
 
 let () =
   Printf.printf "\nTest stack_ option in splice\n";
-  let f = [%eval: unit -> int]
+  let f = Eval.eval
     <[ fun () -> $(
       let local_ opt =
         Sys.opaque_identity

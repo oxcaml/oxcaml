@@ -118,6 +118,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         Generic_fns.Tbl.add ~imports:cached_genfns_imports genfns
           info.ui_generic_fns
       in
+      if
+        (not shared) && info.ui_requires_metaprogramming
+        && not !Clflags.uses_metaprogramming
+      then
+        raise (Linkenv.Error (Requires_metaprogramming_without_flag file_name));
       ( file_name :: full_paths,
         object_file_name :: objfiles,
         unit :: tolink,
@@ -132,6 +137,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       in
       Linkenv.check_cmi_consistency linkenv file_name infos.lib_imports_cmi;
       Linkenv.check_cmx_consistency linkenv file_name infos.lib_imports_cmx;
+      if
+        (not shared) && infos.lib_requires_metaprogramming
+        && not !Clflags.uses_metaprogramming
+      then
+        raise (Linkenv.Error (Requires_metaprogramming_without_flag file_name));
       let objfiles =
         let obj_file =
           Filename.chop_suffix file_name Backend.ext_flambda_lib
@@ -258,17 +268,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         let full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
           scan_user_supplied_files linkenv ~genfns ~objfiles
         in
-        let uses_eval =
-          (* This query must come after scan_file has been called on objfiles,
-             otherwise is_required will always return false. *)
-          (* CR mshinwell: maybe instead we could have a flag on cmx/cmxa files
-             to indicate whether they need metaprogramming? Then we wouldn't
-             have to do scan_file first, which in turn would avoid the need to
-             snapshot the Linkenv. It also wouldn't capture things like mdx
-             which should not receive this special treatment. *)
-          Linkenv.is_required linkenv
-            (Compilation_unit.of_string "Camlinternaleval")
-        in
+        let uses_eval = !Clflags.uses_metaprogramming in
         if uses_eval && not Backend.supports_metaprogramming
         then
           raise
