@@ -1189,6 +1189,13 @@ let mode_quoted : expected_mode = mode_default mode_in_quotes
     Note: we must have that [mode_quoted <= mode_splice] for soundness. *)
 and mode_splice : Value.l = Value.disallow_right mode_in_quotes
 
+(** Lower bound for the mode of a quoted expression that
+    might have side-effects. *)
+let mode_expansive_quoted : Value.l =
+  let open Mode_hint in
+  { Value.Const.min with linearity = Once }
+  |> Value.of_const ~hint_comonadic:Quoted_expansive
+
 (** The [expected_mode] of a quoted expression value when it is spliced. *)
 let mode_spliced =
   let open Mode_hint in
@@ -7711,9 +7718,13 @@ and type_expect_
         | Error err ->
             raise (Error (loc, env, Function_type_not_rep (typ.ctyp_type, err)))
       in
+      let eval_type_arg_mode =
+        { Alloc.Const.legacy with linearity = Once }
+        |> Alloc.of_const
+      in
       let eval_type = newty
         (Tarrow
-          ((Nolabel, Alloc.legacy, Alloc.legacy)
+          ((Nolabel, eval_type_arg_mode, Alloc.legacy)
           , newmono (Predef.type_code (newgenty (Tquote typ.ctyp_type)))
           , typ.ctyp_type
           , commu_ok))
@@ -7861,6 +7872,8 @@ and type_expect_
       with_explanation (fun () ->
         unify_exp_types loc env expr_ty (generic_instance ty_expected));
       let arg = type_expect new_env mode_quoted exp (mk_expected ty) in
+      if not (is_nonexpansive arg) then
+        submode ~loc ~env ~reason:Other mode_expansive_quoted expected_mode;
       re {
         exp_desc = Texp_quotation arg;
         exp_loc = loc; exp_extra = [];

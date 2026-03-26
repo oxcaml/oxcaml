@@ -42,7 +42,7 @@ module M1'' : sig val foo : 'a expr -> <[$('a) -> int]> expr end
 
 (*  Simple functions with a type variable under a quote-splice *)
 module M2 = struct
-  let f (x : <[ 'a ]> expr) = <[ ($x, $x) ]>
+  let f (x : <[ 'a ]> expr) = Obj.magic_many <[ ($x, $x) ]>
 end
 
 [%%expect{|
@@ -53,7 +53,7 @@ module M2 : sig val f : 'a expr -> <[$('a) * $('a)]> expr end
     'a will be unified with <[int]> when checking the function parameter side,
     skipping any nontrivial reasoning.  *)
 module M2' : sig
-  val f : <[ int ]> expr -> <[ int * int ]> expr
+  val f : <[ int ]> expr -> <[ int * int ]> expr @ once
 end = M2
 
 [%%expect{|
@@ -63,7 +63,9 @@ module M2' : sig val f : <[int]> expr -> <[int * int]> expr end
 (*  [M3] is trickier, leading to the case $'a < t *)
 
 module M3 = struct
-  let f = let (x : <[ 'a -> unit ]> expr) = <[ fun _ -> () ]> in <[ ($x, $x) ]>
+  let f () =
+    let (x : <[ 'a -> unit ]> expr) = <[ fun _ -> () ]> in
+    <[ ($x, $x) ]>
 end
 
 [%%expect{|
@@ -72,7 +74,7 @@ module M3 : sig val f : <[($('a) -> unit) * ($('a) -> unit)]> expr end
 
 (*   $('a) = int  <=>  'a = <[int]> *)
 module M3' : sig
-  val f : <[ (int -> unit) * (int -> unit) ]> expr
+  val f : unit -> <[ (int -> unit) * (int -> unit) ]> expr @ once
 end = M3
 
 [%%expect{|
@@ -83,7 +85,7 @@ module M3' : sig val f : <[(int -> unit) * (int -> unit)]> expr end
      contradicting quoted unificands *)
 (*   string = $('a) = int  <=>  <[string]> = 'a = <[int]>  <=>  string = int (error!) *)
 module M3'' : sig
-  val f : <[ (string -> unit) * (int -> unit) ]> expr
+  val f : unit -> <[ (string -> unit) * (int -> unit) ]> expr @ once
 end = M3
 
 [%%expect{|

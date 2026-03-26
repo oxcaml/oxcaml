@@ -11,12 +11,12 @@
 
 (* This type should be the same as [B.t3''] *)
 let (f : <[
-  ('a 'b. unit -> ('a expr -> 'b expr) -> <[unit -> $('a) -> $('b)]> expr) ->
+  ('a 'b. unit -> ('a expr -> 'b expr @ once) -> <[unit -> $('a) -> $('b)]> expr) ->
   <[unit -> int -> int]> expr * <[unit -> int -> string]> expr
 ]> expr) =
   <[fun f -> (
-    f () (fun x -> <[$x + 1]>),
-    f () (fun x -> <[Int.to_string $x]>))]>
+    f () (fun x -> Obj.magic_many <[$x + 1]>),
+    f () (fun x -> Obj.magic_many <[Int.to_string $x]>))]>
 
 [%%expect {|
 >> Fatal error: Translquote [at line 5, characters 8-9]:

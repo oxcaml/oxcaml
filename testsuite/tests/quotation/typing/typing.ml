@@ -427,7 +427,7 @@ Error: This expression has type "<[int -> int]>"
 
 let mk_pair x = <[$x, $x]>;;
 [%%expect {|
-val mk_pair : 'a expr -> <[$('a) * $('a)]> expr = <fun>
+val mk_pair : 'a expr -> <[$('a) * $('a)]> expr @ once = <fun>
 |}];;
 
 mk_pair <[123]>;;
@@ -488,12 +488,12 @@ Error: Type variable "'a" is used outside any quotations,
 
 let eta (type a) (x : a expr) : a expr = <[ $x ]>
 [%%expect {|
-val eta : 'a expr -> 'a expr = <fun>
+val eta : 'a expr -> 'a expr @ once = <fun>
 |}]
 
 let eta1 (type a) = <[ fun (x : $a expr) : $a expr -> <[ $x ]> ]>
 [%%expect {|
-val eta1 : <[$('a) expr -> $('a) expr]> expr =
+val eta1 : <[$('a) expr -> $('a) expr @ once]> expr =
   <[fun (x : _ expr) -> (<[$x]> : _ expr)]>
 |}]
 
@@ -507,13 +507,13 @@ val eta1' : <[$('a) -> $('a)]> expr = <[fun (type a) (x : a) -> (x : a)]>
 let app (type a b) (f : <[$a -> $b]> expr) (x : a expr) =
   <[ $f $x ]>
 [%%expect {|
-val app : <[$('a) -> $('b)]> expr -> 'a expr -> 'b expr = <fun>
+val app : <[$('a) -> $('b)]> expr -> 'a expr -> 'b expr @ once = <fun>
 |}]
 
 let both (type a b) (p : a expr * b expr) : <[$a * $b]> expr =
   let (x, y) = p in <[ $x, $y ]>
 [%%expect {|
-val both : 'a expr * 'b expr -> <[$('a) * $('b)]> expr = <fun>
+val both : 'a expr * 'b expr -> <[$('a) * $('b)]> expr @ once = <fun>
 |}]
 
 (* Non-value-kinded expressions *)
