@@ -16,8 +16,8 @@ mode ::= locality | uniqueness | linearity | portability | contention
 locality ::= `global` | `local`
 uniqueness ::= `unique` | `aliased`
 linearity ::= `many` | `once`
-portability ::= `portable` | `shareable` | `nonportable`
-contention ::= `uncontended` | `shared` | `contended`
+portability ::= `portable` | `poisoning` | `shareable` | `nonportable`
+contention ::= `uncontended` | `shared` | `poisoned` | `contended`
 yield ::= `unyielding` | `yielding`
 fork ::= `forkable` | `unforkable`
 statefulness ::= `stateless` | `writing` | `reading | `stateful`
@@ -296,11 +296,11 @@ and modalities, according to this table:
 | `local`      | `yielding`    |
 | `stateless`  | `portable`    |
 | `reading`    | `shareable`   |
-| `writing`    | `nonportable` |
+| `writing`    | `poisoning`   |
 | `stateful`   | `nonportable` |
 | `immutable`  | `contended`   |
 | `read`       | `shared`      |
-| `write`      | `uncontended` |
+| `write`      | `poisoned`    |
 | `read_write` | `uncontended` |
 
 These implications exist only in the surface syntax for mode and modality
