@@ -1180,28 +1180,21 @@ let mode_force_lazy =
   in
   mode_default mode
 
-(** The [expected_mode] of the result of an expression in a quote. *)
-let mode_quoted : expected_mode =
+let mode_in_quotes : Value.lr =
   let open Mode_hint in
   let hint_monadic = Legacy Quoted
   and hint_comonadic = Legacy Quoted in
-  let mode =
-    Value.Const.legacy |> Value.of_const ~hint_monadic ~hint_comonadic
-  in
-  mode_default mode
+  Value.Const.legacy |> Value.of_const ~hint_monadic ~hint_comonadic
 
-(** The left-mode of the result of an expression that was quoted. *)
-let mode_unquoted : Value.l =
-  let open Mode_hint in
-  let hint_monadic = Legacy Unquoted
-  and hint_comonadic = Legacy Unquoted in
-  let mode =
-    Value.Const.legacy |> Value.of_const ~hint_monadic ~hint_comonadic
-  in
-  mode
+(** The [expected_mode] of the result of an expression in a quote. *)
+let mode_quoted : expected_mode = mode_default mode_in_quotes
+
+(** The left-mode of the result of an expression that was quoted.
+    Note: we must have that [mode_quoted <= mode_splice] for soundness. *)
+and mode_splice : Value.l = Value.disallow_right mode_in_quotes
 
 (** The [expected_mode] of a quoted expression value when it is spliced. *)
-let mode_splice =
+let mode_spliced =
   let open Mode_hint in
   let hint_monadic = Spliced Monadic
   and hint_comonadic = Spliced Comonadic in
@@ -7856,10 +7849,10 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
-      submode ~loc ~env ~reason:Other mode_unquoted expected_mode;
+      submode ~loc ~env ~reason:Other mode_splice expected_mode;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
-      let arg = type_expect new_env mode_splice exp (mk_expected ty) in
+      let arg = type_expect new_env mode_spliced exp (mk_expected ty) in
       re {
         exp_desc = Texp_antiquotation arg;
         exp_loc = loc; exp_extra = [];
