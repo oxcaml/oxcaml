@@ -237,11 +237,17 @@ Error: This value is "local" to the parent region but is expected to be "global"
 |}]
 let cross_many (x : <[int]> expr @ once) : _ @ many = x
 [%%expect{|
-val cross_many : <[int]> expr @ once -> <[int]> expr = <fun>
+Line 1, characters 54-55:
+1 | let cross_many (x : <[int]> expr @ once) : _ @ many = x
+                                                          ^
+Error: This value is "once" but is expected to be "many".
 |}]
 let cross_portable (x : <[int]> expr @ nonportable) : _ @ portable = x
 [%%expect{|
-val cross_portable : <[int]> expr -> <[int]> expr @ portable = <fun>
+Line 1, characters 69-70:
+1 | let cross_portable (x : <[int]> expr @ nonportable) : _ @ portable = x
+                                                                         ^
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (** Quoting non-expansive expressions and using as [many] **)
