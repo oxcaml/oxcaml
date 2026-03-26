@@ -33,7 +33,6 @@ open Stdlib
 open Typedtree
 open Tast_mapper
 open List
-open Types
 open Path
 open Compat
 
