@@ -580,6 +580,12 @@ val extract_layout : Env.t -> 'd Types.jkind -> (Sort.t Layout.t, Path.t) result
 val get_mode_crossing :
   context:jkind_context -> Env.t -> 'd Types.jkind -> Mode.Crossing.t
 
+val get_unique_implies_uncontended :
+  context:jkind_context ->
+  Env.t ->
+  'd Types.jkind ->
+  Jkind_axis.Unique_implies_uncontended.t
+
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
 val get_externality_upper_bound :

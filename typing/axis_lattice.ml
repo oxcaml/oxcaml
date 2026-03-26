@@ -547,7 +547,7 @@ let nonfloat_value : t =
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~unique_implies_uncontended:
-      Jkind_axis.Unique_implies_uncontended.Does_not_hold
+      Jkind_axis.Unique_implies_uncontended.Holds
     ~separability:Jkind_axis.Separability.Non_float
 
 let immutable_data : t =
@@ -561,7 +561,7 @@ let immutable_data : t =
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~unique_implies_uncontended:
-      Jkind_axis.Unique_implies_uncontended.Does_not_hold
+      Jkind_axis.Unique_implies_uncontended.Holds
     ~separability:Jkind_axis.Separability.Non_float
 
 let mutable_data : t =
@@ -575,7 +575,7 @@ let mutable_data : t =
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~unique_implies_uncontended:
-      Jkind_axis.Unique_implies_uncontended.Does_not_hold
+      Jkind_axis.Unique_implies_uncontended.Holds
     ~separability:Jkind_axis.Separability.Non_float
 
 let sync_data : t =

@@ -2001,6 +2001,18 @@ module Const = struct
         | _ -> raise ~loc (Unknown_kind_modifier txt))
       sa_annots None
 
+  let unique_implies_uncontended_is_determined_by_modality modality =
+    let uniqueness =
+      Mode.Modality.Const.proj (Monadic Uniqueness) modality
+    in
+    match uniqueness with
+    | Mode.Modality.Monadic.Atom.Join_const
+        Mode.Uniqueness.Const.Aliased ->
+      true
+    | Mode.Modality.Monadic.Atom.Join_const
+        Mode.Uniqueness.Const.Unique ->
+      false
+
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
       _ ->
@@ -2064,11 +2076,26 @@ module Const = struct
           (Typemode.transl_modalities ~maturity:Stable Immutable modalities)
             .moda_modalities
         in
+        let relevant_axes =
+          let relevant_axes =
+            Mod_bounds.relevant_axes_of_modality
+              ~relevant_for_shallow:`Irrelevant ~modality
+          in
+          if
+            Mod_bounds.Unique_implies_uncontended.equal
+              (Mod_bounds.unique_implies_uncontended base.mod_bounds)
+              Mod_bounds.Unique_implies_uncontended.min
+            && not
+                 (unique_implies_uncontended_is_determined_by_modality modality)
+          then Axis_set.add relevant_axes (Nonmodal Unique_implies_uncontended)
+          else relevant_axes
+        in
         { base = base.base;
-          mod_bounds = base.mod_bounds;
+          mod_bounds =
+            Mod_bounds.contribute_base_from_modality ~modality base.mod_bounds;
           with_bounds =
-            With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
-              ~type_expr:type_ base.with_bounds
+            With_bounds.add type_
+              { relevant_axes } base.with_bounds
         })
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
@@ -2281,19 +2308,38 @@ let for_unboxed_record lbls layouts =
   in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
 
+let unique_implies_uncontended_is_determined_by_modality modality =
+  let uniqueness =
+    Mode.Modality.Const.proj (Monadic Uniqueness) modality
+  in
+  match uniqueness with
+  | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Aliased ->
+    true
+  | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Unique ->
+    false
+
+let relevant_axes_of_modality_with_unique_implies_uncontended
+    ~relevant_for_shallow ~modality =
+  let relevant_axes =
+    Mod_bounds.relevant_axes_of_modality ~relevant_for_shallow ~modality
+  in
+  if unique_implies_uncontended_is_determined_by_modality modality
+  then relevant_axes
+  else Axis_set.add relevant_axes (Nonmodal Unique_implies_uncontended)
+
 let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
   let jkind = type_jkind_purely ty in
   let with_bounds_types =
     let relevant_axes =
-      Mod_bounds.relevant_axes_of_modality ~relevant_for_shallow:`Relevant
-        ~modality
+      relevant_axes_of_modality_with_unique_implies_uncontended
+        ~relevant_for_shallow:`Relevant ~modality
     in
     With_bounds_types.singleton ty { relevant_axes }
   in
   fresh_jkind_poly
     { base = jkind.jkind.base;
-      mod_bounds = Mod_bounds.min;
+      mod_bounds = Mod_bounds.contribute_base_from_modality ~modality Mod_bounds.min;
       with_bounds = With_bounds with_bounds_types
     }
     ~annotation:None ~why:Abbreviation
@@ -2472,9 +2518,10 @@ let sort_of_jkind env (t : jkind_l) : sort =
   in
   sort_of_layout layout
 
-let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
+let get_mod_bounds (type l r) ~mode ~context ~skip_axes env
+    (jk : (l * r) jkind) =
   let jk, _ =
-    Base_and_axes.normalize ~mode:Ignore_best ~skip_axes
+    Base_and_axes.normalize ~mode ~skip_axes
       ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize ~context
       env jk.jkind
   in
@@ -2487,15 +2534,84 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
     Misc.fatal_error
       "Jkind.get_mod_crossing: violated Ignore_best normalize invariant."
 
+let all_except_unique_implies_uncontended =
+  Axis_set.singleton (Nonmodal Unique_implies_uncontended)
+  |> Axis_set.complement
+
+let get_unique_implies_uncontended (type l r) ~context env
+    (jk : (l * r) jkind) =
+  let rec loop_l seen (jk : Types.jkind_l) =
+    let jk, _ =
+      Base_and_axes.normalize ~mode:Ignore_best
+        ~skip_axes:all_except_unique_implies_uncontended
+        ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize
+        ~context env jk.jkind
+    in
+    let base =
+      Mod_bounds.get jk.mod_bounds
+        ~axis:(Nonmodal Unique_implies_uncontended)
+    in
+    With_bounds.to_seq jk.with_bounds
+    |> Seq.fold_left
+         (fun acc
+             (ty, ({ relevant_axes } : With_bounds_type_info.t)) ->
+           if not (Axis_set.mem relevant_axes
+                     (Nonmodal Unique_implies_uncontended))
+           then acc
+           else
+             let ty_bound =
+               let id = Types.get_id ty in
+                 if List.mem id seen
+                 then Unique_implies_uncontended.max
+                 else
+                   match context.jkind_of_type ty with
+                   | None -> Unique_implies_uncontended.max
+                   | Some ty_jkind -> loop_l (id :: seen) ty_jkind
+             in
+             Unique_implies_uncontended.join acc ty_bound)
+         base
+  in
+  let jk, _ =
+    Base_and_axes.normalize ~mode:Ignore_best
+      ~skip_axes:all_except_unique_implies_uncontended
+      ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize
+      ~context env jk.jkind
+  in
+  let base =
+    Mod_bounds.get jk.mod_bounds
+      ~axis:(Nonmodal Unique_implies_uncontended)
+  in
+  With_bounds.to_seq jk.with_bounds
+  |> Seq.fold_left
+       (fun acc
+           (ty, ({ relevant_axes } : With_bounds_type_info.t)) ->
+         if not (Axis_set.mem relevant_axes
+                   (Nonmodal Unique_implies_uncontended))
+         then acc
+         else
+           let ty_bound =
+             match context.jkind_of_type ty with
+             | None -> Unique_implies_uncontended.max
+             | Some ty_jkind -> loop_l [Types.get_id ty] ty_jkind
+           in
+           Unique_implies_uncontended.join acc ty_bound)
+       base
+
 let get_mode_crossing (type l r) ~context env (jk : (l * r) jkind) =
   let mod_bounds =
-    get_mod_bounds ~context
+    get_mod_bounds ~mode:Ignore_best ~context
       ~skip_axes:
         (Axis_set.remove Axis_set.all_nonmodal_axes
            (Nonmodal Unique_implies_uncontended))
       env jk
   in
-  Mod_bounds.to_mode_crossing mod_bounds
+  let crossing = Mod_bounds.to_mode_crossing mod_bounds in
+  { crossing with
+    unique_implies_uncontended =
+      Unique_implies_uncontended.equal
+        (get_unique_implies_uncontended ~context env jk)
+        Unique_implies_uncontended.Holds
+  }
 
 let to_unsafe_mode_crossing jkind =
   { unsafe_mod_bounds = Mod_bounds.to_mode_crossing jkind.jkind.mod_bounds;
@@ -2507,7 +2623,8 @@ let all_except_externality =
 
 let get_externality_upper_bound ~context env jk =
   let mod_bounds =
-    get_mod_bounds ~context ~skip_axes:all_except_externality env jk
+    get_mod_bounds ~mode:Ignore_best ~context ~skip_axes:all_except_externality
+      env jk
   in
   Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
 
@@ -2538,7 +2655,8 @@ let get_nullability ~context env jk =
     Mod_bounds.nullability jkind.mod_bounds
   else
     let mod_bounds =
-      get_mod_bounds ~context ~skip_axes:all_except_nullability env jk
+      get_mod_bounds ~mode:Ignore_best ~context
+        ~skip_axes:all_except_nullability env jk
     in
     Mod_bounds.get mod_bounds ~axis:(Nonmodal Nullability)
 
@@ -2563,7 +2681,7 @@ let set_layout jk layout =
 
 let apply_modality_l modality jk =
   let relevant_axes =
-    Mod_bounds.relevant_axes_of_modality ~modality
+    relevant_axes_of_modality_with_unique_implies_uncontended ~modality
       ~relevant_for_shallow:`Relevant
   in
   let mod_bounds =
@@ -2592,7 +2710,7 @@ let apply_modality_l_with_base modality jk =
 
 let apply_modality_r modality jk =
   let relevant_axes =
-    Mod_bounds.relevant_axes_of_modality ~modality
+    relevant_axes_of_modality_with_unique_implies_uncontended ~modality
       ~relevant_for_shallow:`Relevant
   in
   let mod_bounds =

@@ -42,6 +42,9 @@ val crossing_of_jkind :
 
 val crossing_of_type : Env.t -> Types.type_expr -> Mode.Crossing.t
 
+val principal_jkind_of_type' :
+  (Env.t -> Types.type_expr -> Types.jkind_l option) ref
+
 val instance_poly_for_jkind' :
   (Types.type_expr list -> Types.type_expr -> Types.type_expr) ref
 

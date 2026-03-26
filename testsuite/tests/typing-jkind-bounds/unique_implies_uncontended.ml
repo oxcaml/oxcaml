@@ -24,54 +24,46 @@ type mutable_record = { mutable x : int; }
 (* Types that should satisfy the axis *)
 
 type good_int : value mod unique_implies_uncontended = int
-(* CR jujacobs: Plain immutable data should satisfy this axis. *)
 [%%expect{|
 type good_int = int
 |}]
 
 type good_ref : value mod unique_implies_uncontended = int ref
-(* CR jujacobs: Refs should satisfy this axis. *)
 [%%expect{|
 type good_ref = int ref
 |}]
 
 type good_mut : value mod unique_implies_uncontended = mutable_record
-(* CR jujacobs: Mutable records should satisfy this axis. *)
 [%%expect{|
 type good_mut = mutable_record
 |}]
 
 type good_contended_int : value mod unique_implies_uncontended =
   int contended_modality
-(* CR jujacobs: Explicitly contended immutable data should satisfy this axis. *)
 [%%expect{|
 type good_contended_int = int contended_modality
 |}]
 
 type good_contended_ref : value mod unique_implies_uncontended =
   int ref contended_modality
-(* CR jujacobs: Explicitly contended refs should satisfy this axis. *)
 [%%expect{|
 type good_contended_ref = int ref contended_modality
 |}]
 
 type good_contended_mut : value mod unique_implies_uncontended =
   mutable_record contended_modality
-(* CR jujacobs: Explicitly contended mutable records should satisfy this axis. *)
 [%%expect{|
 type good_contended_mut = mutable_record contended_modality
 |}]
 
 type good_aliased_contended_ref : value mod unique_implies_uncontended =
   int ref Modes.Aliased.t contended_modality
-(* CR jujacobs: Explicitly contended aliased refs should satisfy this axis. *)
 [%%expect{|
 type good_aliased_contended_ref = int ref Modes.Aliased.t contended_modality
 |}]
 
 type good_aliased_contended_mut : value mod unique_implies_uncontended =
   mutable_record Modes.Aliased.t contended_modality
-(* CR jujacobs: Explicitly contended aliased mutable records should satisfy this axis. *)
 [%%expect{|
 type good_aliased_contended_mut =
     mutable_record Modes.Aliased.t contended_modality
@@ -124,7 +116,6 @@ end
 module Cross_abstract_value (X : Abstract_value) = struct
   let f (x : X.t @ unique contended) = use_uncontended x
 end
-(* CR jujacobs: Abstract value types should cross to uncontended when unique. *)
 [%%expect{|
 module type Abstract_value = sig type t end
 module Cross_abstract_value :
@@ -153,7 +144,6 @@ end
 module Cross_abstract_unique (X : Abstract_unique) = struct
   let f (x : X.t @ unique contended) = use_uncontended x
 end
-(* CR jujacobs: Abstract unique types should cross to uncontended when unique. *)
 [%%expect{|
 module type Abstract_unique = sig type t end
 module Cross_abstract_unique :
@@ -177,9 +167,84 @@ module Cross_abstract_contended_unique :
     sig val f : X.t @ unique contended -> unit end
 |}]
 
+module type Abstract_with = sig
+  type ('a : value) t : value mod unique_implies_uncontended with 'a
+end
+
+module Cross_abstract_with (X : Abstract_with) = struct
+  let f (x : int ref X.t @ unique contended) = use_uncontended x
+end
+[%%expect{|
+module type Abstract_with =
+  sig type 'a t : value mod unique_implies_uncontended with 'a end
+module Cross_abstract_with :
+  functor (X : Abstract_with) ->
+    sig val f : int ref X.t @ unique contended -> unit end
+|}]
+
+module Cross_abstract_with_aliased (X : Abstract_with) = struct
+  let f (x : int ref Modes.Aliased.t X.t @ unique contended) =
+    use_uncontended x
+end
+[%%expect{|
+Line 2, characters 20-21:
+2 |     use_uncontended x
+                        ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+module Id_abstract_with : Abstract_with = struct
+  type ('a : value) t = 'a
+end
+
+let id_abstract_with_aliased
+    (x : int ref Modes.Aliased.t Id_abstract_with.t @ unique contended) =
+  use_uncontended x
+[%%expect{|
+module Id_abstract_with : Abstract_with
+Line 3, characters 18-19:
+3 |   use_uncontended x
+                      ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+module type Abstract_param_bound = sig
+  type ('a : value mod unique_implies_uncontended) t :
+    value mod unique_implies_uncontended
+end
+
+module Cross_abstract_param_bound (X : Abstract_param_bound) = struct
+  let f (x : int ref X.t @ unique contended) = use_uncontended x
+end
+[%%expect{|
+module type Abstract_param_bound =
+  sig
+    type ('a : value mod unique_implies_uncontended) t
+      : value mod unique_implies_uncontended
+  end
+module Cross_abstract_param_bound :
+  functor (X : Abstract_param_bound) ->
+    sig val f : int ref X.t @ unique contended -> unit end
+|}]
+
+module Cross_abstract_param_bound_aliased (X : Abstract_param_bound) = struct
+  let f (x : int ref Modes.Aliased.t X.t @ unique contended) =
+    use_uncontended x
+end
+[%%expect{|
+Line 2, characters 13-36:
+2 |   let f (x : int ref Modes.Aliased.t X.t @ unique contended) =
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type "int ref Modes.Aliased.t" should be an instance of type
+         "('a : value mod unique_implies_uncontended)"
+       The kind of int ref Modes.Aliased.t is value_or_null mod aliased.
+       But the kind of int ref Modes.Aliased.t must be a subkind of
+           value mod unique_implies_uncontended
+         because of the definition of t at lines 2-3, characters 2-40.
+|}]
+
 let foo (t : int ref @ unique contended) =
   use_uncontended t
-(* CR jujacobs: Unique refs should become uncontended. *)
 [%%expect{|
 val foo : int ref @ unique contended -> unit = <fun>
 |}]
@@ -204,7 +269,6 @@ val foo :
 
 let foo (t : mutable_record @ unique contended) =
   use_uncontended t
-(* CR jujacobs: Unique mutable records should become uncontended. *)
 [%%expect{|
 val foo : mutable_record @ unique contended -> unit = <fun>
 |}]

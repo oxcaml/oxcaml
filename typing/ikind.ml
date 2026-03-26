@@ -32,6 +32,11 @@ module Ldd = Types.Ldd
 let instance_poly_for_jkind' =
   ref (fun _univars _ty -> Misc.fatal_error "instance_poly_for_jkind")
 
+let principal_jkind_of_type' =
+  ref
+    (fun _env _ty ->
+      Misc.fatal_error "principal_jkind_of_type")
+
 let fresh_unknown_uid () : Types.Uid.t =
   let current_unit =
     Some
@@ -39,6 +44,33 @@ let fresh_unknown_uid () : Types.Uid.t =
          (Compilation_unit.get_current_or_dummy ()))
   in
   Types.Uid.mk ~current_unit
+
+let intrinsic_axis_lattice_of_jkind :
+    type l r. (l * r) Types.jkind -> Axis_lattice.t option =
+ fun jkind ->
+  match Jkind.Desc.get_const (Jkind.get jkind) with
+  | Some { base = Types.Layout (Jkind_types.Layout.Const.Base (Value, _)); _ } ->
+    Some Axis_lattice.value
+ | Some _ | None ->
+    None
+
+let mk_jkind_context env jkind_of_type =
+  let lookup_type p =
+    match Env.find_type p env with
+    | decl -> Some decl
+    | exception Not_found -> None
+  in
+  let is_abstract p =
+    match lookup_type p with
+    | None -> false
+    | Some decl -> (
+      match decl.type_kind, decl.type_manifest with
+      | Types.Type_abstract _, None -> true
+      | Types.Type_abstract _, Some _ | Types.Type_variant _, _
+      | Types.Type_record _, _ | Types.Type_record_unboxed_product _, _
+      | Types.Type_open, _ -> false)
+  in
+  Jkind.{ jkind_of_type; is_abstract; lookup_type }
 
 (** A kind solver specialized to [Types.Ldd] and [Types.type_expr].
 
@@ -576,6 +608,45 @@ let shallow_axes_are_relevant_for_rep = function
   | `Variant Types.Variant_unboxed -> `Relevant
   | `Record _ | `Variant _ -> `Irrelevant
 
+let modality_base_contribution ~(default : Mode.Modality.Const.t)
+    (modality : Mode.Modality.Const.t) : Ldd.node =
+  let actual_contention =
+    Mode.Modality.Const.proj (Monadic Contention) modality
+  in
+  let default_contention =
+    Mode.Modality.Const.proj (Monadic Contention) default
+  in
+  let actual_uniqueness =
+    Mode.Modality.Const.proj (Monadic Uniqueness) modality
+  in
+  let default_uniqueness =
+    Mode.Modality.Const.proj (Monadic Uniqueness) default
+  in
+  let mod_bounds =
+    let open Btype.Jkind0.Mod_bounds in
+    let result = min in
+    if actual_contention <> default_contention
+    then
+      match actual_contention with
+      | Mode.Modality.Monadic.Atom.Join_const
+          Mode.Contention.Const.Contended ->
+        set_unique_implies_uncontended Unique_implies_uncontended.min result
+      | Mode.Modality.Monadic.Atom.Join_const
+          (Mode.Contention.Const.Uncontended
+          | Mode.Contention.Const.Shared) ->
+        result
+    else if actual_uniqueness <> default_uniqueness
+    then
+      match actual_uniqueness with
+      | Mode.Modality.Monadic.Atom.Join_const
+          Mode.Uniqueness.Const.Aliased ->
+        set_unique_implies_uncontended Unique_implies_uncontended.max result
+      | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Unique ->
+        result
+    else result
+  in
+  Ldd.const (Btype.Jkind0.Mod_bounds.to_axis_lattice mod_bounds)
+
 let sum_record_label_contributions
     ~(base : Ldd.node)
     ~relevant_for_shallow
@@ -586,13 +657,17 @@ let sum_record_label_contributions
     ~base
     ~f:(fun (lbl : Types.label_declaration) ->
       validate_label lbl;
+      let default_modalities = Typemode.mutable_modalities lbl.ld_mutable in
       let mask =
         Axis_lattice.mask_of_modality ~relevant_for_shallow
           lbl.ld_modalities
       in
       Ldd.join
+        (modality_base_contribution ~default:default_modalities
+           lbl.ld_modalities)
+        (Ldd.join
         (label_mutability_contribution lbl)
-        (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
+        (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type))))
 
 let no_validation (_ : Types.label_declaration) = ()
 
@@ -770,7 +845,11 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
         in
         let use_decl_jkind ~treat_as_abstract =
           let kind : Solver.ckind =
-           fun ctx -> Solver.ckind_of_jkind ctx type_decl.type_jkind
+           fun ctx ->
+            let kind = Solver.ckind_of_jkind ctx type_decl.type_jkind in
+            match intrinsic_axis_lattice_of_jkind type_decl.type_jkind with
+            | None -> kind
+            | Some intrinsic -> Ldd.meet (Ldd.const intrinsic) kind
           in
           Solver.Ty
             { args = type_decl.type_params;
@@ -883,9 +962,13 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
                       Axis_lattice.mask_of_modality
                         ~relevant_for_shallow arg.ca_modalities
                     in
-                    Ldd.meet
-                      (Ldd.const mask)
-                      (payload_kind arg.ca_type))
+                    Ldd.join
+                      (modality_base_contribution
+                         ~default:Mode.Modality.Const.id
+                         arg.ca_modalities)
+                      (Ldd.meet
+                         (Ldd.const mask)
+                         (payload_kind arg.ca_type)))
               | Types.Cstr_record lbls ->
                 sum_record_label_contributions
                   ~base:Ldd.bot
@@ -914,9 +997,17 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
         )
     in
     (* Prefer a stored constructor ikind if one is present and enabled. *)
+    let use_stored_ikind =
+      !Clflags.ikinds
+      &&
+      match type_decl.type_kind with
+      | Types.Type_abstract _ -> false
+      | Types.Type_record _ | Types.Type_record_unboxed_product _
+      | Types.Type_variant _ | Types.Type_open -> true
+    in
     let ikind =
       match type_decl.type_ikind with
-      | Types.Constructor_ikind { base; coeffs } when !Clflags.ikinds ->
+      | Types.Constructor_ikind { base; coeffs } when use_stored_ikind ->
         Solver.Poly (base, coeffs)
       | Types.No_constructor_ikind reason ->
         if !Clflags.ikinds_debug then Format.eprintf "[ikind-miss] %s@." reason;
@@ -1149,29 +1240,52 @@ let sub_jkind_l ?allow_any_crossing ?origin
 
 let crossing_of_jkind ~(context : Jkind.jkind_context)
     env (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
-  if not (enable_crossing && !Clflags.ikinds)
-  then Jkind.get_mode_crossing ~context env jkind
-  else
-    let with_bounds_is_empty :
-        type l r. (l * r) Types.with_bounds -> bool = function
-      | No_with_bounds -> true
-      | With_bounds _ -> false
-    in
-    match jkind.jkind.base with
-    | Types.Layout _ when with_bounds_is_empty jkind.jkind.with_bounds ->
-      Jkind.get_mode_crossing ~context env jkind
-    | _ ->
-      let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
-      let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
-      Axis_lattice.to_mode_crossing lat
+  let crossing =
+    if not (enable_crossing && !Clflags.ikinds)
+    then Jkind.get_mode_crossing ~context env jkind
+    else
+      let with_bounds_is_empty :
+          type l r. (l * r) Types.with_bounds -> bool = function
+        | No_with_bounds -> true
+        | With_bounds _ -> false
+      in
+      match jkind.jkind.base with
+      | Types.Layout _ when with_bounds_is_empty jkind.jkind.with_bounds ->
+        Jkind.get_mode_crossing ~context env jkind
+      | _ ->
+        let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
+        let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
+        Axis_lattice.to_mode_crossing lat
+  in
+  { crossing with
+    unique_implies_uncontended =
+      Jkind_axis.Unique_implies_uncontended.equal
+        (Jkind.get_unique_implies_uncontended ~context env jkind)
+        Jkind_axis.Unique_implies_uncontended.Holds
+  }
 
 let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
   let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
   Solver.round_up (Solver.kind ~use_tables:false ctx ty)
 
 let crossing_of_type env (ty : Types.type_expr) : Mode.Crossing.t =
-  let lat = round_up_type env ty in
-  Axis_lattice.to_mode_crossing lat
+  let crossing =
+    let lat = round_up_type env ty in
+    Axis_lattice.to_mode_crossing lat
+  in
+  match !principal_jkind_of_type' env ty with
+  | None -> crossing
+  | Some jkind ->
+    let context = mk_jkind_context env (!principal_jkind_of_type' env) in
+    (* The raw ikind crossing still drops this nonmodal dependency for some
+       abstract constructor applications, so recover the boolean from the
+       principal jkind until the solver carries it natively. *)
+    { crossing with
+      unique_implies_uncontended =
+        Jkind_axis.Unique_implies_uncontended.equal
+          (Jkind.get_unique_implies_uncontended ~context env jkind)
+          Jkind_axis.Unique_implies_uncontended.Holds
+    }
 
 type sub_or_intersect = Jkind.sub_or_intersect
 

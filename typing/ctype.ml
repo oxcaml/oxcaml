@@ -2561,6 +2561,9 @@ let estimate_type_jkind =
 let mk_jkind_context_check_principal env =
   mk_jkind_context env (type_jkind_purely_if_principal env)
 
+let () =
+  Ikind.principal_jkind_of_type' := type_jkind_purely_if_principal
+
 (* For cases where we always want Some (type_jkind_purely env ty) *)
 let mk_jkind_context_always_principal env =
   mk_jkind_context env (fun ty -> Some (type_jkind_purely env ty))
@@ -5469,14 +5472,8 @@ let crossing_of_ty env ?modalities ty =
       if !Clflags.ikinds
       then (
         let ikind_crossing = Ikind.crossing_of_type env ty in
-        let jkind_crossing = jkind_crossing () in
-        let ikind_crossing =
-          { ikind_crossing with
-            unique_implies_uncontended =
-              jkind_crossing.unique_implies_uncontended
-          }
-        in
         if debug_ikind_crossing_mismatch then (
+          let jkind_crossing = jkind_crossing () in
           if not (Crossing.equal ikind_crossing jkind_crossing)
           then
             Format.eprintf
