@@ -107,6 +107,7 @@ val link_everything : bool ref
 val custom_runtime : bool ref
 val no_check_prims : bool ref
 val bytecode_compatible_32 : bool ref
+val thunkify_cu_init : bool ref
 val output_c_object : bool ref
 val output_complete_object : bool ref
 val output_complete_executable : bool ref
