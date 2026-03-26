@@ -894,7 +894,7 @@ module type S = sig
     *)
     val partial_apply : (allowed * 'r) t -> l
 
-    (** Copies a mode variable and its submodes from generic level to the
+    (** Copies a mode variable and its children from generic level to the
         current level *)
     val instantiate :
       copy_scope:copy_scope -> current_level:int -> ('l * 'r) t -> ('l * 'r) t
