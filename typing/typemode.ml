@@ -278,6 +278,10 @@ let transl_mod_bounds annots =
       Transled_modifiers.set ~axis bounds_so_far (Some { txt = mode; loc })
     | exception Not_found -> (
       match txt with
+      | "unique_implies_uncontended" ->
+        (* Parser-only first step: accept the modifier syntax without yet
+           threading semantics through jkinds or mode crossing. *)
+        bounds_so_far
       | "everything" ->
         Transled_modifiers.
           { areality =

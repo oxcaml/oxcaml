@@ -27,78 +27,55 @@ type mutable_record = { mutable x : int; }
 type good_int : value mod unique_implies_uncontended = int
 (* CR jujacobs: Plain immutable data should satisfy this axis. *)
 [%%expect{|
-Line 1, characters 26-52:
-1 | type good_int : value mod unique_implies_uncontended = int
-                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unrecognized modifier unique_implies_uncontended.
+type good_int = int
 |}]
 
 type good_ref : value mod unique_implies_uncontended = int ref
 (* CR jujacobs: Refs should satisfy this axis. *)
 [%%expect{|
-Line 1, characters 26-52:
-1 | type good_ref : value mod unique_implies_uncontended = int ref
-                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unrecognized modifier unique_implies_uncontended.
+type good_ref = int ref
 |}]
 
 type good_mut : value mod unique_implies_uncontended = mutable_record
 (* CR jujacobs: Mutable records should satisfy this axis. *)
 [%%expect{|
-Line 1, characters 26-52:
-1 | type good_mut : value mod unique_implies_uncontended = mutable_record
-                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unrecognized modifier unique_implies_uncontended.
+type good_mut = mutable_record
 |}]
 
 type good_contended_int : value mod unique_implies_uncontended =
   int contended_modality
 (* CR jujacobs: Explicitly contended immutable data should satisfy this axis. *)
 [%%expect{|
-Line 1, characters 36-62:
-1 | type good_contended_int : value mod unique_implies_uncontended =
-                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unrecognized modifier unique_implies_uncontended.
+type good_contended_int = int contended_modality
 |}]
 
 type good_contended_ref : value mod unique_implies_uncontended =
   int ref contended_modality
 (* CR jujacobs: Explicitly contended refs should satisfy this axis. *)
 [%%expect{|
-Line 1, characters 36-62:
-1 | type good_contended_ref : value mod unique_implies_uncontended =
-                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unrecognized modifier unique_implies_uncontended.
+type good_contended_ref = int ref contended_modality
 |}]
 
 type good_contended_mut : value mod unique_implies_uncontended =
   mutable_record contended_modality
 (* CR jujacobs: Explicitly contended mutable records should satisfy this axis. *)
 [%%expect{|
-Line 1, characters 36-62:
-1 | type good_contended_mut : value mod unique_implies_uncontended =
-                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unrecognized modifier unique_implies_uncontended.
+type good_contended_mut = mutable_record contended_modality
 |}]
 
 type good_aliased_contended_ref : value mod unique_implies_uncontended =
   int ref aliased_modality contended_modality
 (* CR jujacobs: Explicitly contended aliased refs should satisfy this axis. *)
 [%%expect{|
-Line 1, characters 44-70:
-1 | type good_aliased_contended_ref : value mod unique_implies_uncontended =
-                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unrecognized modifier unique_implies_uncontended.
+type good_aliased_contended_ref = int ref aliased_modality contended_modality
 |}]
 
 type good_aliased_contended_mut : value mod unique_implies_uncontended =
   mutable_record aliased_modality contended_modality
 (* CR jujacobs: Explicitly contended aliased mutable records should satisfy this axis. *)
 [%%expect{|
-Line 1, characters 44-70:
-1 | type good_aliased_contended_mut : value mod unique_implies_uncontended =
-                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unrecognized modifier unique_implies_uncontended.
+type good_aliased_contended_mut =
+    mutable_record aliased_modality contended_modality
 |}]
 
 (*****************************************)
@@ -107,20 +84,14 @@ Error: Unrecognized modifier unique_implies_uncontended.
 type bad_ref : value mod unique_implies_uncontended = int ref aliased_modality
 (* Control: Aliased refs should not satisfy this axis. *)
 [%%expect{|
-Line 1, characters 25-51:
-1 | type bad_ref : value mod unique_implies_uncontended = int ref aliased_modality
-                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unrecognized modifier unique_implies_uncontended.
+type bad_ref = int ref aliased_modality
 |}]
 
 type bad_mut : value mod unique_implies_uncontended =
   mutable_record aliased_modality
 (* Control: Aliased mutable records should not satisfy this axis. *)
 [%%expect{|
-Line 1, characters 25-51:
-1 | type bad_mut : value mod unique_implies_uncontended =
-                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unrecognized modifier unique_implies_uncontended.
+type bad_mut = mutable_record aliased_modality
 |}]
 
 (**********************)
