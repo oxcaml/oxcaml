@@ -2427,6 +2427,15 @@ module Jkind0 = struct
         ~annotation:None ~why:(Primitive ident)
       |> mark_best
 
+    let for_expr =
+      fresh_jkind
+        { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
+          mod_bounds = Mod_bounds.for_arrow;
+          with_bounds = No_with_bounds
+        }
+        ~annotation:None ~why:(Value_creation Quoted_expression)
+      |> mark_best
+
     let for_array_argument =
       let mod_bounds =
         Mod_bounds.create Mode.Crossing.max
