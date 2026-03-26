@@ -5866,7 +5866,7 @@ let check_partial_application ~statement exp =
   let doit () =
     let ty = get_desc (expand_head exp.exp_env exp.exp_type) in
     match ty with
-    | Tarrow _ ->
+    | Tarrow _ | Tfunctor _  ->
         let rec check {exp_desc; exp_loc; exp_extra; _} =
           if List.exists (function
               | (Texp_constraint _, _, _) -> true
@@ -7166,14 +7166,24 @@ and type_expect_
       let outer_level_var () =
         newvar2 outer_level (Jkind.Builtin.any ~why:Dummy_jkind)
       in
-      let rec ret_tvar seen ty_fun =
+      let rec ret_tvar env seen ty_fun =
         let ty = expand_head env ty_fun in
         if TypeSet.mem ty seen then false else
           match get_desc ty with
             Tarrow (_l, ty_arg, ty_fun, _com) ->
               (try Ctype.unify_var env (outer_level_var ()) ty_arg
                with Unify _ -> assert false);
-              ret_tvar (TypeSet.add ty seen) ty_fun
+              ret_tvar env (TypeSet.add ty seen) ty_fun
+          | Tfunctor (_, id, package, ty_fun) ->
+              List.iter
+                (fun (_, ty) ->
+                  try Ctype.unify_var env (outer_level_var ()) ty
+                  with Unify _ -> assert false)
+                package.pack_cstrs;
+              let env, ty_fun =
+                open_tfunctor ~loc:Location.none env id package ty_fun
+              in
+              ret_tvar env (TypeSet.add ty seen) ty_fun
           | Tvar _ ->
               let v = outer_level_var () in
               let rt = get_level ty > get_level v in
@@ -7191,7 +7201,9 @@ and type_expect_
             (fun () -> type_exp env funct_expected_mode sfunct)
         in
         let ty = instance funct.exp_type in
-        let rt = wrap_trace_gadt_instances env (ret_tvar TypeSet.empty) ty in
+        let rt =
+          wrap_trace_gadt_instances env (ret_tvar env TypeSet.empty) ty
+        in
         rt, funct
       in
       let type_sfunct_args sfunct extra_args =
@@ -12470,7 +12482,7 @@ let report_literal_type_constraint const = function
 let report_partial_application = function
   | Some tr -> begin
       match get_desc tr.Errortrace.got.Errortrace.expanded with
-      | Tarrow _ ->
+      | Tarrow _ | Tfunctor _ ->
           [ Location.msg
               "@[@{<hint>Hint@}:@ This function application is partial,@ \
                maybe@ some@ arguments@ are missing.@]" ]
@@ -12733,7 +12745,7 @@ let report_error ~loc env =
       funct; func_ty; res_ty; previous_arg_loc; extra_arg_loc
     } ->
       begin match get_desc func_ty with
-        Tarrow _ ->
+        Tarrow _ | Tfunctor _ ->
           let returns_unit = match get_desc res_ty with
             | Tconstr (p, _, _) -> Path.same p Predef.path_unit
             | _ -> false

@@ -18,6 +18,9 @@ OCaml 5.4.1
 - #14626: Handle module-dependent functions in warning 16 (Reported in #14622).
   (Alistair O'Brien, review by Gabriel Scherer, report by Kate Deplaix)
 
+- #14667: enable application related warnings for module-dependent functions
+  (Florian Angeletti, review by Gabriel Scherer)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 
