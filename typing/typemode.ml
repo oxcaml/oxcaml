@@ -88,9 +88,11 @@ module Mode_axis_pair = struct
     | "unyielding" -> comonadic Yielding Unyielding
     | "stateless" -> comonadic Statefulness Stateless
     | "reading" -> comonadic Statefulness Reading
+    | "writing" -> comonadic Statefulness Writing
     | "stateful" -> comonadic Statefulness Stateful
     | "immutable" -> monadic Visibility Immutable
     | "read" -> monadic Visibility Read
+    | "write" -> monadic Visibility Write
     | "read_write" -> monadic Visibility Read_write
     | "static" -> monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
@@ -231,7 +233,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       match a with
       | Immutable -> Contended
       | Read -> Shared
-      | Read_write -> Uncontended
+      | Read_write | Write -> Uncontended
     in
     [Atom (Monadic Contention, Join_const b)]
   | Comonadic Statefulness, Meet_const a ->
@@ -239,7 +241,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       match a with
       | Stateless -> Portable
       | Reading -> Shareable
-      | Stateful -> Nonportable
+      | Stateful | Writing -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_const b)]
   | _ -> []
@@ -384,7 +386,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     | (Some _ as c), _ | c, None -> c
     | None, Some Visibility.Const.Immutable -> Some Contention.Const.Contended
     | None, Some Visibility.Const.Read -> Some Contention.Const.Shared
-    | None, Some Visibility.Const.Read_write ->
+    | None, Some Visibility.Const.(Read_write | Write) ->
       Some Contention.Const.Uncontended
   in
   (* Likewise for [portability]. *)
@@ -393,7 +395,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     | (Some _ as p), _ | p, None -> p
     | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
     | None, Some Statefulness.Const.Reading -> Some Portability.Const.Shareable
-    | None, Some Statefulness.Const.Stateful ->
+    | None, Some Statefulness.Const.(Stateful | Writing) ->
       Some Portability.Const.Nonportable
   in
   { annots with forkable; yielding; contention; portability }
