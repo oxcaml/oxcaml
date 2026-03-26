@@ -2354,7 +2354,9 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
       let uf_aliased =
         Paths.mark_aliased (Occurrence.mk loc) Aliased.Forced paths
       in
-      let uf_cases = check_uniqueness_cases ienv (Match_single paths) eff_cases in
+      let uf_cases =
+        check_uniqueness_cases ienv (Match_single paths) eff_cases
+      in
       UF.seq uf_aliased uf_cases
   in
   function
