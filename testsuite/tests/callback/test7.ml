@@ -13,6 +13,8 @@
  * OCaml (c_to_caml) to C (printf functions). Effect E is performed in the
  * callback, which does not have a handler. *)
 
+[@@@ocaml.alert "-unsafe_multidomain"]
+
 open Effect
 open Effect.Deep
 

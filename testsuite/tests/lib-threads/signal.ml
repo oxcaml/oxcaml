@@ -1,5 +1,6 @@
 (* TEST
  include systhreads;
+ flags = "-alert -unsafe_multidomain";
  readonly_files = "sigint.c";
  hassysthreads;
  not-target-windows; (* excludes mingw32/64 and msvc32/64 *)
