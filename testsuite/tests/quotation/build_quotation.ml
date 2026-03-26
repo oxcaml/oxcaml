@@ -1260,6 +1260,8 @@ Line 1, characters 17-30:
 Error: Annotating types with kinds
        is not supported inside quoted expressions,
        as seen at line 1, characters 17-30.
+|}];;
+
 (** Mode annotations **)
 
 (* Pattern constraints *)
