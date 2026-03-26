@@ -738,7 +738,16 @@ let dynamic_pat_mode pat_mode =
 
 let allocations : Typedtree.alloc_mode_r list ref = Local_store.s_ref []
 
-let reset_allocations () = allocations := []
+let allocations_args : (Typedtree.alloc_mode_l * Locality.lr) list ref
+  = Local_store.s_ref []
+
+let allocations_rets : (Typedtree.alloc_mode_l * Locality.lr) list ref
+  = Local_store.s_ref []
+
+let reset_allocations () =
+  allocations := [];
+  allocations_args := [];
+  allocations_rets := []
 
 let register_allocation_mode alloc_mode =
   allocations := alloc_mode :: !allocations
@@ -763,19 +772,23 @@ let create_allocation_mode_l_arg :
     Alloc.lr -> alloc_mode_l = fun mode ->
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode = newvar_above_if_modepoly 0 locality_mode in
-  Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
+  let alloc_mode = Typedtree.create_alloc_mode_l (alloc_mode) in
+  allocations_args := (alloc_mode, locality_mode) :: !allocations_args;
+  alloc_mode
 
 let create_allocation_mode_l_ret :
     Alloc.lr -> alloc_mode_l = fun mode ->
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode = newvar_below_if_modepoly 0 locality_mode in
-  Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
+  let alloc_mode = Typedtree.create_alloc_mode_l (alloc_mode) in
+  allocations_rets := (alloc_mode, locality_mode) :: !allocations_rets;
+  alloc_mode
 
 let create_allocation_modes (mode : Alloc.lr) =
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode,_ = Locality.newvar_below 0 locality_mode in
   let alloc_mode_l =
-    Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
+    Typedtree.create_alloc_mode_l (alloc_mode)
   in
   let alloc_mode_r =
     Typedtree.create_alloc_mode_r (Locality.disallow_left alloc_mode)
@@ -832,6 +845,16 @@ let optimise_allocations () =
       Typedtree.zap_alloc_r_to_ceil_exn mode
       |> ignore)
     !allocations;
+  List.iter
+    (fun (alloc_mode, mode) ->
+      let upper = Locality.Guts.get_ceil mode in
+      submode_alloc_mode_l_constant alloc_mode upper)
+    !allocations_args;
+  List.iter
+    (fun (alloc_mode, mode) ->
+      let lower = Locality.Guts.get_floor mode in
+      submode_constant_alloc_mode_l lower alloc_mode)
+    !allocations_rets;
   reset_allocations ()
 
 (** We keep this state which is passed as an optional argument throughout
@@ -7826,7 +7849,7 @@ and type_expect_
             Value.(of_const ~hint_comonadic:Stack_expression
               { Const.min with areality = Local })
             expected_mode;
-          Typedtree.submode_with_constant_l_err ~hint:Stack_expression
+          Typedtree.submode_constant_alloc_mode_r_err ~hint:Stack_expression
             (exp.exp_loc, Allocation) Local alloc_mode
         end
       | Texp_list_comprehension _ -> unsupported List_comprehension

@@ -4706,6 +4706,10 @@ module Locality = struct
       let floor = Guts.get_loose_floor m in
       let ceil = Guts.get_loose_ceil m in
       if Const.le ceil floor then Some ceil else None
+
+    let get_floor m = Guts.get_floor m
+
+    let get_ceil m = Guts.get_ceil m
   end
 end
 

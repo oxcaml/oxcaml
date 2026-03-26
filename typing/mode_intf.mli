@@ -374,6 +374,14 @@ module type S = sig
           a conservative result. I.e., it might return [None] for
           fully-constrained modes. *)
       val check_const_conservative : ('l * 'r) t -> Const.t option
+
+      (** Returns the lower bound of a mode. See [get_floor] in
+          [solver_intf.mli] for cautions *)
+      val get_floor : (allowed * 'r) t -> Const.t
+
+      (** Returns the upper bound of a mode. See [get_ceil] in [solver_intf.mli]
+          for cautions *)
+      val get_ceil : ('l * allowed) t -> Const.t
     end
   end
 

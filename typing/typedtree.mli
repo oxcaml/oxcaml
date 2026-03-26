@@ -111,7 +111,7 @@ val print_unique_use : Format.formatter -> unique_use -> unit
 
 type alloc_mode_r
 
-val submode_with_constant_l_err :
+val submode_constant_alloc_mode_r_err :
   ?hint:(Mode.allowed * 'r) Allowance.pos Mode_hint.const
   -> Mode_hint.pinpoint
   -> Mode.Locality.Const.t
@@ -128,11 +128,23 @@ val alloc_mode_r_legacy : alloc_mode_r
 
 type alloc_mode_l
 
+val submode_alloc_mode_l_constant :
+  ?pp:Mode_hint.pinpoint
+  -> alloc_mode_l
+  -> Mode.Locality.Const.t
+  -> unit
+
+val submode_constant_alloc_mode_l :
+  ?pp:Mode_hint.pinpoint
+  -> Mode.Locality.Const.t
+  -> alloc_mode_l
+  -> unit
+
 val zap_alloc_l_to_floor_exn : alloc_mode_l -> Mode.Locality.Const.t
 
 val print_alloc_mode_l : Format.formatter -> alloc_mode_l -> unit
 
-val create_alloc_mode_l : Mode.Locality.l -> alloc_mode_l
+val create_alloc_mode_l : Mode.Locality.lr -> alloc_mode_l
 
 val alloc_mode_l_legacy : alloc_mode_l
 
