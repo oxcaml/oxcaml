@@ -515,3 +515,15 @@ let both (type a b) (p : a expr * b expr) : <[$a * $b]> expr =
 [%%expect {|
 val both : 'a expr * 'b expr -> <[$('a) * $('b)]> expr = <fun>
 |}]
+
+(* Non-value-kinded expressions *)
+
+let x = <[ #42L ]>
+[%%expect {|
+val x : <[int64#]> expr = <[#42L]>
+|}]
+
+let x = <[ #("abc", #42L) ]>
+[%%expect {|
+val x : <[#(string * int64#)]> expr = <[#("abc", #42L)]>
+|}]

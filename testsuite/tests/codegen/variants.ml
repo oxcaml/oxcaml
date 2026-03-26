@@ -284,8 +284,8 @@ double_match:
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)
-  addq  $2, %rdi
-  movq  %rdi, (%rax)
+  leaq  2(%rdi), %rbx
+  movq  %rbx, (%rax)
 .L119:
   movq  (%rax), %rax
   movq  %rsi, 64(%r14)

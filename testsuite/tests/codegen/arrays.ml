@@ -43,8 +43,7 @@ push:
   jae   .L117
   leaq  -4(%rbx,%r12,4), %rdi
   call  caml_modify@PLT
-  movq  %r12, %rax
-  addq  $2, %rax
+  leaq  2(%r12), %rax
   addq  $8, %rsp
   ret
 .L117:

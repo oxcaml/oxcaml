@@ -6,7 +6,7 @@
 (*                 Benedikt Meurer, University of Siegen                  *)
 (*                        The OxCaml developers                           *)
 (*                                                                        *)
-(*   Copyright 2024--2025 Jane Street Group LLC                           *)
+(*   Copyright 2024--2026 Jane Street Group LLC                           *)
 (*   Copyright 2013 Institut National de Recherche en Informatique et     *)
 (*     en Automatique.                                                    *)
 (*   Copyright 2012 Benedikt Meurer.                                      *)
@@ -31,16 +31,217 @@ open! Operation
 open Linear
 open Emitaux
 module Ast = Arm64_ast.Ast
-module I = Ast.Instruction_name
-module O = Ast.DSL
-module A = Ast.DSL.Acc
-module R = Ast.Reg
 module Cond = Ast.Cond
 module Float_cond = Ast.Float_cond
 module Simd_int_cmp = Ast.Simd_int_cmp
 module Branch_cond = Ast.Branch_cond
+module A = Ast.DSL.Acc
 module D = Asm_targets.Asm_directives
+module H = Dsl_helpers
+module I = Ast.Instruction_name
+module L = Asm_targets.Asm_label
+module O = Ast.DSL
+module R = Ast.Reg
 module S = Asm_targets.Asm_symbol
+open! Int_replace_polymorphic_compare
+
+(* Emitter environment *)
+
+type gc_call =
+  { gc_lbl : L.t; (* Entry label *)
+    gc_return_lbl : L.t; (* Where to branch after GC *)
+    gc_frame_lbl : L.t (* Label of frame descriptor *)
+  }
+
+type local_realloc_call =
+  { lr_lbl : L.t;
+    lr_return_lbl : L.t;
+    lr_dbg : Debuginfo.t
+  }
+
+type stack_realloc =
+  { sc_label : L.t; (* Label of the reallocation code. *)
+    sc_return : L.t; (* Label to return to after reallocation. *)
+    sc_max_frame_size_in_bytes : int (* Size for reallocation. *)
+  }
+
+module Env : sig
+  (* Values of type [t] are mutable *)
+  type t
+
+  val create :
+    fastcode_flag:bool ->
+    num_stack_slots:int Stack_class.Tbl.t ->
+    (* The [num_stack_slots] table will be copied by this function *)
+    prologue_required:bool ->
+    contains_calls:bool ->
+    function_name:string ->
+    tailrec_entry_point:L.t option ->
+    t
+
+  val copy : t -> t
+
+  val fastcode_flag : t -> bool
+
+  val stack_offset : t -> int
+
+  val set_stack_offset : t -> int -> unit
+
+  val prologue_required : t -> bool
+
+  val contains_calls : t -> bool
+
+  val call_gc_sites : t -> gc_call list
+
+  val add_call_gc_site : t -> gc_call -> unit
+
+  val local_realloc_sites : t -> local_realloc_call list
+
+  val add_local_realloc_site : t -> local_realloc_call -> unit
+
+  val stack_realloc : t -> stack_realloc option
+
+  val set_stack_realloc : t -> stack_realloc -> unit
+
+  val function_name : t -> string
+
+  val tailrec_entry_point : t -> L.t option
+
+  val frame_size : t -> int
+
+  val slot_offset : t -> Reg.stack_location -> Stack_class.t -> int
+
+  val stack_operand :
+    t ->
+    Reg.t ->
+    [`Mem of Ast.Addressing_mode.single] Ast.Operand.t H.stack_result
+
+  val find_or_add_float32_literal : t -> int32 -> L.t
+
+  val find_or_add_float_literal : t -> int64 -> L.t
+
+  val find_or_add_vec128_literal : t -> Cmm.vec128_bits -> L.t
+
+  val float32_literals : t -> (int32 * L.t) list
+
+  val float_literals : t -> (int64 * L.t) list
+
+  val vec128_literals : t -> (Cmm.vec128_bits * L.t) list
+end = struct
+  type t =
+    { fastcode_flag : bool;
+      mutable stack_offset : int;
+      (* CR mshinwell/xclerc: [num_stack_slots] is never modified, so we could
+         avoid the copy. Maybe try to make it immutable *)
+      num_stack_slots : int Stack_class.Tbl.t;
+      prologue_required : bool;
+      contains_calls : bool;
+      mutable call_gc_sites : gc_call list;
+      mutable local_realloc_sites : local_realloc_call list;
+      mutable stack_realloc : stack_realloc option;
+      function_name : string;
+      tailrec_entry_point : L.t option;
+      float32_literals : (int32 * L.t) list ref;
+      float_literals : (int64 * L.t) list ref;
+      vec128_literals : (Cmm.vec128_bits * L.t) list ref
+    }
+
+  let create ~fastcode_flag ~num_stack_slots ~prologue_required ~contains_calls
+      ~function_name ~tailrec_entry_point =
+    { fastcode_flag;
+      stack_offset = 0;
+      num_stack_slots = Stack_class.Tbl.copy num_stack_slots;
+      prologue_required;
+      contains_calls;
+      call_gc_sites = [];
+      local_realloc_sites = [];
+      stack_realloc = None;
+      function_name;
+      tailrec_entry_point;
+      float32_literals = ref [];
+      float_literals = ref [];
+      vec128_literals = ref []
+    }
+
+  let copy t =
+    { t with
+      num_stack_slots = Stack_class.Tbl.copy t.num_stack_slots;
+      float32_literals = ref !(t.float32_literals);
+      float_literals = ref !(t.float_literals);
+      vec128_literals = ref !(t.vec128_literals)
+    }
+
+  let fastcode_flag t = t.fastcode_flag
+
+  let stack_offset t = t.stack_offset
+
+  let set_stack_offset t v = t.stack_offset <- v
+
+  let prologue_required t = t.prologue_required
+
+  let contains_calls t = t.contains_calls
+
+  let call_gc_sites t = t.call_gc_sites
+
+  let add_call_gc_site t site = t.call_gc_sites <- site :: t.call_gc_sites
+
+  let local_realloc_sites t = t.local_realloc_sites
+
+  let add_local_realloc_site t site =
+    t.local_realloc_sites <- site :: t.local_realloc_sites
+
+  let stack_realloc t = t.stack_realloc
+
+  let set_stack_realloc t v = t.stack_realloc <- Some v
+
+  let function_name t = t.function_name
+
+  let tailrec_entry_point t = t.tailrec_entry_point
+
+  let frame_size t =
+    Proc.frame_size ~stack_offset:t.stack_offset
+      ~contains_calls:t.contains_calls ~num_stack_slots:t.num_stack_slots
+
+  let slot_offset t loc stack_class =
+    let offset =
+      Proc.slot_offset loc ~stack_class ~stack_offset:t.stack_offset
+        ~fun_contains_calls:t.contains_calls
+        ~fun_num_stack_slots:t.num_stack_slots
+    in
+    match offset with
+    | Bytes_relative_to_stack_pointer n -> n
+    | Bytes_relative_to_domainstate_pointer _ ->
+      Misc.fatal_errorf "Not a stack slot"
+
+  let stack_operand t r =
+    H.stack ~stack_offset:t.stack_offset ~contains_calls:t.contains_calls
+      ~num_stack_slots:t.num_stack_slots r
+
+  let find_or_add_literal literals f =
+    match List.assoc_opt f !literals with
+    | Some lbl -> lbl
+    | None ->
+      (* CR sspies: The [Text] section here is incorrect. We should be in the
+         respective section of the literal type (i.e., 16 or 8 bytes). The code
+         below uses the [Text] section, because that is the section that we are
+         in when we emit literals in the function body. Only macOS currently
+         switches to a dedicated section. *)
+      let lbl = L.create Text in
+      literals := (f, lbl) :: !literals;
+      lbl
+
+  let find_or_add_float32_literal t f = find_or_add_literal t.float32_literals f
+
+  let find_or_add_float_literal t f = find_or_add_literal t.float_literals f
+
+  let find_or_add_vec128_literal t f = find_or_add_literal t.vec128_literals f
+
+  let float32_literals t = !(t.float32_literals)
+
+  let float_literals t = !(t.float_literals)
+
+  let vec128_literals t = !(t.vec128_literals)
+end
 
 (* CR mshinwell: maybe the following two functions should move to a new
    Cmm.Symbol module, which would include Cmm.symbol as the type "t"? *)
@@ -54,10 +255,6 @@ let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
 let symbol_of_cmm_symbol (s : Cmm.symbol) : S.t =
   S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
 
-module L = Asm_targets.Asm_label
-open! Int_replace_polymorphic_compare
-module H = Dsl_helpers
-
 (* Scratch FP/SIMD register 7 in various widths. - S7: used for float32
    load/store conversions - D7, V8B_7, B7: used for popcnt emulation when CSSC
    is unavailable *)
@@ -68,10 +265,6 @@ let reg_d7 = O.reg_op (R.reg_d 7)
 let reg_v8b_7 = O.reg_op (R.reg_v8b 7)
 
 let reg_b7 = O.reg_op (R.reg_b 7)
-
-(* Tradeoff between code size and code speed *)
-
-let fastcode_flag = ref true
 
 (* Names for special regs *)
 
@@ -113,40 +306,6 @@ let global_maybe_protected sym =
   D.global sym;
   if (not macosx) && !Oxcaml_flags.symbol_visibility_protected
   then D.protected sym
-
-(* Layout of the stack frame *)
-
-let stack_offset = ref 0
-
-let num_stack_slots = Stack_class.Tbl.make 0
-
-let prologue_required = ref false
-
-let contains_calls = ref false
-
-let initial_stack_offset () =
-  Proc.initial_stack_offset ~contains_calls:!contains_calls ~num_stack_slots
-
-let frame_size () =
-  Proc.frame_size ~stack_offset:!stack_offset ~contains_calls:!contains_calls
-    ~num_stack_slots
-
-let slot_offset loc stack_class =
-  let offset =
-    Proc.slot_offset loc ~stack_class ~stack_offset:!stack_offset
-      ~fun_contains_calls:!contains_calls ~fun_num_stack_slots:num_stack_slots
-  in
-  match offset with
-  | Bytes_relative_to_stack_pointer n -> n
-  | Bytes_relative_to_domainstate_pointer _ ->
-    Misc.fatal_errorf "Not a stack slot"
-
-(* Local wrapper for stack that provides the emit.ml-local values. Returns a
-   stack_result indicating whether the offset fits in immediate encoding or
-   requires a multi-instruction sequence. *)
-let stack r =
-  H.stack ~stack_offset:!stack_offset ~contains_calls:!contains_calls
-    ~num_stack_slots r
 
 (* Convenience functions for symbols and labels *)
 let symbol ?offset reloc s = O.symbol (Ast.Symbol.create_symbol reloc ?offset s)
@@ -554,7 +713,7 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
 
 (* Record live pointers at call points *)
 
-let record_frame_label live dbg =
+let record_frame_label env live dbg =
   let encode_reg_offset n = (n lsl 1) + 1 in
   let lbl = Cmm.new_label () in
   let live_offset = ref [] in
@@ -564,7 +723,8 @@ let record_frame_label live dbg =
         live_offset := encode_reg_offset (Regs.index_in_class r) :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
-          := slot_offset s (Stack_class.of_machtype reg.typ) :: !live_offset
+          := Env.slot_offset env s (Stack_class.of_machtype reg.typ)
+             :: !live_offset
       | { typ = Addr; _ } as r ->
         Misc.fatal_errorf "bad GC root %a" Printreg.reg r
       | { typ = Valx2; _ } as r ->
@@ -578,43 +738,29 @@ let record_frame_label live dbg =
     live;
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of linear labels. *)
-  record_frame_descr ~label:lbl ~frame_size:(frame_size ())
+  record_frame_descr ~label:lbl ~frame_size:(Env.frame_size env)
     ~live_offset:!live_offset dbg;
   label_to_asm_label ~section:Text lbl
 
-let record_frame live dbg =
-  let lbl = record_frame_label live dbg in
+let record_frame env live dbg =
+  let lbl = record_frame_label env live dbg in
   D.define_label lbl
 
-(* Record calls to the GC -- we've moved them out of the way *)
-
-type gc_call =
-  { gc_lbl: L.t;                      (* Entry label *)
-    gc_return_lbl: L.t;               (* Where to branch after GC *)
-    gc_frame_lbl: L.t }               (* Label of frame descriptor *)
-[@@ocamlformat "disable"]
-
-let call_gc_sites = ref ([] : gc_call list)
-
-let emit_call_gc gc =
-  labelled_ins1 gc.gc_lbl BL (runtime_function S.Predef.caml_call_gc);
-  labelled_ins1 gc.gc_frame_lbl B (local_label gc.gc_return_lbl)
-
-(* Record calls to local stack reallocation *)
-
-type local_realloc_call =
-  { lr_lbl : L.t;
-    lr_return_lbl : L.t;
-    lr_dbg : Debuginfo.t
-  }
-
-let local_realloc_sites = ref ([] : local_realloc_call list)
+(* Misc debug info emission helpers *)
 
 let file_emitter ~file_num ~file_name =
   D.file ~file_num:(Some file_num) ~file_name
 
 let emit_debug_info ?discriminator dbg =
   Emitaux.emit_debug_info_gen ?discriminator dbg file_emitter D.loc
+
+(* Record calls to the GC -- we've moved them out of the way *)
+
+let emit_call_gc gc =
+  labelled_ins1 gc.gc_lbl BL (runtime_function S.Predef.caml_call_gc);
+  labelled_ins1 gc.gc_frame_lbl B (local_label gc.gc_return_lbl)
+
+(* Record calls to local stack reallocation *)
 
 let emit_local_realloc lr =
   D.define_label lr.lr_lbl;
@@ -624,18 +770,8 @@ let emit_local_realloc lr =
 
 (* Local stack reallocation *)
 
-type stack_realloc =
-  { sc_label : L.t; (* Label of the reallocation code. *)
-    sc_return : L.t; (* Label to return to after reallocation. *)
-    sc_max_frame_size_in_bytes : int (* Size for reallocation. *)
-  }
-
-let stack_realloc = ref (None : stack_realloc option)
-
-let clear_stack_realloc () = stack_realloc := None
-
-let emit_stack_realloc () =
-  match !stack_realloc with
+let emit_stack_realloc env =
+  match Env.stack_realloc env with
   | None -> ()
   | Some { sc_label; sc_return; sc_max_frame_size_in_bytes } ->
     D.define_label sc_label;
@@ -707,13 +843,6 @@ let emit_intconst dst n =
           (O.imm_sixteen_of_nativeint nf)
           (O.optional_lsl_by_multiple_of_16_bits p);
         List.iter (emit_movk dst) l
-
-let num_instructions_for_intconst n =
-  if Arm64_ast.Logical_immediates.is_logical_immediate n
-  then 1
-  else
-    let dz = decompose_int 0x0000n n and dn = decompose_int 0xFFFFn n in
-    max 1 (min (List.length dz) (List.length dn))
 
 (* Recognize float constants appropriate for FMOV dst, #fpimm instruction: "a
    normalized binary floating point encoding with 1 sign bit, 4 bits of fraction
@@ -795,8 +924,8 @@ let emit_str_sp_offset reg offset = emit_load_store_sp_offset STR reg offset
 
 (* Generic load/store with stack register that handles large offsets. Works with
    any instruction (LDR, STR, LDR_simd_and_fp, STR_simd_and_fp). *)
-let emit_stack_load_store instr reg (r : Reg.t) =
-  match stack r with
+let emit_stack_load_store env instr reg (r : Reg.t) =
+  match Env.stack_operand env r with
   | Stack_operand operand -> A.ins2 instr reg operand
   | Stack_large_offset_sp { bytes } ->
     A.ins_mov_from_sp ~dst:reg_x_tmp1;
@@ -807,51 +936,26 @@ let emit_stack_load_store instr reg (r : Reg.t) =
     emit_addimm reg_x_tmp1 reg_x_tmp1 bytes;
     A.ins2 instr reg (H.mem reg_tmp1_base)
 
-let emit_stack_ldr reg r = emit_stack_load_store LDR reg r
+let emit_stack_ldr env reg r = emit_stack_load_store env LDR reg r
 
-let emit_stack_str reg r = emit_stack_load_store STR reg r
+let emit_stack_str env reg r = emit_stack_load_store env STR reg r
 
-let emit_stack_ldr_simd_and_fp reg r =
-  emit_stack_load_store LDR_simd_and_fp reg r
+let emit_stack_ldr_simd_and_fp env reg r =
+  emit_stack_load_store env LDR_simd_and_fp reg r
 
-let emit_stack_str_simd_and_fp reg r =
-  emit_stack_load_store STR_simd_and_fp reg r
-
-(* Name of current function *)
-let function_name = ref ""
-
-(* Entry point for tail recursive calls *)
-let tailrec_entry_point = ref None
-
-(* Pending floating-point literals *)
-let float32_literals = ref ([] : (int32 * L.t) list)
-
-let float_literals = ref ([] : (int64 * L.t) list)
-
-let vec128_literals = ref ([] : (Cmm.vec128_bits * L.t) list)
+let emit_stack_str_simd_and_fp env reg r =
+  emit_stack_load_store env STR_simd_and_fp reg r
 
 (* Label a floating-point literal *)
-let add_literal p f =
-  try List.assoc f !p
-  with Not_found ->
-    (* CR sspies: The [Text] section here is incorrect. We should be in the
-       respective section of the literal type (i.e., 16 or 8 bytes). The code
-       below uses the [Text] section, because that is the section that we are in
-       when we emit literals in the function body. Only macOS currently switches
-       to a dedicated section. *)
-    let lbl = L.create Text in
-    p := (f, lbl) :: !p;
-    lbl
+let float32_literal env f = Env.find_or_add_float32_literal env f
 
-let float32_literal f = add_literal float32_literals f
+let float_literal env f = Env.find_or_add_float_literal env f
 
-let float_literal f = add_literal float_literals f
-
-let vec128_literal f = add_literal vec128_literals f
+let vec128_literal env f = Env.find_or_add_vec128_literal env f
 
 (* Emit all pending literals *)
-let emit_literals p align emit_literal =
-  if not (Misc.Stdlib.List.is_empty !p)
+let emit_literals_list literals align emit_literal =
+  if not (Misc.Stdlib.List.is_empty literals)
   then (
     if macosx
     then
@@ -871,8 +975,7 @@ let emit_literals p align emit_literal =
        the section mechanism. *)
     D.unsafe_set_internal_section_ref Text;
     D.align ~fill:Nop ~bytes:align;
-    List.iter emit_literal !p;
-    p := [])
+    List.iter emit_literal literals)
 
 let emit_float32_literal (f, lbl) =
   D.define_label lbl;
@@ -889,11 +992,11 @@ let emit_vec128_literal (({ word0; word1 } : Cmm.vec128_bits), lbl) =
   D.float64_from_bits word0;
   D.float64_from_bits word1
 
-let emit_literals () =
+let emit_literals env =
   (* Align float32 literals to [size_float]=8 bytes, not 4. *)
-  emit_literals float32_literals size_float emit_float32_literal;
-  emit_literals float_literals size_float emit_float_literal;
-  emit_literals vec128_literals size_vec128 emit_vec128_literal
+  emit_literals_list (Env.float32_literals env) size_float emit_float32_literal;
+  emit_literals_list (Env.float_literals env) size_float emit_float_literal;
+  emit_literals_list (Env.vec128_literals env) size_vec128 emit_vec128_literal
 
 (* Emit code to load the address of a symbol *)
 
@@ -929,329 +1032,6 @@ let emit_load_symbol_addr dst s =
       (symbol (Needs_reloc PAGE_OFF) s)
       O.optional_none)
 
-(* The following functions are used for calculating the sizes of the call GC and
-   bounds check points emitted out-of-line from the function body. See
-   branch_relaxation.mli. *)
-
-let num_call_gc_points instr =
-  let rec loop instr call_gc =
-    match instr.desc with
-    | Lend -> call_gc
-    | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag ->
-      loop instr.next (call_gc + 1)
-    | Lop Poll -> loop instr.next (call_gc + 1)
-    (* The following four should never be seen, since this function is run
-       before branch relaxation. *)
-    | Lop (Specific (Ifar_alloc _)) | Lop (Specific Ifar_poll) -> assert false
-    | Lop (Alloc { mode = Local | Heap; _ })
-    | Lop
-        (Specific
-           ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
-           | Inegmulsubf | Isqrtf | Imove32
-           | Ishiftarith (_, _)
-           | Ibswap _ | Isignext _ | Isimd _ ))
-    | Lop
-        ( Move | Spill | Reload | Dummy_use | Opaque | Pause | Begin_region
-        | End_region | Dls_get | Tls_get | Domain_index | Const_int _
-        | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-        | Stackoffset _ | Load _
-        | Store (_, _, _)
-        | Intop _ | Int128op _
-        | Intop_imm (_, _)
-        | Intop_atomic _
-        | Floatop (_, _)
-        | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Name_for_debugger _ )
-    | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-    | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
-    | Lcondbranch (_, _)
-    | Lcondbranch3 (_, _, _)
-    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-    | Lstackcheck _ ->
-      loop instr.next call_gc
-    | Lop (Const_vec256 _ | Const_vec512 _) ->
-      Misc.fatal_error "arm64: got 256/512 bit vector"
-    | Lop (Specific (Illvm_intrinsic intr)) ->
-      Misc.fatal_errorf
-        "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
-  in
-  loop instr 0
-
-let max_out_of_line_code_offset ~num_call_gc =
-  if num_call_gc < 1
-  then 0
-  else
-    let size_of_call_gc = 2 in
-    let size_of_last_thing = size_of_call_gc in
-    let total_size = size_of_call_gc * num_call_gc in
-    let max_offset = total_size - size_of_last_thing in
-    assert (max_offset >= 0);
-    max_offset
-
-module BR = Branch_relaxation.Make (struct
-  (* CR-someday mshinwell: B and BL have +/- 128Mb ranges; for the moment we
-     assume we will never exceed this. It would seem to be most likely to occur
-     for branches between functions; in this case, the linker should be able to
-     insert veneers anyway. (See section 4.6.7 of the document "ELF for the ARM
-     64-bit architecture (AArch64)".) *)
-
-  type distance = int
-
-  module Cond_branch = struct
-    type t =
-      | TB
-      | CB
-      | Bcc
-
-    let all = [TB; CB; Bcc]
-
-    (* AArch64 instructions are 32 bits wide, so [distance] in this module means
-       units of 32-bit words. *)
-    let max_displacement = function
-      | TB -> 32 * 1024 / 4 (* +/- 32Kb *)
-      | CB | Bcc -> 1 * 1024 * 1024 / 4 (* +/- 1Mb *)
-
-    let classify_instr = function
-      | Lop (Alloc _) | Lop Poll -> Some Bcc
-      (* The various "far" variants in [specific_operation] don't need to return
-         [Some] here, since their code sequences never contain any conditional
-         branches that might need relaxing. *)
-      | Lcondbranch (Itruetest, _) | Lcondbranch (Ifalsetest, _) -> Some CB
-      | Lcondbranch (Iinttest _, _)
-      | Lcondbranch (Iinttest_imm _, _)
-      | Lcondbranch (Ifloattest _, _) ->
-        Some Bcc
-      | Lcondbranch (Ioddtest, _) | Lcondbranch (Ieventest, _) -> Some TB
-      | Lcondbranch3 _ -> Some Bcc
-      | Lop
-          ( Specific _ | Move | Spill | Reload | Dummy_use | Opaque
-          | Begin_region | Pause | End_region | Dls_get | Tls_get | Domain_index
-          | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-          | Const_vec128 _ | Stackoffset _ | Load _
-          | Store (_, _, _)
-          | Intop _ | Int128op _
-          | Intop_imm (_, _)
-          | Intop_atomic _
-          | Floatop (_, _)
-          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-          | Name_for_debugger _ )
-      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
-      | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
-      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-      | Lstackcheck _ ->
-        None
-      | Lop (Const_vec256 _ | Const_vec512 _) ->
-        Misc.fatal_error "arm64: got 256/512 bit vector"
-  end
-
-  let offset_pc_at_branch = 0
-
-  let prologue_size () =
-    (if initial_stack_offset () > 0 then 2 else 0)
-    + if !contains_calls then 1 else 0
-
-  let epilogue_size () = if !contains_calls then 3 else 2
-
-  let memory_access_size (memory_chunk : Cmm.memory_chunk) =
-    match memory_chunk with
-    | Single { reg = Float64 } -> 2
-    | Single { reg = Float32 } -> 1
-    | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Double
-    | Onetwentyeight_unaligned | Onetwentyeight_aligned ->
-      1
-    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-    | Fivetwelve_unaligned ->
-      Misc.fatal_error "arm64: got 256/512 bit vector"
-
-  let instr_size instr =
-    match instr.Linear.desc with
-    | Lend -> 0
-    | Lprologue -> prologue_size ()
-    | Lepilogue_open -> epilogue_size ()
-    | Lepilogue_close -> 0
-    | Lop (Move | Spill | Reload) -> 1
-    | Lop Dummy_use -> 0
-    | Lop (Const_int n) -> num_instructions_for_intconst n
-    | Lop (Const_float32 _) -> 2
-    | Lop (Const_float _) -> 2
-    | Lop (Const_vec128 _) -> 2
-    | Lop (Const_vec256 _ | Const_vec512 _) ->
-      Misc.fatal_error "arm64: got 256/512 bit vector"
-    | Lop (Const_symbol _) -> 2
-    | Lop (Intop_atomic _) ->
-      Misc.fatal_errorf
-        "emit_instr: builtins are not yet translated to atomics: %a"
-        Printlinear.instr instr
-    | Lcall_op Lcall_ind -> 1
-    | Lcall_op (Lcall_imm _) -> 1
-    | Lcall_op Ltailcall_ind -> epilogue_size ()
-    | Lcall_op (Ltailcall_imm { func; _ }) ->
-      if String.equal func.sym_name !function_name then 1 else epilogue_size ()
-    | Lcall_op
-        (Lextcall
-           { alloc;
-             stack_ofs;
-             stack_align = _;
-             func = _;
-             ty_res = _;
-             ty_args = _;
-             returns = _
-           }) ->
-      if Config.runtime5 && stack_ofs > 0 then 5 else if alloc then 3 else 5
-    | Lop (Stackoffset _) -> 2
-    | Lop (Load { memory_chunk; addressing_mode; is_atomic; mutability = _ }) ->
-      let based = match addressing_mode with Iindexed _ -> 0 | Ibased _ -> 1
-      and barrier = if is_atomic then 1 else 0
-      and single = memory_access_size memory_chunk in
-      based + barrier + single
-    | Lop (Store (memory_chunk, addressing_mode, assignment)) ->
-      let based = match addressing_mode with Iindexed _ -> 0 | Ibased _ -> 1
-      and barrier =
-        match memory_chunk, assignment with
-        | (Word_int | Word_val), true -> 1
-        | (Word_int | Word_val), false -> 0
-        | ( ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-            | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
-            | Onetwentyeight_unaligned | Onetwentyeight_aligned ),
-            _ ) ->
-          0
-        | ( ( Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-            | Fivetwelve_unaligned ),
-            _ ) ->
-          Misc.fatal_error "arm64: got 256/512 bit vector"
-      and single = memory_access_size memory_chunk in
-      based + barrier + single
-    | Lop (Alloc { mode = Local; _ }) -> 9
-    | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag -> 5
-    | Lop (Specific (Ifar_alloc _)) when !fastcode_flag -> 6
-    | Lop Poll -> 3
-    | Lop Pause -> 1
-    | Lop (Specific Ifar_poll) -> 4
-    | Lop (Alloc { mode = Heap; bytes = num_bytes; _ })
-    | Lop (Specific (Ifar_alloc { bytes = num_bytes; _ })) -> (
-      match num_bytes with
-      | 16 | 24 | 32 -> 1
-      | _ -> 1 + num_instructions_for_intconst (Nativeint.of_int num_bytes))
-    | Lop (Csel _) -> 4
-    | Lop (Begin_region | End_region) -> 1
-    | Lop (Intop (Icomp _)) -> 2
-    | Lop (Floatop (Float64, Icompf _)) -> 2
-    | Lop (Floatop (Float32, Icompf _)) -> 2
-    | Lop (Intop_imm (Icomp _, _)) -> 2
-    | Lop (Int128op (Iadd128 | Isub128 | Imul64 _)) -> 2
-    | Lop (Intop Imod) -> 2
-    | Lop (Intop (Imulh _)) -> 1
-    | Lop (Intop (Iclz _)) -> 1
-    | Lop (Intop (Ictz _)) -> if !Arch.feat_cssc then 1 else 2
-    | Lop (Intop Ipopcnt) -> if !Arch.feat_cssc then 1 else 4
-    | Lop
-        (Intop
-           (Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr))
-      ->
-      1
-    | Lop
-        (Intop_imm
-           ( ( Iadd | Isub | Imul | Idiv | Imod | Imulh _ | Iand | Ior | Ixor
-             | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ),
-             _ )) ->
-      1
-    | Lop (Floatop (Float64, (Iabsf | Inegf))) -> 1
-    | Lop (Floatop (Float32, (Iabsf | Inegf))) -> 1
-    | Lop (Specific Isqrtf) -> 1
-    | Lop
-        (Reinterpret_cast
-           (Value_of_int | Int_of_value | Float_of_int64 | Int64_of_float)) ->
-      1
-    | Lop
-        (Reinterpret_cast
-           ( Float32_of_float | Float_of_float32 | Float32_of_int32
-           | Int32_of_float32 )) ->
-      1
-    | Lop (Reinterpret_cast (V128_of_vec Vec128)) -> 1
-    | Lop
-        (Reinterpret_cast
-           (V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _)) ->
-      Misc.fatal_error "arm64: got 256/512 bit vector"
-    | Lop (Static_cast (Float_of_int Float64 | Int_of_float Float64)) -> 1
-    | Lop
-        (Static_cast
-           ( Float_of_int Float32
-           | Int_of_float Float32
-           | Float_of_float32 | Float32_of_float )) ->
-      1
-    | Lop (Static_cast (Scalar_of_v128 Float16x8 | V128_of_scalar Float16x8)) ->
-      Misc.fatal_error "float16 scalar type not supported"
-    | Lop (Static_cast (Scalar_of_v128 (Int8x16 | Int16x8))) -> 2
-    | Lop
-        (Static_cast
-           (Scalar_of_v128 (Int32x4 | Int64x2 | Float32x4 | Float64x2))) ->
-      1
-    | Lop (Static_cast (V128_of_scalar _)) -> 1
-    | Lop
-        (Static_cast
-           ( V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _
-           | Scalar_of_v512 _ )) ->
-      Misc.fatal_error "arm64: got 256/512 bit vector"
-    | Lop (Floatop (Float64, (Iaddf | Isubf | Imulf | Idivf))) -> 1
-    | Lop (Floatop (Float32, (Iaddf | Isubf | Imulf | Idivf))) -> 1
-    | Lop (Specific Inegmulf) -> 1
-    | Lop Opaque -> 0
-    | Lop (Specific (Imuladdf | Inegmuladdf | Imulsubf | Inegmulsubf)) -> 1
-    | Lop (Specific (Ishiftarith _)) -> 1
-    | Lop (Specific (Imuladd | Imulsub)) -> 1
-    | Lop (Specific (Ibswap { bitwidth = Sixteen })) -> 2
-    | Lop (Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })) -> 1
-    | Lop (Specific Imove32) -> 1
-    | Lop (Specific (Isignext _)) -> 1
-    | Lop (Name_for_debugger _) -> 0
-    | Lcall_op (Lprobe _) ->
-      Misc.fatal_error "Optimized probes not supported on arm64."
-    | Lop (Probe_is_enabled _) -> 3
-    | Lop Dls_get -> 1
-    | Lop Tls_get -> 1
-    | Lop Domain_index -> 1
-    | Lreloadretaddr -> 0
-    | Lreturn -> epilogue_size ()
-    | Llabel _ -> 0
-    | Lbranch _ -> 1
-    | Lcondbranch (tst, _) -> (
-      match tst with
-      | Itruetest -> 1
-      | Ifalsetest -> 1
-      | Iinttest _ -> 2
-      | Iinttest_imm _ -> 2
-      | Ifloattest _ -> 2
-      | Ioddtest -> 1
-      | Ieventest -> 1)
-    | Lcondbranch3 (lbl0, lbl1, lbl2) -> (
-      1
-      + (match lbl0 with None -> 0 | Some _ -> 1)
-      + (match lbl1 with None -> 0 | Some _ -> 1)
-      + match lbl2 with None -> 0 | Some _ -> 1)
-    | Lswitch jumptbl -> 3 + Array.length jumptbl
-    | Lentertrap -> 0
-    | Ladjust_stack_offset _ -> 0
-    | Lpushtrap _ -> 4
-    | Lpoptrap _ -> 1
-    | Lraise k -> (
-      match k with
-      | Lambda.Raise_regular -> 1
-      | Lambda.Raise_reraise -> 1
-      | Lambda.Raise_notrace -> 4)
-    | Lstackcheck _ -> 5
-    | Lop (Specific (Isimd simd)) ->
-      A.with_measuring ~f:(fun () -> simd_instr simd instr)
-    | Lop (Specific (Illvm_intrinsic intr)) ->
-      Misc.fatal_errorf
-        "Emit.size:Unexpected llvm_intrinsic %s: not using LLVM backend" intr
-
-  let relax_poll () = Lop (Specific Ifar_poll)
-
-  let relax_allocation ~num_bytes ~dbginfo =
-    Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
-end)
-
 let cond_for_float_comparison : Cmm.float_comparison -> Float_cond.t = function
   | CFeq -> EQ
   | CFneq -> NE
@@ -1279,7 +1059,7 @@ let cond_for_cset_for_float_comparison : Cmm.float_comparison -> Cond.t =
 
 (* Output the assembly code for an allocation. *)
 
-let assembly_code_for_local_allocation i ~n =
+let assembly_code_for_local_allocation env i ~n =
   let r = H.reg_x i.res.(0) in
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_limit);
   A.ins2 LDR r (H.domainstate_field Domain_local_sp);
@@ -1293,11 +1073,10 @@ let assembly_code_for_local_allocation i ~n =
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_top);
   A.ins4 ADD_shifted_register r r reg_x_tmp1 O.optional_none;
   A.ins4 ADD_immediate r r (O.imm 8) O.optional_none;
-  local_realloc_sites
-    := { lr_lbl; lr_dbg = i.dbg; lr_return_lbl } :: !local_realloc_sites
+  Env.add_local_realloc_site env { lr_lbl; lr_dbg = i.dbg; lr_return_lbl }
 
-let assembly_code_for_fast_heap_allocation i ~n ~far ~dbginfo =
-  let gc_frame_lbl = record_frame_label i.live (Dbg_alloc dbginfo) in
+let assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg =
+  (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
   let gc_return_lbl = L.create Text in
   let gc_lbl = L.create Text in
   (* n is at most Max_young_whsize * 8, i.e. currently 0x808, so it is
@@ -1313,13 +1092,19 @@ let assembly_code_for_fast_heap_allocation i ~n ~far ~dbginfo =
      A.ins1 (B_cond (Branch_cond.Int CS)) (local_label lbl);
      A.ins1 B (local_label gc_lbl);
      D.define_label lbl);
-  labelled_ins4 gc_return_lbl ADD_immediate
-    (H.reg_x i.res.(0))
-    reg_x_alloc_ptr (O.imm 8) O.optional_none;
-  call_gc_sites := { gc_lbl; gc_return_lbl; gc_frame_lbl } :: !call_gc_sites
+  labelled_ins4 gc_return_lbl ADD_immediate res_reg reg_x_alloc_ptr (O.imm 8)
+    O.optional_none;
+  gc_lbl, gc_return_lbl
 
-let assembly_code_for_slow_heap_allocation i ~n ~dbginfo =
-  let lbl_frame = record_frame_label i.live (Dbg_alloc dbginfo) in
+let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
+  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc dbginfo) in
+  let gc_lbl, gc_return_lbl =
+    assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg:(H.reg_x i.res.(0))
+  in
+  Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
+
+let assembly_code_for_slow_heap_allocation env i ~n ~dbginfo =
+  let lbl_frame = record_frame_label env i.live (Dbg_alloc dbginfo) in
   (match n with
   | 16 -> A.ins1 BL (runtime_function S.Predef.caml_alloc1)
   | 24 -> A.ins1 BL (runtime_function S.Predef.caml_alloc2)
@@ -1331,17 +1116,17 @@ let assembly_code_for_slow_heap_allocation i ~n ~dbginfo =
     (H.reg_x i.res.(0))
     reg_x_alloc_ptr (O.imm 8) O.optional_none
 
-let assembly_code_for_allocation i ~local ~n ~far ~dbginfo =
+let assembly_code_for_allocation env i ~local ~n ~far ~dbginfo =
   if local
-  then assembly_code_for_local_allocation i ~n
-  else if !fastcode_flag
-  then assembly_code_for_fast_heap_allocation i ~n ~far ~dbginfo
-  else assembly_code_for_slow_heap_allocation i ~n ~dbginfo
+  then assembly_code_for_local_allocation env i ~n
+  else if Env.fastcode_flag env
+  then assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo
+  else assembly_code_for_slow_heap_allocation env i ~n ~dbginfo
 
 (* Output the assembly code for a poll. *)
 
-let assembly_code_for_poll i ~far ~return_label =
-  let gc_frame_lbl = record_frame_label i.live (Dbg_alloc []) in
+let assembly_code_for_poll0 ~far ~return_label =
+  (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
   let gc_lbl = L.create Text in
   let gc_return_lbl =
     match return_label with None -> L.create Text | Some lbl -> lbl
@@ -1368,7 +1153,12 @@ let assembly_code_for_poll i ~far ~return_label =
        A.ins1 (B_cond (Branch_cond.Int LS)) (local_label lbl);
        A.ins1 B (local_label return_label);
        labelled_ins1 lbl B (local_label gc_lbl));
-  call_gc_sites := { gc_lbl; gc_return_lbl; gc_frame_lbl } :: !call_gc_sites
+  gc_lbl, gc_return_lbl
+
+let assembly_code_for_poll env i ~far ~return_label =
+  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc []) in
+  let gc_lbl, gc_return_lbl = assembly_code_for_poll0 ~far ~return_label in
+  Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
@@ -1408,7 +1198,7 @@ let emit_load_literal dst lbl =
     Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
       Printreg.reg dst
 
-let move_between_distinct_locs (src : Reg.t) (dst : Reg.t) =
+let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
   match src.typ, src.loc, dst.typ, dst.loc with
   | Float, Reg _, Float, Reg _ -> A.ins2 FMOV_fp (H.reg_d dst) (H.reg_d src)
   | Float32, Reg _, Float32, Reg _ -> A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
@@ -1418,20 +1208,22 @@ let move_between_distinct_locs (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_error "arm64: got 256/512 bit vector"
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
-  | Float, Reg _, Float, Stack _ -> emit_stack_str_simd_and_fp (H.reg_d src) dst
+  | Float, Reg _, Float, Stack _ ->
+    emit_stack_str_simd_and_fp env (H.reg_d src) dst
   | Float32, Reg _, Float32, Stack _ ->
-    emit_stack_str_simd_and_fp (H.reg_s src) dst
+    emit_stack_str_simd_and_fp env (H.reg_s src) dst
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
-    emit_stack_str_simd_and_fp (H.reg_q src) dst
+    emit_stack_str_simd_and_fp env (H.reg_q src) dst
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
-    emit_stack_str (H.reg_x src) dst
-  | Float, Stack _, Float, Reg _ -> emit_stack_ldr_simd_and_fp (H.reg_d dst) src
+    emit_stack_str env (H.reg_x src) dst
+  | Float, Stack _, Float, Reg _ ->
+    emit_stack_ldr_simd_and_fp env (H.reg_d dst) src
   | Float32, Stack _, Float32, Reg _ ->
-    emit_stack_ldr_simd_and_fp (H.reg_s dst) src
+    emit_stack_ldr_simd_and_fp env (H.reg_s dst) src
   | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
-    emit_stack_ldr_simd_and_fp (H.reg_q dst) src
+    emit_stack_ldr_simd_and_fp env (H.reg_q dst) src
   | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
-    emit_stack_ldr (H.reg_x dst) src
+    emit_stack_ldr env (H.reg_x dst) src
   | _, Stack _, _, Stack _ ->
     Misc.fatal_errorf "Illegal move between stack slots (%a to %a)\n"
       Printreg.reg src Printreg.reg dst
@@ -1448,11 +1240,11 @@ let move_between_distinct_locs (src : Reg.t) (dst : Reg.t) =
       "Illegal move between registers of differing types (%a to %a)\n"
       Printreg.reg src Printreg.reg dst
 
-let move src dst =
+let move env src dst =
   let distinct = not (Reg.same_loc src dst) in
-  if distinct then move_between_distinct_locs src dst
+  if distinct then move_between_distinct_locs env src dst
 
-let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
+let emit_reinterpret_cast env (cast : Cmm.reinterpret_cast) i =
   let src = i.arg.(0) in
   let dst = i.res.(0) in
   let distinct = not (Reg.same_loc src dst) in
@@ -1483,7 +1275,7 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
     then A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
   | V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
-  | Int_of_value | Value_of_int -> move src dst
+  | Int_of_value | Value_of_int -> move env src dst
 
 let emit_static_cast (cast : Cmm.static_cast) i =
   let dst = i.res.(0) in
@@ -1527,34 +1319,59 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   | V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
 
+let emit_branch lbl =
+  let lbl = label_to_asm_label ~section:Text lbl in
+  A.ins1 B (local_label lbl)
+
+let emit_condbranch arg tst lbl =
+  let lbl = label_to_asm_label ~section:Text lbl |> local_label in
+  match tst with
+  | Itruetest -> A.ins2 CBNZ (H.reg_x arg.(0)) lbl
+  | Ifalsetest -> A.ins2 CBZ (H.reg_x arg.(0)) lbl
+  | Iinttest cmp ->
+    A.ins_cmp_reg (H.reg_x arg.(0)) (H.reg_x arg.(1)) O.optional_none;
+    A.ins1 (B_cond (Int (cond_for_comparison cmp))) lbl
+  | Iinttest_imm (cmp, n) ->
+    emit_cmpimm (H.reg_x arg.(0)) n;
+    A.ins1 (B_cond (Int (cond_for_comparison cmp))) lbl
+  | Ifloattest (Float64, cmp) ->
+    A.ins2 FCMP (H.reg_d arg.(0)) (H.reg_d arg.(1));
+    A.ins1 (B_cond (Float (cond_for_float_comparison cmp))) lbl
+  | Ifloattest (Float32, cmp) ->
+    let cond = cond_for_float_comparison cmp in
+    A.ins2 FCMP (H.reg_s arg.(0)) (H.reg_s arg.(1));
+    A.ins1 (B_cond (Float cond)) lbl
+  | Ioddtest -> A.ins3 TBNZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
+  | Ieventest -> A.ins3 TBZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
+
 (* Output the assembly code for an instruction *)
 
-let emit_instr i =
+let emit_instr env i =
   emit_debug_info i.dbg;
   match i.desc with
   | Lend -> ()
   | Lprologue ->
-    assert !prologue_required;
-    let n = frame_size () in
+    assert (Env.prologue_required env);
+    let n = Env.frame_size env in
     if n > 0 then emit_stack_adjustment (-n);
-    if !contains_calls
+    if Env.contains_calls env
     then (
       D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
       emit_str_sp_offset O.lr (n - 8))
   | Lepilogue_open ->
-    let n = frame_size () in
-    if !contains_calls then emit_ldr_sp_offset O.lr (n - 8);
+    let n = Env.frame_size env in
+    if Env.contains_calls env then emit_ldr_sp_offset O.lr (n - 8);
     if n > 0 then emit_stack_adjustment n
   | Lepilogue_close ->
-    let n = frame_size () in
+    let n = Env.frame_size env in
     if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Intop_atomic _) ->
     Misc.fatal_errorf
       "emit_instr: builtins are not yet translated to atomics: %a"
       Printlinear.instr i
-  | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
+  | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast env cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
-  | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
+  | Lop (Move | Spill | Reload) -> move env i.arg.(0) i.res.(0)
   | Lop Dummy_use -> ()
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
@@ -1562,8 +1379,8 @@ let emit_instr i =
     then
       match src.loc, dst.loc with
       | Reg _, Reg _ -> A.ins_mov_reg_w (H.reg_w dst) (H.reg_w src)
-      | Reg _, Stack _ -> emit_stack_str (H.reg_w src) dst
-      | Stack _, Reg _ -> emit_stack_ldr (H.reg_w dst) src
+      | Reg _, Stack _ -> emit_stack_str env (H.reg_w src) dst
+      | Stack _, Reg _ -> emit_stack_ldr env (H.reg_w dst) src
       | Stack _, Stack _ | _, Unknown | Unknown, _ -> assert false)
   | Lop (Const_int n) -> emit_intconst (H.reg_x i.res.(0)) n
   | Lop (Const_float32 f) ->
@@ -1579,7 +1396,7 @@ let emit_instr i =
          [float_literal] (see the conversion from int32 to int64 below). Thus,
          we load the lower half. Note that this is different from Cmm 32-bit
          floats ([Csingle]), which are emitted as 4-byte constants. *)
-      let lbl = float32_literal f in
+      let lbl = float32_literal env f in
       emit_load_literal i.res.(0) lbl
   | Lop (Const_float f) ->
     if Int64.equal f 0L
@@ -1590,7 +1407,7 @@ let emit_instr i =
         (H.reg_d i.res.(0))
         (O.imm_float (Int64.float_of_bits f))
     else
-      let lbl = float_literal f in
+      let lbl = float_literal env f in
       emit_load_literal i.res.(0) lbl
   | Lop (Const_vec256 _ | Const_vec512 _) ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
@@ -1600,21 +1417,21 @@ let emit_instr i =
       let dst = H.reg_v2d_operand i.res.(0) in
       A.ins2 MOVI dst (O.imm 0)
     | _ ->
-      let lbl = vec128_literal l in
+      let lbl = vec128_literal env l in
       emit_load_literal i.res.(0) lbl)
   | Lop (Const_symbol s) ->
     emit_load_symbol_addr i.res.(0) (symbol_of_cmm_symbol s)
   | Lcall_op Lcall_ind ->
     A.ins1 BLR (H.reg_x i.arg.(0));
-    record_frame i.live (Dbg_other i.dbg)
+    record_frame env i.live (Dbg_other i.dbg)
   | Lcall_op (Lcall_imm { func }) ->
     A.ins1 BL (symbol (Needs_reloc CALL26) (symbol_of_cmm_symbol func));
-    record_frame i.live (Dbg_other i.dbg)
+    record_frame env i.live (Dbg_other i.dbg)
   | Lcall_op Ltailcall_ind -> A.ins1 BR (H.reg_x i.arg.(0))
   | Lcall_op (Ltailcall_imm { func }) ->
-    if String.equal func.sym_name !function_name
+    if String.equal func.sym_name (Env.function_name env)
     then
-      match !tailrec_entry_point with
+      match Env.tailrec_entry_point env with
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point -> A.ins1 B (local_label tailrec_entry_point)
     else A.ins1 B (symbol (Needs_reloc JUMP26) (symbol_of_cmm_symbol func))
@@ -1627,12 +1444,12 @@ let emit_instr i =
         O.optional_none;
       emit_load_symbol_addr reg_x8 (S.create_global func);
       A.ins1 BL (runtime_function S.Predef.caml_c_call_stack_args);
-      record_frame i.live (Dbg_other i.dbg))
+      record_frame env i.live (Dbg_other i.dbg))
     else if alloc
     then (
       emit_load_symbol_addr reg_x8 (S.create_global func);
       A.ins1 BL (runtime_function S.Predef.caml_c_call);
-      record_frame i.live (Dbg_other i.dbg))
+      record_frame env i.live (Dbg_other i.dbg))
     else (
       (* Store OCaml stack pointer in the frame pointer register. No need to
          store previous x29 because OCaml doesn't maintain frame pointers. *)
@@ -1650,7 +1467,7 @@ let emit_instr i =
   | Lop (Stackoffset n) ->
     assert (n mod 16 = 0);
     emit_stack_adjustment (-n);
-    stack_offset := !stack_offset + n
+    Env.set_stack_offset env (Env.stack_offset env + n)
   | Lop (Load { memory_chunk; addressing_mode; is_atomic; _ }) -> (
     assert (
       Cmm.equal_memory_chunk memory_chunk Word_int
@@ -1762,19 +1579,19 @@ let emit_instr i =
     | Fivetwelve_unaligned ->
       Misc.fatal_error "arm64: got 256/512 bit vector")
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
-    assembly_code_for_allocation i ~n ~local:false ~far:false ~dbginfo
+    assembly_code_for_allocation env i ~n ~local:false ~far:false ~dbginfo
   | Lop (Specific (Ifar_alloc { bytes = n; dbginfo })) ->
-    assembly_code_for_allocation i ~n ~local:false ~far:true ~dbginfo
+    assembly_code_for_allocation env i ~n ~local:false ~far:true ~dbginfo
   | Lop (Alloc { bytes = n; dbginfo; mode = Local }) ->
-    assembly_code_for_allocation i ~n ~local:true ~far:false ~dbginfo
+    assembly_code_for_allocation env i ~n ~local:true ~far:false ~dbginfo
   | Lop Begin_region ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_local_sp)
   | Lop End_region ->
     A.ins2 STR (H.reg_x i.arg.(0)) (H.domainstate_field Domain_local_sp)
-  | Lop Poll -> assembly_code_for_poll i ~far:false ~return_label:None
+  | Lop Poll -> assembly_code_for_poll env i ~far:false ~return_label:None
   | Lop Pause -> A.ins0 YIELD
   | Lop (Specific Ifar_poll) ->
-    assembly_code_for_poll i ~far:true ~return_label:None
+    assembly_code_for_poll env i ~far:true ~return_label:None
   | Lop (Intop_imm (Iadd, n)) ->
     emit_addimm (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) n
   | Lop (Intop_imm (Isub, n)) ->
@@ -1981,7 +1798,7 @@ let emit_instr i =
     let ifso = i.arg.(len - 2) in
     let ifnot = i.arg.(len - 1) in
     if Reg.same_loc ifso ifnot
-    then move ifso i.res.(0)
+    then move env ifso i.res.(0)
     else
       let res_x = H.reg_x i.res.(0) in
       match tst with
@@ -2016,29 +1833,8 @@ let emit_instr i =
   | Llabel { label = lbl; _ } ->
     let lbl = label_to_asm_label ~section:Text lbl in
     D.define_label lbl
-  | Lbranch lbl ->
-    let lbl = label_to_asm_label ~section:Text lbl in
-    A.ins1 B (local_label lbl)
-  | Lcondbranch (tst, lbl) -> (
-    let lbl = label_to_asm_label ~section:Text lbl |> local_label in
-    match tst with
-    | Itruetest -> A.ins2 CBNZ (H.reg_x i.arg.(0)) lbl
-    | Ifalsetest -> A.ins2 CBZ (H.reg_x i.arg.(0)) lbl
-    | Iinttest cmp ->
-      A.ins_cmp_reg (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1)) O.optional_none;
-      A.ins1 (B_cond (Branch_cond.Int (cond_for_comparison cmp))) lbl
-    | Iinttest_imm (cmp, n) ->
-      emit_cmpimm (H.reg_x i.arg.(0)) n;
-      A.ins1 (B_cond (Branch_cond.Int (cond_for_comparison cmp))) lbl
-    | Ifloattest (Float64, cmp) ->
-      A.ins2 FCMP (H.reg_d i.arg.(0)) (H.reg_d i.arg.(1));
-      A.ins1 (B_cond (Branch_cond.Float (cond_for_float_comparison cmp))) lbl
-    | Ifloattest (Float32, cmp) ->
-      let cond = cond_for_float_comparison cmp in
-      A.ins2 FCMP (H.reg_s i.arg.(0)) (H.reg_s i.arg.(1));
-      A.ins1 (B_cond (Branch_cond.Float cond)) lbl
-    | Ioddtest -> A.ins3 TBNZ (H.reg_x i.arg.(0)) (O.imm_six 0) lbl
-    | Ieventest -> A.ins3 TBZ (H.reg_x i.arg.(0)) (O.imm_six 0) lbl)
+  | Lbranch lbl -> emit_branch lbl
+  | Lcondbranch (tst, lbl) -> emit_condbranch i.arg tst lbl
   | Lcondbranch3 (lbl0, lbl1, lbl2) ->
     let section = Asm_targets.Asm_section.Text in
     let ins_cond cond lbl =
@@ -2080,11 +1876,11 @@ let emit_instr i =
   | Lentertrap -> ()
   | Ladjust_stack_offset { delta_bytes } ->
     D.cfi_adjust_cfa_offset ~bytes:delta_bytes;
-    stack_offset := !stack_offset + delta_bytes
+    Env.set_stack_offset env (Env.stack_offset env + delta_bytes)
   | Lpushtrap { lbl_handler } ->
     let lbl_handler = label_to_asm_label ~section:Text lbl_handler in
     A.ins2 ADR reg_x_tmp1 (label Same_section_and_unit lbl_handler);
-    stack_offset := !stack_offset + 16;
+    Env.set_stack_offset env (Env.stack_offset env + 16);
     A.ins3 (STP X) reg_x_trap_ptr reg_x_tmp1
       (O.mem_pre_pair ~base:R.sp ~offset:(-16));
     D.cfi_adjust_cfa_offset ~bytes:16;
@@ -2092,17 +1888,17 @@ let emit_instr i =
   | Lpoptrap _ ->
     A.ins2 LDR reg_x_trap_ptr (O.mem_post ~base:R.sp ~offset:16);
     D.cfi_adjust_cfa_offset ~bytes:(-16);
-    stack_offset := !stack_offset - 16
+    Env.set_stack_offset env (Env.stack_offset env - 16)
   | Lraise k -> (
     match k with
     | Raise_regular ->
       A.ins1 BL (runtime_function S.Predef.caml_raise_exn);
-      record_frame Reg.Set.empty (Dbg_raise i.dbg)
+      record_frame env Reg.Set.empty (Dbg_raise i.dbg)
     | Raise_reraise ->
       if Config.runtime5
       then A.ins1 BL (runtime_function S.Predef.caml_reraise_exn)
       else A.ins1 BL (runtime_function S.Predef.caml_raise_exn);
-      record_frame Reg.Set.empty (Dbg_raise i.dbg)
+      record_frame env Reg.Set.empty (Dbg_raise i.dbg)
     | Raise_notrace ->
       A.ins_mov_to_sp ~src:reg_x_trap_ptr;
       A.ins3 (LDP X) reg_x_trap_ptr reg_x_tmp1
@@ -2119,27 +1915,145 @@ let emit_instr i =
     A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
     A.ins1 (B_cond (Branch_cond.Int CC)) (local_label sc_label);
     D.define_label sc_return;
-    stack_realloc := Some { sc_label; sc_return; sc_max_frame_size_in_bytes }
+    Env.set_stack_realloc env
+      { sc_label; sc_return; sc_max_frame_size_in_bytes }
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
 
-let emit_instr i =
-  try emit_instr i
+let emit_instr env i =
+  try emit_instr env i
   with exn ->
     Format.eprintf "Exception whilst emitting instruction:@ %a\n"
       Printlinear.instr i;
     raise exn
 
+(* Branch relaxation, including instruction size computation pass *)
+
+let with_measuring ~f =
+  Emitaux.with_snapshot ~f:(fun () ->
+      D.with_measuring ~f:(fun () -> A.with_measuring ~f))
+
+let measure_emit_instr env i = with_measuring ~f:(fun () -> emit_instr env i)
+
+let compute_instruction_sizes env code =
+  let sizes_rev = ref [] in
+  let rec walk instr =
+    match instr.Linear.desc with
+    | Lend -> ()
+    | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+    | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
+    | Lcondbranch _ | Lcondbranch3 _ | Lswitch _ | Ladjust_stack_offset _
+    | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
+      let m = measure_emit_instr env instr in
+      let size : Branch_relaxation_intf.instruction_size =
+        { size = m.count; max_displacement = m.min_max_displacement }
+      in
+      sizes_rev := size :: !sizes_rev;
+      walk instr.next
+  in
+  walk code;
+  List.rev !sizes_rev
+
+let measure_instruction_count f = (with_measuring ~f).count
+
+let out_of_line_code_block_sizes env =
+  List.map
+    (fun gc -> measure_instruction_count (fun () -> emit_call_gc gc))
+    (Env.call_gc_sites env)
+  @ List.map
+      (fun lr -> measure_instruction_count (fun () -> emit_local_realloc lr))
+      (Env.local_realloc_sites env)
+  @
+  match Env.stack_realloc env with
+  | None -> []
+  | Some _ -> [measure_instruction_count (fun () -> emit_stack_realloc env)]
+
+type relaxed_instruction =
+  | Far_poll
+  | Far_alloc of
+      { num_bytes : int;
+        dbginfo : Cmm.alloc_dbginfo;
+        res : Reg.t
+      }
+  | Condbranch of
+      { test : Operation.test;
+        lbl : Cmm.label;
+        arg : Reg.t array
+      }
+  | Branch of Cmm.label
+
+let emit_relaxed_instruction (relaxed : relaxed_instruction) =
+  match relaxed with
+  | Far_poll ->
+    let _gc_lbl, _gc_return_lbl =
+      assembly_code_for_poll0 ~far:true ~return_label:None
+    in
+    ()
+  | Far_alloc { num_bytes; res; dbginfo = _ } ->
+    let _gc_lbl, _gc_return_lbl =
+      assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
+        ~res_reg:(H.reg_x res)
+    in
+    ()
+  | Condbranch { test; lbl; arg } -> emit_condbranch arg test lbl
+  | Branch lbl -> emit_branch lbl
+
+let measure_relaxed_instruction ri =
+  let m = with_measuring ~f:(fun () -> emit_relaxed_instruction ri) in
+  { Branch_relaxation_intf.size = m.count;
+    max_displacement = m.min_max_displacement
+  }
+
+let relax_branches env body =
+  let initial_sizes, out_of_line_code_block_sizes, num_call_gc_sites =
+    (* Take a copy of [sizing_env] so we don't disturb the caller's [env] *)
+    let sizing_env = Env.copy env in
+    let initial_sizes = compute_instruction_sizes sizing_env body in
+    let out_of_line_code_block_sizes =
+      out_of_line_code_block_sizes sizing_env
+    in
+    let num_call_gc_sites = List.length (Env.call_gc_sites sizing_env) in
+    initial_sizes, out_of_line_code_block_sizes, num_call_gc_sites
+  in
+  let module BR = Branch_relaxation.Make (struct
+    type distance = int
+
+    type nonrec relaxed_instruction = relaxed_instruction
+
+    let offset_pc_at_branch = 0
+
+    let relaxed_instruction_size ri = measure_relaxed_instruction ri
+
+    let relaxed_instruction_desc ri : Linear.instruction_desc =
+      match ri with
+      | Far_poll -> Lop (Specific Ifar_poll)
+      | Far_alloc { num_bytes; dbginfo; res = _ } ->
+        Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
+      | Condbranch { test; lbl; arg = _ } -> Lcondbranch (test, lbl)
+      | Branch lbl -> Lbranch lbl
+
+    let relax_poll () = Far_poll
+
+    let relax_allocation ~num_bytes ~dbginfo ~res =
+      Far_alloc { num_bytes; dbginfo; res }
+
+    let relax_condbranch test lbl ~arg = Condbranch { test; lbl; arg }
+
+    let relax_branch lbl = Branch lbl
+  end) in
+  BR.relax body ~initial_sizes ~out_of_line_code_block_sizes;
+  num_call_gc_sites
+
 (* Emission of an instruction sequence *)
 
-let rec emit_all i =
+let rec emit_all env i =
   (* CR-soon xclerc for xclerc: get rid of polymorphic compare. *)
   if Stdlib.compare i.desc Lend = 0
   then ()
   else (
-    emit_instr i;
-    emit_all i.next)
+    emit_instr env i;
+    emit_all env i.next)
 
 (* Emission of a function declaration *)
 
@@ -2149,22 +2063,17 @@ let fundecl fundecl =
     | None -> None, fundecl
     | Some { fun_end_label; fundecl } -> Some fun_end_label, fundecl
   in
-  function_name := fundecl.fun_name;
-  fastcode_flag := fundecl.fun_fast;
-  tailrec_entry_point
-    := Option.map
-         (label_to_asm_label ~section:Text)
-         fundecl.fun_tailrec_entry_point_label;
-  float_literals := [];
-  stack_offset := 0;
-  call_gc_sites := [];
-  local_realloc_sites := [];
-  clear_stack_realloc ();
-  Stack_class.Tbl.copy_values ~from:fundecl.fun_num_stack_slots
-    ~to_:num_stack_slots;
-  prologue_required := fundecl.fun_prologue_required;
-  contains_calls := fundecl.fun_contains_calls;
-  emit_named_text_section !function_name;
+  let env =
+    Env.create ~fastcode_flag:fundecl.fun_fast
+      ~num_stack_slots:fundecl.fun_num_stack_slots
+      ~prologue_required:fundecl.fun_prologue_required
+      ~contains_calls:fundecl.fun_contains_calls ~function_name:fundecl.fun_name
+      ~tailrec_entry_point:
+        (Option.map
+           (label_to_asm_label ~section:Text)
+           fundecl.fun_tailrec_entry_point_label)
+  in
+  emit_named_text_section (Env.function_name env);
   let fun_sym = S.create_global fundecl.fun_name in
   D.align ~fill:Nop ~bytes:8;
   global_maybe_protected fun_sym;
@@ -2175,14 +2084,12 @@ let fundecl fundecl =
   let fun_start_label = L.create_label_for_local_symbol Text fun_sym in
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
-  let num_call_gc = num_call_gc_points fundecl.fun_body in
-  let max_out_of_line_code_offset = max_out_of_line_code_offset ~num_call_gc in
-  BR.relax fundecl.fun_body ~max_out_of_line_code_offset;
-  emit_all fundecl.fun_body;
-  List.iter emit_call_gc !call_gc_sites;
-  List.iter emit_local_realloc !local_realloc_sites;
-  emit_stack_realloc ();
-  assert (List.length !call_gc_sites = num_call_gc);
+  let num_call_gc_sites = relax_branches env fundecl.fun_body in
+  emit_all env fundecl.fun_body;
+  List.iter emit_call_gc (Env.call_gc_sites env);
+  List.iter emit_local_realloc (Env.local_realloc_sites env);
+  emit_stack_realloc env;
+  assert (List.length (Env.call_gc_sites env) = num_call_gc_sites);
   (match fun_end_label with
   | None -> ()
   | Some fun_end_label ->
@@ -2198,7 +2105,7 @@ let fundecl fundecl =
      minus symbol definition". *)
   D.type_symbol ~ty:Function fun_sym;
   D.size fun_sym;
-  emit_literals ()
+  emit_literals env
 
 (* Emission of data *)
 
@@ -2365,7 +2272,7 @@ let end_assembly () =
   D.size frametable_sym;
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
-  Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol:(fun _ -> ());
+  Probe_emission.emit_probe_notes ~add_def_symbol:(fun _ -> ());
   D.mark_stack_non_executable ();
   (* Finalize binary emitter if enabled *)
   Binary_emitter_helpers.end_emission ()

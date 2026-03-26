@@ -444,6 +444,32 @@ Here is an example of a case that is not matched:
 ]>
 |}];;
 
+(* Non-top-level functor *)
+module Make = Set.Make;;
+<[ let module M = Make(Int) in M.singleton 100 |> M.elements ]>;;
+[%%expect {|
+module Make = Set.Make
+Line 2, characters 18-22:
+2 | <[ let module M = Make(Int) in M.singleton 100 |> M.elements ]>;;
+                      ^^^^
+Error: Identifier "Make" is used at line 2, characters 18-22,
+       inside a quotation (<[ ... ]>);
+       it is introduced at file "_none_", line 1, outside any quotations.
+|}];;
+
+(* Non-top-level functor argument *)
+module Int' = Int;;
+<[ let module M = Set.Make(Int') in M.singleton 100 |> M.elements ]>;;
+[%%expect {|
+module Int' = Int
+Line 2, characters 27-31:
+2 | <[ let module M = Set.Make(Int') in M.singleton 100 |> M.elements ]>;;
+                               ^^^^
+Error: Identifier "Int'" is used at line 2, characters 27-31,
+       inside a quotation (<[ ... ]>);
+       it is introduced at file "_none_", line 1, outside any quotations.
+|}];;
+
 <[ ref 42 ]>;;
 [%%expect {|
 - : <[int ref]> expr = <[Stdlib.ref 42]>
@@ -1003,7 +1029,8 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 
 let x = <[ "foo" ]> in <[ let y = (borrow_ $x) in (fun (a @ local) -> ()) y ]>
 [%%expect{|
-- : <[unit]> expr = <[let y = (borrow_ "foo") in (fun a -> ()) y]>
+- : <[unit]> expr =
+<[let y = (borrow_ "foo") in (fun (a : _ @ local) -> ()) y]>
 |}];;
 
 let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
@@ -1233,4 +1260,78 @@ Line 1, characters 17-30:
 Error: Annotating types with kinds
        is not supported inside quoted expressions,
        as seen at line 1, characters 17-30.
+(** Mode annotations **)
+
+(* Pattern constraints *)
+<[ let (x @ unique portable) = "abc" in x ]>
+[%%expect {|
+- : <[string]> expr = <[let x = ("abc" : _ @ unique portable) in x]>
+|}];;
+
+(* Expression constraints *)
+<[ fun x -> (x : _  @ unique portable)]>
+[%%expect {|
+- : <[$('a) @ unique portable -> $('a)]> expr =
+<[fun x -> (x : _ @ unique portable)]>
+|}];;
+
+<[ fun x -> exclave_ (x : _  @ local)]>
+[%%expect {|
+- : <[$('a) -> $('a) @ local]> expr = <[fun x -> exclave_ (x : _ @ local)]>
+|}];;
+
+(* Function definitions *)
+<[ fun (x @ local unique) @ local unique -> x]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[fun (x : _ @ local unique) -> (x : _ @ local unique)]>
+|}];;
+
+<[ let (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[
+  let f =
+  (fun (x : _ @ local unique) -> (x : _ @ local unique) :
+    _ @ unique portable)
+  in f
+]>
+|}];;
+
+<[ let rec f (x @ local unique) @ local unique = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[let rec f = (fun (x : _ @ local unique) -> (x : _ @ local unique)) in f]>
+|}];;
+
+<[ let rec (f @ unique portable) (x @ local unique) = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local]> expr =
+<[let rec f = (fun (x : _ @ local unique) -> x : _ @ unique portable) in f]>
+|}];;
+
+<[ let rec (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[
+  let rec f =
+  (fun (x : _ @ local unique) -> (x : _ @ local unique) :
+    _ @ unique portable)
+  in f
+]>
+|}];;
+
+<[ let local_ f x = x in f "abc" ]>
+[%%expect {|
+- : <[string]> expr = <[let f = (fun x -> x : _ @ local) in f "abc"]>
+|}];;
+
+(* Function types *)
+<[ fun (f : _ @ local unique -> _ @ local unique) -> f]>
+[%%expect {|
+- : <[
+     ($('a) @ local unique -> $('b) @ local unique) ->
+     $('a) @ local unique -> $('b) @ local unique]>
+    expr
+= <[fun (f : _ @ local unique -> _ @ local unique) -> f]>
 |}];;

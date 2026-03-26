@@ -7818,13 +7818,11 @@ and type_expect_
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
-      let jkind = Jkind.Builtin.value ~why:Quotation_result in
       let new_env = Env.enter_quotation env in
-      let ty = newgenvar jkind in
-      let quoted_ty = newgenty (Tquote ty) in
-      let to_unify = Predef.type_code quoted_ty in
+      let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
+      let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
       with_explanation (fun () ->
-        unify_exp_types loc env to_unify (generic_instance ty_expected));
+        unify_exp_types loc env expr_ty (generic_instance ty_expected));
       let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
       re {
         exp_desc = Texp_quotation arg;
@@ -11672,7 +11670,7 @@ let report_error ~loc env =
     Location.error_of_printer ~loc (fun ppf () ->
       fprintf ppf "Object types must have layout value.@ %a%a"
         (Jkind.Violation.report_with_name ~name:"the type of this expression"
-           ~level:(Ctype.get_current_level ()) env) err
+           env) err
       pp_doc (report_type_expected_explanation_opt explanation))
       ()
   | Non_value_let_rec (err, ty) ->
@@ -11680,7 +11678,7 @@ let report_error ~loc env =
       fprintf ppf "Variables bound in a \"let rec\" must have layout value.@ %a"
         (fun v -> Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env v)
+           env v)
         err)
       ()
   | Undefined_method (ty, me, valid_methods) ->
@@ -12229,25 +12227,25 @@ let report_error ~loc env =
         "@[Function arguments and returns must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ()) env) violation
+           env) violation
   | Record_projection_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Records being projected from must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ()) env) violation
+           env) violation
   | Record_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Record expressions must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ()) env) violation
+           env) violation
   | Mutable_var_not_rep (ty, violation) ->
       Location.errorf ~loc
         "@[Mutable variables must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ()) env) violation
+           env) violation
   | Invalid_label_for_src_pos arg_label ->
       Location.errorf ~loc
         "A position argument must not be %s."

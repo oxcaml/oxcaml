@@ -174,6 +174,12 @@ let create_scope () =
 
 let wrap_end_def f = Misc.try_finally f ~always:end_def
 
+let mark_toplevel_in_quotations env =
+  let scope = !current_level in
+  (* Create a new scope to make sure we only capture what came before *)
+  let _ = create_scope () in
+  Env.mark_toplevel_in_quotations ~scope env
+
 let with_local_level ?post f =
   begin_def ();
   let result = wrap_end_def f in
@@ -2212,7 +2218,12 @@ let try_expand_safe env ty =
 (* Perform one of the following head-position beta reductions via rewrites:
    * Reduce a quoted-eval through a concrete (top-level) type constructor.
    * Cancel a quote-splice pair. *)
-let rec try_reduce_once t =
+let rec try_reduce_once env t =
+  let path_must_be_toplevel path =
+    if not (Env.path_is_toplevel_in_quotations env path) then
+      raise Cannot_expand
+  in
+  let try_reduce_once t = try_reduce_once env t in
   let try_reduce_poly t = if is_Tpoly t then try_reduce_once t else t in
   match get_desc t with
   | Tquote_eval t -> begin
@@ -2231,9 +2242,8 @@ let rec try_reduce_once t =
     | Tunboxed_tuple tl ->
       Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
     (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
-    (* CR metaprogramming jbachurski: Path [p] might only be available inside
-       the quote. Thus, we should check if it is top-level here. *)
     | Tconstr (p, tl, a) ->
+      path_must_be_toplevel p;
       Tconstr (p, List.map new_quote_eval_ty tl, a)
     (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
     | Tobject (t, ct) ->
@@ -2251,8 +2261,9 @@ let rec try_reduce_once t =
         try_reduce_once (new_quote_eval_ty t),
         ref (
           Option.map
-            (* CR metaprogramming jbachurski: Only reduce top-level [p]. *)
-            (fun (p, tl) -> p, List.map new_quote_eval_ty tl)
+            (fun (p, tl) ->
+              path_must_be_toplevel p;
+              p, List.map new_quote_eval_ty tl)
             !ct))
     (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
     | Tfield (s, k, t_method, t_rest) ->
@@ -2302,7 +2313,7 @@ let rec try_reduce_once t =
     (*     [<[ module S with type typ = t ]> eval]
         ==> [module S with type typ = <[t]> eval] *)
     | Tpackage (p, fl) ->
-      (* CR metaprogramming jbachurski: Only reduce if [p] is top-level. *)
+      path_must_be_toplevel p;
       Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
     (* It is safe not to expand [Tof_kind], and we do not need to currently *)
     | Tof_kind _ -> raise Cannot_expand
@@ -2333,41 +2344,41 @@ let rec try_reduce_once t =
   | _ -> raise Cannot_expand
 
 (* Perform head-position reductions exhaustively til the normal form. *)
-let rec try_reduce ty =
-  let ty' = try_reduce_once ty in
-  try try_reduce ty'
+let rec try_reduce env ty =
+  let ty' = try_reduce_once env ty in
+  try try_reduce env ty'
   with Cannot_expand -> ty'
 
 (* [Predef]'s [eval] is special -- we want to always expand it in [reduce_head],
    so we special-case its abbreviation expansion there. *)
-let expand_eval_abbrev () ty =
+let expand_eval_abbrev env ty =
   match get_desc ty with
-  | Tconstr (path, [ty], _) when Path.same path Predef.path_eval ->
-    new_quote_eval_ty (new_splice_ty ty)
+  | Tconstr (path, [_], _) when Path.same path Predef.path_eval ->
+    try_expand_once env ty
   | _ -> raise Cannot_expand
 
 let try_expand_eval_once = try_expand_once_gen expand_eval_abbrev
 
 (* Fully expand the head of a type. *)
-let try_expand_head (type env)
-    (try_once : env -> type_expr -> type_expr) (env : env) ty =
+let try_expand_head
+    (try_once : Env.t -> type_expr -> type_expr) (env : Env.t) ty =
   let rec loop try_once env ty =
     let ty' = try_once env ty in
     try loop try_once env ty'
     with Cannot_expand ->
-      try try_reduce ty'
+      try try_reduce env ty'
       with Cannot_expand -> ty'
   in
   try loop try_once env ty
-  with Cannot_expand -> try_reduce ty
+  with Cannot_expand -> try_reduce env ty
 
-let reduce_head ~expand_eval ty =
+let reduce_head ~expand_eval env ty =
   let try_once =
     if expand_eval
     then try_expand_eval_once
-    else (fun () _ -> raise Cannot_expand)
+    else (fun _env _ty -> raise Cannot_expand)
   in
-  try try_expand_head try_once () ty
+  try try_expand_head try_once env ty
   with Cannot_expand -> ty
 
 (* Unsafe full expansion, may raise [Unify [Escape _]]. *)
@@ -2678,9 +2689,11 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
     end
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
-  | Tquote _ -> Jkind.Builtin.value ~why:Tquote
-  | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
-  | Tquote_eval _ -> Jkind.Builtin.value ~why:Tquote_eval
+   (* CR quoted-kinds jbachurski: These quote/splice the jkind. *)
+  | Tquote ty
+  | Tsplice ty
+  | Tquote_eval ty ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -2812,7 +2825,7 @@ let constrain_type_jkind ~fixed env ty jkind =
         *)
        let jkind_inter =
          Jkind.intersection_or_error ~type_equal ~context
-           ~reason:Tyvar_refinement_intersection env ~level:!current_level
+           ~reason:Tyvar_refinement_intersection env
            ty's_jkind jkind
        in
        Result.map (set_var_jkind ty) jkind_inter
@@ -2829,9 +2842,15 @@ let constrain_type_jkind ~fixed env ty jkind =
          must do so here. Internal ticket 5746. *)
       loop ~fuel ~expanded:false t ty's_jkind jkind
 
+    (* CR quoted-kinds jbachurski: These quote/splice [ty's_jkind]. *)
+    | Tquote ty
+    | Tsplice ty
+    | Tquote_eval ty ->
+      loop ~fuel ~expanded ty ty's_jkind jkind
+
     | _ ->
        match
-         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level env
+         Jkind.sub_or_intersect ~type_equal ~context env
            ty's_jkind jkind
        with
        | Sub -> Ok ()
@@ -3030,9 +3049,9 @@ let constrain_type_jkind_exn env texn ty jkind =
    in some cases where its not (this will happen when pattern matching on a
    "false" GADT pattern), but not to say the intersection is empty if it isn't.
 *)
-let rec intersect_type_jkind ~reason ~level env ty1 jkind2 =
+let rec intersect_type_jkind ~reason env ty1 jkind2 =
   match get_desc ty1 with
-  | Tpoly (ty, _) -> intersect_type_jkind ~reason ~level env ty jkind2
+  | Tpoly (ty, _) -> intersect_type_jkind ~reason env ty jkind2
   | _ ->
     (* [intersect_type_jkind] is called rarely, so we don't bother with trying
        to avoid this call as in [constrain_type_jkind] *)
@@ -3048,7 +3067,7 @@ let rec intersect_type_jkind ~reason ~level env ty1 jkind2 =
        it. Internal ticket 5112. *)
     match jkind1, jkind2 with
     | Some jkind1, Some jkind2 ->
-      Jkind.intersection ~type_equal ~context ~reason ~level env jkind1 jkind2
+      Jkind.intersection ~type_equal ~context ~reason env jkind1 jkind2
     | _, _ -> Jkind.Unknown
 
 (* See comment on [jkind_unification_mode] *)
@@ -3293,7 +3312,7 @@ let local_non_recursive_abbrev uenv p ty =
    They carry redundant information but are added to save two calls to
    [get_desc] which are usually performed already at the call site. *)
 let unify_univar env t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal ~level:!current_level env jkind1 jkind2) then
+  if not (Jkind.equal env jkind1 jkind2) then
     raise Cannot_unify_universal_variables;
   let rec inner t1 t2 = function
     (cl1, cl2) :: rem ->
@@ -3707,8 +3726,8 @@ let equivalent_with_nolabels l1 l2 =
 (* the [tk] means we're comparing a type against a jkind; axes do
    not matter, so a jkind extracted from a type_declaration does
    not need to be substed *)
-let may_have_jkind_intersection_tk ~level env ty jkind =
-  Jkind.may_have_intersection ~level env (type_jkind env ty) jkind
+let may_have_jkind_intersection_tk env ty jkind =
+  Jkind.may_have_intersection env (type_jkind env ty) jkind
 
 (* [mcomp] tests if two types are "compatible" -- i.e., if they could ever
    unify.  (This is distinct from [eqtype], which checks if two types *are*
@@ -3725,7 +3744,7 @@ let may_have_jkind_intersection_tk ~level env ty jkind =
 
 let rec mcomp type_pairs env t1 t2 =
   let check_jkinds ty jkind =
-    if not (may_have_jkind_intersection_tk ~level:!current_level env ty
+    if not (may_have_jkind_intersection_tk env ty
               (Jkind.disallow_right jkind))
     then raise Incompatible
   in
@@ -3783,7 +3802,7 @@ let rec mcomp type_pairs env t1 t2 =
             begin try
               let decl = Env.find_type p env in
               if not (is_aliasable p decl &&
-                      may_have_jkind_intersection_tk ~level:!current_level env
+                      may_have_jkind_intersection_tk env
                         other decl.type_jkind)
               then raise Incompatible
             with Not_found -> ()
@@ -3923,7 +3942,7 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
     let decl = Env.find_type p1 env in
     let decl' = Env.find_type p2 env in
     let check_jkinds () =
-      if not (Jkind.may_have_intersection ~level:!current_level env
+      if not (Jkind.may_have_intersection env
                 decl.type_jkind decl'.type_jkind)
       then raise Incompatible
     in
@@ -4061,7 +4080,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
      refine the type since we don't know the intersection. *)
   let env = get_env uenv in
   match
-    intersect_type_jkind ~reason ~level:!current_level env destination jkind1
+    intersect_type_jkind ~reason env destination jkind1
   with
   | Jkind.No_intersection err -> raise_for Unify (Bad_jkind (destination,err))
   | Jkind.Unknown -> ()
@@ -4075,9 +4094,8 @@ let add_jkind_equation ~reason uenv destination jkind1 =
             (* CR layouts v2.8: We might be able to do better here. Internal
                ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
-            | Some jkind, Some decl_jkind when
-                   not (Jkind.equal ~level:!current_level env jkind
-                          decl_jkind) ->
+            | Some jkind, Some decl_jkind
+                when not (Jkind.equal env jkind decl_jkind) ->
                let refined_decl =
                  { decl with type_jkind = Jkind.disallow_right jkind }
                in
@@ -5717,7 +5735,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           TypePairs.add pairs (t1', t2');
           match (get_desc t1', get_desc t2') with
             (Tvar { jkind }, _) when may_instantiate inst_nongen t1' ->
-              let t2 = reduce_head ~expand_eval:false t2 in
+              let t2 = reduce_head ~expand_eval:false env t2 in
               moregen_occur env (get_level t1') t2;
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
@@ -6005,26 +6023,23 @@ let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
        try
          Misc.protect_refs [R (univar_pairs, [])] begin fun () ->
          let type_pairs = fresh_moregen_pairs () in
-         let (pat_sort_refs, ()) =
-           Jkind_types.Sort.sub_with pat_sorts (fun () ->
-             moregen inst_nongen Covariant type_pairs env patt subj)
-         in
-         (* [subj_sorts] are ephemeral rigid vars created by
+         moregen inst_nongen Covariant type_pairs env patt subj;
+         (* After [moregen], [pat_sorts] have been set to [subj_sorts].
+            [subj_sorts] are ephemeral rigid vars created by
             [instance_with] to stand for [subj_sort_vars] during moregen.
             Replace them back with the originals so that the returned
             [pat_sort_refs] refer to [subj_sort_vars], not to the
             short-lived rigid instances. *)
-         let subst_map = List.combine subj_sorts subj_sort_vars in
-         let rec subst_sort (s : Jkind_types.Sort.t) =
-           match s with
-           | Var v ->
-             (match List.assq_opt v subst_map with
-              | Some v' -> Jkind_types.Sort.Var v'
-              | None -> s)
-           | Base _ | Univar _ -> s
-           | Product ts -> Jkind_types.Sort.Product (List.map subst_sort ts)
+         let subj_sort_vars =
+          List.map (fun v -> Jkind_types.Sort.Var v) subj_sort_vars
          in
-         List.map (Option.map subst_sort) pat_sort_refs
+         let subst_map = List.combine subj_sorts subj_sort_vars in
+         List.map
+           (fun v ->
+             v
+             |> Jkind_types.Sort.get_representable_var
+             |> Option.map (Jkind_types.Sort.subst subst_map))
+           pat_sorts
          end
        with Moregen_trace trace ->
          (* Moregen splits the generic level into two finer levels:
@@ -6130,8 +6145,7 @@ let all_distinct_vars_with_original_jkinds env vars =
          tys := TypeSet.add ty !tys;
          match get_desc ty with
          | Tvar { jkind = inferred_jkind } ->
-           if Jkind.equate ~level:!current_level env inferred_jkind
-                original_jkind
+           if Jkind.equate env inferred_jkind original_jkind
            then All_good
            else Jkind_mismatch { original_jkind; inferred_jkind; ty }
          | _ -> Unification_failure { name; ty }
@@ -6187,7 +6201,7 @@ let eqtype_subst env type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
       !subst
   then ()
   else begin
-    if do_jkind_check && not (Jkind.equal ~level:!current_level env k1 k2)
+    if do_jkind_check && not (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_var_jkinds (t1, k1, t2, k2));
     subst := (t1, t2) :: !subst;
     TypePairs.add type_pairs (t1, t2)
@@ -6218,7 +6232,7 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | (Tof_kind k1, Tof_kind k2) ->
-      if not (Jkind.equal ~level:!current_level env k1 k2)
+      if not (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
     | _ ->
         let t1' = expand_head_rigid env t1 in
@@ -8001,7 +8015,7 @@ let check_decl_jkind env decl jkind =
     | _ -> decl.type_jkind
   in
   match
-    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
+    Jkind.sub_jkind_l ~type_equal ~context env
       decl_jkind jkind
   with
   | Ok () -> Ok ()
@@ -8011,7 +8025,7 @@ let check_decl_jkind env decl jkind =
     | Some ty ->
       let ty_jkind = type_jkind env ty in
       match
-        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
+        Jkind.sub_jkind_l ~type_equal ~context env
           ty_jkind jkind
       with
       | Ok () -> Ok ()
@@ -8029,7 +8043,7 @@ let constrain_decl_jkind env decl jkind =
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      Jkind.sub_or_error ~type_equal ~context ~level:!current_level env
+      Jkind.sub_or_error ~type_equal ~context env
         decl.type_jkind jkind
     with
     | Ok () as ok -> ok

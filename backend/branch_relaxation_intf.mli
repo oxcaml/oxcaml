@@ -7,65 +7,54 @@
 (*                                                                        *)
 (*   Copyright 2015 Institut National de Recherche en Informatique et     *)
 (*     en Automatique.                                                    *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
+
 [@@@ocaml.warning "+a-40-41-42"]
 
+type instruction_size =
+  { size : int;
+    max_displacement : int option
+  }
+
 module type S = sig
-  (* The distance between two instructions, in arbitrary units (typically
-     the natural word size of instructions). *)
+  (* The distance between two instructions, in arbitrary units (typically the
+     natural word size of instructions). *)
   type distance = int
 
-  module Cond_branch : sig
-    (* The various types of conditional branches for a given target that
-       may require relaxation. *)
-    type t
+  (** Instructions produced during branch relaxation (e.g. far branches,
+      inverted conditional branches). *)
+  type relaxed_instruction
 
-    (* All values of type [t] that the emitter may produce. *)
-    val all : t list
-
-    (* If [max_displacement branch] is [n] then [branch] is assumed to
-       reach any address in the range [pc - n, pc + n] (inclusive), after
-       the [pc] of the branch has been adjusted by [offset_pc_at_branch]
-       (see below). *)
-    val max_displacement : t -> distance
-
-    (* Which variety of conditional branch may be produced by the emitter for a
-       given instruction description.  For the moment we assume that only one
-       such variety per instruction description is needed.
-
-       N.B. The only instructions supported are the following:
-                - Lop (Ialloc _)
-                - Lop (Ipoll _)
-                - Lop (Ispecific _)
-                - Lcondbranch (_, _)
-                - Lcondbranch3 (_, _, _)
-       [classify_instr] is expected to return [None] when called on any
-       instruction not in this list. *)
-    val classify_instr : Linear.instruction_desc -> t option
-  end
-
-  (* The value to be added to the program counter (in [distance] units)
-     when it is at a branch instruction, prior to calculating the distance
-     to a branch target. *)
+  (* The value to be added to the program counter (in [distance] units) when it
+     is at a branch instruction, prior to calculating the distance to a branch
+     target. *)
   val offset_pc_at_branch : distance
 
   (* The maximum size of a given instruction. *)
-  val instr_size : Linear.instruction -> distance
+  val relaxed_instruction_size : relaxed_instruction -> instruction_size
+
+  val relaxed_instruction_desc : relaxed_instruction -> Linear.instruction_desc
 
   (* Insertion of target-specific code to relax operations that cannot be
-     relaxed generically.  It is assumed that these rewrites do not change
-     the size of out-of-line code (cf. branch_relaxation.mli). *)
-  val relax_allocation
-     : num_bytes:int
-    -> dbginfo:Cmm.alloc_dbginfo
-    -> Linear.instruction_desc
+     relaxed generically. It is assumed that these rewrites do not change the
+     size of out-of-line code (cf. branch_relaxation.mli). *)
 
-  val relax_poll
-     : unit
-    -> Linear.instruction_desc
+  val relax_poll : unit -> relaxed_instruction
+
+  val relax_allocation :
+    num_bytes:int ->
+    dbginfo:Cmm.alloc_dbginfo ->
+    res:Reg.t ->
+    relaxed_instruction
+
+  val relax_condbranch :
+    Operation.test -> Cmm.label -> arg:Reg.t array -> relaxed_instruction
+
+  val relax_branch : Cmm.label -> relaxed_instruction
 end

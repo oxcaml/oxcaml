@@ -10,6 +10,8 @@ slambda.ml
 slambda.mli
 slambdaeval.ml
 slambdaeval.mli
+slambdaident.ml
+slambdaident.mli
 transl_array_comprehension.ml
 transl_array_comprehension.mli
 transl_comprehension_utils.ml

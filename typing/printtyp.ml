@@ -1547,7 +1547,9 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_ret (Orm_any (tree_of_modes mode), tree)
     | Other _ -> tree
   in
-  let ty = Ctype.reduce_head ~expand_eval:!print_reduced_evals ty in
+  let ty =
+    Ctype.reduce_head ~expand_eval:!print_reduced_evals !printing_env ty
+  in
   let px = proxy ty in
   if List.memq px !printed_aliases && not (List.memq px !delayed) then
    let non_gen = is_non_gen mode (Transient_expr.type_expr px) in
@@ -3388,12 +3390,12 @@ let explanation (type variety) intro prev env
       Some (doc_printf "@ @[<hov>%a@]"
               (Jkind.Violation.report_with_offender
                  ~offender:(fun ppf -> type_expr ppf t)
-                 ~level:(get_current_level ()) env) e)
+                 env) e)
   | Errortrace.Bad_jkind_sort (t,e) ->
       Some (doc_printf "@ @[<hov>%a@]"
               (Jkind.Violation.report_with_offender_sort
                  ~offender:(fun ppf -> type_expr ppf t)
-                 ~level:(get_current_level ()) env) e)
+                 env) e)
   | Errortrace.Unequal_var_jkinds (t1,k1,t2,k2) ->
       let fmt_history t k ppf =
         Jkind.(format_history env ~intro:(
