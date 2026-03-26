@@ -15,39 +15,22 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Symtable = Dynlink_symtable
-module Config = Dynlink_config
-open Dynlink_cmo_format
+open! Dynlink_compilerlibs
+open Cmo_format
 
 module DC = Dynlink_common
 module DT = Dynlink_types
 
-<<<<<<< oxcaml
 let convert_cmi_import import =
   let name = Import_info.name import |> Compilation_unit.Name.to_string in
   let crc = Import_info.crc import in
   name, crc
-||||||| upstream-base
-=======
-module Compression = struct (* Borrowed from utils/compression.ml *)
-  external zstd_initialize: unit -> bool = "caml_zstd_initialize"
-  let input_value = Stdlib.input_value
-end
-
-let _compression_supported = Compression.zstd_initialize ()
->>>>>>> upstream-incoming
 
 module Bytecode = struct
   type filename = string
 
   module Unit_header = struct
-<<<<<<< oxcaml
     type t = Cmo_format.compilation_unit_descr
-||||||| upstream-base
-    type t = Cmo_format.compilation_unit
-=======
-    type t = compilation_unit
->>>>>>> upstream-incoming
 
     let name (t : t) = Compilation_unit.full_path_as_string t.cu_name
     let crc _t = None
@@ -73,25 +56,13 @@ module Bytecode = struct
           required
       in
       List.map
-<<<<<<< oxcaml
         (fun id -> Ident.name id, None)
-||||||| upstream-base
-        (fun (Cmo_format.Compunit cu) -> cu, None)
-=======
-        (fun (Compunit cu) -> cu, None)
->>>>>>> upstream-incoming
         required
 
     let defined_symbols (t : t) =
-<<<<<<< oxcaml
       List.map (fun cu ->
           Compilation_unit.to_global_ident_for_bytecode cu
           |> Ident.name)
-||||||| upstream-base
-      List.map (fun (Cmo_format.Compunit cu) -> cu)
-=======
-      List.map (fun (Compunit cu) -> cu)
->>>>>>> upstream-incoming
         (Symtable.initialized_compunits t.cu_reloc)
 
     let unsafe_module (t : t) = t.cu_primitives <> []
@@ -103,15 +74,12 @@ module Bytecode = struct
   let default_crcs = ref [| |]
   let default_global_map = ref Symtable.empty_global_map
 
-  external get_bytecode_sections : unit -> Symtable.bytecode_sections =
-    "caml_dynlink_get_bytecode_sections"
-
   let init () =
     if !Sys.interactive then begin (* PR#6802 *)
       invalid_arg "The dynlink.cma library cannot be used \
         inside the OCaml toplevel"
     end;
-    default_crcs := Symtable.init_toplevel ~get_bytecode_sections;
+    default_crcs := Symtable.init_toplevel ();
     default_global_map := Symtable.current_state ()
 
   let is_native = false
@@ -124,22 +92,10 @@ module Bytecode = struct
     Compilation_unit.create Compilation_unit.Prefix.empty modname
 
   let fold_initial_units ~init ~f =
-<<<<<<< oxcaml
     Array.fold_left (fun acc import ->
         let modname = Import_info.name import in
         let crc = Import_info.crc import in
         let cu = assume_no_prefix modname in
-||||||| upstream-base
-    List.fold_left (fun acc (compunit, interface) ->
-        let global =
-          Symtable.Global.Glob_compunit (Cmo_format.Compunit compunit)
-        in
-=======
-    List.fold_left (fun acc (compunit, interface) ->
-        let global =
-          Symtable.Global.Glob_compunit (Compunit compunit)
-        in
->>>>>>> upstream-incoming
         let defined =
           Symtable.is_defined_in_global_map !default_global_map
             (Glob_compunit cu)
@@ -181,15 +137,7 @@ module Bytecode = struct
 
   let run lock (ic, file_name, file_digest, _old_st) ~unit_header ~priv:_ =
     let clos = with_lock lock (fun () ->
-<<<<<<< oxcaml
-        let old_state = Symtable.current_state () in
         let compunit : Cmo_format.compilation_unit_descr = unit_header in
-||||||| upstream-base
-        let old_state = Symtable.current_state () in
-        let compunit : Cmo_format.compilation_unit = unit_header in
-=======
-        let compunit : compilation_unit = unit_header in
->>>>>>> upstream-incoming
         seek_in ic compunit.cu_pos;
         let code =
           Bigarray.Array1.create Bigarray.Char Bigarray.c_layout
@@ -204,14 +152,7 @@ module Bytecode = struct
           let new_error : DT.linking_error =
             match error with
             | Symtable.Undefined_global global ->
-<<<<<<< oxcaml
               let desc = Format_doc.compat Symtable.Global.description in
-||||||| upstream-base
-              Undefined_global
-                (Format.asprintf "%a" Symtable.Global.description global)
-=======
-              let desc = Symtable.Global.description in
->>>>>>> upstream-incoming
               Undefined_global (Format.asprintf "%a" desc global)
             | Symtable.Unavailable_primitive s -> Unavailable_primitive s
             | Symtable.Uninitialized_global global ->
@@ -232,18 +173,12 @@ module Bytecode = struct
           if compunit.cu_debug = 0 then [| |]
           else begin
             seek_in ic compunit.cu_debug;
-<<<<<<< oxcaml
             [|
               (* CR ocaml 5 compressed-marshal:
               (Compression.input_value ic : Instruct.debug_event list)
               *)
-              (Marshal.from_channel ic : Instruct.debug_event list)
+              (Marshal.from_channel ic : instruct_debug_event list)
             |]
-||||||| upstream-base
-            [| input_value ic |]
-=======
-            [| (Compression.input_value ic : instruct_debug_event list) |]
->>>>>>> upstream-incoming
           end in
         let _, clos = reify_bytecode code events (Some digest) in
         clos
@@ -280,20 +215,14 @@ module Bytecode = struct
       if buffer = Config.cmo_magic_number then begin
         let compunit_pos = input_binary_int ic in  (* Go to descriptor *)
         seek_in ic compunit_pos;
-<<<<<<< oxcaml
         let cu = (input_value ic : Cmo_format.compilation_unit_descr) in
-||||||| upstream-base
-        let cu = (input_value ic : Cmo_format.compilation_unit) in
-=======
-        let cu = (input_value ic : compilation_unit) in
->>>>>>> upstream-incoming
         handle, [cu]
       end else
       if buffer = Config.cma_magic_number then begin
         let toc_pos = input_binary_int ic in  (* Go to table of contents *)
         seek_in ic toc_pos;
         let lib = (input_value ic : library) in
-        Symtable.open_dlls lib.lib_dllibs;
+        Dll.open_dlls Dll.For_execution lib.lib_dllibs;
         handle, lib.lib_units
       end else begin
         raise (DT.Error (Not_a_bytecode_file file_name))
@@ -313,37 +242,23 @@ module Bytecode = struct
   let register _handle _header ~priv:_ ~filename:_ = ()
 
   let unsafe_get_global_value ~bytecode_or_asm_symbol =
-<<<<<<< oxcaml
     let cu =
       Compilation_unit.Name.of_string bytecode_or_asm_symbol
       |> assume_no_prefix
-||||||| upstream-base
-    let global =
-      Symtable.Global.Glob_compunit (Cmo_format.Compunit bytecode_or_asm_symbol)
-=======
-    let global =
-      Symtable.Global.Glob_compunit (Compunit bytecode_or_asm_symbol)
->>>>>>> upstream-incoming
     in
     match Symtable.get_global_value (Glob_compunit cu) with
     | exception _ -> None
     | obj -> Some obj
 
-<<<<<<< oxcaml
   let does_symbol_exist ~bytecode_or_asm_symbol =
     Option.is_some (unsafe_get_global_value ~bytecode_or_asm_symbol)
 
-  let finish (ic, _filename, _digest) =
-||||||| upstream-base
-  let finish (ic, _filename, _digest) =
-=======
   let finish (ic, _filename, _digest, restore_symtable) =
     begin match restore_symtable with
     | Some old_state ->
       Symtable.hide_additions old_state
     | None -> ()
     end;
->>>>>>> upstream-incoming
     close_in ic
 end
 
