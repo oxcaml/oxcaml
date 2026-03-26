@@ -929,7 +929,11 @@ module Jkind0 = struct
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
           ~forkable ~statefulness
       in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
+      let crossing : Mode.Crossing.t =
+        { crossing = { monadic; comonadic };
+          unique_implies_uncontended = false
+        }
+      in
       {
         crossing;
         externality;
@@ -984,7 +988,11 @@ module Jkind0 = struct
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
           ~forkable ~statefulness
       in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
+      let crossing : Mode.Crossing.t =
+        { crossing = { monadic; comonadic };
+          unique_implies_uncontended = false
+        }
+      in
       {
         crossing;
         externality;
@@ -1136,32 +1144,31 @@ module Jkind0 = struct
         ~separability:(Axis_lattice.separability x)
 
     let contribute_base_from_modality ~modality t =
-      let contention =
-        Mode.Modality.Const.proj (Monadic Contention) modality
-      in
-      if Mode.Modality.Per_axis.is_constant (Monadic Contention) contention
-      then set_unique_implies_uncontended Unique_implies_uncontended.min t
-      else
-        match Mode.Modality.Const.proj (Monadic Uniqueness) modality with
+      let contention = Mode.Modality.Const.proj (Monadic Contention) modality in
+      let uniqueness = Mode.Modality.Const.proj (Monadic Uniqueness) modality in
+      let result =
+        if
+          not (Mode.Modality.Per_axis.is_id (Monadic Contention) contention)
+          &&
+          match contention with
+          | Mode.Modality.Monadic.Atom.Join_const
+              Mode.Contention.Const.Contended -> true
+          | Mode.Modality.Monadic.Atom.Join_const
+              (Mode.Contention.Const.Uncontended | Mode.Contention.Const.Shared) ->
+            false
+        then
+        set_unique_implies_uncontended Unique_implies_uncontended.min t
+        else if
+          not (Mode.Modality.Per_axis.is_id (Monadic Uniqueness) uniqueness)
+        then
+          (match uniqueness with
         | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Aliased ->
-          let aliased_only =
-            List.for_all
-              (fun (Mode.Value.Axis.P axis) ->
-                let (Mode.Modality.Axis.P modality_axis) =
-                  Mode.Modality.Axis.of_value (Mode.Value.Axis.P axis)
-                in
-                match modality_axis with
-                | Monadic Uniqueness -> true
-                | _ ->
-                  Mode.Modality.Per_axis.is_id modality_axis
-                    (Mode.Modality.Const.proj modality_axis modality))
-              Mode.Value.Axis.all
-          in
-          if aliased_only
-          then set_unique_implies_uncontended Unique_implies_uncontended.max t
-          else t
+          set_unique_implies_uncontended Unique_implies_uncontended.max t
         | Mode.Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Unique ->
-          t
+          t)
+        else t
+      in
+      result
 
     (* Returns the set of axes that is relevant under a given modality. For
        example, under the [global] modality, the areality axis is *not*
@@ -1972,9 +1979,6 @@ module Jkind0 = struct
     let map_type_expr f t = Base_and_axes.map_type_expr f t
 
     let add_with_bounds ~relevant_for_shallow ~type_expr ~modality t =
-      let mod_bounds =
-        Mod_bounds.contribute_base_from_modality ~modality t.mod_bounds
-      in
       match get_desc type_expr with
       | Tarrow (_, _, _, _) ->
         (* Optimization: all arrow types have the same (with-bound-free) jkind,
@@ -1983,7 +1987,7 @@ module Jkind0 = struct
            later. *)
         { t with
           mod_bounds =
-            Mod_bounds.join mod_bounds
+            Mod_bounds.join t.mod_bounds
               (Mod_bounds.set_min_in_set Mod_bounds.for_arrow
                  (Jkind_axis.Axis_set.complement
                     (Mod_bounds.relevant_axes_of_modality ~modality
@@ -1991,7 +1995,7 @@ module Jkind0 = struct
         }
       | _ ->
         { t with
-          mod_bounds;
+          mod_bounds = t.mod_bounds;
           with_bounds =
             With_bounds.add_modality ~relevant_for_shallow ~type_expr ~modality
               t.with_bounds
@@ -2025,13 +2029,18 @@ module Jkind0 = struct
            1-field unboxed records and irrelevant for everything else. *)
         match List.length layouts with 1 -> `Relevant | _ -> `Irrelevant
       in
-      let mod_bounds = Mod_bounds.min in
-      let with_bounds =
+      let mod_bounds, with_bounds =
         List.fold_right
-          (fun (type_expr, modality) bounds ->
-            With_bounds.add_modality ~relevant_for_shallow ~type_expr ~modality
-              bounds)
-          tys_modalities No_with_bounds
+          (fun (type_expr, modality) (mod_bounds, with_bounds) ->
+            let mod_bounds =
+              Mod_bounds.contribute_base_from_modality ~modality mod_bounds
+            in
+            let with_bounds =
+              With_bounds.add_modality ~relevant_for_shallow ~type_expr
+                ~modality with_bounds
+            in
+            mod_bounds, with_bounds)
+          tys_modalities (Mod_bounds.min, No_with_bounds)
       in
       { base; mod_bounds; with_bounds }
 

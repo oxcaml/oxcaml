@@ -523,7 +523,13 @@ module Mod_bounds = struct
          (Separability.le Separability.max (separability t))
          (Nonmodal Separability)
 
-  let to_mode_crossing t = crossing t
+  let to_mode_crossing t =
+    { (crossing t) with
+      unique_implies_uncontended =
+        Unique_implies_uncontended.equal
+          (unique_implies_uncontended t)
+          Unique_implies_uncontended.Holds
+    }
 end
 
 module With_bounds = struct
@@ -1202,7 +1208,11 @@ module Base_and_axes = struct
                   ~statefulness:
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
               in
-              let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
+              let crossing : Mod_bounds.Crossing.t =
+                { crossing = { monadic; comonadic };
+                  unique_implies_uncontended = false
+                }
+              in
               Mod_bounds.create crossing
                 ~externality:(value_for_axis ~axis:(Nonmodal Externality))
                 ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
@@ -2371,7 +2381,11 @@ let for_object =
   fresh_jkind
     { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
       mod_bounds =
-        Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
+        Mod_bounds.create
+          { crossing = { comonadic; monadic };
+            unique_implies_uncontended = false
+          }
+          ~externality:Externality.max
           ~nullability:Non_null
           ~unique_implies_uncontended:Unique_implies_uncontended.min
           ~separability:Separability.Non_float;
@@ -2465,12 +2479,8 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
       env jk.jkind
   in
   match jk with
-  | { base = Kconstr _; with_bounds = With_bounds _; _ } ->
-    (* We could do something more precise here, only setting axes that have
-       with_bounds to max. But as such kinds already aren't representable, and
-       this function is mainly used for mode crossing or optimizations, we don't
-       expect this to come up much. *)
-    Mod_bounds.max
+  | { base = Kconstr _; with_bounds = With_bounds _; mod_bounds } ->
+    mod_bounds
   | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds } ->
     mod_bounds
   | { base = Layout _; with_bounds = With_bounds _; _ } ->
@@ -2479,9 +2489,13 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
 
 let get_mode_crossing (type l r) ~context env (jk : (l * r) jkind) =
   let mod_bounds =
-    get_mod_bounds ~context ~skip_axes:Axis_set.all_nonmodal_axes env jk
+    get_mod_bounds ~context
+      ~skip_axes:
+        (Axis_set.remove Axis_set.all_nonmodal_axes
+           (Nonmodal Unique_implies_uncontended))
+      env jk
   in
-  Mod_bounds.crossing mod_bounds
+  Mod_bounds.to_mode_crossing mod_bounds
 
 let to_unsafe_mode_crossing jkind =
   { unsafe_mod_bounds = Mod_bounds.to_mode_crossing jkind.jkind.mod_bounds;
@@ -2553,8 +2567,9 @@ let apply_modality_l modality jk =
       ~relevant_for_shallow:`Relevant
   in
   let mod_bounds =
-    Mod_bounds.set_min_in_set jk.jkind.mod_bounds
-      (Axis_set.complement relevant_axes)
+    jk.jkind.mod_bounds
+    |> fun mod_bounds ->
+    Mod_bounds.set_min_in_set mod_bounds (Axis_set.complement relevant_axes)
   in
   let with_bounds =
     With_bounds.map
@@ -2565,14 +2580,25 @@ let apply_modality_l modality jk =
   { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
   |> disallow_right
 
+let apply_modality_l_with_base modality jk =
+  let jk = apply_modality_l modality jk in
+  { jk with
+    jkind =
+      { jk.jkind with
+        mod_bounds =
+          Mod_bounds.contribute_base_from_modality ~modality jk.jkind.mod_bounds
+      }
+  }
+
 let apply_modality_r modality jk =
   let relevant_axes =
     Mod_bounds.relevant_axes_of_modality ~modality
       ~relevant_for_shallow:`Relevant
   in
   let mod_bounds =
-    Mod_bounds.set_max_in_set jk.jkind.mod_bounds
-      (Axis_set.complement relevant_axes)
+    jk.jkind.mod_bounds
+    |> fun mod_bounds ->
+    Mod_bounds.set_max_in_set mod_bounds (Axis_set.complement relevant_axes)
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 

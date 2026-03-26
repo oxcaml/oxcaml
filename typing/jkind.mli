@@ -614,6 +614,12 @@ val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
 val apply_modality_l :
   Mode.Modality.Const.t -> (allowed * 'r) Types.jkind -> Types.jkind_l
 
+(** As [apply_modality_l], but also updates nonmodal bounds whose base depends
+    on the modality itself. This is currently needed for old-style single-field
+    [@@unboxed] records. *)
+val apply_modality_l_with_base :
+  Mode.Modality.Const.t -> (allowed * 'r) Types.jkind -> Types.jkind_l
+
 (** Change a jkind to be appropriate for an expectation of a type under a
     modality. This means that the jkind's axes affected by the modality will all
     be top. The with-bounds are left unchanged. *)

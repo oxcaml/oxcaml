@@ -2986,6 +2986,11 @@ module Monadic_gen (Obj : Obj) = struct
   let subtract_const c m = m |> disallow_right |> wrap (subtract_const_unhint c)
 
   module Guts = struct
+    let check_const_conservative m =
+      let floor = S.get_loose_ceil obj m in
+      let ceil = S.get_loose_floor obj m in
+      if C.le obj ceil floor then Some ceil else None
+
     let get_ceil m = S.get_floor obj m
   end
 end
@@ -5144,30 +5149,93 @@ module Crossing = struct
     let compare_obj = Axis.compare
   end
 
-  type t = (Monadic.t, Comonadic.t) monadic_comonadic
+  type t =
+    { crossing : (Monadic.t, Comonadic.t) monadic_comonadic;
+      unique_implies_uncontended : bool;
+    }
 
-  let modality m { monadic; comonadic } =
+  let value_mode_is_unique m =
+    match
+      Value.proj_monadic Uniqueness m
+      |> Uniqueness.Guts.check_const_conservative
+    with
+    | Some Uniqueness.Const.Unique -> true
+    | Some Uniqueness.Const.Aliased | None -> false
+
+  let alloc_mode_is_unique m =
+    match
+      Alloc.proj_monadic Uniqueness m
+      |> Uniqueness.Guts.check_const_conservative
+    with
+    | Some Uniqueness.Const.Unique -> true
+    | Some Uniqueness.Const.Aliased | None -> false
+
+  let contention_only_crossing =
+    let monadic =
+      Monadic.create
+        ~uniqueness:(Per_axis.max (Monadic Uniqueness))
+        ~contention:(Per_axis.min (Monadic Contention))
+        ~visibility:(Per_axis.max (Monadic Visibility))
+        ~staticity:(Per_axis.max (Monadic Staticity))
+    in
+    let comonadic =
+      Comonadic.create
+        ~regionality:(Per_axis.max (Comonadic Areality))
+        ~linearity:(Per_axis.max (Comonadic Linearity))
+        ~portability:(Per_axis.max (Comonadic Portability))
+        ~forkable:(Per_axis.max (Comonadic Forkable))
+        ~yielding:(Per_axis.max (Comonadic Yielding))
+        ~statefulness:(Per_axis.max (Comonadic Statefulness))
+    in
+    { crossing = { monadic; comonadic };
+      unique_implies_uncontended = false
+    }
+
+  let modality m { crossing = { monadic; comonadic }; unique_implies_uncontended }
+      =
     let monadic = Monadic.modality m.monadic monadic in
     let comonadic = Comonadic.modality m.comonadic comonadic in
-    { monadic; comonadic }
+    { crossing = { monadic; comonadic }; unique_implies_uncontended }
 
-  let apply_left_unhint t { monadic; comonadic } =
-    let monadic = Monadic.apply_left t.monadic monadic in
+  let apply_left_unhint
+      { crossing = t; unique_implies_uncontended = _ }
+      { monadic = input_monadic; comonadic } =
+    let monadic = Monadic.apply_left t.monadic input_monadic in
     let comonadic = Comonadic.apply_left t.comonadic comonadic in
     { monadic; comonadic }
 
-  let apply_left t m =
-    m |> Value.disallow_right |> Value.unhint |> apply_left_unhint t
-    |> Value.hint ~monadic:Crossing ~comonadic:Crossing
+  let apply_left : type l r. t -> (l * r) Value.t -> (l * disallowed) Value.t =
+   fun t m ->
+    let input = Value.disallow_right m in
+    let output =
+      input |> Value.unhint |> apply_left_unhint t
+      |> Value.hint ~monadic:Crossing ~comonadic:Crossing
+    in
+    if t.unique_implies_uncontended && value_mode_is_unique input
+    then
+      output |> Value.unhint |> apply_left_unhint contention_only_crossing
+      |> Value.hint ~monadic:Crossing ~comonadic:Crossing
+    else output
 
-  let apply_right_unhint t { monadic; comonadic } =
-    let monadic = Monadic.apply_right t.monadic monadic in
+  let apply_right_unhint
+      { crossing = t; unique_implies_uncontended = _ }
+      { monadic = input_monadic; comonadic } =
+    let monadic = Monadic.apply_right t.monadic input_monadic in
     let comonadic = Comonadic.apply_right t.comonadic comonadic in
     { monadic; comonadic }
 
-  let apply_right t m =
-    m |> Value.disallow_left |> Value.unhint |> apply_right_unhint t
-    |> Value.hint ~monadic:Crossing ~comonadic:Crossing
+  let apply_right : type l r. t -> (l * r) Value.t -> (disallowed * r) Value.t =
+   fun t m ->
+    let input = Value.disallow_left m in
+    let output =
+      input |> Value.unhint |> apply_right_unhint t
+      |> Value.hint ~monadic:Crossing ~comonadic:Crossing
+    in
+    if t.unique_implies_uncontended && value_mode_is_unique input
+    then
+      output |> Value.unhint |> apply_right_unhint contention_only_crossing
+      |> Value.hint ~monadic:Crossing ~comonadic:Crossing
+    else output
 
   (* Our mode crossing is for [Value] modes, but can be extended to [Alloc]
      modes via [alloc_as_value], defined as follows:
@@ -5182,17 +5250,30 @@ module Crossing = struct
      where [regional_to_global] is the right adjoint of [alloc_as_value], and
      [regional_to_local] the left adjoint. *)
 
-  let apply_left_alloc t m =
-    m |> Alloc.unhint |> alloc_as_value_unhint |> apply_left_unhint t
-    |> value_to_alloc_r2l_unhint
-    |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
+  let apply_left_alloc : t -> Alloc.l -> Alloc.l =
+   fun t m ->
+    let output = m |> alloc_as_value |> apply_left t |> value_to_alloc_r2l in
+    if t.unique_implies_uncontended && alloc_mode_is_unique m
+    then
+      output |> Alloc.unhint |> alloc_as_value_unhint
+      |> apply_left_unhint contention_only_crossing
+      |> value_to_alloc_r2l_unhint
+      |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
+    else output
 
-  let apply_right_alloc t m =
-    m |> Alloc.unhint |> alloc_as_value_unhint |> apply_right_unhint t
-    |> value_to_alloc_r2g_unhint
-    |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
+  let apply_right_alloc : t -> Alloc.r -> Alloc.r =
+   fun t m ->
+    let output = m |> alloc_as_value |> apply_right t |> value_to_alloc_r2g in
+    if t.unique_implies_uncontended && alloc_mode_is_unique m
+    then
+      output |> Alloc.unhint |> alloc_as_value_unhint
+      |> apply_right_unhint contention_only_crossing
+      |> value_to_alloc_r2g_unhint
+      |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
+    else output
 
-  let apply_left_right_alloc t m =
+  let apply_left_right_alloc_unhint { crossing = t; unique_implies_uncontended = _ } m =
+    let input = m in
     let { monadic; comonadic } = Alloc.unhint m in
     let monadic = Monadic.apply_right t.monadic monadic in
     let comonadic =
@@ -5201,40 +5282,75 @@ module Crossing = struct
       |> comonadic_regional_to_local
       (* the left adjoint of [locality_as_regionality]*)
     in
-    Alloc.hint ~monadic:Crossing ~comonadic:Crossing { monadic; comonadic }
+    let output = Alloc.hint ~monadic:Crossing ~comonadic:Crossing { monadic; comonadic } in
+    input, output
+
+  let apply_left_right_alloc ({ crossing = _; unique_implies_uncontended } as t) m =
+    let input, output = apply_left_right_alloc_unhint t m in
+    if unique_implies_uncontended && alloc_mode_is_unique input
+    then snd (apply_left_right_alloc_unhint contention_only_crossing output)
+    else output
 
   let le t1 t2 =
-    Monadic.le t1.monadic t2.monadic && Comonadic.le t1.comonadic t2.comonadic
+    Monadic.le t1.crossing.monadic t2.crossing.monadic
+    && Comonadic.le t1.crossing.comonadic t2.crossing.comonadic
+    && (t1.unique_implies_uncontended || not t2.unique_implies_uncontended)
 
-  let max = { monadic = Monadic.max; comonadic = Comonadic.max }
+  let max =
+    { crossing = { monadic = Monadic.max; comonadic = Comonadic.max };
+      unique_implies_uncontended = false
+    }
 
-  let min = { monadic = Monadic.min; comonadic = Comonadic.min }
+  let min =
+    { crossing = { monadic = Monadic.min; comonadic = Comonadic.min };
+      unique_implies_uncontended = true
+    }
 
   let join t1 t2 =
-    { monadic = Monadic.join t1.monadic t2.monadic;
-      comonadic = Comonadic.join t1.comonadic t2.comonadic
+    { crossing =
+        { monadic = Monadic.join t1.crossing.monadic t2.crossing.monadic;
+          comonadic =
+            Comonadic.join t1.crossing.comonadic t2.crossing.comonadic
+        };
+      unique_implies_uncontended =
+        t1.unique_implies_uncontended && t2.unique_implies_uncontended
     }
 
   let meet t1 t2 =
-    { monadic = Monadic.meet t1.monadic t2.monadic;
-      comonadic = Comonadic.meet t1.comonadic t2.comonadic
+    { crossing =
+        { monadic = Monadic.meet t1.crossing.monadic t2.crossing.monadic;
+          comonadic =
+            Comonadic.meet t1.crossing.comonadic t2.crossing.comonadic
+        };
+      unique_implies_uncontended =
+        t1.unique_implies_uncontended || t2.unique_implies_uncontended
     }
 
   let equal t1 t2 = le t1 t2 && le t2 t1
 
-  let[@inline available] proj (type a) (ax : a Axis.t) { monadic; comonadic } :
+  let[@inline available] proj (type a) (ax : a Axis.t)
+      { crossing = { monadic; comonadic }; _ } :
       a =
     match ax with
     | Monadic ax -> (Monadic.proj [@inlined hint]) ax monadic
     | Comonadic ax -> (Comonadic.proj [@inlined hint]) ax comonadic
 
   let[@inline available] set (type a) (ax : a Axis.t) (a : a)
-      { monadic; comonadic } : t =
+      ({ crossing = { monadic; comonadic }; unique_implies_uncontended } : t) :
+      t =
     match ax with
     | Monadic ax ->
-      { monadic = (Monadic.set [@inlined hint]) ax a monadic; comonadic }
+      { crossing =
+          { monadic = (Monadic.set [@inlined hint]) ax a monadic; comonadic };
+        unique_implies_uncontended
+      }
     | Comonadic ax ->
-      { monadic; comonadic = (Comonadic.set [@inlined hint]) ax a comonadic }
+      { crossing =
+          { monadic;
+            comonadic = (Comonadic.set [@inlined hint]) ax a comonadic
+          };
+        unique_implies_uncontended
+      }
 
   let create ~regionality ~linearity ~uniqueness ~portability ~contention
       ~forkable ~yielding ~statefulness ~visibility ~staticity =
@@ -5261,7 +5377,7 @@ module Crossing = struct
       Comonadic.create ~regionality ~linearity ~portability ~yielding ~forkable
         ~statefulness
     in
-    { monadic; comonadic }
+    { crossing = { monadic; comonadic }; unique_implies_uncontended = false }
 
   let print ppf t =
     let l =
@@ -5274,11 +5390,19 @@ module Crossing = struct
           else Some (Fmt.asprintf "%a" (Per_axis.print ax) a))
         Value.Axis.all
     in
+    let l =
+      if t.unique_implies_uncontended
+      then "unique_implies_uncontended" :: l
+      else l
+    in
     Fmt.(pp_print_list ~pp_sep:pp_print_space pp_print_string ppf l)
 
   let to_modality
-      { monadic = Monadic.Modality monadic;
-        comonadic = Comonadic.Modality comonadic
+      { crossing =
+          { monadic = Monadic.Modality monadic;
+            comonadic = Comonadic.Modality comonadic
+          };
+        _
       } =
     { monadic; comonadic }
 end

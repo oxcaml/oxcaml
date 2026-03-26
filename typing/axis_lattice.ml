@@ -509,7 +509,12 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
            (Mode.Modality.Comonadic.Atom.Meet_const
               (statefulness x)))
   in
-  { monadic; comonadic }
+  { crossing = { monadic; comonadic };
+    unique_implies_uncontended =
+      Jkind_axis.Unique_implies_uncontended.equal
+        (unique_implies_uncontended x)
+        Jkind_axis.Unique_implies_uncontended.Holds
+  }
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention
     ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality
