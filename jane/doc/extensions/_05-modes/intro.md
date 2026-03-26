@@ -289,21 +289,21 @@ when they are immutable.
 
 ## Future modes: Statefulness
 
-|------------------------|
-| **stateful**           |
-| `|`                    |
-| observable | reading   |
-| `|`                    |
-| stateless              |
+|-------------------|
+| **stateful**      |
+| `|`               |
+| writing | reading |
+| `|`               |
+| stateless         |
 {: .table}
 
 Statefulness is a future axis that tracks whether a function reads or writes to some
 mutable state that it closes over (in other words, state that is not explicitly passed to it in an argument).
 
 *Stateless* functions may not either read or write such state, *reading* functions can
-only read it, and *observable* functions can only write it. *Stateful* functions have no
+only read it, and *writing* functions can only write it. *Stateful* functions have no
 restrictions. Stateless closures capture all values at visibility *immutable*, while
-reading closures capture all values at visibility *read*, and observable closures
+reading closures capture all values at visibility *read*, and writing closures
 capture all values at visibility *write*.
 
 Statefulness is irrelevant for types that do not contain functions, and values of such

@@ -615,7 +615,7 @@ module Lattices = struct
     (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
       | Stateless (* 0b00 *)
-      | Observable (* 0b01 *)
+      | Writing (* 0b01 *)
       | Reading (* 0b10 *)
       | Stateful (* 0b11 *)
 
@@ -624,7 +624,7 @@ module Lattices = struct
 
       let min = Stateless
 
-      let fst = Observable
+      let fst = Writing
 
       let snd = Reading
 
@@ -635,7 +635,7 @@ module Lattices = struct
 
     let print ppf = function
       | Stateless -> Fmt.fprintf ppf "stateless"
-      | Observable -> Fmt.fprintf ppf "observable"
+      | Writing -> Fmt.fprintf ppf "writing"
       | Reading -> Fmt.fprintf ppf "reading"
       | Stateful -> Fmt.fprintf ppf "stateful"
   end
@@ -1761,14 +1761,14 @@ module Lattices_mono = struct
 
   let statefulness_to_visibility = function
     | Statefulness.Stateless -> Visibility.Immutable
-    | Statefulness.Observable -> Visibility.Write
+    | Statefulness.Writing -> Visibility.Write
     | Statefulness.Reading -> Visibility.Read
     | Statefulness.Stateful -> Visibility.Read_write
 
   let visibility_to_statefulness = function
     | Visibility.Immutable -> Statefulness.Stateless
     | Visibility.Read -> Statefulness.Reading
-    | Visibility.Write -> Statefulness.Observable
+    | Visibility.Write -> Statefulness.Writing
     | Visibility.Read_write -> Statefulness.Stateful
 
   let min_with dst ax a = Axis.set ax a (min dst)
@@ -3183,7 +3183,7 @@ module Statefulness = struct
 
   let reading = of_const Reading
 
-  let observable = of_const Observable
+  let writing = of_const Writing
 
   let stateful = of_const Stateful
 
@@ -3233,7 +3233,7 @@ module Portability = struct
   let zap_to_legacy ~statefulness =
     match statefulness with
     | Statefulness.Const.Stateful | Statefulness.Const.Reading
-    | Statefulness.Const.Observable ->
+    | Statefulness.Const.Writing ->
       zap_to_ceil
     | Statefulness.Const.Stateless -> zap_to_floor
 end
