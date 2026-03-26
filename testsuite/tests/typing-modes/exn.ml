@@ -316,7 +316,7 @@ let (foo @ stateless) () =
 Line 4, characters 23-24:
 4 |     raise (StatefulFun g)
                            ^
-Error: This value is "observable"
+Error: This value is "writing"
          because it contains a usage (of the value "x" at line 3, characters 15-16)
          which is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.

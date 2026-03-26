@@ -612,7 +612,7 @@ Error: This value is "stateful"
        However, the highlighted expression is expected to be "stateless".
 |}]
 
-(* Closing over use of write gives observable *)
+(* Closing over use of write gives writing *)
 let foo () =
     let a = Atomic.make 42 in
     let bar () = Atomic.set a 1 in
@@ -622,7 +622,7 @@ let foo () =
 Line 4, characters 24-27:
 4 |     let _ @ stateless = bar in
                             ^^^
-Error: This value is "observable"
+Error: This value is "writing"
          because it contains a usage (of the value "a" at line 3, characters 28-29)
          which is expected to be "write" or "read_write".
        However, the highlighted expression is expected to be "stateless".
@@ -660,7 +660,7 @@ let foo : int Atomic.t @ write -> (unit -> unit) @ stateless =
 Line 2, characters 4-30:
 2 |     fun a () -> Atomic.set a 2
         ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "observable",
+Error: This function when partially applied returns a value which is "writing",
        but expected to be "stateless".
 |}]
 
@@ -742,32 +742,32 @@ Error: The value "f" is "stateful"
          which is expected to be "stateless".
 |}]
 
-(* Closing over an observable value also gives observable. *)
+(* Closing over an writing value also gives writing. *)
 
-let foo (f : (unit -> unit) @ observable) @ observable = fun () -> f ()
+let foo (f : (unit -> unit) @ writing) @ writing = fun () -> f ()
 [%%expect{|
-val foo : (unit -> unit) @ observable -> (unit -> unit) @ observable = <fun>
+val foo : (unit -> unit) @ writing -> (unit -> unit) @ writing = <fun>
 |}]
 
-let foo (f : (unit -> unit) @ observable) @ stateless = fun () -> f ()
+let foo (f : (unit -> unit) @ writing) @ stateless = fun () -> f ()
 [%%expect{|
-Line 1, characters 66-67:
-1 | let foo (f : (unit -> unit) @ observable) @ stateless = fun () -> f ()
-                                                                      ^
-Error: The value "f" is "observable"
+Line 1, characters 63-64:
+1 | let foo (f : (unit -> unit) @ writing) @ stateless = fun () -> f ()
+                                                                   ^
+Error: The value "f" is "writing"
        but is expected to be "stateless"
-         because it is used inside the function at line 1, characters 56-70
+         because it is used inside the function at line 1, characters 53-67
          which is expected to be "stateless".
 |}]
 
-let foo (f : (unit -> unit) @ observable portable) @ stateless = fun () -> f ()
+let foo (f : (unit -> unit) @ writing portable) @ stateless = fun () -> f ()
 [%%expect{|
-Line 1, characters 75-76:
-1 | let foo (f : (unit -> unit) @ observable portable) @ stateless = fun () -> f ()
-                                                                               ^
-Error: The value "f" is "observable"
+Line 1, characters 72-73:
+1 | let foo (f : (unit -> unit) @ writing portable) @ stateless = fun () -> f ()
+                                                                            ^
+Error: The value "f" is "writing"
        but is expected to be "stateless"
-         because it is used inside the function at line 1, characters 65-79
+         because it is used inside the function at line 1, characters 62-76
          which is expected to be "stateless".
 |}]
 
@@ -840,19 +840,19 @@ Line 1, characters 69-70:
 Error: This value is "nonportable" but is expected to be "shareable".
 |}]
 
-(* [observable] => [nonportable] *)
+(* [writing] => [nonportable] *)
 
-let fails : 'a @ observable -> 'a @ shareable = fun x -> x
+let fails : 'a @ writing -> 'a @ shareable = fun x -> x
 [%%expect{|
-Line 1, characters 57-58:
-1 | let fails : 'a @ observable -> 'a @ shareable = fun x -> x
-                                                             ^
+Line 1, characters 54-55:
+1 | let fails : 'a @ writing -> 'a @ shareable = fun x -> x
+                                                          ^
 Error: This value is "nonportable" but is expected to be "shareable".
 |}]
 
-let succeeds : 'a @ observable shareable -> 'a @ shareable = fun x -> x
+let succeeds : 'a @ writing shareable -> 'a @ shareable = fun x -> x
 [%%expect{|
-val succeeds : 'a @ shareable observable -> 'a @ shareable = <fun>
+val succeeds : 'a @ shareable writing -> 'a @ shareable = <fun>
 |}]
 
 (* [stateful] => [nonportable] *)
@@ -870,17 +870,17 @@ let succeeds : 'a @ reading portable -> 'a @ portable = fun x -> x
 val succeeds : 'a @ portable reading -> 'a @ portable = <fun>
 |}]
 
-let fails : 'a @ observable -> 'a @ portable = fun x -> x
+let fails : 'a @ writing -> 'a @ portable = fun x -> x
 [%%expect{|
-Line 1, characters 56-57:
-1 | let fails : 'a @ observable -> 'a @ portable = fun x -> x
-                                                            ^
+Line 1, characters 53-54:
+1 | let fails : 'a @ writing -> 'a @ portable = fun x -> x
+                                                         ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
-let succeeds : 'a @ observable portable -> 'a @ portable = fun x -> x
+let succeeds : 'a @ writing portable -> 'a @ portable = fun x -> x
 [%%expect{|
-val succeeds : 'a @ portable observable -> 'a @ portable = <fun>
+val succeeds : 'a @ portable writing -> 'a @ portable = <fun>
 |}]
 
 let fails : 'a @ stateful -> 'a @ portable = fun x -> x
@@ -1117,22 +1117,22 @@ let bar (x : int ref) @ reading = lazy (x.contents)
 val bar : int ref -> int lazy_t @ reading = <fun>
 |}]
 
-(* [lazy_t @ observable] capture values at [write]. *)
+(* [lazy_t @ writing] capture values at [write]. *)
 
-let biz (x : int ref) @ observable = lazy (x.contents <- 4)
+let biz (x : int ref) @ writing = lazy (x.contents <- 4)
 [%%expect{|
-val biz : int ref -> unit lazy_t @ observable = <fun>
+val biz : int ref -> unit lazy_t @ writing = <fun>
 |}]
 
-let boz (x : int ref) @ observable = lazy (x.contents)
+let boz (x : int ref) @ writing = lazy (x.contents)
 
 [%%expect{|
-Line 1, characters 43-44:
-1 | let boz (x : int ref) @ observable = lazy (x.contents)
-                                               ^
+Line 1, characters 40-41:
+1 | let boz (x : int ref) @ writing = lazy (x.contents)
+                                            ^
 Error: This value is "write"
-         because it is used inside the lazy expression at line 1, characters 37-54
-         which is expected to be "observable".
+         because it is used inside the lazy expression at line 1, characters 34-51
+         which is expected to be "writing".
        However, the highlighted expression is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
 |}]
@@ -1286,10 +1286,10 @@ let f : 'a @ stateless -> 'a @ reading = fun x -> x
 val f : 'a @ stateless -> 'a @ reading = <fun>
 |}]
 
-let f : 'a @ stateless -> 'a @ observable = fun x -> x
+let f : 'a @ stateless -> 'a @ writing = fun x -> x
 
 [%%expect{|
-val f : 'a @ stateless -> 'a @ observable = <fun>
+val f : 'a @ stateless -> 'a @ writing = <fun>
 |}]
 
 let f : 'a @ stateless -> 'a @ stateful = fun x -> x
@@ -1304,10 +1304,10 @@ let f : 'a @ reading -> 'a @ stateful = fun x -> x
 val f : 'a @ reading -> 'a = <fun>
 |}]
 
-let f : 'a @ observable -> 'a @ stateful = fun x -> x
+let f : 'a @ writing -> 'a @ stateful = fun x -> x
 
 [%%expect{|
-val f : 'a @ observable -> 'a = <fun>
+val f : 'a @ writing -> 'a = <fun>
 |}]
 
 (* Lattice structure: [read] and [write] are incomparable. *)
@@ -1330,24 +1330,24 @@ Line 1, characters 43-44:
 Error: This value is "write" but is expected to be "read" or "read_write".
 |}]
 
-(* Lattice structure: [reading] and [observable] are incomparable. *)
+(* Lattice structure: [reading] and [writing] are incomparable. *)
 
-let f : 'a @ reading -> 'a @ observable = fun x -> x
+let f : 'a @ reading -> 'a @ writing = fun x -> x
 
 [%%expect{|
-Line 1, characters 51-52:
-1 | let f : 'a @ reading -> 'a @ observable = fun x -> x
-                                                       ^
-Error: This value is "reading" but is expected to be "observable".
+Line 1, characters 48-49:
+1 | let f : 'a @ reading -> 'a @ writing = fun x -> x
+                                                    ^
+Error: This value is "reading" but is expected to be "writing".
 |}]
 
-let f : 'a @ observable -> 'a @ reading = fun x -> x
+let f : 'a @ writing -> 'a @ reading = fun x -> x
 
 [%%expect{|
-Line 1, characters 51-52:
-1 | let f : 'a @ observable -> 'a @ reading = fun x -> x
-                                                       ^
-Error: This value is "observable" but is expected to be "reading".
+Line 1, characters 48-49:
+1 | let f : 'a @ writing -> 'a @ reading = fun x -> x
+                                                    ^
+Error: This value is "writing" but is expected to be "reading".
 |}]
 
 (* Lattice structure: [read] and [write] join to become [immutable].
@@ -1523,7 +1523,7 @@ Error: Signature mismatch:
          "'b @ read -> 'a * 'b"
 |}]
 
-(* Lattice structure: [reading] and [observable] join to become [stateful].
+(* Lattice structure: [reading] and [writing] join to become [stateful].
 
    We use module inclusion to check what the compiler infers without any
    mode annotations.
@@ -1532,7 +1532,7 @@ Error: Signature mismatch:
    arguments. *)
 
 module _ : sig
-  val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ stateful
+  val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateful
 end = struct
   let f a b = (a, b)
 end
@@ -1541,7 +1541,7 @@ end
 |}]
 
 module _ : sig
-  val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ observable
+  val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing
 end = struct
   let f a b = (a, b)
 end
@@ -1553,24 +1553,20 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig
-           val f : 'a @ observable -> 'b @ observable -> 'a * 'b @ observable
-         end
+         sig val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing end
        is not included in
-         sig
-           val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ observable
-         end
+         sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing end
        Values do not match:
-         val f : 'a @ observable -> 'b @ observable -> 'a * 'b @ observable
+         val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing
        is not included in
-         val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ observable
-       The type "'a @ observable -> 'b @ observable -> 'a * 'b @ observable"
+         val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing
+       The type "'a @ writing -> 'b @ writing -> 'a * 'b @ writing"
        is not compatible with the type
-         "'a @ reading -> 'b @ observable -> 'a * 'b @ observable"
+         "'a @ reading -> 'b @ writing -> 'a * 'b @ writing"
 |}]
 
 module _ : sig
-  val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ reading
+  val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ reading
 end = struct
   let f a b = (a, b)
 end
@@ -1584,19 +1580,19 @@ Error: Signature mismatch:
        Modules do not match:
          sig val f : 'a -> 'b -> 'a * 'b end
        is not included in
-         sig val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ reading end
+         sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ reading end
        Values do not match:
          val f : 'a -> 'b -> 'a * 'b
        is not included in
-         val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ reading
+         val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ reading
        The type "'a -> 'b -> 'a * 'b" is not compatible with the type
-         "'a @ reading -> 'b @ observable -> 'a * 'b @ reading"
+         "'a @ reading -> 'b @ writing -> 'a * 'b @ reading"
        Type "'b -> 'a * 'b" is not compatible with type
-         "'b @ observable -> 'a * 'b @ reading"
+         "'b @ writing -> 'a * 'b @ reading"
 |}]
 
 module _ : sig
-  val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ stateless
+  val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless
 end = struct
   let f a b = (a, b)
 end
@@ -1610,21 +1606,19 @@ Error: Signature mismatch:
        Modules do not match:
          sig val f : 'a -> 'b -> 'a * 'b end
        is not included in
-         sig
-           val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ stateless
-         end
+         sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless end
        Values do not match:
          val f : 'a -> 'b -> 'a * 'b
        is not included in
-         val f : 'a @ reading -> 'b @ observable -> 'a * 'b @ stateless
+         val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless
        The type "'a -> 'b -> 'a * 'b" is not compatible with the type
-         "'a @ reading -> 'b @ observable -> 'a * 'b @ stateless"
+         "'a @ reading -> 'b @ writing -> 'a * 'b @ stateless"
        Type "'b -> 'a * 'b" is not compatible with type
-         "'b @ observable -> 'a * 'b @ stateless"
+         "'b @ writing -> 'a * 'b @ stateless"
 |}]
 
 module _ : sig
-  val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ observable
+  val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ writing
 end = struct
   let f a b = (a, b)
 end
@@ -1638,21 +1632,19 @@ Error: Signature mismatch:
        Modules do not match:
          sig val f : 'a -> 'b -> 'a * 'b end
        is not included in
-         sig
-           val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ observable
-         end
+         sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ writing end
        Values do not match:
          val f : 'a -> 'b -> 'a * 'b
        is not included in
-         val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ observable
+         val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ writing
        The type "'a -> 'b -> 'a * 'b" is not compatible with the type
-         "'a @ observable -> 'b @ reading -> 'a * 'b @ observable"
+         "'a @ writing -> 'b @ reading -> 'a * 'b @ writing"
        Type "'b -> 'a * 'b" is not compatible with type
-         "'b @ reading -> 'a * 'b @ observable"
+         "'b @ reading -> 'a * 'b @ writing"
 |}]
 
 module _ : sig
-  val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ reading
+  val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading
 end = struct
   let f a b = (a, b)
 end
@@ -1666,18 +1658,18 @@ Error: Signature mismatch:
        Modules do not match:
          sig val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading end
        is not included in
-         sig val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ reading end
+         sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading end
        Values do not match:
          val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading
        is not included in
-         val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ reading
+         val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading
        The type "'a @ reading -> 'b @ reading -> 'a * 'b @ reading"
        is not compatible with the type
-         "'a @ observable -> 'b @ reading -> 'a * 'b @ reading"
+         "'a @ writing -> 'b @ reading -> 'a * 'b @ reading"
 |}]
 
 module _ : sig
-  val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ stateless
+  val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless
 end = struct
   let f a b = (a, b)
 end
@@ -1691,15 +1683,13 @@ Error: Signature mismatch:
        Modules do not match:
          sig val f : 'a -> 'b -> 'a * 'b end
        is not included in
-         sig
-           val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ stateless
-         end
+         sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless end
        Values do not match:
          val f : 'a -> 'b -> 'a * 'b
        is not included in
-         val f : 'a @ observable -> 'b @ reading -> 'a * 'b @ stateless
+         val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless
        The type "'a -> 'b -> 'a * 'b" is not compatible with the type
-         "'a @ observable -> 'b @ reading -> 'a * 'b @ stateless"
+         "'a @ writing -> 'b @ reading -> 'a * 'b @ stateless"
        Type "'b -> 'a * 'b" is not compatible with type
          "'b @ reading -> 'a * 'b @ stateless"
 |}]
@@ -1801,100 +1791,100 @@ Error: Signature mismatch:
          "'a * 'b @ immutable -> 'a read * 'b write"
 |}]
 
-(* Lattice structure: [reading] and [observable] meet to become [stateless].
+(* Lattice structure: [reading] and [writing] meet to become [stateless].
 
    We use module inclusion to check what the compiler infers without any
    mode annotations. *)
 
 type 'a reading = { reading : 'a @@ reading } [@@unboxed]
-type 'a observable = { observable : 'a @@ observable } [@@unboxed]
+type 'a writing = { writing : 'a @@ writing } [@@unboxed]
 
 [%%expect{|
 type 'a reading = { reading : 'a @@ reading; } [@@unboxed]
-type 'a observable = { observable : 'a @@ observable; } [@@unboxed]
+type 'a writing = { writing : 'a @@ writing; } [@@unboxed]
 |}]
 
 module _ : sig
-  val f : 'a * 'b @ stateless -> 'a reading * 'b observable
+  val f : 'a * 'b @ stateless -> 'a reading * 'b writing
 end = struct
-  let f (a, b) = { reading = a }, { observable = b }
+  let f (a, b) = { reading = a }, { writing = b }
 end
 
 [%%expect{|
 |}]
 
 module _ : sig
-  val f : 'a * 'b @ reading -> 'a reading * 'b observable
+  val f : 'a * 'b @ reading -> 'a reading * 'b writing
 end = struct
-  let f (a, b) = { reading = a }, { observable = b }
+  let f (a, b) = { reading = a }, { writing = b }
 end
 
 [%%expect{|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (a, b) = { reading = a }, { observable = b }
+4 |   let f (a, b) = { reading = a }, { writing = b }
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a * 'b @ stateless -> 'a reading * 'b observable end
+         sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
        is not included in
-         sig val f : 'a * 'b @ reading -> 'a reading * 'b observable end
+         sig val f : 'a * 'b @ reading -> 'a reading * 'b writing end
        Values do not match:
-         val f : 'a * 'b @ stateless -> 'a reading * 'b observable
+         val f : 'a * 'b @ stateless -> 'a reading * 'b writing
        is not included in
-         val f : 'a * 'b @ reading -> 'a reading * 'b observable
-       The type "'a * 'b @ stateless -> 'a reading * 'b observable"
+         val f : 'a * 'b @ reading -> 'a reading * 'b writing
+       The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type
-         "'a * 'b @ reading -> 'a reading * 'b observable"
+         "'a * 'b @ reading -> 'a reading * 'b writing"
 |}]
 
 module _ : sig
-  val f : 'a * 'b @ observable -> 'a reading * 'b observable
+  val f : 'a * 'b @ writing -> 'a reading * 'b writing
 end = struct
-  let f (a, b) = { reading = a }, { observable = b }
+  let f (a, b) = { reading = a }, { writing = b }
 end
 
 [%%expect{|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (a, b) = { reading = a }, { observable = b }
+4 |   let f (a, b) = { reading = a }, { writing = b }
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a * 'b @ stateless -> 'a reading * 'b observable end
+         sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
        is not included in
-         sig val f : 'a * 'b @ observable -> 'a reading * 'b observable end
+         sig val f : 'a * 'b @ writing -> 'a reading * 'b writing end
        Values do not match:
-         val f : 'a * 'b @ stateless -> 'a reading * 'b observable
+         val f : 'a * 'b @ stateless -> 'a reading * 'b writing
        is not included in
-         val f : 'a * 'b @ observable -> 'a reading * 'b observable
-       The type "'a * 'b @ stateless -> 'a reading * 'b observable"
+         val f : 'a * 'b @ writing -> 'a reading * 'b writing
+       The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type
-         "'a * 'b @ observable -> 'a reading * 'b observable"
+         "'a * 'b @ writing -> 'a reading * 'b writing"
 |}]
 
 module _ : sig
-  val f : 'a * 'b @ stateful -> 'a reading * 'b observable
+  val f : 'a * 'b @ stateful -> 'a reading * 'b writing
 end = struct
-  let f (a, b) = { reading = a }, { observable = b }
+  let f (a, b) = { reading = a }, { writing = b }
 end
 
 [%%expect{|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (a, b) = { reading = a }, { observable = b }
+4 |   let f (a, b) = { reading = a }, { writing = b }
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a * 'b @ stateless -> 'a reading * 'b observable end
+         sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
        is not included in
-         sig val f : 'a * 'b -> 'a reading * 'b observable end
+         sig val f : 'a * 'b -> 'a reading * 'b writing end
        Values do not match:
-         val f : 'a * 'b @ stateless -> 'a reading * 'b observable
+         val f : 'a * 'b @ stateless -> 'a reading * 'b writing
        is not included in
-         val f : 'a * 'b -> 'a reading * 'b observable
-       The type "'a * 'b @ stateless -> 'a reading * 'b observable"
-       is not compatible with the type "'a * 'b -> 'a reading * 'b observable"
+         val f : 'a * 'b -> 'a reading * 'b writing
+       The type "'a * 'b @ stateless -> 'a reading * 'b writing"
+       is not compatible with the type "'a * 'b -> 'a reading * 'b writing"
 |}]
 
 (* Modality composition: visibility. *)
@@ -2027,10 +2017,10 @@ let f ({ stateful } @ reading) = (stateful : @ reading)
 val f : 'a stateful @ reading -> 'a = <fun>
 |}]
 
-let f ({ stateful } @ observable) = (stateful : @ observable)
+let f ({ stateful } @ writing) = (stateful : @ writing)
 
 [%%expect{|
-val f : 'a stateful @ observable -> 'a = <fun>
+val f : 'a stateful @ writing -> 'a = <fun>
 |}]
 
 let f ({ stateful } @ stateless) = (stateful : @ stateless)
@@ -2051,24 +2041,24 @@ let f ({ reading } @ reading) = (reading : @ reading)
 val f : 'a reading @ reading -> 'a = <fun>
 |}]
 
-(* CR nmatschke: We compute [reading /\ observable = stateless], but
+(* CR nmatschke: We compute [reading /\ writing = stateless], but
    [shareable /\ nonportable = shareable], so portability gets stuck there. *)
 
-let f ({ reading } @ observable) = (reading : @ stateless)
+let f ({ reading } @ writing) = (reading : @ stateless)
 
 [%%expect{|
-Line 1, characters 36-43:
-1 | let f ({ reading } @ observable) = (reading : @ stateless)
-                                        ^^^^^^^
+Line 1, characters 33-40:
+1 | let f ({ reading } @ writing) = (reading : @ stateless)
+                                     ^^^^^^^
 Error: This value is "shareable"
          because it is the field "reading" (with some modality) of the record at line 1, characters 7-18.
        However, the highlighted expression is expected to be "portable".
 |}]
 
-let f ({ reading } @ observable) = (reading : @ stateless shareable)
+let f ({ reading } @ writing) = (reading : @ stateless shareable)
 
 [%%expect{|
-val f : 'a reading @ observable -> 'a = <fun>
+val f : 'a reading @ writing -> 'a = <fun>
 |}]
 
 (* CR nmatschke: This failure demonstrates that [stateless] is meaningful. *)
@@ -2090,56 +2080,56 @@ let f ({ reading } @ stateless) = (reading : @ stateless)
 val f : 'a reading @ stateless -> 'a = <fun>
 |}]
 
-let f ({ observable } @ stateful) = (observable : @ observable)
+let f ({ writing } @ stateful) = (writing : @ writing)
 
 [%%expect{|
-val f : 'a observable -> 'a = <fun>
+val f : 'a writing -> 'a = <fun>
 |}]
 
-(* CR nmatschke: We compute [observable /\ reading = stateless], but
+(* CR nmatschke: We compute [writing /\ reading = stateless], but
    [nonportable /\ shareable = shareable], so portability gets stuck there. *)
 
-let f ({ observable } @ reading) = (observable : @ stateless)
+let f ({ writing } @ reading) = (writing : @ stateless)
 
 [%%expect{|
-Line 1, characters 36-46:
-1 | let f ({ observable } @ reading) = (observable : @ stateless)
-                                        ^^^^^^^^^^
+Line 1, characters 33-40:
+1 | let f ({ writing } @ reading) = (writing : @ stateless)
+                                     ^^^^^^^
 Error: This value is "shareable"
-         because it is the field "observable" of the record at line 1, characters 7-21
+         because it is the field "writing" of the record at line 1, characters 7-18
          which is "shareable".
        However, the highlighted expression is expected to be "portable".
 |}]
 
-let f ({ observable } @ reading) = (observable : @ stateless shareable)
+let f ({ writing } @ reading) = (writing : @ stateless shareable)
 
 [%%expect{|
-val f : 'a observable @ reading -> 'a = <fun>
+val f : 'a writing @ reading -> 'a = <fun>
 |}]
 
 (* CR nmatschke: This failure demonstrates that [stateless] is meaningful. *)
 
-let f ({ observable } @ stateful) = (observable : @ stateless shareable)
+let f ({ writing } @ stateful) = (writing : @ stateless shareable)
 
 [%%expect{|
-Line 1, characters 37-47:
-1 | let f ({ observable } @ stateful) = (observable : @ stateless shareable)
-                                         ^^^^^^^^^^
-Error: This value is "observable"
-         because it is the field "observable" (with some modality) of the record at line 1, characters 7-21.
+Line 1, characters 34-41:
+1 | let f ({ writing } @ stateful) = (writing : @ stateless shareable)
+                                      ^^^^^^^
+Error: This value is "writing"
+         because it is the field "writing" (with some modality) of the record at line 1, characters 7-18.
        However, the highlighted expression is expected to be "stateless".
 |}]
 
-let f ({ observable } @ observable) = (observable : @ observable)
+let f ({ writing } @ writing) = (writing : @ writing)
 
 [%%expect{|
-val f : 'a observable @ observable -> 'a = <fun>
+val f : 'a writing @ writing -> 'a = <fun>
 |}]
 
-let f ({ observable } @ stateless) = (observable : @ stateless)
+let f ({ writing } @ stateless) = (writing : @ stateless)
 
 [%%expect{|
-val f : 'a observable @ stateless -> 'a = <fun>
+val f : 'a writing @ stateless -> 'a = <fun>
 |}]
 
 let f ({ stateless } @ stateful) = (stateless : @ stateless)
@@ -2154,10 +2144,10 @@ let f ({ stateless } @ reading) = (stateless : @ stateless)
 val f : 'a stateless @ reading -> 'a = <fun>
 |}]
 
-let f ({ stateless } @ observable) = (stateless : @ stateless)
+let f ({ stateless } @ writing) = (stateless : @ stateless)
 
 [%%expect{|
-val f : 'a stateless @ observable -> 'a = <fun>
+val f : 'a stateless @ writing -> 'a = <fun>
 |}]
 
 let f ({ stateless } @ stateless) = (stateless : @ stateless)
@@ -2200,29 +2190,29 @@ val f : ('a : value mod write). 'a @ shared immutable -> 'a @ read = <fun>
 (* CR nmatschke: The interaction with portability is tricky. Recall we have
    - [stateless => portable]
    - [reading => shareable]
-   - [observable => nonportable]
+   - [writing => nonportable]
 
    In the [value mod reading] case, we have
-   [observable ⊢ reading => stateless], but only
+   [writing ⊢ reading => stateless], but only
    [nonportable ⊢ shareable => shareable]
 
-   In the [value mod observable] case, we have
-   [reading ⊢ observable => stateless], but only
+   In the [value mod writing] case, we have
+   [reading ⊢ writing => stateless], but only
    [shareable ⊢ nonportable => shareable]. *)
 
-let f : type (a : value mod reading). a @ observable -> a @ stateless shareable =
+let f : type (a : value mod reading). a @ writing -> a @ stateless shareable =
   fun x -> x
 
 [%%expect{|
-val f : ('a : value mod reading). 'a @ observable -> 'a @ shareable stateless =
+val f : ('a : value mod reading). 'a @ writing -> 'a @ shareable stateless =
   <fun>
 |}]
 
-let f : type (a : value mod observable). a @ reading -> a @ stateless shareable =
+let f : type (a : value mod writing). a @ reading -> a @ stateless shareable =
   fun x -> x
 
 [%%expect{|
-val f : ('a : value mod observable). 'a @ reading -> 'a @ shareable stateless =
+val f : ('a : value mod writing). 'a @ reading -> 'a @ shareable stateless =
   <fun>
 |}]
 
