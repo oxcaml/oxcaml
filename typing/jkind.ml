@@ -2543,9 +2543,7 @@ let get_unique_implies_uncontended (type l r) ~context env (jk : (l * r) jkind)
          (fun acc (ty, ({ relevant_axes } : With_bounds_type_info.t)) ->
            if
              not
-               (Axis_set.mem
-                  relevant_axes
-                  (Nonmodal Unique_implies_uncontended))
+               (Axis_set.mem relevant_axes (Nonmodal Unique_implies_uncontended))
            then acc
            else
              let ty_bound =
