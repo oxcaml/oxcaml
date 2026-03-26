@@ -133,7 +133,7 @@ let print_unique_use ppf (u,l) =
 
 type alloc_mode_r = Mode.Locality.r
 
-let submode_with_constant_l_err ?hint pp c alloc_mode =
+let submode_constant_alloc_mode_r_err ?hint pp c alloc_mode =
   Mode.Locality.submode_err pp (Mode.Locality.of_const ?hint c) alloc_mode
 
 let zap_alloc_r_to_ceil_exn (alloc_mode : alloc_mode_r) =
@@ -149,7 +149,13 @@ let create_alloc_mode_r m = m
 
 let alloc_mode_r_legacy = Mode.Locality.disallow_left Mode.Locality.legacy
 
-type alloc_mode_l = Mode.Locality.l
+type alloc_mode_l = Mode.Locality.lr
+
+let submode_constant_alloc_mode_l ?pp c alloc_mode =
+  Mode.Locality.submode ?pp (Mode.Locality.of_const c) alloc_mode |> ignore
+
+let submode_alloc_mode_l_constant ?pp alloc_mode c =
+  Mode.Locality.submode ?pp alloc_mode (Mode.Locality.of_const c) |> ignore
 
 let zap_alloc_l_to_floor_exn (alloc_mode : alloc_mode_l) =
   Mode.Locality.zap_to_floor_exn alloc_mode
@@ -162,7 +168,7 @@ let print_alloc_mode_l ppf alloc_mode =
 
 let create_alloc_mode_l m = m
 
-let alloc_mode_l_legacy = Mode.Locality.disallow_right Mode.Locality.legacy
+let alloc_mode_l_legacy = Mode.Locality.legacy
 
 type texp_field_boxing =
   | Boxing of alloc_mode_r * unique_use
