@@ -197,9 +197,6 @@ module Printtyp = Printtyp.Doc
 let as_inline_code pr = Format_doc.compat @@ Style.as_inline_code pr
 let inline_code = Format_doc.compat Style.inline_code
 
-let as_inline_code pr = Format_doc.compat @@ Style.as_inline_code pr
-let inline_code = Format_doc.compat Style.inline_code
-
 let report_error ppf = function
   | Unbound_global glob ->
       fprintf ppf "@[Unbound identifier %a@]@."
