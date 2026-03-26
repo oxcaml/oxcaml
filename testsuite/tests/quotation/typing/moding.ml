@@ -91,7 +91,7 @@ Line 1, characters 27-29:
 1 | let e = fun x -> <[ M.free $x ]>
                                ^^
 Error: This value is "aliased"
-         because it is an unquoted expression and thus always at the legacy modes.
+         because it is a quoted expression's result and thus always at the legacy modes.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -102,7 +102,7 @@ Line 1, characters 27-29:
 1 | let e = fun x -> <[ M.send $x ]>
                                ^^
 Error: This value is "nonportable"
-         because it is an unquoted expression and thus always at the legacy modes.
+         because it is a quoted expression's result and thus always at the legacy modes.
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -120,7 +120,7 @@ Line 8, characters 34-35:
                                       ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is a quoted expression and thus always at the legacy modes.
+         because it is a quoted expression's result and thus always at the legacy modes.
 |}]
 
 (* Unique result *)
@@ -138,7 +138,7 @@ Line 1, characters 33-34:
                                      ^
 Error: This value is "once"
        but is expected to be "many"
-         because it is a quoted expression and thus always at the legacy modes.
+         because it is a quoted expression's result and thus always at the legacy modes.
 |}]
 
 (* Portable result *)
@@ -155,7 +155,7 @@ Line 1, characters 38-39:
                                           ^
 Error: This value is "contended"
        but is expected to be "uncontended"
-         because it is a quoted expression and thus always at the legacy modes.
+         because it is a quoted expression's result and thus always at the legacy modes.
 |}]
 
 (** Quoting expressions with non-legacy closures **)
