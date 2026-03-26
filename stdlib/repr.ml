@@ -12,10 +12,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-external phys_equal : 'a -> 'a -> bool = "%eq"
+external phys_equal :
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%eq"
 
-external equal : 'a -> 'a -> bool = "%equal"
-external compare : 'a -> 'a -> int = "%compare"
+external equal :
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%equal"
+external compare :
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> int
+  = "%compare"
 
 let min = Stdlib.min
 let max = Stdlib.max

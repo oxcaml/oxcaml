@@ -61,8 +61,11 @@ let unsafe_to_char = Char.unsafe_chr
 let equal : int -> int -> bool = ( = )
 let compare : int -> int -> int = Stdlib.compare
 
+(* [caml_hash_exn] doesn't raise on ints, so it's safe for
+   it to be marked as [@@noalloc].
+ *)
 external seeded_hash_param :
-  int -> int -> int -> 'a -> int = "caml_hash" [@@noalloc]
+  int -> int -> int -> 'a -> int @@ portable = "caml_hash_exn" [@@noalloc]
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
 let hash x = seeded_hash_param 10 100 0 x
 

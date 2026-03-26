@@ -31,33 +31,7 @@
 #endif
 #endif
 
-<<<<<<< oxcaml
-static
-#ifdef _MSC_VER
-__forceinline
-#else
-__inline
-#endif
-unsigned long read_size(const char * const ptr)
-||||||| upstream-base
-/* Two macros are required so that QUOTE(foo) stringizes the _expansion_ of foo
-   rather than foo itself. cf. the Stringizing chapter in the cpp manual
-   (https://gcc.gnu.org/onlinedocs/gcc-13.1.0/cpp/Stringizing.html). */
-#define Q(x) #x
-#define QUOTE(x) Q(x)
-
-char * default_runtime_name = QUOTE(RUNTIME_NAME);
-
-static
-#ifdef _MSC_VER
-__forceinline
-#else
-__inline
-#endif
-unsigned long read_size(const char * const ptr)
-=======
 Caml_inline unsigned long read_size(const char * const ptr)
->>>>>>> upstream-incoming
 {
   const unsigned char * const p = (const unsigned char * const) ptr;
   return ((unsigned long) p[0] << 24) | ((unsigned long) p[1] << 16) |

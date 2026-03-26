@@ -328,13 +328,7 @@ let create_table public_methods =
   table
 
 let init_class table =
-<<<<<<< oxcaml
   let _ : int = Atomic.fetch_and_add inst_var_count (table.size - 1) in
-||||||| upstream-base
-  inst_var_count := !inst_var_count + table.size - 1;
-=======
-  ignore (Atomic.fetch_and_add inst_var_count (table.size - 1));
->>>>>>> upstream-incoming
   table.initializers <- List.rev table.initializers;
   resize table (3 + Obj.magic table.methods.(1) * 16 / Sys.word_size)
 
@@ -368,13 +362,7 @@ let make_class_store pub_meths class_init init_table =
 
 let dummy_class loc =
   let undef = fun _ -> raise (Undefined_recursive_module loc) in
-<<<<<<< oxcaml
-  (magic undef, undef, undef, Obj.repr 0)
-||||||| upstream-base
-  (Obj.magic undef, undef, undef, Obj.repr 0)
-=======
-  (Obj.magic undef, undef, Obj.repr 0)
->>>>>>> upstream-incoming
+  (magic undef, undef, Obj.repr 0)
 
 (**** Objects ****)
 

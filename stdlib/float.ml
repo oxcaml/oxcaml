@@ -190,19 +190,20 @@ module Array = struct
   external unsafe_get : t -> int -> float @@ portable = "%floatarray_unsafe_get"
   external unsafe_set : t -> int -> float -> unit @@ portable = "%floatarray_unsafe_set"
 
-  external make : (int[@untagged]) -> (float[@unboxed]) -> t =
+  external make : (int[@untagged]) -> (float[@unboxed]) -> t @@ portable =
     "caml_floatarray_make" "caml_floatarray_make_unboxed"
 
   external unsafe_fill
     : t -> (int[@untagged]) -> (int[@untagged]) -> (float[@unboxed]) -> unit
+        @@ portable
     = "caml_floatarray_fill" "caml_floatarray_fill_unboxed" [@@noalloc]
 
   external unsafe_blit: t -> int -> t -> int -> int -> unit @@ portable =
     "caml_floatarray_blit" [@@noalloc]
 
-  external unsafe_sub : t -> int -> int -> t = "caml_floatarray_sub"
-  external append_prim : t -> t -> t = "caml_floatarray_append"
-  external concat : t list -> t = "caml_floatarray_concat"
+  external unsafe_sub : t -> int -> int -> t @@ portable = "caml_floatarray_sub"
+  external append_prim : t -> t -> t @@ portable = "caml_floatarray_append"
+  external concat : t list -> t @@ portable = "caml_floatarray_concat"
 
   let check a ofs len msg =
     if ofs < 0 || len < 0 || ofs + len < 0 || ofs + len > length a then
@@ -251,7 +252,7 @@ module Array = struct
 
   let copy a =
     let l = length a in
-    if l = 0 then empty
+    if l = 0 then Obj.magic_uncontended empty
     else unsafe_sub a 0 l
 
   let append a1 a2 =
