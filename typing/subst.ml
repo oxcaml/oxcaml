@@ -521,16 +521,6 @@ let rec typexp copy_scope s ty =
       if should_duplicate_vars then newpersty (Tvar {name = None; jkind})
       else newgenstub ~scope:(get_scope ty) jkind
     in
-    let copy_mode =
-      if should_duplicate_vars || get_id ty < 0
-      then (fun m -> For_copy.mode_duplicate copy_scope m)
-      else (fun m -> m)
-    in
-    let copy_mode_generic =
-      if should_duplicate_vars || get_id ty < 0
-      then (fun m -> For_copy.mode_copy_generic copy_scope m)
-      else (fun m -> m)
-    in
     For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
     let desc =
       if has_fixed_row then
@@ -610,10 +600,17 @@ let rec typexp copy_scope s ty =
           Tlink (typexp copy_scope s t2)
       | Tarrow ((label, marg, mret), arg, ret, comm) ->
           let marg, mret =
+            if get_id ty < 0 then
+              For_copy.mode_copy_generic copy_scope marg,
+              For_copy.mode_copy_generic copy_scope mret
+            else
             match s.additional_action with
             | Prepare_for_saving { prepare_mode; _ } ->
-              copy_mode_generic (prepare_mode marg),
-              copy_mode_generic (prepare_mode mret)
+              For_copy.mode_copy_generic copy_scope (prepare_mode marg),
+              For_copy.mode_copy_generic copy_scope (prepare_mode mret)
+            | Duplicate_variables ->
+              For_copy.mode_copy_generic copy_scope marg,
+              For_copy.mode_copy_generic copy_scope mret
             | _ -> marg, mret
           in
           let arg = typexp copy_scope s arg in
@@ -621,7 +618,7 @@ let rec typexp copy_scope s ty =
           let comm = copy_commu comm in
           Tarrow ((label, marg, mret), arg, ret, comm)
       | _ ->
-        copy_type_desc (typexp copy_scope s) copy_mode desc
+        copy_type_desc (typexp copy_scope s) (fun _ -> assert false) desc
     in
     Transient_expr.set_stub_desc ty' desc;
     ty'

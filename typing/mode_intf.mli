@@ -812,15 +812,16 @@ module type S = sig
     *)
     val partial_apply : (allowed * 'r) t -> l
 
-    (** Copies a mode variable and its submodes from generic level to the
+    (** Copies a mode variable and its children from generic level to the
         current level *)
     val instantiate :
       copy_scope:copy_scope -> current_level:int -> ('l * 'r) t -> ('l * 'r) t
 
-    (** Copies a mode variable and its submodes from generic level to max int *)
+    (** Copies a mode variable and its children from generic level to generic
+        level *)
     val copy_generic : copy_scope:copy_scope -> ('l * 'r) t -> ('l * 'r) t
 
-    (** Fully duplicates a mode and its submodes to max int *)
+    (** Fully duplicates a mode and its children to max int *)
     val duplicate : copy_scope:copy_scope -> ('l * 'r) t -> ('l * 'r) t
 
     module Guts : sig
