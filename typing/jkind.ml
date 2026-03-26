@@ -423,8 +423,14 @@ module Mod_bounds = struct
     let crossing = Crossing.meet (crossing t1) (crossing t2) in
     let externality = Externality.meet (externality t1) (externality t2) in
     let nullability = Nullability.meet (nullability t1) (nullability t2) in
+    let unique_implies_uncontended =
+      Unique_implies_uncontended.meet
+        (unique_implies_uncontended t1)
+        (unique_implies_uncontended t2)
+    in
     let separability = Separability.meet (separability t1) (separability t2) in
-    create crossing ~externality ~nullability ~separability
+    create crossing ~externality ~nullability ~unique_implies_uncontended
+      ~separability
 
   let less_or_equal t1 t2 =
     let[@inline] modal_less_or_equal ax : Sub_result.t =
@@ -462,6 +468,11 @@ module Mod_bounds = struct
          (axis_less_or_equal ~le:Nullability.le
             ~axis:(Pack (Nonmodal Nullability)) (nullability t1)
             (nullability t2))
+    @@ Sub_result.combine
+         (axis_less_or_equal ~le:Unique_implies_uncontended.le
+            ~axis:(Pack (Nonmodal Unique_implies_uncontended))
+            (unique_implies_uncontended t1)
+            (unique_implies_uncontended t2))
     @@ axis_less_or_equal ~le:Separability.le
          ~axis:(Pack (Nonmodal Separability)) (separability t1)
          (separability t2)
@@ -471,6 +482,7 @@ module Mod_bounds = struct
     | Modal ax -> t |> crossing |> (Crossing.proj [@inlined hint]) ax
     | Nonmodal Externality -> externality t
     | Nonmodal Nullability -> nullability t
+    | Nonmodal Unique_implies_uncontended -> unique_implies_uncontended t
     | Nonmodal Separability -> separability t
 
   (** Get all axes that are set to max *)
@@ -503,6 +515,10 @@ module Mod_bounds = struct
     |> add_if
          (Nullability.le Nullability.max (nullability t))
          (Nonmodal Nullability)
+    |> add_if
+         (Unique_implies_uncontended.le Unique_implies_uncontended.max
+            (unique_implies_uncontended t))
+         (Nonmodal Unique_implies_uncontended)
     |> add_if
          (Separability.le Separability.max (separability t))
          (Nonmodal Separability)
@@ -1190,6 +1206,9 @@ module Base_and_axes = struct
               Mod_bounds.create crossing
                 ~externality:(value_for_axis ~axis:(Nonmodal Externality))
                 ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
+                ~unique_implies_uncontended:
+                  (value_for_axis
+                     ~axis:(Nonmodal Unique_implies_uncontended))
                 ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
             let found_jkind_for_ty ctl b_upper_bounds b_with_bounds quality
@@ -1657,9 +1676,17 @@ module Const = struct
           then Separability.max
           else Mod_bounds.separability actual
         in
+        let unique_implies_uncontended =
+          if
+            Unique_implies_uncontended.equal
+              (Mod_bounds.unique_implies_uncontended base)
+              (Mod_bounds.unique_implies_uncontended actual)
+          then Unique_implies_uncontended.max
+          else Mod_bounds.unique_implies_uncontended actual
+        in
         Some
           (Mod_bounds.create crossing_diff ~externality ~nullability
-             ~separability)
+             ~unique_implies_uncontended ~separability)
 
     let get_modal_bounds ~verbosity ~(base : Mod_bounds.t)
         (actual : Mod_bounds.t) =
@@ -2271,7 +2298,9 @@ let for_boxed_tuple elts =
 let for_open_boxed_row =
   let mod_bounds =
     Mod_bounds.create Crossing.max ~externality:Externality.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
+      ~nullability:Nullability.Non_null
+      ~unique_implies_uncontended:Unique_implies_uncontended.min
+      ~separability:Separability.Non_float
   in
   fresh_jkind
     { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
@@ -2343,7 +2372,9 @@ let for_object =
     { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
-          ~nullability:Non_null ~separability:Separability.Non_float;
+          ~nullability:Non_null
+          ~unique_implies_uncontended:Unique_implies_uncontended.min
+          ~separability:Separability.Non_float;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)

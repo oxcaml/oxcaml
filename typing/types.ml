@@ -124,6 +124,8 @@ type mod_bounds =
   { crossing : Mode.Crossing.t;
     externality: Jkind_axis.Externality.t;
     nullability: Jkind_axis.Nullability.t;
+    unique_implies_uncontended:
+      Jkind_axis.Unique_implies_uncontended.t;
     separability: Jkind_axis.Separability.t;
   }
 

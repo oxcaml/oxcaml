@@ -58,6 +58,7 @@ val create :
   staticity:Mode.Staticity.const ->
   externality:Jkind_axis.Externality.t ->
   nullability:Jkind_axis.Nullability.t ->
+  unique_implies_uncontended:Jkind_axis.Unique_implies_uncontended.t ->
   separability:Jkind_axis.Separability.t ->
   t
 
@@ -84,6 +85,9 @@ val staticity : t -> Mode.Staticity.const
 val externality : t -> Jkind_axis.Externality.t
 
 val nullability : t -> Jkind_axis.Nullability.t
+
+val unique_implies_uncontended :
+  t -> Jkind_axis.Unique_implies_uncontended.t
 
 val separability : t -> Jkind_axis.Separability.t
 

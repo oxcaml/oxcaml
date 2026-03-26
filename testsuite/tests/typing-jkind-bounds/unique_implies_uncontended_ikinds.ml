@@ -8,7 +8,17 @@
 
 type 'a aliased_modality = { aliased : 'a @@ aliased }
 [%%expect{|
-type 'a aliased_modality = { aliased : 'a @@ aliased; }
+Line 1, characters 0-54:
+1 | type 'a aliased_modality = { aliased : 'a @@ aliased }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "aliased_modality" is
+           value
+             mod forkable unyielding many stateless immutable non_float
+             with 'a
+         because it's a boxed record type.
+       But the kind of type "aliased_modality" must be a subkind of
+           value mod unique_implies_uncontended non_float
+         because it's a boxed record type.
 |}]
 
 type 'a contended_modality = { contended : 'a @@ contended }
@@ -64,34 +74,34 @@ type good_contended_mut = mutable_record contended_modality
 |}]
 
 type good_aliased_contended_ref : value mod unique_implies_uncontended =
-  int ref aliased_modality contended_modality
+  int ref Modes.Aliased.t contended_modality
 (* CR jujacobs: Explicitly contended aliased refs should satisfy this axis. *)
 [%%expect{|
-type good_aliased_contended_ref = int ref aliased_modality contended_modality
+type good_aliased_contended_ref = int ref Modes.Aliased.t contended_modality
 |}]
 
 type good_aliased_contended_mut : value mod unique_implies_uncontended =
-  mutable_record aliased_modality contended_modality
+  mutable_record Modes.Aliased.t contended_modality
 (* CR jujacobs: Explicitly contended aliased mutable records should satisfy this axis. *)
 [%%expect{|
 type good_aliased_contended_mut =
-    mutable_record aliased_modality contended_modality
+    mutable_record Modes.Aliased.t contended_modality
 |}]
 
 (*****************************************)
 (* Types that should not satisfy the axis *)
 
-type bad_ref : value mod unique_implies_uncontended = int ref aliased_modality
+type bad_ref : value mod unique_implies_uncontended = int ref Modes.Aliased.t
 (* Control: Aliased refs should not satisfy this axis. *)
 [%%expect{|
-type bad_ref = int ref aliased_modality
+type bad_ref = int ref Modes.Aliased.t
 |}]
 
 type bad_mut : value mod unique_implies_uncontended =
-  mutable_record aliased_modality
+  mutable_record Modes.Aliased.t
 (* Control: Aliased mutable records should not satisfy this axis. *)
 [%%expect{|
-type bad_mut = mutable_record aliased_modality
+type bad_mut = mutable_record Modes.Aliased.t
 |}]
 
 (**********************)
@@ -177,7 +187,7 @@ Line 2, characters 18-19:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
-let foo (t : int ref aliased_modality @ unique contended) =
+let foo (t : int ref Modes.Aliased.t @ unique contended) =
   use_uncontended t
 (* Control: an aliased wrapper should not enable uncontended crossing. *)
 [%%expect{|
@@ -187,11 +197,11 @@ Line 2, characters 18-19:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
-let foo (t : int ref aliased_modality contended_modality @ unique contended) =
+let foo (t : int ref Modes.Aliased.t contended_modality @ unique contended) =
   use_uncontended t
 [%%expect{|
 val foo :
-  int ref aliased_modality contended_modality @ unique contended -> unit =
+  int ref Modes.Aliased.t contended_modality @ unique contended -> unit =
   <fun>
 |}]
 
@@ -205,7 +215,7 @@ Line 2, characters 18-19:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
-let foo (t : mutable_record aliased_modality @ unique contended) =
+let foo (t : mutable_record Modes.Aliased.t @ unique contended) =
   use_uncontended t
 (* Control: an aliased wrapper should not enable uncontended crossing. *)
 [%%expect{|
@@ -217,11 +227,11 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let foo
     (t :
-       mutable_record aliased_modality contended_modality
+       mutable_record Modes.Aliased.t contended_modality
        @ unique contended) =
   use_uncontended t
 [%%expect{|
 val foo :
-  mutable_record aliased_modality contended_modality @ unique contended ->
+  mutable_record Modes.Aliased.t contended_modality @ unique contended ->
   unit = <fun>
 |}]

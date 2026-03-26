@@ -125,6 +125,8 @@ module Modifier_axis_pair = struct
       | "internal" -> nonmodal Externality Internal
       | "external64" -> nonmodal Externality External64
       | "external_" -> nonmodal Externality External
+      | "unique_implies_uncontended" ->
+        nonmodal Unique_implies_uncontended Holds
       | "maybe_separable" -> nonmodal Separability Maybe_separable
       | "separable" -> nonmodal Separability Separable
       | "non_float" -> nonmodal Separability Non_float
@@ -152,6 +154,8 @@ module Transled_modifiers = struct
          different type operators applied on mode constants. *)
       externality : Jkind_axis.Externality.t Location.loc option;
       nullability : Jkind_axis.Nullability.t Location.loc option;
+      unique_implies_uncontended :
+        Jkind_axis.Unique_implies_uncontended.t Location.loc option;
       separability : Jkind_axis.Separability.t Location.loc option
     }
 
@@ -167,6 +171,7 @@ module Transled_modifiers = struct
       visibility = None;
       externality = None;
       nullability = None;
+      unique_implies_uncontended = None;
       separability = None;
       staticity = None
     }
@@ -185,6 +190,7 @@ module Transled_modifiers = struct
     | Modal (Monadic Staticity) -> t.staticity
     | Nonmodal Externality -> t.externality
     | Nonmodal Nullability -> t.nullability
+    | Nonmodal Unique_implies_uncontended -> t.unique_implies_uncontended
     | Nonmodal Separability -> t.separability
 
   let set (type a) ~(axis : a Axis.t) (t : t) (value : a Location.loc option) :
@@ -202,6 +208,8 @@ module Transled_modifiers = struct
     | Modal (Monadic Staticity) -> { t with staticity = value }
     | Nonmodal Externality -> { t with externality = value }
     | Nonmodal Nullability -> { t with nullability = value }
+    | Nonmodal Unique_implies_uncontended ->
+      { t with unique_implies_uncontended = value }
     | Nonmodal Separability -> { t with separability = value }
 end
 
@@ -278,10 +286,6 @@ let transl_mod_bounds annots =
       Transled_modifiers.set ~axis bounds_so_far (Some { txt = mode; loc })
     | exception Not_found -> (
       match txt with
-      | "unique_implies_uncontended" ->
-        (* Parser-only first step: accept the modifier syntax without yet
-           threading semantics through jkinds or mode crossing. *)
-        bounds_so_far
       | "everything" ->
         Transled_modifiers.
           { areality =
@@ -306,6 +310,8 @@ let transl_mod_bounds annots =
             staticity = None;
             nullability =
               Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
+            unique_implies_uncontended =
+              Some { txt = Unique_implies_uncontended.min; loc };
             separability =
               Transled_modifiers.get ~axis:(Nonmodal Separability) bounds_so_far
           }
@@ -359,12 +365,18 @@ let transl_mod_bounds annots =
     Option.fold ~some:Location.get_txt ~none:Nullability.max
       raw_modifiers.nullability
   in
+  let unique_implies_uncontended =
+    Option.fold ~some:Location.get_txt
+      ~none:Unique_implies_uncontended.max
+      raw_modifiers.unique_implies_uncontended
+  in
   let separability =
     Option.fold ~some:Location.get_txt ~none:Separability.max
       raw_modifiers.separability
   in
   let crossing = Crossing.modality modality Crossing.max in
-  create crossing ~externality ~nullability ~separability
+  create crossing ~externality ~nullability ~unique_implies_uncontended
+    ~separability
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]
@@ -592,6 +604,9 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     in
     [ mk_annot Externality.max Externality.print (externality bounds);
       mk_annot Nullability.max Nullability.print (nullability bounds);
+      mk_annot Unique_implies_uncontended.max
+        Unique_implies_uncontended.print
+        (unique_implies_uncontended bounds);
       mk_annot Separability.max Separability.print (separability bounds) ]
     |> List.partition_map (fun (annot, only_when_verbose) ->
         match only_when_verbose with false -> Left annot | true -> Right annot)
