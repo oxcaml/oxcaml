@@ -199,11 +199,11 @@ module type Common = sig
 
   (** zaps all variables to ceil (including generic variables): use with caution
   *)
-  val zap_to_ceil_force : ('l * allowed) t -> Const.t
+  (* val zap_to_ceil_force : ('l * allowed) t -> Const.t *)
 
   (** zaps all variables to floor (including generic variables): use with
       caution *)
-  val zap_to_floor_force : (allowed * 'r) t -> Const.t
+  (* val zap_to_floor_force : (allowed * 'r) t -> Const.t *)
 
   (** zaps non-generic variables to ceil, raises a [Cannot_zap_generic] excetion
       if variable is generic *)
@@ -711,6 +711,8 @@ module type S = sig
       (** Similar to [comonadic_to_monadic_min] but for constants *)
       val comonadic_to_monadic_min : Comonadic.Const.t -> Monadic.Const.t
 
+      val monadic_to_comonadic_min : Monadic.Const.t -> Comonadic.Const.t
+
       (** Prints a constant on any axis. *)
       val print_axis : 'a Axis.t -> Fmt.formatter -> 'a -> unit
     end
@@ -732,6 +734,108 @@ module type S = sig
     type zap_scope
 
     val with_zap_scope : (zap_scope:zap_scope -> 'a) -> 'a
+
+    (** Exposed subset of the monotone Lattices interface *)
+    module C : sig
+      type ('a, 'b, 'd) morph
+
+      type 'a obj
+
+      val le : 'a obj -> 'a -> 'a -> bool
+
+      val equal_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.eq option
+
+      val src : 'b obj -> ('a, 'b, 'd) morph -> 'a obj
+
+      val id : ('a, 'a, 'd) morph
+
+      val compose :
+        'c obj -> ('b, 'c, 'd) morph -> ('a, 'b, 'd) morph -> ('a, 'c, 'd) morph
+
+      val equal_morph :
+        'b obj ->
+        ('a0, 'b, 'l0 * 'r0) morph ->
+        ('a1, 'b, 'l1 * 'r1) morph ->
+        ('a0, 'a1) Misc.eq option
+
+      val left_adjoint :
+        'b obj -> ('a, 'b, 'l * allowed) morph -> ('b, 'a, left_only) morph
+
+      val disallow_right :
+        ('a, 'b, 'l * 'r) morph -> ('a, 'b, 'l * disallowed) morph
+
+      val apply : 'b obj -> ('a, 'b, 'd) morph -> 'a -> 'b
+
+      val print_morph : 'b obj -> Fmt.formatter -> ('a, 'b, 'd) morph -> unit
+    end
+
+    (** The exposed description of modes *)
+    module Desc : sig
+      module Var : sig
+        type 'a t
+
+        type ('b, 'd) t_with_morph =
+          | Amorphvar : 'a t * ('a, 'b, 'd) C.morph -> ('b, 'd) t_with_morph
+
+        module Head : sig
+          type 'a t =
+            { desc_id : int;
+              desc_upper : 'a;
+              desc_lower : 'a;
+              desc_vlower : ('a, left_only) t_with_morph list;
+              desc_level : int
+            }
+
+          val equal : 'a t -> 'b t -> bool
+
+          val hash : 'a t -> int
+        end
+
+        val force : 'a C.obj -> 'a t -> 'a Head.t
+      end
+
+      type ('b, 'd) morphvar =
+        | Amorphvar : 'a Var.Head.t * ('a, 'b, 'd) C.morph -> ('b, 'd) morphvar
+
+      type ('a, 'd) t =
+        | Amode : 'a -> ('a, 'l * 'r) t
+        | Amodevar : ('a, 'd) morphvar -> ('a, 'd) t
+        | Amodejoin :
+            'a * ('a, 'l * disallowed) morphvar list
+            -> ('a, 'l * disallowed) t
+        | Amodemeet :
+            'a * ('a, disallowed * 'r) morphvar list
+            -> ('a, disallowed * 'r) t
+
+      val equal : 'a C.obj -> ('a, 'l * 'r) t -> ('a, 'l * 'r) t -> bool
+
+      val print : 'a C.obj -> Fmt.formatter -> ('a, 'l * 'r) t -> unit
+    end
+
+    val obj_monadic : Monadic.Const.t C.obj
+
+    val obj_comonadic : Comonadic.Const.t C.obj
+
+    val get_comonadic_desc : 'd Comonadic.t -> (Comonadic.Const.t, 'd) Desc.t
+
+    val get_monadic_desc :
+      ('l * 'r) Monadic.t -> (Monadic.Const.t, 'r * 'l) Desc.t
+
+    val meet_const_morph : 'a -> ('a, 'a, allowed * disallowed) C.morph
+
+    val pretty_print_monadic_morph :
+      (Fmt.formatter -> 'a -> unit) ->
+      'a ->
+      Fmt.formatter ->
+      ('d, Monadic.Const.t, 'f) C.morph ->
+      unit
+
+    val pretty_print_comonadic_morph :
+      (Fmt.formatter -> 'a -> unit) ->
+      'a ->
+      Fmt.formatter ->
+      ('d, Comonadic.Const.t, 'f) C.morph ->
+      unit
 
     include
       Common
@@ -787,15 +891,15 @@ module type S = sig
 
     val zap_to_legacy : lr -> Const.t option
 
-    val zap_to_legacy_force : lr -> Const.t
+    val zap_to_legacy_force : ?commit:bool -> lr -> Const.t
 
     val zap_to_ceil_exn : ('l * allowed) t -> Const.t
 
     val zap_to_floor_exn : (allowed * 'r) t -> Const.t
 
-    val zap_to_ceil_force : ('l * allowed) t -> Const.t
+    (*val zap_to_ceil_force : ('l * allowed) t -> Const.t
 
-    val zap_to_floor_force : (allowed * 'r) t -> Const.t
+    val zap_to_floor_force : (allowed * 'r) t -> Const.t*)
 
     val comonadic_to_monadic_min :
       ?hint:('r * disallowed) neg Hint.morph ->
@@ -834,6 +938,18 @@ module type S = sig
       (** Returns [Some c] if the given mode has been constrained to constant
           [c]. see notes on [get_floor] in [solver_intf.mli] for cautions. *)
       val check_const : (allowed * allowed) t -> Const.t option
+
+      (** Returns the precise bounds of a mode, as close to legacy as possible.
+          see notes on [get_floor] in [solver_intf.mli] for cautions. *)
+      val get_legacy : (allowed * allowed) t -> Const.t
+
+      (** Returns the precise ceiling of a mode. see notes on [get_ceil] in
+          [solver_intf.mli] for cautions. *)
+      val get_ceil : ('l * allowed) t -> Const.t
+
+      (** Checks that a constant is within the precise bounds of a mode. see
+          notes on [get_floor] in [solver_intf.mli] for cautions. *)
+      val in_bounds : Const.t -> (allowed * allowed) t -> bool
     end
   end
 
@@ -1127,6 +1243,11 @@ module type S = sig
         visibility:Visibility.Const.t Atom.t ->
         staticity:Staticity.Const.t Atom.t ->
         t
+
+      val apply_right :
+        t ->
+        (disallowed * 'r) Alloc.Monadic.t ->
+        (disallowed * 'r) Alloc.Monadic.t
     end
 
     module Comonadic : sig
@@ -1159,6 +1280,11 @@ module type S = sig
       (** Create the mode crossing for a type whose values are always
           constructed at the given mode. *)
       val always_constructed_at : Value.Comonadic.Const.t -> t
+
+      val apply_left :
+        t ->
+        ('l * disallowed) Alloc.Comonadic.t ->
+        ('l * disallowed) Alloc.Comonadic.t
     end
 
     (** The mode crossing capability on all axes, split into monadic and
