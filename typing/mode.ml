@@ -524,7 +524,7 @@ module Lattices = struct
     type t =
       | Portable (* 0b00 *)
       | Shareable (* 0b01 *)
-      | Poisoning (* 0b10 *)
+      | Corruptable (* 0b10 *)
       | Nonportable (* 0b11 *)
 
     include Diamond (struct
@@ -534,7 +534,7 @@ module Lattices = struct
 
       let fst = Shareable
 
-      let snd = Poisoning
+      let snd = Corruptable
 
       let max = Nonportable
     end)
@@ -544,7 +544,7 @@ module Lattices = struct
     let print ppf = function
       | Portable -> Fmt.fprintf ppf "portable"
       | Shareable -> Fmt.fprintf ppf "shareable"
-      | Poisoning -> Fmt.fprintf ppf "poisoning"
+      | Corruptable -> Fmt.fprintf ppf "corruptable"
       | Nonportable -> Fmt.fprintf ppf "nonportable"
   end
 
@@ -552,7 +552,7 @@ module Lattices = struct
     (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
       | Uncontended (* 0b00 *)
-      | Poisoned (* 0b01 *)
+      | Corrupted (* 0b01 *)
       | Shared (* 0b10 *)
       | Contended (* 0b11 *)
 
@@ -561,7 +561,7 @@ module Lattices = struct
 
       let min = Uncontended
 
-      let fst = Poisoned
+      let fst = Corrupted
 
       let snd = Shared
 
@@ -572,7 +572,7 @@ module Lattices = struct
 
     let print ppf = function
       | Contended -> Fmt.fprintf ppf "contended"
-      | Poisoned -> Fmt.fprintf ppf "poisoned"
+      | Corrupted -> Fmt.fprintf ppf "corrupted"
       | Shared -> Fmt.fprintf ppf "shared"
       | Uncontended -> Fmt.fprintf ppf "uncontended"
   end
@@ -1740,13 +1740,13 @@ module Lattices_mono = struct
   let portable_to_contended = function
     | Portability.Portable -> Contention.Contended
     | Portability.Shareable -> Contention.Shared
-    | Portability.Poisoning -> Contention.Poisoned
+    | Portability.Corruptable -> Contention.Corrupted
     | Portability.Nonportable -> Contention.Uncontended
 
   let contended_to_portable = function
     | Contention.Contended -> Portability.Portable
     | Contention.Shared -> Portability.Shareable
-    | Contention.Poisoned -> Portability.Poisoning
+    | Contention.Corrupted -> Portability.Corruptable
     | Contention.Uncontended -> Portability.Nonportable
 
   let local_to_regional = function
@@ -2649,9 +2649,9 @@ module Report = struct
          uncontended is expected. *)
       Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
         C.Contention.Uncontended
-    | `Expected, Contention_op, Poisoned ->
-      Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Poisoned mode_printer
-        C.Contention.Uncontended
+    | `Expected, Contention_op, Corrupted ->
+      Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Corrupted
+        mode_printer C.Contention.Uncontended
     | `Expected, Visibility_op, Read ->
       Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
         C.Visibility.Read_write

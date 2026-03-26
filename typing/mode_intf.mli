@@ -379,7 +379,7 @@ module type S = sig
       type t =
         | Portable
         | Shareable
-        | Poisoning
+        | Corruptable
         | Nonportable
 
       include Const with type t := t
@@ -408,7 +408,7 @@ module type S = sig
     module Const : sig
       type t =
         | Uncontended
-        | Poisoned
+        | Corrupted
         | Shared
         | Contended
 

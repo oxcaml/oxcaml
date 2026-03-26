@@ -179,8 +179,8 @@ type 'a t = { field : 'a @@ reading }
 let f : 'a t @ writing -> 'a @ stateless = fun t -> t.field
 ```
 
-Similarly, the least common supermode of `poisoned` and `shared` is `contended`, and
-the greatest common submode of `shareable` and `poisoning` is `portable`.
+Similarly, the least common supermode of `corrupted` and `shared` is `contended`, and
+the greatest common submode of `shareable` and `corruptable` is `portable`.
 
 # Mode crossing
 In the [intro](./intro) to modes, we saw the idea of "mode crossing", in which values of
@@ -236,6 +236,6 @@ let f : type (a : value mod writing). a @ reading -> a @ stateless =
 ```
 
 Like statefulness and visibility, contention and portability are also diamond-shaped
-lattices. Mode crossing works analogously: for example, crossing `poisoned` allows
-strengthening from `contended` to `shared` (and vice-versa), and crossing `poisoning`
+lattices. Mode crossing works analogously: for example, crossing `corrupted` allows
+strengthening from `contended` to `shared` (and vice-versa), and crossing `corruptable`
 allows strengthening from `shareable` to `portable` (and vice-versa).

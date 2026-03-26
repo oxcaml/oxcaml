@@ -29,7 +29,7 @@ Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a <- 42
                               ^
 Error: This value is "contended"
-       but is expected to be "poisoned" or "uncontended"
+       but is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
 |}]
 
@@ -65,7 +65,7 @@ Line 1, characters 23-24:
 1 | let foo (r @ shared) = r.a <- 42
                            ^
 Error: This value is "shared"
-       but is expected to be "poisoned" or "uncontended"
+       but is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
 |}]
 
@@ -86,10 +86,10 @@ let foo (r @ contended) = r.b
 val foo : r @ contended -> bytes @ contended = <fun>
 |}]
 
-(* reading immutable field from poisoned record is fine *)
-let foo (r @ poisoned) = r.b
+(* reading immutable field from corrupted record is fine *)
+let foo (r @ corrupted) = r.b
 [%%expect{|
-val foo : r @ poisoned -> bytes @ poisoned = <fun>
+val foo : r @ corrupted -> bytes @ corrupted = <fun>
 |}]
 
 (* reading immutable field from shared record is fine *)
@@ -131,7 +131,7 @@ Line 3, characters 19-20:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
-(* Closing over writing mutable field gives poisoning *)
+(* Closing over writing mutable field gives corruptable *)
 let foo () =
     let r = {a = best_bytes (); b = best_bytes ()} in
     let bar () = r.a <- best_bytes () in
@@ -141,9 +141,9 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "poisoning"
+Error: This value is "corruptable"
          because it contains a usage (of the value "r" at line 3, characters 17-18)
-         which is expected to be "poisoned" or "uncontended"
+         which is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -167,7 +167,7 @@ Error: This value is "shareable"
 
 (* Closing over reading and writing mutable field gives nonportable *)
 (* CR nmatschke: We can't use the pattern above because the compiler complains
-   about either [shareable] or [poisoning] before [nonportable]. The
+   about either [shareable] or [corruptable] before [nonportable]. The
    "allocated containing data" error is not great. *)
 module _ : sig
   val bar : unit -> unit @@ portable
@@ -225,7 +225,7 @@ Error: Signature mismatch:
        However, the second is "portable".
 |}]
 
-(* For completeness: the error we get for poisoning *)
+(* For completeness: the error we get for corruptable *)
 module _ : sig
   val bar : unit -> unit @@ portable
 end = struct
@@ -241,16 +241,16 @@ Lines 3-6, characters 6-3:
 6 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val r : r val bar : unit -> unit end @ poisoning
+         sig val r : r val bar : unit -> unit end @ corruptable
        is not included in
          sig val bar : unit -> unit @@ portable end @ nonportable
        Values do not match:
-         val bar : unit -> unit (* in a structure at poisoning *)
+         val bar : unit -> unit (* in a structure at corruptable *)
        is not included in
          val bar : unit -> unit @@ portable (* in a structure at nonportable *)
-       The first is "poisoning"
+       The first is "corruptable"
          because it contains a usage (of the value "r" at line 5, characters 15-16)
-         which is expected to be "poisoned" or "uncontended"
+         which is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
        However, the second is "portable".
 |}]
@@ -378,7 +378,7 @@ Error: This value is "nonportable"
 
 
 (* OTHER TESTS *)
-(* Closing over uncontended, shared, or poisoned but doesn't exploit that; the
+(* Closing over uncontended, shared, or corrupted but doesn't exploit that; the
    function is still portable. *)
 let foo () =
     let r @ portable uncontended = best_bytes () in
@@ -399,7 +399,7 @@ val foo : unit -> unit = <fun>
 |}]
 
 let foo () =
-    let r @ portable poisoned = best_bytes () in
+    let r @ portable corrupted = best_bytes () in
     let bar () = let _ = r in () in
     let _ @ portable = bar in
     ()
@@ -453,13 +453,13 @@ Error: This function when partially applied returns a value which is "shareable"
        but expected to be "portable".
 |}]
 
-(* closing over poisoned gives poisoning *)
-let foo : 'a @ poisoned portable -> (unit -> unit) @ portable = fun a () -> ()
+(* closing over corrupted gives corruptable *)
+let foo : 'a @ corrupted portable -> (unit -> unit) @ portable = fun a () -> ()
 [%%expect{|
-Line 1, characters 64-78:
-1 | let foo : 'a @ poisoned portable -> (unit -> unit) @ portable = fun a () -> ()
-                                                                    ^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "poisoning",
+Line 1, characters 65-79:
+1 | let foo : 'a @ corrupted portable -> (unit -> unit) @ portable = fun a () -> ()
+                                                                     ^^^^^^^^^^^^^^
+Error: This function when partially applied returns a value which is "corruptable",
        but expected to be "portable".
 |}]
 (* CR modes: These four tests are in principle fine to allow (they don't cause a data
@@ -500,11 +500,11 @@ let foo (x : int @ shared) =
 val foo : int @ shared -> unit = <fun>
 |}]
 
-let foo (x : int @ poisoned) =
+let foo (x : int @ corrupted) =
     let _ @ uncontended = x in
     ()
 [%%expect{|
-val foo : int @ poisoned -> unit = <fun>
+val foo : int @ corrupted -> unit = <fun>
 |}]
 
 (* TESTING immutable array *)
@@ -526,125 +526,125 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 (* CR zqian: add portable/uncontended modality and test. *)
 
-(* TESTING poisoned mode *)
+(* TESTING corrupted mode *)
 
-(* poisoned and shared are incomparable *)
-let foo (x @ poisoned) = (x : @ shared)
+(* corrupted and shared are incomparable *)
+let foo (x @ corrupted) = (x : @ shared)
 [%%expect{|
-Line 1, characters 26-27:
-1 | let foo (x @ poisoned) = (x : @ shared)
-                              ^
-Error: This value is "poisoned" but is expected to be "shared" or "uncontended".
+Line 1, characters 27-28:
+1 | let foo (x @ corrupted) = (x : @ shared)
+                               ^
+Error: This value is "corrupted" but is expected to be "shared" or "uncontended".
 |}]
 
-let foo (x @ shared) = (x : @ poisoned)
+let foo (x @ shared) = (x : @ corrupted)
 [%%expect{|
 Line 1, characters 24-25:
-1 | let foo (x @ shared) = (x : @ poisoned)
+1 | let foo (x @ shared) = (x : @ corrupted)
                             ^
-Error: This value is "shared" but is expected to be "poisoned" or "uncontended".
+Error: This value is "shared" but is expected to be "corrupted" or "uncontended".
 |}]
 
-(* poisoned submodes to contended *)
-let foo (x @ poisoned) = (x : @ contended)
+(* corrupted submodes to contended *)
+let foo (x @ corrupted) = (x : @ contended)
 [%%expect{|
-val foo : 'a @ poisoned -> 'a @ contended = <fun>
+val foo : 'a @ corrupted -> 'a @ contended = <fun>
 |}]
 
-(* uncontended submodes to poisoned *)
-let foo (x @ uncontended) = (x : @ poisoned)
+(* uncontended submodes to corrupted *)
+let foo (x @ uncontended) = (x : @ corrupted)
 [%%expect{|
-val foo : 'a -> 'a @ poisoned = <fun>
+val foo : 'a -> 'a @ corrupted = <fun>
 |}]
 
-(* Writing to a mutable field from a poisoned record succeeds *)
-let foo (r @ poisoned) = r.a <- best_bytes ()
+(* Writing to a mutable field from a corrupted record succeeds *)
+let foo (r @ corrupted) = r.a <- best_bytes ()
 [%%expect{|
-val foo : r @ poisoned -> unit = <fun>
+val foo : r @ corrupted -> unit = <fun>
 |}]
 
-(* Reading a mutable field from a poisoned record is rejected *)
-let foo (r @ poisoned) = r.a
+(* Reading a mutable field from a corrupted record is rejected *)
+let foo (r @ corrupted) = r.a
 [%%expect{|
-Line 1, characters 25-26:
-1 | let foo (r @ poisoned) = r.a
-                             ^
-Error: This value is "poisoned"
+Line 1, characters 26-27:
+1 | let foo (r @ corrupted) = r.a
+                              ^
+Error: This value is "corrupted"
        but is expected to be "shared" or "uncontended"
          because its mutable field "a" is being read.
 |}]
 
-(* Reading an immutable field from a poisoned record is fine *)
-let foo (r @ poisoned) = r.b
+(* Reading an immutable field from a corrupted record is fine *)
+let foo (r @ corrupted) = r.b
 [%%expect{|
-val foo : r @ poisoned -> bytes @ poisoned = <fun>
+val foo : r @ corrupted -> bytes @ corrupted = <fun>
 |}]
 
-(* TESTING poisoning mode *)
+(* TESTING corruptable mode *)
 
-(* poisoning and shareable are incomparable *)
-let foo (x @ poisoning) = (x : @ shareable)
+(* corruptable and shareable are incomparable *)
+let foo (x @ corruptable) = (x : @ shareable)
+[%%expect{|
+Line 1, characters 29-30:
+1 | let foo (x @ corruptable) = (x : @ shareable)
+                                 ^
+Error: This value is "corruptable" but is expected to be "shareable".
+|}]
+
+let foo (x @ shareable) = (x : @ corruptable)
 [%%expect{|
 Line 1, characters 27-28:
-1 | let foo (x @ poisoning) = (x : @ shareable)
+1 | let foo (x @ shareable) = (x : @ corruptable)
                                ^
-Error: This value is "poisoning" but is expected to be "shareable".
+Error: This value is "shareable" but is expected to be "corruptable".
 |}]
 
-let foo (x @ shareable) = (x : @ poisoning)
-[%%expect{|
-Line 1, characters 27-28:
-1 | let foo (x @ shareable) = (x : @ poisoning)
-                               ^
-Error: This value is "shareable" but is expected to be "poisoning".
-|}]
-
-(* portable submodes to poisoning *)
-let foo (x @ portable) = (x : @ poisoning)
+(* portable submodes to corruptable *)
+let foo (x @ portable) = (x : @ corruptable)
 [%%expect{|
 val foo : 'a @ portable -> 'a = <fun>
 |}]
 
-(* poisoning submodes to nonportable *)
-let foo (x @ poisoning) = (x : @ nonportable)
+(* corruptable submodes to nonportable *)
+let foo (x @ corruptable) = (x : @ nonportable)
 [%%expect{|
-val foo : 'a @ poisoning -> 'a = <fun>
+val foo : 'a @ corruptable -> 'a = <fun>
 |}]
 
-(* Closing over a poisoned value yields a poisoning function *)
-let foo (x @ poisoned) = (fun () -> x.a <- best_bytes () : @ portable)
-
-[%%expect{|
-Line 1, characters 36-37:
-1 | let foo (x @ poisoned) = (fun () -> x.a <- best_bytes () : @ portable)
-                                        ^
-Error: This value is "contended"
-         because it is used inside the function at line 1, characters 26-56
-         which is expected to be "portable".
-       However, the highlighted expression is expected to be "poisoned" or "uncontended"
-         because its mutable field "a" is being written.
-|}]
-
-(* A poisoning function closes over poisoned values *)
-let foo (x @ contended) = (fun () -> x.a <- best_bytes () : @ poisoning)
+(* Closing over a corrupted value yields a corruptable function *)
+let foo (x @ corrupted) = (fun () -> x.a <- best_bytes () : @ portable)
 
 [%%expect{|
 Line 1, characters 37-38:
-1 | let foo (x @ contended) = (fun () -> x.a <- best_bytes () : @ poisoning)
+1 | let foo (x @ corrupted) = (fun () -> x.a <- best_bytes () : @ portable)
                                          ^
 Error: This value is "contended"
-       but is expected to be "poisoned" or "uncontended"
+         because it is used inside the function at line 1, characters 27-57
+         which is expected to be "portable".
+       However, the highlighted expression is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
 |}]
 
-(* TESTING implication: write implies poisoned *)
-let foo (r @ write) = (r : @ poisoned)
+(* A corruptable function closes over corrupted values *)
+let foo (x @ contended) = (fun () -> x.a <- best_bytes () : @ corruptable)
+
+[%%expect{|
+Line 1, characters 37-38:
+1 | let foo (x @ contended) = (fun () -> x.a <- best_bytes () : @ corruptable)
+                                         ^
+Error: This value is "contended"
+       but is expected to be "corrupted" or "uncontended"
+         because its mutable field "a" is being written.
+|}]
+
+(* TESTING implication: write implies corrupted *)
+let foo (r @ write) = (r : @ corrupted)
 [%%expect{|
 val foo : 'a @ write -> 'a @ write = <fun>
 |}]
 
-(* TESTING implication: observable implies poisoning *)
-let foo (f @ observable) = (f : @ poisoning)
+(* TESTING implication: writing implies corruptable *)
+let foo (f @ writing) = (f : @ corruptable)
 [%%expect{|
-val foo : 'a @ observable -> 'a = <fun>
+val foo : 'a @ writing -> 'a = <fun>
 |}]
