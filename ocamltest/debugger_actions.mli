@@ -20,3 +20,5 @@ val gdb : Actions.t
 
 (** Run ocamldebug (bytecode) debugger *)
 val ocamldebug : Actions.t
+
+val init : unit -> unit

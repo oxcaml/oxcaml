@@ -15,7 +15,7 @@
 let debugger_script = Variables.make ("debugger_script",
   "Where the debugger should read its commands")
 
-let _ = List.iter Variables.register_variable
+let init () = List.iter Variables.register_variable
   [
     debugger_script;
   ]

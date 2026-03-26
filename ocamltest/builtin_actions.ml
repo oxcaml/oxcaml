@@ -117,7 +117,8 @@ let hasstr = make
 let multicore = make
   ~name:"multicore"
   ~description:"Pass if running on multicore"
-  (Actions_helpers.pass_or_skip (Domain.recommended_domain_count () >= 2)
+  ~does_something:false
+  (Actions_helpers.predicate (Domain.recommended_domain_count () >= 2)
     "running on multicore"
     "not running on multicore")
 
@@ -144,7 +145,8 @@ let not_windows = make
 let not_msvc = make
   ~name:"not-msvc"
   ~description:"Pass if not using MSVC / clang-cl"
-  (Actions_helpers.pass_or_skip (Ocamltest_config.ccomp_type <> "msvc")
+  ~does_something:false
+  (Actions_helpers.predicate (Ocamltest_config.ccomp_type <> "msvc")
     "not using MSVC / clang-cl"
     "using MSVC / clang-cl")
 
@@ -153,14 +155,16 @@ let not_msvc = make
 let target_windows = make
   ~name:"target-windows"
   ~description:"Pass if the compiler does targets native Windows"
-  (Actions_helpers.pass_or_skip (Ocamltest_config.target_os_type = "Win32")
+  ~does_something:false
+  (Actions_helpers.predicate (Ocamltest_config.target_os_type = "Win32")
     "targeting native Windows"
     "not targeting native Windows")
 
 let not_target_windows = make
   ~name:"not-target-windows"
   ~description:"Pass if the compiler does not target native Windows"
-  (Actions_helpers.pass_or_skip (Ocamltest_config.target_os_type <> "Win32")
+  ~does_something:false
+  (Actions_helpers.predicate (Ocamltest_config.target_os_type <> "Win32")
     "not targeting native Windows"
     "targeting native Windows")
 
@@ -190,7 +194,8 @@ let linux_system = "linux"
 let linux = make
   ~name:"linux"
   ~description:"Pass if running on a Linux system"
-  (Actions_helpers.pass_or_skip (Ocamltest_config.system = linux_system)
+  ~does_something:false
+  (Actions_helpers.predicate (Ocamltest_config.system = linux_system)
      "on a Linux system"
      "not on a Linux system")
 
@@ -204,7 +209,6 @@ let macos = make
     "on a MacOS system"
     "not on a MacOS system")
 
-<<<<<<< oxcaml
 let not_macos = make
   ~name:"not-macos"
   ~description:"Pass if not running on a MacOS system"
@@ -212,18 +216,17 @@ let not_macos = make
   (Actions_helpers.predicate (not (Ocamltest_config.system = macos_system))
     "not on a MacOS system"
     "on a MacOS system")
-||||||| upstream-base
-=======
+
 let not_macos_amd64_tsan = make
   ~name:"not_macos_amd64_tsan"
   ~description:"Pass if not running on a MacOS amd64 system with TSan enabled"
-  (Actions_helpers.pass_or_skip
+  ~does_something:false
+  (Actions_helpers.predicate
      (not ((Ocamltest_config.system = macos_system)
            && (String.equal Ocamltest_config.arch "amd64")
            && (Ocamltest_config.tsan)))
      "not on a MacOS amd64 system with TSan enabled"
      "on a MacOS amd64 system with TSan enabled")
->>>>>>> upstream-incoming
 
 let arch32 = make
   ~name:"arch32"
@@ -284,14 +287,16 @@ let arch_power = make
 let arch_riscv = make
   ~name:"arch_riscv"
   ~description:"Pass if target is a RISC-V architecture"
-  (Actions_helpers.pass_or_skip (String.equal Ocamltest_config.arch "riscv")
+  ~does_something:false
+  (Actions_helpers.predicate (String.equal Ocamltest_config.arch "riscv")
      "Target is RISC-V architecture"
      "Target is not RISC-V architecture")
 
 let arch_s390x = make
   ~name:"arch_s390x"
   ~description:"Pass if target is a S390x architecture"
-  (Actions_helpers.pass_or_skip (String.equal Ocamltest_config.arch "s390x")
+  ~does_something:false
+  (Actions_helpers.predicate (String.equal Ocamltest_config.arch "s390x")
      "Target is S390x architecture"
      "Target is not S390x architecture")
 
@@ -491,12 +496,8 @@ let init () =
     not_bsd;
     linux;
     macos;
-<<<<<<< oxcaml
     not_macos;
-||||||| upstream-base
-=======
     not_macos_amd64_tsan;
->>>>>>> upstream-incoming
     arch32;
     arch64;
     has_symlink;

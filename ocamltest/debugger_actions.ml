@@ -100,14 +100,17 @@ let debug debugger_type log env =
 
 let lldb =
   Actions.make ~name:"lldb"
+    ~does_something:true
     ~description:"Run LLDB on the program" (debug LLDB)
 
 let gdb =
   Actions.make ~name:"gdb"
+    ~does_something:true
     ~description:"Run GDB on the program" (debug GDB)
 
 let ocamldebug =
   Actions.make ~name:"ocamldebug"
+    ~does_something:true
     ~description:"Run ocamldebug on the program" (debug Bytecode)
 
 let initialize_test_exit_status_variables _log env =
@@ -118,7 +121,7 @@ let initialize_test_exit_status_variables _log env =
       Builtin_variables.test_skip, "125";
     ] env
 
-let _ =
+let init () =
   Environments.register_initializer Environments.Post
     "test_exit_status_variables" initialize_test_exit_status_variables;
   List.iter register
