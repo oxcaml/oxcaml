@@ -121,7 +121,8 @@ let execute_phrase print_outcome ppf phr =
   match phr with
   | Ptop_def sstr ->
       let oldenv = !toplevel_env in
-      let (str, sg', newenv) = typecheck_phrase ppf oldenv sstr in
+      let oldsig = !toplevel_sig in
+      let (str, sg', newenv) = typecheck_phrase ppf oldenv oldsig sstr in
       let lam = Translmod.transl_toplevel_definition str in
       Warnings.check_fatal ();
       begin try

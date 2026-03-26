@@ -51,7 +51,7 @@ val preprocess_phrase :
    preprocessors. Return the updated phrase. *)
 
 val typecheck_phrase :
-  formatter -> Env.t -> Parsetree.structure ->
+  formatter -> Env.t -> Types.signature -> Parsetree.structure ->
   Typedtree.structure * Types.signature * Env.t
 (* Type-check the current toplevel phrase (not a directive)
    in the current typing environment, return an updated typing environment. *)

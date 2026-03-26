@@ -113,7 +113,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         for i = start_offset to O.size obj - 1 do
           let arg = O.field obj i in
           if is_null arg then
-            list := Oval_constr (Oide_ident (Out_name.create "<null>"), []) :: !list
+            list := Oval_constr (Oide_ident (Out_type.Out_name.create "<null>"), []) :: !list
           else if not (O.is_block arg) then
             list := Oval_int (O.obj arg : int) :: !list
                (* Note: this could be a char or a constant constructor... *)
@@ -295,11 +295,12 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     let tree_of_constr =
       tree_of_qualified
         (Env.lookup_all_constructors ~use:false ~loc:Location.none Env.Positive)
-        Data_types.cstr_res_type_path
+        (fun (cstr, _locks) -> Data_types.cstr_res_type_path cstr)
 
     and tree_of_label =
       tree_of_qualified
-        (Env.lookup_all_labels ~use:false ~loc:Location.none Env.Construct)
+        (Env.lookup_all_labels ~use:false ~record_form:Legacy
+           ~loc:Location.none Env.Construct)
         Data_types.lbl_res_type_path
 
     (* An abstract type *)
@@ -347,7 +348,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         (* We can't store non-values in an [ObjTbl.t] when cycle-checking.
            As a result, non-values may be printed twice, but cycles will still
            be detected since every cycle contains at least one value. *)
-        if not (is_value ty) || not (is_real_block repr) then
+        if not (is_value ty) || not (is_real_block repr)
+           || (O.tag repr >= Obj.no_scan_tag)
+        then
           f depth obj ty
         else
           if ObjTbl.mem nested_values repr then
@@ -379,10 +382,6 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | Tunboxed_tuple(labeled_tys) ->
               Oval_unboxed_tuple
                 (tree_of_labeled_val_list 0 depth obj labeled_tys)
-          | Tconstr (path, [_], _)
-            when Path.same path Predef.path_code ->
-            Oval_code (O.obj obj : CamlinternalQuote.Code.t)
-
           | Tconstr(path, ty_list, _) -> begin
               match get_desc (Ctype.expand_head env ty) with
               | Tconstr(path, [ty_arg], _)
@@ -414,6 +413,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 when Path.same path Predef.path_lazy_t ->
                 tree_of_lazy depth obj ty_arg
 
+              | Tconstr (path, [_], _)
+                when Path.same path Predef.path_code ->
+                Oval_code (O.obj obj : CamlinternalQuote.Code.t)
+
               | _ ->
                 match Env.find_type path env with
                 | exception Not_found
@@ -435,10 +438,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     begin match check_depth depth obj ty with
                       Some x -> x
                     | None ->
-                        let pos = 0 in
                         tree_of_record_unboxed_product_fields depth
-                          env path decl.type_params ty_list
-                          lbl_list pos obj
+                          env path type_params ty_list
+                          lbl_list 0 obj
                     end
                 | {type_kind = Type_open} ->
                     tree_of_extension path ty_list depth obj
@@ -759,7 +761,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         Oval_record_unboxed_product (tree_of_fields (pos = 0) pos lbl_list)
 
       and tree_of_polyvariant depth obj row =
-        if O.is_block obj then
+        if is_real_block obj then
           let tag : int = O.obj (O.field obj 0) in
           let rec find = function
             | (l, f) :: fields ->

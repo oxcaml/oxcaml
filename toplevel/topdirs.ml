@@ -273,13 +273,13 @@ let show_prim to_sig ppf lid =
       | Longident.Lident s -> s
       | Longident.Ldot (_,{ txt = s; _ }) -> s
       | Longident.Lapply _ ->
-          fprintf ppf "Invalid path %a@." Printtyp.Compat.longident lid;
+          fprintf ppf "Invalid path %a@." Printtyp.longident lid;
           raise Exit
     in
     let id = Ident.create_persistent s in
     let sg = to_sig env loc id lid in
     Printtyp.wrap_printing_env ~error:false env
-      (fun () -> fprintf ppf "@[%a@]@." Printtyp.Compat.signature sg)
+      (fun () -> fprintf ppf "@[%a@]@." Printtyp.signature sg)
   with
   | Not_found ->
       fprintf ppf "@[Unknown element.@]@."
