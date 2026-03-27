@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -587,12 +588,12 @@ let leak_ref_2 =
   let r = local_ ref None in
   use_locally (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
 [%%expect{|
-Line 3, characters 39-40:
+Line 3, characters 63-64:
 3 |   use_locally (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
-                                           ^
-Error: The value "r" is "local"
+                                                                   ^
+Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is used inside the function at line 3, characters 14-68
+         because it is contained (via constructor "Some") in the value at line 3, characters 58-64
          which is expected to be "global".
 |}]
 

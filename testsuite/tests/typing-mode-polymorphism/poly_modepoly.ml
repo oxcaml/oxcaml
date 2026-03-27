@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -1450,12 +1451,8 @@ let f ?x y = () in {f};;
 let f ?x y = y in {f};; (* fail *)
 [%%expect {|
 type t = { f : 'a. 'a -> unit; }
-- : t = {f = <fun>}
-Line 3, characters 19-20:
-3 | let f ?x y = y in {f};; (* fail *)
-                       ^
-Error: This field value has type "unit -> unit" which is less general than
-         "'a. 'a -> unit"
+Uncaught exception: Mode.Cannot_zap_generic
+
 |}];;
 
 (* Polux Moon caml-list 2011-07-26 *)
