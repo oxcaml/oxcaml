@@ -115,6 +115,7 @@ let is_trap_handler t label =
 
 let dump ppf t ~msg =
   let open Format in
+  let ssa = Cfg_ssa.build t.cfg in
   fprintf ppf "\ncfg for %s\n" msg;
   fprintf ppf "%s\n" t.cfg.fun_name;
   let regalloc =
@@ -139,14 +140,58 @@ let dump ppf t ~msg =
     fprintf ppf "regalloc_params=%s\n" (String.concat ", " regalloc_params));
   fprintf ppf "layout.length=%d\n" (DLL.length t.layout);
   fprintf ppf "blocks.length=%d\n" (Label.Tbl.length t.cfg.blocks);
+  let phis_by_block =
+    let tbl = Label.Tbl.create 16 in
+    Cfg_ssa.iter ssa ~f:(fun reg entry ->
+        match[@ocaml.warning "-4"] (entry : Cfg_ssa.entry) with
+        | Phi { merge_label; regs } ->
+          let existing =
+            match Label.Tbl.find_opt tbl merge_label with
+            | Some l -> l
+            | None -> []
+          in
+          Label.Tbl.replace tbl merge_label ((reg, regs) :: existing)
+        | _ -> ());
+    tbl
+  in
+  let print_phis ppf block =
+    Label.Tbl.find_opt phis_by_block block.Cfg.start
+    |> Option.iter (fun phis ->
+        List.iter
+          (fun (reg, regs) ->
+            fprintf ppf "%a <- phi(" Printreg.reg reg;
+            Array.iteri
+              (fun i r ->
+                if i > 0 then fprintf ppf ", ";
+                fprintf ppf "%a" Printreg.reg r)
+              regs;
+            fprintf ppf ")\n")
+          phis)
+  in
   let print_block label =
     let block = Label.Tbl.find t.cfg.blocks label in
     fprintf ppf "\n%a:\n" Label.format label;
-    let pp_with_id ppf ~pp (instr : _ Cfg.instruction) =
-      fprintf ppf "(id:%a) %a\n" InstructionId.format instr.id pp instr
-    in
-    DLL.iter ~f:(pp_with_id ppf ~pp:Cfg.print_basic) block.body;
-    pp_with_id ppf ~pp:Cfg.print_terminator block.terminator;
+    print_phis ppf block;
+    DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+        let assign_symbol =
+          if Array.for_all (Cfg_ssa.is_ssa ssa) instr.res then "<-" else ":="
+        in
+        fprintf ppf "(id:%a) %a" InstructionId.format instr.id
+          (fun ppf i -> Cfg.print_basic' ~assign_symbol ppf i)
+          instr;
+        Array.iter
+          (fun reg ->
+            match[@ocaml.warning "-4"] Cfg_ssa.find ssa reg with
+            | Some
+                (OverwrittenOutput { instr = ow_instr; overwritten_input; _ })
+              when InstructionId.equal instr.id ow_instr.id ->
+              fprintf ppf " (input %a = %a)" Printreg.reg reg Printreg.reg
+                overwritten_input
+            | _ -> ())
+          instr.res;
+        fprintf ppf "\n");
+    fprintf ppf "(id:%a) %a\n" InstructionId.format block.terminator.id
+      Cfg.print_terminator block.terminator;
     fprintf ppf "\npredecessors:";
     Label.Set.iter (fprintf ppf " %a" Label.format) block.predecessors;
     fprintf ppf "\nsuccessors:";

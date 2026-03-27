@@ -28,7 +28,11 @@ val call_operation :
   unit
 
 val instr' :
-  ?print_reg:(formatter -> Reg.t -> unit) -> formatter -> instruction -> unit
+  ?print_reg:(formatter -> Reg.t -> unit) ->
+  ?assign_symbol:string ->
+  formatter ->
+  instruction ->
+  unit
 
 val instr : formatter -> instruction -> unit
 

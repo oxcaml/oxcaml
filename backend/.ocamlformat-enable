@@ -42,6 +42,8 @@ cfg/**/*.ml
 cfg/**/*.mli
 cfg/vectorize.ml
 cfg/vectorize.mli
+cfg/cfg_ssa.ml
+cfg/cfg_ssa.mli
 vectorize_utils.ml
 vectorize_utils.mli
 cfg_selectgen.ml
