@@ -1167,6 +1167,9 @@ and signature_item i ppf x =
   | Tsig_typesubst l ->
       line i ppf "Tsig_typesubst\n";
       list i type_declaration ppf l;
+  | Tsig_jkindsubst jd ->
+      line i ppf "Tsig_jkindsubst";
+      jkind_declaration i ppf jd
   | Tsig_typext e ->
       line i ppf "Tsig_typext\n";
       type_extension i ppf e;
@@ -1244,6 +1247,12 @@ and with_constraint i ppf x =
   | Twith_modtypesubst mty ->
       line i ppf "Twith_modtype\n";
       module_type (i+1) ppf mty
+  | Twith_jkind kd ->
+      line i ppf "Twith_jkind\n";
+      jkind_declaration (i+1) ppf kd;
+  | Twith_jkindsubst kd ->
+      line i ppf "Twith_jkindsubst\n";
+      jkind_declaration (i+1) ppf kd;
 
 and module_expr i ppf x =
   line i ppf "module_expr %a\n" fmt_location x.mod_loc;

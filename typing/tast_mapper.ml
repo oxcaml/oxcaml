@@ -751,6 +751,8 @@ let signature_item sub x =
     | Tsig_typesubst list ->
         let (_, list) = sub.type_declarations sub (Nonrecursive, list) in
         Tsig_typesubst list
+    | Tsig_jkindsubst jd ->
+        Tsig_jkindsubst (sub.jkind_declaration sub jd)
     | Tsig_typext te ->
         Tsig_typext (sub.type_extension sub te)
     | Tsig_exception ext ->
@@ -817,6 +819,8 @@ let with_constraint sub = function
   | Twith_modtypesubst mty -> Twith_modtypesubst (sub.module_type sub mty)
   | Twith_module (path, lid) -> Twith_module (path, map_loc sub lid)
   | Twith_modsubst (path, lid) -> Twith_modsubst (path, map_loc sub lid)
+  | Twith_jkind      jd -> Twith_jkind (sub.jkind_declaration sub jd)
+  | Twith_jkindsubst jd -> Twith_jkindsubst (sub.jkind_declaration sub jd)
 
 let open_description sub od =
   {od with open_loc = sub.location sub od.open_loc;

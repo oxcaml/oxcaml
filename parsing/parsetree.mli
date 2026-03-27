@@ -1133,6 +1133,8 @@ and signature_item_desc =
       (** [type t1 = ... and ... and tn  = ...] *)
   | Psig_typesubst of type_declaration list
       (** [type t1 := ... and ... and tn := ...]  *)
+  | Psig_jkindsubst of jkind_declaration
+      (** [kind_ k := ...] *)
   | Psig_typext of type_extension  (** [type t1 += ...] *)
   | Psig_exception of type_exception  (** [exception C of T] *)
   | Psig_module of module_declaration  (** [module X = M] and [module X : MT] *)
@@ -1235,12 +1237,16 @@ and with_constraint =
       (** [with module X.Y = Z] *)
   | Pwith_modtype of Longident.t loc * module_type
       (** [with module type X.Y = Z] *)
+  | Pwith_jkind of Longident.t loc * jkind_declaration
+      (** [with kind_ X.k = ...] *)
   | Pwith_modtypesubst of Longident.t loc * module_type
       (** [with module type X.Y := sig end] *)
   | Pwith_typesubst of Longident.t loc * type_declaration
       (** [with type X.t := ..., same format as [Pwith_type]] *)
   | Pwith_modsubst of Longident.t loc * Longident.t loc
       (** [with module X.Y := Z] *)
+  | Pwith_jkindsubst of Longident.t loc * jkind_declaration
+      (** [with kind_ X.k := ...] *)
 
 (** {2 Value expressions for the module language} *)
 

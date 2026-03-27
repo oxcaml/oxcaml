@@ -2,7 +2,8 @@
    expect;
 *)
 
-(* Basic tests for abstract kinds. No with-kind substutitions yet. *)
+(* Basic tests for abstract kinds. [with kind_] substitutions are tested in
+   [with_constraints.ml]. *)
 
 (****************************************************)
 (* Test: Abstract kinds allowed in sigs and structs *)
@@ -50,6 +51,78 @@ kind_ k = immutable_data
 module type S = sig kind_ k = float64 type t : float64 end
 module M : sig kind_ k = float64 type t : float64 end
 module M' : S
+|}]
+
+(***************************************************************)
+(* Test: local kind substitutions in signatures are substituted away *)
+
+module type Local_subst = sig
+  kind_ k := value
+  type t : k
+end
+
+[%%expect{|
+module type Local_subst = sig type t end
+|}]
+
+(*********************************************************************)
+(* Test: local kind substitutions compose through path substitutions *)
+
+module type Local_subst_compose = sig
+  kind_ k1 := value
+  kind_ k2 := k1
+  type t : k2
+end
+
+[%%expect{|
+module type Local_subst_compose = sig type t end
+|}]
+
+(*************************************************************************)
+(* Test: local kind substitutions update other places kinds can appear. *)
+
+module type Local_subst_everywhere = sig
+  kind_ k := float64 & value
+
+  type ('a : k) t
+
+  val f : ('a : k) . 'a -> 'a
+end
+
+[%%expect{|
+module type Local_subst_everywhere =
+  sig
+    type ('a : float64 & value) t
+    val f : ('a : float64 & value). 'a -> 'a
+  end
+|}]
+
+(*************************************************************)
+(* Test: local kind substitutions reject unbound kind names. *)
+
+module type Local_subst_reject_unbound = sig
+  kind_ k := missing
+end
+
+[%%expect{|
+Line 2, characters 13-20:
+2 |   kind_ k := missing
+                 ^^^^^^^
+Error: Unbound kind "missing"
+|}]
+
+(************************************************************)
+(* Test: local kind substitutions reject self references. *)
+
+module type Local_subst_reject_rec = sig
+  kind_ recursive_kind := recursive_kind
+end
+
+[%%expect{|
+Line 2, characters 26-40:
+2 |   kind_ recursive_kind := recursive_kind
+                              ^^^^^^^^^^^^^^
+Error: Unbound kind "recursive_kind"
 |}]
 
 (***********************************************************)

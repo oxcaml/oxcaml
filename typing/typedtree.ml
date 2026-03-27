@@ -692,6 +692,7 @@ and signature_item_desc =
     Tsig_value of value_description
   | Tsig_type of rec_flag * type_declaration list
   | Tsig_typesubst of type_declaration list
+  | Tsig_jkindsubst of jkind_declaration
   | Tsig_typext of type_extension
   | Tsig_exception of type_exception
   | Tsig_module of module_declaration
@@ -783,9 +784,11 @@ and with_constraint =
     Twith_type of type_declaration
   | Twith_module of Path.t * Longident.t loc
   | Twith_modtype of module_type
+  | Twith_jkind of jkind_declaration
   | Twith_typesubst of type_declaration
   | Twith_modsubst of Path.t * Longident.t loc
   | Twith_modtypesubst of module_type
+  | Twith_jkindsubst of jkind_declaration
 
 
 and core_type =

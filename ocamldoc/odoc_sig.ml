@@ -535,14 +535,21 @@ module Analyser =
     let erased_names_of_constraints constraints acc =
       List.fold_right (fun constraint_ acc ->
         match constraint_ with
-        | Parsetree.Pwith_type _ | Parsetree.Pwith_module _ | Parsetree.Pwith_modtype _ -> acc
+        | Parsetree.Pwith_type _
+        | Parsetree.Pwith_module _
+        | Parsetree.Pwith_modtype _
+        | Parsetree.Pwith_jkind _ -> acc
         | Parsetree.Pwith_typesubst (s, typedecl) ->
            constraint_for_subitem acc s (fun s -> Parsetree.Pwith_typesubst (s, typedecl))
         | Parsetree.Pwith_modsubst (s, modpath) ->
            constraint_for_subitem acc s (fun s -> Parsetree.Pwith_modsubst (s, modpath))
         | Parsetree.Pwith_modtypesubst (s, modpath) ->
             constraint_for_subitem acc s
-              (fun s -> Parsetree.Pwith_modtypesubst (s, modpath)))
+              (fun s -> Parsetree.Pwith_modtypesubst (s, modpath))
+        | Parsetree.Pwith_jkindsubst (s, skd) ->
+            constraint_for_subitem acc s
+              (fun s -> Parsetree.Pwith_jkindsubst (s, skd))
+      )
         constraints acc
 
     let is_erased ident map =
@@ -566,7 +573,8 @@ module Analyser =
       else List.fold_right (fun sig_item acc ->
         let take_item psig_desc = { sig_item with Parsetree.psig_desc } :: acc in
         match sig_item.Parsetree.psig_desc with
-        | Parsetree.Psig_jkind _ -> Misc.fatal_error "Psig_kind"
+        | Parsetree.Psig_jkind _
+        | Parsetree.Psig_jkindsubst _ -> Misc.fatal_error "Psig_kind"
         | Parsetree.Psig_attribute _
         | Parsetree.Psig_extension _
         | Parsetree.Psig_value _
@@ -889,7 +897,8 @@ module Analyser =
     and analyse_signature_item_desc env _signat table current_module_name
         sig_item_loc pos_start_ele pos_end_ele pos_limit comment_opt sig_item_desc =
         match sig_item_desc with
-        | Parsetree.Psig_jkind _ -> Misc.fatal_error "Psig_jkind"
+        | Parsetree.Psig_jkind _
+        | Parsetree.Psig_jkindsubst _ -> Misc.fatal_error "Psig_jkind"
         | Parsetree.Psig_value value_desc ->
             let name_pre = value_desc.Parsetree.pval_name in
             let type_expr =

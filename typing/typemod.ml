@@ -455,6 +455,9 @@ let check_type_decl env sg loc id row_id newdecl decl =
        in [narrow_to_manifest_jkind], but that's ok, because this check already
        has happened in [Includemod.type_declarations]. *)
 
+let check_jkind_decl env loc id ~orig_decl ~new_decl =
+  Includemod.jkind_declarations ~loc env ~mark:true id new_decl orig_decl
+
 let make_variance p n i =
   let open Variance in
   set_if p May_pos (set_if n May_neg (set_if i Inj null))
@@ -548,7 +551,8 @@ let retype_applicative_functor_type ~loc env funct arg =
    and M.N and so we have to check that uses of the modules other than just
    extracting components from them still make sense. There are only two such
    kinds of uses:
-   - applicative functor types: F(M).t might not be well typed anymore
+   - applicative functor types/kinds: F(M).t or F(M).k might not be well typed
+     anymore
    - aliases: module A = M still makes sense but it doesn't mean the same thing
      anymore, so it's forbidden until it's clear what we should do with it.
    This function would be called with M.N.t and N.t to check for these uses. *)
@@ -700,6 +704,15 @@ let type_decl_is_alias sdecl = (* assuming no explicit constraint *)
     else None
   | _ -> None
 
+let kind_decl_is_alias sdecl =
+  match sdecl.pjkind_manifest with
+  | Some { pjka_desc = Pjk_abbreviation (lid, []); _ } -> Some lid
+  | None
+  | Some { pjka_desc =
+             ( Pjk_abbreviation (_, _ :: _) | Pjk_default | Pjk_mod _
+             | Pjk_with _ | Pjk_kind_of _ | Pjk_product _ ); _ }
+    -> None
+
 let params_are_constrained =
   let rec loop = function
     | [] -> false
@@ -768,11 +781,12 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
 
 module Merge = struct
   (** This module hosts the functions dealing with signature constraints. There
-     are of three forms :
+     are four forms :
      - type constraint [... with type t = ... ], handled by [merge_type]
      - module constraint [... with module X = ... ], handled by [merge_module]
      - module type constraints [... with module type T = ...] handled by
        [merge_modtype]
+     - kind constraint [... with kind_ k = ... ], handled by [merge_jkind]
 
      Each constraint can be *destructive*, (with the syntax [:=]) meaning that
      the substituted identifier is removed from the signature. This imposes
@@ -1199,6 +1213,79 @@ module Merge = struct
     let _, _, _, sg = merge ~patch ~destructive:false env sg loc lid in
     sg
 
+  (** Jkind constraint [sg with kind_ lid = pjka]. As with [merge_type], we
+      use the more complicated [return_payload] (rather then [return]) because
+      we want to get out the computed declaration for the purpose of building
+      the subst for post-processing. *)
+  let merge_jkind ~destructive env loc sg lid
+        (sdecl : Parsetree.jkind_declaration) =
+    let patch item s sig_env sg_for_env ~ghosts =
+      match item with
+      | Sig_jkind(id, orig_decl, vis) when Ident.name id = s ->
+          let sig_env = Env.add_signature sg_for_env sig_env in
+          let jdecl =
+            Typedecl.transl_jkind_constraint id env orig_decl sdecl
+          in
+          let new_decl = jdecl.jkind_jkind in
+          check_jkind_decl sig_env sdecl.pjkind_loc id ~orig_decl ~new_decl;
+          let path = Pident id in
+          let item_opt =
+            if destructive
+            then None
+            else Some (Sig_jkind(id, new_decl, vis))
+          in
+          return_payload ~ghosts ~late_typedtree:jdecl ~replace_by:item_opt path
+      | _ -> None
+    in
+    let path, paths, jkd, sg = merge ~patch ~destructive env sg loc lid in
+    let manifest =
+      match jkd.jkind_jkind.jkind_manifest with
+      | None -> Misc.fatal_error "Typemod.merge_jkind: no manifest"
+      | Some jk -> jk
+    in
+    let replace =
+      if destructive then
+        match kind_decl_is_alias sdecl with
+        | Some lid ->
+          (* if the kind is an alias of [lid], replace by the definition *)
+          let replacement, _ =
+            try Env.find_jkind_by_name lid.txt env
+            with Not_found -> assert false
+          in
+          fun s path -> Subst.Unsafe.add_jkind_path path replacement s
+        | None ->
+          fun s path -> Subst.Unsafe.add_jkind path manifest s
+      else
+        fun s _ -> s
+    in
+    let sg =
+      post_process ~approx:false ~destructive loc lid env paths sg replace
+    in
+    jkd, (path, lid, sg)
+
+  (** Approximated kind constraint [sg with kind_ lid = _].  As with
+      [merge_type] vs [merge_type_approx], we put this in its own function
+      rather than making an ~approx parameter because it is doing something much
+      simpler (it does not need the right-hand side declaration). *)
+  let merge_jkind_approx ~destructive env loc sg lid =
+    let patch item s _sig_env _sg_for_env ~ghosts =
+      match item with
+      | Sig_jkind(id, _, _) when Ident.name id = s ->
+         let item_opt =
+           if destructive then None
+           else
+             (* An identity patch is applied *)
+             Some (item)
+         in
+         return ~ghosts ~replace_by:item_opt (Pident id)
+      | _ -> None
+    in
+    (* Merging *)
+    let _, paths, _, sg = merge ~patch ~destructive env sg loc lid in
+    (* Post processing *)
+    let replace = fun s _path -> s in
+    post_process ~approx:true ~destructive loc lid env paths sg replace
+
   let check_package_with_type_constraints loc env mty constraints =
     let sg = extract_sig env loc mty in
     let sg =
@@ -1221,10 +1308,12 @@ module Merge = struct
     match constr with
     | Pwith_typesubst _
       | Pwith_modtypesubst _
-      | Pwith_modsubst _ -> true
+      | Pwith_modsubst _
+      | Pwith_jkindsubst _ -> true
     | Pwith_module _
       | Pwith_type _
-      | Pwith_modtype _ -> false
+      | Pwith_modtype _
+      | Pwith_jkind _ -> false
 
 end
 
@@ -1436,6 +1525,13 @@ and approx_sig_items env ssg=
           map_rec_type ~rec_flag
             (fun rs (id, info) -> Sig_type(id, info, rs, Exported)) decls rem
       | Psig_typesubst _ -> approx_sig_items env srem
+      | Psig_jkindsubst sdecl ->
+          let jkind_decl = Typedecl.approx_jkind_decl sdecl in
+          let scope = Ctype.create_scope () in
+          let (_id, newenv) =
+            Env.enter_jkind ~scope sdecl.pjkind_name.txt jkind_decl env
+          in
+          approx_sig_items newenv srem
       | Psig_module { pmd_name = { txt = None; _ }; _ } ->
           approx_sig_items env srem
       | Psig_module pmd ->
@@ -1592,6 +1688,10 @@ and approx_constraint env body constr =
         Merge.merge_module ~approx:true ~destructive env
           lid.loc body id approx_md path false in
       sg
+
+  | Pwith_jkind (l, kd)
+  | Pwith_jkindsubst (l, kd) ->
+     Merge.merge_jkind_approx ~destructive env kd.pjkind_loc body l
 
 
 let approx_modtype env smty =
@@ -2059,6 +2159,17 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
         in
         (constr, Merge.merge_modtype ~destructive env loc sg l tmty.mty_type)
 
+    | Pwith_jkind (l, sjd)
+    | Pwith_jkindsubst (l, sjd) ->
+        let jd, merge_res =
+          Merge.merge_jkind ~destructive env loc sg l sjd
+        in
+        let constr = if destructive then
+            (Twith_jkindsubst jd)
+          else
+            (Twith_jkind jd)
+        in
+        (constr, merge_res)
   in
   ((path, lid, constr) :: rev_tcstrs, sg)
 
@@ -2183,6 +2294,32 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           Signature_names.check_type ?info names td.typ_loc td.typ_id
         ) decls;
         mksig (Tsig_typesubst decls) env loc, [], newenv
+    | Psig_jkindsubst sdecl ->
+        let _id, newenv, decl = Typedecl.transl_jkind_decl env sdecl in
+        let manifest =
+          match decl.jkind_jkind.jkind_manifest with
+          | Some jk -> jk
+          | None ->
+              Misc.fatal_error "Typemod.transl_sig_item: no jkind manifest"
+        in
+        let subst =
+          match kind_decl_is_alias sdecl with
+          | Some lid ->
+              let replacement, _ =
+                try Env.find_jkind_by_name lid.txt env
+                with Not_found ->
+                  Misc.fatal_error
+                    "Typemod.transl_sig_item: jkind alias not found"
+              in
+              Subst.Unsafe.add_jkind_path (Pident decl.jkind_id) replacement
+                Subst.identity
+          | None ->
+              Subst.Unsafe.add_jkind (Pident decl.jkind_id) manifest
+                Subst.identity
+        in
+        let info = `Substituted_away subst in
+        Signature_names.check_jkind ~info names decl.jkind_loc decl.jkind_id;
+        mksig (Tsig_jkindsubst decl) env loc, [], newenv
     | Psig_typext styext ->
         let (tyext, newenv, _shapes) =
           Typedecl.transl_type_extension false env item.psig_loc styext

@@ -310,12 +310,16 @@ module MT = struct
         iter_loc sub lid; iter_loc sub lid2
     | Pwith_modtype (lid, mty) ->
         iter_loc sub lid; sub.module_type sub mty
+    | Pwith_jkind (lid, d) ->
+        iter_loc sub lid; sub.jkind_declaration sub d
     | Pwith_typesubst (lid, d) ->
         iter_loc sub lid; sub.type_declaration sub d
     | Pwith_modsubst (s, lid) ->
         iter_loc sub s; iter_loc sub lid
     | Pwith_modtypesubst (lid, mty) ->
         iter_loc sub lid; sub.module_type sub mty
+    | Pwith_jkindsubst (lid, d) ->
+        iter_loc sub lid; sub.jkind_declaration sub d
 
   let iter_signature_item sub {psig_desc = desc; psig_loc = loc} =
     sub.location sub loc;
@@ -324,6 +328,7 @@ module MT = struct
     | Psig_type (_, l)
     | Psig_typesubst l ->
       List.iter (sub.type_declaration sub) l
+    | Psig_jkindsubst x -> sub.jkind_declaration sub x
     | Psig_typext te -> sub.type_extension sub te
     | Psig_exception ed -> sub.type_exception sub ed
     | Psig_module x -> sub.module_declaration sub x
