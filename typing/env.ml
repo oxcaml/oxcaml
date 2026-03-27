@@ -2478,8 +2478,19 @@ let rec components_of_module_maker
 
 (* Insertion of bindings by identifier + path *)
 
-and check_usage loc id uid warn tbl =
-  if not loc.Location.loc_ghost &&
+and is_compiler_generated_name name =
+  let len = String.length name in
+  len = 0
+  || name.[0] = '_' || name.[0] = '#'
+  || (let rec loop i =
+        if i >= len then false
+        else if not (is_identchar name.[i]) then true
+        else loop (i + 1)
+      in
+      loop 0)
+
+and check_usage ?(check_ghost=true) loc id uid warn tbl =
+  if (not check_ghost || not loc.Location.loc_ghost) &&
      Uid.for_actual_declaration uid &&
      Warnings.is_active (warn "")
   then begin
@@ -2487,7 +2498,7 @@ and check_usage loc id uid warn tbl =
     if Types.Uid.Tbl.mem tbl uid then ()
     else let used = ref false in
     Types.Uid.Tbl.add tbl uid (fun () -> used := true);
-    if not (name = "" || name.[0] = '_' || name.[0] = '#')
+    if not (is_compiler_generated_name name)
     then
       !add_delayed_check_forward
         (fun () -> if not !used then Location.prerr_warning loc (warn name))
@@ -2509,10 +2520,12 @@ and store_value ?check ~mode id addr decl shape env =
   Builtin_attributes.mark_alerts_used decl.val_attributes;
   Option.iter
     (fun f ->
-      check_usage decl.val_loc id decl.val_uid f !value_declarations;
+      check_usage ~check_ghost:false decl.val_loc id decl.val_uid
+        f !value_declarations;
       match decl.val_kind with
       | Val_mut _ ->
-        check_usage decl.val_loc id decl.val_uid f !mutated_mutable_values
+        check_usage ~check_ghost:false decl.val_loc id decl.val_uid
+          f !mutated_mutable_values
       | _ -> ())
     check;
   let vda =
