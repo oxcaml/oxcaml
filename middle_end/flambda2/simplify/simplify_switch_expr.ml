@@ -806,9 +806,9 @@ let decide_continuation_specialization ~dacc ~switch ~scrutinee =
       | `Single_use -> counters
       | `Exn_handler -> counters
       | `Toplevel -> counters
-      | `All_unknown -> counters
-      | `No_reason_to_spec -> counters
-      | `Not_lifting -> counters
+      | `All_unknown -> Profile.Counters.incr "all_unknown" counters
+      | `No_reason_to_spec -> Profile.Counters.incr "no_reason" counters
+      | `Not_lifting -> Profile.Counters.incr "not_lifting" counters
       | `Cannot_specialize -> Profile.Counters.incr "cannot_spec" counters
       | `Insufficient_lifting_budget ->
         Profile.Counters.incr "no_lifting_budget" counters
