@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension mode_polymorphism_alpha";
  flags += "-dlambda -dno-unique-ids -extension-universe upstream_compatible";
  expect;
 *)

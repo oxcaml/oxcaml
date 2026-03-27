@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension mode_polymorphism_alpha";
    expect;
 *)
 
@@ -14,5 +15,5 @@ module M = struct
 end
 
 [%%expect{|
-module M : sig val f : 'a @ local -> unit end
+module M : sig val f : 'a -> unit end
 |}]

@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension mode_polymorphism_alpha";
  include stdlib_upstream_compatible;
  flambda2;
  {
