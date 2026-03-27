@@ -544,6 +544,10 @@ val get : 'd Types.jkind -> 'd Desc.t
 val get_layout_defaulting_to_value :
   Env.t -> 'd Types.jkind -> Layout.Const.t option
 
+(** Like [get_layout_defaulting_to_value], but never mutates sort variables. *)
+val get_layout_defaulting_to_value_without_mutation :
+  Env.t -> 'd Types.jkind -> Layout.Const.t option
+
 (** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
 val default_to_value : 'd Types.jkind -> unit
 (* CR layouts v5: When we have proper support for void, we'll want to change
@@ -553,6 +557,9 @@ val default_to_value : 'd Types.jkind -> unit
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)
 val sort_of_jkind : Env.t -> Types.jkind_l -> sort
+
+(** Like [Sort.default_to_value_and_get], but never mutates sort variables. *)
+val default_sort_to_value_without_mutation : sort -> Sort.Const.t
 
 (** Gets the layout of a jkind; returns [None] if the layout is still unknown,
     or the (fully expanded) kind is abstract. Never does mutation. *)
@@ -626,6 +633,11 @@ val apply_or_null_r : Types.jkind_r -> (Types.jkind_r, unit) result
     Because it just reuses the mode information, the resulting jkinds are higher
     in the jkind lattice than they might need to be. *)
 val decompose_product : Env.t -> 'd Types.jkind -> 'd Types.jkind list option
+
+(** Like [decompose_product], but if the layout is a sort variable, try to
+    refine it to a product of the requested arity. *)
+val decompose_product_with_arity :
+  level:int -> Env.t -> 'd Types.jkind -> int -> 'd Types.jkind list option
 
 (** Get an annotation (that a user might write) for this [t]. *)
 val get_annotation : 'd Types.jkind -> Parsetree.jkind_annotation option

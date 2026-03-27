@@ -116,7 +116,11 @@ type t_void : void
 and 'a r : value & any = #{ a : 'a ; v : t_void }
 and bad = F : { x : 'a r } -> bad [@@unboxed]
 [%%expect{|
->> Fatal error: Jkind.sort_of_jkind: layout is any
-Uncaught exception: Misc.Fatal_error
-
+Line 3, characters 0-45:
+3 | and bad = F : { x : 'a r } -> bad [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "bad" is value & any
+         because of the annotation on the declaration of the type r.
+       But the layout of type "bad" must be representable
+         because it's an [@@unboxed] type.
 |}]
