@@ -28,6 +28,15 @@ module SL = Slambda
 
 module Genprintval = Genprintval_native
 
+type input =
+  | Stdin
+  | File of string
+  | String of string
+
+let filename_of_input = function
+  | File name -> name
+  | Stdin | String _ -> ""
+
 type res = Ok of Obj.t | Err of string
 type evaluation_outcome = Result of Obj.t | Exception of exn
 
@@ -894,7 +903,8 @@ let load_file ppf name0 =
 
 let preload_objects = ref []
 
-let prepare ppf ?input () =
+(* CR dallsopp: upstream #12888 needs applying carefully *)
+let prepare ppf ?input:_ () =
   set_paths ();
   begin try
     initialize_toplevel_env ()
