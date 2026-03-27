@@ -185,6 +185,9 @@ val need_symbol : string -> bool
 
 val phrase_name : string ref
 
+val load_file : formatter -> string -> bool
+(** Load a .cmxs, .cmx, or .cmxa file in-core and execute it. *)
+
 val preload_objects : string list ref
 (** List of compilation units to be loaded before entering the interactive
     loop. *)

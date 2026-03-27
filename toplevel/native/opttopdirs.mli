@@ -29,6 +29,3 @@ val dir_remove_printer : formatter -> Longident.t -> unit
 
 type 'a printer_type_new = Format.formatter -> 'a -> unit
 type 'a printer_type_old = 'a -> unit
-
-(* For topmain.ml. Maybe shouldn't be there *)
-val load_file : formatter -> string -> bool

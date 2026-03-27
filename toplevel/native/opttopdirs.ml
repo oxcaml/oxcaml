@@ -71,50 +71,7 @@ let dir_cd s = Sys.chdir s
 
 let _ = Hashtbl.add directive_table "cd" (Directive_string dir_cd)
 
-module Compiler = (val Optcompile.native
-                   (module Unix : Compiler_owee.Unix_intf.S)
-                   ~flambda2:Flambda2.lambda_to_cmm)
-
-(* Load in-core a .cmxs file *)
-
-let linkenv = Linkenv.create ()
-
-let load_file ppf name0 =
-  let name =
-    try Some (Load_path.find name0)
-    with Not_found -> None
-  in
-  match name with
-  | None -> fprintf ppf "File not found: %s@." name0; false
-  | Some name ->
-    let fn,tmp =
-      if Filename.check_suffix name Compiler.ext_flambda_obj
-         || Filename.check_suffix name Compiler.ext_flambda_lib
-      then
-        let cmxs = Filename.temp_file "caml" ".cmxs" in
-        Compiler.link_shared ~ppf_dump:ppf linkenv [name] cmxs;
-        cmxs,true
-      else
-        name,false
-    in
-    let success =
-      (* The Dynlink interface does not allow us to distinguish between
-          a Dynlink.Error exceptions raised in the loaded modules
-          or a genuine error during dynlink... *)
-      try Dynlink.loadfile fn; true
-      with
-      | Dynlink.Error err ->
-        fprintf ppf "Error while loading %s: %s.@."
-          name (Dynlink.error_message err);
-        false
-      | exn ->
-        print_exception_outcome ppf exn;
-        false
-    in
-    if tmp then (try Sys.remove fn with Sys_error _ -> ());
-    success
-
-let dir_load ppf name = ignore (load_file ppf name)
+let dir_load ppf name = ignore (Opttoploop.load_file ppf name)
 
 let _ = Hashtbl.add directive_table "load" (Directive_string (dir_load std_out))
 
