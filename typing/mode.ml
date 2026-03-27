@@ -191,6 +191,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         match h with
         | Unknown -> Unknown
         | Legacy x -> Legacy x
+        | Toplevel_expression -> Toplevel_expression
         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
         | Tailcall_function -> Tailcall_function
         | Tailcall_argument -> Tailcall_argument
@@ -209,6 +210,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Unknown -> Unknown
         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
         | Legacy x -> Legacy x
+        | Toplevel_expression -> Toplevel_expression
         | Tailcall_function -> Tailcall_function
         | Tailcall_argument -> Tailcall_argument
         | Mutable_read m -> Mutable_read m
@@ -230,6 +232,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Unknown -> Unknown
         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
         | Legacy x -> Legacy x
+        | Toplevel_expression -> Toplevel_expression
         | Tailcall_function -> Tailcall_function
         | Tailcall_argument -> Tailcall_argument
         | Mutable_read m -> Mutable_read m
@@ -2321,6 +2324,8 @@ module Report = struct
         Fmt.fprintf ppf "it is %t and thus always"
           (print_legacy m ~definite:false ~capitalize:false));
       Fmt.pp_print_string ppf " at the legacy modes"
+    | Toplevel_expression ->
+      Fmt.pp_print_string ppf "it is a top-level expression"
     | Tailcall_function ->
       Fmt.pp_print_string ppf "it is the function in a tail call"
     | Tailcall_argument ->
