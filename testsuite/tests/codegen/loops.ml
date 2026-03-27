@@ -51,8 +51,6 @@ loop_code_layout.cold:
   ret
 |}]
 
-(* CR ttebbi: For for loops, we could avoid the unconditional jumps even without
-   a general loop rotation optimization by just lowering them right. *)
 let for_loop_layout n f =
   for i = 0 to n do
     f()
