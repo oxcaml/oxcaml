@@ -471,22 +471,22 @@ Error: The value "f" is "stateful"
          which is expected to be "stateless".
 |}]
 
-let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
+let foo (f : (unit -> unit) @ reading portable) @ stateless = fun () -> f ()
 [%%expect{|
-Line 1, characters 74-75:
-1 | let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
-                                                                              ^
-Error: The value "f" is "observing"
+Line 1, characters 72-73:
+1 | let foo (f : (unit -> unit) @ reading portable) @ stateless = fun () -> f ()
+                                                                            ^
+Error: The value "f" is "reading"
        but is expected to be "stateless"
-         because it is used inside the function at line 1, characters 64-78
+         because it is used inside the function at line 1, characters 62-76
          which is expected to be "stateless".
 |}]
 
-(* Closing over use of read gives observing *)
+(* Closing over use of read gives reading *)
 let foo () =
     let a = Atomic.make 0 in
     let bar () = Atomic.get a in
-    let _ @ observing = bar in
+    let _ @ reading = bar in
     ()
 [%%expect{|
 val foo : unit -> unit = <fun>
@@ -502,33 +502,33 @@ let foo () =
 Line 4, characters 22-25:
 4 |   let _ @ stateless = bar in
                           ^^^
-Error: This value is "observing"
+Error: This value is "reading"
          because it contains a usage (of the value "a" at line 3, characters 26-27)
          which is expected to be "read" or "read_write".
        However, the highlighted expression is expected to be "stateless".
 |}]
 
-(* Closing over a observing value also gives observing. *)
+(* Closing over a reading value also gives reading. *)
 
-let foo (f : (unit -> unit) @ observing) @ observing = fun () -> f ()
+let foo (f : (unit -> unit) @ reading) @ reading = fun () -> f ()
 [%%expect{|
-val foo : (unit -> unit) @ observing -> (unit -> unit) @ observing = <fun>
+val foo : (unit -> unit) @ reading -> (unit -> unit) @ reading = <fun>
 |}]
 
-let foo (f : (unit -> unit) @ observing) @ stateful = fun () -> f ()
+let foo (f : (unit -> unit) @ reading) @ stateful = fun () -> f ()
 [%%expect{|
-val foo : (unit -> unit) @ observing -> unit -> unit = <fun>
+val foo : (unit -> unit) @ reading -> unit -> unit = <fun>
 |}]
 
-let foo (f : (unit -> unit) @ stateful) @ observing = fun () -> f ()
+let foo (f : (unit -> unit) @ stateful) @ reading = fun () -> f ()
 [%%expect{|
-Line 1, characters 64-65:
-1 | let foo (f : (unit -> unit) @ stateful) @ observing = fun () -> f ()
-                                                                    ^
+Line 1, characters 62-63:
+1 | let foo (f : (unit -> unit) @ stateful) @ reading = fun () -> f ()
+                                                                  ^
 Error: The value "f" is "stateful"
-       but is expected to be "observing"
-         because it is used inside the function at line 1, characters 54-68
-         which is expected to be "observing".
+       but is expected to be "reading"
+         because it is used inside the function at line 1, characters 52-66
+         which is expected to be "reading".
 |}]
 
 (* Testing defaulting  *)
@@ -556,34 +556,34 @@ Line 1, characters 70-71:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
-(* [observing] => [shareable]. *)
+(* [reading] => [shareable]. *)
 
-let default : 'a @ observing -> 'a @ shareable = fun x -> x
+let default : 'a @ reading -> 'a @ shareable = fun x -> x
 [%%expect{|
-val default : 'a @ observing -> 'a @ shareable = <fun>
+val default : 'a @ reading -> 'a @ shareable = <fun>
 |}]
 
-let override : 'a @ observing nonportable -> 'a @ shareable = fun x -> x
+let override : 'a @ reading nonportable -> 'a @ shareable = fun x -> x
 [%%expect{|
-Line 1, characters 71-72:
-1 | let override : 'a @ observing nonportable -> 'a @ shareable = fun x -> x
-                                                                           ^
+Line 1, characters 69-70:
+1 | let override : 'a @ reading nonportable -> 'a @ shareable = fun x -> x
+                                                                         ^
 Error: This value is "nonportable" but is expected to be "shareable".
 |}]
 
 (* [stateful] => [nonportable] *)
 
-let fails : 'a @ observing -> 'a @ portable = fun x -> x
+let fails : 'a @ reading -> 'a @ portable = fun x -> x
 [%%expect{|
-Line 1, characters 55-56:
-1 | let fails : 'a @ observing -> 'a @ portable = fun x -> x
-                                                           ^
+Line 1, characters 53-54:
+1 | let fails : 'a @ reading -> 'a @ portable = fun x -> x
+                                                         ^
 Error: This value is "shareable" but is expected to be "portable".
 |}]
 
-let succeeds : 'a @ observing portable -> 'a @ portable = fun x -> x
+let succeeds : 'a @ reading portable -> 'a @ portable = fun x -> x
 [%%expect{|
-val succeeds : 'a @ portable observing -> 'a @ portable = <fun>
+val succeeds : 'a @ portable reading -> 'a @ portable = <fun>
 |}]
 
 let fails : 'a @ stateful -> 'a @ portable = fun x -> x
@@ -751,24 +751,24 @@ Error: This value is "immutable"
          because its mutable field "contents" is being written.
 |}]
 
-(* [lazy_t @ observing] capture values at [read]. *)
+(* [lazy_t @ reading] capture values at [read]. *)
 
-let bat (x : int ref) @ observing = lazy (x.contents <- 4)
+let bat (x : int ref) @ reading = lazy (x.contents <- 4)
 [%%expect{|
-Line 1, characters 42-43:
-1 | let bat (x : int ref) @ observing = lazy (x.contents <- 4)
-                                              ^
+Line 1, characters 40-41:
+1 | let bat (x : int ref) @ reading = lazy (x.contents <- 4)
+                                            ^
 Error: This value is "read"
-         because it is used inside the lazy expression at line 1, characters 36-58
-         which is expected to be "observing".
+         because it is used inside the lazy expression at line 1, characters 34-56
+         which is expected to be "reading".
        However, the highlighted expression is expected to be "read_write"
          because its mutable field "contents" is being written.
 |}]
 
-let bar (x : int ref) @ observing = lazy (x.contents)
+let bar (x : int ref) @ reading = lazy (x.contents)
 
 [%%expect{|
-val bar : int ref -> int lazy_t @ observing = <fun>
+val bar : int ref -> int lazy_t @ reading = <fun>
 |}]
 
 let () =
@@ -780,9 +780,9 @@ let () =
 |}]
 
 (* [contended] lazy values can't be forced. *)
-let fuz (x : int ref) @ observing immutable = lazy (x.contents)
+let fuz (x : int ref) @ reading immutable = lazy (x.contents)
 [%%expect{|
-val fuz : int ref -> int lazy_t @ observing immutable = <fun>
+val fuz : int ref -> int lazy_t @ reading immutable = <fun>
 |}]
 
 let () =
@@ -800,10 +800,10 @@ Error: This value is "contended"
 |}]
 
 (* But [immutable] lazy values can be, by design. *)
-let baz (x : int ref) @ observing immutable uncontended = lazy (x.contents)
+let baz (x : int ref) @ reading immutable uncontended = lazy (x.contents)
 
 [%%expect{|
-val baz : int ref -> int lazy_t @ uncontended observing immutable = <fun>
+val baz : int ref -> int lazy_t @ uncontended reading immutable = <fun>
 |}]
 
 let () =

@@ -452,7 +452,7 @@ module type S = sig
     module Const : sig
       type t =
         | Stateless
-        | Observing
+        | Reading
         | Stateful
 
       include Const with type t := t
@@ -462,7 +462,7 @@ module type S = sig
 
     val stateless : lr
 
-    val observing : lr
+    val reading : lr
 
     val stateful : lr
   end
