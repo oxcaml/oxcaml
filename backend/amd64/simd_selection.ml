@@ -1509,7 +1509,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
           | Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence
           | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Iprefetch _
-          | Icldemote _ | Illvm_intrinsic _ ->
+          | Icldemote _ | Illvm_intrinsic _ | Ipush_to_stack | Ipop_from_stack
+            ->
             assert false)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
         | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Dummy_use
@@ -1643,7 +1644,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               ( Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _
               | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
               | Isimd _ | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32
-              | Izextend32 | Illvm_intrinsic _ )
+              | Izextend32 | Illvm_intrinsic _ | Ipush_to_stack
+              | Ipop_from_stack )
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Int128op _
           | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
           | Dummy_use | Const_int _ | Const_float32 _ | Const_float _
@@ -1746,7 +1748,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     | Isimd_mem _ ->
       Misc.fatal_error "Unexpected simd operation with memory arguments"
     | Ioffset_loc _ | Ibswap _ | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
-    | Ipackf32 | Isimd _ | Iprefetch _ | Icldemote _ ->
+    | Ipackf32 | Isimd _ | Iprefetch _ | Icldemote _ | Ipush_to_stack
+    | Ipop_from_stack ->
       None
     | Illvm_intrinsic intr ->
       Misc.fatal_errorf

@@ -205,7 +205,7 @@
   ast_invariants
   depend
   parser_types ; manual update: mli only files asttypes parsetree
-  ;; TYPING
+               ;; TYPING
   ident
   path
   jkind
@@ -643,6 +643,7 @@
   cfg_simplify
   cfg_prologue
   cfg_merge_blocks
+  push_pop_around_calls
   extra_debug
   label
   linear_utils

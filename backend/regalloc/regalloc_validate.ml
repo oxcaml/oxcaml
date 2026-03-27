@@ -26,6 +26,8 @@ module Location : sig
 
   val of_regs_exn : Reg.t array -> t array
 
+  val push_stack : index:int -> t
+
   val to_loc_lossy : t -> Reg.location
 
   val print : Cmm.machtype_component -> Format.formatter -> t -> unit
@@ -133,6 +135,7 @@ end = struct
   type t =
     | Reg of Regs.Phys_reg.t
     | Stack of Stack.t
+    | Push_stack of { index : int }
 
   let of_reg reg =
     match reg.Reg.loc with
@@ -149,20 +152,29 @@ end = struct
 
   let of_regs_exn loc_arr = Array.map of_reg_exn loc_arr
 
+  let push_stack ~index = Push_stack { index }
+
   let to_loc_lossy t =
     match t with
     | Reg idx -> Reg.Reg idx
     | Stack stack -> Reg.Stack (Stack.to_stack_loc_lossy stack)
+    | Push_stack _ -> Reg.Unknown
 
   let print typ ppf t =
-    Printreg.loc ~unknown:(fun _ -> assert false) ppf (to_loc_lossy t) typ
+    match t with
+    | Push_stack { index } -> Format.fprintf ppf "push_stack[%d]" index
+    | _ ->
+      Printreg.loc ~unknown:(fun _ -> assert false) ppf (to_loc_lossy t) typ
 
   let compare (t1 : t) (t2 : t) : int =
     match t1, t2 with
     | Reg r1, Reg r2 -> Regs.Phys_reg.compare r1 r2
     | Stack s1, Stack s2 -> Stack.compare s1 s2
-    | Reg _, Stack _ -> -1
-    | Stack _, Reg _ -> 1
+    | Push_stack { index = i1 }, Push_stack { index = i2 } -> Int.compare i1 i2
+    | Reg _, (Stack _ | Push_stack _) -> -1
+    | (Stack _ | Push_stack _), Reg _ -> 1
+    | Stack _, Push_stack _ -> -1
+    | Push_stack _, Stack _ -> 1
 
   let equal (t1 : t) (t2 : t) : bool = compare t1 t2 = 0
 
@@ -376,7 +388,9 @@ end = struct
   let reg_fun_args t = t.reg_fun_args
 
   let is_regalloc_specific_basic (desc : Cfg.basic) =
-    match desc with Op (Reload | Spill | Dummy_use) -> true | _ -> false
+    match desc with
+    | Op (Reload | Spill | Dummy_use) -> true
+    | _ -> Proc.is_push_to_stack desc || Proc.is_pop_from_stack desc
 
   let add_instr_id ~seen_ids ~context id =
     if Hashtbl.mem seen_ids id
@@ -1009,6 +1023,8 @@ end
 
 module type Description_value = sig
   val description : Description.t
+
+  val push_pop_slots : int InstructionId.Tbl.t
 end
 
 let print_reg_as_loc ppf reg =
@@ -1206,6 +1222,31 @@ module Transfer (Desc_val : Description_value) :
           ~loc_arg:(Location.of_regs_exn loc_instr.arg)
           equations)
 
+  let push_pop_slots = Desc_val.push_pop_slots
+
+  let rename_push_pop_location equations ~instr =
+    match InstructionId.Tbl.find_opt push_pop_slots instr.id with
+    | None ->
+      Regalloc_utils.fatal "Push/pop instruction no. %a has no assigned slot"
+        InstructionId.format instr.id
+    | Some slot ->
+      let push_loc = Location.push_stack ~index:slot in
+      if Proc.is_push_to_stack instr.desc
+      then begin
+        assert (Array.length instr.arg = 1);
+        assert (Array.length instr.res = 0);
+        Equation_set.rename_loc
+          ~arg:(Location.of_reg_exn instr.arg.(0))
+          ~res:push_loc equations
+      end
+      else begin
+        assert (Array.length instr.arg = 0);
+        assert (Array.length instr.res = 1);
+        Equation_set.rename_loc ~arg:push_loc
+          ~res:(Location.of_reg_exn instr.res.(0))
+          equations
+      end
+
   let basic t instr () : (domain, error) result =
     match Description.find_basic description instr with
     | None -> (
@@ -1213,6 +1254,10 @@ module Transfer (Desc_val : Description_value) :
       | Op (Spill | Reload | Move) ->
         Result.ok @@ rename_location t ~loc_instr:instr
       | Op Dummy_use -> Result.ok t
+      | _
+        when Proc.is_push_to_stack instr.desc
+             || Proc.is_pop_from_stack instr.desc ->
+        Result.ok @@ rename_push_pop_location t ~instr
       | _ -> assert false)
     | Some instr_before -> (
       match instr.desc with
@@ -1414,7 +1459,51 @@ let verify_entrypoint (equations : Equation_set.t) (desc : Description.t)
   |> Result.map_error (fun message : Error.At_entrypoint.t ->
       { message; equations; reg_fun_args; loc_fun_args })
 
-let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
+let compute_push_pop_slots (cfg : Cfg.t) : int InstructionId.Tbl.t =
+  let blocks = Label.Tbl.create 8 in
+  let slots = InstructionId.Tbl.create 16 in
+  Label.Tbl.replace blocks (Cfg.entry_label cfg) 0;
+  Cfg.iter_blocks_dfs cfg ~f:(fun label block ->
+      let next_slot =
+        ref
+          (match Label.Tbl.find_opt blocks label with Some s -> s | None -> 0)
+      in
+      DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+          if Proc.is_push_to_stack instr.desc
+          then begin
+            InstructionId.Tbl.replace slots instr.id !next_slot;
+            incr next_slot
+          end
+          else if Proc.is_pop_from_stack instr.desc
+          then begin
+            decr next_slot;
+            if !next_slot < 0
+            then
+              Regalloc_utils.fatal
+                "Push/pop stack underflow at instruction %a in block %a"
+                InstructionId.format instr.id Label.format label;
+            InstructionId.Tbl.replace slots instr.id !next_slot
+          end);
+      let set_successor_slot succ_label slot =
+        match Label.Tbl.find_opt blocks succ_label with
+        | None -> Label.Tbl.replace blocks succ_label slot
+        | Some existing ->
+          if existing <> slot
+          then
+            Regalloc_utils.fatal
+              "Push/pop slot mismatch at block %a: successor %a has slot %d \
+               but expected %d"
+              Label.format label Label.format succ_label existing slot
+      in
+      Label.Set.iter
+        (fun succ -> set_successor_slot succ !next_slot)
+        (Cfg.successor_labels ~normal:true ~exn:false block);
+      Label.Set.iter
+        (fun succ -> set_successor_slot succ 0)
+        (Cfg.successor_labels ~normal:false ~exn:true block));
+  slots
+
+let test (desc : Description.t) ~push_pop_slots (cfg : Cfg_with_layout.t) :
     (Cfg_with_layout.t, Error.t) Result.t =
   if Lazy.force Regalloc_utils.validator_debug
   then
@@ -1429,6 +1518,8 @@ let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
   Description.verify desc cfg;
   let module Check_backwards = Check_backwards (struct
     let description = desc
+
+    let push_pop_slots = push_pop_slots
   end) in
   let res_instr, res_block, result =
     match
@@ -1471,6 +1562,7 @@ let run desc cfg_with_infos =
   match desc with
   | None -> cfg_with_infos
   | Some desc -> (
-    match test desc cfg with
+    let push_pop_slots = compute_push_pop_slots (Cfg_with_layout.cfg cfg) in
+    match test desc ~push_pop_slots cfg with
     | Ok _ -> cfg_with_infos
     | Error error -> Regalloc_utils.fatal "%a%!" Error.dump error)

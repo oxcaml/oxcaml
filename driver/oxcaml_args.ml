@@ -105,6 +105,16 @@ let mk_no_cfg_peephole_optimize f =
     Arg.Unit f,
     " Do not apply peephole optimizations to CFG" )
 
+let mk_cfg_push_pop_around_calls f =
+  ( "-cfg-push-pop-around-calls",
+    Arg.Unit f,
+    " Use push/pop for spills around calls" )
+
+let mk_no_cfg_push_pop_around_calls f =
+  ( "-no-cfg-push-pop-around-calls",
+    Arg.Unit f,
+    " Do not use push/pop for spills around calls (default)" )
+
 let mk_cfg_cse_optimize f =
   ("-cfg-cse-optimize", Arg.Unit f, " Apply CSE optimizations to CFG")
 
@@ -1191,6 +1201,8 @@ module type Oxcaml_options = sig
   val dvectorize : unit -> unit
   val cfg_peephole_optimize : unit -> unit
   val no_cfg_peephole_optimize : unit -> unit
+  val cfg_push_pop_around_calls : unit -> unit
+  val no_cfg_push_pop_around_calls : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
@@ -1360,6 +1372,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dvectorize F.dvectorize;
       mk_cfg_peephole_optimize F.cfg_peephole_optimize;
       mk_no_cfg_peephole_optimize F.no_cfg_peephole_optimize;
+      mk_cfg_push_pop_around_calls F.cfg_push_pop_around_calls;
+      mk_no_cfg_push_pop_around_calls F.no_cfg_push_pop_around_calls;
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
@@ -1565,6 +1579,11 @@ module Oxcaml_options_impl = struct
   let dvectorize = set' Oxcaml_flags.dump_vectorize
   let cfg_peephole_optimize = set' Oxcaml_flags.cfg_peephole_optimize
   let no_cfg_peephole_optimize = clear' Oxcaml_flags.cfg_peephole_optimize
+  let cfg_push_pop_around_calls = set' Oxcaml_flags.cfg_push_pop_around_calls
+
+  let no_cfg_push_pop_around_calls =
+    clear' Oxcaml_flags.cfg_push_pop_around_calls
+
   let cfg_stack_checks = set' Oxcaml_flags.cfg_stack_checks
   let no_cfg_stack_checks = clear' Oxcaml_flags.cfg_stack_checks
 
@@ -2112,6 +2131,7 @@ module Extra_params = struct
     | "vectorize-max-block-size" ->
         set_int' Oxcaml_flags.vectorize_max_block_size
     | "cfg-peephole-optimize" -> set' Oxcaml_flags.cfg_peephole_optimize
+    | "cfg-push-pop-around-calls" -> set' Oxcaml_flags.cfg_push_pop_around_calls
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
     | "cfg-eliminate-dead-trap-handlers" ->
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers

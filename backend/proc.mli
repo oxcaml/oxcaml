@@ -124,5 +124,13 @@ val operation_supported : Cmm.operation -> bool
     supported by this architecture. *)
 val expression_supported : Cmm.expression -> bool
 
+(** Whether this basic instruction is a push to the hardware stack (used by the
+    push/pop around calls optimization). *)
+val is_push_to_stack : Cfg_intf.S.basic -> bool
+
+(** Whether this basic instruction is a pop from the hardware stack (used by the
+    push/pop around calls optimization). *)
+val is_pop_from_stack : Cfg_intf.S.basic -> bool
+
 (** The number of bytes each trap occupies on the stack. *)
 val trap_size_in_bytes : unit -> int

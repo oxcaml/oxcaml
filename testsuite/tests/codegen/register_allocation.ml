@@ -164,7 +164,7 @@ let spill_unspill_loop_movement not_used_in_loop read_in_loop =
   not_used_in_loop + !written_in_loop
 [%%expect_asm X86_64{|
 spill_unspill_loop_movement:
-  subq  $40, %rsp
+  subq  $24, %rsp
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  $3, %rax
@@ -181,13 +181,13 @@ spill_unspill_loop_movement:
   movq  8(%rsp), %rbx
   cmpq  $11, %rbx
   jle   .L123
-  movq  %rsi, 24(%rsp)
-  movq  %rbx, 8(%rsp)
+  pushq %rsi
+  pushq %rbx
   call  camlTOP9__f_20_23_code@PLT
 .L144:
+  popq  %rbx
+  popq  %rsi
   movq  (%rsp), %rax
-  movq  8(%rsp), %rbx
-  movq  24(%rsp), %rsi
   cmpq  %rax, %rbx
   je    .L128
   jmp   .L125
@@ -204,7 +204,7 @@ spill_unspill_loop_movement:
   movl  $1, %esi
 .L136:
   leaq  -1(%rdi,%rsi), %rax
-  addq  $40, %rsp
+  addq  $24, %rsp
   ret
 
 spill_unspill_loop_movement.f:
@@ -306,18 +306,18 @@ let spill_one_or_two (a : int) (b : int) f =
 ;;
 [%%expect_asm X86_64{|
 spill_one_or_two:
-  subq  $24, %rsp
-  movq  %rax, (%rsp)
-  movq  %rbx, 8(%rsp)
+  subq  $8, %rsp
+  pushq %rax
+  pushq %rbx
   movq  %rdi, %rbx
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
 .L107:
-  movq  (%rsp), %rax
-  movq  8(%rsp), %rbx
+  popq  %rbx
+  popq  %rax
   leaq  -1(%rax,%rbx), %rax
-  addq  $24, %rsp
+  addq  $8, %rsp
   ret
 |}]
 
@@ -427,13 +427,13 @@ let spilled_phi_merge cond callback f a b c d e =
   f a b c d e
 [%%expect_asm X86_64{|
 spilled_phi_merge:
-  subq  $56, %rsp
+  subq  $40, %rsp
   movq  %rax, 8(%rsp)
-  movq  %rbx, 48(%rsp)
+  movq  %rbx, 24(%rsp)
   movq  %rdi, (%rsp)
   movq  %rsi, %rbp
   movq  %rdx, %rbx
-  movq  %rcx, 24(%rsp)
+  movq  %rcx, 16(%rsp)
   movq  %r8, %r12
   movq  %r9, %r13
   movl  $1, %edi
@@ -441,35 +441,37 @@ spilled_phi_merge:
   movq  8(%rsp), %rax
   cmpq  $1, %rax
   je    .L114
-  movq  %r13, 40(%rsp)
-  movq  %r12, 32(%rsp)
-  movq  24(%rsp), %rax
-  movq  %rbx, 16(%rsp)
-  movq  %rbp, 8(%rsp)
-  movq  (%rsp), %rax
+  pushq %r13
+  pushq %r12
+  movq  32(%rsp), %rax
+  pushq %rax
+  pushq %rbx
+  pushq %rbp
+  movq  40(%rsp), %rax
+  pushq %rax
   movl  $1, %eax
-  movq  48(%rsp), %rbx
+  movq  72(%rsp), %rbx
   movq  (%rbx), %rdi
-  movq  48(%rsp), %rbx
+  movq  72(%rsp), %rbx
   call  *%rdi
 .L120:
-  movq  (%rsp), %rsi
-  movq  8(%rsp), %rbp
-  movq  16(%rsp), %rbx
-  movq  24(%rsp), %rdx
-  movq  32(%rsp), %rax
-  movq  40(%rsp), %rdi
+  popq  %rsi
+  popq  %rbp
+  popq  %rbx
+  popq  %rdx
+  popq  %rax
+  popq  %rdi
   movq  %rsi, (%rsp)
-  movq  %rdx, 24(%rsp)
+  movq  %rdx, 16(%rsp)
   movq  %rax, %r12
   movq  %rdi, %r13
 .L114:
   movq  %rbp, %rax
-  movq  24(%rsp), %rdi
+  movq  16(%rsp), %rdi
   movq  %r12, %rsi
   movq  %r13, %rdx
   movq  (%rsp), %rcx
-  addq  $56, %rsp
+  addq  $40, %rsp
   jmp   caml_apply5@PLT
 |}]
 

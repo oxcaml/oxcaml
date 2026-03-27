@@ -226,7 +226,7 @@ let pseudoregs_for_operation op arg res =
       | Istore_int (_, _, _)
       | Ilfence | Isfence | Imfence
       | Ioffset_loc (_, _)
-      | Irdtsc | Icldemote _ | Iprefetch _ )
+      | Irdtsc | Icldemote _ | Iprefetch _ | Ipush_to_stack | Ipop_from_stack )
   | Move | Spill | Reload | Dummy_use | Reinterpret_cast _ | Static_cast _
   | Const_int _ | Const_float32 _ | Const_float _ | Const_vec128 _
   | Const_vec256 _ | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _

@@ -107,6 +107,8 @@ type specific_operation =
         addr: addressing_mode;
       }
   | Illvm_intrinsic of string
+  | Ipush_to_stack
+  | Ipop_from_stack
 
 and float_operation =
   | Ifloatadd
@@ -169,6 +171,10 @@ val isomorphic_specific_operation : specific_operation -> specific_operation -> 
 (* addressing mode functions *)
 
 val equal_addressing_mode_without_displ : addressing_mode -> addressing_mode -> bool
+
+val specific_operation_stack_offset_delta : specific_operation -> int
+
+val call_stack_alignment : int
 
 val addressing_offset_in_bytes
   : addressing_mode
