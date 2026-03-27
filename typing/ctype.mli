@@ -748,7 +748,7 @@ val check_type_separability :
 
    *)
 val check_and_update_generalized_ty_jkind :
-  ?name:Ident.t -> loc:Location.t -> Env.t -> type_expr -> unit
+  ?name:Ident.t -> loc:Location.t -> type_expr -> unit
 
 (* False if running in principal mode and the type is not principal.
    True otherwise. *)
