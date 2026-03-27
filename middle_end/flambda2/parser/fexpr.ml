@@ -297,9 +297,13 @@ type expr =
   | Apply_cont of apply_cont
   | Switch of
       { scrutinee : simple;
-        cases : (int * apply_cont) list
+        cases : (int * apply_or_inlined_cont) list
       }
   | Invalid of { message : string }
+
+and apply_or_inlined_cont =
+  | Inlined_goto of expr
+  | Named_cont of apply_cont
 
 and value_slots = one_value_slot list
 

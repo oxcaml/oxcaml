@@ -349,8 +349,10 @@ named:
   | KWD_REC_INFO; ri = rec_info_atom { Rec_info ri }
 ;
 
+
 switch_case:
-  | i = tag; MINUSGREATER; ac = apply_cont_expr { i,ac }
+  | i = tag; MINUSGREATER; ac = apply_cont_expr { i, Named_cont ac }
+  | i = tag; MINUSGREATER; b = atomic_body { i, Inlined_goto b }
 ;
 
 switch:
@@ -446,7 +448,7 @@ let_expr(body):
 
 inner_expr:
   | w = where_expr { w }
-  | a = atomic_expr { a }
+  | s = inlined_expr { s }
 ;
 
 where_expr:
@@ -457,7 +459,17 @@ where_expr:
 
 continuation_body:
   | l = let_expr(continuation_body) { l }
+  | s = inlined_expr { s }
+;
+
+atomic_body:
+  | l = let_expr(atomic_body) { l }
   | a = atomic_expr { a }
+
+inlined_expr:
+  | a = atomic_expr { a }
+  | KWD_SWITCH; scrutinee = simple; cases = switch
+    { Switch {scrutinee; cases} }
 ;
 
 atomic_expr:
@@ -465,7 +477,6 @@ atomic_expr:
   | KWD_UNREACHABLE { Invalid { message =  "treat-as-unreachable" } }
   | KWD_INVALID; message = STRING { Invalid { message } }
   | KWD_CONT; ac = apply_cont_expr { Apply_cont ac }
-  | KWD_SWITCH; scrutinee = simple; cases = switch { Switch {scrutinee; cases} }
   | KWD_APPLY e = apply_expr { Apply e }
   | LPAREN; e = expr; RPAREN { e }
 ;

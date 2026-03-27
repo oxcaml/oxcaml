@@ -357,18 +357,27 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
   | Let_cont _ -> failwith "TODO andwhere"
   | Apply_cont ac -> Flambda.Expr.create_apply_cont (apply_cont env ac)
   | Switch { scrutinee; cases } ->
-    let arms =
-      List.map
-        (fun (case, apply) ->
-          (* CR mshinwell: Should get machine_width from fexpr context when
-             available *)
-          Target_ocaml_int.of_int machine_width case, apply_cont env apply)
-        cases
-      |> Target_ocaml_int.Map.of_list
+    let build_let_ks, arms =
+      List.fold_left_map
+        (fun build_let_ks (case, apply) ->
+          match (apply : Fexpr.apply_or_inlined_cont) with
+          | Named_cont apply ->
+            (* CR mshinwell: Should get machine_width from fexpr context when
+               available *)
+            ( build_let_ks,
+              (Target_ocaml_int.of_int machine_width case, apply_cont env apply)
+            )
+          | Inlined_goto body ->
+            let build_let, apply = inlined_goto env body in
+            let build_let_ks body = build_let_ks (build_let body) in
+            build_let_ks, (Target_ocaml_int.of_int machine_width case, apply))
+        Fun.id cases
     in
-    Flambda.Expr.create_switch
-      (Flambda.Switch.create ~condition_dbg:Debuginfo.none
-         ~scrutinee:(simple env scrutinee) ~arms)
+    let arms = Target_ocaml_int.Map.of_list arms in
+    build_let_ks
+    @@ Flambda.Expr.create_switch
+         (Flambda.Switch.create ~condition_dbg:Debuginfo.none
+            ~scrutinee:(simple env scrutinee) ~arms)
   | Let_symbol { bindings; value_slots; body } ->
     (* Desugar the abbreviated form for a single set of closures *)
     let found_explicit_set = ref false in
@@ -753,6 +762,21 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     in
     Flambda.Expr.create_apply apply
   | Invalid { message } -> Flambda.Expr.create_invalid (Message message)
+
+and inlined_goto env (handler_body : Fexpr.expr) =
+  let handler =
+    Flambda.Continuation_handler.create Bound_parameters.empty
+      ~free_names_of_handler:Unknown ~is_exn_handler:false ~is_cold:false
+      ~handler:(expr env handler_body)
+  in
+  (* no need to propagate env, nothing here can nor should be used elsewhere *)
+  let cont = Continuation.create ~name:"branch_k" ~sort:Normal_or_exn () in
+  let apply = Flambda.Apply_cont.create cont ~args:[] ~dbg:Debuginfo.none in
+  let build_let body =
+    Flambda.Let_cont.create_non_recursive cont handler ~body
+      ~free_names_of_body:Unknown
+  in
+  build_let, apply
 
 let bind_all_code_ids env (unit : Fexpr.flambda_unit) =
   let rec go env (e : Fexpr.expr) =

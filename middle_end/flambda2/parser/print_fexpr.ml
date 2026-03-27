@@ -415,16 +415,12 @@ let trap_action ppf = function
       (pp_option ~space:After raise_kind)
       rk continuation exn_handler
 
-let apply_cont ppf (ac : Fexpr.apply_cont) =
-  match ac with
-  | { cont; trap_action = action; args } ->
-    Format.fprintf ppf "@[<hv2>%a%a%a@]" continuation cont
-      (pp_option ~space:Before trap_action)
-      action
-      (simple_args ~space:Before ~omit_if_empty:true)
-      args
-
-let switch_case ppf (v, c) = Format.fprintf ppf "@;| %i -> %a" v apply_cont c
+let apply_cont ppf ({ cont; trap_action = action; args } : Fexpr.apply_cont) =
+  Format.fprintf ppf "@[<hv2>%a%a%a@]" continuation cont
+    (pp_option ~space:Before trap_action)
+    action
+    (simple_args ~space:Before ~omit_if_empty:true)
+    args
 
 let value_slots ppf = function
   | None -> ()
@@ -594,6 +590,14 @@ let rec expr scope ppf = function
       (func, arities)
       (simple_args ~space:Before ~omit_if_empty:true)
       args result_continuation ret exn_continuation ek
+
+and apply_or_inlined_cont ppf (ac : Fexpr.apply_or_inlined_cont) =
+  match ac with
+  | Named_cont ac -> apply_cont ppf ac
+  | Inlined_goto e -> Format.fprintf ppf "(%a)" (expr Outer) e
+
+and switch_case ppf (v, c) =
+  Format.fprintf ppf "@;@[<hov 2>| %i ->@ %a@]" v apply_or_inlined_cont c
 
 and let_expr scope ppf : let_ -> unit = function
   | { bindings = first :: rest; body; value_slots = ces } ->
