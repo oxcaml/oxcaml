@@ -62,9 +62,6 @@ val type_open:
    Longident.t Asttypes.loc -> Path.t * Env.t)
     ref
 
-val check_no_repeated_labels_unless_extension_enabled :
-  loc:Location.t -> ('a -> string option) -> 'a list -> unit
-
 val valid_tyvar_name : string -> bool
 
 (** [transl_label lbl ty] produces a Typedtree argument label for an argument
@@ -182,6 +179,7 @@ type error =
   | Method_mismatch of string * type_expr * type_expr
   | Opened_object of Path.t option
   | Not_an_object of type_expr
+  | Repeated_tuple_label of string
   | Unsupported_extension : _ Language_extension.t -> error
   | Polymorphic_optional_param
   | Non_value of

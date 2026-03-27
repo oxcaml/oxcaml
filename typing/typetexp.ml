@@ -27,19 +27,6 @@ open Ctype
 
 exception Already_bound
 
-let check_no_repeated_labels_unless_extension_enabled ~loc f l =
-  let rec has_repeated_labels seen = function
-    | [] -> false
-    | x :: rest ->
-      match f x with
-      | None -> has_repeated_labels seen rest
-      | Some l ->
-        if List.mem l seen then true
-        else has_repeated_labels (l :: seen) rest
-  in
-  if has_repeated_labels [] l then
-    Language_extension.assert_enabled ~loc Labeled_tuples ()
-
 type unbound_variable_policy =
   | Open (* common case *)
   | Closed (* no wildcards or unqunatified variables allowed *)
@@ -102,6 +89,7 @@ type error =
   | Method_mismatch of string * type_expr * type_expr
   | Opened_object of Path.t option
   | Not_an_object of type_expr
+  | Repeated_tuple_label of string
   | Unsupported_extension : _ Language_extension.t -> error
   | Polymorphic_optional_param
   | Non_value of
@@ -1423,7 +1411,8 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
 
 and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
   assert (List.length stl >= 2);
-  check_no_repeated_labels_unless_extension_enabled ~loc fst stl;
+  Option.iter (fun l -> raise (Error (loc, env, Repeated_tuple_label l)))
+    (Misc.repeated_label stl);
   let ctys =
     List.map
       (fun (label, t) ->
@@ -1877,6 +1866,9 @@ let report_error_doc env ppf =
                    To enable it, pass the '-extension %s' flag@]" ext ext
   | Polymorphic_optional_param ->
       fprintf ppf "@[Optional parameters cannot be polymorphic@]"
+  | Repeated_tuple_label l ->
+      fprintf ppf "@[This tuple type has two labels named %a@]"
+        Style.inline_code l
   | Non_value {vloc; typ; err} ->
     let s =
       match vloc with

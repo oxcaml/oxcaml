@@ -48,7 +48,7 @@ type t = x:int * x:string
 Line 1, characters 9-25:
 1 | type t = x:int * x:string
              ^^^^^^^^^^^^^^^^
-Error: The extension "labeled_tuples" is disabled and cannot be used
+Error: This tuple type has two labels named "x"
 |}]
 
 let f x y = ~x, ~x:y
@@ -57,7 +57,7 @@ let f x y = ~x, ~x:y
 Line 1, characters 12-20:
 1 | let f x y = ~x, ~x:y
                 ^^^^^^^^
-Error: The extension "labeled_tuples" is disabled and cannot be used
+Error: This tuple expression has two labels named "x"
 |}]
 
 let x = ~x:5, ~x:"hi"
@@ -66,7 +66,7 @@ let x = ~x:5, ~x:"hi"
 Line 1, characters 8-21:
 1 | let x = ~x:5, ~x:"hi"
             ^^^^^^^^^^^^^
-Error: The extension "labeled_tuples" is disabled and cannot be used
+Error: This tuple expression has two labels named "x"
 |}]
 
 let f x y = ~(x : int), ~x:(y : string)
@@ -75,7 +75,7 @@ let f x y = ~(x : int), ~x:(y : string)
 Line 1, characters 12-39:
 1 | let f x y = ~(x : int), ~x:(y : string)
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The extension "labeled_tuples" is disabled and cannot be used
+Error: This tuple expression has two labels named "x"
 |}]
 
 let f (~x, ~x:y) = x, y
@@ -84,7 +84,7 @@ let f (~x, ~x:y) = x, y
 Line 1, characters 6-16:
 1 | let f (~x, ~x:y) = x, y
           ^^^^^^^^^^
-Error: The extension "labeled_tuples" is disabled and cannot be used
+Error: This tuple pattern has two labels named "x"
 |}]
 
 let f (~x:_, ~x:_) = ()
@@ -93,7 +93,7 @@ let f (~x:_, ~x:_) = ()
 Line 1, characters 6-18:
 1 | let f (~x:_, ~x:_) = ()
           ^^^^^^^^^^^^
-Error: The extension "labeled_tuples" is disabled and cannot be used
+Error: This tuple pattern has two labels named "x"
 |}]
 
 let f (~(x:int), ~x:(y:string)) = x, y
@@ -102,7 +102,7 @@ let f (~(x:int), ~x:(y:string)) = x, y
 Line 1, characters 6-31:
 1 | let f (~(x:int), ~x:(y:string)) = x, y
           ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The extension "labeled_tuples" is disabled and cannot be used
+Error: This tuple pattern has two labels named "x"
 |}]
 
 let (_ : x : int * x : string) = assert false
@@ -111,7 +111,7 @@ let (_ : x : int * x : string) = assert false
 Line 1, characters 9-29:
 1 | let (_ : x : int * x : string) = assert false
              ^^^^^^^^^^^^^^^^^^^^
-Error: The extension "labeled_tuples" is disabled and cannot be used
+Error: This tuple type has two labels named "x"
 |}]
 
 let (_ : ('a -> x : int * x : string) -> 'b) = assert false
@@ -120,5 +120,5 @@ let (_ : ('a -> x : int * x : string) -> 'b) = assert false
 Line 1, characters 16-36:
 1 | let (_ : ('a -> x : int * x : string) -> 'b) = assert false
                     ^^^^^^^^^^^^^^^^^^^^
-Error: The extension "labeled_tuples" is disabled and cannot be used
+Error: This tuple type has two labels named "x"
 |}]

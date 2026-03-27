@@ -104,26 +104,26 @@ Error: This expression has type "int" but an expression was expected of type
 |}]
 
 (* Wrong label *)
-let f : (foo:int * foo:int) -> int =
+let f : (foo:int * baz:int) -> int =
    fun (~foo, ~bar:bar) -> foo * 10 + bar
 [%%expect{|
 Line 2, characters 7-23:
 2 |    fun (~foo, ~bar:bar) -> foo * 10 + bar
            ^^^^^^^^^^^^^^^^
-Error: This pattern was expected to match values of type "foo:int * foo:int",
-       but it is missing a component with label "foo".
+Error: This pattern was expected to match values of type "foo:int * baz:int",
+       but it is missing a component with label "baz".
        Hint: use ".." to ignore some components.
 |}]
 
 (* Wrong type *)
-let f : (foo:float * foo:int) -> int =
+let f : (foo:float * baz:int) -> int =
    fun (~foo, ~bar:bar) -> foo * 10 + bar
 [%%expect{|
 Line 2, characters 7-23:
 2 |    fun (~foo, ~bar:bar) -> foo * 10 + bar
            ^^^^^^^^^^^^^^^^
-Error: This pattern was expected to match values of type "foo:float * foo:int",
-       but it is missing a component with label "foo".
+Error: This pattern was expected to match values of type "foo:float * baz:int",
+       but it is missing a component with label "baz".
        Hint: use ".." to ignore some components.
 |}]
 
@@ -250,14 +250,14 @@ Error: This expression has type "yx -> yx"
 |}]
 
 (* Reordering and partial matches *)
-let lt = ~x:1, ~y:2, ~x:3, 4
+let lt = ~x:1, ~y:2, ~x2:3, 4
 
 (* Full match, in order *)
 let matches =
-  let ~x, ~y, ~x:x2, z = lt in
+  let ~x, ~y, ~x2:x2, z = lt in
   x, y, x2, z
 [%%expect{|
-val lt : x:int * y:int * x:int * int = (~x:1, ~y:2, ~x:3, 4)
+val lt : x:int * y:int * x2:int * int = (~x:1, ~y:2, ~x2:3, 4)
 val matches : int * int * int * int = (1, 2, 3, 4)
 |}]
 
@@ -266,10 +266,10 @@ let matches =
   let ~x, ~y, ~x, z = lt in
   x, y, z
 [%%expect{|
-Line 2, characters 15-16:
+Line 2, characters 6-19:
 2 |   let ~x, ~y, ~x, z = lt in
-                   ^
-Error: Variable "x" is bound several times in this matching
+          ^^^^^^^^^^^^^
+Error: This tuple pattern has two labels named "x"
 |}]
 
 (* Full match, missing label *)
@@ -281,8 +281,8 @@ Line 2, characters 6-15:
 2 |   let ~x, ~y, z = lt in
           ^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
-       but it is missing a component with label "x".
+       "x:int * y:int * x2:int * int",
+       but it is missing a component with label "x2".
        Hint: use ".." to ignore some components.
 |}]
 
@@ -295,34 +295,34 @@ Line 2, characters 6-19:
 2 |   let ~x, ~y, ~w, z = lt in
           ^^^^^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
-       but it is missing a component with label "x".
+       "x:int * y:int * x2:int * int",
+       but it is missing a component with label "x2".
        Hint: use ".." to ignore some components.
 |}]
 
 (* Full match, extra label *)
 let matches =
-  let ~x, ~y, ~x, ~y, z = lt in
+  let ~x, ~y, ~x2, ~y2, z = lt in
   x, y, z
 [%%expect{|
-Line 2, characters 6-23:
-2 |   let ~x, ~y, ~x, ~y, z = lt in
-          ^^^^^^^^^^^^^^^^^
+Line 2, characters 6-25:
+2 |   let ~x, ~y, ~x2, ~y2, z = lt in
+          ^^^^^^^^^^^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
-       but it contains an extra component with label "y".
+       "x:int * y:int * x2:int * int",
+       but it contains an extra component with label "y2".
 |}]
 
 (* Full match, extra unlabeled label *)
 let matches =
-  let ~x, ~y, ~x, z, w = lt in
+  let ~x, ~y, ~x2, z, w = lt in
   x, y, z
 [%%expect{|
-Line 2, characters 6-22:
-2 |   let ~x, ~y, ~x, z, w = lt in
-          ^^^^^^^^^^^^^^^^
+Line 2, characters 6-23:
+2 |   let ~x, ~y, ~x2, z, w = lt in
+          ^^^^^^^^^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
+       "x:int * y:int * x2:int * int",
        but it contains an extra unlabeled component.
 |}]
 
@@ -364,12 +364,12 @@ val matches : int = 1
 
 (* Partial match all *)
 let matches =
-   let ~x, ~y, ~x:x2, z, .. = lt in
+   let ~x, ~y, ~x2:x2, z, .. = lt in
    x, y, x2, z
 [%%expect{|
-Line 2, characters 7-27:
-2 |    let ~x, ~y, ~x:x2, z, .. = lt in
-           ^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 7-28:
+2 |    let ~x, ~y, ~x2:x2, z, .. = lt in
+           ^^^^^^^^^^^^^^^^^^^^^
 Warning 189 [unnecessarily-partial-tuple-pattern]: This tuple pattern
 unnecessarily ends in '..', as it explicitly matches all components
 of its expected type.
@@ -377,17 +377,17 @@ of its expected type.
 val matches : int * int * int * int = (1, 2, 3, 4)
 |}]
 
-(* Partial match too many of a name *)
+(* Partial match too many of a name (legacy test from when repeated labels) *)
 let matches =
-   let ~y, ~y:y2, ~x, .. = lt in
+   let ~y, ~y2, ~x, .. = lt in
    x, y
 [%%expect{|
-Line 2, characters 7-24:
-2 |    let ~y, ~y:y2, ~x, .. = lt in
-           ^^^^^^^^^^^^^^^^^
+Line 2, characters 7-22:
+2 |    let ~y, ~y2, ~x, .. = lt in
+           ^^^^^^^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
-       but it contains an extra component with label "y".
+       "x:int * y:int * x2:int * int",
+       but it contains an extra component with label "y2".
 |}]
 
 (* Partial match bad name *)
@@ -399,7 +399,7 @@ Line 2, characters 7-21:
 2 |    let ~w, ~y, ~x, .. = lt in
            ^^^^^^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
+       "x:int * y:int * x2:int * int",
        but it contains an extra component with label "w".
 |}]
 
@@ -432,14 +432,14 @@ Error: Could not determine the type of this partial tuple pattern.
 
 (* Labeled tuples nested in records *)
 
-let x = ref (~x:1, ~y:2, ~x:3, 4)
+let x = ref (~x:1, ~y:2, ~x1:3, 4)
 
 (* Good match *)
 let _1234 = match x with
-| { contents = ~x:x0, ~y, ~x , z } -> x0, y, x, z
+| { contents = ~x:x0, ~y, ~x1 , z } -> x0, y, x1, z
 [%%expect{|
-val x : (x:int * y:int * x:int * int) ref =
-  {contents = (~x:1, ~y:2, ~x:3, 4)}
+val x : (x:int * y:int * x1:int * int) ref =
+  {contents = (~x:1, ~y:2, ~x1:3, 4)}
 val _1234 : int * int * int * int = (1, 2, 3, 4)
 |}]
 
@@ -458,42 +458,43 @@ Line 2, characters 15-22:
 2 | | { contents = ~w , .. } -> w
                    ^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
+       "x:int * y:int * x1:int * int",
        but it contains an extra component with label "w".
 |}]
 
 (* Missing unordered label *)
 let () = match x with
-| { contents = ~x:x0, ~y , ~x } -> y
+| { contents = ~x:x0, ~y , ~x1 } -> y
 [%%expect{|
-Line 2, characters 15-29:
-2 | | { contents = ~x:x0, ~y , ~x } -> y
-                   ^^^^^^^^^^^^^^
+Line 2, characters 15-30:
+2 | | { contents = ~x:x0, ~y , ~x1 } -> y
+                   ^^^^^^^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int", but it is missing an unlabeled component.
+       "x:int * y:int * x1:int * int",
+       but it is missing an unlabeled component.
 |}]
 
 (* Extra unordered label *)
 let () = match x with
-| { contents = ~x:x0, ~y, ~x, w1, w2 } -> y
+| { contents = ~x:x0, ~y, ~x1, w1, w2 } -> y
 [%%expect{|
-Line 2, characters 15-36:
-2 | | { contents = ~x:x0, ~y, ~x, w1, w2 } -> y
-                   ^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 15-37:
+2 | | { contents = ~x:x0, ~y, ~x1, w1, w2 } -> y
+                   ^^^^^^^^^^^^^^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
+       "x:int * y:int * x1:int * int",
        but it contains an extra unlabeled component.
 |}]
 
 (* Extra unordered label, open *)
 let () = match x with
-| { contents = ~x:x0, ~y, ~x, w1, w2, .. } -> y
+| { contents = ~x:x0, ~y, ~x1, w1, w2, .. } -> y
 [%%expect{|
-Line 2, characters 15-40:
-2 | | { contents = ~x:x0, ~y, ~x, w1, w2, .. } -> y
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 15-41:
+2 | | { contents = ~x:x0, ~y, ~x1, w1, w2, .. } -> y
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
+       "x:int * y:int * x1:int * int",
        but it contains an extra unlabeled component.
 |}]
 
@@ -505,21 +506,21 @@ Line 2, characters 15-27:
 2 | | { contents = ~x:x0, ~y, x } -> y
                    ^^^^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
-       but it is missing a component with label "x".
+       "x:int * y:int * x1:int * int",
+       but it is missing a component with label "x1".
        Hint: use ".." to ignore some components.
 |}]
 
 (* Extra label *)
 let () = match x with
-| { contents = ~y:y0, ~y, ~x } -> y
+| { contents = ~y:y0, ~y1, ~x } -> y
 [%%expect{|
-Line 2, characters 15-28:
-2 | | { contents = ~y:y0, ~y, ~x } -> y
-                   ^^^^^^^^^^^^^
+Line 2, characters 15-29:
+2 | | { contents = ~y:y0, ~y1, ~x } -> y
+                   ^^^^^^^^^^^^^^
 Error: This pattern was expected to match values of type
-       "x:int * y:int * x:int * int",
-       but it is missing a component with label "x".
+       "x:int * y:int * x1:int * int",
+       but it is missing a component with label "x1".
        Hint: use ".." to ignore some components.
 |}]
 
@@ -561,30 +562,32 @@ Error: This expression has type "y:int * x:int"
        but an expression was expected of type "x:int * y:int"
 |}]
 
-(* More re-ordering stress tests *)
+(* More re-ordering stress tests (these tests were more stressful when labels
+   could be repeated) *)
 type t =
-  x:int *
-  y:int *
+  x1:int *
+  y1:int *
   int *
-  x:int *
-  x:int *
-  y:int *
-  y:int *
+  x2:int *
+  x3:int *
+  y2:int *
+  y3:int *
   int *
   int *
-  y:int *
-  x:int
+  y4:int *
+  x4:int
 
-let t : t = ~x:1, ~y:2, 3, ~x:4, ~x:5, ~y:6, ~y:7, 8, 9, ~y:10, ~x:11
+let t : t = ~x1:1, ~y1:2, 3, ~x2:4, ~x3:5, ~y2:6, ~y3:7, 8, 9, ~y4:10, ~x4:11
 
 let _ =
-  let (~y, ~y:y2, ~y:y3, ..) = t in
-  y, y2, y3
+  let (~y1, ~y2, ~y3, ..) = t in
+  y1, y2, y3
 [%%expect{|
 type t =
-    x:int * y:int * int * x:int * x:int * y:int * y:int * int * int *
-    y:int * x:int
-val t : t = (~x:1, ~y:2, 3, ~x:4, ~x:5, ~y:6, ~y:7, 8, 9, ~y:10, ~x:11)
+    x1:int * y1:int * int * x2:int * x3:int * y2:int * y3:int * int *
+    int * y4:int * x4:int
+val t : t =
+  (~x1:1, ~y1:2, 3, ~x2:4, ~x3:5, ~y2:6, ~y3:7, 8, 9, ~y4:10, ~x4:11)
 - : int * int * int = (2, 6, 7)
 |}]
 
@@ -596,21 +599,21 @@ let _ =
 |}]
 
 let _ =
-  let (n3, ~y:n2, ~y, ~x:n1, ..) = t in
+  let (n3, ~y1:n2, ~y2:y, ~x1:n1, ..) = t in
   (n1, n2, n3, y)
 [%%expect{|
 - : int * int * int * int = (1, 2, 3, 6)
 |}]
 
 let _ =
-  let (~x:x1, ~x:x2, ~x:x3, ~x, ..) = t in
+  let (~x1:x1, ~x2:x2, ~x3:x3, ~x4:x, ..) = t in
   (x1, x2, x3, x)
 [%%expect{|
 - : int * int * int * int = (1, 4, 5, 11)
 |}]
 
 let _ =
-  let (~y:n2, ~y:n6, n3, ~x:n1, ~y:n7, n8, ~y:n10, ~x:n4, ~x:n5, ~x:n11, n9) =
+  let (~y1:n2, ~y2:n6, n3, ~x1:n1, ~y3:n7, n8, ~y4:n10, ~x2:n4, ~x3:n5, ~x4:n11, n9) =
     t
   in
   (n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11)
@@ -620,7 +623,7 @@ let _ =
 |}]
 
 let _ =
-  let (n3, n8, n9, ~y:n2, ~y:n6, ~y:n7, ~y:n10, ~x:n1, ~x:n4, ~x:n5, ~x:n11) =
+  let (n3, n8, n9, ~y1:n2, ~y2:n6, ~y3:n7, ~y4:n10, ~x1:n1, ~x2:n4, ~x3:n5, ~x4:n11) =
     t
   in
   (n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11)
@@ -630,7 +633,7 @@ let _ =
 |}]
 
 let _ =
-  let (~x:n1, ~y:n2, n3, ~x:n4, ~x:n5, ~y:n6, ~y:n7, n8, n9, ~y:n10, ~x:n11) =
+  let (~x1:n1, ~y1:n2, n3, ~x2:n4, ~x3:n5, ~y2:n6, ~y3:n7, n8, n9, ~y4:n10, ~x4:n11) =
     t
   in
   (n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11)
