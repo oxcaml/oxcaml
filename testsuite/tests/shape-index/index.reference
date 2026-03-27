@@ -74,12 +74,6 @@ Index.25: u (File "index.ml", line 66, characters 7-8)
 Index.26: t (File "index.ml", line 67, characters 23-24)
 Index.27: G (File "index.ml", line 68, characters 9-10)
 Index.28: MSB (File "index.ml", line 65, characters 12-15)
-<<<<<<< oxcaml
-||||||| upstream-base
-Index.7: c (File "index.ml", line 35, characters 6-7)
-Index.2: AS (File "index.ml", line 18, characters 12-14)
-=======
 Index.29: x (File "index.ml", line 71, characters 43-44)
 Index.30: In (File "index.ml", line 71, characters 27-29)
 Index.31: Out (File "index.ml", line 71, characters 7-10)
->>>>>>> upstream-incoming
