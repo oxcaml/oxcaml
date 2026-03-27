@@ -1,0 +1,117 @@
+let code f1_0 deleted in
+let code f2_1 deleted in
+let code f3_returning_a_2 deleted in
+let code loopify(never) size(21) newer_version_of(f1_0)
+      f1_0_1 (b : imm tagged, x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k2 (0i, x)
+     | 1 -> k2 (1i, 0))
+    where k2 (is_int : imm, unboxed_field_0_0) =
+      switch is_int
+        | 0 -> k (unboxed_field_0_0)
+        | 1 -> k (1)
+in
+let $camlVariant_unboxing__f1_3 = closure f1_0_1 @f1 in
+let code loopify(never) size(94) newer_version_of(f2_1)
+      f2_1_1 (x : imm tagged, y : imm tagged, a : imm tagged, b : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  (let untagged = %untag_imm (x) in
+   switch untagged
+     | 0 -> k4
+     | 1 -> k5)
+    where k5 =
+      let Pnot = %boolean_not (y) in
+      cont k3 (Pnot, 0i, 1i, 0, 0, 0)
+    where k4 =
+      ((let untagged = %untag_imm (y) in
+        switch untagged
+          | 0 -> k4
+          | 1 -> k5)
+         where k5 =
+           let Pmakeblock = %block.[`0`].`local`[`region`] (a) in
+           cont k3 (Pmakeblock, 0i, 0i, 0, 0, a)
+         where k4 =
+           let Popaque = %opaque (0) in
+           ((let untagged = %untag_imm (Popaque) in
+             switch untagged
+               | 0 -> k4
+               | 1 -> k5)
+              where k5 =
+                let Pmakeblock = %block.[`0`].`local`[`region`] (b) in
+                cont k3 (Pmakeblock, 0i, 0i, 0, 0, b)
+              where k4 =
+                let Pmakeblock = %block.[`1`].`local`[`region`] (a, b) in
+                cont k3 (Pmakeblock, 1i, 0i, b, a, 0)))
+    where k3
+            (t : [ 0 |1 | 0 of imm tagged |1 of imm tagged * imm tagged ],
+             tag : imm,
+             is_int : imm,
+             unboxed_field_1_1,
+             unboxed_field_1_0,
+             unboxed_field_0_0) =
+      (switch is_int
+         | 0 -> k4
+         | 1 -> k5
+         where k5 =
+           let untagged = %untag_imm (t) in
+           switch untagged
+             | 0 -> k2 (40)
+             | 1 -> k2 (50)
+         where k4 =
+           switch tag
+             | 0 -> k2 (unboxed_field_0_0)
+             | 1 -> k3
+         where k3 =
+           let int_add =
+             %int_barith.add (unboxed_field_1_0, unboxed_field_1_1)
+           in
+           cont k2 (int_add))
+    where k2 (region_return : imm tagged) =
+      let `unit` = %end_region (`region`) in
+      cont k (region_return)
+in
+let $camlVariant_unboxing__f2_4 = closure f2_1_1 @f2 in
+let code loopify(never) size(45) newer_version_of(f3_returning_a_2)
+      f3_returning_a_2_1
+        (x : imm tagged, y : imm tagged, a : imm tagged, b : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  (let untagged = %untag_imm (x) in
+   switch untagged
+     | 0 -> k4
+     | 1 -> k3 (0i, 1i, 0, 0))
+    where k4 =
+      let untagged = %untag_imm (y) in
+      switch untagged
+        | 0 -> k3 (1i, 0i, a, 0)
+        | 1 -> k3 (0i, 0i, 0, a)
+    where k3 (tag : imm, is_int : imm, unboxed_field_1_1, unboxed_field_0_0) =
+      (switch is_int
+         | 0 -> k3
+         | 1 -> k2 (a)
+         where k3 =
+           switch tag
+             | 0 -> k2 (unboxed_field_0_0)
+             | 1 -> k2 (unboxed_field_1_1))
+    where k2 (region_return : imm tagged) =
+      let `unit` = %end_region (`region`) in
+      cont k (region_return)
+in
+let $camlVariant_unboxing__f3_returning_a_5 =
+  closure f3_returning_a_2_1 @f3_returning_a
+in
+let $camlVariant_unboxing =
+  Block 0 ($camlVariant_unboxing__f1_3,
+           $camlVariant_unboxing__f2_4,
+           $camlVariant_unboxing__f3_returning_a_5)
+in
+cont done ($camlVariant_unboxing)

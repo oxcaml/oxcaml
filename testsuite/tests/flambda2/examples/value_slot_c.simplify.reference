@@ -1,0 +1,58 @@
+let $camlValue_slot_c__immstring116 = "value_slot_c.ml" in
+let $camlValue_slot_c__const_block118 =
+  Block 0 ($camlValue_slot_c__immstring116, 24, 2)
+in
+let $camlValue_slot_c__Pmakeblock121 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlValue_slot_c__const_block118)
+in
+let $camlValue_slot_c__const_block129 =
+  Block 0 ($camlValue_slot_c__immstring116, 25, 2)
+in
+let $camlValue_slot_c__Pmakeblock132 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlValue_slot_c__const_block129)
+in
+let code f_3 deleted in
+let code loopify(never) size(59) newer_version_of(f_3)
+      f_3_1 (b : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let Pfield = %block_load.[`0`] ($Value_slot_b.camlValue_slot_b) in
+      cont k2 (Pfield)
+    where k3 =
+      let Pfield = %block_load.[`1`] ($Value_slot_b.camlValue_slot_b) in
+      cont k2 (Pfield)
+    where k2 (g : val) =
+      (apply inlined(always) g (3) -> k2 * k1
+         where k2 (`*match*` : [ 0 of imm tagged * imm tagged ]) =
+           let x = %block_load.[`0`] (`*match*`) in
+           ((let prim = %phys_eq (x, 0) in
+             switch prim
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 let prim_1 = %phys_eq (x, 1) in
+                 switch prim_1
+                   | 0 -> k1
+                            pop(regular k1)
+                            ($camlValue_slot_c__Pmakeblock121)
+                   | 1 -> k2)
+              where k2 =
+                let Pfield = %block_load.[`1`] (`*match*`) in
+                let prim = %phys_eq (Pfield, 3) in
+                switch prim
+                  | 0 -> k1
+                           pop(regular k1)
+                           ($camlValue_slot_c__Pmakeblock132)
+                  | 1 -> k (0)))
+in
+let $camlValue_slot_c__f_4 = closure f_3_1 @f in
+let $camlValue_slot_c = Block 0 ($camlValue_slot_c__f_4) in
+cont done ($camlValue_slot_c)

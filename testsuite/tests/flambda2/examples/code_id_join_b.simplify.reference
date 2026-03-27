@@ -1,0 +1,37 @@
+let $camlCode_id_join_b__const_block334 = Block 0 (2, 0) in
+let $camlCode_id_join_b__const_block336 =
+  Block 0 (1, $camlCode_id_join_b__const_block334)
+in
+let $camlCode_id_join_b__const_block338 =
+  Block 0 (0, $camlCode_id_join_b__const_block336)
+in
+cont self ($camlCode_id_join_b__const_block338)
+  where rec self (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+    let prim = %is_int (param) in
+    (switch prim
+       | 0 -> k1
+       | 1 -> k
+       where k1 =
+         let Pfield = %block_load.[`0`] (param) in
+         ((let prim_1 = %int_comp.ne (Pfield, 0) in
+           switch prim_1
+             | 0 -> k1
+                      ($Code_id_join_a.`camlCode_id_join_a__fn[code_id_join_a.ml:9,24--35]_11`)
+             | 1 -> k2
+             where k2 =
+               let prim_2 = %int_comp.ne (Pfield, 1) in
+               switch prim_2
+                 | 0 -> k1
+                          ($Code_id_join_a.`camlCode_id_join_a__fn[code_id_join_a.ml:9,24--35]_12`)
+                 | 1 -> k1
+                          ($Code_id_join_a.`camlCode_id_join_a__fn[code_id_join_a.ml:9,24--35]_13`))
+            where k1 (full_apply) =
+              (apply inlining_state(depth(20)) full_apply (42) -> k2 * error
+                 where k2 (param_1 : imm tagged) =
+                   cont k1
+                 where k1 =
+                   let Pfield_1 = %block_load.[`1`] (param) in
+                   cont self (Pfield_1))))
+  where k =
+    let $camlCode_id_join_b = Block 0 () in
+    cont done ($camlCode_id_join_b)

@@ -1,0 +1,52 @@
+let code ignore_0 deleted in
+let code `fn[symbol_projections2.ml:21,8--17]_2` deleted in
+let code g_1 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(ignore_0)
+      ignore_0_1 (param)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let $camlSymbol_projections2__ignore_3 = closure ignore_0_1 @ignore in
+let v = %opaque (33) in
+let v_1 = v in
+let set_of_closures
+      $camlSymbol_projections2__g_4 =
+      closure g_1_1 @g
+      with { v = v }
+    end
+and code loopify(never) size(5) newer_version_of(g_1)
+      g_1_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply direct(ignore_0_1)
+    ($camlSymbol_projections2__ignore_3 : _ -> imm tagged) (0) -> k2 * k1
+    where k2 (param_1 : imm tagged) =
+      cont k
+             ($`camlSymbol_projections2__fn[symbol_projections2.ml:21,8--17]_5`)
+and set_of_closures
+      $`camlSymbol_projections2__fn[symbol_projections2.ml:21,8--17]_5` =
+      closure `fn[symbol_projections2.ml:21,8--17]_2_1`
+        @`fn[symbol_projections2.ml:21,8--17]`
+      with { v_1 = v_1 }
+    end
+and code loopify(never) size(4) newer_version_of(`fn[symbol_projections2.ml:21,8--17]_2`)
+      `fn[symbol_projections2.ml:21,8--17]_2_1` (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let v_2 =
+    %project_value_slot.[`fn[symbol_projections2.ml:21,8--17]`].[`v_1`]
+      ($`camlSymbol_projections2__fn[symbol_projections2.ml:21,8--17]_5`)
+  in
+  let int_add = %int_barith.add (x, v_2) in
+  cont k (int_add)
+in
+let $camlSymbol_projections2 =
+  Block 0 ($camlSymbol_projections2__ignore_3,
+           v,
+           $camlSymbol_projections2__g_4)
+in
+cont done ($camlSymbol_projections2)

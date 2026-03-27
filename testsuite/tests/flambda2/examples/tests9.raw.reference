@@ -1,0 +1,1637 @@
+(let code rec loopify(default tailrec) size(22)
+       length_aux_0
+         (len : imm tagged, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   (let prim = %is_int (param) in
+    let Pisint = %tag_imm (prim) in
+    (let untagged = %untag_imm (Pisint) in
+     switch untagged
+       | 0 -> k4
+       | 1 -> k1 (len))
+      where k4 =
+        cont k3)
+     where k3 =
+       let Pfield = %block_load.[`1`] (param) in
+       let int_add = %int_barith.add (len, 1) in
+       apply direct(length_aux_0)
+         (my_closure ~ depth my_depth -> next_depth : _ -> imm tagged)
+           (int_add, Pfield)
+           -> k1 * k2
+ in
+ let code size(5)
+       length_1 (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let length_aux =
+     %project_value_slot.[`length`].[`length_aux`] (my_closure)
+   in
+   apply direct(length_aux_0)
+     (length_aux : _ -> imm tagged) (0, l) -> k1 * k2
+ in
+ let code rec loopify(default tailrec) size(28)
+       rev_append_2
+         (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+          l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   (let prim = %is_int (l1) in
+    let Pisint = %tag_imm (prim) in
+    (let untagged = %untag_imm (Pisint) in
+     switch untagged
+       | 0 -> k4
+       | 1 -> k1 (l2))
+      where k4 =
+        cont k3)
+     where k3 =
+       let Pfield = %block_load.[`0`] (l1) in
+       let Pmakeblock = %block.[`0`] (Pfield, l2) in
+       let Pfield_1 = %block_load.[`1`] (l1) in
+       apply direct(rev_append_2)
+         (my_closure ~ depth my_depth -> next_depth
+          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+           (Pfield_1, Pmakeblock)
+           -> k1 * k2
+ in
+ let $camlTests9__immstring48 = "tests9.ml" in
+ let $camlTests9__const_block50 = Block 0 ($camlTests9__immstring48, 39, 52)
+ in
+ let $camlTests9__Pmakeblock53 =
+   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block50)
+ in
+ let code rec loopify(default tailrec) size(42)
+       chop_3 (k : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   (let prim = %phys_eq (k, 0) in
+    let eq = %tag_imm (prim) in
+    (let untagged = %untag_imm (eq) in
+     switch untagged
+       | 0 -> k4
+       | 1 -> k1 (l))
+      where k4 =
+        cont k3)
+     where k3 =
+       ((let prim = %is_int (l) in
+         let Pisint = %tag_imm (prim) in
+         (let untagged = %untag_imm (Pisint) in
+          switch untagged
+            | 0 -> k5
+            | 1 -> k6)
+           where k6 =
+             cont k3
+           where k5 =
+             cont k4)
+          where k4 =
+            let Pfield = %block_load.[`1`] (l) in
+            let int_sub = %int_barith.sub (k, 1) in
+            apply direct(chop_3)
+              (my_closure ~ depth my_depth -> next_depth
+               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (int_sub, Pfield)
+                -> k1 * k2
+          where k3 =
+            cont k2 pop(regular k2) ($camlTests9__Pmakeblock53))
+ in
+ let code rec loopify(default tailrec) size(119)
+       rev_merge_5
+         (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+          l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+          accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let cmp = %project_value_slot.[`rev_merge`].[`cmp`] (my_closure) in
+   let rev_append =
+     %project_value_slot.[`rev_merge`].[`rev_append`] (my_closure)
+   in
+   (let prim = %is_int (l1) in
+    let Pisint = %tag_imm (prim) in
+    (let untagged = %untag_imm (Pisint) in
+     switch untagged
+       | 0 -> k5
+       | 1 -> k6)
+      where k6 =
+        cont k3
+      where k5 =
+        cont k4)
+     where k4 =
+       ((let prim = %is_int (l2) in
+         let Pisint = %tag_imm (prim) in
+         (let untagged = %untag_imm (Pisint) in
+          switch untagged
+            | 0 -> k6
+            | 1 -> k7)
+           where k7 =
+             cont k4
+           where k6 =
+             cont k5)
+          where k5 =
+            let t2 = %block_load.[`1`] (l2) in
+            let h2 = %block_load.[`0`] (l2) in
+            let t1 = %block_load.[`1`] (l1) in
+            let h1 = %block_load.[`0`] (l1) in
+            (apply cmp (h1, h2) -> k5 * k2
+               where k5 (c : imm tagged) =
+                 ((let prim = %phys_eq (c, 0) in
+                   let eq = %tag_imm (prim) in
+                   (let untagged = %untag_imm (eq) in
+                    switch untagged
+                      | 0 -> k7
+                      | 1 -> k8)
+                     where k8 =
+                       cont k5
+                     where k7 =
+                       cont k6)
+                    where k6 =
+                      ((let prim = %int_comp.lt (c, 0) in
+                        let int_lessthan = %tag_imm (prim) in
+                        (let untagged = %untag_imm (int_lessthan) in
+                         switch untagged
+                           | 0 -> k8
+                           | 1 -> k9)
+                          where k9 =
+                            cont k6
+                          where k8 =
+                            cont k7)
+                         where k7 =
+                           let Pmakeblock = %block.[`0`] (h2, accu) in
+                           apply direct(rev_merge_5)
+                             (my_closure ~ depth my_depth -> next_depth
+                              : _ ->
+                                [ 0 | 0 of val * [ 0 | 0 of val * val ] ]
+                              )
+                               (l1, t2, Pmakeblock)
+                               -> k1 * k2
+                         where k6 =
+                           let Pmakeblock = %block.[`0`] (h1, accu) in
+                           apply direct(rev_merge_5)
+                             (my_closure ~ depth my_depth -> next_depth
+                              : _ ->
+                                [ 0 | 0 of val * [ 0 | 0 of val * val ] ]
+                              )
+                               (t1, l2, Pmakeblock)
+                               -> k1 * k2)
+                    where k5 =
+                      let Pmakeblock = %block.[`0`] (h1, accu) in
+                      apply direct(rev_merge_5)
+                        (my_closure ~ depth my_depth -> next_depth
+                         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                          (t1, t2, Pmakeblock)
+                          -> k1 * k2))
+          where k4 =
+            apply direct(rev_append_2)
+              (rev_append : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (l1, accu)
+                -> k1 * k2)
+     where k3 =
+       apply direct(rev_append_2)
+         (rev_append : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+           (l2, accu)
+           -> k1 * k2
+ in
+ let code rec loopify(default tailrec) size(119)
+       rev_merge_rev_6
+         (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+          l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+          accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let cmp = %project_value_slot.[`rev_merge_rev`].[`cmp_1`] (my_closure) in
+   let rev_append =
+     %project_value_slot.[`rev_merge_rev`].[`rev_append_1`] (my_closure)
+   in
+   (let prim = %is_int (l1) in
+    let Pisint = %tag_imm (prim) in
+    (let untagged = %untag_imm (Pisint) in
+     switch untagged
+       | 0 -> k5
+       | 1 -> k6)
+      where k6 =
+        cont k3
+      where k5 =
+        cont k4)
+     where k4 =
+       ((let prim = %is_int (l2) in
+         let Pisint = %tag_imm (prim) in
+         (let untagged = %untag_imm (Pisint) in
+          switch untagged
+            | 0 -> k6
+            | 1 -> k7)
+           where k7 =
+             cont k4
+           where k6 =
+             cont k5)
+          where k5 =
+            let t2 = %block_load.[`1`] (l2) in
+            let h2 = %block_load.[`0`] (l2) in
+            let t1 = %block_load.[`1`] (l1) in
+            let h1 = %block_load.[`0`] (l1) in
+            (apply cmp (h1, h2) -> k5 * k2
+               where k5 (c : imm tagged) =
+                 ((let prim = %phys_eq (c, 0) in
+                   let eq = %tag_imm (prim) in
+                   (let untagged = %untag_imm (eq) in
+                    switch untagged
+                      | 0 -> k7
+                      | 1 -> k8)
+                     where k8 =
+                       cont k5
+                     where k7 =
+                       cont k6)
+                    where k6 =
+                      ((let prim = %int_comp.gt (c, 0) in
+                        let int_greaterthan = %tag_imm (prim) in
+                        (let untagged = %untag_imm (int_greaterthan) in
+                         switch untagged
+                           | 0 -> k8
+                           | 1 -> k9)
+                          where k9 =
+                            cont k6
+                          where k8 =
+                            cont k7)
+                         where k7 =
+                           let Pmakeblock = %block.[`0`] (h2, accu) in
+                           apply direct(rev_merge_rev_6)
+                             (my_closure ~ depth my_depth -> next_depth
+                              : _ ->
+                                [ 0 | 0 of val * [ 0 | 0 of val * val ] ]
+                              )
+                               (l1, t2, Pmakeblock)
+                               -> k1 * k2
+                         where k6 =
+                           let Pmakeblock = %block.[`0`] (h1, accu) in
+                           apply direct(rev_merge_rev_6)
+                             (my_closure ~ depth my_depth -> next_depth
+                              : _ ->
+                                [ 0 | 0 of val * [ 0 | 0 of val * val ] ]
+                              )
+                               (t1, l2, Pmakeblock)
+                               -> k1 * k2)
+                    where k5 =
+                      let Pmakeblock = %block.[`0`] (h1, accu) in
+                      apply direct(rev_merge_rev_6)
+                        (my_closure ~ depth my_depth -> next_depth
+                         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                          (t1, t2, Pmakeblock)
+                          -> k1 * k2))
+          where k4 =
+            apply direct(rev_append_2)
+              (rev_append : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (l1, accu)
+                -> k1 * k2)
+     where k3 =
+       apply direct(rev_append_2)
+         (rev_append : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+           (l2, accu)
+           -> k1 * k2
+ in
+ let code rec size(696)
+       sort_7 (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let chop = %project_value_slot.[`sort`].[`chop`] (my_closure) in
+   let cmp = %project_value_slot.[`sort`].[`cmp_2`] (my_closure) in
+   let rev_merge_rev =
+     %project_value_slot.[`sort`].[`rev_merge_rev`] (my_closure)
+   in
+   let rev_merge = %project_value_slot.[`sort`].[`rev_merge`] (my_closure) in
+   let rev_sort = %project_function_slot.[`sort`].[`rev_sort`] (my_closure)
+   in
+   (let prim = %int_comp.ne (n, 2) in
+    let int_notequal = %tag_imm (prim) in
+    (let untagged = %untag_imm (int_notequal) in
+     switch untagged
+       | 0 -> k6
+       | 1 -> k7)
+      where k7 =
+        cont k4
+      where k6 =
+        cont k5)
+     where k5 =
+       ((let prim = %is_int (l) in
+         let Pisint = %tag_imm (prim) in
+         (let untagged = %untag_imm (Pisint) in
+          switch untagged
+            | 0 -> k6
+            | 1 -> k7)
+           where k7 =
+             cont k3
+           where k6 =
+             cont k5)
+          where k5 =
+            let `*match*` = %block_load.[`1`] (l) in
+            ((let prim = %is_int (`*match*`) in
+              let Pisint = %tag_imm (prim) in
+              (let untagged = %untag_imm (Pisint) in
+               switch untagged
+                 | 0 -> k6
+                 | 1 -> k7)
+                where k7 =
+                  cont k3
+                where k6 =
+                  cont k5)
+               where k5 =
+                 let x2 = %block_load.[`0`] (`*match*`) in
+                 let x1 = %block_load.[`0`] (l) in
+                 (apply cmp (x1, x2) -> k5 * k2
+                    where k5 (c : imm tagged) =
+                      ((let prim = %phys_eq (c, 0) in
+                        let eq = %tag_imm (prim) in
+                        (let untagged = %untag_imm (eq) in
+                         switch untagged
+                           | 0 -> k7
+                           | 1 -> k8)
+                          where k8 =
+                            cont k5
+                          where k7 =
+                            cont k6)
+                         where k6 =
+                           ((let prim = %int_comp.lt (c, 0) in
+                             let int_lessthan = %tag_imm (prim) in
+                             (let untagged = %untag_imm (int_lessthan) in
+                              switch untagged
+                                | 0 -> k8
+                                | 1 -> k9)
+                               where k9 =
+                                 cont k6
+                               where k8 =
+                                 cont k7)
+                              where k7 =
+                                let Pmakeblock = %block.[`0`] (x1, 0) in
+                                let Pmakeblock_1 =
+                                  %block.[`0`] (x2, Pmakeblock)
+                                in
+                                cont k1 (Pmakeblock_1)
+                              where k6 =
+                                let Pmakeblock = %block.[`0`] (x2, 0) in
+                                let Pmakeblock_1 =
+                                  %block.[`0`] (x1, Pmakeblock)
+                                in
+                                cont k1 (Pmakeblock_1))
+                         where k5 =
+                           let Pmakeblock = %block.[`0`] (x1, 0) in
+                           cont k1 (Pmakeblock)))))
+     where k4 =
+       ((let prim = %int_comp.ne (n, 3) in
+         let int_notequal = %tag_imm (prim) in
+         (let untagged = %untag_imm (int_notequal) in
+          switch untagged
+            | 0 -> k5
+            | 1 -> k6)
+           where k6 =
+             cont k3
+           where k5 =
+             cont k4)
+          where k4 =
+            ((let prim = %is_int (l) in
+              let Pisint = %tag_imm (prim) in
+              (let untagged = %untag_imm (Pisint) in
+               switch untagged
+                 | 0 -> k5
+                 | 1 -> k6)
+                where k6 =
+                  cont k3
+                where k5 =
+                  cont k4)
+               where k4 =
+                 let `*match*` = %block_load.[`1`] (l) in
+                 ((let prim = %is_int (`*match*`) in
+                   let Pisint = %tag_imm (prim) in
+                   (let untagged = %untag_imm (Pisint) in
+                    switch untagged
+                      | 0 -> k5
+                      | 1 -> k6)
+                     where k6 =
+                       cont k3
+                     where k5 =
+                       cont k4)
+                    where k4 =
+                      let `*match*_1` = %block_load.[`1`] (`*match*`) in
+                      ((let prim = %is_int (`*match*_1`) in
+                        let Pisint = %tag_imm (prim) in
+                        (let untagged = %untag_imm (Pisint) in
+                         switch untagged
+                           | 0 -> k5
+                           | 1 -> k6)
+                          where k6 =
+                            cont k3
+                          where k5 =
+                            cont k4)
+                         where k4 =
+                           let x3 = %block_load.[`0`] (`*match*_1`) in
+                           let x2 = %block_load.[`0`] (`*match*`) in
+                           let x1 = %block_load.[`0`] (l) in
+                           (apply cmp (x1, x2) -> k4 * k2
+                              where k4 (c : imm tagged) =
+                                ((let prim = %phys_eq (c, 0) in
+                                  let eq = %tag_imm (prim) in
+                                  (let untagged = %untag_imm (eq) in
+                                   switch untagged
+                                     | 0 -> k6
+                                     | 1 -> k7)
+                                    where k7 =
+                                      cont k4
+                                    where k6 =
+                                      cont k5)
+                                   where k5 =
+                                     ((let prim = %int_comp.lt (c, 0) in
+                                       let int_lessthan = %tag_imm (prim) in
+                                       (let untagged =
+                                          %untag_imm (int_lessthan)
+                                        in
+                                        switch untagged
+                                          | 0 -> k7
+                                          | 1 -> k8)
+                                         where k8 =
+                                           cont k5
+                                         where k7 =
+                                           cont k6)
+                                        where k6 =
+                                          (apply cmp (x1, x3) -> k6 * k2
+                                             where k6 (c_1 : imm tagged) =
+                                               ((let prim = %phys_eq (c_1, 0)
+                                                 in
+                                                 let eq = %tag_imm (prim) in
+                                                 (let untagged =
+                                                    %untag_imm (eq)
+                                                  in
+                                                  switch untagged
+                                                    | 0 -> k8
+                                                    | 1 -> k9)
+                                                   where k9 =
+                                                     cont k6
+                                                   where k8 =
+                                                     cont k7)
+                                                  where k7 =
+                                                    ((let prim =
+                                                        %int_comp.lt (c_1, 0)
+                                                      in
+                                                      let int_lessthan =
+                                                        %tag_imm (prim)
+                                                      in
+                                                      (let untagged =
+                                                         %untag_imm
+                                                           (int_lessthan)
+                                                       in
+                                                       switch untagged
+                                                         | 0 -> k9
+                                                         | 1 -> k10)
+                                                        where k10 =
+                                                          cont k7
+                                                        where k9 =
+                                                          cont k8)
+                                                       where k8 =
+                                                         (apply
+                                                            cmp
+                                                              (x2, x3)
+                                                              -> k8 * k2
+                                                            where k8
+                                                                    (
+                                                                    c_2 :
+                                                                    imm tagged) =
+                                                              ((let prim =
+                                                                  %phys_eq
+                                                                    (
+                                                                    c_2, 0)
+                                                                in
+                                                                let eq =
+                                                                  %tag_imm
+                                                                    (
+                                                                    prim)
+                                                                in
+                                                                (let untagged =
+                                                                   %untag_imm
+                                                                    (eq)
+                                                                 in
+                                                                 switch untagged
+                                                                   | 0 -> 
+                                                                   k10
+                                                                   | 1 -> 
+                                                                   k11)
+                                                                  where 
+                                                                    k11 =
+                                                                    cont k8
+                                                                  where 
+                                                                    k10 =
+                                                                    cont k9)
+                                                                 where 
+                                                                   k9 =
+                                                                   ((let prim =
+                                                                    %int_comp.lt
+                                                                    (c_2, 0)
+                                                                    in
+                                                                    let int_lessthan =
+                                                                    %tag_imm
+                                                                    (prim)
+                                                                    in
+                                                                    (let untagged =
+                                                                    %untag_imm
+                                                                    (int_lessthan)
+                                                                    in
+                                                                    switch untagged
+                                                                    | 0 -> 
+                                                                    k11
+                                                                    | 1 -> 
+                                                                    k12)
+                                                                    where 
+                                                                    k12 =
+                                                                    cont k9
+                                                                    where 
+                                                                    k11 =
+                                                                    cont k10)
+                                                                    where 
+                                                                    k10 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k1
+                                                                    (Pmakeblock_2)
+                                                                    where 
+                                                                    k9 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k1
+                                                                    (Pmakeblock_2))
+                                                                 where 
+                                                                   k8 =
+                                                                   let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                   in
+                                                                   let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock)
+                                                                   in
+                                                                   cont 
+                                                                   k1
+                                                                    (Pmakeblock_1)))
+                                                       where k7 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x3, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x1, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x2,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k1
+                                                                (Pmakeblock_2))
+                                                  where k6 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x1, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x2, Pmakeblock)
+                                                    in
+                                                    cont k1 (Pmakeblock_1)))
+                                        where k5 =
+                                          (apply cmp (x2, x3) -> k5 * k2
+                                             where k5 (c_1 : imm tagged) =
+                                               ((let prim = %phys_eq (c_1, 0)
+                                                 in
+                                                 let eq = %tag_imm (prim) in
+                                                 (let untagged =
+                                                    %untag_imm (eq)
+                                                  in
+                                                  switch untagged
+                                                    | 0 -> k7
+                                                    | 1 -> k8)
+                                                   where k8 =
+                                                     cont k5
+                                                   where k7 =
+                                                     cont k6)
+                                                  where k6 =
+                                                    ((let prim =
+                                                        %int_comp.lt (c_1, 0)
+                                                      in
+                                                      let int_lessthan =
+                                                        %tag_imm (prim)
+                                                      in
+                                                      (let untagged =
+                                                         %untag_imm
+                                                           (int_lessthan)
+                                                       in
+                                                       switch untagged
+                                                         | 0 -> k8
+                                                         | 1 -> k9)
+                                                        where k9 =
+                                                          cont k6
+                                                        where k8 =
+                                                          cont k7)
+                                                       where k7 =
+                                                         (apply
+                                                            cmp
+                                                              (x1, x3)
+                                                              -> k7 * k2
+                                                            where k7
+                                                                    (
+                                                                    c_2 :
+                                                                    imm tagged) =
+                                                              ((let prim =
+                                                                  %phys_eq
+                                                                    (
+                                                                    c_2, 0)
+                                                                in
+                                                                let eq =
+                                                                  %tag_imm
+                                                                    (
+                                                                    prim)
+                                                                in
+                                                                (let untagged =
+                                                                   %untag_imm
+                                                                    (eq)
+                                                                 in
+                                                                 switch untagged
+                                                                   | 0 -> 
+                                                                   k9
+                                                                   | 1 -> 
+                                                                   k10)
+                                                                  where 
+                                                                    k10 =
+                                                                    cont k7
+                                                                  where 
+                                                                    k9 =
+                                                                    cont k8)
+                                                                 where 
+                                                                   k8 =
+                                                                   ((let prim =
+                                                                    %int_comp.lt
+                                                                    (c_2, 0)
+                                                                    in
+                                                                    let int_lessthan =
+                                                                    %tag_imm
+                                                                    (prim)
+                                                                    in
+                                                                    (let untagged =
+                                                                    %untag_imm
+                                                                    (int_lessthan)
+                                                                    in
+                                                                    switch untagged
+                                                                    | 0 -> 
+                                                                    k10
+                                                                    | 1 -> 
+                                                                    k11)
+                                                                    where 
+                                                                    k11 =
+                                                                    cont k8
+                                                                    where 
+                                                                    k10 =
+                                                                    cont k9)
+                                                                    where 
+                                                                    k9 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k1
+                                                                    (Pmakeblock_2)
+                                                                    where 
+                                                                    k8 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k1
+                                                                    (Pmakeblock_2))
+                                                                 where 
+                                                                   k7 =
+                                                                   let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                   in
+                                                                   let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock)
+                                                                   in
+                                                                   cont 
+                                                                   k1
+                                                                    (Pmakeblock_1)))
+                                                       where k6 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x3, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x2, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x1,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k1
+                                                                (Pmakeblock_2))
+                                                  where k5 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x2, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x1, Pmakeblock)
+                                                    in
+                                                    cont k1 (Pmakeblock_1))))
+                                   where k4 =
+                                     (apply cmp (x2, x3) -> k4 * k2
+                                        where k4 (c_1 : imm tagged) =
+                                          ((let prim = %phys_eq (c_1, 0) in
+                                            let eq = %tag_imm (prim) in
+                                            (let untagged = %untag_imm (eq)
+                                             in
+                                             switch untagged
+                                               | 0 -> k6
+                                               | 1 -> k7)
+                                              where k7 =
+                                                cont k4
+                                              where k6 =
+                                                cont k5)
+                                             where k5 =
+                                               ((let prim =
+                                                   %int_comp.lt (c_1, 0)
+                                                 in
+                                                 let int_lessthan =
+                                                   %tag_imm (prim)
+                                                 in
+                                                 (let untagged =
+                                                    %untag_imm (int_lessthan)
+                                                  in
+                                                  switch untagged
+                                                    | 0 -> k7
+                                                    | 1 -> k8)
+                                                   where k8 =
+                                                     cont k5
+                                                   where k7 =
+                                                     cont k6)
+                                                  where k6 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x2, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x3, Pmakeblock)
+                                                    in
+                                                    cont k1 (Pmakeblock_1)
+                                                  where k5 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x3, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x2, Pmakeblock)
+                                                    in
+                                                    cont k1 (Pmakeblock_1))
+                                             where k4 =
+                                               let Pmakeblock =
+                                                 %block.[`0`] (x2, 0)
+                                               in
+                                               cont k1 (Pmakeblock)))))))))
+     where k3 =
+       let prim = %untag_imm (1) in
+       let n1 = %int_shift.asr (n, prim) in
+       let n2 = %int_barith.sub (n, n1) in
+       (apply direct(chop_3)
+          (chop : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            (n1, l)
+            -> k3 * k2
+          where k3 (l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+            (apply direct(rev_sort_8)
+               (rev_sort ~ depth my_depth -> next_depth
+                : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 (n1, l)
+                 -> k3 * k2
+               where k3 (s1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                 (apply direct(rev_sort_8)
+                    (rev_sort ~ depth my_depth -> next_depth
+                     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                      (n2, l2)
+                      -> k3 * k2
+                    where k3 (s2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                      apply direct(rev_merge_rev_6)
+                        (rev_merge_rev
+                         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                          (s1, s2, 0)
+                          -> k1 * k2)))
+ and code rec size(696)
+       rev_sort_8
+         (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let chop = %project_value_slot.[`rev_sort`].[`chop`] (my_closure) in
+   let rev_merge =
+     %project_value_slot.[`rev_sort`].[`rev_merge`] (my_closure)
+   in
+   let rev_merge_rev =
+     %project_value_slot.[`rev_sort`].[`rev_merge_rev`] (my_closure)
+   in
+   let cmp = %project_value_slot.[`rev_sort`].[`cmp_2`] (my_closure) in
+   let sort = %project_function_slot.[`rev_sort`].[`sort`] (my_closure) in
+   (let prim = %int_comp.ne (n, 2) in
+    let int_notequal = %tag_imm (prim) in
+    (let untagged = %untag_imm (int_notequal) in
+     switch untagged
+       | 0 -> k6
+       | 1 -> k7)
+      where k7 =
+        cont k4
+      where k6 =
+        cont k5)
+     where k5 =
+       ((let prim = %is_int (l) in
+         let Pisint = %tag_imm (prim) in
+         (let untagged = %untag_imm (Pisint) in
+          switch untagged
+            | 0 -> k6
+            | 1 -> k7)
+           where k7 =
+             cont k3
+           where k6 =
+             cont k5)
+          where k5 =
+            let `*match*` = %block_load.[`1`] (l) in
+            ((let prim = %is_int (`*match*`) in
+              let Pisint = %tag_imm (prim) in
+              (let untagged = %untag_imm (Pisint) in
+               switch untagged
+                 | 0 -> k6
+                 | 1 -> k7)
+                where k7 =
+                  cont k3
+                where k6 =
+                  cont k5)
+               where k5 =
+                 let x2 = %block_load.[`0`] (`*match*`) in
+                 let x1 = %block_load.[`0`] (l) in
+                 (apply cmp (x1, x2) -> k5 * k2
+                    where k5 (c : imm tagged) =
+                      ((let prim = %phys_eq (c, 0) in
+                        let eq = %tag_imm (prim) in
+                        (let untagged = %untag_imm (eq) in
+                         switch untagged
+                           | 0 -> k7
+                           | 1 -> k8)
+                          where k8 =
+                            cont k5
+                          where k7 =
+                            cont k6)
+                         where k6 =
+                           ((let prim = %int_comp.gt (c, 0) in
+                             let int_greaterthan = %tag_imm (prim) in
+                             (let untagged = %untag_imm (int_greaterthan) in
+                              switch untagged
+                                | 0 -> k8
+                                | 1 -> k9)
+                               where k9 =
+                                 cont k6
+                               where k8 =
+                                 cont k7)
+                              where k7 =
+                                let Pmakeblock = %block.[`0`] (x1, 0) in
+                                let Pmakeblock_1 =
+                                  %block.[`0`] (x2, Pmakeblock)
+                                in
+                                cont k1 (Pmakeblock_1)
+                              where k6 =
+                                let Pmakeblock = %block.[`0`] (x2, 0) in
+                                let Pmakeblock_1 =
+                                  %block.[`0`] (x1, Pmakeblock)
+                                in
+                                cont k1 (Pmakeblock_1))
+                         where k5 =
+                           let Pmakeblock = %block.[`0`] (x1, 0) in
+                           cont k1 (Pmakeblock)))))
+     where k4 =
+       ((let prim = %int_comp.ne (n, 3) in
+         let int_notequal = %tag_imm (prim) in
+         (let untagged = %untag_imm (int_notequal) in
+          switch untagged
+            | 0 -> k5
+            | 1 -> k6)
+           where k6 =
+             cont k3
+           where k5 =
+             cont k4)
+          where k4 =
+            ((let prim = %is_int (l) in
+              let Pisint = %tag_imm (prim) in
+              (let untagged = %untag_imm (Pisint) in
+               switch untagged
+                 | 0 -> k5
+                 | 1 -> k6)
+                where k6 =
+                  cont k3
+                where k5 =
+                  cont k4)
+               where k4 =
+                 let `*match*` = %block_load.[`1`] (l) in
+                 ((let prim = %is_int (`*match*`) in
+                   let Pisint = %tag_imm (prim) in
+                   (let untagged = %untag_imm (Pisint) in
+                    switch untagged
+                      | 0 -> k5
+                      | 1 -> k6)
+                     where k6 =
+                       cont k3
+                     where k5 =
+                       cont k4)
+                    where k4 =
+                      let `*match*_1` = %block_load.[`1`] (`*match*`) in
+                      ((let prim = %is_int (`*match*_1`) in
+                        let Pisint = %tag_imm (prim) in
+                        (let untagged = %untag_imm (Pisint) in
+                         switch untagged
+                           | 0 -> k5
+                           | 1 -> k6)
+                          where k6 =
+                            cont k3
+                          where k5 =
+                            cont k4)
+                         where k4 =
+                           let x3 = %block_load.[`0`] (`*match*_1`) in
+                           let x2 = %block_load.[`0`] (`*match*`) in
+                           let x1 = %block_load.[`0`] (l) in
+                           (apply cmp (x1, x2) -> k4 * k2
+                              where k4 (c : imm tagged) =
+                                ((let prim = %phys_eq (c, 0) in
+                                  let eq = %tag_imm (prim) in
+                                  (let untagged = %untag_imm (eq) in
+                                   switch untagged
+                                     | 0 -> k6
+                                     | 1 -> k7)
+                                    where k7 =
+                                      cont k4
+                                    where k6 =
+                                      cont k5)
+                                   where k5 =
+                                     ((let prim = %int_comp.gt (c, 0) in
+                                       let int_greaterthan = %tag_imm (prim)
+                                       in
+                                       (let untagged =
+                                          %untag_imm (int_greaterthan)
+                                        in
+                                        switch untagged
+                                          | 0 -> k7
+                                          | 1 -> k8)
+                                         where k8 =
+                                           cont k5
+                                         where k7 =
+                                           cont k6)
+                                        where k6 =
+                                          (apply cmp (x1, x3) -> k6 * k2
+                                             where k6 (c_1 : imm tagged) =
+                                               ((let prim = %phys_eq (c_1, 0)
+                                                 in
+                                                 let eq = %tag_imm (prim) in
+                                                 (let untagged =
+                                                    %untag_imm (eq)
+                                                  in
+                                                  switch untagged
+                                                    | 0 -> k8
+                                                    | 1 -> k9)
+                                                   where k9 =
+                                                     cont k6
+                                                   where k8 =
+                                                     cont k7)
+                                                  where k7 =
+                                                    ((let prim =
+                                                        %int_comp.gt (c_1, 0)
+                                                      in
+                                                      let int_greaterthan =
+                                                        %tag_imm (prim)
+                                                      in
+                                                      (let untagged =
+                                                         %untag_imm
+                                                           (int_greaterthan)
+                                                       in
+                                                       switch untagged
+                                                         | 0 -> k9
+                                                         | 1 -> k10)
+                                                        where k10 =
+                                                          cont k7
+                                                        where k9 =
+                                                          cont k8)
+                                                       where k8 =
+                                                         (apply
+                                                            cmp
+                                                              (x2, x3)
+                                                              -> k8 * k2
+                                                            where k8
+                                                                    (
+                                                                    c_2 :
+                                                                    imm tagged) =
+                                                              ((let prim =
+                                                                  %phys_eq
+                                                                    (
+                                                                    c_2, 0)
+                                                                in
+                                                                let eq =
+                                                                  %tag_imm
+                                                                    (
+                                                                    prim)
+                                                                in
+                                                                (let untagged =
+                                                                   %untag_imm
+                                                                    (eq)
+                                                                 in
+                                                                 switch untagged
+                                                                   | 0 -> 
+                                                                   k10
+                                                                   | 1 -> 
+                                                                   k11)
+                                                                  where 
+                                                                    k11 =
+                                                                    cont k8
+                                                                  where 
+                                                                    k10 =
+                                                                    cont k9)
+                                                                 where 
+                                                                   k9 =
+                                                                   ((let prim =
+                                                                    %int_comp.gt
+                                                                    (c_2, 0)
+                                                                    in
+                                                                    let int_greaterthan =
+                                                                    %tag_imm
+                                                                    (prim)
+                                                                    in
+                                                                    (let untagged =
+                                                                    %untag_imm
+                                                                    (int_greaterthan)
+                                                                    in
+                                                                    switch untagged
+                                                                    | 0 -> 
+                                                                    k11
+                                                                    | 1 -> 
+                                                                    k12)
+                                                                    where 
+                                                                    k12 =
+                                                                    cont k9
+                                                                    where 
+                                                                    k11 =
+                                                                    cont k10)
+                                                                    where 
+                                                                    k10 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k1
+                                                                    (Pmakeblock_2)
+                                                                    where 
+                                                                    k9 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k1
+                                                                    (Pmakeblock_2))
+                                                                 where 
+                                                                   k8 =
+                                                                   let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                   in
+                                                                   let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock)
+                                                                   in
+                                                                   cont 
+                                                                   k1
+                                                                    (Pmakeblock_1)))
+                                                       where k7 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x3, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x1, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x2,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k1
+                                                                (Pmakeblock_2))
+                                                  where k6 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x1, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x2, Pmakeblock)
+                                                    in
+                                                    cont k1 (Pmakeblock_1)))
+                                        where k5 =
+                                          (apply cmp (x2, x3) -> k5 * k2
+                                             where k5 (c_1 : imm tagged) =
+                                               ((let prim = %phys_eq (c_1, 0)
+                                                 in
+                                                 let eq = %tag_imm (prim) in
+                                                 (let untagged =
+                                                    %untag_imm (eq)
+                                                  in
+                                                  switch untagged
+                                                    | 0 -> k7
+                                                    | 1 -> k8)
+                                                   where k8 =
+                                                     cont k5
+                                                   where k7 =
+                                                     cont k6)
+                                                  where k6 =
+                                                    ((let prim =
+                                                        %int_comp.gt (c_1, 0)
+                                                      in
+                                                      let int_greaterthan =
+                                                        %tag_imm (prim)
+                                                      in
+                                                      (let untagged =
+                                                         %untag_imm
+                                                           (int_greaterthan)
+                                                       in
+                                                       switch untagged
+                                                         | 0 -> k8
+                                                         | 1 -> k9)
+                                                        where k9 =
+                                                          cont k6
+                                                        where k8 =
+                                                          cont k7)
+                                                       where k7 =
+                                                         (apply
+                                                            cmp
+                                                              (x1, x3)
+                                                              -> k7 * k2
+                                                            where k7
+                                                                    (
+                                                                    c_2 :
+                                                                    imm tagged) =
+                                                              ((let prim =
+                                                                  %phys_eq
+                                                                    (
+                                                                    c_2, 0)
+                                                                in
+                                                                let eq =
+                                                                  %tag_imm
+                                                                    (
+                                                                    prim)
+                                                                in
+                                                                (let untagged =
+                                                                   %untag_imm
+                                                                    (eq)
+                                                                 in
+                                                                 switch untagged
+                                                                   | 0 -> 
+                                                                   k9
+                                                                   | 1 -> 
+                                                                   k10)
+                                                                  where 
+                                                                    k10 =
+                                                                    cont k7
+                                                                  where 
+                                                                    k9 =
+                                                                    cont k8)
+                                                                 where 
+                                                                   k8 =
+                                                                   ((let prim =
+                                                                    %int_comp.gt
+                                                                    (c_2, 0)
+                                                                    in
+                                                                    let int_greaterthan =
+                                                                    %tag_imm
+                                                                    (prim)
+                                                                    in
+                                                                    (let untagged =
+                                                                    %untag_imm
+                                                                    (int_greaterthan)
+                                                                    in
+                                                                    switch untagged
+                                                                    | 0 -> 
+                                                                    k10
+                                                                    | 1 -> 
+                                                                    k11)
+                                                                    where 
+                                                                    k11 =
+                                                                    cont k8
+                                                                    where 
+                                                                    k10 =
+                                                                    cont k9)
+                                                                    where 
+                                                                    k9 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k1
+                                                                    (Pmakeblock_2)
+                                                                    where 
+                                                                    k8 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k1
+                                                                    (Pmakeblock_2))
+                                                                 where 
+                                                                   k7 =
+                                                                   let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                   in
+                                                                   let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock)
+                                                                   in
+                                                                   cont 
+                                                                   k1
+                                                                    (Pmakeblock_1)))
+                                                       where k6 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x3, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x2, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x1,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k1
+                                                                (Pmakeblock_2))
+                                                  where k5 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x2, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x1, Pmakeblock)
+                                                    in
+                                                    cont k1 (Pmakeblock_1))))
+                                   where k4 =
+                                     (apply cmp (x2, x3) -> k4 * k2
+                                        where k4 (c_1 : imm tagged) =
+                                          ((let prim = %phys_eq (c_1, 0) in
+                                            let eq = %tag_imm (prim) in
+                                            (let untagged = %untag_imm (eq)
+                                             in
+                                             switch untagged
+                                               | 0 -> k6
+                                               | 1 -> k7)
+                                              where k7 =
+                                                cont k4
+                                              where k6 =
+                                                cont k5)
+                                             where k5 =
+                                               ((let prim =
+                                                   %int_comp.gt (c_1, 0)
+                                                 in
+                                                 let int_greaterthan =
+                                                   %tag_imm (prim)
+                                                 in
+                                                 (let untagged =
+                                                    %untag_imm
+                                                      (int_greaterthan)
+                                                  in
+                                                  switch untagged
+                                                    | 0 -> k7
+                                                    | 1 -> k8)
+                                                   where k8 =
+                                                     cont k5
+                                                   where k7 =
+                                                     cont k6)
+                                                  where k6 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x2, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x3, Pmakeblock)
+                                                    in
+                                                    cont k1 (Pmakeblock_1)
+                                                  where k5 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x3, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x2, Pmakeblock)
+                                                    in
+                                                    cont k1 (Pmakeblock_1))
+                                             where k4 =
+                                               let Pmakeblock =
+                                                 %block.[`0`] (x2, 0)
+                                               in
+                                               cont k1 (Pmakeblock)))))))))
+     where k3 =
+       let prim = %untag_imm (1) in
+       let n1 = %int_shift.asr (n, prim) in
+       let n2 = %int_barith.sub (n, n1) in
+       (apply direct(chop_3)
+          (chop : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            (n1, l)
+            -> k3 * k2
+          where k3 (l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+            (apply direct(sort_7)
+               (sort ~ depth my_depth -> next_depth
+                : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 (n1, l)
+                 -> k3 * k2
+               where k3 (s1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                 (apply direct(sort_7)
+                    (sort ~ depth my_depth -> next_depth
+                     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                      (n2, l2)
+                      -> k3 * k2
+                    where k3 (s2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                      apply direct(rev_merge_5)
+                        (rev_merge
+                         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                          (s1, s2, 0)
+                          -> k1 * k2)))
+ in
+ let code size(1692)
+       sort_uniq_4 (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let rev_append =
+     %project_value_slot.[`sort_uniq`].[`rev_append_2`] (my_closure)
+   in
+   let chop = %project_value_slot.[`sort_uniq`].[`chop_1`] (my_closure) in
+   let length = %project_value_slot.[`sort_uniq`].[`length`] (my_closure) in
+   let rev_merge = closure rev_merge_5 @rev_merge
+   with { rev_append = rev_append; cmp = cmp }
+   in
+   let rev_merge_rev = closure rev_merge_rev_6 @rev_merge_rev
+   with { rev_append_1 = rev_append; cmp_1 = cmp }
+   in
+   let sort = closure sort_7 @sort
+   and rev_sort = closure rev_sort_8 @rev_sort
+   with {
+     chop = chop;
+     cmp_2 = cmp;
+     rev_merge = rev_merge;
+     rev_merge_rev = rev_merge_rev
+   }
+   in
+   apply direct(length_1) (length : _ -> imm tagged) (l) -> k3 * k2
+     where k3 (len : imm tagged) =
+       ((let prim = %int_comp.lt (len, 2) in
+         let int_lessthan = %tag_imm (prim) in
+         (let untagged = %untag_imm (int_lessthan) in
+          switch untagged
+            | 0 -> k4
+            | 1 -> k1 (l))
+           where k4 =
+             cont k3)
+          where k3 =
+            apply direct(sort_7)
+              (sort : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (len, l)
+                -> k1 * k2)
+ in
+ let code rec size(6)
+       sort_10
+         (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let cmp = %project_value_slot.[`sort_1`].[`cmp_3`] (my_closure) in
+   let rev_sort =
+     %project_function_slot.[`sort_1`].[`rev_sort_1`] (my_closure)
+   in
+   apply direct(rev_sort_11)
+     (rev_sort ~ depth my_depth -> next_depth
+      : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+       (n, l)
+       -> k1 * k2
+ and code rec size(97)
+       rev_sort_11
+         (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let cmp = %project_value_slot.[`rev_sort_1`].[`cmp_3`] (my_closure) in
+   let sort = %project_function_slot.[`rev_sort_1`].[`sort_1`] (my_closure)
+   in
+   (let prim = %int_comp.ne (n, 2) in
+    let int_notequal = %tag_imm (prim) in
+    (let untagged = %untag_imm (int_notequal) in
+     switch untagged
+       | 0 -> k5
+       | 1 -> k6)
+      where k6 =
+        cont k3
+      where k5 =
+        cont k4)
+     where k4 =
+       ((let prim = %is_int (l) in
+         let Pisint = %tag_imm (prim) in
+         (let untagged = %untag_imm (Pisint) in
+          switch untagged
+            | 0 -> k5
+            | 1 -> k6)
+           where k6 =
+             cont k3
+           where k5 =
+             cont k4)
+          where k4 =
+            let `*match*` = %block_load.[`1`] (l) in
+            ((let prim = %is_int (`*match*`) in
+              let Pisint = %tag_imm (prim) in
+              (let untagged = %untag_imm (Pisint) in
+               switch untagged
+                 | 0 -> k5
+                 | 1 -> k6)
+                where k6 =
+                  cont k3
+                where k5 =
+                  cont k4)
+               where k4 =
+                 let x2 = %block_load.[`0`] (`*match*`) in
+                 let x1 = %block_load.[`0`] (l) in
+                 (apply cmp (x1, x2) -> k4 * k2
+                    where k4 (c : imm tagged) =
+                      ((let prim = %int_comp.lt (c, 0) in
+                        let int_lessthan = %tag_imm (prim) in
+                        (let untagged = %untag_imm (int_lessthan) in
+                         switch untagged
+                           | 0 -> k6
+                           | 1 -> k7)
+                          where k7 =
+                            cont k4
+                          where k6 =
+                            cont k5)
+                         where k5 =
+                           let Pmakeblock = %block.[`0`] (x2, 0) in
+                           cont k1 (Pmakeblock)
+                         where k4 =
+                           let Pmakeblock = %block.[`0`] (x1, 0) in
+                           cont k1 (Pmakeblock)))))
+     where k3 =
+       apply direct(sort_10)
+         (sort ~ depth my_depth -> next_depth
+          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+           (n, l)
+           -> k1 * k2
+ in
+ let code size(119)
+       foo_9 (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let sort = closure sort_10 @sort_1
+   and rev_sort = closure rev_sort_11 @rev_sort_1
+   with { cmp_3 = cmp }
+   in
+   apply direct(sort_10)
+     (sort : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+       (42, l)
+       -> k1 * k2
+ in
+ let length_aux = closure length_aux_0 @length_aux in
+ let length = closure length_1 @length with { length_aux = length_aux } in
+ let rev_append = closure rev_append_2 @rev_append in
+ let chop = closure chop_3 @chop in
+ let sort_uniq = closure sort_uniq_4 @sort_uniq
+ with { length = length; rev_append_2 = rev_append; chop_1 = chop }
+ in
+ let foo = closure foo_9 @foo in
+ let Pmakeblock =
+   %block.[`0`] (length_aux, length, rev_append, chop, sort_uniq, foo)
+ in
+ cont k (Pmakeblock))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`6`].[`0`] (module_block) in
+    let field_1 = %block_load.tag[`0`].`size`[`6`].[`1`] (module_block) in
+    let field_2 = %block_load.tag[`0`].`size`[`6`].[`2`] (module_block) in
+    let field_3 = %block_load.tag[`0`].`size`[`6`].[`3`] (module_block) in
+    let field_4 = %block_load.tag[`0`].`size`[`6`].[`4`] (module_block) in
+    let field_5 = %block_load.tag[`0`].`size`[`6`].[`5`] (module_block) in
+    let $camlTests9 =
+      Block 0 (field_0, field_1, field_2, field_3, field_4, field_5)
+    in
+    cont done ($camlTests9)

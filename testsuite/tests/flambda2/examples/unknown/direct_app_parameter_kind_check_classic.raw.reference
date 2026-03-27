@@ -1,0 +1,77 @@
+(let code size(25)
+       send_0 (t : val, c : val)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let `*match*` = %block_load.mut.[`0`] (t) in
+   (let prim = %is_int (`*match*`) in
+    let Pisint = %tag_imm (prim) in
+    (let untagged = %untag_imm (Pisint) in
+     switch untagged
+       | 0 -> k4
+       | 1 -> k1 (0))
+      where k4 =
+        cont k3)
+     where k3 =
+       let `*match*_1` = %block_load.[`0`] (`*match*`) in
+       let Pfield = %block_load.[`1`] (`*match*_1`) in
+       let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
+       apply c (Pfield_1, Pfield) -> k1 * k2
+ in
+ let code size(7)
+       create_1 (_arity : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : val =
+   let Pmakeblock = %block.mut.[`0`] (0) in
+   cont k1 (Pmakeblock)
+ in
+ let code size(1)
+       fn_2 (param_298_unboxed0, param_298_unboxed1)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   cont k1 (0)
+ in
+ let $camlDirect_app_parameter_kind_check_classic__s0 = closure send_0 @send
+ in
+ let $camlDirect_app_parameter_kind_check_classic__s1 =
+   closure create_1 @create
+ in
+ let $camlDirect_app_parameter_kind_check_classic__s3 =
+   Block 0 (0,
+            $camlDirect_app_parameter_kind_check_classic__s0,
+            $camlDirect_app_parameter_kind_check_classic__s1)
+ in
+ let $camlDirect_app_parameter_kind_check_classic__s2 = closure fn_2 @fn in
+ (let inlined_dbg = %inlined_apply () in
+  let Pmakeblock = %block.mut.[`0`] (0) in
+  cont k2 (Pmakeblock))
+   where k2 (apply_result : val) =
+     let inlined_dbg = %inlined_apply () in
+     let c = $camlDirect_app_parameter_kind_check_classic__s2 in
+     let t = apply_result in
+     let `*match*` = %block_load.mut.[`0`] (t) in
+     ((let prim = %is_int (`*match*`) in
+       let Pisint = %tag_imm (prim) in
+       (let untagged = %untag_imm (Pisint) in
+        switch untagged
+          | 0 -> k3
+          | 1 -> k1 (0))
+         where k3 =
+           cont k2)
+        where k2 =
+          let `*match*_1` = %block_load.[`0`] (`*match*`) in
+          let Pfield = %block_load.[`1`] (`*match*_1`) in
+          let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
+          apply c (Pfield_1, Pfield) -> k1 * error)
+   where k1 (`*match*` : imm tagged) =
+     cont k ($camlDirect_app_parameter_kind_check_classic__s3))
+  where k define_root_symbol (module_block) =
+    let field_0 = 0 in
+    let field_1 = $camlDirect_app_parameter_kind_check_classic__s0 in
+    let field_2 = $camlDirect_app_parameter_kind_check_classic__s1 in
+    let $camlDirect_app_parameter_kind_check_classic =
+      Block 0 (field_0, field_1, field_2)
+    in
+    cont done ($camlDirect_app_parameter_kind_check_classic)

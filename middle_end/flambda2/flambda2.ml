@@ -85,18 +85,6 @@ let print_fexpr name target ppf unit =
   let header = "After " ^ name in
   dump_to_target_if_any ppf target ~header ~f:pp_flambda_as_fexpr unit
 
-let pp_flambda_as_flexpect ppf (old_unit, new_unit) =
-  let before = old_unit |> Flambda_to_fexpr.conv in
-  let after = new_unit |> Flambda_to_fexpr.conv in
-  let test : Fexpr.expect_test_spec = { before; after } in
-  Print_fexpr.expect_test_spec ppf test
-
-let print_flexpect name main_dump_ppf ~raw_flambda:old_unit new_unit =
-  dump_to_target_if_any main_dump_ppf
-    (Flambda_features.dump_flexpect ())
-    ~header:("Before and after " ^ name)
-    ~f:pp_flambda_as_flexpect (old_unit, new_unit)
-
 module NO = Flambda2_nominal.Name_occurrences
 
 type run_result =
@@ -198,7 +186,6 @@ let flambda_to_flambda0 : type m.
       print_fexpr "simplify"
         (Flambda_features.dump_fexpr (This_pass "simplify"))
         ppf flambda;
-      print_flexpect "simplify" ppf ~raw_flambda flambda;
       dump_fexpr_annot ~prefixname "simplify" flambda;
       let ( flambda,
             free_names,
@@ -216,7 +203,6 @@ let flambda_to_flambda0 : type m.
           print_fexpr "reaper"
             (Flambda_features.dump_fexpr (This_pass "reaper"))
             ppf flambda;
-          print_flexpect "reaper" ppf ~raw_flambda flambda;
           dump_fexpr_annot ~prefixname "reaper" flambda;
           ( flambda,
             free_names,
