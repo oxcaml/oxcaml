@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
    flags += "-flambda2-match-in-match -O3";
-   { native with dump-raw, dump-simplify, dump-reaper; check-fexpr-dump; }
+   { native with dump-raw, dump-simplify; check-fexpr-dump; }
 *)
 
 (* This test is here to check that match-in-match triggers and adequately
@@ -9,7 +9,8 @@
    stdlib's sequences so that they are more easily optimized by flambda,
    while we wait for function specialization). *)
 
-(* The signature is here to reduce the contents of the fexpr after Simplify. *)
+(* The signature is here to reduce the contents of the fexpr after Simplify,
+   as we only want to check whether `foo` has been adequately simplified. *)
 module Seq : sig
   val foo : unit -> int
 end = struct
