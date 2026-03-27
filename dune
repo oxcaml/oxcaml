@@ -645,6 +645,7 @@
   cfg_merge_blocks
   extra_debug
   label
+  printcfg
   linear_utils
   simplify_terminator
   vectorize
