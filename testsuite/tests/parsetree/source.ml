@@ -7523,13 +7523,10 @@ let x = true 0
 (* check pretty-printing of local module open in core_type *)
 type t = String.( t )
 
-<<<<<<< oxcaml
 (* Coercion in value constraint *)
 
 let x: [`A] :> [> `A | `B ] = `A
 let x :> [> `A | `B ] = `A
-||||||| upstream-base
-=======
+
 (* Utf8 identifier *)
 let là = function ça -> ça
->>>>>>> upstream-incoming

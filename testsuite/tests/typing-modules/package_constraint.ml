@@ -53,19 +53,9 @@ type m2 = (module S with type t = t_value);;
 [%%expect{|
 module type S = sig type t : immediate end
 type m1 = (module S with type t = int)
-<<<<<<< oxcaml
-Line 6, characters 10-42:
-6 | type m2 = (module S with type t = t_value);;
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-||||||| upstream-base
-Line 6, characters 10-41:
-6 | type m2 = (module S with type t = string);;
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-=======
 Line 6, characters 18-40:
 6 | type m2 = (module S with type t = string);;
                       ^^^^^^^^^^^^^^^^^^^^^^
->>>>>>> upstream-incoming
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        Type declarations do not match:
@@ -86,19 +76,9 @@ end
 type m = (module S with type t = t_value);;
 [%%expect{|
 module type S = sig type t = int end
-<<<<<<< oxcaml
-Line 5, characters 9-41:
-5 | type m = (module S with type t = t_value);;
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-||||||| upstream-base
-Line 5, characters 9-40:
-5 | type m = (module S with type t = string);;
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-=======
 Line 5, characters 17-39:
 5 | type m = (module S with type t = string);;
                      ^^^^^^^^^^^^^^^^^^^^^^
->>>>>>> upstream-incoming
 Error: In the constrained signature, type "t" is defined to be "int".
        Package "with" constraints may only be used on abstract types.
 |}];;
@@ -149,35 +129,9 @@ end
 type t1 = int
 and t2 = (module S with type t = t1);;
 [%%expect{|
-<<<<<<< oxcaml
 module type S = sig type t : immediate end
 type t1 = int
 and t2 = (module S with type t = t1)
-||||||| upstream-base
-module type S = sig type t [@@immediate] end
-Line 6, characters 9-36:
-6 | and t2 = (module S with type t = t1);;
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: In this "with" constraint, the new definition of "t"
-       does not match its original definition in the constrained signature:
-       Type declarations do not match:
-         type t = t1
-       is not included in
-         type t [@@immediate]
-       The first is not an immediate type.
-=======
-module type S = sig type t [@@immediate] end
-Line 6, characters 17-35:
-6 | and t2 = (module S with type t = t1);;
-                     ^^^^^^^^^^^^^^^^^^
-Error: In this "with" constraint, the new definition of "t"
-       does not match its original definition in the constrained signature:
-       Type declarations do not match:
-         type t = t1
-       is not included in
-         type t [@@immediate]
-       The first is not an immediate type.
->>>>>>> upstream-incoming
 |}];;
 
 module type S = sig
@@ -271,16 +225,8 @@ end;;
 module type S = sig type t end
 type m = (module S with type t = int)
 module F :
-<<<<<<< oxcaml
   functor (X : sig val x : m end) ->
     sig module M : sig type t = int end type t = M.t end
-||||||| upstream-base
-  functor (X : sig val x : m end) ->
-    sig module M : sig type t = int end type t = M.t [@@immediate] end
-=======
-  (X : sig val x : m end) ->
-    sig module M : sig type t = int end type t = M.t [@@immediate] end
->>>>>>> upstream-incoming
 |}];;
 
 (* Checking such a constraint may require expanding definitions from the module
@@ -368,7 +314,6 @@ Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
-<<<<<<< oxcaml
 (* In cases where the package constraint involves a type variable from the
    current ty var env, it can affect inference.  t1 below should check but not
    t2. *)
@@ -393,8 +338,7 @@ Error: This type "t_value" should be an instance of type "('a : immediate)"
        But the kind of t_value must be a subkind of immediate
          because of the definition of t at line 5, characters 0-39.
 |}];;
-||||||| upstream-base
-=======
+
 (** Issue 13778: constraining a type should count as using it *)
 module X: sig
   type t
@@ -405,4 +349,3 @@ end
 [%%expect {|
 module X : sig type t end
 |}]
->>>>>>> upstream-incoming

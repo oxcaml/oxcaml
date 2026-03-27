@@ -23,22 +23,12 @@ match None with | Some (Some _) -> () | _ -> ()
 |}];;
 
 run {| let open struct type t = { mutable x : int [@atomic] } end in
-<<<<<<< oxcaml
        let _ = fun (v : t) -> v.x in () |};;
 
 [%%expect{|
 let open struct type t = {
                   mutable x: int [@atomic ]} end in
   let _ = fun (v : t) -> v.x in ()
-||||||| upstream-base
-- : string = "match None with | Some (Some _) -> () | _ -> ()"
-=======
-       let _ = fun (v : t) -> [%atomic.loc v.x] in () |};;
-[%%expect{|
-let open struct type t = {
-                  mutable x: int [@atomic ]} end in
-  let _ = fun (v : t) -> [%ocaml.atomic.loc v.x] in ()
->>>>>>> upstream-incoming
 - : unit = ()
 |}];;
 
@@ -59,7 +49,6 @@ run {| fun x y z -> (function w -> x y z w) |};;
 [%%expect{|
 fun x y z -> (function | w -> x y z w)
 - : unit = ()
-<<<<<<< oxcaml
 |}];;
 
 run {| match None with Some (Some _) -> () | _ -> () |};;
@@ -140,10 +129,6 @@ run {| let foo : 'a -> 'a = fun x -> x in foo |}
 [%%expect{|
 let (foo : 'a -> 'a) = ( (fun x -> x : 'a -> 'a)) in foo
 - : unit = ()
-||||||| upstream-base
-- : string = "fun x y z -> (function | w -> x y z w)"
-=======
->>>>>>> upstream-incoming
 |}];;
 
 (***********************************)
