@@ -6,7 +6,6 @@ setup-ocamlc.byte-build-env;
 set OCAMLPARAM = "";
 ocamlc_byte_exit_status = "0";
 flags = "-dcounters -extension include_functor -extension comprehensions \
-        -extension immutable_arrays -extension immutable_arrays \
         -extension module_strengthening -extension labeled_tuples";
 
 
