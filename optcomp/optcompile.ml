@@ -309,6 +309,7 @@ let native unix
       [ "unix/unix";
         "compiler-libs/ocamlcommon";
         "compiler-libs/ocamloptcomp";
+        "compiler-libs/ocamlopttoplevel";
         "ocaml-jit/jit";
         "camlinternaleval" ]
 
