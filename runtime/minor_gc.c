@@ -610,6 +610,8 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   scan_roots_hook scan_roots_hook;
   promote_result_s result = { .locked_ephemerons = false, };
 
+  CAMLassert(!Is_block(domain->preemption));
+
   st.domain = domain;
   st.domain_alone = caml_domain_alone();
   st.status = caml_allocation_status();
@@ -1142,34 +1144,24 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
       caml_handle_gc_interrupt();
     }
 
+    /* If a preemption continuation has just been allocated, we must not enter
+       the GC again, as the continuation mustn't be scanned (and potentially
+       promoted) by the GC before it is initialized. Fortunately, we do not need
+       to maintain the invariant that there is enough room in the minor heap to
+       re-do the allocation in this case, since we are about to preempt anyway,
+       so we can just return. */
+    if ((flags & CAML_FROM_CAML) && Is_block(Caml_state->preemption)) {
+      return;
+    }
+
     /* Now, there might be enough room in the minor heap to do our
        allocation. */
     if (dom_st->young_ptr - whsize >= dom_st->young_start)
       break;
 
-    /* If not, then empty the minor heap, and check again for async
-       callbacks. */
+    /* Otherwise, empty the minor heap, and check again for async callbacks. */
     CAML_EV_COUNTER(EV_C_FORCE_MINOR_ALLOC_SMALL, 1);
     caml_poll_gc_work();
-  }
-
-  /* If we're about to preempt, we return early. This importantly:
-
-     - Skips redoing the allocation. When we return back into user code, it'll
-       be in the effect handler for the preemption, not the code that just
-       allocated, and we don't want to leave dead bits of minor heap around
-       where nobody's going to initialize it. When the preempted continuation is
-       resumed, it'll handle redoing the allocation by calling
-       [caml_redo_preempted_allocation].
-     - Skips memprof, for the same reason
-
-     Note: This only applies to native OCaml allocations (CAML_FROM_CAML).
-     For C allocations, we must complete the allocation since the caller
-     expects young_ptr to point to valid allocated space (and won't actually
-     trigger a preemption before using it).
-  */
-  if ((flags & CAML_FROM_CAML) && Is_block(Caml_state->preemption)) {
-    return;
   }
 
   /* Re-do the allocation: we now have enough space in the minor heap. */
