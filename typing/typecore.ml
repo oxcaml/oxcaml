@@ -148,6 +148,8 @@ type error =
   | Partial_tuple_pattern_bad_type
   | Extra_tuple_label of string option * type_expr
   | Missing_tuple_label of string option * type_expr
+  | Repeated_tuple_exp_label of string
+  | Repeated_tuple_pat_label of string
   | Label_mismatch of
       record_form_packed * Longident.t * Errortrace.unification_error
   | Pattern_type_clash :
@@ -2894,6 +2896,9 @@ and type_pat_aux
   let type_tuple_pat spl closed =
     (* CR layouts v5: consider sharing code with [type_unboxed_tuple_pat] below
        when we allow non-values in boxed tuples. *)
+    Option.iter
+      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
+      (Misc.repeated_label spl);
     let args =
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
@@ -2908,8 +2913,6 @@ and type_pat_aux
     let spl_ann =
       solve_Ppat_tuple ~refine:false ~alloc_mode loc penv args expected_ty
     in
-    Typetexp.check_no_repeated_labels_unless_extension_enabled ~loc
-      (fun (lbl, _, _, _) -> lbl) spl_ann;
     let pl =
       List.map (fun (lbl, p, t, alloc_mode) ->
         lbl,
@@ -2928,6 +2931,9 @@ and type_pat_aux
   let type_unboxed_tuple_pat spl closed =
     Language_extension.assert_enabled ~loc Layouts
       Language_extension.Stable;
+    Option.iter
+      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
+      (Misc.repeated_label spl);
     let args =
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
@@ -2943,8 +2949,6 @@ and type_pat_aux
       solve_Ppat_unboxed_tuple ~refine:false ~alloc_mode loc penv args
         expected_ty
     in
-    Typetexp.check_no_repeated_labels_unless_extension_enabled ~loc
-      (fun (lbl, _, _, _, _) -> lbl) spl_ann;
     let pl =
       List.map (fun (lbl, p, t, alloc_mode, sort) ->
         lbl, type_pat tps Value ~alloc_mode p t sort, sort)
@@ -9372,6 +9376,9 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
      we allow non-values in boxed tuples. *)
   let arity = List.length sexpl in
   assert (arity >= 2);
+  Option.iter
+    (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
+    (Misc.repeated_label sexpl);
   let alloc_mode, value_mode =
     register_allocation_value_mode ~loc expected_mode.mode
   in
@@ -9420,7 +9427,6 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
         labeled_subtypes)
     overwrite
   in
-  Typetexp.check_no_repeated_labels_unless_extension_enabled ~loc fst sexpl;
   let expl =
     Misc.Stdlib.List.map3
       (fun (label, body) ((_, ty), argument_mode) overwrite ->
@@ -9442,6 +9448,9 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
   let arity = List.length sexpl in
   assert (arity >= 2);
+  Option.iter
+    (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
+    (Misc.repeated_label sexpl);
   let argument_mode =
     expected_mode.mode
     |> apply_is_contained_by {containing = Tuple; container = (loc, Expression)}
@@ -9482,7 +9491,6 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   let types_sorts_and_modes =
     List.combine labels_types_and_sorts argument_modes
   in
-  Typetexp.check_no_repeated_labels_unless_extension_enabled ~loc fst sexpl;
   let expl =
     List.map2
       (fun (label, body) ((_, ty, sort), argument_mode) ->
@@ -12045,6 +12053,14 @@ let report_error ~loc env =
          which is not a %s type."
         (Style.as_inline_code Printtyp.type_expr) ty
         (record_form_to_string record_form)
+  | Repeated_tuple_exp_label l ->
+      Location.errorf ~loc
+        "@[This tuple expression has two labels named %a@]"
+        Style.inline_code l
+  | Repeated_tuple_pat_label l ->
+      Location.errorf ~loc
+        "@[This tuple pattern has two labels named %a@]"
+        Style.inline_code l
   | Expr_record_type_has_wrong_boxing (P record_form, ty) ->
       let expected, actual =
         match record_form with
