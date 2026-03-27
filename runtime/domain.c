@@ -784,7 +784,11 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_major_slice = 0;
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
-  domain_root_register(&domain_state->preemption, Val_unit);
+
+  /* Note that we do not make domain_state->preemption a domain_root, as as long
+     as it's a block (between being allocated and being initialized) it must not
+     be seen by the GC. */
+  domain_state->preemption = Val_unit;
 
   domain_state->parser_trace = 0;
 
@@ -1830,7 +1834,7 @@ CAMLprim value caml_domain_preempt_self(value unit) {
   if (Caml_state->preemption != Val_unit) {
     return Val_unit;
   }
-  domain_root_set(&Caml_state->preemption, Val_long(1));
+  Caml_state->preemption = Val_long(1);
   caml_interrupt_self();
   return Val_unit;
 }
@@ -1861,13 +1865,13 @@ void caml_domain_setup_preemption(void) {
   Field(cont, 1) = Debug_free_minor;
   Field(cont, 2) = Debug_free_minor;
 #endif
-  domain_root_set(&Caml_state->preemption, cont);
+  Caml_state->preemption = cont;
   CAMLreturn0;
 }
 
 void caml_domain_reset_preemption(void) {
   if (Is_block(Caml_state->preemption)) {
-    domain_root_set(&Caml_state->preemption, Val_long(1));
+    Caml_state->preemption = Val_long(1);
   }
 }
 
@@ -2234,7 +2238,6 @@ static void domain_terminate (void)
   domain_root_remove(&domain_state->dls_state);
   domain_root_remove(&domain_state->tls_state);
   domain_root_remove(&domain_state->backtrace_last_exn);
-  domain_root_remove(&domain_state->preemption);
   caml_stat_free(domain_state->final_info);
   caml_stat_free(domain_state->ephe_info);
   caml_free_intern_state();
