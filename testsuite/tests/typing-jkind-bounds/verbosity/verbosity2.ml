@@ -185,3 +185,62 @@ type ('a
              internal)
      t
 |}]
+
+type 'a t : value mod portable external_ with 'a @@ external_
+[%%expect {|
+type 'a t
+  : value
+      mod portable
+          external_
+          non_null
+          separable
+          local
+          unforkable
+          yielding
+          once
+          stateful
+          unique
+          read_write
+          uncontended
+          static
+      with 'a @@ external_
+|}]
+
+type 'a t : value mod external_ with 'a @@ external_
+[%%expect {|
+type 'a t
+  : value
+      mod external_
+          non_null
+          separable
+          local
+          unforkable
+          yielding
+          once
+          stateful
+          nonportable
+          unique
+          read_write
+          uncontended
+          static
+|}]
+
+type 'a t : immutable_data with 'a @@ external_
+[%%expect {|
+type 'a t
+  : value
+      mod forkable
+          unyielding
+          many
+          stateless
+          immutable
+          portable
+          contended
+          non_null
+          non_float
+          local
+          unique
+          static
+          internal
+      with 'a
+|}]

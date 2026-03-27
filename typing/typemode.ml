@@ -679,6 +679,27 @@ let sort_dedup_modalities modalities =
 
 let untransl_modalities t = List.map untransl_modality t.moda_desc
 
+let transl_with_bound_modifiers annots =
+  let modal_annots, externality =
+    List.fold_left
+      (fun (modal_annots, externality)
+           ({ txt = Parsetree.Modality modality; loc } as annot) ->
+        match Modifier_axis_pair.of_string modality with
+        | P (Modal _, _) -> annot :: modal_annots, externality
+        | P (Nonmodal Externality, (value : Externality.t)) ->
+          modal_annots, Some value
+        | P (Nonmodal (Nullability | Separability), _) ->
+          raise (Error (loc, Unrecognized_modifier (Modality, modality)))
+        | exception Not_found ->
+          raise (Error (loc, Unrecognized_modifier (Modality, modality))))
+      ([], None) annots
+  in
+  let modality =
+    (transl_modalities ~maturity:Stable Immutable (List.rev modal_annots))
+      .moda_modalities
+  in
+  modality, externality
+
 let transl_alloc_mode annots =
   let { mode_modes = opt_modes; mode_desc = annots } =
     transl_mode_annots annots
