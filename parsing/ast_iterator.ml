@@ -484,8 +484,6 @@ module E = struct
     | Pexp_match (e, pel) ->
         sub.expr sub e; sub.cases sub pel
     | Pexp_try (e, pel) -> sub.expr sub e; sub.cases sub pel
-    | Pexp_unboxed_unit -> ()
-    | Pexp_unboxed_bool _ -> ()
     | Pexp_tuple el -> iter_labeled_tuple sub el
     | Pexp_unboxed_tuple el -> iter_labeled_tuple sub el
     | Pexp_construct (lid, arg) ->
@@ -583,8 +581,6 @@ module P = struct
     | Ppat_alias (p, s) -> sub.pat sub p; iter_loc sub s
     | Ppat_constant _ -> ()
     | Ppat_interval _ -> ()
-    | Ppat_unboxed_unit -> ()
-    | Ppat_unboxed_bool _ -> ()
     | Ppat_tuple (pl, _) -> iter_labeled_tuple sub pl
     | Ppat_unboxed_tuple (pl, _) -> iter_labeled_tuple sub pl
     | Ppat_construct (l, p) ->

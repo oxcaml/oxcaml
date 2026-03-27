@@ -79,6 +79,10 @@ let fmt_constant f x =
   | Pconst_float (s,m) -> fprintf f "PConst_float (%s,%a)" s fmt_char_option m;
   | Pconst_unboxed_float (s,m) ->
       fprintf f "PConst_unboxed_float (%s,%a)" s fmt_char_option m;
+  | Pconst_unboxed_unit ->
+      fprintf f "PConst_unboxed_unit"
+  | Pconst_unboxed_bool b ->
+      fprintf f "PConst_unboxed_bool %b" b
 ;;
 
 let fmt_bool f x =
@@ -294,8 +298,6 @@ and pattern i ppf x =
   | Ppat_constant (c) -> line i ppf "Ppat_constant %a\n" fmt_constant c;
   | Ppat_interval (c1, c2) ->
       line i ppf "Ppat_interval %a..%a\n" fmt_constant c1 fmt_constant c2;
-  | Ppat_unboxed_unit -> line i ppf "Ppat_unboxed_unit\n";
-  | Ppat_unboxed_bool b -> line i ppf "Ppat_unboxed_bool %a\n" fmt_bool b;
   | Ppat_tuple (l, c) ->
       line i ppf "Ppat_tuple %a\n" fmt_closed_flag c;
       list i (labeled_tuple_element pattern) ppf l;
@@ -382,8 +384,6 @@ and expression i ppf x =
       line i ppf "Pexp_try\n";
       expression i ppf e;
       list i case ppf l;
-  | Pexp_unboxed_unit -> line i ppf "Pexp_unboxed_unit\n";
-  | Pexp_unboxed_bool b -> line i ppf "Pexp_unboxed_bool %a\n" fmt_bool b;
   | Pexp_tuple (l) ->
       line i ppf "Pexp_tuple\n";
       list i (labeled_tuple_element expression) ppf l;
