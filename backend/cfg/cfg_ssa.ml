@@ -74,13 +74,22 @@ let build (cfg : Cfg.t) : t =
         | Some (Output { label = old_label; instr = old_instr; _ }) ->
           if Label.equal label old_label
           then begin
+            (* Detect 2-operand instructions where the result overwrites an
+               input. Instruction selection emits these as a move-then-operate
+               pair:
+
+               reg := overwritten_input; reg := op(reg, y)
+
+               We require old_instr to be the immediately preceding. As a
+               consequence, we only support a single overwritten output. *)
             match DLL.prev cell with
             | Some prev_cell
               when InstructionId.equal
                      (DLL.value prev_cell : Cfg.basic Cfg.instruction).id
                      old_instr.id -> (
               match[@ocaml.warning "-4"] old_instr.desc, old_instr.arg with
-              | Op Move, [| overwritten_input |] ->
+              | Op Move, [| overwritten_input |]
+                when Array.exists (Reg.same reg) instr.arg ->
                 Reg.Tbl.replace table reg
                   (OverwrittenOutput
                      { label; instr; res_index; overwritten_input });
@@ -90,21 +99,13 @@ let build (cfg : Cfg.t) : t =
           end
           else false
         | Some (OverwrittenOutput _) -> false
-        | Some (Phi { merge_label; regs }) ->
+        | Some (Phi { merge_label; regs }) -> (
           let succ_block = Cfg.get_block_exn cfg merge_label in
-          if not (Label.Set.mem label succ_block.predecessors)
-          then false
-          else begin
-            let i =
-              predecessor_index succ_block.predecessors label |> Option.get
-            in
-            if not (Reg.same regs.(i) Reg.dummy)
-            then false
-            else begin
-              regs.(i) <- reg;
-              true
-            end
-          end
+          match predecessor_index succ_block.predecessors label with
+          | Some i when Reg.same regs.(i) Reg.dummy ->
+            regs.(i) <- reg;
+            true
+          | _ -> false)
       in
       if not success then Reg.Tbl.replace table reg NotSSA
   in
