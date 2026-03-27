@@ -1856,6 +1856,11 @@ void caml_domain_setup_preemption(void) {
   if (Caml_state->preemption != Val_long(1)) {
     CAMLreturn0;
   }
+#ifdef DEBUG
+  Field(cont, 0) = Debug_free_minor;
+  Field(cont, 1) = Debug_free_minor;
+  Field(cont, 2) = Debug_free_minor;
+#endif
   domain_root_set(&Caml_state->preemption, cont);
   CAMLreturn0;
 }
