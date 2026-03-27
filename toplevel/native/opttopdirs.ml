@@ -71,50 +71,7 @@ let dir_cd s = Sys.chdir s
 
 let _ = Hashtbl.add directive_table "cd" (Directive_string dir_cd)
 
-module Compiler = (val Optcompile.native
-                   (module Unix : Compiler_owee.Unix_intf.S)
-                   ~flambda2:Flambda2.lambda_to_cmm)
-
-(* Load in-core a .cmxs file *)
-
-let linkenv = Linkenv.create ()
-
-let load_file ppf name0 =
-  let name =
-    try Some (Load_path.find name0)
-    with Not_found -> None
-  in
-  match name with
-  | None -> fprintf ppf "File not found: %s@." name0; false
-  | Some name ->
-    let fn,tmp =
-      if Filename.check_suffix name Compiler.ext_flambda_obj
-         || Filename.check_suffix name Compiler.ext_flambda_lib
-      then
-        let cmxs = Filename.temp_file "caml" ".cmxs" in
-        Compiler.link_shared ~ppf_dump:ppf linkenv [name] cmxs;
-        cmxs,true
-      else
-        name,false
-    in
-    let success =
-      (* The Dynlink interface does not allow us to distinguish between
-          a Dynlink.Error exceptions raised in the loaded modules
-          or a genuine error during dynlink... *)
-      try Dynlink.loadfile fn; true
-      with
-      | Dynlink.Error err ->
-        fprintf ppf "Error while loading %s: %s.@."
-          name (Dynlink.error_message err);
-        false
-      | exn ->
-        print_exception_outcome ppf exn;
-        false
-    in
-    if tmp then (try Sys.remove fn with Sys_error _ -> ());
-    success
-
-let dir_load ppf name = ignore (load_file ppf name)
+let dir_load ppf name = ignore (Opttoploop.load_file ppf name)
 
 let _ = Hashtbl.add directive_table "load" (Directive_string (dir_load std_out))
 
@@ -136,14 +93,15 @@ let match_printer_type ppf desc typename =
   let printer_type =
     match
       Env.find_type_by_name
-        (Ldot(Lident "Opttopdirs", typename)) !toplevel_env
+        (Ldot(Location.mknoloc (Lident "Opttopdirs"),
+              Location.mknoloc typename)) !toplevel_env
     with
     | (path, _) -> path
     | exception Not_found ->
         fprintf ppf "Cannot find type Topdirs.%s.@." typename;
         raise Exit
   in
-  Ctype.with_local_level ~post:Ctype.generalize (fun () ->
+  Ctype.with_local_level_generalize (fun () ->
     let ty_arg = Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument) in
     Ctype.unify !toplevel_env
       (Ctype.newconstr printer_type [ty_arg])
@@ -160,13 +118,13 @@ let find_printer_type ppf lid =
         | ty_arg -> (ty_arg, path, true)
         | exception Ctype.Unify _ ->
             fprintf ppf "%a has a wrong type for a printing function.@."
-              (Format_doc.compat Printtyp.longident) lid;
+              Printtyp.longident lid;
             raise Exit
       end
   end
   | exception Not_found ->
       fprintf ppf "Unbound value %a.@."
-        (Format_doc.compat Printtyp.longident) lid;
+        Printtyp.longident lid;
       raise Exit
 
 let dir_install_printer ppf lid =
@@ -188,7 +146,7 @@ let dir_remove_printer ppf lid =
       remove_printer path
     with Not_found ->
       fprintf ppf "No printer named %a.@."
-        (Format_doc.compat Printtyp.longident) lid
+        Printtyp.longident lid
     end
   with Exit -> ()
 

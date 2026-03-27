@@ -83,7 +83,7 @@ let match_simple_printer_type env ty ~is_old_style =
 let filter_arrow env ty =
   let ty = Ctype.expand_head env ty in
   match Types.get_desc ty with
-  | Tarrow (lbl, l, r, _) when not (Btype.is_optional lbl) -> Some (l, r)
+  | Tarrow ((lbl,_,_), l, r, _) when not (Btype.is_omittable lbl) -> Some (l, r)
   | _ -> None
 
 let extract_last_arrow env ty =
@@ -94,7 +94,14 @@ let extract_last_arrow env ty =
   in extract None ty
 
 let extract_target_type env ty =
-  Option.map fst (extract_last_arrow env ty)
+  match extract_last_arrow env ty with
+  | None -> None
+  | Some ty ->
+    let ty = fst ty in
+    match Ctype.filter_mono ty with
+    | exception Ctype.Filter_mono_failed ->
+        None
+    | ty -> Some ty
 
 let extract_target_parameters env ty =
   match extract_target_type env ty with
@@ -113,7 +120,10 @@ let match_generic_printer_type env ty =
   | Some (ty_path, params) ->
       match
         Ctype.with_local_level_generalize begin fun () ->
-          let args = List.map (fun _ -> Ctype.newvar ()) params in
+          let args = List.map (fun _ ->
+            Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument))
+            params
+          in
           let ty_target =
             Ctype.newty (Tconstr (ty_path, args, ref Types.Mnil)) in
           let printer_args_ty =

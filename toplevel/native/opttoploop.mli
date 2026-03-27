@@ -184,3 +184,14 @@ val default_lookup : string -> Obj.t option
 val need_symbol : string -> bool
 
 val phrase_name : string ref
+
+val load_file : formatter -> string -> bool
+(** Load a .cmxs, .cmx, or .cmxa file in-core and execute it. *)
+
+val preload_objects : string list ref
+(** List of compilation units to be loaded before entering the interactive
+    loop. *)
+
+val prepare : Format.formatter -> ?input:input -> unit -> bool
+(** Setup the load paths and initial toplevel environment and load compilation
+    units in {!preload_objects}. *)
