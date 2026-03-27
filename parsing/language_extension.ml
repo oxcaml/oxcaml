@@ -364,8 +364,6 @@ end = struct
         (compiler_options !universe)
         ()
 
-  (* CR ageorges: Mode_polymorphism is omitted from universe to ensure
-  it is not enabled by -extension-universe alpha/beta. TODO: add when ready *)
   let allowed_extensions_in t =
     let maximal_in_universe (Pack extn) =
       let (module Ops) = get_level_ops extn in
@@ -378,12 +376,7 @@ end = struct
         let max_allowed_lvl = List.fold_left Ops.max lvl lvls in
         Some (Pair (extn, max_allowed_lvl))
     in
-    let all =
-      List.filter
-        (fun (Pack extn) -> not (equal extn Mode_polymorphism))
-        all_extensions
-    in
-    List.filter_map maximal_in_universe all
+    List.filter_map maximal_in_universe all_extensions
 end
 
 (*****************************************)
