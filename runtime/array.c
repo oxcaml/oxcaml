@@ -1259,7 +1259,7 @@ static value uniform_array_gather(intnat num_arrays,
     /* If total size = 0, just return an empty array */
     res = Atom(0);
   }
-  if (size > Max_wosize/Double_wosize) caml_invalid_argument("Array.concat");
+  else if (size > Max_wosize/Double_wosize) caml_invalid_argument("Array.concat");
   else if (size <= Max_young_wosize || local) {
     /* Array of values, small enough to fit in young generation. */
     res = local ? caml_alloc_local(size, 0) : caml_alloc_small(size, 0);
