@@ -84,6 +84,8 @@ CAMLprim value jit_dlsym(value symbol) {
   CAMLreturn (result);
 }
 
+#if defined(__linux__)
+
 #define SBRK_FAILED ((void*)-1)
 
 static void* alloc_page_aligned_using_sbrk(size_t page_size, size_t size) {
@@ -101,6 +103,8 @@ static void* alloc_page_aligned_using_sbrk(size_t page_size, size_t size) {
   assert((uintptr_t)brk % page_size == 0);
   return next_page_start;
 }
+
+#endif
 
 #if defined(__has_feature)
   // For clang
@@ -165,7 +169,12 @@ CAMLprim value jit_memalign(value section_size) {
        addresses which are too large to apply relocations to against other
        sections (e.g. [.rodata]), so we manually use [sbrk] when linked against
        either. */
+#if defined(__APPLE__)
+    /* sbrk is deprecated on macOS, so we'll have to make do */
+    addr = aligned_alloc(page_size, size);
+#else
     addr = alloc_page_aligned_using_sbrk(page_size, size);
+#endif
   } else {
     addr = aligned_alloc(page_size, size);
   }
