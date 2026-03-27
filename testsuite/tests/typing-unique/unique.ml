@@ -696,3 +696,26 @@ Line 3, characters 4-10:
         ^^^^^^
 
 |}]
+
+(* Texp_ident mode crossing on the [expected_mode], to make UA pass *)
+module Crossing = struct
+  module F (M : sig
+      type t : value mod aliased
+      val take : 'a @ unique -> unit
+    end) =
+  struct
+    let f (t : M.t) =
+      M.take t;
+      M.take t
+  end
+end
+[%%expect{|
+Line 9, characters 13-14:
+9 |       M.take t
+                 ^
+Error: This value is used here, but it has already been used as unique at:
+Line 8, characters 13-14:
+8 |       M.take t;
+                 ^
+
+|}]
