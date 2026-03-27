@@ -1151,3 +1151,10 @@ CAMLprim value caml_set_current_thread_name(value name)
 
   return Val_unit;
 }
+
+CAMLprim value caml_thread_fatal_spawn_outside_multicore(value unit) {
+  CAMLparam1 (unit);
+  /* CR-someday vkarvonen: Change [caml_fatal_error] to take [const char*] */
+  caml_fatal_error("Multicore: domains have been spawned outside of Multicore");
+  CAMLreturn(Val_unit);
+}
