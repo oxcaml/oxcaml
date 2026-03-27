@@ -111,3 +111,4 @@ let wait_signal = Unix.sigwait
 external use_domains : unit -> unit @@ portable = "caml_thread_use_domains"
 
 external set_current_thread_name  : string -> unit @@ portable =
+  "caml_set_current_thread_name"
