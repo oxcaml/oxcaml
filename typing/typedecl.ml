@@ -137,6 +137,7 @@ type error =
   | Local_not_enabled
   | Unexpected_layout_any_in_primitive of string
   | Useless_layout_poly
+  | Bad_or_null_attribute of string
   | Zero_alloc_attr_unsupported of Builtin_attributes.zero_alloc_attribute
   | Zero_alloc_attr_non_function
   | Zero_alloc_attr_bad_user_arity
@@ -167,6 +168,85 @@ let get_unboxed_from_attributes sdecl =
   | true, false -> Some false
   | false, true -> Some true
   | false, false -> None
+
+let get_or_null_from_attributes sdecl =
+  let or_null = Builtin_attributes.has_or_null sdecl.ptype_attributes in
+  let reexport =
+    Builtin_attributes.has_or_null_reexport sdecl.ptype_attributes
+  in
+  if or_null && reexport then
+    raise (Error (sdecl.ptype_loc,
+      Bad_or_null_attribute
+        "it cannot be both [@@or_null] and [@@or_null_reexport]"));
+  or_null
+
+let check_or_null_variant_shape _path params sdecl scstrs =
+  let bad msg =
+    raise (Error (sdecl.ptype_loc, Bad_or_null_attribute msg))
+  in
+  begin match get_unboxed_from_attributes sdecl with
+  | None -> ()
+  | Some _ ->
+    bad "it must not also use [@@boxed] or [@@unboxed]"
+  end;
+  begin match sdecl.ptype_manifest with
+  | None -> ()
+  | Some _ ->
+    bad "it must define a fresh variant, not an alias with an explicit manifest"
+  end;
+  let param_name =
+    match sdecl.ptype_params, params with
+    | [({ ptyp_desc = Ptyp_var (name, _); _ }, _)], [param] -> name, param
+    | [_], [_] ->
+      bad "its single type parameter must be written as a type variable"
+    | _ ->
+      bad "it must have exactly one type parameter"
+  in
+  let check_no_gadt ({ pcd_res; _ } : Parsetree.constructor_declaration) =
+    match pcd_res with
+    | None -> ()
+    | Some _ ->
+      bad "GADT constructors are not supported with [@@or_null]"
+  in
+  let find_constructors = function
+    | [c1; c2] ->
+      check_no_gadt c1;
+      check_no_gadt c2;
+      begin match c1.pcd_args, c2.pcd_args with
+      | Pcstr_tuple [],
+        Pcstr_tuple
+          [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }]
+      | Pcstr_tuple
+          [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }],
+        Pcstr_tuple [] ->
+        if String.equal name (fst param_name)
+        then snd param_name
+        else bad "its payload constructor must carry the sole type parameter"
+      | _ ->
+        bad
+          "it must have exactly one nullary constructor and one unary \
+           constructor carrying the sole type parameter"
+      end
+    | _ ->
+      bad "it must have exactly two constructors"
+  in
+  match sdecl.ptype_private with
+  | Private ->
+    bad "private types are not supported with [@@or_null]"
+  | Public ->
+    let _payload_param = find_constructors scstrs in
+    ()
+
+let custom_or_null_jkind path param =
+  let why : Jkind.History.value_or_null_creation_reason =
+    Jkind.History.Type_argument
+      { parent_path = path; position = 1; arity = 1 }
+  in
+  Jkind.Builtin.value_or_null ~why
+  |> Btype.Jkind0.add_with_bounds
+       ~modality:Mode.Modality.Const.id
+       ~type_expr:param
+  |> Jkind.mark_best
 
 (* [make_params] creates sort variables - these can be defaulted away (as in
    transl_type_decl) or unified with existing sort-variable-free types (as in
@@ -927,6 +1007,29 @@ let transl_declaration env sdecl (id, uid) =
         Ttype_abstract, Type_abstract Definition,
         Jkind.Builtin.value ~why:Default_type_jkind
       | Ptype_variant scstrs ->
+        let custom_or_null = get_or_null_from_attributes sdecl in
+        if custom_or_null then begin
+          check_or_null_variant_shape path params sdecl scstrs;
+          match sdecl.ptype_params, params with
+          | [({ ptyp_desc = Ptyp_var (_, jkind_annot);
+                ptyp_loc;
+                _
+              }, _)],
+            [param] ->
+            let required = Btype.Jkind0.for_or_null_argument id in
+            let check =
+              match jkind_annot with
+              | None -> Ctype.constrain_type_jkind env param required
+              | Some _ -> Ctype.check_type_jkind env param required
+            in
+            begin match check with
+            | Ok () -> ()
+            | Error err ->
+              raise
+                (Error (ptyp_loc, Jkind_mismatch_of_type (env, param, err)))
+            end
+          | _ -> assert false
+        end;
         if List.exists (fun cstr -> cstr.pcd_res <> None) scstrs then begin
           match cstrs with
             [] -> ()
@@ -978,7 +1081,11 @@ let transl_declaration env sdecl (id, uid) =
         in
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         let rep, jkind =
-          if unbox then
+          if custom_or_null then
+            match params with
+            | [param] -> Variant_with_null, custom_or_null_jkind path param
+            | _ -> assert false
+          else if unbox then
             Variant_unboxed,
             Jkind.of_new_sort ~why:Old_style_unboxed_type
               ~level:(Ctype.get_current_level ())
@@ -2076,10 +2183,54 @@ let rec update_decl_jkind env dpath decl =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
-      (* CR layouts v3.5: this case only happens with [or_null_reexport].
-         Change when we allow users to write their own null constructors. *)
-      (* CR layouts v3.3: use the kind of the argument + [maybe_null]. *)
-      cstrs, rep, Jkind.Builtin.value_or_null ~why:(Primitive Predef.ident_or_null)
+      let payload =
+        List.find_opt
+          (fun cd ->
+             match cd.Types.cd_args with
+             | Cstr_tuple [_] -> true
+             | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
+               false)
+          cstrs
+      in
+      begin match payload with
+      | Some
+          ({ Types.cd_uid;
+             cd_args =
+               Cstr_tuple
+                 [{ ca_type = ty; ca_modalities = modality }];
+             _
+           } as _payload) ->
+        let jkind = Ctype.type_jkind env ty in
+        let sort = Jkind.sort_of_jkind env jkind in
+        let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+        let cstrs =
+          List.map
+            (fun (cstr : Types.constructor_declaration) ->
+               if Uid.equal cstr.cd_uid cd_uid then
+                 match cstr.cd_args with
+                 | Cstr_tuple [{ ca_type; ca_modalities; ca_loc; _ }] ->
+                   { cstr with
+                     cd_args =
+                       Cstr_tuple
+                         [{ ca_type; ca_sort; ca_modalities; ca_loc }] }
+                 | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
+                   Misc.fatal_error "Invalid constructor for Variant_with_null"
+               else cstr)
+            cstrs
+        in
+        begin match
+          Jkind.apply_modality_l modality jkind
+          |> Jkind.apply_or_null_l
+        with
+        | Ok type_jkind -> cstrs, rep, type_jkind
+        | Error () ->
+          Misc.fatal_error
+            "Typedecl.update_variant_kind: Variant_with_null payload is \
+             already maybe-null"
+        end
+      | Some _ | None ->
+        Misc.fatal_error "Invalid constructor for Variant_with_null"
+      end
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin
         match cd_args with
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
@@ -5080,6 +5231,8 @@ let report_error_doc ppf = function
            effect. Consider removing it or adding a type@ \
            variable for it to operate on.@]"
         Style.inline_code "[@layout_poly]"
+  | Bad_or_null_attribute msg ->
+      fprintf ppf "@[Invalid [@@or_null] declaration:@ %s.@]" msg
   | Zero_alloc_attr_unsupported ca ->
       let variety = match ca with
         | Default_zero_alloc  | Check _ -> assert false

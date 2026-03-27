@@ -122,6 +122,7 @@ let builtin_attrs =
   ; "only_generative_effects"
   ; "error_message"
   ; "layout_poly"
+  ; "or_null"
   ; "or_null_reexport"
   ; "no_recursive_modalities"
   ; "jane.non_erasable.instances"
@@ -685,6 +686,9 @@ let curry_attr_name = "extension.curry"
 let has_curry attrs =
   has_attribute curry_attr_name attrs
   || has_attribute "curry" attrs
+
+let has_or_null attrs =
+  has_attribute "or_null" attrs
 
 let has_or_null_reexport attrs =
   has_attribute "or_null_reexport" attrs

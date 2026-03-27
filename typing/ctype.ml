@@ -2532,14 +2532,23 @@ let unbox_once env ty =
                                    modality = ld.ld_modalities }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
-        | Type_variant ([_; cd2], Variant_with_null, _) ->
-          begin match cd2.cd_args with
-          | Cstr_tuple [arg] ->
-            (* [arg.ca_modalities] is currently always empty, but won't be
-               when we let users define custom or-null-like types. *)
-            Stepped_or_null { ty = apply arg.ca_type ~extra_substs:[];
-                              modality = arg.ca_modalities }
-          | _ -> Misc.fatal_error "Invalid constructor for Variant_with_null"
+        | Type_variant (cstrs, Variant_with_null, _) ->
+          let payload =
+            List.find_opt
+              (fun cd ->
+                 match cd.cd_args with
+                 | Cstr_tuple [_] -> true
+                 | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
+                   false)
+              cstrs
+          in
+          begin match payload with
+          | Some { cd_args = Cstr_tuple [arg]; _ } ->
+            Stepped_or_null
+              { ty = apply arg.ca_type ~extra_substs:[];
+                modality = arg.ca_modalities }
+          | Some _ | None ->
+            Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
           Final_result

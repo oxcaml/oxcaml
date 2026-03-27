@@ -111,6 +111,13 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
   let cstr_shapes_and_arg_jkinds, is_unboxed =
+    let variant_with_null_shape cstr =
+      match cstr.cd_args with
+      | Cstr_tuple [] -> Constructor_uniform_value, [| |]
+      | Cstr_tuple [{ ca_sort = sort }] -> Constructor_uniform_value, [| sort |]
+      | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
+        Misc.fatal_error "Invalid constructor for Variant_with_null"
+    in
     match rep, cstrs with
     | Variant_extensible, _ -> assert false
     | Variant_boxed x, _ -> x, false
@@ -134,12 +141,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     | Variant_unboxed, ([] | _ :: _) ->
       Misc.fatal_error "Multiple or 0 constructors in [@@unboxed] variant"
     | Variant_with_null, _ ->
-      (* CR layouts v3.5: this hardcodes ['a or_null]. Fix when we allow
-         users to write their own null constructors. *)
-      (* CR layouts v3.3: generalize to [any]. *)
-      [| Constructor_uniform_value, [| |]
-       ; Constructor_uniform_value, [| Jkind_types.Sort.Const.value |] |],
-      false
+      Array.of_list (List.map variant_with_null_shape cstrs), false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
@@ -169,9 +171,13 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       else nonconst_tag, const_tag, 1 + nonconst_tag
     in
     let cstr_tag =
-      match rep, cstr_constant with
-      | Variant_with_null, true -> Null
-      | _, _ ->  Ordinary {src_index; runtime_tag}
+      match rep, cd_args with
+      | Variant_with_null, Cstr_tuple [] -> Null
+      | Variant_with_null, (Cstr_tuple [_] | Cstr_record [_]) ->
+        Ordinary {src_index; runtime_tag}
+      | Variant_with_null, (Cstr_tuple (_ :: _ :: _) | Cstr_record []) ->
+        Misc.fatal_error "Invalid constructor for Variant_with_null"
+      | _, _ -> Ordinary {src_index; runtime_tag}
     in
     let cstr_existentials, cstr_args, cstr_inlined =
       (* This is the representation of the inner record, IF there is one *)
