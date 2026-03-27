@@ -648,3 +648,715 @@ let foo (f @ writing) = (f : @ corruptable)
 [%%expect{|
 val foo : 'a @ writing -> 'a = <fun>
 |}]
+
+(* Modalities: contention. *)
+
+type 'a uncontended = { uncontended : 'a @@ uncontended }
+type 'a shared = { shared : 'a @@ shared }
+type 'a corrupted = { corrupted : 'a @@ corrupted }
+type 'a contended = { contended : 'a @@ contended }
+
+[%%expect{|
+type 'a uncontended = { uncontended : 'a; }
+type 'a shared = { shared : 'a @@ shared; }
+type 'a corrupted = { corrupted : 'a @@ corrupted; }
+type 'a contended = { contended : 'a @@ contended; }
+|}]
+
+let f (x @ uncontended) = { uncontended = x }
+
+[%%expect{|
+val f : 'a -> 'a uncontended = <fun>
+|}]
+
+let f (x @ shared) = { uncontended = x }
+
+[%%expect{|
+val f : 'a @ shared -> 'a uncontended @ shared = <fun>
+|}]
+
+let f (x @ corrupted) = { uncontended = x }
+
+[%%expect{|
+val f : 'a @ corrupted -> 'a uncontended @ corrupted = <fun>
+|}]
+
+let f (x @ contended) = { uncontended = x }
+
+[%%expect{|
+val f : 'a @ contended -> 'a uncontended @ contended = <fun>
+|}]
+
+let f (x @ uncontended) = { shared = x }
+
+[%%expect{|
+val f : 'a -> 'a shared = <fun>
+|}]
+
+let f (x @ shared) = { shared = x }
+
+[%%expect{|
+val f : 'a @ shared -> 'a shared = <fun>
+|}]
+
+let f (x @ corrupted) = { shared = x }
+
+[%%expect{|
+val f : 'a @ corrupted -> 'a shared @ corrupted = <fun>
+|}]
+
+let f (x @ contended) = { shared = x }
+
+[%%expect{|
+val f : 'a @ contended -> 'a shared @ corrupted = <fun>
+|}]
+
+let f (x @ uncontended) = { corrupted = x }
+
+[%%expect{|
+val f : 'a -> 'a corrupted = <fun>
+|}]
+
+let f (x @ shared) = { corrupted = x }
+
+[%%expect{|
+val f : 'a @ shared -> 'a corrupted @ shared = <fun>
+|}]
+
+let f (x @ corrupted) = { corrupted = x }
+
+[%%expect{|
+val f : 'a @ corrupted -> 'a corrupted = <fun>
+|}]
+
+let f (x @ contended) = { corrupted = x }
+
+[%%expect{|
+val f : 'a @ contended -> 'a corrupted @ shared = <fun>
+|}]
+
+let f (x @ uncontended) = { contended = x }
+
+[%%expect{|
+val f : 'a -> 'a contended = <fun>
+|}]
+
+let f (x @ shared) = { contended = x }
+
+[%%expect{|
+val f : 'a @ shared -> 'a contended = <fun>
+|}]
+
+let f (x @ corrupted) = { contended = x }
+
+[%%expect{|
+val f : 'a @ corrupted -> 'a contended = <fun>
+|}]
+
+let f (x @ contended) = { contended = x }
+
+[%%expect{|
+val f : 'a @ contended -> 'a contended = <fun>
+|}]
+
+let f { uncontended = x } = (x : @ uncontended)
+
+[%%expect{|
+val f : 'a uncontended -> 'a = <fun>
+|}]
+
+let f { uncontended = x } = (x : @ shared)
+
+[%%expect{|
+val f : 'a uncontended -> 'a @ shared = <fun>
+|}]
+
+let f { uncontended = x } = (x : @ corrupted)
+
+[%%expect{|
+val f : 'a uncontended -> 'a @ corrupted = <fun>
+|}]
+
+let f { uncontended = x } = (x : @ contended)
+
+[%%expect{|
+val f : 'a uncontended -> 'a @ contended = <fun>
+|}]
+
+let f { shared = x } = (x : @ uncontended)
+
+[%%expect{|
+Line 1, characters 24-25:
+1 | let f { shared = x } = (x : @ uncontended)
+                            ^
+Error: This value is "shared"
+         because it is the field "shared" (with some modality) of the record at line 1, characters 6-20.
+       However, the highlighted expression is expected to be "uncontended".
+|}]
+
+let f { shared = x } = (x : @ shared)
+
+[%%expect{|
+val f : 'a shared -> 'a @ shared = <fun>
+|}]
+
+let f { shared = x } = (x : @ corrupted)
+
+[%%expect{|
+Line 1, characters 24-25:
+1 | let f { shared = x } = (x : @ corrupted)
+                            ^
+Error: This value is "shared"
+         because it is the field "shared" (with some modality) of the record at line 1, characters 6-20.
+       However, the highlighted expression is expected to be "corrupted" or "uncontended".
+|}]
+
+let f { shared = x } = (x : @ contended)
+
+[%%expect{|
+val f : 'a shared -> 'a @ contended = <fun>
+|}]
+
+let f { corrupted = x } = (x : @ uncontended)
+
+[%%expect{|
+Line 1, characters 27-28:
+1 | let f { corrupted = x } = (x : @ uncontended)
+                               ^
+Error: This value is "corrupted"
+         because it is the field "corrupted" (with some modality) of the record at line 1, characters 6-23.
+       However, the highlighted expression is expected to be "uncontended".
+|}]
+
+let f { corrupted = x } = (x : @ shared)
+
+[%%expect{|
+Line 1, characters 27-28:
+1 | let f { corrupted = x } = (x : @ shared)
+                               ^
+Error: This value is "corrupted"
+         because it is the field "corrupted" (with some modality) of the record at line 1, characters 6-23.
+       However, the highlighted expression is expected to be "shared" or "uncontended".
+|}]
+
+let f { corrupted = x } = (x : @ corrupted)
+
+[%%expect{|
+val f : 'a corrupted -> 'a @ corrupted = <fun>
+|}]
+
+let f { corrupted = x } = (x : @ contended)
+
+[%%expect{|
+val f : 'a corrupted -> 'a @ contended = <fun>
+|}]
+
+let f { contended = x } = (x : @ uncontended)
+
+[%%expect{|
+Line 1, characters 27-28:
+1 | let f { contended = x } = (x : @ uncontended)
+                               ^
+Error: This value is "contended"
+         because it is the field "contended" (with some modality) of the record at line 1, characters 6-23.
+       However, the highlighted expression is expected to be "uncontended".
+|}]
+
+let f { contended = x } = (x : @ shared)
+
+[%%expect{|
+Line 1, characters 27-28:
+1 | let f { contended = x } = (x : @ shared)
+                               ^
+Error: This value is "contended"
+         because it is the field "contended" (with some modality) of the record at line 1, characters 6-23.
+       However, the highlighted expression is expected to be "shared" or "uncontended".
+|}]
+
+let f { contended = x } = (x : @ corrupted)
+
+[%%expect{|
+Line 1, characters 27-28:
+1 | let f { contended = x } = (x : @ corrupted)
+                               ^
+Error: This value is "contended"
+         because it is the field "contended" (with some modality) of the record at line 1, characters 6-23.
+       However, the highlighted expression is expected to be "corrupted" or "uncontended".
+|}]
+
+let f { contended = x } = (x : @ contended)
+
+[%%expect{|
+val f : 'a contended -> 'a @ contended = <fun>
+|}]
+
+(* Modalities: portability. *)
+
+type 'a nonportable = { nonportable : 'a @@ nonportable }
+type 'a shareable = { shareable : 'a @@ shareable }
+type 'a corruptable = { corruptable : 'a @@ corruptable }
+type 'a portable = { portable : 'a @@ portable }
+
+[%%expect{|
+type 'a nonportable = { nonportable : 'a; }
+type 'a shareable = { shareable : 'a @@ shareable; }
+type 'a corruptable = { corruptable : 'a @@ corruptable; }
+type 'a portable = { portable : 'a @@ portable; }
+|}]
+
+let f (x @ nonportable) = { nonportable = x }
+
+[%%expect{|
+val f : 'a -> 'a nonportable = <fun>
+|}]
+
+let f (x @ shareable) = { nonportable = x }
+
+[%%expect{|
+val f : 'a @ shareable -> 'a nonportable = <fun>
+|}]
+
+let f (x @ corruptable) = { nonportable = x }
+
+[%%expect{|
+val f : 'a @ corruptable -> 'a nonportable = <fun>
+|}]
+
+let f (x @ portable) = { nonportable = x }
+
+[%%expect{|
+val f : 'a @ portable -> 'a nonportable = <fun>
+|}]
+
+let f (x @ nonportable) = { shareable = x }
+
+[%%expect{|
+Line 1, characters 40-41:
+1 | let f (x @ nonportable) = { shareable = x }
+                                            ^
+Error: This value is "nonportable"
+       but is expected to be "shareable"
+         because it is the field "shareable" (with some modality) of the record at line 1, characters 26-43.
+|}]
+
+let f (x @ shareable) = { shareable = x }
+
+[%%expect{|
+val f : 'a @ shareable -> 'a shareable = <fun>
+|}]
+
+let f (x @ corruptable) = { shareable = x }
+
+[%%expect{|
+Line 1, characters 40-41:
+1 | let f (x @ corruptable) = { shareable = x }
+                                            ^
+Error: This value is "corruptable"
+       but is expected to be "shareable"
+         because it is the field "shareable" (with some modality) of the record at line 1, characters 26-43.
+|}]
+
+let f (x @ portable) = { shareable = x }
+
+[%%expect{|
+val f : 'a @ portable -> 'a shareable = <fun>
+|}]
+
+let f (x @ nonportable) = { corruptable = x }
+
+[%%expect{|
+Line 1, characters 42-43:
+1 | let f (x @ nonportable) = { corruptable = x }
+                                              ^
+Error: This value is "nonportable"
+       but is expected to be "corruptable"
+         because it is the field "corruptable" (with some modality) of the record at line 1, characters 26-45.
+|}]
+
+let f (x @ shareable) = { corruptable = x }
+
+[%%expect{|
+Line 1, characters 40-41:
+1 | let f (x @ shareable) = { corruptable = x }
+                                            ^
+Error: This value is "shareable"
+       but is expected to be "corruptable"
+         because it is the field "corruptable" (with some modality) of the record at line 1, characters 24-43.
+|}]
+
+let f (x @ corruptable) = { corruptable = x }
+
+[%%expect{|
+val f : 'a @ corruptable -> 'a corruptable = <fun>
+|}]
+
+let f (x @ portable) = { corruptable = x }
+
+[%%expect{|
+val f : 'a @ portable -> 'a corruptable = <fun>
+|}]
+
+let f (x @ nonportable) = { portable = x }
+
+[%%expect{|
+Line 1, characters 39-40:
+1 | let f (x @ nonportable) = { portable = x }
+                                           ^
+Error: This value is "nonportable"
+       but is expected to be "portable"
+         because it is the field "portable" (with some modality) of the record at line 1, characters 26-42.
+|}]
+
+let f (x @ shareable) = { portable = x }
+
+[%%expect{|
+Line 1, characters 37-38:
+1 | let f (x @ shareable) = { portable = x }
+                                         ^
+Error: This value is "shareable"
+       but is expected to be "portable"
+         because it is the field "portable" (with some modality) of the record at line 1, characters 24-40.
+|}]
+
+let f (x @ corruptable) = { portable = x }
+
+[%%expect{|
+Line 1, characters 39-40:
+1 | let f (x @ corruptable) = { portable = x }
+                                           ^
+Error: This value is "corruptable"
+       but is expected to be "portable"
+         because it is the field "portable" (with some modality) of the record at line 1, characters 26-42.
+|}]
+
+let f (x @ portable) = { portable = x }
+
+[%%expect{|
+val f : 'a @ portable -> 'a portable = <fun>
+|}]
+
+let f { nonportable = x } = (x : @ nonportable)
+
+[%%expect{|
+val f : 'a nonportable -> 'a = <fun>
+|}]
+
+let f { nonportable = x } = (x : @ shareable)
+
+[%%expect{|
+val f : 'a nonportable @ shareable -> 'a = <fun>
+|}]
+
+let f { nonportable = x } = (x : @ corruptable)
+
+[%%expect{|
+val f : 'a nonportable @ corruptable -> 'a = <fun>
+|}]
+
+let f { nonportable = x } = (x : @ portable)
+
+[%%expect{|
+val f : 'a nonportable @ portable -> 'a = <fun>
+|}]
+
+let f { shareable = x } = (x : @ nonportable)
+
+[%%expect{|
+val f : 'a shareable -> 'a = <fun>
+|}]
+
+let f { shareable = x } = (x : @ shareable)
+
+[%%expect{|
+val f : 'a shareable -> 'a = <fun>
+|}]
+
+let f { shareable = x } = (x : @ corruptable)
+
+[%%expect{|
+val f : 'a shareable @ corruptable -> 'a = <fun>
+|}]
+
+let f { shareable = x } = (x : @ portable)
+
+[%%expect{|
+val f : 'a shareable @ corruptable -> 'a = <fun>
+|}]
+
+let f { corruptable = x } = (x : @ nonportable)
+
+[%%expect{|
+val f : 'a corruptable -> 'a = <fun>
+|}]
+
+let f { corruptable = x } = (x : @ shareable)
+
+[%%expect{|
+val f : 'a corruptable @ shareable -> 'a = <fun>
+|}]
+
+let f { corruptable = x } = (x : @ corruptable)
+
+[%%expect{|
+val f : 'a corruptable -> 'a = <fun>
+|}]
+
+let f { corruptable = x } = (x : @ portable)
+
+[%%expect{|
+val f : 'a corruptable @ shareable -> 'a = <fun>
+|}]
+
+let f { portable = x } = (x : @ nonportable)
+
+[%%expect{|
+val f : 'a portable -> 'a = <fun>
+|}]
+
+let f { portable = x } = (x : @ shareable)
+
+[%%expect{|
+val f : 'a portable -> 'a = <fun>
+|}]
+
+let f { portable = x } = (x : @ corruptable)
+
+[%%expect{|
+val f : 'a portable -> 'a = <fun>
+|}]
+
+let f { portable = x } = (x : @ portable)
+
+[%%expect{|
+val f : 'a portable -> 'a = <fun>
+|}]
+
+(* Modality composition: contention. *)
+
+let f ({ uncontended } @ uncontended) = uncontended
+
+[%%expect{|
+val f : 'a uncontended -> 'a = <fun>
+|}]
+
+let f ({ uncontended } @ shared) = uncontended
+
+[%%expect{|
+val f : 'a uncontended @ shared -> 'a @ shared = <fun>
+|}]
+
+let f ({ uncontended } @ corrupted) = uncontended
+
+[%%expect{|
+val f : 'a uncontended @ corrupted -> 'a @ corrupted = <fun>
+|}]
+
+let f ({ uncontended } @ contended) = uncontended
+
+[%%expect{|
+val f : 'a uncontended @ contended -> 'a @ contended = <fun>
+|}]
+
+let f ({ shared } @ uncontended) = shared
+
+[%%expect{|
+val f : 'a shared -> 'a @ shared = <fun>
+|}]
+
+let f ({ shared } @ shared) = shared
+
+[%%expect{|
+val f : 'a shared @ shared -> 'a @ shared = <fun>
+|}]
+
+let f ({ shared } @ corrupted) = shared
+
+[%%expect{|
+val f : 'a shared @ corrupted -> 'a @ contended = <fun>
+|}]
+
+let f ({ shared } @ contended) = shared
+
+[%%expect{|
+val f : 'a shared @ contended -> 'a @ contended = <fun>
+|}]
+
+let f ({ corrupted } @ uncontended) = corrupted
+
+[%%expect{|
+val f : 'a corrupted -> 'a @ corrupted = <fun>
+|}]
+
+let f ({ corrupted } @ shared) = corrupted
+
+[%%expect{|
+val f : 'a corrupted @ shared -> 'a @ contended = <fun>
+|}]
+
+let f ({ corrupted } @ corrupted) = corrupted
+
+[%%expect{|
+val f : 'a corrupted @ corrupted -> 'a @ corrupted = <fun>
+|}]
+
+let f ({ corrupted } @ contended) = corrupted
+
+[%%expect{|
+val f : 'a corrupted @ contended -> 'a @ contended = <fun>
+|}]
+
+let f ({ contended } @ uncontended) = contended
+
+[%%expect{|
+val f : 'a contended -> 'a @ contended = <fun>
+|}]
+
+let f ({ contended } @ shared) = contended
+
+[%%expect{|
+val f : 'a contended @ shared -> 'a @ contended = <fun>
+|}]
+
+let f ({ contended } @ corrupted) = contended
+
+[%%expect{|
+val f : 'a contended @ corrupted -> 'a @ contended = <fun>
+|}]
+
+let f ({ contended } @ contended) = contended
+
+[%%expect{|
+val f : 'a contended @ contended -> 'a @ contended = <fun>
+|}]
+
+(* Modality composition: portability.
+
+   Note the return mode gets zapped to nonportable without an annotation. *)
+
+let f ({ nonportable } @ nonportable) = (nonportable : @ nonportable)
+
+[%%expect{|
+val f : 'a nonportable -> 'a = <fun>
+|}]
+
+let f ({ nonportable } @ shareable) = (nonportable : @ shareable)
+
+[%%expect{|
+val f : 'a nonportable @ shareable -> 'a = <fun>
+|}]
+
+let f ({ nonportable } @ corruptable) = (nonportable : @ corruptable)
+
+[%%expect{|
+val f : 'a nonportable @ corruptable -> 'a = <fun>
+|}]
+
+let f ({ nonportable } @ portable) = (nonportable : @ portable)
+
+[%%expect{|
+val f : 'a nonportable @ portable -> 'a = <fun>
+|}]
+
+let f ({ shareable } @ nonportable) = (shareable : @ shareable)
+
+[%%expect{|
+val f : 'a shareable -> 'a = <fun>
+|}]
+
+let f ({ shareable } @ shareable) = (shareable : @ shareable)
+
+[%%expect{|
+val f : 'a shareable @ shareable -> 'a = <fun>
+|}]
+
+let f ({ shareable } @ corruptable) = (shareable : @ portable)
+
+[%%expect{|
+val f : 'a shareable @ corruptable -> 'a = <fun>
+|}]
+
+let f ({ shareable } @ portable) = (shareable : @ portable)
+
+[%%expect{|
+val f : 'a shareable @ portable -> 'a = <fun>
+|}]
+
+let f ({ corruptable } @ nonportable) = (corruptable : @ corruptable)
+
+[%%expect{|
+val f : 'a corruptable -> 'a = <fun>
+|}]
+
+let f ({ corruptable } @ shareable) = (corruptable : @ portable)
+
+[%%expect{|
+val f : 'a corruptable @ shareable -> 'a = <fun>
+|}]
+
+let f ({ corruptable } @ corruptable) = (corruptable : @ corruptable)
+
+[%%expect{|
+val f : 'a corruptable @ corruptable -> 'a = <fun>
+|}]
+
+let f ({ corruptable } @ portable) = (corruptable : @ portable)
+
+[%%expect{|
+val f : 'a corruptable @ portable -> 'a = <fun>
+|}]
+
+let f ({ portable } @ nonportable) = (portable : @ portable)
+
+[%%expect{|
+val f : 'a portable -> 'a = <fun>
+|}]
+
+let f ({ portable } @ shareable) = (portable : @ portable)
+
+[%%expect{|
+val f : 'a portable @ shareable -> 'a = <fun>
+|}]
+
+let f ({ portable } @ corruptable) = (portable : @ portable)
+
+[%%expect{|
+val f : 'a portable @ corruptable -> 'a = <fun>
+|}]
+
+let f ({ portable } @ portable) = (portable : @ portable)
+
+[%%expect{|
+val f : 'a portable @ portable -> 'a = <fun>
+|}]
+
+(* Mode crossing: contention. *)
+
+let f : type (a : value mod shared). a @ contended -> a @ corrupted =
+  fun x -> x
+
+[%%expect{|
+val f : ('a : value mod shared). 'a @ contended -> 'a @ corrupted = <fun>
+|}]
+
+let f : type (a : value mod corrupted). a @ contended -> a @ shared =
+  fun x -> x
+
+[%%expect{|
+val f : ('a : value mod corrupted). 'a @ contended -> 'a @ shared = <fun>
+|}]
+
+(* Mode crossing: portability. *)
+
+let f : type (a : value mod shareable). a @ corruptable -> a @ portable =
+  fun x -> x
+
+[%%expect{|
+val f : ('a : value mod shareable). 'a @ corruptable -> 'a @ portable = <fun>
+|}]
+
+let f : type (a : value mod corruptable). a @ shareable -> a @ portable =
+  fun x -> x
+
+[%%expect{|
+val f : ('a : value mod corruptable). 'a @ shareable -> 'a @ portable = <fun>
+|}]
