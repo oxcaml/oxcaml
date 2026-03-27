@@ -60,13 +60,16 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       try Load_path.find obj_name
       with Not_found -> raise (Linkenv.Error (File_not_found obj_name))
     in
-    if Filename.check_suffix file_name Backend.ext_flambda_obj
+    let has_ext ext name = Filename.check_suffix name ext in
+    if has_ext Backend.ext_flambda_obj file_name
+    || has_ext Backend.ext_flambda_obj obj_name
     then
       (* This is a cmx file. It must be linked in any case. Read the infos to
          see which modules it requires. *)
       let info, crc = read_unit_info file_name in
       Unit (file_name, info, crc)
-    else if Filename.check_suffix file_name Backend.ext_flambda_lib
+    else if has_ext Backend.ext_flambda_lib file_name
+         || has_ext Backend.ext_flambda_lib obj_name
     then
       let infos =
         try read_library_info file_name
@@ -109,7 +112,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         }
       in
       let object_file_name =
-        Filename.chop_suffix file_name Backend.ext_flambda_obj ^ Backend.ext_obj
+        let obj_basename =
+          Filename.chop_suffix file Backend.ext_flambda_obj ^ Backend.ext_obj
+        in
+        try Load_path.find obj_basename
+        with Not_found ->
+          Filename.chop_suffix file_name Backend.ext_flambda_obj ^ Backend.ext_obj
       in
       Linkenv.check_consistency linkenv ~unit
         (Array.of_list info.ui_imports_cmi)
@@ -134,8 +142,14 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       Linkenv.check_cmx_consistency linkenv file_name infos.lib_imports_cmx;
       let objfiles =
         let obj_file =
-          Filename.chop_suffix file_name Backend.ext_flambda_lib
-          ^ Backend.ext_lib
+          let lib_basename =
+            Filename.chop_suffix file Backend.ext_flambda_lib
+            ^ Backend.ext_lib
+          in
+          try Load_path.find lib_basename
+          with Not_found ->
+            Filename.chop_suffix file_name Backend.ext_flambda_lib
+            ^ Backend.ext_lib
         in
         (* MSVC doesn't support empty .lib files, and macOS struggles to make
            them (#6550), so there shouldn't be one if the cmxa contains no

@@ -220,9 +220,15 @@ end = struct
   ;;
 end
 
-module For_testing = struct
-  exception Parse_error = Parse_error
+let iter_manifest_files manifest_path ~f =
+  let reader = Dune_manifests_reader.create () in
+  let manifest_path =
+    Dune_manifests_reader.Path.Load_root_relative.of_string manifest_path
+  in
+  Dune_manifests_reader.iter_manifest reader ~manifest_path ~f:(fun ~filename ~location ->
+    f ~filename ~location:(Dune_manifests_reader.Path.Cwd_relative.to_string location))
 
+module For_testing = struct
   let split_and_unescape = split_and_unescape
 
   let set_manifest_files_root path =

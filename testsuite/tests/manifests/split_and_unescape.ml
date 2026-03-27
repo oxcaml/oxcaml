@@ -11,7 +11,7 @@ let print_result input =
     let result = Load_path.For_testing.split_and_unescape ~buffer input in
     Printf.printf "[%s]\n" (String.concat "; " (List.map (Printf.sprintf "%S") result))
   with
-  | Load_path.For_testing.Parse_error msg ->
+  | Load_path.Parse_error msg ->
     Printf.printf "Parse_error(%S)\n" msg
 ;;
 

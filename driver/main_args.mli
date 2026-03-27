@@ -147,6 +147,7 @@ module type Compiler_options = sig
   val _where : unit -> unit
   val _color : string -> unit
   val _error_style : string -> unit
+  val _manifest : string -> unit
 
   val _match_context_rows : int -> unit
   val _dtimings : unit -> unit

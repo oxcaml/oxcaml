@@ -114,9 +114,15 @@ val get_visible : unit -> dirs_and_files
 (** Same as [get_paths ()], except that it returns a [Dir.t list], and doesn't
     include the -H paths. *)
 
-module For_testing : sig
-  exception Parse_error of string
+exception Parse_error of string
 
+(** [iter_manifest_files manifest_path ~f] reads the manifest file at [manifest_path]
+    (relative to [$MANIFEST_FILES_ROOT]) and calls [f] for each file entry. [filename] is
+    the visible/logical name from the manifest; [location] is the resolved filesystem path
+    (cwd-relative). Raises [Parse_error] on malformed manifest lines. *)
+val iter_manifest_files : string -> f:(filename:string -> location:string -> unit) -> unit
+
+module For_testing : sig
   val split_and_unescape : buffer:Buffer.t -> string -> string list
   val set_manifest_files_root : string option -> unit
 end

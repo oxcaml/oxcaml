@@ -202,6 +202,12 @@ let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
   \    paths to the list of \"hidden\" files (see -H for more details)"
 
+let mk_manifest f =
+  "-manifest", Arg.String f, "<file>  Get input files for linking from a\n\
+  \    given manifest file. Uses the same manifest format as -I-manifest.\n\
+  \    Each 'file' entry specifies an object file to link, with paths\n\
+  \    relative to [$MANIFEST_FILES_ROOT]."
+
 let mk_impl f =
   "-impl", Arg.String f, "<file>  Compile <file> as a .ml file"
 
@@ -1205,6 +1211,7 @@ module type Compiler_options = sig
   val _where : unit -> unit
   val _color : string -> unit
   val _error_style : string -> unit
+  val _manifest : string -> unit
   val _match_context_rows : int -> unit
   val _dtimings : unit -> unit
   val _dtimings_precision : int -> unit
@@ -1509,6 +1516,7 @@ struct
     mk_warn_error F._warn_error;
     mk_warn_help F._warn_help;
     mk_where F._where;
+    mk_manifest F._manifest;
     mk__ F.anonymous;
 
     mk_match_context_rows F._match_context_rows;
@@ -1779,6 +1787,7 @@ struct
     mk_warn_error F._warn_error;
     mk_warn_help F._warn_help;
     mk_where F._where;
+    mk_manifest F._manifest;
     mk__ F.anonymous;
 
     mk_match_context_rows F._match_context_rows;
@@ -2067,6 +2076,7 @@ struct
     mk_warn_error F._warn_error;
     mk_warn_help F._warn_help;
     mk_where F._where;
+    mk_manifest F._manifest;
     mk__ F.anonymous;
 
     mk_match_context_rows F._match_context_rows;
@@ -2459,6 +2469,21 @@ module Default = struct
     let _keep_locs = set keep_locs
     let _linkall = set link_everything
     let _llvm_backend = set llvm_backend
+
+    let _manifest file =
+      match
+        Load_path.iter_manifest_files file ~f:(fun ~filename ~location:_ ->
+          Compenv.defer (ProcessOtherFile filename))
+      with
+      | () -> ()
+      | exception exn ->
+        raise
+          (Arg.Bad
+             (Printf.sprintf
+                "Error reading manifest %s: %s"
+                file
+                (Printexc.to_string exn)))
+
     let _match_context_rows n = match_context_rows := n
     let _no_keep_docs = clear keep_docs
     let _no_keep_locs = clear keep_locs
