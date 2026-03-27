@@ -36,7 +36,6 @@ Error: This expression has type "int list list list t"
        The kind of int list list list t is
            immutable_data
              with int list list list
-
              with int list list list list list list list list list list list list list
                     @@
                     portable
@@ -73,7 +72,6 @@ Error: This expression has type "int list list list Foo.t"
        The kind of int list list list Foo.t is
            immutable_data
              with int list list list
-
              with int list list list list list list list list list list list list list
                     @@
                     portable.

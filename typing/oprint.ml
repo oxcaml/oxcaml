@@ -660,6 +660,7 @@ and print_out_jkind_const ppf ojkind =
     | [] -> ()
     | withs ->
       pp_print_list
+        ~pp_sep:(fun _ () -> ())
         (fun ppf ->
            fprintf ppf "@ with @[<hv 2>%a@]"
              (pp_print_list ~pp_sep:pp_print_space pp_print_string))
