@@ -168,7 +168,9 @@ let rec_catch_for_for_loop env loc ident duid start stop
   let lam : L.lambda =
     (* The loop counter operates on naked int64 values, avoiding overflow when
        incrementing past max_int or decrementing past min_int, since tagged ints
-       fit in 63 bits but we operate in 64. *)
+       fit in 63 bits but we operate in 64. This enables us to avoid the problem
+       of having two branch instructions (one conditional and one unconditional)
+       at the end of "for" loops. *)
     Llet
       ( Strict,
         L.layout_int,
