@@ -332,6 +332,14 @@ module Module_type : sig
   val of_string : string -> t
 end
 
+module Modes : sig
+  type t
+
+  val legacy : t
+
+  val of_string_list : string list -> t
+end
+
 module rec Object_type : sig
   module Object_closed_flag : sig
     type t
@@ -383,7 +391,7 @@ and Type : sig
 
   val var : Var.Type_var.t option -> t
 
-  val arrow : Label.t -> t -> t -> t
+  val arrow : Label.t -> t -> Modes.t -> t -> Modes.t -> t
 
   val tuple : (Label.Nonoptional.t * t) list -> t
 
@@ -447,7 +455,7 @@ module Pat : sig
 
   val exception_ : t -> t
 
-  val constraint_ : t -> Type.t -> t
+  val constraint_ : t -> Type.t -> Modes.t -> t
 end
 
 module Exp_attribute : sig
@@ -512,7 +520,7 @@ end
 and Type_constraint : sig
   type t
 
-  val constraint_ : Type.t -> t
+  val constraint_ : Type.t -> Modes.t -> t
 
   val coercion : Type.t option -> Type.t -> t
 end
@@ -669,7 +677,6 @@ and Exp_desc : sig
 
   val splice : Code.t -> t
 
-  val eval : Type.t -> t
 end
 
 and Exp : sig

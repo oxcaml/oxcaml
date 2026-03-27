@@ -75,7 +75,7 @@ Error: This expression has type "<[int]> eval" = "int"
 (* Printing *)
 let f (x : <['a]> expr) = eval x
 [%%expect {|
-val f : ('a : any). 'a expr -> 'a eval = <fun>
+val f : 'a expr -> 'a eval = <fun>
 |}]
 let f (x : <[int]> expr) = eval x
 [%%expect {|
@@ -97,35 +97,41 @@ val f : <[($('a), $('b)) Either.t]> expr -> ('a eval, 'b eval) Either.t =
   <fun>
 |}]
 (* non-top-level type constructor -- locally abstract type *)
-(* CR metaprogramming jbachurski: This should not state [<[t]> eval = t]. *)
 let _ = <[ fun (type t) (x : t) -> $(eval <[ x ]>) ]>
 [%%expect {|
 Line 1, characters 36-50:
 1 | let _ = <[ fun (type t) (x : t) -> $(eval <[ x ]>) ]>
                                         ^^^^^^^^^^^^^^
-Error: This expression has type "<[t]> eval" = "t"
+Error: This expression has type "<[t]> eval"
        but an expression was expected of type "<['a]> expr"
 |}]
 
 (* Arrows *)
 let f (x : <[$('a) -> $('b)]> expr) : 'a eval -> 'b eval = eval x
 [%%expect {|
-val f : <[$('a) -> $('b)]> expr -> 'a eval -> 'b eval = <fun>
+val f : ('a : any) ('b : any). <[$('a) -> $('b)]> expr -> 'a eval -> 'b eval =
+  <fun>
 |}]
 let f (x : <[l:$('a) -> $('b)]> expr) : l:('a eval) -> 'b eval = eval x
 [%%expect {|
-val f : <[l:$('a) -> $('b)]> expr -> l:'a eval -> 'b eval = <fun>
+val f :
+  ('a : any) ('b : any). <[l:$('a) -> $('b)]> expr -> l:'a eval -> 'b eval =
+  <fun>
 |}]
 let f (x : <[?l:$('a) -> $('b)]> expr) : ?l:('a eval) -> 'b eval = eval x
 [%%expect {|
-val f : <[?l:$('a) -> $('b)]> expr -> ?l:'a eval -> 'b eval = <fun>
+val f :
+  ('a : any) ('b : any). <[?l:$('a) -> $('b)]> expr -> ?l:'a eval -> 'b eval =
+  <fun>
 |}]
 let f (x : <[$('a) @ local -> $('b) @ local]> expr)
     : 'a eval @ local -> 'b eval @ local = eval x
 [%%expect {|
 val f :
-  <[$('a) @ local -> $('b) @ local]> expr ->
-  'a eval @ local -> 'b eval @ local = <fun>
+  ('a : any) ('b : any).
+    <[$('a) @ local -> $('b) @ local]> expr ->
+    'a eval @ local -> 'b eval @ local =
+  <fun>
 |}]
 
 (* Tuples *)
@@ -139,8 +145,16 @@ val f : <[$('a) * $('b) * $('c)]> expr -> 'a eval * 'b eval * 'c eval = <fun>
 let f (x : <[#($('a) * $('b) * $('c))]> expr)
     : #('a eval * 'b eval * 'c eval) = eval x
 [%%expect {|
-val f : <[#($('a) * $('b) * $('c))]> expr -> #('a eval * 'b eval * 'c eval) =
-  <fun>
+Line 2, characters 44-45:
+2 |     : #('a eval * 'b eval * 'c eval) = eval x
+                                                ^
+Error: This expression has type "<[#($('a) * $('b) * $('c))]> expr"
+       but an expression was expected of type "'d expr"
+       The layout of <[#($('a) * $('b) * $('c))]> is any & any & any
+         because it is an unboxed tuple.
+       But the layout of <[#($('a) * $('b) * $('c))]> must be a sublayout of
+           value
+         because of the definition of eval at line 7, characters 2-31.
 |}]
 
 (* Objects *)
@@ -148,9 +162,7 @@ val f : <[#($('a) * $('b) * $('c))]> expr -> #('a eval * 'b eval * 'c eval) =
 let f (x : <[ <a: $('a); b: $('b)> ]> expr)
     : <a: 'a eval; b: 'b eval> = eval x
 [%%expect {|
-val f :
-  ('a : any) ('b : any).
-    <[< a : $('a); b : $('b) >]> expr -> < a : 'a eval; b : 'b eval > =
+val f : <[< a : $('a); b : $('b) >]> expr -> < a : 'a eval; b : 'b eval > =
   <fun>
 |}]
 (* error! open object should not eval *)
@@ -172,10 +184,8 @@ let f (x : <[ <a: $('a); b: $('b); ..> ]> expr)
       ignore (x : <[ <a: _; b: _; c: int > ]> expr); y
 [%%expect {|
 val f :
-  ('a : any) ('b : any).
-    <[< a : $('a); b : $('b); c : int >]> expr ->
-    < a : 'a eval; b : 'b eval; c : int > =
-  <fun>
+  <[< a : $('a); b : $('b); c : int >]> expr ->
+  < a : 'a eval; b : 'b eval; c : int > = <fun>
 |}]
 (* polymorphic methods *)
 let f (x : <[ <a: 'c. 'c -> $('a); b: 'd. 'd -> $('b)> ]> expr)
@@ -322,8 +332,6 @@ module S () = struct
   end
 end
 #mark_toplevel_in_quotations
-(* CR metaprogramming jbachurski: This should not state that
-   [<[(module Z.T)]> eval = (module Z.T)]. *)
 let _ = <[
   (* It is illegal to write [S()] in a type, so we have an intermediate [Z]. *)
   let module Z = S () in
@@ -331,14 +339,12 @@ let _ = <[
   fun (type t) (module M : Z.T) -> $(eval <[ (module M : Z.T) ]>) ]>
 [%%expect {|
 module S : functor () -> sig module type T = sig type s end end
-Line 13, characters 36-65:
-13 |   fun (type t) (module M : Z.T) -> $(eval <[ (module M : Z.T) ]>) ]>
+Line 11, characters 36-65:
+11 |   fun (type t) (module M : Z.T) -> $(eval <[ (module M : Z.T) ]>) ]>
                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "<[(module Z.T)]> eval" = "(module Z.T)"
+Error: This expression has type "<[(module Z.T)]> eval"
        but an expression was expected of type "<['a]> expr"
 |}]
-(* CR metaprogramming jbachurski: As above, but also the package constraint
-   should say [s = <[t]> eval] and not [s = t]. *)
 let _ = <[
   let module Z = S () in
   fun (type t) (module M : Z.T with type s = t) ->
@@ -347,8 +353,7 @@ let _ = <[
 Line 4, characters 6-51:
 4 |      $(eval <[ (module M : Z.T with type s = t) ]>) ]>
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type
-         "<[(module Z.T with type s = t)]> eval" = "(module Z.T with type s = t)"
+Error: This expression has type "<[(module Z.T with type s = t)]> eval"
        but an expression was expected of type "<['a]> expr"
 |}]
 
@@ -509,7 +514,7 @@ module QuoteKindedParam : sig type 'a t end
 (* [expr] should not reduce, as it has a quote-kinded parameter *)
 let f (x : <[$('a) expr]> eval) : 'a eval expr = x
 [%%expect {|
-val f : 'a eval expr -> 'a eval expr = <fun>
+val f : ('a : any). 'a eval expr -> 'a eval expr = <fun>
 |}]
 let f (x : <[<[int]> expr]> eval) : <[<[int]>]> eval expr = x
 [%%expect {|
@@ -531,7 +536,7 @@ Error: This expression has type "<['a eval]> eval"
 |}]
 let f (x : <[$('a) eval]> eval) = x
 [%%expect {|
-val f : ('a : any). <[$('a) eval]> eval -> <[$('a) eval]> eval = <fun>
+val f : <[$('a) eval]> eval -> <[$('a) eval]> eval = <fun>
 |}]
 (* The inner eval is allowed to reduce on [int], but not the outer on [<[int]> eval]. *)
 let f (x : <[<[int]> eval]> eval) : <[<[int]>]> eval eval = x

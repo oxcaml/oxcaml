@@ -61,6 +61,7 @@ let current_unit =
     ui_format = ();
     ui_generic_fns = { curry_fun = []; apply_fun = []; send_fun = [] };
     ui_force_link = false;
+    ui_requires_metaprogramming = false;
     ui_zero_alloc_info = Zero_alloc_info.create ();
     ui_export_info = None;
     ui_external_symbols = [];
@@ -81,6 +82,8 @@ let reset unit_info =
   current_unit.ui_generic_fns <-
     { curry_fun = []; apply_fun = []; send_fun = [] };
   current_unit.ui_force_link <- !Clflags.link_everything;
+  current_unit.ui_requires_metaprogramming <-
+    !Clflags.requires_metaprogramming;
   Zero_alloc_info.reset current_unit.ui_zero_alloc_info;
   Hashtbl.clear exported_constants;
   current_unit.ui_export_info <- None;
@@ -125,6 +128,7 @@ let read_unit_info filename =
       ui_export_info = export_info;
       ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
       ui_force_link = uir.uir_force_link;
+      ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
     }
     in
@@ -285,6 +289,7 @@ let write_unit_info info filename =
     uir_export_info = raw_export_info;
     uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
     uir_force_link = info.ui_force_link;
+    uir_requires_metaprogramming = info.ui_requires_metaprogramming;
     uir_section_toc = toc;
     uir_sections_length = total_length;
     uir_external_symbols = Array.of_list info.ui_external_symbols;

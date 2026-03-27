@@ -2827,6 +2827,9 @@ module Format_history = struct
       fprintf ppf
         "the compiler failed to deduce its exact kind@ due to with-bound \
          checking limitations"
+    | Inside_quote ->
+      fprintf ppf "it's the type of an expression inside of a quote"
+    | Evaluated_quote -> fprintf ppf "it's the result of evaluating a quote"
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -2933,14 +2936,7 @@ module Format_history = struct
     | Debug_printer_argument ->
       format_with_notify_js ppf
         "it's the type of an argument to a debugger printer function"
-    | Quotation_result -> fprintf ppf "it's the result type of a quotation"
-    | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
-    | Evaluation_result ->
-      fprintf ppf "it's the result of evaluating a quotation"
-    | Tquote -> fprintf ppf "it's a staged type"
-    | Tsplice -> fprintf ppf "it's a splice of a staged type"
-    | Tquote_eval ->
-      fprintf ppf "it's the result of evaluating a staged program"
+    | Quoted_expression -> fprintf ppf "it's the type of a quoted expression"
     | Unknown s ->
       fprintf ppf
         "unknown @[(please alert the Jane Street@;\
@@ -3741,6 +3737,8 @@ module Debug_printers = struct
         parent_path
     | Overapproximation_of_with_bounds ->
       fprintf ppf "Overapproximation_of_with_bounds"
+    | Inside_quote -> fprintf ppf "Inside_quote"
+    | Evaluated_quote -> fprintf ppf "Evaluated_quote"
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function
@@ -3805,12 +3803,7 @@ module Debug_printers = struct
     | Class_type_argument -> fprintf ppf "Class_type_argument"
     | Class_term_argument -> fprintf ppf "Class_term_argument"
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
-    | Quotation_result -> fprintf ppf "Quotation_result"
-    | Antiquotation_result -> fprintf ppf "Antiquotation_result"
-    | Evaluation_result -> fprintf ppf "Evaluation_result"
-    | Tquote -> fprintf ppf "Tquote"
-    | Tsplice -> fprintf ppf "Tsplice"
-    | Tquote_eval -> fprintf ppf "Tquote_eval"
+    | Quoted_expression -> fprintf ppf "Quoted_expression"
     | Unknown s -> fprintf ppf "Unknown %s" s
     | Array_type_kind -> fprintf ppf "Array_type_kind"
 

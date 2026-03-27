@@ -2666,9 +2666,6 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_antiquotation e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.antiquote uf
-  | Texp_eval _ ->
-    (* CR metaprogramming mshinwell: Make sure this is correct *)
-    UF.unused
 
 and check_uniqueness_exp ~borrows ~overwrite (ienv : Ienv.t) exp : UF.t =
   let loc = exp.exp_loc in

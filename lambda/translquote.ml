@@ -534,6 +534,34 @@ end = struct
       (Lconst (Const_base (Const_unboxed_nativeint x)))
 end
 
+module Modes : sig
+  type s
+
+  type t' = s lazy_t
+
+  type t = s lam
+
+  val wrap : t' -> t
+
+  val legacy : t'
+
+  val of_string_list : Debuginfo.Scoped_location.t -> string list -> t'
+end = struct
+  type s = lambda
+
+  type t' = s lazy_t
+
+  type t = s lam
+
+  let wrap = inject_force
+
+  let legacy = use "Modes" "legacy"
+
+  let of_string_list loc a1 =
+    apply1 "Modes" "of_string_list" loc
+      (mk_list ~loc (List.map (string ~loc) a1))
+end
+
 module Exp_attribute : sig
   type s
 
@@ -1436,7 +1464,8 @@ and Type : sig
 
   val var : Debuginfo.Scoped_location.t -> Var.Type_var.t option -> t'
 
-  val arrow : Debuginfo.Scoped_location.t -> Label.t -> t -> t -> t'
+  val arrow :
+    Debuginfo.Scoped_location.t -> Label.t -> t -> Modes.t -> t -> Modes.t -> t'
 
   val tuple :
     Debuginfo.Scoped_location.t -> (Label.Nonoptional.t * t) list -> t'
@@ -1479,8 +1508,9 @@ end = struct
 
   let var loc a1 = apply1 "Type" "var" loc (option ~loc (Option.map extract a1))
 
-  let arrow loc a1 a2 a3 =
-    apply3 "Type" "arrow" loc (extract a1) (extract a2) (extract a3)
+  let arrow loc a1 a2 a3 a4 a5 =
+    apply5 "Type" "arrow" loc (extract a1) (extract a2) (extract a3)
+      (extract a4) (extract a5)
 
   let tuple loc a1 =
     apply1 "Type" "tuple" loc
@@ -1564,7 +1594,7 @@ module Pat : sig
 
   val exception_ : Debuginfo.Scoped_location.t -> t -> t'
 
-  val constraint_ : Debuginfo.Scoped_location.t -> t -> Type.t -> t'
+  val constraint_ : Debuginfo.Scoped_location.t -> t -> Type.t -> Modes.t -> t'
 end = struct
   type s = lambda
 
@@ -1627,8 +1657,8 @@ end = struct
 
   let exception_ loc a1 = apply1 "Pat" "exception_" loc (extract a1)
 
-  let constraint_ loc a1 a2 =
-    apply2 "Pat" "constraint_" loc (extract a1) (extract a2)
+  let constraint_ loc a1 a2 a3 =
+    apply3 "Pat" "constraint_" loc (extract a1) (extract a2) (extract a3)
 end
 
 module rec Case : sig
@@ -1715,7 +1745,7 @@ and Type_constraint : sig
 
   val wrap : t' -> t
 
-  val constraint_ : Debuginfo.Scoped_location.t -> Type.t -> t'
+  val constraint_ : Debuginfo.Scoped_location.t -> Type.t -> Modes.t -> t'
 
   val coercion : Debuginfo.Scoped_location.t -> Type.t option -> Type.t -> t'
 end = struct
@@ -1727,8 +1757,8 @@ end = struct
 
   let wrap = inject_force
 
-  let constraint_ loc a1 =
-    apply1 "Type_constraint" "constraint_" loc (extract a1)
+  let constraint_ loc a1 a2 =
+    apply2 "Type_constraint" "constraint_" loc (extract a1) (extract a2)
 
   let coercion loc a1 a2 =
     apply2 "Type_constraint" "coercion" loc
@@ -2035,8 +2065,6 @@ and Exp_desc : sig
   val antiquote : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
   val splice : Debuginfo.Scoped_location.t -> Code.t -> t'
-
-  val eval : Debuginfo.Scoped_location.t -> Type.t -> t'
 end = struct
   type s = lambda
 
@@ -2202,8 +2230,6 @@ end = struct
   let antiquote loc a1 = apply1 "Exp_desc" "antiquote" loc (extract a1)
 
   let splice loc a1 = apply1 "Exp_desc" "splice" loc (extract a1)
-
-  let eval loc a1 = apply1 "Exp_desc" "eval" loc (extract a1)
 end
 
 and Exp : sig
@@ -2669,13 +2695,18 @@ let without_param fp =
     (fun (id, _, _, _) -> without_idents_types_constr [id])
     fp.fp_newtypes
 
+let quote_modes loc modes =
+  Typemode.untransl_mode modes
+  |> List.map (function { loc = _; txt = Parsetree.Mode m } -> m)
+  |> Modes.of_string_list loc |> Modes.wrap
+
 let type_constraint_of_ambiguity loc ambiguity =
   match ambiguity with
   | Unambiguous -> None
   | Ambiguous { path; arity } -> Some (type_constr_for_path loc path arity)
 
 let constrain_exp_with_type loc typ exp_desc =
-  Type_constraint.constraint_ loc typ
+  Type_constraint.constraint_ loc typ (Modes.wrap Modes.legacy)
   |> Type_constraint.wrap
   |> Exp_desc.constraint_ loc (exp_desc |> mk_exp_noattr loc)
 
@@ -2685,15 +2716,19 @@ let maybe_constrain_exp_desc_with_type loc typ exp_desc =
   | None -> exp_desc
 
 let constrain_pat_with_type loc typ pat =
-  Pat.constraint_ loc pat typ |> Pat.wrap
+  Pat.constraint_ loc pat typ (Modes.wrap Modes.legacy) |> Pat.wrap
 
 let maybe_constrain_pat_with_type loc typ exp =
   match typ with Some typ -> constrain_pat_with_type loc typ exp | None -> exp
 
+let any_modes modes = not (List.is_empty modes.mode_desc)
+
 let assert_no_modes modes =
   List.iter
     (fun mode ->
-      fatal_errorf "Translquote [at %a]: no support for mode annotations."
+      fatal_errorf
+        "Translquote [at %a]:@ no support for mode annotations in this \
+         position."
         Location.print_loc (Location.get_loc mode))
     modes.mode_desc
 
@@ -2844,8 +2879,10 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
   let extra, _, _ = extra in
   match extra with
   | Tpat_constraint (ty, ms) ->
-    assert_no_modes ms;
-    Pat.constraint_ loc pat_lam (quote_core_type ~scopes ty) |> Pat.wrap
+    Pat.constraint_ loc pat_lam
+      (quote_core_type ~scopes ty)
+      (quote_modes loc ms)
+    |> Pat.wrap
   | Tpat_unpack -> pat_lam (* handled elsewhere *)
   | Tpat_type _ ->
     fatal_errorf "Translquote [at %a]: [#tconst] not implemented."
@@ -2861,6 +2898,7 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
     Pat.constraint_ loc pat_lam
       (type_for_annotation ~env ~loc:(to_location loc) ty
       |> quote_core_type ~scopes)
+      (Modes.wrap Modes.legacy)
     |> Pat.wrap
 
 and quote_value_pattern ~scopes p =
@@ -2975,12 +3013,12 @@ and quote_core_type ~scopes ty =
     in
     Type.var loc (Some var) |> Type.wrap
   | Ttyp_arrow (arg_lab, ty1, ms1, ty2, ms2) ->
-    assert_no_modes ms1;
-    assert_no_modes ms2;
     let lab = quote_arg_label loc arg_lab
     and ty1 = quote_core_type ~scopes ty1
-    and ty2 = quote_core_type ~scopes ty2 in
-    Type.arrow loc lab ty1 ty2 |> Type.wrap
+    and ms1 = quote_modes loc ms1
+    and ty2 = quote_core_type ~scopes ty2
+    and ms2 = quote_modes loc ms2 in
+    Type.arrow loc lab ty1 ms1 ty2 ms2 |> Type.wrap
   | Ttyp_tuple ts ->
     let tups =
       List.map
@@ -3241,22 +3279,30 @@ and fun_param_binding ~scopes ~transl stage loc param frest =
       pat, Some (quote_expression ~scopes ~transl stage exp)
   in
   let idents = pat_bound_idents pat in
+  let pat_quoted = quote_value_pattern ~scopes pat in
+  let pat_quoted =
+    if any_modes param.fp_mode
+    then
+      Pat.constraint_ loc pat_quoted
+        (Type.var loc None |> Type.wrap)
+        (quote_modes loc param.fp_mode)
+      |> Pat.wrap
+    else pat_quoted
+  in
   let fun_ =
     if is_module pat
-    then
+    then begin
       match idents with
       | [] ->
         Function.param_module_nonbinding loc
           (quote_arg_label loc param.fp_arg_label)
-          (quote_loc loc)
-          (quote_value_pattern ~scopes pat)
-          with_newtypes
+          (quote_loc loc) pat_quoted with_newtypes
       | [id] ->
         let fun_rem =
           Lam.func ~loc Var_module
             (fun (p, e) -> pair ~loc (extract p, extract e))
             id
-            (quote_value_pattern ~scopes pat, with_newtypes)
+            (pat_quoted, with_newtypes)
         and name = name_of_ident loc id in
         Function.param_module loc
           (quote_arg_label loc param.fp_arg_label)
@@ -3266,12 +3312,13 @@ and fun_param_binding ~scopes ~transl stage loc param frest =
           "Translquote [at %a]: expected only one module variable in parameter \
            binding."
           Location.print_loc (to_location loc)
+    end
     else
       let fun_rem =
         Lam.list_param_binding ~loc Var_value
           (fun (p, f) -> pair ~loc (extract p, extract f))
           idents
-          (quote_value_pattern ~scopes pat, with_newtypes)
+          (pat_quoted, with_newtypes)
       and names = List.map (name_of_ident loc) idents in
       Function.param loc
         (quote_arg_label loc param.fp_arg_label)
@@ -3286,8 +3333,25 @@ and quote_function ~scopes ~transl stage loc fn extras =
     let fn_body =
       match fn.body with
       | Tfunction_body exp ->
-        Function.body loc (quote_expression ~scopes ~transl stage exp) None
+        let exp_quoted = quote_expression ~scopes ~transl stage exp in
+        let exp_quoted =
+          if any_modes fn.ret_mode
+          then
+            Exp.mk loc
+              (quote_modes loc fn.ret_mode
+              |> Type_constraint.constraint_ loc (Type.var loc None |> Type.wrap)
+              |> Type_constraint.wrap
+              |> Exp_desc.constraint_ loc exp_quoted
+              |> Exp_desc.wrap)
+              []
+            |> Exp.wrap
+          else exp_quoted
+        in
+        Function.body loc exp_quoted None
       | Tfunction_cases cases ->
+        (* This case should be impossible, since there is no syntax for
+           annotating the mode of the result of all [function] cases. *)
+        assert_no_modes fn.ret_mode;
         Function.cases loc
           (List.map
              (fun fc ->
@@ -3432,7 +3496,9 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
   (* Texp_newtype only relevant for functions, handled elsewhere *)
   | Texp_constraint ty ->
     let constr_ =
-      Type_constraint.constraint_ loc (quote_core_type ~scopes ty)
+      Type_constraint.constraint_ loc
+        (quote_core_type ~scopes ty)
+        (Modes.wrap Modes.legacy)
       |> Type_constraint.wrap
     in
     Exp_desc.constraint_ loc (mk_exp_noattr loc lambda) constr_ |> Exp_desc.wrap
@@ -3448,7 +3514,13 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
   | Texp_poly _ ->
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
-  | Texp_mode _ -> lambda (* FIXME: add modes to quotation representation *)
+  | Texp_mode modes ->
+    Type_constraint.constraint_ loc
+      (Type.var loc None |> Type.wrap)
+      (quote_modes loc modes)
+    |> Type_constraint.wrap
+    |> Exp_desc.constraint_ loc (mk_exp_noattr loc lambda)
+    |> Exp_desc.wrap
   | Texp_inspected_type (Label_disambiguation ambiguity) ->
     lambda
     |> maybe_constrain_exp_desc_with_type loc
@@ -3502,7 +3574,9 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
           params (newcorevar ())
     in
     Exp_desc.constraint_ loc (mk_exp_noattr loc lambda)
-      (Type_constraint.constraint_ loc (quote_core_type ~scopes cty)
+      (Type_constraint.constraint_ loc
+         (quote_core_type ~scopes cty)
+         (Modes.wrap Modes.legacy)
       |> Type_constraint.wrap)
     |> Exp_desc.wrap
   | Texp_ghost_region -> lambda
@@ -3558,6 +3632,8 @@ and quote_expression_desc ~scopes ~transl stage e =
               let cstr =
                 match vb.vb_pat.pat_extra with
                 | [(Tpat_constraint (ct, ms), _, _)] ->
+                  (* CR-soon metaprogramming jbachurski: Support modes on
+                     recursive let bindings after refactoring this mess. *)
                   assert_no_modes ms;
                   Some ct
                 | [] -> None
@@ -3902,7 +3978,6 @@ and quote_expression_desc ~scopes ~transl stage e =
     | Texp_idx _ ->
       fatal_errorf "Translquote [at %a]: Texp_idx" Location.print_loc
         (to_location loc)
-    | Texp_eval (typ, _) -> Exp_desc.eval loc (quote_core_type ~scopes typ)
   in
   List.iter (update_env_without_extra ~loc) e.exp_extra;
   List.fold_right

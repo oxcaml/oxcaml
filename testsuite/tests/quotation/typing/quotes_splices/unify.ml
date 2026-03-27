@@ -148,7 +148,7 @@ let _ = <[ fun (Equal : (<[Inst0.t]>, int NonInst1.t) Type.eq)
 =
 <[
   fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[Inst0.t]>, (int) NonInst1.t) Stdlib.Type.eq) (x : Inst0.t) -> (x : _)
+    (<[Inst0.t]>, (int) NonInst1.t) Stdlib.Type.eq) (x : Inst0.t) -> x
 ]>
 |}]
 (* t ~ <[s]>  when s instantiable *)
@@ -160,7 +160,7 @@ let _ = <[ fun (Equal : (int NonInst1.t, <[Inst0.t]>) Type.eq)
 =
 <[
   fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    ((int) NonInst1.t, <[Inst0.t]>) Stdlib.Type.eq) (x : Inst0.t) -> (x : _)
+    ((int) NonInst1.t, <[Inst0.t]>) Stdlib.Type.eq) (x : Inst0.t) -> x
 ]>
 |}]
 

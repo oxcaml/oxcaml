@@ -25,52 +25,66 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Probe management for code emission *)
+open Local_store
 
-type probe = private
-  { stack_offset : int;
-    num_stack_slots : int Stack_class.Tbl.t;
-    contains_calls : bool;
-    probe_name : string;
-    probe_enabled_at_init : bool;
-    probe_handler_code_sym : string;
-        (** Record frame info held in the corresponding mutable variables. *)
-    probe_label : Label.t;
-        (** Probe site, recorded in .note.stapsdt section for enabling and
-            disabling the probes *)
-    probe_insn : Linear.instruction
-        (** For optimized probes, the Iprobe instruction, recorded at the probe
-            site and used for emitting the notes and the wrapper code at the end
-            of the compilation unit. For non-optimized probes, this will be a
-            direct call instruction. *)
-  }
+type t =
+  | Local of
+      { name : string;
+        stamp : int
+      }
+  | Ident of Ident.t
 
-val get_probes : unit -> probe list
+let currentstamp = s_ref 0
 
-(** Add a probe site. *)
-val add_probe :
-  stack_offset:int ->
-  num_stack_slots:int Stack_class.Tbl.t ->
-  contains_calls:bool ->
-  probe_name:string ->
-  probe_enabled_at_init:bool ->
-  probe_handler_code_sym:string ->
-  probe_label:Label.t ->
-  probe_insn:Linear.instruction ->
-  unit
+let create_local name =
+  incr currentstamp;
+  Local { name; stamp = !currentstamp }
 
-(** Reset the probe semaphore registry *)
-val reset : unit -> unit
+let of_ident ident = Ident ident
 
-(** Find or add a semaphore for a probe name. Returns the label string for the
-    semaphore symbol.
-    - [name]: probe name
-    - [enabled_at_init]: whether the probe is enabled at initialization
-    - [dbg]: debug info for error reporting
+let equal i1 i2 =
+  match i1, i2 with
+  | Local { stamp = s1; _ }, Local { stamp = s2; _ } -> s1 = s2
+  | Ident i1, Ident i2 -> Ident.equal i1 i2
+  | _ -> false
 
-    Raises Emitaux.Error (Inconsistent_probe_init ...) if the same probe is used
-    with different enabled_at_init values. *)
-val find_or_add_semaphore : string -> bool option -> Debuginfo.t -> string
+let hash = function
+  | Local { stamp = s; _ } -> Hashtbl.hash (0, s)
+  | Ident i -> Hashtbl.hash (1, Ident.hash i)
 
-(** Emit probe notes and semaphores to the assembly output *)
-val emit_probe_notes : add_def_symbol:(string -> unit) -> unit
+let compare i1 i2 =
+  match i1, i2 with
+  | Local { stamp = s1; _ }, Local { stamp = s2; _ } -> compare s1 s2
+  | Local _, _ -> 1
+  | _, Local _ -> -1
+  | Ident i1, Ident i2 -> Ident.compare i1 i2
+
+let output oc =
+  let open Format in
+  function
+  | Local { name; stamp } -> output_string oc (sprintf "s_%s_%i" name stamp)
+  | Ident ident ->
+    output_string oc "l_";
+    Ident.output oc ident
+
+let print ppf =
+  let open Format in
+  function
+  | Local { name; stamp } ->
+    fprintf ppf "#%s%s" name
+      (if !Clflags.unique_ids then sprintf "/%i" stamp else "")
+  | Ident ident -> fprintf ppf "%a" Ident.print ident
+
+include Identifiable.Make (struct
+  type nonrec t = t
+
+  let equal = equal
+
+  let hash = hash
+
+  let compare = compare
+
+  let output = output
+
+  let print = print
+end)

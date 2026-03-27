@@ -341,7 +341,6 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Eval_format
   | Let_poly_not_yet_implemented
   | Layout_poly_inst_not_yet_supported
 

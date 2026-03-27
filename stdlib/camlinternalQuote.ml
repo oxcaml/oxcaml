@@ -1166,6 +1166,9 @@ module Ast = struct
     | Nonrecursive
     | Recursive
 
+  type mode = | Mode of string [@@unboxed]
+  type modes = mode list
+
   type direction_flag =
     | Upto
     | Downto
@@ -1207,7 +1210,7 @@ module Ast = struct
   type core_type =
     | TypeAny
     | TypeVar of Var.Type_var.t
-    | TypeArrow of arg_label * core_type * core_type
+    | TypeArrow of arg_label * core_type * modes * core_type * modes
     | TypeTuple of (tuple_label * core_type) list
     | TypeUnboxedTuple of (tuple_label * core_type) list
     | TypeConstr of raw_ident_type_t * core_type list
@@ -1235,7 +1238,7 @@ module Ast = struct
     | Dot of modtype_path * Name.t
 
   type type_constraint =
-    | Constraint of core_type
+    | Constraint of core_type * modes
     | Coerce of core_type option * core_type
 
   type pattern =
@@ -1253,7 +1256,7 @@ module Ast = struct
     | PatUnboxedRecord of (record_field * pattern) list * record_flag
     | PatArray of pattern list
     | PatOr of pattern * pattern
-    | PatConstraint of pattern * core_type
+    | PatConstraint of pattern * core_type * modes
     | PatLazy of pattern
     | PatAnyModule
     | PatUnpack of Var.Module.t
@@ -1313,7 +1316,7 @@ module Ast = struct
     | While of expression * expression
     | For of pattern * expression * expression * direction_flag * expression
     | Send of expression * Method.t
-    | ConstraintExp of expression * core_type
+    | ConstraintExp of expression * core_type * modes
     | CoerceExp of expression * core_type option * core_type
     | Letmodule of Var.Module.t option * module_expr * expression
     | Assert of expression
@@ -1339,7 +1342,6 @@ module Ast = struct
     | Immutable_array_comprehension of comprehension
     | Quote of expression
     | Antiquote of expression
-    | Eval of core_type
 
   and case =
     { lhs : pattern;
@@ -1497,6 +1499,9 @@ module Ast = struct
     | FBasic s -> pp fmt "%s" s
     | FIdent id -> print_raw_ident_field env fmt id
 
+  and maybe_parens parens fmt a =
+    if parens then pp fmt "(%a)" a () else pp fmt "%a" a ()
+
   (* Used to check whether the expression should be parenthesised *)
   and is_negative_const = function
     | Int n -> n < 0
@@ -1565,28 +1570,44 @@ module Ast = struct
     | PatArray pats -> print_array (print_pat env) fmt pats
     | PatOr (pat1, pat2) ->
       pp fmt "%a@ |@ %a" (print_pat env) pat1 (print_pat env) pat2
-    | PatConstraint (pat, ty) ->
-      if with_parens then pp fmt "(";
-      (match pat, ty with
-      | PatUnpack _, TypePackage (ident, wcs) ->
-        (* Package types should not be preceded by "module"
-           inside unpack patterns, so we have a separate case *)
-        pp fmt "%a@ :@ %a"
-          (print_pat env) pat (print_package_type env) (ident, wcs)
-      | _ ->
-        pp fmt "%a@ :@ %a"
-          (print_pat env) pat (print_core_type env) ty);
-      if with_parens then pp fmt ")"
+    | PatConstraint (pat, ty, modes) ->
+      maybe_parens with_parens fmt (fun fmt () ->
+        let print_type =
+          match pat, ty with
+          | PatUnpack _, TypePackage pty ->
+            (* Package types should not be preceded by "module"
+               inside unpack patterns, so we have a separate case *)
+            fun fmt () -> print_package_type env fmt pty
+          | _ ->
+            fun fmt () -> print_core_type env fmt ty
+        in
+        pp fmt "%a@ :@ %a%a"
+          (print_pat env) pat print_type ()
+          print_mode_constraint modes)
     | PatLazy pat -> pp fmt "lazy@ (%a)" (print_pat env) pat
     | PatAnyModule -> pp fmt "module _"
     | PatUnpack v -> pp fmt "module@ %a" (Var.Module.print env) v
     | PatException pat -> pp fmt "(exception@ %a)" (print_pat env) pat
 
+  and print_mode_constraint fmt = function
+    | [] -> ()
+    | _::_ as modes ->
+      pp fmt " %@ @[%a@]"
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space
+          Format.pp_print_string)
+        (List.map (fun (Mode m) -> m) modes)
+
   and print_type_constraint env fmt = function
-    | Constraint ty -> pp fmt "@ : @[%a@]" (print_core_type env) ty
-    | Coerce (None, ty) -> pp fmt "@ :> @[%a@]" (print_core_type env) ty
+    | Constraint (ty, modes) ->
+      pp fmt "@ : @[%a@]%a"
+        (print_core_type env) ty
+        print_mode_constraint modes
+    | Coerce (None, ty) ->
+      pp fmt "@ :> @[%a@]"
+        (print_core_type env) ty
     | Coerce (Some ty_constr, ty) ->
-      pp fmt "@ : @[%a@]@ :> @[%a@]" (print_core_type env) ty_constr
+      pp fmt "@ : @[%a@]@ :> @[%a@]"
+        (print_core_type env) ty_constr
         (print_core_type env) ty
 
   and print_exp_with_parens env fmt exp =
@@ -1688,10 +1709,12 @@ module Ast = struct
   and print_core_type env fmt = function
     | TypeAny -> pp fmt "_"
     | TypeVar v -> Var.Type_var.print env fmt v
-    | TypeArrow (arg_label, ty1, ty2) ->
-      pp fmt "%a%a@ ->@ %a" print_arrow_arg_lab arg_label
-        (print_core_type_with_arrow env)
-        ty1 (print_core_type env) ty2
+    | TypeArrow (arg_label, ty1, ms1, ty2, ms2) ->
+      pp fmt "%a%a%a@ ->@ %a%a" print_arrow_arg_lab arg_label
+        (print_core_type_with_arrow env) ty1
+        print_mode_constraint ms1
+        (print_core_type env) ty2
+        print_mode_constraint ms2
     | TypeTuple ts ->
       pp fmt "%a"
         (print_tuple_like " *" "" "" (print_label_tup (print_core_type env)))
@@ -1975,15 +1998,25 @@ module Ast = struct
         body
     | Send (exp, meth) ->
       pp fmt "%a#@[%a@]" (print_exp_with_parens env) exp Method.print meth
-    | ConstraintExp (exp, ty) ->
-      pp fmt "(%a@ :@ %a)" (print_exp env) exp (print_core_type env) ty
-    | CoerceExp (exp, opt_ty, ty) -> (
+    | ConstraintExp (exp, TypeAny, []) ->
+      print_exp_desc env fmt exp
+    | ConstraintExp (exp, ty, modes) ->
+      pp fmt "(%a@ :@ %a%a)"
+        (print_exp env) exp
+        (print_core_type env) ty
+        print_mode_constraint modes
+    | CoerceExp (exp, opt_ty, ty) -> begin
       match opt_ty with
       | None ->
-        pp fmt "(%a@ :>@ %a)" (print_exp env) exp (print_core_type env) ty
+        pp fmt "(%a@ :>@ %a)"
+          (print_exp env) exp
+          (print_core_type env) ty
       | Some ty_constr ->
-        pp fmt "(%a@ :@ %a@ :>@ %a)" (print_exp env) exp (print_core_type env)
-          ty_constr (print_core_type env) ty)
+        pp fmt "(%a@ :@ %a@ :>@ %a)"
+          (print_exp env) exp
+          (print_core_type env) ty_constr
+          (print_core_type env) ty
+      end
     | Match (exp, cases) ->
       pp fmt "@[<2>match@ @[%a@]@ with" (print_exp env) exp;
       List.iter (print_case env fmt) cases;
@@ -2038,7 +2071,6 @@ module Ast = struct
       pp fmt "@[<2>[|@ %a@ |]@]" (print_comprehension env) compr
     | Immutable_array_comprehension compr ->
       pp fmt "@[<2>[:@ %a@ :]@]" (print_comprehension env) compr
-    | Eval typ -> pp fmt "@[<2>[%%eval:@ %a]@]" (print_core_type env) typ
     | Unreachable -> pp fmt "."
     | Src_pos -> pp fmt "[%%src_pos]"
 
@@ -2188,6 +2220,14 @@ module Field = struct
   let of_string s = return (Ast.FBasic s)
 end
 
+module Modes = struct
+  type t = Ast.modes
+
+  let legacy = []
+
+  let of_string_list ms : t = List.map (fun m -> Ast.Mode m) ms
+end
+
 module Pat = struct
   open With_free_and_bound_vars
 
@@ -2295,9 +2335,9 @@ module Pat = struct
     let+ p = t in
     Ast.PatException p
 
-  let constraint_ pat ty =
+  let constraint_ pat ty ms =
     let+ pat = pat and+ ty = with_no_bound_vars ty in
-    Ast.PatConstraint (pat, ty)
+    Ast.PatConstraint (pat, ty, ms)
 end
 
 module Exp_attribute = struct
@@ -2421,9 +2461,9 @@ module Type = struct
     | None -> With_free_vars.return Ast.TypeAny
     | Some tv -> With_free_vars.return (Ast.TypeVar tv)
 
-  let arrow lab lhs rhs =
+  let arrow lab lhs lhs_modes rhs rhs_modes =
     let+ l = lhs and+ r = rhs in
-    Ast.TypeArrow (lab, l, r)
+    Ast.TypeArrow (lab, l, lhs_modes, r, rhs_modes)
 
   let tuple ts =
     let w =
@@ -2569,9 +2609,9 @@ module Type_constraint = struct
 
   let ( and+ ) = With_free_vars.both
 
-  let constraint_ typ =
+  let constraint_ typ modes =
     let+ typ = typ in
-    Ast.Constraint typ
+    Ast.Constraint (typ, modes)
 
   let coercion typ1 typ2 =
     let+ typ1 = With_free_vars.optional typ1 and+ typ2 = typ2 in
@@ -2781,7 +2821,7 @@ module Exp_desc = struct
               let pat =
                 match cstr with
                 | None -> Ast.PatVar var
-                | Some ct -> Ast.PatConstraint (Ast.PatVar var, ct)
+                | Some ct -> Ast.PatConstraint (Ast.PatVar var, ct, [])
               in
               mk_vb pat def attrs)
             vars_with_cstrs defs attrs_per_vb
@@ -2939,7 +2979,7 @@ module Exp_desc = struct
     let+ exp = exp and+ constr = constr in
     match constr with
     | Ast.Coerce (ty_opt, ty_to) -> Ast.CoerceExp (exp, ty_opt, ty_to)
-    | Ast.Constraint ty -> Ast.ConstraintExp (exp, ty)
+    | Ast.Constraint (ty, modes) -> Ast.ConstraintExp (exp, ty, modes)
 
   let new_ class_id =
     let+ class_id = class_id in
@@ -3029,9 +3069,6 @@ module Exp_desc = struct
     let+ exp = Code.to_exp code in
     Ast.(exp.desc)
 
-  let eval typ =
-    let+ typ = typ in
-    Ast.Eval typ
 end
 
 module Exp = struct
