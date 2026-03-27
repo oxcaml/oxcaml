@@ -84,7 +84,7 @@ CAMLprim value jit_dlsym(value symbol) {
   CAMLreturn (result);
 }
 
-#if defined(__linux__)
+#if !defined(__APPLE__)
 
 #define SBRK_FAILED ((void*)-1)
 
