@@ -3,6 +3,7 @@
  stack-allocation;
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (* We explicitly enable the warning (see the discussion in the
    "Warning reference" section of the reference manual), which makes
@@ -41,25 +42,6 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   exception. This typically occurs due to complex matches on mutable fields.
   (see manual section 13.5.5)
 (let
-<<<<<<< oxcaml
-  (f/290 =
-     (function {nlocal = 0} x/292 : int
-       (if (field_int 0 x/292)
-         (let (*match*/296 =o? (field_mut 1 x/292))
-           (if *match*/296
-             (if (seq (setfield_ptr 1 x/292 0) 0) 2
-               (let (*match*/297 =o? (field_mut 1 x/292))
-                 (field_imm 0 *match*/297)))
-||||||| upstream-base
-  (f/280 =
-     (function x/282 : int
-       (if (field_int 0 x/282)
-         (let (*match*/286 =o (field_mut 1 x/282))
-           (if *match*/286
-             (if (seq (setfield_ptr 1 x/282 0) 0) 2
-               (let (*match*/287 =o (field_mut 1 x/282))
-                 (field_imm 0 *match*/287)))
-=======
   (f/0 =
      (function x/0 : int
        (if (field_int 0 x/0)
@@ -69,18 +51,11 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                (let (*match*/1 =o (field_mut 1 x/0))
                  (if *match*/1 (field_imm 0 *match*/1)
                    (raise
-                     (makeblock 0 (global Match_failure/0!) [0: "" 4 2])))))
->>>>>>> upstream-incoming
+                     (makeblock 0 (global Match_failure/0!) [0: "" 4 2])))))))
              1))
          0)))
-<<<<<<< oxcaml
-  (apply (field_imm 1 (global Toploop!)) "f" f/290))
-||||||| upstream-base
-  (apply (field_mut 1 (global Toploop!)) "f" f/280))
-=======
   (apply (field_mut 1 (global Toploop!)) "f" f/0))
 
->>>>>>> upstream-incoming
 val f : t -> int = <fun>
 |}]
 
@@ -100,19 +75,6 @@ let simple x =
 0
 type t = { a : bool; mutable b : int option; }
 (let
-<<<<<<< oxcaml
-  (f/303 =
-     (function {nlocal = 0} x/304 : int
-       (if (field_int 0 x/304)
-         (let (*match*/308 =o? (field_mut 1 x/304))
-           (if *match*/308 (field_imm 0 *match*/308) 1))
-||||||| upstream-base
-  (f/291 =
-     (function x/292 : int
-       (if (field_int 0 x/292)
-         (let (*match*/296 =o (field_mut 1 x/292))
-           (if *match*/296 (field_imm 0 *match*/296) 1))
-=======
   (simple/0 =
      (function x/1 : int
        (let (*match*/2 =o (field_mut 1 x/1))
@@ -153,16 +115,9 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                (if *match*/4
                  (raise (makeblock 0 (global Match_failure/0!) [0: "" 2 2]))
                  1))))
->>>>>>> upstream-incoming
          0)))
-<<<<<<< oxcaml
-  (apply (field_imm 1 (global Toploop!)) "f" f/303))
-||||||| upstream-base
-  (apply (field_mut 1 (global Toploop!)) "f" f/291))
-=======
   (apply (field_mut 1 (global Toploop!)) "f" f/1))
 
->>>>>>> upstream-incoming
 val f : t -> int = <fun>
 |}]
 
@@ -193,43 +148,6 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   exception. This typically occurs due to complex matches on mutable fields.
   (see manual section 13.5.5)
 (let
-<<<<<<< oxcaml
-  (f/310 =
-     (function {nlocal = 0} r/311 : int
-       (region
-         (let
-           (*match*/313 =[value<(consts (0)) (non_consts ([0: ?]))>]
-              (makelocalblock 0 (*) r/311))
-           (catch
-             (if *match*/313
-               (let (*match*/315 =o? (field_mut 0 (field_imm 0 *match*/313)))
-                 (if *match*/315 (exit 7) 0))
-               (exit 7))
-            with (7)
-             (if (seq (setfield_ptr 0 r/311 0) 0) 1
-               (if *match*/313
-                 (let
-                   (*match*/317 =o? (field_mut 0 (field_imm 0 *match*/313)))
-                   (field_imm 0 *match*/317))
-                 3)))))))
-  (apply (field_imm 1 (global Toploop!)) "f" f/310))
-||||||| upstream-base
-  (f/298 =
-     (function r/299 : int
-       (let (*match*/301 = (makeblock 0 r/299))
-         (catch
-           (if *match*/301
-             (let (*match*/303 =o (field_mut 0 (field_imm 0 *match*/301)))
-               (if *match*/303 (exit 7) 0))
-             (exit 7))
-          with (7)
-           (if (seq (setfield_ptr 0 r/299 0) 0) 1
-             (if *match*/301
-               (let (*match*/305 =o (field_mut 0 (field_imm 0 *match*/301)))
-                 (field_imm 0 *match*/305))
-               3))))))
-  (apply (field_mut 1 (global Toploop!)) "f" f/298))
-=======
   (f/2 =
      (function r/0 : int
        (let (*match*/5 = (makeblock 0 r/0))
@@ -248,7 +166,6 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                3))))))
   (apply (field_mut 1 (global Toploop!)) "f" f/2))
 
->>>>>>> upstream-incoming
 val f : int option ref -> int = <fun>
 |}]
 
@@ -268,23 +185,10 @@ let test = function
 0
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
-<<<<<<< oxcaml
-  (test/321 =
-     (function {nlocal = 0}
-       param/324[value<(consts (0)) (non_consts ([0: ?]))>] : int
-       (if param/324 (field_imm 0 (field_imm 0 param/324)) 0)))
-  (apply (field_imm 1 (global Toploop!)) "test" test/321))
-||||||| upstream-base
-  (test/309 =
-     (function param/312 : int
-       (if param/312 (field_imm 0 (field_imm 0 param/312)) 0)))
-  (apply (field_mut 1 (global Toploop!)) "test" test/309))
-=======
   (test/0 =
      (function param/0 : int
        (if param/0 (field_imm 0 (field_imm 0 param/0)) 0)))
   (apply (field_mut 1 (global Toploop!)) "test" test/0))
->>>>>>> upstream-incoming
 val test : int t option -> int = <fun>
 |}]
 
@@ -302,25 +206,11 @@ let test = function
 0
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
-<<<<<<< oxcaml
-  (test/329 =
-     (function {nlocal = 0} param/331 : int
-       (let (*match*/332 =o? (field_mut 0 param/331))
-         (if *match*/332 (field_imm 0 (field_imm 0 *match*/332)) 0))))
-  (apply (field_imm 1 (global Toploop!)) "test" test/329))
-||||||| upstream-base
-  (test/317 =
-     (function param/319 : int
-       (let (*match*/320 =o (field_mut 0 param/319))
-         (if *match*/320 (field_imm 0 (field_imm 0 *match*/320)) 0))))
-  (apply (field_mut 1 (global Toploop!)) "test" test/317))
-=======
   (test/1 =
      (function param/1 : int
        (let (*match*/8 =o (field_mut 0 param/1))
          (if *match*/8 (field_imm 0 (field_imm 0 *match*/8)) 0))))
   (apply (field_mut 1 (global Toploop!)) "test" test/1))
->>>>>>> upstream-incoming
 val test : int t option ref -> int = <fun>
 |}]
 
@@ -341,48 +231,6 @@ let test n =
 0
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
-<<<<<<< oxcaml
-  (test/337 =
-     (function {nlocal = 0} n/338? : int
-       (region
-         (let
-           (*match*/341 =[value<(consts (0)) (non_consts ([0: ?]))>]
-              (makelocalblock 0 (value<
-                                  (consts ())
-                                   (non_consts ([0: *,
-                                                 value<
-                                                  (consts ())
-                                                   (non_consts ([1:
-                                                                 value<int>]
-                                                   [0: value<int>]))>]))>)
-                (makelocalblock 0 (*,value<
-                                      (consts ())
-                                       (non_consts ([1: value<int>]
-                                       [0: value<int>]))>)
-                  (makelocalmutable 0 (value<int>) 1) [0: 42])))
-           (if *match*/341
-             (let
-               (*match*/342 =a? (field_imm 0 *match*/341)
-                *match*/344 =o? (field_mut 0 (field_imm 0 *match*/342)))
-               (if *match*/344 (field_imm 0 (field_imm 1 *match*/342))
-                 (%int_neg (field_imm 0 (field_imm 1 *match*/342)))))
-             3)))))
-  (apply (field_imm 1 (global Toploop!)) "test" test/337))
-||||||| upstream-base
-  (test/325 =
-     (function n/326 : int
-       (let
-         (*match*/329 =
-            (makeblock 0 (makeblock 0 (makemutable 0 (int) 1) [0: 42])))
-         (if *match*/329
-           (let
-             (*match*/330 =a (field_imm 0 *match*/329)
-              *match*/332 =o (field_mut 0 (field_imm 0 *match*/330)))
-             (if *match*/332 (field_imm 0 (field_imm 1 *match*/330))
-               (~ (field_imm 0 (field_imm 1 *match*/330)))))
-           3))))
-  (apply (field_mut 1 (global Toploop!)) "test" test/325))
-=======
   (test/2 =
      (function n/0 : int
        (let
@@ -396,7 +244,6 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
                (~ (field_imm 0 (field_imm 1 *match*/10)))))
            3))))
   (apply (field_mut 1 (global Toploop!)) "test" test/2))
->>>>>>> upstream-incoming
 val test : 'a -> int = <fun>
 |}]
 

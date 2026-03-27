@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (* PR#6650 *)
 
@@ -50,23 +51,9 @@ module Test : (X : (A -> (B -> C) -> D) -> E -> F) -> sig end
 (* test reprinting of functors *)
 module type LongFunctor1 = functor (X : A) () (_ : B) () -> C -> D -> sig end
 [%%expect {|
-<<<<<<< oxcaml
-module type LongFunctor1 =
-  functor (X : A) () -> B -> functor () -> C -> D -> sig end
-||||||| upstream-base
-module type LongFunctor1 = functor (X : A) () (_ : B) () -> C -> D -> sig end
-=======
 module type LongFunctor1 = (X : A) () (_ : B) () -> C -> D -> sig end
->>>>>>> upstream-incoming
 |}]
 module type LongFunctor2 = functor (_ : A) () (_ : B) () -> C -> D -> sig end
 [%%expect {|
-<<<<<<< oxcaml
-module type LongFunctor2 =
-  A -> functor () -> B -> functor () -> C -> D -> sig end
-||||||| upstream-base
-module type LongFunctor2 = A -> functor () (_ : B) () -> C -> D -> sig end
-=======
 module type LongFunctor2 = A -> () (_ : B) () -> C -> D -> sig end
->>>>>>> upstream-incoming
 |}]

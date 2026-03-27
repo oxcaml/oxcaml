@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 class type ct = object end
 module type s = sig type a val one:int type b class two:ct type c type exn+=Three type d end
 module type c12 = sig type a class two:ct type b val one:int type c type exn+=Three type d end
@@ -501,28 +502,6 @@ Error: Signature mismatch:
                    module B :
                      sig
                        module C :
-<<<<<<< oxcaml
-                         functor (X : sig end) (Y : sig end)
-                           (Z : sig ... end) -> sig end
-||||||| upstream-base
-                         functor (X : sig end) (Y : sig end)
-                           (Z : sig
-                                  module D :
-                                    sig
-                                      module E :
-                                        sig
-                                          module F :
-                                            functor (X : sig end)
-                                              (Arg : sig
-                                                       val two : int
-                                                       val one : int
-                                                     end)
-                                              -> sig end
-                                        end
-                                    end
-                                end)
-                           -> sig end
-=======
                          (X : sig end) (Y : sig end)
                          (Z : sig
                                 module D :
@@ -540,7 +519,6 @@ Error: Signature mismatch:
                                   end
                               end)
                            -> sig end
->>>>>>> upstream-incoming
                      end
                  end
              end
@@ -554,28 +532,6 @@ Error: Signature mismatch:
                    module B :
                      sig
                        module C :
-<<<<<<< oxcaml
-                         functor (X : sig end) (Y : sig end)
-                           (Z : sig ... end) -> sig end
-||||||| upstream-base
-                         functor (X : sig end) (Y : sig end)
-                           (Z : sig
-                                  module D :
-                                    sig
-                                      module E :
-                                        sig
-                                          module F :
-                                            functor (X : sig end)
-                                              (Arg : sig
-                                                       val one : int
-                                                       val two : int
-                                                     end)
-                                              -> sig end
-                                        end
-                                    end
-                                end)
-                           -> sig end
-=======
                          (X : sig end) (Y : sig end)
                          (Z : sig
                                 module D :
@@ -593,7 +549,6 @@ Error: Signature mismatch:
                                   end
                               end)
                            -> sig end
->>>>>>> upstream-incoming
                      end
                  end
              end
@@ -606,28 +561,6 @@ Error: Signature mismatch:
                  module B :
                    sig
                      module C :
-<<<<<<< oxcaml
-                       functor (X : sig end) (Y : sig end)
-                         (Z : sig module D : sig ... end end) -> sig end
-||||||| upstream-base
-                       functor (X : sig end) (Y : sig end)
-                         (Z : sig
-                                module D :
-                                  sig
-                                    module E :
-                                      sig
-                                        module F :
-                                          functor (X : sig end)
-                                            (Arg : sig
-                                                     val two : int
-                                                     val one : int
-                                                   end)
-                                            -> sig end
-                                      end
-                                  end
-                              end)
-                         -> sig end
-=======
                        (X : sig end) (Y : sig end)
                        (Z : sig
                               module D :
@@ -645,7 +578,6 @@ Error: Signature mismatch:
                                 end
                             end)
                          -> sig end
->>>>>>> upstream-incoming
                    end
                end
            end
@@ -657,28 +589,6 @@ Error: Signature mismatch:
                  module B :
                    sig
                      module C :
-<<<<<<< oxcaml
-                       functor (X : sig end) (Y : sig end)
-                         (Z : sig module D : sig ... end end) -> sig end
-||||||| upstream-base
-                       functor (X : sig end) (Y : sig end)
-                         (Z : sig
-                                module D :
-                                  sig
-                                    module E :
-                                      sig
-                                        module F :
-                                          functor (X : sig end)
-                                            (Arg : sig
-                                                     val one : int
-                                                     val two : int
-                                                   end)
-                                            -> sig end
-                                      end
-                                  end
-                              end)
-                         -> sig end
-=======
                        (X : sig end) (Y : sig end)
                        (Z : sig
                               module D :
@@ -696,7 +606,6 @@ Error: Signature mismatch:
                                 end
                             end)
                          -> sig end
->>>>>>> upstream-incoming
                    end
                end
            end

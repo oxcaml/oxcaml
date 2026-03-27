@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 
 
@@ -563,27 +564,7 @@ Error: This application of the functor "F" is ill-typed.
        do not match these parameters:
          (X : x) (B : b/2) (Y : y) -> ...
        1. Module $S1 matches the expected module type x
-<<<<<<< oxcaml
-       2. Modules do not match:
-            P.B : b/1
-          is not included in
-            b/2
-          Line 5, characters 2-15:
-            Definition of module type "b/1"
-          Line 2, characters 0-13:
-            Definition of module type "b/2"
-||||||| upstream-base
-       2. Modules do not match:
-            P.B : b
-          is not included in
-            b/2
-          Line 5, characters 2-15:
-            Definition of module type "b"
-          Line 2, characters 0-13:
-            Definition of module type "b/2"
-=======
        2. Modules do not match: P.B : b is not included in b/2
->>>>>>> upstream-incoming
        3. Modules do not match: $S3 : sig type w end is not included in y
 Line 5, characters 2-15:
   Definition of module type "b"
@@ -603,28 +584,12 @@ end
 module F : (X : a) -> sig type t end
 Line 6, characters 13-17:
 6 |     type t = F(X).t
-<<<<<<< oxcaml
-                 ^^^^^^
-Error: Modules do not match: (a/1 with P.X) is not included in a/2
-     Line 3, characters 2-15:
-       Definition of module type "a/1"
-     Line 1, characters 0-13:
-       Definition of module type "a/2"
-||||||| upstream-base
-                 ^^^^^^
-Error: Modules do not match: a is not included in a/2
-     Line 3, characters 2-15:
-       Definition of module type "a"
-     Line 1, characters 0-13:
-       Definition of module type "a/2"
-=======
                  ^^^^
 Error: Modules do not match: a is not included in a/2
 Line 3, characters 2-15:
   Definition of module type "a"
 Line 1, characters 0-13:
   Definition of module type "a/2"
->>>>>>> upstream-incoming
 |}]
 
 
@@ -653,41 +618,15 @@ Error: Signature mismatch:
          sig module F : (X : a) (Y : a) -> sig end end
        In module "F":
        Modules do not match:
-<<<<<<< oxcaml
-         functor (X : aa) (Y : a/1) -> ...
-||||||| upstream-base
-         functor (X : aa) (Y : a) -> ...
-=======
          (X : aa) (Y : a) -> ...
->>>>>>> upstream-incoming
        is not included in
          (X : a/2) (Y : a/2) -> ...
        1. Module types aa and a/2 match
-<<<<<<< oxcaml
-       2. Module types do not match:
-            a/1
-          does not include
-            a/2
-          Line 4, characters 2-15:
-            Definition of module type "a/1"
-          Line 1, characters 0-13:
-            Definition of module type "a/2"
-||||||| upstream-base
-       2. Module types do not match:
-            a
-          does not include
-            a/2
-          Line 4, characters 2-15:
-            Definition of module type "a"
-          Line 1, characters 0-13:
-            Definition of module type "a/2"
-=======
        2. Module types do not match: a does not include a/2
 Line 4, characters 2-15:
   Definition of module type "a"
 Line 1, characters 0-13:
   Definition of module type "a/2"
->>>>>>> upstream-incoming
 |}]
 
 module X: functor ( X: sig end) -> sig end = functor(X: Set.OrderedType) -> struct end
@@ -987,23 +926,6 @@ Error: Signature mismatch:
          sig
            module B :
              sig
-<<<<<<< oxcaml
-               module C : sig module D : sig module E : sig ... end end end
-||||||| upstream-base
-               module C :
-                 sig
-                   module D :
-                     sig
-                       module E :
-                         sig
-                           module F :
-                             functor (X : sig type x end)
-                               (Y : sig type y' end) (W : sig type w end) ->
-                               sig end
-                         end
-                     end
-                 end
-=======
                module C :
                  sig
                    module D :
@@ -1016,7 +938,6 @@ Error: Signature mismatch:
                          end
                      end
                  end
->>>>>>> upstream-incoming
              end
          end
        is not included in
@@ -1297,28 +1218,12 @@ end
 
 module U = F(PF)(PF)(PF)
 [%%expect {|
-<<<<<<< oxcaml
-module F :
-  functor (X : sig type witness module type t module M : t end) ->
-    (X.t with X.M)
-||||||| upstream-base
-module F :
-  functor (X : sig type witness module type t module M : t end) -> X.t
-=======
 module F : (X : sig type witness module type t module M : t end) -> X.t
->>>>>>> upstream-incoming
 module PF :
   sig
     type witness
     module type t =
-<<<<<<< oxcaml
-      functor (X : sig type witness module type t module M : t end) ->
-        (X.t with X.M)
-||||||| upstream-base
-      functor (X : sig type witness module type t module M : t end) -> X.t
-=======
       (X : sig type witness module type t module M : t end) -> X.t
->>>>>>> upstream-incoming
     module M = F
   end
 module U :
@@ -1342,17 +1247,7 @@ Error: This application of the functor "F" is ill-typed.
        4. Module PF matches the expected module type
        5. Module PF matches the expected module type
        6. Modules do not match:
-<<<<<<< oxcaml
-            F :
-            functor (X : sig type witness module type t module M : t end) ->
-              (X.t with X.M)
-||||||| upstream-base
-            F :
-            functor (X : sig type witness module type t module M : t end) ->
-              X.t
-=======
             F : (X : sig type witness module type t module M : t end) -> X.t
->>>>>>> upstream-incoming
           is not included in
             $T6 = sig type witness module type t module M : t end
           This module should not be a functor, a structure was expected.
@@ -1582,55 +1477,13 @@ Error: Signature mismatch:
          sig
            module F :
              sig type wrong end ->
-<<<<<<< oxcaml
-               functor (X : sig module type T end) (Res : X.T) (Res : X.T)
-                 (Res : X.T) -> (X.T with Res)
-||||||| upstream-base
-               functor (X : sig module type T end) (Res : X.T) (Res :
-                 X.T) (Res : X.T)
-               -> X.T
-=======
                (X : sig module type T end) (Res : X.T) (Res : X.T)
                (Res : X.T) -> X.T
->>>>>>> upstream-incoming
          end
        is not included in
          sig
            module F :
              sig end ->
-<<<<<<< oxcaml
-               functor
-                 (X : sig
-                        module type T
-                        module type inner =
-                          sig module type t module M : t end
-                        module F :
-                          functor (X : inner) ->
-                            (T -> T -> T) -> sig module type res = X.t end
-                        module Y :
-                          sig
-                            module type t = T -> T -> T
-                            module M : functor (X : T) (Y : T) -> T
-                          end
-                      end)
-                 -> X.F(X.Y)(X.Y.M).res
-||||||| upstream-base
-               functor
-                 (X : sig
-                        module type T
-                        module type inner =
-                          sig module type t module M : t end
-                        module F :
-                          functor (X : inner) -> (T -> T -> T) ->
-                            sig module type res = X.t end
-                        module Y :
-                          sig
-                            module type t = T -> T -> T
-                            module M : functor (X : T) (Y : T) -> T
-                          end
-                      end)
-               -> X.F(X.Y)(X.Y.M).res
-=======
                (X : sig
                       module type T
                       module type inner = sig module type t module M : t end
@@ -1644,19 +1497,10 @@ Error: Signature mismatch:
                         end
                     end)
                -> X.F(X.Y)(X.Y.M).res
->>>>>>> upstream-incoming
          end
        In module "F":
        Modules do not match:
-<<<<<<< oxcaml
-         functor (Arg : $S1) (X : $S2) (Res : X.T) (Res : X.T) (Res : X.T)
-         -> ...
-||||||| upstream-base
-         functor (Arg : $S1) (X : $S2) (Res : X.T) (Res : X.T) (Res :
-         X.T) -> ...
-=======
          (Arg : $S1) (X : $S2) (Res : X.T) (Res : X.T) (Res : X.T) -> ...
->>>>>>> upstream-incoming
        is not included in
          (sig end) (X : $T2) X.T X.T -> ...
        1. Module types do not match:
@@ -1665,19 +1509,9 @@ Error: Signature mismatch:
             sig end
           The type "wrong" is required but not provided
        2. Module types $S2 and $T2 match
-<<<<<<< oxcaml
-       3. An extra argument is provided of module type X/2.T
-       4. Module types X/2.T and X/2.T match
-       5. Module types X/2.T and X/2.T match
-||||||| upstream-base
-       3. An extra argument is provided of module type X.T
-       4. Module types X.T and X.T match
-       5. Module types X.T and X.T match
-=======
        3. Module types X.T and X.T match
        4. Module types X.T and X.T match
        5. An extra argument is provided of module type X.T
->>>>>>> upstream-incoming
 |}]
 
 
@@ -1718,47 +1552,9 @@ Error: This application of the functor "F" is ill-typed.
        3. Modules do not match:
             Y : sig type t = Y.t = Y of int end
           is not included in
-<<<<<<< oxcaml
-            $T3 = sig type t = Y of X/2.t end
-||||||| upstream-base
-            $T3 = sig type t = Y of X.t end
-=======
             $T3 = sig type t = Z of X.t end
->>>>>>> upstream-incoming
           Type declarations do not match:
-<<<<<<< oxcaml
-            type t = Y.t = Y of int
-          is not included in
-            type t = Y of X.t
-          Constructors do not match:
-            "Y of int"
-          is not the same as:
-            "Y of X.t"
-          The type "int" is not equal to the type "X.t"
-       4. Modules do not match:
-            Z : sig type t = Z.t = Z of int end
-          is not included in
-            $T4 = sig type t = Z of X/2.t end
-          Type declarations do not match:
-            type t = Z.t = Z of int
-||||||| upstream-base
-            type t = Y.t = Y of int
-          is not included in
-            type t = Y of X.t
-          Constructors do not match:
-            "Y of int"
-          is not the same as:
-            "Y of X.t"
-          The type "int" is not equal to the type "X.t"
-       4. Modules do not match:
-            Z : sig type t = Z.t = Z of int end
-          is not included in
-            $T4 = sig type t = Z of X.t end
-          Type declarations do not match:
-            type t = Z.t = Z of int
-=======
             type t = Y/2.t = Y of int
->>>>>>> upstream-incoming
           is not included in
             type t = Z of X.t
           Constructors have different names, "Y" and "Z".
@@ -1806,13 +1602,7 @@ module type Ext = sig module type T module X : T end
 module AExt : sig module type T = A module X = A end
 module FiveArgsExt :
   sig module type T = ty -> ty -> ty -> ty -> ty -> sig end module X : T end
-<<<<<<< oxcaml
-module Bar : functor (W : A) (X : Ext) (Y : B) (Z : Ext) -> (Z.T with Z.X)
-||||||| upstream-base
-module Bar : functor (W : A) (X : Ext) (Y : B) (Z : Ext) -> Z.T
-=======
 module Bar : (W : A) (X : Ext) (Y : B) (Z : Ext) -> Z.T
->>>>>>> upstream-incoming
 type fine = Bar(A)(FiveArgsExt)(B)(AExt).a
 |}]
 
@@ -2262,21 +2052,9 @@ Error: The functor application "Set.Make(Set)(A)" is ill-typed.
        These arguments:
          Set A
        do not match these parameters:
-<<<<<<< oxcaml
-         functor (Ord : Set.OrderedType) -> ...
-       1. The following extra argument is provided Set : (module Set)
-       2. Modules do not match:
-            A : sig module type S = A.S module M = A.M end
-||||||| upstream-base
-         functor (Ord : Set.OrderedType) -> ...
-       1. The following extra argument is provided Set : (module Set)
-       2. Modules do not match:
-            A : sig type a = A.a end
-=======
          (Ord : Set.OrderedType) -> ...
        1. Modules do not match:
             Set : (module Set)
->>>>>>> upstream-incoming
           is not included in
             Set.OrderedType
           Modules do not match:

@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (* The goal of this test is exhaustively cover all spellcheck-style
    error messages in the compiler. *)
@@ -124,13 +125,7 @@ let _ =
 Line 5, characters 22-33:
 5 |     method update n = foobaz <- n
                           ^^^^^^^^^^^
-<<<<<<< oxcaml
-Error: The value "foobaz" is not an instance variable or mutable variable
-||||||| upstream-base
-Error: The value "foobaz" is not an instance variable
-=======
 Error:   The value "foobaz" is not an instance variable
->>>>>>> upstream-incoming
 Hint: Did you mean "foobar"?
 |}];;
 

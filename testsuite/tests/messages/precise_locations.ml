@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 type t = (unit, unit, unit, unit) bar
 ;;
@@ -86,13 +87,7 @@ end);;
 Line 2, characters 0-9:
 2 | open List
     ^^^^^^^^^
-<<<<<<< oxcaml
-Error (warning 33 [unused-open]): unused open List.
-||||||| upstream-base
-Error (warning 33 [unused-open]): unused open Stdlib.List.
-=======
 Error (warning 33 [unused-open]): unused open "Stdlib.List".
->>>>>>> upstream-incoming
 |}];;
 
 type unknown += Foo;;

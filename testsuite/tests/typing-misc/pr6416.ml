@@ -2,6 +2,7 @@
  flags = "-no-alias-deps -w +40";
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 module M = struct
   type t = A
   module M : sig
@@ -85,42 +86,14 @@ Error: Signature mismatch:
          sig module A : (X : s) -> sig end end
        In module "A":
        Modules do not match:
-<<<<<<< oxcaml
-         functor (X : s/1) -> ...
-||||||| upstream-base
-         functor (X : s) -> ...
-=======
          (X : s) -> ...
->>>>>>> upstream-incoming
        is not included in
-<<<<<<< oxcaml
-         functor (X : s/2) -> ...
-       Module types do not match:
-         s/1
-       does not include
-         s/2
-       Line 5, characters 6-19:
-         Definition of module type "s/1"
-       Line 2, characters 2-15:
-         Definition of module type "s/2"
-||||||| upstream-base
-         functor (X : s/2) -> ...
-       Module types do not match:
-         s
-       does not include
-         s/2
-       Line 5, characters 6-19:
-         Definition of module type "s"
-       Line 2, characters 2-15:
-         Definition of module type "s/2"
-=======
          (X : s/2) -> ...
        Module types do not match: s does not include s/2
 Line 5, characters 6-19:
   Definition of module type "s"
 Line 2, characters 2-15:
   Definition of module type "s/2"
->>>>>>> upstream-incoming
 |}]
 
 module L = struct
@@ -179,13 +152,7 @@ Error: Signature mismatch:
          val f : (module s/2) -> t/2 -> t/2
        The type "(module s/1) -> t/2 -> t/1" is not compatible with the type
          "(module s/2) -> t/2 -> t/2"
-<<<<<<< oxcaml
-       Type "(module s/1)" is not compatible with type "(module s/2)"
-||||||| upstream-base
-       Type "(module s)" is not compatible with type "(module s/2)"
-=======
        Modules do not match: s is not included in s/2
->>>>>>> upstream-incoming
        Line 5, characters 23-33:
          Definition of type "t/1"
        Line 3, characters 2-12:
@@ -252,22 +219,10 @@ Error: Signature mismatch:
          class b : a/2
        The public method c cannot be hidden
        The first class type has no method m
-<<<<<<< oxcaml
-       Line 5, characters 4-74:
-         Definition of class type "a/1"
-       Line 2, characters 2-36:
-         Definition of class type "a/2"
-||||||| upstream-base
-       Line 5, characters 4-74:
-         Definition of class type "a"
-       Line 2, characters 2-36:
-         Definition of class type "a/2"
-=======
 Line 5, characters 4-74:
   Definition of class type "a"
 Line 2, characters 2-36:
   Definition of class type "a/2"
->>>>>>> upstream-incoming
 |}]
 
 module R = struct
@@ -295,22 +250,10 @@ Error: Signature mismatch:
        does not match
          class type b = a/2
        The first class type has no method m
-<<<<<<< oxcaml
-       Line 5, characters 4-29:
-         Definition of class type "a/1"
-       Line 2, characters 2-42:
-         Definition of class type "a/2"
-||||||| upstream-base
-       Line 5, characters 4-29:
-         Definition of class type "a"
-       Line 2, characters 2-42:
-         Definition of class type "a/2"
-=======
 Line 5, characters 4-29:
   Definition of class type "a"
 Line 2, characters 2-42:
   Definition of class type "a/2"
->>>>>>> upstream-incoming
 |}]
 
 module S = struct

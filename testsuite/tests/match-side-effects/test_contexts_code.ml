@@ -4,6 +4,7 @@
  stack-allocation;
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 #use "contexts_1.ml";;
 (* Notice that (field_mut 1 input) occurs twice, it
@@ -32,43 +33,6 @@ let example_1 () =
       Result.Error 3
   | { a = true; b = Either.Left y } -> Result.Ok y;;
 (let
-<<<<<<< oxcaml
-  (example_1/305 =
-     (function {nlocal = 0} param/329[value<int>]
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
-       (region
-         (let
-           (input/307 =
-              (makelocalmutable 0 (value<int>,value<
-                                               (consts ())
-                                                (non_consts ([1: ?] [0: ?]))>)
-                1 [0: 1]))
-           (if (field_int 0 input/307)
-             (let (*match*/332 =o? (field_mut 1 input/307))
-               (switch* *match*/332
-                case tag 0:
-                 (if (seq (setfield_ptr(maybe-stack) 1 input/307 [1: 3]) 0)
-                   [1: 3]
-                   (let (*match*/334 =o? (field_mut 1 input/307))
-                     (makeblock 0 (value<int>) (field_imm 0 *match*/334))))
-                case tag 1: [1: 2]))
-             [1: 1])))))
-  (apply (field_imm 1 (global Toploop!)) "example_1" example_1/305))
-||||||| upstream-base
-  (example_1/310 =
-     (function param/334[int]
-       (let (input/312 = (makemutable 0 (int,*) 1 [0: 1]))
-         (if (field_int 0 input/312)
-           (let (*match*/337 =o (field_mut 1 input/312))
-             (switch* *match*/337
-              case tag 0:
-               (if (seq (setfield_ptr 1 input/312 [1: 3]) 0) [1: 3]
-                 (let (*match*/339 =o (field_mut 1 input/312))
-                   (makeblock 0 (int) (field_imm 0 *match*/339))))
-              case tag 1: [1: 2]))
-           [1: 1]))))
-  (apply (field_mut 1 (global Toploop!)) "example_1" example_1/310))
-=======
   (example_1/0 =
      (function param/0[int]
        (let (input/0 = (makemutable 0 (int,*) 1 [0: 1]))
@@ -87,7 +51,6 @@ let example_1 () =
               case tag 1: [1: 2]))
            [1: 1]))))
   (apply (field_mut 1 (global Toploop!)) "example_1" example_1/0))
->>>>>>> upstream-incoming
 val example_1 : unit -> (bool, int) Result.t = <fun>
 |}]
 
@@ -116,50 +79,6 @@ let example_2 () =
       Result.Error 3
   | { a = true; b = { mut = Either.Left y } } -> Result.Ok y;;
 (let
-<<<<<<< oxcaml
-  (example_2/344 =
-     (function {nlocal = 0} param/348[value<int>]
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
-       (region
-         (let
-           (input/346 =[value<(consts ()) (non_consts ([0: value<int>, *]))>]
-              (makelocalblock 0 (value<int>,*) 1
-                (makelocalmutable 0 (value<
-                                      (consts ()) (non_consts ([1: ?]
-                                       [0: ?]))>)
-                  [0: 1])))
-           (if (field_int 0 input/346)
-             (let (*match*/352 =o? (field_mut 0 (field_imm 1 input/346)))
-               (switch* *match*/352
-                case tag 0:
-                 (if
-                   (seq
-                     (setfield_ptr(maybe-stack) 0 (field_imm 1 input/346)
-                       [1: 3])
-                     0)
-                   [1: 3]
-                   (let
-                     (*match*/355 =o? (field_mut 0 (field_imm 1 input/346)))
-                     (makeblock 0 (value<int>) (field_imm 0 *match*/355))))
-                case tag 1: [1: 2]))
-             [1: 1])))))
-  (apply (field_imm 1 (global Toploop!)) "example_2" example_2/344))
-||||||| upstream-base
-  (example_2/346 =
-     (function param/350[int]
-       (let (input/348 = (makeblock 0 (int,*) 1 (makemutable 0 [0: 1])))
-         (if (field_int 0 input/348)
-           (let (*match*/354 =o (field_mut 0 (field_imm 1 input/348)))
-             (switch* *match*/354
-              case tag 0:
-               (if (seq (setfield_ptr 0 (field_imm 1 input/348) [1: 3]) 0)
-                 [1: 3]
-                 (let (*match*/357 =o (field_mut 0 (field_imm 1 input/348)))
-                   (makeblock 0 (int) (field_imm 0 *match*/357))))
-              case tag 1: [1: 2]))
-           [1: 1]))))
-  (apply (field_mut 1 (global Toploop!)) "example_2" example_2/346))
-=======
   (example_2/0 =
      (function param/1[int]
        (let (input/1 = (makeblock 0 (int,*) 1 (makemutable 0 [0: 1])))
@@ -179,7 +98,6 @@ let example_2 () =
               case tag 1: [1: 2]))
            [1: 1]))))
   (apply (field_mut 1 (global Toploop!)) "example_2" example_2/0))
->>>>>>> upstream-incoming
 val example_2 : unit -> (bool, int) Result.t = <fun>
 |}]
 
@@ -206,42 +124,6 @@ let example_3 () =
       Result.Error 3
   | { mut = (true, Either.Left y) } -> Result.Ok y;;
 (let
-<<<<<<< oxcaml
-  (example_3/362 =
-     (function {nlocal = 0} param/366[value<int>]
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
-       (region
-         (let
-           (input/364 =mut[value<
-                            (consts ())
-                             (non_consts ([0: value<int>,
-                                           value<
-                                            (consts ()) (non_consts (
-                                             [1: ?] [0: ?]))>]))>]
-              [0: 1 [0: 1]]
-            *match*/367 =o? *input/364)
-           (if (field_imm 0 *match*/367)
-             (switch* (field_imm 1 *match*/367)
-              case tag 0:
-               (if (seq (assign input/364 [0: 1 [1: 3]]) 0) [1: 3]
-                 (makeblock 0 (value<int>)
-                   (field_imm 0 (field_imm 1 *match*/367))))
-              case tag 1: [1: 2])
-             [1: 1])))))
-  (apply (field_imm 1 (global Toploop!)) "example_3" example_3/362))
-||||||| upstream-base
-  (example_3/363 =
-     (function param/367[int]
-       (let (input/365 =mut [0: 1 [0: 1]] *match*/368 =o *input/365)
-         (if (field_imm 0 *match*/368)
-           (switch* (field_imm 1 *match*/368)
-            case tag 0:
-             (if (seq (assign input/365 [0: 1 [1: 3]]) 0) [1: 3]
-               (makeblock 0 (int) (field_imm 0 (field_imm 1 *match*/368))))
-            case tag 1: [1: 2])
-           [1: 1]))))
-  (apply (field_mut 1 (global Toploop!)) "example_3" example_3/363))
-=======
   (example_3/0 =
      (function param/2[int]
        (let (input/2 =mut [0: 1 [0: 1]] *match*/4 =o *input/2)
@@ -253,6 +135,5 @@ let example_3 () =
             case tag 1: [1: 2])
            [1: 1]))))
   (apply (field_mut 1 (global Toploop!)) "example_3" example_3/0))
->>>>>>> upstream-incoming
 val example_3 : unit -> (bool, int) Result.t = <fun>
 |}]
