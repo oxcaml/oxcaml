@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 type t = Set.Make(String).t
 [%%expect{|
@@ -74,14 +75,6 @@ end
 [%%expect{|
 Line 2, characters 11-14:
 2 |   type t = X.F(Parsing).t
-<<<<<<< oxcaml
-               ^^^^^^^^^^^^^^
-Error: The module "X.F" is of abstract type "S", it cannot be applied
-||||||| upstream-base
-               ^^^^^^^^^^^^^^
-Error: The module "X.F" is abstract, it cannot be applied
-=======
                ^^^
 Error: The module "X.F" is abstract, it cannot be applied
->>>>>>> upstream-incoming
 |}]

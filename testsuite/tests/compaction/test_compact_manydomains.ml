@@ -1,13 +1,7 @@
 (* TEST
-<<<<<<< oxcaml
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- runtime5;
- multidomain;
+ multicore;
  { bytecode; }
  { native; }
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
 *)
 
 let num_domains = 20

@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 module type T = sig type t end
 module Fix(F:(T -> T)) = struct
@@ -61,13 +62,7 @@ module M :
   end
 module type S =
   sig
-<<<<<<< oxcaml
-    module F : functor (X : T) -> T @@ stateless
-||||||| upstream-base
-    module F : functor (X : T) -> T
-=======
     module F : (X : T) -> T
->>>>>>> upstream-incoming
     module rec Fixed : sig type t = F(Fixed).t end
   end
 module Id : (X : T) -> sig type t = X.t end
@@ -126,17 +121,8 @@ module Foo (F : T -> T) = struct
 module M = Foo(Id);;
 M.f 5;;
 [%%expect{|
-<<<<<<< oxcaml
-module Foo :
-  functor (F : T -> T) -> sig val f : Fix(F).Fixed.t -> Fix(F).Fixed.t end
-||||||| upstream-base
-module Foo :
-  functor (F : T -> T) -> sig val f : Fix(F).Fixed.t -> Fix(F).Fixed.t end
-module M : sig val f : Fix(Id).Fixed.t -> Fix(Id).Fixed.t end
-=======
 module Foo : (F : T -> T) -> sig val f : Fix(F).Fixed.t -> Fix(F).Fixed.t end
 module M : sig val f : Fix(Id).Fixed.t -> Fix(Id).Fixed.t end
->>>>>>> upstream-incoming
 Line 1:
 Error: In the signature of Fix(Id):
        The definition of "Fixed.t" contains a cycle:

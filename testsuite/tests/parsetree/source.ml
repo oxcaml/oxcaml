@@ -7490,16 +7490,6 @@ let x = new M.\#begin
 
 let f = fun x (type \#begin) (type \#end) -> 1
 
-<<<<<<< oxcaml
-(* check pretty-printing of local module open in core_type *)
-type t = String.( t )
-
-(* Coercion in value constraint *)
-
-let x: [`A] :> [> `A | `B ] = `A
-let x :> [> `A | `B ] = `A
-||||||| upstream-base
-=======
 let f: type \#if. \#if -> \#if = fun x -> x
 
 let mlet = M.\#let
@@ -7533,6 +7523,10 @@ let x = true 0
 (* check pretty-printing of local module open in core_type *)
 type t = String.( t )
 
+(* Coercion in value constraint *)
+
+let x: [`A] :> [> `A | `B ] = `A
+let x :> [> `A | `B ] = `A
+
 (* Utf8 identifier *)
 let là = function ça -> ça
->>>>>>> upstream-incoming

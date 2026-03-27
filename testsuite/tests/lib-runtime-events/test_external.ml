@@ -1,15 +1,4 @@
 (* TEST
-<<<<<<< oxcaml
-||||||| upstream-base
- include runtime_events;
- include unix;
- libunix;
-=======
- include runtime_events;
- include unix;
- hasunix;
- not-target-windows;
->>>>>>> upstream-incoming
  {
    runtime4;
    skip;
@@ -17,7 +6,8 @@
    include runtime_events;
    include unix;
    runtime5;
-   libunix;
+   hasunix;
+   not-target-windows;
    {
      bytecode;
    }{

@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (* Subtyping is "syntactic" *)
 fun (x : < x : int >) y z -> (y :> 'a), (x :> 'a), (z :> 'a);;
@@ -730,16 +731,10 @@ Error: Multiple definition of the type name "t".
 
 fun x -> (x :> < m : 'a -> 'a > as 'a);;
 [%%expect{|
-<<<<<<< oxcaml
-- : < m : (< m : 'a -> 'a > as 'a) -> 'a; .. > -> 'a = <fun>
-||||||| upstream-base
-- : < m : (< m : 'a > as 'b) -> 'b as 'a; .. > -> 'b = <fun>
-=======
 - : < m : (< m : 'a > as 'b) -> 'b as 'a; .. > -> 'b = <fun>
 |}, Principal{|
 - : < m : < m : 'a > -> < m : 'a > as 'a; .. > -> (< m : 'b -> 'b > as 'b) =
 <fun>
->>>>>>> upstream-incoming
 |}];;
 
 fun x -> (x : int -> bool :> 'a -> 'a);;

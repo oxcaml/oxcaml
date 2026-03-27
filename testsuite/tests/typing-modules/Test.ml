@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (* with module *)
 
@@ -122,14 +123,7 @@ F.x;; (* fail *)
 module F : (X : sig end) -> sig val x : int end
 Line 2, characters 0-1:
 2 | F.x;; (* fail *)
-<<<<<<< oxcaml
-    ^^^
-||||||| upstream-base
-    ^^^
-Error: The module F is a functor, it cannot have any components
-=======
     ^
->>>>>>> upstream-incoming
 Error: The module "F" is a functor, it cannot have any components
 |}];;
 
