@@ -575,6 +575,16 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        be clobbered in the middle. *)
     destroyed_r10
 
+let[@ocaml.warning "-4"] is_push_to_stack (basic : Cfg_intf.S.basic) =
+  match basic with
+  | Op (Specific Ipush_to_stack) -> true
+  | _ -> false
+
+let[@ocaml.warning "-4"] is_pop_from_stack (basic : Cfg_intf.S.basic) =
+  match basic with
+  | Op (Specific Ipop_from_stack) -> true
+  | _ -> false
+
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   match terminator with

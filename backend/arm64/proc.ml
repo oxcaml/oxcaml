@@ -356,6 +356,10 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
                      V512_of_scalar _ | Scalar_of_v512 _))
     -> Misc.fatal_error "arm64: got 256/512 bit vector"
 
+let is_push_to_stack (_ : Cfg_intf.S.basic) = false
+
+let is_pop_from_stack (_ : Cfg_intf.S.basic) = false
+
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   match terminator with
