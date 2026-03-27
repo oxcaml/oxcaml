@@ -93,20 +93,22 @@ m4_define([OCAML__RELEASE_EXTRA],
 
 # The magic numbers are made of three components:
 # - An 8-bytes prefix, common to all of them
-# - A 1-byte kind, specifying the file type (exeecutable, cmi, cmo, etc.)
-# - A 3-bytes version number
+# - A 1-byte kind, specifying the file type (executable, cmi, cmo, etc.)
+# - A variable-length version string, supplied at configure time
 
 m4_define([MAGIC_NUMBER__PREFIX], [Caml1999])
-m4_define([MAGIC_NUMBER__VERSION], [575])
 
 # The following macro is used to define all our magic numbers
 # Its first argument is the name of the file type described by that
 # magic number and its second argument is the character used to
-# characterize that file type
+# characterize that file type.
+# The version part is supplied at configure time via
+# --with-magic-number-version, so only the prefix and kind are
+# defined here.
 
 AC_DEFUN([DEFINE_MAGIC_NUMBER],
   [m4_define([$1__MAGIC_NUMBER],
-    [MAGIC_NUMBER__PREFIX[]$2[]MAGIC_NUMBER__VERSION])])
+    [MAGIC_NUMBER__PREFIX[]$2])])
 
 m4_define(EXEC__FORMAT, [X])
 DEFINE_MAGIC_NUMBER([EXEC], EXEC__FORMAT)
@@ -124,4 +126,3 @@ DEFINE_MAGIC_NUMBER([CMJ], [J])
 DEFINE_MAGIC_NUMBER([CMJA], [K])
 DEFINE_MAGIC_NUMBER([CFG], [G])
 DEFINE_MAGIC_NUMBER([LINEAR], [L])
-m4_define([MAGIC_NUMBER__LENGTH], m4_len(EXEC__MAGIC_NUMBER))

@@ -10,6 +10,7 @@
   pollInsertion ? false,
   runtime5 ? false,
   stackChecks ? false,
+  magicNumberVersion ? null,
   warnError ? true,
   oxcamlClang ? false,
   oxcamlLldb ? false,
@@ -41,7 +42,9 @@ let
       (mkFlag warnError "warn-error")
       (mkFlag ocamltest "ocamltest")
       (mkFlag syntaxQuotations "syntax-quotations")
-    ];
+    ]
+    ++ lib.optional (magicNumberVersion != null)
+      "--with-magic-number-version=${magicNumberVersion}";
 
 
   # Boot compilers
