@@ -11,20 +11,19 @@ let f bound r t =
 [%%expect_asm X86_64{|
 f:
   cmpq  $1, %rax
-  jl    .L120
-  movl  $1, %ebx
-.L108:
+  jl    .L121
+  sarq  $1, %rax
+  xorl  %ebx, %ebx
+.L109:
   movq  (%rdi), %rsi
-  leaq  -1(%rsi,%rbx), %rsi
+  leaq  (%rsi,%rbx,2), %rsi
   movq  %rsi, (%rdi)
+  incq  %rbx
   cmpq  %rax, %rbx
-  je    .L116
-  addq  $2, %rbx
-  jmp   .L108
-.L116:
+  jle   .L109
   movl  $1, %eax
   ret
-.L120:
+.L121:
   movl  $1, %eax
   ret
 |}]
