@@ -12,19 +12,18 @@ external set_tick_hook : (unit -> unit) -> unit = "set_tick_hook" [@@noalloc]
 
 external poll : unit -> unit = "%poll"
 
+let print_tick_interval () =
+  match Domain.Tick.global_effective_interval_usec () with
+  | Null -> Printf.printf "effective tick interval: none\n%!"
+  | This n -> Printf.printf "effective tick interval: %d\n%!" n
+
 let () =
-  Printf.printf "initial tick interval: %d\n%!"
-    (Domain.Tick.local_requested_interval_usec ());
-  Printf.printf "initial effective tick interval: %d\n%!"
-    (Domain.Tick.global_effective_interval_usec ());
+  print_tick_interval ();
   let ticks = Atomic.make 0 in
   set_tick_hook (fun () -> Atomic.incr ticks);
   let tick = Domain.Tick.acquire ~interval_usec:1_000 in
-  assert (Domain.Tick.local_requested_interval_usec () = 1_000);
-  Printf.printf "tick interval after set: %d\n%!"
-    (Domain.Tick.local_requested_interval_usec ());
-  Printf.printf "effective tick interval after set: %d\n%!"
-    (Domain.Tick.global_effective_interval_usec ());
+  print_endline "after set to 1000";
+  print_tick_interval ();
   let start = Sys.time () in
   while Atomic.get ticks = 0 do
     if (Sys.time () -. start) > 5.0
@@ -32,7 +31,5 @@ let () =
     else poll ()
   done;
   Domain.Tick.release tick;
-  Printf.printf "tick interval after set back to 0: %d\n%!"
-    (Domain.Tick.local_requested_interval_usec ());
-  Printf.printf "effective tick interval after set back to 0: %d\n%!"
-    (Domain.Tick.global_effective_interval_usec ())
+  print_endline "after release";
+  print_tick_interval ()

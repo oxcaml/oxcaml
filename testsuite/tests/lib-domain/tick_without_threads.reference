@@ -1,6 +1,5 @@
-initial tick interval: 0
-initial effective tick interval: 50000
-tick interval after set: 1000
-effective tick interval after set: 1000
-tick interval after set back to 0: 50000
-effective tick interval after set back to 0: 50000
+effective tick interval: none
+after set to 1000
+effective tick interval: 1000
+after release
+effective tick interval: none

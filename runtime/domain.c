@@ -1905,7 +1905,7 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
      (internal Memprof and finalisers), because they will already have set
      action_pending if needed. */
   if (caml_check_pending_signals() ||
-      atomic_load_acquire(&Caml_state->requested_tick) ||
+      atomic_load_relaxed(&Caml_state->requested_tick) ||
       caml_memprof_pending_external_interrupt(dom_st))
     caml_set_action_pending(dom_st);
 }
@@ -2026,7 +2026,7 @@ void caml_process_tick(void)
 
 CAMLextern void caml_stop_tick_thread(void)
 {
-  caml_plat_lock_non_blocking(&tick_thread.mutex);
+  caml_plat_lock_blocking(&tick_thread.mutex);
   if (tick_thread.running) {
     tick_thread.running = false;
     atomic_store_release(&tick_thread.stop, true);
@@ -2058,9 +2058,17 @@ CAMLextern uintnat caml_effective_tick_interval_usec(void) {
 
   uintnat res = Max_tick_interval_usec;
 
-  for (int i = 0; i < caml_params->max_domains; i++) {
+  /* See [caml_interrupt_all_signal_safe] for why reading from this array can
+     be done without any synchronization */
+  for (dom_internal *d = all_domains;
+       d < &all_domains[caml_params->max_domains];
+       d++) {
+    /* Early exit: if the current domain was never initialized, then
+       neither have been any of the remaining ones. */
+    if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
+
     uintnat dom_tick_interval =
-      atomic_load_relaxed(&all_domains[i].tick_interval_usec);
+      atomic_load_relaxed(&d->tick_interval_usec);
     if (dom_tick_interval == 0) { continue; }
     else if (dom_tick_interval < res) {
       res = dom_tick_interval;

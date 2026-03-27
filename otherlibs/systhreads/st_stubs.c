@@ -168,7 +168,11 @@ struct caml_thread_table {
 /* thread_table instance, up to caml_params->max_domains */
 static struct caml_thread_table* thread_table;
 
-/* How many ticks have we received since the last yield? */
+/* How many ticks have we received since the last yield?
+
+   Note this is per-domain to preserve historical behavior, but arguably this
+   should be per-thread so that it's actually a timeout for fairness.
+ */
 #define Ticks_elapsed thread_table[Caml_state->id].ticks_elapsed
 
 #define Locking_scheme(dom_id) (thread_table[dom_id].locking_scheme)
@@ -735,13 +739,8 @@ CAMLprim value caml_thread_initialize(value unit)
   return Val_unit;
 }
 
-/* Cleanup the thread machinery when the runtime is shut down. Joining the tick
-   thread take 25ms on average / 50ms in the worst case, so we don't do it on
-   program exit. (FIXME: not implemented in OCaml 5 yet) */
-
 CAMLprim value caml_thread_cleanup(value unit)
 {
-  caml_stop_tick_thread();
   return Val_unit;
 }
 
@@ -880,10 +879,10 @@ CAMLexport int caml_c_thread_register(void)
      domains. */
   const value* acquire_tick = caml_named_value("Domain.Tick.acquire");
   if (!acquire_tick) {
-    fprintf(stderr, "Fatal error: named value Domain.Tick.acquire not found");
-    exit(2);
+    caml_fatal_error("named value Domain.Tick.acquire not found");
   }
-  value tick = caml_callback_exn(*acquire_tick, Val_unit);
+  value tick =
+    caml_callback_exn(*acquire_tick, Val_long(Thread_timeout_usec));
   if (Is_exception_result(tick)) {
     caml_thread_remove_and_free(th);
     goto out_err;
@@ -917,8 +916,7 @@ CAMLexport int caml_c_thread_unregister(void)
   if (c_thread_tick != 0) {
     const value* release_tick = caml_named_value("Domain.Tick.release");
     if (!release_tick) {
-      fprintf(stderr, "Fatal error: named value Domain.Tick.release not found");
-      exit(2);
+      caml_fatal_error("Fatal error: named value Domain.Tick.release not found");
     }
     result = caml_callback_exn(*release_tick, Val_long(c_thread_tick));
   }
