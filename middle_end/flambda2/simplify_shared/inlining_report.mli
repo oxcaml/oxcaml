@@ -34,6 +34,8 @@ module Context : sig
       pass : Pass.t
     }
 
+  val print_cost_metrics : Format.formatter -> Cost_metrics.t -> unit
+
   val print : Format.formatter -> t -> unit
 end
 

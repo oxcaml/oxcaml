@@ -1,0 +1,296 @@
+let $camlMatch_in_match_seq__first_const = Block 0 () in
+(let code rec inline(always) loopify(always) size(35)
+       aux_1 (acc, s : val)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let f = %project_value_slot.[`aux`].[`f`] (my_closure) in
+   let next = %project_value_slot.[`aux`].[`next`] (my_closure) in
+   apply inlined(hint) next (s) -> k3 * k2
+     where k3 (`*match*` : [ 0 | 0 of val * val ]) =
+       ((let prim = %is_int (`*match*`) in
+         let Pisint = %tag_imm (prim) in
+         (let untagged = %untag_imm (Pisint) in
+          switch untagged
+            | 0 -> k4
+            | 1 -> k1 (acc))
+           where k4 =
+             cont k3)
+          where k3 =
+            let Pfield = %block_load.[`1`] (`*match*`) in
+            ((let Pfield_1 = %block_load.[`0`] (`*match*`) in
+              apply f (acc, Pfield_1) -> k3 * k2)
+               where k3 (apply_result) =
+                 apply direct(aux_1)
+                   my_closure ~ depth my_depth -> next_depth
+                     (apply_result, Pfield)
+                     -> k1 * k2))
+ in
+ let code inline(always) size(52)
+       fold_left_0 (f : val, acc, param : [ 0 of [ 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let `*match*` = %block_load.[`0`] (param) in
+   let next = %block_load.[`1`] (`*match*`) in
+   let aux = closure aux_1 @aux with { f = f; next = next } in
+   let Pfield = %block_load.[`0`] (`*match*`) in
+   apply direct(aux_1) aux (acc, Pfield) -> k1 * k2
+ in
+ let code size(39)
+       `fn[match_in_match_seq.ml:35,14--125]_3` (s : val)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * val ] =
+   let next_depth = rec_info (succ my_depth) in
+   let next =
+     %project_value_slot.[`fn[match_in_match_seq.ml:35,14--125]`].[`next_1`]
+       (my_closure)
+   in
+   let f =
+     %project_value_slot.[`fn[match_in_match_seq.ml:35,14--125]`].[`f_1`]
+       (my_closure)
+   in
+   apply inlined(hint) next (s) -> k3 * k2
+     where k3 (`*match*` : [ 0 | 0 of val * val ]) =
+       ((let prim = %is_int (`*match*`) in
+         let Pisint = %tag_imm (prim) in
+         (let untagged = %untag_imm (Pisint) in
+          switch untagged
+            | 0 -> k4
+            | 1 -> k1 (0))
+           where k4 =
+             cont k3)
+          where k3 =
+            let Pfield = %block_load.[`1`] (`*match*`) in
+            ((let Pfield_1 = %block_load.[`0`] (`*match*`) in
+              apply f (Pfield_1) -> k3 * k2)
+               where k3 (apply_result : val) =
+                 let Pmakeblock = %block.[`0`] (apply_result, Pfield) in
+                 cont k1 (Pmakeblock)))
+ in
+ let code inline(always) size(65)
+       map_2 (f : val, param : [ 0 of [ 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 of [ 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let `*match*` = %block_load.[`0`] (param) in
+   let next = %block_load.[`1`] (`*match*`) in
+   let `fn[match_in_match_seq.ml:35,14--125]` =
+     closure `fn[match_in_match_seq.ml:35,14--125]_3`
+       @`fn[match_in_match_seq.ml:35,14--125]`
+   with { f_1 = f; next_1 = next }
+   in
+   let Pfield = %block_load.[`0`] (`*match*`) in
+   let Pmakeblock =
+     %block.[`0`] (Pfield, `fn[match_in_match_seq.ml:35,14--125]`)
+   in
+   let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+   cont k1 (Pmakeblock_1)
+ in
+ let code rec inline(always) loopify(always) size(56)
+       aux_5 (s : val)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * val ] =
+   let next_depth = rec_info (succ my_depth) in
+   let next = %project_value_slot.[`aux_1`].[`next_2`] (my_closure) in
+   let f = %project_value_slot.[`aux_1`].[`f_2`] (my_closure) in
+   apply inlined(hint) next (s) -> k3 * k2
+     where k3 (`*match*` : [ 0 | 0 of val * val ]) =
+       ((let prim = %is_int (`*match*`) in
+         let Pisint = %tag_imm (prim) in
+         (let untagged = %untag_imm (Pisint) in
+          switch untagged
+            | 0 -> k4
+            | 1 -> k1 (0))
+           where k4 =
+             cont k3)
+          where k3 =
+            let s' = %block_load.[`1`] (`*match*`) in
+            let x = %block_load.[`0`] (`*match*`) in
+            (apply f (x) -> k5 * k2
+               where k5 (apply_result : imm tagged) =
+                 ((let untagged = %untag_imm (apply_result) in
+                   switch untagged
+                     | 0 -> k5
+                     | 1 -> k6)
+                    where k6 =
+                      cont k3
+                    where k5 =
+                      cont k4)
+               where k4 =
+                 apply direct(aux_5)
+                   (my_closure ~ depth my_depth -> next_depth
+                    : _ -> [ 0 | 0 of val * val ])
+                     (s')
+                     -> k1 * k2
+               where k3 =
+                 let Pmakeblock = %block.[`0`] (x, s') in
+                 cont k1 (Pmakeblock)))
+ in
+ let code inline(always) size(82)
+       filter_4 (f : val, param : [ 0 of [ 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 of [ 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let `*match*` = %block_load.[`0`] (param) in
+   let next = %block_load.[`1`] (`*match*`) in
+   let aux = closure aux_5 @aux_1 with { f_2 = f; next_2 = next } in
+   let Pfield = %block_load.[`0`] (`*match*`) in
+   let Pmakeblock = %block.[`0`] (Pfield, aux) in
+   let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+   cont k1 (Pmakeblock_1)
+ in
+ let code inline(always) size(14)
+       unfold_6 (f : val, acc : val)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 of [ 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let Pmakeblock = %block.[`0`] (acc, f) in
+   let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+   cont k1 (Pmakeblock_1)
+ in
+ let code inline(always) size(5)
+       square_7 (x : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let int_mul = %int_barith.mul (x, x) in
+   cont k1 (int_mul)
+ in
+ let code size(27)
+       `fn[match_in_match_seq.ml:55,11--63]_9` (i : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val * val ] =
+   let next_depth = rec_info (succ my_depth) in
+   let hi =
+     %project_value_slot.[`fn[match_in_match_seq.ml:55,11--63]`].[`hi`]
+       (my_closure)
+   in
+   (let prim = %int_comp.gt (i, hi) in
+    let int_greaterthan = %tag_imm (prim) in
+    (let untagged = %untag_imm (int_greaterthan) in
+     switch untagged
+       | 0 -> k4
+       | 1 -> k1 (0))
+      where k4 =
+        cont k3)
+     where k3 =
+       let int_add = %int_barith.add (i, 1) in
+       let Pmakeblock = %block.[`0`] (i, int_add) in
+       cont k1 (Pmakeblock)
+ in
+ let code inline(always) size(40)
+       ints_8 (lo : imm tagged, hi : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 of [ 0 of val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let unfold = %project_value_slot.[`ints`].[`unfold`] (my_closure) in
+   let `fn[match_in_match_seq.ml:55,11--63]` =
+     closure `fn[match_in_match_seq.ml:55,11--63]_9`
+       @`fn[match_in_match_seq.ml:55,11--63]`
+   with { hi = hi }
+   in
+   apply direct(unfold_6)
+     (unfold : _ -> [ 0 of [ 0 of val * val ] ])
+       (`fn[match_in_match_seq.ml:55,11--63]`, lo)
+       -> k1 * k2
+ in
+ let code size(3)
+       `fn[match_in_match_seq.ml:57,33--36]_11`
+         (prim : imm tagged, prim_1 : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let int_add = %int_barith.add (prim, prim_1) in
+   cont k1 (int_add)
+ in
+ let code inline(always) size(16)
+       sum_10 (s : [ 0 of [ 0 of val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let fold_left = %project_value_slot.[`sum`].[`fold_left`] (my_closure) in
+   let `fn[match_in_match_seq.ml:57,33--36]` =
+     closure `fn[match_in_match_seq.ml:57,33--36]_11`
+       @`fn[match_in_match_seq.ml:57,33--36]`
+   in
+   apply direct(fold_left_0)
+     (fold_left : _ -> imm tagged)
+       (`fn[match_in_match_seq.ml:57,33--36]`, 0, s)
+       -> k1 * k2
+ in
+ let code size(5)
+       `fn[match_in_match_seq.ml:60,28--44]_13` (i : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let prim = %int_comp.gt (i, 5) in
+   let int_greaterthan = %tag_imm (prim) in
+   cont k1 (int_greaterthan)
+ in
+ let code size(33)
+       foo_12 (param : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let map = %project_value_slot.[`foo`].[`map`] (my_closure) in
+   let square = %project_value_slot.[`foo`].[`square`] (my_closure) in
+   let ints = %project_value_slot.[`foo`].[`ints`] (my_closure) in
+   let sum = %project_value_slot.[`foo`].[`sum`] (my_closure) in
+   let filter = %project_value_slot.[`foo`].[`filter`] (my_closure) in
+   apply direct(ints_8)
+     (ints : _ -> [ 0 of [ 0 of val * val ] ]) (0, 11) -> k5 * k2
+     where k5 (apply_result : [ 0 of [ 0 of val * val ] ]) =
+       let `fn[match_in_match_seq.ml:60,28--44]` =
+         closure `fn[match_in_match_seq.ml:60,28--44]_13`
+           @`fn[match_in_match_seq.ml:60,28--44]`
+       in
+       apply direct(filter_4)
+         (filter : _ -> [ 0 of [ 0 of val * val ] ])
+           (`fn[match_in_match_seq.ml:60,28--44]`, apply_result)
+           -> k4 * k2
+     where k4 (apply_result : [ 0 of [ 0 of val * val ] ]) =
+       apply direct(map_2)
+         (map : _ -> [ 0 of [ 0 of val * val ] ])
+           (square, apply_result)
+           -> k3 * k2
+     where k3 (apply_result : [ 0 of [ 0 of val * val ] ]) =
+       apply direct(sum_10) (sum : _ -> imm tagged) (apply_result) -> k1 * k2
+ in
+ (let fold_left = closure fold_left_0 @fold_left in
+  let map = closure map_2 @map in
+  let filter = closure filter_4 @filter in
+  let unfold = closure unfold_6 @unfold in
+  let square = closure square_7 @square in
+  let ints = closure ints_8 @ints with { unfold = unfold } in
+  let sum = closure sum_10 @sum with { fold_left = fold_left } in
+  let foo = closure foo_12 @foo
+  with {
+    map = map;
+    filter = filter;
+    square = square;
+    ints = ints;
+    sum = sum
+  }
+  in
+  let Pmakeblock = %block.[`0`] (foo) in
+  cont k1 (Pmakeblock))
+   where k1 (Seq : val) =
+     let Pmakeblock = %block.[`0`] (Seq) in
+     cont k (Pmakeblock))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
+    let $camlMatch_in_match_seq = Block 0 (field_0) in
+    cont done ($camlMatch_in_match_seq)
