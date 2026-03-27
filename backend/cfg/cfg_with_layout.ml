@@ -115,7 +115,9 @@ let is_trap_handler t label =
 
 let dump ppf t ~msg =
   let open Format in
-  let ssa = Cfg_ssa.build t.cfg in
+  let ssa =
+    if !Oxcaml_flags.dump_cfg_ssa then Cfg_ssa.build t.cfg else Cfg_ssa.empty
+  in
   fprintf ppf "\ncfg for %s\n" msg;
   fprintf ppf "%s\n" t.cfg.fun_name;
   let regalloc =

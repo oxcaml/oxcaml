@@ -49,6 +49,8 @@ type entry =
 
 type t
 
+val empty : t
+
 val build : Cfg.t -> t
 
 val find : t -> Reg.t -> entry option

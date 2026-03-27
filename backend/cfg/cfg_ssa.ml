@@ -23,6 +23,8 @@ type entry =
 
 type t = entry Reg.Tbl.t
 
+let empty : t = Reg.Tbl.create 0
+
 let build (cfg : Cfg.t) : t =
   let table : t = Reg.Tbl.create 64 in
   let predecessor_index preds label =
