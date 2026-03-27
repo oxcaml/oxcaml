@@ -36,8 +36,8 @@ let expand_position pos len =
     (* New last position *)
     first_nonexpanded_pos := pos + len + 2
 
-let input_argument name =
-  let filename = Toploop.filename_of_input name in
+let input_argument (name : Opttoploop.input) =
+  let filename = Opttoploop.filename_of_input name in
   let ppf = Format.err_formatter in
   if Filename.check_suffix filename ".cmxs"
     || Filename.check_suffix filename ".cmx"
@@ -50,7 +50,7 @@ let input_argument name =
     *)
     Printf.eprintf "For implementation reasons, the toplevel does not support\
     \ having script files (here %S) inside expanded arguments passed through\
-    \ the -args{,0} command-line option.\n" name;
+    \ the -args{,0} command-line option.\n" filename;
     raise (Exit_with_status 2)
   end else begin
     let newargs = Array.sub !argv !Arg.current
@@ -58,10 +58,12 @@ let input_argument name =
       in
       Compmisc.read_clflags_from_env ();
       if Opttoploop.prepare ppf ~input:name () &&
-         Opttoploop.run_script ppf name newargs
+         Opttoploop.run_script ppf filename newargs
       then raise (Exit_with_status 0)
       else raise (Exit_with_status 2)
     end
+
+let file_argument x = input_argument (Opttoploop.File x)
 
 let wrap_expand f s =
   let start = !current in
@@ -86,6 +88,7 @@ let () =
   Clflags.include_dirs := List.rev_append extra_paths !Clflags.include_dirs
 
 let main () =
+  let ppf = Format.err_formatter in
   Clflags.native_code := true;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   let list = ref Options.list in
@@ -99,7 +102,7 @@ let main () =
                       raise (Exit_with_status 0)
   end;
   Compmisc.read_clflags_from_env ();
-  if not (Toploop.prepare ppf ()) then raise (Exit_with_status 2);
+  if not (Opttoploop.prepare ppf ()) then raise (Exit_with_status 2);
   Compmisc.init_path ();
   Opttoploop.loop Format.std_formatter
 

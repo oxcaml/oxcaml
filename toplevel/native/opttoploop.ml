@@ -361,7 +361,7 @@ let outval_of_id env id val_type =
 (* Print the outcome of an evaluation *)
 
 let pr_item =
-  Printtyp.print_items
+  Out_type.print_items
     (fun env -> function
       | Sig_value(id, {val_kind = Val_reg _; val_type; _}, _) ->
          Some (outval_of_id env id val_type)
@@ -523,7 +523,7 @@ let execute_phrase print_outcome ppf phr =
                       match sg' with
                       | [ Sig_value (id, vd, _) ] ->
                           let outv = outval_of_id newenv id vd.val_type in
-                          let ty = Printtyp.tree_of_type_scheme vd.val_type in
+                          let ty = Out_type.tree_of_type_scheme vd.val_type in
                           Ophr_eval (outv, ty)
                       | _ -> assert false
                     else
@@ -852,10 +852,7 @@ let run_script ppf name args =
 let preload_objects = ref []
 
 let prepare ppf ?input () =
-  let dir =
-    (* CR sspies: Not sure we want to depend on the toploop like this. *)
-    Option.map (fun inp -> Filename.dirname (Toploop.filename_of_input inp)) input in
-  Topcommon.set_paths ?dir ();
+  set_paths ();
   begin try
     initialize_toplevel_env ()
   with Env.Error _ | Typetexp.Error _ as exn ->

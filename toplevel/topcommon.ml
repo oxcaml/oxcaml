@@ -253,10 +253,6 @@ let typecheck_phrase ppf oldenv oldsig sstr =
   in
   if !Clflags.dump_typedtree then Printtyped.implementation ppf str;
   let sg' = Typemod.Signature_names.simplify newenv sn sg in
-  (* CR sspies: I have very low confidence in this change, since we used to
-     compute the old signature above differently.
-
-     dkalinichenko: I think this looks right. *)
   let modes = Includemod.modes_toplevel in
   Includemod.check_implementation oldenv ~modes sg sg';
   Typecore.force_delayed_checks ();

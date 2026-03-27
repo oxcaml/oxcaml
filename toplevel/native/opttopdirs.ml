@@ -136,14 +136,15 @@ let match_printer_type ppf desc typename =
   let printer_type =
     match
       Env.find_type_by_name
-        (Ldot(Lident "Opttopdirs", typename)) !toplevel_env
+        (Ldot(Location.mknoloc (Lident "Opttopdirs"),
+              Location.mknoloc typename)) !toplevel_env
     with
     | (path, _) -> path
     | exception Not_found ->
         fprintf ppf "Cannot find type Topdirs.%s.@." typename;
         raise Exit
   in
-  Ctype.with_local_level ~post:Ctype.generalize (fun () ->
+  Ctype.with_local_level_generalize (fun () ->
     let ty_arg = Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument) in
     Ctype.unify !toplevel_env
       (Ctype.newconstr printer_type [ty_arg])
@@ -160,13 +161,13 @@ let find_printer_type ppf lid =
         | ty_arg -> (ty_arg, path, true)
         | exception Ctype.Unify _ ->
             fprintf ppf "%a has a wrong type for a printing function.@."
-              (Format_doc.compat Printtyp.longident) lid;
+              Printtyp.longident lid;
             raise Exit
       end
   end
   | exception Not_found ->
       fprintf ppf "Unbound value %a.@."
-        (Format_doc.compat Printtyp.longident) lid;
+        Printtyp.longident lid;
       raise Exit
 
 let dir_install_printer ppf lid =
@@ -188,7 +189,7 @@ let dir_remove_printer ppf lid =
       remove_printer path
     with Not_found ->
       fprintf ppf "No printer named %a.@."
-        (Format_doc.compat Printtyp.longident) lid
+        Printtyp.longident lid
     end
   with Exit -> ()
 

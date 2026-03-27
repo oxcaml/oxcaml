@@ -113,7 +113,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         for i = start_offset to O.size obj - 1 do
           let arg = O.field obj i in
           if is_null arg then
-            list := Oval_constr (Oide_ident (Out_type.Out_name.create "<null>"), []) :: !list
+            list :=
+              Oval_constr (Oide_ident (Out_type.Out_name.create "<null>"), [])
+              :: !list
           else if not (O.is_block arg) then
             list := Oval_int (O.obj arg : int) :: !list
                (* Note: this could be a char or a constant constructor... *)
