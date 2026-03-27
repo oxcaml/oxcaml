@@ -44,6 +44,7 @@ enum {
   CLOSURES = 2,                 /* Flag to allow marshaling code pointers */
   COMPAT_32 = 4                 /* Flag to ensure that output can safely
                                    be read back on a 32-bit platform */
+  COMPRESSED = 8                /* Flag to request compression if available */
 };
 
 static int extern_flags;        /* logical or of some of the flags above */
@@ -872,7 +873,9 @@ static void extern_rec(value v)
   /* Never reached as function leaves with return */
 }
 
-static int extern_flag_values[] = { NO_SHARING, CLOSURES, COMPAT_32 };
+static int extern_flag_values[] = {
+  NO_SHARING, CLOSURES, COMPAT_32, COMPRESSED
+};
 
 static intnat extern_value(value v, value flags,
                            /*out*/ char header[32],
@@ -881,6 +884,8 @@ static intnat extern_value(value v, value flags,
   intnat res_len;
   /* Parse flag list */
   extern_flags = caml_convert_flag_list(flags, extern_flag_values);
+  /* Turn compression off */
+  s->extern_flags &= ~COMPRESSED;
   /* Initializations */
   obj_counter = 0;
   size_32 = 0;
@@ -1383,4 +1388,10 @@ CAMLprim value caml_obj_uniquely_reachable_words(value v)
   Field(ret, 0) = sizes_by_root_id;
   Field(ret, 1) = Val_long(shared_size);
   CAMLreturn(ret);
+}
+
+/* Taken from zstd.c in runtime5 */
+CAMLprim value caml_zstd_initialize(value vunit)
+{
+  return Val_false;
 }
