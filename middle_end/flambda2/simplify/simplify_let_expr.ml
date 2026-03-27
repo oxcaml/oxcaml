@@ -199,7 +199,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
             let required_by_lifted_constants =
               (not (Name_mode.Or_absent.is_present greatest_name_mode))
               && at_unit_toplevel
-              && not no_constants_to_place
+              && (not no_constants_to_place)
               && Bound_pattern.exists_all_bound_vars bound_vars
                    ~f:(fun bound_var ->
                      Name.Set.mem
