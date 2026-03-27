@@ -73,6 +73,27 @@ Line 3, characters 17-18:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
+let foo () =
+    let l = lazy (let x @ shareable = fun x -> x in x) in
+    use_portable l
+[%%expect{|
+Line 3, characters 17-18:
+3 |     use_portable l
+                     ^
+Error: This value is "shareable" but is expected to be "portable".
+|}]
+
+let foo () =
+    let l = lazy (let x @ corruptable = fun x -> x in x) in
+    use_portable l
+[%%expect{|
+Line 3, characters 17-18:
+3 |     use_portable l
+                     ^
+Error: This value is "corruptable" but is expected to be "portable".
+|}]
+
+
 (* thunk is evaluated only when [uncontended] lazy is forced, so the thunk can be
     [nonportable] even if the lazy is [portable]. *)
 let foo (x @ nonportable) =
@@ -80,6 +101,24 @@ let foo (x @ nonportable) =
     use_portable l
 [%%expect{|
 val foo : 'a -> unit = <fun>
+|}]
+
+(* thunk is evaluated only when [uncontended] lazy is forced, so the thunk can be
+    [shareable] even if the lazy is [portable]. *)
+let foo (x @ shareable) =
+    let l = lazy (let _ = x in ()) in
+    use_portable l
+[%%expect{|
+val foo : 'a @ shareable -> unit = <fun>
+|}]
+
+(* thunk is evaluated only when [uncontended] lazy is forced, so the thunk can be
+    [corruptable] even if the lazy is [portable]. *)
+let foo (x @ corruptable) =
+    let l = lazy (let _ = x in ()) in
+    use_portable l
+[%%expect{|
+val foo : 'a @ corruptable -> unit = <fun>
 |}]
 
 (* For the same reason, [portable] lazy can close over things at [uncontended]. *)
@@ -90,12 +129,50 @@ let foo (x @ uncontended) =
 val foo : 'a -> unit = <fun>
 |}]
 
+(* For the same reason, [portable] lazy can close over things at [shared]. *)
+let foo (x @ shared) =
+    let l @ portable = lazy ( let _x @ shared = x in ()) in
+    use_portable l
+[%%expect{|
+val foo : 'a @ shared -> unit = <fun>
+|}]
+
+(* For the same reason, [portable] lazy can close over things at [corrupted]. *)
+let foo (x @ corrupted) =
+    let l @ portable = lazy ( let _x @ corrupted = x in ()) in
+    use_portable l
+[%%expect{|
+val foo : 'a @ corrupted -> unit = <fun>
+|}]
+
 (* Portable lazy gives portable result *)
 let foo (x @ portable) =
     match x with
     | lazy r -> use_portable x
 [%%expect{|
 val foo : 'a lazy_t @ portable -> unit = <fun>
+|}]
+
+(* Shareable lazy gives shareable result *)
+let foo (x @ shareable) =
+    match x with
+    | lazy r -> use_portable x
+[%%expect{|
+Line 3, characters 29-30:
+3 |     | lazy r -> use_portable x
+                                 ^
+Error: This value is "shareable" but is expected to be "portable".
+|}]
+
+(* Corruptable lazy gives corruptable result *)
+let foo (x @ corruptable) =
+    match x with
+    | lazy r -> use_portable x
+[%%expect{|
+Line 3, characters 29-30:
+3 |     | lazy r -> use_portable x
+                                 ^
+Error: This value is "corruptable" but is expected to be "portable".
 |}]
 
 (* Nonportable lazy gives nonportable result *)
@@ -119,6 +196,32 @@ Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
 Error: This value is "contended"
+       but is expected to be "uncontended"
+         because it is a lazy value being forced.
+|}]
+
+(* as above, but with shared *)
+let foo (x @ shared) =
+    match x with
+    | lazy _ -> ()
+[%%expect{|
+Line 3, characters 6-12:
+3 |     | lazy _ -> ()
+          ^^^^^^
+Error: This value is "shared"
+       but is expected to be "uncontended"
+         because it is a lazy value being forced.
+|}]
+
+(* as above, but with corrupted *)
+let foo (x @ corrupted) =
+    match x with
+    | lazy _ -> ()
+[%%expect{|
+Line 3, characters 6-12:
+3 |     | lazy _ -> ()
+          ^^^^^^
+Error: This value is "corrupted"
        but is expected to be "uncontended"
          because it is a lazy value being forced.
 |}]

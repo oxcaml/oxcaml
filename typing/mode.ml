@@ -509,19 +509,23 @@ module Lattices = struct
   end
 
   module Portability = struct
+    (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
-      | Portable
-      | Shareable
-      | Nonportable
+      | Portable (* 0b00 *)
+      | Shareable (* 0b01 *)
+      | Corruptable (* 0b10 *)
+      | Nonportable (* 0b11 *)
 
-    include Total (struct
+    include Diamond (struct
       type nonrec t = t
 
       let min = Portable
 
-      let max = Nonportable
+      let fst = Shareable
 
-      let ord = function Portable -> 0 | Shareable -> 1 | Nonportable -> 2
+      let snd = Corruptable
+
+      let max = Nonportable
     end)
 
     let legacy = Nonportable
@@ -529,29 +533,35 @@ module Lattices = struct
     let print ppf = function
       | Portable -> Fmt.fprintf ppf "portable"
       | Shareable -> Fmt.fprintf ppf "shareable"
+      | Corruptable -> Fmt.fprintf ppf "corruptable"
       | Nonportable -> Fmt.fprintf ppf "nonportable"
   end
 
   module Contention = struct
+    (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
-      | Uncontended
-      | Shared
-      | Contended
+      | Uncontended (* 0b00 *)
+      | Corrupted (* 0b01 *)
+      | Shared (* 0b10 *)
+      | Contended (* 0b11 *)
 
-    include Total (struct
+    include Diamond (struct
       type nonrec t = t
 
       let min = Uncontended
 
-      let max = Contended
+      let fst = Corrupted
 
-      let ord = function Uncontended -> 0 | Shared -> 1 | Contended -> 2
+      let snd = Shared
+
+      let max = Contended
     end)
 
     let legacy = Uncontended
 
     let print ppf = function
       | Contended -> Fmt.fprintf ppf "contended"
+      | Corrupted -> Fmt.fprintf ppf "corrupted"
       | Shared -> Fmt.fprintf ppf "shared"
       | Uncontended -> Fmt.fprintf ppf "uncontended"
   end
@@ -1719,11 +1729,13 @@ module Lattices_mono = struct
   let portable_to_contended = function
     | Portability.Portable -> Contention.Contended
     | Portability.Shareable -> Contention.Shared
+    | Portability.Corruptable -> Contention.Corrupted
     | Portability.Nonportable -> Contention.Uncontended
 
   let contended_to_portable = function
     | Contention.Contended -> Portability.Portable
     | Contention.Shared -> Portability.Shareable
+    | Contention.Corrupted -> Portability.Corruptable
     | Contention.Uncontended -> Portability.Nonportable
 
   let local_to_regional = function
@@ -2621,6 +2633,9 @@ module Report = struct
          uncontended is expected. *)
       Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
         C.Contention.Uncontended
+    | `Expected, Contention_op, Corrupted ->
+      Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Corrupted
+        mode_printer C.Contention.Uncontended
     | `Expected, Visibility_op, Read ->
       Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
         C.Visibility.Read_write
