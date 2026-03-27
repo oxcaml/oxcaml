@@ -55,10 +55,6 @@ val find : t -> Reg.t -> entry option
 
 val iter : t -> f:(Reg.t -> entry -> unit) -> unit
 
-(** [is_ssa t reg] returns [true] if [reg] has a single static assignment
-    (Output, OverwrittenOutput, or Phi). *)
-val is_ssa : t -> Reg.t -> bool
-
 (** [has_ssa_semantics_at t cfg ~at_block reg] checks whether [reg] has an SSA
     value and if using [reg] in block [block] coincides with SSA semantics. This
     does *NOT* check for dominance. Instead, the one case this filters out is

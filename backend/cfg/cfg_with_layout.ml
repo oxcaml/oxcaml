@@ -174,7 +174,17 @@ let dump ppf t ~msg =
     print_phis ppf block;
     DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
         let assign_symbol =
-          if Array.for_all (Cfg_ssa.is_ssa ssa) instr.res then "<-" else ":="
+          if
+            Array.for_all
+              (fun reg ->
+                match[@ocaml.warning "-4"] Cfg_ssa.find ssa reg with
+                | Some (Output { instr = def_instr; _ })
+                | Some (OverwrittenOutput { instr = def_instr; _ }) ->
+                  InstructionId.equal instr.id def_instr.id
+                | _ -> false)
+              instr.res
+          then "<-"
+          else ":="
         in
         fprintf ppf "(id:%a) %a" InstructionId.format instr.id
           (fun ppf i -> Cfg.print_basic' ~assign_symbol ppf i)

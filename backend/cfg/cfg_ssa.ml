@@ -128,11 +128,6 @@ let find table reg = Reg.Tbl.find_opt table reg
 
 let iter table ~f = Reg.Tbl.iter f table
 
-let is_ssa table reg =
-  match Reg.Tbl.find_opt table reg with
-  | Some (Output _ | OverwrittenOutput _ | Phi _) -> true
-  | Some NotSSA | None -> false
-
 let has_ssa_semantics_at table cfg ~at_block reg =
   match[@ocaml.warning "-4"] Reg.Tbl.find_opt table reg with
   | Some (Output _ | OverwrittenOutput _) -> true
