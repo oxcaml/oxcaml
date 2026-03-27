@@ -38,17 +38,17 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
    apply direct(aux_1) aux (acc, Pfield) -> k1 * k2
  in
  let code size(39)
-       `fn[match_in_match_seq.ml:29,14--125]_3` (s : val)
+       `fn[match_in_match_seq.ml:35,14--125]_3` (s : val)
          my_closure _region _ghost_region my_depth
          -> k1 * k2
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
    let next =
-     %project_value_slot.[`fn[match_in_match_seq.ml:29,14--125]`].[`next_1`]
+     %project_value_slot.[`fn[match_in_match_seq.ml:35,14--125]`].[`next_1`]
        (my_closure)
    in
    let f =
-     %project_value_slot.[`fn[match_in_match_seq.ml:29,14--125]`].[`f_1`]
+     %project_value_slot.[`fn[match_in_match_seq.ml:35,14--125]`].[`f_1`]
        (my_closure)
    in
    apply inlined(hint) next (s) -> k3 * k2
@@ -77,14 +77,14 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
    let next_depth = rec_info (succ my_depth) in
    let `*match*` = %block_load.[`0`] (param) in
    let next = %block_load.[`1`] (`*match*`) in
-   let `fn[match_in_match_seq.ml:29,14--125]` =
-     closure `fn[match_in_match_seq.ml:29,14--125]_3`
-       @`fn[match_in_match_seq.ml:29,14--125]`
+   let `fn[match_in_match_seq.ml:35,14--125]` =
+     closure `fn[match_in_match_seq.ml:35,14--125]_3`
+       @`fn[match_in_match_seq.ml:35,14--125]`
    with { f_1 = f; next_1 = next }
    in
    let Pfield = %block_load.[`0`] (`*match*`) in
    let Pmakeblock =
-     %block.[`0`] (Pfield, `fn[match_in_match_seq.ml:29,14--125]`)
+     %block.[`0`] (Pfield, `fn[match_in_match_seq.ml:35,14--125]`)
    in
    let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
    cont k1 (Pmakeblock_1)
@@ -164,13 +164,13 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
    cont k1 (int_mul)
  in
  let code size(27)
-       `fn[match_in_match_seq.ml:49,11--63]_9` (i : imm tagged)
+       `fn[match_in_match_seq.ml:55,11--63]_9` (i : imm tagged)
          my_closure _region _ghost_region my_depth
          -> k1 * k2
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
    let hi =
-     %project_value_slot.[`fn[match_in_match_seq.ml:49,11--63]`].[`hi`]
+     %project_value_slot.[`fn[match_in_match_seq.ml:55,11--63]`].[`hi`]
        (my_closure)
    in
    (let prim = %int_comp.gt (i, hi) in
@@ -193,18 +193,18 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
          : [ 0 of [ 0 of val * val ] ] =
    let next_depth = rec_info (succ my_depth) in
    let unfold = %project_value_slot.[`ints`].[`unfold`] (my_closure) in
-   let `fn[match_in_match_seq.ml:49,11--63]` =
-     closure `fn[match_in_match_seq.ml:49,11--63]_9`
-       @`fn[match_in_match_seq.ml:49,11--63]`
+   let `fn[match_in_match_seq.ml:55,11--63]` =
+     closure `fn[match_in_match_seq.ml:55,11--63]_9`
+       @`fn[match_in_match_seq.ml:55,11--63]`
    with { hi = hi }
    in
    apply direct(unfold_6)
      (unfold : _ -> [ 0 of [ 0 of val * val ] ])
-       (`fn[match_in_match_seq.ml:49,11--63]`, lo)
+       (`fn[match_in_match_seq.ml:55,11--63]`, lo)
        -> k1 * k2
  in
  let code size(3)
-       `fn[match_in_match_seq.ml:51,33--36]_11`
+       `fn[match_in_match_seq.ml:57,33--36]_11`
          (prim : imm tagged, prim_1 : imm tagged)
          my_closure _region _ghost_region my_depth
          -> k1 * k2
@@ -220,17 +220,17 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
    let fold_left = %project_value_slot.[`sum`].[`fold_left`] (my_closure) in
-   let `fn[match_in_match_seq.ml:51,33--36]` =
-     closure `fn[match_in_match_seq.ml:51,33--36]_11`
-       @`fn[match_in_match_seq.ml:51,33--36]`
+   let `fn[match_in_match_seq.ml:57,33--36]` =
+     closure `fn[match_in_match_seq.ml:57,33--36]_11`
+       @`fn[match_in_match_seq.ml:57,33--36]`
    in
    apply direct(fold_left_0)
      (fold_left : _ -> imm tagged)
-       (`fn[match_in_match_seq.ml:51,33--36]`, 0, s)
+       (`fn[match_in_match_seq.ml:57,33--36]`, 0, s)
        -> k1 * k2
  in
  let code size(5)
-       `fn[match_in_match_seq.ml:54,28--44]_13` (i : imm tagged)
+       `fn[match_in_match_seq.ml:60,28--44]_13` (i : imm tagged)
          my_closure _region _ghost_region my_depth
          -> k1 * k2
          : imm tagged =
@@ -253,13 +253,13 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
    apply direct(ints_8)
      (ints : _ -> [ 0 of [ 0 of val * val ] ]) (0, 11) -> k5 * k2
      where k5 (apply_result : [ 0 of [ 0 of val * val ] ]) =
-       let `fn[match_in_match_seq.ml:54,28--44]` =
-         closure `fn[match_in_match_seq.ml:54,28--44]_13`
-           @`fn[match_in_match_seq.ml:54,28--44]`
+       let `fn[match_in_match_seq.ml:60,28--44]` =
+         closure `fn[match_in_match_seq.ml:60,28--44]_13`
+           @`fn[match_in_match_seq.ml:60,28--44]`
        in
        apply direct(filter_4)
          (filter : _ -> [ 0 of [ 0 of val * val ] ])
-           (`fn[match_in_match_seq.ml:54,28--44]`, apply_result)
+           (`fn[match_in_match_seq.ml:60,28--44]`, apply_result)
            -> k4 * k2
      where k4 (apply_result : [ 0 of [ 0 of val * val ] ]) =
        apply direct(map_2)

@@ -4,6 +4,12 @@
    { native with dump-raw, dump-simplify; check-fexpr-dump; }
 *)
 
+(* This test really requires O3 (or at least join points) for the
+   match-in-match optimization to work, so we need to force it here,
+   or else CI runs that set OCAMLPARAM to classic mode will fail on
+   this test *)
+[@@@ocaml.flambda_o3]
+
 (* This test is here to check that match-in-match triggers and adequately
    simplifies a test case on sequences (slightly different from the
    stdlib's sequences so that they are more easily optimized by flambda,
