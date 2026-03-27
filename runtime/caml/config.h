@@ -292,9 +292,6 @@ typedef uint64_t uintnat;
 /* Default size of runtime_events ringbuffers, in words, in powers of two */
 #define Default_runtime_events_log_wsize 16
 
-/* Maximum possible tick interval, in microseconds */
-#define Max_tick_interval_usec 50000
-
 /* Assumed size of cache line. This value can be bigger than the actual L1
    cache line size. Atomics allocated with aligned constructor are
    memory-aligned this value to avoid false sharing of cache line. */

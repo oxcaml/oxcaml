@@ -620,12 +620,18 @@ module Tick = struct
   module Runtime5 = struct
     module Registry : sig @@ portable
       type t : sync_data
+      type inner : mutable_data
 
       val create : unit -> t
 
+      val protect
+        : t
+        -> (inner -> 'r @ contended portable) @ local once portable
+        -> 'r @ contended portable
+
       (** These two functions return the new min interval *)
-      val add : t -> int -> int
-      val remove : t -> int -> int or_null
+      val add : inner -> int -> int
+      val remove : inner -> int -> int or_null
     end = struct
       (* NOTE this is extremely un-optimized; we assume that ticks are acquired
          and released relatively infrequently so the performance of registry
@@ -661,14 +667,20 @@ module Tick = struct
         }
       [@@unsafe_allow_any_mode_crossing "All accesses protected by mutex"]
 
+      type inner = t
+
       let create () =
         { inner = Inner.empty ()
         ; mutex = Mutex.create ()
         }
 
-      let protect t f = Mutex.protect t.mutex f
+      let protect t f =
+        (Mutex.protect
+          t.mutex
+          (fun () -> { Modes.Portended.portended = f t })).portended
 
-      let add t tick = protect t (fun () ->
+      (* Must be called from within [protect] *)
+      let add t tick =
         let inner' =
           Inner.update tick
             (function
@@ -677,9 +689,10 @@ module Tick = struct
             t.inner
         in
         t.inner <- inner';
-        Inner.min_binding inner' |> fst)
+        Inner.min_binding inner' |> fst
 
-      let remove t tick = protect t (fun () ->
+      (* Must be called from within [protect] *)
+      let remove t tick =
         let inner' =
           Inner.update tick
             (function
@@ -689,7 +702,7 @@ module Tick = struct
         in
         t.inner <- inner';
         if Inner.is_empty inner' then Null
-        else This (Inner.min_binding inner' |> fst))
+        else This (Inner.min_binding inner' |> fst)
     end
 
     (* NOTE: st_stubs.c relies on this being an int (and in particular not
@@ -720,34 +733,34 @@ module Tick = struct
           "caml_domain_set_tick_interval_usec"
 
     let acquire ~interval_usec =
-      let registry = local_registry () in
-      let interval = Registry.add registry interval_usec in
-      match set_tick_interval_usec interval with
-      | () -> interval_usec
-      | exception exn ->
-        let bt = Printexc.get_raw_backtrace () in
-        (* We might raise because we failed to start the tick thread, not just
-           because the interval was invalid. In that case, we don't want to
-           leave the domain's min requested tick interval in place - instead, we
-           use the interval returned by [Registry.remove] to set the tick
-           interval again. This will probably (though might not) fail because we
-           fail to start the tick thread again; in that case, it's fine to
-           re-raise that exception as the state should be the same as we left it
-           before calling [acquire] *)
-        (match Registry.remove registry interval_usec with
-         | This interval -> set_tick_interval_usec interval
-         | Null -> set_tick_interval_usec 0);
-        Printexc.raise_with_backtrace exn bt
+      Registry.protect (local_registry ()) (fun registry ->
+        let interval = Registry.add registry interval_usec in
+        match set_tick_interval_usec interval with
+        | () -> interval_usec
+        | exception exn ->
+          let bt = Printexc.get_raw_backtrace () in
+          (* We might raise because we failed to start the tick thread, not just
+             because the interval was invalid. In that case, we don't want to
+             leave the domain's min requested tick interval in place - instead,
+             we use the interval returned by [Registry.remove] to set the tick
+             interval again. This will probably (though might not) fail because
+             we fail to start the tick thread again; in that case, it's fine to
+             re-raise that exception as the state should be the same as we left
+             it before calling [acquire] *)
+          (match Registry.remove registry interval_usec with
+           | This interval -> set_tick_interval_usec interval
+           | Null -> set_tick_interval_usec 0);
+          Printexc.raise_with_backtrace exn bt)
 
     let release interval_usec =
-      let registry = local_registry () in
-      (* Note that the calls to [set_tick_interval_usec] can't raise here, as
-         we're neither setting the requested interval to a value we haven't
-         successfully set it to before, nor are we starting the tick thread. *)
-      match Registry.remove registry interval_usec with
-      | Null -> set_tick_interval_usec 0
-      | This interval -> set_tick_interval_usec interval
-
+      Registry.protect (local_registry ()) (fun registry ->
+        (* Note that the calls to [set_tick_interval_usec] can't raise here, as
+           we're neither setting the requested interval to a value we haven't
+           successfully set it to before, nor are we starting the tick
+           thread. *)
+        match Registry.remove registry interval_usec with
+        | Null -> set_tick_interval_usec 0
+        | This interval -> set_tick_interval_usec interval)
   end
 
   let impl =
@@ -759,11 +772,6 @@ module Tick = struct
 
   let () = Callback.Safe.register "Domain.Tick.acquire" acquire
   let () = Callback.Safe.register "Domain.Tick.release" release
-
-  external local_requested_interval_usec
-    : unit -> int @@ portable
-    = "caml_domain_get_tick_interval_usec"
-  [@@noalloc]
 
   external global_effective_interval_usec
     : (unit[@untagged]) -> (int[@untagged]) @@ portable

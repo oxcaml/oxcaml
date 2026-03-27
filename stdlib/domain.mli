@@ -227,14 +227,8 @@ module Tick : sig @@ portable
   *)
   val release : t @ unique -> unit
 
-  (** Returns the interval at which this domain has requested ticks.
-
-      This is the minimum of all [t]s which exist within this domain. *)
-  external local_requested_interval_usec
-    : unit -> int @@ portable
-    = "caml_domain_get_tick_interval_usec"
-  [@@noalloc]
-
+  (** Calculates and returns the interval at which the tick thread will tick.
+      This is the global minimum across all domains of live tick requests *)
   external global_effective_interval_usec
     : (unit[@untagged]) -> (int[@untagged]) @@ portable
     = "caml_effective_tick_interval_usec_bytecode"
