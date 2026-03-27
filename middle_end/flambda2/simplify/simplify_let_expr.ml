@@ -72,6 +72,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
   let no_constants_to_place =
     no_constants_from_defining_expr && UA.no_lifted_constants uacc
   in
+  let put_bindings_around_body uacc ~body =
   let uacc = UA.notify_removed ~operation:removed_operations uacc in
   let bindings =
     Simplify_named_result.bindings_to_place simplify_named_result
@@ -305,6 +306,8 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               ) ) ->
           Misc.fatal_errorf "Prim_rewrite applied to a non-prim Named.t"))
   in
+  EB.make_new_let_bindings uacc ~bindings_outermost_first:bindings ~body
+  in
   (* Return as quickly as possible if there is nothing to do. In this case, all
      constants get floated up to an outer binding. *)
   if no_constants_to_place || not at_unit_toplevel
@@ -319,7 +322,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
         |> UA.with_lifted_constants uacc
     in
     let body, uacc =
-      EB.make_new_let_bindings uacc ~bindings_outermost_first:bindings ~body
+      put_bindings_around_body uacc ~body
     in
     after_rebuild body uacc
   else
@@ -329,8 +332,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
     let body, uacc =
       EB.place_lifted_constants uacc ~lifted_constants_from_defining_expr
         ~lifted_constants_from_body
-        ~put_bindings_around_body:(fun uacc ~body ->
-          EB.make_new_let_bindings uacc ~bindings_outermost_first:bindings ~body)
+        ~put_bindings_around_body
         ~body
     in
     after_rebuild body uacc
