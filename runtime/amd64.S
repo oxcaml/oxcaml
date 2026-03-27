@@ -1475,6 +1475,14 @@ CFI_STARTPROC
         C_call  (GCALL(caml_get_preemption_effect)) /* %rax := Preemption */
         SWITCH_C_TO_OCAML
         movq    Caml_state(preemption), %rbx        /* %rbx := continuation */
+#ifdef DEBUG
+        /* Verify that the preemption continuation is freshly allocated */
+        leaq    -8(%rbx), %r11
+        cmp     %r11, %r15
+        je      1f
+        int3
+1:
+#endif
         /* Reset Caml_state->preemption back to Val_unit, indicating no
            preemption is scheduled */
         movq    $1, Caml_state(preemption)
