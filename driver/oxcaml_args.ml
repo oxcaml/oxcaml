@@ -678,6 +678,20 @@ let mk_no_reaper_change_calling_conventions f =
        functions%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
 
+let mk_simplify_stubs f =
+  ( "-flambda2-simplify-stubs",
+    Arg.Unit f,
+    Printf.sprintf
+      " Allow the simplification of stub functions%s (Flambda2 only)"
+      (format_default Flambda2.Default.simplify_stubs) )
+
+let mk_no_simplify_stubs f =
+  ( "-flambda2-no-simplify-stubs",
+    Arg.Unit f,
+    Printf.sprintf
+      " Prevent the simplification of stub functions%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.simplify_stubs) )
+
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
     Arg.Unit f,
@@ -1280,6 +1294,8 @@ module type Oxcaml_options = sig
   val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
+  val simplify_stubs : unit -> unit
+  val no_simplify_stubs : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -1459,6 +1475,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
       mk_no_reaper_change_calling_conventions
         F.no_reaper_change_calling_conventions;
+      mk_simplify_stubs F.simplify_stubs;
+      mk_no_simplify_stubs F.no_simplify_stubs;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -1783,6 +1801,9 @@ module Oxcaml_options_impl = struct
 
   let no_reaper_change_calling_conventions =
     clear Flambda2.reaper_change_calling_conventions
+
+  let simplify_stubs = set Flambda2.simplify_stubs
+  let no_simplify_stubs = clear Flambda2.simplify_stubs
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -2370,6 +2391,7 @@ module Extra_params = struct
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
+    | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
     | "dissector" -> set' Clflags.dissector
     | "dissector-partition-size" -> (
         match float_of_string_opt v with

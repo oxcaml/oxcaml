@@ -82,6 +82,11 @@ let compute_value_slot_types_inside_function ~value_slot_types
       type_prior_to_sets)
     value_slot_types
 
+let function_can_be_simplified code =
+  Code_or_metadata.code_present code
+  && ((not (Code_metadata.stub (Code_or_metadata.code_metadata code)))
+     || Flambda_features.simplify_stubs ())
+
 let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
     ~closure_bound_names_all_sets ~value_slot_types_inside_functions_all_sets
     ~old_to_new_code_ids_all_sets =
@@ -120,11 +125,7 @@ let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
                   (* The types of the functions involved should reference the
                      _new_ code IDs (where such exist), so that direct recursive
                      calls can be compiled straight to the new code. *)
-                  if
-                    Code_or_metadata.code_present code_or_metadata
-                    && not
-                         (Code_metadata.stub
-                            (Code_or_metadata.code_metadata code_or_metadata))
+                  if function_can_be_simplified code_or_metadata
                   then Code_id.Map.find old_code_id old_to_new_code_ids_all_sets
                   else old_code_id
                 in
@@ -225,9 +226,7 @@ let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
                 Misc.fatal_errorf "Missing code for %a" Code_id.print
                   old_code_id
             in
-            if
-              Code_or_metadata.code_present code
-              && not (Code_metadata.stub (Code_or_metadata.code_metadata code))
+            if function_can_be_simplified code
             then
               let new_code_id = Code_id.rename old_code_id in
               Code_id.Map.add old_code_id new_code_id old_to_new_code_ids
@@ -240,9 +239,7 @@ let bind_existing_code_to_new_code_ids denv ~old_to_new_code_ids_all_sets =
   Code_id.Map.fold
     (fun old_code_id new_code_id denv ->
       let code = DE.find_code_exn denv old_code_id in
-      if
-        Code_or_metadata.code_present code
-        && not (Code_metadata.stub (Code_or_metadata.code_metadata code))
+      if function_can_be_simplified code
       then
         let code =
           Code_or_metadata.get_code code
