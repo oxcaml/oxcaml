@@ -10,19 +10,14 @@ in
 let $camlArguments_for_unboxed_closure__id_6 = closure id_2_1 @`id` in
 let code inline(never) loopify(never) size(10) newer_version_of(u_4)
       u_4_1
-        (`u_into_my_closure_field_(g/2 ∷ 𝕍)_field_(x/0 ∷ 𝕍(immediate))`,
-         `u_into_my_closure_field_(g/2 ∷ 𝕍)_field_(y/1 ∷ 𝕍(immediate))`)
+        (u_into_my_closure_field_g_field_x, u_into_my_closure_field_g_field_y)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let `g_into_g_field_(x/0 ∷ 𝕍(immediate))` =
-    `u_into_my_closure_field_(g/2 ∷ 𝕍)_field_(x/0 ∷ 𝕍(immediate))`
-  in
-  let `g_into_g_field_(y/1 ∷ 𝕍(immediate))` =
-    `u_into_my_closure_field_(g/2 ∷ 𝕍)_field_(y/1 ∷ 𝕍(immediate))`
-  in
-  let y = `g_into_g_field_(y/1 ∷ 𝕍(immediate))` in
-  let x = `g_into_g_field_(x/0 ∷ 𝕍(immediate))` in
+  let g_into_g_field_x = u_into_my_closure_field_g_field_x in
+  let g_into_g_field_y = u_into_my_closure_field_g_field_y in
+  let y = g_into_g_field_y in
+  let x = g_into_g_field_x in
   apply direct(id_2_1) inlining_state(depth(1))
     $camlArguments_for_unboxed_closure__id_6 (y) -> k2 * k1
     where k2 (apply_result : imm tagged) =
@@ -39,11 +34,11 @@ in
 let $camlArguments_for_unboxed_closure__unused_7 = closure unused_3_1 @unused
 in
 let code loopify(never) size(11) newer_version_of(g_1)
-      g_1_1 (`g_into_my_closure_field_(x/0 ∷ 𝕍(immediate))`, h : val)
+      g_1_1 (g_into_my_closure_field_x, h : val)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let x = `g_into_my_closure_field_(x/0 ∷ 𝕍(immediate))` in
+  let x = g_into_my_closure_field_x in
   apply h (0) -> k2 * k1
     where k2 (apply_result : imm tagged) =
       let int_add = %int_barith.add (x, apply_result) in
@@ -55,24 +50,16 @@ let code loopify(never) size(52) newer_version_of(f_0)
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
-  let `g_into_g_field_(x/0 ∷ 𝕍(immediate))` = x in
-  let `g_into_g_field_(y/1 ∷ 𝕍(immediate))` = y in
-  let `u_into_u_field_(g/2 ∷ 𝕍)_field_(x/0 ∷ 𝕍(immediate))` =
-    `g_into_g_field_(x/0 ∷ 𝕍(immediate))`
-  in
-  let `u_into_u_field_(g/2 ∷ 𝕍)_field_(y/1 ∷ 𝕍(immediate))` =
-    `g_into_g_field_(y/1 ∷ 𝕍(immediate))`
-  in
+  let g_into_g_field_x = x in
+  let g_into_g_field_y = y in
+  let u_into_u_field_g_field_x = g_into_g_field_x in
+  let u_into_u_field_g_field_y = g_into_g_field_y in
   apply direct(u_4_1)
-    
-      (`u_into_u_field_(g/2 ∷ 𝕍)_field_(x/0 ∷ 𝕍(immediate))`,
-       `u_into_u_field_(g/2 ∷ 𝕍)_field_(y/1 ∷ 𝕍(immediate))`)
-      -> k2 * k1
+     (u_into_u_field_g_field_x, u_into_u_field_g_field_y) -> k2 * k1
     where k2 (apply_result : imm tagged) =
       (apply direct(g_1_1) inlined(never)
          
-           (`g_into_g_field_(x/0 ∷ 𝕍(immediate))`,
-            $camlArguments_for_unboxed_closure__unused_7)
+           (g_into_g_field_x, $camlArguments_for_unboxed_closure__unused_7)
            -> k2 * k1
          where k2 (apply_result_1 : imm tagged) =
            let int_add = %int_barith.add (apply_result_1, apply_result) in
