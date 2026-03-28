@@ -300,7 +300,7 @@ let () =
 
 let () =
   (* Compare *)
-  let run compare =
+  let[@inline available] run compare =
     CFloat32.check_float32s (fun f1 f2 ->
         let no_nan = (not (CFloat32.is_nan f1)) && not (CFloat32.is_nan f2) in
         if no_nan
