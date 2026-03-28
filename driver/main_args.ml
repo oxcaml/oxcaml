@@ -788,7 +788,11 @@ let mk_dump_into_csv f =
   "-dump-into-csv", Arg.Unit f, " Dump profile information to profile.csv"
 
 let mk_ikinds f =
-  "-ikinds", Arg.Unit f, " Enable ikinds-based kind checker (experimental)"
+  ( "-ikinds",
+    Arg.Unit f,
+    " Enable ikinds-based kind checker (experimental).\n\
+    \  If the option is not specified, this can also be enabled through the\n\
+    \  OXCAML_IKINDS environment variable by setting it to 1." )
 
 let mk_ikinds_debug f =
   "-ikinds-debug", Arg.Unit f, " Enable ikinds debug logging"

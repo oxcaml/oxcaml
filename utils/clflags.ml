@@ -600,6 +600,16 @@ let error_style_reader = {
   env_var = "OCAML_ERROR_STYLE";
 }
 
+let ikinds_reader = {
+  parse = (function
+    | "0" -> Some false
+    | "1" -> Some true
+    | _ -> None);
+  print = (function false -> "0" | true -> "1");
+  usage = "expected \"0\" or \"1\"";
+  env_var = "OXCAML_IKINDS";
+}
+
 let unboxed_types = ref false
 
 let dump_debug_uids = ref false         (* -ddebug-uids *)
