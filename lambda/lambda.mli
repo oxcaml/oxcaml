@@ -58,6 +58,10 @@ val modify_heap : modify_mode
 
 val modify_maybe_stack : modify_mode
 
+type staticity =
+  | Static
+  | Dynamic
+
 type initialization_or_assignment =
   (* [Assignment Alloc_local] is a mutation of a block that may be heap or local.
      [Assignment Alloc_heap] is a mutation of a block that's definitely heap. *)
@@ -123,7 +127,7 @@ type primitive =
   | Pbytes_of_string
   | Pignore
   (* Globals *)
-  | Pgetglobal of Compilation_unit.t
+  | Pgetglobal of Compilation_unit.t * staticity
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode

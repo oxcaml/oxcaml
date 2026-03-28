@@ -119,6 +119,10 @@ let eq_locality_mode a b =
   | Alloc_heap, Alloc_local -> false
   | Alloc_local, Alloc_heap -> false
 
+type staticity =
+  | Static
+  | Dynamic
+
 type initialization_or_assignment =
   | Assignment of modify_mode
   | Heap_initialization
@@ -146,7 +150,7 @@ type primitive =
   | Pbytes_of_string
   | Pignore
     (* Globals *)
-  | Pgetglobal of Compilation_unit.t
+  | Pgetglobal of Compilation_unit.t * staticity
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
@@ -1837,7 +1841,7 @@ let transl_module_representation repr =
 (* Translate an access path *)
 
 let rec transl_address loc = function
-  | Env.Aunit cu -> Lprim(Pgetglobal cu, [], loc)
+  | Env.Aunit cu -> Lprim(Pgetglobal (cu, Dynamic), [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
