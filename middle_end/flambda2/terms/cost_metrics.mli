@@ -22,7 +22,15 @@ val from_size : Code_size.t -> t
 
 val size : t -> Code_size.t
 
+val nested_size : t -> Code_size.t
+
+val total_size : t -> Code_size.t
+
 val removed : t -> Removed_operations.t
+
+val nested_removed : t -> Removed_operations.t
+
+val total_removed : t -> Removed_operations.t
 
 val print : Format.formatter -> t -> unit
 
