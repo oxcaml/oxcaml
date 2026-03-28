@@ -230,8 +230,8 @@ and value_kind ppf vk =
       or_null_suffix nullable
       raw_value_kind raw_kind
 
-let rec layout ppf layout_ =
-  match layout_ with
+let rec layout ppf lay_ =
+  match lay_ with
   | Pvalue k -> value_kind ppf k
   | Ptop -> fprintf ppf "top"
   | Pbottom -> fprintf ppf "bottom"
@@ -245,12 +245,12 @@ let rec layout ppf layout_ =
       layouts
   | Psplicevar id -> fprintf ppf "$%a" Ident.print id
 
-let layout_annotation ppf layout_ =
-  match layout_ with
+let layout_annotation ppf lay_ =
+  match lay_ with
   | Pvalue { raw_kind = Pgenval; nullable = Non_nullable } -> ()
   | Pvalue { raw_kind = Pgenval; nullable = Nullable } ->
     fprintf ppf "?"
-  | _ -> fprintf ppf "[%a]" layout layout_
+  | _ -> fprintf ppf "[%a]" layout lay_
 
 let return_kind ppf (mode, kind) =
   let smode = locality_mode_if_local mode in

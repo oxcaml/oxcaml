@@ -645,6 +645,7 @@
   cfg_polling
   cfg_simplify
   cfg_prologue
+  cfg_merge_blocks
   extra_debug
   label
   linear_utils

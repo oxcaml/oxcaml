@@ -1097,6 +1097,7 @@ let maybe_pmod_constraint mode expr =
 %token HASH_SUFFIX            "# "
 %token <string> HASHOP        "##" (* just an example *)
 %token SIG                    "sig"
+%token LAYOUT                 "layout_"
 %token STACK                  "stack_"
 %token STAR                   "*"
 %token <string * Location.t * string option>
@@ -4398,21 +4399,31 @@ with_type_binder:
   nonempty_llist(typevar_repr)
     { $1 }
 ;
+%inline newlayouts:
+  (* : string with_loc list *)
+  nonempty_llist(mkrhs(ident))
+    { $1 }
+;
 %inline poly(X):
   typevar_list DOT X
-    { ($1, $3) }
+    { let bound_vars, inner_type = $1, $3 in
+      mktyp ~loc:$sloc (Ptyp_poly (bound_vars, inner_type)) }
 ;
 %inline repr(X):
   typevar_repr_list DOT X
-    { ($1, $3) }
+    { let bound_vars, inner_type = $1, $3 in
+      mktyp ~loc:$sloc (Ptyp_repr (bound_vars, inner_type)) }
+;
+%inline lpoly(X):
+  LAYOUT newlayouts DOT X
+    { let bound_vars, inner_type = $2, $4 in
+      mktyp ~loc:$sloc (Ptyp_newlayout (bound_vars, inner_type)) }
 ;
 %inline strictly_poly(X):
-| poly(X)
-    { let bound_vars, inner_type = $1 in
-      mktyp ~loc:$sloc (Ptyp_poly (bound_vars, inner_type)) }
-| repr(X)
-    { let bound_vars, inner_type = $1 in
-      mktyp ~loc:$sloc (Ptyp_repr (bound_vars, inner_type)) }
+| poly(X) { $1 }
+| repr(X) { $1 }
+| lpoly(X) { $1 }
+| lpoly(poly(X)) { $1 }
 ;
 
 possibly_poly(X):
@@ -4690,6 +4701,11 @@ optional_atat_modalities_expr:
   | mktyp(
     LPAREN bound_vars = typevar_repr_list DOT inner_type = core_type RPAREN
       { Ptyp_repr (bound_vars, inner_type) }
+    )
+    { $1 }
+  | mktyp(
+    LPAREN LAYOUT bound_vars = newlayouts DOT inner_type = core_type RPAREN
+      { Ptyp_newlayout (bound_vars, inner_type) }
     )
     { $1 }
   | ty = tuple_type
@@ -5326,6 +5342,7 @@ single_attr_id:
   | INCLUDE { "include" }
   | INHERIT { "inherit" }
   | INITIALIZER { "initializer" }
+  | LAYOUT { "layout_" }
   | LAZY { "lazy" }
   | LET { "let" }
   | LOCAL { "local_" }
@@ -5342,6 +5359,7 @@ single_attr_id:
   | POLY { "poly_" }
   | PRIVATE { "private" }
   | REC { "rec" }
+  | REPR { "repr_" }
   | SIG { "sig" }
   | STRUCT { "struct" }
   | THEN { "then" }

@@ -219,6 +219,7 @@ let classify ~classify_product env ty sort : _ classification =
   | Base Void -> Void
   | Product c -> Product (classify_product ty c)
   | Univar _ -> Misc.fatal_error "classify: Univar"
+  | Genvar _ -> Misc.fatal_error "classify: Genvar"
 
 let rec scannable_product_array_kind elt_ty_for_error loc sorts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
@@ -239,6 +240,8 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
     Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
   | Univar _ ->
     Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
+  | Genvar _ ->
+    Misc.fatal_error "sort_to_scannable_product_element_kind: Genvar"
 
 let rec ignorable_product_array_kind loc (sorts : Jkind.Sort.Const.t list) =
   match sorts with
@@ -269,6 +272,8 @@ and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
   | Univar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
+  | Genvar _ ->
+    Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
 
 let array_kind_of_elt ~elt_sort env loc ty =
   let elt_sort =
@@ -429,6 +434,7 @@ let value_kind_of_value_jkind env jkind =
   | Some ( Any _
          | Product _
          | Univar _
+         | Genvar _
          | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
                   | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
                   | Vec512 ),
@@ -1084,6 +1090,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
+  | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1107,6 +1114,7 @@ let layout env loc sort ty =
                                                    Stable,
                                                    Some ty)))
       | Univar _ -> assert false
+      | Genvar _ -> assert false
     )
 
 let layout_of_sort loc sort =
@@ -1129,6 +1137,7 @@ let layout_of_sort loc sort =
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
     | Univar _ -> assert false
+    | Genvar _ -> assert false
     )
 
 let layout_of_non_void_sort c =

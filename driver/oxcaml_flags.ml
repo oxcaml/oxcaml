@@ -40,6 +40,8 @@ let cfg_prologue_shrink_wrap = ref false    (* -[no-]cfg-prologue-shrink-wrap *)
 let cfg_prologue_shrink_wrap_threshold = ref 16384
                                        (* -cfg-prologue-shrink-wrap-threshold *)
 
+let cfg_merge_blocks = ref false        (* -[no]-cfg-merge-blocks *)
+
 let cfg_value_propagation = ref true    (* -[no]-cfg-value-propagation *)
 let cfg_value_propagation_float = ref false
                                         (* -[no]-cfg-value-propagation-float *)
@@ -233,7 +235,8 @@ module Flambda2 = struct
 
   let o4 = {
     o3 with
-    enable_reaper = true
+    enable_reaper = true;
+    reaper_local_fields = true;
   }
 
   let default_for_opt_level opt_level =

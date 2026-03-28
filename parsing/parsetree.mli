@@ -205,6 +205,11 @@ and core_type_desc =
            - As the {!core_type} of a
            {{!function_param_desc.Pparam_val}[Pparam_val]}.
          *)
+  | Ptyp_newlayout of string loc list * core_type
+      (** [layout_ a b c. T]
+
+           Introduces locally abstract layouts into scope.
+         *)
   | Ptyp_package of package_type  (** [(module S)]. *)
   | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
   | Ptyp_quote of core_type (** [<[T]>] *)
