@@ -44,6 +44,7 @@ val flambda_to_flambda :
   ppf_dump:Format.formatter ->
   prefixname:string ->
   machine_width:Target_system.Machine_width.t ->
+  code_slot_offsets:Slot_offsets.t Flambda2_identifiers.Code_id.Map.t ->
   Flambda_unit.t ->
   flambda_result
 
