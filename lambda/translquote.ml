@@ -2641,6 +2641,7 @@ let rec with_new_idents_pat pat =
   | Tpat_record_unboxed_product (lbl_pats, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> with_new_idents_pat pat
+  | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
 
 let rec without_idents_pat pat =
   match pat.pat_desc with
@@ -2672,6 +2673,7 @@ let rec without_idents_pat pat =
   | Tpat_record_unboxed_product (lbl_pats, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> without_idents_pat pat
+  | Tpat_fun_layout { id; _ } -> without_idents_values [id]
 
 let with_new_param fp =
   let pat_of_param =
@@ -2905,6 +2907,12 @@ and quote_value_pattern ~scopes p =
   let env = p.pat_env and loc = of_location ~scopes p.pat_loc in
   let pat_quoted =
     match p.pat_desc with
+    | Tpat_fun_layout { id; _ } ->
+      (* Layout polymorphism has a parsetree representation, but not in
+         patterns. *)
+      Misc.fatal_errorf
+        "translquote: layout poly pattern not supported in quote: %s"
+        (Ident.name id)
     | Tpat_any -> if is_module p then Pat.any_module else Pat.any
     | Tpat_var { id; _ } ->
       if is_module p

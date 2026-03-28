@@ -155,6 +155,8 @@ type t =
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
+  | Useless_lpoly                           (* 217 *)
+  | Lpoly_in_letrec                         (* 218 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 
