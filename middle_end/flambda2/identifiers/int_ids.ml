@@ -842,6 +842,15 @@ module Code_id = struct
           else Printf.sprintf "%s_%d_code" name name_stamp
         in
         Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
+      | Structured ->
+        let suffix =
+          if Flambda_features.Expert.shorten_symbol_names ()
+          then Printf.sprintf "_%d" name_stamp
+          else Printf.sprintf "_%d_code" name_stamp
+        in
+        let path = Debuginfo.to_structured_mangling_path ~name debug in
+        Symbol0.for_structured_mangling_path ~compilation_unit ~path ~suffix
+        |> Symbol0.linkage_name
     in
     let data : Code_id_data.t =
       { compilation_unit; name; debug_info = debug; linkage_name }

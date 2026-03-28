@@ -686,11 +686,12 @@ AC_ARG_ENABLE([cpp-mangling],
 
 AC_ARG_ENABLE([name-mangling],
   [AS_HELP_STRING([--enable-name-mangling=SCHEME],
-    [specify name mangling scheme [default=flat]])],
+    [specify name mangling scheme: flat or structured [default=flat]])],
   [AS_CASE([$enable_name_mangling],
     [flat], [name_mangling_scheme=flat],
+    [structured], [name_mangling_scheme=structured],
     [*], [AC_MSG_ERROR(m4_normalize([Invalid or missing name mangling scheme:
-      must be 'flat']))])],
+      must be 'flat' or 'structured']))])],
   [name_mangling_scheme=flat])
 
 AC_ARG_ENABLE([naked-pointers], [],
@@ -2897,7 +2898,8 @@ AS_IF([test x"$enable_cpp_mangling" = "xyes"],
 ## Name mangling scheme
 
 AS_CASE([$name_mangling_scheme],
-  [flat], [AC_DEFINE([NAME_MANGLING_FLAT])])
+  [flat], [AC_DEFINE([NAME_MANGLING_FLAT])],
+  [structured], [AC_DEFINE([NAME_MANGLING_STRUCTURED])])
 
 ## Check for mmap support for huge pages and contiguous heap
 OCAML_MMAP_SUPPORTS_HUGE_PAGES
