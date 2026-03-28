@@ -53,9 +53,11 @@
 #define JIT_FLUSH_ICACHE(addr, size) ((void)0)
 #endif
 
+#ifdef __linux__
 bool __attribute__((weak)) TCMalloc_MallocExtension_MallocIsTCMalloc(void) {
   return false;
 }
+#endif
 
 CAMLprim value jit_get_page_size(value unit) {
   CAMLparam1(unit);
@@ -82,6 +84,8 @@ CAMLprim value jit_dlsym(value symbol) {
   CAMLreturn (result);
 }
 
+#if !defined(__APPLE__)
+
 #define SBRK_FAILED ((void*)-1)
 
 static void* alloc_page_aligned_using_sbrk(size_t page_size, size_t size) {
@@ -99,6 +103,8 @@ static void* alloc_page_aligned_using_sbrk(size_t page_size, size_t size) {
   assert((uintptr_t)brk % page_size == 0);
   return next_page_start;
 }
+
+#endif
 
 #if defined(__has_feature)
   // For clang
@@ -154,12 +160,21 @@ CAMLprim value jit_memalign(value section_size) {
        to make the tests pass. For serious usage of this under [musl], we'll need to
        do better. */
     addr = alloc_page_aligned_statically(page_size, size);
-  } else if (ASAN_IS_ENABLED || TCMalloc_MallocExtension_MallocIsTCMalloc()) {
+  } else if (ASAN_IS_ENABLED
+#ifdef __linux__
+             || TCMalloc_MallocExtension_MallocIsTCMalloc()
+#endif
+  ) {
     /* AddressSanitizer and TCMalloc use [mmap], not [sbrk], which results in
        addresses which are too large to apply relocations to against other
        sections (e.g. [.rodata]), so we manually use [sbrk] when linked against
        either. */
+#if defined(__APPLE__)
+    /* sbrk is deprecated on macOS, so we'll have to make do */
+    addr = aligned_alloc(page_size, size);
+#else
     addr = alloc_page_aligned_using_sbrk(page_size, size);
+#endif
   } else {
     addr = aligned_alloc(page_size, size);
   }
