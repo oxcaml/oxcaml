@@ -18,9 +18,6 @@ module Env = Lambda_to_flambda_env
 module L = Lambda
 module P = Flambda_primitive
 
-let int_scalar : _ Scalar.Maybe_naked.t =
-  Value (Scalar.Integral.Width.Taggable Int)
-
 type primitive_transform_result =
   | Primitive of L.primitive * L.lambda list * L.scoped_location
   | Transformed of L.lambda
@@ -128,23 +125,52 @@ let rec_catch_for_for_loop env loc ident duid start stop
   let start_ident_duid = Lambda.debug_uid_none in
   let stop_ident = Ident.create_local "for_stop" in
   let stop_ident_duid = Lambda.debug_uid_none in
-  let first_test : L.lambda =
-    match dir with
-    | Upto -> L.icmp Cle L.int (Lvar start_ident) (Lvar stop_ident) ~loc
-    | Downto -> L.icmp Cge L.int (Lvar start_ident) (Lvar stop_ident) ~loc
+  let cmp : Scalar.Integer_comparison.t =
+    match dir with Upto -> Cle | Downto -> Cge
   in
-  let subsequent_test : L.lambda =
-    L.icmp Cne L.int (Lvar ident) (Lvar stop_ident) ~loc
+  let first_test : L.lambda =
+    L.icmp cmp L.int (Lvar start_ident) (Lvar stop_ident) ~loc
+  in
+  (* Naked int64 scalar type — the loop counter uses naked int64 to gain one
+     extra bit of range, avoiding overflow on increment/decrement. *)
+  let naked_int64_scalar : _ Scalar.Integral.t =
+    Scalar.naked
+      (Scalar.Integral.Width.Boxable (Int64 Scalar.Any_locality_mode))
+  in
+  let layout_naked_int64 : L.layout =
+    Punboxed_or_untagged_integer Unboxed_int64
+  in
+  let start_naked = Ident.create_local "for_start_naked" in
+  let stop_naked = Ident.create_local "for_stop_naked" in
+  let counter_naked = Ident.create_local "for_counter_naked" in
+  let next_naked = Ident.create_local "for_next_naked" in
+  let tagged_to_naked_int64 arg =
+    L.static_cast
+      ~src:(Scalar.ignore_locality (Scalar.integral L.int))
+      ~dst:(Scalar.integral naked_int64_scalar)
+      arg ~loc
+  in
+  let naked_int64_to_tagged arg =
+    L.static_cast
+      ~src:(Scalar.ignore_locality (Scalar.integral naked_int64_scalar))
+      ~dst:(Scalar.integral L.int) arg ~loc
   in
   let next_value_of_counter : L.lambda =
     match dir with
-    | Upto -> L.succ int_scalar (Lvar ident) ~loc
-    | Downto -> L.pred int_scalar (Lvar ident) ~loc
+    | Upto -> L.succ naked_int64_scalar (Lvar counter_naked) ~loc
+    | Downto -> L.pred naked_int64_scalar (Lvar counter_naked) ~loc
+  in
+  let continue_test : L.lambda =
+    L.icmp cmp
+      (Scalar.Integral.ignore_locality naked_int64_scalar)
+      (Lvar next_naked) (Lvar stop_naked) ~loc
   in
   let lam : L.lambda =
-    (* Care needs to be taken here not to cause overflow if, for an incrementing
-       for-loop, the upper bound is [max_int]; likewise, for a decrementing
-       for-loop, if the lower bound is [min_int]. *)
+    (* The loop counter operates on naked int64 values, avoiding overflow when
+       incrementing past max_int or decrementing past min_int, since tagged ints
+       fit in 63 bits but we operate in 64. This enables us to avoid the problem
+       of having two branch instructions (one conditional and one unconditional)
+       at the end of "for" loops. *)
     Llet
       ( Strict,
         L.layout_int,
@@ -159,18 +185,46 @@ let rec_catch_for_for_loop env loc ident duid start stop
             stop,
             Lifthenelse
               ( first_test,
-                Lstaticcatch
-                  ( Lstaticraise (cont, [L.Lvar start_ident]),
-                    (cont, [ident, duid, L.layout_int]),
-                    Lsequence
-                      ( body,
-                        Lifthenelse
-                          ( subsequent_test,
-                            Lstaticraise (cont, [next_value_of_counter]),
-                            L.lambda_unit,
-                            L.layout_unit ) ),
-                    Same_region,
-                    L.layout_unit ),
+                Llet
+                  ( Strict,
+                    layout_naked_int64,
+                    start_naked,
+                    Lambda.debug_uid_none,
+                    tagged_to_naked_int64 (Lvar start_ident),
+                    Llet
+                      ( Strict,
+                        layout_naked_int64,
+                        stop_naked,
+                        Lambda.debug_uid_none,
+                        tagged_to_naked_int64 (Lvar stop_ident),
+                        Lstaticcatch
+                          ( Lstaticraise (cont, [Lvar start_naked]),
+                            ( cont,
+                              [ ( counter_naked,
+                                  Lambda.debug_uid_none,
+                                  layout_naked_int64 ) ] ),
+                            Llet
+                              ( Strict,
+                                L.layout_int,
+                                ident,
+                                duid,
+                                naked_int64_to_tagged (Lvar counter_naked),
+                                Lsequence
+                                  ( body,
+                                    Llet
+                                      ( Strict,
+                                        layout_naked_int64,
+                                        next_naked,
+                                        Lambda.debug_uid_none,
+                                        next_value_of_counter,
+                                        Lifthenelse
+                                          ( continue_test,
+                                            Lstaticraise
+                                              (cont, [Lvar next_naked]),
+                                            L.lambda_unit,
+                                            L.layout_unit ) ) ) ),
+                            Same_region,
+                            L.layout_unit ) ) ),
                 L.lambda_unit,
                 L.layout_unit ) ) )
   in
