@@ -142,6 +142,8 @@ type mutable_restriction =
   | In_group
   | In_rec
 
+type mode_mismatch_kind = Parameter | Return
+
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
   | Constructor_labeled_arg
@@ -275,7 +277,7 @@ type error =
   | Submode_failed of Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
-  | Param_mode_mismatch of Alloc.equate_error
+  | Mode_mismatch of mode_mismatch_kind * Alloc.equate_error
   | Uncurried_function_escapes of Alloc.error
   | Function_returns_local
   | Tail_call_local_returning
@@ -1093,9 +1095,11 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
-let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
+(* CR-someday: This function should be migrated to use the new mode
+   error system instead of the ad-hoc [Mode_mismatch] error variant. *)
+let apply_mode_annots ~loc ~env kind (m : Alloc.Const.Option.t) mode =
   let error axis =
-    raise (Error(loc, env, Param_mode_mismatch axis))
+    raise (Error(loc, env, Mode_mismatch (kind, axis)))
   in
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m in
@@ -4890,7 +4894,7 @@ let type_approx_fun_one_param
   in
   Option.iter
     (fun mode_annots ->
-      apply_mode_annots ~loc ~env mode_annots.mode_modes arg_mode)
+      apply_mode_annots ~loc ~env Parameter mode_annots.mode_modes arg_mode)
     mode_annots;
   if has_poly then begin
     match spato with
@@ -5567,8 +5571,8 @@ let split_function_ty
           generalize_structure ty_arg;
           generalize_structure ty_ret)
   in
-  apply_mode_annots ~loc:loc_fun ~env mode_annots arg_mode;
-  apply_mode_annots ~loc:loc_fun ~env ret_mode_annots ret_mode;
+  apply_mode_annots ~loc:loc_fun ~env Parameter mode_annots arg_mode;
+  apply_mode_annots ~loc:loc_fun ~env Return ret_mode_annots ret_mode;
   let really_poly =
     not has_poly && not (tpoly_is_mono ty_arg) && is_really_poly ~env ty_arg
   in
@@ -12127,18 +12131,22 @@ let report_error ~loc env =
         "@[This application is complete, but surplus arguments were provided afterwards.@ \
          When passing or calling %a values, extra arguments are passed in a separate application.@]"
          (Alloc.Const.print_axis ax) left
-  | Param_mode_mismatch (s, e) ->
+  | Mode_mismatch (kind, (s, e)) ->
       let Mode.Alloc.Error (ax, {left; right}) = Mode.Alloc.to_simple_error e in
       let actual, expected =
         match s with
         | Left_le_right -> left, right
         | Right_le_left -> right, left
       in
+      let desc, desc_inf = match kind with
+        | Parameter -> "takes a parameter", "take a parameter"
+        | Return -> "has a return value", "have a return value"
+      in
       Location.errorf ~loc
-        "@[This function takes a parameter which is %a,@ \
-        but was expected to take a parameter which is %a.@]"
-        (Style.as_inline_code (Alloc.Const.print_axis ax)) actual
-        (Style.as_inline_code (Alloc.Const.print_axis ax)) expected
+        "@[This function %s which is %a,@ \
+        but was expected to %s which is %a.@]"
+        desc (Style.as_inline_code (Alloc.Const.print_axis ax)) actual
+        desc_inf (Style.as_inline_code (Alloc.Const.print_axis ax)) expected
   | Uncurried_function_escapes e -> begin
       let Mode.Alloc.Error (ax, {left; right}) = Mode.Alloc.to_simple_error e in
       match ax with

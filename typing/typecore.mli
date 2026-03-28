@@ -200,6 +200,8 @@ type unsupported_stack_allocation =
   | List_comprehension
   | Array_comprehension
 
+type mode_mismatch_kind = Parameter | Return
+
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
   | Constructor_labeled_arg
@@ -320,7 +322,7 @@ type error =
   | Submode_failed of Mode.Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
-  | Param_mode_mismatch of Mode.Alloc.equate_error
+  | Mode_mismatch of mode_mismatch_kind * Mode.Alloc.equate_error
   | Uncurried_function_escapes of Mode.Alloc.error
   | Function_returns_local
   | Tail_call_local_returning
