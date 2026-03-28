@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [ -z "$MERLIN_TEST_OCAML_PATH" ]; then
+  echo >&2 "You must set the MERLIN_TEST_OCAML_PATH environment variable in your shell to run merlin tests."
+  echo >&2 "It should be set to the directory where your flambda-backend build artifacts are installed."
+  exit 1
+fi
+
+MERLIN_TEST_OCAMLC_PATH="$MERLIN_TEST_OCAML_PATH/bin/ocamlc"
+
+if [ ! -f "$MERLIN_TEST_OCAMLC_PATH" ]; then
+    echo >&2 "Error: $MERLIN_TEST_OCAMLC_PATH does not exist."
+    echo >&2 "Check that you've set MERLIN_TEST_OCAML_PATH correctly."
+    exit 1
+fi
+
+"$MERLIN_TEST_OCAMLC_PATH" "$@"

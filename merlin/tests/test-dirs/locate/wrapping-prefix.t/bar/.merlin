@@ -1,0 +1,3 @@
+WRAPPING_PREFIX Bar__
+B ../foo
+S ../foo
