@@ -63,6 +63,7 @@
 
 (rule
  (targets libasmrun.a libasmrund.a libasmruni.a libasmrun_pic.a
+    libasmrunnnp_noasan.a
     libasmrun_shared.so libcamlrun.a libcamlrund.a libcamlruni.a libcamlrun_pic.a
     libcamlrun_shared.so ocamlrun ocamlrund ocamlruni ld.conf)
  (mode    fallback)
@@ -89,6 +90,7 @@
    (progn
      (bash "rm -f sak build_config.h")
      (bash "cd .. && make V=1 -j8 -f Makefile.upstream runtime/libasmrun.a runtime/libasmrund.a runtime/libasmruni.a runtime/libasmrun_pic.a \
+    runtime/libasmrunnnp_noasan.a \
     runtime/libasmrun_shared.so runtime/libcamlrun.a runtime/libcamlrund.a runtime/libcamlruni.a runtime/libcamlrun_pic.a \
     runtime/libcamlrun_shared.so runtime/ocamlrun runtime/ocamlrund runtime/ocamlruni runtime/ld.conf COMPUTE_DEPS=false")))))
 
@@ -120,6 +122,7 @@
     libasmrund.a
     libasmruni.a
     libasmrun_pic.a
+    libasmrunnnp_noasan.a
     libasmrun_shared.so
   )
   (section lib)
