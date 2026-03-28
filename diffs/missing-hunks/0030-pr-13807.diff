@@ -1,0 +1,13 @@
+diff --git a/asmcomp/arm64/arch.ml b/asmcomp/arm64/arch.ml
+index 8ffc903093d1..731e9a4cac9c 100644
+--- a/asmcomp/arm64/arch.ml
++++ b/asmcomp/arm64/arch.ml
+@@ -74,7 +74,7 @@ let size_addr = 8
+ let size_int = 8
+ let size_float = 8
+ 
+-let allow_unaligned_access = false
++let allow_unaligned_access = true
+ 
+ (* Behavior of division *)
+ 
