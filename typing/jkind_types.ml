@@ -563,6 +563,10 @@ module Sort = struct
 
   let last_var_uid = ref 0
 
+  let new_var_unsafe ~level =
+    incr last_var_uid;
+    { contents = None; uid = !last_var_uid; level }
+
   let new_var ~level =
     (* Guard against accidentally creating a genvar or rigidvar via this path:
        those require special handling (instance_map registration for genvars;
@@ -571,12 +575,9 @@ module Sort = struct
        level is simply lowered by [update_level] upon unification. *)
     if level >= level_rigid
     then Misc.fatal_error "Jkind_types.new_var: level >= level_rigid";
-    incr last_var_uid;
-    Var { contents = None; uid = !last_var_uid; level }
+    new_var_unsafe ~level
 
-  let new_genvar () =
-    incr last_var_uid;
-    { contents = None; uid = !last_var_uid; level = level_generic }
+  let new_genvar () = new_var_unsafe ~level:level_generic
 
   let instance_map : (var * var) list ref = ref []
 
@@ -585,8 +586,7 @@ module Sort = struct
       List.map
         (fun v ->
           assert (is_genvar v);
-          incr last_var_uid;
-          let v' = { contents = None; uid = !last_var_uid; level } in
+          let v' = new_var_unsafe ~level in
           v, v')
         vars
     in
@@ -815,7 +815,7 @@ module Sort = struct
       true
 
   let decompose_into_product t n =
-    let ts = List.init n (fun _ -> new_var ~level:level_fresh) in
+    let ts = List.init n (fun _ -> of_var (new_var ~level:level_fresh)) in
     if equate t (Product ts) then Some ts else None
 
   (*** pretty printing ***)
@@ -999,6 +999,6 @@ module Layout = struct
   let get_const t = get_const Const.of_sort t
 
   let of_new_sort_var ~level =
-    let sort = Sort.new_var ~level in
+    let sort = Sort.(of_var (new_var ~level)) in
     Sort (sort, Scannable_axes.max), sort
 end
