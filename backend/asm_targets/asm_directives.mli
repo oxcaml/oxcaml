@@ -410,7 +410,7 @@ module Directive : sig
       assembler or printer instead of using [print], below. Symbols that occur
       in values of type [t] are encoded as [string]s and have had all necessary
       prefixing, mangling, escaping and suffixing applied. *)
-  type t = private
+  type t =
     | Align of
         { bytes : int;
               (** The number of bytes to align to. This will be taken log2 by
