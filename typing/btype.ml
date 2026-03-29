@@ -2284,7 +2284,54 @@ module Jkind0 = struct
        needs a [fixed_explanation]. The [fixed_explanation] is [Existential],
        used only for this purpose.
   *)
-  let for_boxed_variant ~loc ~decl_params ~type_apply ~free_vars cstrs =
+  (* Shared type-level implementation of Steps B1-B4 from
+     Note [With-bounds for GADTs]. *)
+  let gadt_payload_subst
+      ~projected_params ~res_args ~payload_tys ~get_free_vars =
+    (* STEP B1 from Note [With-bounds for GADTs]: *)
+    let domain, range, seen =
+      List.fold_left2
+        (* CR ocaml-5.4: Use labeled tuples for the accumulator here *)
+          (fun ((domain, range, seen) as acc) res_arg projected_param ->
+          if TypeSet.mem res_arg seen
+          then
+            (* We've already seen this type parameter, so don't add it again.
+               See wrinkle BW1 from Note [With-bounds for GADTs]. *)
+            acc
+          else
+            match get_desc res_arg with
+            | Tvar _ ->
+              (* Only add types which are direct variables. Note that types
+                 which aren't variables might themselves /contain/ variables; if
+                 those variables don't show up on another parameter, they're
+                 treated as orphaned. See example K2 from Note [With-bounds for
+                 GADTs]. *)
+              res_arg :: domain, projected_param :: range,
+              TypeSet.add res_arg seen
+            | _ -> acc)
+        ([], [], TypeSet.empty)
+        res_args projected_params
+    in
+    (* STEP B2 from Note [With-bounds for GADTs]: *)
+    let orphaned_type_var_set = TypeSet.diff (get_free_vars payload_tys) seen in
+    let orphaned_type_var_list = TypeSet.elements orphaned_type_var_set in
+    (* STEP B3 from Note [With-bounds for GADTs]: *)
+    let mk_type_of_kind ty =
+      match get_desc ty with
+      (* use [newgenty] not [newty] here because we've already generalized the
+         declaration and want to keep things at [generic_level] *)
+      | Tvar { jkind; name = _ } -> newgenty (Tof_kind jkind)
+      | _ ->
+        Misc.fatal_error
+          "post-condition of [free_variable_set_of_list] violated"
+    in
+    let type_of_kind_list = List.map mk_type_of_kind orphaned_type_var_list in
+    (* STEP B4 from Note [With-bounds for GADTs]: *)
+    List.combine
+      (orphaned_type_var_list @ domain)
+      (type_of_kind_list @ range)
+
+  let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars cstrs =
     let base =
       let all_args_void =
         List.for_all
@@ -2339,64 +2386,29 @@ module Jkind0 = struct
         match cstr.cd_res with
         | None -> cstr_arg_tys
         | Some res ->
-          (* See Note [With-bounds for GADTs] for an overview *)
+          (* See Note [With-bounds for GADTs] for an overview. *)
           let apply_subst domain range tys =
             if Misc.Stdlib.List.is_empty domain
             then tys
             else List.map (fun ty -> type_apply domain ty range) tys
           in
-          (* STEP B1 from Note [With-bounds for GADTs]: *)
           let res_args =
             match get_desc res with
             | Tconstr (_, args, _) -> args
             | _ -> Misc.fatal_error "cd_res must be Tconstr"
           in
-          let domain, range, seen =
-            List.fold_left2
-              (* CR ocaml-5.4: Use labeled tuples for the accumulator here *)
-                (fun ((domain, range, seen) as acc) arg param ->
-                if TypeSet.mem arg seen
-                then
-                  (* We've already seen this type parameter, so don't add it
-                     again.  See wrinkle BW1 from Note [With-bounds for GADTs]
-                  *)
-                  acc
-                else
-                  match get_desc arg with
-                  | Tvar _ ->
-                    (* Only add types which are direct variables. Note that
-                       types which aren't variables might themselves /contain/
-                       variables; if those variables don't show up on another
-                       parameter, they're treated as orphaned. See example K2
-                       from Note [With-bounds for GADTs] *)
-                    arg :: domain, param :: range, TypeSet.add arg seen
-                  | _ -> acc)
-              ([], [], TypeSet.empty)
-              res_args decl_params
+          let extra_substs =
+            gadt_payload_subst
+              ~projected_params:decl_params
+              ~res_args
+              ~payload_tys:cstr_arg_tys
+              ~get_free_vars
           in
-          (* STEP B2 from Note [With-bounds for GADTs]: *)
-          let free_var_set = free_vars cstr_arg_tys in
-          let orphaned_type_var_set = TypeSet.diff free_var_set seen in
-          let orphaned_type_var_list = TypeSet.elements orphaned_type_var_set in
-          (* STEP B3 from Note [With-bounds for GADTs]: *)
-          let mk_type_of_kind ty =
-            match get_desc ty with
-            (* use [newgenty] not [newty] here because we've already
-               generalized the decl and want to keep things at
-               generic_level *)
-            | Tvar { jkind; name = _ } -> newgenty (Tof_kind jkind)
-            | _ ->
-              Misc.fatal_error
-                "post-condition of [free_variable_set_of_list] violated"
-          in
-          let type_of_kind_list =
-            List.map mk_type_of_kind orphaned_type_var_list
-          in
-          (* STEP B4 from Note [With-bounds for GADTs]: *)
+          let domain, range = List.split extra_substs in
           let cstr_arg_tys =
             apply_subst
-              (orphaned_type_var_list @ domain)
-              (type_of_kind_list @ range)
+              domain
+              range
               cstr_arg_tys
           in
           cstr_arg_tys
