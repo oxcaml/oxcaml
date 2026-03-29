@@ -587,6 +587,8 @@ let with_constraint sub = function
   | Twith_modsubst  (_, lid) -> iter_loc sub lid
   | Twith_modtype      mty -> sub.module_type sub mty
   | Twith_modtypesubst mty -> sub.module_type sub mty
+  | Twith_jkind      jd -> sub.jkind_declaration sub jd
+  | Twith_jkindsubst jd -> sub.jkind_declaration sub jd
 
 
 let open_description sub {open_loc; open_expr; open_env; open_attributes; _} =

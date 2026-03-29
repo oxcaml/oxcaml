@@ -429,13 +429,6 @@ let raise ~loc err = raise (Error.User_error (loc, err))
 module Mod_bounds = struct
   include Jkind0.Mod_bounds
 
-  let meet t1 t2 =
-    let crossing = Crossing.meet (crossing t1) (crossing t2) in
-    let externality = Externality.meet (externality t1) (externality t2) in
-    let nullability = Nullability.meet (nullability t1) (nullability t2) in
-    let separability = Separability.meet (separability t1) (separability t2) in
-    create crossing ~externality ~nullability ~separability
-
   let less_or_equal t1 t2 =
     let[@inline] modal_less_or_equal ax : Sub_result.t =
       let a = t1 |> crossing |> (Crossing.proj [@inlined hint]) ax in

@@ -2,7 +2,8 @@
    expect;
 *)
 
-(* Basic tests for abstract kinds. No with-kind substutitions yet. *)
+(* Basic tests for abstract kinds. [with kind_] substitutions are tested in
+   [with_constraints.ml]. *)
 
 (****************************************************)
 (* Test: Abstract kinds allowed in sigs and structs *)
