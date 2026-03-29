@@ -1172,6 +1172,96 @@ Warning 10 [non-unit-statement]: this expression should have type unit.
 <[(Stdlib.List.hd ([{ Stdlib.contents = 42; }])).Stdlib.contents]>
 |}];;
 
+(* Jkind annotations inside quotations *)
+
+(* Ptyp_any with jkind annotation: (_ : value) *)
+<[ fun (x : (_ : value)) -> x ]>;;
+[%%expect {|
+Line 1, characters 17-22:
+1 | <[ fun (x : (_ : value)) -> x ]>;;
+                     ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-22.
+|}];;
+
+(* Ptyp_var with jkind annotation: ('a : value) *)
+<[ fun (x : ('a : value)) -> x ]>;;
+[%%expect {|
+Line 1, characters 18-23:
+1 | <[ fun (x : ('a : value)) -> x ]>;;
+                      ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 18-23.
+|}];;
+
+(* Ptyp_alias with jkind annotation: t as ('a : value) *)
+<[ fun (x : int as ('a : value)) -> x ]>;;
+[%%expect {|
+Line 1, characters 25-30:
+1 | <[ fun (x : int as ('a : value)) -> x ]>;;
+                             ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 25-30.
+|}];;
+
+(* Ptyp_poly with jkind annotation: ('a : value). 'a -> 'a *)
+<[ fun (f : ('a : value). 'a -> 'a) -> f 42 ]>;;
+[%%expect {|
+Line 1, characters 18-23:
+1 | <[ fun (f : ('a : value). 'a -> 'a) -> f 42 ]>;;
+                      ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 18-23.
+|}];;
+
+(* Ptyp_of_kind: (type : value) *)
+<[ fun (x : (type : value)) -> x ]>;;
+[%%expect {|
+Line 1, characters 20-25:
+1 | <[ fun (x : (type : value)) -> x ]>;;
+                        ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 20-25.
+|}];;
+
+(* Pexp_newtype with jkind annotation: fun (type t : value) -> *)
+<[ fun (type t : value) (x : t) -> x ]>;;
+[%%expect {|
+Line 1, characters 17-22:
+1 | <[ fun (type t : value) (x : t) -> x ]>;;
+                     ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-22.
+|}];;
+
+(* Pparam_newtype with jkind annotation, multiple newtypes before a val param *)
+<[ fun (type t : value) (type u : value) (x : t) (y : u) -> (x, y) ]>;;
+[%%expect {|
+Line 1, characters 17-22:
+1 | <[ fun (type t : value) (type u : value) (x : t) (y : u) -> (x, y) ]>;;
+                     ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-22.
+|}];;
+
+(* Jkind annotation with & (intersection): fun (type t : value & float) -> *)
+<[ fun (type t : value & float) (x : t) -> x ]>;;
+[%%expect {|
+Line 1, characters 17-30:
+1 | <[ fun (type t : value & float) (x : t) -> x ]>;;
+                     ^^^^^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-30.
+|}];;
+
 (** Mode annotations **)
 
 (* Pattern constraints *)

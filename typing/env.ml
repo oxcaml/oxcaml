@@ -814,6 +814,7 @@ type no_open_quotations_context =
   | Open_qt
   | Object_field_with_attribute_qt
   | Variant_tag_with_attribute_qt
+  | Jkind_annotation_qt
 
 let print_structure_components_reason ppf = function
   | Project -> Format_doc.fprintf ppf "have any components"
@@ -4967,6 +4968,8 @@ let print_unsupported_quotation ppf =
       fprintf ppf "Adding attributes on fields in object types"
   | Variant_tag_with_attribute_qt ->
       fprintf ppf "Adding attributes on tags in polymorphic variant types"
+  | Jkind_annotation_qt ->
+      fprintf ppf "Annotating types with kinds"
 
 let print_unbound_in_quotation ppf =
   function
