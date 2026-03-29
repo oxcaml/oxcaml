@@ -572,6 +572,7 @@ static uintnat fresh_domain_unique_id(void) {
 }
 
 static inline void domain_root_register(value *root, value t);
+static inline void domain_root_set(value *root, value t);
 static inline void domain_root_remove(value *root);
 
 /* must be run on the domain's thread */
@@ -783,6 +784,11 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_major_slice = 0;
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
+
+  /* Note that we do not make domain_state->preemption a domain_root, as as long
+     as it's a block (between being allocated and being initialized) it must not
+     be seen by the GC. */
+  domain_state->preemption = Val_unit;
 
   domain_state->parser_trace = 0;
 
@@ -1816,6 +1822,59 @@ void caml_interrupt_self(void)
   interrupt_domain_local(Caml_state);
 }
 
+/* Request that a preemption occur at the next possible time.
+ *
+ * XXX aspsmith: This function will almost definitely not last long - it's here
+ * basically entirely to test preemption while it's under active development.
+ * Importantly, eventually the "thing" that gets preempted will be a fiber, not
+ * a domain
+ */
+CAMLprim value caml_domain_preempt_self(value unit) {
+  CAMLnoalloc;
+  if (Caml_state->preemption != Val_unit) {
+    return Val_unit;
+  }
+  Caml_state->preemption = Val_long(1);
+  caml_interrupt_self();
+  return Val_unit;
+}
+
+/* If a preemption is pending, allocate a 3-word continuation for the preemption
+   and store it in Caml_state->preemption
+
+  The resulting preemption will not be fully initialized, so after this function
+  is run care must be taken not to enter the GC before returning from
+  caml_garbage_collection.
+*/
+void caml_domain_setup_preemption(void) {
+  CAMLparam0();
+  CAMLlocal1(cont);
+  /* Check if there is a pending preemption */
+  if (Caml_state->preemption != Val_long(1)) {
+    CAMLreturn0;
+  }
+  cont = caml_alloc_3(Cont_tag, Val_ptr(NULL), Val_ptr(NULL), Val_ptr(NULL));
+  /* Check if there is still a pending preemption. This might not be true if the
+     caml_alloc_3 also called the GC, which itself called
+  `  caml_domain_setup_preemption`. */
+  if (Caml_state->preemption != Val_long(1)) {
+    CAMLreturn0;
+  }
+#ifdef DEBUG
+  Field(cont, 0) = Debug_free_minor;
+  Field(cont, 1) = Debug_free_minor;
+  Field(cont, 2) = Debug_free_minor;
+#endif
+  Caml_state->preemption = cont;
+  CAMLreturn0;
+}
+
+void caml_domain_reset_preemption(void) {
+  if (Is_block(Caml_state->preemption)) {
+    Caml_state->preemption = Val_long(1);
+  }
+}
+
 /*  This function is async-signal-safe as [all_domains] and
     [caml_params->max_domains] are set before signal handlers are installed and
     do not change afterwards. */
@@ -1878,20 +1937,20 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
       || dom_st->major_slice_epoch < atomic_load (&caml_major_slice_epoch)) {
     interrupt_domain_local(dom_st);
   }
-  /* We might be here due to a recently-recorded signal or forced
-     systhread switching, so we need to remember that we must run
-     signal handlers or systhread's yield. In addition, in the case of
-     long-running C code (that may regularly poll with
-     caml_process_pending_actions), we want to force a query of all
-     callbacks at every minor collection or major slice (similarly to
-     the OCaml behaviour).
+  /* We might be here due to a recently-recorded signal or forced systhread
+     switching, so we need to remember that we must run signal handlers,
+     systhread's yield or preemption. In addition, in the case of long-running C
+     code (that may regularly poll with caml_process_pending_actions), we want
+     to force a query of all callbacks at every minor collection or major slice
+     (similarly to the OCaml behaviour).
 
      We don't need to check for internally triggered pending actions
      (internal Memprof and finalisers), because they will already have set
      action_pending if needed. */
   if (caml_check_pending_signals() ||
       Caml_state->requested_external_interrupt ||
-      caml_memprof_pending_external_interrupt(dom_st))
+      caml_memprof_pending_external_interrupt(dom_st) ||
+      Is_block(Caml_state->preemption))
     caml_set_action_pending(dom_st);
 }
 
