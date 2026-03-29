@@ -1456,6 +1456,15 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
       None
     | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
   in
+  let unboxing_kind layout mode =
+    match (mode : Lambda.alloc_mode) with
+    | Alloc_heap -> unboxing_kind layout
+    | Alloc_local ->
+      Location.prerr_warning
+        (Debuginfo.Scoped_location.to_location loc)
+        Warnings.Unboxing_impossible;
+      None
+  in
   let params_arity =
     Flambda_arity.from_lambda_list
       (List.map (fun (p : L.lparam) -> p.layout) params)
@@ -1479,11 +1488,11 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           ~is_always_immediate:false Flambda_kind.value
       in
       let unboxed_return =
-        if attr.unbox_return then unboxing_kind return else None
+        if attr.unbox_return then unboxing_kind return ret_mode else None
       in
       let unboxed_param (param : Lambda.lparam) =
         if param.attributes.unbox_param
-        then unboxing_kind param.layout
+        then unboxing_kind param.layout param.mode
         else None
       in
       let unboxed_params =
