@@ -198,6 +198,8 @@ val incr_degree : t -> Reg.t -> unit
     during IRC simplification phase. Does nothing if the degree is infinite. *)
 val decr_degree : t -> Reg.t -> unit
 
+val get_max_degree : t -> int
+
 (** {2 Initialization} *)
 
 (** [init_register graph reg] initializes storage for [reg] in the graph. Sets

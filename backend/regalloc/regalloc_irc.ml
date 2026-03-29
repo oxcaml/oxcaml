@@ -418,6 +418,8 @@ let rewrite :
    seems to be fine with 4 *)
 let max_rounds = 50
 
+exception Function_is_too_complex
+
 module For_testing = struct
   let rounds = ref (-1)
 end
@@ -448,6 +450,14 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
     if debug then log "%s -- %s" prefix (work_lists_desc state)
   in
   build state cfg_with_infos;
+  if round = 1
+  then begin
+    match Lazy.force Interf_threshold.value with
+    | None -> ()
+    | Some threshold ->
+      if State.get_max_degree state > threshold
+      then raise Function_is_too_complex
+  end;
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   if debug
   then (
@@ -510,7 +520,7 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
       State.invariant state;
       main ~round:(succ round) state cfg_with_infos)
 
-let run : Cfg_with_infos.t -> Cfg_with_infos.t =
+let run : Cfg_with_infos.t -> Cfg_with_infos.t option =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
@@ -530,16 +540,18 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
       ~stack_slots ~affinity ()
   in
   Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
-  main ~round:1 state cfg_with_infos;
-  if debug then log_cfg_with_infos cfg_with_infos;
-  Regalloc_rewrite.postlude
-    (module State)
-    (module Utils)
-    state
-    ~f:(fun () ->
-      State.update_register_locations state;
-      Reg.Set.iter
-        (fun reg -> State.set_degree state reg 0)
-        (all_precolored_regs ()))
-    cfg_with_infos;
-  cfg_with_infos
+  match main ~round:1 state cfg_with_infos with
+  | exception Function_is_too_complex -> None
+  | () ->
+    if debug then log_cfg_with_infos cfg_with_infos;
+    Regalloc_rewrite.postlude
+      (module State)
+      (module Utils)
+      state
+      ~f:(fun () ->
+        State.update_register_locations state;
+        Reg.Set.iter
+          (fun reg -> State.set_degree state reg 0)
+          (all_precolored_regs ()))
+      cfg_with_infos;
+    Some cfg_with_infos
