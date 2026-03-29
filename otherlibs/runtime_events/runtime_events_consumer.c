@@ -1020,8 +1020,8 @@ static value user_events_find_callback_list_for_event_type(value callbacks_root,
 static int user_events_call_callback_list(
   struct callbacks_exception_holder* holder, value callback_list,
   value params[5]) {
-  CAMLparam5(callback_list, params[0], params[1], params[2], params[3]);
-  CAMLxparam1(params[4]);
+  CAMLparam1(callback_list);
+  CAMLxparamN(params, 5);
   CAMLlocal2(callback, res);
 
   while (Is_block(callback_list)) {
