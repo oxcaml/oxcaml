@@ -117,6 +117,37 @@ module For_applications = struct
         (Name_occurrences.singleton_variable region Name_mode.normal)
         ghost_region Name_mode.normal
 
+  let rename = function
+    | Heap -> Heap
+    | Local { region; ghost_region } ->
+      Local
+        { region = Variable.rename region;
+          ghost_region = Variable.rename ghost_region
+        }
+
+  let is_renamed_version_of t t' =
+    match t, t' with
+    | Heap, Heap -> true
+    | Heap, Local _ | Local _, Heap -> false
+    | ( Local { region; ghost_region },
+        Local { region = region'; ghost_region = ghost_region' } ) ->
+      Variable.is_renamed_version_of region region'
+      && Variable.is_renamed_version_of ghost_region ghost_region'
+
+  let renaming t ~guaranteed_fresh =
+    match t, guaranteed_fresh with
+    | Heap, Heap -> Renaming.empty
+    | ( Local { region; ghost_region },
+        Local { region = region'; ghost_region = ghost_region' } ) ->
+      let renaming =
+        Renaming.add_fresh_variable Renaming.empty region
+          ~guaranteed_fresh:region'
+      in
+      Renaming.add_fresh_variable renaming ghost_region
+        ~guaranteed_fresh:ghost_region'
+    | Heap, Local _ | Local _, Heap ->
+      Misc.fatal_error "Mismatched alloc_mode in renaming"
+
   let apply_renaming t renaming =
     match t with
     | Heap -> Heap

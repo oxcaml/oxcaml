@@ -65,8 +65,7 @@ and rev_params_and_body =
     params : Bound_parameters.t;
     body : rev_expr;
     my_closure : Variable.t;
-    my_region : Variable.t option;
-    my_ghost_region : Variable.t option;
+    my_alloc_mode : Alloc_mode.For_applications.t;
     my_depth : Variable.t
   }
 

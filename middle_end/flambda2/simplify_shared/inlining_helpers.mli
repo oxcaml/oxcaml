@@ -21,8 +21,7 @@ val make_inlined_body :
   params:'param list ->
   args:Simple.List.t ->
   my_closure:'param ->
-  my_region:Variable.t option ->
-  my_ghost_region:Variable.t option ->
+  my_alloc_mode:Alloc_mode.For_applications.t ->
   my_depth:Variable.t ->
   rec_info:Rec_info_expr.t ->
   body:'expr_with_acc ->
