@@ -1124,26 +1124,26 @@ AS_CASE([$enable_warn_error],
 # - strict type-based aliasing analysis (too risky for the OCaml runtime)
 # - strict no-overflow conditions on signed integer arithmetic
 #   (the OCaml runtime assumes Java-style behavior of signed integer arith.)
-# Concerning optimization level, -O3 is somewhat risky, so take -O2.
+# Concerning optimization level, use -O3.
 # Concerning language version, recent enough versions of GCC and Clang
 # default to gnu11 (C11 + GNU extensions) or gnu17, which is fine.
 AS_CASE([$ocaml_cc_vendor],
   [clang-*],
-    [common_cflags="-O2 -fno-strict-aliasing -fwrapv";
+    [common_cflags="-O3 -fno-strict-aliasing -fwrapv";
     internal_cflags="$cc_warnings -fno-common"],
   [*gcc-[[0123]]-*|*gcc-4-[[0-8]]],
     # No C11 support
     [AC_MSG_ERROR(m4_normalize([This version of GCC is too old.
       Please use GCC version 4.9 or above.]), 69)],
   [gcc-*],
-    [common_cflags="-O2 -fno-strict-aliasing -fwrapv";
+    [common_cflags="-O3 -fno-strict-aliasing -fwrapv";
     internal_cflags="$cc_warnings -fno-common -fexcess-precision=standard \
 -Wvla"],
   [mingw-*-*-gcc-*],
     [internal_cflags="-Wno-unused $cc_warnings \
 -fexcess-precision=standard"
     # TODO: see whether the code can be fixed to avoid -Wno-unused
-    common_cflags="-O2 -fno-strict-aliasing -fwrapv -mms-bitfields"
+    common_cflags="-O3 -fno-strict-aliasing -fwrapv -mms-bitfields"
     internal_cppflags='-D__USE_MINGW_ANSI_STDIO=0 -DUNICODE -D_UNICODE'
     internal_cppflags="$internal_cppflags -DWINDOWS_UNICODE="
     internal_cppflags="${internal_cppflags}\$(WINDOWS_UNICODE)"],
