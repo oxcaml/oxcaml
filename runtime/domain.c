@@ -2138,7 +2138,8 @@ static void tick_thread_wake(void)
   uint64_t val = 1;
   /* We don't care about signals here since the eventfd is O_NONBLOCK, so the
      write completes immediately and hence cannot be interrupted */
-  (void)write(tick_thread.interrupt_fd, &val, sizeof(val));
+  ssize_t ret = write(tick_thread.interrupt_fd, &val, sizeof(val));
+  (void)ret;
 }
 
 /* Returns true if the timer expired, false if interrupted. */
@@ -2157,13 +2158,16 @@ static bool tick_thread_wait(void)
       /* Note: we read to clear the state of the timerfd, but don't actually use
          the number of expirations at all */
       uint64_t expirations;
-      (void)read(tick_thread.timer_fd, &expirations, sizeof(expirations));
+      ssize_t r = read(tick_thread.timer_fd, &expirations,
+                       sizeof(expirations));
+      (void)r;
       timer_fired = true;
     } else if (events[i].data.fd == tick_thread.interrupt_fd) {
       /* Note: we read to clear the state of the timerfd, but don't actually use
          the value at all */
       uint64_t val;
-      (void)read(tick_thread.interrupt_fd, &val, sizeof(val));
+      ssize_t r = read(tick_thread.interrupt_fd, &val, sizeof(val));
+      (void)r;
     }
   }
   return timer_fired;
