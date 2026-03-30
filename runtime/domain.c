@@ -2228,9 +2228,7 @@ CAMLextern uintnat caml_effective_tick_interval_usec(void) {
 }
 
 CAMLprim value caml_effective_tick_interval_usec_bytecode(value v_unit) {
-  uintnat interval = caml_effective_tick_interval_usec();
-  if (interval == 0) return Val_null;
-  return Val_long(interval);
+  return Val_long(caml_effective_tick_interval_usec());
 }
 
 static void caml_do_tick_all_domains(void)
