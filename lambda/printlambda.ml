@@ -1433,6 +1433,7 @@ and slam ppf = function
   | SLhalves { sval_comptime; sval_runtime } ->
     fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]"
       slam sval_comptime lam sval_runtime
+
 and sequence ppf = function
   | Lsequence(l1, l2) ->
       fprintf ppf "%a@ %a" sequence l1 sequence l2

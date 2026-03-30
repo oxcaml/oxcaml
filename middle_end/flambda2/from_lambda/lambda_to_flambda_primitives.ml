@@ -1725,7 +1725,8 @@ let block_index_access_offsets ~machine_width layout idx =
                   (Int64.of_int
                      (BC.on_64_bit_arch cts.value
                      + BC.on_64_bit_arch to_left.flat))))
-        | Splice_variable ident -> Lambda.error (Unevaluated_splice_var ident)
+        | Splice_variable ident ->
+          Lambda.fatal_error_unevaluated_splice_var ident
       in
       let prim = add offset offset_from_offset in
       MPB.add to_left (MPB.count mbe), prim

@@ -18,8 +18,6 @@ open Asttypes
 
 type error =
   | Slambda_unsupported of string
-  | Unevaluated_splice_var of Ident.t
-  | Invalid_constructor of string
 
 exception Error of Location.t option * error
 
@@ -694,6 +692,8 @@ let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
       Array.for_all
         (function
           | Value _ -> true
+          (* CR layout poly: This function probably shouldn't exist at all
+             and we should merge mixed_block_shape and block_shape. *)
           | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
           | _ -> false)
         shape
@@ -1032,6 +1032,80 @@ and lambda_event_kind =
   | Lev_after of Types.type_expr
   | Lev_function
   | Lev_pseudo
+
+let rec try_to_find_location lam =
+  (* This is very much best-effort and may overshoot, but will still likely be
+     better than nothing. *)
+  match lam with
+  | Lprim (_, _, loc)
+  | Lfunction { loc; _ }
+  | Lletrec ({ def = { loc; _ }; _ } :: _, _)
+  | Lapply { ap_loc = loc; _ }
+  | Lfor { for_loc = loc; _ }
+  | Lswitch (_, _, loc, _)
+  | Lstringswitch (_, _, _, loc, _)
+  | Lsend (_, _, _, _, _, _, loc, _)
+  | Levent (_, { lev_loc = loc; _ })
+  | Lsplice (loc, _) ->
+    loc
+  | Llet (_, _, _, _, lam, _)
+  | Lmutlet (_, _, _, lam, _)
+  | Lifthenelse (lam, _, _, _)
+  | Lstaticcatch (lam, _, _, _, _)
+  | Lstaticraise (_, lam :: _)
+  | Lwhile { wh_cond = lam; _ }
+  | Lsequence (lam, _)
+  | Lassign (_, lam)
+  | Lifused (_, lam)
+  | Lregion (lam, _)
+  | Lexclave lam
+  | Ltrywith (lam, _, _, _, _) ->
+    try_to_find_location lam
+  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
+    Debuginfo.Scoped_location.Loc_unknown
+
+let try_to_find_debuginfo lam =
+  Debuginfo.from_location (try_to_find_location lam)
+
+let fatal_error_unevaluated_splice_var ident =
+  Misc.fatal_errorf_doc
+    "Splice variable %a should have been evaluated"
+    Ident.doc_print ident
+
+let fatal_error_invalid_constructor lambda =
+  let loc =
+    Debuginfo.Scoped_location.to_location (try_to_find_location lambda)
+  in
+  let name = match lambda with
+    | Lvar _ -> "Lvar"
+    | Lmutvar _ -> "Lmutvar"
+    | Lconst _ -> "Lconst"
+    | Lapply _ -> "Lapply"
+    | Lfunction _ -> "Lfunction"
+    | Llet _ -> "Llet"
+    | Lmutlet _ -> "Lmutlet"
+    | Lletrec _ -> "Lletrec"
+    | Lprim _ -> "Lprim"
+    | Lswitch _ -> "Lswitch"
+    | Lstringswitch _ -> "Lstringswitch"
+    | Lstaticraise _ -> "Lstaticraise"
+    | Lstaticcatch _ -> "Lstaticcatch"
+    | Ltrywith _ -> "Ltrywith"
+    | Lifthenelse _ -> "Lifthenelse"
+    | Lsequence _ -> "Lsequence"
+    | Lwhile _ -> "Lwhile"
+    | Lfor _ -> "Lfor"
+    | Lassign _ -> "Lassign"
+    | Lsend _ -> "Lsend"
+    | Levent _ -> "Levent"
+    | Lifused _ -> "Lifused"
+    | Lregion _ -> "Lregion"
+    | Lexclave _ -> "Lexclave"
+    | Lsplice _ -> "Lsplice"
+  in
+  Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
+    name Location.print_loc loc
+
 
 type runtime_param =
   | Rp_argument_block of Global_module.t
@@ -1423,7 +1497,7 @@ let make_key e =
     | Levent _ ->
         raise Not_simple
     | Lsplice _ ->
-        error (Invalid_constructor "Lsplice")
+        fatal_error_invalid_constructor e
 
   and tr_recs env es = List.map (tr_rec env) es
 
@@ -1961,9 +2035,7 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
-    | Lsplice (loc, _) ->
-        error ~loc:(Debuginfo.Scoped_location.to_location loc)
-          (Invalid_constructor "Lsplice")
+    | Lsplice _ -> fatal_error_invalid_constructor lam
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -3075,9 +3147,7 @@ let may_allocate_in_region lam =
         rather, it's in the parent region *)
       ()
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
-    | Lsplice (loc, _) ->
-        error ~loc:(Debuginfo.Scoped_location.to_location loc)
-          (Invalid_constructor "Lsplice")
+    | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
     | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
@@ -3105,40 +3175,6 @@ let simple_prim_on_values ~name ~arity ~alloc =
         (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.value))
     ~native_repr_res:(Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.value)
     ~is_layout_poly:false
-
-let rec try_to_find_location lam =
-  (* This is very much best-effort and may overshoot, but will still likely be
-     better than nothing. *)
-  match lam with
-  | Lprim (_, _, loc)
-  | Lfunction { loc; _ }
-  | Lletrec ({ def = { loc; _ }; _ } :: _, _)
-  | Lapply { ap_loc = loc; _ }
-  | Lfor { for_loc = loc; _ }
-  | Lswitch (_, _, loc, _)
-  | Lstringswitch (_, _, _, loc, _)
-  | Lsend (_, _, _, _, _, _, loc, _)
-  | Levent (_, { lev_loc = loc; _ })
-  | Lsplice (loc, _) ->
-    loc
-  | Llet (_, _, _, _, lam, _)
-  | Lmutlet (_, _, _, lam, _)
-  | Lifthenelse (lam, _, _, _)
-  | Lstaticcatch (lam, _, _, _, _)
-  | Lstaticraise (_, lam :: _)
-  | Lwhile { wh_cond = lam; _ }
-  | Lsequence (lam, _)
-  | Lassign (_, lam)
-  | Lifused (_, lam)
-  | Lregion (lam, _)
-  | Lexclave lam
-  | Ltrywith (lam, _, _, _, _) ->
-    try_to_find_location lam
-  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
-    Debuginfo.Scoped_location.Loc_unknown
-
-let try_to_find_debuginfo lam =
-  Debuginfo.from_location (try_to_find_location lam)
 
 (* The "count_initializers_*" functions count the number of individual
    components in an initializer for the corresponding array kind _after_
@@ -3254,12 +3290,6 @@ let report_error ppf = function
     Format_doc.fprintf ppf
       "Static computation and layout polymorphism are not yet supported in %s."
       where
-  | Unevaluated_splice_var ident ->
-    Format_doc.fprintf ppf "Splice variable %a should have been evaluated."
-      Ident.doc_print ident
-  | Invalid_constructor constructor ->
-    Format_doc.fprintf ppf "Lambda constructor %s is not valid at this stage."
-     constructor
 
 let () =
   Location.register_error_of_exn (function

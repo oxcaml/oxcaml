@@ -282,7 +282,6 @@
   mixed_block_shape
   mixed_product_bytes
   printlambda
-  printslambda
   runtimedef
   runtimetags
   tmc
@@ -290,7 +289,6 @@
   slambda_fracture
   slambda
   slambdaeval
-  slambdaident
   switch
   value_rec_compiler
   translmode
