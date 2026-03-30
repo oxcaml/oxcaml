@@ -217,7 +217,7 @@ static struct {
   pthread_t thread_id;
   bool running;
 
-  atomic_bool disabled;
+  atomic_bool enabled;
   atomic_bool stop;
 
 #ifdef HAS_INTERRUPTIBLE_TICK
@@ -2201,7 +2201,7 @@ CAMLextern void caml_stop_tick_thread(void)
 
 /* Compute the interval at which the tick thread will tick. */
 CAMLextern uintnat caml_effective_tick_interval_usec(void) {
-  if (atomic_load_relaxed(&tick_thread.disabled)) {
+  if (!atomic_load_relaxed(&tick_thread.enabled)) {
     return 0;
   }
 
@@ -2254,7 +2254,7 @@ static void caml_do_tick_all_domains(void)
 static void* caml_tick(void *arg)
 {
   (void)arg;
-  uintnat interval;
+  uintnat interval = 0;
   while (!atomic_load_acquire(&tick_thread.stop)) {
     /* We re-calculate the interval each iteration of the loop so that the
        per-domain tick interval can be changed. We use the (quite loose)
@@ -2271,7 +2271,6 @@ static void* caml_tick(void *arg)
     } else {
       if (new_interval != interval) {
         tick_thread_arm_timer(new_interval);
-        interval = new_interval;
       }
 
       if (tick_thread_wait()) {
@@ -2282,11 +2281,10 @@ static void* caml_tick(void *arg)
          to recalculate the interval and re-arm the timer. */
     }
 #else
-    interval = new_interval;
-    if (interval > 0) {
+    if (new_interval > 0) {
       /* Note: we don't need to handle signals here because signals are masked
          when we start the tick thread */
-      usleep(interval);
+      usleep(new_interval);
       caml_do_tick_all_domains();
     } else {
       /* No interruptible wait and no tick requests; poll up to the previous
@@ -2294,6 +2292,8 @@ static void* caml_tick(void *arg)
       usleep(Tick_poll_interval_usec);
     }
 #endif
+
+    interval = new_interval;
   }
 
   return NULL;
@@ -2301,8 +2301,9 @@ static void* caml_tick(void *arg)
 
 CAMLextern int caml_start_tick_thread(void)
 {
-  if (atomic_load_acquire(&tick_thread.disabled))
+  if (!atomic_load_acquire(&tick_thread.enabled)) {
     return 0;
+  }
 
   caml_plat_lock_non_blocking(&tick_thread.mutex);
   if (tick_thread.running) {
@@ -2348,10 +2349,10 @@ CAMLextern int caml_start_tick_thread(void)
 CAMLprim value caml_enable_tick_thread(value v_enable)
 {
   bool enable = Long_val(v_enable) ? 1 : 0;
-  bool prev = atomic_exchange_explicit(&tick_thread.disabled, !enable,
-                                       memory_order_acq_rel);
+  bool was_enabled = atomic_exchange_explicit(&tick_thread.enabled, enable,
+                                              memory_order_acq_rel);
 
-  if (enable && !prev) {
+  if (enable && !was_enabled) {
     int err = caml_start_tick_thread();
     sync_check_error(err, "caml_enable_tick_thread");
   } else {
@@ -2366,14 +2367,13 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
    If argument is 0, the current domain no longer wants ticks */
 CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
 {
-  intnat prev_interval =
-    atomic_exchange_relaxed(&domain_self->tick_interval_usec, interval_usec);
+  atomic_store_relaxed(&domain_self->tick_interval_usec, interval_usec);
   if (interval_usec != 0) {
     caml_start_tick_thread();
   }
-  if (interval_usec != prev_interval) {
-    tick_thread_wake();
-  }
+  /* NOTE: We don't worry too much about spurious wakes here, since we assume
+     changing the tick interval is uncommon */
+  tick_thread_wake();
 
   return 0;
 }
