@@ -52,9 +52,25 @@ let one (type a r)
       match plt_lookup with
       | None -> None
       | Some lookup ->
-        Option.map Address.to_int64 (lookup name)
+        let result = Option.map Address.to_int64 (lookup name) in
+        (match Sys.getenv_opt "OCAML_JIT_DEBUG", result with
+        | Some ("true" | "1"), Some addr ->
+          Printf.eprintf "PLT lookup for %s -> entry at %Lx\n%!" name addr
+        | Some ("true" | "1"), None ->
+          Printf.eprintf "PLT lookup for %s -> NOT FOUND\n%!" name
+        | _ -> ());
+        result
     else
-      Option.map Address.to_int64 (Symbols.find symbols name)
+      let result = Option.map Address.to_int64 (Symbols.find symbols name) in
+      (match Sys.getenv_opt "OCAML_JIT_DEBUG", result with
+      | Some ("true" | "1"), Some addr ->
+        Printf.eprintf
+          "Direct reloc lookup for %s -> %Lx\n%!" name addr
+      | Some ("true" | "1"), None ->
+        Printf.eprintf
+          "Direct reloc lookup for %s -> NOT FOUND\n%!" name
+      | _ -> ());
+      result
   in
   (* Check for invalid GOT/PLT outside .text *)
   let* () =

@@ -1731,6 +1731,11 @@ module For_jit = struct
       | Binary_emitter_intf.Symbol sym -> Asm_symbol.print ppf sym
       | Binary_emitter_intf.Label lbl -> Asm_label.print ppf lbl
 
+    let jit_debug =
+      match Sys.getenv_opt "OCAML_JIT_DEBUG" with
+      | Some ("true" | "1") -> true
+      | _ -> false
+
     let compute_value (r : Reloc.t) ~place_address ~lookup_target
         ~read_instruction:_ =
       let label, addend =
@@ -1740,12 +1745,34 @@ module For_jit = struct
         | Kind.DIR64 (label, addend) ->
           label, addend
       in
-      let sym, _ = parse_label label in
+      let sym, suffix = parse_label label in
       let target = string_to_target sym in
+      let kind_str =
+        if jit_debug then
+          match r.Reloc.kind with
+          | Kind.REL32 _ -> "REL32"
+          | Kind.DIR32 _ -> "DIR32"
+          | Kind.DIR64 _ -> "DIR64"
+        else ""
+      in
+      if jit_debug then
+        Printf.eprintf
+          "x86 compute_value: label=%s sym=%s suffix=%s \
+           kind=%s place=0x%Lx addend=%Ld\n%!"
+          label sym
+          (match suffix with None -> "<none>" | Some s -> s)
+          kind_str place_address addend;
       match lookup_target target with
       | None ->
+        if jit_debug then
+          Printf.eprintf
+            "x86 compute_value: lookup FAILED for %s\n%!" sym;
         Error (Format.asprintf "Symbol not found: %a" print_target target)
       | Some target_addr ->
+        if jit_debug then
+          Printf.eprintf
+            "x86 compute_value: lookup OK for %s -> 0x%Lx\n%!"
+            sym target_addr;
         let target_addr = Int64.add target_addr addend in
         let check_range ~value ~min_value ~max_value ~compare =
           if compare value min_value < 0 || compare value max_value > 0
