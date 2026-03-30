@@ -65,6 +65,8 @@ type machtype = machtype_component array
 
 val equal_machtype : machtype -> machtype -> bool
 
+val typ_of_int_width : int_width -> machtype
+
 val typ_void : machtype
 
 val typ_val : machtype
@@ -460,7 +462,7 @@ type operation =
       }
   | Calloc of Alloc_mode.t * alloc_block_kind
   | Cstore of memory_chunk * initialization_or_assignment
-  | Caddi
+  | Caddi of int_width
   | Csubi
   | Cmuli
   | Cmulhi of { signed : bool }

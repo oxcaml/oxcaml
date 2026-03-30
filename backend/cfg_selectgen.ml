@@ -70,7 +70,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         false
         (* avoid reordering *)
         (* The remaining operations are simple if their args are *)
-      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Caddi128
+      | Cload _ | Caddi _ | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Caddi128
       | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Ccmpi _
       | Caddv | Cadda | Cnegf _ | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccsel _
       | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
@@ -127,7 +127,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ->
           EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
-        | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+        | Ctuple_field _ | Caddi _ | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
         | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
         | Ccsel _ | Cclz _ | Cctz _ | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _
         | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
@@ -341,7 +341,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         args )
     | Cpoll -> SU.basic_op Poll, args
     | Cpause -> SU.basic_op Pause, args
-    | Caddi -> select_arith_comm Iadd args
+    | Caddi I64 -> select_arith_comm Iadd args
+    | Caddi (I32 | I16 | I8) -> failwith "Non-I64 addition not supported"
     | Csubi -> select_arith Isub args
     | Cmuli -> select_arith_comm Imul args
     | Cmulhi { signed } -> select_arith_comm (Imulh { signed }) args

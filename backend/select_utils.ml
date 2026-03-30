@@ -194,8 +194,9 @@ let oper_result_type = function
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
     typ_tagged_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
-  | Clsr | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
+  | Caddi width -> typ_of_int_width width
+  | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl | Clsr
+  | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
     typ_int64
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val

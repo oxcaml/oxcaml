@@ -111,7 +111,7 @@ let clz ~arg_is_non_zero bi arg dbg =
       let res = Cop (op, [make_unsigned_int bi arg dbg], dbg) in
       let extra_bits = (size_int * 8) - bit_count bi in
       if extra_bits <> 0
-      then Cop (Caddi, [res; Cconst_int (-extra_bits, dbg)], dbg)
+      then Cop (Caddi I64, [res; Cconst_int (-extra_bits, dbg)], dbg)
       else res)
 
 let ctz ~arg_is_non_zero bi arg dbg =
@@ -877,7 +877,7 @@ let transl_builtin name args dbg typ_res =
     let op = Cclz { arg_is_non_zero = false } in
     if_operation_supported op ~f:(fun () ->
         let arg = clear_sign_bit (one_arg name args) dbg in
-        Cop (Caddi, [Cop (op, [arg], dbg); Cconst_int (-1, dbg)], dbg))
+        Cop (Caddi I64, [Cop (op, [arg], dbg); Cconst_int (-1, dbg)], dbg))
   | "caml_int64_clz_unboxed_to_untagged" ->
     clz ~arg_is_non_zero:false Unboxed_int64 (one_arg name args) dbg
   | "caml_int32_clz_unboxed_to_untagged" ->
@@ -902,7 +902,7 @@ let transl_builtin name args dbg typ_res =
     if_operation_supported Cpopcnt ~f:(fun () ->
         (* Having the argument tagged saves a shift, but there is one extra
            "set" bit, which is accounted for by the (-1) below. *)
-        Cop (Caddi, [Cop (Cpopcnt, args, dbg); Cconst_int (-1, dbg)], dbg))
+        Cop (Caddi I64, [Cop (Cpopcnt, args, dbg); Cconst_int (-1, dbg)], dbg))
   | "caml_int_popcnt_untagged_to_untagged" ->
     (* This code is expected to be faster than [popcnt(tagged_x) - 1] when the
        untagged argument is already available from a previous computation. *)

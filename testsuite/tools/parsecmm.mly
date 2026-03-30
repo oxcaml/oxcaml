@@ -332,7 +332,7 @@ unaryop:
 ;
 binaryop:
     STORE chunk                 { Cstore ($2, Assignment) }
-  | ADDI                        { Caddi }
+  | ADDI                        { Caddi I64 }
   | SUBI                        { Csubi }
   | STAR                        { Cmuli }
   | DIVI                        { Cdivi }

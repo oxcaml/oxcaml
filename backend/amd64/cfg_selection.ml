@@ -35,8 +35,8 @@ let rec select_addr exp =
   let default = Alinear exp, 0 in
   match exp with
   | Cmm.Cconst_symbol (s, _) when not !Clflags.dlcode -> Asymbol s, 0
-  | Cmm.Cop ((Caddi | Caddv | Cadda), [arg; Cconst_int (m, _)], _)
-  | Cmm.Cop ((Caddi | Caddv | Cadda), [Cconst_int (m, _); arg], _) ->
+  | Cmm.Cop ((Caddi _ | Caddv | Cadda), [arg; Cconst_int (m, _)], _)
+  | Cmm.Cop ((Caddi _ | Caddv | Cadda), [Cconst_int (m, _); arg], _) ->
     let a, n = select_addr arg in
     if Misc.no_overflow_add n m then a, n + m else default
   | Cmm.Cop (Csubi, [arg; Cconst_int (m, _)], _) ->
@@ -65,7 +65,7 @@ let rec select_addr exp =
       else default
     | (Asymbol _ | Aadd (_, _) | Ascale (_, _) | Ascaledadd (_, _, _)), _ ->
       default)
-  | Cmm.Cop ((Caddi | Caddv | Cadda), [arg1; arg2], _) -> (
+  | Cmm.Cop ((Caddi _ | Caddv | Cadda), [arg1; arg2], _) -> (
     match select_addr arg1, select_addr arg2 with
     | (Alinear e1, n1), (Alinear e2, n2) when Misc.no_overflow_add n1 n2 ->
       Aadd (e1, e2), n1 + n2
@@ -363,7 +363,7 @@ let select_operation'
     Cfg_selectgen_target_intf.select_operation_result =
   match op with
   (* Recognize the LEA instruction *)
-  | Caddi | Caddv | Cadda | Csubi | Cor | Cmuli -> (
+  | Caddi _ | Caddv | Cadda | Csubi | Cor | Cmuli -> (
     match select_addressing Word_int (Cop (op, args, dbg)) with
     | Iindexed _, _ | Iindexed2 0, _ -> Use_default
     | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg ->
@@ -399,7 +399,7 @@ let select_operation'
   (* Recognize store instructions *)
   | Cstore (((Word_int | Word_val) as chunk), _init) -> (
     match args with
-    | [loc; Cop (Caddi, [Cop (Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
+    | [loc; Cop (Caddi _, [Cop (Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
       when Stdlib.( = ) loc loc' && int_is_immediate n ->
       let addr, arg = select_addressing chunk loc in
       Rewritten (specific (Ioffset_loc (n, addr)), [arg])

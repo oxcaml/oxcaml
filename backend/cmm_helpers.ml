@@ -454,7 +454,7 @@ let cint_const n =
 
 let add_no_overflow n x c dbg =
   let d = n + x in
-  if d = 0 then c else Cop (Caddi, [c; Cconst_int (d, dbg)], dbg)
+  if d = 0 then c else Cop (Caddi I64, [c; Cconst_int (d, dbg)], dbg)
 
 let is_defined_shift n = 0 <= n && n < arch_bits
 
@@ -469,11 +469,11 @@ let[@inline] can_interchange_add_with_or e n =
 let[@inline] prefer_add = function
   | Cop (Cor, [e; (Cconst_int (n, _) as n')], dbg)
     when can_interchange_add_with_or e n ->
-    Cop (Caddi, [e; n'], dbg)
+    Cop (Caddi I64, [e; n'], dbg)
   | e -> e
 
 let[@inline] prefer_or = function
-  | Cop (Caddi, [e; (Cconst_int (n, _) as n')], dbg)
+  | Cop (Caddi I64, [e; (Cconst_int (n, _) as n')], dbg)
     when can_interchange_add_with_or e n ->
     Cop (Cor, [e; n'], dbg)
   | e -> e
@@ -503,11 +503,11 @@ let rec add_const c n dbg =
         match prefer_add c with
         | Cconst_int (x, _) when Misc.no_overflow_add x n ->
           Cconst_int (x + n, dbg)
-        | Cop (Caddi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
-          ->
+        | Cop (Caddi I64, [Cconst_int (x, _); c], _)
+          when Misc.no_overflow_add n x ->
           add_no_overflow n x c dbg
-        | Cop (Caddi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_add n x
-          ->
+        | Cop (Caddi I64, [c; Cconst_int (x, _)], _)
+          when Misc.no_overflow_add n x ->
           add_no_overflow n x c dbg
         | Cop (Csubi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
           ->
@@ -515,12 +515,14 @@ let rec add_const c n dbg =
         | Cop (Csubi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_sub n x
           ->
           add_const c (n - x) dbg
-        | _ -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
+        | _ -> Cop (Caddi I64, [c; Cconst_int (n, dbg)], dbg))
 
 let rec add_const' arg const dbg =
   let open P.Default_variables in
   map_tail1 arg ~f:(fun arg ->
-      let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
+      let res =
+        Cop (Caddi I64, [prefer_add arg; Cconst_int (const, dbg)], dbg)
+      in
       let x = P.create_var Int "x" in
       P.run res
         [ (Binop (Add, Any c, Const_int_fixed 0) => fun env -> env#.c);
@@ -561,16 +563,16 @@ let rec add_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match prefer_add c1, prefer_add c2 with
       | Cconst_int (n, _), c | c, Cconst_int (n, _) -> add_const c n dbg
-      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), c2 ->
+      | Cop (Caddi I64, [c1; Cconst_int (n1, _)], _), c2 ->
         add_const (add_int c1 c2 dbg) n1 dbg
-      | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) ->
+      | c1, Cop (Caddi I64, [c2; Cconst_int (n2, _)], _) ->
         add_const (add_int c1 c2 dbg) n2 dbg
-      | _, _ -> Cop (Caddi, [c1; c2], dbg))
+      | _, _ -> Cop (Caddi I64, [c1; c2], dbg))
 
 let rec add_int' arg1 arg2 dbg =
   let open P.Default_variables in
   map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
-      let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
+      let res = Cop (Caddi I64, [prefer_add arg1; prefer_add arg2], dbg) in
       P.run res
         [ ( Binop (Add, Const_int n, Any c) => fun env ->
             add_const env#.c env#.n dbg );
@@ -587,9 +589,9 @@ let rec sub_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match prefer_add c1, prefer_add c2 with
       | _, Cconst_int (n2, _) when n2 <> min_int -> add_const c1 (-n2) dbg
-      | _, Cop (Caddi, [c2; Cconst_int (n2, _)], _) when n2 <> min_int ->
+      | _, Cop (Caddi I64, [c2; Cconst_int (n2, _)], _) when n2 <> min_int ->
         add_const (sub_int c1 c2 dbg) (-n2) dbg
-      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), _ ->
+      | Cop (Caddi I64, [c1; Cconst_int (n1, _)], _), _ ->
         add_const (sub_int c1 c2 dbg) n1 dbg
       | _, _ -> Cop (Csubi, [c1; c2], dbg))
 
@@ -685,7 +687,7 @@ let max_signed_bit_length =
 
 let ignore_low_bit_int = function
   | Cop
-      ( Caddi,
+      ( Caddi I64,
         [(Cop (Clsl, [_; Cconst_int (n, _)], _) as c); Cconst_int (1, _)],
         _ )
     when n > 0 && is_defined_shift n ->
@@ -913,7 +915,7 @@ and lsl_int c1 c2 dbg =
             if is_defined_shift (n + n')
             then lsl_const inner (n + n') dbg
             else replace inner ~with_:(Cconst_int (0, dbg))
-          | Cop (Caddi, [c1; Cconst_int (offset, _)], _)
+          | Cop (Caddi I64, [c1; Cconst_int (offset, _)], _)
             when Misc.no_overflow_lsl offset n ->
             add_const (lsl_int c1 c2 dbg) (offset lsl n) dbg
           | Cop ((Cor | Cxor), [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
@@ -951,8 +953,8 @@ let rec mul_int c1 c2 dbg =
     sub_int (Cconst_int (0, dbg)) c dbg
   | c, Cconst_int (n, _) when is_power2 n -> mult_power2 c n dbg
   | Cconst_int (n, _), c when is_power2 n -> mult_power2 c n dbg
-  | Cop (Caddi, [c; Cconst_int (n, _)], _), Cconst_int (k, _)
-  | Cconst_int (k, _), Cop (Caddi, [c; Cconst_int (n, _)], _)
+  | Cop (Caddi I64, [c; Cconst_int (n, _)], _), Cconst_int (k, _)
+  | Cconst_int (k, _), Cop (Caddi I64, [c; Cconst_int (n, _)], _)
     when Misc.no_overflow_mul n k ->
     add_const (mul_int c (Cconst_int (k, dbg)) dbg) (n * k) dbg
   | c1, c2 -> Cop (Cmuli, [c1; c2], dbg)
@@ -1028,7 +1030,7 @@ let untag_int i dbg =
 let mk_not dbg cmm =
   match cmm with
   | Cop
-      ( (Caddi | Cor),
+      ( (Caddi _ | Cor),
         [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
         dbg' ) -> (
     match c with
@@ -1366,7 +1368,7 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
 let test_bool dbg cmm =
   match cmm with
   | Cop
-      ( (Caddi | Cor),
+      ( (Caddi _ | Cor),
         [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
         _ ) ->
     c
@@ -1632,7 +1634,7 @@ let array_indexing ?typ log2size ptr ofs dbg =
   let add =
     match typ with
     | None | Some Addr -> Cadda
-    | Some (Tagged_int | Naked_int (I64 | I32 | I16 | I8)) -> Caddi
+    | Some (Tagged_int | Naked_int (I64 | I32 | I16 | I8)) -> Caddi I64
     | _ -> assert false
   in
   match ofs with
@@ -1642,16 +1644,16 @@ let array_indexing ?typ log2size ptr ofs dbg =
     then ptr
     else Cop (add, [ptr; Cconst_int (i lsl log2size, dbg)], dbg)
   | Cop
-      ( (Caddi | Cor),
+      ( (Caddi I64 | Cor),
         [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
         dbg' ) ->
     Cop (add, [ptr; lsl_const c log2size dbg], dbg')
-  | Cop (Caddi, [c; Cconst_int (n, _)], dbg') when log2size = 0 ->
+  | Cop (Caddi I64, [c; Cconst_int (n, _)], dbg') when log2size = 0 ->
     Cop
       ( add,
         [Cop (add, [ptr; untag_int c dbg], dbg); Cconst_int (n asr 1, dbg)],
         dbg' )
-  | Cop (Caddi, [c; Cconst_int (n, _)], _) ->
+  | Cop (Caddi I64, [c; Cconst_int (n, _)], _) ->
     Cop
       ( add,
         [ Cop (add, [ptr; lsl_const c (log2size - 1) dbg], dbg);
@@ -2093,7 +2095,7 @@ let bigstring_get_alignment ba idx align dbg =
     (fun ba_data ->
       Cop
         ( Cand,
-          [Cconst_int (align - 1, dbg); Cop (Caddi, [ba_data; idx], dbg)],
+          [Cconst_int (align - 1, dbg); Cop (Caddi I64, [ba_data; idx], dbg)],
           dbg ))
 
 (* Message sending *)
@@ -3446,7 +3448,7 @@ let cache_public_method meths tag cache dbg =
     Clet
       ( VP.create result,
         Cop
-          ( Caddi,
+          ( Caddi I64,
             [ lsl_const (Cvar result_label_index) log2_size_addr dbg;
               cconst_int (1 - (3 * size_addr)) ],
             dbg ),
@@ -3478,7 +3480,9 @@ let cache_public_method meths tag cache dbg =
         Cop
           ( Cor,
             [ Cop
-                (Clsr, [Cop (Caddi, [Cvar li; Cvar hi], dbg); cconst_int 1], dbg);
+                ( Clsr,
+                  [Cop (Caddi I64, [Cvar li; Cvar hi], dbg); cconst_int 1],
+                  dbg );
               cconst_int 1 ],
             dbg ),
         Cifthenelse
@@ -4047,7 +4051,7 @@ let curry_function (kind, arity, return) =
 
 type unary_primitive = expression -> Debuginfo.t -> expression
 
-let int_as_pointer arg dbg = Cop (Caddi, [arg; Cconst_int (-1, dbg)], dbg)
+let int_as_pointer arg dbg = Cop (Caddi I64, [arg; Cconst_int (-1, dbg)], dbg)
 (* always a pointer outside the heap *)
 
 let raise_prim raise_kind ~extra_args arg dbg =
@@ -4333,7 +4337,7 @@ let entry_point namelist =
       ( Cstore (Word_int, Assignment),
         [ cconst_symbol (global_symbol "caml_globals_inited");
           Cop
-            ( Caddi,
+            ( Caddi I64,
               [ Cop
                   ( mk_load_mut Word_int,
                     [cconst_symbol (global_symbol "caml_globals_inited")],
@@ -4370,7 +4374,7 @@ let entry_point namelist =
   let high = cconst_int (List.length namelist) in
   let body =
     let dbg = dbg () in
-    let incr_i id = Cop (Caddi, [Cvar id; Cconst_int (1, dbg)], dbg) in
+    let incr_i id = Cop (Caddi I64, [Cvar id; Cconst_int (1, dbg)], dbg) in
     let exit_if_last_iteration id =
       Cifthenelse
         ( Cop (Ccmpi Ceq, [Cvar id; high], dbg),
@@ -4999,8 +5003,8 @@ let cmm_arith_size (e : Cmm.expression) =
   let rec cmm_arith_size0 (e : Cmm.expression) =
     match e with
     | Cop
-        ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor
-          | Clsl | Clsr | Casr ),
+        ( ( Caddi _ | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor
+          | Cxor | Clsl | Clsr | Casr ),
           l,
           _ ) ->
       List.fold_left ( + ) 1 (List.map cmm_arith_size0 l)

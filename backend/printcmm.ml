@@ -275,7 +275,7 @@ let operation d = function
       match init with Initialization -> "(init)" | Assignment -> ""
     in
     Printf.sprintf "store %s%s" (chunk c) init
-  | Caddi -> "+"
+  | Caddi _ -> "+"
   | Csubi -> "-"
   | Cmuli -> "*"
   | Cmulhi { signed } -> "*h" ^ if signed then "" else "u"
