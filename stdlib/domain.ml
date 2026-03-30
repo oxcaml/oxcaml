@@ -773,11 +773,16 @@ module Tick = struct
   let () = Callback.Safe.register "Domain.Tick.acquire" acquire
   let () = Callback.Safe.register "Domain.Tick.release" release
 
-  external global_effective_interval_usec
+  external global_effective_interval_usec_prim
     : (unit[@untagged]) -> (int[@untagged]) @@ portable
     = "caml_effective_tick_interval_usec_bytecode"
         "caml_effective_tick_interval_usec"
   [@@noalloc]
+
+  let global_effective_interval_usec () =
+    match global_effective_interval_usec_prim () with
+    | 0 -> Null
+    | n -> This n
 end
 
 module Safe = struct

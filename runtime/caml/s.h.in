@@ -84,6 +84,10 @@
 
 #undef HAS_LINUX_FUTEX_H
 
+#undef HAS_SYS_EPOLL_H
+#undef HAS_SYS_TIMERFD_H
+#undef HAS_SYS_EVENTFD_H
+
 /* 2. For the Unix library. */
 
 #undef HAS_SOCKETS

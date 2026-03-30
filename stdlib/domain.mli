@@ -228,13 +228,10 @@ module Tick : sig @@ portable
   *)
   val release : t @ unique -> unit
 
-  (** Calculates and returns the interval at which the tick thread will tick.
-      This is the global minimum across all domains of live tick requests *)
-  external global_effective_interval_usec
-    : (unit[@untagged]) -> (int[@untagged]) @@ portable
-    = "caml_effective_tick_interval_usec_bytecode"
-        "caml_effective_tick_interval_usec"
-  [@@noalloc]
+  (** Returns the interval at which the tick thread will tick, or [Null]
+      if no domain has any active tick requests. This is the global minimum
+      across all domains of live tick requests. *)
+  val global_effective_interval_usec : unit -> int or_null
 end
 
 (** Submodule containing non-backwards-compatible functions which enforce thread
