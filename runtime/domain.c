@@ -2177,10 +2177,7 @@ static bool tick_thread_wait(void)
 
 static int tick_thread_open_fds(void) { return 0; }
 static int tick_thread_close_fds(void) { return 0; }
-static void tick_thread_arm_timer(uintnat interval_usec)
-{ (void)interval_usec; }
 static void tick_thread_wake(void) {}
-static bool tick_thread_wait(void) { return true; }
 
 #endif
 
