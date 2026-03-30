@@ -733,24 +733,11 @@ module Tick = struct
           "caml_domain_set_tick_interval_usec"
 
     let acquire ~interval_usec =
+      if interval_usec < 0 then invalid_arg "Tick.acquire: negative interval";
       Registry.protect (local_registry ()) (fun registry ->
         let interval = Registry.add registry interval_usec in
-        match set_tick_interval_usec interval with
-        | () -> interval_usec
-        | exception exn ->
-          let bt = Printexc.get_raw_backtrace () in
-          (* We might raise because we failed to start the tick thread, not just
-             because the interval was invalid. In that case, we don't want to
-             leave the domain's min requested tick interval in place - instead,
-             we use the interval returned by [Registry.remove] to set the tick
-             interval again. This will probably (though might not) fail because
-             we fail to start the tick thread again; in that case, it's fine to
-             re-raise that exception as the state should be the same as we left
-             it before calling [acquire] *)
-          (match Registry.remove registry interval_usec with
-           | This interval -> set_tick_interval_usec interval
-           | Null -> set_tick_interval_usec 0);
-          Printexc.raise_with_backtrace exn bt)
+        set_tick_interval_usec interval);
+      interval_usec
 
     let release interval_usec =
       Registry.protect (local_registry ()) (fun registry ->
