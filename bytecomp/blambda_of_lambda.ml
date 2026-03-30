@@ -1174,8 +1174,10 @@ and make_unsigned_comparison size signed_comparison x y =
    (pop)
 *)
 
-let thunk_and_call blam =
-  let thunk = Ident.create_local "thunk" in
+let thunkify_compilation_unit_initialization ~thunk_name blam =
+  (* Transforms [blam] into something like [let thunk () = blam in thunk ()].
+     Assumes no free variables in [blam]. *)
+  let thunk = Ident.create_local thunk_name in
   Blambda.Let
     { id = thunk;
       arg =
@@ -1194,6 +1196,11 @@ let blambda_of_lambda ~compilation_unit x =
   | None -> blam
   | Some cu ->
     let blam =
-      if !Clflags.thunkify_cu_init then thunk_and_call blam else blam
+      if !Clflags.thunkify_cu_init
+      then
+        thunkify_compilation_unit_initialization
+          ~thunk_name:("init_" ^ Compilation_unit.full_path_as_string cu)
+          blam
+      else blam
     in
     Blambda.Prim (Blambda.Setglobal cu, [blam])
