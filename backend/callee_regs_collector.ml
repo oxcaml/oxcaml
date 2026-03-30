@@ -9,6 +9,8 @@ type strategy =
   | Leaf_only
   | All_functions
 
+let _ = Leaf_only, All_functions
+
 let strategy = Leaf_only
 
 let value_to_phys_regs (value : Callee_regs_info.value) :
