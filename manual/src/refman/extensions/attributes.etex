@@ -308,14 +308,10 @@ Some attributes are understood by the compiler:
   "ocaml.poll" or "poll" with an "error" payload on a function definition emits
   an error whenever the compiler inserts a runtime polling point in the body of
   the annotated function.
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
  \item
    "ocaml.atomic" or "atomic" on a record field definition, marks this
    record field as atomic. See \ref{s:atomic-record-fields} for more
    details.
->>>>>>> upstream-incoming
 \end{itemize}
 
 \begin{caml_example*}{verbatim}

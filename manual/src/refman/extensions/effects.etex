@@ -46,27 +46,9 @@ returns their sum.
 We can handle the "Xchg" effect by implementing a handler that always returns
 the successor of the offered value:
 
-<<<<<<< oxcaml
 \begin{caml_example}{verbatim}[error]
-try_with comp1 ()
-{ effc = fun (type a) (eff: a t) ->
-    match eff with
-    | Xchg n -> Some (fun (k: (a, _) continuation) ->
-        continue k (n+1))
-    | _ -> None }
-||||||| upstream-base
-\begin{caml_example}{verbatim}
-try_with comp1 ()
-{ effc = fun (type a) (eff: a t) ->
-    match eff with
-    | Xchg n -> Some (fun (k: (a, _) continuation) ->
-        continue k (n+1))
-    | _ -> None }
-=======
-\begin{caml_example}{verbatim}
 try comp1 () with
 | effect (Xchg n), k -> continue k (n+1)
->>>>>>> upstream-incoming
 \end{caml_example}
 
 We run the computation "comp1 ()" under an effect handler that handles the
@@ -581,27 +563,9 @@ must be resumed either with a "continue" or "discontinue" exactly once}}.
 Attempting to use a continuation more than once raises a
 "Continuation_already_resumed" exception. For example:
 
-<<<<<<< oxcaml
 \begin{caml_example}{verbatim}[error]
-try_with perform (Xchg 0)
-{ effc = fun (type a) (eff : a t) ->
-    match eff with
-    | Xchg n -> Some (fun (k: (a, _) continuation) ->
-        continue k 21 + continue k 21)
-    | _ -> None }
-||||||| upstream-base
-\begin{caml_example}{verbatim}
-try_with perform (Xchg 0)
-{ effc = fun (type a) (eff : a t) ->
-    match eff with
-    | Xchg n -> Some (fun (k: (a, _) continuation) ->
-        continue k 21 + continue k 21)
-    | _ -> None }
-=======
-\begin{caml_example}{verbatim}
 try perform (Xchg 0) with
 | effect Xchg n, k -> continue k 21 + continue k 21
->>>>>>> upstream-incoming
 \end{caml_example}
 
 The primary motivation for adding effect handlers to OCaml is to enable
