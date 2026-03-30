@@ -71,6 +71,16 @@ Line 2, characters 60-71:
                                                                 ^^^^^^^^^^^
 Warning 213: This contention is overriden by contended later.
 
+Line 2, characters 29-34:
+2 |     val x : string @@ global local unique aliased once many uncontended contended
+                                 ^^^^^
+Warning 217 [redundant-modality]: This modality is redundant.
+
+Line 3, characters 15-26:
+3 |       portable nonportable
+                   ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This modality is redundant.
+
 module type S = sig val x : string @@ many aliased contended end
 |}]
 
@@ -407,6 +417,11 @@ module Inclusion_match = struct
     let () = uncontended_use M.x
 end
 [%%expect{|
+Line 3, characters 27-38:
+3 |         val x : int ref @@ uncontended
+                               ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This modality is redundant.
+
 module Inclusion_match : sig module M : sig val x : int ref end end @@
   stateless
 |}]
@@ -671,6 +686,11 @@ end = struct
   let foo @ nonportable contended = 42
 end
 [%%expect{|
+Line 2, characters 28-39:
+2 |   val foo : int @@ portable uncontended
+                                ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This modality is redundant.
+
 module M : sig val foo : int @@ portable end @@ stateless
 |}]
 
@@ -684,6 +704,11 @@ end = struct
   let t @ nonportable contended = 42
 end
 [%%expect{|
+Line 3, characters 24-35:
+3 |   val t : t @@ portable uncontended
+                            ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This modality is redundant.
+
 module M : sig type t val t : t @@ portable end @@ stateless
 |}]
 
@@ -697,6 +722,11 @@ end = struct
   let t @ nonportable contended = `Foo
 end
 [%%expect{|
+Line 2, characters 36-47:
+2 |   val t : [`Foo | `Bar] @@ portable uncontended
+                                        ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This modality is redundant.
+
 module M : sig val t : [ `Bar | `Foo ] @@ portable end @@ stateless
 |}]
 
@@ -706,6 +736,11 @@ end = struct
   let t @ nonportable contended = `Foo
 end
 [%%expect{|
+Line 2, characters 69-80:
+2 |   val t : [`Foo | `Bar of 'a -> 'a | `Baz of string ref] @@ portable uncontended
+                                                                         ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This modality is redundant.
+
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let t @ nonportable contended = `Foo
@@ -993,6 +1028,11 @@ module type T = sig @@ portable
   val baz : 'a -> 'a @@ portable
 end
 [%%expect{|
+Line 4, characters 24-32:
+4 |   val baz : 'a -> 'a @@ portable
+                            ^^^^^^^^
+Warning 217 [redundant-modality]: This modality is redundant.
+
 module type T =
   sig
     val foo : 'a -> 'a @@ portable
