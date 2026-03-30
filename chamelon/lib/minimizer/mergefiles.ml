@@ -107,15 +107,15 @@ let rec remove_head_path p =
 let rec remove_head_lid li =
   match li with
   | Ldot ({ txt = Lident _; _ }, s) -> Lident s.txt
-  | Ldot (li, s) ->
-    Ldot ({ li with txt = remove_head_lid li.txt }, s)
+  | Ldot (li, s) -> Ldot ({ li with txt = remove_head_lid li.txt }, s)
   | _ -> li
 
 let rec print_path_lid p =
   match p with
   | Lident id -> id
   | Ldot (p, s) -> print_path_lid p.txt ^ "." ^ s.txt
-  | Lapply (t1, t2) -> "app " ^ print_path_lid t1.txt ^ " " ^ print_path_lid t2.txt
+  | Lapply (t1, t2) ->
+    "app " ^ print_path_lid t1.txt ^ " " ^ print_path_lid t2.txt
 
 let remove_file_name_mapper n1 =
   let n1 = String.capitalize_ascii (String.sub n1 0 (String.length n1 - 3)) in

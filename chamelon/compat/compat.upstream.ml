@@ -115,7 +115,12 @@ let mkTexp_function ?id:(() = ()) ({ params; body } : texp_function) =
           (Texp_function
              { arg_label;
                param;
-               cases = [{ c_lhs = pattern; c_cont = None; c_guard = None; c_rhs = acc }];
+               cases =
+                 [ { c_lhs = pattern;
+                     c_cont = None;
+                     c_guard = None;
+                     c_rhs = acc
+                   } ];
                partial
              }))
       params

@@ -303,7 +303,8 @@ let view_texp (e : expression_desc) =
       ( { params; body },
         { alloc_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc } )
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
-  | Texp_match (e, sort, cases, _, partial) -> Texp_match (e, cases, partial, sort)
+  | Texp_match (e, sort, cases, _, partial) ->
+    Texp_match (e, cases, partial, sort)
   | _ -> O e
 
 let mkpattern_data ~pat_desc ~pat_loc ~pat_extra ~pat_type ~pat_env
