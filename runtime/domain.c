@@ -2120,6 +2120,10 @@ fail:
 static void tick_thread_arm_timer(uintnat interval_usec)
 {
   struct itimerspec its;
+  /* CR-someday aspsmith: We ostensibly could get better behavior / performance
+     by using a recurring interval timer rather than a one-shot timer, but
+     currently we tick infrequently enough that it doesn't seem like this is
+     worth it. But we should at least measure and see. */
   its.it_interval.tv_sec = 0;
   its.it_interval.tv_nsec = 0;
   its.it_value.tv_sec = (time_t)(interval_usec / 1000000);
@@ -2250,6 +2254,7 @@ static void caml_do_tick_all_domains(void)
 }
 
 static void* caml_tick(void *arg)
+  return Val_long(interval);
 {
   (void)arg;
   uintnat interval = 0;
@@ -2264,13 +2269,10 @@ static void* caml_tick(void *arg)
 #ifdef HAS_INTERRUPTIBLE_TICK
     if (new_interval == 0) {
       interval = new_interval;
-      /* No domain wants ticks; sleep until woken by the eventfd/pipe. */
+      /* No domain wants ticks; sleep until woken by the eventfd. */
       tick_thread_wait();
     } else {
-      if (new_interval != interval) {
-        tick_thread_arm_timer(new_interval);
-      }
-
+      tick_thread_arm_timer(new_interval);
       if (tick_thread_wait()) {
         caml_do_tick_all_domains();
       }
