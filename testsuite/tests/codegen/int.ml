@@ -1,5 +1,8 @@
 (* TEST
  flags += " -O3";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  only-default-codegen;
  expect.opt;
 *)
@@ -142,6 +145,27 @@ rem_2:
   ret
 |}]
 
+
+(* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/2187 *)
+let is_divisible_by_128 x = (x mod 128) = 0
+[%%expect_asm X86_64{|
+is_divisible_by_128:
+  sarq  $1, %rax
+  movq  $-128, %rdi
+  movq  %rax, %rbx
+  sarq  $6, %rbx
+  shrq  $57, %rbx
+  addq  %rax, %rbx
+  andq  %rdi, %rbx
+  subq  %rbx, %rax
+  leaq  1(%rax,%rax), %rax
+  cmpq  $1, %rax
+  sete  %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
 let succ x = x + 1
 [%%expect_asm X86_64{|
 succ:
@@ -272,7 +296,7 @@ equal:
 
 (* CR ttebbi: This is very inefficient, should be like `equal`. *)
 let equal_using_compare (x : int) (y : int) =
-  Stdlib.compare x y = 0
+  Int.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
   movq  %rax, %rdi

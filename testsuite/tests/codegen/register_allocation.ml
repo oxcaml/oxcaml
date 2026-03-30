@@ -1,11 +1,19 @@
 (* TEST
- flags += " -O3 -cfg-prologue-shrink-wrap";
+ readonly_files = "intrinsics.ml";
+ setup-ocamlopt.opt-build-env;
+ all_modules = "intrinsics.ml";
+ compile_only = "true";
+ ocamlopt.opt;
+
+ only-default-codegen;
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
- only-default-codegen;
  expect.opt;
 *)
 
+open Intrinsics
 
 (* CR ttebbi:
   - The cold branch should be moved to the end.
@@ -25,7 +33,7 @@ spill_cold_path:
   jne   .L113
   movq  %rax, (%rsp)
   movl  $1, %eax
-  call  camlTOP1__cold_1_3_code@PLT
+  call  camlTOP2__cold_1_3_code@PLT
 .L119:
   movq  (%rsp), %rax
 .L113:
@@ -76,7 +84,7 @@ let useless_movs x y = sink (x - y) x
 [%%expect_asm X86_64{|
 useless_movs:
   movq  %rax, %rsi
-  movq  camlTOP5__useless_movs_9@GOTPCREL(%rip), %rax
+  movq  camlTOP6__useless_movs_9@GOTPCREL(%rip), %rax
   movq  24(%rax), %rdi
   movq  %rsi, %rax
   subq  %rbx, %rax
@@ -97,11 +105,11 @@ let f x =
 f:
   subq  $24, %rsp
   movq  %rax, (%rsp)
-  call  camlTOP6__g_11_13_code@PLT
+  call  camlTOP7__g_11_13_code@PLT
 .L108:
   movq  %rax, 8(%rsp)
   movq  (%rsp), %rax
-  call  camlTOP6__g_11_13_code@PLT
+  call  camlTOP7__g_11_13_code@PLT
 .L109:
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
@@ -134,7 +142,7 @@ spill_in_loop:
   ret
 .L111:
   movq  %rbx, (%rsp)
-  call  camlTOP7__g_15_18_code@PLT
+  call  camlTOP8__g_15_18_code@PLT
 .L117:
   movq  (%rsp), %rbx
   cmpq  $1, %rax
@@ -255,5 +263,152 @@ spill_one_or_two:
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
   addq  $24, %rsp
+  ret
+|}]
+
+
+(* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/5115 *)
+let spilled_phi_merge cond callback f a b c d e =
+  let _ : _ = Stdlib.Sys.time () in
+  if cond then callback ();
+  f a b c d e
+[%%expect_asm X86_64{|
+spilled_phi_merge:
+  subq  $56, %rsp
+  movq  %rax, 8(%rsp)
+  movq  %rbx, 48(%rsp)
+  movq  %rdi, (%rsp)
+  movq  %rsi, %rbp
+  movq  %rdx, %rbx
+  movq  %rcx, 24(%rsp)
+  movq  %r8, %r12
+  movq  %r9, %r13
+  movl  $1, %edi
+  call  caml_sys_time_unboxed@PLT
+  movq  8(%rsp), %rax
+  cmpq  $1, %rax
+  je    .L114
+  movq  %r13, 40(%rsp)
+  movq  %r12, 32(%rsp)
+  movq  24(%rsp), %rax
+  movq  %rbx, 16(%rsp)
+  movq  %rbp, 8(%rsp)
+  movq  (%rsp), %rax
+  movl  $1, %eax
+  movq  48(%rsp), %rbx
+  movq  (%rbx), %rdi
+  movq  48(%rsp), %rbx
+  call  *%rdi
+.L120:
+  movq  (%rsp), %rsi
+  movq  8(%rsp), %rbp
+  movq  16(%rsp), %rbx
+  movq  24(%rsp), %rdx
+  movq  32(%rsp), %rax
+  movq  40(%rsp), %rdi
+  movq  %rsi, (%rsp)
+  movq  %rdx, 24(%rsp)
+  movq  %rax, %r12
+  movq  %rdi, %r13
+.L114:
+  movq  %rbp, %rax
+  movq  24(%rsp), %rdi
+  movq  %r12, %rsi
+  movq  %r13, %rdx
+  movq  (%rsp), %rcx
+  addq  $56, %rsp
+  jmp   caml_apply5@PLT
+|}]
+
+
+(* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/2441 *)
+let spill_slot_lifetime () =
+  let[@inline never] get_one () = #1. in
+  let acc = #0. in
+  let one = get_one () in
+  let acc = Float_u.add acc one in
+  let one = get_one () in
+  let acc = Float_u.add acc one in
+  let one = get_one () in
+  let acc = Float_u.add acc one in
+  let one = get_one () in
+  let acc = Float_u.add acc one in
+  let one = get_one () in
+  let acc = Float_u.add acc one in
+  let one = get_one () in
+  let acc = Float_u.add acc one in
+  let one = get_one () in
+  let acc = Float_u.add acc one in
+  let one = get_one () in
+  let acc = Float_u.add acc one in
+  acc
+[%%expect_asm X86_64{|
+spill_slot_lifetime:
+  subq  $56, %rsp
+  movl  $1, %eax
+  call  camlTOP15__get_one_30_33_code@PLT
+.L127:
+  vmovsd %xmm0, (%rsp)
+  movl  $1, %eax
+  call  camlTOP15__get_one_30_33_code@PLT
+.L128:
+  vmovsd %xmm0, 8(%rsp)
+  movl  $1, %eax
+  call  camlTOP15__get_one_30_33_code@PLT
+.L129:
+  vmovsd %xmm0, 16(%rsp)
+  movl  $1, %eax
+  call  camlTOP15__get_one_30_33_code@PLT
+.L130:
+  vmovsd %xmm0, 24(%rsp)
+  movl  $1, %eax
+  call  camlTOP15__get_one_30_33_code@PLT
+.L131:
+  vmovsd %xmm0, 32(%rsp)
+  movl  $1, %eax
+  call  camlTOP15__get_one_30_33_code@PLT
+.L132:
+  vmovsd %xmm0, 40(%rsp)
+  movl  $1, %eax
+  call  camlTOP15__get_one_30_33_code@PLT
+.L133:
+  vmovsd %xmm0, 48(%rsp)
+  movl  $1, %eax
+  call  camlTOP15__get_one_30_33_code@PLT
+.L134:
+  vxorpd %xmm1, %xmm1, %xmm1
+  vmovsd (%rsp), %xmm2
+  vaddsd %xmm2, %xmm1, %xmm1
+  vmovsd 8(%rsp), %xmm2
+  vaddsd %xmm2, %xmm1, %xmm1
+  vmovsd 16(%rsp), %xmm2
+  vaddsd %xmm2, %xmm1, %xmm1
+  vmovsd 24(%rsp), %xmm2
+  vaddsd %xmm2, %xmm1, %xmm1
+  vmovsd 32(%rsp), %xmm2
+  vaddsd %xmm2, %xmm1, %xmm1
+  vmovsd 40(%rsp), %xmm2
+  vaddsd %xmm2, %xmm1, %xmm1
+  vmovsd 48(%rsp), %xmm2
+  vaddsd %xmm2, %xmm1, %xmm1
+  vaddsd %xmm0, %xmm1, %xmm0
+  addq  $56, %rsp
+  ret
+
+spill_slot_lifetime.get_one:
+  vmovsd .L138(%rip), %xmm0
+  ret
+|}]
+
+
+(* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/2288 *)
+let f ~(s: int64#) (t : int64#) =
+  Int64_u.sub t (Int64_u.mul t s)
+[%%expect_asm X86_64{|
+f:
+  movq  %rax, %rdi
+  movq  %rbx, %rax
+  imulq %rdi, %rbx
+  subq  %rbx, %rax
   ret
 |}]

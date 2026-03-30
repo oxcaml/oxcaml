@@ -193,7 +193,7 @@ let main () =
       let command = !command ^ " " ^ sourcefile in
       Modules { modname; command; output_dir = ""; context }
     | true, [(input_file, cmt_info)] ->
-      if !output_file != ""
+      if !output_file <> ""
       then (
         Format.eprintf "Options -i and -o are not compatible@.";
         exit 2);
