@@ -3,13 +3,6 @@
 open X86_ast
 module DLL = Oxcaml_utils.Doubly_linked_list
 
-(** Type for the result of searching for the next occurrence of a register or
-    flags *)
-type next_occurrence =
-  | WriteFound
-  | ReadFound
-  | NotFound
-
 (** Type for the result of applying a peephole rewrite rule *)
 type rule_result =
   | No_match
@@ -39,5 +32,4 @@ val writes_flags : instruction -> bool
 
 (** Liveness analysis *)
 
-val find_next_occurrence_of_reg64 :
-  reg64 -> asm_line DLL.cell -> next_occurrence
+val reg64_is_never_read : reg64 -> asm_line DLL.cell -> bool

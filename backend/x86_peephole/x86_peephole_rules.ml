@@ -43,9 +43,15 @@ let combine_add_rsp stats cell =
           (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d1),
         Ins (ADD (Imm n2, Reg64 RSP)),
         Directive
-          (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) )
-      when Int64.equal (Int64.of_int d1) (Int64.neg n1)
-           && Int64.equal (Int64.of_int d2) (Int64.neg n2) ->
+          (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) ) ->
+      if not (Int64.equal (Int64.of_int d1) (Int64.neg n1)
+              && Int64.equal (Int64.of_int d2) (Int64.neg n2))
+      then
+        Misc.fatal_errorf
+          "combine_add_rsp: CFI offsets do not track stack adjustment: \
+           addq $%Ld, %%rsp with cfi_adjust_cfa_offset %d; \
+           addq $%Ld, %%rsp with cfi_adjust_cfa_offset %d"
+          n1 d1 n2 d2;
       (* Combine the instructions *)
       let combined_imm = Int64.add n1 n2 in
       let combined_offset = d1 + d2 in
@@ -90,12 +96,11 @@ let remove_mov_to_dead_register stats cell =
     match DLL.value cell1, DLL.value cell2 with
     | Ins (MOV (src1, Reg64 dst1)), Ins (MOV (Reg64 src2, dst2))
       when equal_reg64 dst1 src2 && (U.is_register src1 || U.is_register dst2)
-      -> (
-      (* Pattern: mov A, x; mov x, B *)
-      (* Check if the next occurrence of x is a write *)
-      match U.find_next_occurrence_of_reg64 dst1 cell2 with
-      | WriteFound ->
-        (* x is written before being read, so we can optimize *)
+      ->
+      if
+        (* Pattern: mov A, x; mov x, B *)
+        U.reg64_is_never_read dst1 cell2
+      then begin
         (* Rewrite to: mov A, B *)
         DLL.set_value cell1 (Ins (MOV (src1, dst2)));
         DLL.delete_curr cell2;
@@ -103,9 +108,8 @@ let remove_mov_to_dead_register stats cell =
           <- stats.remove_mov_to_dead_register + 1;
         (* Return cell1 to allow iterative combination *)
         U.Matched (Some cell1)
-      | ReadFound | NotFound ->
-        (* x is read before write, or we can't determine - don't optimize *)
-        U.No_match)
+      end
+      else U.No_match
     | _, _ -> U.No_match)
   | _ -> U.No_match
 

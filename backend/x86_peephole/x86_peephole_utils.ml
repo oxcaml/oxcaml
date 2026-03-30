@@ -5,11 +5,6 @@ open X86_ast
 module DLL = Oxcaml_utils.Doubly_linked_list
 open X86_ast_utils
 
-type next_occurrence =
-  | WriteFound
-  | ReadFound
-  | NotFound
-
 type rule_result =
   | No_match
   | Matched of asm_line DLL.cell option
@@ -28,38 +23,13 @@ let is_control_flow = function
 let is_hard_barrier = function
   | Directive d -> (
     match d with
-    | Asm_targets.Asm_directives.Directive.New_label _
-    | Asm_targets.Asm_directives.Directive.Bytes _
-    | Asm_targets.Asm_directives.Directive.Cfi_startproc
-    | Asm_targets.Asm_directives.Directive.Cfi_endproc
-    | Asm_targets.Asm_directives.Directive.Section _ ->
-      true
-    | Asm_targets.Asm_directives.Directive.Align _
-    | Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset _
-    | Asm_targets.Asm_directives.Directive.Cfi_def_cfa_offset _
-    | Asm_targets.Asm_directives.Directive.Cfi_offset _
-    | Asm_targets.Asm_directives.Directive.Cfi_remember_state
-    | Asm_targets.Asm_directives.Directive.Cfi_restore_state
-    | Asm_targets.Asm_directives.Directive.Cfi_def_cfa_register _
-    | Asm_targets.Asm_directives.Directive.Comment _
-    | Asm_targets.Asm_directives.Directive.Const _
-    | Asm_targets.Asm_directives.Directive.Direct_assignment _
-    | Asm_targets.Asm_directives.Directive.File _
-    | Asm_targets.Asm_directives.Directive.Global _
-    | Asm_targets.Asm_directives.Directive.Indirect_symbol _
-    | Asm_targets.Asm_directives.Directive.Loc _
-    | Asm_targets.Asm_directives.Directive.New_line
-    | Asm_targets.Asm_directives.Directive.Private_extern _
-    | Asm_targets.Asm_directives.Directive.Size _
-    | Asm_targets.Asm_directives.Directive.Sleb128 _
-    | Asm_targets.Asm_directives.Directive.Space _
-    | Asm_targets.Asm_directives.Directive.Type _
-    | Asm_targets.Asm_directives.Directive.Uleb128 _
-    | Asm_targets.Asm_directives.Directive.Protected _
-    | Asm_targets.Asm_directives.Directive.Hidden _
-    | Asm_targets.Asm_directives.Directive.Weak _
-    | Asm_targets.Asm_directives.Directive.External _
-    | Asm_targets.Asm_directives.Directive.Reloc _ ->
+    | New_label _ | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ -> true
+    | Align _ | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
+    | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _
+    | Comment _ | Const _ | Direct_assignment _ | File _ | Global _
+    | Indirect_symbol _ | Loc _ | New_line | Private_extern _ | Size _
+    | Sleb128 _ | Space _ | Type _ | Uleb128 _ | Protected _ | Hidden _ | Weak _
+    | External _ | Reloc _ ->
       false)
   | Ins instr -> is_control_flow instr
 
@@ -131,33 +101,35 @@ let writes_to_reg64 target = function
   | BSR (_, dst)
   | CMOV (_, _, dst)
   | ADC (_, dst)
-  | SBB (_, dst) ->
-    is_reg64_subregister target dst
-  | INC dst | DEC dst | NEG dst | BSWAP dst | SET (_, dst) ->
-    is_reg64_subregister target dst
-  | POP dst -> is_reg64_subregister target dst || equal_reg64 target RSP
-  | IMUL (_, Some dst) -> is_reg64_subregister target dst
-  | LOCK_XADD (src, dst) ->
-    is_reg64_subregister target src || is_reg64_subregister target dst
-  | XCHG (op1, op2) ->
-    is_reg64_subregister target op1 || is_reg64_subregister target op2
-  | MUL _ | IMUL (_, None) -> equal_reg64 target RAX || equal_reg64 target RDX
-  | IDIV _ -> equal_reg64 target RAX || equal_reg64 target RDX
-  | CDQ -> equal_reg64 target RDX
-  | CQO -> equal_reg64 target RDX
-  | LOCK_CMPXCHG (_, dst) ->
-    is_reg64_subregister target dst || equal_reg64 target RAX
+  | SBB (_, dst)
+  | INC dst
+  | DEC dst
+  | NEG dst
+  | BSWAP dst
+  | SET (_, dst)
+  | IMUL (_, Some dst)
   | LOCK_ADD (_, dst)
   | LOCK_SUB (_, dst)
   | LOCK_AND (_, dst)
   | LOCK_OR (_, dst)
   | LOCK_XOR (_, dst) ->
     is_reg64_subregister target dst
+  | POP dst -> is_reg64_subregister target dst || equal_reg64 target RSP
+  | LOCK_XADD (src, dst) ->
+    is_reg64_subregister target src || is_reg64_subregister target dst
+  | XCHG (op1, op2) ->
+    is_reg64_subregister target op1 || is_reg64_subregister target op2
+  | MUL _ | IMUL (_, None) | IDIV _ ->
+    equal_reg64 target RAX || equal_reg64 target RDX
+  | CDQ | CQO -> equal_reg64 target RDX
+  | LOCK_CMPXCHG (_, dst) ->
+    is_reg64_subregister target dst || equal_reg64 target RAX
   | PUSH _ -> equal_reg64 target RSP
+  | LEAVE -> equal_reg64 target RBP || equal_reg64 target RSP
   | RDTSC | RDPMC ->
     (* Rare instructions, let's be conservative. *)
     true
-  | J _ | JMP _ | CALL _ | RET | HLT | LEAVE ->
+  | J _ | JMP _ | CALL _ | RET | HLT ->
     (* These are all control flow operations, there is no point in assuming
        anything. *)
     true
@@ -169,7 +141,13 @@ let writes_to_reg64 target = function
     true
 
 let reads_from_reg64 target = function
-  | MOV (src, dst) | MOVSX (src, dst) | MOVSXD (src, dst) | MOVZX (src, dst) ->
+  | MOV (src, dst)
+  | MOVSX (src, dst)
+  | MOVSXD (src, dst)
+  | MOVZX (src, dst)
+  | LEA (src, dst)
+  | BSF (src, dst)
+  | BSR (src, dst) ->
     arg_contains_reg64 target src || reg64_read_when_writing target dst
   | PUSH src -> arg_contains_reg64 target src || equal_reg64 target RSP
   | ADD (src, dst)
@@ -180,30 +158,15 @@ let reads_from_reg64 target = function
   | CMP (src, dst)
   | TEST (src, dst)
   | ADC (src, dst)
-  | SBB (src, dst) ->
-    arg_contains_reg64 target src || arg_contains_reg64 target dst
-  | LEA (src, dst) | BSF (src, dst) | BSR (src, dst) ->
-    arg_contains_reg64 target src || reg64_read_when_writing target dst
-  | SAL (src, dst) | SAR (src, dst) | SHR (src, dst) ->
-    arg_contains_reg64 target src || arg_contains_reg64 target dst
+  | SBB (src, dst)
+  | SAL (src, dst)
+  | SAR (src, dst)
+  | SHR (src, dst)
   | CMOV (_, src, dst) ->
     arg_contains_reg64 target src || arg_contains_reg64 target dst
   | INC dst | DEC dst | NEG dst | BSWAP dst -> arg_contains_reg64 target dst
-  | IMUL (op1, Some op2) ->
-    arg_contains_reg64 target op1 || arg_contains_reg64 target op2
-  | MUL op -> arg_contains_reg64 target op || equal_reg64 target RAX
-  | IMUL (op, None) -> arg_contains_reg64 target op || equal_reg64 target RAX
-  | IDIV op ->
-    arg_contains_reg64 target op
-    || equal_reg64 target RAX || equal_reg64 target RDX
-  | CDQ -> equal_reg64 target RAX
-  | CQO -> equal_reg64 target RAX
-  | XCHG (op1, op2) ->
-    arg_contains_reg64 target op1 || arg_contains_reg64 target op2
-  | LOCK_CMPXCHG (op1, op2) ->
-    arg_contains_reg64 target op1
-    || arg_contains_reg64 target op2
-    || equal_reg64 target RAX
+  | IMUL (op1, Some op2)
+  | XCHG (op1, op2)
   | LOCK_XADD (op1, op2)
   | LOCK_ADD (op1, op2)
   | LOCK_SUB (op1, op2)
@@ -211,11 +174,23 @@ let reads_from_reg64 target = function
   | LOCK_OR (op1, op2)
   | LOCK_XOR (op1, op2) ->
     arg_contains_reg64 target op1 || arg_contains_reg64 target op2
+  | MUL op | IMUL (op, None) ->
+    arg_contains_reg64 target op || equal_reg64 target RAX
+  | IDIV op ->
+    arg_contains_reg64 target op
+    || equal_reg64 target RAX || equal_reg64 target RDX
+  | CDQ -> equal_reg64 target RAX
+  | CQO -> equal_reg64 target RAX
+  | LOCK_CMPXCHG (op1, op2) ->
+    arg_contains_reg64 target op1
+    || arg_contains_reg64 target op2
+    || equal_reg64 target RAX
   | SET (_, dst) -> reg64_read_when_writing target dst
   | POP dst -> reg64_read_when_writing target dst || equal_reg64 target RSP
+  | LEAVE -> equal_reg64 target RBP
   | CLDEMOTE arg -> arg_contains_reg64 target arg
   | PREFETCH (_, _, arg) -> arg_contains_reg64 target arg
-  | J _ | JMP _ | CALL _ | RET | HLT | LEAVE ->
+  | J _ | JMP _ | CALL _ | RET | HLT ->
     (* These are all control flow operations, there is no point in assuming
        anything. *)
     true
@@ -226,22 +201,19 @@ let reads_from_reg64 target = function
   (* Conservative: assume SIMD instructions may read from target. *)
   | SIMD _ -> true
 
-let find_next_occurrence_of_reg64 target start_cell =
+let reg64_is_never_read target start_cell =
   let rec loop cell_opt =
     match cell_opt with
-    | None -> NotFound
+    | None -> false
     | Some cell -> (
       let value = DLL.value cell in
       if is_hard_barrier value
-      then NotFound
+      then false
       else
         match value with
         | Ins instr ->
-          if reads_from_reg64 target instr
-          then ReadFound
-          else if writes_to_reg64 target instr
-          then WriteFound
-          else loop (DLL.next cell)
+          (not (reads_from_reg64 target instr))
+          && (writes_to_reg64 target instr || loop (DLL.next cell))
         | Directive _ -> loop (DLL.next cell))
   in
   loop (DLL.next start_cell)
