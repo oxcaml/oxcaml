@@ -61,17 +61,17 @@ let build (cfg : Cfg.t) : t =
                  _
                })
           when not (Label.equal label old_label) -> begin
-          match find_common_successor old_label label with
-          | None -> false
-          | Some merge_label ->
+          match find_common_successor old_label label, instr with
+          | Some merge_label, { desc = Op Move; arg = [| new_input |]; _ } ->
             let succ_block = Cfg.get_block_exn cfg merge_label in
             let preds = succ_block.predecessors in
             let n = Label.Set.cardinal preds in
             let regs = Array.make n Reg.dummy in
             regs.(predecessor_index preds old_label |> Option.get) <- old_input;
-            regs.(predecessor_index preds label |> Option.get) <- reg;
+            regs.(predecessor_index preds label |> Option.get) <- new_input;
             Reg.Tbl.replace table reg (Phi { merge_label; regs });
             true
+          | _ -> false
         end
         | Some (Output { label = old_label; instr = old_instr; _ }) ->
           if Label.equal label old_label
@@ -103,9 +103,10 @@ let build (cfg : Cfg.t) : t =
         | Some (OverwrittenOutput _) -> false
         | Some (Phi { merge_label; regs }) -> (
           let succ_block = Cfg.get_block_exn cfg merge_label in
-          match predecessor_index succ_block.predecessors label with
-          | Some i when Reg.same regs.(i) Reg.dummy ->
-            regs.(i) <- reg;
+          match predecessor_index succ_block.predecessors label, instr with
+          | Some i, { desc = Op Move; arg = [| input |]; _ }
+            when Reg.same regs.(i) Reg.dummy ->
+            regs.(i) <- input;
             true
           | _ -> false)
       in
