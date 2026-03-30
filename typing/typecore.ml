@@ -1142,6 +1142,15 @@ let mutvar_mode ~loc ~env m0 exp_mode =
     (Mutable { mode = m0; atomic = Nonatomic}) ~modalities mode;
   m |> Value.disallow_right
 
+(** The [expected_mode] of a top-level expression. *)
+let mode_toplevel_expression =
+  let mode =
+    { Value.Const.legacy with
+      linearity = Once }
+    |> Value.of_const ~hint_comonadic:Toplevel_expression
+  in
+  mode_default mode
+
 (** The [expected_mode] of the record when projecting a mutable field. *)
 let mode_project_mutable mut_name =
   let mode =
@@ -11214,7 +11223,7 @@ let type_expression env jkind sexp =
     with_local_level begin fun () ->
       Typetexp.TyVarEnv.reset ();
       let expected = mk_expected (newvar jkind) in
-      type_expect env mode_legacy sexp expected
+      type_expect env mode_toplevel_expression sexp expected
     end
     ~post:(may_lower_contravariant_then_generalize env)
   in
