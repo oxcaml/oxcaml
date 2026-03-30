@@ -16,6 +16,9 @@
 
 open Import
 
+external ndl_loadsym : string -> Obj.t
+  = "caml_sys_exit" "caml_natdynlink_loadsym"
+
 type t = Address.t String.Map.t
 
 let empty = String.Map.empty
@@ -88,7 +91,12 @@ let find t name =
         String.sub name 1 (String.length name - 1)
       | _ -> name
     in
-    Externals.dlsym dlsym_name
+    match Externals.dlsym dlsym_name with
+    | Some _ as result -> result
+    | None -> (
+      match ndl_loadsym dlsym_name with
+      | exception _ -> None
+      | obj -> Some (Address.of_obj obj))
 
 let dprint t =
   Printf.printf "------ Symbols -----\n%!";

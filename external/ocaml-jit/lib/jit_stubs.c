@@ -319,3 +319,8 @@ CAMLprim value jit_addr_to_obj(value address) {
 
   CAMLreturn(obj);
 }
+
+CAMLprim value jit_obj_to_addr(value obj) {
+  CAMLparam1(obj);
+  CAMLreturn(caml_copy_nativeint((intnat) obj));
+}
