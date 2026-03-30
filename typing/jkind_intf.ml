@@ -362,6 +362,7 @@ module History = struct
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
+    | Idx_base
 
   type value_creation_reason =
     | Class_let_binding
@@ -390,7 +391,6 @@ module History = struct
     | Univar
     | Default_type_jkind
     | Existential_type_variable
-    | Idx_base
     | List_comprehension_iterator_element
     | Lazy_expression
     | Class_type_argument

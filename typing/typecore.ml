@@ -6852,7 +6852,7 @@ and type_expect_
           || Path.same p Predef.path_idx_mut ->
         arg1
       | _ ->
-        newgenvar (Jkind.Builtin.value ~why:Idx_base)
+        newgenvar (Jkind.Builtin.value_or_null ~why:Idx_base)
     in
     let expected_base_ty = expected_base_ty ty_expected in
     let principal = is_principal ty_expected in
@@ -7893,7 +7893,7 @@ and type_block_access env expected_base_ty principal
     let modality = label.lbl_modalities in
     { ba; base_ty = ty_res; el_ty = ty_arg; flat_float; modality }
   | Baccess_block (mut, idx) ->
-    let base_ty = newvar (Jkind.Builtin.value ~why:Idx_base) in
+    let base_ty = newvar (Jkind.Builtin.value_or_null ~why:Idx_base) in
     let el_ty =
       newvar
         (Jkind.of_new_sort ~why:Idx_element ~level:(Ctype.get_current_level ()))
