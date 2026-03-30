@@ -230,7 +230,7 @@ static struct {
   CAML_PLAT_MUTEX_INITIALIZER,
   0,
   false,
-  false,
+  true,
   false,
 #ifdef HAS_INTERRUPTIBLE_TICK
   -1, -1, -1
