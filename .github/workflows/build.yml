@@ -3,15 +3,14 @@
 # @jvanburen @glittershark @mshinwell
 name: build
 on:
-  workflow_dispatch:
-#  push:
-#    branches:
-#      - main
-#      - '*microbranch'
-#    tags:
-#      - '*'
-#  pull_request:
-#  merge_group:
+  push:
+    branches:
+      - main
+      - '*microbranch'
+    tags:
+      - '*'
+  pull_request:
+  merge_group:
 jobs:
   build:
     name: ${{ matrix.name }}
