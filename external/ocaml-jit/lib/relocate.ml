@@ -16,6 +16,11 @@
 
 open Import
 
+let debug =
+  match Sys.getenv_opt "OCAML_JIT_DEBUG" with
+  | Some ("true" | "1") -> true
+  | _ -> false
+
 let out_of_text_error ~got_or_plt ~section_name =
   errorf
     "Relocation through %s in section %S. Such relocations should not be found \
@@ -41,35 +46,30 @@ let one (type a r)
       | None -> None
       | Some lookup ->
         let result = Option.map Address.to_int64 (lookup name) in
-        (match Sys.getenv_opt "OCAML_JIT_DEBUG", result with
-        | Some ("true" | "1"), Some addr ->
-          Printf.eprintf "GOT lookup for %s -> entry at %Lx\n%!" name addr
-        | Some ("true" | "1"), None ->
-          Printf.eprintf "GOT lookup for %s -> NOT FOUND\n%!" name
-        | _ -> ());
+        if debug then
+          Printf.eprintf "GOT lookup for %s -> %s\n%!" name
+            (match result with
+            | Some addr -> Printf.sprintf "entry at %Lx" addr
+            | None -> "NOT FOUND");
         result
     else if is_plt then
       match plt_lookup with
       | None -> None
       | Some lookup ->
         let result = Option.map Address.to_int64 (lookup name) in
-        (match Sys.getenv_opt "OCAML_JIT_DEBUG", result with
-        | Some ("true" | "1"), Some addr ->
-          Printf.eprintf "PLT lookup for %s -> entry at %Lx\n%!" name addr
-        | Some ("true" | "1"), None ->
-          Printf.eprintf "PLT lookup for %s -> NOT FOUND\n%!" name
-        | _ -> ());
+        if debug then
+          Printf.eprintf "PLT lookup for %s -> %s\n%!" name
+            (match result with
+            | Some addr -> Printf.sprintf "entry at %Lx" addr
+            | None -> "NOT FOUND");
         result
     else
       let result = Option.map Address.to_int64 (Symbols.find symbols name) in
-      (match Sys.getenv_opt "OCAML_JIT_DEBUG", result with
-      | Some ("true" | "1"), Some addr ->
-        Printf.eprintf
-          "Direct reloc lookup for %s -> %Lx\n%!" name addr
-      | Some ("true" | "1"), None ->
-        Printf.eprintf
-          "Direct reloc lookup for %s -> NOT FOUND\n%!" name
-      | _ -> ());
+      if debug then
+        Printf.eprintf "Direct reloc lookup for %s -> %s\n%!" name
+          (match result with
+          | Some addr -> Printf.sprintf "%Lx" addr
+          | None -> "NOT FOUND");
       result
   in
   (* Check for invalid GOT/PLT outside .text *)

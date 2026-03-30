@@ -291,6 +291,6 @@ let compute_value (r : t) ~target_addr ~place_address ~read_instruction
       (* The data slot already contains an addend encoding the offsets from the
          symbols to the actual target/place. We must add it to the symbol-level
          difference. *)
-      let existing_addend = Int64.of_int (Int32.to_int (read_instruction ())) in
+      let existing_addend = Int64.of_int32 (read_instruction ()) in
       Ok (Int64.add (Int64.sub target_addr minus_addr) existing_addend))
   | R_AARCH64_PREL32 _ -> Ok (Int64.sub target_addr place_address)
