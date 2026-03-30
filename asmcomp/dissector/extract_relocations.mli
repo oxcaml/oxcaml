@@ -47,11 +47,12 @@ end
 (** The result of extracting relocations from object files. *)
 type t
 
-(** Returns relocations with type R_X86_64_PLT32 that need PLT entries. *)
+(** Returns relocations that need PLT entries (x86-64: R_X86_64_PLT32; always
+    empty on AArch64 since the linker inserts veneers automatically). *)
 val convert_to_plt : t -> Relocation_entry.t list
 
-(** Returns relocations with type R_X86_64_REX_GOTPCRELX that need GOT entries.
-*)
+(** Returns relocations that need GOT entries (x86-64: R_X86_64_REX_GOTPCRELX;
+    AArch64: R_AARCH64_ADR_GOT_PAGE). *)
 val convert_to_got : t -> Relocation_entry.t list
 
 (** [extract unix ~filename] reads the ELF object file at [filename] and

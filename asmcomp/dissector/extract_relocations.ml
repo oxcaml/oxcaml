@@ -84,7 +84,7 @@ let finalize acc =
 
    PC32 relocations to undefined symbols are an error. They occur when code is
    compiled with -nodynlink, which is incompatible with the dissector. *)
-let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
+let parse_rela_section_x86_64 ~rela_body ~symtab_body ~strtab_body =
   let open Rela.X86_64 in
   let open Reloc_type in
   let convert_to_plt = ref [] in
@@ -143,6 +143,55 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
   { convert_to_plt = List.rev !convert_to_plt;
     convert_to_got = List.rev !convert_to_got
   }
+
+(* Parse RELA entries for AArch64: extract ADR_GOT_PAGE relocations for
+   undefined symbols. CALL26/JUMP26 are left alone — the linker inserts veneers
+   automatically for out-of-range branches. *)
+let parse_rela_section_aarch64 ~rela_body ~symtab_body ~strtab_body =
+  let open Rela.Aarch64.Reloc_type in
+  let convert_to_got = ref [] in
+  Rela.Aarch64.iter_rela_entries ~rela_body ~f:(fun entry ->
+      match entry.r_type with
+      | R_AARCH64_ADR_GOT_PAGE -> (
+        match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
+        | None ->
+          log_verbose "  reloc %s at 0x%Lx: no symbol shndx"
+            (Rela.Aarch64.Reloc_type.name entry.r_type)
+            entry.r_offset
+        | Some shndx when Rela.Section_index.is_defined shndx ->
+          log_verbose "  reloc %s at 0x%Lx: symbol defined (shndx=%d), skipping"
+            (Rela.Aarch64.Reloc_type.name entry.r_type)
+            entry.r_offset
+            (Rela.Section_index.to_int shndx)
+        | Some _ -> (
+          match
+            Rela.read_symbol_name ~symtab_body ~strtab_body
+              ~sym_index:entry.r_sym
+          with
+          | None ->
+            log_verbose "  reloc %s at 0x%Lx: no symbol name"
+              (Rela.Aarch64.Reloc_type.name entry.r_type)
+              entry.r_offset
+          | Some symbol_name ->
+            log_verbose "  reloc %s at 0x%Lx -> %s (UNDEF)"
+              (Rela.Aarch64.Reloc_type.name entry.r_type)
+              entry.r_offset symbol_name;
+            let reloc_entry =
+              { Relocation_entry.symbol_name; offset = entry.r_offset }
+            in
+            convert_to_got := reloc_entry :: !convert_to_got))
+      | R_AARCH64_ABS64 | R_AARCH64_ADR_PREL_PG_HI21 | R_AARCH64_ADD_ABS_LO12_NC
+      | R_AARCH64_LDST64_ABS_LO12_NC | R_AARCH64_JUMP26 | R_AARCH64_CALL26
+      | R_AARCH64_LD64_GOT_LO12_NC ->
+        ());
+  { convert_to_plt = []; convert_to_got = List.rev !convert_to_got }
+
+let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
+  match Target_system.architecture () with
+  | X86_64 -> parse_rela_section_x86_64 ~rela_body ~symtab_body ~strtab_body
+  | AArch64 -> parse_rela_section_aarch64 ~rela_body ~symtab_body ~strtab_body
+  | IA32 | ARM | POWER | Z | Riscv ->
+    Misc.fatal_error "Dissector: unsupported architecture"
 
 (* Find a section by name *)
 let find_section sections name =

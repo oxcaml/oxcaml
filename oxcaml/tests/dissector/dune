@@ -50,7 +50,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target simple.exe)
@@ -62,7 +63,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target simple.output)
@@ -73,7 +75,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps simple.expected simple.output)
@@ -84,7 +87,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target simple_funcsect.exe)
@@ -96,7 +100,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target simple_funcsect.output)
@@ -107,7 +112,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps simple.expected simple_funcsect.output)
@@ -121,7 +127,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (targets gen_module_a.cmi gen_module_a.cmx gen_module_a.o)
@@ -132,7 +139,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (targets gen_module_b.cmi gen_module_b.cmx gen_module_b.o)
@@ -143,7 +151,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (targets gen_module_c.cmi gen_module_c.cmx gen_module_c.o)
@@ -156,7 +165,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (targets gen_main.cmi gen_main.cmx gen_main.o)
@@ -171,7 +181,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cross_partition.exe)
@@ -187,7 +198,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cross_partition.output)
@@ -198,7 +210,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps cross_partition.expected cross_partition.output)
@@ -209,7 +222,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps cross_partition.exe)
@@ -221,7 +235,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cross_partition_fs.exe)
@@ -237,7 +252,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cross_partition_fs.output)
@@ -248,7 +264,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps cross_partition.expected cross_partition_fs.output)
@@ -259,7 +276,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
@@ -373,12 +391,13 @@
      echo 'IGOT verification passed'
    ")))
 
-; Verify IGOT relocations are all R_X86_64_64
+; Verify IGOT relocations are all R_X86_64_64 / R_AARCH64_ABS64
 (rule
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
@@ -404,14 +423,15 @@
      for part in $PARTITION_DIR/partition*.o.rewritten; do
        echo \"Checking $part\"
        if readelf -SW \"$part\" 2>/dev/null | grep -q 'data\\.igot'; then
-         # Count total IGOT relocs and R_X86_64_64 relocs
+         # Count total IGOT relocs and R_X86_64_64 or R_AARCH64_ABS64 relocs
          TOTAL=$(readelf -r \"$part\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | grep -c '^[0-9a-f]' || true)
-         R64=$(readelf -r \"$part\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | grep -c 'R_X86_64_64' || true)
-         echo \"  IGOT relocs: Total=$TOTAL, R_X86_64_64=$R64\"
+         R_X86_64_64=$(readelf -r \"$part\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | grep -c 'R_X86_64_64' || true)
+         R_AARCH64_ABS64=$(readelf -r \"$part\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | grep -c 'R_AARCH64_ABS64' || true)
+         echo \"  IGOT relocs: Total=$TOTAL, R_X86_64_64=$R_X86_64_64, R_AARCH64_ABS64=$R_AARCH64_ABS64\"
 
-         if [ \"$TOTAL\" != \"$R64\" ]; then
-           echo \"ERROR: Not all IGOT relocations are R_X86_64_64 in $(basename $part)\"
-           echo \"Total: $TOTAL, R_X86_64_64: $R64\"
+         if [ \"$TOTAL\" != \"$R_X86_64_64\" -a \"$TOTAL\" != \"$R_AARCH64_ABS64\" ]; then
+           echo \"ERROR: Not all IGOT relocations are R_X86_64_64 or R_AARCH64_ABS64 in $(basename $part)\"
+           echo \"Total: $TOTAL, R_X86_64_64: $R_X86_64_64, R_AARCH64_ABS64: $R_AARCH64_ABS64\"
            echo 'IGOT relocations:'
            readelf -r \"$part\" 2>/dev/null | sed -n '/rela.*\\.data\\.igot/,/^Relocation/p' | head -50
            exit 1
@@ -428,7 +448,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
@@ -524,7 +545,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (targets mylib_a.cmi mylib_a.cmx mylib_a.o)
@@ -535,7 +557,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (targets mylib_b.cmi mylib_b.cmx mylib_b.o)
@@ -547,7 +570,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (targets mylib.cmxa mylib.a)
@@ -559,7 +583,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cmxa_test.exe)
@@ -571,7 +596,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cmxa_test.output)
@@ -582,7 +608,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps cmxa_test.expected cmxa_test.output)
@@ -593,7 +620,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps cmxa_test.exe)
@@ -605,7 +633,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cclib_test.exe)
@@ -618,7 +647,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cclib_test.output)
@@ -631,7 +661,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps cclib_test.output)
@@ -643,7 +674,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cstub.o)
@@ -655,7 +687,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target libcstub.a)
@@ -667,7 +700,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cstub_passthrough.exe)
@@ -681,7 +715,8 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (target cstub_passthrough.output)
@@ -694,7 +729,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps cstub_passthrough.output)
@@ -705,7 +741,8 @@
  (alias runtest)
  (enabled_if
   (and (= %{context_name} "main")
-       (= %{architecture} "amd64")
+       (or (= %{architecture} "amd64")
+           (= %{architecture} "arm64"))
        (= %{system} "linux")
        (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
  (deps cstub_passthrough.ml libcstub.a)
