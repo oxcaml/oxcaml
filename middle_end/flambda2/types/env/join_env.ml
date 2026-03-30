@@ -1697,6 +1697,8 @@ module Analysis = struct
     { definitions_in_joined_envs :
         Bindings_in_target_env.definition_in_joined_envs
         Name_in_target_env.Map.t;
+      canonical_definitions_at_normal_mode :
+        (Simple_in_one_joined_env.t Index.Map.t * K.t) Name_in_target_env.Map.t;
       external_ids : 'a Index.Map.t
     }
 
@@ -1711,8 +1713,57 @@ module Analysis = struct
           Index.Map.print Simple_in_one_joined_env.print ppf simples)
       ppf definitions_in_joined_envs
 
-  let create ~external_ids definitions_in_joined_envs =
-    { definitions_in_joined_envs; external_ids }
+  let create ~external_ids ~joined_envs definitions_in_joined_envs =
+    let canonical_definitions_at_normal_mode =
+      Name_in_target_env.Map.filter_map
+        (fun _name
+             (definition : Bindings_in_target_env.definition_in_joined_envs) ->
+          match definition with
+          | Imported_var (var, kind) ->
+            let var = (var :> Variable.t) in
+            let exists_at_normal_name_mode_in_all_envs =
+              Index.Map.for_all
+                (fun _env_id typing_env ->
+                  TE.mem ~min_name_mode:Name_mode.normal typing_env
+                    (Name.var var))
+                joined_envs
+            in
+            if exists_at_normal_name_mode_in_all_envs
+            then
+              Some
+                ( Index.Map.map
+                    (fun typing_env ->
+                      Simple_in_one_joined_env.create
+                        (TE.get_canonical_simple_exn
+                           ~min_name_mode:Name_mode.normal typing_env
+                           (Simple.var var)))
+                    joined_envs,
+                  kind )
+            else None
+          | These_canonicals (simples, kind) ->
+            let exists_at_normal_name_mode_in_all_envs_it_is_defined_in =
+              Index.Map.for_all
+                (fun env_id simple ->
+                  let typing_env =
+                    match Index.Map.find_opt env_id joined_envs with
+                    | Some typing_env -> typing_env
+                    | None ->
+                      Misc.fatal_errorf "Join does not include environment %a"
+                        Index.print env_id
+                  in
+                  TE.mem_simple ~min_name_mode:Name_mode.normal typing_env
+                    simple)
+                (simples :> Simple.t Index.Map.t)
+            in
+            if exists_at_normal_name_mode_in_all_envs_it_is_defined_in
+            then Some (simples, kind)
+            else None)
+        definitions_in_joined_envs
+    in
+    { definitions_in_joined_envs;
+      canonical_definitions_at_normal_mode;
+      external_ids
+    }
 
   module Variable_refined_at_join = struct
     type 'a t =
@@ -1767,6 +1818,37 @@ module Analysis = struct
               kind;
               external_ids = t.external_ids
             })
+
+  module Simples_at_join = struct
+    type 'a t =
+      { canonicals_in_joined_envs : Simple_in_one_joined_env.t Index.Map.t;
+        external_ids : 'a Index.Map.t
+      }
+
+    type definition_at_use = At_normal_mode of Simple.t [@@unboxed]
+
+    let fold_definitions_at_uses f t init =
+      Index.Map.fold
+        (fun index simple acc ->
+          match Index.Map.find_opt index t.external_ids with
+          | None -> Misc.fatal_error "Missing environment for use"
+          | Some external_id ->
+            f external_id
+              (At_normal_mode (simple : Simple_in_one_joined_env.t :> Simple.t))
+              acc)
+        t.canonicals_in_joined_envs init
+  end
+
+  let fold_variables_created_at_join ~f t ~init =
+    Name_in_target_env.Map.fold
+      (fun name (canonicals_in_joined_envs, kind) acc ->
+        (f [@inlined hint])
+          (name :> Name.t)
+          { Simples_at_join.canonicals_in_joined_envs;
+            external_ids = t.external_ids
+          }
+          kind acc)
+      t.canonical_definitions_at_normal_mode init
 end
 
 let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after source_env
@@ -1815,7 +1897,7 @@ let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_type ~cut_after
       joined_envs equations_to_join symbol_projections_to_join
   in
   let target_env = ME.typing_env target_env in
-  let join_analysis = Analysis.create ~external_ids bindings in
+  let join_analysis = Analysis.create ~external_ids ~joined_envs bindings in
   target_env, join_analysis
 
 let n_way_join_canonicals ~bindings ~joined_envs kind simples =
