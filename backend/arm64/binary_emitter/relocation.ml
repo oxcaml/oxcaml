@@ -280,5 +280,10 @@ let compute_value (r : t) ~target_addr ~place_address ~read_instruction
       Error
         (Printf.sprintf "Minus target not found: %s"
            (target_to_string minus_target))
-    | Some minus_addr -> Ok (Int64.sub target_addr minus_addr))
+    | Some minus_addr ->
+      (* The data slot already contains an addend encoding the offsets from the
+         symbols to the actual target/place. We must add it to the symbol-level
+         difference. *)
+      let existing_addend = Int64.of_int (Int32.to_int (read_instruction ())) in
+      Ok (Int64.add (Int64.sub target_addr minus_addr) existing_addend))
   | R_AARCH64_PREL32 _ -> Ok (Int64.sub target_addr place_address)

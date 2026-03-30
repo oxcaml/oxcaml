@@ -66,13 +66,12 @@ module Relocation = struct
       ~read_instruction =
     let target = Relocation.primary_target r in
     let target_name =
-      if jit_debug then Relocation.target_to_string target
-      else ""
+      if jit_debug then Relocation.target_to_string target else ""
     in
-    if jit_debug then
+    if jit_debug
+    then
       Printf.eprintf
-        "arm64 compute_value: target=%s got=%b plt=%b \
-         place=0x%Lx\n%!"
+        "arm64 compute_value: target=%s got=%b plt=%b place=0x%Lx\n%!"
         target_name
         (Relocation.is_got_reloc r)
         (Relocation.is_plt_reloc r)
@@ -82,15 +81,15 @@ module Relocation = struct
     let lookup_target_inner t = lookup_target (convert_target t) in
     match lookup_target_inner target with
     | None ->
-      if jit_debug then
-        Printf.eprintf
-          "arm64 compute_value: lookup FAILED for %s\n%!"
+      if jit_debug
+      then
+        Printf.eprintf "arm64 compute_value: lookup FAILED for %s\n%!"
           target_name;
       Error (Format.asprintf "Symbol not found: %a" Symbol.print_target target)
     | Some sym_addr ->
-      if jit_debug then
-        Printf.eprintf
-          "arm64 compute_value: lookup OK for %s -> 0x%Lx\n%!"
+      if jit_debug
+      then
+        Printf.eprintf "arm64 compute_value: lookup OK for %s -> 0x%Lx\n%!"
           target_name sym_addr;
       let addend = Relocation.get_addend r.kind in
       let target_addr = Int64.add sym_addr (Int64.of_int addend) in
