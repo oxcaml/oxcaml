@@ -1,0 +1,2997 @@
+(* TEST
+ expect;
+*)
+
+let leak n =
+  let r = local_ ref n in
+  r
+[%%expect{|
+Line 3, characters 2-3:
+3 |   r
+      ^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+external idint : local_ int -> int = "%identity"
+[%%expect{|
+external idint : int @ local -> int = "%identity"
+|}]
+
+let noleak n =
+  let r = local_ ref n in
+  idint (r.contents)
+[%%expect{|
+val noleak : int -> int = <fun>
+|}]
+
+
+let (!) = fun (local_ r) -> r.contents
+[%%expect{|
+val ( ! ) : 'a ref @ local -> 'a = <fun>
+|}]
+
+(* Local lets *)
+
+let leak n =
+  let local_ r = ref n in
+  r
+[%%expect{|
+Line 3, characters 2-3:
+3 |   r
+      ^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+let leak n =
+  let local_ r : int ref = ref n in
+  r
+[%%expect{|
+Line 3, characters 2-3:
+3 |   r
+      ^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+let leak n =
+  let local_ f : 'a. 'a -> 'a = fun x -> x in
+  f
+[%%expect{|
+Line 3, characters 2-3:
+3 |   f
+      ^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+let leak n =
+  let local_ f x : int = x in
+  f
+[%%expect{|
+Line 3, characters 2-3:
+3 |   f
+      ^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+(* If both type and mode are wrong, complain about type *)
+let f () =
+  let local_ r = ref 42 in
+  print_endline r
+[%%expect{|
+Line 3, characters 16-17:
+3 |   print_endline r
+                    ^
+Error: This expression has type "int ref"
+       but an expression was expected of type "string"
+|}]
+
+(*
+ * Type equalities of function types
+ *)
+
+  (* When a [local_] argument appears in a function type with multiple arguments,
+     return modes are implicitly stack until the final argument. *)
+type equ_fn = unit
+  constraint
+    'a -> local_ 'b -> 'c -> 'd -> 'e
+    = 'a -> local_ 'b -> local_ ('c -> local_ ('d -> 'e))
+[%%expect{|
+type equ_fn = unit
+|}]
+
+type distinct_sarg = unit constraint local_ int -> int = int -> int
+[%%expect{|
+Line 1, characters 37-67:
+1 | type distinct_sarg = unit constraint local_ int -> int = int -> int
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type constraints are not consistent.
+       Type "int @ local -> int" is not compatible with type "int -> int"
+|}]
+type distinct_sret = unit constraint int -> local_ int = int -> int
+[%%expect{|
+Line 1, characters 37-67:
+1 | type distinct_sret = unit constraint int -> local_ int = int -> int
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type constraints are not consistent.
+       Type "int -> int @ local" is not compatible with type "int -> int"
+|}]
+type distinct_sarg_sret = unit constraint local_ int -> int = local_ int -> local_ int
+[%%expect{|
+Line 1, characters 42-86:
+1 | type distinct_sarg_sret = unit constraint local_ int -> int = local_ int -> local_ int
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type constraints are not consistent.
+       Type "int @ local -> int" is not compatible with type
+         "int @ local -> int @ local"
+|}]
+
+type local_higher_order = unit constraint
+  local_ (int -> int -> int) -> int = local_ (int -> local_ (int -> int)) -> int
+[%%expect{|
+type local_higher_order = unit
+|}]
+
+type nonlocal_higher_order = unit constraint
+  (int -> int -> int) -> int = (int -> local_ (int -> int)) -> int
+[%%expect{|
+Line 2, characters 2-66:
+2 |   (int -> int -> int) -> int = (int -> local_ (int -> int)) -> int
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type constraints are not consistent.
+       Type "(int -> int -> int) -> int" is not compatible with type
+         "(int -> (int -> int) @ local) -> int"
+       Type "int -> int -> int" is not compatible with type
+         "int -> (int -> int) @ local"
+|}]
+
+type local_higher_order = unit constraint
+  int -> local_ (int -> int -> int) = int -> local_ (int -> local_ (int -> int))
+[%%expect{|
+type local_higher_order = unit
+|}]
+
+type nonlocal_higher_order = unit constraint
+  int -> (int -> int -> int) = int -> (int -> local_ (int -> int))
+[%%expect{|
+Line 2, characters 2-66:
+2 |   int -> (int -> int -> int) = int -> (int -> local_ (int -> int))
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type constraints are not consistent.
+       Type "int -> int -> int -> int" is not compatible with type
+         "int -> int -> (int -> int) @ local"
+       Type "int -> int -> int" is not compatible with type
+         "int -> (int -> int) @ local"
+|}]
+
+let foo () =
+  let local_ _bar : int -> int -> int =
+    ((fun y z -> z) : int -> local_ (int -> int)) in
+  ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+
+let foo () =
+  let _bar : int -> int -> int =
+    ((fun y z -> z) : int -> local_ (int -> int)) in
+  ()
+[%%expect{|
+Line 3, characters 4-49:
+3 |     ((fun y z -> z) : int -> local_ (int -> int)) in
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "int -> (int -> int) @ local"
+       but an expression was expected of type "int -> int -> int"
+|}]
+
+let foo () =
+  let local_ _bar : 'a. 'a -> 'a -> 'a =
+    ((fun y z -> z) : _ -> local_ (_ -> _)) in
+  ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+
+let foo () =
+  let _bar : 'a. 'a -> 'a -> 'a =
+    ((fun y z -> z) : _ -> local_ (_ -> _)) in
+  ()
+[%%expect{|
+Line 3, characters 4-43:
+3 |     ((fun y z -> z) : _ -> local_ (_ -> _)) in
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'b -> ('c -> 'c) @ local"
+       but an expression was expected of type "'a -> 'a -> 'a"
+|}]
+
+let foo () =
+  let local_ _bar x : int -> int -> int =
+    ((fun y z -> z) : int -> local_ (int -> int)) in
+  ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+
+let foo () =
+  let _bar x : int -> int -> int =
+    ((fun y z -> z) : int -> local_ (int -> int)) in
+  ()
+[%%expect{|
+Line 3, characters 4-49:
+3 |     ((fun y z -> z) : int -> local_ (int -> int)) in
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "int -> (int -> int) @ local"
+       but an expression was expected of type "int -> int -> int"
+|}]
+
+let foo (local_ bar : int -> int -> int) =
+  let _ = (bar : int -> local_ (int -> int)) in
+  ()
+[%%expect{|
+val foo : (int -> int -> int) @ local -> unit = <fun>
+|}]
+
+let foo (bar : int -> local_ (int -> int)) =
+  let _ = (bar : int -> int -> int) in
+  ()
+[%%expect{|
+Line 2, characters 11-14:
+2 |   let _ = (bar : int -> int -> int) in
+               ^^^
+Error: This expression has type "int -> (int -> int) @ local"
+       but an expression was expected of type "int -> int -> int"
+|}]
+
+
+(*
+ * Curried functions and partial application
+ *)
+
+(* f4 results in a local value if it is partially applied to two or
+   three arguments, because it closes over the locally-allocated
+   second argument. Applications to 1 or 4 arguments are not local. *)
+let f4 : int -> local_ 'a -> int -> int -> int =
+  fun a _ b c -> a + b + c
+[%%expect{|
+val f4 : int -> 'a @ local -> int -> int -> int = <fun>
+|}]
+
+let apply1 x = f4 x
+[%%expect{|
+val apply1 : int -> 'a @ local -> int -> int -> int = <fun>
+|}]
+let apply2 x = f4 x x
+[%%expect{|
+Line 1, characters 15-21:
+1 | let apply2 x = f4 x x
+                   ^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+  Hint: This is a partial application
+        Adding 2 more arguments will make the value non-local
+|}]
+let apply3 x = f4 x x x
+[%%expect{|
+Line 1, characters 15-23:
+1 | let apply3 x = f4 x x x
+                   ^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+  Hint: This is a partial application
+        Adding 1 more argument will make the value non-local
+|}]
+let apply4 x =
+  f4 x x x x
+[%%expect{|
+val apply4 : int -> int = <fun>
+|}]
+
+(* Partial applications of two or three arguments are OK if bound locally *)
+let apply2_stack x =
+  let g = f4 x x in
+  let res = g x x in
+  res
+let apply3_stack x =
+  let g = f4 x x x in
+  let res = g x in
+  res
+[%%expect{|
+val apply2_stack : int -> int = <fun>
+val apply3_stack : int -> int = <fun>
+|}]
+
+(*
+ * Optional arguments
+ *)
+let appopt1 (f : ?a:local_ int ref -> unit -> unit) =
+  let res = f ~a:(let x = local_ ref 42 in x) () in
+  res
+[%%expect{|
+val appopt1 : (?a:int ref @ local -> unit -> unit) -> unit = <fun>
+|}]
+let appopt2 (f : ?a:local_ int ref -> unit -> unit) =
+  let res = f ~a:(let x = local_ ref 42 in x) in
+  res
+[%%expect{|
+Line 3, characters 2-5:
+3 |   res
+      ^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+(* In principle. it would be sound to allow this one:
+   we close over a value in Alloc_local mode, but it is known to be immediate *)
+let appopt3 (f : ?a:local_ int ref -> int -> int -> unit) =
+  let res = f 42 in
+  res
+[%%expect{|
+Line 3, characters 2-5:
+3 |   res
+      ^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+let optret1 (f : ?x:int -> local_ (y:unit -> unit -> int)) = f ()
+[%%expect{|
+Line 1, characters 61-65:
+1 | let optret1 (f : ?x:int -> local_ (y:unit -> unit -> int)) = f ()
+                                                                 ^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+  Hint: This is a partial application
+        Adding 1 more argument will make the value non-local
+|}]
+
+(* Optional argument elimination eta-expands and therefore allocates *)
+let no_eta (local_ f : unit -> int) = (f : unit -> int)
+[%%expect{|
+val no_eta : (unit -> int) @ local -> unit -> int = <fun>
+|}]
+
+let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
+[%%expect{|
+Line 1, characters 47-48:
+1 | let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
+                                                   ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is to omit some parameters by partial application (and thus an allocation)
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+let etajoin p (f : ?b:bool -> unit -> int) (local_ g : unit -> int) =
+  if p then (f : unit -> int) else g
+[%%expect{|
+val etajoin :
+  bool -> (?b:bool -> unit -> int) -> (unit -> int) @ local -> unit -> int =
+  <fun>
+|}]
+
+(* Default arguments *)
+
+let foo ?(local_ x) () = x;;
+[%%expect{|
+val foo : ?x:'a @ local -> unit -> 'a option @ local = <fun>
+|}]
+
+let foo ?(local_ x = "hello") () = x;;
+[%%expect{|
+val foo : ?x:string @ local -> unit -> string @ local = <fun>
+|}]
+
+let foo ?(local_ x = local_ "hello") () = x;;
+[%%expect{|
+Line 1, characters 21-35:
+1 | let foo ?(local_ x = local_ "hello") () = x;;
+                         ^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+let foo ?(local_ x = local_ "hello") () = local_ x;;
+[%%expect{|
+Line 1, characters 21-35:
+1 | let foo ?(local_ x = local_ "hello") () = local_ x;;
+                         ^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+(*
+ * Closures and context locks
+ *)
+
+let heap_closure () =
+  let foo = local_ ref 1 in
+  let fn () =
+    let[@stack] fn2 () =
+      let[@stack] _baz = foo in
+      () in
+    let res = fn2 () in
+    res
+  in
+  let _force_heap = ref fn in
+  let res = fn () in
+  res
+
+[%%expect{|
+Line 10, characters 24-26:
+10 |   let _force_heap = ref fn in
+                             ^^
+Error: This value is "local"
+         because it closes over the value "foo" at line 5, characters 25-28
+         which is "local".
+       However, the highlighted expression is expected to be "global".
+|}]
+
+let local_closure () =
+  let foo = local_ ref 1 in
+  let local_ fn () =
+    let local_ fn2 () =
+      let _baz = local_ foo in
+      ()
+    in
+    let res = fn2 () in
+    res
+  in
+  let res = fn () in
+  res
+
+[%%expect{|
+val local_closure : unit -> unit = <fun>
+|}]
+
+(*
+ * Always-nonlocal things
+ *)
+let toplevel_stack = local_ {contents=42}
+[%%expect{|
+Line 1, characters 21-41:
+1 | let toplevel_stack = local_ {contents=42}
+                         ^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+module M = struct
+  let _ = local_ {contents=42}
+end
+[%%expect{|
+module M : sig end
+|}]
+
+let _ = local_ {contents=42}
+[%%expect{|
+Line 1, characters 8-28:
+1 | let _ = local_ {contents=42}
+            ^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+
+module type T = sig val x : int option end
+let first_class_module () =
+  let thing = local_ Some 1 in
+  let _m : (module T) = local_ (module struct let x = thing end) in
+  ()
+[%%expect{|
+module type T = sig val x : int option end
+Line 4, characters 50-51:
+4 |   let _m : (module T) = local_ (module struct let x = thing end) in
+                                                      ^
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 4, characters 46-59
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
+|}]
+let local_module () =
+  let thing = local_ Some 1 in
+  let _ =
+    let module M = struct let x = thing end in
+    local_ ()
+  in ()
+[%%expect{|
+Line 4, characters 30-31:
+4 |     let module M = struct let x = thing end in
+                                  ^
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 4, characters 26-39
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
+|}]
+let obj () =
+  let thing = local_ Some 1 in
+  let _obj = object method foo = thing end in
+  ()
+[%%expect{|
+Line 3, characters 33-38:
+3 |   let _obj = object method foo = thing end in
+                                     ^^^^^
+Error: The value "thing" is "local"
+       but is expected to be "global"
+         because it is used in an object (at line 3, characters 13-42).
+|}]
+
+
+(*
+ * Higher order functions, with arguments that promise not to leak
+ *)
+
+let use_locally (f : local_ 'a -> 'a) (x : 'a) = f x
+(* This version also promises not to leak the closure *)
+let use_locally' (local_ f : local_ 'a -> 'a) (x : 'a) =
+  let res = f x in
+  res
+[%%expect{|
+val use_locally : ('a @ local -> 'a) -> 'a -> 'a = <fun>
+val use_locally' : ('a @ local -> 'a) @ local -> 'a -> 'a = <fun>
+|}]
+
+let no_leak = use_locally (fun x -> 1) 42
+let no_leak' = use_locally' (fun x -> 1) 42
+[%%expect{|
+val no_leak : int = 1
+val no_leak' : int = 1
+|}]
+
+let leak_id =
+  use_locally (fun x -> x) 42
+[%%expect{|
+Line 2, characters 24-25:
+2 |   use_locally (fun x -> x) 42
+                            ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let leak_ref =
+  let r = ref None in
+  use_locally (fun x -> r.contents <- Some x; x) 42
+
+[%%expect{|
+Line 3, characters 43-44:
+3 |   use_locally (fun x -> r.contents <- Some x; x) 42
+                                               ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is contained (via constructor "Some") in the value at line 3, characters 38-44
+         which is expected to be "global".
+|}]
+
+let leak_ref_2 =
+  let r = local_ ref None in
+  use_locally (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
+[%%expect{|
+Line 3, characters 39-40:
+3 |   use_locally (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
+                                           ^
+Error: The value "r" is "local"
+       but is expected to be "global"
+         because it is used inside the function at line 3, characters 14-68
+         which is expected to be "global".
+|}]
+
+let leak_ref_3 =
+  let r = local_ ref None in
+  use_locally' (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
+[%%expect{|
+Line 3, characters 64-65:
+3 |   use_locally' (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
+                                                                    ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is contained (via constructor "Some") in the value at line 3, characters 59-65
+         which is expected to be "global".
+|}]
+
+
+(* raised exceptions must be global *)
+let no_leak_exn =
+  use_locally (fun x -> let _exn = local_ Invalid_argument x in "bluh") "blah"
+[%%expect{|
+val no_leak_exn : string = "bluh"
+|}]
+let do_leak_exn =
+  use_locally (fun x -> let _exn = local_ raise (Invalid_argument x) in "bluh") "blah"
+
+[%%expect{|
+Line 2, characters 66-67:
+2 |   use_locally (fun x -> let _exn = local_ raise (Invalid_argument x) in "bluh") "blah"
+                                                                      ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is contained (via constructor "Invalid_argument") in the value at line 2, characters 48-68
+         which is expected to be "global".
+|}]
+
+(* handled exceptions are known to be global *)
+let catch (f : unit -> local_ string) =
+  let a =
+    match f () with
+    | _ -> "hello"
+    | exception (Invalid_argument x) -> x
+  in
+  let b =
+    try let _ = f () in "hello" with
+    | Invalid_argument x -> x
+  in
+  (a, b)
+[%%expect{|
+val catch : (unit -> string @ local) -> string * string = <fun>
+|}]
+
+
+(* same, but this time the function is allowed to return its argument *)
+let use_locally (f : local_ 'a -> local_ 'a) : local_ 'a -> local_ 'a = f
+[%%expect{|
+val use_locally :
+  ('a : any). ('a @ local -> 'a @ local) -> 'a @ local -> 'a @ local = <fun>
+|}]
+
+let loc = ((fun x -> local_ x) : local_ int -> local_ int)
+
+let no_leak_id =
+  let _ =
+    local_ use_locally ((fun x -> local_ x) : local_ int -> local_ int) 42
+  in ()
+
+[%%expect{|
+val loc : int @ local -> int @ local = <fun>
+val no_leak_id : unit = ()
+|}]
+
+module type S = sig val s : string end
+
+(* Currently we can't stack-allocate modules, but it's fine to take modules as
+   local parameters. *)
+
+let bar (local_ (m : (module S))) =
+  let (module _) = m in
+  ()
+[%%expect{|
+module type S = sig val s : string end
+val bar : (module S) @ local -> unit = <fun>
+|}]
+
+(* While it's sound to let modules cross locality (since they are always heap
+   allocated), we choose not to expose this for future compatibility. *)
+let bar (local_ (m : (module S))) =
+  let (module M) = m in
+  M.s
+[%%expect{|
+val bar : (module S) @ local -> string @ local = <fun>
+|}]
+
+let bar (local_ m) =
+  let module M = (val m : S) in
+  M.s
+[%%expect{|
+val bar : (module S) @ local -> string @ local = <fun>
+|}]
+
+(* packing is allocation, and we can't construct a global module using local values *)
+let bar (local_ m) =
+  let module M = (val m : S) in
+  (module M : S)
+[%%expect{|
+Line 3, characters 10-11:
+3 |   (module M : S)
+              ^
+Error: Signature mismatch:
+       Got "local" to the parent region
+       but expected "global"
+         because it is a module and thus needs to be allocated on the heap.
+|}]
+
+(* Don't escape through a lazy value *)
+
+let foo (local_ x) =
+  let _ = lazy (print_string !x) in
+  ()
+[%%expect{|
+Line 2, characters 30-31:
+2 |   let _ = lazy (print_string !x) in
+                                  ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the lazy expression at line 2, characters 10-32
+         which is expected to be "global"
+         because lazy expressions always need to be allocated on the heap.
+|}]
+
+(* Don't escape through a functor *)
+
+let foo (local_ x) =
+  let module Foo (X : sig end) = struct
+    let () = print_string !x
+  end in
+  let module _ = Foo(struct end) in
+  ()
+[%%expect{|
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the functor at lines 2-4, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
+|}]
+
+(* Don't escape through a functor with underscore parameter *)
+
+let foo (local_ x) =
+  let module Foo (_ : sig end) = struct
+    let () = print_string !x
+  end in
+  let module _ = Foo(struct end) in
+  ()
+[%%expect{|
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the functor at lines 2-4, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
+|}]
+
+(* Don't escape through a generative functor *)
+
+let foo (local_ x) =
+  let module Foo () = struct
+    let () = print_string !x
+  end in
+  let module _ = Foo() in
+  ()
+[%%expect{|
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the functor at lines 2-4, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
+|}]
+
+(* Don't escape through a functor with underscore parameter *)
+
+let foo (local_ x) =
+  let module Foo (_ : sig end) = struct
+    let () = print_string !x
+  end in
+  let module _ = Foo(struct end) in
+  ()
+[%%expect{|
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the functor at lines 2-4, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
+|}]
+
+(* Don't escape through a generative functor *)
+
+let foo (local_ x) =
+  let module Foo () = struct
+    let () = print_string !x
+  end in
+  let module _ = Foo() in
+  ()
+[%%expect{|
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the functor at lines 2-4, characters 17-5
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
+|}]
+
+(* Don't escape through a class method *)
+
+let foo (local_ x) =
+  let module M = struct
+    class c = object
+      method m = !x
+    end
+  end in new c
+[%%expect{|
+Line 4, characters 18-19:
+4 |       method m = !x
+                      ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used in a class (at lines 3-5, characters 14-7).
+|}]
+
+(* Don't escape through an object method *)
+
+let foo (local_ x) =
+  let o = object
+    method m = !x
+  end in
+  o#m
+
+[%%expect{|
+Line 3, characters 16-17:
+3 |     method m = !x
+                    ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used in an object (at lines 2-4, characters 10-5).
+|}]
+
+(* Don't escape through a class instance variable *)
+
+let foo (local_ x) =
+  let module M = struct
+    class c = object
+      val m = !x
+    end
+  end in new c
+[%%expect{|
+Line 4, characters 15-16:
+4 |       val m = !x
+                   ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used in a class (at lines 3-5, characters 14-7).
+|}]
+
+(* Don't escape through a class instance variable *)
+
+let foo (local_ x) =
+  let o = object
+    val m = !x
+  end in o
+[%%expect{|
+Line 3, characters 13-14:
+3 |     val m = !x
+                 ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used in an object (at lines 2-4, characters 10-5).
+|}]
+
+(* Don't escape through a class local variable *)
+
+let foo (local_ x) =
+  let module M = struct
+    class c =
+      let y = x in
+      object end
+  end in new M.c
+[%%expect{|
+Line 4, characters 10-11:
+4 |       let y = x in
+              ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (local_ x) =
+  let module M = struct
+    class c =
+      let _ = x in
+      object end
+  end in new M.c
+[%%expect{|
+val foo : 'a @ local -> <  > = <fun>
+|}]
+
+let foo (local_ x : string ref) =
+  let module M = struct
+    class c =
+      let y = !x in
+      object method m = y
+    end
+  end in new M.c
+[%%expect{|
+val foo : string ref @ local -> < m : string > = <fun>
+|}]
+
+(* Don't escape under a class parameter variable *)
+
+let foo (local_ x : string ref) =
+  let module M = struct
+    class c =
+      fun () ->
+      let y = !x in
+      object method m = y end
+  end in new M.c
+[%%expect{|
+Line 5, characters 15-16:
+5 |       let y = !x in
+                   ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used in a class (at lines 4-6, characters 10-29).
+|}]
+
+let foo (local_ x : string ref) =
+  let module M = struct
+    class c =
+      let y = !x in
+      fun () ->
+      object method m = y end
+  end in new M.c
+[%%expect{|
+val foo : string ref @ local -> (unit -> < m : string >) = <fun>
+|}]
+
+(* Don't escape in inherit expressions *)
+
+class d (p : string) = object method m = p end
+
+let foo (local_ x : string ref) =
+  let module M = struct
+    class c = object
+      inherit d !x
+      method n = 42
+    end
+  end in new M.c
+[%%expect{|
+class d : string -> object method m : string end
+Line 6, characters 17-18:
+6 |       inherit d !x
+                     ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used in a class (at lines 5-8, characters 14-7).
+|}]
+
+(* Don't escape in initializers *)
+
+let foo (local_ x) =
+  let o = object
+    initializer (print_string !x)
+  end in
+  o#m
+
+[%%expect{|
+Line 3, characters 31-32:
+3 |     initializer (print_string !x)
+                                   ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used in an object (at lines 2-4, characters 10-5).
+|}]
+
+(* Don't escape in non-function 'let rec' bindings *)
+let foo (local_ x) =
+  (* fine, local recursive function *)
+  let rec g () = let _ = x in h (); () and h () = g (); () in
+  g (); ()
+[%%expect {|
+val foo : 'a @ local -> unit = <fun>
+|}]
+
+let foo (local_ x) =
+  (* fine, local non-recursive binding *)
+  let _ = (x, 1) in
+  1
+[%%expect {|
+val foo : 'a @ local -> int = <fun>
+|}]
+
+let foo (local_ x) =
+  (* not fine, local recursive non-function (needs caml_alloc_dummy) *)
+  let rec g = x :: g in
+  let _ = g in ()
+[%%expect {|
+Line 3, characters 14-15:
+3 |   let rec g = x :: g in
+                  ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is contained (via constructor "::") in the value at line 3, characters 14-20
+         which is expected to be "global".
+|}]
+
+(* Cannot pass local values to tail calls *)
+
+let print (local_ x) = print_string !x
+
+let foo x =
+  let r = local_ { contents = x } in
+  print r
+[%%expect{|
+val print : string ref @ local -> unit = <fun>
+Line 5, characters 8-9:
+5 |   print r
+            ^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is an argument in a tail call.
+|}]
+
+let local_cb (local_ f) = f ()
+let foo (local_ x) = local_cb (fun () -> x := 17; 42)
+[%%expect{|
+val local_cb : (unit -> 'a) @ local -> 'a = <fun>
+Line 2, characters 41-42:
+2 | let foo (local_ x) = local_cb (fun () -> x := 17; 42)
+                                             ^
+Error: The value "x" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the function at line 2, characters 30-53
+         which is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is an argument in a tail call.
+|}]
+
+let foo x =
+  let r = local_ { contents = x } in
+  print r;
+  ()
+[%%expect{|
+val foo : string -> unit = <fun>
+|}]
+
+let foo x = exclave_
+  let r = local_ { contents = x } in
+  print r
+[%%expect{|
+val foo : string -> unit @ local = <fun>
+|}]
+
+(* Can pass local values to calls explicitly marked as nontail *)
+let foo x =
+  let local_ r = ref x in
+  print r [@nontail]
+[%%expect{|
+val foo : string -> unit = <fun>
+|}]
+
+let foo x =
+  let local_ f () = 42 in
+  f () [@nontail]
+[%%expect{|
+val foo : 'a -> int = <fun>
+|}]
+
+(* Cannot call local values in tail calls *)
+
+let foo x =
+  let r = local_ { contents = x } in
+  let local_ foo () = r.contents in
+  foo ()
+[%%expect{|
+Line 4, characters 2-5:
+4 |   foo ()
+      ^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is the function in a tail call.
+|}]
+
+let foo x =
+  let r = local_ { contents = x } in
+  let local_ foo () = r.contents in
+  let res = foo () in
+  res
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+
+let foo x = exclave_
+  let r = local_ { contents = x } in
+  let local_ foo () = r.contents in
+  foo ()
+[%%expect{|
+val foo : 'a -> 'a @ local = <fun>
+|}]
+
+(* Cannot return local values without annotations on all exits *)
+
+let foo x =
+  let r = local_ { contents = x } in
+  r
+[%%expect{|
+Line 3, characters 2-3:
+3 |   r
+      ^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+let foo x = exclave_
+  let r = local_ { contents = x } in
+  r
+[%%expect{|
+val foo : 'a -> 'a ref @ local = <fun>
+|}]
+
+let foo p x = exclave_
+  let r = local_ { contents = x } in
+  if p then r
+  else r
+[%%expect{|
+val foo : bool -> 'a -> 'a ref @ local = <fun>
+|}]
+
+(* Non-local regional values can be passed to tail calls *)
+let rec length acc (local_ xl) =
+  match xl with
+  | [] -> 0
+  | x :: xs -> length (acc + 1) xs
+[%%expect{|
+val length : int -> 'a list @ local -> int = <fun>
+|}]
+
+let foo () =
+  let r = local_ ref 5 in
+  let bar x = !x in
+  let baz () =
+    bar r
+  in
+  let x = baz () in
+  x
+[%%expect{|
+val foo : unit -> int = <fun>
+|}]
+
+(* tail-calling local-returning functions make the current function
+   local-returning as well; mode-crossing is irrelavent here. Whether or not the
+   function actually allocates in parent-region is also irrelavent here, but we
+   allocate just to demonstrate the potential leaking. *)
+let foo () = exclave_
+  let _ = local_ (52, 24) in
+  42
+[%%expect{|
+val foo : unit -> int @ local = <fun>
+|}]
+
+let bar () =
+  let _x = 52 in
+  foo ()
+[%%expect{|
+val bar : unit -> int @ local = <fun>
+|}]
+
+(* if not at tail, then not affected *)
+let bar' () =
+  let _x = foo () in
+  52
+[%%expect{|
+val bar' : unit -> int = <fun>
+|}]
+
+(* nontail attribute works as well *)
+let bar' () =
+  foo () [@nontail]
+[%%expect{|
+val bar' : unit -> int = <fun>
+|}]
+
+(* Parameter modes must be matched by the type *)
+
+let foo : 'a -> unit = fun (local_ x) -> ()
+[%%expect{|
+Line 1, characters 23-43:
+1 | let foo : 'a -> unit = fun (local_ x) -> ()
+                           ^^^^^^^^^^^^^^^^^^^^
+Error: This function takes a parameter which is "local",
+       but was expected to take a parameter which is "global".
+|}]
+
+(* Return mode must be greater than the type *)
+
+let foo : unit -> local_ string = fun () -> "hello"
+[%%expect{|
+val foo : unit -> string @ local = <fun>
+|}]
+
+let foo : unit -> string = fun () -> exclave_ "hello"
+[%%expect{|
+Line 1, characters 37-53:
+1 | let foo : unit -> string = fun () -> exclave_ "hello"
+                                         ^^^^^^^^^^^^^^^^
+Error: This expression is local because it is an exclave,
+       but was expected otherwise.
+|}]
+
+(* Unboxed type constructors do not affect regionality *)
+type 'a unb1 = A of 'a [@@unboxed]
+type 'a unb2 = { foo : 'a } [@@unboxed]
+type 'a unb3 = B of { bar : 'a } [@@unboxed]
+let f (local_ x) = B { bar = { foo = A x } }
+[%%expect{|
+type 'a unb1 = A of 'a [@@unboxed]
+type 'a unb2 = { foo : 'a; } [@@unboxed]
+type 'a unb3 = B of { bar : 'a; } [@@unboxed]
+val f : 'a @ local -> 'a unb1 unb2 unb3 @ local = <fun>
+|}]
+
+
+(* Fields have the same mode unless they are global or mutable *)
+
+type 'a imm = { imm : 'a }
+type 'a mut = { mutable mut : 'a }
+type 'a gbl = { global_ gbl : 'a }
+[%%expect{|
+type 'a imm = { imm : 'a; }
+type 'a mut = { mutable mut : 'a; }
+type 'a gbl = { gbl : 'a @@ global; }
+|}]
+
+let foo (local_ x) = x.imm
+[%%expect{|
+val foo : 'a imm @ local -> 'a @ local = <fun>
+|}]
+let foo y =
+  let x = local_ { imm = y } in
+  x.imm
+[%%expect{|
+Line 3, characters 2-7:
+3 |   x.imm
+      ^^^^^
+Error: This value is "local"
+         because it is the field "imm" of the record at line 3, characters 2-3
+         which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+let foo (local_ x) = x.mut
+[%%expect{|
+val foo : 'a mut @ local -> 'a = <fun>
+|}]
+let foo y =
+  let x = local_ { mut = y } in
+  x.mut
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+let foo (local_ x) = x.gbl
+[%%expect{|
+val foo : 'a gbl @ local -> 'a = <fun>
+|}]
+let foo y =
+  let x = local_ { gbl = y } in
+  x.gbl
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+
+let foo (local_ { imm }) = imm
+[%%expect{|
+val foo : 'a imm @ local -> 'a @ local = <fun>
+|}]
+let foo y =
+  let { imm } = local_ { imm = y } in
+  imm
+[%%expect{|
+Line 3, characters 2-5:
+3 |   imm
+      ^^^
+Error: This value is "local"
+         because it is the field "imm" of the record at line 2, characters 6-13
+         which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+let foo (local_ { mut }) = mut
+[%%expect{|
+val foo : 'a mut @ local -> 'a = <fun>
+|}]
+let foo y =
+  let { mut } = local_ { mut = y } in
+  mut
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+let foo (local_ { gbl }) = gbl
+[%%expect{|
+val foo : 'a gbl @ local -> 'a = <fun>
+|}]
+let foo y =
+  let { gbl } = local_ { gbl = y } in
+  gbl
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+
+let foo (local_ imm) =
+  let _ = { imm } in
+  ()
+[%%expect{|
+val foo : 'a @ local -> unit = <fun>
+|}]
+let foo () =
+  let imm = local_ ref 5 in
+  let _ = { imm } in
+  ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+let foo (local_ mut) =
+  let _ = { mut } in
+  ()
+[%%expect{|
+Line 2, characters 12-15:
+2 |   let _ = { mut } in
+                ^^^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is the field "mut" (with some modality) of the record at line 2, characters 10-17.
+|}]
+let foo () =
+  let mut = local_ ref 5 in
+  let _ = { mut } in
+  ()
+[%%expect{|
+Line 3, characters 12-15:
+3 |   let _ = { mut } in
+                ^^^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is the field "mut" (with some modality) of the record at line 3, characters 10-17.
+|}]
+let foo (local_ gbl) =
+  let _ = { gbl } in
+  ()
+[%%expect{|
+Line 2, characters 12-15:
+2 |   let _ = { gbl } in
+                ^^^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is the field "gbl" (with some modality) of the record at line 2, characters 10-17.
+|}]
+let foo () =
+  let gbl = local_ ref 5 in
+  let _ = { gbl } in
+  ()
+[%%expect{|
+Line 3, characters 12-15:
+3 |   let _ = { gbl } in
+                ^^^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is the field "gbl" (with some modality) of the record at line 3, characters 10-17.
+|}]
+
+(* Implicit records version of the same test *)
+
+let foo (local_ x) = x.#imm
+[%%expect{|
+val foo : 'a imm# @ local -> 'a @ local = <fun>
+|}]
+let foo y =
+  let x = local_ #{ imm = y } in
+  x.#imm
+[%%expect{|
+Line 3, characters 2-8:
+3 |   x.#imm
+      ^^^^^^
+Error: This value is "local"
+         because it is the field "imm" of the record at line 3, characters 2-3
+         which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+let foo (local_ x) = x.#mut
+[%%expect{|
+val foo : 'a mut# @ local -> 'a = <fun>
+|}]
+let foo y =
+  let x = local_ #{ mut = y } in
+  x.#mut
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+let foo (local_ x) = x.#gbl
+[%%expect{|
+val foo : 'a gbl# @ local -> 'a = <fun>
+|}]
+let foo y =
+  let x = local_ #{ gbl = y } in
+  x.#gbl
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+
+let foo (local_ #{ imm }) = imm
+[%%expect{|
+val foo : 'a imm# @ local -> 'a @ local = <fun>
+|}]
+let foo y =
+  let #{ imm } = local_ #{ imm = y } in
+  imm
+[%%expect{|
+Line 3, characters 2-5:
+3 |   imm
+      ^^^
+Error: This value is "local"
+         because it is the field "imm" of the record at line 2, characters 6-14
+         which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+let foo (local_ #{ mut }) = mut
+[%%expect{|
+val foo : 'a mut# @ local -> 'a = <fun>
+|}]
+let foo y =
+  let #{ mut } = local_ #{ mut = y } in
+  mut
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+let foo (local_ #{ gbl }) = gbl
+[%%expect{|
+val foo : 'a gbl# @ local -> 'a = <fun>
+|}]
+let foo y =
+  let #{ gbl } = local_ #{ gbl = y } in
+  gbl
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+
+let foo (local_ imm) =
+  let _ = #{ imm } in
+  ()
+[%%expect{|
+val foo : 'a @ local -> unit = <fun>
+|}]
+let foo () =
+  let imm = local_ ref 5 in
+  let _ = #{ imm } in
+  ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+let foo (local_ mut) =
+  let _ = #{ mut } in
+  ()
+[%%expect{|
+Line 2, characters 13-16:
+2 |   let _ = #{ mut } in
+                 ^^^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is the field "mut" (with some modality) of the record at line 2, characters 10-18.
+|}]
+let foo () =
+  let mut = local_ ref 5 in
+  let _ = #{ mut } in
+  ()
+[%%expect{|
+Line 3, characters 13-16:
+3 |   let _ = #{ mut } in
+                 ^^^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is the field "mut" (with some modality) of the record at line 3, characters 10-18.
+|}]
+let foo (local_ gbl) =
+  let _ = #{ gbl } in
+  ()
+[%%expect{|
+Line 2, characters 13-16:
+2 |   let _ = #{ gbl } in
+                 ^^^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is the field "gbl" (with some modality) of the record at line 2, characters 10-18.
+|}]
+let foo () =
+  let gbl = local_ ref 5 in
+  let _ = #{ gbl } in
+  ()
+[%%expect{|
+Line 3, characters 13-16:
+3 |   let _ = #{ gbl } in
+                 ^^^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is the field "gbl" (with some modality) of the record at line 3, characters 10-18.
+|}]
+
+(* Unboxed records version of the same test *)
+
+type 'a gbl = #{ global_ gbl : 'a }
+[%%expect{|
+type 'a gbl = #{ gbl : 'a @@ global; }
+|}]
+
+let foo (local_ x) = x.#gbl
+[%%expect{|
+val foo : 'a gbl @ local -> 'a = <fun>
+|}]
+let foo y =
+  let x = local_ #{ gbl = y } in
+  x.#gbl
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+let foo (local_ #{ gbl }) = gbl
+[%%expect{|
+val foo : 'a gbl @ local -> 'a = <fun>
+|}]
+let foo y =
+  let #{ gbl } = local_ #{ gbl = y } in
+  gbl
+[%%expect{|
+val foo : 'a -> 'a = <fun>
+|}]
+let foo (local_ gbl) =
+  let _ = #{ gbl } in
+  ()
+[%%expect{|
+Line 2, characters 13-16:
+2 |   let _ = #{ gbl } in
+                 ^^^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is the field "gbl" (with some modality) of the record at line 2, characters 10-18.
+|}]
+let foo () =
+  let gbl = local_ ref 5 in
+  let _ = #{ gbl } in
+  ()
+[%%expect{|
+Line 3, characters 13-16:
+3 |   let _ = #{ gbl } in
+                 ^^^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is the field "gbl" (with some modality) of the record at line 3, characters 10-18.
+|}]
+
+(* Global fields are preserved in module inclusion *)
+module M : sig
+  type t = { global_ foo : string }
+end = struct
+  type t = { foo : string }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { foo : string }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { foo : string; } end
+       is not included in
+         sig type t = { foo : string @@ global; } end
+       Type declarations do not match:
+         type t = { foo : string; }
+       is not included in
+         type t = { foo : string @@ global; }
+       Fields do not match:
+         "foo : string;"
+       is not the same as:
+         "foo : string @@ global;"
+       The second is global and the first is not.
+|}]
+
+module M : sig
+  type t = { foo : string }
+end = struct
+  type t = { global_ foo : string }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { global_ foo : string }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { foo : string @@ global; } end
+       is not included in
+         sig type t = { foo : string; } end
+       Type declarations do not match:
+         type t = { foo : string @@ global; }
+       is not included in
+         type t = { foo : string; }
+       Fields do not match:
+         "foo : string @@ global;"
+       is not the same as:
+         "foo : string;"
+       The second is empty and the first is aliased.
+|}]
+
+(* Unboxed records version of the same test *)
+
+module M : sig
+  type t = #{ global_ foo : string }
+end = struct
+  type t = #{ foo : string }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = #{ foo : string }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #{ foo : string; } end
+       is not included in
+         sig type t = #{ foo : string @@ global; } end
+       Type declarations do not match:
+         type t = #{ foo : string; }
+       is not included in
+         type t = #{ foo : string @@ global; }
+       Fields do not match:
+         "foo : string;"
+       is not the same as:
+         "foo : string @@ global;"
+       The second is global and the first is not.
+|}]
+
+module M : sig
+  type t = #{ foo : string }
+end = struct
+  type t = #{ global_ foo : string }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = #{ global_ foo : string }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #{ foo : string @@ global; } end
+       is not included in
+         sig type t = #{ foo : string; } end
+       Type declarations do not match:
+         type t = #{ foo : string @@ global; }
+       is not included in
+         type t = #{ foo : string; }
+       Fields do not match:
+         "foo : string @@ global;"
+       is not the same as:
+         "foo : string;"
+       The second is empty and the first is aliased.
+|}]
+
+(* Special handling of tuples in matches and let bindings *)
+let escape : 'a -> unit = fun x -> ()
+
+let foo (local_ x) y =
+  match x, y with
+  | Some _, Some b -> escape b
+  | None, _ -> ()
+  | pr  -> let _, _ = pr in ();;
+[%%expect{|
+val escape : 'a -> unit = <fun>
+val foo : 'a option @ local -> 'b option -> unit = <fun>
+|}]
+
+let foo (local_ x) y =
+  let pr = x, y in
+  match pr with
+  | Some _, Some b -> escape b
+  | None, _ -> ()
+  | _  -> ();;
+[%%expect{|
+Line 4, characters 29-30:
+4 |   | Some _, Some b -> escape b
+                                 ^
+Error: This value is "local"
+         because it is contained (via constructor "Some") in the value at line 4, characters 12-18
+         which is "local"
+         because it is an element of the tuple at line 3, characters 8-10
+         which is "local"
+         because it is allocated at line 2, characters 11-15 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 11-12
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+let foo (local_ x) y =
+  match x, y with
+  | pr ->
+    let _, b = pr in
+    escape b
+  | _  -> ();;
+[%%expect{|
+Line 5, characters 11-12:
+5 |     escape b
+               ^
+Error: This value is "local"
+         because it is an element of the tuple at line 4, characters 15-17
+         which is "local"
+         because it is allocated at line 2, characters 8-12 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 2, characters 8-9
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+let foo p (local_ x) y z =
+  let (_, b) as pr =
+    if p then x, y else z
+  in
+  let _, _ = pr in
+  escape b;;
+[%%expect{|
+val foo : bool -> 'a @ local -> 'b -> 'a * 'b -> unit = <fun>
+|}]
+
+let foo p (local_ x) y (local_ z) =
+  let _, b =
+    if p then x, y else z
+  in
+  escape b;;
+[%%expect{|
+Line 5, characters 9-10:
+5 |   escape b;;
+             ^
+Error: This value is "local" to the parent region
+         because it is an element of the tuple at line 3, characters 24-25
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+let foo p (local_ x) y z =
+  let a, _ =
+    if p then x, y else z
+  in
+  escape a;;
+[%%expect{|
+Line 5, characters 9-10:
+5 |   escape a;;
+             ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo p (local_ x) y z =
+  let pr =
+    if p then x, y else z
+  in
+  let _, b = pr in
+  escape b;;
+[%%expect{|
+Line 6, characters 9-10:
+6 |   escape b;;
+             ^
+Error: This value is "local"
+         because it is an element of the tuple at line 5, characters 13-15
+         which is "local"
+         because it is allocated at line 3, characters 14-18 containing data
+         which is "local" to the parent region
+         because it is a tuple that contains the expression at line 3, characters 14-15
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+(* [as] patterns *)
+
+let foo (local_ x) =
+  match x with
+  | None as y -> escape y
+  | Some _ -> ()
+[%%expect{|
+val foo : 'a option @ local -> unit = <fun>
+|}]
+
+let foo (local_ x) =
+  match x with
+  | None -> ()
+  | Some _ as y -> escape y
+[%%expect{|
+Line 4, characters 26-27:
+4 |   | Some _ as y -> escape y
+                              ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (local_ x) =
+  match x with
+  | 0 as y -> escape y
+  | _ -> ()
+[%%expect{|
+val foo : int @ local -> unit = <fun>
+|}, Principal{|
+Line 3, characters 21-22:
+3 |   | 0 as y -> escape y
+                         ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (local_ x) =
+  match x with
+  | 'a'..'e' as y -> escape y
+  | _ -> ()
+[%%expect{|
+val foo : char @ local -> unit = <fun>
+|}, Principal{|
+Line 3, characters 28-29:
+3 |   | 'a'..'e' as y -> escape y
+                                ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (local_ x) =
+  match x with
+  | 1.1 as y -> escape y
+  | _ -> ()
+[%%expect{|
+Line 3, characters 23-24:
+3 |   | 1.1 as y -> escape y
+                           ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (local_ x) =
+  match x with
+  | `Foo as y -> escape y
+  | _ -> ()
+[%%expect{|
+val foo : [> `Foo ] @ local -> unit = <fun>
+|}]
+
+let foo (local_ x) =
+  match x with
+  | (`Foo _) as y -> escape y
+  | _ -> ()
+[%%expect{|
+Line 3, characters 28-29:
+3 |   | (`Foo _) as y -> escape y
+                                ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (local_ x) =
+  match x with
+  | (None | Some _) as y -> escape y
+[%%expect{|
+Line 3, characters 35-36:
+3 |   | (None | Some _) as y -> escape y
+                                       ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (local_ x) =
+  match x with
+  | (Some _|None) as y -> escape y
+[%%expect{|
+Line 3, characters 33-34:
+3 |   | (Some _|None) as y -> escape y
+                                     ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+type foo = [`Foo | `Bar]
+
+let foo (local_ x) =
+  match x with
+  | #foo as y -> escape y
+[%%expect{|
+type foo = [ `Bar | `Foo ]
+val foo : [< foo ] @ local -> unit = <fun>
+|}]
+
+type foo = [`Foo | `Bar of int]
+
+let foo (local_ x) =
+  match x with
+  | #foo as y -> escape y
+[%%expect{|
+type foo = [ `Bar of int | `Foo ]
+Line 5, characters 24-25:
+5 |   | #foo as y -> escape y
+                            ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+(* Primitives *)
+
+(* Poly-moded eta expansion *)
+module Heap32 : sig val add : int32 -> int32 -> int32 end = Int32
+module Heap32E : sig external add : int32 -> int32 -> int32 = "%int32_add" end = Int32
+module Local32 : sig val add : local_ int32 -> local_ int32 -> local_ int32 end = Int32
+module Local32E : sig external add : local_ int32 -> local_ int32 -> local_ int32 = "%int32_add" end = Int32
+[%%expect{|
+module Heap32 : sig val add : int32 -> int32 -> int32 end
+module Heap32E :
+  sig external add : int32 -> int32 -> int32 = "%int32_add" end
+module Local32 :
+  sig val add : int32 @ local -> int32 @ local -> int32 @ local end
+module Local32E :
+  sig
+    external add : int32 @ local -> int32 @ local -> int32 @ local
+      = "%int32_add"
+  end
+|}]
+module Bad32 : sig val add : local_ int32 -> local_ int32 -> int32 end =
+  struct let add = Int32.add end
+[%%expect{|
+Line 2, characters 2-32:
+2 |   struct let add = Int32.add end
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val add : int32 @ local -> int32 @ local -> int32 @ local end
+       is not included in
+         sig val add : int32 @ local -> int32 @ local -> int32 end
+       Values do not match:
+         val add : int32 @ local -> int32 @ local -> int32 @ local
+       is not included in
+         val add : int32 @ local -> int32 @ local -> int32
+       The type "int32 @ local -> int32 @ local -> int32 @ local"
+       is not compatible with the type
+         "int32 @ local -> int32 @ local -> int32"
+       Type "int32 @ local -> int32 @ local" is not compatible with type
+         "int32 @ local -> int32"
+|}]
+module Opt32 : sig external add : (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt]) = "%int32_add" end = Int32
+module Bad32_2 : sig val add : local_ int32 -> local_ int32 -> int32 end =
+  Opt32
+[%%expect{|
+module Opt32 :
+  sig
+    external add :
+      (int32 [@local_opt]) -> (int32 [@local_opt]) -> (int32 [@local_opt])
+      = "%int32_add"
+  end
+Line 3, characters 2-7:
+3 |   Opt32
+      ^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           external add :
+             (int32 [@local_opt]) ->
+             (int32 [@local_opt]) -> (int32 [@local_opt]) = "%int32_add"
+         end
+       is not included in
+         sig val add : int32 @ local -> int32 @ local -> int32 end
+       Values do not match:
+         external add :
+           (int32 [@local_opt]) ->
+           (int32 [@local_opt]) -> (int32 [@local_opt]) = "%int32_add"
+       is not included in
+         val add : int32 @ local -> int32 @ local -> int32
+       The type "int32 @ local -> int32 @ local -> int32 @ local"
+       is not compatible with the type
+         "int32 @ local -> int32 @ local -> int32"
+       Type "int32 @ local -> int32 @ local" is not compatible with type
+         "int32 @ local -> int32"
+|}]
+
+module Contravariant_instantiation : sig
+  external to_int_trunc : Int64.t -> int = "%int64_to_int"
+end = struct
+  external to_int_trunc : (Int64.t [@local_opt]) -> int = "%int64_to_int"
+end
+[%%expect{|
+module Contravariant_instantiation :
+  sig external to_int_trunc : Int64.t -> int = "%int64_to_int" end
+|}]
+
+(* Return modes *)
+let zx : int ref -> (int -> unit) = (:=)
+let zz : local_ (int ref) -> int -> unit = (:=)
+let zy : local_ (int ref) -> (int -> unit) = (:=)
+[%%expect{|
+val zx : int ref -> int -> unit = <fun>
+val zz : int ref @ local -> int -> unit = <fun>
+Line 3, characters 45-49:
+3 | let zy : local_ (int ref) -> (int -> unit) = (:=)
+                                                 ^^^^
+Error: This expression has type "'a ref @ local -> 'a -> unit"
+       but an expression was expected of type
+         "int ref @ local -> (int -> unit)"
+|}]
+
+let int32 (local_ x) (local_ y) = exclave_
+  Int32.(div (logxor (mul x y) (sub x y)) (shift_right y 10))
+let int64 (local_ x) (local_ y) = exclave_
+  Int64.(div (logxor (mul x y) (sub x y)) (shift_right y 10))
+let nativeint (local_ x) (local_ y) = exclave_
+  Nativeint.(div (logxor (mul x y) (sub x y)) (shift_right y 10))
+let float (local_ x) (local_ y) = exclave_
+  (x +. y *. x -. 42.)
+[%%expect{|
+val int32 : int32 @ local -> int32 @ local -> int32 @ local = <fun>
+val int64 : int64 @ local -> int64 @ local -> int64 @ local = <fun>
+val nativeint : nativeint @ local -> nativeint @ local -> nativeint @ local =
+  <fun>
+val float : float @ local -> float @ local -> float @ local = <fun>
+|}]
+
+let etapair (local_ x) = exclave_ (fst x, snd x)
+[%%expect{|
+val etapair : 'a * 'b @ local -> 'a * 'b @ local = <fun>
+|}]
+
+(* Arity checking on primitives *)
+external goodadd : int32 -> int32 -> int32 = "%int32_add"
+[%%expect{|
+external goodadd : int32 -> int32 -> int32 = "%int32_add"
+|}]
+external badadd : int32 -> (int32 -> int32) = "%int32_add"
+[%%expect{|
+Line 1, characters 0-58:
+1 | external badadd : int32 -> (int32 -> int32) = "%int32_add"
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Wrong arity for builtin primitive "%int32_add"
+|}]
+
+let compare (local_ x) (local_ y) =
+  [x = y; x <> y; x < y; x > y; x <= y; x >= y; compare x y = 0; x == y; x != y]
+[%%expect{|
+val compare : 'a @ local -> 'a @ local -> bool list = <fun>
+|}]
+
+(* integer primitives accept local args *)
+let intf (local_ x) = x |> Int.succ |> Int.add 42 |> pred |> (/) 100 |> (+) 1
+[%%expect{|
+val intf : int @ local -> int = <fun>
+|}]
+
+(* primitives don't count as tail calls, so you can pass them locals *)
+let primloc x = let local_ y = Int32.add x 1l in Int32.to_int y
+[%%expect{|
+val primloc : int32 -> int = <fun>
+|}]
+
+(* (&&) and (||) tail call on the right *)
+let testbool1 f = let local_ r = ref 42 in (f r || false) && true
+
+let testbool2 f = let local_ r = ref 42 in true && (false || f r)
+[%%expect{|
+val testbool1 : (int ref @ local -> bool) -> bool = <fun>
+Line 3, characters 63-64:
+3 | let testbool2 f = let local_ r = ref 42 in true && (false || f r)
+                                                                   ^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is an argument in a tail call.
+|}]
+
+(* boolean operator when at tail of function makes the function local-returning
+   if its RHS is local-returning *)
+let foo () = exclave_ let local_ _x = "hello" in true
+let testboo3 () =  true && (foo ())
+[%%expect{|
+val foo : unit -> bool @ local = <fun>
+val testboo3 : unit -> bool @ local = <fun>
+|}]
+
+(* Test from Nathanaëlle Courant.
+  User can define strange AND. Supposedly [strange_and] will look at its first
+  arguments, and returns [None] or tailcall on second argument accordingly.
+  The second argument should not cross modes in generall. *)
+external strange_and : bool -> 'a option -> 'a option = "%sequand"
+
+let testboo4 () =
+  let local_ x = Some "hello" in
+  strange_and true x
+[%%expect{|
+external strange_and : bool -> 'a option -> 'a option = "%sequand"
+Line 5, characters 19-20:
+5 |   strange_and true x
+                       ^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+(* mode-crossing using unary + *)
+let promote (local_ x) = +x
+[%%expect{|
+val promote : int @ local -> int = <fun>
+|}]
+
+(* Or-patterns *)
+let foo (local_ x) y =
+  match y, x with
+  | Some z, None | None, Some z -> z
+  | None, None | Some _, Some _ -> assert false
+[%%expect{|
+val foo : 'a option @ local -> 'a option -> 'a @ local = <fun>
+|}]
+
+let foo (local_ x) y =
+  match x, y with
+  | Some z, None | None, Some z -> z
+  | None, None | Some _, Some _ -> assert false
+[%%expect{|
+val foo : 'a option @ local -> 'a option -> 'a @ local = <fun>
+|}]
+
+module M = struct
+  let (Some z, _, _) | (None, Some z, _)
+      | (None, None, z) = (Some (ref 0), (local_ (Some (ref 0))), (ref 0))
+end
+[%%expect{|
+Line 2, characters 12-13:
+2 |   let (Some z, _, _) | (None, Some z, _)
+                ^
+Error: The expression is "local"
+         because it is contained (via constructor "Some") in the value at line 2, characters 30-36
+         which is "local".
+       However, the expression highlighted is expected to be "global"
+         because it is the value "z" in the structure at lines 2-3, characters 2-74
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
+|}]
+
+module M = struct
+  let (Some z, _, _) | (None, Some z, _)
+      | (None, None, z) = ((local_ Some (ref 0)), (Some (ref 0)), (ref 0))
+end
+[%%expect{|
+Line 2, characters 12-13:
+2 |   let (Some z, _, _) | (None, Some z, _)
+                ^
+Error: The expression is "local"
+         because it is contained (via constructor "Some") in the value at line 2, characters 7-13
+         which is "local".
+       However, the expression highlighted is expected to be "global"
+         because it is the value "z" in the structure at lines 2-3, characters 2-74
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
+|}]
+
+(* Example of backtracking after mode error *)
+let f g n =
+  let a = local_ [n+1] in
+  let () = g a in
+  ()
+let z : (int list -> unit) -> int -> unit = f
+[%%expect{|
+val f : (int list @ local -> unit) -> int -> unit = <fun>
+Line 5, characters 44-45:
+5 | let z : (int list -> unit) -> int -> unit = f
+                                                ^
+Error: This expression has type "(int list @ local -> unit) -> int -> unit"
+       but an expression was expected of type
+         "(int list -> unit) -> int -> unit"
+       Type "int list @ local -> unit" is not compatible with type
+         "int list -> unit"
+|}]
+
+module M = struct
+  let f g n =
+    let a = local_ [n+1] in
+    let () = g a in
+    ()
+  let z : (int list -> unit) -> int -> unit = f
+end
+[%%expect{|
+Line 6, characters 46-47:
+6 |   let z : (int list -> unit) -> int -> unit = f
+                                                  ^
+Error: This expression has type "(int list @ local -> unit) -> int -> unit"
+       but an expression was expected of type
+         "(int list -> unit) -> int -> unit"
+       Type "int list @ local -> unit" is not compatible with type
+         "int list -> unit"
+|}]
+
+(* Subtyping *)
+
+let foo f = (f : local_ string -> float :> string -> float)
+[%%expect{|
+val foo : (string @ local -> float) -> string -> float = <fun>
+|}]
+
+let foo f = (f : string -> float :> string -> local_ float)
+[%%expect{|
+val foo : (string -> float) -> string -> float @ local = <fun>
+|}]
+
+let foo f = (f : string -> local_ float :> string -> float)
+[%%expect{|
+Line 1, characters 12-59:
+1 | let foo f = (f : string -> local_ float :> string -> float)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "string -> float @ local" is not a subtype of "string -> float"
+|}]
+
+let foo f = (f : string -> float :> local_ string -> local_ float)
+[%%expect{|
+Line 1, characters 12-66:
+1 | let foo f = (f : string -> float :> local_ string -> local_ float)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "string -> float" is not a subtype of
+         "string @ local -> float @ local"
+|}]
+
+let foo f = ignore (f :> string -> float); ()
+[%%expect{|
+val foo : (string -> float) -> unit = <fun>
+|}]
+
+let global_to_global_to_global (f : float -> string) = f 42.0
+
+let foo f =
+  ignore (f :> (local_ float -> string) -> string);
+  [f; global_to_global_to_global]
+[%%expect{|
+val global_to_global_to_global : (float -> string) -> string = <fun>
+val foo : ((float -> string) -> string) -> ((float -> string) -> string) list =
+  <fun>
+|}]
+
+let local_to_global_to_global (f : local_ float -> string) = f 42.0
+
+let foo f =
+  ignore (f :> (float -> string) -> string);
+  [f; local_to_global_to_global]
+[%%expect{|
+val local_to_global_to_global : (float @ local -> string) -> string = <fun>
+Line 5, characters 6-31:
+5 |   [f; local_to_global_to_global]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "(float @ local -> string) -> string"
+       but an expression was expected of type "(float -> string) -> string"
+       Type "float @ local -> string" is not compatible with type
+         "float -> string"
+|}]
+
+(* Submoding during module inclusion *)
+
+module F (X : sig val foo : local_ float -> string end) : sig
+  val foo : float -> string
+end = X;;
+[%%expect{|
+module F :
+  functor (X : sig val foo : float @ local -> string end) ->
+    sig val foo : float -> string end
+|}]
+
+module F (X : sig val foo : float -> string end) : sig
+  val foo : float -> local_ string
+end = X;;
+[%%expect{|
+module F :
+  functor (X : sig val foo : float -> string end) ->
+    sig val foo : float -> string @ local end
+|}]
+
+module F (X : sig val foo : float -> string end) : sig
+  val foo : local_ float -> string
+end = X;;
+[%%expect{|
+Line 3, characters 6-7:
+3 | end = X;;
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val foo : float -> string end
+       is not included in
+         sig val foo : float @ local -> string end
+       Values do not match:
+         val foo : float -> string
+       is not included in
+         val foo : float @ local -> string
+       The type "float -> string" is not compatible with the type
+         "float @ local -> string"
+|}]
+
+module F (X : sig val foo : float -> local_ string end) : sig
+  val foo : float -> string
+end = X;;
+[%%expect{|
+Line 3, characters 6-7:
+3 | end = X;;
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val foo : float -> string @ local end
+       is not included in
+         sig val foo : float -> string end
+       Values do not match:
+         val foo : float -> string @ local
+       is not included in
+         val foo : float -> string
+       The type "float -> string @ local" is not compatible with the type
+         "float -> string"
+|}]
+
+module F (X : sig val foo : local_ float -> float -> string end) : sig
+  val foo : float -> float -> string
+end = X;;
+[%%expect{|
+Line 3, characters 6-7:
+3 | end = X;;
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val foo : float @ local -> float -> string end
+       is not included in
+         sig val foo : float -> float -> string end
+       Values do not match:
+         val foo : float @ local -> float -> string
+       is not included in
+         val foo : float -> float -> string
+       The type "float @ local -> float -> string"
+       is not compatible with the type "float -> float -> string"
+|}]
+
+module F (X : sig val foo : local_ float -> float -> string end) : sig
+  val foo : float -> local_ (float -> string)
+end = X;;
+[%%expect{|
+module F :
+  functor (X : sig val foo : float @ local -> float -> string end) ->
+    sig val foo : float -> (float -> string) @ local end
+|}]
+
+module F (X : sig val foo : float -> float -> string end) : sig
+  val foo : float -> local_ (float -> string)
+end = X;;
+[%%expect{|
+module F :
+  functor (X : sig val foo : float -> float -> string end) ->
+    sig val foo : float -> (float -> string) @ local end
+|}]
+
+type 'a inv = Inv of ('a -> 'a)
+type 'a co = Co of 'a
+type 'a contra = Contra of ('a -> int)
+type 'a bi = Bi
+
+module F (X : sig val foo : (float -> string) inv end) : sig
+  val foo : (float -> local_ string) inv
+end = X;;
+[%%expect{|
+type 'a inv = Inv of ('a -> 'a)
+type 'a co = Co of 'a
+type 'a contra = Contra of ('a -> int)
+type 'a bi = Bi
+Line 8, characters 6-7:
+8 | end = X;;
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val foo : (float -> string) inv end
+       is not included in
+         sig val foo : (float -> string @ local) inv end
+       Values do not match:
+         val foo : (float -> string) inv
+       is not included in
+         val foo : (float -> string @ local) inv
+       The type "(float -> string) inv" is not compatible with the type
+         "(float -> string @ local) inv"
+       Type "float -> string" is not compatible with type
+         "float -> string @ local"
+|}]
+
+module F (X : sig val foo : (float -> string) co end) : sig
+  val foo : (float -> local_ string) co
+end = X;;
+[%%expect{|
+module F :
+  functor (X : sig val foo : (float -> string) co end) ->
+    sig val foo : (float -> string @ local) co end
+|}]
+
+module F (X : sig val foo : (float -> string) contra end) : sig
+  val foo : (float -> local_ string) contra
+end = X;;
+[%%expect{|
+Line 3, characters 6-7:
+3 | end = X;;
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val foo : (float -> string) contra end
+       is not included in
+         sig val foo : (float -> string @ local) contra end
+       Values do not match:
+         val foo : (float -> string) contra
+       is not included in
+         val foo : (float -> string @ local) contra
+       The type "(float -> string) contra" is not compatible with the type
+         "(float -> string @ local) contra"
+       Type "float -> string" is not compatible with type
+         "float -> string @ local"
+|}]
+
+module F (X : sig val foo : (float -> string) bi end) : sig
+  val foo : (float -> local_ string) bi
+end = X;;
+[%%expect{|
+module F :
+  functor (X : sig val foo : (float -> string) bi end) ->
+    sig val foo : (float -> string @ local) bi end
+|}]
+
+module F (X : sig val foo : (float -> local_ string) inv end) : sig
+  val foo : (float -> string) inv
+end = X;;
+[%%expect{|
+Line 3, characters 6-7:
+3 | end = X;;
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val foo : (float -> string @ local) inv end
+       is not included in
+         sig val foo : (float -> string) inv end
+       Values do not match:
+         val foo : (float -> string @ local) inv
+       is not included in
+         val foo : (float -> string) inv
+       The type "(float -> string @ local) inv" is not compatible with the type
+         "(float -> string) inv"
+       Type "float -> string @ local" is not compatible with type
+         "float -> string"
+|}]
+
+module F (X : sig val foo : (float -> local_ string) co end) : sig
+  val foo : (float -> string) co
+end = X;;
+[%%expect{|
+Line 3, characters 6-7:
+3 | end = X;;
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val foo : (float -> string @ local) co end
+       is not included in
+         sig val foo : (float -> string) co end
+       Values do not match:
+         val foo : (float -> string @ local) co
+       is not included in
+         val foo : (float -> string) co
+       The type "(float -> string @ local) co" is not compatible with the type
+         "(float -> string) co"
+       Type "float -> string @ local" is not compatible with type
+         "float -> string"
+|}]
+
+module F (X : sig val foo : (float -> local_ string) contra end) : sig
+  val foo : (float -> string) contra
+end = X;;
+[%%expect{|
+module F :
+  functor (X : sig val foo : (float -> string @ local) contra end) ->
+    sig val foo : (float -> string) contra end
+|}]
+
+module F (X : sig val foo : (float -> local_ string) bi end) : sig
+  val foo : (float -> string) bi
+end = X;;
+[%%expect{|
+module F :
+  functor (X : sig val foo : (float -> string @ local) bi end) ->
+    sig val foo : (float -> string) bi end
+|}]
+
+
+(*
+ * constructor arguments global
+ *)
+
+(* Global argument are preserved in module inclusion *)
+module M : sig
+  type t = Bar of int * global_ string
+end = struct
+  type t = Bar of int * string
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = Bar of int * string
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = Bar of int * string end
+       is not included in
+         sig type t = Bar of int * string @@ global end
+       Type declarations do not match:
+         type t = Bar of int * string
+       is not included in
+         type t = Bar of int * string @@ global
+       Constructors do not match:
+         "Bar of int * string"
+       is not the same as:
+         "Bar of int * string @@ global"
+       Modality mismatch at argument position 2:
+       The second is global and the first is not.
+|}]
+
+
+module M : sig
+  type t = Bar of int * string
+end = struct
+  type t = Bar of int * global_ string
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = Bar of int * global_ string
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = Bar of int * string @@ global end
+       is not included in
+         sig type t = Bar of int * string end
+       Type declarations do not match:
+         type t = Bar of int * string @@ global
+       is not included in
+         type t = Bar of int * string
+       Constructors do not match:
+         "Bar of int * string @@ global"
+       is not the same as:
+         "Bar of int * string"
+       Modality mismatch at argument position 2:
+       The second is empty and the first is aliased.
+|}]
+
+(* global_ binds closer than star *)
+type gfoo = GFoo of global_ string * string
+[%%expect{|
+type gfoo = GFoo of string @@ global * string
+|}]
+
+type gfoo' = GFoo' : global_ string -> gfoo'
+[%%expect{|
+type gfoo' = GFoo' : string @@ global -> gfoo'
+|}]
+
+(* TESTING OF GLOBAL_ *)
+
+(* global arguments must be global when constructing
+   cannot be regional or local
+*)
+let f (local_ s : string) =
+  GFoo (s, "bar")
+[%%expect{|
+Line 2, characters 8-9:
+2 |   GFoo (s, "bar")
+            ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is contained (via constructor "GFoo") (with some modality) in the value at line 2, characters 2-17.
+|}]
+
+let f =
+  let local_ s = "foo" in
+  GFoo (s, "bar")
+[%%expect{|
+Line 3, characters 8-9:
+3 |   GFoo (s, "bar")
+            ^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is contained (via constructor "GFoo") in the value at line 3, characters 2-17
+         which is expected to be "global".
+|}]
+
+(* s' extracted from x as global *)
+(* despite x is local or regional*)
+let f (s : string) =
+  let local_ x = GFoo (s, "bar") in
+  match x with
+  | GFoo (s', _) -> ref s'
+
+[%%expect{|
+val f : string -> string ref = <fun>
+|}]
+
+let f (local_ x : gfoo) =
+  match x with
+  | GFoo (s', _) -> ref s'
+
+[%%expect{|
+val f : gfoo @ local -> string ref = <fun>
+|}]
+
+(* the argument not marked global remains contingent on construction  *)
+(* local gives local *)
+let f (s : string) =
+  let local_ x = GFoo ("bar", s) in
+  match x with
+  | GFoo (_, s') -> s'
+
+[%%expect{|
+Line 4, characters 20-22:
+4 |   | GFoo (_, s') -> s'
+                        ^^
+Error: This value is "local"
+         because it is contained (via constructor "GFoo") in the value at line 4, characters 4-16
+         which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+(* and regional gives regional *)
+let f (local_ x : gfoo) =
+  match x with
+  | GFoo (_, s') -> ref s'
+
+[%%expect{|
+Line 3, characters 24-26:
+3 |   | GFoo (_, s') -> ref s'
+                            ^^
+Error: This value is "local" to the parent region
+         because it is contained (via constructor "GFoo") in the value at line 3, characters 4-16
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+(* Test of array.*)
+
+(* Immutable arrays are like tuples or normal record: local array contains local
+elements, both at construction and at projection; global array contains global
+elements. *)
+
+(* constructing global iarray from local elements is rejected *)
+let f (local_ x : string) = ref [: x; "foo" :]
+[%%expect{|
+Line 1, characters 35-36:
+1 | let f (local_ x : string) = ref [: x; "foo" :]
+                                       ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is an element of the array at line 1, characters 32-46
+         which is expected to be "global".
+|}]
+
+(* constructing local iarray from local elements is fine *)
+let f (local_ x : string) = exclave_ [:x; "foo":]
+[%%expect{|
+val f : string @ local -> string iarray @ local = <fun>
+|}]
+
+(* constructing global iarray from global elements is fine *)
+let f (x : string) = ref [:x; "foo":]
+[%%expect{|
+val f : string -> string iarray ref = <fun>
+|}]
+
+(* projecting out of local array gives local elements *)
+let f (local_ a : string iarray) =
+  match a with
+  | [: x; _ :] -> ref x
+  | _ -> ref "foo"
+[%%expect{|
+Line 3, characters 22-23:
+3 |   | [: x; _ :] -> ref x
+                          ^
+Error: This value is "local" to the parent region
+         because it is an element of the array at line 3, characters 4-14
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+(* a test that was passing type check *)
+let unsafe_globalize (local_ s : string) : string =
+  match local_ [:s:] with
+  | [:s':] -> s'
+  | _ -> assert false
+[%%expect{|
+Line 3, characters 14-16:
+3 |   | [:s':] -> s'
+                  ^^
+Error: This value is "local"
+         because it is an element of the array at line 3, characters 4-10
+         which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+let f (local_ a : string iarray) =
+  match a with
+  | [: x; _ :] -> x
+  | _ -> "foo"
+[%%expect{|
+val f : string iarray @ local -> string @ local = <fun>
+|}]
+
+(* projecting out of global iarray gives global elements *)
+let f (a : string iarray) =
+  match a with
+  | [: x :] -> ref x
+  | _ -> ref "foo"
+[%%expect{|
+val f : string iarray -> string ref = <fun>
+|}]
+
+(* Mutable array, like references, is dangerous. They must contain global
+    elements regardless of the array's mode. *)
+
+(* constructing local array from local elements is rejected *)
+let f (local_ x : string) = exclave_ [| x |]
+[%%expect{|
+Line 1, characters 40-41:
+1 | let f (local_ x : string) = exclave_ [| x |]
+                                            ^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is an element (with some modality) of the array at line 1, characters 37-44.
+|}]
+
+(* constructing local array from global elements is allowed *)
+let f (x : string) = exclave_ [| x |]
+[%%expect{|
+val f : string -> string array @ local = <fun>
+|}]
+
+(* projecting out of local array gives global elements *)
+let f (local_ a : string array) =
+  match a with
+  | [| x |] -> ref x
+  | _ -> ref "foo"
+[%%expect{|
+val f : string array @ local -> string ref = <fun>
+|}]
+
+(* reported internal to Jane Street as TANDC-1742 *)
+
+module M = struct
+  let fold_until :
+    'a list -> init:'accum ->
+    f:local_ ('accum -> 'a -> ('accum, 'final) Either.t) ->
+    finish:local_ ('accum -> 'final) ->
+    'final =
+    fun _ -> assert false
+
+  (* this led to a poor error message about a value that escapes its region,
+     but really it's just under-applied *)
+  let f () = fold_until [] ~init:0 ~f:(fun _ _ -> Right ())
+end
+
+[%%expect {|
+Line 11, characters 13-59:
+11 |   let f () = fold_until [] ~init:0 ~f:(fun _ _ -> Right ())
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+  Hint: This is a partial application
+        Adding 1 more argument will make the value non-local
+|}]
+
+(* Regression test for printing of [local_] *)
+
+module M : sig
+  val f : string -> string -> local_ string
+end = struct
+  let g x y = exclave_ "foo"
+  let f x = exclave_ g x
+end;;
+[%%expect{|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   let g x y = exclave_ "foo"
+5 |   let f x = exclave_ g x
+6 | end..
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val g : 'a -> 'b -> string @ local
+           val f : 'a -> ('b -> string @ local) @ local
+         end
+       is not included in
+         sig val f : string -> string -> string @ local end
+       Values do not match:
+         val f : 'a -> ('b -> string @ local) @ local
+       is not included in
+         val f : string -> string -> string @ local
+       The type "string -> (string -> string @ local) @ local"
+       is not compatible with the type "string -> string -> string @ local"
+|}]
+
+(* Escaping uncurried functions *)
+
+(* Valid; [local_ string -> string -> string] is [local_ string -> local_ (string -> string)] *)
+let f () = ((fun x y -> "") : (local_ string -> string -> string));;
+[%%expect{|
+val f : unit -> string @ local -> string -> string = <fun>
+|}];;
+
+(* Illegal: the return mode on (string -> string) is global. *)
+let f () = ((fun x y -> "") : (local_ string -> (string -> string)));;
+[%%expect{|
+Line 1, characters 12-27:
+1 | let f () = ((fun x y -> "") : (local_ string -> (string -> string)));;
+                ^^^^^^^^^^^^^^^
+Error: This function or one of its parameters escape their region
+       when it is partially applied.
+|}];;
+
+let f () = ((fun x -> function | y -> "") : (local_ string -> (string -> string)));;
+[%%expect{|
+Line 1, characters 12-41:
+1 | let f () = ((fun x -> function | y -> "") : (local_ string -> (string -> string)));;
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This function or one of its parameters escape their region
+       when it is partially applied.
+|}];;
+
+(* ok if curried *)
+let f () = ((fun x -> (fun y -> "") [@extension.curry])
+            : (local_ string -> (string -> string)));;
+[%%expect{|
+val f : unit -> string @ local -> (string -> string) = <fun>
+|}];;
+
+(* mode crossing - the inner closure is [global] despite closing over [local_
+int] *)
+let f () = ((fun x y -> x + y) : (local_ int -> (int -> int)));;
+[%%expect{|
+val f : unit -> int @ local -> (int -> int) = <fun>
+|}];;
+
+(* Illegal: the expected mode is global *)
+let f () = exclave_ ((fun x y -> x + y) : (_ -> _));;
+[%%expect{|
+Line 1, characters 21-39:
+1 | let f () = exclave_ ((fun x y -> x + y) : (_ -> _));;
+                         ^^^^^^^^^^^^^^^^^^
+Error: This function or one of its parameters escape their region
+       when it is partially applied.
+|}];;
+
+let f () = exclave_ ((fun x -> function | 0 -> x | y -> x + y) : (_ -> _));;
+[%%expect{|
+Line 1, characters 21-62:
+1 | let f () = exclave_ ((fun x -> function | 0 -> x | y -> x + y) : (_ -> _));;
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This function or one of its parameters escape their region
+       when it is partially applied.
+|}];;
+
+(* For nested functions, inner functions are not constrained *)
+let f () = ((fun x -> fun y -> "") : (local_ string -> (string -> string)));;
+[%%expect{|
+val f : unit -> string @ local -> (string -> string) = <fun>
+|}];;
+
+let f () = exclave_ ((fun x -> fun y -> x + y) : (_ -> _));;
+[%%expect{|
+val f : unit -> (int -> (int -> int)) @ local = <fun>
+|}];;
+
+(* ok if curried *)
+let f () = exclave_ ((fun x -> (fun y -> x + y) [@extension.curry]) : (_ -> _));;
+[%%expect{|
+val f : unit -> (int -> (int -> int)) @ local = <fun>
+|}];;
+
+(* Type annotations on a [local_] binding are interpreted in a local context,
+ * so [int -> int -> int] is secretly [int -> local_ (int -> int)]. Contrast
+ * with the below type error where `local_` is omitted on the binding.
+ *)
+let foo () =
+  let local_ _bar1 : int -> int -> int = local_ (fun x y -> x + y) in
+  let local_ _bar2 z : int -> int -> int = exclave_ (fun x y -> x + y + z) in
+  ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}];;
+
+let foo () =
+  let _bar : int -> int -> int = local_ (fun x y -> x + y) in
+  ()
+[%%expect{|
+Line 2, characters 40-58:
+2 |   let _bar : int -> int -> int = local_ (fun x y -> x + y) in
+                                            ^^^^^^^^^^^^^^^^^^
+Error: This function or one of its parameters escape their region
+       when it is partially applied.
+|}];;
+
+
+type f = local_ local_ string -> string
+[%%expect{|
+Line 1, characters 16-22:
+1 | type f = local_ local_ string -> string
+                    ^^^^^^
+Error: The locality axis has already been specified.
+|}]
+
+let foo () =
+  let local_ local_ _x = "hello" in
+  ()
+[%%expect{|
+Line 2, characters 13-19:
+2 |   let local_ local_ _x = "hello" in
+                 ^^^^^^
+Error: The locality axis has already been specified.
+|}]
+
+let foo (local_ local_ _) = ()
+[%%expect{|
+Line 1, characters 16-22:
+1 | let foo (local_ local_ _) = ()
+                    ^^^^^^
+Error: The locality axis has already been specified.
+|}]
+
+(* type-directed disambiguation *)
+
+module M = struct
+  type t = M_constructor
+end
+
+let foo (local_ _ : M.t) = ();;
+let foo_f (local_ _ : M.t -> unit) = ();;
+[%%expect{|
+module M : sig type t = M_constructor end
+val foo : M.t @ local -> unit = <fun>
+val foo_f : (M.t -> unit) @ local -> unit = <fun>
+|}]
+
+let () = foo M_constructor
+[%%expect{|
+|}]
+
+let () = foo_f (fun M_constructor -> ())
+[%%expect{|
+|}]
+
+let () = foo (local_ M_constructor)
+[%%expect{|
+|}]
+
+let () = foo_f (local_ (fun M_constructor -> ()))
+[%%expect{|
+|}]
+
+let _ret () : M.t -> unit = (fun M_constructor -> ())
+[%%expect{|
+val _ret : unit -> M.t -> unit = <fun>
+|}]
+
+let _ret () : M.t -> unit = exclave_ (fun M_constructor -> ())
+[%%expect{|
+val _ret : unit -> (M.t -> unit) @ local = <fun>
+|}]
+
+let _ret () : M.t -> unit = exclave_ (fun M_constructor -> ())
+[%%expect{|
+val _ret : unit -> (M.t -> unit) @ local = <fun>
+|}]
+
+type r = {global_ x : string; y : string}
+
+let foo () =
+  let local_ y = "world" in
+  let local_ r = {x = "hello"; y} in
+  (* Only using r.x, which is global. So the whole return is global and OK. *)
+  {r with y = "foo!" }
+[%%expect{|
+type r = { x : string @@ global; y : string; }
+val foo : unit -> r = <fun>
+|}]
