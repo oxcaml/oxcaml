@@ -220,6 +220,11 @@ module Describe = struct
       decode = (fun _ s -> int_of_string (unwrap_loc s))
     }
 
+  let bool : bool value_lens =
+    { encode = (fun _ i -> wrap_loc @@ string_of_bool i);
+      decode = (fun _ s -> bool_of_string (unwrap_loc s))
+    }
+
   let string : string Fexpr.located value_lens =
     { encode = (fun _ s -> s); decode = (fun _ s -> s) }
 
