@@ -1774,6 +1774,41 @@ module Analysis = struct
               kind;
               external_ids = t.external_ids
             })
+
+  module Simples_at_join = struct
+    type 'a t =
+      { canonicals_in_joined_envs : Simple_in_one_joined_env.t Index.Map.t;
+        external_ids : 'a Index.Map.t
+      }
+
+    let fold_values_at_uses f t init =
+      Index.Map.fold
+        (fun index simple acc ->
+          match Index.Map.find_opt index t.external_ids with
+          | None -> Misc.fatal_error "Missing environment for use"
+          | Some external_id ->
+            f external_id (simple : Simple_in_one_joined_env.t :> Simple.t) acc)
+        t.canonicals_in_joined_envs init
+  end
+
+  let fold_variables_created_at_join ~imported ~existential t ~init =
+    Name_in_target_env.Map.fold
+      (fun name (definition : Bindings_in_target_env.definition_in_joined_envs)
+           acc ->
+        match definition with
+        | Imported_var (var, kind) ->
+          (imported [@inlined hint])
+            (name :> Name.t)
+            (var :> Variable.t)
+            kind acc
+        | These_canonicals (simples, kind) ->
+          (existential [@inlined hint])
+            (name :> Name.t)
+            { Simples_at_join.canonicals_in_joined_envs = simples;
+              external_ids = t.external_ids
+            }
+            kind acc)
+      t.definitions_in_joined_envs init
 end
 
 let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after source_env
