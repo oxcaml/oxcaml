@@ -148,6 +148,7 @@
   mode_intf)
  (modules
   ;; UTILS
+  compression
   arrayset
   config
   build_path_prefix_map
