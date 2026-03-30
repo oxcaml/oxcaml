@@ -2254,25 +2254,22 @@ static void caml_do_tick_all_domains(void)
 }
 
 static void* caml_tick(void *arg)
-  return Val_long(interval);
 {
   (void)arg;
-  uintnat interval = 0;
   while (!atomic_load_acquire(&tick_thread.stop)) {
     /* We re-calculate the interval each iteration of the loop so that the
        per-domain tick interval can be changed. We use the (quite loose)
        heuristic of always ticking at the minimum requested interval, allowing
        domains which want coarser ticks to round up to a multiple of that
        interval. */
-    uintnat new_interval = caml_effective_tick_interval_usec();
+    uintnat interval = caml_effective_tick_interval_usec();
 
 #ifdef HAS_INTERRUPTIBLE_TICK
-    if (new_interval == 0) {
-      interval = new_interval;
+    if (interval == 0) {
       /* No domain wants ticks; sleep until woken by the eventfd. */
       tick_thread_wait();
     } else {
-      tick_thread_arm_timer(new_interval);
+      tick_thread_arm_timer(interval);
       if (tick_thread_wait()) {
         caml_do_tick_all_domains();
       }
@@ -2281,10 +2278,10 @@ static void* caml_tick(void *arg)
          to recalculate the interval and re-arm the timer. */
     }
 #else
-    if (new_interval > 0) {
+    if (interval > 0) {
       /* Note: we don't need to handle signals here because signals are masked
          when we start the tick thread */
-      usleep(new_interval);
+      usleep(interval);
       caml_do_tick_all_domains();
     } else {
       /* No interruptible wait and no tick requests; poll up to the previous
@@ -2292,8 +2289,6 @@ static void* caml_tick(void *arg)
       usleep(Tick_poll_interval_usec);
     }
 #endif
-
-    interval = new_interval;
   }
 
   return NULL;
