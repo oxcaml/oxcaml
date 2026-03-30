@@ -62,9 +62,9 @@ module Section_index : sig
       meaning it requires the SHT_SYMTAB_SHNDX extended section index table. *)
 end
 
-(** {1 x86-64 Relocation Types} *)
+(** {1 Relocation Types} *)
 
-(** Abstract type representing an x86-64 relocation type. *)
+(** Abstract type representing an ELF relocation type. *)
 module Reloc_type : sig
   type t
 
@@ -77,6 +77,8 @@ module Reloc_type : sig
   val of_int64 : int64 -> t
   (** Create from a raw ELF relocation type value. *)
 
+  (** {2 x86-64 relocation types} *)
+
   val plt32 : t
   (** R_X86_64_PLT32 relocation type. *)
 
@@ -88,6 +90,37 @@ module Reloc_type : sig
 
   val pc32 : t
   (** R_X86_64_PC32 relocation type (32-bit PC-relative). *)
+
+  (** {2 AArch64 relocation types} *)
+
+  val aarch64_abs64 : t
+  (** R_AARCH64_ABS64 relocation type (64-bit absolute). *)
+
+  val aarch64_prel32 : t
+  (** R_AARCH64_PREL32 relocation type (32-bit PC-relative). *)
+
+  val aarch64_call26 : t
+  (** R_AARCH64_CALL26 relocation type (26-bit PC-relative call). *)
+
+  val aarch64_jump26 : t
+  (** R_AARCH64_JUMP26 relocation type (26-bit PC-relative jump). *)
+
+  val aarch64_adr_prel_pg_hi21 : t
+  (** R_AARCH64_ADR_PREL_PG_HI21 relocation type (page-relative). *)
+
+  val aarch64_add_abs_lo12_nc : t
+  (** R_AARCH64_ADD_ABS_LO12_NC relocation type (low 12-bit ADD). *)
+
+  val aarch64_ldst64_abs_lo12_nc : t
+  (** R_AARCH64_LDST64_ABS_LO12_NC relocation type
+      (low 12-bit load/store). *)
+
+  val aarch64_adr_got_page : t
+  (** R_AARCH64_ADR_GOT_PAGE relocation type (GOT page-relative). *)
+
+  val aarch64_ld64_got_lo12_nc : t
+  (** R_AARCH64_LD64_GOT_LO12_NC relocation type
+      (GOT low 12-bit load). *)
 
   val name : t -> string
   (** [name t] returns a human-readable name for the relocation type.

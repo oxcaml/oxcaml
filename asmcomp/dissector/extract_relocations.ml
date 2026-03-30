@@ -74,22 +74,58 @@ let finalize acc =
     convert_to_got = List.rev acc.acc_got
   }
 
-(* Parse RELA entries and extract PLT32 and REX_GOTPCRELX relocations for
+(* Architecture-specific relocation classification. *)
+
+let is_plt_reloc r_type =
+  match Target_system.architecture () with
+  | X86_64 -> Rela.Reloc_type.equal r_type Rela.Reloc_type.plt32
+  | AArch64 ->
+    Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_call26
+    || Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_jump26
+  | arch ->
+    Misc.fatal_errorf "Dissector: unsupported architecture %s"
+      (match arch with
+      | IA32 -> "IA32"
+      | ARM -> "ARM"
+      | POWER -> "POWER"
+      | Z -> "Z"
+      | Riscv -> "Riscv"
+      | X86_64 | AArch64 -> assert false)
+
+let is_got_reloc r_type =
+  match Target_system.architecture () with
+  | X86_64 -> Rela.Reloc_type.equal r_type Rela.Reloc_type.rex_gotpcrelx
+  | AArch64 ->
+    Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_adr_got_page
+    || Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_ld64_got_lo12_nc
+  | _ -> Misc.fatal_error "Dissector: unsupported architecture"
+
+let is_direct_pc_reloc_error r_type =
+  match Target_system.architecture () with
+  | X86_64 -> Rela.Reloc_type.equal r_type Rela.Reloc_type.pc32
+  | AArch64 ->
+    Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_adr_prel_pg_hi21
+    || Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_add_abs_lo12_nc
+  | _ -> Misc.fatal_error "Dissector: unsupported architecture"
+
+(* Parse RELA entries and extract function-call and GOT relocations for
    undefined symbols (st_shndx = SHN_UNDEF). Only undefined symbols need PLT/GOT
    entries since defined symbols can be resolved directly.
 
-   - PLT32: function calls, rewritten to use IPLT
+   On x86-64: - PLT32: function calls, rewritten to use IPLT - REX_GOTPCRELX:
+   GOT-relative references, rewritten to use IGOT
 
-   - REX_GOTPCRELX: GOT-relative references, rewritten to use IGOT.
+   On AArch64: - CALL26/JUMP26: branch instructions, rewritten to use IPLT -
+   ADR_GOT_PAGE/LD64_GOT_LO12_NC: GOT references, rewritten to use IGOT
 
-   PC32 relocations to undefined symbols are an error. They occur when code is
-   compiled with -nodynlink, which is incompatible with the dissector. *)
+   Direct PC-relative relocations to undefined symbols are an error. They occur
+   when code is compiled with -nodynlink, which is incompatible with the
+   dissector. *)
 let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
   let convert_to_plt = ref [] in
   let convert_to_got = ref [] in
   Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
-      (* Check for PC32 relocations to undefined symbols - these are an error *)
-      if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.pc32
+      if is_direct_pc_reloc_error entry.r_type
       then
         match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
         | Some shndx when Rela.Section_index.is_undef shndx ->
@@ -102,15 +138,14 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
             | None -> "<unknown>"
           in
           Misc.fatal_errorf
-            "Dissector: R_X86_64_PC32 relocation to undefined symbol %s at \
-             offset 0x%Lx. This occurs when code is compiled with -nodynlink. \
-             The dissector requires code to be compiled without -nodynlink \
-             (i.e., with dynamic linking support enabled)."
+            "Dissector: %s relocation to undefined symbol %s at offset 0x%Lx. \
+             This occurs when code is compiled with -nodynlink. The dissector \
+             requires code to be compiled without -nodynlink (i.e., with \
+             dynamic linking support enabled)."
+            (Rela.Reloc_type.name entry.r_type)
             symbol_name entry.r_offset
         | _ -> ()
-      else if
-        Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-        || Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
+      else if is_plt_reloc entry.r_type || is_got_reloc entry.r_type
       then
         (* Only process relocations for undefined symbols *)
         match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
@@ -139,7 +174,7 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
             let reloc_entry =
               { Relocation_entry.symbol_name; offset = entry.r_offset }
             in
-            if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
+            if is_plt_reloc entry.r_type
             then convert_to_plt := reloc_entry :: !convert_to_plt
             else convert_to_got := reloc_entry :: !convert_to_got));
   { convert_to_plt = List.rev !convert_to_plt;

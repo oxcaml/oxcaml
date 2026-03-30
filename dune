@@ -728,6 +728,7 @@
   compiler_owee
   gc_timings
   arm64_ast
+  arm64_binary_emitter
   dwarf_low
   dwarf_high
   binary_emitter_intf))

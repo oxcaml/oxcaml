@@ -28,6 +28,7 @@
 (* CR mshinwell: This file needs to be code reviewed *)
 
 module String = Misc.Stdlib.String
+module Rela = Compiler_owee.Owee_elf_relocation
 
 let log_verbose = Dissector_log.log_verbose
 
@@ -105,6 +106,7 @@ module Relocation = struct
   type t =
     { offset : int;
       symbol : string;
+      reloc_type : Rela.Reloc_type.t;
       addend : int64
     }
 
@@ -112,8 +114,16 @@ module Relocation = struct
 
   let symbol r = r.symbol
 
+  let reloc_type r = r.reloc_type
+
   let addend r = r.addend
 end
+
+let abs64_reloc_type =
+  match Target_system.architecture () with
+  | X86_64 -> Rela.Reloc_type.r64
+  | AArch64 -> Rela.Reloc_type.aarch64_abs64
+  | _ -> Misc.fatal_error "Dissector IGOT: unsupported architecture"
 
 let relocations t =
   List.map
@@ -121,6 +131,7 @@ let relocations t =
       Relocation.
         { offset = Entry.offset entry;
           symbol = Entry.original_symbol entry;
+          reloc_type = abs64_reloc_type;
           addend = 0L
         })
     t.entries
