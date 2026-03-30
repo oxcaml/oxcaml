@@ -53,10 +53,14 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap : unit -> unit
   val no_cfg_prologue_shrink_wrap : unit -> unit
   val cfg_prologue_shrink_wrap_threshold : int -> unit
+  val cfg_merge_blocks : unit -> unit
+  val no_cfg_merge_blocks : unit -> unit
   val cfg_value_propagation : unit -> unit
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit
   val no_cfg_value_propagation_float : unit -> unit
+  val cfg_value_propagation_flow : unit -> unit
+  val no_cfg_value_propagation_flow : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -125,6 +129,7 @@ module type Oxcaml_options = sig
   val no_reaper_local_fields : unit -> unit
   val reaper_unbox : unit -> unit
   val no_reaper_unbox : unit -> unit
+  val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit

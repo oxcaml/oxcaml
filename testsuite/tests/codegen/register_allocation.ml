@@ -62,8 +62,7 @@ let[@cold] reduce t =
 reduce:
   movq  (%rax), %rbx
   movq  8(%rax), %rdi
-  movq  %rbx, %rsi
-  addq  $2, %rsi
+  leaq  2(%rbx), %rsi
   movq  %rsi, (%rax)
   leaq  -1(%rbx,%rdi), %rax
   ret
@@ -122,8 +121,7 @@ f.g:
 |}]
 
 
-(* CR ttebbi: n gets spilled on every loop iteration. *)
-let spill_in_loop n =
+let loop_readonly_use_spilled_var n =
   let[@inline never] g x y = x - 1 in
   let rec loop x =
       if x < 0 then n + x else loop (g x n)
@@ -131,9 +129,11 @@ let spill_in_loop n =
   loop n
 ;;
 [%%expect_asm X86_64{|
-spill_in_loop:
+loop_readonly_use_spilled_var:
   subq  $8, %rsp
   movq  %rax, %rbx
+  movq  %rbx, (%rsp)
+  movq  %rbx, %rax
   cmpq  $1, %rax
   jge   .L111
 .L108:
@@ -141,7 +141,6 @@ spill_in_loop:
   addq  $8, %rsp
   ret
 .L111:
-  movq  %rbx, (%rsp)
   call  camlTOP8__g_15_18_code@PLT
 .L117:
   movq  (%rsp), %rbx
@@ -149,20 +148,76 @@ spill_in_loop:
   jge   .L111
   jmp   .L108
 
-spill_in_loop.g:
+loop_readonly_use_spilled_var.g:
   addq  $-2, %rax
   ret
 |}]
 
-(* CR ttebbi: The movq is unnecessary if incq was replaced with lea. *)
+let spill_unspill_loop_movement not_used_in_loop read_in_loop =
+  let[@inline never] f x = x in
+  let written_in_loop = ref 0 in
+  for i = 1 to read_in_loop do
+    written_in_loop := f read_in_loop;
+    if i > 5 then
+      (let _ =  f read_in_loop in ())
+  done;
+  not_used_in_loop + !written_in_loop
+[%%expect_asm X86_64{|
+spill_unspill_loop_movement:
+  subq  $40, %rsp
+  movq  %rax, %rdi
+  movq  %rbx, %rax
+  cmpq  $3, %rax
+  jl    .L133
+  movq  %rax, (%rsp)
+  movq  %rdi, 16(%rsp)
+  movl  $3, %ebx
+.L111:
+  movq  %rbx, 8(%rsp)
+  call  camlTOP9__f_20_23_code@PLT
+.L143:
+  movq  %rax, %rsi
+  movq  (%rsp), %rax
+  movq  8(%rsp), %rbx
+  cmpq  $11, %rbx
+  jle   .L123
+  movq  %rsi, 24(%rsp)
+  movq  %rbx, 8(%rsp)
+  call  camlTOP9__f_20_23_code@PLT
+.L144:
+  movq  (%rsp), %rax
+  movq  8(%rsp), %rbx
+  movq  24(%rsp), %rsi
+  cmpq  %rax, %rbx
+  je    .L128
+  jmp   .L125
+.L123:
+  cmpq  %rax, %rbx
+  je    .L128
+.L125:
+  addq  $2, %rbx
+  jmp   .L111
+.L128:
+  movq  16(%rsp), %rdi
+  jmp   .L136
+.L133:
+  movl  $1, %esi
+.L136:
+  leaq  -1(%rdi,%rsi), %rax
+  addq  $40, %rsp
+  ret
+
+spill_unspill_loop_movement.f:
+  ret
+|}]
+
 let f a b c = if a > 10 then b - c else a - b
 [%%expect_asm X86_64{|
 f:
   cmpq  $21, %rax
   jle   .L107
-  movq  %rbx, %rax
-  subq  %rdi, %rax
-  incq  %rax
+  subq  %rdi, %rbx
+  leaq  1(%rbx), %rax
   ret
 .L107:
   subq  %rbx, %rax
@@ -267,6 +322,104 @@ spill_one_or_two:
 |}]
 
 
+(* This triggers a rare path where the closure register spill is hoisted
+   out of the loop but also pushed into the loop, and then a spill-unspill
+   pair gets eliminated, resulting in a spill without explicit unspill.
+*)
+let double_loop_no_definition_at_beginning array n list =
+  let rec iter f = function
+    [] -> ()
+    | a::l -> f a; iter f l
+  in
+  for i = 0 to n do
+    let[@inline never] f x = array.(x) <- i in
+    iter f list;
+  done
+[%%expect_asm X86_64{|
+double_loop_no_definition_at_beginning:
+  subq  $72, %rsp
+  movq  %rbx, %rsi
+  movq  64(%r14), %rbx
+  cmpq  $1, %rsi
+  jl    .L147
+  movq  %rbx, 56(%rsp)
+  movq  %rdi, 16(%rsp)
+  movq  %rsi, 8(%rsp)
+  movq  %rax, (%rsp)
+  movl  $1, %edx
+.L112:
+  movq  %rdx, 40(%rsp)
+  movq  64(%r14), %rbx
+  movq  %rbx, 48(%rsp)
+  movq  64(%r14), %rbx
+  subq  $40, %rbx
+  movq  %rbx, 64(%r14)
+  cmpq  80(%r14), %rbx
+  jl    .L154
+.L155:
+  addq  72(%r14), %rbx
+  addq  $8, %rbx
+  movq  $5111, -8(%rbx)
+  movq  camlTOP15__f_33_37_code@GOTPCREL(%rip), %rcx
+  movq  %rcx, (%rbx)
+  movabsq $108086391056891911, %rcx
+  movq  %rcx, 8(%rbx)
+  movq  %rdx, 16(%rbx)
+  movq  %rax, 24(%rbx)
+  movq  %rbx, 24(%rsp)
+  movq  %rdi, %rdx
+  testb $1, %dl
+  jne   .L133
+.L126:
+  movq  %rdx, 32(%rsp)
+  movq  (%rdx), %rax
+  call  camlTOP15__f_33_37_code@PLT
+.L156:
+  movq  32(%rsp), %rdx
+  movq  8(%rdx), %rdx
+  movq  (%rsp), %rax
+  movq  8(%rsp), %rsi
+  movq  16(%rsp), %rdi
+  movq  24(%rsp), %rbx
+  testb $1, %dl
+  je    .L126
+.L133:
+  movq  48(%rsp), %rbx
+  movq  %rbx, 64(%r14)
+  movq  40(%rsp), %rdx
+  cmpq  %rsi, %rdx
+  jne   .L136
+  movq  56(%rsp), %rbx
+  jmp   .L147
+.L136:
+  addq  $2, %rdx
+  jmp   .L112
+.L147:
+  movq  %rbx, 64(%r14)
+  movl  $1, %eax
+  addq  $72, %rsp
+  ret
+
+double_loop_no_definition_at_beginning.f:
+  movq  24(%rbx), %rsi
+  movq  -8(%rsi), %rdi
+  salq  $8, %rdi
+  shrq  $17, %rdi
+  cmpq  %rdi, %rax
+  jae   .L175
+  movq  16(%rbx), %rbx
+  movq  %rbx, -4(%rsi,%rax,4)
+  movl  $1, %eax
+  ret
+.L175:
+  movq  camlTOP15__block723@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+|}]
+
+
 (* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/5115 *)
 let spilled_phi_merge cond callback f a b c d e =
   let _ : _ = Stdlib.Sys.time () in
@@ -346,35 +499,35 @@ let spill_slot_lifetime () =
 spill_slot_lifetime:
   subq  $56, %rsp
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP17__get_one_39_43_code@PLT
 .L127:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP17__get_one_39_43_code@PLT
 .L128:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP17__get_one_39_43_code@PLT
 .L129:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP17__get_one_39_43_code@PLT
 .L130:
   vmovsd %xmm0, 24(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP17__get_one_39_43_code@PLT
 .L131:
   vmovsd %xmm0, 32(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP17__get_one_39_43_code@PLT
 .L132:
   vmovsd %xmm0, 40(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP17__get_one_39_43_code@PLT
 .L133:
   vmovsd %xmm0, 48(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP17__get_one_39_43_code@PLT
 .L134:
   vxorpd %xmm1, %xmm1, %xmm1
   vmovsd (%rsp), %xmm2

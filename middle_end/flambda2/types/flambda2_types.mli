@@ -54,13 +54,6 @@ module Code_age_relation : sig
 
   val union : t -> t -> t
 
-  val meet :
-    t ->
-    resolver:(Compilation_unit.t -> t option) ->
-    Code_id.t ->
-    Code_id.t ->
-    Code_id.t Or_bottom.t
-
   val meet_set :
     t ->
     resolver:(Compilation_unit.t -> t option) ->

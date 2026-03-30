@@ -258,9 +258,9 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
         c_headers_flags;
         Ocaml_flags.stdlib;
         directory_flags env;
-        flags env;
         libraries;
         backend_default_flags env Compiler.target;
+        flags env;
         backend_flags env Compiler.target;
         compile_flags;
         output;
@@ -306,9 +306,9 @@ let compile_module (compiler : Ocaml_compilers.compiler) module_ log env =
     Ocaml_flags.stdlib;
     c_headers_flags;
     directory_flags env;
-    flags env;
     libraries Compiler.target env;
     backend_default_flags env Compiler.target;
+    flags env;
     backend_flags env Compiler.target;
     compile_only_flag_opt;
     module_;
@@ -716,6 +716,11 @@ let run_fexpr_check log env =
   let passes_sfx =
     Actions_helpers.words_of_variable env Ocaml_variables.fexpr_dump_files
   in
+  let reference_suffix =
+    match Environments.lookup Ocaml_variables.fexpr_reference_suffix env with
+    | None -> "reference"
+    | Some reference_suffix -> reference_suffix
+  in
   let test_build_dir = Actions_helpers.test_build_directory env in
   let test_source_dir = Actions_helpers.test_source_directory env in
   let test_name = Filename.chop_extension (Actions_helpers.testfile env) in
@@ -724,7 +729,7 @@ let run_fexpr_check log env =
       let pass_ref_file =
         Filename.(make_filename
                     (chop_extension pass_dump_file)
-                    "reference")
+                    reference_suffix)
       in
       let dump_file =
         Filename.make_path [test_build_dir; pass_dump_file]
@@ -733,10 +738,19 @@ let run_fexpr_check log env =
         Filename.make_path [test_source_dir; pass_ref_file]
       in
       let nr =
-        if Sys.file_exists dump_file && Sys.file_exists ref_file then
-          Actions_helpers.compare_files "fexpr" dump_file ref_file log env
+        if Sys.file_exists ref_file then
+          if Sys.file_exists dump_file then
+            Actions_helpers.compare_files "fexpr" dump_file ref_file log env
+          else
+            let dump_sfx = Filename.basename dump_file in
+            (Result.fail_with_reason
+              ("Expected a pass output: " ^ dump_sfx)
+            , env)
         else
-          (Result.fail_with_reason ("Expected a pass output "^pass_sfx), env)
+          let ref_sfx = Filename.basename ref_file in
+          (Result.fail_with_reason
+            ("Missing reference file: " ^ ref_sfx)
+          , env)
       in
       if Result.is_pass res then nr else (res, env))
     (Result.pass, env)

@@ -334,7 +334,7 @@ let () =
 
 (* First layout poly versions *)
 external unsafe_set : ('a : value) ('b : any).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 [@@layout_poly]
 
 let () =
@@ -367,7 +367,7 @@ let () =
 
 (* Second, specialized versions *)
 external unsafe_set_imm : ('a : value) ('b : immediate).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -379,7 +379,7 @@ let () =
     (fun () -> unsafe_set_imm t idx 1; ignore (Sys.opaque_identity t))
 
 external unsafe_set_i64 : ('a : value) ('b : bits64).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -391,7 +391,7 @@ let () =
     (fun () -> unsafe_set_i64 t idx #1L; ignore (Sys.opaque_identity t))
 
 external unsafe_set_prod : ('a : value) ('b : bits64 & value & immediate).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -407,7 +407,7 @@ external unsafe_set_or_null
   : ('a : value) ('b : any).
   'a or_null @ local -> ('a, 'b) idx_mut @ local -> 'b -> unit
   @@ portable
-  = "%unsafe_set_idx"
+  = "%set_idx"
 [@@layout_poly]
 
 let () =

@@ -52,7 +52,8 @@ let scrape_ty env ty =
     | _ -> ty
   in
   match get_desc ty with
-  | Tconstr _ ->
+  | Tconstr _
+  | Tquote _ | Tsplice _ | Tquote_eval _ ->
       let ty = Ctype.correct_levels ty in
       let ty' = Ctype.expand_head_opt env ty in
       begin match get_desc ty' with
@@ -194,10 +195,14 @@ let classify ~classify_product env ty sort : _ classification =
              Maybe we should emit a warning. *)
           Any
       end
-  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _
-  | Tquote _ | Tsplice _-> Addr
-  | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _
-  | Trepr _ ->
+  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _  | Tnil | Tvariant _ ->
+      Addr
+  (* Quotes are not representable, but it's safe to say they are [Any].
+     Unreduced splices and evals might stand for anything. *)
+  | Tquote _ | Tsplice _ | Tquote_eval _ ->
+      Any
+  | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
+  | Tof_kind _ | Trepr _ ->
       assert false
   end
   | Base Float64 -> Unboxed_float Unboxed_float64
@@ -219,6 +224,7 @@ let classify ~classify_product env ty sort : _ classification =
   | Base Void -> Void
   | Product c -> Product (classify_product ty c)
   | Univar _ -> Misc.fatal_error "classify: Univar"
+  | Genvar _ -> Misc.fatal_error "classify: Genvar"
 
 let rec scannable_product_array_kind elt_ty_for_error loc sorts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
@@ -239,6 +245,8 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
     Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
   | Univar _ ->
     Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
+  | Genvar _ ->
+    Misc.fatal_error "sort_to_scannable_product_element_kind: Genvar"
 
 let rec ignorable_product_array_kind loc (sorts : Jkind.Sort.Const.t list) =
   match sorts with
@@ -269,6 +277,8 @@ and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
   | Univar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
+  | Genvar _ ->
+    Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
 
 let array_kind_of_elt ~elt_sort env loc ty =
   let elt_sort =
@@ -429,6 +439,7 @@ let value_kind_of_value_jkind env jkind =
   | Some ( Any _
          | Product _
          | Univar _
+         | Genvar _
          | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
                   | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
                   | Vec512 ),
@@ -722,7 +733,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     else non_nullable Pintval
   | _ ->
     num_nodes_visited,
-    add_nullability_from_jkind env (Ctype.estimate_type_jkind env ty) Pgenval
+    add_nullability_from_jkind env (Ctype.estimate_type_jkind env scty) Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
@@ -774,7 +785,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           end
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
-        | Tquote _ | Tsplice _ | Tof_kind _ -> unknown ()
+        | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ -> unknown ()
         | Trepr _ -> Misc.fatal_error "value_kind_mixed_block_field: Trepr"
     in
     let (_, num_nodes_visited), kinds =
@@ -1084,6 +1095,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
+  | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1107,6 +1119,7 @@ let layout env loc sort ty =
                                                    Stable,
                                                    Some ty)))
       | Univar _ -> assert false
+      | Genvar _ -> assert false
     )
 
 let layout_of_sort loc sort =
@@ -1129,6 +1142,7 @@ let layout_of_sort loc sort =
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
     | Univar _ -> assert false
+    | Genvar _ -> assert false
     )
 
 let layout_of_non_void_sort c =
@@ -1216,7 +1230,7 @@ let report_error ppf = function
         fprintf ppf "@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env) err
+           env) err
       end
   | Sort_without_extension (sort, maturity, ty) ->
       fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
@@ -1274,7 +1288,7 @@ let report_error ppf = function
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env) err
+           env) err
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
@@ -1310,7 +1324,7 @@ let report_error ppf = function
           Printtyp.type_expr ty
           (Jkind.Violation.report_with_offender
              ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-             ~level:(Ctype.get_current_level ()) env) err
+             env) err
       | None ->
         fprintf ppf
           "This array operation expects an array type, but %a does not appear@ \

@@ -162,7 +162,7 @@ module Namespace = struct
     | Jkind -> 7
      (* we do not handle those component *)
 
-  let size = 1 + id Unboxed_label
+  let size = 1 + id Jkind
 
 
   let pp ppf x =
@@ -720,6 +720,8 @@ and raw_type_desc ppf = function
       fprintf ppf "@[Tquote@ %a@]" raw_type t
   | Tsplice t ->
       fprintf ppf "@[Tsplice@ %a@]" raw_type t
+  | Tquote_eval t ->
+      fprintf ppf "@[Tquote_eval@ %a@]" raw_type t
   | Tfield (f, k, t1, t2) ->
       fprintf ppf "@[<hov1>Tfield(@,%s,@,%s,@,%a,@;<0 -1>%a)@]" f
         (string_of_field_kind k)
@@ -737,10 +739,8 @@ and raw_type_desc ppf = function
         raw_type t
         raw_type_list tl
   | Trepr (t, sort_vars) ->
-      let print_sort_univar ppf (uv : Jkind_types.Sort.univar) =
-        match uv.name with
-        | Some n -> fprintf ppf "%s" n
-        | None -> fprintf ppf "_"
+      let print_sort_univar ppf uv =
+        fprintf ppf "%s" (Option.value uv.Jkind_types.Sort.name ~default:"_")
       in
       fprintf ppf "@[<hov1>Trepr(@,%a,@,[@[%a@]])@]"
         raw_type t
@@ -752,7 +752,7 @@ and raw_type_desc ppf = function
       fprintf ppf "@[<hov1>Tpackage(@,%a,@,%a)@]" path p
         raw_lid_type_list fl
   | Tof_kind jkind ->
-    fprintf ppf "(type@ :@ %a)" (Jkind.format !printing_env) jkind
+    fprintf ppf "Tof_kind@ %a" (Jkind.format !printing_env) jkind
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"
@@ -1384,6 +1384,10 @@ let add_type_to_preparation = prepare_type
 (* Disabled in classic mode when printing an unification error *)
 let print_labels = ref true
 
+(* Whether to expand [eval] in types for reductions before printing.
+   Disabled when printing errors, as they usually contain an expansion trace. *)
+let print_reduced_evals = ref true
+
 let out_jkind_of_const_jkind env jkind =
   Ojkind_const (Jkind.Const.to_out_jkind_const env jkind)
 
@@ -1475,7 +1479,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     let portability =
       match modes.statefulness, modes.portability with
       | Stateless, Portable
-      | Observing, Shareable
+      | Reading, Shareable
       | Stateful, Nonportable -> None
       | _, _ -> Some modes.portability
     in
@@ -1542,6 +1546,9 @@ let rec tree_of_modal_typexp mode modal ty =
         let mode = Alloc.zap_to_legacy mode in
         Otyp_ret (Orm_any (tree_of_modes mode), tree)
     | Other _ -> tree
+  in
+  let ty =
+    Ctype.reduce_head ~expand_eval:!print_reduced_evals !printing_env ty
   in
   let px = proxy ty in
   if List.memq px !printed_aliases && not (List.memq px !delayed) then
@@ -1625,6 +1632,13 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_quote (tree_of_typexp mode alloc_mode ty)
     | Tsplice ty ->
         Otyp_splice (tree_of_typexp mode alloc_mode ty)
+    | Tquote_eval ty ->
+        (* We use [Predef]'s [eval] as the syntax, so we need to quote [ty]. *)
+        let ty = newgenty (Tquote ty) in
+        let p', s = best_type_path Predef.path_eval in
+        let tyl = apply_subst s [ty] in
+        Internal_names.add p';
+        Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl)
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->
@@ -2385,7 +2399,13 @@ let tree_of_value_description id decl =
       Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         decl.val_modalities
   in
-  let qtvs = extract_qtvs [decl.val_type] in
+  let qsvs, qtvs =
+    (* Important: process the fvs *after* the type; tree_of_type_scheme
+       resets the naming context. Both must be inside print_with_genvars
+       so that sort poly var names are registered when jkinds are printed. *)
+    Jkind_types.Sort.print_with_genvars decl.val_lpoly (fun names ->
+      names, extract_qtvs [decl.val_type])
+  in
   let apparent_arity =
     let rec count n typ =
       match get_desc typ with
@@ -2422,7 +2442,7 @@ let tree_of_value_description id decl =
   in
   let vd =
     { oval_name = id;
-      oval_type = Otyp_poly(qtvs, ty);
+      oval_type = Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty));
       oval_modalities = tree_of_modalities Immutable moda;
       oval_prims = [];
       oval_attributes = attrs
@@ -3032,7 +3052,9 @@ let trees_of_type_expansion'
     let t' = if proxy t == proxy t' then unalias t' else t' in
     (* beware order matter due to side effect,
        e.g. when printing object types *)
+    print_reduced_evals := false; (* preserve unreduced eval in types *)
     let first = tree_of_typexp' t in
+    print_reduced_evals := true;
     let second = tree_of_typexp' t' in
     if first = second then Same first
     else Diff(first,second)
@@ -3368,12 +3390,12 @@ let explanation (type variety) intro prev env
       Some (doc_printf "@ @[<hov>%a@]"
               (Jkind.Violation.report_with_offender
                  ~offender:(fun ppf -> type_expr ppf t)
-                 ~level:(get_current_level ()) env) e)
+                 env) e)
   | Errortrace.Bad_jkind_sort (t,e) ->
       Some (doc_printf "@ @[<hov>%a@]"
               (Jkind.Violation.report_with_offender_sort
                  ~offender:(fun ppf -> type_expr ppf t)
-                 ~level:(get_current_level ()) env) e)
+                 env) e)
   | Errortrace.Unequal_var_jkinds (t1,k1,t2,k2) ->
       let fmt_history t k ppf =
         Jkind.(format_history env ~intro:(
@@ -3493,6 +3515,7 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
       print_labels := true
     with exn ->
       print_labels := true;
+      print_reduced_evals := true;
       raise exn
 
 let report_error trace_format ppf mode env tr

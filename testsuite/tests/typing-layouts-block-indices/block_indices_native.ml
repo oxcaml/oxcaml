@@ -7,8 +7,8 @@
  native;
 *)
 
-external[@layout_poly] get_idx_mut : 'a ('b : any). 'a -> ('a, 'b) idx_mut -> 'b = "%unsafe_get_idx"
-external[@layout_poly] set_idx_mut : 'a ('b : any). 'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+external[@layout_poly] get_idx_mut : 'a ('b : any). 'a -> ('a, 'b) idx_mut -> 'b = "%get_idx"
+external[@layout_poly] set_idx_mut : 'a ('b : any). 'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 external box_int64x2 : int64x2# -> int64x2 = "%box_vec128"
 external unbox_int64x2 : int64x2 -> int64x2# = "%unbox_vec128"

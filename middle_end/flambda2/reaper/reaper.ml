@@ -40,18 +40,15 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
       Format.printf "RESULT@ %a@." Dep_solver.pp_result solved_dep;
       Dot_printer.print_solved_dep solved_dep deps)
   in
-  let Rebuild.{ body; free_names; all_code; slot_offsets } =
+  let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }
+      =
     Rebuild.rebuild ~machine_width ~code_deps ~fixed_arity_continuations
       ~continuation_info ~final_typing_env kinds solved_dep get_code_metadata
       holed
   in
-  (* Is this what we really want? This keeps all the code that has not been
-     deleted by this pass to be exported in the cmx. It looks like this does the
-     same thing as [Simplify], but on the other hand, we might not want to
-     export un-inlinable functions. *)
   let all_code =
     Exported_code.add_code
-      ~keep_code:(fun _ -> true)
+      ~keep_code:(fun code_id -> Code_id.Set.mem code_id code_ids_to_remember)
       all_code
       (Exported_code.mark_as_imported
          (Flambda_cmx.get_imported_code cmx_loader ()))

@@ -8,4 +8,4 @@ let () = Printf.printf "Reentrant_c: initialized with magic_value=%d\n%!" magic_
 
 (* Register a callback so C code can get our value *)
 let get_magic () = magic_value
-let () = Callback.register "get_reentrant_c_magic" get_magic [@@alert "-unsafe_multidomain"]
+let () = Callback.register "get_reentrant_c_magic" get_magic

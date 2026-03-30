@@ -45,6 +45,7 @@ type upstream_compat_warning =
   | Unboxed_attribute of string
   | Immediate_void_variant
   | Separability_check
+  | Unpacked_attribute
 
 type name_out_of_scope_warning =
   | Name of string

@@ -41,6 +41,8 @@ module Datalog : sig
         that is part of a schema. *)
     type ('t, 'k, 'v) id
 
+    val singleton : ('t, 'k, 'v) id -> 'k -> 'v -> 't
+
     type (_, _, _) hlist =
       | [] : ('v, nil, 'v) hlist
       | ( :: ) :

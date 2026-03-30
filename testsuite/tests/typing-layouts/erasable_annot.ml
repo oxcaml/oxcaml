@@ -672,3 +672,14 @@ external f_2_ok : M.t -> M.t = "%identity" [@@unboxed] [@@warning "-187"];;
 [%%expect{|
 external f_2_ok : M.t -> M.t = "%identity" [@@unboxed]
 |}]
+
+(* [@unpacked] is not upstream compatible *)
+external f_unpacked : (#(int * bool) [@unpacked]) -> int = "foo" "bar";;
+[%%expect{|
+Line 1, characters 23-36:
+1 | external f_unpacked : (#(int * bool) [@unpacked]) -> int = "foo" "bar";;
+                           ^^^^^^^^^^^^^
+Warning 187 [incompatible-with-upstream]: [@unpacked] is not supported by upstream OCaml.
+
+external f_unpacked : (#(int * bool) [@unpacked]) -> int = "foo" "bar"
+|}]

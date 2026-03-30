@@ -104,6 +104,8 @@ val set_gdwarf_fidelity : gdwarf_fidelity -> unit
 val unsafe : bool ref
 val use_linscan : bool ref
 val link_everything : bool ref
+val requires_metaprogramming : bool ref
+val uses_metaprogramming : bool ref
 val custom_runtime : bool ref
 val no_check_prims : bool ref
 val bytecode_compatible_32 : bool ref
@@ -289,6 +291,7 @@ module Opt_flag_handler : sig
     set_oclassic : unit -> unit;
     set_o2 : unit -> unit;
     set_o3 : unit -> unit;
+    set_o4 : unit -> unit;
   }
 
   val default : t
@@ -299,6 +302,7 @@ end
 val set_oclassic : unit -> unit
 val set_o2 : unit -> unit
 val set_o3 : unit -> unit
+val set_o4 : unit -> unit
 
 module Compiler_ir : sig
   type t = Linear | Cfg | Llvmir

@@ -227,6 +227,7 @@ type no_open_quotations_context =
   | Open_qt
   | Object_field_with_attribute_qt
   | Variant_tag_with_attribute_qt
+  | Jkind_annotation_qt
 
 type none_in_quotations_context =
   | Constructor
@@ -512,6 +513,8 @@ val enter_modtype:
 val enter_class: scope:int -> string -> class_declaration -> t -> Ident.t * t
 val enter_cltype:
   scope:int -> string -> class_type_declaration -> t -> Ident.t * t
+val enter_jkind:
+  scope:int -> string -> jkind_declaration -> t -> Ident.t * t
 
 (* Same as [add_signature] but refreshes (new stamp) and rescopes bound idents
    in the process. *)
@@ -546,11 +549,13 @@ val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t
-val mark_toplevel_in_quotations : t -> t
 
 val check_no_open_quotations :
   Location.t -> t -> no_open_quotations_context -> unit
 val stage : t -> stage
+
+val mark_toplevel_in_quotations : scope:int -> t -> t
+val path_is_toplevel_in_quotations : t -> Path.t -> bool
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit
@@ -658,13 +663,13 @@ type error =
 exception Error of error
 
 
-val report_error: level:int -> error Format_doc.format_printer
-val report_error_doc: level:int -> error Format_doc.printer
+val report_error: error Format_doc.format_printer
+val report_error_doc: error Format_doc.printer
 
 val report_lookup_error:
-    level:int -> Location.t -> t -> lookup_error Format_doc.format_printer
+    Location.t -> t -> lookup_error Format_doc.format_printer
 val report_lookup_error_doc:
-    level:int -> Location.t -> t -> lookup_error Format_doc.printer
+    Location.t -> t -> lookup_error Format_doc.printer
 val in_signature: bool -> t -> t
 
 val is_in_signature: t -> bool
@@ -705,7 +710,7 @@ val print_path: Path.t Format_doc.printer ref
 val print_type_expr: Types.type_expr Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Jkind. *)
 val report_jkind_violation_with_offender:
-  (offender:(Format_doc.formatter -> unit) -> level:int -> t ->
+  (offender:(Format_doc.formatter -> unit) -> t ->
    Format_doc.formatter -> Jkind.Violation.t -> unit) ref
 
 

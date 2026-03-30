@@ -1,6 +1,7 @@
 (* TEST
+ include eval;
  modules = "labeled_args_types.ml util.ml";
- flags = "-extension runtime_metaprogramming";
+ flags = "-extension runtime_metaprogramming -uses-metaprogramming";
  native;
 *)
 

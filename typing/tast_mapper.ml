@@ -505,9 +505,6 @@ let expr sub x =
   let map_block_access sub = function
     | Baccess_field (lid, ld) ->
       Baccess_field (map_loc sub lid, ld)
-    | Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort } ->
-      let index = sub.expr sub index in
-      Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
     | Baccess_block (mut, idx) ->
       Baccess_block (mut, sub.expr sub idx)
   in
@@ -712,8 +709,6 @@ let expr sub x =
         Texp_quotation (sub.expr sub exp)
     | Texp_antiquotation exp ->
         Texp_antiquotation (sub.expr sub exp)
-    | Texp_eval (typ, sort) ->
-        Texp_eval (sub.typ sub typ, sort)
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}
@@ -1032,6 +1027,7 @@ let typ sub x =
     | Ttyp_open (path, mod_ident, t) ->
         Ttyp_open (path, map_loc sub mod_ident, sub.typ sub t)
     | Ttyp_repr (vars, ct) -> Ttyp_repr (vars, sub.typ sub ct)
+    | Ttyp_newlayout (vars, ct) -> Ttyp_newlayout (vars, sub.typ sub ct)
     | Ttyp_of_kind jkind ->
         Ttyp_of_kind (sub.jkind_annotation sub jkind)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)

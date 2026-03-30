@@ -99,11 +99,12 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     List.iter
       (fun var -> Acc.add_any_usage acc (Code_id_or_name.var var))
       ((my_closure :: params) @ (exn :: return));
+    Acc.add_zero_alloc_source acc (Code_id_or_name.var my_closure);
     List.iter
       (fun param ->
         let param = Code_id_or_name.var param in
         Acc.add_any_source acc param)
-      (my_closure :: params));
+      params);
   if never_delete then Acc.add_any_usage acc (Code_id_or_name.code_id code_id);
   Acc.add_code code_id code_dep acc
 
@@ -441,13 +442,19 @@ and traverse_let_cont_non_recursive denv acc cont ~body handler =
         is_exn_handler
       };
     if is_exn_handler
-    then
+    then (
       (* The exception parameter of any exception handler is assumed to have any
          possible source. This makes sure that we do not unbox the exception
          parameter of exception handlers, which is incorrect when used in
          functions (for instance, if they raise async exceptions), and would
          also probably put incorrect backtrace information. *)
       Acc.add_any_source acc (Code_id_or_name.var (List.hd params));
+      (* It is also assumed to have any possible use, to make sure it is never
+         deleted, as the runtime can look at it. *)
+      (* CR ncourant: the runtime should not look at it if the raise was a
+         [raise_notrace], could we avoid setting it to [any_usage] in that
+         case? *)
+      Acc.add_cond_any_usage acc ~denv (Simple.var (List.hd params)));
     let conts = Continuation.Map.add cont (Normal params) denv.conts in
     let denv =
       { parent = Let_cont { cont; handler; parent = denv.parent };

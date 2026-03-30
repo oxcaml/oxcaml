@@ -225,6 +225,136 @@ bytes_get_int64_indexed_by_int64:
   ret
 |}]
 
+let bytes_set_int64_indexed_by_int64
+    (buf : bytes) (i : Int64_u.t) (v : Int64_u.t) =
+  Bytes.unsafe_set_int64_ne_indexed_by_int64 buf i v
+[%%expect_asm X86_64{|
+bytes_set_int64_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  movq  %rdi, (%rax,%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
+let bytes_get_int8_indexed_by_int64
+    (buf : bytes) (i : Int64_u.t) =
+  Bytes.unsafe_get_int8_indexed_by_int64 buf i
+[%%expect_asm X86_64{|
+bytes_get_int8_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  movsbq (%rax,%rbx), %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+(* CR ttebbi: Both index and value are needlessly sign-extended. *)
+let bytes_set_int8_indexed_by_int64
+    (buf : bytes) (i : Int64_u.t) (v : int) =
+  Bytes.unsafe_set_int8_indexed_by_int64 buf i v
+[%%expect_asm X86_64{|
+bytes_set_int8_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  salq  $55, %rdi
+  sarq  $56, %rdi
+  movb  %dil, (%rax,%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
+let bytes_get_int32_indexed_by_int64
+    (buf : bytes) (i : Int64_u.t) =
+  Bytes.unsafe_get_int32_ne_indexed_by_int64 buf i
+[%%expect_asm X86_64{|
+bytes_get_int32_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  movslq (%rax,%rbx), %rax
+  ret
+|}]
+
+let bytes_set_int32_indexed_by_int64
+    (buf : bytes) (i : Int64_u.t) (v : Int32_u.t) =
+  Bytes.unsafe_set_int32_ne_indexed_by_int64 buf i v
+[%%expect_asm X86_64{|
+bytes_set_int32_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  movl  %edi, (%rax,%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
+let bytes_get_float32_indexed_by_int64
+    (buf : bytes) (i : Int64_u.t) =
+  Bytes.unsafe_get_float32_ne_indexed_by_int64 buf i
+[%%expect_asm X86_64{|
+bytes_get_float32_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  vmovss (%rax,%rbx), %xmm0
+  ret
+|}]
+
+let bytes_set_float32_indexed_by_int64
+    (buf : bytes) (i : Int64_u.t) (v : Float32_u.t) =
+  Bytes.unsafe_set_float32_ne_indexed_by_int64 buf i v
+[%%expect_asm X86_64{|
+bytes_set_float32_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  vmovss %xmm0, (%rax,%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
+let string_get_int8_indexed_by_int64
+    (s : string) (i : Int64_u.t) =
+  String.unsafe_get_int8_indexed_by_int64 s i
+[%%expect_asm X86_64{|
+string_get_int8_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  movsbq (%rax,%rbx), %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+let string_get_int32_indexed_by_int64
+    (s : string) (i : Int64_u.t) =
+  String.unsafe_get_int32_ne_indexed_by_int64 s i
+[%%expect_asm X86_64{|
+string_get_int32_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  movslq (%rax,%rbx), %rax
+  ret
+|}]
+
+let string_get_int64_indexed_by_int64
+    (s : string) (i : Int64_u.t) =
+  String.unsafe_get_int64_ne_indexed_by_int64 s i
+[%%expect_asm X86_64{|
+string_get_int64_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  movq  (%rax,%rbx), %rax
+  ret
+|}]
+
+let string_get_float32_indexed_by_int64
+    (s : string) (i : Int64_u.t) =
+  String.unsafe_get_float32_ne_indexed_by_int64 s i
+[%%expect_asm X86_64{|
+string_get_float32_indexed_by_int64:
+  salq  $1, %rbx
+  sarq  $1, %rbx
+  vmovss (%rax,%rbx), %xmm0
+  ret
+|}]
+
 let str_length (s : string) = String.length s
 [%%expect_asm X86_64{|
 str_length:

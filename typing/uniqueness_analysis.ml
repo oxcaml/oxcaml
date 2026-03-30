@@ -2540,15 +2540,6 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_idx (ba, _uas) ->
     let block_access = function
       | Baccess_field _ -> UF.unused
-      | Baccess_array
-          { mut = _;
-            index_kind = _;
-            index;
-            base_ty = _;
-            elt_ty = _;
-            elt_sort = _
-          } ->
-        check_uniqueness_exp ~overwrite:None ienv index
       | Baccess_block (_, idx) -> check_uniqueness_exp ~overwrite:None ienv idx
     in
     (* All unboxed accesses are unused, but we include the below match in case
@@ -2675,9 +2666,6 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_antiquotation e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.antiquote uf
-  | Texp_eval _ ->
-    (* CR metaprogramming mshinwell: Make sure this is correct *)
-    UF.unused
 
 and check_uniqueness_exp ~borrows ~overwrite (ienv : Ienv.t) exp : UF.t =
   let loc = exp.exp_loc in

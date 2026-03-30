@@ -129,7 +129,7 @@ Adding bounds to a kind always makes the kind more specific, or lower. That is,
 for any kind `k`, `k mod <bounds> <= k`.
 
 Along the future modal axes, a _lower_ mode leads to a lower kind. So `stateless
-< observing` leads to `value mod stateless <= value mod observing`, and bounding
+< reading` leads to `value mod stateless <= value mod reading`, and bounding
 by the maximum mode has no effect. However, along the past modal axes, a
 _higher_ mode leads to a lower kind. So `shared < contended` leads to `value mod
 contended <= value mod shared` and it's bounding by the minimum mode that has no

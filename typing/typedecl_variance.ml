@@ -89,6 +89,8 @@ let compute_variance env visited vari ty =
         compute_same ty
     | Tsplice ty ->
         compute_same ty
+    | Tquote_eval ty ->
+        compute_same ty
     | Tfield (_, _, ty1, ty2) ->
         compute_same ty1;
         compute_same ty2

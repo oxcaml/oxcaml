@@ -125,6 +125,7 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_export_info = export_info;
             ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
             ui_force_link = uir.uir_force_link;
+            ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
             ui_external_symbols = uir.uir_external_symbols |> Array.to_list
           }
         in
@@ -150,7 +151,8 @@ let read_bundles_from_exe () =
 
 let counter = ref 0
 
-let eval code =
+let eval (expr : 'a expr) =
+  let code : CamlinternalQuote.Code.t = Obj.magic expr in
   (* TODO: assert Linux x86-64 *)
   let id = !counter in
   incr counter;
@@ -163,6 +165,8 @@ let eval code =
   Clflags.dont_write_files := true;
   Clflags.shared := true;
   Clflags.dlcode := false;
+  Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
+  Clflags.set_o3 ();
   (* TODO: Set a bunch of flags to match the initial compile (like
      nopervasives) *)
   Location.reset ();
@@ -255,8 +259,9 @@ let eval code =
     Symbol.for_compilation_unit compilation_unit
     |> Symbol.linkage_name |> Linkage_name.to_string
   in
-  let obj = Jit.jit_lookup_symbol linkage_name |> Option.get in
-  Obj.field obj 0
+  let struct_obj = Jit.jit_lookup_symbol linkage_name |> Option.get in
+  let obj = Obj.field struct_obj 0 in
+  (Obj.obj obj : 'a eval)
 
 let compile_mutex = Mutex.create ()
 

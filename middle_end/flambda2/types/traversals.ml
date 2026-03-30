@@ -1,3 +1,32 @@
+(******************************************************************************
+ *                                  OxCaml                                    *
+ *                       Basile Clément, OCamlPro                             *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2025 OCamlPro                                                *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
 module ET = Expand_head.Expanded_type
 module TE = Typing_env
 module TG = Type_grammar
@@ -1291,7 +1320,7 @@ struct
                 TE.add_definition base_env bound_name (TG.kind ty')
               in
               let new_types = Name.Map.add (Name.var var') ty' new_types in
-              Var.Map.add var (var', ty') sbs, base_env, new_types, acc))
+              Var.Map.add var var' sbs, base_env, new_types, acc))
         live_vars
         (Var.Map.empty, base_env, Name.Map.empty, empty)
     in
@@ -1327,20 +1356,20 @@ struct
     in
     let subst var =
       match Var.Map.find_opt var sbs with
-      | Some (v, ty) ->
-        Name.var v, ET.to_type (Expand_head.expand_head final_env ty)
+      | Some v ->
+        Name.var v, TE.find final_env (Name.var v) (Some (Variable.kind v))
       | None -> Misc.fatal_error "Not defined [subst]"
     in
     let to_keep =
       Var.Map.fold
-        (fun _ (var, _) acc -> Variable.Set.add var acc)
+        (fun _ var acc -> Variable.Set.add var acc)
         sbs Variable.Set.empty
     in
     let teev =
       Expand_head.make_suitable_for_environment final_env
         (All_variables_except to_keep) (List.map subst bind_to)
     in
-    Var.Map.map fst sbs, teev
+    sbs, teev
 
   let rewrite env symbol_abstraction =
     (* CR vlaviron for bclement: This should share more code with

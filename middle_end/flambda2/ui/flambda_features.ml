@@ -92,6 +92,10 @@ let reaper_unbox () =
   !Oxcaml_flags.Flambda2.reaper_unbox
   |> with_default ~f:(fun d -> d.reaper_unbox)
 
+let reaper_max_unbox_size () =
+  !Oxcaml_flags.Flambda2.reaper_max_unbox_size
+  |> with_default ~f:(fun d -> d.reaper_max_unbox_size)
+
 let reaper_change_calling_conventions () =
   !Oxcaml_flags.Flambda2.reaper_change_calling_conventions
   |> with_default ~f:(fun d -> d.reaper_change_calling_conventions)
@@ -191,7 +195,7 @@ module Inlining = struct
     match opt_level with
     | Oclassic -> I.oclassic_arguments
     | O2 -> I.o2_arguments
-    | O3 -> I.o3_arguments
+    | O3 | O4 -> I.o3_arguments
 
   let max_depth round_or_default =
     let depth =

@@ -230,8 +230,8 @@ and value_kind ppf vk =
       or_null_suffix nullable
       raw_value_kind raw_kind
 
-let rec layout ppf layout_ =
-  match layout_ with
+let rec layout ppf lay_ =
+  match lay_ with
   | Pvalue k -> value_kind ppf k
   | Ptop -> fprintf ppf "top"
   | Pbottom -> fprintf ppf "bottom"
@@ -245,12 +245,12 @@ let rec layout ppf layout_ =
       layouts
   | Psplicevar id -> fprintf ppf "$%a" Ident.print id
 
-let layout_annotation ppf layout_ =
-  match layout_ with
+let layout_annotation ppf lay_ =
+  match lay_ with
   | Pvalue { raw_kind = Pgenval; nullable = Non_nullable } -> ()
   | Pvalue { raw_kind = Pgenval; nullable = Nullable } ->
     fprintf ppf "?"
-  | _ -> fprintf ppf "[%a]" layout layout_
+  | _ -> fprintf ppf "[%a]" layout lay_
 
 let return_kind ppf (mode, kind) =
   let smode = locality_mode_if_local mode in
@@ -1429,10 +1429,40 @@ let rec lam ppf = function
       fprintf ppf "$(%a)" slam slambda
 
 and slam ppf = function
+  | SLlayout layout -> fprintf ppf "⟪%a⟫" layout_annotation layout
+  | SLglobal cu ->
+    fprintf ppf "(global %a)" (Format_doc.compat Compilation_unit.print) cu
+  | SLvar id -> Slambdaident.print ppf id
   | SLmissing -> fprintf ppf "(missing)"
+  | SLrecord fields ->
+    let print_fields ppf =
+      List.iter (fun value -> fprintf ppf "%a;@ " slam value) fields
+    in
+    fprintf ppf "@[<hv 2>[@ %t]@]" print_fields
+  | SLfield (container, field) ->
+    fprintf ppf "%a.%i" slam container field
   | SLhalves { sval_comptime; sval_runtime } ->
     fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]"
       slam sval_comptime lam sval_runtime
+  | SLproj_comptime value -> fprintf ppf "%a.c" slam value
+  | SLproj_runtime value -> fprintf ppf "%a.r" slam value
+  | SLtemplate func -> fprintf ppf "(template %a)" slambda_function func
+  | SLinstantiate apply -> fprintf ppf "(%a)" slambda_apply apply
+  | SLlet { slet_name; slet_value; slet_body } ->
+    fprintf ppf "@[<hv 2>(let %a =@;<1 2>%a in@ %a)@]"
+      Slambdaident.print slet_name slam slet_value slam slet_body
+
+and slambda_function ppf { sfun_params; sfun_body } =
+  let print_params ppf =
+    Array.iter (fun id -> fprintf ppf "%a@ " Slambdaident.print id) sfun_params
+  in
+  fprintf ppf "@[<2>@[<2>%t->@]@ %a@]" print_params slam sfun_body
+
+and slambda_apply ppf { sapp_func; sapp_arguments } =
+  let print_args ppf =
+    Array.iter (fun arg -> fprintf ppf "@ %a" slam arg) sapp_arguments
+  in
+  fprintf ppf "@[<2>%a%t@]" slam sapp_func print_args
 
 and sequence ppf = function
   | Lsequence(l1, l2) ->

@@ -104,6 +104,7 @@ type error =
        usage_stage : Env.stage}
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
+  | Lpoly_unsupported
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -378,8 +379,7 @@ end = struct
     in
     begin match Env.find_implicit_jkind name env with
     | Some implicit_jkind
-      when not (Jkind.equate ~level:(get_current_level ()) env original_jkind
-                  implicit_jkind) ->
+      when not (Jkind.equate env original_jkind implicit_jkind) ->
         raise (Error (loc, env,
           Mismatched_jkind_annotation { name; explicit_jkind = original_jkind;
                                         implicit_jkind }))
@@ -436,7 +436,7 @@ end = struct
   let check_jkind env loc name v jkind_info =
     match get_desc v with
     | Tvar { jkind } | Tunivar { jkind } when
-        not (Jkind.equate ~level:(get_current_level ()) env jkind
+        not (Jkind.equate env jkind
                jkind_info.original_jkind) ->
       let reason =
         Bad_univar_jkind { name; jkind_info; inferred_jkind = jkind }
@@ -694,8 +694,7 @@ let transl_type_param env path jkind_default styp =
           Jkind.of_annotation ~context:(Type_parameter (path, name)) env
             jkind_annot
         in
-        if not (Jkind.equate ~level:(get_current_level ()) env jkind
-                  implicit_jkind) then
+        if not (Jkind.equate env jkind implicit_jkind) then
           raise (Error (loc, env,
             Mismatched_jkind_annotation
               { name = var_name; explicit_jkind = jkind;
@@ -1165,6 +1164,10 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           vars st
       in
       ctyp desc typ
+  | Ptyp_newlayout _ ->
+      Language_extension.assert_enabled ~loc Layout_poly
+        Language_extension.Alpha;
+      raise (Error (loc, env, Lpoly_unsupported))
   | Ptyp_package (p, l) ->
     (* CR layouts: right now we're doing a real gross hack where we demand
        everything in a package type with constraint be value.
@@ -1317,7 +1320,7 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
     | Some jkind_annot, None -> jkind_of_annot jkind_annot, None
     | Some jkind_annot, Some implicit_jkind ->
       let jkind = jkind_of_annot jkind_annot in
-      if not (Jkind.equate ~level:(get_current_level ()) env jkind
+      if not (Jkind.equate env jkind
                 implicit_jkind) then
         raise (Error (alias_loc, env,
             Mismatched_jkind_annotation { name = alias; explicit_jkind = jkind;
@@ -1626,13 +1629,79 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
     ctyp_loc = loc;
     ctyp_attributes = attrs }
 
-let transl_type_scheme env styp =
+let transl_type_scheme_lmono env styp =
   match styp.ptyp_desc with
   | Ptyp_poly (vars, st) ->
     transl_type_scheme_poly env styp.ptyp_attributes
       styp.ptyp_loc vars st
   | _ ->
     transl_type_scheme_mono env styp
+
+let transl_type_scheme_lpoly env attrs loc vars inner_type =
+  (* Use [with_local_level] just for scoping *)
+  with_local_level begin fun () ->
+    let env', ident_var_pairs =
+      List.fold_left (fun (env, pairs) var ->
+        let name = var.txt in
+        let decl = new_local_jkind ~loc:var.loc () in
+        let scope = create_scope () in
+        let id, env' = Env.enter_jkind ~scope name decl env in
+        let v = Jkind_types.Sort.new_genvar () in
+        (env', (id, v) :: pairs))
+      (env, []) vars
+    in
+    let cty = transl_type_scheme_lmono env' inner_type in
+    let ty = cty.ctyp_type in
+    (* Replace references to the ident with a Var at generic_level *)
+    let seen = Hashtbl.create 8 in
+    let rec replace t =
+      if Hashtbl.mem seen (get_id t) then ()
+      else begin
+        Hashtbl.add seen (get_id t) ();
+        (match get_desc t with
+        | Tvar { jkind; _ } ->
+          let desc = jkind.jkind in
+          (match desc.base with
+          | Kconstr (Pident id) ->
+            let v_opt =
+              List.find_map
+                (fun (id', v) ->
+                  if Ident.same id id' then Some v else None)
+                ident_var_pairs
+            in
+            (match v_opt with
+            | Some v ->
+              let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
+                = Layout (Sort (Var v, {pointerness = Maybe_pointer})) in
+              let desc = {desc with base} in
+              let jkind = {jkind with jkind = desc} in
+              Types.set_var_jkind t jkind
+            | None -> ())
+          | _ -> ())
+        | _ -> Btype.iter_type_expr replace t)
+      end
+    in
+    let ety = Subst.type_expr Subst.identity ty in
+    replace ety;
+    let ctyp =
+      { ctyp_desc = Ttyp_newlayout (vars, cty);
+        ctyp_type = ty;
+        ctyp_env = env;
+        ctyp_loc = loc;
+        ctyp_attributes = attrs }
+    in
+    ident_var_pairs |> List.map snd |> List.rev, ctyp
+  end
+
+let transl_type_scheme env styp =
+  match styp.ptyp_desc with
+  | Ptyp_newlayout (vars, st) ->
+    Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
+      Language_extension.Alpha;
+    transl_type_scheme_lpoly env styp.ptyp_attributes
+      styp.ptyp_loc vars st
+  | _ ->
+    [], transl_type_scheme_lmono env styp
 
 (* Error report *)
 
@@ -1749,7 +1818,7 @@ let report_error_doc env ppf =
           dprintf "But it was inferred to have %t"
             (fun ppf -> let desc = Jkind.get inferred_jkind in
               match desc.base with
-              | Layout (Sort (Var _, sa)) ->
+              | Layout (Sort (Var _, sa)) | Layout (Sort (Genvar _, sa)) ->
                 fprintf ppf "%a representable kind"
                   (pp_print_list ~pp_sep:(fun f () -> fprintf f " ")
                     pp_print_string)
@@ -1803,7 +1872,7 @@ let report_error_doc env ppf =
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
                Style.as_inline_code Printtyp.type_expr ppf typ)
-           ~level:(get_current_level ()) env) err
+           env) err
   | Non_sort {vloc; typ; err} ->
     let s =
       match vloc with
@@ -1814,13 +1883,13 @@ let report_error_doc env ppf =
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
                Style.as_inline_code Printtyp.type_expr ppf typ)
-           ~level:(get_current_level ()) env) err
+           env) err
   | Bad_jkind_annot(ty, violation) ->
     fprintf ppf "@[<b 2>Bad layout annotation:@ %a@]"
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf ->
              Style.as_inline_code Printtyp.type_expr ppf ty)
-         ~level:(get_current_level ()) env) violation
+         env) violation
   | Did_you_mean_unboxed lid ->
     fprintf ppf "@[%a isn't a class type.@ \
                  Did you mean the unboxed type %a?@]"
@@ -1841,6 +1910,9 @@ let report_error_doc env ppf =
       Env.print_stage usage_stage
       Env.print_stage intro_stage
       Env.print_with_quote_promote (name, intro_stage, usage_stage)
+  | Lpoly_unsupported ->
+      fprintf ppf
+        "@[Layout polymorphism is not supported in this context@]"
 
 let () =
   Location.register_error_of_exn

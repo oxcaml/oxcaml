@@ -45,6 +45,10 @@ type param_decision =
   | Delete
   | Unbox of Variable.t DS.unboxed_fields Field.Map.t
 
+type my_closure_param_decision =
+  | Keep_my_closure
+  | Unbox_my_closure of Variable.t DS.unboxed_fields Field.Map.t
+
 (* CR sspies: Throughout this file, we create bound paramters and variables
    without corresponding debugging uids. Does it make sense to properly
    propagate debugging uids there? If so, where should they come from? *)
@@ -74,18 +78,21 @@ type env =
     cont_params_to_keep : param_decision list Continuation.Map.t;
     should_keep_param : Continuation.t -> Variable.t -> KS.t -> param_decision;
     (* TODO same here *)
+    my_closure_decisions : my_closure_param_decision Code_id.Map.t;
     function_params_to_keep : param_decision list Code_id.Map.t;
     should_keep_function_param :
       Code_id.t -> Variable.t -> KS.t -> param_decision;
     function_return_decision : param_decision list Code_id.Map.t;
     kinds : K.t Name.Map.t;
     should_preserve_direct_calls : should_preserve_direct_calls;
-    old_typing_env : Typing_env.t option
+    old_typing_env : Typing_env.t option;
+    inside_code_definition : bool
   }
 
 type rebuild_result =
   { all_slot_offsets : Slot_offsets.t;
-    all_code : Code.t Code_id.Map.t
+    all_code : Code.t Code_id.Map.t;
+    code_ids_to_remember : Code_id.Set.t
   }
 
 let freshen_decisions = function
@@ -134,8 +141,13 @@ let rec fold2_unboxed_subset (f : 'a -> 'b -> 'c -> 'c)
   | Unboxed fields1, Unboxed fields2 ->
     Field.Map.fold
       (fun field f1 acc ->
-        let f2 = Field.Map.find field fields2 in
-        fold2_unboxed_subset f f1 f2 acc)
+        match Field.Map.find field fields2 with
+        | exception Not_found ->
+          Misc.fatal_errorf "@[<v 2>@[%a@]:@ @[%a@]@]@." Format.pp_print_text
+            "Expected a subset of unboxed fields, but the following field is \
+             not in the superset"
+            Field.print field
+        | f2 -> fold2_unboxed_subset f f1 f2 acc)
       fields1 acc
 
 let rec fold2_unboxed_subset_with_kind (f : K.t -> 'a -> 'b -> 'c -> 'c)
@@ -143,13 +155,19 @@ let rec fold2_unboxed_subset_with_kind (f : K.t -> 'a -> 'b -> 'c -> 'c)
     (fields2 : 'b DS.unboxed_fields Field.Map.t) acc =
   Field.Map.fold
     (fun field f1 acc ->
-      let f2 = Field.Map.find field fields2 in
-      match (f1, f2 : _ DS.unboxed_fields * _ DS.unboxed_fields) with
-      | Not_unboxed x1, Not_unboxed x2 -> f (Field.kind field) x1 x2 acc
-      | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ ->
-        Misc.fatal_errorf "[fold2_unboxed_subset]"
-      | Unboxed fields1, Unboxed fields2 ->
-        fold2_unboxed_subset_with_kind f fields1 fields2 acc)
+      match Field.Map.find field fields2 with
+      | exception Not_found ->
+        Misc.fatal_errorf "@[<v 2>@[%a@]:@ @[%a@]@]@." Format.pp_print_text
+          "Expected a subset of unboxed fields, but the following field is not \
+           in the superset"
+          Field.print field
+      | f2 -> (
+        match (f1, f2 : _ DS.unboxed_fields * _ DS.unboxed_fields) with
+        | Not_unboxed x1, Not_unboxed x2 -> f (Field.kind field) x1 x2 acc
+        | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ ->
+          Misc.fatal_errorf "[fold2_unboxed_subset]"
+        | Unboxed fields1, Unboxed fields2 ->
+          fold2_unboxed_subset_with_kind f fields1 fields2 acc))
     fields1 acc
 
 let simple_is_unboxable env simple =
@@ -167,7 +185,12 @@ let get_simple_unboxable env simple =
         "Expected unboxable name in [get_simple_unboxable], got constant %a"
         Reg_width_const.print const)
     ~name:(fun name ~coercion:_ ->
-      Option.get (DS.get_unboxed_fields env.uses (Code_id_or_name.name name)))
+      match DS.get_unboxed_fields env.uses (Code_id_or_name.name name) with
+      | Some unboxing -> unboxing
+      | None ->
+        Misc.fatal_errorf
+          "Cannot get unboxing information for name that was not unboxed:@ %a"
+          Name.print name)
     simple
 
 let simple_changed_repr env simple =
@@ -249,6 +272,13 @@ let is_dead_var env v =
   | Region | Rec_info -> false
   | Value | Naked_number _ ->
     not (DS.has_source env.uses (Code_id_or_name.var v))
+
+let simple_is_dead env simple =
+  Simple.pattern_match' simple
+    ~var:(fun v ~coercion:_ -> is_dead_var env v)
+    ~symbol:(fun sym ~coercion:_ ->
+      not (DS.has_source env.uses (Code_id_or_name.symbol sym)))
+    ~const:(fun _ -> false)
 
 type change_calling_convention =
   | Not_changing_calling_convention
@@ -546,6 +576,28 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
       (Function_slot.Lmap.bindings
          (Function_declarations.funs_in_order function_decls))
   in
+  let code_ids_to_remember =
+    if env.inside_code_definition
+    then
+      (* If a closure is defined inside a code definition (let's call it C) it
+         is possible, for other compilation units to need the code of the
+         functions. If the C code is inlined in this other compilation unit, the
+         functions of the closure can be simplified again. Hence it has to be
+         exported (remembered).
+
+         This is an over-approximation: If the current code C cannot be inlined
+         or re-simplified in another compilation unit, this closure can't be
+         resimplified there. Yet the current criterion will still export the
+         code from this closure *)
+      List.fold_left
+        (fun code_ids_to_remember (_, decl) ->
+          match decl with
+          | Deleted _ -> code_ids_to_remember
+          | Code_id { code_id; _ } ->
+            Code_id.Set.add code_id code_ids_to_remember)
+        res.code_ids_to_remember function_decls
+    else res.code_ids_to_remember
+  in
   let function_decls =
     Function_declarations.create (Function_slot.Lmap.of_list function_decls)
   in
@@ -556,7 +608,8 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
     { res with
       all_slot_offsets =
         Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
-          set_of_closures
+          set_of_closures;
+      code_ids_to_remember
     }
   in
   set_of_closures, res
@@ -638,56 +691,80 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   | Empty_array _ | Mutable_string _ | Immutable_string _ -> sc
 
 let rebuild_named_default_case env (named : Named.t) =
-  let[@local] rewrite_field_access arg field =
-    let arg = get_simple_unboxable env arg in
-    let var = Field.Map.find field arg in
-    let var =
-      match var with
-      | Not_unboxed var -> var
-      | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
-    in
-    Named.create_simple (Simple.var var)
+  let[@local] rewrite_field_access ?(mut : Mutability.t = Immutable) base field
+      =
+    let arg = get_simple_unboxable env base in
+    match Field.Map.find field arg with
+    | Not_unboxed var -> Named.create_simple (Simple.var var)
+    | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
+    | exception Not_found -> (
+      match mut with
+      | Immutable | Immutable_unique ->
+        Misc.fatal_errorf
+          "In [rewrite_field_access], an immutable field load for field %a did \
+           not appear in the fields. This case should have been excluded by \
+           the no_source check previously.@.Block is: %a@.Expected fields are: \
+           %a@."
+          Field.print field Simple.print base Field.Set.print
+          (Field.Map.keys arg)
+      | Mutable ->
+        Named.create_prim
+          (P.Nullary (Invalid (Field.kind field)))
+          Debuginfo.none)
   in
-  let[@local] rewrite_field_access_chg_repr arg field dbg =
+  let[@local] rewrite_field_access_chg_repr ?(mut : Mutability.t = Immutable)
+      arg field dbg =
+    let[@inline] get_field ~f (arg_fields : _ DS.unboxed_fields Field.Map.t) =
+      match Field.Map.find field arg_fields with
+      | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
+      | Not_unboxed r -> f r
+      | exception Not_found ->
+        (match mut with
+        | Immutable | Immutable_unique ->
+          Misc.fatal_errorf
+            "In [rewrite_field_access_chg_repr], an immutable field load for \
+             field %a did not appear in the fields. This case should have been \
+             excluded by the no_source check previously.@.Block is: \
+             %a@.Expected fields are: %a@."
+            Field.print field Simple.print arg Field.Set.print
+            (Field.Map.keys arg_fields)
+        | Mutable -> Named.create_prim (P.Nullary (Invalid (Field.kind field))))
+          dbg
+    in
     let arg_repr = get_simple_changed_repr env arg in
     match arg_repr with
-    | Block_representation (arg_fields, _size) -> (
-      let f = Field.Map.find field arg_fields in
-      match f with
-      | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
-      | Not_unboxed (field, kind) ->
-        Named.create_prim
-          (P.Unary
-             ( Block_load
-                 { field = Target_ocaml_int.of_int env.machine_width field;
-                   kind;
-                   mut = Immutable
-                 },
-               arg ))
-          dbg)
+    | Block_representation (arg_fields, _size) ->
+      get_field arg_fields ~f:(fun (field, kind) ->
+          Named.create_prim
+            (P.Unary
+               ( Block_load
+                   { field = Target_ocaml_int.of_int env.machine_width field;
+                     kind;
+                     mut = Immutable
+                   },
+                 arg ))
+            dbg)
     | Closure_representation (arg_fields, function_slots, current_function_slot)
-      -> (
-      let f = Field.Map.find field arg_fields in
-      match f with
-      | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
-      | Not_unboxed value_slot ->
-        Named.create_prim
-          (P.Unary
-             ( Project_value_slot
-                 { value_slot;
-                   project_from =
-                     Function_slot.Map.find current_function_slot function_slots
-                 },
-               arg ))
-          dbg)
+      ->
+      get_field arg_fields ~f:(fun value_slot ->
+          Named.create_prim
+            (P.Unary
+               ( Project_value_slot
+                   { value_slot;
+                     project_from =
+                       Function_slot.Map.find current_function_slot
+                         function_slots
+                   },
+                 arg ))
+            dbg)
   in
   match[@ocaml.warning "-fragile-match"] named with
   | Simple simple -> Named.create_simple (rewrite_simple env simple)
-  | Prim (Unary (Block_load { kind; field; _ }, arg), _dbg)
+  | Prim (Unary (Block_load { kind; field; mut; _ }, arg), _dbg)
     when simple_is_unboxable env arg ->
     let kind = P.Block_access_kind.element_kind_for_load kind in
     let field = Field.block (Target_ocaml_int.to_int field) kind in
-    rewrite_field_access arg field
+    rewrite_field_access ~mut arg field
   | Prim (Unary (Project_value_slot { value_slot; _ }, arg), _dbg)
     when simple_is_unboxable env arg ->
     rewrite_field_access arg (Field.value_slot value_slot)
@@ -696,11 +773,11 @@ let rebuild_named_default_case env (named : Named.t) =
     rewrite_field_access arg Field.is_int
   | Prim (Unary (Get_tag, arg), _dbg) when simple_is_unboxable env arg ->
     rewrite_field_access arg Field.get_tag
-  | Prim (Unary (Block_load { kind; field; _ }, arg), dbg)
+  | Prim (Unary (Block_load { kind; field; mut; _ }, arg), dbg)
     when simple_changed_repr env arg ->
     let kind = P.Block_access_kind.element_kind_for_load kind in
     let field = Field.block (Target_ocaml_int.to_int field) kind in
-    rewrite_field_access_chg_repr arg field dbg
+    rewrite_field_access_chg_repr ~mut arg field dbg
   | Prim (Unary (Project_value_slot { value_slot; _ }, arg), dbg)
     when simple_changed_repr env arg ->
     rewrite_field_access_chg_repr arg (Field.value_slot value_slot) dbg
@@ -737,7 +814,20 @@ let rewrite_apply_cont_expr env ac =
   else
     let args =
       let args_to_keep = Continuation.Map.find cont env.cont_params_to_keep in
-      get_args env args_to_keep args
+      try get_args env args_to_keep args
+      with Misc.Fatal_error ->
+        let bt = Printexc.get_raw_backtrace () in
+        Format.eprintf
+          "\n\
+           %tContext is:%t rewriting apply_cont for continuation %a with@ \
+           original args @[(%a)@],@ params to keep @[(%a)@]\n"
+          Flambda_colours.error Flambda_colours.pop Continuation.print cont
+          (Format.pp_print_list ~pp_sep:Format.pp_print_space Simple.print)
+          args
+          (Format.pp_print_list ~pp_sep:Format.pp_print_space
+             print_param_decision)
+          args_to_keep;
+        Printexc.raise_with_backtrace Misc.Fatal_error bt
     in
     Some (Apply_cont_expr.with_continuation_and_args ac cont ~args)
 
@@ -1018,26 +1108,25 @@ let decide_whether_apply_needs_calling_convention_change env apply =
       else Changing_calling_convention code_id, call_kind)
 
 let rebuild_apply env apply =
-  let callee_is_dead_variable =
+  let callee_is_dead =
     match Apply.callee apply with
     | None -> false
-    | Some c ->
-      Simple.pattern_match c
-        ~const:(fun _ -> false)
-        ~name:(fun name ~coercion:_ ->
-          not (DS.has_source env.uses (Code_id_or_name.name name)))
+    | Some c -> simple_is_dead env c
   in
-  if callee_is_dead_variable
+  if callee_is_dead || List.exists (simple_is_dead env) (Apply.args apply)
   then
-    (* This is to avoid having to consider the case where the callee is dead in
-       the rest of rebuilding the apply. This invalid should be eliminated
-       higher anyway, at the moment the callee is bound. *)
+    (* This is to avoid having to consider the case where the callee or one of
+       its arguments is dead in the rest of rebuilding the apply. This invalid
+       should be eliminated higher anyway, at the moment the dead
+       callee/argument is bound. *)
     RE.from_expr
       ~expr:
         (Expr.create_invalid
            (Message
-              (Format.asprintf "Callee %a has no source" Simple.print
-                 (Option.get (Apply.callee apply)))))
+              (Format.asprintf
+                 "[This invalid should not appear in the output code] Callee \
+                  or one of the args has no source for apply %a"
+                 Apply.print apply)))
       ~free_names:Name_occurrences.empty
   else
     (* CR ncourant: we never rewrite alloc_mode. This is currently ok because we
@@ -1058,7 +1147,19 @@ let rebuild_apply env apply =
             (* This contains the exn argument that is not part of the extra
                args *)
           in
-          get_args_with_kinds env args_to_keep (List.map fst extra_args)
+          try get_args_with_kinds env args_to_keep (List.map fst extra_args)
+          with Misc.Fatal_error ->
+            let bt = Printexc.get_raw_backtrace () in
+            Format.eprintf
+              "\n\
+               %tContext is:%t rebuilding exception continuation@ %a,@ with \
+               args to keep @[(%a)@]\n"
+              Flambda_colours.error Flambda_colours.pop Exn_continuation.print
+              exn_continuation
+              (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                 print_param_decision)
+              args_to_keep;
+            Printexc.raise_with_backtrace Misc.Fatal_error bt
           (* with Not_found -> (* Not defined in cont_params_to_keep *)
              extra_args *)
         in
@@ -1161,23 +1262,40 @@ let rebuild_apply env apply =
     | Changing_calling_convention code_id ->
       (* Format.eprintf "CHANGING CALLING CONVENTION %a %a@." Code_id.print
          code_id Apply.print apply; *)
+      let original_callee = Apply.callee apply in
       let args_from_unboxed_callee, callee =
-        match Apply.callee apply with
-        | Some callee when simple_is_unboxable env callee ->
-          let fields = get_simple_unboxable env callee in
-          let new_args =
-            DS.fold_unboxed_with_kind
-              (fun kind v acc -> (Simple.var v, KS.anything kind) :: acc)
-              fields []
-          in
-          new_args, None
-        | (None | Some _) as callee ->
+        match Code_id.Map.find_opt code_id env.my_closure_decisions with
+        | None ->
+          Misc.fatal_errorf
+            "No my_closure_decisions found for code id %a in direct apply \
+             rewrite of@ %a"
+            Code_id.print code_id Apply.print apply
+        | Some Keep_my_closure ->
           ( [],
             (* Note here that callee is rewritten with [rewrite_simple_opt],
                which will put [None] as the callee instead of a dummy value, as
                a dummy value would then be further used in a later simplify pass
                to refine the call kind and produce an invalid. *)
-            rewrite_simple_opt env callee )
+            rewrite_simple_opt env (Apply.callee apply) )
+        | Some (Unbox_my_closure fields) ->
+          let callee =
+            match Apply.callee apply with
+            | None ->
+              Misc.fatal_errorf "No callee for apply %a with unboxed closure"
+                Apply.print apply
+            | Some callee -> callee
+          in
+          if not (simple_is_unboxable env callee)
+          then
+            Misc.fatal_errorf
+              "Callee is not unboxable in apply %a with unboxed closure"
+              Apply.print apply;
+          let callee_fields = get_simple_unboxable env callee in
+          ( fold2_unboxed_subset_with_kind
+              (fun kind _param callee_field acc ->
+                (Simple.var callee_field, KS.anything kind) :: acc)
+              fields callee_fields [],
+            None )
       in
       let params_decisions =
         match Code_id.Map.find_opt code_id env.function_params_to_keep with
@@ -1196,7 +1314,49 @@ let rebuild_apply env apply =
         Flambda_arity.group_by_parameter (Apply.args_arity apply)
           (Apply.args apply)
       in
-      let args = List.map2 (get_args_with_kinds env) params_decisions args in
+      let args =
+        try List.map2 (get_args_with_kinds env) params_decisions args
+        with Misc.Fatal_error ->
+          let bt = Printexc.get_raw_backtrace () in
+          Format.eprintf
+            "\n\
+             %tContext is:%t changing calling convention of direct apply with \
+             code id %a,@ original callee %a@ (new callee is %a%a),@ original \
+             args @[(%a)@],@ unboxing decisions @[(%a)@]\n"
+            Flambda_colours.error Flambda_colours.pop Code_id.print code_id
+            (Format.pp_print_option
+               ~none:(fun ppf () -> Format.pp_print_string ppf "absent")
+               Simple.print)
+            original_callee
+            (Format.pp_print_option
+               ~none:(fun ppf () -> Format.pp_print_string ppf "absent")
+               Simple.print)
+            callee
+            (fun ppf args_from_unboxed_callee ->
+              match args_from_unboxed_callee with
+              | [] -> ()
+              | args ->
+                Format.fprintf ppf " and unboxed into args: @[(%a)@]"
+                  (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                     (fun ppf (simple, _) -> Simple.print ppf simple))
+                  args)
+            args_from_unboxed_callee
+            (Format.pp_print_list ~pp_sep:Format.pp_print_space
+               (fun ppf param ->
+                 Format.fprintf ppf "@[(%a)@]"
+                   (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                      Simple.print)
+                   param))
+            args
+            (Format.pp_print_list ~pp_sep:Format.pp_print_space
+               (fun ppf param_decisions ->
+                 Format.fprintf ppf "@[(%a)@]"
+                   (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                      print_param_decision)
+                   param_decisions))
+            params_decisions;
+          Printexc.raise_with_backtrace Misc.Fatal_error bt
+      in
       let args =
         match args with
         | [] ->
@@ -1241,7 +1401,14 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
   in
   let arg = Code_id_or_name.name arg in
   match DS.get_unboxed_fields env.uses arg with
-  | Some arg -> bind_fields (Unboxed to_bind) (Field.Map.find field arg) hole
+  | Some arg -> (
+    match Field.Map.find field arg with
+    | exception Not_found ->
+      Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
+        Format.pp_print_text "Loading unboxed field:" Field.print field
+        Format.pp_print_text "from unboxed variable:" Simple.print oarg
+        Format.pp_print_text "but it was not tracked."
+    | f -> bind_fields (Unboxed to_bind) f hole)
   | None -> (
     if Option.is_none (DS.get_changed_representation env.uses arg)
     then
@@ -1252,52 +1419,64 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
         (DS.has_source env.uses arg);
     let arg = Option.get (DS.get_changed_representation env.uses arg) in
     match arg with
-    | Block_representation (arg_fields, _size) ->
-      let arg = Field.Map.find field arg_fields in
-      fold2_unboxed_subset
-        (fun var (field, kind) hole ->
-          let bp =
-            Bound_pattern.singleton
-              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
-            (* CR sspies: Missing debug uid. *)
-          in
-          let named =
-            Named.create_prim
-              (P.Unary
-                 ( Block_load
-                     { field = Target_ocaml_int.of_int env.machine_width field;
-                       kind;
-                       mut = Immutable
-                     },
-                   oarg ))
-              dbg
-          in
-          RE.create_let bp named ~body:hole)
-        (Unboxed to_bind) arg hole
+    | Block_representation (arg_fields, _size) -> (
+      match Field.Map.find field arg_fields with
+      | exception Not_found ->
+        Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
+          Format.pp_print_text "Loading unboxed field:" Field.print field
+          Format.pp_print_text "from block with changed representation:"
+          Simple.print oarg Format.pp_print_text "but it was not tracked."
+      | arg ->
+        fold2_unboxed_subset
+          (fun var (field, kind) hole ->
+            let bp =
+              Bound_pattern.singleton
+                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+              (* CR sspies: Missing debug uid. *)
+            in
+            let named =
+              Named.create_prim
+                (P.Unary
+                   ( Block_load
+                       { field = Target_ocaml_int.of_int env.machine_width field;
+                         kind;
+                         mut = Immutable
+                       },
+                     oarg ))
+                dbg
+            in
+            RE.create_let bp named ~body:hole)
+          (Unboxed to_bind) arg hole)
     | Closure_representation (arg_fields, function_slots, current_function_slot)
-      ->
-      let arg = Field.Map.find field arg_fields in
-      fold2_unboxed_subset
-        (fun var value_slot hole ->
-          let bp =
-            Bound_pattern.singleton
-              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
-            (* CR sspies: Missing debug uid. *)
-          in
-          let named =
-            Named.create_prim
-              (P.Unary
-                 ( Project_value_slot
-                     { value_slot;
-                       project_from =
-                         Function_slot.Map.find current_function_slot
-                           function_slots
-                     },
-                   oarg ))
-              dbg
-          in
-          RE.create_let bp named ~body:hole)
-        (Unboxed to_bind) arg hole)
+      -> (
+      match Field.Map.find field arg_fields with
+      | exception Not_found ->
+        Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
+          Format.pp_print_text "Loading unboxed field:" Field.print field
+          Format.pp_print_text "from closure with changed representation:"
+          Simple.print oarg Format.pp_print_text "but it was not tracked."
+      | arg ->
+        fold2_unboxed_subset
+          (fun var value_slot hole ->
+            let bp =
+              Bound_pattern.singleton
+                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+              (* CR sspies: Missing debug uid. *)
+            in
+            let named =
+              Named.create_prim
+                (P.Unary
+                   ( Project_value_slot
+                       { value_slot;
+                         project_from =
+                           Function_slot.Map.find current_function_slot
+                             function_slots
+                       },
+                     oarg ))
+                dbg
+            in
+            RE.create_let bp named ~body:hole)
+          (Unboxed to_bind) arg hole))
 
 let rebuild_singleton_binding_which_is_being_unboxed env bv
     ~(defining_expr : Named.t) ~hole =
@@ -1916,6 +2095,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       in
       { env with should_preserve_direct_calls }
   in
+  let env = { env with inside_code_definition = true } in
   let { Rev_expr.return_continuation;
         exn_continuation;
         params;
@@ -2179,6 +2359,7 @@ type result =
   { body : Expr.t;
     free_names : Name_occurrences.t;
     all_code : Code.t Code_id.Map.t;
+    code_ids_to_remember : Code_id.Set.t;
     slot_offsets : Slot_offsets.t
   }
 
@@ -2212,6 +2393,25 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       (fun code_id (code_dep : Traverse_acc.code_dep) ->
         let kinds = Flambda_arity.unarize code_dep.arity in
         List.map2 (should_keep_function_param code_id) code_dep.params kinds)
+      code_deps
+  in
+  let my_closure_decisions =
+    Code_id.Map.mapi
+      (fun code_id (code_dep : Traverse_acc.code_dep) ->
+        let unboxed_fields =
+          DS.get_unboxed_fields solved_dep
+            (Code_id_or_name.var code_dep.my_closure)
+        in
+        match unboxed_fields with
+        | None -> Keep_my_closure
+        | Some unboxed_fields ->
+          if DS.cannot_change_calling_convention solved_dep code_id
+          then
+            Misc.fatal_errorf
+              "For code_id %a, we cannot change calling convention but closure \
+               is expected to be unboxed"
+              Code_id.print code_id;
+          Unbox_my_closure unboxed_fields)
       code_deps
   in
   let should_keep_function_param code_id =
@@ -2295,23 +2495,29 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;
+      my_closure_decisions;
       function_params_to_keep;
       should_keep_function_param;
       function_return_decision;
       kinds;
       should_preserve_direct_calls;
-      old_typing_env = final_typing_env
+      old_typing_env = final_typing_env;
+      inside_code_definition = false
     }
   in
   let res =
-    { all_slot_offsets = Slot_offsets.empty; all_code = Code_id.Map.empty }
+    { all_slot_offsets = Slot_offsets.empty;
+      all_code = Code_id.Map.empty;
+      code_ids_to_remember = Code_id.Set.empty
+    }
   in
-  let rebuilt_expr, { all_slot_offsets; all_code } =
+  let rebuilt_expr, { all_slot_offsets; all_code; code_ids_to_remember } =
     Profile.record_call ~accumulate:true "up" (fun () ->
         rebuild_expr env res holed)
   in
   { body = rebuilt_expr.expr;
     free_names = rebuilt_expr.free_names;
     all_code;
+    code_ids_to_remember;
     slot_offsets = all_slot_offsets
   }

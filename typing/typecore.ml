@@ -142,6 +142,8 @@ type mutable_restriction =
   | In_group
   | In_rec
 
+type mode_mismatch_kind = Parameter | Return
+
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
   | Constructor_labeled_arg
@@ -275,7 +277,7 @@ type error =
   | Submode_failed of Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
-  | Param_mode_mismatch of Alloc.equate_error
+  | Mode_mismatch of mode_mismatch_kind * Alloc.equate_error
   | Uncurried_function_escapes of Alloc.error
   | Function_returns_local
   | Tail_call_local_returning
@@ -296,8 +298,8 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Eval_format
   | Let_poly_not_yet_implemented
+  | Layout_poly_inst_not_yet_supported
 
 
 let not_principal fmt =
@@ -1093,9 +1095,11 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
-let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
+(* CR-someday: This function should be migrated to use the new mode
+   error system instead of the ad-hoc [Mode_mismatch] error variant. *)
+let apply_mode_annots ~loc ~env kind (m : Alloc.Const.Option.t) mode =
   let error axis =
-    raise (Error(loc, env, Param_mode_mismatch axis))
+    raise (Error(loc, env, Mode_mismatch (kind, axis)))
   in
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m in
@@ -1382,7 +1386,8 @@ let add_pattern_variables ?check ?check_as env pv =
           pv_attributes; pv_uid} env ->
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
-         {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
+         {val_type = pv_type; val_kind = pv_kind; val_lpoly = [];
+          Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
@@ -3558,6 +3563,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
           Env.add_value ~mode:Mode.Value.legacy pv_id
             { val_type = pv_type
             ; val_kind = Val_reg pv_sort
+            ; val_lpoly = []
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.undefined
@@ -3570,6 +3576,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
           Env.add_value ~mode:Mode.Value.legacy id' ~check
             { val_type = pv_type
             ; val_kind = Val_ivar (Immutable, cl_num)
+            ; val_lpoly = []
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.undefined
@@ -4548,9 +4555,7 @@ let rec is_nonexpansive exp =
   | Texp_probe_is_enabled _
   | Texp_src_pos
   | Texp_quotation _
-  | Texp_array (_, _, [], _)
-    (* CR metaprogramming mshinwell: Make sure this is correct for Texp_eval *)
-  | Texp_eval _ -> true
+  | Texp_array (_, _, [], _) -> true
   | Texp_let(_rec_flag, pat_exp_list, body) ->
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
       is_nonexpansive body
@@ -4606,14 +4611,6 @@ let rec is_nonexpansive exp =
   | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> true
-        | Baccess_array
-            { mut = _
-            ; index_kind = _
-            ; index
-            ; base_ty = _
-            ; elt_ty = _
-            ; elt_sort = _ } ->
-          is_nonexpansive index
         | Baccess_block (_, idx) -> is_nonexpansive idx
       in
       (* All unboxed accesses are nonexpansive, but we include the below match
@@ -4897,7 +4894,7 @@ let type_approx_fun_one_param
   in
   Option.iter
     (fun mode_annots ->
-      apply_mode_annots ~loc ~env mode_annots.mode_modes arg_mode)
+      apply_mode_annots ~loc ~env Parameter mode_annots.mode_modes arg_mode)
     mode_annots;
   if has_poly then begin
     match spato with
@@ -5132,10 +5129,7 @@ let check_partial_application ~statement exp =
             | Texp_lazy _ | Texp_object _ | Texp_pack _ | Texp_unreachable
             | Texp_extension_constructor _ | Texp_ifthenelse (_, _, None)
             | Texp_probe _ | Texp_probe_is_enabled _ | Texp_src_pos
-            | Texp_function _ | Texp_quotation _ | Texp_antiquotation _
-            | Texp_eval _ ->
-                (* CR metaprogramming mshinwell: make sure this is correct for
-                   Texp_eval *)
+            | Texp_function _ | Texp_quotation _ | Texp_antiquotation _ ->
                 check_statement ()
             | Texp_match (_, _, cases, _) ->
                 List.iter (fun {c_rhs; _} -> check c_rhs) cases
@@ -5577,8 +5571,8 @@ let split_function_ty
           generalize_structure ty_arg;
           generalize_structure ty_ret)
   in
-  apply_mode_annots ~loc:loc_fun ~env mode_annots arg_mode;
-  apply_mode_annots ~loc:loc_fun ~env ret_mode_annots ret_mode;
+  apply_mode_annots ~loc:loc_fun ~env Parameter mode_annots arg_mode;
+  apply_mode_annots ~loc:loc_fun ~env Return ret_mode_annots ret_mode;
   let really_poly =
     not has_poly && not (tpoly_is_mono ty_arg) && is_really_poly ~env ty_arg
   in
@@ -5686,11 +5680,6 @@ let generalize_structure_type_block_access_result
   generalize_structure el_ty;
   match ba with
   | Baccess_field _ -> ()
-  | Baccess_array
-      { mut = _; index; index_kind = _; base_ty; elt_ty; elt_sort = _ } ->
-    generalize_structure base_ty;
-    generalize_structure elt_ty;
-    generalize_structure_exp index
   | Baccess_block (_, idx) ->
     generalize_structure_exp idx
 
@@ -5877,7 +5866,7 @@ and type_expect_
                 exp, mode
               end ~post:(fun (exp, _) -> generalize_structure_exp exp)
             in
-            Some (exp, mode)
+            Some (exp, Mode.Value.disallow_right mode)
       in
       let ty_record, expected_type =
         let extract_record loc ty other_form_error not_a_record_error =
@@ -6042,6 +6031,7 @@ and type_expect_
                 apply_is_contained_by is_contained_by
                   ~modalities:lbl.lbl_modalities mode
               in
+              let mode = cross_left env lbl.lbl_arg mode in
               check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
                 ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode;
               let is_contained_by : Mode.Hint.is_contained_by =
@@ -6869,11 +6859,11 @@ and type_expect_
     let mut =
       match ba with
       | Baccess_field (_, { lbl_mut = Immutable; _ })
-      | Baccess_array { mut = Immutable; _ } | Baccess_block (Immutable, _) ->
+      | Baccess_block (Immutable, _) ->
         false
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ })
-      | Baccess_array { mut = Mutable; _ } | Baccess_block (Mutable, _) ->
+      | Baccess_block (Mutable, _) ->
         true
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }) ->
@@ -7047,6 +7037,28 @@ and type_expect_
       let exp = type_expect env expected_mode sarg (mk_expected ty_expected ?explanation) in
       { exp with exp_loc = loc
       ; exp_extra = (Texp_mode modes, loc, []) :: exp.exp_extra
+      }
+  | Pexp_constraint (sarg, Some sty, []) ->
+      let (ty, extra_cty) = type_constraint env sty Mode.Alloc.Const.legacy in
+      let ty' = instance ty in
+      let error_message_attr_opt =
+        Builtin_attributes.error_message_attr sexp.pexp_attributes in
+      let explanation = Option.map (fun msg -> Error_message_attr msg)
+                          error_message_attr_opt in
+      let arg =
+        type_argument ~overwrite ?explanation env expected_mode sarg ty
+          (instance ty)
+      in
+      rue {
+        exp_desc = arg.exp_desc;
+        exp_loc = arg.exp_loc;
+        exp_type = ty';
+        exp_attributes = arg.exp_attributes;
+        exp_env = env;
+        exp_extra =
+          (Texp_constraint extra_cty,
+           loc,
+           sexp.pexp_attributes) :: arg.exp_extra;
       }
   | Pexp_constraint (sarg, Some sty, modes) ->
       let modes = Typemode.transl_mode_annots modes in
@@ -7641,43 +7653,6 @@ and type_expect_
       | _ ->
           raise (Error (loc, env, Invalid_atomic_loc_payload))
       end
-  | Pexp_extension ({ txt = ("eval" | "ocaml.eval"); _ }, payload) ->
-    (* CR metaprogramming mshinwell: This match clause needs code review *)
-    if not (Language_extension.is_enabled Runtime_metaprogramming) then
-      raise (Typetexp.Error (loc, env,
-                             Unsupported_extension Runtime_metaprogramming));
-    begin match Builtin_attributes.get_eval_payload payload with
-    | Error () -> raise (Error (loc, env, Eval_format))
-    | Ok typ ->
-      let _ =
-        (* Check that the type is valid in a quote too. *)
-        let env' = Env.enter_quotation env in
-        Typetexp.transl_simple_type env' ~new_var_jkind:Any ~closed:true
-          Alloc.Const.legacy typ in
-      let typ =
-        Typetexp.transl_simple_type env ~new_var_jkind:Any ~closed:true
-          Alloc.Const.legacy typ
-      in
-      let sort =
-        match type_sort ~why:Function_result ~fixed:false env typ.ctyp_type with
-        | Ok sort -> sort
-        | Error err ->
-            raise (Error (loc, env, Function_type_not_rep (typ.ctyp_type, err)))
-      in
-      let eval_type = newty
-        (Tarrow
-          ((Nolabel, Alloc.legacy, Alloc.legacy)
-          , newmono (Predef.type_code (newgenty (Tquote typ.ctyp_type)))
-          , typ.ctyp_type
-          , commu_ok))
-      in
-      rue {
-        exp_desc = Texp_eval (typ, sort);
-        exp_loc = loc; exp_extra = [];
-        exp_type = eval_type;
-        exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
-    end
   | Pexp_extension ext ->
     raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -7804,13 +7779,11 @@ and type_expect_
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
-      let jkind = Jkind.Builtin.value ~why:Quotation_result in
       let new_env = Env.enter_quotation env in
-      let ty = newgenvar jkind in
-      let quoted_ty = newgenty (Tquote ty) in
-      let to_unify = Predef.type_code quoted_ty in
+      let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
+      let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
       with_explanation (fun () ->
-        unify_exp_types loc env to_unify (generic_instance ty_expected));
+        unify_exp_types loc env expr_ty (generic_instance ty_expected));
       let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
       re {
         exp_desc = Texp_quotation arg;
@@ -7900,34 +7873,6 @@ and type_block_access env expected_base_ty principal
     in
     let modality = label.lbl_modalities in
     { ba; base_ty = ty_res; el_ty = ty_arg; flat_float; modality }
-  | Baccess_array (mut, index_kind, index) ->
-    let elt_jkind, elt_sort =
-      Jkind.of_new_non_float_sort_var ~why:Idx_element
-        ~level:(Ctype.get_current_level ())
-    in
-    let elt_ty = newvar elt_jkind in
-    let base_ty =
-      match mut with
-      | Immutable -> Predef.type_iarray elt_ty
-      | Mutable -> Predef.type_array elt_ty
-    in
-    let index_type_expected =
-      match index_kind with
-      | Index_int -> Predef.type_int
-      | Index_unboxed_int64 -> Predef.type_unboxed_int64
-      | Index_unboxed_int32 -> Predef.type_unboxed_int32
-      | Index_unboxed_int16 -> Predef.type_unboxed_int16
-      | Index_unboxed_int8 -> Predef.type_unboxed_int8
-      | Index_unboxed_nativeint -> Predef.type_unboxed_nativeint
-    in
-    let index =
-      type_expect env mode_legacy index (mk_expected index_type_expected) in
-    let ba =
-      Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
-    in
-    let mut = match mut with Immutable -> false | Mutable -> true in
-    let modality = Typemode.idx_expected_modalities ~mut in
-    { ba; base_ty; el_ty = elt_ty; flat_float = false; modality }
   | Baccess_block (mut, idx) ->
     let base_ty = newvar (Jkind.Builtin.value ~why:Idx_base) in
     let el_ty =
@@ -8126,6 +8071,8 @@ and type_ident env ?(recarg=Rejected) lid =
 
   Therefore, we need to cross modes upon look-up. Ideally that should be done in
   [Env], but that is difficult due to cyclic dependency between jkind and env. *)
+  if not @@ List.is_empty desc.val_lpoly then
+    raise (Error (lid.loc, env, Layout_poly_inst_not_yet_supported));
   let mode = cross_left env desc.val_type mode in
   (* There can be locks between the definition and a use of a value. For
   example, if a function closes over a value, there will be Closure_lock between
@@ -9121,6 +9068,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         let id = Ident.create_local name in
         let desc =
           { val_type = ty; val_kind = Val_reg sort;
+            val_lpoly = [];
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.undefined;
@@ -11683,7 +11631,7 @@ let report_error ~loc env =
     Location.error_of_printer ~loc (fun ppf () ->
       fprintf ppf "Object types must have layout value.@ %a%a"
         (Jkind.Violation.report_with_name ~name:"the type of this expression"
-           ~level:(Ctype.get_current_level ()) env) err
+           env) err
       pp_doc (report_type_expected_explanation_opt explanation))
       ()
   | Non_value_let_rec (err, ty) ->
@@ -11691,7 +11639,7 @@ let report_error ~loc env =
       fprintf ppf "Variables bound in a \"let rec\" must have layout value.@ %a"
         (fun v -> Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env v)
+           env v)
         err)
       ()
   | Undefined_method (ty, me, valid_methods) ->
@@ -12183,18 +12131,22 @@ let report_error ~loc env =
         "@[This application is complete, but surplus arguments were provided afterwards.@ \
          When passing or calling %a values, extra arguments are passed in a separate application.@]"
          (Alloc.Const.print_axis ax) left
-  | Param_mode_mismatch (s, e) ->
+  | Mode_mismatch (kind, (s, e)) ->
       let Mode.Alloc.Error (ax, {left; right}) = Mode.Alloc.to_simple_error e in
       let actual, expected =
         match s with
         | Left_le_right -> left, right
         | Right_le_left -> right, left
       in
+      let desc, desc_inf = match kind with
+        | Parameter -> "takes a parameter", "take a parameter"
+        | Return -> "has a return value", "have a return value"
+      in
       Location.errorf ~loc
-        "@[This function takes a parameter which is %a,@ \
-        but was expected to take a parameter which is %a.@]"
-        (Style.as_inline_code (Alloc.Const.print_axis ax)) actual
-        (Style.as_inline_code (Alloc.Const.print_axis ax)) expected
+        "@[This function %s which is %a,@ \
+        but was expected to %s which is %a.@]"
+        desc (Style.as_inline_code (Alloc.Const.print_axis ax)) actual
+        desc_inf (Style.as_inline_code (Alloc.Const.print_axis ax)) expected
   | Uncurried_function_escapes e -> begin
       let Mode.Alloc.Error (ax, {left; right}) = Mode.Alloc.to_simple_error e in
       match ax with
@@ -12240,25 +12192,25 @@ let report_error ~loc env =
         "@[Function arguments and returns must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ()) env) violation
+           env) violation
   | Record_projection_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Records being projected from must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ()) env) violation
+           env) violation
   | Record_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Record expressions must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ()) env) violation
+           env) violation
   | Mutable_var_not_rep (ty, violation) ->
       Location.errorf ~loc
         "@[Mutable variables must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ()) env) violation
+           env) violation
   | Invalid_label_for_src_pos arg_label ->
       Location.errorf ~loc
         "A position argument must not be %s."
@@ -12299,15 +12251,13 @@ let report_error ~loc env =
   | Unexpected_hole ->
       Location.errorf ~loc
         "wildcard \"_\" not expected."
-  | Eval_format ->
-      Location.errorf ~loc
-        "The eval extension takes a single type as its argument, for \
-         example %a."
-        Style.inline_code "[%eval: int]"
   | Let_poly_not_yet_implemented ->
       Location.errorf ~loc
         "The %a annotation is not yet implemented."
         Style.inline_code "let poly_"
+  | Layout_poly_inst_not_yet_supported ->
+      Location.errorf ~loc
+        "Instantiation of layout-polymorphic values is not yet supported."
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

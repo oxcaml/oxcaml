@@ -262,9 +262,6 @@ let classify_expression : Typedtree.expression -> sd =
           (* other cases compile to a lazy block holding a function *)
           Static
       end
-    | Texp_eval _ ->
-      (* CR metaprogramming mshinwell: Make sure this is correct *)
-      Static
 
     | Texp_new _
     | Texp_instvar _
@@ -757,14 +754,6 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> empty
-        | Baccess_array
-            { mut = _
-            ; index_kind = _
-            ; index
-            ; base_ty = _
-            ; elt_ty = _
-            ; elt_sort = _ } ->
-          expression index << Dereference
         | Baccess_block (_, idx) ->
           expression idx << Dereference
       in
@@ -1104,9 +1093,6 @@ let rec expression : Typedtree.expression -> term_judg =
         expression e << Dereference
     | Texp_antiquotation e ->
         expression e << Dereference
-    | Texp_eval _ ->
-      (* CR metaprogramming mshinwell: Make sure this is correct *)
-      empty
 
 (* Function bodies.
     G |-{body} b : m

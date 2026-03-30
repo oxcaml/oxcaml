@@ -160,6 +160,9 @@ and type_desc =
   | Tsplice of type_expr
   (** [Tsplice t] ==> [$t] *)
 
+  | Tquote_eval of type_expr
+  (** [Tquote_eval t] ==> [<[ t ]> eval] *)
+
   | Tnil
   (** [Tnil] ==> [<...; >] *)
 
@@ -1048,6 +1051,9 @@ module type Wrapped = sig
       have been applied and we have the real mode of the value. The original
       modalities shouldn't be looked again and is replaced by [undefined]. *)
       val_kind: value_kind;
+      val_lpoly: Jkind_types.Sort.var list;
+      (** poly sort vars (level = [Sort.generic_level]) that the value is
+          layout-polymorphic on; empty list means not layout polymorphic. *)
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;

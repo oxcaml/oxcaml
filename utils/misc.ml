@@ -327,6 +327,13 @@ module Stdlib = struct
       | None -> Format.pp_print_string ppf "None"
       | Some contents ->
         Format.fprintf ppf "@[(Some@ %a)@]" print_contents contents
+
+    let map_sharing f t =
+      match t with
+      | None -> t
+      | Some x ->
+        let y = f x in
+        if y == x then t else Some y
   end
 
   module Array = struct
@@ -1908,6 +1915,17 @@ end
 (* Fancy types *)
 
 type (_, _) eq = Refl : ('a, 'a) eq
+
+type ('a, 'b) comparison =
+  | Less_than : ('a, 'b) comparison
+  | Equal : ('a, 'a) comparison
+  | Greater_than : ('a, 'b) comparison
+
+let comparison_result : type a b. (a, b) comparison -> int = function
+  | Less_than -> -1
+  | Equal -> 0
+  | Greater_than -> 1
+
 (*********************************************)
 (* Fancy modules *)
 

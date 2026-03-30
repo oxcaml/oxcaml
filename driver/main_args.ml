@@ -240,6 +240,10 @@ let mk_o3 f =
   "-O3", Arg.Unit f, " Apply aggressive optimization for speed (may \
     significantly increase code size and compilation time)"
 
+let mk_o4 f =
+  "-O4", Arg.Unit f, " Like -O3, but also enable the reaper pass \
+    (Flambda 2 only)"
+
 let mk_rounds f =
   "-rounds", Arg.Int f,
     Printf.sprintf "<n>  Repeat tree optimization and inlining phases this \
@@ -365,6 +369,14 @@ let mk_labels f =
 
 let mk_linkall f =
   "-linkall", Arg.Unit f, " Link all modules, even unused ones"
+
+let mk_requires_metaprogramming f =
+  "-requires-metaprogramming", Arg.Unit f,
+  " Mark this unit as requiring metaprogramming support libraries"
+
+let mk_uses_metaprogramming f =
+  "-uses-metaprogramming", Arg.Unit f,
+  " Link metaprogramming support libraries"
 
 let mk_linscan f =
   "-linscan", Arg.Unit f, " Use the linear scan register allocator"
@@ -1186,6 +1198,8 @@ module type Compiler_options = sig
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit
   val _linkall : unit -> unit
+  val _requires_metaprogramming : unit -> unit
+  val _uses_metaprogramming : unit -> unit
   val _noautolink : unit -> unit
   val _o : string -> unit
   val _opaque :  unit -> unit
@@ -1289,6 +1303,7 @@ module type Optcommon_options = sig
   val _no_unbox_specialised_args : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+  val _o4 : unit -> unit
   val _insn_sched : unit -> unit
   val _no_insn_sched : unit -> unit
   val _linscan : unit -> unit
@@ -1371,6 +1386,7 @@ module type Jscomp_options = sig
   val _classic_inlining : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+  val _o4 : unit -> unit
 end
 
 module type Opttop_options = sig
@@ -1450,6 +1466,8 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
+    mk_requires_metaprogramming F._requires_metaprogramming;
+    mk_uses_metaprogramming F._uses_metaprogramming;
     mk_llvm_backend F._llvm_backend;
     mk_make_runtime F._make_runtime;
     mk_make_runtime_2 F._make_runtime;
@@ -1712,6 +1730,8 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
+    mk_requires_metaprogramming F._requires_metaprogramming;
+    mk_uses_metaprogramming F._uses_metaprogramming;
     mk_llvm_backend F._llvm_backend;
     mk_inline_max_depth F._inline_max_depth;
     mk_alias_deps F._alias_deps;
@@ -1735,6 +1755,7 @@ struct
     mk_o F._o;
     mk_o2 F._o2;
     mk_o3 F._o3;
+    mk_o4 F._o4;
     mk_opaque F._opaque;
     mk_open F._open;
     mk_output_obj F._output_obj;
@@ -1904,6 +1925,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_no_unbox_specialised_args F._no_unbox_specialised_args;
     mk_o2 F._o2;
     mk_o3 F._o3;
+    mk_o4 F._o4;
     mk_open F._open;
     mk_ppx F._ppx;
     mk_principal F._principal;
@@ -2021,6 +2043,8 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
+    mk_requires_metaprogramming F._requires_metaprogramming;
+    mk_uses_metaprogramming F._uses_metaprogramming;
     mk_modern F._labels;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
@@ -2037,6 +2061,7 @@ struct
     mk_o F._o;
     mk_o2 F._o2;
     mk_o3 F._o3;
+    mk_o4 F._o4;
     mk_opaque F._opaque;
     mk_open F._open;
     mk_output_obj F._output_obj;
@@ -2415,6 +2440,7 @@ module Default = struct
     *)
     let _o2 () = Clflags.set_o2 ()
     let _o3 () = Clflags.set_o3 ()
+    let _o4 () = Clflags.set_o4 ()
     let _remove_unused_arguments = set remove_unused_arguments
     let _rounds n = simplify_rounds := (Some n)
     let _unbox_closures = set unbox_closures
@@ -2468,6 +2494,8 @@ module Default = struct
     let _keep_docs = set keep_docs
     let _keep_locs = set keep_locs
     let _linkall = set link_everything
+    let _requires_metaprogramming = set requires_metaprogramming
+    let _uses_metaprogramming = set uses_metaprogramming
     let _llvm_backend = set llvm_backend
     let _match_context_rows n = match_context_rows := n
     let _no_keep_docs = clear keep_docs
@@ -2747,5 +2775,6 @@ third-party libraries such as Lwt, but with a different API."
     let _classic_inlining () = set_oclassic ()
     let _o2 () = Clflags.set_o2 ()
     let _o3 () = Clflags.set_o3 ()
+    let _o4 () = Clflags.set_o4 ()
   end
 end

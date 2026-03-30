@@ -170,7 +170,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     | _, Res_none ->
       (* Res_none implies one argument is already an address. *)
       May_still_have_spilled_registers
-    | 1, First_arg -> May_still_have_spilled_registers
+    | 1, Arg _ -> May_still_have_spilled_registers
     | 1, Res [| { loc = res_loc; _ } |] ->
       let arg_mem = Simd.loc_allows_mem simd.args.(0).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
@@ -180,11 +180,11 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       else if res_mem
       then may_use_stack_operand_for_result map instr ~num_args:1
       else May_still_have_spilled_registers
-    | num_args, First_arg ->
+    | num_args, Arg rr ->
       if Simd.loc_allows_mem simd.args.(1).loc
       then
         may_use_stack_operand_for_second_argument map instr ~num_args
-          ~res_is_fst:true
+          ~res_is_fst:(rr.(0) = 0)
       else May_still_have_spilled_registers
     | num_args, Res rr ->
       (* We don't attempt to allow spilling additional result regs. *)
@@ -249,13 +249,13 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Intop (Icomp _)) -> binary_operation map instr Result_cannot_be_on_stack
   | Op (Intop_imm (Icomp _, _)) ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
-  | Op (Intop Iadd) | Op (Intop_imm (Iadd, _)) ->
+  | Op (Intop Iadd) | Op (Intop_imm ((Iadd | Isub), _)) ->
     (* Conservatively assume it will be turned into a `lea` instruction, and ask
        for everything to be in registers. *)
     May_still_have_spilled_registers
   | Op (Intop (Ilsl | Ilsr | Iasr)) ->
     may_use_stack_operand_for_result map instr ~num_args:2
-  | Op (Intop_imm ((Isub | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)) ->
+  | Op (Intop_imm ((Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)) ->
     may_use_stack_operand_for_result map instr ~num_args:1
   | Op (Csel _) (* CR gyorsh: optimize *)
   | Op (Specific (Ilfence | Isfence | Imfence))

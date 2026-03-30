@@ -593,6 +593,13 @@ and raise_kind =
   | Raise_reraise
   | Raise_notrace
 
+let equal_raise_kind left right =
+  match left, right with
+  | Raise_regular, Raise_regular
+  | Raise_reraise, Raise_reraise
+  | Raise_notrace, Raise_notrace -> true
+  | (Raise_regular | Raise_reraise | Raise_notrace), _ -> false
+
 let generic_value =
   { raw_kind = Pgenval;
     nullable = Nullable;
@@ -961,12 +968,38 @@ type lambda =
   | Lsplice of scoped_location * slambda
 
 and slambda =
+  | SLlayout of layout
+  | SLglobal of Compilation_unit.t
+  | SLvar of Slambdaident.t
   | SLmissing
+  | SLrecord of slambda list
+  | SLfield of slambda * int
   | SLhalves of slambda_halves
+  | SLproj_comptime of slambda
+  | SLproj_runtime of slambda
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
 
 and slambda_halves =
   { sval_comptime: slambda;
     sval_runtime: lambda
+  }
+
+and slambda_function =
+  { sfun_params: Slambdaident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Slambdaident.t;
+    slet_value: slambda;
+    slet_body: slambda
   }
 
 and rec_binding = {
@@ -1687,18 +1720,11 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice (_, slambda) -> free_variables_slambda slambda
+  | Lsplice _ as l -> fatal_error_invalid_constructor l
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
     set exprs
-
-and free_variables_slambda = function
-  | SLmissing -> Ident.Set.empty
-  | SLhalves { sval_comptime; sval_runtime } ->
-      Ident.Set.union
-        (free_variables_slambda sval_comptime)
-        (free_variables sval_runtime)
 
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()
@@ -2681,6 +2707,8 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
     layout_unboxed_product (List.map layout_of_const_sort sorts)
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
+  | Genvar _ ->
+    Misc.fatal_error "layout_of_const_sort: unexpected genvar"
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
@@ -2705,6 +2733,8 @@ let extern_repr_involves_unboxed_products extern_repr =
     false
   | Same_as_ocaml_repr (Univar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"
+  | Same_as_ocaml_repr (Genvar _) ->
+    Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected genvar"
 
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)

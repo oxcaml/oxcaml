@@ -204,7 +204,6 @@ let iter_on_occurrences
   let iter_block_access exp_env = function
     | Baccess_field (lid, label_desc) ->
       add_label ~namespace:Label exp_env lid label_desc
-    | Baccess_array _ -> ()
     | Baccess_block _ -> ()
   in
   let iter_unboxed_access exp_env = function
@@ -266,8 +265,7 @@ let iter_on_occurrences
       (* CR-someday let_mutable: maybe iterate on mutvar? *)
       | Texp_mutvar _ | Texp_setmutvar _
       | Texp_open _ | Texp_src_pos | Texp_overwrite _
-      | Texp_hole _  | Texp_quotation _ | Texp_antiquotation _
-      | Texp_eval _ -> ());
+      | Texp_hole _  | Texp_quotation _ | Texp_antiquotation _ -> ());
       default_iterator.expr sub e);
 
   (* Remark: some types get iterated over twice due to how constraints are
@@ -289,7 +287,7 @@ let iter_on_occurrences
       | Ttyp_unboxed_tuple _
       | Ttyp_quote _ | Ttyp_splice _ | Ttyp_of_kind _
       | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_call_pos
-      | Ttyp_repr _ -> ());
+      | Ttyp_repr _ | Ttyp_newlayout _ -> ());
       default_iterator.typ sub ct);
 
   pat =

@@ -429,21 +429,14 @@ Error: This expression has type "int" but an expression was expected of type
 
 (* expressions *)
 let g () = exclave_ local_
-  let f = (() : _ @ unique once) in
-  let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-  local_ (() : _ @ unique once);;
+  let _f = (() : _ @ unique once) in
+  let _f = (() : @ unique once) in
+  let _f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
+  let _f x y @ local unique = exclave_ local_ (x + y : @ once unique) in
+  local_ (() : _ @ unique once);
+  local_ (() : @ unique once);;
 
 [%%expect{|
-Line 2, characters 6-7:
-2 |   let f = (() : _ @ unique once) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
-Line 3, characters 6-7:
-3 |   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
 val g : unit -> unit @ local once = <fun>
 |}]
 
@@ -1291,59 +1284,10 @@ val inc : 'a with_idx -> 'a with_idx = <fun>
 type 'a r = { foo : 'a }
 let idx_r () = (.foo)
 let idx_r_r () = (.foo.#foo)
-let idx_array x = (.(x))
-let idx_array_L x = (.L(x))
-let idx_array_l x = (.l(x))
-let idx_array_S x = (.S(x))
-let idx_array_s x = (.s(x))
-let idx_array_n x = (.n(x))
-let idx_iarray x = (.:(x))
-let idx_iarray_L x = (.:L(x))
-let idx_iarray_l x = (.:l(x))
-let idx_iarray_S x = (.:S(x))
-let idx_iarray_s x = (.:s(x))
-let idx_iarray_n x = (.:n(x))
-let idx_imm x = (.idx_imm(x))
-let idx_mut x = (.idx_mut(x))
 [%%expect{|
 type 'a r = { foo : 'a; }
 val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
 val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
-val idx_array :
-  ('a : value_or_null mod non_float). int -> ('a array, 'a) idx_mut = <fun>
-val idx_array_L :
-  ('a : value_or_null mod non_float). int64# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_l :
-  ('a : value_or_null mod non_float). int32# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_S :
-  ('a : value_or_null mod non_float). int16# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_s :
-  ('a : value_or_null mod non_float). int8# -> ('a array, 'a) idx_mut = <fun>
-val idx_array_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_iarray :
-  ('a : value_or_null mod non_float). int -> ('a iarray, 'a) idx_imm = <fun>
-val idx_iarray_L :
-  ('a : value_or_null mod non_float). int64# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_l :
-  ('a : value_or_null mod non_float). int32# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_S :
-  ('a : value_or_null mod non_float). int16# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_s :
-  ('a : value_or_null mod non_float). int8# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
-val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
 |}]
 
 module Borrow = struct
@@ -1618,7 +1562,7 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1137, characters 2-8: Assertion failed
 
 |}]
 
@@ -1797,4 +1741,11 @@ Line 2, characters 0-39:
 2 | and poly_ n : 'a. 'a -> 'a = fun x -> x
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+module type S = sig
+  val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
+end
+[%%expect{|
+module type S = sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
 |}]

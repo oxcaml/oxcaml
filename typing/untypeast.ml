@@ -473,10 +473,6 @@ let value_binding sub vb =
 let block_access sub : block_access -> Parsetree.block_access = function
   | Baccess_field (lid, _) ->
     Baccess_field (map_loc sub lid)
-  | Baccess_array
-      { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort = _ } ->
-    let index = sub.expr sub index in
-    Baccess_array (mut, index_kind, index)
   | Baccess_block (mut, idx) ->
     Baccess_block (mut, sub.expr sub idx)
 
@@ -801,8 +797,6 @@ let expression sub exp =
     | Texp_hole _ -> Pexp_hole
     | Texp_quotation exp -> Pexp_quote (sub.expr sub exp)
     | Texp_antiquotation exp -> Pexp_splice (sub.expr sub exp)
-    | Texp_eval (typ, _) ->
-        Pexp_extension ({ txt = "ocaml.eval"; loc}, PTyp (sub.typ sub typ))
   in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)
@@ -1103,6 +1097,8 @@ let core_type sub ct =
     | Ttyp_repr (list, ct) ->
         let bound_vars = List.map (fun v -> mkloc v loc) list in
         Ptyp_repr (bound_vars, sub.typ sub ct)
+    | Ttyp_newlayout (list, ct) ->
+        Ptyp_newlayout (list, sub.typ sub ct)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension

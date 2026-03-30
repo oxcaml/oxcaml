@@ -501,8 +501,8 @@ Error: Signature mismatch:
          val wrap : unit -> exn (* in a structure at nonportable *)
        is not included in
          val wrap : unit -> exn @@ portable (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
+       The first is "nonportable"
          because it contains a usage (of the constructor "R" at line 9, characters 16-17)
          which is expected to be "uncontended".
-       However, the right-hand side is "portable".
+       However, the second is "portable".
 |}]
