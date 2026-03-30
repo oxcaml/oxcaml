@@ -17,7 +17,7 @@
 module Toplevel = struct
   let override_sys_argv = Opttoploop.override_sys_argv
   let initialize_toplevel_env = Opttoploop.initialize_toplevel_env
-  let load_file = Opttopdirs.load_file
+  let load_file = Opttoploop.load_file
   let execute_phrase = Opttoploop.execute_phrase
 end
 

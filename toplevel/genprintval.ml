@@ -113,7 +113,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         for i = start_offset to O.size obj - 1 do
           let arg = O.field obj i in
           if is_null arg then
-            list := Oval_constr (Oide_ident (Out_name.create "<null>"), []) :: !list
+            list :=
+              Oval_constr (Oide_ident (Out_type.Out_name.create "<null>"), [])
+              :: !list
           else if not (O.is_block arg) then
             list := Oval_int (O.obj arg : int) :: !list
                (* Note: this could be a char or a constant constructor... *)
@@ -186,14 +188,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
     let exn_printer path ppf exn =
       Format_doc.fprintf ppf "<printer %a raised an exception: %s>"
-<<<<<<< oxcaml
-        Printtyp.path path
-||||||| upstream-base
-    let exn_printer ppf path exn =
-      fprintf ppf "<printer %a raised an exception: %s>" Printtyp.path path
-=======
         Printtyp.Doc.path path
->>>>>>> upstream-incoming
         (Printexc.to_string exn)
 
     let out_exn path exn =
@@ -302,20 +297,13 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     let tree_of_constr =
       tree_of_qualified
         (Env.lookup_all_constructors ~use:false ~loc:Location.none Env.Positive)
-        Data_types.cstr_res_type_path
+        (fun (cstr, _locks) -> Data_types.cstr_res_type_path cstr)
 
     and tree_of_label =
       tree_of_qualified
-<<<<<<< oxcaml
-        (fun lid env ->
-          (Env.find_label_by_name Legacy lid env).lbl_res)
-||||||| upstream-base
-        (fun lid env ->
-          (Env.find_label_by_name lid env).lbl_res)
-=======
-        (Env.lookup_all_labels ~use:false ~loc:Location.none Env.Construct)
+        (Env.lookup_all_labels ~use:false ~record_form:Legacy
+           ~loc:Location.none Env.Construct)
         Data_types.lbl_res_type_path
->>>>>>> upstream-incoming
 
     (* An abstract type *)
 
@@ -359,16 +347,12 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       let nested_values = ObjTbl.create 8 in
       let nest_gen err f depth obj ty =
         let repr = obj in
-<<<<<<< oxcaml
         (* We can't store non-values in an [ObjTbl.t] when cycle-checking.
            As a result, non-values may be printed twice, but cycles will still
            be detected since every cycle contains at least one value. *)
-        if not (is_value ty) || not (is_real_block repr) then
-||||||| upstream-base
-        if not (O.is_block repr) then
-=======
-        if not (O.is_block repr) || (O.tag repr >= Obj.no_scan_tag) then
->>>>>>> upstream-incoming
+        if not (is_value ty) || not (is_real_block repr)
+           || (O.tag repr >= Obj.no_scan_tag)
+        then
           f depth obj ty
         else
           if ObjTbl.mem nested_values repr then
@@ -397,224 +381,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Oval_stuff "<fun>"
           | Ttuple(labeled_tys) ->
               Oval_tuple (tree_of_labeled_val_list 0 depth obj labeled_tys)
-<<<<<<< oxcaml
           | Tunboxed_tuple(labeled_tys) ->
               Oval_unboxed_tuple
                 (tree_of_labeled_val_list 0 depth obj labeled_tys)
-          | Tconstr(path, [ty_arg], _)
-            when Path.same path Predef.path_list ->
-              if is_real_block obj then
-                match check_depth depth obj ty with
-                  Some x -> x
-                | None ->
-                    let rec tree_of_conses tree_list depth obj ty_arg =
-                      if !printer_steps < 0 || depth < 0 then
-                        Oval_ellipsis :: tree_list
-                      else if is_real_block obj then
-                        let tree =
-                          nest tree_of_val (depth - 1) (O.field obj 0) ty_arg
-                        in
-                        let next_obj = O.field obj 1 in
-                        nest_gen (Oval_stuff "<cycle>" :: tree :: tree_list)
-                          (tree_of_conses (tree :: tree_list))
-                          depth next_obj ty_arg
-                      else tree_list
-                    in
-                    Oval_list (List.rev (tree_of_conses [] depth obj ty_arg))
-              else
-                Oval_list []
-          | Tconstr(path, [ty_arg], _)
-            when Path.same path Predef.path_array ->
-              tree_of_generic_array Asttypes.Mutable depth obj ty_arg
-          | Tconstr(path, [ty_arg], _)
-            when Path.same path Predef.path_iarray ->
-              tree_of_generic_array Asttypes.Immutable depth obj ty_arg
-
-          | Tconstr(path, [], _)
-              when Path.same path Predef.path_string ->
-            Oval_string ((O.obj obj : string), !printer_steps, Ostr_string)
-
-          | Tconstr (path, [], _)
-              when Path.same path Predef.path_bytes ->
-            let s = Bytes.to_string (O.obj obj : bytes) in
-            Oval_string (s, !printer_steps, Ostr_bytes)
-
-          | Tconstr (path, [ty_arg], _)
-            when Path.same path Predef.path_lazy_t ->
-             let obj_tag = O.tag obj in
-             (* Lazy values are represented in three possible ways:
-
-                1. a lazy thunk that is not yet forced has tag
-                   Obj.lazy_tag
-
-                2. a lazy thunk that has just been forced has tag
-                   Obj.forward_tag; its first field is the forced
-                   result, which we can print
-
-                3. when the GC moves a forced trunk with forward_tag,
-                   or when a thunk is directly created from a value,
-                   we get a third representation where the value is
-                   directly exposed, without the Obj.forward_tag
-                   (if its own tag is not ambiguous, that is neither
-                   lazy_tag nor forward_tag)
-
-                Note that using Lazy.is_val and Lazy.force would be
-                unsafe, because they use the Obj.* functions rather
-                than the O.* functions of the functor argument, and
-                would thus crash if called from the toplevel
-                (debugger/printval instantiates Genprintval.Make with
-                an Obj module talking over a socket).
-              *)
-             if obj_tag = Obj.lazy_tag then Oval_stuff "<lazy>"
-             else begin
-                 let forced_obj =
-                   if obj_tag = Obj.forward_tag then O.field obj 0 else obj
-                 in
-                 (* calling oneself recursively on forced_obj risks
-                    having a false positive for cycle detection;
-                    indeed, in case (3) above, the value is stored
-                    as-is instead of being wrapped in a forward
-                    pointer. It means that, for (lazy "foo"), we have
-                      forced_obj == obj
-                    and it is easy to wrongly print (lazy <cycle>) in such
-                    a case (PR#6669).
-
-                    Unfortunately, there is a corner-case that *is*
-                    a real cycle: using unboxed types one can define
-
-                       type t = T : t Lazy.t -> t [@@unboxed]
-                       let rec x = lazy (T x)
-
-                    which creates a Forward_tagged block that points to
-                    itself. For this reason, we still "nest"
-                    (detect head cycles) on forward tags.
-                  *)
-                 let v =
-                   if obj_tag = Obj.forward_tag
-                   then nest tree_of_val depth forced_obj ty_arg
-                   else      tree_of_val depth forced_obj ty_arg
-                 in
-                 Oval_lazy v
-               end
-
-          | Tconstr (path, [_], _)
-            when Path.same path Predef.path_code ->
-            Oval_code (O.obj obj : CamlinternalQuote.Code.t)
-
-||||||| upstream-base
-          | Ttuple(ty_list) ->
-              Oval_tuple (tree_of_val_list 0 depth obj ty_list)
-          | Tconstr(path, [ty_arg], _)
-            when Path.same path Predef.path_list ->
-              if O.is_block obj then
-                match check_depth depth obj ty with
-                  Some x -> x
-                | None ->
-                    let rec tree_of_conses tree_list depth obj ty_arg =
-                      if !printer_steps < 0 || depth < 0 then
-                        Oval_ellipsis :: tree_list
-                      else if O.is_block obj then
-                        let tree =
-                          nest tree_of_val (depth - 1) (O.field obj 0) ty_arg
-                        in
-                        let next_obj = O.field obj 1 in
-                        nest_gen (Oval_stuff "<cycle>" :: tree :: tree_list)
-                          (tree_of_conses (tree :: tree_list))
-                          depth next_obj ty_arg
-                      else tree_list
-                    in
-                    Oval_list (List.rev (tree_of_conses [] depth obj ty_arg))
-              else
-                Oval_list []
-          | Tconstr(path, [ty_arg], _)
-            when Path.same path Predef.path_array ->
-              let length = O.size obj in
-              if length > 0 then
-                match check_depth depth obj ty with
-                  Some x -> x
-                | None ->
-                    let rec tree_of_items tree_list i =
-                      if !printer_steps < 0 || depth < 0 then
-                        Oval_ellipsis :: tree_list
-                      else if i < length then
-                        let tree =
-                          nest tree_of_val (depth - 1) (O.field obj i) ty_arg
-                        in
-                        tree_of_items (tree :: tree_list) (i + 1)
-                      else tree_list
-                    in
-                    Oval_array (List.rev (tree_of_items [] 0))
-              else
-                Oval_array []
-
-          | Tconstr(path, [], _)
-              when Path.same path Predef.path_string ->
-            Oval_string ((O.obj obj : string), !printer_steps, Ostr_string)
-
-          | Tconstr (path, [], _)
-              when Path.same path Predef.path_bytes ->
-            let s = Bytes.to_string (O.obj obj : bytes) in
-            Oval_string (s, !printer_steps, Ostr_bytes)
-
-          | Tconstr (path, [ty_arg], _)
-            when Path.same path Predef.path_lazy_t ->
-             let obj_tag = O.tag obj in
-             (* Lazy values are represented in three possible ways:
-
-                1. a lazy thunk that is not yet forced has tag
-                   Obj.lazy_tag
-
-                2. a lazy thunk that has just been forced has tag
-                   Obj.forward_tag; its first field is the forced
-                   result, which we can print
-
-                3. when the GC moves a forced trunk with forward_tag,
-                   or when a thunk is directly created from a value,
-                   we get a third representation where the value is
-                   directly exposed, without the Obj.forward_tag
-                   (if its own tag is not ambiguous, that is neither
-                   lazy_tag nor forward_tag)
-
-                Note that using Lazy.is_val and Lazy.force would be
-                unsafe, because they use the Obj.* functions rather
-                than the O.* functions of the functor argument, and
-                would thus crash if called from the toplevel
-                (debugger/printval instantiates Genprintval.Make with
-                an Obj module talking over a socket).
-              *)
-             if obj_tag = Obj.lazy_tag then Oval_stuff "<lazy>"
-             else begin
-                 let forced_obj =
-                   if obj_tag = Obj.forward_tag then O.field obj 0 else obj
-                 in
-                 (* calling oneself recursively on forced_obj risks
-                    having a false positive for cycle detection;
-                    indeed, in case (3) above, the value is stored
-                    as-is instead of being wrapped in a forward
-                    pointer. It means that, for (lazy "foo"), we have
-                      forced_obj == obj
-                    and it is easy to wrongly print (lazy <cycle>) in such
-                    a case (PR#6669).
-
-                    Unfortunately, there is a corner-case that *is*
-                    a real cycle: using unboxed types one can define
-
-                       type t = T : t Lazy.t -> t [@@unboxed]
-                       let rec x = lazy (T x)
-
-                    which creates a Forward_tagged block that points to
-                    itself. For this reason, we still "nest"
-                    (detect head cycles) on forward tags.
-                  *)
-                 let v =
-                   if obj_tag = Obj.forward_tag
-                   then nest tree_of_val depth forced_obj ty_arg
-                   else      tree_of_val depth forced_obj ty_arg
-                 in
-                 Oval_lazy v
-               end
-=======
->>>>>>> upstream-incoming
           | Tconstr(path, ty_list, _) -> begin
               match get_desc (Ctype.expand_head env ty) with
               | Tconstr(path, [ty_arg], _)
@@ -646,6 +415,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 when Path.same path Predef.path_lazy_t ->
                 tree_of_lazy depth obj ty_arg
 
+              | Tconstr (path, [_], _)
+                when Path.same path Predef.path_code ->
+                Oval_code (O.obj obj : CamlinternalQuote.Code.t)
+
               | _ ->
                 match Env.find_type path env with
                 | exception Not_found
@@ -654,207 +427,23 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 | {type_kind = Type_abstract _; type_manifest = Some body;
                    type_params} ->
                     tree_of_val depth obj
-<<<<<<< oxcaml
-                      (instantiate_type env decl.type_params ty_list body)
-                | {type_kind = Type_variant (constr_list, rep, _)} ->
-                  (* Here we work backwards from the actual runtime value to
-                     find the appropriate `constructor_declaration` in
-                     `constr_list`.  `Datarepr.find_constr_by_tag` does most
-                     of the work, but needs two pieces of information in
-                     addition to the tag:
-                     1) Whether the value is a block or immediate (because tags
-                        are only unique within a category).
-                     2) The `constructor_description`s, because the declarations
-                        don't record the jkind information needed to determine
-                        which constructors are immediate due to void arguments.
-                  *)
-                    let cstrs =
-                      Env.lookup_all_constructors_from_type ~use:false
-                        ~loc:Location.none Positive path env
-                    in
-                    let constant, tag =
-                      (* CR dkalinichenko: the null case being represented
-                         by [-1] is hacky, but there's no simple fix. *)
-                      if is_null obj then
-                        true, -1
-                      else if O.is_block obj then
-                        false, O.tag obj
-                      else
-                        true, O.obj obj
-                    in
-                    let {cd_id;cd_args;cd_res} =
-                      try
-                        (* CR dkalinichenko: this is broken for unboxed variants:
-                           unless the tag of the inner value just happens to be 0,
-                           [Datarepr.find_constr_by_tag] will fail. *)
-                        let {cstr_uid} =
-                          Datarepr.find_constr_by_tag ~constant tag cstrs
-                        in
-                        List.find (fun {cd_uid} -> Uid.equal cd_uid cstr_uid)
-                          constr_list
-                      with
-                      | Datarepr.Constr_not_found | Not_found ->
-                        (* If a [Variant_with_null] is not a [Null],
-                            it's guaranteed to be [This value]. *)
-                        match rep with
-                        | Variant_with_null -> List.nth constr_list 1
-                        | _ -> raise Datarepr.Constr_not_found
-                    in
-                    let type_params =
-                      match cd_res with
-                        Some t ->
-                          begin match get_desc t with
-                            Tconstr (_,params,_) ->
-                              params
-                          | _ -> assert false end
-                      | None -> decl.type_params
-                    in
-                    let unbx =
-                      match rep with
-                      | Variant_unboxed -> true
-                      | Variant_with_null when tag = -1 -> false
-                      | Variant_with_null -> true
-                      | Variant_boxed _ | Variant_extensible -> false
-                    in
-                    begin
-                      match cd_args with
-                      | Cstr_tuple l ->
-                          let ty_args =
-                            instantiate_types env type_params ty_list l in
-                          let ty_args =
-                            List.map2
-                              (fun { ca_sort } ty_arg ->
-                                 (ty_arg, print_sort ca_sort)
-                              ) l ty_args
-                          in
-                          tree_of_constr_with_args (tree_of_constr env path)
-                            (Ident.name cd_id) false 0 depth obj
-                            ty_args unbx
-                      | Cstr_record lbls ->
-                          let rep =
-                            if unbx then
-                              Outval_record_unboxed
-                            else
-                              Outval_record_boxed
-                          in
-                          let r =
-                            tree_of_record_fields depth
-                              env path type_params ty_list
-                              lbls 0 obj rep
-                          in
-                          Oval_constr(tree_of_constr env path
-                                        (Out_name.create (Ident.name cd_id)),
-                                      [ r ])
-                    end
-                | {type_kind = Type_record(lbl_list, rep, _)} ->
-                    begin match check_depth depth obj ty with
-                      Some x -> x
-                    | None ->
-                        let pos =
-                          match rep with
-                          | Record_inlined (_, _, Variant_extensible) -> 1
-                          | _ -> 0
-                        in
-                        let rep =
-                          match rep with
-                          | Record_inlined (_, Constructor_mixed _,
-                                            Variant_unboxed) ->
-                              Misc.fatal_error
-                                "a 'mixed' unboxed record is impossible"
-                          | Record_inlined (_, Constructor_uniform_value,
-                                            Variant_unboxed)
-                          | Record_unboxed
-                              -> Outval_record_unboxed
-                          | Record_boxed _ | Record_float | Record_ufloat
-                          | Record_inlined (_, Constructor_uniform_value, _)
-                              -> Outval_record_boxed
-                          | Record_inlined (_, Constructor_mixed mixed, _)
-                          | Record_mixed mixed
-                              ->
-                                (* Mixed records are only represented as
-                                   mixed blocks in native code.
-                                *)
-                                if !Clflags.native_code
-                                then Outval_record_mixed_block mixed
-                                else Outval_record_boxed
-                        in
-                        tree_of_record_fields depth
-                          env path decl.type_params ty_list
-                          lbl_list pos obj rep
-                    end
-                | {type_kind = Type_record_unboxed_product
-                                 (lbl_list, Record_unboxed_product, _)} ->
-                    begin match check_depth depth obj ty with
-                      Some x -> x
-                    | None ->
-                        let pos = 0 in
-                        tree_of_record_unboxed_product_fields depth
-                          env path decl.type_params ty_list
-                          lbl_list pos obj
-                    end
-||||||| upstream-base
-                      (instantiate_type env decl.type_params ty_list body)
-                | {type_kind = Type_variant (constr_list,rep)} ->
-                    let unbx = (rep = Variant_unboxed) in
-                    let tag =
-                      if unbx then Cstr_unboxed
-                      else if O.is_block obj
-                      then Cstr_block(O.tag obj)
-                      else Cstr_constant(O.obj obj) in
-                    let {cd_id;cd_args;cd_res} =
-                      Datarepr.find_constr_by_tag tag constr_list in
-                    let type_params =
-                      match cd_res with
-                        Some t ->
-                          begin match get_desc t with
-                            Tconstr (_,params,_) ->
-                              params
-                          | _ -> assert false end
-                      | None -> decl.type_params
-                    in
-                    begin
-                      match cd_args with
-                      | Cstr_tuple l ->
-                          let ty_args =
-                            instantiate_types env type_params ty_list l in
-                          tree_of_constr_with_args (tree_of_constr env path)
-                            (Ident.name cd_id) false 0 depth obj
-                            ty_args unbx
-                      | Cstr_record lbls ->
-                          let r =
-                            tree_of_record_fields depth
-                              env path type_params ty_list
-                              lbls 0 obj unbx
-                          in
-                          Oval_constr(tree_of_constr env path
-                                        (Out_name.create (Ident.name cd_id)),
-                                      [ r ])
-                    end
-                | {type_kind = Type_record(lbl_list, rep)} ->
-                    begin match check_depth depth obj ty with
-                      Some x -> x
-                    | None ->
-                        let pos =
-                          match rep with
-                          | Record_extension _ -> 1
-                          | _ -> 0
-                        in
-                        let unbx =
-                          match rep with Record_unboxed _ -> true | _ -> false
-                        in
-                        tree_of_record_fields depth
-                          env path decl.type_params ty_list
-                          lbl_list pos obj unbx
-                    end
-=======
                       (instantiate_type env type_params ty_list body)
-                | {type_kind = Type_variant (constr_list,rep); type_params} ->
+                | {type_kind = Type_variant (constr_list,rep,_); type_params} ->
                     tree_of_variant depth path type_params ty_list obj
                       constr_list rep
-                | {type_kind = Type_record(lbl_list, rep); type_params} ->
+                | {type_kind = Type_record(lbl_list, rep,_); type_params} ->
                     tree_of_record depth path type_params ty_list obj
                       lbl_list rep
->>>>>>> upstream-incoming
+                | {type_kind = Type_record_unboxed_product
+                                 (lbl_list, Record_unboxed_product, _);
+                  type_params} ->
+                    begin match check_depth depth obj ty with
+                      Some x -> x
+                    | None ->
+                        tree_of_record_unboxed_product_fields depth
+                          env path type_params ty_list
+                          lbl_list 0 obj
+                    end
                 | {type_kind = Type_open} ->
                     tree_of_extension path ty_list depth obj
             end
@@ -874,14 +463,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         end
 
       and tree_of_list depth obj ty_arg =
-        if not (O.is_block obj) then Oval_list []
+        if not (is_real_block obj) then Oval_list []
         else match check_depth depth obj ty with
           | Some x -> x
           | None ->
               let rec tree_of_conses tree_list depth obj ty_arg =
                 if !printer_steps < 0 || depth < 0 then
                   Oval_ellipsis :: tree_list
-                else if O.is_block obj then
+                else if is_real_block obj then
                   let tree = nest tree_of_val (depth - 1)
                                 (O.field obj 0) ty_arg
                   in
@@ -895,22 +484,26 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   (List.rev (tree_of_conses [] depth obj ty_arg))
 
       and tree_of_generic_array am depth obj ty_arg =
-        let length = O.size obj in
-        if length = 0 then Oval_array ([], am)
-        else match check_depth depth obj ty with
-          | Some x -> x
-          | None ->
-              let rec tree_of_items tree_list i =
-                if !printer_steps < 0 || depth < 0 then
-                  Oval_ellipsis :: tree_list
-                else if i < length then
-                  let tree = nest tree_of_val (depth - 1)
-                                  (O.field obj i) ty_arg
-                  in
-                  tree_of_items (tree :: tree_list) (i + 1)
-                else tree_list
-              in
-              Oval_array (List.rev (tree_of_items [] 0), am)
+        let obj_block = Obj.Uniform_or_mixed.of_block (O.obj obj) in
+        if Obj.Uniform_or_mixed.is_mixed obj_block then
+          Oval_stuff "<abstr array>"
+        else
+          let length = O.size obj in
+          if length = 0 then Oval_array ([], am)
+          else match check_depth depth obj ty with
+            | Some x -> x
+            | None ->
+                let rec tree_of_items tree_list i =
+                  if !printer_steps < 0 || depth < 0 then
+                    Oval_ellipsis :: tree_list
+                  else if i < length then
+                    let tree = nest tree_of_val (depth - 1)
+                                    (O.field obj i) ty_arg
+                    in
+                    tree_of_items (tree :: tree_list) (i + 1)
+                  else tree_list
+                in
+                Oval_array (List.rev (tree_of_items [] 0), am)
 
       and tree_of_lazy depth obj ty_arg =
         let obj_tag = O.tag obj in
@@ -974,15 +567,46 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           end
 
       and tree_of_variant depth path type_params ty_list obj constr_list rep =
-        let unbx = (rep = Variant_unboxed) in
-        let tag =
-          if unbx then Cstr_unboxed
-          else if O.is_block obj
-          then Cstr_block(O.tag obj)
-          else Cstr_constant(O.obj obj) in
-        match Datarepr.find_constr_by_tag tag constr_list with
-        | exception Datarepr.Constr_not_found ->
-            Oval_stuff "<unknown constructor>"
+       (* Here we work backwards from the actual runtime value to
+          find the appropriate `constructor_declaration` in
+          `constr_list`.  `Datarepr.find_constr_by_tag` does most
+          of the work, but needs two pieces of information in
+          addition to the tag:
+          1) Whether the value is a block or immediate (because tags
+            are only unique within a category).
+          2) The `constructor_description`s, because the declarations
+            don't record the jkind information needed to determine
+            which constructors are immediate due to void arguments. *)
+        let cstrs =
+          Env.lookup_all_constructors_from_type ~use:false
+            ~loc:Location.none Positive path env
+        in
+        let constant, tag =
+          (* CR dkalinichenko: the null case being represented
+             by [-1] is hacky, but there's no simple fix. *)
+          if is_null obj then
+            true, -1
+          else if O.is_block obj then
+            false, O.tag obj
+          else
+            true, O.obj obj
+        in
+        match
+          (* CR dkalinichenko: this is broken for unboxed variants:
+             unless the tag of the inner value just happens to be 0,
+             [Datarepr.find_constr_by_tag] will fail. *)
+          let {cstr_uid} =
+            Datarepr.find_constr_by_tag ~constant tag cstrs
+          in
+          List.find (fun {cd_uid} -> Uid.equal cd_uid cstr_uid)
+            constr_list
+        with
+        | exception (Datarepr.Constr_not_found | Not_found) ->
+          (* If a [Variant_with_null] is not a [Null],
+             it's guaranteed to be [This value]. *)
+          (match rep with
+          | Variant_with_null -> List.nth constr_list 1
+          | _ -> raise Datarepr.Constr_not_found)
         | {cd_id;cd_args;cd_res} ->
         let type_params =
           match cd_res with
@@ -993,19 +617,38 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               | _ -> assert false end
           | None -> type_params
         in
+        let unbx =
+          match rep with
+          | Variant_unboxed -> true
+          | Variant_with_null when tag = -1 -> false
+          | Variant_with_null -> true
+          | Variant_boxed _ | Variant_extensible -> false
+        in
         begin
           match cd_args with
           | Cstr_tuple l ->
               let ty_args =
                 instantiate_types env type_params ty_list l in
+              let ty_args =
+                List.map2
+                  (fun { ca_sort } ty_arg ->
+                      (ty_arg, print_sort ca_sort)
+                  ) l ty_args
+              in
               tree_of_constr_with_args (tree_of_constr env path)
                 (Ident.name cd_id) false 0 depth obj
                 ty_args unbx
           | Cstr_record lbls ->
+              let rep =
+                if unbx then
+                  Outval_record_unboxed
+                else
+                  Outval_record_boxed
+              in
               let r =
                 tree_of_record_fields depth
                   env path type_params ty_list
-                  lbls 0 obj unbx
+                  lbls 0 obj rep
               in
               Oval_constr(tree_of_constr env path (Ident.name cd_id),
                           [ r ])
@@ -1017,15 +660,34 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         | None ->
             let pos =
               match rep with
-              | Record_extension _ -> 1
+              | Record_inlined (_, _, Variant_extensible) -> 1
               | _ -> 0
             in
-            let unbx =
-              match rep with Record_unboxed _ -> true | _ -> false
+            let rep =
+              match rep with
+              | Record_inlined (_, Constructor_mixed _,
+                                Variant_unboxed) ->
+                  Misc.fatal_error
+                    "a 'mixed' unboxed record is impossible"
+              | Record_inlined (_, Constructor_uniform_value,
+                                Variant_unboxed)
+              | Record_unboxed
+                  -> Outval_record_unboxed
+              | Record_boxed _ | Record_float | Record_ufloat
+              | Record_inlined (_, Constructor_uniform_value, _)
+                  -> Outval_record_boxed
+              | Record_inlined (_, Constructor_mixed mixed, _)
+              | Record_mixed mixed
+                  ->
+                    (* Mixed records are only represented as
+                       mixed blocks in native code. *)
+                    if !Clflags.native_code
+                    then Outval_record_mixed_block mixed
+                    else Outval_record_boxed
             in
             tree_of_record_fields depth
               env path type_params ty_list
-              lbl_list pos obj unbx
+              lbl_list pos obj rep
 
       and tree_of_record_fields depth env path type_params ty_list
           lbl_list pos obj rep =
@@ -1038,8 +700,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                  for first record field *)
               let is_void = Jkind.Sort.Const.(equal void ld_sort) in
               let lid =
-                if first then tree_of_label env path (Out_name.create name)
-                else Oide_ident (Out_name.create name)
+                if first then tree_of_label env path name
+                else tree_of_name name
               and v =
                 if is_void then Oval_stuff "<void>"
                 else match rep with
@@ -1084,16 +746,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               (* PR#5722: print full module path only
                  for first record field *)
               let lid =
-<<<<<<< oxcaml
-                if first then tree_of_label env path (Out_name.create name)
-                else Oide_ident (Out_name.create name)
-||||||| upstream-base
-                if pos = 0 then tree_of_label env path (Out_name.create name)
-                else Oide_ident (Out_name.create name)
-=======
-                if pos = 0 then tree_of_label env path name
+                if first then tree_of_label env path name
                 else tree_of_name name
->>>>>>> upstream-incoming
               and v =
                 match print_sort ld_sort with
                 | Print_as msg -> Oval_stuff msg
@@ -1108,22 +762,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         in
         Oval_record_unboxed_product (tree_of_fields (pos = 0) pos lbl_list)
 
-<<<<<<< oxcaml
-      and tree_of_labeled_val_list start depth obj labeled_tys =
-        let rec tree_list i = function
-          | [] -> []
-          | (label, ty) :: labeled_tys ->
-              let tree = nest tree_of_val (depth - 1) (O.field obj i) ty in
-              (label, tree) :: tree_list (i + 1) labeled_tys in
-      tree_list start labeled_tys
-
-      (* CR layouts v4: When we allow other jkinds in tuples, this should be
-         generalized to take a list or array of jkinds, rather than just
-         pairing each type with a bool indicating whether it is void *)
-||||||| upstream-base
-=======
       and tree_of_polyvariant depth obj row =
-        if O.is_block obj then
+        if is_real_block obj then
           let tag : int = O.obj (O.field obj 0) in
           let rec find = function
             | (l, f) :: fields ->
@@ -1156,7 +796,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               (label, tree) :: tree_list (i + 1) labeled_tys in
       tree_list start labeled_tys
 
->>>>>>> upstream-incoming
+      (* CR layouts v4: When we allow other jkinds in tuples, this should be
+         generalized to take a list or array of jkinds, rather than just
+         pairing each type with a bool indicating whether it is void *)
       and tree_of_val_list start depth obj ty_list =
         let rec tree_list i = function
           | [] -> []
@@ -1167,31 +809,6 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               tree :: tree_list (i + 1) ty_list
         in
       tree_list start ty_list
-
-      and tree_of_generic_array am depth obj ty_arg =
-        let obj_block = Obj.Uniform_or_mixed.of_block (O.obj obj) in
-        if Obj.Uniform_or_mixed.is_mixed obj_block then
-          Oval_stuff "<abstr array>"
-        else
-          let oval elts = Oval_array (elts, am) in
-          let length = O.size obj in
-          if length > 0 then
-            match check_depth depth obj ty with
-              Some x -> x
-            | None ->
-                let rec tree_of_items tree_list i =
-                  if !printer_steps < 0 || depth < 0 then
-                    Oval_ellipsis :: tree_list
-                  else if i < length then
-                    let tree =
-                      nest tree_of_val (depth - 1) (O.field obj i) ty_arg
-                    in
-                    tree_of_items (tree :: tree_list) (i + 1)
-                  else tree_list
-                in
-                oval (List.rev (tree_of_items [] 0))
-          else
-            oval []
 
       and tree_of_constr_with_args
              tree_of_cstr cstr_name inlined start depth obj ty_args unboxed =
@@ -1291,14 +908,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             let printer ppf =
               Format_doc.fprintf ppf
                 "<internal error: incorrect arity for '%a'>"
-<<<<<<< oxcaml
-                Printtyp.path path in
-||||||| upstream-base
-              fprintf ppf "<internal error: incorrect arity for '%a'>"
-                Printtyp.path path in
-=======
                 Printtyp.Doc.path path in
->>>>>>> upstream-incoming
             Oval_printer printer)
 
 
