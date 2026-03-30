@@ -1747,21 +1747,17 @@ module For_jit = struct
       in
       let sym, suffix = parse_label label in
       let target = string_to_target sym in
-      let kind_str =
-        if jit_debug then
-          match r.Reloc.kind with
-          | Kind.REL32 _ -> "REL32"
-          | Kind.DIR32 _ -> "DIR32"
-          | Kind.DIR64 _ -> "DIR64"
-        else ""
-      in
       if jit_debug then
         Printf.eprintf
           "x86 compute_value: label=%s sym=%s suffix=%s \
            kind=%s place=0x%Lx addend=%Ld\n%!"
           label sym
           (match suffix with None -> "<none>" | Some s -> s)
-          kind_str place_address addend;
+          (match r.Reloc.kind with
+          | Kind.REL32 _ -> "REL32"
+          | Kind.DIR32 _ -> "DIR32"
+          | Kind.DIR64 _ -> "DIR64")
+          place_address addend;
       match lookup_target target with
       | None ->
         if jit_debug then
