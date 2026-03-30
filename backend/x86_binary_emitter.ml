@@ -1768,7 +1768,9 @@ module For_jit = struct
       | _ -> label, None
 
     let string_to_target name : Binary_emitter_intf.target =
-      Binary_emitter_intf.Symbol (Asm_symbol.create_global name)
+      Binary_emitter_intf.Symbol
+        (Asm_symbol.create_without_encoding
+           ~visibility:Asm_symbol.Global name)
 
     let target_symbol (r : Reloc.t) : Binary_emitter_intf.target =
       let label =
