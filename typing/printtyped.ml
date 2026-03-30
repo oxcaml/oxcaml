@@ -524,6 +524,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_or\n";
       pattern i ppf p1;
       pattern i ppf p2;
+  | Tpat_fun_layout { id = s; sort; mode = m; _ } ->
+      line i ppf "Tpat_fun_layout \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" fmt_sort sort;
+      value_mode i ppf m
 
 and labeled_pattern : type k . _ -> _ -> string option * k general_pattern -> unit =
   fun i ppf (label, x) ->

@@ -308,6 +308,7 @@ let pat
   | Tpat_or (p1, p2, _) ->
       sub.pat sub p1;
       sub.pat sub p2
+  | Tpat_fun_layout { name = s; _ } -> iter_loc sub s
 
 let extra sub = function
   | Texp_constraint (cty) -> sub.typ sub cty

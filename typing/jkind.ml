@@ -377,6 +377,11 @@ module Layout = struct
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     in
     pp_element ~nested:false ppf layout
+
+  let rec generalize ~current_level : _ Layout.t -> unit = function
+    | Sort (sort, _) -> Sort.generalize ~current_level sort
+    | Product layouts -> List.iter (generalize ~current_level) layouts
+    | Any _ -> ()
 end
 
 module Externality = Externality
@@ -2443,6 +2448,12 @@ let default_to_value t =
   match t.jkind.base with
   | Kconstr _ -> ()
   | Layout l -> ignore (Layout.default_to_value_and_get l)
+
+let generalize ~current_level t =
+  (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
+  match t.jkind.base with
+  | Kconstr _ -> ()
+  | Layout l -> Layout.generalize ~current_level l
 
 let get t = Jkind_desc.get t.jkind
 
