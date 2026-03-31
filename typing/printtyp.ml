@@ -866,6 +866,9 @@ let same_printing_env env =
   && Compilation_unit.Name.Set.equal !printing_pers used_pers
 
 let set_printing_env env =
+  (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
+     errors track their stage, as we should usually print at stage 0.
+     See ticket 6726. *)
   printing_env := Env.enter_future env;
   if !Clflags.real_paths ||
      env == Env.empty ||
