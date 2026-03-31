@@ -1,6 +1,8 @@
 open Cfg_intf.S
 open Utils
 
+let () = Clflags.color := Some Misc.Color.Never
+
 let check =
   check
     ~validate:(fun cfg ->

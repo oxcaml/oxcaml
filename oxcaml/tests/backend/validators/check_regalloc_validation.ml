@@ -1,6 +1,8 @@
 open Cfg_intf.S
 open Utils
 
+let () = Clflags.color := Some Misc.Color.Never
+
 (*= CR xclerc for xclerc: that test relies on the use of the polymorphic
         comparison over CFG values, but that can no longer be used since instruction
         lists now contain circular values.
