@@ -903,7 +903,6 @@ let load_file ppf name0 =
 
 let preload_objects = ref []
 
-(* CR dallsopp: upstream #12888 needs applying carefully *)
 let prepare ppf ?input:_ () =
   set_paths ();
   begin try
