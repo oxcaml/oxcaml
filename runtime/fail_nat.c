@@ -281,8 +281,3 @@ int caml_is_special_exception(value exn) {
     || exn == (value) caml_exn_Assert_failure
     || exn == (value) caml_exn_Undefined_recursive_module;
 }
-
-value caml_failure_exn (value msg)
-{
-  return caml_exn_with_arg((value) caml_exn_Failure, msg);
-}

@@ -7,7 +7,7 @@ let _ =
     let unit1 = Test_utils.parse_flambda file1 in
     let unit2 = Test_utils.parse_flambda file2 in
     let unit_info = Parse_flambda.make_unit_info ~filename:file1 in
-    Env.set_unit_name (Some unit_info);
+    Env.set_current_unit (Some unit_info);
     match Compare.flambda_units unit2 unit1 with
     | Equivalent -> ()
     | Different { approximant = unit2' } ->

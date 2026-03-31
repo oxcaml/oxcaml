@@ -300,7 +300,8 @@ let indexed_name namespace id =
     | Module_type -> Env.find_modtype_index id env
     | Class -> Env.find_class_index id env
     | Class_type-> Env.find_cltype_index id env
-    | Value | Extension_constructor | Constructor | Label | Unboxed_label -> None
+    | Value | Extension_constructor | Constructor | Label | Unboxed_label
+    | Jkind -> None
   in
   let index =
     match M.find_opt (Ident.name id) !bound_in_recursion with

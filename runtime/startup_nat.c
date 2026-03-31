@@ -230,7 +230,7 @@ caml_unit_deps_find(const char *name)
 /* The result of this macro must not be exposed to the GC. */
 #define init_module_failure_exn(fmt, ...) \
   Make_exception_result( \
-    caml_failure_exn(caml_alloc_sprintf("%s: " fmt, __func__, __VA_ARGS__)))
+    caml_exception_failure_value(caml_alloc_sprintf("%s: " fmt, __func__, __VA_ARGS__)))
 
 /* Initialize a module and its dependencies in topological order.
    Uses a recursive depth-first approach.

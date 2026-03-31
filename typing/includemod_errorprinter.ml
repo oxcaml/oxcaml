@@ -919,10 +919,10 @@ let core env id x =
       Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
         "Kind declarations do not match"
         !Oprint.out_sig_item
-        (Printtyp.tree_of_jkind_declaration id diff.got)
+        (Out_type.tree_of_jkind_declaration id diff.got)
         "is not included in"
         !Oprint.out_sig_item
-        (Printtyp.tree_of_jkind_declaration id diff.expected)
+        (Out_type.tree_of_jkind_declaration id diff.expected)
         (Includecore.report_jkind_mismatch "the first" "the second")
         diff.symptom show_locs (diff.got.jkind_loc, diff.expected.jkind_loc)
 
@@ -1034,7 +1034,9 @@ let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx
       module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx
         diff.symptom
   | _ ->
-      let inner = if eqmode then eq_module_types ~env else module_types ~env in
+      let inner =
+        if eqmode then eq_module_types ~env:env.i_env
+        else module_types ~env:env.i_env in
       let next =
         match diff.symptom with
         | Mt_core _ ->

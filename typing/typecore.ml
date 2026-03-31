@@ -11975,7 +11975,7 @@ let report_error ~loc env =
         (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
     in
     Location.error_of_printer ~loc (fun ppf () ->
-        Printtyp.report_unification_error ppf env err
+        Errortrace_report.unification ppf env err
           intro
           (Fmt.Doc.msg "but is here used with type")
         )
@@ -11987,7 +11987,7 @@ let report_error ~loc env =
                   of the form: %a"
                  Style.inline_code "(foo : ty1 :> ty2)"
              ]
-         )
+         ) ()
   | Not_a_function (ty, explanation) ->
       Location.errorf ~loc
         "This expression should not be a function,@ \

@@ -1069,7 +1069,8 @@ and signature_components :
             id1, item, (info1.clty_uid, info2.clty_uid), shape_map, false
         | Sig_jkind (id1, jd1, _), Sig_jkind (_id2, jd2, _) ->
            let item =
-             jkind_declarations ~loc env ~direction subst id1 jd1 jd2
+             Core_inclusion.jkind_declarations
+                ~loc env ~direction subst id1 jd1 jd2
            in
            let item = mark_error_as_unrecoverable item in
            let shape_map = Shape.Map.add_jkind_proj shape_map id1 orig_shape in

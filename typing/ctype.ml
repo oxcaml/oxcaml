@@ -3123,7 +3123,7 @@ let unify_univar env t1 t2 jkind1 jkind2 pairs =
 (* The same as [unify_univar], but raises the appropriate exception instead of
    [Cannot_unify_universal_variables] *)
 let unify_univar_for (type a) (tr_exn : a trace_exn)
-    t1 t2 jkind1 jkind2 univar_pairs =
+    env t1 t2 jkind1 jkind2 univar_pairs =
   try unify_univar env t1 t2 jkind1 jkind2 univar_pairs with
   | Cannot_unify_universal_variables -> raise_unexplained_for tr_exn
   | Out_of_scope_universal_variable ->

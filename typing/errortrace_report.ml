@@ -399,14 +399,14 @@ let explanation (type variety) intro prev env
         "@,@[The type variable %a has kind %a,@ but the type variable %a \
          has kind %a@]"
         (Style.as_inline_code type_expr_with_reserved_names) ty1
-        Jkind.format jkind1
+        (Jkind.format env) jkind1
         (Style.as_inline_code type_expr_with_reserved_names) ty2
-        Jkind.format jkind2)
+        (Jkind.format env) jkind2)
   | Errortrace.Unequal_tof_kind_jkinds (jkind1, jkind2) ->
     Some (
       doc_printf "@,@[Kinds %a and %a are incompatible@]"
-        Jkind.format jkind1
-        Jkind.format jkind2)
+        (Jkind.format env) jkind1
+        (Jkind.format env) jkind2)
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)

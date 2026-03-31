@@ -695,7 +695,7 @@ CAMLexport void caml_startup_code(
 
 CAMLexport value caml_init_module_exn(const char *name)
 {
-  return Make_exception_result(caml_failure_exn(init_not_supported_msg()));
+  return Make_exception_result(caml_exception_failure_value(init_not_supported_msg()));
 }
 
 CAMLexport void caml_init_module(const char *name)
