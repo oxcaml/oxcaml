@@ -566,6 +566,7 @@ let () =
     (fun () -> unsafe_set_ptr_prod #(t, idx) #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
 
+(* Parameterized unboxed records: type args must be substituted for params *)
 let () =
   let open struct
     type ('a : value_or_null) pair = #{ x : 'a; y : 'a }
@@ -577,4 +578,17 @@ let () =
   let t = { is = #{ x = 1; y = 2 } } in
   test ~expect_caml_modifies:0
     (fun () -> f t #{ x = 3; y = 4 };
+               ignore (Sys.opaque_identity t))
+
+(* Two type params, one immediate and one pointer *)
+let () =
+  let open struct
+    type ('a : value_or_null, 'b : value_or_null) t2 =
+      #{ x : 'a; y : 'b }
+    type t = { mutable p : (int, string) t2 }
+  end in
+  let[@inline never] f t p = t.p <- p in
+  let t = { p = #{ x = 1; y = "a" } } in
+  test ~expect_caml_modifies:1
+    (fun () -> f t #{ x = 3; y = "b" };
                ignore (Sys.opaque_identity t))
