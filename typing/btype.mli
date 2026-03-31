@@ -712,6 +712,9 @@ module Jkind0 : sig
     (** The jkind of a float. *)
     val for_float : Ident.t -> jkind_l
 
+    (** The jkind of a quoted expression, [_ expr]. *)
+    val for_expr : Types.jkind_l
+
     (** The jkind for [array] type arguments. *)
     val for_array_argument : jkind_lr
   end

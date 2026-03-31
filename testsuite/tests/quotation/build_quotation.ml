@@ -713,6 +713,15 @@ Hint: Label "x" is defined outside any quotations.
 <[fun () -> exclave_ stack_ (Some 42)]>
 |}];;
 
+(* Expressions cannot be stack-allocated *)
+stack_ <[ 42 ]>;;
+[%%expect {|
+Line 1, characters 7-15:
+1 | stack_ <[ 42 ]>;;
+           ^^^^^^^^
+Error: This expression is not an allocation site.
+|}];;
+
 <[ let x = borrow_ 42 in x + 1 ]>;;
 [%%expect {|
 - : <[int]> expr = <[let x = (borrow_ 42) in x + 1]>
