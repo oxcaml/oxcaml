@@ -63,6 +63,7 @@ let in_printing_env f = Env.without_cmis f !printing_env
     | Extension_constructor
     | Class
     | Class_type
+    | Jkind
 
 
 module Namespace = struct
@@ -75,6 +76,7 @@ module Namespace = struct
     | Class_type -> 4
     | Extension_constructor | Value | Constructor | Label -> 5
     | Unboxed_label -> 6
+    | Jkind -> 7
      (* we do not handle those component *)
 
   let size = 1 + id Unboxed_label
@@ -94,6 +96,7 @@ module Namespace = struct
     | Some Module_type -> to_lookup Env.find_modtype_by_name_lazy
     | Some Class -> to_lookup Env.find_class_by_name
     | Some Class_type -> to_lookup Env.find_cltype_by_name
+    | Some Jkind -> to_lookup Env.find_jkind_by_name
     | None | Some(Value|Extension_constructor|Constructor|Label|Unboxed_label) ->
          fun _ -> raise Not_found
 
@@ -107,6 +110,7 @@ module Namespace = struct
             (in_printing_env @@ Env.find_modtype_lazy path).mtd_loc
         | Some Class -> (in_printing_env @@ Env.find_class path).cty_loc
         | Some Class_type -> (in_printing_env @@ Env.find_cltype path).clty_loc
+        | Some Jkind -> (in_printing_env @@ Env.find_jkind path).jkind_loc
         | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label)
         | None ->
             Location.none
@@ -616,8 +620,9 @@ let set_printing_env env =
 
 let wrap_printing_env env f =
   Ident_names.reset ();
+  let old_env = !printing_env in
   set_printing_env env;
-  try_finally f ~always:(fun () -> set_printing_env Env.empty)
+  try_finally f ~always:(fun () -> set_printing_env old_env)
 
 let wrap_printing_env ~error env f =
   if error then Env.without_cmis (wrap_printing_env env) f
@@ -1106,33 +1111,36 @@ let add_type_to_preparation = prepare_type
 let print_labels = ref true
 let with_labels b f = Misc.protect_refs [R (print_labels,b)] f
 
-let out_jkind_of_const_jkind jkind =
-  Ojkind_const (Jkind.Const.to_out_jkind_const jkind)
+let out_jkind_of_const_jkind env jkind =
+  Ojkind_const (Jkind.Const.to_out_jkind_const env jkind)
 
-let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
-  match desc.layout with
-  | Sort (Var n) ->
-      Ojkind_var
-        ("'_representable_layout_"
-         ^ Int.to_string (Jkind.Sort.Var.get_print_number n))
-  | Product layouts ->
-      Ojkind_product
-        (List.map (fun layout -> out_jkind_of_desc { desc with layout }) layouts)
-  | _ ->
-      match Jkind.Desc.get_const desc with
-      | Some constant -> out_jkind_of_const_jkind constant
-      | None -> assert false
+let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
+  match desc.base with
+  | Layout (Sort (Var n)) ->
+    Ojkind_var ("'_representable_layout_" ^
+                Int.to_string (Jkind.Sort.Var.get_print_number n))
+  (* Analyze a product before calling [get_const]: the machinery in
+     [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
+     products. *)
+  | Layout (Product lays) ->
+    Ojkind_product
+      (List.map
+         (fun layout ->
+            out_jkind_of_desc env { desc with base = Layout layout })
+         lays)
+  | _ -> match Jkind.Desc.get_const desc with
+    | Some c -> out_jkind_of_const_jkind env c
+    | None -> assert false (* handled above *)
 
-let out_jkind_option_of_jkind ~ignore_null jkind =
+let out_jkind_option_of_jkind ~ignore_null env jkind =
   let desc = Jkind.get jkind in
   let elide =
-    Jkind.is_value_for_printing ~ignore_null jkind
-    ||
-    match desc.layout with
-    | Sort (Var _) -> not !Clflags.verbose_types
-    | _ -> false
+    Jkind.is_value_for_printing ~ignore_null env jkind
+    || (match desc.base with
+        | Layout (Sort (Var _)) -> not !Clflags.verbose_types
+        | _ -> false)
   in
-  if elide then None else Some (out_jkind_of_desc desc)
+  if elide then None else Some (out_jkind_of_desc env desc)
 
 let outcome_label : Types.arg_label -> Outcometree.arg_label = function
   | Nolabel -> Nolabel
@@ -1338,7 +1346,7 @@ let rec tree_of_modal_typexp mode modal ty =
                          match get_desc ty with
                          | Tunivar { jkind; _ } ->
                              begin
-                               match Jkind.get_layout jkind with
+                               match Jkind.get_layout !printing_env jkind with
                                | Some layout ->
                                    begin
                                      match Jkind.Layout.Const.get_sort layout with
@@ -1372,7 +1380,7 @@ let rec tree_of_modal_typexp mode modal ty =
       | Tpackage pack ->
           Otyp_module (tree_of_package mode pack)
       | Tof_kind jkind ->
-          Otyp_of_kind (out_jkind_of_desc (Jkind.get jkind))
+          Otyp_of_kind (out_jkind_of_desc !printing_env (Jkind.get jkind))
     in
     Aliases.remove_delay px;
     alias_nongen_row mode px ty;
@@ -1406,7 +1414,7 @@ and tree_of_qtvs qtvs =
     let tree jkind =
       Some
         ( Variable_names.name_of_type Variable_names.new_name variable,
-          out_jkind_option_of_jkind ~ignore_null:true jkind )
+          out_jkind_option_of_jkind ~ignore_null:true !printing_env jkind )
     in
     match variable.desc with
     | Tvar { jkind; _ } when variable.level = generic_level -> tree jkind
@@ -1597,7 +1605,7 @@ let extract_qtvs tys =
 let param_jkind ty =
   match get_desc ty with
   | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
-      out_jkind_option_of_jkind ~ignore_null:false jkind
+      out_jkind_option_of_jkind ~ignore_null:false !printing_env jkind
   | _ -> None
 
 let tree_of_label label =
@@ -1816,11 +1824,13 @@ let tree_of_type_decl id decl =
           false,
           false )
   in
-  let is_value = Jkind.is_value_for_printing ~ignore_null:false decl.type_jkind in
+  let is_value =
+    Jkind.is_value_for_printing ~ignore_null:false !printing_env decl.type_jkind
+  in
   let otype_jkind =
     match ty, is_value, unsafe_mode_crossing with
     | (Otyp_abstract, false, _) | (_, _, true) ->
-        Some (out_jkind_of_desc (Jkind.get decl.type_jkind))
+        Some (out_jkind_of_desc !printing_env (Jkind.get decl.type_jkind))
     | _ -> None
   in
   let otype_attributes =
@@ -2251,6 +2261,7 @@ let dummy =
 
 let ident_sigitem = function
   | Types.Sig_type(ident,_,_,_) ->  {hide=true;ident}
+  | Types.Sig_jkind (ident,_,_)
   | Types.Sig_class(ident,_,_,_)
   | Types.Sig_class_type (ident,_,_,_)
   | Types.Sig_module(ident,_, _,_,_)
@@ -2321,6 +2332,18 @@ module Abbrev = struct
     | None ->
         None, false
 end
+
+let tree_of_jkind_declaration id decl =
+  let ojkind =
+    { ojkind_name = Ident.name id
+    ; ojkind_jkind =
+        Option.map
+          (fun jkind ->
+             jkind |> Jkind.Desc.of_const |> out_jkind_of_desc !printing_env)
+          decl.jkind_manifest
+    }
+  in
+  Osig_jkind ojkind
 
 let rec tree_of_modtype ?abbrev = function
   | Mty_ident p ->
@@ -2445,6 +2468,9 @@ and tree_of_sigitem ?abbrev = function
       tree_of_class_declaration id decl rs
   | Sig_class_type(id, decl, rs, _) ->
       tree_of_cltype_declaration id decl rs
+  | Sig_jkind(id, decl, _) ->
+    tree_of_jkind_declaration id decl
+
 
 and tree_of_modtype_declaration ?abbrev id decl =
   let mty =

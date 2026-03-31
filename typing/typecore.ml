@@ -11968,54 +11968,14 @@ let report_error ~loc env =
         "The instance variable %a is overridden several times"
         Style.inline_code v
   | Coercion_failure (ty_exp, err, b) ->
-<<<<<<< HEAD
-     (* Use deprecated_printer to defer prepare_expansion until after
-        reset() is called inside report_unification_error. This ensures
-        consistent type variable naming between the intro and trace. *)
-     let intro =
-       doc_printf "%t" (fun fmt_doc ->
-         deprecated_printer (fun fmt ->
-           let ty_exp = Out_type.prepare_expansion ty_exp in
-           Format.fprintf fmt
-             "This expression cannot be coerced to type@;<1 2>%a;@ \
-              it has type"
-             (Fmt.compat
-                (Style.as_inline_code @@ Printtyp.type_expansion Type))
-             ty_exp
-         ) fmt_doc
-       )
-     in
-      Location.errorf ~loc "%t" (fun ppf ->
-        Errortrace_report.unification ppf env err
-||||||| f8c6716f8c
-      Location.error_of_printer ~loc (fun ppf () ->
-          (* Use deprecated_printer to defer prepare_expansion until after
-             reset() is called inside report_unification_error. This ensures
-             consistent type variable naming between the intro and trace. *)
-          let intro =
-            doc_printf "%t" (fun fmt_doc ->
-              deprecated_printer (fun fmt ->
-                let ty_exp = Printtyp.prepare_expansion ty_exp in
-                Format.fprintf fmt
-                  "This expression cannot be coerced to type@;<1 2>%a;@ \
-                   it has type"
-                  (Fmt.compat
-                     (Style.as_inline_code @@ Printtyp.type_expansion Type))
-                  ty_exp
-              ) fmt_doc
-            )
-          in
-        Printtyp.report_unification_error ppf env err
-=======
     let intro =
-      let ty_exp = Printtyp.prepare_expansion ty_exp in
+      let ty_exp = Out_type.prepare_expansion ty_exp in
       doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
                   it has type"
         (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
     in
     Location.error_of_printer ~loc (fun ppf () ->
         Printtyp.report_unification_error ppf env err
->>>>>>> 5.2.0minus-31
           intro
           (Fmt.Doc.msg "but is here used with type")
         )
@@ -12600,7 +12560,6 @@ let report_error ~loc env =
         "The eval extension takes a single type as its argument, for \
          example %a."
         Style.inline_code "[%eval: int]"
-<<<<<<< HEAD
   | Repeated_tuple_exp_label l ->
       Location.errorf ~loc
         "@[This tuple expression has two labels named %a@]"
@@ -12609,13 +12568,10 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[This tuple pattern has two labels named %a@]"
         Style.inline_code l
-||||||| f8c6716f8c
-=======
   | Let_poly_not_yet_implemented ->
       Location.errorf ~loc
         "The %a annotation is not yet implemented."
         Style.inline_code "let poly_"
->>>>>>> 5.2.0minus-31
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

@@ -82,7 +82,9 @@ and raw_lid_type_list tl =
              fprintf ppf "(@,%a,@,%a)" longident lid raw_type typ)
     tl
 and raw_type_desc ppf = function
-    Tvar { name; _ } -> fprintf ppf "Tvar %a" print_name name
+    Tvar { name; _ } ->
+      fprintf ppf "Tvar (@,%a,@,%a)"
+        print_name name (Jkind.format !printing_env) jkind
   | Tarrow ((l, _, _), t1, t2, c) ->
       fprintf ppf "@[<hov1>Tarrow(\"%s\",@,%a,@,%a,@,%s)@]"
         (string_of_arg_label l) raw_type t1 raw_type t2
@@ -112,7 +114,9 @@ and raw_type_desc ppf = function
   | Tsubst (t, None) -> fprintf ppf "@[<1>Tsubst@,(%a,None)@]" raw_type t
   | Tsubst (t, Some t') ->
       fprintf ppf "@[<1>Tsubst@,(%a,@ Some%a)@]" raw_type t raw_type t'
-  | Tunivar { name; _ } -> fprintf ppf "Tunivar %a" print_name name
+  | Tunivar { name; jkind } ->
+        fprintf ppf "Tunivar (@,%a,@,%a)"
+          print_name name (Jkind.format !printing_env) jkind
   | Tpoly (t, tl) ->
       fprintf ppf "@[<hov1>Tpoly(@,%a,@,%a)@]"
         raw_type t
@@ -124,7 +128,8 @@ and raw_type_desc ppf = function
       raw_lid_type_list pack.pack_cstrs
   | Trepr (t, _) ->
       fprintf ppf "@[<hov1>Trepr(@,%a,@,<sorts>)@]" raw_type t
-  | Tof_kind _ -> fprintf ppf "Tof_kind"
+  | Tof_kind jkind ->
+      fprintf ppf "(type@ :@ %a)" (Jkind.format !printing_env) jkind
 and row_desc ppf row =
   let Row { fields; more; name; fixed; closed } = row_repr row in
   fprintf ppf

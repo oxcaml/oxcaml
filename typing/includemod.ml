@@ -295,11 +295,6 @@ module Core_inclusion = struct
     | Some err ->
         Error Error.(Core(Extension_constructors(diff ext1 ext2 err)))
 
-<<<<<<< HEAD
-  (* Inclusion between class declarations *)
-||||||| f8c6716f8c
-(* Inclusion between class declarations *)
-=======
 (* Inclusion between jkind declarations *)
 let jkind_declarations ~loc env ~direction subst id decl1 decl2 =
   let mark = Directionality.mark_as_used direction in
@@ -311,8 +306,7 @@ let jkind_declarations ~loc env ~direction subst id decl1 decl2 =
   | Some err ->
      Error Error.(Core(Jkind_declarations (diff decl1 decl2 err)))
 
-(* Inclusion between class declarations *)
->>>>>>> 5.2.0minus-31
+  (* Inclusion between class declarations *)
 
   let class_type_declarations ~loc env ~direction:_ subst _id ~mmodes:_ decl1
         decl2 =

@@ -170,6 +170,9 @@ val tree_of_cltype_declaration:
 
 val expand_module_type: (Env.t -> module_type -> module_type) ref
 
+val tree_of_jkind_declaration:
+    Ident.t -> jkind_declaration -> out_sig_item
+
 val tree_of_module:
     Ident.t -> ?ellipsis:bool -> module_declaration -> rec_status ->
     out_sig_item

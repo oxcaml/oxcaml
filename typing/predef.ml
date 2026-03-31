@@ -924,13 +924,9 @@ let build_initial_env add_type add_extension add_jkind empty_env =
   |> add_extension ident_undefined_recursive_module
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
        Jkind_types.Sort.Const.value]
-<<<<<<< HEAD
   |> add_extension ident_continuation_already_taken []
-||||||| f8c6716f8c
-=======
   (* Predefined jkinds *)
   |> add_predef_jkinds add_jkind
->>>>>>> 5.2.0minus-31
 
 let add_simd_stable_extension_types add_type env =
   let _, add_type = mk_add_type add_type in

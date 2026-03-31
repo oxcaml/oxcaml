@@ -381,7 +381,7 @@ let explanation (type variety) intro prev env
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
              Style.as_inline_code type_expr_with_reserved_names ppf ty)
-           ~level:(Ctype.get_current_level ()))
+           ~level:(Ctype.get_current_level ()) env)
         violation)
   | Errortrace.Bad_jkind_sort (ty, violation) ->
     Some (
@@ -389,7 +389,7 @@ let explanation (type variety) intro prev env
         (Jkind.Violation.report_with_offender_sort
            ~offender:(fun ppf ->
              Style.as_inline_code type_expr_with_reserved_names ppf ty)
-           ~level:(Ctype.get_current_level ()))
+           ~level:(Ctype.get_current_level ()) env)
         violation)
   | Errortrace.Unequal_var_jkinds (ty1, jkind1, ty2, jkind2) ->
     Variable_names.reserve ty1;

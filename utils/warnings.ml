@@ -1408,21 +1408,11 @@ let message = function
   | Unerasable_position_argument ->
       msg "this position argument cannot be erased."
   | Probe_name_too_long name ->
-<<<<<<< HEAD
       msg "This probe name is too long: %a.@ \
            Probe names must be at most 100 characters long."
         Style.inline_code name
-||||||| f8c6716f8c
-      Printf.sprintf
-        "This probe name is too long: `%s'. \
-         Probe names must be at most 100 characters long." name
-=======
-      Printf.sprintf
-        "This probe name is too long: `%s'. \
-         Probe names must be at most 100 characters long." name
   | Unused_kind_declaration s ->
       "unused kind " ^ s ^ "."
->>>>>>> 5.2.0minus-31
   | Zero_alloc_all_hidden_arrow s ->
       msg "The type of this item is an@ alias of a function type,@ \
            but the %a attribute for@ this signature does not apply to it@ \

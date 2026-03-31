@@ -1227,18 +1227,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
 
 and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
   let print_name = "'" ^ name in
-<<<<<<< HEAD
   check_tyvar_name env loc name;
-  let of_annot = jkind_of_annotation (Type_variable print_name) attrs in
-||||||| f8c6716f8c
-  if not (valid_tyvar_name name) then
-    raise (Error (loc, env, Invalid_variable_name print_name));
-  let of_annot = jkind_of_annotation (Type_variable print_name) attrs in
-=======
-  if not (valid_tyvar_name name) then
-    raise (Error (loc, env, Invalid_variable_name print_name));
   let of_annot = jkind_of_annotation env (Type_variable print_name) attrs in
->>>>>>> 5.2.0minus-31
   let ty, stage = try
       TyVarEnv.lookup_local ~row_context name
     with Not_found ->
@@ -1701,20 +1691,10 @@ let report_error_doc loc env = function
       Location.errorf ~loc "This type is recursive"
   | Type_mismatch trace ->
       let msg = Format_doc.Doc.msg in
-<<<<<<< HEAD
       Location.errorf ~loc "%t" @@ fun ppf ->
-        Errortrace_report.unification ppf Env.empty trace
+        Errortrace_report.unification ppf env trace
           (msg "This type")
           (msg "should be an instance of type")
-||||||| f8c6716f8c
-      Printtyp.report_unification_error ppf Env.empty trace
-        (msg "This type")
-        (msg "should be an instance of type")
-=======
-      Printtyp.report_unification_error ppf env trace
-        (msg "This type")
-        (msg "should be an instance of type")
->>>>>>> 5.2.0minus-31
   | Alias_type_mismatch trace ->
       let msg = Format_doc.Doc.msg in
       Location.errorf ~loc "%t" @@ fun ppf ->
@@ -1840,16 +1820,8 @@ let report_error_doc loc env = function
     Location.errorf ~loc "@[%s types must have layout value.@ %a@]"
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
-<<<<<<< HEAD
                Style.as_inline_code type_expr ppf typ)
-           ~level:(get_current_level ())) err
-||||||| f8c6716f8c
-               Style.as_inline_code Printtyp.type_expr ppf typ)
-           ~level:(get_current_level ())) err
-=======
-               Style.as_inline_code Printtyp.type_expr ppf typ)
            ~level:(get_current_level ()) env) err
->>>>>>> 5.2.0minus-31
   | Non_sort {vloc; typ; err} ->
     let s =
       match vloc with
@@ -1859,30 +1831,14 @@ let report_error_doc loc env = function
     Location.errorf ~loc "@[%s types must have a representable layout.@ %a@]"
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
-<<<<<<< HEAD
                Style.as_inline_code type_expr ppf typ)
-           ~level:(get_current_level ())) err
-||||||| f8c6716f8c
-               Style.as_inline_code Printtyp.type_expr ppf typ)
-           ~level:(get_current_level ())) err
-=======
-               Style.as_inline_code Printtyp.type_expr ppf typ)
            ~level:(get_current_level ()) env) err
->>>>>>> 5.2.0minus-31
   | Bad_jkind_annot(ty, violation) ->
     Location.errorf ~loc "@[<b 2>Bad layout annotation:@ %a@]"
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf ->
-<<<<<<< HEAD
              Style.as_inline_code type_expr ppf ty)
-         ~level:(get_current_level ())) violation
-||||||| f8c6716f8c
-             Style.as_inline_code Printtyp.type_expr ppf ty)
-         ~level:(get_current_level ())) violation
-=======
-             Style.as_inline_code Printtyp.type_expr ppf ty)
          ~level:(get_current_level ()) env) violation
->>>>>>> 5.2.0minus-31
   | Did_you_mean_unboxed lid ->
     Location.errorf ~loc
       "@[%a isn't a class type.@ \
