@@ -162,7 +162,8 @@ Error: Signature mismatch:
        which is not supported yet.
 |}]
 
-(* The middle-end won't support this for now (or forever) *)
+(* a [let poly_] binding of a tuple. The middle-end won't support this in the
+   foreseeable future *)
 module _ : sig
   val foo : layout_ x. ('a : x). 'a -> 'a
   val bar : layout_ p q. ('a : p) ('b : q). 'a -> 'b -> 'a
@@ -353,7 +354,7 @@ Error: Signature mismatch:
 |}]
 
 (* We observe that foo is polymorphic on two types sharing the same polymorphic
-   layout. *)
+   layout *)
 module M : sig
   val foo : int
 end = struct
