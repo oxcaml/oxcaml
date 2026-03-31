@@ -2312,12 +2312,11 @@ let try_expand_safe env ty =
    * Reduce a quoted-eval through a concrete (top-level) type constructor.
    * Cancel a quote-splice pair. *)
 let rec try_reduce_once env t =
-  let path_must_be_toplevel path =
+  let path_must_be_toplevel env path =
     if not (Env.path_is_toplevel_in_quotations env path) then
       raise Cannot_expand
   in
-  let try_reduce_once t = try_reduce_once env t in
-  let try_reduce_poly t = if is_Tpoly t then try_reduce_once t else t in
+  let try_reduce_poly env t = if is_Tpoly t then try_reduce_once env t else t in
   match get_desc t with
   | Tquote_eval t -> begin
     match get_desc t with
@@ -2325,7 +2324,7 @@ let rec try_reduce_once env t =
     (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
     | Tarrow (a, t1, t2, c) ->
       (* Reduce the parameter type's [Tpoly] immediately *)
-      let t1' = new_quote_eval_ty t1 |> try_reduce_once in
+      let t1' = new_quote_eval_ty t1 |> try_reduce_once env in
       let t2' = new_quote_eval_ty t2 in
       Tarrow (a, t1', t2', c)
     (* [<[t1 * t2]> eval]  ==>  [<[t1]> eval * <[t2]> eval] *)
@@ -2336,7 +2335,7 @@ let rec try_reduce_once env t =
       Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
     (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
     | Tconstr (p, tl, a) ->
-      path_must_be_toplevel p;
+      path_must_be_toplevel env p;
       Tconstr (p, List.map new_quote_eval_ty tl, a)
     (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
     | Tobject (t, ct) ->
@@ -2351,11 +2350,11 @@ let rec try_reduce_once env t =
       (* CR metaprogramming jbachurski: As for [Tvariant], it would be nicer
          to support open object types here. *)
       Tobject (
-        try_reduce_once (new_quote_eval_ty t),
+        try_reduce_once env (new_quote_eval_ty t),
         ref (
           Option.map
             (fun (p, tl) ->
-              path_must_be_toplevel p;
+              path_must_be_toplevel env p;
               p, List.map new_quote_eval_ty tl)
             !ct))
     (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
@@ -2363,13 +2362,13 @@ let rec try_reduce_once env t =
       Tfield (
         s, k,
         (* If the method type's [Tpoly] is present, we reduce it. *)
-        try_reduce_poly (new_quote_eval_ty t_method),
+        try_reduce_poly env (new_quote_eval_ty t_method),
         (* Immediately reduce other fields to make sure we don't get stuck. *)
-        try_reduce_once (new_quote_eval_ty t_rest))
+        try_reduce_once env (new_quote_eval_ty t_rest))
     | Tnil -> Tnil
     (* reduce in subterm *)
     | Tquote _ | Tsplice _ | Tquote_eval _ ->
-      Tquote_eval (try_reduce_once t)
+      Tquote_eval (try_reduce_once (incr_stage env) t)
     (* [<[ < > ]> eval] ==> [< >] *)
     (* [<[ [ `A of t ... ] | ]> eval] ==> [ [ `A of <[t]> eval | ... ] ] *)
     | Tvariant row ->
@@ -2377,7 +2376,7 @@ let rec try_reduce_once env t =
       (* CR metaprogramming jbachurski: We should not need a restriction to
          closed row types, and allow having [Tquote_eval] on row variables.
          As is, this is incomplete and order-dependent. Same for [Tobject]. *)
-      let more = row_more row |> new_quote_eval_ty |> try_reduce_once in
+      let more = row_more row |> new_quote_eval_ty |> try_reduce_once env in
       Tvariant (copy_row new_quote_eval_ty true row false more)
     (* [<['a. t]> eval] ==> ['b. (<[{$'b/'a} t]> eval)],
         where {t/x} is a substitution of t for x. *)
@@ -2406,7 +2405,7 @@ let rec try_reduce_once env t =
     (*     [<[ module S with type typ = t ]> eval]
         ==> [module S with type typ = <[t]> eval] *)
     | Tpackage (p, fl) ->
-      path_must_be_toplevel p;
+      path_must_be_toplevel env p;
       Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
     (* It is safe not to expand [Tof_kind], and we do not need to currently *)
     | Tof_kind _ -> raise Cannot_expand
@@ -2418,9 +2417,8 @@ let rec try_reduce_once env t =
     | Tquote t ->
       t
     (* reduce in subterm *)
-    | Tsplice _
-    | Tquote_eval _ ->
-      try_reduce_once t |> new_splice_ty
+    | Tsplice _ -> try_reduce_once (decr_stage env) t |> new_splice_ty
+    | Tquote_eval _ -> try_reduce_once (decr_stage env) t |> new_splice_ty
     | _ -> raise Cannot_expand
     end
   | Tquote t -> begin
@@ -2429,9 +2427,8 @@ let rec try_reduce_once env t =
     | Tsplice t ->
       t
     (* reduce in subterm *)
-    | Tquote _
-    | Tquote_eval _ ->
-      try_reduce_once t |> new_quote_ty
+    | Tquote _ -> try_reduce_once (incr_stage env) t |> new_quote_ty
+    | Tquote_eval _ -> try_reduce_once (incr_stage env) t |> new_quote_ty
     | _ -> raise Cannot_expand
     end
   | _ -> raise Cannot_expand
