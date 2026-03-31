@@ -11,7 +11,7 @@ let max = Int.max
 
 let to_string = Int.to_string
 
-let to_string_padded t = Printf.sprintf "#%08d" t
+let to_string_padded t = Printf.sprintf "#%04d" t
 
 let format fmt t = Format.fprintf fmt "%d" t
 
