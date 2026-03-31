@@ -198,7 +198,7 @@
 /* OCaml values */
 /******************************************************************************/
 
-#define WOSIZE_VAL(src, dst) \
+#define WOSIZE_BLOCK_VAL(src, dst) \
   movq -8(src), dst; \
   shrq $10, dst
 
@@ -1405,7 +1405,7 @@ LBL(112):
     /* No parent stack. If this is a preemption effect (wosize of the
        continuation is 3, meaning we have a gc_regs present) then just continue
        execution. Otherwise, raise Effect.Unhandled. */
-        WOSIZE_VAL(%rbx, %rcx)
+        WOSIZE_BLOCK_VAL(%rbx, %rcx)
         cmpq    $3, %rcx
         je      1f
         CFI_REMEMBER_STATE
@@ -1505,7 +1505,7 @@ CFI_STARTPROC
     /* %rax -> continuation, %rbx -> fun, %rdi -> arg */
         movq   %rdi, %r12                    /* %r12 := arg */
         movq   Cont_last_fiber(%rax),  %r13  /* %r13 := last_fiber */
-        WOSIZE_VAL(%rax, %rcx)
+        WOSIZE_BLOCK_VAL(%rax, %rcx)
         cmpq   $3, %rcx                      /* Wosize_hd(%rax) == 3 ? */
         je     1f
         pushq  $0                            /* no gc_regs, push NULL */
