@@ -23,11 +23,15 @@ let instr_suffix : type a.
   | None -> ()
   | Some liveness -> (
     match InstructionId.Tbl.find_opt liveness instr.id with
-    | None -> Format.fprintf fmt " (no liveness found)"
+    | None ->
+      Format.fprintf fmt " %t(no liveness found)%t" Cfg_colours.liveness
+        Cfg_colours.pop
     | Some { before = _; across = live } -> (
       match Reg.Set.is_empty live with
       | true -> ()
-      | false -> Format.fprintf fmt " live:[|%a|]" Printreg.regset live))
+      | false ->
+        Format.fprintf fmt " %tlive:[|%a|]%t" Cfg_colours.liveness
+          Printreg.regset live Cfg_colours.pop))
 
 let label_set : Format.formatter -> Label.Set.t -> unit =
  fun fmt set ->
@@ -41,13 +45,13 @@ let block :
     Cfg_with_infos.liveness option ->
     unit =
  fun fmt block liveness ->
-  Format.fprintf fmt "block %t%a%t%s -"
+  Format.fprintf fmt "block %t%a%t%s%s -"
     (if block.is_trap_handler
      then Cfg_colours.block_label_exn
      else Cfg_colours.block_label)
     Label.format block.start Cfg_colours.pop
-    (match block.is_trap_handler with false -> "" | true -> " [handler]");
-  (match block.cold with false -> () | true -> Format.fprintf fmt " [cold]");
+    (match block.is_trap_handler with false -> "" | true -> " [handler]")
+    (match block.cold with false -> "" | true -> " [cold]");
   Format.fprintf fmt " %tpredecessors: %a%t" Cfg_colours.pred_succ label_set
     block.predecessors Cfg_colours.pop;
   Format.fprintf fmt " %tnormal successors: %a%t" Cfg_colours.pred_succ
