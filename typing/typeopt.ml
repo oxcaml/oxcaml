@@ -778,6 +778,9 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           | { type_kind = Type_record_unboxed_product (lbls, _, _);
               type_params; _ } ->
             let type_of_ld { Types.ld_type } =
+              let ld_type = Ctype.correct_levels ld_type in
+              let type_params = List.map Ctype.correct_levels type_params in
+              (* [args] is already corrected by [scrape_ty] *)
               try Some (Ctype.apply env type_params ld_type args)
               with Ctype.Cannot_apply -> None
             in
