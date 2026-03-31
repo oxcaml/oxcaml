@@ -12,11 +12,20 @@
    module = "triple.ml";
    ocamlopt.byte;
    module = "";
-   all_modules = "counter.cmx increment.cmx triple.cmx print.cmx";
    program = "${test_build_directory}/test.opt";
-   ocamlopt.byte;
-   run;
-   check-program-output;
+   {
+     all_modules = "counter.cmx increment.cmx triple.cmx print.cmx";
+     reference = "${test_source_directory}/test_order_1.reference";
+     ocamlopt.byte;
+     run;
+     check-program-output;
+   }{
+     all_modules = "counter.cmx triple.cmx increment.cmx print.cmx";
+     reference = "${test_source_directory}/test_order_2.reference";
+     ocamlopt.byte;
+     run;
+     check-program-output;
+   }
  }{
    setup-ocamlc.byte-build-env;
    module = "counter.ml";
@@ -28,11 +37,20 @@
    module = "triple.ml";
    ocamlc.byte;
    module = "";
-   all_modules = "counter.cmo increment.cmo triple.cmo print.cmo";
    program = "${test_build_directory}/test.byte";
-   ocamlc.byte;
-   run;
-   check-program-output;
+   {
+     all_modules = "counter.cmo increment.cmo triple.cmo print.cmo";
+     reference = "${test_source_directory}/test_order_1.reference";
+     ocamlc.byte;
+     run;
+     check-program-output;
+   }{
+     all_modules = "counter.cmo triple.cmo increment.cmo print.cmo";
+     reference = "${test_source_directory}/test_order_2.reference";
+     ocamlc.byte;
+     run;
+     check-program-output;
+   }
  }{
    setup-ocamlc.byte-build-env;
    flags = "-thunkify-compilation-unit-initialization";
@@ -45,10 +63,19 @@
    module = "triple.ml";
    ocamlc.byte;
    module = "";
-   all_modules = "counter.cmo increment.cmo triple.cmo print.cmo";
-   program = "${test_build_directory}/test.thunkified.byte";
-   ocamlc.byte;
-   run;
-   check-program-output;
+   program = "${test_build_directory}/test.byte";
+   {
+     all_modules = "counter.cmo increment.cmo triple.cmo print.cmo";
+     reference = "${test_source_directory}/test_order_1.reference";
+     ocamlc.byte;
+     run;
+     check-program-output;
+   }{
+     all_modules = "counter.cmo triple.cmo increment.cmo print.cmo";
+     reference = "${test_source_directory}/test_order_2.reference";
+     ocamlc.byte;
+     run;
+     check-program-output;
+   }
  }
 *)
