@@ -16,6 +16,8 @@ val to_string_padded : t -> string
 
 val format : Format.formatter -> t -> unit
 
+val format_padded : Format.formatter -> t -> unit
+
 type sequence
 
 val make_sequence : ?last_used:t -> unit -> sequence

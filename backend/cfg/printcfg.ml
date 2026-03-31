@@ -7,7 +7,8 @@ module List = ListLabels
 
 let instr_prefix : type a. Format.formatter -> a Cfg.instruction -> unit =
  fun fmt instr ->
-  Format.fprintf fmt "  %s " (InstructionId.to_string_padded instr.id)
+  Format.fprintf fmt "%t%a%t " Cfg_colours.instr_id InstructionId.format_padded
+    instr.id Cfg_colours.pop
 
 let instr_suffix : type a.
     Format.formatter ->
@@ -28,27 +29,46 @@ let instr_suffix : type a.
       | true -> ()
       | false -> Format.fprintf fmt " live:[|%a|]" Printreg.regset live))
 
+let label_set : Format.formatter -> Label.Set.t -> unit =
+ fun fmt set ->
+  Format.fprintf fmt "{";
+  Label.Set.iter (fun label -> Format.fprintf fmt " %a" Label.print label) set;
+  Format.fprintf fmt " }"
+
 let block :
     Format.formatter ->
     Cfg.basic_block ->
     Cfg_with_infos.liveness option ->
     unit =
  fun fmt block liveness ->
-  Format.fprintf fmt "block %a:" Label.format block.start;
-  (match block.exn with
-  | None -> ()
-  | Some exn_label -> Format.fprintf fmt " [exn: %a]" Label.format exn_label);
+  Format.fprintf fmt "block %t%a%t:"
+    (if block.is_trap_handler
+     then Cfg_colours.block_label_exn
+     else Cfg_colours.block_label)
+    Label.format block.start Cfg_colours.pop;
   (match block.is_trap_handler with
   | false -> ()
   | true -> Format.fprintf fmt " [handler]");
   (match block.cold with false -> () | true -> Format.fprintf fmt " [cold]");
   Format.fprintf fmt "\n";
+  Format.fprintf fmt "  %tpredecessors: %a%t\n" Cfg_colours.pred_succ label_set
+    block.predecessors Cfg_colours.pop;
+  Format.fprintf fmt "  %tnormal successors: %a%t\n" Cfg_colours.pred_succ
+    label_set
+    (Cfg.successor_labels block ~normal:true ~exn:false)
+    Cfg_colours.pop;
+  (match block.exn with
+  | None -> ()
+  | Some exn_label ->
+    Format.fprintf fmt "  %texceptional successor: %a%t\n" Cfg_colours.pred_succ
+      Label.format exn_label Cfg_colours.pop);
   DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
-      Format.fprintf fmt "%a%a%a\n" instr_prefix instr Cfg.dump_basic instr.desc
-        instr_suffix (instr, liveness));
-  Format.fprintf fmt "%a%a%a\n\n" instr_prefix block.terminator
+      Format.fprintf fmt "%a%t%a%t%a\n" instr_prefix instr Cfg_colours.basic
+        Cfg.dump_basic instr.desc Cfg_colours.pop instr_suffix (instr, liveness));
+  Format.fprintf fmt "%a%t%a%t%a\n\n" instr_prefix block.terminator
+    Cfg_colours.terminator
     (Cfg.dump_terminator ~sep:", ")
-    block.terminator.desc instr_suffix
+    block.terminator.desc Cfg_colours.pop instr_suffix
     (block.terminator, liveness)
 
 let format :
@@ -58,7 +78,8 @@ let format :
     Cfg_with_infos.liveness option ->
     unit =
  fun fmt cfg labels liveness ->
-  Format.fprintf fmt "cfg for %s\n" cfg.fun_name;
+  Format.fprintf fmt "cfg for %t%s%t\n" Cfg_colours.function_name cfg.fun_name
+    Cfg_colours.pop;
   Format.fprintf fmt "  args: %a\n" Printreg.regs cfg.fun_args;
   Format.fprintf fmt "  ret_type: %a\n" Printcmm.machtype cfg.fun_ret_type;
   Format.fprintf fmt "  entry_label: %a\n" Label.format cfg.entry_label;
