@@ -318,6 +318,15 @@ Line 4, characters 8-9:
             ^
 
 |}];;
+(<[ref 0]> : _ @ many)
+[%%expect{|
+Line 1, characters 1-10:
+1 | (<[ref 0]> : _ @ many)
+     ^^^^^^^^^
+Error: This value is "once"
+         because it is the quote of a non-trivial expression.
+       However, the highlighted expression is expected to be "many".
+|}];;
 
 (* Quoting pure expansive expressions still fails (over-approximation). *)
 let x = <[1 + 1]> in <[$x + $x]>

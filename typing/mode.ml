@@ -2463,8 +2463,7 @@ module Report = struct
     | Escape_region reg ->
       Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
     | Quoted_expansive ->
-      Fmt.fprintf ppf
-        "it is the quote of a potentially side-effectful expression"
+      Fmt.fprintf ppf "it is the quote of a non-trivial expression"
     | Spliced _ -> Fmt.fprintf ppf "it is spliced"
 
   let print_allocation_l : allocation -> Fmt.formatter -> unit =
