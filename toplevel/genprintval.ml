@@ -593,9 +593,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         in
         let {cd_id;cd_args;cd_res} =
           try
-          (* CR dkalinichenko: this is broken for unboxed variants:
-             unless the tag of the inner value just happens to be 0,
-             [Datarepr.find_constr_by_tag] will fail. *)
+            (* CR dkalinichenko: this is broken for unboxed variants:
+               unless the tag of the inner value just happens to be 0,
+               [Datarepr.find_constr_by_tag] will fail. *)
             let {cstr_uid} =
               Datarepr.find_constr_by_tag ~constant tag cstrs
             in
