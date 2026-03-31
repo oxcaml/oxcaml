@@ -67,6 +67,8 @@
 
 (copy_files# backend/cfg/*.ml{,i})
 
+(copy_files# backend/sframe/*.ml{,i})
+
 (copy_files# backend/debug/*.ml{,i})
 
 (copy_files# backend/debug/dwarf/dwarf_ocaml/*.ml{,i})
@@ -730,7 +732,8 @@
   arm64_ast
   dwarf_low
   dwarf_high
-  binary_emitter_intf))
+  binary_emitter_intf
+  sframe))
 
 (library
  (name oxcaml_common)
@@ -833,6 +836,7 @@
    %{dep:backend/binary_emitter_intf/binary_emitter_intf.a}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.a}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.a}
+   %{dep:backend/sframe/sframe.a}
    %{dep:oxcaml_common.a}
    %{dep:utils/oxcaml_utils.a}
    %{dep:middle_end/flambda2/import/flambda2_import.a}
@@ -875,6 +879,7 @@
    %{dep:backend/binary_emitter_intf/binary_emitter_intf.cma}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cma}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cma}
+   %{dep:backend/sframe/sframe.cma}
    %{dep:oxcaml_common.cma}
    %{dep:utils/oxcaml_utils.cma}
    %{dep:middle_end/flambda2/import/flambda2_import.cma}
@@ -917,6 +922,7 @@
    %{dep:backend/binary_emitter_intf/binary_emitter_intf.cmxa}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cmxa}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cmxa}
+   %{dep:backend/sframe/sframe.cmxa}
    %{dep:oxcaml_common.cmxa}
    %{dep:utils/oxcaml_utils.cmxa}
    %{dep:middle_end/flambda2/import/flambda2_import.cmxa}
@@ -1031,6 +1037,9 @@
    backend/debug/dwarf/dwarf_high/.dwarf_high.objs/byte/*.{cmi,cmo,cmt})
   (glob_files backend/debug/dwarf/dwarf_high/.dwarf_high.objs/native/*.cmx)
   (glob_files backend/debug/dwarf/dwarf_ocaml/.dwarf_ocaml.objs/native/*.cmx)
+  (glob_files
+   backend/sframe/.sframe.objs/byte/*.{cmi,cmo,cmt,cmti})
+  (glob_files backend/sframe/.sframe.objs/native/*.cmx)
   (glob_files external/owee/.compiler_owee.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files external/owee/.compiler_owee.objs/native/*.cmx)
   (glob_files

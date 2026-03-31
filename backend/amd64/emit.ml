@@ -235,6 +235,17 @@ let frame_required = ref false
 
 let contains_calls = ref false
 
+let sframe_env : Sframe.t option ref = ref None
+
+let sframe_add_fre ~cfa_base ~cfa_offset ?ra_offset ?fp_offset () =
+  match !sframe_env with
+  | None -> ()
+  | Some env ->
+    let lbl = L.create Text in
+    D.define_label lbl;
+    Sframe.add_fre env
+      { fre_label = lbl; cfa_base; cfa_offset; ra_offset; fp_offset }
+
 let frame_size () =
   Proc.frame_size ~stack_offset:!stack_offset ~num_stack_slots
     ~contains_calls:!contains_calls
@@ -1907,16 +1918,18 @@ let emit_instr ~first ~last ~fallthrough i =
     then (
       I.push rbp;
       D.cfi_adjust_cfa_offset ~bytes:8;
-      I.mov rsp rbp);
+      sframe_add_fre ~cfa_base:SP ~cfa_offset:16 ~fp_offset:(-16) ();
+      I.mov rsp rbp;
+      sframe_add_fre ~cfa_base:FP ~cfa_offset:16 ~fp_offset:(-16) ());
     if !frame_required
     then
       let n = prologue_stack_offset () in
       if n <> 0
       then (
         I.sub (int n) rsp;
-        D.cfi_adjust_cfa_offset ~bytes:n)
+        D.cfi_adjust_cfa_offset ~bytes:n;
+        if not fp then sframe_add_fre ~cfa_base:SP ~cfa_offset:(8 + n) ())
   | Lepilogue_open ->
-    (* Deallocate the stack frame before a return or tail call *)
     let n = prologue_stack_offset () in
     if n <> 0
     then (
@@ -1925,12 +1938,17 @@ let emit_instr ~first ~last ~fallthrough i =
     if fp
     then (
       I.pop rbp;
-      D.cfi_adjust_cfa_offset ~bytes:(-8))
+      D.cfi_adjust_cfa_offset ~bytes:(-8));
+    if fp || n <> 0 then sframe_add_fre ~cfa_base:SP ~cfa_offset:8 ()
   | Lepilogue_close ->
-    (* reset CFA back cause function body may continue *)
     let n = prologue_stack_offset () in
     let n = if fp then n + 8 else n in
-    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
+    if n <> 0
+    then (
+      D.cfi_adjust_cfa_offset ~bytes:n;
+      if fp
+      then sframe_add_fre ~cfa_base:FP ~cfa_offset:16 ~fp_offset:(-16) ()
+      else sframe_add_fre ~cfa_base:SP ~cfa_offset:(frame_size ()) ())
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop Dummy_use -> ()
   | Lop (Const_int n) ->
@@ -2656,6 +2674,14 @@ let fundecl fundecl =
   D.define_joint_label_and_symbol ~section:Text fundecl_sym;
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
+  (* SFrame: begin recording for this function *)
+  (match !sframe_env with
+  | Some env ->
+    let lbl = L.create_label_for_local_symbol Text fundecl_sym in
+    Sframe.new_function env ~fun_symbol:fundecl_sym ~fun_start_label:lbl
+      ~contains_calls:fundecl.fun_contains_calls;
+    sframe_add_fre ~cfa_base:SP ~cfa_offset:8 ()
+  | None -> ());
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
   if
     Config.runtime5
@@ -2683,6 +2709,13 @@ let fundecl fundecl =
       ~start_label ~end_label ~offset_past_end_label:None
   | None -> ());
   D.comment ("LLVM-MCA-END " ^ !function_name);
+  (* SFrame: end recording for this function *)
+  (match !sframe_env with
+  | Some env ->
+    let lbl = L.create Text in
+    D.define_label lbl;
+    Sframe.end_function env ~fun_end_label:lbl
+  | None -> ());
   D.cfi_endproc ();
   emit_function_type_and_size fundecl_sym
 
@@ -2766,6 +2799,7 @@ let reset_all () =
 
 let begin_assembly unix =
   reset_all ();
+  if !Clflags.gsframe then sframe_env := Some (Sframe.create ());
   if !Oxcaml_flags.internal_assembler && !Emitaux.binary_backend_available
   then X86_proc.register_internal_assembler (Internal_assembler.assemble unix);
   (* We initialize the new assembly directives. *)
@@ -3177,6 +3211,7 @@ let end_assembly () =
            !Emitaux.output_channel)
     else None
   in
+  (match !sframe_env with Some env -> Sframe.emit env | None -> ());
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
   invoke_expect_asm_callbacks ();
