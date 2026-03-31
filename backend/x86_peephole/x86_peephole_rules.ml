@@ -44,14 +44,17 @@ let combine_add_rsp stats cell =
         Ins (ADD (Imm n2, Reg64 RSP)),
         Directive
           (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) ) ->
-      if not (Int64.equal (Int64.of_int d1) (Int64.neg n1)
-              && Int64.equal (Int64.of_int d2) (Int64.neg n2))
+      if
+        not
+          (Int64.equal (Int64.of_int d1) (Int64.neg n1)
+          && Int64.equal (Int64.of_int d2) (Int64.neg n2))
       then
         Misc.fatal_errorf
-          "combine_add_rsp: CFI offsets do not track stack adjustment: \
-           addq $%Ld, %%rsp with cfi_adjust_cfa_offset %d; \
-           addq $%Ld, %%rsp with cfi_adjust_cfa_offset %d"
+          "combine_add_rsp: CFI offsets do not track stack adjustment: addq \
+           $%Ld, %%rsp with cfi_adjust_cfa_offset %d; addq $%Ld, %%rsp with \
+           cfi_adjust_cfa_offset %d"
           n1 d1 n2 d2;
+      stats.combine_add_rsp <- stats.combine_add_rsp + 1;
       (* Combine the instructions *)
       let combined_imm = Int64.add n1 n2 in
       let combined_offset = d1 + d2 in
@@ -74,7 +77,6 @@ let combine_add_rsp stats cell =
         (* Delete the redundant cells *)
         DLL.delete_curr cell3;
         DLL.delete_curr cell4;
-        stats.combine_add_rsp <- stats.combine_add_rsp + 1;
         (* Return cell1 to allow iterative combination of multiple ADDs *)
         U.Matched (Some cell1)
       end

@@ -10,14 +10,14 @@ type rule_result =
   | Matched of asm_line DLL.cell option
 
 let is_control_flow = function
-  | J _ | JMP _ | CALL _ | RET | HLT | LEAVE -> true
-  | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
-  | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
-  | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _ | CMOV _
-  | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _
-  | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _
-  | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ | ADC _
-  | SBB _ ->
+  | J _ | JMP _ | CALL _ | RET | HLT -> true
+  | LEAVE | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _
+  | ADD _ | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _
+  | SAR _ | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _
+  | CMOV _ | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _
+  | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _
+  | PREFETCH _ | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _
+  | ADC _ | SBB _ ->
     false
 
 let is_hard_barrier = function
@@ -174,9 +174,11 @@ let reads_from_reg64 target = function
   | LOCK_OR (op1, op2)
   | LOCK_XOR (op1, op2) ->
     arg_contains_reg64 target op1 || arg_contains_reg64 target op2
-  | MUL op | IMUL (op, None) ->
-    arg_contains_reg64 target op || equal_reg64 target RAX
-  | IDIV op ->
+  | MUL op | IMUL (op, None) | IDIV op ->
+    (* MUL / IMUL don't usually read RDX, but the 16bit version does and in any
+       case, we assume that these instructions write RDX, which is not true for
+       the 8bit version. Assuming that we read RDX makes this conservative,
+       because first reading and then writing can simulate no change. *)
     arg_contains_reg64 target op
     || equal_reg64 target RAX || equal_reg64 target RDX
   | CDQ -> equal_reg64 target RAX
@@ -226,9 +228,9 @@ let writes_flags = function
     true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ | CQO
   | SET _ | CMOV _ | BSWAP _ | XCHG _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE
-  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE ->
+  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | LEAVE ->
     false
-  | J _ | JMP _ | CALL _ | RET | HLT | LEAVE ->
+  | J _ | JMP _ | CALL _ | RET | HLT ->
     (* These are all control flow operations, there is no point in assuming
        anything. *)
     true
