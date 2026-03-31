@@ -779,7 +779,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
               type_params; _ } ->
             let type_of_ld { Types.ld_type } =
               try Some (Ctype.apply env type_params ld_type args)
-              with Ctype.Cannot_apply -> Some ld_type
+              with Ctype.Cannot_apply -> None
             in
             Misc.Stdlib.Array.of_list_map type_of_ld lbls
           | { type_kind =
