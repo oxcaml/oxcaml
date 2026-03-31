@@ -1047,3 +1047,22 @@ val j : int = 2
 val i' : int = 3
 val k : int = 3
 |}]
+
+type ('a : bits64) a = { a : 'a }
+module M : sig
+  val idx_imm : ('a : value_or_null) ('b : bits64).
+    ('a, 'b a#) idx_imm -> ('a, 'b) idx_imm
+  val idx_mut : ('a : value_or_null) ('b : bits64).
+    ('a, 'b a#) idx_mut -> ('a, 'b) idx_mut
+end = struct
+  let idx_imm i = (.idx_imm(i).#a)
+  let idx_mut i = (.idx_mut(i).#a)
+end
+[%%expect{|
+type ('a : bits64) a = { a : 'a; }
+module M :
+  sig
+    val idx_imm : 'a ('b : bits64). ('a, 'b a#) idx_imm -> ('a, 'b) idx_imm
+    val idx_mut : 'a ('b : bits64). ('a, 'b a#) idx_mut -> ('a, 'b) idx_mut
+  end
+|}]
