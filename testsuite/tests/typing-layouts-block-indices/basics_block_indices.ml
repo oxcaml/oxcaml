@@ -1025,13 +1025,13 @@ end = struct
   let k = (.k)
 end
 
-let () =
+let ~i, ~j, ~i', ~k =
   let i = Idx_mut.get M.t M.i in
   let j = Idx_imm.get M.t M.j in
   Idx_mut.set M.t M.i 3;
   let i' = Idx_mut.get M.t M.i in
   let k = Idx_imm.get M.t (.idx_imm(M.k).#x) in
-  Printf.printf "i = %d, j = %d, i' = %d, k = %d\n" i j i' k
+  ~i, ~j, ~i', ~k
 [%%expect{|
 type r = #{ x : int; }
 module M :
@@ -1042,4 +1042,8 @@ module M :
     val j : (t, int) idx_imm
     val k : (t, r) idx_imm
   end
+val i : int = 1
+val j : int = 2
+val i' : int = 3
+val k : int = 3
 |}]
