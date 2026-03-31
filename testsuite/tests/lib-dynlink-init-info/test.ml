@@ -1,5 +1,20 @@
 (* TEST
  include dynlink;
+ {
+   setup-ocamlc.opt-build-env;
+   ocamlc.opt;
+   compiler_reference2 =
+     "${test_source_directory}/test.bytecode.compilers.reference";
+   check-ocamlc.opt-output;
+   run;
+   check-program-output;
+ }{
+   setup-ocamlopt.opt-build-env;
+   ocamlopt.opt;
+   check-ocamlopt.opt-output;
+   run;
+   check-program-output;
+ }
 *)
 
 (* Make sure dynlink state info is accurate before any load
