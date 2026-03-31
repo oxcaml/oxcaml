@@ -1106,7 +1106,7 @@ END_FUNCTION(caml_callback3_asm)
         ldr     TMP, Stack_local_limit(\new_stack)
         str     TMP, Caml_state(local_limit)
     /* Restore frame pointer and return address for new_stack */
-        LEAVE_FUNCITON
+        LEAVE_FUNCTION
 .endm
 
 /*

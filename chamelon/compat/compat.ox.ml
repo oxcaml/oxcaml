@@ -214,7 +214,7 @@ let mkTexp_sequence ?id:(sort = Jkind.Sort.value) (e1, e2) =
 type texp_match_identifier = Jkind.sort
 
 let mkTexp_match ?id:(sort = Jkind.Sort.value) (e, cases, partial) =
-  Texp_match (e, sort, cases, partial)
+  Texp_match (e, sort, cases, [], partial)
 
 let mkTexp_assert e loc = Texp_assert (e, loc)
 
@@ -302,7 +302,8 @@ let view_texp (e : expression_desc) =
       ( { params; body },
         { alloc_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc } )
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
-  | Texp_match (e, sort, cases, partial) -> Texp_match (e, cases, partial, sort)
+  | Texp_match (e, sort, cases, _, partial) ->
+    Texp_match (e, cases, partial, sort)
   | _ -> O e
 
 let mkpattern_data ~pat_desc ~pat_loc ~pat_extra ~pat_type ~pat_env
@@ -404,7 +405,7 @@ let option_of_arg_or_omitted arg =
 
 let mk_constructor_description cstr_name =
   { Data_types.cstr_name;
-    cstr_res = newty2 ~level:0 (mkTvar (Some "a"));
+    cstr_res = Btype.newty2 ~level:0 (mkTvar (Some "a"));
     cstr_shape = Constructor_uniform_value;
     cstr_existentials = [];
     cstr_args = [];

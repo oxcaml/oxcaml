@@ -60,15 +60,8 @@ let match_expect_extension (ext : Parsetree.extension) =
           match e.pexp_desc with
           | Pexp_tuple
               [ None, a
-<<<<<<< oxcaml:oxcaml/testsuite/tools/expectcommon.ml
-              ; None, { pexp_desc = Pexp_construct
-||||||| upstream-base:testsuite/tools/expect.ml
-              [ a
-              ; { pexp_desc = Pexp_construct
-=======
               ; None,
                 { pexp_desc = Pexp_construct
->>>>>>> upstream-incoming:testsuite/tools/expect.ml
                                 ({ txt = Lident "Principal"; _ }, Some b) }
               ] ->
             (string_constant a, string_constant b)
@@ -206,11 +199,6 @@ function
   | (Ptop_dir _  | Ptop_def []) :: l -> min_line_number l
   | Ptop_def (st :: _) :: _ -> Some st.pstr_loc.loc_start.pos_lnum
 
-<<<<<<< oxcaml:oxcaml/testsuite/tools/expectcommon.ml
-let eval_expect_file _fname ~file_contents ~execute_phrase =
-||||||| upstream-base:testsuite/tools/expect.ml
-let eval_expect_file _fname ~file_contents =
-=======
 
 let visible_inline_code () =
   let open Misc.Style in
@@ -218,8 +206,7 @@ let visible_inline_code () =
   let inline_code = { ansi = []; text_open = {|"|}; text_close={|"|} } in
   set_styles { default with inline_code }
 
-let eval_expect_file _fname ~file_contents =
->>>>>>> upstream-incoming:testsuite/tools/expect.ml
+let eval_expect_file _fname ~file_contents ~execute_phrase =
   Warnings.reset_fatal ();
   let chunks, trailing_code =
     parse_contents ~fname:"" file_contents |> split_chunks

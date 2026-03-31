@@ -56,7 +56,7 @@ let remove_module id =
                         txt =
                           Lident
                             (String.lowercase_ascii (Ident.name id1)
-                            ^ "_" ^ lid2)
+                            ^ "_" ^ lid2.txt)
                       },
                       vd )
               }
@@ -81,7 +81,7 @@ let remove_module id =
                         txt =
                           Lident
                             (String.lowercase_ascii (Ident.name id1)
-                            ^ "_" ^ lid2)
+                            ^ "_" ^ lid2.txt)
                       },
                       tl )
               }

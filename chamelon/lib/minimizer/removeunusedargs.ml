@@ -81,6 +81,7 @@ let rec fun_wrapper arg_list acc_id depth path_fun n =
                             } ))
                      ~pat_loc:Location.none ~pat_extra:[] ~pat_env:Env.empty
                      ~pat_attributes:[] ~pat_type:dummy_type_expr;
+                 c_cont = None;
                  c_guard = None;
                  c_rhs =
                    exp_desc_to_exp
