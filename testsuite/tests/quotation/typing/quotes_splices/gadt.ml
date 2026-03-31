@@ -16,15 +16,24 @@ module M : sig type t type t' end
 |}]
 #mark_toplevel_in_quotations
 
-let sorry0 = fun f -> f (Obj.magic Type.Equal)
-let sorry1 = <[ fun f -> f (Obj.magic Type.Equal) ]>
-let sorry2 = <[ <[ fun f -> f (Obj.magic Type.Equal) ]> ]>
+let sorry0 =       fun (f : _ Type.eq -> _) -> f (Obj.magic Type.Equal)
+let sorry1 =    <[ fun (f : _ Type.eq -> _) -> f (Obj.magic Type.Equal) ]>
+let sorry2 = <[ <[ fun (f : _ Type.eq -> _) -> f (Obj.magic Type.Equal) ]> ]>
 [%%expect {|
-val sorry0 : ('a -> 'b) -> 'b = <fun>
-val sorry1 : <[($('a) -> $('b)) -> $('b)]> expr =
-  <[fun f -> f (Stdlib.Obj.magic Stdlib__Type.Equal)]>
-val sorry2 : <[<[($($('a)) -> $($('b))) -> $($('b))]> expr]> expr =
-  <[<[fun f -> f (Stdlib.Obj.magic Stdlib__Type.Equal)]>]>
+val sorry0 : (('a, 'b) Type.eq -> 'c) -> 'c = <fun>
+val sorry1 : <[(($('a), $('b)) Type.eq -> $('c)) -> $('c)]> expr =
+  <[
+    fun (f : (_, _) Stdlib.Type.eq -> _) ->
+      f (Stdlib.Obj.magic Stdlib__Type.Equal)
+  ]>
+val sorry2 :
+  <[<[(($($('a)), $($('b))) Type.eq -> $($('c))) -> $($('c))]> expr]> expr =
+  <[
+    <[
+      fun (f : (_, _) Stdlib.Type.eq -> _) ->
+        f (Stdlib.Obj.magic Stdlib__Type.Equal)
+      ]>
+  ]>
 |}]
 
 
@@ -138,7 +147,7 @@ let _ = fun (type t) (Equal : (t, int) Type.eq) (x : t) ->
 [%%expect {|
 - : ('t, int) Type.eq -> 't -> <[int]> expr = <fun>
 |}]
-(* 0 ~~> 1 ~~> 0  @  1 <=> 1 *)
+(* 1 ~~> 0 ~~> 1  @  1 <=> 1 *)
 let _ = <[
   fun (type t) (x : t) -> $(
     (fun (Equal : (<[t]> expr, <[int]> expr) Type.eq) -> <[ x + 1 ]>) |> ignore;
@@ -452,7 +461,9 @@ let _ = <[ <[
       $
         ((fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
             (<[t]> expr, <[int]> expr) Stdlib.Type.eq) -> <[x + 1]>)
-           |> (fun f -> f (Stdlib.Obj.magic Stdlib__Type.Equal)))
+           |>
+           (fun (f : (_, _) Stdlib.Type.eq -> _) ->
+              f (Stdlib.Obj.magic Stdlib__Type.Equal)))
     ]>
 ]>
 |}]
@@ -632,7 +643,12 @@ let _ = <[ fun (type t) (x : t expr) -> <[
     <[
       (fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, int)
          Stdlib.Type.eq) -> ($x) + 1)
-        |> ($<[fun f -> f (Stdlib.Obj.magic Stdlib__Type.Equal)]>)
+        |>
+        ($
+           <[
+             fun (f : (_, _) Stdlib.Type.eq -> _) ->
+               f (Stdlib.Obj.magic Stdlib__Type.Equal)
+             ]>)
       ]>
 ]>
 |}]
