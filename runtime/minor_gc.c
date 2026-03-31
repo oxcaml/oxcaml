@@ -610,6 +610,9 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   scan_roots_hook scan_roots_hook;
   promote_result_s result = { .locked_ephemerons = false, };
 
+  /* We should only have a block in domain->preemption if we've just allocated
+     it and are about to return back to ocaml; once it's initialized it should
+     be reset back to Val_unit, and we should not GC in the meantime. */
   CAMLassert(!Is_block(domain->preemption));
 
   st.domain = domain;
