@@ -524,13 +524,12 @@ let compare x y = Int64_u.compare x y
 [%%expect_asm X86_64{|
 compare:
   movq  %rax, %rdi
+  movq  $-1, %rsi
+  xorl  %eax, %eax
   cmpq  %rbx, %rdi
-  setl  %al
-  movzbq %al, %rsi
   setg  %al
-  movzbq %al, %rax
-  subq  %rsi, %rax
-  leaq  1(%rax,%rax), %rax
+  cmovge %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
   ret
 |}]
 
@@ -542,13 +541,12 @@ unsigned_compare:
   subq  %rax, %rbx
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rdi
+  movq  $-1, %rsi
+  xorl  %eax, %eax
   cmpq  %rbx, %rdi
-  setl  %al
-  movzbq %al, %rsi
   setg  %al
-  movzbq %al, %rax
-  subq  %rsi, %rax
-  leaq  1(%rax,%rax), %rax
+  cmovge %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
   ret
 |}]
 
@@ -567,13 +565,12 @@ let equal_using_compare x y = Int64_u.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
   movq  %rax, %rdi
+  movq  $-1, %rsi
+  xorl  %eax, %eax
   cmpq  %rbx, %rdi
-  setl  %al
-  movzbq %al, %rsi
   setg  %al
-  movzbq %al, %rax
-  subq  %rsi, %rax
-  leaq  1(%rax,%rax), %rax
+  cmovge %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
   cmpq  $1, %rax
   sete  %al
   movzbq %al, %rax
