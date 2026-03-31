@@ -2862,8 +2862,6 @@ let mk_jkind_context_always_principal env =
    then we will update the jkind of type variables to make the check true, if
    possible.  If true, we won't (but will still instantiate sort variables). *)
 let constrain_type_jkind ~fixed env ty jkind =
-  let type_equal = !type_equal' env in
-  let context = mk_jkind_context_check_principal env in
   (* The [expanded] argument says whether we've already tried [expand_head_opt].
 
      The "fuel" argument is used because we're duplicating the loop of
@@ -2886,7 +2884,9 @@ let constrain_type_jkind ~fixed env ty jkind =
      Trying to apply the modality to the jkind extracted from [ty] would be
      wrong, as it would incorrectly change the jkind on a [Tvar] to mode-cross
      more than necessary.  *)
-  let rec loop ~fuel ~expanded ty ty's_jkind jkind =
+  let rec loop ~fuel ~expanded env ty ty's_jkind jkind =
+    let type_equal = !type_equal' env in
+    let context = mk_jkind_context_check_principal env in
     (* Just succeed if we're comparing against [any] *)
     if Jkind.is_obviously_max jkind then Ok () else
     if fuel < 0 then
@@ -2936,15 +2936,17 @@ let constrain_type_jkind ~fixed env ty jkind =
 
          But if we ever choose to substitute min mod-bounds for [Tunivar]s, we
          must do so here. Internal ticket 5746. *)
-      loop ~fuel ~expanded:false t ty's_jkind jkind
+      loop ~fuel ~expanded:false env t ty's_jkind jkind
 
     (* CR metaprogramming jbachurski: These should update the stage, which
        means this function should pass the context explicitly. *)
     (* CR quoted-kinds jbachurski: These quote/splice [ty's_jkind]. *)
-    | Tquote ty
-    | Tsplice ty
+    | Tquote ty ->
+      loop ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
+    | Tsplice ty ->
+      loop ~fuel ~expanded (decr_stage env) ty ty's_jkind jkind
     | Tquote_eval ty ->
-      loop ~fuel ~expanded ty ty's_jkind jkind
+      loop ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
 
     | _ ->
        match
@@ -2975,7 +2977,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                       let jkind =
                         Jkind.apply_modality_r modality jkind
                       in
-                      loop ~fuel ~expanded:false ty ty's_jkind jkind)
+                      loop ~fuel ~expanded:false env ty ty's_jkind jkind)
                    tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
@@ -3076,7 +3078,7 @@ let constrain_type_jkind ~fixed env ty jkind =
     let jkind = Jkind.fully_expand_aliases env jkind in
     let ignore_mod_bounds = Jkind.mod_bounds_are_obviously_max jkind in
     let ty's_jkind = estimate_type_jkind ~ignore_mod_bounds env ty in
-    loop ~fuel ~expanded ty ty's_jkind jkind
+    loop ~fuel ~expanded env ty ty's_jkind jkind
   in
   estimate_jkind_and_loop ~fuel:100 ~expanded:false ty
     (Jkind.disallow_left jkind)
