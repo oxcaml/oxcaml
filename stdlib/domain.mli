@@ -231,7 +231,7 @@ module Tick : sig @@ portable
   (** Returns the interval at which the tick thread will tick, or [Null]
       if no domain has any active tick requests. This is the global minimum
       across all domains of live tick requests. *)
-  val global_effective_interval_usec : unit -> int or_null
+  val effective_interval_usec : unit -> int or_null
 end
 
 (** Submodule containing non-backwards-compatible functions which enforce thread

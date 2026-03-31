@@ -2150,7 +2150,7 @@ static bool tick_thread_wait(void)
 
   struct epoll_event events[2];
   int n = epoll_wait(tick_thread.epoll_fd, events, 2, -1);
-  if (n <= 0) return true;
+  if (n <= 0) return false;
 
   bool timer_fired = false;
   for (int i = 0; i < n; i++) {
@@ -2297,11 +2297,11 @@ static void* caml_tick(void *arg)
 
 CAMLextern int caml_start_tick_thread(void)
 {
+  caml_plat_lock_non_blocking(&tick_thread.mutex);
   if (!atomic_load_acquire(&tick_thread.enabled)) {
     return 0;
   }
 
-  caml_plat_lock_non_blocking(&tick_thread.mutex);
   if (tick_thread.running) {
     caml_plat_unlock(&tick_thread.mutex);
     return 0;
@@ -2378,13 +2378,6 @@ CAMLprim value caml_domain_set_tick_interval_usec_bytecode(value v_interval_usec
   CAMLparam1(v_interval_usec);
   caml_domain_set_tick_interval_usec(Long_val(v_interval_usec));
   CAMLreturn(Val_unit);
-}
-
-CAMLprim value caml_domain_get_tick_interval_usec(value v_unit)
-{
-  CAMLparam1(v_unit);
-  CAMLnoalloc;
-  CAMLreturn(Val_long(atomic_load_relaxed(&domain_self->tick_interval_usec)));
 }
 
 /* Backup thread */

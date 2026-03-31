@@ -916,7 +916,7 @@ CAMLexport int caml_c_thread_unregister(void)
   if (c_thread_tick != 0) {
     const value* release_tick = caml_named_value("Domain.Tick.release");
     if (!release_tick) {
-      caml_fatal_error("Fatal error: named value Domain.Tick.release not found");
+      caml_fatal_error("Named value Domain.Tick.release not found");
     }
     result = caml_callback_exn(*release_tick, Val_long(c_thread_tick));
   }

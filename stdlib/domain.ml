@@ -733,7 +733,8 @@ module Tick = struct
           "caml_domain_set_tick_interval_usec"
 
     let acquire ~interval_usec =
-      if interval_usec < 0 then invalid_arg "Tick.acquire: negative interval";
+      if interval_usec <= 0
+      then invalid_arg "Tick.acquire: interval must be strictly positive";
       Registry.protect (local_registry ()) (fun registry ->
         let interval = Registry.add registry interval_usec in
         set_tick_interval_usec interval);
