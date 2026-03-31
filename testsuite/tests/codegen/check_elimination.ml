@@ -102,12 +102,12 @@ search:
   movq  %rbx, %rax
   jmp   .L131
 .L116:
-  movq  (%rbx), %rax
-  cmpq  %rax, %rdi
+  movq  (%rbx), %rdx
+  cmpq  %rdx, %rdi
   setl  %al
   movzbq %al, %rsi
-  testq %rsi, %rsi
-  je    .L123
+  cmpq  %rdx, %rdi
+  jge   .L123
   movq  8(%rbx), %rax
   testq %rsi, %rsi
   jne   .L129

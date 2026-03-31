@@ -90,25 +90,19 @@ logand_branch:
 |}]
 
 
-(* CR ttebbi: We materialize comparison result bits despite
-   only using them for a single branch. Also, the `_ -> 0`
-   case is duplicated for no good reason. *)
-let combine_comparisons r f =
+(* CR ttebbi: The `_ -> 0` case is duplicated for no good reason. *)
+let combine_comparisons r x f =
   match !r > 5, !r < 20 with
   | true, true -> !r
   | _ -> 0
 ;;
 [%%expect_asm X86_64{|
 combine_comparisons:
-  movq  (%rax), %rbx
-  cmpq  $41, %rbx
-  setl  %al
-  movzbq %al, %rax
-  cmpq  $11, %rbx
+  movq  (%rax), %rax
+  cmpq  $11, %rax
   jle   .L114
-  testq %rax, %rax
-  je    .L111
-  movq  %rbx, %rax
+  cmpq  $41, %rax
+  jge   .L111
   ret
 .L111:
   movl  $1, %eax
@@ -126,14 +120,11 @@ let repeat_comparisons r _f =
   if a && b then 1 else 2
 [%%expect_asm X86_64{|
 repeat_comparisons:
-  movq  (%rax), %rbx
-  cmpq  $11, %rbx
-  setg  %al
-  movzbq %al, %rax
-  cmpq  $11, %rbx
+  movq  (%rax), %rax
+  cmpq  $11, %rax
   jle   .L113
-  testq %rax, %rax
-  je    .L110
+  cmpq  $11, %rax
+  jle   .L110
   movl  $3, %eax
   ret
 .L110:
@@ -335,7 +326,7 @@ let is_int_constant () : bool =
    Obj.repr (Some 3) |> Obj.is_int
 [%%expect_asm X86_64{|
 is_int_constant:
-  movq  camlTOP25__const_block785@GOTPCREL(%rip), %rax
+  movq  camlTOP25__const_block788@GOTPCREL(%rip), %rax
   andl  $1, %eax
   leaq  1(%rax,%rax), %rax
   ret
@@ -382,13 +373,13 @@ let branch_or_tailcall x =
 branch_or_tailcall:
   cmpq  $5, %rax
   jbe   .L105
-  movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
+  movq  camlTOP28__Pmakeblock921@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
 .L105:
-  movq  camlTOP28__switch_block919@GOTPCREL(%rip), %rbx
+  movq  camlTOP28__switch_block922@GOTPCREL(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
