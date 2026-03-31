@@ -42,11 +42,11 @@ module M1'' : sig val foo : 'a expr -> <[$('a) -> int]> expr end
 
 (*  Simple functions with a type variable under a quote-splice *)
 module M2 = struct
-  let f (x : <[ 'a ]> expr) = Obj.magic_many <[ ($x, $x) ]>
+  let f (x : <[ 'a ]> expr) = <[ ($x, $x) ]>
 end
 
 [%%expect{|
-module M2 : sig val f : 'a expr -> <[$('a) * $('a)]> expr end
+module M2 : sig val f : 'a expr -> <[$('a) * $('a)]> expr @ once end
 |}]
 
 (*  Checking [M2'] does not rely on any quote-splice inverses:
