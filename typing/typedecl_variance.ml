@@ -54,7 +54,7 @@ exception Error of Location.t * error
 (* Compute variance *)
 
 let get_variance ty visited =
-  try TypeMap.find ty !visited with Not_found -> Variance.null
+  try TypeMap.find ty !visited |> snd with Not_found -> Variance.null
 
 let compute_variance env visited vari ty =
   let rec compute_variance_rec env vari ty =
@@ -62,7 +62,7 @@ let compute_variance env visited vari ty =
     let vari' = get_variance ty visited in
     if Variance.subset vari vari' then () else
     let vari = Variance.union vari vari' in
-    visited := TypeMap.add ty vari !visited;
+    visited := TypeMap.add ty (env, vari) !visited;
     let compute_same = compute_variance_rec env vari in
     match get_desc ty with
       Tarrow (_, ty1, ty2, _) ->
@@ -209,8 +209,11 @@ let compute_variance_type env ~check (required, loc) decl tyl =
       let snap = Btype.snapshot () in
       let v2 =
         TypeMap.fold
-          (fun t vt v ->
-             if Ctype.is_equal env false [ty] [t] then union vt v else v)
+          (fun t (env', vt) v ->
+             (* Only check type subterms that occur at the same stage *)
+             if Env.stage env = Env.stage env' &&
+                Ctype.is_equal env false [ty] [t]
+             then union vt v else v)
           !tvl2 null in
       Btype.backtrack snap;
       let (c1,n1) = get_upper v1 and (c2,n2,i2) = get_lower v2 in

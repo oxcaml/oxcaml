@@ -446,14 +446,6 @@ let iter_type_expr_with_stages f env ty =
   | _ ->
     iter_type_expr (f env) ty
 
-let rec offset_stage n env =
-  if n < 0 then
-    offset_stage (n + 1) (decr_stage env)
-  else if n > 0 then
-    offset_stage (n - 1) (incr_stage env)
-  else
-    env
-
 (* CR metaprogramming jbachurski: We use this to adjust the environment while
    printing error messages. The original type may have been well-staged,
    but since we always print (non-unification) errors at stage 0, we should
@@ -461,7 +453,8 @@ let rec offset_stage n env =
    been fine were the type at stage 1).
 
    The right way to address this is to track the stage in errors. With that
-   done, this function can be removed, and some GADT-related errors improve. *)
+   done, this function can be removed, and some GADT-related errors improve.
+   This is tracked by ticket 6726. *)
 let contains_toplevel_splice stage ty =
   let visited = ref TypeSet.empty in
   let rec loop acc ty =
@@ -488,9 +481,13 @@ let unify_with_incr_stage uenv f =
     f (Expression { e with env = incr_stage e.env })
   | Pattern p ->
     Pattern_env.set_env p.penv (incr_stage p.penv.env);
-    let x = f (Pattern p) in
-    Pattern_env.set_env p.penv (decr_stage p.penv.env);
-    x
+    try
+      let x = f (Pattern p) in
+      Pattern_env.set_env p.penv (decr_stage p.penv.env);
+      x
+    with exn ->
+      Pattern_env.set_env p.penv (decr_stage p.penv.env);
+      raise exn
 
 let unify_with_decr_stage uenv f =
   match uenv with
@@ -498,9 +495,13 @@ let unify_with_decr_stage uenv f =
     f (Expression { e with env = decr_stage e.env })
   | Pattern p ->
     Pattern_env.set_env p.penv (decr_stage p.penv.env);
-    let x = f (Pattern p) in
-    Pattern_env.set_env p.penv (incr_stage p.penv.env);
-    x
+    try
+      let x = f (Pattern p) in
+      Pattern_env.set_env p.penv (incr_stage p.penv.env);
+      x
+    with exn ->
+      Pattern_env.set_env p.penv (incr_stage p.penv.env);
+      raise exn
 
 (* Unification generally must check that the jkinds of the two types being
    unified agree.  However, sometimes we need to delay these jkind
@@ -2255,29 +2256,16 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
-let try_expand_once_gen expand_abbrev env ty =
-  (* CR metaprogramming jbachurski: Sometimes, expansion deals with bad types
-     that contain cancellable top-level splices (e.g. $(<[unit]>) at stage 0).
-     This probably means another bit of the code was careless with splicing in
-     some non-trivial way.
-     We should probably find and fix the source: see ticket 6725.
-
-     It seems considerate to let this slide -- as those splices are cancelled
-     during [try_reduce] anyway. Hence, we track the stage here lazily to avoid
-     failing the assertion in [decr_stage]. *)
-  let rec loop acc ty =
-    match get_desc ty with
-    | Tconstr _ ->
-        expand_abbrev (offset_stage acc env) ty
-    | Tquote ty ->
-        loop (acc + 1) ty |> new_quote_ty
-    | Tsplice ty ->
-        loop (acc - 1) ty |> new_splice_ty
-    | Tquote_eval ty ->
-        loop (acc + 1) ty |> new_quote_eval_ty
-    | _ -> raise Cannot_expand
-  in
-  loop 0 ty
+let rec try_expand_once_gen expand_abbrev env ty =
+  match get_desc ty with
+    Tconstr _ -> expand_abbrev env ty
+  | Tquote t ->
+      try_expand_once_gen expand_abbrev (incr_stage env) t |> new_quote_ty
+  | Tsplice t ->
+      try_expand_once_gen expand_abbrev (decr_stage env) t |> new_splice_ty
+  | Tquote_eval t ->
+      try_expand_once_gen expand_abbrev (incr_stage env) t |> new_quote_eval_ty
+  | _ -> raise Cannot_expand
 
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
@@ -2747,7 +2735,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
      let tys_modalities =
        List.map
          (fun (_lbl, ty) ->
-            let { ty; modality } = expand_component ty in
+            let { ty; modality } = expand_component env ty in
             (ty, modality))
          ltys
      in
@@ -2797,10 +2785,15 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
    (* CR quoted-kinds jbachurski: These quote/splice the jkind. *)
-  | Tquote ty
-  | Tsplice ty
+  | Tquote ty ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds (incr_stage env) ty
+    |> Jkind.map_type_expr new_quote_ty
+  | Tsplice ty ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds (decr_stage env) ty
+    |> Jkind.map_type_expr new_splice_ty
   | Tquote_eval ty ->
-    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds (incr_stage env) ty
+    |> Jkind.map_type_expr new_quote_ty
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -2832,7 +2825,7 @@ let estimate_type_jkind_unwrapped
 let type_jkind env ty =
   get_unboxed_type_approximation env ty |>
   estimate_type_jkind_unwrapped
-    ~expand_component:(get_unboxed_type_approximation env) env
+    ~expand_component:get_unboxed_type_approximation env
 
 (* CR layouts v2.8: This function is quite suspect. See Jane Street internal
    gdoc titled "Let's kill type_jkind_purely". Internal ticket 3782. *)
@@ -2857,7 +2850,8 @@ let type_jkind_purely_if_principal env ty =
 let () = type_jkind_purely_if_principal' := type_jkind_purely_if_principal
 
 let estimate_type_jkind =
-  estimate_type_jkind ~expand_component:mk_unwrapped_type_expr
+  estimate_type_jkind
+    ~expand_component:(fun _env ty -> mk_unwrapped_type_expr ty)
 
 (* After type_jkind_purely_if_principal is defined, we can use it directly *)
 let mk_jkind_context_check_principal env =
@@ -2949,6 +2943,8 @@ let constrain_type_jkind ~fixed env ty jkind =
          must do so here. Internal ticket 5746. *)
       loop ~fuel ~expanded:false t ty's_jkind jkind
 
+    (* CR metaprogramming jbachurski: These should update the stage, which
+       means this function should pass the context explicitly. *)
     (* CR quoted-kinds jbachurski: These quote/splice [ty's_jkind]. *)
     | Tquote ty
     | Tsplice ty
