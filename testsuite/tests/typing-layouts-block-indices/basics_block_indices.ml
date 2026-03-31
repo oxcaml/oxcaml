@@ -1005,3 +1005,41 @@ val use_ok :
   ('a : value_or_null mod separable). unit -> ('a an_array, 'a) an_idx =
   <fun>
 |}]
+
+(***************************)
+(* [value_or_null] indices *)
+
+type r = #{ x : int }
+
+module M : sig
+  type t : value_or_null
+  val t : t
+  val i : (t, int) idx_mut
+  val j : (t, int) idx_imm
+  val k : (t, r) idx_imm
+end = struct
+  type t = { mutable i : int; j : int; k : r }
+  let t = { i = 1; j = 2; k = #{ x = 3 } }
+  let i = (.i)
+  let j = (.j)
+  let k = (.k)
+end
+
+let () =
+  let i = Idx_mut.get M.t M.i in
+  let j = Idx_imm.get M.t M.j in
+  Idx_mut.set M.t M.i 3;
+  let i' = Idx_mut.get M.t M.i in
+  let k = Idx_imm.get M.t (.idx_imm(M.k).#x) in
+  Printf.printf "i = %d, j = %d, i' = %d, k = %d\n" i j i' k
+[%%expect{|
+type r = #{ x : int; }
+module M :
+  sig
+    type t : value_or_null
+    val t : t
+    val i : (t, int) idx_mut
+    val j : (t, int) idx_imm
+    val k : (t, r) idx_imm
+  end
+|}]
