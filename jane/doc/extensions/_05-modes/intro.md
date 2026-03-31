@@ -141,7 +141,7 @@ when they are contended.
 |---------------------------|
 | **nonportable**           |
 | `|`                       |
-| shareable `|` corruptable |
+| shareable `|` corruptible |
 | `|`                       |
 | portable                  |
 {: .table }
@@ -150,9 +150,9 @@ Portability is a future axis that tracks whether a value is allowed to move acro
 thread boundaries. Functions that capture uncontended state are *nonportable*,
 so cannot escape the current thread. Functions that capture shared state are
 *shareable*, so may be executed in parallel. Functions that only close over
-corrupted values are *corruptable*. Functions that capture all values at
+corrupted values are *corruptible*. Functions that capture all values at
 contended are *portable*, so may execute concurrently. Note that *shareable* and
-*corruptable* are incomparable: neither is a submode of the other.
+*corruptible* are incomparable: neither is a submode of the other.
 
 Notably, it is generally safe to send mutable data *itself* to other threads,
 because it will then be *contended*, so the mutable portions will be

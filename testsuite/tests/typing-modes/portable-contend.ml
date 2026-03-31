@@ -131,7 +131,7 @@ Line 3, characters 19-20:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
-(* Closing over writing mutable field gives corruptable *)
+(* Closing over writing mutable field gives corruptible *)
 let foo () =
     let r = {a = best_bytes (); b = best_bytes ()} in
     let bar () = r.a <- best_bytes () in
@@ -141,7 +141,7 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "corruptable"
+Error: This value is "corruptible"
          because it contains a usage (of the value "r" at line 3, characters 17-18)
          which is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
@@ -167,7 +167,7 @@ Error: This value is "shareable"
 
 (* Closing over reading and writing mutable field gives nonportable *)
 (* CR nmatschke: We can't use the pattern above because the compiler complains
-   about either [shareable] or [corruptable] before [nonportable]. The
+   about either [shareable] or [corruptible] before [nonportable]. The
    "allocated containing data" error is not great. *)
 module _ : sig
   val bar : unit -> unit @@ portable
@@ -225,7 +225,7 @@ Error: Signature mismatch:
        However, the second is "portable".
 |}]
 
-(* For completeness: the error we get for corruptable *)
+(* For completeness: the error we get for corruptible *)
 module _ : sig
   val bar : unit -> unit @@ portable
 end = struct
@@ -241,14 +241,14 @@ Lines 3-6, characters 6-3:
 6 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val r : r val bar : unit -> unit end @ corruptable
+         sig val r : r val bar : unit -> unit end @ corruptible
        is not included in
          sig val bar : unit -> unit @@ portable end @ nonportable
        Values do not match:
-         val bar : unit -> unit (* in a structure at corruptable *)
+         val bar : unit -> unit (* in a structure at corruptible *)
        is not included in
          val bar : unit -> unit @@ portable (* in a structure at nonportable *)
-       The first is "corruptable"
+       The first is "corruptible"
          because it contains a usage (of the value "r" at line 5, characters 15-16)
          which is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
@@ -453,13 +453,13 @@ Error: This function when partially applied returns a value which is "shareable"
        but expected to be "portable".
 |}]
 
-(* closing over corrupted gives corruptable *)
+(* closing over corrupted gives corruptible *)
 let foo : 'a @ corrupted portable -> (unit -> unit) @ portable = fun a () -> ()
 [%%expect{|
 Line 1, characters 65-79:
 1 | let foo : 'a @ corrupted portable -> (unit -> unit) @ portable = fun a () -> ()
                                                                      ^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "corruptable",
+Error: This function when partially applied returns a value which is "corruptible",
        but expected to be "portable".
 |}]
 (* CR modes: These four tests are in principle fine to allow (they don't cause a data
@@ -580,38 +580,38 @@ let foo (r @ corrupted) = r.b
 val foo : r @ corrupted -> bytes @ corrupted = <fun>
 |}]
 
-(* TESTING corruptable mode *)
+(* TESTING corruptible mode *)
 
-(* corruptable and shareable are incomparable *)
-let foo (x @ corruptable) = (x : @ shareable)
+(* corruptible and shareable are incomparable *)
+let foo (x @ corruptible) = (x : @ shareable)
 [%%expect{|
 Line 1, characters 29-30:
-1 | let foo (x @ corruptable) = (x : @ shareable)
+1 | let foo (x @ corruptible) = (x : @ shareable)
                                  ^
-Error: This value is "corruptable" but is expected to be "shareable".
+Error: This value is "corruptible" but is expected to be "shareable".
 |}]
 
-let foo (x @ shareable) = (x : @ corruptable)
+let foo (x @ shareable) = (x : @ corruptible)
 [%%expect{|
 Line 1, characters 27-28:
-1 | let foo (x @ shareable) = (x : @ corruptable)
+1 | let foo (x @ shareable) = (x : @ corruptible)
                                ^
-Error: This value is "shareable" but is expected to be "corruptable".
+Error: This value is "shareable" but is expected to be "corruptible".
 |}]
 
-(* portable submodes to corruptable *)
-let foo (x @ portable) = (x : @ corruptable)
+(* portable submodes to corruptible *)
+let foo (x @ portable) = (x : @ corruptible)
 [%%expect{|
 val foo : 'a @ portable -> 'a = <fun>
 |}]
 
-(* corruptable submodes to nonportable *)
-let foo (x @ corruptable) = (x : @ nonportable)
+(* corruptible submodes to nonportable *)
+let foo (x @ corruptible) = (x : @ nonportable)
 [%%expect{|
-val foo : 'a @ corruptable -> 'a = <fun>
+val foo : 'a @ corruptible -> 'a = <fun>
 |}]
 
-(* Closing over a corrupted value yields a corruptable function *)
+(* Closing over a corrupted value yields a corruptible function *)
 let foo (x @ corrupted) = (fun () -> x.a <- best_bytes () : @ portable)
 
 [%%expect{|
@@ -625,12 +625,12 @@ Error: This value is "contended"
          because its mutable field "a" is being written.
 |}]
 
-(* A corruptable function closes over corrupted values *)
-let foo (x @ contended) = (fun () -> x.a <- best_bytes () : @ corruptable)
+(* A corruptible function closes over corrupted values *)
+let foo (x @ contended) = (fun () -> x.a <- best_bytes () : @ corruptible)
 
 [%%expect{|
 Line 1, characters 37-38:
-1 | let foo (x @ contended) = (fun () -> x.a <- best_bytes () : @ corruptable)
+1 | let foo (x @ contended) = (fun () -> x.a <- best_bytes () : @ corruptible)
                                          ^
 Error: This value is "contended"
        but is expected to be "corrupted" or "uncontended"
@@ -643,8 +643,8 @@ let foo (r @ write) = (r : @ corrupted)
 val foo : 'a @ write -> 'a @ write = <fun>
 |}]
 
-(* TESTING implication: writing implies corruptable *)
-let foo (f @ writing) = (f : @ corruptable)
+(* TESTING implication: writing implies corruptible *)
+let foo (f @ writing) = (f : @ corruptible)
 [%%expect{|
 val foo : 'a @ writing -> 'a = <fun>
 |}]
@@ -894,13 +894,13 @@ val f : 'a contended -> 'a @ contended = <fun>
 
 type 'a nonportable = { nonportable : 'a @@ nonportable }
 type 'a shareable = { shareable : 'a @@ shareable }
-type 'a corruptable = { corruptable : 'a @@ corruptable }
+type 'a corruptible = { corruptible : 'a @@ corruptible }
 type 'a portable = { portable : 'a @@ portable }
 
 [%%expect{|
 type 'a nonportable = { nonportable : 'a; }
 type 'a shareable = { shareable : 'a @@ shareable; }
-type 'a corruptable = { corruptable : 'a @@ corruptable; }
+type 'a corruptible = { corruptible : 'a @@ corruptible; }
 type 'a portable = { portable : 'a @@ portable; }
 |}]
 
@@ -916,10 +916,10 @@ let f (x @ shareable) = { nonportable = x }
 val f : 'a @ shareable -> 'a nonportable = <fun>
 |}]
 
-let f (x @ corruptable) = { nonportable = x }
+let f (x @ corruptible) = { nonportable = x }
 
 [%%expect{|
-val f : 'a @ corruptable -> 'a nonportable = <fun>
+val f : 'a @ corruptible -> 'a nonportable = <fun>
 |}]
 
 let f (x @ portable) = { nonportable = x }
@@ -945,13 +945,13 @@ let f (x @ shareable) = { shareable = x }
 val f : 'a @ shareable -> 'a shareable = <fun>
 |}]
 
-let f (x @ corruptable) = { shareable = x }
+let f (x @ corruptible) = { shareable = x }
 
 [%%expect{|
 Line 1, characters 40-41:
-1 | let f (x @ corruptable) = { shareable = x }
+1 | let f (x @ corruptible) = { shareable = x }
                                             ^
-Error: This value is "corruptable"
+Error: This value is "corruptible"
        but is expected to be "shareable"
          because it is the field "shareable" (with some modality) of the record at line 1, characters 26-43.
 |}]
@@ -962,38 +962,38 @@ let f (x @ portable) = { shareable = x }
 val f : 'a @ portable -> 'a shareable = <fun>
 |}]
 
-let f (x @ nonportable) = { corruptable = x }
+let f (x @ nonportable) = { corruptible = x }
 
 [%%expect{|
 Line 1, characters 42-43:
-1 | let f (x @ nonportable) = { corruptable = x }
+1 | let f (x @ nonportable) = { corruptible = x }
                                               ^
 Error: This value is "nonportable"
-       but is expected to be "corruptable"
-         because it is the field "corruptable" (with some modality) of the record at line 1, characters 26-45.
+       but is expected to be "corruptible"
+         because it is the field "corruptible" (with some modality) of the record at line 1, characters 26-45.
 |}]
 
-let f (x @ shareable) = { corruptable = x }
+let f (x @ shareable) = { corruptible = x }
 
 [%%expect{|
 Line 1, characters 40-41:
-1 | let f (x @ shareable) = { corruptable = x }
+1 | let f (x @ shareable) = { corruptible = x }
                                             ^
 Error: This value is "shareable"
-       but is expected to be "corruptable"
-         because it is the field "corruptable" (with some modality) of the record at line 1, characters 24-43.
+       but is expected to be "corruptible"
+         because it is the field "corruptible" (with some modality) of the record at line 1, characters 24-43.
 |}]
 
-let f (x @ corruptable) = { corruptable = x }
+let f (x @ corruptible) = { corruptible = x }
 
 [%%expect{|
-val f : 'a @ corruptable -> 'a corruptable = <fun>
+val f : 'a @ corruptible -> 'a corruptible = <fun>
 |}]
 
-let f (x @ portable) = { corruptable = x }
+let f (x @ portable) = { corruptible = x }
 
 [%%expect{|
-val f : 'a @ portable -> 'a corruptable = <fun>
+val f : 'a @ portable -> 'a corruptible = <fun>
 |}]
 
 let f (x @ nonportable) = { portable = x }
@@ -1018,13 +1018,13 @@ Error: This value is "shareable"
          because it is the field "portable" (with some modality) of the record at line 1, characters 24-40.
 |}]
 
-let f (x @ corruptable) = { portable = x }
+let f (x @ corruptible) = { portable = x }
 
 [%%expect{|
 Line 1, characters 39-40:
-1 | let f (x @ corruptable) = { portable = x }
+1 | let f (x @ corruptible) = { portable = x }
                                            ^
-Error: This value is "corruptable"
+Error: This value is "corruptible"
        but is expected to be "portable"
          because it is the field "portable" (with some modality) of the record at line 1, characters 26-42.
 |}]
@@ -1047,10 +1047,10 @@ let f { nonportable = x } = (x : @ shareable)
 val f : 'a nonportable @ shareable -> 'a = <fun>
 |}]
 
-let f { nonportable = x } = (x : @ corruptable)
+let f { nonportable = x } = (x : @ corruptible)
 
 [%%expect{|
-val f : 'a nonportable @ corruptable -> 'a = <fun>
+val f : 'a nonportable @ corruptible -> 'a = <fun>
 |}]
 
 let f { nonportable = x } = (x : @ portable)
@@ -1071,40 +1071,40 @@ let f { shareable = x } = (x : @ shareable)
 val f : 'a shareable -> 'a = <fun>
 |}]
 
-let f { shareable = x } = (x : @ corruptable)
+let f { shareable = x } = (x : @ corruptible)
 
 [%%expect{|
-val f : 'a shareable @ corruptable -> 'a = <fun>
+val f : 'a shareable @ corruptible -> 'a = <fun>
 |}]
 
 let f { shareable = x } = (x : @ portable)
 
 [%%expect{|
-val f : 'a shareable @ corruptable -> 'a = <fun>
+val f : 'a shareable @ corruptible -> 'a = <fun>
 |}]
 
-let f { corruptable = x } = (x : @ nonportable)
+let f { corruptible = x } = (x : @ nonportable)
 
 [%%expect{|
-val f : 'a corruptable -> 'a = <fun>
+val f : 'a corruptible -> 'a = <fun>
 |}]
 
-let f { corruptable = x } = (x : @ shareable)
+let f { corruptible = x } = (x : @ shareable)
 
 [%%expect{|
-val f : 'a corruptable @ shareable -> 'a = <fun>
+val f : 'a corruptible @ shareable -> 'a = <fun>
 |}]
 
-let f { corruptable = x } = (x : @ corruptable)
+let f { corruptible = x } = (x : @ corruptible)
 
 [%%expect{|
-val f : 'a corruptable -> 'a = <fun>
+val f : 'a corruptible -> 'a = <fun>
 |}]
 
-let f { corruptable = x } = (x : @ portable)
+let f { corruptible = x } = (x : @ portable)
 
 [%%expect{|
-val f : 'a corruptable @ shareable -> 'a = <fun>
+val f : 'a corruptible @ shareable -> 'a = <fun>
 |}]
 
 let f { portable = x } = (x : @ nonportable)
@@ -1119,7 +1119,7 @@ let f { portable = x } = (x : @ shareable)
 val f : 'a portable -> 'a = <fun>
 |}]
 
-let f { portable = x } = (x : @ corruptable)
+let f { portable = x } = (x : @ corruptible)
 
 [%%expect{|
 val f : 'a portable -> 'a = <fun>
@@ -1245,10 +1245,10 @@ let f ({ nonportable } @ shareable) = (nonportable : @ shareable)
 val f : 'a nonportable @ shareable -> 'a = <fun>
 |}]
 
-let f ({ nonportable } @ corruptable) = (nonportable : @ corruptable)
+let f ({ nonportable } @ corruptible) = (nonportable : @ corruptible)
 
 [%%expect{|
-val f : 'a nonportable @ corruptable -> 'a = <fun>
+val f : 'a nonportable @ corruptible -> 'a = <fun>
 |}]
 
 let f ({ nonportable } @ portable) = (nonportable : @ portable)
@@ -1269,10 +1269,10 @@ let f ({ shareable } @ shareable) = (shareable : @ shareable)
 val f : 'a shareable @ shareable -> 'a = <fun>
 |}]
 
-let f ({ shareable } @ corruptable) = (shareable : @ portable)
+let f ({ shareable } @ corruptible) = (shareable : @ portable)
 
 [%%expect{|
-val f : 'a shareable @ corruptable -> 'a = <fun>
+val f : 'a shareable @ corruptible -> 'a = <fun>
 |}]
 
 let f ({ shareable } @ portable) = (shareable : @ portable)
@@ -1281,28 +1281,28 @@ let f ({ shareable } @ portable) = (shareable : @ portable)
 val f : 'a shareable @ portable -> 'a = <fun>
 |}]
 
-let f ({ corruptable } @ nonportable) = (corruptable : @ corruptable)
+let f ({ corruptible } @ nonportable) = (corruptible : @ corruptible)
 
 [%%expect{|
-val f : 'a corruptable -> 'a = <fun>
+val f : 'a corruptible -> 'a = <fun>
 |}]
 
-let f ({ corruptable } @ shareable) = (corruptable : @ portable)
+let f ({ corruptible } @ shareable) = (corruptible : @ portable)
 
 [%%expect{|
-val f : 'a corruptable @ shareable -> 'a = <fun>
+val f : 'a corruptible @ shareable -> 'a = <fun>
 |}]
 
-let f ({ corruptable } @ corruptable) = (corruptable : @ corruptable)
+let f ({ corruptible } @ corruptible) = (corruptible : @ corruptible)
 
 [%%expect{|
-val f : 'a corruptable @ corruptable -> 'a = <fun>
+val f : 'a corruptible @ corruptible -> 'a = <fun>
 |}]
 
-let f ({ corruptable } @ portable) = (corruptable : @ portable)
+let f ({ corruptible } @ portable) = (corruptible : @ portable)
 
 [%%expect{|
-val f : 'a corruptable @ portable -> 'a = <fun>
+val f : 'a corruptible @ portable -> 'a = <fun>
 |}]
 
 let f ({ portable } @ nonportable) = (portable : @ portable)
@@ -1317,10 +1317,10 @@ let f ({ portable } @ shareable) = (portable : @ portable)
 val f : 'a portable @ shareable -> 'a = <fun>
 |}]
 
-let f ({ portable } @ corruptable) = (portable : @ portable)
+let f ({ portable } @ corruptible) = (portable : @ portable)
 
 [%%expect{|
-val f : 'a portable @ corruptable -> 'a = <fun>
+val f : 'a portable @ corruptible -> 'a = <fun>
 |}]
 
 let f ({ portable } @ portable) = (portable : @ portable)
@@ -1347,16 +1347,16 @@ val f : ('a : value mod corrupted). 'a @ contended -> 'a @ shared = <fun>
 
 (* Mode crossing: portability. *)
 
-let f : type (a : value mod shareable). a @ corruptable -> a @ portable =
+let f : type (a : value mod shareable). a @ corruptible -> a @ portable =
   fun x -> x
 
 [%%expect{|
-val f : ('a : value mod shareable). 'a @ corruptable -> 'a @ portable = <fun>
+val f : ('a : value mod shareable). 'a @ corruptible -> 'a @ portable = <fun>
 |}]
 
-let f : type (a : value mod corruptable). a @ shareable -> a @ portable =
+let f : type (a : value mod corruptible). a @ shareable -> a @ portable =
   fun x -> x
 
 [%%expect{|
-val f : ('a : value mod corruptable). 'a @ shareable -> 'a @ portable = <fun>
+val f : ('a : value mod corruptible). 'a @ shareable -> 'a @ portable = <fun>
 |}]

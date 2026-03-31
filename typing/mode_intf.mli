@@ -379,7 +379,7 @@ module type S = sig
       type t =
         | Portable
         | Shareable
-        | Corruptable
+        | Corruptible
         | Nonportable
 
       include Const with type t := t

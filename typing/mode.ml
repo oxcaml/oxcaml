@@ -524,7 +524,7 @@ module Lattices = struct
     type t =
       | Portable (* 0b00 *)
       | Shareable (* 0b01 *)
-      | Corruptable (* 0b10 *)
+      | Corruptible (* 0b10 *)
       | Nonportable (* 0b11 *)
 
     include Diamond (struct
@@ -534,7 +534,7 @@ module Lattices = struct
 
       let fst = Shareable
 
-      let snd = Corruptable
+      let snd = Corruptible
 
       let max = Nonportable
     end)
@@ -544,7 +544,7 @@ module Lattices = struct
     let print ppf = function
       | Portable -> Fmt.fprintf ppf "portable"
       | Shareable -> Fmt.fprintf ppf "shareable"
-      | Corruptable -> Fmt.fprintf ppf "corruptable"
+      | Corruptible -> Fmt.fprintf ppf "corruptible"
       | Nonportable -> Fmt.fprintf ppf "nonportable"
   end
 
@@ -1740,13 +1740,13 @@ module Lattices_mono = struct
   let portable_to_contended = function
     | Portability.Portable -> Contention.Contended
     | Portability.Shareable -> Contention.Shared
-    | Portability.Corruptable -> Contention.Corrupted
+    | Portability.Corruptible -> Contention.Corrupted
     | Portability.Nonportable -> Contention.Uncontended
 
   let contended_to_portable = function
     | Contention.Contended -> Portability.Portable
     | Contention.Shared -> Portability.Shareable
-    | Contention.Corrupted -> Portability.Corruptable
+    | Contention.Corrupted -> Portability.Corruptible
     | Contention.Uncontended -> Portability.Nonportable
 
   let local_to_regional = function

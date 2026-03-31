@@ -1483,7 +1483,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
       match modes.statefulness, modes.portability with
       | Stateless, Portable
       | Reading, Shareable
-      | Writing, Corruptable
+      | Writing, Corruptible
       | Stateful, Nonportable -> None
       | _, _ -> Some modes.portability
     in

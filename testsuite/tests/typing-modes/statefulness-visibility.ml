@@ -914,12 +914,12 @@ Line 1, characters 68-69:
 Error: This value is "shareable" but is expected to be "portable".
 |}]
 
-let override : 'a @ stateless corruptable -> 'a @ portable = fun x -> x
+let override : 'a @ stateless corruptible -> 'a @ portable = fun x -> x
 [%%expect{|
 Line 1, characters 70-71:
-1 | let override : 'a @ stateless corruptable -> 'a @ portable = fun x -> x
+1 | let override : 'a @ stateless corruptible -> 'a @ portable = fun x -> x
                                                                           ^
-Error: This value is "corruptable" but is expected to be "portable".
+Error: This value is "corruptible" but is expected to be "portable".
 |}]
 
 let override : 'a @ stateless nonportable -> 'a @ portable = fun x -> x
@@ -945,14 +945,14 @@ Line 1, characters 69-70:
 Error: This value is "nonportable" but is expected to be "shareable".
 |}]
 
-(* [writing] => [corruptable] *)
+(* [writing] => [corruptible] *)
 
 let fails : 'a @ writing -> 'a @ shareable = fun x -> x
 [%%expect{|
 Line 1, characters 54-55:
 1 | let fails : 'a @ writing -> 'a @ shareable = fun x -> x
                                                           ^
-Error: This value is "corruptable" but is expected to be "shareable".
+Error: This value is "corruptible" but is expected to be "shareable".
 |}]
 
 let succeeds : 'a @ writing shareable -> 'a @ shareable = fun x -> x
@@ -980,7 +980,7 @@ let fails : 'a @ writing -> 'a @ portable = fun x -> x
 Line 1, characters 53-54:
 1 | let fails : 'a @ writing -> 'a @ portable = fun x -> x
                                                          ^
-Error: This value is "corruptable" but is expected to be "portable".
+Error: This value is "corruptible" but is expected to be "portable".
 |}]
 
 let succeeds : 'a @ writing portable -> 'a @ portable = fun x -> x

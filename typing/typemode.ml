@@ -77,7 +77,7 @@ module Mode_axis_pair = struct
     | "once" -> comonadic Linearity Once
     | "many" -> comonadic Linearity Many
     | "nonportable" -> comonadic Portability Nonportable
-    | "corruptable" -> comonadic Portability Corruptable
+    | "corruptible" -> comonadic Portability Corruptible
     | "shareable" -> comonadic Portability Shareable
     | "portable" -> comonadic Portability Portable
     | "contended" -> monadic Contention Contended
@@ -244,7 +244,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       match a with
       | Stateless -> Portable
       | Reading -> Shareable
-      | Writing -> Corruptable
+      | Writing -> Corruptible
       | Stateful -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_const b)]
@@ -401,7 +401,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
     | None, Some Statefulness.Const.Reading -> Some Portability.Const.Shareable
     | None, Some Statefulness.Const.Writing ->
-      Some Portability.Const.Corruptable
+      Some Portability.Const.Corruptible
     | None, Some Statefulness.Const.Stateful ->
       Some Portability.Const.Nonportable
   in
