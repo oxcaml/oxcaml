@@ -174,6 +174,14 @@ let mk_cfg_merge_blocks f =
 let mk_no_cfg_merge_blocks f =
   ("-no-cfg-merge-blocks", Arg.Unit f, " Do not merge equivalent CFG blocks")
 
+let mk_cfg_share_instrs f =
+  ("-cfg-share-instrs", Arg.Unit f, " Share equivalent CFG instructions")
+
+let mk_no_cfg_share_instrs f =
+  ( "-no-cfg-share-instrs",
+    Arg.Unit f,
+    " Do not share equivalent CFG instructions" )
+
 let mk_cfg_value_propagation f =
   ("-cfg-value-propagation", Arg.Unit f, " Propagate value to simplify CFG")
 
@@ -1203,6 +1211,8 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap_threshold : int -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
+  val cfg_share_instrs : unit -> unit
+  val no_cfg_share_instrs : unit -> unit
   val cfg_value_propagation : unit -> unit
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit
@@ -1373,6 +1383,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_prologue_shrink_wrap_threshold F.cfg_prologue_shrink_wrap_threshold;
       mk_cfg_merge_blocks F.cfg_merge_blocks;
       mk_no_cfg_merge_blocks F.no_cfg_merge_blocks;
+      mk_cfg_share_instrs F.cfg_share_instrs;
+      mk_no_cfg_share_instrs F.no_cfg_share_instrs;
       mk_cfg_value_propagation F.cfg_value_propagation;
       mk_no_cfg_value_propagation F.no_cfg_value_propagation;
       mk_cfg_value_propagation_float F.cfg_value_propagation_float;
@@ -1586,6 +1598,8 @@ module Oxcaml_options_impl = struct
   let no_cfg_prologue_shrink_wrap = clear' Oxcaml_flags.cfg_prologue_shrink_wrap
   let cfg_merge_blocks = set' Oxcaml_flags.cfg_merge_blocks
   let no_cfg_merge_blocks = clear' Oxcaml_flags.cfg_merge_blocks
+  let cfg_share_instrs = set' Oxcaml_flags.cfg_share_instrs
+  let no_cfg_share_instrs = clear' Oxcaml_flags.cfg_share_instrs
   let cfg_value_propagation = set' Oxcaml_flags.cfg_value_propagation
   let no_cfg_value_propagation = clear' Oxcaml_flags.cfg_value_propagation
 
@@ -2118,6 +2132,7 @@ module Extra_params = struct
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
+    | "cfg-share-instrs" -> set' Oxcaml_flags.cfg_share_instrs
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
     | "cfg-value-propagation-float" ->
         set' Oxcaml_flags.cfg_value_propagation_float

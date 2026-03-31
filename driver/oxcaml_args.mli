@@ -55,6 +55,8 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap_threshold : int -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
+  val cfg_share_instrs : unit -> unit
+  val no_cfg_share_instrs : unit -> unit
   val cfg_value_propagation : unit -> unit
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit
