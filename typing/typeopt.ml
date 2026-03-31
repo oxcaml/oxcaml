@@ -772,14 +772,20 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         match get_desc ty with
         | Tunboxed_tuple fields ->
           Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
-        | Tconstr(p, _, _) ->
-          begin match (Env.find_type p env).type_kind with
+        | Tconstr(p, args, _) ->
+          begin match Env.find_type p env with
           | exception Not_found -> unknown ()
-          | Type_record_unboxed_product (lbls, _, _) ->
-            Misc.Stdlib.Array.of_list_map (fun {Types.ld_type} -> Some ld_type)
-              lbls
-          | Type_variant _ | Type_record _ | Type_abstract _ | Type_open ->
-            (* We don't need to handle [@@unboxed] records/variants here,
+          | { type_kind = Type_record_unboxed_product (lbls, _, _);
+              type_params; _ } ->
+            let type_of_ld { Types.ld_type } =
+              try Some (Ctype.apply env type_params ld_type args)
+              with Ctype.Cannot_apply -> Some ld_type
+            in
+            Misc.Stdlib.Array.of_list_map type_of_ld lbls
+          | { type_kind =
+                Type_variant _ | Type_record _ | Type_abstract _ | Type_open;
+              _ } ->
+            (* We don't need to handle  records/variants here,
                because [scrape_ty] looks though them. *)
             unknown ()
           end

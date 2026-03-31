@@ -575,7 +575,6 @@ let () =
     t.is <- is
   in
   let t = { is = #{ x = 1; y = 2 } } in
-  (* CR rtjoa: this should be 0 *)
-  test ~expect_caml_modifies:2
+  test ~expect_caml_modifies:0
     (fun () -> f t #{ x = 3; y = 4 };
                ignore (Sys.opaque_identity t))
