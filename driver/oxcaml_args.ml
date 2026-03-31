@@ -105,6 +105,29 @@ let mk_no_cfg_peephole_optimize f =
     Arg.Unit f,
     " Do not apply peephole optimizations to CFG" )
 
+let mk_x86_peephole_optimize f =
+  ("-x86-peephole-optimize", Arg.Unit f, " Apply peephole optimizations to x86")
+
+let mk_no_x86_peephole_optimize f =
+  ( "-no-x86-peephole-optimize",
+    Arg.Unit f,
+    " Do not apply peephole optimizations to x86" )
+
+let mk_no_x86_peephole_remove_mov_to_dead_register f =
+  ( "-no-x86-peephole-remove-mov-to-dead-register",
+    Arg.Unit f,
+    " Disable x86 peephole: remove mov to dead register" )
+
+let mk_no_x86_peephole_remove_redundant_cmp f =
+  ( "-no-x86-peephole-remove-redundant-cmp",
+    Arg.Unit f,
+    " Disable x86 peephole: remove redundant cmp" )
+
+let mk_no_x86_peephole_combine_add_rsp f =
+  ( "-no-x86-peephole-combine-add-rsp",
+    Arg.Unit f,
+    " Disable x86 peephole: combine adjacent add rsp" )
+
 let mk_cfg_cse_optimize f =
   ("-cfg-cse-optimize", Arg.Unit f, " Apply CSE optimizations to CFG")
 
@@ -1191,6 +1214,11 @@ module type Oxcaml_options = sig
   val dvectorize : unit -> unit
   val cfg_peephole_optimize : unit -> unit
   val no_cfg_peephole_optimize : unit -> unit
+  val x86_peephole_optimize : unit -> unit
+  val no_x86_peephole_optimize : unit -> unit
+  val no_x86_peephole_remove_mov_to_dead_register : unit -> unit
+  val no_x86_peephole_remove_redundant_cmp : unit -> unit
+  val no_x86_peephole_combine_add_rsp : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
@@ -1360,6 +1388,13 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dvectorize F.dvectorize;
       mk_cfg_peephole_optimize F.cfg_peephole_optimize;
       mk_no_cfg_peephole_optimize F.no_cfg_peephole_optimize;
+      mk_x86_peephole_optimize F.x86_peephole_optimize;
+      mk_no_x86_peephole_optimize F.no_x86_peephole_optimize;
+      mk_no_x86_peephole_remove_mov_to_dead_register
+        F.no_x86_peephole_remove_mov_to_dead_register;
+      mk_no_x86_peephole_remove_redundant_cmp
+        F.no_x86_peephole_remove_redundant_cmp;
+      mk_no_x86_peephole_combine_add_rsp F.no_x86_peephole_combine_add_rsp;
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
@@ -1565,6 +1600,18 @@ module Oxcaml_options_impl = struct
   let dvectorize = set' Oxcaml_flags.dump_vectorize
   let cfg_peephole_optimize = set' Oxcaml_flags.cfg_peephole_optimize
   let no_cfg_peephole_optimize = clear' Oxcaml_flags.cfg_peephole_optimize
+  let x86_peephole_optimize = set' Oxcaml_flags.x86_peephole_optimize
+  let no_x86_peephole_optimize = clear' Oxcaml_flags.x86_peephole_optimize
+
+  let no_x86_peephole_remove_mov_to_dead_register =
+    clear' Oxcaml_flags.x86_peephole_remove_mov_to_dead_register
+
+  let no_x86_peephole_remove_redundant_cmp =
+    clear' Oxcaml_flags.x86_peephole_remove_redundant_cmp
+
+  let no_x86_peephole_combine_add_rsp =
+    clear' Oxcaml_flags.x86_peephole_combine_add_rsp
+
   let cfg_stack_checks = set' Oxcaml_flags.cfg_stack_checks
   let no_cfg_stack_checks = clear' Oxcaml_flags.cfg_stack_checks
 
@@ -2112,6 +2159,7 @@ module Extra_params = struct
     | "vectorize-max-block-size" ->
         set_int' Oxcaml_flags.vectorize_max_block_size
     | "cfg-peephole-optimize" -> set' Oxcaml_flags.cfg_peephole_optimize
+    | "x86-peephole-optimize" -> set' Oxcaml_flags.x86_peephole_optimize
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
     | "cfg-eliminate-dead-trap-handlers" ->
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers

@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
@@ -511,8 +512,7 @@ float_of_bits:
   ret
 |}]
 
-(* CR ttebbi: Double cmp instruction, subtraction should be done on byte
-   registers. *)
+(* CR ttebbi: Subtraction should be done on byte registers. *)
 let compare x y = Int64_u.compare x y
 [%%expect_asm X86_64{|
 compare:
@@ -520,7 +520,6 @@ compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
@@ -539,7 +538,6 @@ unsigned_compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
@@ -565,7 +563,6 @@ equal_using_compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
