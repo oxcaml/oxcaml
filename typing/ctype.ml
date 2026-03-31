@@ -7660,8 +7660,10 @@ let rec normalize_type_rec mark ty =
               let tyl' =
                 List.fold_left
                   (fun tyl ty ->
-                     let eq = is_equal (Env.enter_future Env.empty) false in
-                     if List.exists (fun ty' -> eq [ty] [ty']) tyl
+                     let eq ty' =
+                       is_equal (Env.enter_future Env.empty) false [ty] [ty']
+                     in
+                     if List.exists eq tyl
                      then tyl
                      else ty::tyl)
                   [ty] tyl
