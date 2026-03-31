@@ -565,3 +565,17 @@ let () =
   test ~expect_caml_modifies:1
     (fun () -> unsafe_set_ptr_prod #(t, idx) #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type ('a : value_or_null) pair = #{ x : 'a; y : 'a }
+    type t = { mutable is : int pair }
+  end in
+  let[@inline never] f t is =
+    t.is <- is
+  in
+  let t = { is = #{ x = 1; y = 2 } } in
+  (* CR rtjoa: this should be 0 *)
+  test ~expect_caml_modifies:2
+    (fun () -> f t #{ x = 3; y = 4 };
+               ignore (Sys.opaque_identity t))
