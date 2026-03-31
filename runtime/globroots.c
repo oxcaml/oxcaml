@@ -259,7 +259,7 @@ static void scan_native_globals(scanning_action f, void* fdata)
     }
   }
 
-  /* Dynamic (natdynlink) global roots */
+  /* Dynamic global roots (natdynlink and manual module init) */
   caml_plat_lock_blocking(&roots_mutex);
   int start, stop;
   FOREACH_SKIPLIST_ELEMENT(e, &caml_dyn_globals, {

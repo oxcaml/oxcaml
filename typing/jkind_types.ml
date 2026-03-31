@@ -657,17 +657,6 @@ module Sort = struct
     | Equal_mutated_both ->
       true
 
-  let is_void_defaulting t =
-    (* CR layouts v5: this should probably default to void now *)
-    match default_to_value_and_get t with
-    | Base Void -> true
-    | Base
-        ( Value | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
-        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
-      false
-    | Univar _ -> Misc.fatal_error "is_void_defaulting: Univar"
-    | Product _ -> false
-
   let decompose_into_product ~level t n =
     let ts = List.init n (fun _ -> new_var ~level) in
     if equate t (Product ts) then Some ts else None

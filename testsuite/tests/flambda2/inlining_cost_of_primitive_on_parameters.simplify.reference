@@ -1,5 +1,3 @@
-
-After simplify:
 let code f_0 deleted in
 let code g_1 deleted in
 let code loopify(never) size(8) newer_version_of(f_0)
@@ -28,4 +26,3 @@ let $camlInlining_cost_of_primitive_on_parameters =
            $camlInlining_cost_of_primitive_on_parameters__g_3)
 in
 cont done ($camlInlining_cost_of_primitive_on_parameters)
-

@@ -321,24 +321,26 @@ module M :
    the closure for [f x] contains a pointer to [f] and therfore must close over the [mode].
    Only relevant for comonadic axes since functions cross monadic axes. *)
 
-let f (k : (unit -> unit -> unit) @ once ) =
-  let (k' @ many) = k () in
+let f (k : (unit -> unit -> unit) @ local ) =
+  let (k' @ global) = k () in
   k' ()
 [%%expect{|
-Line 2, characters 20-24:
-2 |   let (k' @ many) = k () in
-                        ^^^^
-Error: This value is "once" but is expected to be "many".
+Line 2, characters 22-26:
+2 |   let (k' @ global) = k () in
+                          ^^^^
+Error: This value is "local" but is expected to be "global".
+  Hint: This is a partial application
+        Adding 1 more argument will make the value non-local
 |}]
 
-(* However, for [f : (A -> (B -> C)) @ once], we presume that [f] itself returns
-   a new closure which can be applied [many] times. *)
+(* However, for [f : (A -> (B -> C) @ mode1) @ mode2], we presume that [f]
+   itself returns a new closure at [mode1]. *)
 
-let f' (k : (unit -> (unit -> unit)) @ once ) =
-  let (k' @ many) = k () in
+let f' (k : (unit -> (unit -> unit)) @ local) =
+  let (k' @ global) = k () in
   k' ()
 [%%expect{|
-val f' : (unit -> (unit -> unit)) @ once -> unit = <fun>
+val f' : (unit -> (unit -> unit)) @ local -> unit = <fun>
 |}]
 
 (* CR modes: Functors don't have yet syntactic arity,
@@ -348,34 +350,34 @@ val f' : (unit -> (unit -> unit)) @ once -> unit = <fun>
 
    Internal ticket 1534. *)
 
-module F (K : (functor () () -> sig end) @ once) = struct
-  module (K' @ many) = K ()
+module F (K : (functor () () -> sig end) @ local) = struct
+  module (K' @ global) = K ()
 end
 [%%expect{|
-Line 2, characters 23-27:
-2 |   module (K' @ many) = K ()
-                           ^^^^
-Error: The module is "once" but is expected to be "many".
+Line 2, characters 25-29:
+2 |   module (K' @ global) = K ()
+                             ^^^^
+Error: The module is "local" but is expected to be "global".
 |}]
 
 (* For functions we can infer the more permissive choice. *)
 
 let () =
-  let (f @ once) () @ many = fun () -> () in
-  let (_f @ many) = f () in
+  let (f @ stateful) () @ stateless = fun () -> () in
+  let (_f @ stateless) = f () in
   ()
 [%%expect{|
 |}]
 
 let () =
-  let (f @ once) : (unit -> unit -> unit) = fun () () -> () in
-  let (_f @ many) = f () in
+  let (f @ stateful) : (unit -> unit -> unit) = fun () () -> () in
+  let (_f @ stateless) = f () in
   ()
 [%%expect{|
-Line 3, characters 20-24:
-3 |   let (_f @ many) = f () in
-                        ^^^^
-Error: This value is "once" but is expected to be "many".
+Line 3, characters 25-29:
+3 |   let (_f @ stateless) = f () in
+                             ^^^^
+Error: This value is "stateful" but is expected to be "stateless".
 |}]
 
 (* Functor behavior here is stricter. *)
@@ -384,22 +386,22 @@ let () =
   (* CR modes: this line should raise the error eagerly.
 
      Internal ticket 6260. *)
-  let module (F @ once) () @ many = (functor () -> struct end) in
-  let module (M' @ many) = F () in
+  let module (F @ stateful) () @ stateless = (functor () -> struct end) in
+  let module (M' @ stateless) = F () in
   ()
 [%%expect{|
-Line 6, characters 27-31:
-6 |   let module (M' @ many) = F () in
-                               ^^^^
-Error: The module is "once" but is expected to be "many".
+Line 6, characters 32-36:
+6 |   let module (M' @ stateless) = F () in
+                                    ^^^^
+Error: The module is "stateful" but is expected to be "stateless".
 |}]
 
 (* Closing over arguments: given [f : A -> B -> C] and [a : A @ mode], [f a] must close
    over [a]. The multi-argument function syntax handles this implicitly.  *)
 
-let f_once (x @ once) () = ()
+let f_local (x @ local) () = ()
 [%%expect{|
-val f_once : 'a @ once -> unit -> unit = <fun>
+val f_local : 'a @ local -> unit -> unit = <fun>
 |}]
 
 (* CR modes: For functor, the behavior is the same but explicit
@@ -407,307 +409,319 @@ val f_once : 'a @ once -> unit -> unit = <fun>
 
    Internal ticket 6259. *)
 
-module F (M : S @ once) () = struct end
+module F (M : S @ local) () = struct end
 [%%expect{|
-module F : functor (M : S @ once) -> (functor () -> sig end) @ once @@
+module F : functor (M : S @ local) -> (functor () -> sig end) @ local @@
   stateless
 |}]
 
 (* Demonstration. *)
 
-let f_once_app (x @ once) =
-  let (f_app @ many) = f_once x in
+let f_stateful (x @ stateful) () = ()
+module F (M : S @ stateful) () = struct end
+[%%expect{|
+val f_stateful : 'a -> unit -> unit = <fun>
+module F : functor (M : S) () -> sig end @@ stateless
+|}]
+
+let f_stateful_app (x @ stateful) =
+  let (f_app @ stateless) = f_stateful x in
   f_app ()
 [%%expect{|
-Line 2, characters 23-31:
-2 |   let (f_app @ many) = f_once x in
-                           ^^^^^^^^
-Error: This value is "once" but is expected to be "many".
+Line 2, characters 28-40:
+2 |   let (f_app @ stateless) = f_stateful x in
+                                ^^^^^^^^^^^^
+Error: This value is "stateful" but is expected to be "stateless".
 |}]
 
-module F_once_app (M : S @ once) = struct
-  module (F_app @ many) = F (M)
+module F_stateful_app (M : S @ stateful) = struct
+  module (F_app @ stateless) = F (M)
 end
 [%%expect{|
-Line 2, characters 26-31:
-2 |   module (F_app @ many) = F (M)
-                              ^^^^^
-Error: The module is "once" but is expected to be "many".
+Line 2, characters 31-36:
+2 |   module (F_app @ stateless) = F (M)
+                                   ^^^^^
+Error: The module is "stateful" but is expected to be "stateless".
 |}]
 
-module F : functor (M : S @ once) () -> sig end @ many =
-  functor (M : S @ once) () -> struct end
+module F : functor (M : S @ stateful) -> (functor () -> sig end) @ stateless =
+  functor (M : S @ stateful) () -> struct end
 [%%expect{|
-Line 2, characters 10-41:
-2 |   functor (M : S @ once) () -> struct end
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 10-45:
+2 |   functor (M : S @ stateful) () -> struct end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
-         functor (M : S @ once) -> (functor () -> sig end) @ once
+         functor (M : S) () -> sig end
        is not included in
-         functor (M : S @ once) () -> sig end
-       Got "once"
-       but expected "many".
+         functor (M : S) -> (functor () -> sig end) @ stateless
+       Got "stateful"
+       but expected "stateless".
 |}]
 
-let f_once_app2 (x @ once) =
-  let f_app = f_once x in
-  let (f_app' @ many) = f_app in
+let f_stateful_app2 (x @ stateful) =
+  let f_app = f_stateful x in
+  let (f_app' @ stateless) = f_app in
   f_app' ()
 [%%expect{|
-Line 3, characters 24-29:
-3 |   let (f_app' @ many) = f_app in
-                            ^^^^^
-Error: This value is "once" but is expected to be "many".
+Line 3, characters 29-34:
+3 |   let (f_app' @ stateless) = f_app in
+                                 ^^^^^
+Error: This value is "stateful" but is expected to be "stateless".
 |}]
 
-module F_once_app2 (M : S @ once) = struct
+module F_stateful_app2 (M : S @ stateful) = struct
   module F_app = F (M)
-  module (F_app' @ many) = F_app
+  module (F_app' @ stateless) = F_app
 end
 [%%expect{|
-Line 3, characters 27-32:
-3 |   module (F_app' @ many) = F_app
-                               ^^^^^
-Error: The module is "once" but is expected to be "many".
+Line 3, characters 32-37:
+3 |   module (F_app' @ stateless) = F_app
+                                    ^^^^^
+Error: The module is "stateful" but is expected to be "stateless".
 |}]
 
-module F : functor (M : S @ once) -> (functor () -> sig end) @ many =
-  functor (M : S @ once) () -> struct end
+module F : functor (M : S @ stateful) -> (functor () -> sig end) @ stateless =
+  functor (M : S @ stateful) () -> struct end
 [%%expect{|
-Line 2, characters 10-41:
-2 |   functor (M : S @ once) () -> struct end
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 10-45:
+2 |   functor (M : S @ stateful) () -> struct end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
-         functor (M : S @ once) -> (functor () -> sig end) @ once
+         functor (M : S) () -> sig end
        is not included in
-         functor (M : S @ once) () -> sig end
-       Got "once"
-       but expected "many".
+         functor (M : S) -> (functor () -> sig end) @ stateless
+       Got "stateful"
+       but expected "stateless".
 |}]
 
-let f_unique (x @ unique) () = ()
+let f_read_write (x @ read_write) () = ()
 [%%expect{|
-val f_unique : 'a @ unique -> unit -> unit = <fun>
+val f_read_write : 'a -> unit -> unit = <fun>
 |}]
 
-module F (M : S @ unique) () = struct end
+module F (M : S @ read_write) () = struct end
 [%%expect{|
-module F : functor (M : S @ unique) -> (functor () -> sig end) @ once @@
-  stateless
+module F : functor (M : S) () -> sig end @@ stateless
 |}]
 
-let f_unique_app (x @ unique) =
-  let (f_app @ many) = f_unique x in
+let f_read_write_app (x @ read_write) =
+  let (f_app @ stateless) = f_read_write x in
   f_app ()
 [%%expect{|
-Line 2, characters 23-33:
-2 |   let (f_app @ many) = f_unique x in
-                           ^^^^^^^^^^
-Error: This value is "once" but is expected to be "many".
+Line 2, characters 28-42:
+2 |   let (f_app @ stateless) = f_read_write x in
+                                ^^^^^^^^^^^^^^
+Error: This value is "stateful" but is expected to be "stateless".
 |}]
 
-module F_unique_app (M : S @ unique) = struct
-  module (F_app @ many) = F (M)
+module F_read_write_app (M : S @ read_write) = struct
+  module (F_app @ stateless) = F (M)
 end
 [%%expect{|
-Line 2, characters 26-31:
-2 |   module (F_app @ many) = F (M)
-                              ^^^^^
-Error: The module is "once" but is expected to be "many".
+Line 2, characters 31-36:
+2 |   module (F_app @ stateless) = F (M)
+                                   ^^^^^
+Error: The module is "stateful" but is expected to be "stateless".
 |}]
 
-module F : functor (M : S @ unique) () -> sig end @ many =
-  functor (M : S @ unique) () -> struct end
+module F : functor (M : S @ read_write) -> (functor () -> sig end) @ stateless =
+  functor (M : S @ read_write) () -> struct end
 [%%expect{|
-Line 2, characters 10-43:
-2 |   functor (M : S @ unique) () -> struct end
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 10-47:
+2 |   functor (M : S @ read_write) () -> struct end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
-         functor (M : S @ unique) -> (functor () -> sig end) @ once
+         functor (M : S) () -> sig end
        is not included in
-         functor (M : S @ unique) () -> sig end
-       Got "once"
-       but expected "many".
+         functor (M : S) -> (functor () -> sig end) @ stateless
+       Got "stateful"
+       but expected "stateless".
 |}]
 
-let f_unique_app2 (x @ unique) =
-  let f_app = f_unique x in
-  let (f_app' @ many) = f_app in
+let f_read_write_app2 (x @ read_write) =
+  let f_app = f_read_write x in
+  let (f_app' @ stateless) = f_app in
   f_app' ()
 [%%expect{|
-Line 3, characters 24-29:
-3 |   let (f_app' @ many) = f_app in
-                            ^^^^^
-Error: This value is "once" but is expected to be "many".
+Line 3, characters 29-34:
+3 |   let (f_app' @ stateless) = f_app in
+                                 ^^^^^
+Error: This value is "stateful" but is expected to be "stateless".
 |}]
 
-module F_unique_app2 (M : S @ unique) = struct
+module F_read_write_app2 (M : S @ read_write) = struct
   module F_app = F (M)
-  module (F_app' @ many) = F_app
+  module (F_app' @ stateless) = F_app
 end
 [%%expect{|
-Line 3, characters 27-32:
-3 |   module (F_app' @ many) = F_app
-                               ^^^^^
-Error: The module is "once" but is expected to be "many".
+Line 3, characters 32-37:
+3 |   module (F_app' @ stateless) = F_app
+                                    ^^^^^
+Error: The module is "stateful" but is expected to be "stateless".
 |}]
 
-module F : functor (_ : S @ unique) -> (functor () -> sig end) @ many =
-  functor (_ : S @ unique) () -> struct end
+module F : functor (_ : S @ read_write) -> (functor () -> sig end) @ stateless =
+  functor (_ : S @ read_write) () -> struct end
 [%%expect{|
-Line 2, characters 10-43:
-2 |   functor (_ : S @ unique) () -> struct end
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 10-47:
+2 |   functor (_ : S @ read_write) () -> struct end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
-         S @ unique -> (functor () -> sig end) @ once
+         S -> functor () -> sig end
        is not included in
-         S @ unique -> functor () -> sig end
-       Got "once"
-       but expected "many".
+         S -> (functor () -> sig end) @ stateless
+       Got "stateful"
+       but expected "stateless".
 |}]
 
-let f_unique_ret (_x @ unique) =
-  ((fun () -> ()) : (unit -> unit) @ many)
+let f_read_write_ret (_x @ read_write) =
+  ((fun () -> ()) : (unit -> unit) @ stateless)
 [%%expect{|
-val f_unique_ret : 'a @ unique -> (unit -> unit) = <fun>
+val f_read_write_ret : 'a -> unit -> unit = <fun>
 |}]
 
-(* Here, the inner [many] value is submoded into a [once] value. *)
-module F (M : S @ unique) =
-  ((functor () -> struct end) : (functor () -> sig end) @ many)
+(* Here, the inner [stateless] value is submoded into a [stateful] value. *)
+module F (M : S @ read_write) =
+  ((functor () -> struct end) : (functor () -> sig end) @ stateless)
 [%%expect{|
-module F : functor (M : S @ unique) -> (functor () -> sig end) @ once @@
-  stateless
+module F : functor (M : S) () -> sig end @@ stateless
 |}]
 
-let f1 (x1 @ once) x2 x3 =
+let f1 (x1 @ stateful) (x2 @ stateless) (x3 @ stateless) =
   x1 (); x2 (); x3 ()
 [%%expect{|
-val f1 : (unit -> 'a) @ once -> (unit -> 'b) -> (unit -> 'c) -> 'c = <fun>
+val f1 :
+  (unit -> 'a) -> (unit -> 'b) @ stateless -> (unit -> 'c) @ stateless -> 'c =
+  <fun>
 |}]
 
-module F1 (M1 : S @ unique) (M2 : S) (M3 : S) = struct
+module F1 (M1 : S @ read_write) (M2 : S @ stateless) (M3 : S @ stateless) = struct
   let () = M1.f ()
   let () = M2.f ()
   let () = M3.f ()
 end
 [%%expect{|
 module F1 :
-  functor (M1 : S @ unique) -> (functor (M2 : S) (M3 : S) -> sig end) @ once
-  @@ stateless
+  functor (M1 : S) (M2 : S @ stateless) (M3 : S @ stateless) -> sig end @@
+  stateless
 |}]
 
-let f1_flip x2 (x1 @ once) = f1 x1 x2
+let f1_flip (x2 @ stateless) (x1 @ stateful) = f1 x1 x2
 [%%expect{|
-val f1_flip : (unit -> 'a) -> (unit -> 'b) @ once -> (unit -> 'c) -> 'c =
+val f1_flip :
+  (unit -> 'a) @ stateless -> (unit -> 'b) -> (unit -> 'c) @ stateless -> 'c =
   <fun>
 |}]
 
-module F1_flip (M2 : S) (M1 : S @ unique) = F1 (M1) (M2)
+module F1_flip (M2 : S @ stateless) (M1 : S @ read_write) = F1 (M1) (M2)
 [%%expect{|
 module F1_flip :
-  functor (M2 : S) (M1 : S @ unique) -> (functor (M3 : S) -> sig end) @ once
-  @@ stateless
+  functor (M2 : S @ stateless) (M1 : S) (M3 : S @ stateless) -> sig end @@
+  stateless
 |}]
 
 (* This example explains why we need the stricter partial application
-   behavior for functors. [(functor (M2 : S) (M3 : S) -> sig end) @ once],
-   returned by [F1], should be still [once] when partially applied for soundness. *)
+   behavior for functors. [(functor (M2 : S) (M3 : S) -> sig end) @ stateful],
+   returned by [F1], should be still [stateful] when partially applied for soundness. *)
 
-let a (x1 @ once) x2 x3 =
+let a (x1 @ stateful) (x2 @ stateless) (x3 @ stateless) =
   let f1_app = f1 x1 in
-  let (f1_app_2 @ many) = f1_app x2 in
+  let (f1_app_2 @ stateless) = f1_app x2 in
   f1_app_2 x3
 [%%expect{|
-Line 3, characters 26-35:
-3 |   let (f1_app_2 @ many) = f1_app x2 in
-                              ^^^^^^^^^
-Error: This value is "once" but is expected to be "many".
+Line 3, characters 31-40:
+3 |   let (f1_app_2 @ stateless) = f1_app x2 in
+                                   ^^^^^^^^^
+Error: This value is "stateful" but is expected to be "stateless".
 |}]
 
-module A (M1 : S @ unique) (M2 : S) (M3 : S) = struct
+module A (M1 : S @ read_write) (M2 : S @ stateless) (M3 : S @ stateless) = struct
   module F1_applied = F1 (M1)
-  module (F1_applied_2 @ many) = F1_applied (M2)
+  module (F1_applied_2 @ stateless) = F1_applied (M2)
 end
 [%%expect{|
-Line 3, characters 33-48:
-3 |   module (F1_applied_2 @ many) = F1_applied (M2)
-                                     ^^^^^^^^^^^^^^^
-Error: The module is "once" but is expected to be "many".
+Line 3, characters 38-53:
+3 |   module (F1_applied_2 @ stateless) = F1_applied (M2)
+                                          ^^^^^^^^^^^^^^^
+Error: The module is "stateful" but is expected to be "stateless".
 |}]
 
-let f2 x1 (x2 @ once) x3 =
+let f2 (x1 @ stateless) (x2 @ stateful) (x3 @ stateless) =
   x1 (); x2 (); x3 ()
 [%%expect{|
-val f2 : (unit -> 'a) -> (unit -> 'b) @ once -> (unit -> 'c) -> 'c = <fun>
+val f2 :
+  (unit -> 'a) @ stateless -> (unit -> 'b) -> (unit -> 'c) @ stateless -> 'c =
+  <fun>
 |}]
 
-module F2 (M1 : S) (M2 : S @ unique) (M3 : S) = struct
+module F2 (M1 : S @ stateless) (M2 : S @ read_write) (M3 : S @ stateless) = struct
   let () = M1.f ()
   let () = M2.f ()
   let () = M3.f ()
 end
 [%%expect{|
 module F2 :
-  functor (M1 : S) (M2 : S @ unique) -> (functor (M3 : S) -> sig end) @ once
-  @@ stateless
+  functor (M1 : S @ stateless) (M2 : S) (M3 : S @ stateless) -> sig end @@
+  stateless
 |}]
 
-let f3 x1 x2 (x3 @ once) =
+let f3 (x1 @ stateless) (x2 @ stateless) (x3 @ stateful) =
   x1 (); x2 (); x3 ()
 [%%expect{|
-val f3 : (unit -> 'a) -> (unit -> 'b) -> (unit -> 'c) @ once -> 'c = <fun>
+val f3 :
+  (unit -> 'a) @ stateless -> (unit -> 'b) @ stateless -> (unit -> 'c) -> 'c =
+  <fun>
 |}]
 
-module F3 (M1 : S) (M2 : S) (M3 : S @ unique) = struct
+module F3 (M1 : S @ stateless) (M2 : S @ stateless) (M3 : S @ read_write) = struct
   let () = M1.f ()
   let () = M2.f ()
   let () = M3.f ()
 end
 [%%expect{|
-module F3 : functor (M1 : S) (M2 : S) (M3 : S @ unique) -> sig end @@
+module F3 :
+  functor (M1 : S @ stateless) (M2 : S @ stateless) (M3 : S) -> sig end @@
   stateless
 |}]
 
-let test1 (_x @ once) : (unit -> unit) @ many = fun () -> ()
+let test1 (_x @ stateful) : (unit -> unit) @ stateless = fun () -> ()
 [%%expect{|
-val test1 : 'a @ once -> (unit -> unit) = <fun>
+val test1 : 'a -> (unit -> unit) @ stateless = <fun>
 |}]
 
-module F1 (M1 : S @ once) : (functor () -> sig end) @ many =
+module F1 (M1 : S @ stateful) : (functor () -> sig end) @ stateless =
   functor () -> struct end
 [%%expect{|
-module F1 : functor (M1 : S @ once) -> (functor () -> sig end) @ once @@
-  stateless
+module F1 : functor (M1 : S) () -> sig end @@ stateless
 |}]
 
-let test2 (x @ once) : (unit -> unit) @ many =
+let test2 (x @ stateful) : (unit -> unit) @ stateless =
   fun () -> let _x = x in ()
 [%%expect{|
 Line 2, characters 21-22:
 2 |   fun () -> let _x = x in ()
                          ^
-Error: The value "x" is "once"
-       but is expected to be "many"
+Error: The value "x" is "stateful"
+       but is expected to be "stateless"
          because it is used inside the function at line 2, characters 2-28
-         which is expected to be "many".
+         which is expected to be "stateless".
 |}]
 
-module F2 (M1 : S @ once) : (functor () -> sig end) @ many =
+module F2 (M1 : S @ stateful) : (functor () -> sig end) @ stateless =
   functor () -> struct module M2 = M1 end
 [%%expect{|
 Line 2, characters 10-41:
 2 |   functor () -> struct module M2 = M1 end
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Got "once"
+       Got "stateful"
          because it closes over the module "M1" at line 2, characters 35-37
-         which is "once".
-       However, expected "many".
+         which is "stateful".
+       However, expected "stateless".
 |}]
 
 (* testing functor type inclusion *)
@@ -862,48 +876,61 @@ Error: Signature mismatch:
        but the right-hand side is "shareable".
 |}]
 
-module type T = sig val t : int * int end
+module type T = sig val t : int * int ref end
 
-module F (M : T @ unique -> S) = (M : T -> S)
+module F (M : T -> S) = (M : T @ immutable -> S)
 [%%expect{|
-module type T = sig val t : int * int end
-Line 3, characters 34-35:
-3 | module F (M : T @ unique -> S) = (M : T -> S)
-                                      ^
-Error: Signature mismatch:
-       Modules do not match:
-         functor (Arg : T @ unique) -> ...
-       is not included in
-         functor T @ aliased -> ...
-       Module types do not match:
-         T @ unique
-       does not include
-         T @ aliased
-       Got "aliased" but expected "unique".
-|}]
-
-module F (M : T -> S) = (M : T @ unique -> S)
-[%%expect{|
-module F : functor (M : T -> S) -> T @ unique -> S @@ stateless
-|}]
-
-module F (M : S -> T @ unique) = (M : S -> T)
-[%%expect{|
-module F : functor (M : S -> T @ unique) -> S -> T @@ stateless
-|}]
-
-module F (M : S -> T) = (M : S -> T @ unique)
-[%%expect{|
-Line 1, characters 25-26:
-1 | module F (M : S -> T) = (M : S -> T @ unique)
+module type T = sig val t : int * int ref end
+Line 3, characters 25-26:
+3 | module F (M : T -> S) = (M : T @ immutable -> S)
                              ^
 Error: Signature mismatch:
        Modules do not match:
-         functor (Arg : S) -> sig val t : int * int end
+         functor (Arg : T @ read_write) -> ...
        is not included in
-         S -> T @ unique
-       Got "aliased"
-       but expected "unique".
+         functor T @ immutable -> ...
+       Module types do not match:
+         T @ read_write
+       does not include
+         T @ immutable
+       Values do not match:
+         val t : int * int ref (* in a structure at immutable *)
+       is not included in
+         val t : int * int ref (* in a structure at read_write *)
+       The left-hand side is "immutable"
+       but the right-hand side is "read_write".
+|}]
+
+module F (M : T @ immutable -> S) = (M : T -> S)
+[%%expect{|
+module F : functor (M : T @ immutable -> S) -> T -> S @@ stateless
+|}]
+
+module F (M : S -> T) = (M : S -> T @ immutable)
+[%%expect{|
+module F : functor (M : S -> T) -> S -> T @ immutable @@ stateless
+|}]
+
+module F (M : S -> T @ immutable) = (M : S -> T)
+[%%expect{|
+Line 1, characters 37-38:
+1 | module F (M : S -> T @ immutable) = (M : S -> T)
+                                         ^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (Arg : S) -> sig val t : int * int ref end @ immutable
+       is not included in
+         S -> T
+       Modules do not match:
+         sig val t : int * int ref end @ immutable
+       is not included in
+         T @ read_write
+       Values do not match:
+         val t : int * int ref (* in a structure at immutable *)
+       is not included in
+         val t : int * int ref (* in a structure at read_write *)
+       The left-hand side is "immutable"
+       but the right-hand side is "read_write".
 |}]
 
 (* refering to [F(M).t] is allowed even if [M] is weaker than what [F] wants *)

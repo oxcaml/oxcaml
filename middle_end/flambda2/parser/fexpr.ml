@@ -263,7 +263,7 @@ type loopify_attribute = Loopify_attribute.t =
   | Default_loopify_and_not_tailrec
 
 type apply =
-  { func : simple;
+  { func : simple option;
     continuation : result_continuation;
     exn_continuation : continuation * cont_extra_arg list;
     args : simple list;

@@ -310,6 +310,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
+  | Let_poly_not_yet_implemented
 
 
 let not_principal fmt =
@@ -1932,6 +1933,7 @@ let solve_constructor_annotation
       (fun (name, jkind_annot_opt) ->
         let jkind =
           Jkind.of_annotation_option_default
+            !!penv
             ~context:(Existential_unpack name.txt)
             ~default:(Jkind.Builtin.value ~why:Existential_type_variable)
             jkind_annot_opt
@@ -4949,6 +4951,7 @@ and is_nonexpansive_mod mexp =
                 te.tyext_constructors
           | Tstr_class _ -> false (* could be more precise *)
           | Tstr_attribute _ -> true
+          | Tstr_jkind _ -> true
         )
         str.str_items
   | Tmod_apply _ | Tmod_apply_unit _ -> false
@@ -5893,7 +5896,13 @@ let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=
       List.fold_right mk_newtype locally_abstract_univars expr
 
 let vb_pat_constraint
-      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; _ } as vb) =
+      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; pvb_is_poly;
+        pvb_loc; _ } as vb) =
+  if pvb_is_poly then begin
+    Language_extension.assert_enabled ~loc:pvb_loc Layout_poly
+      Language_extension.Alpha;
+    raise (Error (pvb_loc, Env.empty, Let_poly_not_yet_implemented))
+  end;
   let spat =
     let open Ast_helper in
     let loc =
@@ -8396,7 +8405,7 @@ and type_ident env ?(recarg=Rejected) lid =
   let val_type, kind =
     match desc.val_kind with
     | Val_prim prim ->
-       let ty, mode, _, sort = instance_prim prim desc.val_type in
+       let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
        begin match prim.prim_native_repr_res, mode with
        (* if the locality of returned value of the primitive is poly
@@ -10238,7 +10247,7 @@ and type_newtype
   fun env name jkind_annot_opt type_body  ->
   let { txt = name; loc = name_loc } : _ Location.loc = name in
   let jkind =
-    Jkind.of_annotation_option_default ~context:(Newtype_declaration name)
+    Jkind.of_annotation_option_default env ~context:(Newtype_declaration name)
       ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
   in
   let ty =
@@ -11901,15 +11910,15 @@ let report_error ~loc env =
     Location.error_of_printer ~loc (fun ppf () ->
       fprintf ppf "Object types must have layout value.@ %a%a"
         (Jkind.Violation.report_with_name ~name:"the type of this expression"
-           ~level:(Ctype.get_current_level ())) err
-        pp_doc (report_type_expected_explanation_opt explanation))
+           ~level:(Ctype.get_current_level ()) env) err
+      pp_doc (report_type_expected_explanation_opt explanation))
       ()
   | Non_value_let_rec (err, ty) ->
     Location.error_of_printer ~loc (fun ppf () ->
       fprintf ppf "Variables bound in a \"let rec\" must have layout value.@ %a"
         (fun v -> Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) v)
+           ~level:(Ctype.get_current_level ()) env v)
         err)
       ()
   | Undefined_method (ty, me, valid_methods) ->
@@ -11959,6 +11968,7 @@ let report_error ~loc env =
         "The instance variable %a is overridden several times"
         Style.inline_code v
   | Coercion_failure (ty_exp, err, b) ->
+<<<<<<< HEAD
      (* Use deprecated_printer to defer prepare_expansion until after
         reset() is called inside report_unification_error. This ensures
         consistent type variable naming between the intro and trace. *)
@@ -11977,6 +11987,35 @@ let report_error ~loc env =
      in
       Location.errorf ~loc "%t" (fun ppf ->
         Errortrace_report.unification ppf env err
+||||||| f8c6716f8c
+      Location.error_of_printer ~loc (fun ppf () ->
+          (* Use deprecated_printer to defer prepare_expansion until after
+             reset() is called inside report_unification_error. This ensures
+             consistent type variable naming between the intro and trace. *)
+          let intro =
+            doc_printf "%t" (fun fmt_doc ->
+              deprecated_printer (fun fmt ->
+                let ty_exp = Printtyp.prepare_expansion ty_exp in
+                Format.fprintf fmt
+                  "This expression cannot be coerced to type@;<1 2>%a;@ \
+                   it has type"
+                  (Fmt.compat
+                     (Style.as_inline_code @@ Printtyp.type_expansion Type))
+                  ty_exp
+              ) fmt_doc
+            )
+          in
+        Printtyp.report_unification_error ppf env err
+=======
+    let intro =
+      let ty_exp = Printtyp.prepare_expansion ty_exp in
+      doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
+                  it has type"
+        (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
+    in
+    Location.error_of_printer ~loc (fun ppf () ->
+        Printtyp.report_unification_error ppf env err
+>>>>>>> 5.2.0minus-31
           intro
           (Fmt.Doc.msg "but is here used with type")
         )
@@ -12497,25 +12536,25 @@ let report_error ~loc env =
         "@[Function arguments and returns must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Record_projection_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Records being projected from must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Record_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Record expressions must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Mutable_var_not_rep (ty, violation) ->
       Location.errorf ~loc
         "@[Mutable variables must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Invalid_label_for_src_pos arg_label ->
       Location.errorf ~loc
         "A position argument must not be %s."
@@ -12547,8 +12586,8 @@ let report_error ~loc env =
          be the kind of a function.@ \
          (Functions always have kind %a.)%t@]"
         (Style.as_inline_code Printtyp.type_expr) ty_fun
-        (Style.as_inline_code Jkind.format) jkind
-        (Style.as_inline_code Jkind.format) Jkind.for_arrow
+        (Style.as_inline_code (Jkind.format env)) jkind
+        (Style.as_inline_code (Jkind.format env)) Jkind.for_arrow
         hint
   | Overwrite_of_invalid_term ->
       Location.errorf ~loc
@@ -12561,6 +12600,7 @@ let report_error ~loc env =
         "The eval extension takes a single type as its argument, for \
          example %a."
         Style.inline_code "[%eval: int]"
+<<<<<<< HEAD
   | Repeated_tuple_exp_label l ->
       Location.errorf ~loc
         "@[This tuple expression has two labels named %a@]"
@@ -12569,6 +12609,13 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[This tuple pattern has two labels named %a@]"
         Style.inline_code l
+||||||| f8c6716f8c
+=======
+  | Let_poly_not_yet_implemented ->
+      Location.errorf ~loc
+        "The %a annotation is not yet implemented."
+        Style.inline_code "let poly_"
+>>>>>>> 5.2.0minus-31
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

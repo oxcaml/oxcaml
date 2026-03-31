@@ -515,11 +515,14 @@ let or_blank f ppf ob =
   match ob with None -> Format.pp_print_string ppf "_" | Some a -> f ppf a
 
 let func_name_with_optional_arities ppf (n, arities) =
-  match arities with
-  | None -> simple ppf n
-  | Some { params_arity; ret_arity } ->
-    Format.fprintf ppf "@[<1>(%a@ : @[%a ->@ %a@]@,)@]" simple n
-      (or_blank arity) params_arity arity ret_arity
+  match n with
+  | None -> ()
+  | Some n -> (
+    match arities with
+    | None -> simple ppf n
+    | Some { params_arity; ret_arity } ->
+      Format.fprintf ppf "@[<1>(%a@ : @[%a ->@ %a@]@,)@]" simple n
+        (or_blank arity) params_arity arity ret_arity)
 
 type scope =
   | Outer

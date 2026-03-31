@@ -131,6 +131,15 @@ let debugger = [add_compiler_subdir ("debugger" ^ runtime_suffix)]
 let extension_universe_lib name =
   make_library_modifier name [compiler_subdir ["otherlibs"; name]]
 
+let make_fexpr_dump pass = [
+  append Ocaml_variables.fexpr_dump_files [pass ^ ".fl"];
+  append Ocaml_variables.ocamlopt_flags ["-dfexpr-annot-after="^pass];
+]
+
+let fexpr_dump_raw = make_fexpr_dump "raw"
+let fexpr_dump_simplify = make_fexpr_dump "simplify"
+let fexpr_dump_reaper = make_fexpr_dump "reaper"
+
 let init () =
   register_modifiers "principal" principal;
   register_modifiers "config" config;
@@ -162,4 +171,7 @@ let init () =
   register_modifiers "man" man;
   register_modifiers "tool-ocaml-lib" tool_ocaml_lib;
   register_modifiers "debugger" debugger;
+  register_modifiers "dump-raw" fexpr_dump_raw;
+  register_modifiers "dump-simplify" fexpr_dump_simplify;
+  register_modifiers "dump-reaper" fexpr_dump_reaper;
   ()

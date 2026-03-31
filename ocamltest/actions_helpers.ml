@@ -358,15 +358,13 @@ let run_hook hook_name log input_env =
   Sys.force_remove response_file;
   final_value
 
-let check_output kind_of_output output_variable reference_variable log
+let compare_files kind_of_output output_filename reference_filename log
     env =
   let to_int = function None -> 0 | Some s -> int_of_string s in
   let skip_lines =
     to_int (Environments.lookup Builtin_variables.skip_header_lines env) in
   let skip_bytes =
     to_int (Environments.lookup Builtin_variables.skip_header_bytes env) in
-  let reference_filename = Environments.safe_lookup reference_variable env in
-  let output_filename = Environments.safe_lookup output_variable env in
   Printf.fprintf log "Comparing %s output %s to reference %s\n%!"
     kind_of_output output_filename reference_filename;
   let files =
@@ -412,3 +410,10 @@ let check_output kind_of_output output_variable reference_variable log
       let reason = Printf.sprintf "The command %s failed with status %d"
         commandline exitcode in
       (Result.fail_with_reason reason, env)
+
+let check_output kind_of_output output_variable reference_variable log
+    env =
+  compare_files kind_of_output
+    (Environments.safe_lookup output_variable env)
+    (Environments.safe_lookup reference_variable env)
+    log env

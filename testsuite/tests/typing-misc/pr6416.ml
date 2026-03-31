@@ -53,7 +53,7 @@ Error: Signature mismatch:
        is not included in
          type u = A of t/2
        Constructors do not match:
-         "A of t/1"
+         "A of t"
        is not the same as:
          "A of t/2"
 <<<<<<< oxcaml
@@ -154,7 +154,7 @@ Error: Signature mismatch:
        is not included in
          type t = A of T/2.t
        Constructors do not match:
-         "A of T/1.t"
+         "A of T.t"
        is not the same as:
          "A of T/2.t"
 <<<<<<< oxcaml

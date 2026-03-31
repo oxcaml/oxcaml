@@ -145,6 +145,13 @@ jobs:
             ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             check_arch: true
 
+          - name: runtime5 cfg-invariants (aarch64-linux)
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-arm64-8x
+            build_ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
+            ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
+            check_arch: true
+
           - name: runtime5 vectorizer (x86_64-linux)
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
@@ -437,6 +444,8 @@ jobs:
             ./_build/main/tools/regalloc/regalloc.exe _build \
               -validate -summary -regalloc $allocator || exit 1; \
           done
+          ./_build/main/tools/regalloc/regalloc.exe _build \
+            -validate -summary -regalloc irc -param BIT_MATRIX_THRESHOLD:8192
           for allocator in irc ls gi; do \
             ./_build/main/tools/regalloc/regalloc.exe _build \
               -validate -insert-prologue -regalloc $allocator || exit 1; \

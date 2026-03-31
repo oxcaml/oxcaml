@@ -1382,29 +1382,44 @@ type existential_abstract =
     Mk : ('a : value mod portable). 'a abstract -> existential_abstract
 |}]
 
+module M : sig
+  kind_ immediate = value mod global many uncontended
+  kind_ immutable_data = value mod uncontended many
+  kind_ immutable = value mod uncontended
+  kind_ data = value mod many
+  kind_ abstract
+end = struct
+  kind_ immediate = value mod global many uncontended
+  kind_ immutable_data = value mod uncontended many
+  kind_ immutable = value mod uncontended
+  kind_ data = value mod many
+  kind_ abstract
+end
+[%%expect{|
+module M :
+  sig
+    kind_ immediate = value mod global many
+    kind_ immutable_data = value mod many
+    kind_ immutable = value
+    kind_ data = value mod many
+    kind_ abstract
+  end @@ stateless
+|}]
+
 (* not yet supported *)
 module _ : sig
   type 'a gel : kind_of_ 'a mod global
   type 'a t : _
-  kind_abbrev_ immediate = value mod global unique many sync uncontended
-  kind_abbrev_ immutable_data = value mod sync uncontended many
-  kind_abbrev_ immutable = value mod uncontended
-  kind_abbrev_ data = value mod sync many
 end = struct
   type 'a gel : kind_of_ 'a mod global
   type 'a t : _
-  kind_abbrev_ immediate = value mod global unique many sync uncontended
-  kind_abbrev_ immutable_data = value mod sync uncontended many
-  kind_abbrev_ immutable = value mod uncontended
-  kind_abbrev_ data = value mod sync many
 end
 
-(* CR layouts v2.8: Expect this output to change once modal kinds are
-   supported. Internal ticket 5118. *)
-
+(* CR layouts: Expect this output to change once `kind_of_` is   supported.
+   Internal ticket 2912. *)
 [%%expect{|
-Line 9, characters 16-27:
-9 |   type 'a gel : kind_of_ 'a mod global
+Line 5, characters 16-27:
+5 |   type 'a gel : kind_of_ 'a mod global
                     ^^^^^^^^^^^
 Error: Unimplemented kind syntax
 |}]
@@ -1703,4 +1718,72 @@ val f : bool# -> bool# = <fun>
 let f (_ : (repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) = ()
 [%%expect{|
 val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
+|}]
+
+(*****************)
+(* let poly_ and val poly_ *)
+
+let poly_ id : 'a. 'a -> 'a = fun x -> x
+[%%expect{|
+Line 1, characters 0-40:
+1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+[%%expect{|
+Line 1, characters 0-54:
+1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+module type S_poly = sig
+  val poly_ f : 'a. 'a -> 'a
+  val poly_ g : 'a 'b. 'a -> 'b -> 'a
+end
+[%%expect{|
+Line 2, characters 2-28:
+2 |   val poly_ f : 'a. 'a -> 'a
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "val poly_" annotation is not yet implemented.
+|}]
+
+let poly_ f : 'a. 'a -> 'a = fun x -> x
+and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+[%%expect{|
+Line 1, characters 0-39:
+1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+(* Mixed poly and non-poly in mutually recursive bindings *)
+let poly_ f : 'a. 'a -> 'a = fun x -> x
+and g = fun x -> x
+[%%expect{|
+Line 1, characters 0-39:
+1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+let h = fun x -> x
+and poly_ k : 'a. 'a -> 'a = fun x -> x
+[%%expect{|
+Line 2, characters 0-39:
+2 | and poly_ k : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+let m = fun x -> x
+and poly_ n : 'a. 'a -> 'a = fun x -> x
+and p = fun x -> x
+[%%expect{|
+Line 2, characters 0-39:
+2 | and poly_ n : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
 |}]

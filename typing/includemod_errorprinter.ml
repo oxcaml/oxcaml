@@ -289,7 +289,7 @@ module Is_modal = struct
     | Value_descriptions d -> value_mismatch d.symptom
     | Class_declarations d -> class_declaration_symptom d.symptom
     | Type_declarations _ | Extension_constructors _ | Class_type_declarations _
-    | Modalities _ -> None
+    | Modalities _ | Jkind_declarations _ -> None
 
   and class_declaration_symptom = function
     | Class_mode e ->
@@ -915,6 +915,23 @@ let core env id x =
         "@[<hv 2>Class declarations %s do not match:@ @]@ %a"
         (Ident.name id)
         (Includecore.report_mode_sub_error "first is" "second is") e
+<<<<<<< HEAD
+||||||| f8c6716f8c
+        Printtyp.Conflicts.print_explanations
+=======
+        Printtyp.Conflicts.print_explanations
+  | Err.Jkind_declarations diff ->
+      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a%t@]"
+        "Kind declarations do not match"
+        !Oprint.out_sig_item
+        (Printtyp.tree_of_jkind_declaration id diff.got)
+        "is not included in"
+        !Oprint.out_sig_item
+        (Printtyp.tree_of_jkind_declaration id diff.expected)
+        (Includecore.report_jkind_mismatch "the first" "the second")
+        diff.symptom show_locs (diff.got.jkind_loc, diff.expected.jkind_loc)
+        Printtyp.Conflicts.print_explanations
+>>>>>>> 5.2.0minus-31
 
 let missing_field ppf item =
   let id, loc, kind =  Includemod.item_ident_name item in
@@ -923,7 +940,8 @@ let missing_field ppf item =
     (Style.as_inline_code Printtyp.ident) id
     (show_loc "Expected declaration") loc
 
-let module_types {Err.got=mty1; expected=mty2; modes; symptom}=
+let module_types ~env {Err.got=mty1; expected=mty2; modes; symptom}=
+  Printtyp.wrap_printing_env ~error:true env @@ fun () ->
   let is_modal = Is_modal.module_type_symptom symptom in
   let mode1, mode2 = maybe_print_modes ~is_modal modes in
   Fmt.dprintf
@@ -934,7 +952,8 @@ let module_types {Err.got=mty1; expected=mty2; modes; symptom}=
     !Oprint.out_module_type (Out_type.tree_of_modtype ~abbrev:true mty2)
     mode2
 
-let eq_module_types ({Err.got=mty1; expected=mty2} : _ mdiff) =
+let eq_module_types ~env ({Err.got=mty1; expected=mty2} : _ mdiff) =
+  Printtyp.wrap_printing_env ~error:true env @@ fun () ->
   Fmt.dprintf
     "@[<hv 2>Module types do not match:@ \
      %a@;<1 -2>is not equal to@ %a@]"
@@ -1022,7 +1041,7 @@ let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx
       module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx
         diff.symptom
   | _ ->
-      let inner = if eqmode then eq_module_types else module_types in
+      let inner = if eqmode then eq_module_types ~env else module_types ~env in
       let next =
         match diff.symptom with
         | Mt_core _ ->

@@ -1,10 +1,10 @@
 (* TEST
  compile_only = "true";
- ocamlopt_flags = "-flambda2-inline-small-function-size 0 -flambda2-inline-threshold 7.99 -dfexpr-after simplify";
+ ocamlopt_flags = "-flambda2-inline-small-function-size 0 -flambda2-inline-threshold 7.99";
  flambda2;
  setup-ocamlopt.byte-build-env;
- ocamlopt.byte;
- check-ocamlopt.byte-output;
+ ocamlopt.byte with dump-simplify;
+ check-fexpr-dump;
 *)
 
 external string_length : string -> int = "%string_length"

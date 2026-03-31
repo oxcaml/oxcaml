@@ -128,6 +128,10 @@ type type_mismatch =
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
+type jkind_mismatch =
+  | Manifest_missing
+  | Manifest_mismatch
+
 (** Describes the modes of modules on both sides, passed to inclusion check. *)
 type mmodes =
   | All
@@ -185,6 +189,7 @@ val extension_constructors:
   extension_constructor -> extension_constructor ->
   extension_constructor_mismatch option
 
+<<<<<<< HEAD
 (** The functions [value_descriptions_consistency] and
     [type_declarations_consistency] check if two declaration are consistent.
     Declarations are consistent when there exists an environment such that the
@@ -199,6 +204,13 @@ val value_descriptions_consistency:
 val type_declarations_consistency:
   Env.t -> type_declaration -> type_declaration -> type_mismatch option
 
+||||||| f8c6716f8c
+=======
+val jkind_declarations:
+  loc:Location.t -> Env.t -> string ->
+  jkind_declaration -> jkind_declaration ->
+  jkind_mismatch option
+>>>>>>> 5.2.0minus-31
 (*
 val class_types:
         Env.t -> class_type -> class_type -> bool
@@ -224,3 +236,6 @@ val report_extension_constructor_mismatch :
   string -> string -> string ->
   Env.t ->
   extension_constructor_mismatch Format_doc.printer
+
+val report_jkind_mismatch :
+  string -> string -> Format_doc.formatter -> jkind_mismatch -> unit

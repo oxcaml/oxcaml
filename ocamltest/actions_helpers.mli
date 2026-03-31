@@ -61,4 +61,6 @@ val run_script : Actions.code
 
 val run_hook : string -> Actions.code
 
+val compare_files : string -> string -> string -> Actions.code
+
 val check_output : string -> Variables.t -> Variables.t -> Actions.code

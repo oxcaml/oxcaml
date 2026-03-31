@@ -61,6 +61,10 @@ val transl_with_constraint:
 val transl_package_constraint:
   loc:Location.t -> type_expr -> Types.type_declaration
 
+val transl_jkind_decl:
+  Env.t -> Parsetree.jkind_declaration ->
+  Ident.t * Env.t * Typedtree.jkind_declaration
+
 val abstract_type_decl:
   injective:bool ->
   jkind:jkind_l ->
@@ -68,7 +72,8 @@ val abstract_type_decl:
   type_declaration
 
 val approx_type_decl:
-    Parsetree.type_declaration list -> (Ident.t * type_declaration) list
+    Env.t -> Parsetree.type_declaration list ->
+    (Ident.t * type_declaration) list
 val check_recmod_typedecl:
     Env.t -> Location.t -> Ident.t list -> Path.t -> type_declaration -> unit
 
@@ -162,21 +167,23 @@ type error =
   | Multiple_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
-  | Jkind_mismatch_of_type of type_expr * Jkind.Violation.t
-  | Jkind_mismatch_of_path of Path.t * Jkind.Violation.t
+  | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t
+  | Jkind_mismatch_of_path of Env.t * Path.t * Jkind.Violation.t
   | Jkind_mismatch_due_to_bad_inference of
-      type_expr * Jkind.Violation.t * bad_jkind_inference_location
+      Env.t * type_expr * Jkind.Violation.t * bad_jkind_inference_location
   | Jkind_sort of
-      { kloc : jkind_sort_loc
+      { env : Env.t
+      ; kloc : jkind_sort_loc
       ; typ : type_expr
       ; err : Jkind.Violation.t
       }
   | Jkind_empty_record
-  | Non_representable_in_module of Jkind.Violation.t * type_expr
+  | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error
   | Bad_unboxed_attribute of string
+  | Poly_not_yet_implemented
   | Boxed_and_unboxed
   | Nonrec_gadt
   | Invalid_private_row_declaration of type_expr
@@ -192,7 +199,7 @@ type error =
       }
   | Non_abstract_reexport of Path.t
   | Unsafe_mode_crossing_on_invalid_type_kind
-  | Illegal_baggage of jkind_l
+  | Illegal_baggage of Env.t * jkind_l
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
   | Constructor_submode_failed of Mode.Value.error
