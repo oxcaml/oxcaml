@@ -41,27 +41,25 @@ let block :
     Cfg_with_infos.liveness option ->
     unit =
  fun fmt block liveness ->
-  Format.fprintf fmt "block %t%a%t:"
+  Format.fprintf fmt "block %t%a%t%s -"
     (if block.is_trap_handler
      then Cfg_colours.block_label_exn
      else Cfg_colours.block_label)
-    Label.format block.start Cfg_colours.pop;
-  (match block.is_trap_handler with
-  | false -> ()
-  | true -> Format.fprintf fmt " [handler]");
+    Label.format block.start Cfg_colours.pop
+    (match block.is_trap_handler with false -> "" | true -> " [handler]");
   (match block.cold with false -> () | true -> Format.fprintf fmt " [cold]");
-  Format.fprintf fmt "\n";
-  Format.fprintf fmt "  %tpredecessors: %a%t\n" Cfg_colours.pred_succ label_set
+  Format.fprintf fmt " %tpredecessors: %a%t" Cfg_colours.pred_succ label_set
     block.predecessors Cfg_colours.pop;
-  Format.fprintf fmt "  %tnormal successors: %a%t\n" Cfg_colours.pred_succ
+  Format.fprintf fmt " %tnormal successors: %a%t" Cfg_colours.pred_succ
     label_set
     (Cfg.successor_labels block ~normal:true ~exn:false)
     Cfg_colours.pop;
   (match block.exn with
   | None -> ()
   | Some exn_label ->
-    Format.fprintf fmt "  %texceptional successor: %a%t\n" Cfg_colours.pred_succ
+    Format.fprintf fmt " %texceptional successor: %a%t" Cfg_colours.pred_succ
       Label.format exn_label Cfg_colours.pop);
+  Format.fprintf fmt "\n";
   DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
       Format.fprintf fmt "%a%t%a%t%a\n" instr_prefix instr Cfg_colours.basic
         Cfg.dump_basic instr.desc Cfg_colours.pop instr_suffix (instr, liveness));
