@@ -15,6 +15,14 @@
 
 open Format
 
+(* type of toplevel inputs *)
+type input =
+  | Stdin
+  | File of string
+  | String of string
+
+val filename_of_input: input -> string
+
 (* Set the load paths, before running anything *)
 
 val set_paths : unit -> unit

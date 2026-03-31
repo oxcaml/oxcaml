@@ -591,23 +591,24 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           else
             true, O.obj obj
         in
-        match
-          (* CR dkalinichenko: this is broken for unboxed variants:
-             unless the tag of the inner value just happens to be 0,
-             [Datarepr.find_constr_by_tag] will fail. *)
-          let {cstr_uid} =
-            Datarepr.find_constr_by_tag ~constant tag cstrs
-          in
-          List.find (fun {cd_uid} -> Uid.equal cd_uid cstr_uid)
-            constr_list
-        with
-        | exception (Datarepr.Constr_not_found | Not_found) ->
-          (* If a [Variant_with_null] is not a [Null],
-             it's guaranteed to be [This value]. *)
-          (match rep with
-          | Variant_with_null -> List.nth constr_list 1
-          | _ -> raise Datarepr.Constr_not_found)
-        | {cd_id;cd_args;cd_res} ->
+        let {cd_id;cd_args;cd_res} =
+          try
+            (* CR dkalinichenko: this is broken for unboxed variants:
+               unless the tag of the inner value just happens to be 0,
+               [Datarepr.find_constr_by_tag] will fail. *)
+            let {cstr_uid} =
+              Datarepr.find_constr_by_tag ~constant tag cstrs
+            in
+            List.find (fun {cd_uid} -> Uid.equal cd_uid cstr_uid)
+              constr_list
+          with
+          | Datarepr.Constr_not_found | Not_found ->
+            (* If a [Variant_with_null] is not a [Null],
+               it's guaranteed to be [This value]. *)
+            match rep with
+            | Variant_with_null -> List.nth constr_list 1
+            | _ -> raise Datarepr.Constr_not_found
+        in
         let type_params =
           match cd_res with
             Some t ->

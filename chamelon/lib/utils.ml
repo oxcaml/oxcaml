@@ -506,5 +506,5 @@ module E = struct
     | [] -> list [ignore e; Dummy.apply_dummy2]
     | cases -> desc (mkTexp_match ?id (e, cases, Partial))
 
-  let try_ e = function [] -> e | cases -> desc (Texp_try (e, cases))
+  let try_ e = function [] -> e | cases -> desc (Texp_try (e, cases, []))
 end

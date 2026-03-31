@@ -86,7 +86,7 @@ type texp_function =
 
 type texp_function_identifier = unit
 
-let dummy_type_expr = newty2 ~level:0 (mkTvar (Some "a"))
+let dummy_type_expr = Btype.newty2 ~level:0 (mkTvar (Some "a"))
 
 let mk_exp ed =
   { exp_desc = ed;
@@ -115,7 +115,12 @@ let mkTexp_function ?id:(() = ()) ({ params; body } : texp_function) =
           (Texp_function
              { arg_label;
                param;
-               cases = [{ c_lhs = pattern; c_guard = None; c_rhs = acc }];
+               cases =
+                 [ { c_lhs = pattern;
+                     c_cont = None;
+                     c_guard = None;
+                     c_rhs = acc
+                   } ];
                partial
              }))
       params
@@ -263,7 +268,7 @@ let option_of_arg_or_omitted arg =
 
 let mk_constructor_description cstr_name =
   { cstr_name;
-    cstr_res = newty2 ~level:0 (mkTvar (Some "a"));
+    cstr_res = Btype.newty2 ~level:0 (mkTvar (Some "a"));
     cstr_shape = Constructor_uniform_value;
     cstr_existentials = [];
     cstr_args = [];
