@@ -619,6 +619,12 @@ module Source_env : sig
 
   val exists_in_source_env : t -> Variable.t -> Variable_in_source_env.t option
 
+  val exists_at_name_mode :
+    min_name_mode:Name_mode.t ->
+    t ->
+    Variable.t ->
+    Variable_in_source_env.t option
+
   type candidate_canonical_in_source_env =
     | No_simples_in_joined_envs  (** The provided set of simples was empty. *)
     | No_canonical_in_source_env
@@ -651,6 +657,11 @@ end = struct
     if TE.variable_definitely_not_in_scope source_env var
     then None
     else Some (Variable_in_source_env.create var)
+
+  let exists_at_name_mode ~min_name_mode { source_env } var =
+    if TE.mem ~min_name_mode source_env (Name.var var)
+    then Some (Variable_in_source_env.create var)
+    else None
 
   let total_compare_binding_times { source_env } var1 var2 =
     TE.stable_compare_simples source_env
@@ -802,21 +813,6 @@ module Bindings_in_target_env : sig
      created to represent it. *)
   val existential_for_these_simples :
     t -> Simples_in_joined_envs.t -> K.t -> Simple_in_target_env.t * t
-
-  (* Return the canonical name of an imported variable in the target env.
-
-     If the variable has not been used (neither [add_imported_var] nor
-     [import_from_all_envs] has been called on it), return [None]. *)
-  val is_imported_from_all_joined_envs :
-    t -> Variable_in_one_joined_env.t -> Simple_in_target_env.t option
-
-  (* Return the canonical name of a set of simples in joined environments.
-
-     If this set of simples has not been used (neither
-     [add_existential_for_these_simples] nor [existential_for_these_simples] has
-     been called on it), returns [None]. *)
-  val has_existential_for_these_simples :
-    t -> Simples_in_joined_envs.t -> Simple_in_target_env.t option
 
   type definition_in_joined_envs =
     | Imported_var of Variable_in_one_joined_env.t * K.t
@@ -1536,63 +1532,60 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
 
 (** {2:n-way-join Cut and n-way join} *)
 
-let get_canonical_simple_if_exists ~bindings ~joined_envs simples =
-  match get_canonical_in_target_env ~bindings ~joined_envs simples with
-  | Canonical_in_source_env simple ->
-    Some (Simple_in_target_env.from_source_env simple)
-  | Import_from_all_joined_envs (var, coercion) -> (
-    match
-      Bindings_in_target_env.is_imported_from_all_joined_envs bindings var
-    with
-    | Some simple ->
-      Some (Simple_in_target_env.apply_coercion_exn simple coercion)
-    | None -> None)
-  | Existential_for_these_simples ->
-    Bindings_in_target_env.has_existential_for_these_simples bindings simples
-
 let n_way_join_symbol_projections t symbol_projections_to_join =
+  (* Recall that being a symbol projection is a property of the *variable*
+     itself, not of the canonicals -- so we can only propagate a symbol
+     projection when the same symbol projection is associated with the same
+     variable in all joined environments. *)
   let joined_projections =
     Index.Map.fold
       (fun index symbol_projections acc ->
-        let typing_env = Joined_envs.get_nth_joined_env t.joined_envs index in
         Variable_in_one_joined_env.Map.fold
-          (fun var symbol_projection acc ->
-            let canonical =
-              TE.get_canonical_simple_ignoring_name_mode typing_env
-                (Simple.var (var : Variable_in_one_joined_env.t :> Variable.t))
-            in
-            let canonical = Simple_in_one_joined_env.create canonical in
-            Symbol_projection.Map.update symbol_projection
-              (fun joined_projections ->
-                let joined_projections =
-                  Option.value joined_projections ~default:Index.Map.empty
-                in
-                Some (Index.Map.add index canonical joined_projections))
-              acc)
+          (fun var symbol_projection symbol_projections_to_join ->
+            match
+              Source_env.exists_at_name_mode ~min_name_mode:Name_mode.normal
+                (Bindings_in_target_env.source_env t.bindings)
+                (var :> Variable.t)
+            with
+            | None -> symbol_projections_to_join
+            | Some var ->
+              Variable_in_source_env.Map.update var
+                (fun joined_projections ->
+                  let joined_projections =
+                    Option.value joined_projections ~default:Index.Map.empty
+                  in
+                  Some
+                    (Index.Map.add index symbol_projection joined_projections))
+                symbol_projections_to_join)
           symbol_projections acc)
-      symbol_projections_to_join Symbol_projection.Map.empty
+      symbol_projections_to_join Variable_in_source_env.Map.empty
   in
   let all_indices = Joined_envs.keys t.joined_envs in
-  Symbol_projection.Map.fold
-    (fun symbol_projection simples symbol_projections ->
-      if not (Index.Set.subset all_indices (Index.Map.keys simples))
+  Variable_in_source_env.Map.fold
+    (fun var joined_projections symbol_projections ->
+      if not (Index.Set.subset all_indices (Index.Map.keys joined_projections))
       then symbol_projections
       else
-        match
-          get_canonical_simple_if_exists ~bindings:t.bindings
-            ~joined_envs:t.joined_envs simples
-        with
-        | Some simple ->
-          Simple_in_target_env.pattern_match' simple
-            ~var:(fun var ~coercion ->
-              if Coercion.is_id coercion
-              then
-                Variable_in_target_env.Map.add var symbol_projection
-                  symbol_projections
-              else symbol_projections)
-            ~symbol:(fun _ ~coercion:_ -> symbol_projections)
-            ~const:(fun _ -> symbol_projections)
-        | None -> symbol_projections)
+        match Index.Map.choose joined_projections with
+        | _, unique_projection
+          when Index.Map.for_all
+                 (fun _ projection ->
+                   Symbol_projection.equal projection unique_projection)
+                 joined_projections ->
+          Variable_in_target_env.Map.add
+            (Variable_in_target_env.from_source_env var)
+            unique_projection symbol_projections
+        | _ | (exception Not_found) ->
+          (* This can only happen if:
+
+             - The same variable is bound to different symbol projections in
+             different input environments; or
+
+             - We are joining zero environments
+
+             We don't expect either of these to happen, but still return
+             [symbol_projections] in this case as it is harmless. *)
+          symbol_projections)
     joined_projections Variable_in_target_env.Map.empty
 
 let cut_for_join typing_env ~cut_after =
