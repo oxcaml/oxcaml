@@ -233,9 +233,3 @@ int caml_is_special_exception(value exn) {
       || exn == Field(f, ASSERT_FAILURE_EXN)
       || exn == Field(f, UNDEFINED_RECURSIVE_MODULE_EXN);
 }
-
-CAMLexport value caml_failure_exn (value msg)
-{
-  value tag = caml_get_failwith_tag(String_val(msg));
-  return caml_exn_with_arg(tag, msg);
-}

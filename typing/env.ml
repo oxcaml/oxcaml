@@ -4031,10 +4031,10 @@ let lookup_dot_cltype ~errors ~use ~loc l s env =
       may_lookup_error errors loc env (Unbound_cltype (Ldot(l, s)))
 
 let lookup_dot_jkind ~errors ~use ~loc l s env =
-  let (p, _, comps) = lookup_structure_components ~errors ~use ~loc l env in
-  match NameMap.find s comps.comp_jkinds with
+  let (p, _, comps) = lookup_structure_components ~errors ~use l env in
+  match NameMap.find s.txt comps.comp_jkinds with
   | jkind ->
-      let path = Pdot(p, s) in
+      let path = Pdot(p, s.txt) in
       use_jkind ~use ~loc path jkind;
       (path, jkind.jkda_declaration)
   | exception Not_found ->
@@ -4871,11 +4871,6 @@ let pp_path ppf l = !print_path ppf l
 let print_type_expr : Types.type_expr printer ref =
   ref (fun _ _ -> assert false)
 
-let report_jkind_violation_with_offender =
-  ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
-       : offender:(Format_doc.formatter -> unit) ->
-         level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit)
-
 module Style = Misc.Style
 
 let quoted_longident = Style.as_inline_code Pprintast.Doc.longident
@@ -5104,9 +5099,9 @@ let report_lookup_error_doc loc env = function
        "@{<ralign>Unbound class type @}%a" quoted_longident lid
       (spellcheck extract_cltypes env lid)
   | Unbound_jkind lid ->
-      fprintf ppf "Unbound kind %a"
-        (Style.as_inline_code !print_longident) lid;
-      spellcheck ppf extract_jkinds env lid
+     Location.aligned_error_hint ~loc
+       "@{<ralign>Unbound kind @}%a" quoted_longident lid
+       (spellcheck extract_jkinds env lid)
   | Unbound_settable_variable s ->
         Location.aligned_error_hint ~loc
           "@{<ralign>Unbound instance variable or mutable variable @}%a"
@@ -5216,9 +5211,9 @@ let report_lookup_error_doc loc env = function
         "%a must have a type of layout value because it is captured by an \
          object.@ %a"
         quoted_longident lid
-        (fun v -> !report_jkind_violation_with_offender
+        (fun ppf v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
-           ~level:Btype.generic_level env v)
+           ~level:Btype.generic_level env ppf v)
         err
   | No_unboxed_version (lid, decl) ->
       let sub =

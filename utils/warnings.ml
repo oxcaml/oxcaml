@@ -1412,7 +1412,7 @@ let message = function
            Probe names must be at most 100 characters long."
         Style.inline_code name
   | Unused_kind_declaration s ->
-      "unused kind " ^ s ^ "."
+      msg "unused kind %a." Style.inline_code s
   | Zero_alloc_all_hidden_arrow s ->
       msg "The type of this item is an@ alias of a function type,@ \
            but the %a attribute for@ this signature does not apply to it@ \

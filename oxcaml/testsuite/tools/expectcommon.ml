@@ -84,7 +84,7 @@ let match_expect_extension (ext : Parsetree.extension) =
     (* Parse a single element: either {|...|} or Filter{|...|} *)
     let parse_element (e : Parsetree.expression) =
       match e.pexp_desc with
-      | Pexp_constant (Pconst_string _) ->
+      | Pexp_constant {pconst_desc = Pconst_string _; _} ->
         (* Bare string constant - no filter *)
         (None, string_constant e)
       | Pexp_construct ({ txt = Lident name; }, Some arg) -> (

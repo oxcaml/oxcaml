@@ -4382,7 +4382,7 @@ let transl_jkind_decl env
       { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc=loc } =
   let scope = Ctype.create_scope () in
   let id = Ident.create_scoped ~scope pjkind_name.txt in
-  let uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
+  let uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
   let context = Jkind.History.Jkind_declaration (Pident id) in
   let jkind_manifest =
     Option.map (fun annot -> Jkind.Const.of_annotation env ~context annot)
@@ -4956,7 +4956,7 @@ let report_error ~loc = function
   | Bad_unboxed_attribute msg ->
       Location.errorf ~loc "This type cannot be unboxed because@ %s." msg
   | Poly_not_yet_implemented ->
-    fprintf ppf "@[The %a annotation is not yet implemented.@]"
+    Location.errorf ~loc "@[The %a annotation is not yet implemented.@]"
       Style.inline_code "val poly_"
   | Separability (Typedecl_separability.Non_separable_evar evar) ->
       let pp_evar ppf = function

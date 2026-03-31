@@ -158,9 +158,9 @@ let value_descriptions_consistency env vd1 vd2 =
       List.iter (fun loc ->
        List.iter (fun fork ->
         List.iter (fun yield ->
-          let ty1, _, _, _ = Ctype.instance_prim p1 vd1.val_type in
+          let ty1, _, _, _ = Ctype.instance_prim env p1 vd1.val_type in
           let ty2, mode_l2, mode_fy2, _ =
-            Ctype.instance_prim p2 vd2.val_type
+            Ctype.instance_prim env p2 vd2.val_type
           in
           let mode_f2 = Option.map fst mode_fy2 in
           let mode_y2 = Option.map snd mode_fy2 in
@@ -180,7 +180,7 @@ let value_descriptions_consistency env vd1 vd2 =
     end
   | (Val_prim p, _) ->
       let _ty, mode_l, _mode_fy, sort =
-        Ctype.instance_prim p vd1.val_type
+        Ctype.instance_prim env p vd1.val_type
       in
       let pc =
         { pc_desc = p; pc_type = vd2.Types.val_type;

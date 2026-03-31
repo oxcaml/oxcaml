@@ -1042,7 +1042,9 @@ let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx
       module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx
         diff.symptom
   | _ ->
-      let inner = if eqmode then eq_module_types ~env else module_types ~env in
+      let inner =
+        if eqmode then eq_module_types ~env:env.i_env
+        else module_types ~env:env.i_env in
       let next =
         match diff.symptom with
         | Mt_core _ ->
