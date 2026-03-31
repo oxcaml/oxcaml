@@ -377,6 +377,35 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
        it is introduced at line 1, characters 0-13, outside any quotations.
 |}];;
 
+type 'a t_param_well_staged = A of 'a expr
+[%%expect {|
+type 'a t_param_well_staged = A of 'a expr
+|}];;
+
+type 'a t_param_ill_staged = A of <['a]> expr
+[%%expect {|
+Line 1, characters 36-38:
+1 | type 'a t_param_ill_staged = A of <['a]> expr
+                                        ^^
+Error: Type variable "'a" is used inside a quotation (<[ ... ]>),
+       it already occurs outside any quotations.
+       Hint: Consider using "$'a".
+|}];;
+
+type _ t_param_well_staged_gadt =
+  | A : 'a expr -> <[$('a) * $('a)]> t_param_well_staged_gadt
+[%%expect {|
+type _ t_param_well_staged_gadt =
+    A : 'a expr -> <[$('a) * $('a)]> t_param_well_staged_gadt
+|}];;
+
+type _ t_param_re_staged_gadt =
+  | B : <['b]> expr -> <['b * 'b]> t_param_re_staged_gadt
+[%%expect {|
+type _ t_param_re_staged_gadt =
+    B : 'b expr -> <[$('b) * $('b)]> t_param_re_staged_gadt
+|}];;
+
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
 [%%expect {|
 - : <[$('a) -> $('b) -> $('a) * $('b)]> expr =
