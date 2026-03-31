@@ -1150,7 +1150,9 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
        to maintain the invariant that there is enough room in the minor heap to
        re-do the allocation in this case, since we are about to preempt anyway,
        so we can just return. */
-    if ((flags & CAML_FROM_CAML) && Is_block(Caml_state->preemption)) {
+    if (Is_block(Caml_state->preemption)) {
+      /* We should only see this case if we allocated from ocaml */
+      CAMLassert(flags & CAML_FROM_CAML);
       return;
     }
 
