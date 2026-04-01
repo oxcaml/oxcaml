@@ -1,0 +1,14 @@
+Inline, Yep 4 + 5: Yep 9
+Inline, Nope + 5: Nope
+Map, increment: Yep 8
+Map, increment Nope: Nope
+Bind, Yep 8: Yep 4
+Bind, Yep 3: Nope
+Bind, Nope: Nope
+Flipped map: Yep_first CUSTOM
+Flipped map Nope: Nope_last
+Closure, add two: Yep 12
+Closure, add two to Nope: Nope
+Closure, add none: Nope
+Ref, initial: Nope_last
+Ref, updated: Yep_first kept
