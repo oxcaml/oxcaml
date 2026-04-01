@@ -696,6 +696,7 @@ let same_printing_env env =
 
 let set_printing_env env =
   printing_env := env;
+  Env.printing_env := env;
   if !Clflags.real_paths ||
      !printing_env == Env.empty ||
      same_printing_env env then
