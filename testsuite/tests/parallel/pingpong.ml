@@ -1,13 +1,6 @@
 (* TEST
-<<<<<<< oxcaml
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
-||||||| upstream-base
-=======
  multicore;
->>>>>>> upstream-incoming
  no-tsan; (* TSan detects the intentional data race *)
- runtime5;
- multidomain;
  { bytecode; }
  { native; }
 *)

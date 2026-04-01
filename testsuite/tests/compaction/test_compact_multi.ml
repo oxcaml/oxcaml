@@ -1,14 +1,7 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- {
-   runtime4;
-   skip;
- }{
-   runtime5;
-   multidomain;
-   { bytecode; }
-   { native; }
- }
+ multicore;
+ { bytecode; }
+ { native; }
 *)
 
 let num_domains = 2

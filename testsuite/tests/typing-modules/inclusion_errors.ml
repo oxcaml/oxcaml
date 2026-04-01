@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 (********************************** Equality **********************************)
 
@@ -561,13 +562,7 @@ Error: Signature mismatch:
          val f : (module s/2) -> unit
        The type "(module s/1) -> unit" is not compatible with the type
          "(module s/2) -> unit"
-<<<<<<< oxcaml
-       Type "(module s/1)" is not compatible with type "(module s/2)"
-||||||| upstream-base
-       Type "(module s)" is not compatible with type "(module s/2)"
-=======
        Modules do not match: s is not included in s/2
->>>>>>> upstream-incoming
        Line 6, characters 4-17:
          Definition of module type "s/1"
        Line 2, characters 2-15:
@@ -1862,9 +1857,6 @@ Error: Signature mismatch:
        The value "x" is required but not provided
        The value "y" is required but not provided
 |}];;
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
 
 
 module Eq_label: sig
@@ -2048,4 +2040,3 @@ Error: Signature mismatch:
        The type "'a -> unit" is not compatible with the type "?x:int -> unit"
        A label "?x" was expected
 |}]
->>>>>>> upstream-incoming

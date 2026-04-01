@@ -1,11 +1,5 @@
 (* TEST
  include unix;
-<<<<<<< oxcaml
- flags = "-alert -unsafe_multidomain";
- libunix;
-||||||| upstream-base
- libunix;
-=======
  hasunix;
  not-target-windows;
  (*
@@ -14,7 +8,6 @@
    see https://github.com/llvm/llvm-project/issues/63824
  *)
  not_macos_amd64_tsan;
->>>>>>> upstream-incoming
  {
    bytecode;
  }{

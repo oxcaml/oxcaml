@@ -1,19 +1,9 @@
 (* TEST
-<<<<<<< oxcaml
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- runtime5;
- multidomain;
- { bytecode; }
- { native; }
-*)
-||||||| upstream-base
-(* TEST *)
-=======
+  multicore;
   include unix;
   hasunix;
   { bytecode; } { native; }
- *)
->>>>>>> upstream-incoming
+*)
 
 open Domain
 

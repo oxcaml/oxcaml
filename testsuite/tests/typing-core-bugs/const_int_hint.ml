@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 let _ = Int32.(add 1 2l);;
 [%%expect{|
@@ -188,25 +189,11 @@ Hint: Did you mean "0b1000_1101l"?
 |}]
 type t1 = {mutable f1: int32};; let _ = fun x -> x.f1 <- 1_000n;;
 [%%expect{|
-<<<<<<< oxcaml
-type t1 = { mutable f1 : int32; }
-Line 1, characters 57-63:
-1 | type t1 = {mutable f1: int32};; let _ = fun x -> x.f1 <- 1_000n;;
-                                                             ^^^^^^
-Error: This expression has type "nativeint"
-||||||| upstream-base
-type t1 = { f1 : int32; }
-Line 1, characters 49-55:
-1 | type t1 = {f1: int32};; let _ = fun x -> x.f1 <- 1_000n;;
-                                                     ^^^^^^
-Error: This expression has type "nativeint"
-=======
 type t1 = { f1 : int32; }
 Line 1, characters 49-55:
 1 | type t1 = {f1: int32};; let _ = fun x -> x.f1 <- 1_000n;;
                                                      ^^^^^^
 Error: The constant "1_000n" has type "nativeint"
->>>>>>> upstream-incoming
        but an expression was expected of type "int32"
 Hint: Did you mean "1_000l"?
 |}]

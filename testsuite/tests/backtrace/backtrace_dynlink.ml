@@ -77,46 +77,5 @@ let () =
 
  ocamlrunparam += ",b=1";
  run;
- {
-   no-flambda;
-   check-program-output;
- }{
-<<<<<<< oxcaml
-   program = "backtrace_dynlink_plugin.cmxs";
-   flags = "-shared -g";
-   all_modules = "backtrace_dynlink_plugin.ml";
-   ocamlopt.byte;
- }{
-   program = "${test_build_directory}/main.exe";
-   libraries = "dynlink";
-   all_modules = "backtrace_dynlink.cmx";
-   ocamlopt.byte;
-   ocamlrunparam += ",b=1";
-   run;
-||||||| upstream-base
-   program = "backtrace_dynlink_plugin.cmxs";
-   flags = "-shared -g";
-   all_modules = "backtrace_dynlink_plugin.ml";
-   ocamlopt.byte;
- }{
-   program = "${test_build_directory}/main.exe";
-   libraries = "dynlink";
-   all_modules = "backtrace_dynlink.cmx";
-   ocamlopt.byte;
-   ocamlrunparam += ",b=1";
-   run;
-   {
-     no-flambda;
-     check-program-output;
-   }{
-     reference = "${test_source_directory}/backtrace_dynlink.flambda.reference";
-     flambda;
-     check-program-output;
-   }
-=======
-   reference = "${test_source_directory}/backtrace_dynlink.flambda.reference";
-   flambda;
->>>>>>> upstream-incoming
-   check-program-output;
- }
+ check-program-output;
 *)
