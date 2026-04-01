@@ -66,6 +66,81 @@ Error: This expression has type "'a t" but an expression was expected of type
          because of the definition of t at lines 1-4, characters 0-11.
 |}]
 
+type t_non_float : value mod non_float
+type ('a : any mod separable) accepts_sep
+type ('a : value_or_null mod non_float) accepts_nonfloat
+
+type succeeds = t_non_float t accepts_sep
+type succeeds = t_non_float t accepts_nonfloat
+
+[%%expect{|
+type t_non_float : value mod non_float
+type ('a : any mod separable) accepts_sep
+type ('a : value_or_null mod non_float) accepts_nonfloat
+type succeeds = t_non_float t accepts_sep
+type succeeds = t_non_float t accepts_nonfloat
+|}]
+
+type fails = float t accepts_sep
+
+[%%expect{|
+Line 1, characters 13-20:
+1 | type fails = float t accepts_sep
+                 ^^^^^^^
+Error: This type "float t" should be an instance of type
+         "('a : any mod separable)"
+       The kind of float t is value_or_null
+         because of the definition of t at lines 1-4, characters 0-11.
+       But the kind of float t must be a subkind of any mod separable
+         because of the definition of accepts_sep at line 2, characters 0-41.
+|}]
+
+type fails = float t accepts_nonfloat
+
+[%%expect{|
+Line 1, characters 13-20:
+1 | type fails = float t accepts_nonfloat
+                 ^^^^^^^
+Error: This type "float t" should be an instance of type
+         "('a : value_or_null mod non_float)"
+       The kind of float t is value_or_null
+         because of the definition of t at lines 1-4, characters 0-11.
+       But the kind of float t must be a subkind of
+           value_or_null mod non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
+type int_t = int t
+
+module type S = sig
+  type t : any mod separable
+end
+
+[%%expect{|
+type int_t = int t
+module type S = sig type t : any mod separable end
+|}]
+
+(* CR separability: this should type-check. *)
+
+module type S' = S with type t = int_t
+
+[%%expect{|
+Line 1, characters 17-38:
+1 | module type S' = S with type t = int_t
+                     ^^^^^^^^^^^^^^^^^^^^^
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type t = int_t
+       is not included in
+         type t : any mod separable
+       The kind of the first is value_or_null
+         because of the definition of t at lines 1-4, characters 0-11.
+       But the kind of the first must be a subkind of any mod separable
+         because of the definition of t at line 4, characters 2-28.
+|}]
+
 type 'a too_many =
   | A
   | B of 'a
