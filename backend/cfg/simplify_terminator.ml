@@ -551,7 +551,6 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
     false
 
 let run cfg =
-  Format.eprintf "XXX %s\n%!" cfg.Cfg.fun_name;
   let registration_needed =
     C.fold_blocks cfg ~init:false ~f:(fun _ b registration_needed ->
         let shortcircuit = block cfg b in
