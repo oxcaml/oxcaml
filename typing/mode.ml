@@ -185,7 +185,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lazy_forced -> Lazy_forced
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
-        | Quoted_expansive -> Quoted_expansive
+        | Quoted_computation -> Quoted_computation
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
 
@@ -230,7 +230,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
-        | Quoted_expansive -> Quoted_expansive
+        | Quoted_computation -> Quoted_computation
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
 
@@ -255,7 +255,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
-        | Quoted_expansive -> Quoted_expansive
+        | Quoted_computation -> Quoted_computation
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
     end)
@@ -2462,8 +2462,7 @@ module Report = struct
     | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
     | Escape_region reg ->
       Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
-    | Quoted_expansive ->
-      Fmt.fprintf ppf "it is the quote of a non-trivial expression"
+    | Quoted_computation -> Fmt.fprintf ppf "it is the quote of a computation"
     | Spliced _ -> Fmt.fprintf ppf "it is spliced"
 
   let print_allocation_l : allocation -> Fmt.formatter -> unit =

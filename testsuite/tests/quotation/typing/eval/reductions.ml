@@ -361,9 +361,9 @@ Error: This expression has type "<[(module Z.T with type s = t)]> eval"
 
 (* Quoted [eval] stubs *)
 open (struct
-  let eval0 = Obj.magic ()
-  let eval1 = <[Obj.magic ()]>
-  let eval2 = <[<[Obj.magic ()]>]>
+  let eval0 = Obj.magic (fun x -> x)
+  let eval1 = Obj.magic <[fun x -> x]>
+  let eval2 = Obj.magic <[<[fun x -> x]>]>
 end : sig
   val eval0 : 'a expr @ once -> 'a eval
   val eval1 : <[ $('a) expr @ once -> $('a) eval ]> expr
@@ -371,10 +371,9 @@ end : sig
 end)
 [%%expect {|
 val eval0 : 'a expr @ once -> 'a eval = <fun>
-val eval1 : <[$('a) expr @ once -> $('a) eval]> expr = <[Stdlib.Obj.magic ()
-  ]>
+val eval1 : <[$('a) expr @ once -> $('a) eval]> expr = <[fun x -> x]>
 val eval2 : <[<[$($('a)) expr @ once -> $($('a)) eval]> expr]> expr =
-  <[<[Stdlib.Obj.magic ()]>]>
+  <[<[fun x -> x]>]>
 |}]
 
 (* The obvious form of eval composition -- [fun x -> eval (eval x)] --

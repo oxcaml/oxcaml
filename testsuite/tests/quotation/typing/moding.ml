@@ -263,7 +263,7 @@ Line 1, characters 69-70:
 Error: This value is "nonportable" but is expected to be "portable".
 |}];;
 
-(** Quoting non-expansive expressions and using as [many] **)
+(** Quoting computations (non-values) and using as [many] **)
 
 let x = <[42]> in <[$x + $x]>
 [%%expect{|
@@ -279,29 +279,33 @@ let x = <[fun () -> 2]> in <[$x () + $x ()]>
 - : <[int]> expr = <[((fun () -> 2) ()) + ((fun () -> 2) ())]>
 |}];;
 
-(** Quoting expansive expressions and using as [many] **)
-
-(* CR metaprogramming jbachurski: We'd like to give expansive expressions
-   (i.e. not syntactic values) the mode [once], so these tests should fail.
-   See internal ticket 5525. *)
+(** Quoting value expressions and using as [many] **)
 
 (* Quoted expressions with side effects should be [once],
    so these tests fail. *)
 let x = <[ref 0]> in <[!($x) + !($x)]>
 [%%expect{|
-Line 9, characters 34-35:
-9 | let x = <[ref 0]> in <[!($x) + !($x)]>
+Line 5, characters 34-35:
+5 | let x = <[ref 0]> in <[!($x) + !($x)]>
                                       ^
 Error: This value is used here,
        but it is defined as once and is also being used at:
-Line 9, characters 26-27:
-9 | let x = <[ref 0]> in <[!($x) + !($x)]>
+Line 5, characters 26-27:
+5 | let x = <[ref 0]> in <[!($x) + !($x)]>
                               ^
 
 |}];;
 let x = <[raise Not_found]> in <[$x + $x]>
 [%%expect{|
-- : <[int]> expr = <[(Stdlib.raise Not_found) + (Stdlib.raise Not_found)]>
+Line 1, characters 39-40:
+1 | let x = <[raise Not_found]> in <[$x + $x]>
+                                           ^
+Error: This value is used here,
+       but it is defined as once and is also being used at:
+Line 1, characters 34-35:
+1 | let x = <[raise Not_found]> in <[$x + $x]>
+                                      ^
+
 |}];;
 <[
   let r = ref 0 in $(
@@ -323,12 +327,11 @@ Line 4, characters 8-9:
 Line 1, characters 1-10:
 1 | (<[ref 0]> : _ @ many)
      ^^^^^^^^^
-Error: This value is "once"
-         because it is the quote of a non-trivial expression.
+Error: This value is "once" because it is the quote of a computation.
        However, the highlighted expression is expected to be "many".
 |}];;
 
-(* Quoting pure expansive expressions still fails (over-approximation). *)
+(* Quoting pure computations still fails. *)
 let x = <[1 + 1]> in <[$x + $x]>
 [%%expect{|
 Line 1, characters 29-30:

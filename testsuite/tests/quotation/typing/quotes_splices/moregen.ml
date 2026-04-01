@@ -120,7 +120,7 @@ Error: Signature mismatch:
 module M4 : sig
   val x : <[ 'a * 'a ]> expr
 end = struct
-  let x = <[ let y = Obj.magic () in (y, y) ]>
+  let x = Obj.magic_many <[ let y = Obj.magic () in (y, y) ]>
 end
 
 [%%expect{|
