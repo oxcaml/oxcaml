@@ -27,7 +27,8 @@
 
 open Asm_targets
 
-(** Emission of SFrame (Simple Frame format) stack trace information.
+(** Emission of SFrame (Simple Frame format) version 2 (errata 1) stack trace
+    information.
 
     SFrame is a simple stack unwinding format that tracks the Canonical Frame
     Address (CFA), Frame Pointer (FP), and Return Address (RA) for each
