@@ -6056,7 +6056,9 @@ let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
             legible error messages, we have to manually perform the
             regeneralization rather than backtracking. *)
          current_level := generic_level - 2;
-         generalize subj_inst;
+         let (), _sub_sorts =
+          Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)
+         in
          raise (Moregen (expand_to_moregen_error env trace)))
     ~always:(fun () -> current_level := old_level)
 
