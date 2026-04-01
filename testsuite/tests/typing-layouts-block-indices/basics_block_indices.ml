@@ -1005,3 +1005,64 @@ val use_ok :
   ('a : value_or_null mod separable). unit -> ('a an_array, 'a) an_idx =
   <fun>
 |}]
+
+(***************************)
+(* [value_or_null] indices *)
+
+type r = #{ x : int }
+
+module M : sig
+  type t : value_or_null
+  val t : t
+  val i : (t, int) idx_mut
+  val j : (t, int) idx_imm
+  val k : (t, r) idx_imm
+end = struct
+  type t = { mutable i : int; j : int; k : r }
+  let t = { i = 1; j = 2; k = #{ x = 3 } }
+  let i = (.i)
+  let j = (.j)
+  let k = (.k)
+end
+
+let ~i, ~j, ~i', ~k =
+  let i = Idx_mut.get M.t M.i in
+  let j = Idx_imm.get M.t M.j in
+  Idx_mut.set M.t M.i 3;
+  let i' = Idx_mut.get M.t M.i in
+  let k = Idx_imm.get M.t (.idx_imm(M.k).#x) in
+  ~i, ~j, ~i', ~k
+[%%expect{|
+type r = #{ x : int; }
+module M :
+  sig
+    type t : value_or_null
+    val t : t
+    val i : (t, int) idx_mut
+    val j : (t, int) idx_imm
+    val k : (t, r) idx_imm
+  end
+val i : int = 1
+val j : int = 2
+val i' : int = 3
+val k : int = 3
+|}]
+
+type ('a : bits64) a = { a : 'a }
+module M : sig
+  val idx_imm : ('a : value_or_null) ('b : bits64).
+    ('a, 'b a#) idx_imm -> ('a, 'b) idx_imm
+  val idx_mut : ('a : value_or_null) ('b : bits64).
+    ('a, 'b a#) idx_mut -> ('a, 'b) idx_mut
+end = struct
+  let idx_imm i = (.idx_imm(i).#a)
+  let idx_mut i = (.idx_mut(i).#a)
+end
+[%%expect{|
+type ('a : bits64) a = { a : 'a; }
+module M :
+  sig
+    val idx_imm : 'a ('b : bits64). ('a, 'b a#) idx_imm -> ('a, 'b) idx_imm
+    val idx_mut : 'a ('b : bits64). ('a, 'b a#) idx_mut -> ('a, 'b) idx_mut
+  end
+|}]
