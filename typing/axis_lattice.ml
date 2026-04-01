@@ -27,7 +27,8 @@
    4. Portability: Portable -> Shareable -> Nonportable
    5. Forkable: Forkable -> Unforkable
    6. Yielding: Unyielding -> Yielding
-   7. Statefulness: Stateless -> Observing -> Stateful
+   7. Statefulness: Stateless -> Reading -> Stateful
+      with Writing conservatively collapsed to Stateful
    8. Visibility (monadic): Immutable -> Read -> Read_write
    9. Staticity (monadic): Dynamic -> Static
    10. Externality: External -> External64 -> Internal
@@ -269,13 +270,15 @@ module Levels = struct
   let level_of_statefulness (x : Mode.Statefulness.Const.t) : int =
     match x with
     | Mode.Statefulness.Const.Stateless -> 0
-    | Mode.Statefulness.Const.Observing -> 1
+    | Mode.Statefulness.Const.Reading -> 1
+    | Mode.Statefulness.Const.Writing
     | Mode.Statefulness.Const.Stateful -> 2
 
   let level_of_visibility_monadic (x : Mode.Visibility.Const.t) : int =
     match x with
     | Mode.Visibility.Const.Immutable -> 0
     | Mode.Visibility.Const.Read -> 1
+    | Mode.Visibility.Const.Write
     | Mode.Visibility.Const.Read_write -> 2
 
   let level_of_staticity_monadic (x : Mode.Staticity.const) : int =
@@ -330,7 +333,7 @@ module Levels = struct
 
   let statefulness_of_level = function
     | 0 -> Mode.Statefulness.Const.Stateless
-    | 1 -> Mode.Statefulness.Const.Observing
+    | 1 -> Mode.Statefulness.Const.Reading
     | 2 -> Mode.Statefulness.Const.Stateful
     | _ -> invalid_arg "Axis_lattice.statefulness_of_level"
 

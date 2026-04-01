@@ -467,8 +467,9 @@ module Solver = struct
         failwith "Tfield shouldn't appear in kind"
       | Types.Tnil ->
         failwith "Tnil shouldn't appear in kind"
-      | Types.Tquote _ | Types.Tsplice _ ->
-        (* Treat quoted/spliced types conservatively as boxed values. *)
+      | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ ->
+        (* Treat quoted/spliced/evaluated quoted types conservatively as
+           boxed values. *)
         Ldd.const Axis_lattice.value
       | Types.Tvariant row ->
         if Btype.tvariant_not_immediate row
@@ -1077,18 +1078,18 @@ let compute_subcheck_polys ~context:_ env
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
-    ~(context : Jkind.jkind_context) ~level env (sub : Types.jkind_l)
+    ~(context : Jkind.jkind_context) ~level:_level env (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then
-    Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context ~level env
+    Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env
       sub super
   else
     (* Check layouts first; if that fails, print both sides with full
        info and return the error. *)
     let* () =
-      match Jkind.sub_layout_or_error ~context ~level env sub super with
+      match Jkind.sub_layout_or_error ~context env sub super with
       | Ok () -> Ok ()
       | Error v -> Error v
     in
@@ -1289,12 +1290,12 @@ let sub_or_intersect ?origin
     (* Old behavior adapted to abstract kinds:
        1) gate on env-aware layout subchecking
        2) if layouts are compatible, decide based on ikind polynomials *)
-    match Jkind.sub_layout_or_error ~context ~level env t1 t2 with
+    match Jkind.sub_layout_or_error ~context env t1 t2 with
     | Error _ ->
       (* Keep Jkind as the source of Disjoint vs May_have_intersection
          classification when layouts fail. *)
       (match
-         Jkind.sub_or_intersect ~type_equal ~context ~level env t1 t2
+         Jkind.sub_or_intersect ~type_equal ~context env t1 t2
        with
        | Jkind.Disjoint _ as disjoint ->
          debug_polys ~outcome:"Disjoint" ();
@@ -1332,7 +1333,7 @@ let sub_or_intersect ?origin
         Jkind.May_have_intersection reasons
   in
   if not (enable_sub_or_intersect && !Clflags.ikinds)
-  then Jkind.sub_or_intersect ~type_equal ~context ~level env t1 t2
+  then Jkind.sub_or_intersect ~type_equal ~context env t1 t2
   else if fast_sub ~context ~level env t1 t2
   then (
     if !Clflags.ikinds_debug
@@ -1346,12 +1347,12 @@ let sub_or_intersect ?origin
 
 let sub_or_error ?origin:_origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
-    ~(context : Jkind.jkind_context) ~level env
+    ~(context : Jkind.jkind_context) ~level:_level env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) :
     (unit, Jkind.Violation.t) result =
   if not (enable_sub_or_error && !Clflags.ikinds)
-  then Jkind.sub_or_error ~type_equal ~context ~level env t1 t2
+  then Jkind.sub_or_error ~type_equal ~context env t1 t2
   else
     let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
       compute_subcheck_polys ~context env t1 t2
@@ -1360,7 +1361,7 @@ let sub_or_error ?origin:_origin
     | [] -> Ok ()
     | _ ->
       (* Delegate to Jkind for detailed error reporting. *)
-      Jkind.sub_or_error ~type_equal ~context ~level env t1 t2
+      Jkind.sub_or_error ~type_equal ~context env t1 t2
 
 (** Substitute constructor ikinds according to [lookup] without requiring
     Env. *)

@@ -2985,6 +2985,7 @@ let normalize_decl_jkinds env decls =
           ~type_equal
           ~context
           ~allow_any_crossing
+          ~level:(Ctype.get_current_level ())
           env
           decl.type_jkind
           original_decl.type_jkind

@@ -24,7 +24,7 @@ open Types
 
 open Local_store
 
-module Jkind0 = Btype.Jkind0
+module Jkind = Btype.Jkind0
 module String = Misc.Stdlib.String
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
@@ -3644,7 +3644,7 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
        not a specific instance of that variable. *)
     match
       !constrain_type_jkind env ty
-        Jkind0.Builtin.(value_or_null ~why:Captured_in_object)
+        Jkind.Builtin.(value_or_null ~why:Captured_in_object)
     with
     | Ok () -> ()
     | Result.Error err ->
