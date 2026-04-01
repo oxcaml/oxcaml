@@ -2150,7 +2150,7 @@ static bool tick_thread_wait(void)
 
   struct epoll_event events[2];
   int n = epoll_wait(tick_thread.epoll_fd, events, 2, -1);
-  if (n <= 0) return false;
+  if (n <= 0) return true;
 
   bool timer_fired = false;
   for (int i = 0; i < n; i++) {
