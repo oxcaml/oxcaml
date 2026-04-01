@@ -2299,6 +2299,7 @@ CAMLextern int caml_start_tick_thread(void)
 {
   caml_plat_lock_non_blocking(&tick_thread.mutex);
   if (!atomic_load_acquire(&tick_thread.enabled)) {
+    caml_plat_unlock(&tick_thread.mutex);
     return 0;
   }
 
