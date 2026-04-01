@@ -4855,6 +4855,8 @@ let env_of_only_summary env_from_summary env =
   }
 
 (* Forward declartions that must refer to type t *)
+let printing_env = ref empty
+
 let report_jkind_violation_with_offender =
   ref ((fun ~offender:_ ~level:_ _ _ _ -> assert false)
        : offender:(Format_doc.formatter -> unit) -> level:int -> t ->
