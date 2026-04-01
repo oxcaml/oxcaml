@@ -344,9 +344,20 @@ and fracture_fun
 
 (** Fracture [lambda = Lprim (prim, args, loc)]. *)
 and fracture_prim lambda prim args loc =
+  let wrong_arity ~expected =
+    Misc.fatal_errorf "Slambda_fracture: %a takes exactly %d %s got %d"
+      Printlambda.primitive prim expected
+      (if expected = 1 then "argument" else "arguments")
+      (List.length args)
+  in
+  let check_arity ~arity =
+    match List.compare_length_with args arity with
+    | 0 -> ()
+    | _ -> wrong_arity ~expected:arity
+  in
   match prim with
   | Pgetglobal (cu, Static) ->
-    assert (List.is_empty args);
+    check_arity ~arity:0;
     SLhalves { sval_comptime = SLglobal cu; sval_runtime = lambda }
   | Pmakeblock _ ->
     let rec fracture_make_block unchanged i args_c args_r = function
@@ -369,7 +380,7 @@ and fracture_prim lambda prim args loc =
        reverse order. *)
     fracture_make_block true (List.length args - 1) [] [] (List.rev args)
   | Pfield (pos, _ptr, _sem) ->
-    let arg = match args with [arg] -> arg | _ -> assert false in
+    let arg = match args with [arg] -> arg | _ -> wrong_arity ~expected:1 in
     slet_local "arg" arg (fun arg_c arg_r ->
         SLhalves
           { sval_comptime = SLfield (arg_c, pos);
@@ -377,7 +388,7 @@ and fracture_prim lambda prim args loc =
               (if arg_r == arg then lambda else Lprim (prim, [arg_r], loc))
           })
   | Pmixedfield (path, _shape, _sem) ->
-    let arg = match args with [arg] -> arg | _ -> assert false in
+    let arg = match args with [arg] -> arg | _ -> wrong_arity ~expected:1 in
     slet_local "arg" arg (fun arg_c arg_r ->
         SLhalves
           { sval_comptime =
