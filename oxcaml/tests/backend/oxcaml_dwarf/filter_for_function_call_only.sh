@@ -26,17 +26,7 @@ sed \
   -e 's|\([a-z_][a-zA-Z0-9_]*\)_[0-9]\+_unboxed|\1_XXX_unboxed|g' | \
 # Second sed: Conceal unstable pointer values in C runtime function parameters
 sed \
-  -e '/caml_blit_bytes/s|s1=#[0-9]\{10,\}L|s1=<PTR>|g' \
-  -e '/caml_blit_bytes/s|s2=#[0-9]\{10,\}L|s2=<PTR>|g' \
-  -e '/caml_hash_exn/s|obj=#[0-9]\{5,\}L|obj=<PTR>|g' \
-  -e '/caml_compare/s|v1=#[0-9]\{5,\}L|v1=<PTR>|g' \
-  -e '/caml_compare/s|v2=#[0-9]\{5,\}L|v2=<PTR>|g' \
-  -e '/caml_output_value_to_buffer/s|buf=#[0-9]\{10,\}L|buf=<PTR>|g' \
-  -e '/caml_output_value_to_buffer/s|v=#[0-9]\{5,\}L|v=<PTR>|g' \
-  -e '/caml_input_value_from_bytes/s|str=#[0-9]\{10,\}L|str=<PTR>|g' \
-  -e '/caml_md5_string/s|str=#[0-9]\{5,\}L|str=<PTR>|g' \
-  -e '/caml_sys_getenv/s|var=#[0-9]\{5,\}L|var=<PTR>|g' \
-  -e '/caml_ba_create/s|vdim=#[0-9]\{5,\}L|vdim=<PTR>|g' | \
+  -e 's|#[0-9]*[02468]L : value|<PTR> : value|g' | \
 # grep: Remove LLDB noise
 grep -v \
   -e '^(lldb) ' \
