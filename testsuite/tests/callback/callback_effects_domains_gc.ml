@@ -1,10 +1,8 @@
 (* TEST
- runtime5;
- multidomain;
+ flags += "-alert -do_not_spawn_domains";
+ multicore;
  native;
 *)
-
-[@@@alert "-do_not_spawn_domains"]
 
 external caml_callback : ('a -> 'b) -> 'a -> 'b = "caml_callback"
 

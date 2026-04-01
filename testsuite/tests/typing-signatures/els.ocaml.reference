@@ -80,27 +80,11 @@ module type WEAPON_LIB =
     module T :
       sig type t = t val eq : t -> t -> bool val to_string : t -> string end
     module Make :
-<<<<<<< oxcaml
-      functor
-        (TV : sig
-                type combined
-                type t = t
-                val map : (combined -> t) * (t -> combined)
-              end)
-||||||| upstream-base
-      functor
-        (TV : sig
-                type combined
-                type t = t/2
-                val map : (combined -> t) * (t -> combined)
-              end)
-=======
       (TV : sig
               type combined
               type t = t/2
               val map : (combined -> t) * (t -> combined)
             end)
->>>>>>> upstream-incoming
         -> USERCODE(TV).F
   end
 module type X = (X : CORE) -> BARECODE

@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 module C = Char;;
 C.chr 66;;
@@ -15,31 +16,6 @@ module C = Char
 - : char = 'B'
 module C' :
   sig
-<<<<<<< oxcaml
-    external code : char -> int @@ portable = "%identity"
-    val chr : int -> char @@ portable
-    val escaped : char -> string @@ portable
-    val lowercase_ascii : char -> char @@ portable
-    val uppercase_ascii : char -> char @@ portable
-    type t = char
-    val compare : t -> t -> int @@ portable
-    val equal : t -> t -> bool @@ portable
-    val seeded_hash : int -> t -> int @@ portable
-    val hash : t -> int @@ portable
-    external unsafe_chr : int -> char @@ portable = "%identity"
-||||||| upstream-base
-    external code : char -> int = "%identity"
-    val chr : int -> char
-    val escaped : char -> string
-    val lowercase_ascii : char -> char
-    val uppercase_ascii : char -> char
-    type t = char
-    val compare : t -> t -> int
-    val equal : t -> t -> bool
-    val seeded_hash : int -> t -> int
-    val hash : t -> int
-    external unsafe_chr : int -> char = "%identity"
-=======
     type t = char
     external code : char -> int = "%identity"
     val chr : int -> char
@@ -75,7 +51,6 @@ module C' :
     val seeded_hash : int -> t -> int
     val hash : t -> int
     external unsafe_chr : int -> char = "%identity"
->>>>>>> upstream-incoming
   end
 - : char = 'B'
 module C3 :
@@ -110,31 +85,6 @@ C4.chr 66;;
 module F :
   (X : sig end) ->
     sig
-<<<<<<< oxcaml
-      external code : char -> int @@ portable = "%identity"
-      val chr : int -> char @@ portable
-      val escaped : char -> string @@ portable
-      val lowercase_ascii : char -> char @@ portable
-      val uppercase_ascii : char -> char @@ portable
-      type t = char
-      val compare : t -> t -> int @@ portable
-      val equal : t -> t -> bool @@ portable
-      val seeded_hash : int -> t -> int @@ portable
-      val hash : t -> int @@ portable
-      external unsafe_chr : int -> char @@ portable = "%identity"
-||||||| upstream-base
-      external code : char -> int = "%identity"
-      val chr : int -> char
-      val escaped : char -> string
-      val lowercase_ascii : char -> char
-      val uppercase_ascii : char -> char
-      type t = char
-      val compare : t -> t -> int
-      val equal : t -> t -> bool
-      val seeded_hash : int -> t -> int
-      val hash : t -> int
-      external unsafe_chr : int -> char = "%identity"
-=======
       type t = char
       external code : char -> int = "%identity"
       val chr : int -> char
@@ -147,35 +97,9 @@ module F :
       val seeded_hash : int -> t -> int
       val hash : t -> int
       external unsafe_chr : int -> char = "%identity"
->>>>>>> upstream-incoming
     end
 module C4 :
   sig
-<<<<<<< oxcaml
-    external code : char -> int @@ portable = "%identity"
-    val chr : int -> char @@ portable
-    val escaped : char -> string @@ portable
-    val lowercase_ascii : char -> char @@ portable
-    val uppercase_ascii : char -> char @@ portable
-    type t = char
-    val compare : t -> t -> int @@ portable
-    val equal : t -> t -> bool @@ portable
-    val seeded_hash : int -> t -> int @@ portable
-    val hash : t -> int @@ portable
-    external unsafe_chr : int -> char @@ portable = "%identity"
-||||||| upstream-base
-    external code : char -> int = "%identity"
-    val chr : int -> char
-    val escaped : char -> string
-    val lowercase_ascii : char -> char
-    val uppercase_ascii : char -> char
-    type t = char
-    val compare : t -> t -> int
-    val equal : t -> t -> bool
-    val seeded_hash : int -> t -> int
-    val hash : t -> int
-    external unsafe_chr : int -> char = "%identity"
-=======
     type t = char
     external code : char -> int = "%identity"
     val chr : int -> char
@@ -188,7 +112,6 @@ module C4 :
     val seeded_hash : int -> t -> int
     val hash : t -> int
     external unsafe_chr : int -> char = "%identity"
->>>>>>> upstream-incoming
   end
 - : char = 'B'
 |}];;
@@ -615,13 +538,7 @@ module A1 : sig end
 module A2 : sig end
 module L1 : sig module X = A1 end
 module L2 : sig module X = A2 end
-<<<<<<< oxcaml
-module F : functor (L : sig module X : sig end @@ stateless end) -> sig end
-||||||| upstream-base
-module F : functor (L : sig module X : sig end end) -> sig end
-=======
 module F : (L : sig module X : sig end end) -> sig end
->>>>>>> upstream-incoming
 module F1 : sig end
 module F2 : sig end
 |}];;

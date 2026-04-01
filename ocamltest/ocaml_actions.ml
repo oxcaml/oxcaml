@@ -1341,14 +1341,6 @@ let no_poll_insertion = Actions.make
     "Poll insertion disabled"
     "Poll insertion enabled")
 
-let multidomain = Actions.make
-  ~name:"multidomain"
-  ~description:"Passes if multiple domains is enabled"
-  ~does_something:false
-  (Actions_helpers.predicate Config.multidomain
-    "Multidomain enabled"
-    "Multidomain disabled")
-
 let stack_checks = Actions.make
   ~name:"stack-checks"
   ~description:"Passes if stack checks are enabled"
@@ -1596,7 +1588,6 @@ let init () =
     codegen;
     cc;
     ocamlobjinfo;
-    multidomain;
     stack_checks;
     no_stack_checks;
     runtime4;

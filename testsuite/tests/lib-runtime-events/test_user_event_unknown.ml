@@ -1,17 +1,4 @@
 (* TEST
-<<<<<<< oxcaml
-||||||| upstream-base
- include runtime_events;
- include unix;
- set OCAML_RUNTIME_EVENTS_PRESERVE = "1";
- libunix;
-=======
- include runtime_events;
- include unix;
- set OCAML_RUNTIME_EVENTS_PRESERVE = "1";
- hasunix;
- not-target-windows;
->>>>>>> upstream-incoming
  {
    runtime4;
    skip;
@@ -20,7 +7,8 @@
    include unix;
    set OCAML_RUNTIME_EVENTS_PRESERVE = "1";
    runtime5;
-   libunix;
+   hasunix;
+   not-target-windows;
    {
      bytecode;
    }{

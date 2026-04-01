@@ -98,7 +98,7 @@ val concat_local
 
 val sub
   : ('a : value_or_null mod separable).
-  'a iarray -> int -> int -> 'a iarray
+  'a iarray -> pos:int -> len:int -> 'a iarray
 (** [sub a pos len] returns a fresh immutable array of length [len],
    containing the elements number [pos] to [pos + len - 1]
    of immutable array [a].  This creates a copy of the selected
@@ -110,7 +110,7 @@ val sub
 
 val sub_local
   : ('a : value_or_null mod separable).
-  local_ 'a iarray -> int -> int -> local_ 'a iarray
+  local_ 'a iarray -> pos:int -> len:int -> local_ 'a iarray
 (** The locally-allocating version of [sub]. *)
 
 val to_list : ('a : value_or_null mod separable). 'a iarray -> 'a list

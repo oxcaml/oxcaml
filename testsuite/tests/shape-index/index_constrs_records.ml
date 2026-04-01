@@ -42,9 +42,6 @@ let e = Exn { l_exn = 2}
 let _ = match e with
   | Exn { l_exn } -> l_exn
   | _ -> assert false
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
 
 module Mod = struct
   type t = A of { lbl : int}
@@ -53,4 +50,3 @@ let () =
   match Mod.A { lbl = 42 } with
   | Mod.A { lbl = 42 } -> ()
   | Mod.A r -> ignore r.lbl
->>>>>>> upstream-incoming

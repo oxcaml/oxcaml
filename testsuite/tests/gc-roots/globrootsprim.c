@@ -15,30 +15,14 @@
 
 #define CAML_INTERNALS
 
-<<<<<<< oxcaml
-#include "caml/mlvalues.h"
-#include "caml/memory.h"
-#include "caml/alloc.h"
-#include "caml/gc.h"
-#ifdef CAML_RUNTIME_5
-#include "caml/shared_heap.h"
-#endif
-#include "caml/callback.h"
-||||||| upstream-base
-#include "caml/mlvalues.h"
-#include "caml/memory.h"
-#include "caml/alloc.h"
-#include "caml/gc.h"
-#include "caml/shared_heap.h"
-#include "caml/callback.h"
-=======
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
 #include <caml/alloc.h>
 #include <caml/gc.h>
+#ifdef CAML_RUNTIME_5
 #include <caml/shared_heap.h>
+#endif
 #include <caml/callback.h>
->>>>>>> upstream-incoming
 
 struct block { value header; value v; };
 

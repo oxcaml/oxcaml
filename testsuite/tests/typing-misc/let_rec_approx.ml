@@ -1,6 +1,7 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 module M = struct type t = A | B end
 let rec f () = g A
@@ -16,25 +17,11 @@ Error: Unbound constructor "A"
 let rec f () = g 42
 and g (x : string) = f ()
 [%%expect{|
-<<<<<<< oxcaml
-Line 2, characters 6-18:
-2 | and g (x : string) = f ()
-          ^^^^^^^^^^^^
-Error: This pattern matches values of type "string"
-       but a pattern was expected which matches values of type "int"
-||||||| upstream-base
-Line 1, characters 17-19:
-1 | let rec f () = g 42
-                     ^^
-Error: This expression has type "int" but an expression was expected of type
-         "string"
-=======
 Line 1, characters 17-19:
 1 | let rec f () = g 42
                      ^^
 Error: The constant "42" has type "int" but an expression was expected of type
          "string"
->>>>>>> upstream-incoming
 |}]
 
 let rec opt_error ?(opt : string) () = f ?opt ()

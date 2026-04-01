@@ -1,114 +1,66 @@
-<<<<<<< oxcaml
 (data global "camlCmm__gc_roots": int 0)
 (data
- int 5888
+ int 6912
  global "camlCmm":
- addr G:"camlCmm__standard_atomic_get_7"
- addr G:"camlCmm__get_8"
- addr G:"camlCmm__set_9"
- addr G:"camlCmm__get_imm_10"
- addr G:"camlCmm__set_imm_11")
+ addr G:"camlCmm__standard_atomic_get_8"
+ addr G:"camlCmm__get_9"
+ addr G:"camlCmm__set_10"
+ addr G:"camlCmm__get_imm_11"
+ addr G:"camlCmm__set_imm_12"
+ addr G:"camlCmm__cas_13")
 (data
  int 4087
- global "camlCmm__set_imm_11":
+ global "camlCmm__cas_13":
+ addr G:"caml_curry3"
+ int 252201579132747783
+ addr G:"camlCmm__cas_6_13_code")
+(data
+ int 4087
+ global "camlCmm__set_imm_12":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__set_imm_5_11_code")
+ addr G:"camlCmm__set_imm_5_12_code")
 (data
  int 3063
- global "camlCmm__get_imm_10":
- addr G:"camlCmm__get_imm_4_10_code"
+ global "camlCmm__get_imm_11":
+ addr G:"camlCmm__get_imm_4_11_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlCmm__set_9":
+ global "camlCmm__set_10":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__set_3_9_code")
+ addr G:"camlCmm__set_3_10_code")
 (data
  int 3063
- global "camlCmm__get_8":
- addr G:"camlCmm__get_2_8_code"
+ global "camlCmm__get_9":
+ addr G:"camlCmm__get_2_9_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlCmm__standard_atomic_get_7":
+ global "camlCmm__standard_atomic_get_8":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__standard_atomic_get_1_7_code")
-(function camlCmm__standard_atomic_get_1_7_code (r: val v: val) : int
+ addr G:"camlCmm__standard_atomic_get_1_8_code")
+(function camlCmm__standard_atomic_get_1_8_code (r: val v: val) : int
  (extcall "caml_atomic_exchange_field" r 1 v ->val) 1 )
 
-(function camlCmm__get_2_8_code (r: val) : val
+(function camlCmm__get_2_9_code (r: val) : val
  (load_mut_atomic val (+a r 8)) )
 
-(function camlCmm__set_3_9_code (r: val v: val) : int
+(function camlCmm__set_3_10_code (r: val v: val) : int
  (extcall "caml_atomic_exchange_field" r 3 v ->val) 1 )
 
-(function camlCmm__get_imm_4_10_code (r: val) : int
+(function camlCmm__get_imm_4_11_code (r: val) : int
  (load_mut_atomic int (+a r 8)) )
 
-(function camlCmm__set_imm_5_11_code (r: val v: int) : int
+(function camlCmm__set_imm_5_12_code (r: val v: int) : int
  (atomic exchange v (+a r 8)) 1 )
+
+(function camlCmm__cas_6_13_code (r: val oldv: val newv: val) : int
+ (extcall "caml_atomic_cas_field" r 3 oldv newv ->int) )
 
 (function no_cse reduce_code_size linscan camlCmm__entry () : val
  (catch (exit 1 G:"camlCmm") with(1 *ret*: val) 1) )
-||||||| upstream-base
-=======
-
-cmm:
-(data)
-(data
- int 3063
- "camlCmm.5":
- addr "camlCmm.standard_atomic_get_274"
- int 72057594037927941)
-(data
- int 4087
- "camlCmm.4":
- addr "caml_curry3"
- int 216172782113783815
- addr "camlCmm.standard_atomic_cas_299")
-(data int 3063 "camlCmm.3": addr "camlCmm.get_307" int 72057594037927941)
-(data
- int 4087
- "camlCmm.2":
- addr "caml_curry2"
- int 144115188075855879
- addr "camlCmm.set_310")
-(data
- int 4087
- "camlCmm.1":
- addr "caml_curry3"
- int 216172782113783815
- addr "camlCmm.cas_314")
-(data int 5888 global "camlCmm" "camlCmm": int 1 int 1 int 1 int 1 int 1)
-(data global "camlCmm.gc_roots" "camlCmm.gc_roots": addr "camlCmm" int 0)
-(function camlCmm.standard_atomic_get_274 (r: val) (load_mut_atomic val r))
-
-(function camlCmm.standard_atomic_cas_299 (r: val oldv: val newv: val)
- (extcall "caml_atomic_cas_field" r 1 oldv newv int,int,int,int->val))
-
-(function camlCmm.get_307 (r: val) (load_mut_atomic val (+a r 8)))
-
-(function camlCmm.set_310 (r: val v: val)
- (extcall "caml_atomic_exchange_field" r 3 v int,int,int->unit) 1)
-
-(function camlCmm.cas_314 (r: val oldv: val newv: val)
- (extcall "caml_atomic_cas_field" r 3 oldv newv int,int,int,int->val))
-
-(function camlCmm.entry ()
- (let standard_atomic_get "camlCmm.5"
-   (extcall "caml_initialize" "camlCmm" standard_atomic_get ->unit))
- (let standard_atomic_cas "camlCmm.4"
-   (extcall "caml_initialize" (+a "camlCmm" 8) standard_atomic_cas ->unit))
- (let get "camlCmm.3"
-   (extcall "caml_initialize" (+a "camlCmm" 16) get ->unit))
- (let set "camlCmm.2"
-   (extcall "caml_initialize" (+a "camlCmm" 24) set ->unit))
- (let cas "camlCmm.1"
-   (extcall "caml_initialize" (+a "camlCmm" 32) cas ->unit))
- 1)
->>>>>>> upstream-incoming
 
 (data)

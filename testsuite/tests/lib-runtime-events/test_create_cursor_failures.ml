@@ -1,5 +1,4 @@
 (* TEST
-<<<<<<< oxcaml
 {
    runtime4;
    skip;
@@ -7,20 +6,13 @@
    runtime5;
    include unix;
    include runtime_events;
-   libunix;
-   { bytecode; }
-   { native; }
-||||||| upstream-base
-=======
- include unix;
- include runtime_events;
- hasunix;
- {
-   bytecode;
- }{
-   native;
->>>>>>> upstream-incoming
- }
+   hasunix;
+   {
+     bytecode;
+   }{
+     native;
+   }
+}
 *)
 
 (* Tests that [create_cursor]:

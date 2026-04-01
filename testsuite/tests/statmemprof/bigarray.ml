@@ -23,30 +23,6 @@ let keep = ref []
 
 let test () =
   let custom_words = ref 0 in
-<<<<<<< oxcaml
-  let tmp_filename = Filename.temp_file "custom_test" ".dat" in
-  let alloc (info : MP.allocation) =
-    match info.source with
-    | Custom ->
-      custom_words := !custom_words + info.size * Sys.word_size/8;
-      Some info.size
-    | _ ->
-      None
-  in
-  let dealloc size =
-    custom_words := !custom_words - size * Sys.word_size/8
-  in
-  let tracker : _ MP.tracker =
-    { alloc_minor = alloc;
-      alloc_major = alloc;
-      promote = (fun x -> Some x);
-      dealloc_minor = dealloc;
-      dealloc_major = dealloc }
-  in
-  let _:MP.t = MP.start ~sampling_rate:1. tracker in
-  let log s = Printf.printf "%20s: %d bytes\n%!" s !custom_words in
-||||||| upstream-base
-=======
   let mmapped_words = ref 0 in
   let tmp_filename = Filename.temp_file "custom_test" ".dat" in
   let update words_ref size =
@@ -83,7 +59,6 @@ let test () =
       !custom_words
       !mmapped_words
   in
->>>>>>> upstream-incoming
   let[@inline never] test_tail () =
     (* This is a separate tail-called function, to ensure
        that [str] is out of scope even on bytecode builds *)

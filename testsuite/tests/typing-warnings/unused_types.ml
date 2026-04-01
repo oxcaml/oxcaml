@@ -538,64 +538,7 @@ let u (type unused) = ()
 Line 1, characters 12-18:
 1 | let u (type unused) = ()
                 ^^^^^^
-<<<<<<< oxcaml
-Warning 34 [unused-type-declaration]: unused type unused.
-
-val u : unit = ()
-|}]
-
-let u = fun (type unused) -> ()
-[%%expect {|
-Line 1, characters 18-24:
-1 | let u = fun (type unused) -> ()
-                      ^^^^^^
-Warning 34 [unused-type-declaration]: unused type unused.
-
-val u : unit = ()
-|}]
-
-let f (type unused) x = x
-[%%expect {|
-Line 1, characters 12-18:
-1 | let f (type unused) x = x
-                ^^^^^^
-Warning 34 [unused-type-declaration]: unused type unused.
-
-val f : 'a -> 'a = <fun>
-|}]
-
-let f = fun (type unused) x -> x
-[%%expect {|
-Line 1, characters 18-24:
-1 | let f = fun (type unused) x -> x
-                      ^^^^^^
-Warning 34 [unused-type-declaration]: unused type unused.
-
-val f : 'a -> 'a = <fun>
-|}]
-
-let f (type used unused) (x : used) = x
-[%%expect {|
-Line 1, characters 17-23:
-1 | let f (type used unused) (x : used) = x
-                     ^^^^^^
-Warning 34 [unused-type-declaration]: unused type unused.
-
-val f : 'used -> 'used = <fun>
-|}]
-
-let f = fun (type used unused) (x : used) -> x
-
-[%%expect{|
-Line 1, characters 23-29:
-1 | let f = fun (type used unused) (x : used) -> x
-                           ^^^^^^
-Warning 34 [unused-type-declaration]: unused type unused.
-
-val f : 'used -> 'used = <fun>
-||||||| upstream-base
-=======
-Warning 34 [unused-type-declaration]: unused type "unused".
+                Warning 34 [unused-type-declaration]: unused type "unused".
 
 val u : unit = ()
 |}]
@@ -751,5 +694,4 @@ type 'a t = [> `A] as 'a
 
 [%%expect{|
 type 'a t = 'a constraint 'a = [> `A ]
->>>>>>> upstream-incoming
 |}]

@@ -2,6 +2,7 @@
  expect;
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 
 (** Gives an example for every [raise(Error(_,_,_)] in typing/typecore.ml
@@ -15,16 +16,8 @@ let x = function 0. .. 1. -> ()
 [%%expect {|
 Line 8, characters 17-19:
 8 | let x = function 0. .. 1. -> ()
-<<<<<<< oxcaml
-                     ^^^^^^^^
-Error: Only character intervals and untagged character intervals are supported in patterns.
-||||||| upstream-base
-                     ^^^^^^^^
-Error: Only character intervals are supported in patterns.
-=======
                      ^^
 Error: Only character intervals are supported in patterns.
->>>>>>> upstream-incoming
 |}]
 
 (** Constructor arity mismatch *)

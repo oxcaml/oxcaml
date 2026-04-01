@@ -1,20 +1,13 @@
 (* TEST
  expect;
 *)
+(* CR 5.4-merge: expect tests auto-resolved in favour of upstream *)
 
 module type S = sig type t [@@immediate] end;;
 module F (M : S) : S = M;;
 [%%expect{|
-<<<<<<< oxcaml
-module type S = sig type t : immediate end
-module F : functor (M : S) -> S
-||||||| upstream-base
-module type S = sig type t [@@immediate] end
-module F : functor (M : S) -> S
-=======
 module type S = sig type t [@@immediate] end
 module F : (M : S) -> S
->>>>>>> upstream-incoming
 |}];;
 
 (* VALID DECLARATIONS *)

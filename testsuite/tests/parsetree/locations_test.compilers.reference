@@ -651,15 +651,9 @@ Ptop_def
                   [
                     None
                     expression (//toplevel//[2,1+12]..[2,1+13])
-<<<<<<< oxcaml
-                      Pexp_constant PConst_int (3,None)
-||||||| upstream-base
-                      Pexp_constant PConst_int (3,None)
-=======
                       Pexp_constant
                       constant (//toplevel//[2,1+12]..[2,1+13])
                         PConst_int (3,None)
->>>>>>> upstream-incoming
                     None
                     expression (//toplevel//[2,1+15]..[2,1+18]) ghost
                       Pexp_construct "::" (//toplevel//[2,1+15]..[2,1+18]) ghost
@@ -669,15 +663,9 @@ Ptop_def
                           [
                             None
                             expression (//toplevel//[2,1+15]..[2,1+16])
-<<<<<<< oxcaml
-                              Pexp_constant PConst_int (4,None)
-||||||| upstream-base
-                              Pexp_constant PConst_int (4,None)
-=======
                               Pexp_constant
                               constant (//toplevel//[2,1+15]..[2,1+16])
                                 PConst_int (4,None)
->>>>>>> upstream-incoming
                             None
                             expression (//toplevel//[2,1+17]..[2,1+18]) ghost
                               Pexp_construct "[]" (//toplevel//[2,1+17]..[2,1+18]) ghost
