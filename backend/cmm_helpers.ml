@@ -992,6 +992,14 @@ let rec low_bits ~bits ~dbg x =
           (* these sign-extensions can be replaced with a left shift since we
              don't care about the high bits that it changed *)
           low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
+        | Cop
+            ( (Casr | Clsr),
+              [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
+              _ )
+          when 0 <= left && left < right && right <= unused_bits ->
+          (* combined shift-right + sign-extension: the low [bits] bits are the
+             same as those of [asr x (right - left)] *)
+          low_bits ~bits ~dbg (asr_const x (right - left) dbg)
         | x -> (
           match get_const_bitmask x with
           | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->
