@@ -639,6 +639,17 @@ Error: This expression has type "t expr" but an expression was expected of type
          "<[int]> expr"
        Type "t" is not compatible with type "<[int]>"
 |}]
+let _ = fun (type t) (x : t expr) -> <[
+    (fun (Equal : ($t, int) Type.eq) ->
+      let y = $x in (y : int) + 1)
+    |> $sorry1 ]>
+[%%expect{|
+Line 3, characters 21-22:
+3 |       let y = $x in (y : int) + 1)
+                         ^
+Error: This expression has type "$(t)" but an expression was expected of type
+         "int"
+|}]
 (* 2 ~~> 1  @  1 <=> 1 *)
 let _ = <[ fun (type t) (x : t expr) -> <[
     (fun (Equal : ($t, int) Type.eq) ->
