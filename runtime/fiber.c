@@ -795,9 +795,9 @@ CAMLexport void caml_do_local_roots (
   caml_dynamic_scan_thread_roots(dynamic_bindings, f, fflags, fdata);
   for (lr = local_roots; lr != NULL; lr = lr->next) {
 #ifdef NATIVE_CODE
-    while ((uintnat)c_stack < (uintnat)lr) {
+    while (c_stack != NULL && (uintnat)c_stack < (uintnat)lr) {
       c_stack = c_stack->prev;
-      locals = caml_refresh_locals(c_stack->stack);
+      if (c_stack != NULL) locals = caml_refresh_locals(c_stack->stack);
     }
 #endif
     for (i = 0; i < lr->ntables; i++){
