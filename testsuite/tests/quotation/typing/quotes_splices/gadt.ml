@@ -105,10 +105,12 @@ val maybe_non_negative : <[int]> t -> bool = <fun>
    betweeen stages. We check this by passing a *subject* [x : t]
    and attempting to coerce it to [s]. We call [t] the *target*.
 
-   There are four interesting variables:
+   There are six interesting variables:
    * [S_proof]: The stage of the *proof* value.
    * [T_proof]: The stage of the *target* in the *proof*'s equation.
+   * [S_subj]:  The stage at which the *proof* was introduced.
    * [S_min]:   The earliest stage we entered since the *proof* was introduced.
+   * [S_max]:   The latemost stage we entered since the *proof* was introduced.
    * [T_subj]:  The stage of the *target* in the *subject*'s type.
 
    Note [S_min] is upper-bounded by the stage of the *subject* value
@@ -127,8 +129,9 @@ val maybe_non_negative : <[int]> t -> bool = <fun>
      Mechanism: Unification tracks initial stage.
    * [S_proof <= T_proof]: Proofs cannot mention types that might not exist
      anymore. For example, [$t = int] at stage 1 will not make sense after
-     stage 0, since $t is erased.
-     Mechanism: Splices are non-instantiable.
+     stage 0, since $t no longer exists and should not be instantiable.
+     Note that a related problem is that some splice types are erased.
+     Mechanism: Types before the pattern's stage are not instantiable.
 
    We annotate tests in the format [S_proof ~~> S_min @ T_proof <=> T_subj].
 
@@ -618,7 +621,9 @@ let _ =
 
 (* Evidence travels to the right stage in the past, but the target is spliced
    -- should always fail.
-   [S_proof > S_min], [S_proof > T_proof = T_subj]. *)
+   [S_proof > S_min], [S_proof > T_proof = T_subj].
+   Should fail because of both time travel and instantiating a type
+   that does not exist at a later stage. *)
 
 (* CR metaprogramming jbachurski: Tests succeed until splices are rigid. *)
 (* CR quoted-kinds jbachurski: Annotate [t : <[value]>]. *)
