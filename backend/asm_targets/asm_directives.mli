@@ -410,7 +410,7 @@ module Directive : sig
       assembler or printer instead of using [print], below. Symbols that occur
       in values of type [t] are encoded as [string]s and have had all necessary
       prefixing, mangling, escaping and suffixing applied. *)
-  type t = private
+  type t =
     | Align of
         { bytes : int;
               (** The number of bytes to align to. This will be taken log2 by
@@ -519,6 +519,10 @@ val debug_header : get_file_num:(string -> int) -> unit
 
 (** Reinitialize the emitter before compiling a different source file. *)
 val reset : unit -> unit
+
+(** Suppress directive emission during [f], so that [f] can be called for
+    measurement purposes only. *)
+val with_measuring : f:(unit -> 'a) -> 'a
 
 (** Directly set the internal section ref. Use this function with caution. It
     only makes sense when you manually switch directly to a section. *)

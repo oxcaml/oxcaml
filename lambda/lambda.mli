@@ -924,12 +924,40 @@ type lambda =
   | Lsplice of scoped_location * slambda
 
 and slambda =
+  | SLlayout of layout
+  | SLglobal of Compilation_unit.t
+  | SLvar of Slambdaident.t
   | SLmissing
+  | SLrecord of slambda list
+  | SLfield of slambda * int
   | SLhalves of slambda_halves
+  | SLproj_comptime of slambda
+    (** Project out the compiletime half of a [slambda_halves] *)
+  | SLproj_runtime of slambda
+    (** Project out the runtime half of a [slambda_halves] *)
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
 
 and slambda_halves =
   { sval_comptime: slambda;
     sval_runtime: lambda
+  }
+
+and slambda_function =
+  { sfun_params: Slambdaident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Slambdaident.t;
+    slet_value: slambda;
+    slet_body: slambda
   }
 
 and rec_binding = {

@@ -389,11 +389,8 @@ module Foo :
       : value
           mod portable
           with 'a
-
           with 'b
-
           with ('a * 'b, 'c) u
-
           with ('b, 'c) u
   end
 |}]

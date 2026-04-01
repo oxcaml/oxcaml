@@ -115,13 +115,10 @@
  * processing.
  *
  * If a domain is terminated, all its current and orphaned entries
- * (and those of its threads) are moved to a global `orphans`
- * list. This list, and its protective lock `orphans_lock`, are the
- * only memprof global variables. No domain processes the entries in
- * the global orphans list directly: the first domain to look at the
- * list (either at a collection or when checking for pending
- * callbacks) adopts all entry tables on it into its own orphans list,
- * and then processes them as its own.
+ * (and those of its threads) are moved to a global `orphans` list,
+ * protected by a lock. No domain processes the entries in the global
+ * orphans list directly: a domain may adopt the whole list into its
+ * own orphans list, and then process them as its own.
  *
  * 2. Synchronisation
  *
@@ -145,15 +142,22 @@
  * need take any action on it (and we can lazily discard any state
  * from it).
  *
- * The only other data shared between domains is the global orphans
- * list. As noted above, this is protected by a single global lock,
- * `orphans_lock`. Because an entry table only gets onto the global
- * orphans list when its owning domain terminates (at which point all
- * threads of that domain have terminated), and a table is adopted
- * from the global orphans list before being processed, all callbacks
- * and other entry table processing is performed by a thread of the
- * domain which owns the entry table. (and actions of those threads
- * are serialized by `systhreads`).
+ * The only other data shared between domains is in C global variables:
+ *
+ * - The global orphans list, kept in `orphans`, and the associated
+ *   boolean flag `orphans_present`, both protected by the
+ *   `orphans_lock` lock. Because an entry table only gets onto the
+ *   global orphans list when its owning domain terminates (at which
+ *   point all threads of that domain have terminated), and a table is
+ *   adopted from the global orphans list before being processed, all
+ *   callbacks and other entry table processing is performed by a
+ *   thread of the domain which owns the entry table. (and actions of
+ *   those threads are serialized by `systhreads`).
+ *
+ * - The atomic root value `requested_global_config`, used to
+ *   implement `caml_memprof_enlist_all_domains`. This is only ever
+ *   set in that function, and used in `caml_memprof_scan_roots` and
+ *   `caml_memprof_do_pending_exn`.
  *
  * 3. Interface with GC
  *
@@ -331,12 +335,12 @@
  * Some callbacks are run at allocation time, for allocations from
  * Caml (see under "Sampling" above). Other allocation callbacks, and
  * all post-allocation callbacks, are run during
- * `caml_memprof_run_callbacks_exn()`, which is called by the
+ * `caml_memprof_do_pending_exn()`, which is called by the
  * runtime's general pending-action mechanism at poll points.
  *
  * We set the domain's action-pending flag when we notice we have
  * pending callbacks. Caml drops into the runtime at a poll point, and
- * calls `caml_memprof_run_callbacks_exn()`, whenever the
+ * calls `caml_memprof_do_pending_exn()`, whenever the
  * action-pending flag is set, whether or not memprof set it. So
  * memprof maintains its own per-domain `pending` flag, to avoid
  * suspending/unsuspending sampling, and checking all the entries
@@ -631,6 +635,9 @@ static caml_plat_mutex orphans_lock = CAML_PLAT_MUTEX_INITIALIZER;
 
 /* Flag indicating non-NULL orphans. Only modified when holding orphans_lock. */
 static atomic_uintnat orphans_present;
+
+/* The config passed to caml_memprof_enlist_all_domains. (A root) */
+static _Atomic value requested_global_config = CONFIG_NONE;
 
 /**** Initializing and clearing entries tables ****/
 
@@ -1334,6 +1341,18 @@ static memprof_domain_t domain_create(caml_domain_state *caml_state)
 
 /**** Interface with domain action-pending flag ****/
 
+static bool has_pending_interrupt(memprof_domain_t domain)
+{
+  value requested_config = atomic_load_acquire(&requested_global_config);
+  return (requested_config != CONFIG_NONE &&
+          (domain == NULL || domain->entries.config != requested_config));
+}
+
+bool caml_memprof_pending_external_interrupt(caml_domain_state* caml_state)
+{
+  return has_pending_interrupt(caml_state->memprof);
+}
+
 /* If a domain has some callbacks pending, and isn't currently
  * suspended, set the action pending flag. */
 
@@ -1343,7 +1362,8 @@ static void set_action_pending_as_needed(memprof_domain_t domain)
   if (domain->current->suspended) return;
   domain->pending = (domain->entries.active < domain->entries.size ||
                      domain->current->entries.size > 0 ||
-                     domain->orphans_pending);
+                     domain->orphans_pending ||
+                     has_pending_interrupt(domain));
   if (domain->pending) {
     caml_set_action_pending(domain->caml_state);
   }
@@ -1478,6 +1498,15 @@ void caml_memprof_scan_roots(scanning_action f,
 {
   memprof_domain_t domain = state->memprof;
   CAMLassert(domain);
+
+  value requested_config = requested_global_config;
+  if (requested_config != CONFIG_NONE) {
+    value updated = requested_config;
+    f(fdata, requested_config, &updated);
+    if (updated != requested_config)
+      atomic_compare_exchange_strong(&requested_global_config,
+                                     &requested_config, updated);
+  }
 
   /* Adopt all global orphans into this domain. */
   orphans_adopt(domain);
@@ -1864,23 +1893,19 @@ static value entries_run_callbacks_exn(memprof_thread_t thread,
   return res;
 }
 
-/* Run any pending callbacks for the current thread and domain, and
- * any orphaned callbacks.
+/* Run any pending callbacks for the current thread and domain.
  *
  * Does not use domain_apply_actions() because this can dynamically
  * change the various indexes into an entries table while iterating
  * over it, whereas domain_apply_actions assumes that can't happen. */
 
-value caml_memprof_run_callbacks_exn(void)
+static value domain_run_callbacks_exn(memprof_domain_t domain)
 {
-  memprof_domain_t domain = Caml_state->memprof;
-  CAMLassert(domain);
   memprof_thread_t thread = domain->current;
   CAMLassert(thread);
   value res = Val_unit;
   if (thread->suspended || !domain->pending) return res;
 
-  orphans_adopt(domain);
   update_suspended(domain, true);
 
   /* run per-domain callbacks first */
@@ -2205,10 +2230,10 @@ CAMLexport void caml_memprof_enter_thread(memprof_thread_t thread)
   }
 }
 
-/**** Interface to OCaml ****/
+/**** Pending actions ****/
 
-/* Set config of the domain and all its threads */
-static void set_config(memprof_domain_t domain, value config)
+/* Set config of the domain and all its threads. */
+static void change_config(memprof_domain_t domain, value config)
 {
   CAMLassert(domain->entries.size == 0);
   domain->entries.config = config;
@@ -2218,7 +2243,39 @@ static void set_config(memprof_domain_t domain, value config)
     thread->entries.config = config;
     thread = thread->next;
   }
+  rand_init(domain);
 }
+
+value caml_memprof_do_pending_exn(void)
+{
+  memprof_domain_t domain = Caml_state->memprof;
+  CAMLassert(domain);
+  memprof_thread_t thread = domain->current;
+  CAMLassert(thread);
+
+  if (thread->suspended) return Val_unit;
+
+  /* participate in any requested profile */
+  value requested_config = atomic_load_acquire(&requested_global_config);
+  value existing_config = thread->entries.config;
+  if (requested_config != CONFIG_NONE && existing_config != requested_config) {
+    if (!Sampling(requested_config)) {
+        atomic_compare_exchange_strong(&requested_global_config, &requested_config, CONFIG_NONE);
+    } else {
+      if (Sampling(existing_config)) /* stop any existing profile on this domain */
+          Set_status(existing_config, CONFIG_STATUS_STOPPED);
+
+      if (!orphans_create(domain))
+          caml_fatal_error("caml_memprof_do_pending_exn: out of memory");
+
+      change_config(domain, requested_config);
+      domain->pending = true;
+    }
+  }
+  return domain_run_callbacks_exn(domain);
+}
+
+/**** Interface to OCaml ****/
 
 CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 {
@@ -2271,10 +2328,7 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
   }
 
 
-  set_config(domain, config);
-
-  /* reset PRNG, generate first batch of random numbers. */
-  rand_init(domain);
+  change_config(domain, config);
 
   caml_memprof_set_trigger(Caml_state);
   caml_reset_young_limit(Caml_state);
@@ -2284,21 +2338,21 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
   CAMLreturn(config);
 }
 
-CAMLprim value caml_memprof_participate(value config)
+CAMLprim value caml_memprof_enlist(value config)
 {
   CAMLparam1(config);
   memprof_domain_t domain = Caml_state->memprof;
   CAMLassert(domain);
 
   if (Sampling(thread_config(domain->current))) {
-    caml_failwith("Gc.Memprof.participate: already profiling.");
+    caml_failwith("Gc.Memprof.enlist: already profiling.");
   }
 
   switch (Status(config)) {
   case CONFIG_STATUS_DISCARDED:
-    caml_failwith("Gc.Memprof.restart: profile already discarded.");
+    caml_failwith("Gc.Memprof.enlist: profile already discarded.");
   case CONFIG_STATUS_STOPPED:
-    caml_failwith("Gc.Memprof.restart: profile already stopped.");
+    caml_failwith("Gc.Memprof.enlist: profile already stopped.");
   case CONFIG_STATUS_SAMPLING:
     break;
   }
@@ -2308,10 +2362,7 @@ CAMLprim value caml_memprof_participate(value config)
     caml_raise_out_of_memory();
   }
 
-  set_config(domain, config);
-
-  /* reset PRNG, generate first batch of random numbers. */
-  rand_init(domain);
+  change_config(domain, config);
 
   caml_memprof_set_trigger(Caml_state);
   caml_reset_young_limit(Caml_state);
@@ -2319,6 +2370,24 @@ CAMLprim value caml_memprof_participate(value config)
   set_action_pending_as_needed(domain);
 
   CAMLreturn(Val_unit);
+}
+
+CAMLprim value caml_memprof_enlist_all_domains(value config)
+{
+  CAMLparam1(config);
+  switch (Status(config)) {
+  case CONFIG_STATUS_DISCARDED:
+    caml_failwith("Gc.Memprof.enlist_all_domains: profile already discarded.");
+  case CONFIG_STATUS_STOPPED:
+    caml_failwith("Gc.Memprof.enlist_all_domains: profile already stopped.");
+  case CONFIG_STATUS_SAMPLING:
+    break;
+  }
+  atomic_store(&requested_global_config, config);
+  /* The actual work of changing other domains to the new profile is done in
+     caml_memprof_do_pending_exn */
+  caml_interrupt_all_signal_safe();
+  CAMLreturn (Val_unit);
 }
 
 CAMLprim value caml_memprof_stop(value unit)

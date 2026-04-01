@@ -1,11 +1,18 @@
 (* TEST
  flags = "-extension runtime_metaprogramming";
- setup-ocamlc.byte-build-env;
- ocamlc_byte_exit_status = "2";
- ocamlc.byte;
- check-ocamlc.byte-output;
+ expect;
 *)
 
 #syntax quotations on
 
-let variable_eval (type a) () = [%eval: a]
+(* Locally abstract types cannot cross quotation boundaries *)
+
+let variable_eval (type a) (x : <[a]> expr) : a = Eval.eval x
+[%%expect {|
+Line 1, characters 34-35:
+1 | let variable_eval (type a) (x : <[a]> expr) : a = Eval.eval x
+                                      ^
+Error: Identifier "a" is used at line 1, characters 34-35,
+       inside a quotation (<[ ... ]>);
+       it is introduced at line 1, characters 24-25, outside any quotations.
+|}]

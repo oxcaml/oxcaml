@@ -38,6 +38,7 @@ asm_targets/**/*.ml
 asm_targets/**/*.mli
 branch_relaxation.ml
 branch_relaxation.mli
+branch_relaxation_intf.mli
 cfg/**/*.ml
 cfg/**/*.mli
 cfg/vectorize.ml
@@ -112,3 +113,5 @@ x86_gas.ml
 x86_gas.mli
 x86_dsl.ml
 x86_dsl.mli
+x86_peephole/**/*.ml
+x86_peephole/**/*.mli

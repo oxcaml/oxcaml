@@ -27,28 +27,52 @@ module Relations : sig
 
   val use : to_:Code_id_or_name.t term -> from:Code_id_or_name.t term -> _ atom
 
+  (** [accessor ~to_ field ~base] represents a {b directed} flow from the field
+      [field] of variable [base] into the variable [to_].
+
+      It corresponds to a projection [to_ = base.field]. *)
   val accessor :
     to_:Code_id_or_name.t term ->
     Field.t term ->
     base:Code_id_or_name.t term ->
     _ atom
 
+  (** [constructor ~base field ~from] represents a {b directed} flow from
+      variable [from] into the field [field] or allocation [base].
+
+      It corresponds to an allocation [base = { field = from; _ }] (there might
+      be other fields in the allocation). *)
   val constructor :
     base:Code_id_or_name.t term ->
     Field.t term ->
     from:Code_id_or_name.t term ->
     _ atom
 
-  val coaccessor :
-    to_:Code_id_or_name.t term ->
+  (** [argument ~from param ~base] represents a {b directed} flow from variable
+      [from] into the parameter [param] of function [base].
+
+      It corresponds to a call [base(param = from, _)] (there might be other
+      parameters in the call).
+
+      Note that [base] is a virtual object representing function-like calls; see
+      the comment about encoding of function calls in {!module-Dep_solver}. *)
+  val argument :
+    from:Code_id_or_name.t term ->
     Cofield.t term ->
     base:Code_id_or_name.t term ->
     _ atom
 
-  val coconstructor :
+  (** [parameter ~base param ~to_] represents a {b directed} flow from function
+      parameter [param] into variable [to_].
+
+      There is no surface language syntax for this; we write [to_ = base@param].
+
+      Note that [base] is a virtual object representing function-like calls; see
+      the comment about encoding of function calls in {!module-Dep_solver}. *)
+  val parameter :
     base:Code_id_or_name.t term ->
     Cofield.t term ->
-    from:Code_id_or_name.t term ->
+    to_:Code_id_or_name.t term ->
     _ atom
 
   val propagate :
@@ -95,11 +119,11 @@ val add_accessor_dep :
 val add_constructor_dep :
   graph -> base:Code_id_or_name.t -> Field.t -> from:Code_id_or_name.t -> unit
 
-val add_coaccessor_dep :
-  graph -> to_:Code_id_or_name.t -> Cofield.t -> base:Code_id_or_name.t -> unit
+val add_argument_dep :
+  graph -> from:Code_id_or_name.t -> Cofield.t -> base:Code_id_or_name.t -> unit
 
-val add_coconstructor_dep :
-  graph -> base:Code_id_or_name.t -> Cofield.t -> from:Code_id_or_name.t -> unit
+val add_parameter_dep :
+  graph -> base:Code_id_or_name.t -> Cofield.t -> to_:Code_id_or_name.t -> unit
 
 val add_propagate_dep :
   graph ->

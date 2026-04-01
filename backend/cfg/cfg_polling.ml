@@ -340,7 +340,6 @@ let instr_cfg_with_layout :
           let instrs = DLL.of_list [poll] in
           let inserted_blocks =
             Cfg_with_layout.insert_block cfg_with_layout instrs ~after ~before
-              ~next_instruction_id
           in
           (* All the inserted blocks are safe since they contain a poll
              instruction *)

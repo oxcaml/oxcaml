@@ -20,8 +20,8 @@ portability ::= `portable` | `shareable` | `nonportable`
 contention ::= `uncontended` | `shared` | `contended`
 yield ::= `unyielding` | `yielding`
 fork ::= `forkable` | `unforkable`
-statefulness ::= `stateless` | `observing` | `stateful`
-visibility ::= `read_write` | `read` | `immutable`
+statefulness ::= `stateless` | `writing` | `reading | `stateful`
+visibility ::= `read_write` | `read` | `write` | `immutable`
 
 modes ::= mode
       |  mode modes
@@ -137,9 +137,11 @@ include S @@ portable
 ## Expressions
 ```ocaml
 (expression : ty @ modes)
+(expression : @ modes)
 ```
 We don't support `(expression @ modes)` because `@` is already parsed as a binary operator.
-However, you can write `(expression : _ @ modes)` if you do not want to constrain the type.
+However, you can write `(expression : @ modes)` if you do not want to constrain the type,
+or `(expression : ty @ modes)` to combine both type and mode constraints.
 
 ## Modules
 Support for modules with modes is being worked on and not ready for wide adoption.
@@ -286,16 +288,20 @@ exist, all to lower users' annotation burden, all applying both to modes
 and modalities, according to this table:
 
 
-| this          | implies this |
-|---------------|--------------|
-| `global`      | `forkable`   |
-| `local`       | `unforkable` |
-| `global`      | `unyielding` |
-| `local`       | `yielding`   |
-| `stateless`   | `portable`   |
-| `observing`   | `shareable`  |
-| `immutable`   | `contended`  |
-| `read`        | `shared`     |
+| this         | implies this  |
+|--------------|---------------|
+| `global`     | `forkable`    |
+| `local`      | `unforkable`  |
+| `global`     | `unyielding`  |
+| `local`      | `yielding`    |
+| `stateless`  | `portable`    |
+| `reading`    | `shareable`   |
+| `writing`    | `nonportable` |
+| `stateful`   | `nonportable` |
+| `immutable`  | `contended`   |
+| `read`       | `shared`      |
+| `write`      | `uncontended` |
+| `read_write` | `uncontended` |
 
 These implications exist only in the surface syntax for mode and modality
 expressions. Mode inference does not necessarily follow these implications.

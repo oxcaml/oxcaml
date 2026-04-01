@@ -30,6 +30,8 @@ Line 1, characters 35-59:
                                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+       Hint: Types with product layouts in C stub arguments
+       require the "[@unpacked]" attribute.
 |}]
 
 external ext_void_in_product_return : unit -> #(string * void) = "foo" "bar"
@@ -44,6 +46,8 @@ Line 1, characters 28-37:
                                 ^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+       Hint: Types with product layouts in C stub arguments
+       require the "[@unpacked]" attribute.
 |}]
 external ext_all_void_return : unit -> r = "foo" "bar"
 [%%expect{|

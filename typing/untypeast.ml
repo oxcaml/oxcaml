@@ -420,6 +420,8 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_exception p -> Ppat_exception (sub.pat sub p)
     | Tpat_value p -> (sub.pat sub (p :> pattern)).ppat_desc
     | Tpat_or (p1, p2, _) -> Ppat_or (sub.pat sub p1, sub.pat sub p2)
+    | Tpat_fun_layout { id; name; _ } ->
+        Ppat_var { name with txt = Ident.name id }
   in
   Pat.mk ~loc ~attrs desc
 
@@ -797,8 +799,6 @@ let expression sub exp =
     | Texp_hole _ -> Pexp_hole
     | Texp_quotation exp -> Pexp_quote (sub.expr sub exp)
     | Texp_antiquotation exp -> Pexp_splice (sub.expr sub exp)
-    | Texp_eval (typ, _) ->
-        Pexp_extension ({ txt = "ocaml.eval"; loc}, PTyp (sub.typ sub typ))
   in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)

@@ -370,6 +370,14 @@ let mk_labels f =
 let mk_linkall f =
   "-linkall", Arg.Unit f, " Link all modules, even unused ones"
 
+let mk_requires_metaprogramming f =
+  "-requires-metaprogramming", Arg.Unit f,
+  " Mark this unit as requiring metaprogramming support libraries"
+
+let mk_uses_metaprogramming f =
+  "-uses-metaprogramming", Arg.Unit f,
+  " Link metaprogramming support libraries"
+
 let mk_linscan f =
   "-linscan", Arg.Unit f, " Use the linear scan register allocator"
 
@@ -1198,6 +1206,8 @@ module type Compiler_options = sig
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit
   val _linkall : unit -> unit
+  val _requires_metaprogramming : unit -> unit
+  val _uses_metaprogramming : unit -> unit
   val _noautolink : unit -> unit
   val _o : string -> unit
   val _opaque :  unit -> unit
@@ -1466,6 +1476,8 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
+    mk_requires_metaprogramming F._requires_metaprogramming;
+    mk_uses_metaprogramming F._uses_metaprogramming;
     mk_llvm_backend F._llvm_backend;
     mk_make_runtime F._make_runtime;
     mk_make_runtime_2 F._make_runtime;
@@ -1732,6 +1744,8 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
+    mk_requires_metaprogramming F._requires_metaprogramming;
+    mk_uses_metaprogramming F._uses_metaprogramming;
     mk_llvm_backend F._llvm_backend;
     mk_inline_max_depth F._inline_max_depth;
     mk_alias_deps F._alias_deps;
@@ -2045,6 +2059,8 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
+    mk_requires_metaprogramming F._requires_metaprogramming;
+    mk_uses_metaprogramming F._uses_metaprogramming;
     mk_modern F._labels;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
@@ -2496,6 +2512,8 @@ module Default = struct
     let _keep_docs = set keep_docs
     let _keep_locs = set keep_locs
     let _linkall = set link_everything
+    let _requires_metaprogramming = set requires_metaprogramming
+    let _uses_metaprogramming = set uses_metaprogramming
     let _llvm_backend = set llvm_backend
     let _match_context_rows n = match_context_rows := n
     let _no_keep_docs = clear keep_docs

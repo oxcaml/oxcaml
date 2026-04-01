@@ -1887,9 +1887,11 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
      the OCaml behaviour).
 
      We don't need to check for internally triggered pending actions
-     (Memprof and finalisers), because they will already have set
+     (internal Memprof and finalisers), because they will already have set
      action_pending if needed. */
-  if (caml_check_pending_signals() || Caml_state->requested_external_interrupt)
+  if (caml_check_pending_signals() ||
+      Caml_state->requested_external_interrupt ||
+      caml_memprof_pending_external_interrupt(dom_st))
     caml_set_action_pending(dom_st);
 }
 

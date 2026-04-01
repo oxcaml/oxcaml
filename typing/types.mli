@@ -217,6 +217,9 @@ and type_desc =
   | Tsplice of type_expr
   (** [Tsplice t] ==> [$t] *)
 
+  | Tquote_eval of type_expr
+  (** [Tquote_eval t] ==> [<[ t ]> eval] *)
+
   | Tnil
   (** [Tnil] ==> [<...; >] *)
 
@@ -1095,6 +1098,42 @@ module type Wrap = sig
   type 'a t
 end
 
+(** Tracks layout polymorphism state for a value binding. A value is either
+    pending generalization ([pending]) or has a finalized list of layout
+    vars ([determined]) at generic level. An empty list means the value is not
+    layout-polymorphic.
+
+    Layout poly cannot be inferred from usages, so a value description should
+    have determined layout poly. However, in [type_let] we add variables to the
+    environment before type-checking the RHS and generalizing. Therefore, the
+    value description uses a mutable cell that is filled in during
+    generalization. After filling, layout poly is determined and should not be
+    mutated again. We explicitly distinguish the two stages for extra safety. *)
+module Lpoly : sig
+  type t
+
+  (** [determined vars] creates a finalized value with the given generalized
+      layout vars. Pass [[]] for a non-layout-polymorphic value. *)
+  val determined : Jkind_types.Sort.var list -> t
+
+  (** [pending ~loc] creates a value pending layout generalization,
+      where [loc] is the source location that requested polymorphism. *)
+  val pending : loc:Location.t -> t
+
+  (** Assert that layout poly is determined and return the generalized vars. *)
+  val get_exn : t -> Jkind_types.Sort.var list
+
+  (** Dispatch on the state of [t]:
+      - If pending ([pending loc]), call [on_to_generalize loc],
+        transition to finalized with the returned vars.
+      - If finalized ([determined _]), call [on_determined]. *)
+  val generalize
+    :  on_determined:(unit -> unit)
+    -> on_to_generalize:(Location.t -> Jkind_types.Sort.var list)
+    -> t
+    -> unit
+end
+
 module type Wrapped = sig
   type 'a wrapped
 
@@ -1110,9 +1149,10 @@ module type Wrapped = sig
       have been applied and we have the real mode of the value. The original
       modalities shouldn't be looked again and is replaced by [undefined]. *)
       val_kind: value_kind;
-      val_lpoly: Jkind_types.Sort.var list;
-      (** poly sort vars (level = [Sort.generic_level]) that the value is
-          layout-polymorphic on; empty list means not layout polymorphic. *)
+      val_lpoly: Lpoly.t;
+      (** Guaranteed [determined] for all values visible outside [type_let].
+          May be [to_generalize] during intermediate stages of typing a
+          [let poly_] binding. See [Lpoly]. *)
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;

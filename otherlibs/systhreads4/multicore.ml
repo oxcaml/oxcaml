@@ -259,12 +259,7 @@ let rec manager_loop t =
          | exception exn ->
            (* This might fail if the user tries to create too many threads *)
            let bt = Printexc.get_raw_backtrace () in
-           (* The only exception raised by [Thread.Portable.create] is
-              [Sys_error of string] which is immutable data and we only use the
-              [exn] and [bt] to reraise to the caller of [spawn_on] in that
-              function. In other words, the [exn] and [bt] are in fact portable
-              and uncontended meaning that they do not contain shared mutable
-              state being potentially accessed by multiple threads. *)
+           Atomic.decr t.threads;
            req.result <-
              Failed (
                req.argument, Obj.magic_portable exn, Obj.magic_portable bt));

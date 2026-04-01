@@ -897,7 +897,7 @@ L1:
 L234:
   %7 = load i64, ptr %4
   store i64 %7, ptr %5
-  %8 = ptrtoint ptr @camlExn_part2__Exn3229 to i64
+  %8 = ptrtoint ptr @camlExn_part2__Exn3235 to i64
   store i64 %8, ptr %6
   %9 = load i64, ptr %6
   store i64 %9, ptr %4
@@ -1420,7 +1420,7 @@ L244:
   store i64 1, ptr %68
   %328 = load i64, ptr %68
   store i64 %328, ptr %69
-  %329 = ptrtoint ptr @camlExn_part2__Exn3229 to i64
+  %329 = ptrtoint ptr @camlExn_part2__Exn3235 to i64
   store i64 %329, ptr %70
   %330 = load i64, ptr %18
   %331 = load i64, ptr %70
@@ -1470,227 +1470,241 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlExn_part2__raise_in_loop_HIDE_ST
   %9 = alloca i64
   %10 = alloca i64
   %11 = alloca i64
-  %12 = alloca ptr addrspace(1)
+  %12 = alloca i64
   %13 = alloca i64
-  %14 = alloca ptr addrspace(1)
+  %14 = alloca i64
   %15 = alloca ptr addrspace(1)
-  %16 = alloca ptr addrspace(1)
-  %17 = alloca i64
-  %18 = alloca i64
-  %19 = alloca i64
+  %16 = alloca i64
+  %17 = alloca ptr addrspace(1)
+  %18 = alloca ptr addrspace(1)
+  %19 = alloca ptr addrspace(1)
   %20 = alloca i64
   %21 = alloca i64
   %22 = alloca i64
-  %23 = alloca ptr addrspace(1)
-  %24 = alloca ptr addrspace(1)
-  %25 = alloca ptr addrspace(1)
+  %23 = alloca i64
+  %24 = alloca i64
+  %25 = alloca i64
   %26 = alloca ptr addrspace(1)
-  %27 = alloca i64
-  %28 = alloca i64
-  %29 = alloca i64
+  %27 = alloca ptr addrspace(1)
+  %28 = alloca ptr addrspace(1)
+  %29 = alloca ptr addrspace(1)
   %30 = alloca i64
+  %31 = alloca i64
+  %32 = alloca i64
+  %33 = alloca i64
+  %34 = alloca i64
   br label %L1
 L1:
   br label %L342
 L342:
-  %31 = load i64, ptr %4
-  store i64 %31, ptr %6
-  store i64 1, ptr %8
-  %32 = load i64, ptr %8
-  store i64 %32, ptr %9
-  %33 = load i64, ptr %9
-  store i64 %33, ptr %7
+  %35 = load i64, ptr %4
+  store i64 %35, ptr %6
+  store i64 0, ptr %8
+  %36 = load i64, ptr %8
+  store i64 %36, ptr %9
+  %37 = load i64, ptr %9
+  store i64 %37, ptr %7
   br label %L347
 L347:
-  %34 = load i64, ptr %ds
-  %35 = add i64 %34, 64
-  %36 = inttoptr i64 %35 to ptr
-  %37 = load i64, ptr %36
-  store i64 %37, ptr %10
-  %38 = load i64, ptr %10
-  store i64 %38, ptr %11
-  %39 = load i64, ptr %ds
-  %40 = load i64, ptr %alloc
-  %41 = call oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %39, i64 %40) returns_twice "gc-leaf-function"="true"
-  %42 = extractvalue { { i64, i64 }, { i64 } } %41, 0, 0
-  %43 = extractvalue { { i64, i64 }, { i64 } } %41, 0, 1
-  store i64 %42, ptr %ds
-  store i64 %43, ptr %alloc
-  %44 = extractvalue { { i64, i64 }, { i64 } } %41, 1, 0
-  call void asm sideeffect "movq $0, %rax", "r"(i64 %44) "gc-leaf-function"="true"
-  br label %L394
-L394:
-  %45 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
-  %46 = icmp eq i64 %45, 0
-  br i1 %46, label %L395, label %L353
-L395:
-  store ptr blockaddress(@camlExn_part2__raise_in_loop_7_16_code, %L394), ptr @camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_var.L394
-  %47 = call  ptr @llvm.stacksave()
-  %48 = alloca { i64, i64, i64, i64 }
-  %49 = ptrtoint ptr %48 to i64
-  %50 = add i64 %49, 16
-  %51 = inttoptr i64 %50 to ptr
-  %52 = ptrtoint ptr %48 to i64
-  %53 = add i64 %52, 8
-  %54 = inttoptr i64 %53 to ptr
-  %55 = load i64, ptr %ds
-  %56 = add i64 %55, 48
-  %57 = inttoptr i64 %56 to ptr
-  %58 = load i64, ptr %57
-  store ptr %48, ptr %57
-  store ptr @camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_asm.L394, ptr %54
-  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %51) "gc-leaf-function"="true"
-  store i64 %58, ptr %48
-  %59 = ptrtoint ptr @camlExn_part1 to i64
-  store i64 %59, ptr %13
-  %60 = load ptr addrspace(1), ptr %13
-  %61 = getelementptr i8, ptr addrspace(1) %60, i64 32
-  store ptr addrspace(1) %61, ptr %14
-  %62 = load ptr addrspace(1), ptr %14
-  %63 = load ptr addrspace(1), ptr addrspace(1) %62
-  store ptr addrspace(1) %63, ptr %15
-  %64 = load ptr addrspace(1), ptr %15
-  store ptr addrspace(1) %64, ptr %16
-  %65 = load ptr addrspace(1), ptr %16
-  %66 = load i64, ptr addrspace(1) %65
-  store i64 %66, ptr %17
-  %67 = load i64, ptr %7
-  store i64 %67, ptr %4
-  %68 = load ptr addrspace(1), ptr %16
-  store ptr addrspace(1) %68, ptr %5
-  %69 = load i64, ptr %4
-  %70 = load ptr addrspace(1), ptr %5
-  %71 = load i64, ptr %ds
-  %72 = load i64, ptr %alloc
-  %73 = load ptr, ptr %17
-  %74 = call oxcamlcc { { i64, i64 }, { i64 } } %73(i64 %71, i64 %72, i64 %69, ptr addrspace(1) %70) "statepoint-id"="32"
-  %75 = extractvalue { { i64, i64 }, { i64 } } %74, 0, 0
-  %76 = extractvalue { { i64, i64 }, { i64 } } %74, 0, 1
-  store i64 %75, ptr %ds
-  store i64 %76, ptr %alloc
-  %77 = extractvalue { { i64, i64 }, { i64 } } %74, 1, 0
-  store i64 %77, ptr %4
-  br label %L363
-L363:
-  %78 = load i64, ptr %4
-  store i64 %78, ptr %18
-  %79 = load i64, ptr %18
-  store i64 %79, ptr %19
-  %80 = load i64, ptr %ds
-  %81 = add i64 %80, 48
-  %82 = inttoptr i64 %81 to ptr
-  %83 = load i64, ptr %48
-  store i64 %83, ptr %82
-  call  void @llvm.stackrestore(ptr %47)
-  br label %L384
-L353:
-  %84 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
-  store i64 %84, ptr %alloc
-  store i64 %45, ptr %4
-  %85 = load i64, ptr %4
-  %86 = inttoptr i64 %85 to ptr addrspace(1)
-  store ptr addrspace(1) %86, ptr %12
-  %87 = load i64, ptr %ds
-  %88 = add i64 %87, 64
-  %89 = inttoptr i64 %88 to ptr
-  %90 = load i64, ptr %11
-  store i64 %90, ptr %89
-  store i64 1, ptr %20
-  %91 = load i64, ptr %20
-  store i64 %91, ptr %21
-  %92 = ptrtoint ptr @camlExn_part1 to i64
-  store i64 %92, ptr %22
-  %93 = load i64, ptr %22
-  %94 = inttoptr i64 %93 to ptr
-  %95 = load ptr addrspace(1), ptr %94
-  store ptr addrspace(1) %95, ptr %23
-  %96 = load ptr addrspace(1), ptr %12
-  %97 = load ptr addrspace(1), ptr addrspace(1) %96
-  store ptr addrspace(1) %97, ptr %24
-  %98 = load i64, ptr %24
-  %99 = load i64, ptr %23
-  %100 = icmp slt i64 %98, %99
-  br i1 %100, label %L380, label %L396
+  %38 = load i64, ptr %7
+  %39 = shl i64 %38, 1
+  store i64 %39, ptr %10
+  %40 = load i64, ptr %10
+  %41 = add i64 %40, 1
+  store i64 %41, ptr %11
+  %42 = load i64, ptr %11
+  store i64 %42, ptr %12
+  %43 = load i64, ptr %ds
+  %44 = add i64 %43, 64
+  %45 = inttoptr i64 %44 to ptr
+  %46 = load i64, ptr %45
+  store i64 %46, ptr %13
+  %47 = load i64, ptr %13
+  store i64 %47, ptr %14
+  %48 = load i64, ptr %ds
+  %49 = load i64, ptr %alloc
+  %50 = call oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %48, i64 %49) returns_twice "gc-leaf-function"="true"
+  %51 = extractvalue { { i64, i64 }, { i64 } } %50, 0, 0
+  %52 = extractvalue { { i64, i64 }, { i64 } } %50, 0, 1
+  store i64 %51, ptr %ds
+  store i64 %52, ptr %alloc
+  %53 = extractvalue { { i64, i64 }, { i64 } } %50, 1, 0
+  call void asm sideeffect "movq $0, %rax", "r"(i64 %53) "gc-leaf-function"="true"
+  br label %L396
 L396:
-  %101 = load i64, ptr %24
-  %102 = load i64, ptr %23
-  %103 = icmp sgt i64 %101, %102
-  br i1 %103, label %L380, label %L371
-L371:
-  %104 = load ptr addrspace(1), ptr %12
-  %105 = getelementptr i8, ptr addrspace(1) %104, i64 8
-  store ptr addrspace(1) %105, ptr %25
-  %106 = load ptr addrspace(1), ptr %25
-  %107 = load ptr addrspace(1), ptr addrspace(1) %106
-  store ptr addrspace(1) %107, ptr %26
-  %108 = load i64, ptr %26
-  %109 = load i64, ptr %7
-  %110 = icmp slt i64 %108, %109
-  br i1 %110, label %L377, label %L397
+  %54 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
+  %55 = icmp eq i64 %54, 0
+  br i1 %55, label %L397, label %L355
 L397:
-  %111 = load i64, ptr %26
-  %112 = load i64, ptr %7
-  %113 = icmp sgt i64 %111, %112
-  br i1 %113, label %L377, label %L384
-L377:
-  %114 = ptrtoint ptr @camlExn_part2__Pmakeblock195 to i64
-  store i64 %114, ptr %27
-  %115 = load i64, ptr %27
-  store i64 %115, ptr %4
-  %116 = load i64, ptr %ds
-  %117 = add i64 %116, 240
-  %118 = inttoptr i64 %117 to ptr
-  store i64 0, ptr %118
-  %119 = load i64, ptr %4
-  %120 = load i64, ptr %ds
-  %121 = load i64, ptr %alloc
-  %122 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %120, i64 %121, i64 %119) "statepoint-id"="0"
-  %123 = extractvalue { { i64, i64 }, {  } } %122, 0, 0
-  %124 = extractvalue { { i64, i64 }, {  } } %122, 0, 1
-  store i64 %123, ptr %ds
-  store i64 %124, ptr %alloc
-  unreachable
-L380:
-  %125 = load ptr addrspace(1), ptr %12
-  %126 = ptrtoint ptr addrspace(1) %125 to i64
-  store i64 %126, ptr %4
-  %127 = load i64, ptr %4
-  %128 = load i64, ptr %ds
-  %129 = load i64, ptr %alloc
-  %130 = call oxcamlcc { { i64, i64 }, {  } } @caml_reraise_exn(i64 %128, i64 %129, i64 %127) "statepoint-id"="0"
-  %131 = extractvalue { { i64, i64 }, {  } } %130, 0, 0
-  %132 = extractvalue { { i64, i64 }, {  } } %130, 0, 1
-  store i64 %131, ptr %ds
-  store i64 %132, ptr %alloc
-  unreachable
-L384:
-  %133 = load i64, ptr %7
-  %134 = icmp slt i64 %133, 2001
-  br i1 %134, label %L386, label %L398
+  store ptr blockaddress(@camlExn_part2__raise_in_loop_7_16_code, %L396), ptr @camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_var.L396
+  %56 = call  ptr @llvm.stacksave()
+  %57 = alloca { i64, i64, i64, i64 }
+  %58 = ptrtoint ptr %57 to i64
+  %59 = add i64 %58, 16
+  %60 = inttoptr i64 %59 to ptr
+  %61 = ptrtoint ptr %57 to i64
+  %62 = add i64 %61, 8
+  %63 = inttoptr i64 %62 to ptr
+  %64 = load i64, ptr %ds
+  %65 = add i64 %64, 48
+  %66 = inttoptr i64 %65 to ptr
+  %67 = load i64, ptr %66
+  store ptr %57, ptr %66
+  store ptr @camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_asm.L396, ptr %63
+  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %60) "gc-leaf-function"="true"
+  store i64 %67, ptr %57
+  %68 = ptrtoint ptr @camlExn_part1 to i64
+  store i64 %68, ptr %16
+  %69 = load ptr addrspace(1), ptr %16
+  %70 = getelementptr i8, ptr addrspace(1) %69, i64 32
+  store ptr addrspace(1) %70, ptr %17
+  %71 = load ptr addrspace(1), ptr %17
+  %72 = load ptr addrspace(1), ptr addrspace(1) %71
+  store ptr addrspace(1) %72, ptr %18
+  %73 = load ptr addrspace(1), ptr %18
+  store ptr addrspace(1) %73, ptr %19
+  %74 = load ptr addrspace(1), ptr %19
+  %75 = load i64, ptr addrspace(1) %74
+  store i64 %75, ptr %20
+  %76 = load i64, ptr %12
+  store i64 %76, ptr %4
+  %77 = load ptr addrspace(1), ptr %19
+  store ptr addrspace(1) %77, ptr %5
+  %78 = load i64, ptr %4
+  %79 = load ptr addrspace(1), ptr %5
+  %80 = load i64, ptr %ds
+  %81 = load i64, ptr %alloc
+  %82 = load ptr, ptr %20
+  %83 = call oxcamlcc { { i64, i64 }, { i64 } } %82(i64 %80, i64 %81, i64 %78, ptr addrspace(1) %79) "statepoint-id"="32"
+  %84 = extractvalue { { i64, i64 }, { i64 } } %83, 0, 0
+  %85 = extractvalue { { i64, i64 }, { i64 } } %83, 0, 1
+  store i64 %84, ptr %ds
+  store i64 %85, ptr %alloc
+  %86 = extractvalue { { i64, i64 }, { i64 } } %83, 1, 0
+  store i64 %86, ptr %4
+  br label %L365
+L365:
+  %87 = load i64, ptr %4
+  store i64 %87, ptr %21
+  %88 = load i64, ptr %21
+  store i64 %88, ptr %22
+  %89 = load i64, ptr %ds
+  %90 = add i64 %89, 48
+  %91 = inttoptr i64 %90 to ptr
+  %92 = load i64, ptr %57
+  store i64 %92, ptr %91
+  call  void @llvm.stackrestore(ptr %56)
+  br label %L386
+L355:
+  %93 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
+  store i64 %93, ptr %alloc
+  store i64 %54, ptr %4
+  %94 = load i64, ptr %4
+  %95 = inttoptr i64 %94 to ptr addrspace(1)
+  store ptr addrspace(1) %95, ptr %15
+  %96 = load i64, ptr %ds
+  %97 = add i64 %96, 64
+  %98 = inttoptr i64 %97 to ptr
+  %99 = load i64, ptr %14
+  store i64 %99, ptr %98
+  store i64 1, ptr %23
+  %100 = load i64, ptr %23
+  store i64 %100, ptr %24
+  %101 = ptrtoint ptr @camlExn_part1 to i64
+  store i64 %101, ptr %25
+  %102 = load i64, ptr %25
+  %103 = inttoptr i64 %102 to ptr
+  %104 = load ptr addrspace(1), ptr %103
+  store ptr addrspace(1) %104, ptr %26
+  %105 = load ptr addrspace(1), ptr %15
+  %106 = load ptr addrspace(1), ptr addrspace(1) %105
+  store ptr addrspace(1) %106, ptr %27
+  %107 = load i64, ptr %27
+  %108 = load i64, ptr %26
+  %109 = icmp slt i64 %107, %108
+  br i1 %109, label %L382, label %L398
 L398:
-  %135 = load i64, ptr %7
-  %136 = icmp sgt i64 %135, 2001
-  br i1 %136, label %L386, label %L389
+  %110 = load i64, ptr %27
+  %111 = load i64, ptr %26
+  %112 = icmp sgt i64 %110, %111
+  br i1 %112, label %L382, label %L373
+L373:
+  %113 = load ptr addrspace(1), ptr %15
+  %114 = getelementptr i8, ptr addrspace(1) %113, i64 8
+  store ptr addrspace(1) %114, ptr %28
+  %115 = load ptr addrspace(1), ptr %28
+  %116 = load ptr addrspace(1), ptr addrspace(1) %115
+  store ptr addrspace(1) %116, ptr %29
+  %117 = load i64, ptr %29
+  %118 = load i64, ptr %12
+  %119 = icmp slt i64 %117, %118
+  br i1 %119, label %L379, label %L399
+L399:
+  %120 = load i64, ptr %29
+  %121 = load i64, ptr %12
+  %122 = icmp sgt i64 %120, %121
+  br i1 %122, label %L379, label %L386
+L379:
+  %123 = ptrtoint ptr @camlExn_part2__Pmakeblock201 to i64
+  store i64 %123, ptr %30
+  %124 = load i64, ptr %30
+  store i64 %124, ptr %4
+  %125 = load i64, ptr %ds
+  %126 = add i64 %125, 240
+  %127 = inttoptr i64 %126 to ptr
+  store i64 0, ptr %127
+  %128 = load i64, ptr %4
+  %129 = load i64, ptr %ds
+  %130 = load i64, ptr %alloc
+  %131 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %129, i64 %130, i64 %128) "statepoint-id"="0"
+  %132 = extractvalue { { i64, i64 }, {  } } %131, 0, 0
+  %133 = extractvalue { { i64, i64 }, {  } } %131, 0, 1
+  store i64 %132, ptr %ds
+  store i64 %133, ptr %alloc
+  unreachable
+L382:
+  %134 = load ptr addrspace(1), ptr %15
+  %135 = ptrtoint ptr addrspace(1) %134 to i64
+  store i64 %135, ptr %4
+  %136 = load i64, ptr %4
+  %137 = load i64, ptr %ds
+  %138 = load i64, ptr %alloc
+  %139 = call oxcamlcc { { i64, i64 }, {  } } @caml_reraise_exn(i64 %137, i64 %138, i64 %136) "statepoint-id"="0"
+  %140 = extractvalue { { i64, i64 }, {  } } %139, 0, 0
+  %141 = extractvalue { { i64, i64 }, {  } } %139, 0, 1
+  store i64 %140, ptr %ds
+  store i64 %141, ptr %alloc
+  unreachable
 L386:
-  %137 = load i64, ptr %7
-  %138 = add i64 %137, 2
-  store i64 %138, ptr %28
-  %139 = load i64, ptr %28
-  store i64 %139, ptr %29
-  %140 = load i64, ptr %29
-  store i64 %140, ptr %7
-  br label %L347
+  %142 = load i64, ptr %7
+  %143 = add i64 %142, 1
+  store i64 %143, ptr %31
+  %144 = load i64, ptr %31
+  store i64 %144, ptr %32
+  %145 = load i64, ptr %32
+  %146 = icmp slt i64 %145, 1000
+  br i1 %146, label %L389, label %L400
+L400:
+  %147 = load i64, ptr %32
+  %148 = icmp sgt i64 %147, 1000
+  br i1 %148, label %L391, label %L389
 L389:
-  store i64 1, ptr %30
-  %141 = load i64, ptr %30
-  store i64 %141, ptr %4
-  %142 = load i64, ptr %4
-  %143 = load i64, ptr %ds
-  %144 = load i64, ptr %alloc
-  %145 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %143, 0, 0
-  %146 = insertvalue { { i64, i64 }, { i64 } } %145, i64 %144, 0, 1
-  %147 = insertvalue { { i64, i64 }, { i64 } } %146, i64 %142, 1, 0
-  ret { { i64, i64 }, { i64 } } %147
+  %149 = load i64, ptr %32
+  store i64 %149, ptr %33
+  %150 = load i64, ptr %33
+  store i64 %150, ptr %7
+  br label %L347
+L391:
+  store i64 1, ptr %34
+  %151 = load i64, ptr %34
+  store i64 %151, ptr %4
+  %152 = load i64, ptr %4
+  %153 = load i64, ptr %ds
+  %154 = load i64, ptr %alloc
+  %155 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %153, 0, 0
+  %156 = insertvalue { { i64, i64 }, { i64 } } %155, i64 %154, 0, 1
+  %157 = insertvalue { { i64, i64 }, { i64 } } %156, i64 %152, 1, 0
+  ret { { i64, i64 }, { i64 } } %157
 }
 
 define  oxcamlcc { { i64, i64 }, { i64 } } @camlExn_part2__catch_wildcard_HIDE_STAMP(i64 %0, i64 %1, i64 %2) noinline gc "oxcaml" {
@@ -1716,214 +1730,219 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlExn_part2__catch_wildcard_HIDE_S
   %18 = alloca i64
   %19 = alloca i64
   %20 = alloca i64
-  %21 = alloca ptr addrspace(1)
+  %21 = alloca i64
   %22 = alloca ptr addrspace(1)
   %23 = alloca ptr addrspace(1)
   %24 = alloca ptr addrspace(1)
-  %25 = alloca i64
+  %25 = alloca ptr addrspace(1)
   %26 = alloca i64
-  %27 = alloca ptr addrspace(1)
+  %27 = alloca i64
   %28 = alloca ptr addrspace(1)
   %29 = alloca ptr addrspace(1)
   %30 = alloca ptr addrspace(1)
-  %31 = alloca i64
-  %32 = alloca ptr addrspace(1)
+  %31 = alloca ptr addrspace(1)
+  %32 = alloca i64
   %33 = alloca ptr addrspace(1)
   %34 = alloca ptr addrspace(1)
+  %35 = alloca ptr addrspace(1)
   br label %L1
 L1:
-  br label %L400
-L400:
-  %35 = load i64, ptr %4
-  store i64 %35, ptr %10
-  %36 = load i64, ptr %ds
-  %37 = add i64 %36, 64
-  %38 = inttoptr i64 %37 to ptr
-  %39 = load i64, ptr %38
-  store i64 %39, ptr %11
-  %40 = load i64, ptr %11
-  store i64 %40, ptr %12
-  %41 = load i64, ptr %ds
-  %42 = load i64, ptr %alloc
-  %43 = call oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %41, i64 %42) returns_twice "gc-leaf-function"="true"
-  %44 = extractvalue { { i64, i64 }, { i64 } } %43, 0, 0
-  %45 = extractvalue { { i64, i64 }, { i64 } } %43, 0, 1
-  store i64 %44, ptr %ds
-  store i64 %45, ptr %alloc
-  %46 = extractvalue { { i64, i64 }, { i64 } } %43, 1, 0
-  call void asm sideeffect "movq $0, %rax", "r"(i64 %46) "gc-leaf-function"="true"
-  br label %L426
-L426:
-  %47 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
-  %48 = icmp eq i64 %47, 0
-  br i1 %48, label %L427, label %L403
-L427:
-  store ptr blockaddress(@camlExn_part2__catch_wildcard_8_17_code, %L426), ptr @camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_var.L426
-  %49 = call  ptr @llvm.stacksave()
-  %50 = alloca { i64, i64, i64, i64 }
-  %51 = ptrtoint ptr %50 to i64
-  %52 = add i64 %51, 16
-  %53 = inttoptr i64 %52 to ptr
-  %54 = ptrtoint ptr %50 to i64
-  %55 = add i64 %54, 8
-  %56 = inttoptr i64 %55 to ptr
-  %57 = load i64, ptr %ds
-  %58 = add i64 %57, 48
-  %59 = inttoptr i64 %58 to ptr
-  %60 = load i64, ptr %59
-  store ptr %50, ptr %59
-  store ptr @camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_asm.L426, ptr %56
-  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %53) "gc-leaf-function"="true"
-  store i64 %60, ptr %50
+  br label %L402
+L402:
+  %36 = load i64, ptr %4
+  store i64 %36, ptr %10
+  %37 = load i64, ptr %ds
+  %38 = add i64 %37, 64
+  %39 = inttoptr i64 %38 to ptr
+  %40 = load i64, ptr %39
+  store i64 %40, ptr %11
+  %41 = load i64, ptr %11
+  store i64 %41, ptr %12
+  %42 = load i64, ptr %ds
+  %43 = load i64, ptr %alloc
+  %44 = call oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %42, i64 %43) returns_twice "gc-leaf-function"="true"
+  %45 = extractvalue { { i64, i64 }, { i64 } } %44, 0, 0
+  %46 = extractvalue { { i64, i64 }, { i64 } } %44, 0, 1
+  store i64 %45, ptr %ds
+  store i64 %46, ptr %alloc
+  %47 = extractvalue { { i64, i64 }, { i64 } } %44, 1, 0
+  call void asm sideeffect "movq $0, %rax", "r"(i64 %47) "gc-leaf-function"="true"
+  br label %L428
+L428:
+  %48 = call i64 asm sideeffect "mov %rax, $0", "=r"() "gc-leaf-function"="true"
+  %49 = icmp eq i64 %48, 0
+  br i1 %49, label %L429, label %L405
+L429:
+  store ptr blockaddress(@camlExn_part2__catch_wildcard_8_17_code, %L428), ptr @camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_var.L428
+  %50 = call  ptr @llvm.stacksave()
+  %51 = alloca { i64, i64, i64, i64 }
+  %52 = ptrtoint ptr %51 to i64
+  %53 = add i64 %52, 16
+  %54 = inttoptr i64 %53 to ptr
+  %55 = ptrtoint ptr %51 to i64
+  %56 = add i64 %55, 8
+  %57 = inttoptr i64 %56 to ptr
+  %58 = load i64, ptr %ds
+  %59 = add i64 %58, 48
+  %60 = inttoptr i64 %59 to ptr
+  %61 = load i64, ptr %60
+  store ptr %51, ptr %60
+  store ptr @camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_asm.L428, ptr %57
+  call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %54) "gc-leaf-function"="true"
+  store i64 %61, ptr %51
   store i64 1, ptr %14
-  %61 = load i64, ptr %14
-  store i64 %61, ptr %4
-  %62 = load i64, ptr %4
-  %63 = load i64, ptr %ds
-  %64 = load i64, ptr %alloc
-  %65 = call oxcamlcc { { i64, i64 }, { i64 } } @camlExn_part2__raise_3_HIDE_STAMP(i64 %63, i64 %64, i64 %62) "statepoint-id"="32"
-  %66 = extractvalue { { i64, i64 }, { i64 } } %65, 0, 0
-  %67 = extractvalue { { i64, i64 }, { i64 } } %65, 0, 1
-  store i64 %66, ptr %ds
-  store i64 %67, ptr %alloc
-  %68 = extractvalue { { i64, i64 }, { i64 } } %65, 1, 0
-  store i64 %68, ptr %4
-  br label %L411
-L411:
-  %69 = load i64, ptr %ds
-  %70 = add i64 %69, 48
-  %71 = inttoptr i64 %70 to ptr
-  %72 = load i64, ptr %50
-  store i64 %72, ptr %71
-  call  void @llvm.stackrestore(ptr %49)
-  %73 = load i64, ptr %4
-  %74 = load i64, ptr %ds
-  %75 = load i64, ptr %alloc
-  %76 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %74, 0, 0
-  %77 = insertvalue { { i64, i64 }, { i64 } } %76, i64 %75, 0, 1
-  %78 = insertvalue { { i64, i64 }, { i64 } } %77, i64 %73, 1, 0
-  ret { { i64, i64 }, { i64 } } %78
-L403:
-  %79 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
-  store i64 %79, ptr %alloc
-  store i64 %47, ptr %4
-  %80 = load i64, ptr %4
-  %81 = inttoptr i64 %80 to ptr addrspace(1)
-  store ptr addrspace(1) %81, ptr %13
-  %82 = load i64, ptr %ds
-  %83 = add i64 %82, 64
-  %84 = inttoptr i64 %83 to ptr
-  %85 = load i64, ptr %12
-  store i64 %85, ptr %84
-  store i64 1, ptr %15
-  %86 = load i64, ptr %15
-  store i64 %86, ptr %16
-  store i64 13, ptr %17
-  store i64 1, ptr %18
-  %87 = ptrtoint ptr @camlExn_part2__immstring215 to i64
-  store i64 %87, ptr %19
-  %88 = ptrtoint ptr @camlStdlib__print_endline_138 to i64
-  store i64 %88, ptr %20
-  %89 = load ptr addrspace(1), ptr %20
-  %90 = getelementptr i8, ptr addrspace(1) %89, i64 16
-  store ptr addrspace(1) %90, ptr %21
-  %91 = load ptr addrspace(1), ptr %21
-  %92 = load ptr addrspace(1), ptr addrspace(1) %91
-  store ptr addrspace(1) %92, ptr %22
-  %93 = load ptr addrspace(1), ptr %22
-  store ptr addrspace(1) %93, ptr %6
-  %94 = load i64, ptr %19
-  %95 = inttoptr i64 %94 to ptr addrspace(1)
-  store ptr addrspace(1) %95, ptr %7
-  %96 = load i64, ptr %18
-  %97 = inttoptr i64 %96 to ptr addrspace(1)
-  store ptr addrspace(1) %97, ptr %8
-  %98 = load i64, ptr %17
-  %99 = inttoptr i64 %98 to ptr addrspace(1)
-  store ptr addrspace(1) %99, ptr %9
-  %100 = load ptr addrspace(1), ptr %6
-  %101 = load ptr addrspace(1), ptr %7
-  %102 = load ptr addrspace(1), ptr %8
-  %103 = load ptr addrspace(1), ptr %9
-  %104 = load i64, ptr %ds
-  %105 = load i64, ptr %alloc
-  %106 = call oxcaml_ccc { { i64, i64 }, { ptr addrspace(1) } } @caml_c_call(i64 %104, i64 %105, ptr @caml_ml_output, ptr addrspace(1) %100, ptr addrspace(1) %101, ptr addrspace(1) %102, ptr addrspace(1) %103) "statepoint-id"="0"
-  %107 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %106, 0, 0
-  %108 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %106, 0, 1
-  store i64 %107, ptr %ds
-  store i64 %108, ptr %alloc
-  %109 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %106, 1, 0
-  store ptr addrspace(1) %109, ptr %5
-  br label %L416
-L416:
-  %110 = load ptr addrspace(1), ptr %5
-  store ptr addrspace(1) %110, ptr %23
-  %111 = load ptr addrspace(1), ptr %23
-  store ptr addrspace(1) %111, ptr %24
-  store i64 21, ptr %25
-  %112 = ptrtoint ptr @camlStdlib__print_endline_138 to i64
-  store i64 %112, ptr %26
-  %113 = load ptr addrspace(1), ptr %26
-  %114 = getelementptr i8, ptr addrspace(1) %113, i64 16
-  store ptr addrspace(1) %114, ptr %27
-  %115 = load ptr addrspace(1), ptr %27
-  %116 = load ptr addrspace(1), ptr addrspace(1) %115
-  store ptr addrspace(1) %116, ptr %28
-  %117 = load ptr addrspace(1), ptr %28
-  store ptr addrspace(1) %117, ptr %6
-  %118 = load i64, ptr %25
-  %119 = inttoptr i64 %118 to ptr addrspace(1)
-  store ptr addrspace(1) %119, ptr %7
-  %120 = load ptr addrspace(1), ptr %6
-  %121 = load ptr addrspace(1), ptr %7
-  %122 = load i64, ptr %ds
-  %123 = load i64, ptr %alloc
-  %124 = call oxcaml_ccc { { i64, i64 }, { ptr addrspace(1) } } @caml_c_call(i64 %122, i64 %123, ptr @caml_ml_output_char, ptr addrspace(1) %120, ptr addrspace(1) %121) "statepoint-id"="0"
-  %125 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %124, 0, 0
-  %126 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %124, 0, 1
-  store i64 %125, ptr %ds
-  store i64 %126, ptr %alloc
-  %127 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %124, 1, 0
-  store ptr addrspace(1) %127, ptr %5
-  br label %L419
-L419:
-  %128 = load ptr addrspace(1), ptr %5
-  store ptr addrspace(1) %128, ptr %29
-  %129 = load ptr addrspace(1), ptr %29
-  store ptr addrspace(1) %129, ptr %30
-  %130 = ptrtoint ptr @camlStdlib__print_endline_138 to i64
-  store i64 %130, ptr %31
-  %131 = load ptr addrspace(1), ptr %31
-  %132 = getelementptr i8, ptr addrspace(1) %131, i64 16
-  store ptr addrspace(1) %132, ptr %32
-  %133 = load ptr addrspace(1), ptr %32
-  %134 = load ptr addrspace(1), ptr addrspace(1) %133
-  store ptr addrspace(1) %134, ptr %33
-  %135 = load ptr addrspace(1), ptr %33
-  store ptr addrspace(1) %135, ptr %6
-  %136 = load ptr addrspace(1), ptr %6
-  %137 = load i64, ptr %ds
-  %138 = load i64, ptr %alloc
-  %139 = call oxcaml_ccc { { i64, i64 }, { ptr addrspace(1) } } @caml_c_call(i64 %137, i64 %138, ptr @caml_ml_flush, ptr addrspace(1) %136) "statepoint-id"="0"
-  %140 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %139, 0, 0
-  %141 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %139, 0, 1
-  store i64 %140, ptr %ds
-  store i64 %141, ptr %alloc
-  %142 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %139, 1, 0
-  store ptr addrspace(1) %142, ptr %5
-  br label %L422
-L422:
-  %143 = load ptr addrspace(1), ptr %5
-  store ptr addrspace(1) %143, ptr %34
-  %144 = load ptr addrspace(1), ptr %34
-  store ptr addrspace(1) %144, ptr %5
-  %145 = load i64, ptr %5
-  %146 = load i64, ptr %ds
-  %147 = load i64, ptr %alloc
-  %148 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %146, 0, 0
-  %149 = insertvalue { { i64, i64 }, { i64 } } %148, i64 %147, 0, 1
-  %150 = insertvalue { { i64, i64 }, { i64 } } %149, i64 %145, 1, 0
-  ret { { i64, i64 }, { i64 } } %150
+  %62 = load i64, ptr %14
+  store i64 %62, ptr %4
+  %63 = load i64, ptr %4
+  %64 = load i64, ptr %ds
+  %65 = load i64, ptr %alloc
+  %66 = call oxcamlcc { { i64, i64 }, { i64 } } @camlExn_part2__raise_3_HIDE_STAMP(i64 %64, i64 %65, i64 %63) "statepoint-id"="32"
+  %67 = extractvalue { { i64, i64 }, { i64 } } %66, 0, 0
+  %68 = extractvalue { { i64, i64 }, { i64 } } %66, 0, 1
+  store i64 %67, ptr %ds
+  store i64 %68, ptr %alloc
+  %69 = extractvalue { { i64, i64 }, { i64 } } %66, 1, 0
+  store i64 %69, ptr %4
+  br label %L413
+L413:
+  %70 = load i64, ptr %4
+  store i64 %70, ptr %15
+  %71 = load i64, ptr %ds
+  %72 = add i64 %71, 48
+  %73 = inttoptr i64 %72 to ptr
+  %74 = load i64, ptr %51
+  store i64 %74, ptr %73
+  call  void @llvm.stackrestore(ptr %50)
+  %75 = load i64, ptr %15
+  store i64 %75, ptr %4
+  %76 = load i64, ptr %4
+  %77 = load i64, ptr %ds
+  %78 = load i64, ptr %alloc
+  %79 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %77, 0, 0
+  %80 = insertvalue { { i64, i64 }, { i64 } } %79, i64 %78, 0, 1
+  %81 = insertvalue { { i64, i64 }, { i64 } } %80, i64 %76, 1, 0
+  ret { { i64, i64 }, { i64 } } %81
+L405:
+  %82 = call i64 asm sideeffect "movq %r15, $0", "=r"() "gc-leaf-function"="true"
+  store i64 %82, ptr %alloc
+  store i64 %48, ptr %4
+  %83 = load i64, ptr %4
+  %84 = inttoptr i64 %83 to ptr addrspace(1)
+  store ptr addrspace(1) %84, ptr %13
+  %85 = load i64, ptr %ds
+  %86 = add i64 %85, 64
+  %87 = inttoptr i64 %86 to ptr
+  %88 = load i64, ptr %12
+  store i64 %88, ptr %87
+  store i64 1, ptr %16
+  %89 = load i64, ptr %16
+  store i64 %89, ptr %17
+  store i64 13, ptr %18
+  store i64 1, ptr %19
+  %90 = ptrtoint ptr @camlExn_part2__immstring221 to i64
+  store i64 %90, ptr %20
+  %91 = ptrtoint ptr @camlStdlib__print_endline_138 to i64
+  store i64 %91, ptr %21
+  %92 = load ptr addrspace(1), ptr %21
+  %93 = getelementptr i8, ptr addrspace(1) %92, i64 16
+  store ptr addrspace(1) %93, ptr %22
+  %94 = load ptr addrspace(1), ptr %22
+  %95 = load ptr addrspace(1), ptr addrspace(1) %94
+  store ptr addrspace(1) %95, ptr %23
+  %96 = load ptr addrspace(1), ptr %23
+  store ptr addrspace(1) %96, ptr %6
+  %97 = load i64, ptr %20
+  %98 = inttoptr i64 %97 to ptr addrspace(1)
+  store ptr addrspace(1) %98, ptr %7
+  %99 = load i64, ptr %19
+  %100 = inttoptr i64 %99 to ptr addrspace(1)
+  store ptr addrspace(1) %100, ptr %8
+  %101 = load i64, ptr %18
+  %102 = inttoptr i64 %101 to ptr addrspace(1)
+  store ptr addrspace(1) %102, ptr %9
+  %103 = load ptr addrspace(1), ptr %6
+  %104 = load ptr addrspace(1), ptr %7
+  %105 = load ptr addrspace(1), ptr %8
+  %106 = load ptr addrspace(1), ptr %9
+  %107 = load i64, ptr %ds
+  %108 = load i64, ptr %alloc
+  %109 = call oxcaml_ccc { { i64, i64 }, { ptr addrspace(1) } } @caml_c_call(i64 %107, i64 %108, ptr @caml_ml_output, ptr addrspace(1) %103, ptr addrspace(1) %104, ptr addrspace(1) %105, ptr addrspace(1) %106) "statepoint-id"="0"
+  %110 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %109, 0, 0
+  %111 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %109, 0, 1
+  store i64 %110, ptr %ds
+  store i64 %111, ptr %alloc
+  %112 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %109, 1, 0
+  store ptr addrspace(1) %112, ptr %5
+  br label %L418
+L418:
+  %113 = load ptr addrspace(1), ptr %5
+  store ptr addrspace(1) %113, ptr %24
+  %114 = load ptr addrspace(1), ptr %24
+  store ptr addrspace(1) %114, ptr %25
+  store i64 21, ptr %26
+  %115 = ptrtoint ptr @camlStdlib__print_endline_138 to i64
+  store i64 %115, ptr %27
+  %116 = load ptr addrspace(1), ptr %27
+  %117 = getelementptr i8, ptr addrspace(1) %116, i64 16
+  store ptr addrspace(1) %117, ptr %28
+  %118 = load ptr addrspace(1), ptr %28
+  %119 = load ptr addrspace(1), ptr addrspace(1) %118
+  store ptr addrspace(1) %119, ptr %29
+  %120 = load ptr addrspace(1), ptr %29
+  store ptr addrspace(1) %120, ptr %6
+  %121 = load i64, ptr %26
+  %122 = inttoptr i64 %121 to ptr addrspace(1)
+  store ptr addrspace(1) %122, ptr %7
+  %123 = load ptr addrspace(1), ptr %6
+  %124 = load ptr addrspace(1), ptr %7
+  %125 = load i64, ptr %ds
+  %126 = load i64, ptr %alloc
+  %127 = call oxcaml_ccc { { i64, i64 }, { ptr addrspace(1) } } @caml_c_call(i64 %125, i64 %126, ptr @caml_ml_output_char, ptr addrspace(1) %123, ptr addrspace(1) %124) "statepoint-id"="0"
+  %128 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %127, 0, 0
+  %129 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %127, 0, 1
+  store i64 %128, ptr %ds
+  store i64 %129, ptr %alloc
+  %130 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %127, 1, 0
+  store ptr addrspace(1) %130, ptr %5
+  br label %L421
+L421:
+  %131 = load ptr addrspace(1), ptr %5
+  store ptr addrspace(1) %131, ptr %30
+  %132 = load ptr addrspace(1), ptr %30
+  store ptr addrspace(1) %132, ptr %31
+  %133 = ptrtoint ptr @camlStdlib__print_endline_138 to i64
+  store i64 %133, ptr %32
+  %134 = load ptr addrspace(1), ptr %32
+  %135 = getelementptr i8, ptr addrspace(1) %134, i64 16
+  store ptr addrspace(1) %135, ptr %33
+  %136 = load ptr addrspace(1), ptr %33
+  %137 = load ptr addrspace(1), ptr addrspace(1) %136
+  store ptr addrspace(1) %137, ptr %34
+  %138 = load ptr addrspace(1), ptr %34
+  store ptr addrspace(1) %138, ptr %6
+  %139 = load ptr addrspace(1), ptr %6
+  %140 = load i64, ptr %ds
+  %141 = load i64, ptr %alloc
+  %142 = call oxcaml_ccc { { i64, i64 }, { ptr addrspace(1) } } @caml_c_call(i64 %140, i64 %141, ptr @caml_ml_flush, ptr addrspace(1) %139) "statepoint-id"="0"
+  %143 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %142, 0, 0
+  %144 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %142, 0, 1
+  store i64 %143, ptr %ds
+  store i64 %144, ptr %alloc
+  %145 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %142, 1, 0
+  store ptr addrspace(1) %145, ptr %5
+  br label %L424
+L424:
+  %146 = load ptr addrspace(1), ptr %5
+  store ptr addrspace(1) %146, ptr %35
+  %147 = load ptr addrspace(1), ptr %35
+  store ptr addrspace(1) %147, ptr %5
+  %148 = load i64, ptr %5
+  %149 = load i64, ptr %ds
+  %150 = load i64, ptr %alloc
+  %151 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %149, 0, 0
+  %152 = insertvalue { { i64, i64 }, { i64 } } %151, i64 %150, 0, 1
+  %153 = insertvalue { { i64, i64 }, { i64 } } %152, i64 %148, 1, 0
+  ret { { i64, i64 }, { i64 } } %153
 }
 
 define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlExn_part2__entry(i64 %0, i64 %1) gc "oxcaml" {
@@ -1947,8 +1966,8 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlExn_part2__entry(i6
   %16 = alloca i64
   br label %L1
 L1:
-  br label %L432
-L432:
+  br label %L434
+L434:
   store i64 1, ptr %8
   %17 = load i64, ptr %8
   %18 = inttoptr i64 %17 to ptr addrspace(1)
@@ -1963,13 +1982,13 @@ L432:
   store i64 %24, ptr %alloc
   %25 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %22, 1, 0
   store ptr addrspace(1) %25, ptr %3
-  br label %L434
-L434:
+  br label %L436
+L436:
   %26 = load ptr addrspace(1), ptr %3
   store ptr addrspace(1) %26, ptr %9
   %27 = load ptr addrspace(1), ptr %9
   store ptr addrspace(1) %27, ptr %10
-  %28 = ptrtoint ptr @camlExn_part2__Exn3229 to i64
+  %28 = ptrtoint ptr @camlExn_part2__Exn3235 to i64
   store i64 %28, ptr %11
   %29 = load ptr addrspace(1), ptr %11
   %30 = getelementptr i8, ptr addrspace(1) %29, i64 8
@@ -1987,8 +2006,8 @@ L434:
   %39 = extractvalue { { i64, i64 }, {  } } %37, 0, 1
   store i64 %38, ptr %ds
   store i64 %39, ptr %alloc
-  br label %L435
-L435:
+  br label %L437
+L437:
   store i64 1, ptr %13
   %40 = ptrtoint ptr @camlExn_part2 to i64
   store i64 %40, ptr %14
@@ -2044,9 +2063,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
   ret { { i64, i64 }, { i64 } } %5
 }
 
-@camlExn_part2__gc_roots = global { ptr, i64 } { ptr @camlExn_part2__Exn3229, i64 0 }, section ".data", align 8
+@camlExn_part2__gc_roots = global { ptr, i64 } { ptr @camlExn_part2__Exn3235, i64 0 }, section ".data", align 8
 @header.camlExn_part2 = global i64 11008, section ".data", align 8
-@camlExn_part2 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlExn_part2__Exn3229, ptr @camlExn_part2__catch_exn1_from_llvm_9, ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_10, ptr @camlExn_part2__catch_exn1_nested_from_llvm_11, ptr @camlExn_part2__raise_1_12, ptr @camlExn_part2__raise_2_13, ptr @camlExn_part2__raise_HIDE_STAMP, ptr @camlExn_part2__complicated_15, ptr @camlExn_part2__raise_in_loop_16, ptr @camlExn_part2__catch_wildcard_17 }, section ".data", align 8
+@camlExn_part2 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlExn_part2__Exn3235, ptr @camlExn_part2__catch_exn1_from_llvm_9, ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_10, ptr @camlExn_part2__catch_exn1_nested_from_llvm_11, ptr @camlExn_part2__raise_1_12, ptr @camlExn_part2__raise_2_13, ptr @camlExn_part2__raise_HIDE_STAMP, ptr @camlExn_part2__complicated_15, ptr @camlExn_part2__raise_in_loop_16, ptr @camlExn_part2__catch_wildcard_17 }, section ".data", align 8
 @header.camlExn_part2__catch_wildcard_17 = global i64 3063, section ".data", align 8
 @camlExn_part2__catch_wildcard_17 = global { ptr, i64 } { ptr @camlExn_part2__catch_wildcard_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExn_part2__raise_in_loop_16 = global i64 3063, section ".data", align 8
@@ -2065,22 +2084,22 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @camlExn_part2__raise_exn1_catch_exn2_from_llvm_10 = global { ptr, i64 } { ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExn_part2__catch_exn1_from_llvm_9 = global i64 3063, section ".data", align 8
 @camlExn_part2__catch_exn1_from_llvm_9 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlExn_part2__Exn3229 = global i64 3064, section ".data", align 8
-@camlExn_part2__Exn3229 = global { ptr, i64 } { ptr @camlExn_part2__immstring6, i64 1 }, section ".data", align 8
+@header.camlExn_part2__Exn3235 = global i64 3064, section ".data", align 8
+@camlExn_part2__Exn3235 = global { ptr, i64 } { ptr @camlExn_part2__immstring6, i64 1 }, section ".data", align 8
 @header.camlExn_part2__immstring6 = global i64 3068, section ".data", align 8
 @camlExn_part2__immstring6 = global { [ 14 x i8 ], [ 1 x i8 ], i8 } { [ 14 x i8 ] c"\45\78\6e\5f\70\61\72\74\32\2e\45\78\6e\33", [ 1 x i8 ] zeroinitializer, i8 1 }, section ".data", align 8
-@header.camlExn_part2__immstring215 = global i64 2044, section ".data", align 8
-@camlExn_part2__immstring215 = global { [ 6 x i8 ], [ 1 x i8 ], i8 } { [ 6 x i8 ] c"\63\61\75\67\68\74", [ 1 x i8 ] zeroinitializer, i8 1 }, section ".data", align 8
-@header.camlExn_part2__Pmakeblock195 = global i64 2816, section ".data", align 8
-@camlExn_part2__Pmakeblock195 = global { ptr, ptr } { ptr @caml_exn_Assert_failure, ptr @camlExn_part2__const_block192 }, section ".data", align 8
-@header.camlExn_part2__const_block192 = global i64 3840, section ".data", align 8
-@camlExn_part2__const_block192 = global { ptr, i64, i64 } { ptr @camlExn_part2__immstring190, i64 101, i64 95 }, section ".data", align 8
-@header.camlExn_part2__immstring190 = global i64 3068, section ".data", align 8
-@camlExn_part2__immstring190 = global { [ 12 x i8 ], [ 3 x i8 ], i8 } { [ 12 x i8 ] c"\65\78\6e\5f\70\61\72\74\32\2e\6d\6c", [ 3 x i8 ] zeroinitializer, i8 3 }, section ".data", align 8
-@camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_asm.L426 = external global ptr
-@camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_var.L426 = global ptr zeroinitializer, section ".data", align 8
-@camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_asm.L394 = external global ptr
-@camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_var.L394 = global ptr zeroinitializer, section ".data", align 8
+@header.camlExn_part2__immstring221 = global i64 2044, section ".data", align 8
+@camlExn_part2__immstring221 = global { [ 6 x i8 ], [ 1 x i8 ], i8 } { [ 6 x i8 ] c"\63\61\75\67\68\74", [ 1 x i8 ] zeroinitializer, i8 1 }, section ".data", align 8
+@header.camlExn_part2__Pmakeblock201 = global i64 2816, section ".data", align 8
+@camlExn_part2__Pmakeblock201 = global { ptr, ptr } { ptr @caml_exn_Assert_failure, ptr @camlExn_part2__const_block198 }, section ".data", align 8
+@header.camlExn_part2__const_block198 = global i64 3840, section ".data", align 8
+@camlExn_part2__const_block198 = global { ptr, i64, i64 } { ptr @camlExn_part2__immstring196, i64 101, i64 95 }, section ".data", align 8
+@header.camlExn_part2__immstring196 = global i64 3068, section ".data", align 8
+@camlExn_part2__immstring196 = global { [ 12 x i8 ], [ 3 x i8 ], i8 } { [ 12 x i8 ] c"\65\78\6e\5f\70\61\72\74\32\2e\6d\6c", [ 3 x i8 ] zeroinitializer, i8 3 }, section ".data", align 8
+@camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_asm.L428 = external global ptr
+@camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_var.L428 = global ptr zeroinitializer, section ".data", align 8
+@camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_asm.L396 = external global ptr
+@camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_var.L396 = global ptr zeroinitializer, section ".data", align 8
 @camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L332 = external global ptr
 @camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L332 = global ptr zeroinitializer, section ".data", align 8
 @camlExn_part2__complicated_HIDE_STAMP.recover_rbp_asm.L334 = external global ptr
@@ -2148,16 +2167,16 @@ module asm "  addq $8, %rsp"
 module asm "  movq camlExn_part2__complicated_HIDE_STAMP.recover_rbp_var.L332(%rip), %rbx"
 module asm "  jmpq *%rbx"
 module asm "  .text"
-module asm "camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_asm.L394:"
+module asm "camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_asm.L396:"
 module asm "  pop %rbp"
 module asm "  addq $8, %rsp"
-module asm "  movq camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_var.L394(%rip), %rbx"
+module asm "  movq camlExn_part2__raise_in_loop_HIDE_STAMP.recover_rbp_var.L396(%rip), %rbx"
 module asm "  jmpq *%rbx"
 module asm "  .text"
-module asm "camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_asm.L426:"
+module asm "camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_asm.L428:"
 module asm "  pop %rbp"
 module asm "  addq $8, %rsp"
-module asm "  movq camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_var.L426(%rip), %rbx"
+module asm "  movq camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_var.L428(%rip), %rbx"
 module asm "  jmpq *%rbx"
 
 !0 = !{ i32 1, !"oxcaml_module", !"Exn_part2" }

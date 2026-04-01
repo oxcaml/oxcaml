@@ -19,15 +19,15 @@ in
 let $camlLarge_no_unbox__large_5 = closure large_2_1 @large in
 let code inline(never) loopify(never) size(8) newer_version_of(small_1)
       small_1_1
-        (`Pmakeblock_into_param_field_0_𝕍`,
-         `Pmakeblock_into_param_field_1_𝕍`,
-         `Pmakeblock_into_param_field_2_𝕍`)
+        (Pmakeblock_into_param_field_0,
+         Pmakeblock_into_param_field_1,
+         Pmakeblock_into_param_field_2)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Pfield = `Pmakeblock_into_param_field_2_𝕍` in
-  let Pfield_1 = `Pmakeblock_into_param_field_1_𝕍` in
-  let Pfield_2 = `Pmakeblock_into_param_field_0_𝕍` in
+  let Pfield = Pmakeblock_into_param_field_2 in
+  let Pfield_1 = Pmakeblock_into_param_field_1 in
+  let Pfield_2 = Pmakeblock_into_param_field_0 in
   let int_add = %int_barith.add (Pfield_2, Pfield_1) in
   let int_add_1 = %int_barith.add (int_add, Pfield) in
   cont k (int_add_1)
@@ -53,14 +53,14 @@ let code loopify(never) size(47) newer_version_of(f_0)
       ((let int_add = %int_barith.add (x, 3) in
         let int_add_1 = %int_barith.add (x, 2) in
         let int_add_2 = %int_barith.add (x, 1) in
-        let `Pmakeblock_into_Pmakeblock_field_2_𝕍` = int_add in
-        let `Pmakeblock_into_Pmakeblock_field_1_𝕍` = int_add_1 in
-        let `Pmakeblock_into_Pmakeblock_field_0_𝕍` = int_add_2 in
+        let Pmakeblock_into_Pmakeblock_field_2 = int_add in
+        let Pmakeblock_into_Pmakeblock_field_1 = int_add_1 in
+        let Pmakeblock_into_Pmakeblock_field_0 = int_add_2 in
         apply direct(small_1_1)
           ($camlLarge_no_unbox__small_4 : _ -> imm tagged)
-            (`Pmakeblock_into_Pmakeblock_field_0_𝕍`,
-             `Pmakeblock_into_Pmakeblock_field_1_𝕍`,
-             `Pmakeblock_into_Pmakeblock_field_2_𝕍`)
+            (Pmakeblock_into_Pmakeblock_field_0,
+             Pmakeblock_into_Pmakeblock_field_1,
+             Pmakeblock_into_Pmakeblock_field_2)
             -> k2 * k1)
          where k2 (apply_result_1 : imm tagged) =
            let int_add = %int_barith.add (apply_result_1, apply_result) in

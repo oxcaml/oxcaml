@@ -194,3 +194,22 @@ let is_local f =
   | Block _ | Call_witness _ | Return_of_call _ | Code_id_of_call_witness
   | Is_int | Get_tag ->
     false
+
+let debug_nostamps = lazy (Flambda_features.debug_reaper "nostamps")
+
+let print_for_variable_name ppf x =
+  let view = view x in
+  if not (Lazy.force debug_nostamps)
+  then Flambda_colours.without_colours ~f:(fun () -> print_view ppf view)
+  else
+    match view with
+    | Block (i, _k) -> Format.fprintf ppf "%i" i
+    | Value_slot s -> Format.fprintf ppf "%s" (Value_slot.name s)
+    | Is_int -> Format.fprintf ppf "is_int"
+    | Get_tag -> Format.fprintf ppf "tag"
+    | Function_slot _ | Return_of_call _ | Code_id_of_call_witness
+    | Call_witness _ ->
+      Misc.fatal_errorf
+        "[Field.print_for_variable_name] got field %a but this field was not \
+         expected to be possible to occur in unboxed blocks"
+        print_view view

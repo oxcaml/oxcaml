@@ -24,7 +24,7 @@ open Typetexp
 
 module String = Misc.Stdlib.String
 
-type native_repr_kind = Unboxed | Untagged
+type native_repr_kind = Unboxed | Untagged | Unpacked
 
 type jkind_sort_loc =
   | Cstr_tuple of { unboxed : bool }
@@ -1535,6 +1535,7 @@ let narrow_to_manifest_jkind env loc path decl =
            (e.g. due to with-bounds/Best). *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
+<<<<<<< HEAD
         (match
            Ikind.sub_jkind_l
              ~origin:(Format.asprintf
@@ -1569,6 +1570,35 @@ let narrow_to_manifest_jkind env loc path decl =
                  "[ikind-narrow] path=%a branch=constrain_type_jkind error@."
                  (Format_doc.compat Path.print) path;
              raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
+||||||| 23394b0b2c
+        match
+          Jkind.sub_jkind_l ~type_equal ~context
+            ~level:(Ctype.get_current_level ()) env manifest_jkind
+            decl.type_jkind
+        with
+        | Ok () -> ()
+        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
+      end
+    | Some type_jkind -> begin
+        match Ctype.constrain_type_jkind env ty type_jkind with
+        | Ok () -> ()
+        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
+      end
+=======
+        match
+          Jkind.sub_jkind_l ~type_equal ~context
+            env manifest_jkind
+            decl.type_jkind
+        with
+        | Ok () -> ()
+        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
+      end
+    | Some type_jkind -> begin
+        match Ctype.constrain_type_jkind env ty type_jkind with
+        | Ok () -> ()
+        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
+      end
+>>>>>>> origin/main
     end;
     let type_ikind =
       Ikind.type_declaration_ikind_gated ~env:(Some env) ~path
@@ -2276,7 +2306,7 @@ let rec update_decl_jkind env dpath decl =
      jkinds in transl_declaration]) *)
   let context = Ctype.mk_jkind_context_always_principal env in
   match
-    Jkind.sub_layout_or_error ~context ~level:(Ctype.get_current_level ())
+    Jkind.sub_layout_or_error ~context
       env new_decl.type_jkind decl.type_jkind
   with
   | Ok () -> new_decl
@@ -2985,7 +3015,6 @@ let normalize_decl_jkinds env decls =
           ~type_equal
           ~context
           ~allow_any_crossing
-          ~level:(Ctype.get_current_level ())
           env
           decl.type_jkind
           original_decl.type_jkind
@@ -3608,14 +3637,17 @@ let get_native_repr_attribute attrs ~global_repr =
   match
     Attr_helper.get_no_payload_attribute "unboxed"  attrs,
     Attr_helper.get_no_payload_attribute "untagged" attrs,
+    Attr_helper.get_no_payload_attribute "unpacked" attrs,
     global_repr
   with
-  | None, None, None -> Native_repr_attr_absent
-  | None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None -> Native_repr_attr_present Untagged
-  | Some { Location.loc }, _, _
-  | _, Some { Location.loc }, _ ->
+  | None, None, None, None -> Native_repr_attr_absent
+  | None, None, None, Some repr -> Native_repr_attr_present repr
+  | Some _, None, None, None -> Native_repr_attr_present Unboxed
+  | None, Some _, None, None -> Native_repr_attr_present Untagged
+  | None, None, Some _, None -> Native_repr_attr_present Unpacked
+  | Some { Location.loc }, _, _, _
+  | _, Some { Location.loc }, _, _
+  | _, _, Some { Location.loc }, _ ->
     raise (Error (loc, Multiple_native_repr_attributes))
 
 let is_upstream_compatible_non_value_unbox env ty =
@@ -3802,7 +3834,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
          (Warnings.Incompatible_with_upstream
             (Warnings.Non_value_sort sort)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_present kind, (Poly | Sort (Base Value))
+  | Native_repr_attr_present ((Unboxed | Untagged) as kind),
+    (Poly | Sort (Base Value))
   | Native_repr_attr_present (Untagged as kind), Sort _ ->
     begin match native_repr_of_type env kind ty sort_or_poly with
     | None ->
@@ -3843,6 +3876,17 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
         (Warnings.Incompatible_with_upstream
               (Warnings.Non_value_sort layout)));
     Same_as_ocaml_repr c
+  | Native_repr_attr_present Unpacked, Sort (Product _ as sort) ->
+    (if Language_extension.erasable_extensions_only ()
+     then
+       Location.prerr_warning core_type.ptyp_loc
+         (Warnings.Incompatible_with_upstream
+            Warnings.Unpacked_attribute));
+    Unpacked_product sort
+  | Native_repr_attr_present Unpacked, (Sort (Base _) | Poly) ->
+    raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unpacked))
+  | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
+    Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
 
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
@@ -4112,7 +4156,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       in
       { val_type = ty;
         val_kind = Val_reg sort;
-        val_lpoly = lpoly;
+        val_lpoly = Lpoly.determined lpoly;
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
@@ -4156,7 +4200,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
       && not (String.starts_with ~prefix:"%" prim.prim_name)
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
-      { val_type = ty; val_kind = Val_prim prim; val_lpoly = lpoly;
+      { val_type = ty; val_kind = Val_prim prim;
+        val_lpoly = Lpoly.determined lpoly;
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;
@@ -4717,7 +4762,7 @@ let report_jkind_mismatch_due_to_bad_inference ppf env ty violation loc =
     loc
     (Jkind.Violation.report_with_offender
        ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-       ~level:(Ctype.get_current_level ()) env) violation
+       env) violation
 
 let quoted_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
 let report_error_doc ppf = function
@@ -4973,9 +5018,10 @@ let report_error_doc ppf = function
   | Val_in_structure ->
       fprintf ppf "Value declarations are only allowed in signatures"
   | Multiple_native_repr_attributes ->
-      fprintf ppf "Too many %a/%a attributes"
+      fprintf ppf "Too many %a/%a/%a attributes"
         Style.inline_code "[@@unboxed]"
         Style.inline_code "[@@untagged]"
+        Style.inline_code "[@@unpacked]"
   | Cannot_unbox_or_untag_type Unboxed ->
       fprintf ppf "@[Don't know how to unbox this type.@ \
                    Only %a, %a, %a, %a, vector primitives, and@ \
@@ -4990,13 +5036,20 @@ let report_error_doc ppf = function
         Style.inline_code "int8"
         Style.inline_code "int16"
         Style.inline_code "int"
+  | Cannot_unbox_or_untag_type Unpacked ->
+      fprintf ppf "@[Don't know how to unpack this type.@ \
+                   Only types with product layouts can be marked %a.@]"
+        Style.inline_code "unpacked"
   | Deep_unbox_or_untag_attribute kind ->
       fprintf ppf
         "@[The attribute %a should be attached to@ \
          a direct argument or result of the primitive,@ \
          it should not occur deeply into its type.@]"
         Style.inline_code
-        (match kind with Unboxed -> "@unboxed" | Untagged -> "@untagged")
+        (match kind with
+         | Unboxed -> "@unboxed"
+         | Untagged -> "@untagged"
+         | Unpacked -> "@unpacked")
   | Jkind_mismatch_of_path (env, dpath, v) ->
     (* the type is always printed just above, so print out just the head of the
        path instead of something like [t/3] *)
@@ -5008,12 +5061,12 @@ let report_error_doc ppf = function
       fprintf ppf "type %a" Style.inline_code path_end
     in
     Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) env ppf v
+      env ppf v
   | Jkind_mismatch_of_type (env, ty, v) ->
     let offender ppf = fprintf ppf "type %a"
         (Style.as_inline_code Printtyp.type_expr) ty in
     Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) env ppf v
+      env ppf v
   | Jkind_sort {env; kloc; typ; err} ->
     let s =
       match kloc with
@@ -5040,7 +5093,7 @@ let report_error_doc ppf = function
       extra
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
-         ~level:(Ctype.get_current_level ()) env) err
+         env) err
   | Jkind_empty_record ->
     fprintf ppf "@[Records must contain at least one runtime value.@]"
   | Non_representable_in_module (env, err, ty) ->
@@ -5048,7 +5101,7 @@ let report_error_doc ppf = function
     fprintf ppf "@[The type of a module-level value must have a@ \
                    representable layout.@ %a@]"
       (Jkind.Violation.report_with_offender ~offender
-         ~level:(Ctype.get_current_level ()) env)
+         env)
       err
   | Invalid_jkind_in_block (typ, sort_const, lloc) ->
     let struct_desc =

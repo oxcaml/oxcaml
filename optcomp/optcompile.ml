@@ -305,12 +305,12 @@ let native unix
 
     let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
 
+    (* These are the dependencies of otherlibs/eval. *)
     let extra_libraries_for_eval =
       [ "unix/unix";
         "compiler-libs/ocamlcommon";
         "compiler-libs/ocamloptcomp";
-        "ocaml-jit/jit";
-        "camlinternaleval" ]
+        "ocaml-jit/jit" ]
 
     let support_files_for_eval () =
       List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval

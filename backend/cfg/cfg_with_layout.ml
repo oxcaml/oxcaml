@@ -448,10 +448,8 @@ let insert_block :
     Cfg.basic_instruction_list ->
     after:Cfg.basic_block ->
     before:Cfg.basic_block option ->
-    next_instruction_id:(unit -> InstructionId.t) ->
     Cfg.basic_block list =
- fun cfg_with_layout body ~after:predecessor_block ~before:only_successor
-     ~next_instruction_id ->
+ fun cfg_with_layout body ~after:predecessor_block ~before:only_successor ->
   let cfg = cfg_with_layout.cfg in
   let successors =
     match only_successor with
@@ -478,7 +476,7 @@ let insert_block :
       dbg, fdo, live, stack_offset, available_before, available_across
   in
   let copy (i : Cfg.basic Cfg.instruction) : Cfg.basic Cfg.instruction =
-    { i with id = next_instruction_id () }
+    { i with id = InstructionId.get_and_incr cfg.next_instruction_id }
   in
   (* copy body if there is more than one successor *)
   let first = ref true in
@@ -508,7 +506,7 @@ let insert_block :
               fdo;
               live;
               stack_offset;
-              id = next_instruction_id ();
+              id = InstructionId.get_and_incr cfg.next_instruction_id;
               available_before;
               available_across
             };

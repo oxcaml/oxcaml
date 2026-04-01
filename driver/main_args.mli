@@ -127,6 +127,8 @@ module type Compiler_options = sig
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit
   val _linkall : unit -> unit
+  val _requires_metaprogramming : unit -> unit
+  val _uses_metaprogramming : unit -> unit
   val _noautolink : unit -> unit
   val _o : string -> unit
   val _opaque :  unit -> unit

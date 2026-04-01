@@ -156,6 +156,7 @@ and type_desc =
   | Tfield of string * field_kind * type_expr * type_expr
   | Tquote of type_expr
   | Tsplice of type_expr
+  | Tquote_eval of type_expr
   | Tnil
   | Tlink of type_expr
   | Tsubst of type_expr * type_expr option
@@ -641,6 +642,26 @@ module type Wrap = sig
   type 'a t
 end
 
+module Lpoly = struct
+  type state =
+    | Pending of Location.t
+    | Determined of Jkind_types.Sort.var list
+
+  type t = state ref
+
+  let get_exn t = match !t with
+    | Pending _ -> Misc.fatal_error "layout is pending generalization"
+    | Determined l -> l
+
+  let determined l = ref (Determined l)
+  let pending ~loc = ref (Pending loc)
+
+  let generalize ~on_determined ~on_to_generalize t =
+    match !t with
+    | Pending loc -> t := Determined (on_to_generalize loc)
+    | Determined _ -> on_determined ()
+end
+
 module type Wrapped = sig
   type 'a wrapped
 
@@ -648,7 +669,7 @@ module type Wrapped = sig
     { val_type: type_expr wrapped;                (* Type of the value *)
       val_modalities : Mode.Modality.t;     (* Modalities on the value *)
       val_kind: value_kind;
-      val_lpoly: Jkind_types.Sort.var list;
+      val_lpoly: Lpoly.t;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
@@ -1344,6 +1365,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tarrow (_, _, _, _)
         | Tquote _
         | Tsplice _
+        | Tquote_eval _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in

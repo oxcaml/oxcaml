@@ -257,6 +257,10 @@ module Stdlib : sig
       -> Format.formatter
       -> 'a t
       -> unit
+
+    val map_sharing : ('a -> 'a) -> 'a option -> 'a option
+    (** [map_sharing f a] is [map f a]. If [a] is [None] or it is [Some e] and
+        [f e == e] then [map_sharing f a == a]. *)
   end
 
 (** {2 Extensions to the Array module} *)

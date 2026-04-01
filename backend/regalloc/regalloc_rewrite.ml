@@ -308,9 +308,6 @@ let rewrite_gen : type s.
               Cfg_with_layout.insert_block
                 (Cfg_with_infos.cfg_with_layout cfg_with_infos)
                 new_instrs ~after:block ~before:None
-                ~next_instruction_id:(fun () ->
-                  InstructionId.get_and_incr
-                    (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id)
             in
             block_insertion := true);
       if !block_rewritten && should_coalesce_temp_spills_and_reloads
@@ -427,17 +424,12 @@ let prelude :
   in
   if not (Cfg_edge.Set.is_empty critical_edges)
   then (
-    let next_instruction_id () =
-      InstructionId.get_and_incr
-        (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
-    in
     Cfg_edge.Set.iter
       (fun { Cfg_edge.src; dst } ->
         let (_inserted_blocks : Cfg.basic_block list) =
           Cfg_with_layout.insert_block cfg_with_layout (DLL.make_empty ())
             ~after:(Cfg.get_block_exn cfg src)
             ~before:(Some (Cfg.get_block_exn cfg dst))
-            ~next_instruction_id
         in
         ())
       critical_edges;
@@ -511,8 +503,6 @@ let insert_dummy_uses : Cfg_with_infos.t -> cfg_infos -> unit =
                 Cfg_with_layout.insert_block
                   (Cfg_with_infos.cfg_with_layout cfg_with_infos)
                   new_instrs ~after:block ~before:None
-                  ~next_instruction_id:(fun () ->
-                    InstructionId.get_and_incr cfg.next_instruction_id)
               in
               block_insertion := true
             end)

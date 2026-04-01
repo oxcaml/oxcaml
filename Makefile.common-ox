@@ -347,11 +347,12 @@ install_for_test: install
 	 done; \
 	 ln -s . lex; ln -s . yacc; \
 	 ln -s _install/lib/ocaml/compiler-libs compilerlibs; \
-	 mkdir -p otherlibs/{unix,dynlink/native,str,bigarray,runtime_events}; \
+	 mkdir -p otherlibs/{unix,dynlink/native,str,bigarray,runtime_events,eval}; \
 	 ln -s ../stdlib/threads otherlibs/systhreads$(RUNTIME_SUFFIX); \
          $(cpl) stdlib/unix/{lib,}unix* otherlibs/unix; \
          $(cpl) stdlib/dynlink/dynlink* otherlibs/dynlink; \
          $(cpl) stdlib/str/{lib,}str* otherlibs/str; \
+         $(cpl) stdlib/{lib,}eval* otherlibs/eval; \
 	 for universe in upstream_compatible stable beta alpha ; do \
 		mkdir -p otherlibs/{stdlib_,}$${universe}; \
 		$(cpl) stdlib/stdlib_$${universe}/* otherlibs/stdlib_$${universe}; \
@@ -406,9 +407,9 @@ install_for_test: install
 	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/ocamltest
 test: install_for_test
 	if [ "$(middle_end)" = "flambda2" ]; then \
-	  for dir in `cd testsuite; ls -1 -d tests/*`; do \
-	    if ! grep -q "^  $$dir " oxcaml/testsuite/flambda2-test-list; then \
-	      echo "  $$dir"; \
+	  for path in `cd testsuite; ls -1 -d tests/*`; do \
+	    if [[ -d "testsuite/$$path" ]] && ! grep -q "^  $$path " oxcaml/testsuite/flambda2-test-list; then \
+	      echo "  $$path"; \
 	    fi; \
 	  done > _runtest/flambda2-test-list; \
 	fi

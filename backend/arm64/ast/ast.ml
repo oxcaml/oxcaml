@@ -2652,6 +2652,44 @@ module Instruction = struct
           if i > 0 then Format.fprintf ppf ", ";
           Operand.Wrapped.print ppf op)
         operands_arr)
+
+  (* CR-someday mshinwell: B and BL have +/- 128Mb ranges; for the moment we
+     assume we will never exceed this. It would seem to be most likely to occur
+     for branches between functions; in this case, the linker should be able to
+     insert veneers anyway. (See section 4.6.7 of the document "ELF for the ARM
+     64-bit architecture (AArch64)".)
+
+     Follow-up: see comment in binary_emitter/relocation.ml *)
+  let max_displacement (I { name; _ }) =
+    match name with
+    | TBZ | TBNZ -> Some 0x2000
+    | CBZ | CBNZ | B_cond _ -> Some 0x40000
+    | ABS_vector | ADDP_vector | ADDS | ADDV | ADD_immediate
+    | ADD_shifted_register | ADD_vector | ADR | ADRP | AND_immediate
+    | AND_shifted_register | AND_vector | ASRV | B | BL | BLR | BR | CLZ
+    | CM_register _ | CM_zero _ | CNT | CNT_vector | CSEL | CSINC | CTZ | DMB _
+    | DSB _ | DUP _ | EOR_immediate | EOR_shifted_register | EOR_vector | EXT
+    | FABS | FADD | FADDP_vector | FADD_vector | FCMP | FCM_register _
+    | FCM_zero _ | FCSEL | FCVT | FCVTL_vector | FCVTNS | FCVTNS_vector
+    | FCVTN_vector | FCVTZS | FCVTZS_vector | FDIV | FDIV_vector | FMADD | FMAX
+    | FMAX_vector | FMIN | FMIN_vector | FMOV_fp | FMOV_gp_to_fp_32
+    | FMOV_gp_to_fp_64 | FMOV_fp_to_gp_32 | FMOV_fp_to_gp_64
+    | FMOV_scalar_immediate | FMSUB | FMUL | FMUL_vector | FNEG | FNEG_vector
+    | FNMADD | FNMSUB | FNMUL | FRECPE_vector | FRINT _ | FRINT_vector _
+    | FRSQRTE_vector | FSQRT | FSQRT_vector | FSUB | FSUB_vector | INS _
+    | INS_V _ | LDAR | LDP _ | LDR | LDRB | LDRH | LDRSB | LDRSH | LDRSW
+    | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ | MSUB
+    | MUL_vector | MVN_vector | NEG_vector | NOP | ORR_immediate
+    | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | SBFM
+    | SCVTF | SCVTF_vector | SDIV | SHL | SMAX_vector | SMIN_vector | SMOV _
+    | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector | SQSUB_vector
+    | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR | STRB | STRH
+    | STR_simd_and_fp | SUBS_immediate | SUBS_shifted_register | SUB_immediate
+    | SUB_shifted_register | SUB_vector | SXTL _ | TST | UADDLP_vector | UBFM
+    | UMAX_vector | UMIN_vector | UMOV _ | UMULH | UMULL2_vector _
+    | UMULL_vector _ | UQADD_vector | UQSUB_vector | UQXTN _ | UQXTN2 _
+    | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD | ZIP1 | ZIP2 ->
+      None
 end
 
 module DSL = struct
@@ -2973,16 +3011,32 @@ module DSL = struct
       let str = Format.asprintf "\t%a\n" Instruction.print instr in
       match !emit_string with None -> () | Some emit_string -> emit_string str
 
+    type measurement =
+      { count : int;
+        min_max_displacement : int option
+      }
+
     let with_measuring ~f =
       let saved_emit_string = !emit_string in
       let saved_emit_instruction = !emit_instruction in
       let count = ref 0 in
+      let min_disp = ref None in
       emit_string := None;
-      emit_instruction := Some (fun _ -> incr count);
+      let emit_instruction_callback instr =
+        incr count;
+        match Instruction.max_displacement instr with
+        | None -> ()
+        | Some disp ->
+          let new_min_disp =
+            match !min_disp with None -> disp | Some prev -> min prev disp
+          in
+          min_disp := Some new_min_disp
+      in
+      emit_instruction := Some emit_instruction_callback;
       f ();
       emit_string := saved_emit_string;
       emit_instruction := saved_emit_instruction;
-      !count
+      { count = !count; min_max_displacement = !min_disp }
 
     let ins1 name a = ins name (Singleton a)
 

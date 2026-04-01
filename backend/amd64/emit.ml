@@ -2247,6 +2247,9 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Intop_imm (Iadd, n))
     when not (Reg.equal_location i.arg.(0).loc i.res.(0).loc) ->
     I.lea (mem64 NONE n (arg_idx i 0)) (res i 0)
+  | Lop (Intop_imm (Isub, n))
+    when not (Reg.equal_location i.arg.(0).loc i.res.(0).loc) ->
+    I.lea (mem64 NONE (-n) (arg_idx i 0)) (res i 0)
   | Lop (Intop_imm (Iadd, 1) | Intop_imm (Isub, -1)) -> I.inc (res i 0)
   | Lop (Intop_imm (Iadd, -1) | Intop_imm (Isub, 1)) -> I.dec (res i 0)
   | Lop (Intop_imm (op, n)) ->
@@ -2442,7 +2445,8 @@ let emit_instr ~first ~last ~fallthrough i =
     Probe_emission.add_probe ~probe_label ~probe_insn:i ~probe_name:name
       ~probe_enabled_at_init:enabled_at_init
       ~probe_handler_code_sym:handler_code_sym ~stack_offset:!stack_offset
-      ~num_stack_slots:(Stack_class.Tbl.copy num_stack_slots);
+      ~num_stack_slots:(Stack_class.Tbl.copy num_stack_slots)
+      ~contains_calls:!contains_calls;
     D.define_label (label_to_asm_label ~section:Text probe_label);
     I.nop ();
     (* for uprobes and usdt probes as well *)
@@ -2660,6 +2664,7 @@ let fundecl fundecl =
   then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
+  X86_proc.peephole_optimize_from fun_body_start;
   record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
     ~asm_start:fun_body_start;
   List.iter emit_call_gc !call_gc_sites;
@@ -3151,7 +3156,7 @@ let end_assembly () =
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
   D.data ();
-  Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol;
+  Probe_emission.emit_probe_notes ~add_def_symbol;
   emit_trap_notes ();
   D.mark_stack_non_executable ();
   (* Note that [mark_stack_non_executable] switches the section on Linux. *)

@@ -2099,7 +2099,7 @@ and n_way_join_head_of_kind_value env
       List.map
         (fun ((id, head) : TG.head_of_kind_value Join_env.join_arg) ->
           match head.is_null with
-          | Not_null -> id, Simple.const_false machine_width
+          | Not_null -> id, Simple.untagged_const_false machine_width
           | Maybe_null { is_null = None } -> raise_notrace Cannot_track
           | Maybe_null { is_null = Some is_null } -> id, Simple.var is_null)
         heads
@@ -2116,11 +2116,11 @@ and n_way_join_head_of_kind_value env
             ~const:(fun const : TG.is_null ->
               if
                 Reg_width_const.equal const
-                  (Reg_width_const.const_false machine_width)
+                  (Reg_width_const.untagged_const_false machine_width)
               then Not_null
               else
                 (* We rely on the fact that, if we find [true] here, all the
-                   [non_null] fields must be [Bottom] already. *)
+                   [Not_null] fields must be [Bottom] already. *)
                 Maybe_null { is_null = None })
             ~symbol:(fun _ ->
               Misc.fatal_error "Unexpected symbol in join of naked immediates")
