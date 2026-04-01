@@ -37,7 +37,7 @@ Line 2, characters 14-17:
 2 | let invalid = #'' ;;
                   ^^^
 Error: Illegal empty character literal ''
-  Hint: Did you mean ' ' or a type variable 'a?
+Hint: Did you mean ' ' or a type variable 'a?
 Line 1, characters 14-21:
 1 | let invalid = #'\400' ;;
                   ^^^^^^^

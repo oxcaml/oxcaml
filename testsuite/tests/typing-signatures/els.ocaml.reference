@@ -62,15 +62,20 @@ module type COMBINED_TYPE =
   end
 module type BARECODE = sig type state val init : state -> unit end
 module USERCODE :
-  (X : TYPEVIEW) ->
+  functor (X : TYPEVIEW) ->
     sig
       module type F =
-        (C : sig
-               module V :
-                 sig type value type state type usert = X.combined end
-               val setglobal : V.state -> string -> V.value -> unit
-               val apply : V.value -> V.state -> V.value list -> V.value
-             end)
+        functor (C : sig
+                       module V :
+                         sig
+                           type value
+                           type state
+                           type usert = X.combined
+                         end
+                       val setglobal : V.state -> string -> V.value -> unit
+                       val apply :
+                         V.value -> V.state -> V.value list -> V.value
+                     end)
           -> sig val init : C.V.state -> unit end
     end
 module Weapon : sig type t end
@@ -87,6 +92,6 @@ module type WEAPON_LIB =
             end)
         -> USERCODE(TV).F
   end
-module type X = (X : CORE) -> BARECODE
-module type X = CORE -> BARECODE
+module type X = functor (X : CORE) -> BARECODE
+module type X = functor CORE -> BARECODE
 

@@ -1,20 +1,20 @@
 Line _, characters _-_:
  | let _ = x;;
            ^
-Error: Unbound value "x"
+Error: Unbound value x
 Line _, characters _-_:
  | let _ = 1 + "abc";;
                ^^^^^
-Error: This expression has type "string" but an expression was expected of type
-         "int"
+Error: This constant has type string but an expression was expected of type
+         int
 Lines _-_, characters _-_:
  | ....(
  |     1
  |     +
  |     2
  |   )
-Error: This expression has type "int" but an expression was expected of type
-         "string"
+Error: This expression has type int but an expression was expected of type
+         string
 Line _, characters _-_:
  | struct type t module M = struct type t end type a = M.t end;;
    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
