@@ -193,6 +193,42 @@ Error: Invalid [@or_null] declaration:
        it must have exactly one nullary constructor and one unary constructor carrying the sole type parameter.
 |}]
 
+(* CR or-null: allow GADT custom [@@or_null] types.
+   Internal ticket 6854. *)
+
+type 'a gadt =
+  | A : 'a gadt
+  | B : 'a -> 'a gadt
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type 'a gadt =
+2 |   | A : 'a gadt
+3 |   | B : 'a -> 'a gadt
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       GADT constructors are not supported with [@@or_null].
+|}]
+
+(* CR or-null: allow GADT custom [@@or_null] types with concrete indices.
+   Internal ticket 6854. *)
+
+type 'a concrete_gadt =
+  | Null : int concrete_gadt
+  | This : string -> bool concrete_gadt
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type 'a concrete_gadt =
+2 |   | Null : int concrete_gadt
+3 |   | This : string -> bool concrete_gadt
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       GADT constructors are not supported with [@@or_null].
+|}]
+
 type ('a : value_or_null) bad_jkind =
   | A
   | B of 'a
