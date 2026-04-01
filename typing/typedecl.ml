@@ -2188,8 +2188,8 @@ let rec update_decl_jkind env dpath decl =
           (fun cd ->
              match cd.Types.cd_args with
              | Cstr_tuple [_] -> true
-             | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
-               false)
+             | Cstr_tuple [] -> false
+             | Cstr_tuple (_ :: _ :: _) | Cstr_record _ -> assert false)
           cstrs
       in
       begin match payload with
