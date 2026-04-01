@@ -20,3 +20,12 @@ let rec t =
   };;
 
 let (_ : t) = Sys.opaque_identity t
+
+type v = { void : unit#; i : int }
+
+let rec v = { void = #(); i = 0xdeadbeef }
+
+let () =
+  Gc.full_major ();
+  ignore (Sys.opaque_identity t.i);
+;;
