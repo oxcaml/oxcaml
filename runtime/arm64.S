@@ -1156,7 +1156,9 @@ L(do_perform):
 #endif
         ldr     x9, Stack_handler(x2)  /* x9 := old stack -> handler */
         ldr     x10, Handler_parent(x9) /* x10 := parent stack */
-        cbz     x10, 1f
+        ldr     TMP, Handler_effect(x9)
+        cmp     TMP, 1
+        beq     1f
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers x0, x1, x2, x3, x9 and x10 */
         stp     x0, x1, [sp, -16]!

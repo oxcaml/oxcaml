@@ -1037,7 +1037,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       }
     raise_notrace:
       if (domain_state->trap_sp_off > 0) {
-        if (Stack_parent(domain_state->current_stack) == NULL) {
+        if (Stack_handle_exception(domain_state->current_stack) == Val_unit) {
           domain_state->external_raise = initial_external_raise;
           domain_state->external_raise_async = initial_external_raise_async;
           domain_state->trap_sp_off = initial_trap_sp_off;
@@ -1047,6 +1047,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
         } else {
           struct stack_info* old_stack = domain_state->current_stack;
           struct stack_info* parent_stack = Stack_parent(old_stack);
+          CAMLassert(parent_stack != NULL);
           value hexn = Stack_handle_exception(old_stack);
           old_stack->sp = sp;
           domain_state->current_stack = parent_stack;
@@ -1404,7 +1405,7 @@ do_resume: {
       struct stack_info* parent_stack = Stack_parent(old_stack);
 
       check_trap_barrier_for_effect (domain_state);
-      if (parent_stack == NULL) {
+      if (Stack_handle_effect(old_stack) == Val_unit) {
         Setup_for_c_call;
         accu = caml_make_unhandled_effect_exn(accu);
         Restore_after_c_call;
@@ -1452,7 +1453,7 @@ do_resume: {
       sp[0] = Val_long(domain_state->trap_sp_off);
       sp[1] = Val_long(extra_args);
 
-      if (parent == NULL) {
+      if (Stack_handle_effect(self) == Val_unit) {
         Setup_for_c_call;
         resume_arg = caml_make_unhandled_effect_exn(eff);
         accu = caml_continuation_use(cont);

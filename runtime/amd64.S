@@ -1308,7 +1308,7 @@ LBL(do_perform):
 #endif
         movq    Stack_handler(%rsi), %r11  /* %r11 := old stack -> handler */
         movq    Handler_parent(%r11), %r10 /* %r10 := parent stack */
-        cmpq    $0, %r10                   /* parent is NULL? */
+        cmpq    $1, Handler_effect(%r11)   /* handler is Val_unit? */
         je      LBL(112)
 #if defined(WITH_THREAD_SANITIZER)
      /* Save non-callee-saved registers %rax, %rdi, %rsi, %r10, %r11 before C

@@ -46,33 +46,26 @@
 
 /*
  * These functions are to ensure effects are handled correctly inside
- * callbacks. There are two aspects:
- *  - we clear the stack parent for a callback to force an Effect.Unhandled
- *  exception rather than effects being passed over the callback
- *  - we register the stack parent as a local root while the callback
- * is executing to ensure that the garbage collector follows the
- * stack parent
+ * callbacks, by saving and restoring exception and effect handlers.
  */
-Caml_inline value alloc_and_clear_stack_parent(caml_domain_state* domain_state)
+Caml_inline void save_stack_handlers(caml_domain_state* domain_state,
+                                     value* hexn, value* heff)
 {
-  struct stack_info* parent_stack = Stack_parent(domain_state->current_stack);
-  if (parent_stack == NULL) {
-    return Val_unit;
-  } else {
-    value cont = caml_alloc_2(Cont_tag, Val_ptr(parent_stack), Val_long(0));
-    Stack_parent(domain_state->current_stack) = NULL;
-    return cont;
-  }
+  struct stack_info* stk = domain_state->current_stack;
+  *hexn = Stack_handle_exception(stk);
+  *heff = Stack_handle_effect(stk);
+  Stack_handle_exception(stk) = Val_unit;
+  Stack_handle_effect(stk) = Val_unit;
 }
 
-Caml_inline void restore_stack_parent(caml_domain_state* domain_state,
-                                      value cont)
+Caml_inline void restore_stack_handlers(caml_domain_state* domain_state,
+                                        value hexn, value heff)
 {
-  CAMLassert(Stack_parent(domain_state->current_stack) == NULL);
-  if (Is_block(cont)) {
-    struct stack_info* parent_stack = Ptr_val(caml_continuation_use(cont));
-    Stack_parent(domain_state->current_stack) = parent_stack;
-  }
+  struct stack_info* stk = domain_state->current_stack;
+  CAMLassert(Stack_handle_exception(stk) == Val_unit);
+  CAMLassert(Stack_handle_effect(stk) == Val_unit);
+  Stack_handle_exception(stk) = hexn;
+  Stack_handle_effect(stk) = heff;
 }
 
 static value raise_if_exception(value res)
@@ -118,7 +111,7 @@ static void init_callback_code(void)
 static value caml_callbackN_exn0(value closure, int narg, value args[])
 {
   CAMLparam0(); /* no need to register closure and args as roots, see below */
-  CAMLlocal1(cont);
+  CAMLlocal2(hexn, heff);
   value res;
   int i;
   caml_domain_state* domain_state = Caml_state;
@@ -139,17 +132,14 @@ static value caml_callbackN_exn0(value closure, int narg, value args[])
   domain_state->current_stack->sp[narg + 2] = Val_long(0); /* extra args */
   domain_state->current_stack->sp[narg + 3] = closure;
 
-  cont = alloc_and_clear_stack_parent(domain_state);
-  /* This can call the GC and invalidate the values [closure] and [args].
-     However, they are never used afterwards,
-     as they were copied into the root [domain_state->current_stack]. */
+  save_stack_handlers(domain_state, &hexn, &heff);
 
   caml_update_young_limit_after_c_call(domain_state);
   res = caml_interprete(callback_code, sizeof(callback_code));
   if (Is_exception_result(res))
     domain_state->current_stack->sp += narg + 4; /* PR#3419 */
 
-  restore_stack_parent(domain_state, cont);
+  restore_stack_handlers(domain_state, hexn, heff);
 
   CAMLreturn (res);
 }
@@ -246,21 +236,16 @@ static value callback(value closure, value arg)
   caml_maybe_expand_stack();
 
   if (Stack_parent(domain_state->current_stack)) {
-    value cont, res;
+    value hexn, heff, res;
 
-    /* [closure] and [arg] need to be preserved across the allocation
-       of the stack parent, but need not and should not be registered
-       as roots past this allocation. */
-    Begin_roots2(closure, arg);
-    cont = alloc_and_clear_stack_parent(domain_state);
-    End_roots();
+    save_stack_handlers(domain_state, &hexn, &heff);
 
-    Begin_roots1(cont);
+    Begin_roots2(hexn, heff);
     caml_update_young_limit_after_c_call(domain_state);
     res = caml_callback_asm(domain_state, closure, &arg);
     End_roots();
 
-    restore_stack_parent(domain_state, cont);
+    restore_stack_handlers(domain_state, hexn, heff);
 
     return res;
   } else {
@@ -278,20 +263,17 @@ static value callback2(value closure, value arg1, value arg2)
   CAMLassert(arg1 != 0);
 
   if (Stack_parent(domain_state->current_stack)) {
-    value cont, res;
+    value hexn, heff, res;
 
-    /* Root registration policy: see caml_callback_exn. */
-    Begin_roots3(closure, arg1, arg2);
-    cont = alloc_and_clear_stack_parent(domain_state);
-    End_roots();
+    save_stack_handlers(domain_state, &hexn, &heff);
 
-    Begin_roots1(cont);
+    Begin_roots2(hexn, heff);
     value args[] = {arg1, arg2};
     caml_update_young_limit_after_c_call(domain_state);
     res = caml_callback2_asm(domain_state, closure, args);
     End_roots();
 
-    restore_stack_parent(domain_state, cont);
+    restore_stack_handlers(domain_state, hexn, heff);
 
     return res;
   } else {
@@ -308,20 +290,18 @@ static value callback3(value closure, value arg1, value arg2, value arg3)
   caml_maybe_expand_stack();
 
   if (Stack_parent(domain_state->current_stack))  {
-    value cont, res;
+    value hexn, heff, res;
 
     /* Root registration policy: see caml_callback_exn. */
-    Begin_roots4(closure, arg1, arg2, arg3);
-    cont = alloc_and_clear_stack_parent(domain_state);
-    End_roots();
+    save_stack_handlers(domain_state, &hexn, &heff);
 
-    Begin_root(cont);
+    Begin_roots2(hexn, heff);
     value args[] = {arg1, arg2, arg3};
     caml_update_young_limit_after_c_call(domain_state);
     res = caml_callback3_asm(domain_state, closure, args);
     End_roots();
 
-    restore_stack_parent(domain_state, cont);
+    restore_stack_handlers(domain_state, hexn, heff);
 
     return res;
   } else {
