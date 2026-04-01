@@ -272,7 +272,7 @@ static void caml_thread_scan_roots(
         if (th->current_stack != NULL)
           caml_do_local_roots(action, fflags, fdata,
                               th->local_roots, th->current_stack, th->gc_regs,
-                              th->dynamic);
+                              th->dynamic, th->c_stack);
       }
       th = th->next;
     } while (th != active);

@@ -749,7 +749,8 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   caml_do_local_roots(
     &oldify_one, oldify_scanning_flags, &st,
     domain->local_roots, domain->current_stack, domain->gc_regs,
-    domain->dynamic_bindings);
+    domain->dynamic_bindings,
+    domain->c_stack);
 
   scan_roots_hook = atomic_load(&caml_scan_roots_hook);
   if (scan_roots_hook != NULL)
