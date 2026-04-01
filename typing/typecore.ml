@@ -4846,10 +4846,6 @@ let rec maybe_computation exp =
     maybe_computation exp
   | Texp_array (_, _, exps, _) ->
     List.exists maybe_computation exps
-  | Texp_exclave exp ->
-    maybe_computation exp
-  | Texp_pack mexp ->
-    maybe_computation_mod mexp
   | Texp_hole _ ->
     false
   | Texp_quotation exp ->
@@ -4883,28 +4879,17 @@ let rec maybe_computation exp =
   | Texp_assert _
   | Texp_lazy _
   | Texp_object _
+  | Texp_pack _
   | Texp_letop _
   | Texp_unreachable
   | Texp_extension_constructor _
   | Texp_open _
   | Texp_probe _
   | Texp_probe_is_enabled _
+  | Texp_exclave _
   | Texp_src_pos
   | Texp_overwrite _
   | Texp_antiquotation _
-    -> true
-
-and maybe_computation_mod mexp =
-  match mexp.mod_desc with
-  | Tmod_ident _ ->
-    false
-  | Tmod_constraint (mexp, _, _, _) ->
-    maybe_computation_mod mexp
-  | Tmod_functor _
-  | Tmod_unpack _
-  | Tmod_structure _
-  | Tmod_apply _
-  | Tmod_apply_unit _
     -> true
 
 let annotate_recursive_bindings env valbinds =

@@ -47,10 +47,10 @@ val f : 'a eval -> 'a eval = <fun>
 open (struct
   let eval x = x |> Obj.magic_many |> Obj.magic
 end : sig
-  val eval : 'a expr -> 'a eval
+  val eval : 'a expr @ once -> 'a eval
 end)
 [%%expect {|
-val eval : 'a expr -> 'a eval = <fun>
+val eval : 'a expr @ once -> 'a eval = <fun>
 |}]
 
 let f (x : <[int]> expr) : int = eval x
@@ -154,7 +154,7 @@ Error: This expression has type "<[#($('a) * $('b) * $('c))]> expr"
          because it is an unboxed tuple.
        But the layout of <[#($('a) * $('b) * $('c))]> must be a sublayout of
            value
-         because of the definition of eval at line 7, characters 2-31.
+         because of the definition of eval at line 7, characters 2-38.
 |}]
 
 (* Objects *)
