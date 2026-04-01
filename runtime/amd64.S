@@ -1407,7 +1407,7 @@ LBL(112):
        execution. Otherwise, raise Effect.Unhandled. */
         WOSIZE_BLOCK_VAL(%rbx, %rcx)
         cmpq    $3, %rcx
-        je      1f
+        je      LBL(preemption_unhandled)
         CFI_REMEMBER_STATE
         ENTER_FUNCTION
 #if defined(WITH_THREAD_SANITIZER)
@@ -1431,9 +1431,15 @@ LBL(112):
         LEA_VAR(caml_raise_unhandled_effect, %rax)
         jmp     LBL(caml_c_call)
         CFI_RESTORE_STATE
-1:      /* Preemption unhandled; jump into the end of caml_resume which will
-           handle redoing the interrupted allocation, restoring registers, and
-           returning to user code */
+LBL(preemption_unhandled):
+    /* When preemptions are unhandled, we resume them rather than raising */
+        movq   %rbx, C_ARG_1
+        SWITCH_OCAML_TO_C
+        C_call (GCALL(caml_continuation_use_noexc)) /* %rax := stack */
+        SWITCH_C_TO_OCAML
+    /* jump into the end of caml_resume, which will handle redoing the
+       interrupted allocation, restoring registers, and returning to user
+       code */
         movq   Cont_gc_regs(%rbx), %rdx
         jmp    LBL(resume_preemption)
 CFI_ENDPROC
