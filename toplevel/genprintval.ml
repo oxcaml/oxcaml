@@ -494,9 +494,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                                    Types.constructor_declaration) ->
                                match cd_args with
                                | Cstr_tuple [_] | Cstr_record [_] -> true
-                               | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _)
-                               | Cstr_record [] | Cstr_record (_ :: _ :: _) ->
-                                 false)
+                               | Cstr_tuple [] -> false
+                               | Cstr_tuple (_ :: _ :: _) | Cstr_record []
+                               | Cstr_record (_ :: _ :: _) -> assert false)
                             constr_list
                         | _ -> raise Datarepr.Constr_not_found
                     in
