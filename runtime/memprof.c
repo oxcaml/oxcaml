@@ -2299,10 +2299,10 @@ value caml_memprof_do_pending_exn(void)
   value requested_config = atomic_load_acquire(&requested_global_config);
   value existing_config = thread->entries.config;
   if (requested_config != CONFIG_NONE && existing_config != requested_config) {
-    if (!Sampling(requested_config)) {
+    if (!profiling(requested_config)) {
         atomic_compare_exchange_strong(&requested_global_config, &requested_config, CONFIG_NONE);
     } else {
-      if (Sampling(existing_config)) /* stop any existing profile on this domain */
+      if (profiling(existing_config)) /* stop any existing profile on this domain */
           Set_status(existing_config, CONFIG_STATUS_STOPPED);
 
       if (!orphans_create(domain))
@@ -2402,6 +2402,7 @@ CAMLprim value caml_memprof_enlist(value config)
   case CONFIG_STATUS_STOPPED:
     caml_failwith("Gc.Memprof.enlist: profile already stopped.");
   case CONFIG_STATUS_SAMPLING:
+  case CONFIG_STATUS_SAMPLING_MIN:
     break;
   }
 
@@ -2429,6 +2430,7 @@ CAMLprim value caml_memprof_enlist_all_domains(value config)
   case CONFIG_STATUS_STOPPED:
     caml_failwith("Gc.Memprof.enlist_all_domains: profile already stopped.");
   case CONFIG_STATUS_SAMPLING:
+  case CONFIG_STATUS_SAMPLING_MIN:
     break;
   }
   atomic_store(&requested_global_config, config);
