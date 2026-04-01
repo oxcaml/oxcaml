@@ -47,9 +47,11 @@ let client (id, addr) =
   let buf = Bytes.make 1024 ' ' in
   ignore (Unix.write_substring sock msg 0 (String.length msg));
   let n = Unix.read sock buf 0 (Bytes.length buf) in
+  wait_for_turn id;
   Mutex.lock mutex;
   lines := (Bytes.sub buf 0 n) :: !lines;
-  Mutex.unlock mutex
+  Mutex.unlock mutex;
+  signal_turn id
 
 let () =
   let addr = Unix.ADDR_INET(Unix.inet_addr_loopback, 0) in
