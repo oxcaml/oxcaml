@@ -7,7 +7,7 @@
 *)
 
 let print_interval ?expected () =
-  let interval = Domain.Tick.global_effective_interval_usec () in
+  let interval = Domain.Tick.effective_interval_usec () in
   (match interval with
    | Null -> Printf.printf "Global (effective) interval: none"
    | This n -> Printf.printf "Global (effective) interval: %d μs" n);

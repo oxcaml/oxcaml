@@ -13,7 +13,7 @@ external set_tick_hook : (unit -> unit) -> unit = "set_tick_hook" [@@noalloc]
 external poll : unit -> unit = "%poll"
 
 let print_tick_interval () =
-  match Domain.Tick.global_effective_interval_usec () with
+  match Domain.Tick.effective_interval_usec () with
   | Null -> Printf.printf "effective tick interval: none\n%!"
   | This n -> Printf.printf "effective tick interval: %d\n%!" n
 
