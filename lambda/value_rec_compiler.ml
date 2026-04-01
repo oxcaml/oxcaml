@@ -943,6 +943,7 @@ let compile_letrec input_bindings body =
           | Regular_block size -> alloc_prim, [size]
           | Float_record size -> alloc_float_record_prim, [size]
           | Mixed_record shape ->
+            if !Clflags.native_code then
               let shape =
                 Mixed_block_shape.of_mixed_block_elements
                   ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
@@ -952,6 +953,9 @@ let compile_letrec input_bindings body =
               let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
               let size = value_prefix_len + flat_suffix_len in
               alloc_mixed_record_prim, [size; value_prefix_len]
+            else
+              let size = Array.length shape in
+              alloc_mixed_record_prim, [size; size]
         in
         let alloc =
           Lprim (Pccall alloc_prim,
