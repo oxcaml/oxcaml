@@ -82,6 +82,9 @@ Lines 1-5, characters 0-11:
 Error: Invalid [@or_null] declaration: it must have exactly two constructors.
 |}]
 
+(* CR or-null: allow non-parameterized custom [@@or_null] types.
+   Internal ticket 6853. *)
+
 type t_no_param =
   | A
   | B of int
