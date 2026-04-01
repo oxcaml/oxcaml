@@ -236,10 +236,31 @@ module MoveSpillsAndReloads : sig
     definitions_at_beginning:definitions_at_beginning ->
     destructions_at_end * definitions_at_beginning
 end = struct
+  let move_definition :
+      definitions_at_beginning:definitions_at_beginning ref ->
+      from:Label.t ->
+      to_:Label.t ->
+      Reg.t ->
+      unit =
+   fun ~definitions_at_beginning ~from ~to_ definition ->
+    definitions_at_beginning
+      := Label.Map.update from
+           (function
+             | None -> assert false
+             | Some set -> Some (Reg.Set.remove definition set))
+           !definitions_at_beginning;
+    definitions_at_beginning
+      := Label.Map.update to_
+           (function
+             | None -> Some (Reg.Set.singleton definition)
+             | Some set -> Some (Reg.Set.add definition set))
+           !definitions_at_beginning
+
   (** A definition at the begin of a block can be moved down if:
 
       - the block does neither raise nor end with a destruction point;
-      - the block has only one normal successor and no exceptional successor;
+      - the block has only one normal successor where the definition is used,
+        and no exceptional successor;
       - the successor has only one predecessor;
       - the block and its successor are different;
       - the defined register has no occurrences in the block. *)
@@ -261,54 +282,47 @@ end = struct
         let block = Cfg_with_infos.get_block_exn cfg_with_infos label in
         match Label.Map.find_opt label !definitions_at_beginning with
         | None -> ()
-        | Some (definitions : Reg.Set.t) -> (
+        | Some (definitions : Reg.Set.t) ->
           if
             Option.is_none (destruction_point_at_end block)
             && Option.is_none block.exn
           then
-            let successor_labels =
+            let successor_labels : Label.Set.t =
               Cfg.successor_labels ~normal:true ~exn:false block
             in
-            match Label.Set.cardinal successor_labels with
-            | 1 ->
-              let successor_label = Label.Set.choose successor_labels in
-              let successor_block =
-                Cfg.get_block_exn
-                  (Cfg_with_infos.cfg cfg_with_infos)
-                  successor_label
-              in
-              if
-                (not (Label.equal label successor_label))
-                && Label.Set.cardinal successor_block.predecessors = 1
-              then
-                let to_move : Reg.Set.t =
-                  (* CR-soon xclerc for xclerc: consider ignoring `res` to speed
-                     up the check. *)
-                  Reg.Set.filter
-                    (fun (reg : Reg.t) ->
-                      let occurs = occurs_block block reg in
-                      not occurs)
-                    definitions
+            Reg.Set.iter
+              (fun (definition : Reg.t) ->
+                let successor_blocks_using_definition : Label.Set.t =
+                  Label.Set.filter
+                    (fun successor_label ->
+                      Reg.Set.mem definition
+                        (live_at_block_beginning cfg_with_infos successor_label))
+                    successor_labels
                 in
-                if not (Reg.Set.is_empty to_move)
-                then (
-                  if debug
-                  then
-                    log "moving %a from block %a to block %a" Printreg.regset
-                      to_move Label.format label Label.format successor_label;
-                  definitions_at_beginning
-                    := Label.Map.update label
-                         (function
-                           | None -> assert false
-                           | Some set -> Some (Reg.Set.diff set to_move))
-                         !definitions_at_beginning;
-                  definitions_at_beginning
-                    := Label.Map.update successor_label
-                         (function
-                           | None -> Some to_move
-                           | Some set -> Some (Reg.Set.union set to_move))
-                         !definitions_at_beginning)
-            | _ -> ()));
+                match Label.Set.cardinal successor_blocks_using_definition with
+                | 1 ->
+                  (* CR-someday xclerc for xclerc: consider duplicating the
+                     definition *)
+                  let successor_label =
+                    Label.Set.choose successor_blocks_using_definition
+                  in
+                  let successor_block =
+                    Cfg.get_block_exn
+                      (Cfg_with_infos.cfg cfg_with_infos)
+                      successor_label
+                  in
+                  if
+                    (not (Label.equal label successor_label))
+                    && Label.Set.cardinal successor_block.predecessors = 1
+                    && not (occurs_block block definition)
+                  then begin
+                    log "moving %a from block %a to block %a" Printreg.reg
+                      definition Label.format label Label.format successor_label;
+                    move_definition ~definitions_at_beginning ~from:label
+                      ~to_:successor_label definition
+                  end
+                | _ -> ())
+              definitions);
     if debug then dedent ();
     !definitions_at_beginning, stack
 
