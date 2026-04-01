@@ -85,14 +85,14 @@ Error: Invalid [@or_null] declaration: it must have exactly two constructors.
 (* CR or-null: allow non-parameterized custom [@@or_null] types.
    Internal ticket 6853. *)
 
-type t_no_param =
+type no_param =
   | A
   | B of int
 [@@or_null]
 
 [%%expect{|
 Lines 1-4, characters 0-11:
-1 | type t_no_param =
+1 | type no_param =
 2 |   | A
 3 |   | B of int
 4 | [@@or_null]
@@ -100,14 +100,17 @@ Error: Invalid [@or_null] declaration:
        it must have exactly one type parameter.
 |}]
 
-type 'a wrong_payload =
+(* CR or-null: allow custom [@@or_null] types with unused type parameters.
+   Internal ticket 6853. *)
+
+type 'a unused_param =
   | A
   | B of int
 [@@or_null]
 
 [%%expect{|
 Lines 1-4, characters 0-11:
-1 | type 'a wrong_payload =
+1 | type 'a unused_param =
 2 |   | A
 3 |   | B of int
 4 | [@@or_null]
