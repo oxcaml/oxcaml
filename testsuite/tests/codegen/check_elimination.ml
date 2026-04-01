@@ -4,6 +4,7 @@
  flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  only-default-codegen;
  expect.opt;
 *)
@@ -131,11 +132,8 @@ redundant_compare:
   cmpq  $1, %rax
   jle   .L110
   cmpq  $11, %rax
-  jle   .L107
+  jle   .L110
   movl  $201, %eax
-  ret
-.L107:
-  movl  $401, %eax
   ret
 .L110:
   movl  $401, %eax

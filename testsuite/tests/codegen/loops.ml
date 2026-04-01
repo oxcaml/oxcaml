@@ -11,6 +11,7 @@
  flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -170,8 +171,6 @@ noop_loop:
   incq  %rax
   cmpq  %rbx, %rax
   jle   .L110
-  movl  $1, %eax
-  ret
 .L119:
   movl  $1, %eax
   ret
@@ -275,7 +274,11 @@ loop_invariant_code:
   subq  $24, %rsp
   movq  %rax, (%rsp)
   movq  %rbx, 8(%rsp)
-  movl  $1, %edi
+  xorl  %edi, %edi
+  cmpq  $1, %rax
+  je    .L118
+  jmp   .L113
+.L109:
   cmpq  $1, %rax
   je    .L118
 .L113:
@@ -287,18 +290,10 @@ loop_invariant_code:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   movq  16(%rsp), %rdi
-  cmpq  $19, %rdi
-  je    .L123
-  jmp   .L120
 .L118:
-  cmpq  $19, %rdi
-  je    .L123
-.L120:
-  addq  $2, %rdi
-  cmpq  $1, %rax
-  je    .L118
-  jmp   .L113
-.L123:
+  incq  %rdi
+  cmpq  $9, %rdi
+  jle   .L109
   movl  $1, %eax
   addq  $24, %rsp
   ret

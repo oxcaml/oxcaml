@@ -11,6 +11,7 @@
  flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -376,7 +377,7 @@ unsigned_to_int:
   jl    .L112
   movabsq $4611686018427387903, %rax
   cmpq  %rax, %rbx
-  jg    .L109
+  jg    .L112
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
@@ -387,9 +388,6 @@ unsigned_to_int:
   leaq  1(%rbx,%rbx), %rbx
   movq  %rbx, (%rax)
   addq  $8, %rsp
-  ret
-.L109:
-  movl  $1, %eax
   ret
 .L112:
   movl  $1, %eax

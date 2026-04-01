@@ -11,6 +11,7 @@
  flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -108,11 +109,8 @@ combine_comparisons:
   cmpq  $11, %rbx
   jle   .L114
   testq %rax, %rax
-  je    .L111
+  je    .L114
   movq  %rbx, %rax
-  ret
-.L111:
-  movl  $1, %eax
   ret
 .L114:
   movl  $1, %eax
@@ -134,11 +132,8 @@ repeat_comparisons:
   cmpq  $11, %rbx
   jle   .L113
   testq %rax, %rax
-  je    .L110
+  je    .L113
   movl  $3, %eax
-  ret
-.L110:
-  movl  $5, %eax
   ret
 .L113:
   movl  $5, %eax
@@ -201,14 +196,12 @@ let constant_folding (x : int) =
 [%%expect_asm X86_64{|
 constant_folding:
   cmpq  %rax, %rax
-  jge   .L105
-  movl  $7, %eax
-  ret
-.L105:
+  jl    .L109
   subq  %rax, %rax
   incq  %rax
   cmpq  $1, %rax
   jne   .L111
+.L109:
   movl  $7, %eax
   ret
 .L111:
