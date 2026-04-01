@@ -2868,7 +2868,6 @@ let constrain_type_jkind ~fixed env ty jkind =
       loop ~fuel ~expanded ty ty's_jkind jkind
 
     | _ ->
-<<<<<<< HEAD
        if !Clflags.ikinds_debug
        then
          Format.eprintf
@@ -2881,13 +2880,6 @@ let constrain_type_jkind ~fixed env ty jkind =
            jkind;
        let sub_result =
          Ikind.sub_or_intersect ~type_equal ~context ~level:!current_level env
-||||||| 23394b0b2c
-       match
-         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level env
-=======
-       match
-         Jkind.sub_or_intersect ~type_equal ~context env
->>>>>>> origin/main
            ty's_jkind jkind
        in
        if !Clflags.ikinds_debug
@@ -8128,18 +8120,10 @@ let check_decl_jkind env decl jkind =
     | _ -> decl.type_jkind
   in
   match
-<<<<<<< HEAD
     Ikind.sub_jkind_l
       ~origin:
         (Format.asprintf "ctype:decl %a" Location.print_loc decl.type_loc)
       ~type_equal ~context ~level:!current_level env decl_jkind jkind
-||||||| 23394b0b2c
-    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
-      decl_jkind jkind
-=======
-    Jkind.sub_jkind_l ~type_equal ~context env
-      decl_jkind jkind
->>>>>>> origin/main
   with
   | Ok () -> Ok ()
   | Error _ as err ->
@@ -8148,19 +8132,11 @@ let check_decl_jkind env decl jkind =
     | Some ty ->
       let ty_jkind = type_jkind env ty in
       match
-<<<<<<< HEAD
         Ikind.sub_jkind_l
           ~origin:
             (Format.asprintf "ctype:manifest %a"
                Location.print_loc decl.type_loc)
           ~type_equal ~context ~level:!current_level env ty_jkind jkind
-||||||| 23394b0b2c
-        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
-          ty_jkind jkind
-=======
-        Jkind.sub_jkind_l ~type_equal ~context env
-          ty_jkind jkind
->>>>>>> origin/main
       with
       | Ok () -> Ok ()
       | Error _ as err -> err
@@ -8178,15 +8154,9 @@ let constrain_decl_jkind env decl jkind =
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-<<<<<<< HEAD
       (* Use Ikind when enabled so axis constraints are checked; it falls
          back to [Jkind.sub_or_error] when ikinds are disabled. *)
       Ikind.sub_or_error ~type_equal ~context ~level:!current_level env
-||||||| 23394b0b2c
-      Jkind.sub_or_error ~type_equal ~context ~level:!current_level env
-=======
-      Jkind.sub_or_error ~type_equal ~context env
->>>>>>> origin/main
         decl.type_jkind jkind
     with
     | Ok () as ok -> ok

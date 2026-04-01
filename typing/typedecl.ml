@@ -1535,7 +1535,6 @@ let narrow_to_manifest_jkind env loc path decl =
            (e.g. due to with-bounds/Best). *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
-<<<<<<< HEAD
         (match
            Ikind.sub_jkind_l
              ~origin:(Format.asprintf
@@ -1570,35 +1569,6 @@ let narrow_to_manifest_jkind env loc path decl =
                  "[ikind-narrow] path=%a branch=constrain_type_jkind error@."
                  (Format_doc.compat Path.print) path;
              raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
-||||||| 23394b0b2c
-        match
-          Jkind.sub_jkind_l ~type_equal ~context
-            ~level:(Ctype.get_current_level ()) env manifest_jkind
-            decl.type_jkind
-        with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
-      end
-    | Some type_jkind -> begin
-        match Ctype.constrain_type_jkind env ty type_jkind with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
-      end
-=======
-        match
-          Jkind.sub_jkind_l ~type_equal ~context
-            env manifest_jkind
-            decl.type_jkind
-        with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
-      end
-    | Some type_jkind -> begin
-        match Ctype.constrain_type_jkind env ty type_jkind with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
-      end
->>>>>>> origin/main
     end;
     let type_ikind =
       Ikind.type_declaration_ikind_gated ~env:(Some env) ~path

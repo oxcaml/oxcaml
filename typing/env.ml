@@ -858,7 +858,7 @@ type lookup_error =
       }
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
-  | Non_value_used_in_object of Longident.t * type_expr * Jkind0.Violation.t
+  | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
@@ -3236,22 +3236,6 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
   let with_imports cmi = { cmi with cmi_crcs = imports } in
   save_signature_with_transform with_imports ~alerts sg modname cu cmi
 
-let add_language_extension_types env =
-  let add ext lvl f env  =
-    match Language_extension.is_at_least ext lvl with
-    | true ->
-      (* CR-someday poechsel: Pass a correct shape here *)
-      f (add_type ?shape:None ~check:false) env
-    | false -> env
-  in
-  Language_extension.(env
-  |> add SIMD Stable Predef.add_simd_stable_extension_types
-  |> add SIMD Beta Predef.add_simd_beta_extension_types
-  |> add SIMD Alpha Predef.add_simd_alpha_extension_types
-  |> add Small_numbers Stable Predef.add_small_number_extension_types
-  |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
-  |> add Layouts Stable Predef.add_or_null)
-
 (* Make the initial environment. *)
 let initial () =
   let add_type_and_remember_decl (type_ident : Ident.t) decl env =
@@ -3272,27 +3256,6 @@ let initial () =
       empty
   in
   initial_env
-<<<<<<< HEAD
-  |> add_language_extension_types
-||||||| 23394b0b2c
-
-let add_language_extension_types env =
-  let add ext lvl f env  =
-    match Language_extension.is_at_least ext lvl with
-    | true ->
-      (* CR-someday poechsel: Pass a correct shape here *)
-      f (add_type ?shape:None ~check:false) env
-    | false -> env
-  in
-  lazy
-    Language_extension.(env ()
-    |> add SIMD Stable Predef.add_simd_stable_extension_types
-    |> add SIMD Beta Predef.add_simd_beta_extension_types
-    |> add SIMD Alpha Predef.add_simd_alpha_extension_types
-    |> add Small_numbers Stable Predef.add_small_number_extension_types
-    |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
-    |> add Layouts Stable Predef.add_or_null)
-=======
 
 let add_language_extension_types env =
   let add ext lvl f env  =
@@ -3311,7 +3274,6 @@ let add_language_extension_types env =
     |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
     |> add Layouts Stable Predef.add_or_null
     |> add Runtime_metaprogramming () Predef.add_runtime_metaprogramming_types)
->>>>>>> origin/main
 
 (* Some predefined types are part of language extensions, and we don't want to
    make them available in the initial environment if those extensions are not
@@ -3321,7 +3283,7 @@ let add_language_extension_types env =
    If language extensions are adjusted after [initial] is forced, these
    environments may be inaccurate.
 *)
-let initial = lazy (initial ())
+let initial = add_language_extension_types initial
 
 (* Tracking usage *)
 
@@ -4899,19 +4861,9 @@ let env_of_only_summary env_from_summary env =
 
 (* Forward declartions that must refer to type t *)
 let report_jkind_violation_with_offender =
-<<<<<<< HEAD
-  ref ((fun ~offender:_ ~level:_ _ _ _ -> assert false)
-       : offender:(Format_doc.formatter -> unit) -> level:int -> t ->
-         Format_doc.formatter -> Jkind0.Violation.t -> unit)
-||||||| 23394b0b2c
-  ref ((fun ~offender:_ ~level:_ _ _ _ -> assert false)
-       : offender:(Format_doc.formatter -> unit) -> level:int -> t ->
-         Format_doc.formatter -> Jkind.Violation.t -> unit)
-=======
   ref ((fun ~offender:_ _ _ _ -> assert false)
        : offender:(Format_doc.formatter -> unit) -> t ->
          Format_doc.formatter -> Jkind.Violation.t -> unit)
->>>>>>> origin/main
 
 (* Error report *)
 
