@@ -981,7 +981,6 @@ let rec low_bits ~bits ~dbg x =
       let low_bits = Nativeint.pred (Nativeint.shift_left 1n bits) in
       Nativeint.equal low_bits (Nativeint.logand mask low_bits)
     in
-    (* Ignore sign and zero extensions which do not affect the low bits *)
     map_tail
       (function
         | Cop
@@ -989,12 +988,10 @@ let rec low_bits ~bits ~dbg x =
               [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
               _ )
           when 0 <= left && 0 <= right && max left right <= unused_bits ->
-          (* [sar right (sal left x)] or [shr right (sal left x)]: the low
-             [bits] bits depend only on x shifted by [left - right]. When [left
-             >= right] the net effect is a left shift; when [right > left] the
-             net effect is a right shift, and the condition [right <=
-             unused_bits] guarantees the arithmetic-shift sign extension does
-             not reach into the low [bits] bits. *)
+          (* Replacing a first left then right shift pattern with a single shift
+             leaves the highest `max left right` bits in a different state. It
+             doesn't matter if we use a logical or arithmetic right shift in the
+             end because the topmost bits are wrong anyway. *)
           if left >= right
           then low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
           else low_bits ~bits ~dbg (asr_const x (right - left) dbg)
