@@ -358,6 +358,17 @@ val make_suitable_for_environment :
   (Name.t * flambda_type) list ->
   Typing_env_extension.With_extra_variables.t
 
+(** [type_is_useful full_kind env ty] returns [true] if knowing the type of
+    [name] (which is known to have kind [full_kind]) in environment [env] is
+    useful.
+
+    The exact definition of being "useful" is left to the typing env, and is an
+    approximation of the answer to the question: is the current type of [name]
+    in [env] more precise (in the sense that it would generally allow to [prove]
+    more properties) than [full_kind]? *)
+val type_is_useful :
+  Flambda_kind.With_subkind.t -> Typing_env.t -> Name.t -> bool
+
 val apply_coercion : flambda_type -> Coercion.t -> flambda_type
 
 (** Construct a bottom type of the given kind. *)

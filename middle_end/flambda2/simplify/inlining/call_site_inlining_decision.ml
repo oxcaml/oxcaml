@@ -18,7 +18,6 @@ open! Flambda.Import
 module DE = Downwards_env
 module DA = Downwards_acc
 module T = Flambda2_types
-module TE = T.Typing_env
 module UA = Upwards_acc
 module UE = Upwards_env
 
@@ -125,21 +124,23 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   in
   UA.cost_metrics uacc
 
-let argument_types_useful dacc apply =
+let argument_types_useful dacc ~apply ~code_or_metadata =
   if
     not
       (Flambda_features.Inlining.speculative_inlining_only_if_arguments_useful
          ())
   then true
   else
+    let code_metadata = Code_or_metadata.code_metadata code_or_metadata in
+    let arity = Code_metadata.params_arity code_metadata in
     let typing_env = DE.typing_env (DA.denv dacc) in
-    List.exists
-      (fun simple ->
+    List.exists2
+      (fun full_kind simple ->
         Simple.pattern_match simple
           ~name:(fun name ~coercion:_ ->
-            let ty = TE.find typing_env name None in
-            not (T.is_unknown_maybe_null typing_env ty))
+            T.type_is_useful full_kind typing_env name)
           ~const:(fun _ -> true))
+      (Flambda_arity.unarize arity)
       (Apply.args apply)
 
 let inlining_does_decrease_code_size ~code_or_metadata cost_metrics =
@@ -207,7 +208,7 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
               "Unexpected call site inlinine decision for speculative inlining";
           counters)
       (fun () : Call_site_inlining_decision_type.t ->
-        if not (argument_types_useful dacc apply)
+        if not (argument_types_useful dacc ~apply ~code_or_metadata)
         then Argument_types_not_useful
         else
           let cost_metrics =
