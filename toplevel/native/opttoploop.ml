@@ -34,7 +34,8 @@ let _dummy = (Ok (Obj.magic 0), Err "")
 module Jit = struct
   type t =
     {
-      load : Format.formatter -> Lambda.program -> evaluation_outcome;
+      load : phrase_name:string -> Format.formatter -> Lambda.program
+        -> evaluation_outcome;
       lookup_symbol : string -> Obj.t option;
     }
 end
@@ -348,7 +349,7 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   in
   match !jit with
   | None -> default_load ppf program
-  | Some {Jit.load; _} -> load ppf program
+  | Some {Jit.load; _} -> load ~phrase_name:!phrase_name ppf program
 
 let outval_of_id env id val_type =
   let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
