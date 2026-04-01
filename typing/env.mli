@@ -19,6 +19,14 @@ open Types
 open Misc
 module Jkind = Btype.Jkind0
 
+type stage = private int
+
+module StagedPath : sig
+    type t = { stage : stage; path : Path.t }
+
+    module Map : Map.S with type key = t
+end
+
 type value_unbound_reason =
   | Val_unbound_instance_variable
   | Val_unbound_self
@@ -47,7 +55,7 @@ type summary =
   (** The string set argument of [Env_open] represents a list of module names
       to skip, i.e. that won't be imported in the toplevel namespace. *)
   | Env_functor_arg of summary * Ident.t
-  | Env_constraints of summary * type_declaration Path.Map.t
+  | Env_constraints of summary * type_declaration StagedPath.Map.t
   | Env_copy_types of summary
   | Env_persistent of summary * Ident.t
   | Env_value_unbound of summary * string * value_unbound_reason
@@ -61,8 +69,6 @@ type address = Persistent_env.address =
   | Adot of address * Jkind_types.Sort.t array * int
 
 type t
-
-type stage = private int
 
 val empty: t
 
@@ -444,7 +450,7 @@ val add_modtype_lazy: update_summary:bool ->
    Ident.t -> Subst.Lazy.modtype_declaration -> t -> t
 val add_class: Ident.t -> class_declaration -> t -> t
 val add_cltype: Ident.t -> class_type_declaration -> t -> t
-val add_local_constraint: Path.t -> type_declaration -> t -> t
+val add_local_constraint: stage:stage -> Path.t -> type_declaration -> t -> t
 val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
 val clear_implicit_jkinds : t -> t
 val add_jkind:
