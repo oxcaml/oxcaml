@@ -14,10 +14,9 @@
 
 (* Axis lattice: efficient bitfield encoding of jkind axes.
 
-   This module packs 13 axes into an OCaml immediate-sized integer, where each
-   axis can have 2 or 3 possible values (levels). The axes are indexed 0-12 and
-   their values are ordered from most restrictive (0) to least restrictive
-   (max).
+   This module packs 13 axes into an OCaml immediate-sized integer. The axes
+   are indexed 0-12 and their values are ordered from most restrictive (0) to
+   least restrictive (max).
 
    Axis layout (index, name, values from level 0 to max):
    0. Areality (Regionality): Global -> Regional -> Local
@@ -27,9 +26,8 @@
    4. Portability: Portable -> Shareable -> Nonportable
    5. Forkable: Forkable -> Unforkable
    6. Yielding: Unyielding -> Yielding
-   7. Statefulness: Stateless -> Reading -> Stateful
-      with Writing conservatively collapsed to Stateful
-   8. Visibility (monadic): Immutable -> Read -> Read_write
+   7. Statefulness: Stateless -> Writing / Reading -> Stateful
+   8. Visibility (monadic): Immutable -> Read / Write -> Read_write
    9. Staticity (monadic): Dynamic -> Static
    10. Externality: External -> External64 -> Internal
    11. Nullability: Non_null -> Maybe_null
@@ -40,50 +38,56 @@
    Axes 11-12 are "shallow" axes (nullability and separability) that are
    sometimes excluded from masking operations.
 
-   Each 3-valued axis uses 2 bits, each 2-valued axis uses 1 bit.
-   For 3-valued axes, level 2 is encoded as 0b11 (not 0b10).
+   Each 2-valued axis uses 1 bit. The 3-valued chain axes and 4-valued diamond
+   axes use 2 bits.
 
-   Encoding scheme: each axis uses a "prefix ones" encoding within its slot.
-   For 2 levels: 0 -> 0b0, 1 -> 0b1.
-   For 3 levels: 0 -> 0b00, 1 -> 0b01, 2 -> 0b11.
-   If an axis had 5 levels, it would be 0b0000, 0b0001, 0b0011,
-   0b0111, 0b1111.
+   Chain encoding uses "prefix ones" inside the slot:
+   - 2 levels: 0 -> 0b0, 1 -> 0b1
+   - 3 levels: 0 -> 0b00, 1 -> 0b01, 2 -> 0b11
 
-   With this encoding, per-axis order is just bit inclusion, so bitwise
-   OR/AND compute join/meet, and disjoint slots make that true for all
-   axes at once. *)
+   Diamond encoding uses two independent bits:
+   - 4 levels: 0 -> 0b00, 1 -> 0b01, 2 -> 0b10, 3 -> 0b11
+
+   With these encodings, per-axis order is still bit inclusion, so bitwise
+   OR/AND compute join/meet, and disjoint slots make that true for all axes at
+   once. *)
 
 let axis_by_number = Array.of_list Jkind_axis.Axis.all
 
-let axis_sizes =
+type axis_shape =
+  | Chain2
+  | Chain3
+  | Diamond4
+
+let axis_shapes =
   let open Jkind_axis.Axis in
   let open Mode.Axis in
   let open Mode.Crossing.Axis in
   Array.map
     (fun (Pack axis) ->
       match axis with
-      | Modal (Comonadic Areality) -> 3
-      | Modal (Monadic Uniqueness) -> 2
-      | Modal (Comonadic Linearity) -> 2
-      | Modal (Monadic Contention) -> 3
-      | Modal (Comonadic Portability) -> 3
-      | Modal (Comonadic Forkable) -> 2
-      | Modal (Comonadic Yielding) -> 2
-      | Modal (Comonadic Statefulness) -> 3
-      | Modal (Monadic Visibility) -> 3
-      | Modal (Monadic Staticity) -> 2
-      | Nonmodal Externality -> 3
-      | Nonmodal Nullability -> 2
-      | Nonmodal Separability -> 3)
+      | Modal (Comonadic Areality) -> Chain3
+      | Modal (Monadic Uniqueness) -> Chain2
+      | Modal (Comonadic Linearity) -> Chain2
+      | Modal (Monadic Contention) -> Chain3
+      | Modal (Comonadic Portability) -> Chain3
+      | Modal (Comonadic Forkable) -> Chain2
+      | Modal (Comonadic Yielding) -> Chain2
+      | Modal (Comonadic Statefulness) -> Diamond4
+      | Modal (Monadic Visibility) -> Diamond4
+      | Modal (Monadic Staticity) -> Chain2
+      | Nonmodal Externality -> Chain3
+      | Nonmodal Nullability -> Chain2
+      | Nonmodal Separability -> Chain3)
     axis_by_number
 
-let num_axes = Array.length axis_sizes
+let num_axes = Array.length axis_shapes
 
-(* widths[i] = 2 for size-3 axes, 1 for size-2 *)
+(* widths[i] = 2 for chain-3/diamond axes, 1 for chain-2 axes *)
 let widths =
   Array.map
-    (function 3 -> 2 | 2 -> 1 | _ -> invalid_arg "bad axis size")
-    axis_sizes
+    (function Chain2 -> 1 | Chain3 | Diamond4 -> 2)
+    axis_shapes
 
 (* consecutive packing offsets *)
 let offsets =
@@ -95,10 +99,9 @@ let offsets =
 (* 1 if axis i has a high bit (i.e. width=2), else 0 *)
 let has_hi =
   Array.init num_axes (fun i ->
-      match axis_sizes.(i) with
-      | 3 -> 1
-      | 2 -> 0
-      | _ -> invalid_arg "bad axis size")
+      match axis_shapes.(i) with
+      | Chain2 -> 0
+      | Chain3 | Diamond4 -> 1)
 
 let lo_mask = Array.map (fun off -> 1 lsl off) offsets
 
@@ -108,10 +111,6 @@ let hi_mask =
     offsets
 
 let axis_mask = Array.map2 (fun lo hi -> lo lor hi) lo_mask hi_mask
-
-(* OR of all low bits (for size-2 axes that’s their only bit).
-   For this layout: 0x6D75D. *)
-let lows = Array.fold_left ( lor ) 0 lo_mask
 
 type t = int
 
@@ -130,25 +129,29 @@ let equal (a : t) (b : t) : bool = a = b
 
 let hash = Hashtbl.hash
 
-(* Branchless get: for 3-ary axes level = lo + hi (00→0, 01→1, 11→2).
-    For 2-ary axes hi=0 (masked by has_hi). *)
+(* Decode one axis from its packed slot. Chain axes use prefix-ones encoding;
+   diamond axes use the raw 2-bit product encoding. *)
 let get_axis (v : t) ~axis:i : int =
   let off = offsets.(i) in
-  let lo = (v lsr off) land 1 in
-  let hi = (v lsr (off + 1)) land has_hi.(i) in
-  lo + hi
+  match axis_shapes.(i) with
+  | Chain2 -> (v lsr off) land 1
+  | Chain3 ->
+    let lo = (v lsr off) land 1 in
+    let hi = (v lsr (off + 1)) land 1 in
+    lo + hi
+  | Diamond4 -> (v lsr off) land 0b11
 
-(* Branchless set:
-    low_bit  = (lev | (lev >> 1)) & 1  (0→0, 1→1, 2→1)
-    high_bit = (lev >> 1) & has_hi
-      (0→0, 1→0, 2→1; zeroed for 1-bit axes)
-    No range checks—caller keeps lev in-range. *)
+(* Encode one axis into its packed slot. *)
 let set_axis (v : t) ~axis:i ~level:lev : t =
   let off = offsets.(i) in
   let cleared = v land lnot axis_mask.(i) in
-  let lo = lev lor (lev lsr 1) land 1 in
-  let hi = (lev lsr 1) land has_hi.(i) in
-  cleared lor (lo lsl off) lor (hi lsl (off + 1))
+  match axis_shapes.(i) with
+  | Chain2 -> cleared lor ((lev land 1) lsl off)
+  | Chain3 ->
+    let lo = (lev lor (lev lsr 1)) land 1 in
+    let hi = (lev lsr 1) land 1 in
+    cleared lor (lo lsl off) lor (hi lsl (off + 1))
+  | Diamond4 -> cleared lor ((lev land 0b11) lsl off)
 
 let decode (v : t) : int array =
   Array.init num_axes (fun i -> get_axis v ~axis:i)
@@ -170,17 +173,21 @@ let pp (v : t) : string =
 let to_string = pp
 
 (* Axis-wise residual:
-    r = a & ~b zeroes axes where b >= a; only invalid per-axis
-    pattern is 10 (from 11 - 01).
-    (r >> 1) copies surviving high bits down to their own low slots;
-    AND with ~ (lows >> 1) kills spillovers from low bits into neighbors;
-    OR repairs 10 -> 11. *)
+    r = a & ~b zeroes axes where b >= a.
+    On chain-3 axes, the only invalid per-axis result is 10 (from 11 - 01),
+    so copy surviving chain-3 high bits down into their own low slots.
+    Diamond axes intentionally keep 10 unchanged. *)
 
-let lnot_lsr_1_lows = lnot (lows lsr 1)
+let chain3_hi_mask =
+  hi_mask.(0)
+  lor hi_mask.(3)
+  lor hi_mask.(4)
+  lor hi_mask.(10)
+  lor hi_mask.(12)
 
 let co_sub (a : t) (b : t) : t =
   let r = a land lnot b in
-  r lor ((r lsr 1) land lnot_lsr_1_lows)
+  r lor ((r land chain3_hi_mask) lsr 1)
 
 (* Build a mask from a set of relevant axes. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
@@ -270,16 +277,16 @@ module Levels = struct
   let level_of_statefulness (x : Mode.Statefulness.Const.t) : int =
     match x with
     | Mode.Statefulness.Const.Stateless -> 0
-    | Mode.Statefulness.Const.Reading -> 1
-    | Mode.Statefulness.Const.Writing
-    | Mode.Statefulness.Const.Stateful -> 2
+    | Mode.Statefulness.Const.Writing -> 1
+    | Mode.Statefulness.Const.Reading -> 2
+    | Mode.Statefulness.Const.Stateful -> 3
 
   let level_of_visibility_monadic (x : Mode.Visibility.Const.t) : int =
     match x with
     | Mode.Visibility.Const.Immutable -> 0
     | Mode.Visibility.Const.Read -> 1
-    | Mode.Visibility.Const.Write
-    | Mode.Visibility.Const.Read_write -> 2
+    | Mode.Visibility.Const.Write -> 2
+    | Mode.Visibility.Const.Read_write -> 3
 
   let level_of_staticity_monadic (x : Mode.Staticity.const) : int =
     match x with Mode.Staticity.Dynamic -> 0 | Mode.Staticity.Static -> 1
@@ -333,14 +340,16 @@ module Levels = struct
 
   let statefulness_of_level = function
     | 0 -> Mode.Statefulness.Const.Stateless
-    | 1 -> Mode.Statefulness.Const.Reading
-    | 2 -> Mode.Statefulness.Const.Stateful
+    | 1 -> Mode.Statefulness.Const.Writing
+    | 2 -> Mode.Statefulness.Const.Reading
+    | 3 -> Mode.Statefulness.Const.Stateful
     | _ -> invalid_arg "Axis_lattice.statefulness_of_level"
 
   let visibility_of_level_monadic = function
     | 0 -> Mode.Visibility.Const.Immutable
     | 1 -> Mode.Visibility.Const.Read
-    | 2 -> Mode.Visibility.Const.Read_write
+    | 2 -> Mode.Visibility.Const.Write
+    | 3 -> Mode.Visibility.Const.Read_write
     | _ -> invalid_arg "Axis_lattice.visibility_of_level_monadic"
 
   let staticity_of_level_monadic = function

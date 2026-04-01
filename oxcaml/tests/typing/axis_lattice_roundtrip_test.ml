@@ -43,10 +43,53 @@ let lattice_of_sample sample =
 
 let base_samples = [sample_of_lattice bot; sample_of_lattice top]
 
+let base_bot_sample = sample_of_lattice bot
+
 let check_roundtrip label sample =
   let roundtripped = sample_of_lattice (lattice_of_sample sample) in
   if roundtripped <> sample
   then failwith (Format.asprintf "axis roundtrip failed: %s" label)
+
+let mod_bounds_of_sample sample =
+  let monadic =
+    Mode.Crossing.Monadic.create
+      ~uniqueness:
+        (Mode.Crossing.Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const sample.uniqueness))
+      ~contention:
+        (Mode.Crossing.Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const sample.contention))
+      ~visibility:
+        (Mode.Crossing.Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const sample.visibility))
+      ~staticity:
+        (Mode.Crossing.Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const sample.staticity))
+  in
+  let comonadic =
+    Mode.Crossing.Comonadic.create
+      ~regionality:
+        (Mode.Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const sample.areality))
+      ~linearity:
+        (Mode.Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const sample.linearity))
+      ~portability:
+        (Mode.Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const sample.portability))
+      ~forkable:
+        (Mode.Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const sample.forkable))
+      ~yielding:
+        (Mode.Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const sample.yielding))
+      ~statefulness:
+        (Mode.Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const sample.statefulness))
+  in
+  Btype.Jkind0.Mod_bounds.create { monadic; comonadic }
+    ~externality:sample.externality ~nullability:sample.nullability
+    ~separability:sample.separability
 
 let check_values label update values =
   List.iter
@@ -54,6 +97,128 @@ let check_values label update values =
       List.iter
         (fun base_sample -> check_roundtrip label (update base_sample value))
         base_samples)
+    values
+
+let check_mod_bounds_roundtrip label update values =
+  List.iter
+    (fun value ->
+      List.iter
+        (fun base_sample ->
+          let sample = update base_sample value in
+          let bounds = mod_bounds_of_sample sample in
+          let roundtripped =
+            bounds |> Btype.Jkind0.Mod_bounds.to_axis_lattice
+            |> Btype.Jkind0.Mod_bounds.of_axis_lattice
+          in
+          if not (Btype.Jkind0.Mod_bounds.equal bounds roundtripped)
+          then
+            failwith (Format.asprintf "mod_bounds roundtrip failed: %s" label))
+        base_samples)
+    values
+
+let level_of_statefulness = function
+  | Mode.Statefulness.Const.Stateless -> 0
+  | Mode.Statefulness.Const.Writing -> 1
+  | Mode.Statefulness.Const.Reading -> 2
+  | Mode.Statefulness.Const.Stateful -> 3
+
+let statefulness_of_level = function
+  | 0 -> Mode.Statefulness.Const.Stateless
+  | 1 -> Mode.Statefulness.Const.Writing
+  | 2 -> Mode.Statefulness.Const.Reading
+  | 3 -> Mode.Statefulness.Const.Stateful
+  | _ -> invalid_arg "statefulness_of_level"
+
+let level_of_visibility = function
+  | Mode.Visibility.Const.Immutable -> 0
+  | Mode.Visibility.Const.Read -> 1
+  | Mode.Visibility.Const.Write -> 2
+  | Mode.Visibility.Const.Read_write -> 3
+
+let visibility_of_level = function
+  | 0 -> Mode.Visibility.Const.Immutable
+  | 1 -> Mode.Visibility.Const.Read
+  | 2 -> Mode.Visibility.Const.Write
+  | 3 -> Mode.Visibility.Const.Read_write
+  | _ -> invalid_arg "visibility_of_level"
+
+let statefulness_co_sub lhs rhs =
+  statefulness_of_level
+    (level_of_statefulness lhs land (lnot (level_of_statefulness rhs) land 0b11))
+
+let visibility_co_sub lhs rhs =
+  visibility_of_level
+    (level_of_visibility lhs land (lnot (level_of_visibility rhs) land 0b11))
+
+let check_statefulness_laws () =
+  let values =
+    [ Mode.Statefulness.Const.Stateless;
+      Mode.Statefulness.Const.Writing;
+      Mode.Statefulness.Const.Reading;
+      Mode.Statefulness.Const.Stateful ]
+  in
+  List.iter
+    (fun lhs_value ->
+      List.iter
+        (fun rhs_value ->
+          let lhs =
+            lattice_of_sample { base_bot_sample with statefulness = lhs_value }
+          in
+          let rhs =
+            lattice_of_sample { base_bot_sample with statefulness = rhs_value }
+          in
+          let expect_value op_name actual expected =
+            if actual <> expected
+            then failwith (Format.asprintf "statefulness %s mismatch" op_name)
+          in
+          expect_value "join"
+            (statefulness (join lhs rhs))
+            (Mode.Statefulness.Const.join lhs_value rhs_value);
+          expect_value "meet"
+            (statefulness (meet lhs rhs))
+            (Mode.Statefulness.Const.meet lhs_value rhs_value);
+          expect_value "co_sub"
+            (statefulness (co_sub lhs rhs))
+            (statefulness_co_sub lhs_value rhs_value);
+          let expected_leq = Mode.Statefulness.Const.le lhs_value rhs_value in
+          if leq lhs rhs <> expected_leq
+          then failwith "statefulness leq mismatch")
+        values)
+    values
+
+let check_visibility_laws () =
+  let values =
+    [ Mode.Visibility.Const.Immutable;
+      Mode.Visibility.Const.Read;
+      Mode.Visibility.Const.Write;
+      Mode.Visibility.Const.Read_write ]
+  in
+  List.iter
+    (fun lhs_value ->
+      List.iter
+        (fun rhs_value ->
+          let lhs =
+            lattice_of_sample { base_bot_sample with visibility = lhs_value }
+          in
+          let rhs =
+            lattice_of_sample { base_bot_sample with visibility = rhs_value }
+          in
+          let expect_value op_name actual expected =
+            if actual <> expected
+            then failwith (Format.asprintf "visibility %s mismatch" op_name)
+          in
+          expect_value "join"
+            (visibility (join lhs rhs))
+            (Mode.Visibility.Const.meet lhs_value rhs_value);
+          expect_value "meet"
+            (visibility (meet lhs rhs))
+            (Mode.Visibility.Const.join lhs_value rhs_value);
+          expect_value "co_sub"
+            (visibility (co_sub lhs rhs))
+            (visibility_co_sub lhs_value rhs_value);
+          let expected_leq = Mode.Visibility.Const.le rhs_value lhs_value in
+          if leq lhs rhs <> expected_leq then failwith "visibility leq mismatch")
+        values)
     values
 
 let all_axis_sets =
@@ -155,13 +320,29 @@ let () =
   check_values "statefulness"
     (fun sample statefulness -> { sample with statefulness })
     [ Mode.Statefulness.Const.Stateless;
+      Mode.Statefulness.Const.Writing;
       Mode.Statefulness.Const.Reading;
       Mode.Statefulness.Const.Stateful ];
   check_values "visibility"
     (fun sample visibility -> { sample with visibility })
     [ Mode.Visibility.Const.Immutable;
       Mode.Visibility.Const.Read;
+      Mode.Visibility.Const.Write;
       Mode.Visibility.Const.Read_write ];
+  check_mod_bounds_roundtrip "statefulness"
+    (fun sample statefulness -> { sample with statefulness })
+    [ Mode.Statefulness.Const.Stateless;
+      Mode.Statefulness.Const.Writing;
+      Mode.Statefulness.Const.Reading;
+      Mode.Statefulness.Const.Stateful ];
+  check_mod_bounds_roundtrip "visibility"
+    (fun sample visibility -> { sample with visibility })
+    [ Mode.Visibility.Const.Immutable;
+      Mode.Visibility.Const.Read;
+      Mode.Visibility.Const.Write;
+      Mode.Visibility.Const.Read_write ];
+  check_statefulness_laws ();
+  check_visibility_laws ();
   check_values "staticity"
     (fun sample staticity -> { sample with staticity })
     [Mode.Staticity.Static; Mode.Staticity.Dynamic];
