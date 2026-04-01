@@ -1880,9 +1880,16 @@ void caml_interrupt_self(void)
  */
 CAMLprim value caml_domain_preempt_self(value unit) {
   CAMLnoalloc;
+
   if (Caml_state->preemption != Val_unit) {
     return Val_unit;
   }
+
+  /* Don't allow preemption of domains that are in the process of terminating */
+  if (domain_self->terminating) {
+    return Val_unit;
+  }
+
   Caml_state->preemption = Val_long(1);
   caml_interrupt_self();
   return Val_unit;
