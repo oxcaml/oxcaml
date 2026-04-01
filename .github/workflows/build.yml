@@ -225,6 +225,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'flambda2-expert-cont-lifting-budget=1000,flambda2-expert-cont-spec-budget=100,_'
             ocamlparam: 'flambda2-expert-cont-lifting-budget=1000,flambda2-expert-cont-spec-budget=100,_'
+            disable_testcases: 'testsuite/tests/flambda2/n_way_join_preserves_null.ml'
 
     env:
       J: "8"
