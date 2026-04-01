@@ -210,7 +210,9 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
   in
   if !Oxcaml_flags.cfg_value_propagation_flow
   then infer_known_values_from_predecessor ();
-  Dll.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+  Dll.iter_cell block.body
+    ~f:(fun (cell : Cfg.basic Cfg.instruction Dll.cell) ->
+      let instr : Cfg.basic Cfg.instruction = Dll.value cell in
       let apply_int_op op right_opt =
         let result_opt =
           match find_opt instr.arg.(0) with
@@ -221,7 +223,10 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
           | Some (Const_float32 _ | Const_float _) | None -> None
         in
         (match result_opt with
-        | Some result -> replace instr.res.(0) (Const_int result)
+        | Some result ->
+          Dll.set_value cell
+            { instr with desc = Cfg.Op (Const_int result); arg = [||] };
+          replace instr.res.(0) (Const_int result)
         | None -> remove instr.res.(0));
         remove_destroyed instr
       in
@@ -538,11 +543,15 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
     else (
       simplify_switch block labels;
       false)
-  | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ | Invalid _ ->
+  | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _
+  | Prim _ | Invalid _ ->
+    false
+  | Return ->
+    if is_after_regalloc then ignore (collect_known_values cfg block);
     false
 
 let run cfg =
+  Format.eprintf "XXX %s\n%!" cfg.Cfg.fun_name;
   let registration_needed =
     C.fold_blocks cfg ~init:false ~f:(fun _ b registration_needed ->
         let shortcircuit = block cfg b in
