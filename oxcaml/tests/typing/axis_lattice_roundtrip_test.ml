@@ -155,7 +155,7 @@ let () =
   check_values "statefulness"
     (fun sample statefulness -> { sample with statefulness })
     [ Mode.Statefulness.Const.Stateless;
-      Mode.Statefulness.Const.Observing;
+      Mode.Statefulness.Const.Reading;
       Mode.Statefulness.Const.Stateful ];
   check_values "visibility"
     (fun sample visibility -> { sample with visibility })
