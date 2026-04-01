@@ -359,3 +359,10 @@ let x () = <[1 + 1]> in <[$(x ()) + $(x ())]>
 <[let r = (Stdlib.ref 0) in (r := ((! r) + 1); ! r) + (r := ((! r) + 1); ! r)
 ]>
 |}];;
+
+(** Duplication of [once] quotes *)
+
+let x = <[1 + 1]> in let x, y = Quote.duplicate x in <[$x + $y]>
+[%%expect{|
+- : <[int]> expr = <[(1 + 1) + (1 + 1)]>
+|}];;
