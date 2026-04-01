@@ -269,12 +269,16 @@ Lines 3-5, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val f : layout_ l. ('a : l) 'b. 'a -> 'b -> #('a * ('b * 'b))
+           val f :
+             layout_ l.
+               ('a : l) ('b : value_or_null). 'a -> 'b -> #('a * ('b * 'b))
          end
        is not included in
          sig val f : int end
        Values do not match:
-         val f : layout_ l. ('a : l) 'b. 'a -> 'b -> #('a * ('b * 'b))
+         val f :
+           layout_ l.
+             ('a : l) ('b : value_or_null). 'a -> 'b -> #('a * ('b * 'b))
        is not included in
          val f : int
        The type "'a -> 'b -> #('a * ('b * 'b))" is not compatible with the type
