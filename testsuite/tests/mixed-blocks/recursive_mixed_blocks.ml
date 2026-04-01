@@ -23,9 +23,9 @@ let (_ : t) = Sys.opaque_identity t
 
 type v = { void : unit#; i : int }
 
-let rec v = { void = #(); i = 0xdeadbeef }
+let rec v =
+  { void = (Gc.full_major (); #());
+    i = 0xdeadbeef }
 
-let () =
-  Gc.full_major ();
-  ignore (Sys.opaque_identity v.i);
+let (_ : int) = Sys.opaque_identity v.i;
 ;;
