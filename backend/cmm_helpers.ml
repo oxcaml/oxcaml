@@ -988,18 +988,16 @@ let rec low_bits ~bits ~dbg x =
             ( (Casr | Clsr),
               [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
               _ )
-          when 0 <= right && right <= left && left <= unused_bits ->
-          (* these sign-extensions can be replaced with a left shift since we
-             don't care about the high bits that it changed *)
-          low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
-        | Cop
-            ( (Casr | Clsr),
-              [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
-              _ )
-          when 0 <= left && left < right && right <= unused_bits ->
-          (* combined shift-right + sign-extension: the low [bits] bits are the
-             same as those of [asr x (right - left)] *)
-          low_bits ~bits ~dbg (asr_const x (right - left) dbg)
+          when 0 <= left && 0 <= right && max left right <= unused_bits ->
+          (* [sar right (sal left x)] or [shr right (sal left x)]: the low
+             [bits] bits depend only on x shifted by [left - right]. When [left
+             >= right] the net effect is a left shift; when [right > left] the
+             net effect is a right shift, and the condition [right <=
+             unused_bits] guarantees the arithmetic-shift sign extension does
+             not reach into the low [bits] bits. *)
+          if left >= right
+          then low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
+          else low_bits ~bits ~dbg (asr_const x (right - left) dbg)
         | x -> (
           match get_const_bitmask x with
           | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->
