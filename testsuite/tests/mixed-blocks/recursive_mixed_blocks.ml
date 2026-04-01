@@ -27,5 +27,5 @@ let rec v = { void = #(); i = 0xdeadbeef }
 
 let () =
   Gc.full_major ();
-  ignore (Sys.opaque_identity t.i);
+  ignore (Sys.opaque_identity v.i);
 ;;
