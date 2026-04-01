@@ -303,9 +303,6 @@ type error =
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
 
 and invalid_layout_poly_inst_context =
-  | Ivar
-  | Mutvar
-  | Self
   | Binding_op
 
 
@@ -6301,7 +6298,8 @@ and type_expect_
       let exp_desc =
         match desc.val_kind with
         | Val_ivar (_, cl_num) ->
-            check_layout_args_empty ~loc ~env layout_args Ivar;
+            if not (List.is_empty layout_args) then
+              Misc.fatal_error "type_expect_: Val_ivar with layout args";
             let (self_path, _) =
               Env.find_value_by_name_lazy
                 (Longident.Lident ("self-" ^ cl_num)) env
@@ -6311,7 +6309,8 @@ and type_expect_
                              Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
         | Val_mut (_m0, _) -> begin
-            check_layout_args_empty ~loc ~env layout_args Mutvar;
+            if not (List.is_empty layout_args) then
+              Misc.fatal_error "type_expect_: Val_mut with layout args";
             match path with
             | Path.Pident id ->
               let modalities = Typemode.let_mutable_modalities in
@@ -6323,7 +6322,8 @@ and type_expect_
                 bad mutable variable identifier"
           end
         | Val_self (_, _, _, cl_num) ->
-            check_layout_args_empty ~loc ~env layout_args Self;
+            if not (List.is_empty layout_args) then
+              Misc.fatal_error "type_expect_: Val_self with layout args";
             let (path, _) =
               Env.find_value_by_name_lazy
                 (Longident.Lident ("self-" ^ cl_num))
@@ -12474,9 +12474,6 @@ let report_error ~loc env =
         Style.inline_code "let poly_"
   | Layout_poly_inst_not_yet_supported ctx ->
       let ctx_str = match ctx with
-        | Ivar -> "instance variables"
-        | Mutvar -> "mutable variables"
-        | Self -> "self variables"
         | Binding_op -> "binding operators"
       in
       Location.errorf ~loc

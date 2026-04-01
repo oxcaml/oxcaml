@@ -342,8 +342,8 @@ module F (M : sig val f : layout_ x. ('a : x). 'a -> 'a end) = struct
   let () = let _ = M.f in ()
 end
 [%%expect{|
->> Fatal error: Translcore: unexpected Texp_apply_layout
-with sorts [value]
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [value])
 Uncaught exception: Misc.Fatal_error
 
 |}]

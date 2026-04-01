@@ -391,7 +391,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_apply_layout (_, args) ->
       let sorts = List.map Jkind.Sort.var_default_to_value_and_get args in
       Misc.fatal_errorf
-        "Translcore: unexpected Texp_apply_layout@ with sorts [%a]"
+        "Translcore: translation of layout-polymorphic instantiation is not \
+         yet supported@ (layout args: [%a])"
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
            (Format_doc.compat Jkind.Sort.Const.format))

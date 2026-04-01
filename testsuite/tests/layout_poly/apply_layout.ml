@@ -59,8 +59,8 @@ module F (M : S) = struct
     M.f y x
 end
 [%%expect{|
->> Fatal error: Translcore: unexpected Texp_apply_layout
-with sorts [float64, value]
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [float64, value])
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -72,8 +72,8 @@ end) = struct
   let apply_int_to_float (f : int -> float#) (x : int) = M.map f x
 end
 [%%expect{|
->> Fatal error: Translcore: unexpected Texp_apply_layout
-with sorts [value, float64]
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [value, float64])
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -84,8 +84,8 @@ module F (M :S) = struct
   let h (x : float#)= g x
 end
 [%%expect{|
->> Fatal error: Translcore: unexpected Texp_apply_layout
-with sorts [value, float64]
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [value, float64])
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -125,8 +125,8 @@ end = struct
   let poly_ g x = M.f 42 x
 end
 [%%expect{|
->> Fatal error: Translcore: unexpected Texp_apply_layout
-with sorts [value, value]
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [value, value])
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -191,8 +191,8 @@ end) = struct
   let _ = M.f
 end
 [%%expect{|
->> Fatal error: Translcore: unexpected Texp_apply_layout
-with sorts [value]
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [value])
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -204,8 +204,8 @@ end) = struct
   let f : int -> int = M.id
 end
 [%%expect{|
->> Fatal error: Translcore: unexpected Texp_apply_layout
-with sorts [value]
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [value])
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -230,4 +230,18 @@ Line 1, characters 21-50:
 1 | let poly_ ( let+ ) : layout_ x. ('a : x). 'a -> 'a = fun x -> x
                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Layout polymorphism is not supported in term-level type annotations
+|}]
+
+(* Binding_op from a module signature raises the unsupported error *)
+module F (M : sig
+  val ( let+ ) : layout_ x. ('a : x). 'a -> ('a -> 'b) -> 'b
+end) = struct
+  open M
+  let g = let+ x = 42 in x
+end
+[%%expect{|
+Line 5, characters 10-14:
+5 |   let g = let+ x = 42 in x
+              ^^^^
+Error: Instantiation of layout-polymorphic values is not yet supported for binding operators.
 |}]
