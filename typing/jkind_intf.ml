@@ -211,6 +211,7 @@ module type Sort = sig
       variable, it is set to [value] first. *)
   val default_to_value_and_get : t -> Const.t
 
+  val default_to_fresh_layouts_and_get : t -> var list * t
   (* CR layouts v12: Default this to void. *)
 
   (** [default_for_transl_and_get] extracts the sort as a `const`. If it's a

@@ -130,7 +130,7 @@ val transl_simple_type_delayed
            Returns the type, an instance of the corresponding type_expr, and a
            function that binds the type variable. *)
 val transl_type_scheme:
-        Env.t -> Parsetree.core_type ->
+        Env.t -> bool -> Parsetree.core_type ->
         Jkind_types.Sort.var list * Typedtree.core_type
 val transl_type_param:
   Env.t -> Path.t -> jkind_lr -> Parsetree.core_type -> Typedtree.core_type
@@ -195,6 +195,7 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+  | Val_poly_and_layout
 
 exception Error of Location.t * Env.t * error
 

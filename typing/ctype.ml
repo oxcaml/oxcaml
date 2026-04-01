@@ -601,6 +601,30 @@ let remove_mode_and_jkind_variables ty =
     end
   in go ty
 
+(* Generalize layout variables, return a list of fresh layouts *)
+let generalize_layout_variables ty =
+  let visited = ref TypeSet.empty in
+  let layouts = ref ([] : Jkind.Sort.var list) in
+  let rec go ty =
+    if TypeSet.mem ty !visited then () else begin
+      visited := TypeSet.add ty !visited;
+      match get_desc ty with
+      | Tvar { name; jkind } ->
+        let vars, base = Jkind.default_to_fresh_layout jkind in
+        layouts := vars @ !layouts;
+        let jkind = { jkind with jkind = { jkind.jkind with base = base } } in
+        set_type_desc ty (Tvar { name; jkind })
+      | Tunivar { name; jkind } ->
+        let vars, base = Jkind.default_to_fresh_layout jkind in
+        layouts := vars @ !layouts;
+        let jkind = { jkind with jkind = { jkind.jkind with base = base } } in
+        set_type_desc ty (Tunivar { name; jkind })
+      | _ -> iter_type_expr go ty
+    end
+  in
+  go ty;
+  List.rev !layouts
+
                     (**************************************)
                     (*  Check genericity of type schemes  *)
                     (**************************************)

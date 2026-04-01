@@ -3979,7 +3979,6 @@ let transl_value_decl env loc ~modal ~why valdecl =
         if valdecl.pval_poly then begin
           Language_extension.assert_enabled ~loc Layout_poly
             Language_extension.Alpha;
-          raise (Error (loc, Poly_not_yet_implemented))
         end;
         let raw_modalities =
           Typemode.transl_modalities_with_default
@@ -3990,7 +3989,9 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         md_mode, modalities, Valmi_sig_value raw_modalities
   in
-  let lpoly, cty = Typetexp.transl_type_scheme env valdecl.pval_type in
+  let lpoly, cty =
+    Typetexp.transl_type_scheme env valdecl.pval_poly valdecl.pval_type
+  in
   let sort =
     match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
     | Ok sort -> sort
