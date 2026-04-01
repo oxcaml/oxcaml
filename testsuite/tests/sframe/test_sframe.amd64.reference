@@ -4,3 +4,22 @@ SFrame header:
   ABI/arch: AMD64_LITTLE
   Fixed FP offset: 0
   Fixed RA offset: -8
+  Num FDEs: 4
+  Num FREs: 12
+  FRE section length: 84
+  FDE 0: size=5, num_fres=1, type=PCINC, fre_type=ADDR4
+    FRE: start_addr=+0, SP, cfa_offset=+8
+  FDE 1: size=10, num_fres=1, type=PCINC, fre_type=ADDR4
+    FRE: start_addr=+0, SP, cfa_offset=+8
+  FDE 2: size=56, num_fres=6, type=PCINC, fre_type=ADDR4
+    FRE: start_addr=+0, SP, cfa_offset=+8
+    FRE: start_addr=+4, SP, cfa_offset=+16
+    FRE: start_addr=+19, SP, cfa_offset=+8
+    FRE: start_addr=+20, SP, cfa_offset=+16
+    FRE: start_addr=+55, SP, cfa_offset=+8
+    FRE: start_addr=+56, SP, cfa_offset=+16
+  FDE 3: size=68, num_fres=4, type=PCINC, fre_type=ADDR4
+    FRE: start_addr=+0, SP, cfa_offset=+8
+    FRE: start_addr=+4, SP, cfa_offset=+16
+    FRE: start_addr=+67, SP, cfa_offset=+8
+    FRE: start_addr=+68, SP, cfa_offset=+16

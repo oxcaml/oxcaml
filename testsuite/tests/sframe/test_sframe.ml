@@ -13,7 +13,6 @@
    script;
 
    script = "./dump_sframe test_sframe.${objext}";
-   output = "test_sframe.output";
    script;
 
    reference = "${test_source_directory}/test_sframe.amd64.reference";
@@ -30,7 +29,6 @@
    script;
 
    script = "./dump_sframe test_sframe.${objext}";
-   output = "test_sframe.output";
    script;
 
    reference = "${test_source_directory}/test_sframe.arm64.reference";
