@@ -24,11 +24,13 @@ val equal : t -> t -> bool
 
 val default : round:int -> t
 
-val create : arguments:Inlining_arguments.t -> depth:int -> t
+val create : arguments:Inlining_arguments.t -> depth:int -> stub_depth:int -> t
 
 val depth : t -> int
 
-val increment_depth : t -> by:int -> t
+val stub_depth : t -> int
+
+val increment_depth : t -> is_stub:bool -> by:int -> t
 
 val is_depth_exceeded : t -> bool
 
