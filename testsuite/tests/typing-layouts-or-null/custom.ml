@@ -11,6 +11,17 @@ type ('a : value) t : value_or_null =
 type 'a t = Nope | Yep of 'a [@@or_null]
 |}]
 
+type ('a : value) both_attrs : value_or_null =
+  Nope | Yep of 'a [@@or_null] [@@or_null_reexport]
+
+[%%expect{|
+Lines 1-2, characters 0-51:
+1 | type ('a : value) both_attrs : value_or_null =
+2 |   Nope | Yep of 'a [@@or_null] [@@or_null_reexport]
+Error: Invalid [@or_null] declaration:
+       it cannot be both [@@or_null] and [@@or_null_reexport].
+|}]
+
 let to_option = function
   | Nope -> None
   | Yep x -> Some x

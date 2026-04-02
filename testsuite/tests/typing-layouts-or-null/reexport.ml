@@ -189,6 +189,16 @@ Error: Invalid reexport declaration.
        Type t must be defined equal to the primitive type or_null.
 |}]
 
+type 'a both_attrs = 'a or_null [@@or_null] [@@or_null_reexport]
+
+[%%expect{|
+Line 1, characters 0-64:
+1 | type 'a both_attrs = 'a or_null [@@or_null] [@@or_null_reexport]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Invalid [@or_null] declaration:
+       it cannot be both [@@or_null] and [@@or_null_reexport].
+|}]
+
 (* CR layouts v3: This would be nice to accept, but it's somewhat complicated
    to implement. So we won't unless we encounter a use-case. *)
 module M : sig

@@ -169,16 +169,16 @@ let get_unboxed_from_attributes sdecl =
   | false, true -> Some true
   | false, false -> None
 
-let get_or_null_from_attributes sdecl =
+let get_or_null_attributes sdecl =
   let or_null = Builtin_attributes.has_or_null sdecl.ptype_attributes in
-  let reexport =
+  let or_null_reexport =
     Builtin_attributes.has_or_null_reexport sdecl.ptype_attributes
   in
-  if or_null && reexport then
+  if or_null && or_null_reexport then
     raise (Error (sdecl.ptype_loc,
       Bad_or_null_attribute
         "it cannot be both [@@or_null] and [@@or_null_reexport]"));
-  or_null
+  or_null, or_null_reexport
 
 let check_or_null_variant_shape _path params sdecl scstrs =
   let bad msg =
@@ -910,6 +910,7 @@ let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
   Ctype.with_local_level begin fun () ->
   TyVarEnv.reset();
+  let or_null, or_null_reexport = get_or_null_attributes sdecl in
   let path = Path.Pident id in
   let tparams = make_params env path sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
@@ -973,8 +974,7 @@ let transl_declaration env sdecl (id, uid) =
 
          Remove when we allow users to define their own null constructors.
       *)
-      | Ptype_abstract when
-        Builtin_attributes.has_or_null_reexport sdecl.ptype_attributes ->
+      | Ptype_abstract when or_null_reexport ->
           let param =
             (* We require users to define ['a t = 'a or_null]. Manifest
                must be set to [or_null] so typechecking stays correct. *)
@@ -989,15 +989,13 @@ let transl_declaration env sdecl (id, uid) =
           let jkind = Predef.or_null_jkind param in
           Ttype_abstract, type_kind, jkind
       | (Ptype_variant _ | Ptype_record _ | Ptype_record_unboxed_product _
-        | Ptype_open)
-        when Builtin_attributes.has_or_null_reexport sdecl.ptype_attributes ->
+        | Ptype_open) when or_null_reexport ->
         raise (Error (sdecl.ptype_loc, Non_abstract_reexport path))
       | Ptype_abstract ->
         Ttype_abstract, Type_abstract Definition,
         Jkind.Builtin.value ~why:Default_type_jkind
       | Ptype_variant scstrs ->
-        let custom_or_null = get_or_null_from_attributes sdecl in
-        if custom_or_null then begin
+        if or_null then begin
           check_or_null_variant_shape path params sdecl scstrs;
           match sdecl.ptype_params, params with
           | [({ ptyp_desc = Ptyp_var (_, _);
@@ -1065,10 +1063,11 @@ let transl_declaration env sdecl (id, uid) =
         in
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         let rep, jkind =
-          if custom_or_null then
+          if or_null then
             match params with
             | [param] ->
-              Variant_with_null, Btype.Jkind0.for_variant_with_null_result path param
+              Variant_with_null,
+              Btype.Jkind0.for_variant_with_null_result path param
             | _ -> assert false
           else if unbox then
             Variant_unboxed,
