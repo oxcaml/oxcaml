@@ -67,6 +67,14 @@ type out_value =
 
 type out_modality = string
 
+type out_atomicity =
+  | Atomic
+  | Nonatomic
+
+type out_mutability =
+  | Om_immutable
+  | Om_mutable of string option * out_atomicity
+
 (** This definition avoids a cyclic dependency between Outcometree and Types. *)
 type arg_label =
   | Nolabel
@@ -145,8 +153,7 @@ and out_type =
 
 and out_label = {
   olab_name: string;
-  olab_mut: Asttypes.mutable_flag;
-  olab_atomic: Asttypes.atomic_flag;
+  olab_mut: out_mutability;
   olab_type: out_type;
   olab_modalities: out_modality list;
 }

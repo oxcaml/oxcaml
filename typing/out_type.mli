@@ -51,7 +51,7 @@ val with_labels: bool -> (unit -> 'a) -> 'a
 (** {1 Printing idents and paths } *)
 
 val ident_name: Shape.Sig_component_kind.t option -> Ident.t -> out_name
-val tree_of_path: ?disambiguation:bool -> Path.t -> out_ident
+val tree_of_path: Path.t -> out_ident
 val namespaced_tree_of_path: Shape.Sig_component_kind.t -> Path.t -> out_ident
 val tree_of_type_path: Path.t -> out_ident
 (** Specialized functions for printing types with [short-paths] *)
@@ -124,7 +124,8 @@ val hide_variant_name: Types.type_expr -> Types.type_expr
 
 (** {1: Label and constructors }*)
 val prepare_type_constructor_arguments: constructor_arguments -> unit
-val tree_of_constructor_arguments: constructor_arguments -> out_type list
+val tree_of_constructor_arguments:
+    constructor_arguments -> (out_type * string list) list
 
 val tree_of_label: label_declaration -> out_label
 
@@ -141,12 +142,6 @@ val add_extension_constructor_to_preparation :
 val prepared_extension_constructor:
     Ident.t -> extension_constructor printer
 
-
-val raw_row_desc : Format.formatter -> row_desc -> unit
-val raw_type_expr: Format.formatter -> type_expr -> unit
-val raw_field : Format.formatter -> row_field -> unit
-
-val rewrite_double_underscore_longidents: Env.t -> Longident.t -> Longident.t
 
 (** {1 Declarations }*)
 
