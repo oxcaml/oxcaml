@@ -180,10 +180,7 @@ let get_or_null_attributes sdecl =
         "it cannot be both [@@or_null] and [@@or_null_reexport]"));
   or_null, or_null_reexport
 
-let check_or_null_variant_shape _path params sdecl scstrs =
-  let bad msg =
-    raise (Error (sdecl.ptype_loc, Bad_or_null_attribute msg))
-  in
+let check_or_null_decl bad sdecl =
   begin match get_unboxed_from_attributes sdecl with
   | None -> ()
   | Some _ ->
@@ -194,46 +191,54 @@ let check_or_null_variant_shape _path params sdecl scstrs =
   | Some _ ->
     bad "it must define a fresh variant, not an alias with an explicit manifest"
   end;
-  let type_param_name =
-    match sdecl.ptype_params, params with
-    | [({ ptyp_desc = Ptyp_var (name, _); _ }, _)], [_] -> name
-    | [_], [_] ->
-      bad "its single type parameter must be written as a type variable"
-    | _ ->
-      bad "it must have exactly one type parameter"
-  in
-  let check_no_gadt ({ pcd_res; _ } : Parsetree.constructor_declaration) =
-    match pcd_res with
-    | None -> ()
-    | Some _ ->
-      bad "GADT constructors are not supported with [@@or_null]"
-  in
-  let check_constructors = function
-    | [c1; c2] ->
-      check_no_gadt c1;
-      check_no_gadt c2;
-      begin match c1.pcd_args, c2.pcd_args with
-      | Pcstr_tuple [],
-        Pcstr_tuple
-          [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }]
-      | Pcstr_tuple
-          [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }],
-        Pcstr_tuple [] ->
-        if not (String.equal name type_param_name) then
-          bad "its payload constructor must carry the sole type parameter"
-      | _ ->
-        bad
-          "it must have exactly one nullary constructor and one unary \
-           constructor carrying the sole type parameter"
-      end
-    | _ ->
-      bad "it must have exactly two constructors"
-  in
   match sdecl.ptype_private with
   | Private ->
     bad "private types are not supported with [@@or_null]"
   | Public ->
-    check_constructors scstrs
+    ()
+
+let get_or_null_type_param_name bad sdecl params =
+  match sdecl.ptype_params, params with
+  | [({ ptyp_desc = Ptyp_var (name, _); _ }, _)], [_] -> name
+  | [_], [_] ->
+    bad "its single type parameter must be written as a type variable"
+  | _ ->
+    bad "it must have exactly one type parameter"
+
+let check_or_null_constructors bad type_param_name = function
+  | [c1; c2] ->
+    let check_no_gadt ({ pcd_res; _ } : Parsetree.constructor_declaration) =
+      match pcd_res with
+      | None -> ()
+      | Some _ ->
+        bad "GADT constructors are not supported with [@@or_null]"
+    in
+    check_no_gadt c1;
+    check_no_gadt c2;
+    begin match c1.pcd_args, c2.pcd_args with
+    | Pcstr_tuple [],
+      Pcstr_tuple
+        [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }]
+    | Pcstr_tuple
+        [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }],
+      Pcstr_tuple [] ->
+      if not (String.equal name type_param_name) then
+        bad "its payload constructor must carry the sole type parameter"
+    | _ ->
+      bad
+        "it must have exactly one nullary constructor and one unary \
+         constructor carrying the sole type parameter"
+    end
+  | _ ->
+    bad "it must have exactly two constructors"
+
+let check_or_null_variant_shape _path params sdecl scstrs =
+  let bad msg =
+    raise (Error (sdecl.ptype_loc, Bad_or_null_attribute msg))
+  in
+  check_or_null_decl bad sdecl;
+  let type_param_name = get_or_null_type_param_name bad sdecl params in
+  check_or_null_constructors bad type_param_name scstrs
 
 (* [make_params] creates sort variables - these can be defaulted away (as in
    transl_type_decl) or unified with existing sort-variable-free types (as in
