@@ -26,7 +26,7 @@
  ******************************************************************************)
 
 (** Evaluate a quoted OCaml expression at runtime. *)
-val eval : 'a expr -> 'a eval
+val eval : 'a expr @ once -> 'a eval
 
 (** Disallow the reading of bundles from the current executable. Instead, fetch
     them via the normal mechanisms used by compilerlibs. This should only be
