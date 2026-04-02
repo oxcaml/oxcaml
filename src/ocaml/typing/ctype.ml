@@ -2214,33 +2214,6 @@ let try_expand_once = try_expand_once_gen expand_abbrev
 let try_expand_safe env ty =
   let snap = Btype.snapshot () in
   try try_expand_once env ty
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-  with Escape _ ->
-    Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
-
-(* Fully expand the head of a type. *)
-let rec try_expand_head ?(fuel = 5000)
-    (try_once : Env.t -> type_expr -> type_expr) env ty =
-  (* Merlin-jst: we give this function a fuel parameter because this function sometimes
-     loops forever. See tests tests/test-dirs/type-enclosing/issue1335.t
-     and tests/test-dirs/type-enclosing/issue1755.t
-
-     This issue is resolved in upstream Merlin, but the upstream Merlin maintainers are
-     unsure why (they believe is was due to merging changes in Printtyp when merging
-     5.2 compiler changes). This is a cheap and dirty solution to prevent crashing. *)
-  if fuel <= 0 then raise Cannot_expand;
-  let ty' = try_once env ty in
-  try try_expand_head ~fuel:(fuel - 1) try_once env ty'
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-  with Escape _ ->
-    Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
-
-(* Fully expand the head of a type. *)
-let rec try_expand_head
-    (try_once : Env.t -> type_expr -> type_expr) env ty =
-  let ty' = try_once env ty in
-  try try_expand_head try_once env ty'
-=======
   with Escape _ ->
     Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
 
@@ -2405,7 +2378,6 @@ let rec try_reduce_once env t =
 let rec try_reduce env ty =
   let ty' = try_reduce_once env ty in
   try try_reduce env ty'
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
   with Cannot_expand -> ty'
 
 (* [Predef]'s [eval] is special -- we want to always expand it in [reduce_head],
@@ -2419,16 +2391,24 @@ let expand_eval_abbrev env ty =
 let try_expand_eval_once = try_expand_once_gen expand_eval_abbrev
 
 (* Fully expand the head of a type. *)
-let try_expand_head
+let try_expand_head ?(fuel = 5000)
     (try_once : Env.t -> type_expr -> type_expr) (env : Env.t) ty =
-  let rec loop try_once env ty =
+  (* Merlin-jst: we give this function a fuel parameter because this function sometimes
+     loops forever. See tests tests/test-dirs/type-enclosing/issue1335.t
+     and tests/test-dirs/type-enclosing/issue1755.t
+
+     This issue is resolved in upstream Merlin, but the upstream Merlin maintainers are
+     unsure why (they believe is was due to merging changes in Printtyp when merging
+     5.2 compiler changes). This is a cheap and dirty solution to prevent crashing. *)
+  let rec loop try_once env ty ~fuel =
+    if fuel <= 0 then raise Cannot_expand;
     let ty' = try_once env ty in
-    try loop try_once env ty'
+    try loop try_once env ty' ~fuel:(fuel - 1)
     with Cannot_expand ->
       try try_reduce env ty'
       with Cannot_expand -> ty'
   in
-  try loop try_once env ty
+  try loop try_once env ty ~fuel
   with Cannot_expand -> try_reduce env ty
 
 let reduce_head ~expand_eval env ty =
