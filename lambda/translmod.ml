@@ -92,6 +92,18 @@ let transl_type_extension ~scopes env rootpath tyext body =
     tyext.tyext_constructors
     body
 
+let block_of_module_representation ~loc = function
+  | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
+  | Module_mixed (shape, _) ->
+    let mpb = Mixed_product_bytes.count (Product shape) in
+    (* All-value/void shapes compile to uniform blocks, so the scannable
+       prefix length limit doesn't apply. *)
+    if not (Mixed_product_bytes.all_value mpb)
+    then
+      Typedecl.assert_mixed_product_support loc Module
+        ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb);
+    Pmakeblock(0, Immutable, Shape shape, alloc_heap)
+
 (* Compile a coercion *)
 
 let rec apply_coercion loc strict restr arg =

@@ -174,6 +174,7 @@ COMPILERLIBS_SOURCES=\
   typing/type_shape.ml \
   typing/typedtree.ml \
   lambda/debuginfo.ml \
+  lambda/mixed_product_bytes.ml \
   lambda/lambda.ml \
   lambda/runtimedef.ml \
   lambda/static_label.ml \

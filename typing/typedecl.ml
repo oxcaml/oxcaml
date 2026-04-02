@@ -1912,26 +1912,23 @@ module Element_repr = struct
         Misc.fatal_error "Element_repr.classify: unexpected missing layout"
 
   let mixed_product_shape loc ts kind =
-    let boxed_elements =
-      let rec count_boxed_in_t acc : t -> int = function
-        | Unboxed_element u -> count_boxed_in_unboxed_element acc u
-        | Void -> acc
-        | Float_element | Value_element _ -> acc + 1
-      and count_boxed_in_unboxed_element acc : unboxed_element -> int =
-        function
-        | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate -> acc
-        | Product l -> Array.fold_left count_boxed_in_t acc l
-      in
-      List.fold_left (fun acc (t,_) -> count_boxed_in_t acc t) 0 ts
-    in
     let mixed =
       List.exists
         (function ((Unboxed_element _ | Void), _) -> true | _ -> false) ts
     in
     if not mixed then None else begin
-      assert_mixed_product_support loc kind ~value_prefix_len:boxed_elements;
-      Some (List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list)
+      let shape =
+        List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list
+      in
+      (* All-value/void shapes will compile to uniform blocks, so the
+         scannable prefix length limit doesn't apply. *)
+      let mpb = Mixed_product_bytes.count_types_shape shape in
+      if not (Mixed_product_bytes.all_value mpb)
+      then
+        assert_mixed_product_support loc kind
+          ~value_prefix_len:
+            (Mixed_product_bytes.value_prefix_len mpb);
+      Some shape
     end
 end
 
