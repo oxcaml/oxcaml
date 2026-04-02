@@ -15,7 +15,6 @@
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
     (unit : Flambda_unit.t) =
-  let debug_print = Flambda_features.dump_reaper () in
   let load_code = Flambda_cmx.get_imported_code cmx_loader in
   let get_code_metadata code_id =
     Code_or_metadata.code_metadata
@@ -35,7 +34,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   in
   let solved_dep = Dep_solver.fixpoint deps in
   let () =
-    if debug_print
+    if Flambda_features.debug_reaper "print-solved"
     then (
       Format.printf "RESULT@ %a@." Dep_solver.pp_result solved_dep;
       Dot_printer.print_solved_dep solved_dep deps)

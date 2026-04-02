@@ -936,10 +936,7 @@ let run (unit : Flambda_unit.t) =
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
   let continuation_info = Acc.get_continuation_info acc in
   let code_deps = Acc.code_deps acc in
-  let () =
-    let debug_print = Flambda_features.dump_reaper () in
-    if false && debug_print then Dot.print_dep deps
-  in
+  if Flambda_features.debug_reaper "print-raw" then Dot.print_dep deps;
   { holed;
     deps;
     kinds;
