@@ -104,7 +104,8 @@ module Genarray = struct
   type (!'a : any, !'b : any, !'c : any) t : mutable_data
   external create
      : ('a : any) ('b : any) ('c : any).
-       ('a, 'b) kind -> 'c layout -> (int array[@local_opt]) -> ('a, 'b, 'c) t
+       ('a, 'b) kind -> 'c layout -> (int array[@local_opt])
+       -> ('a, 'b, 'c) t @ unique
      @@ portable
      = "caml_ba_create"
   external get
@@ -136,8 +137,9 @@ module Genarray = struct
     let arr = create kind layout dims in
     let dlen = Array.length dims in
     match layout with
-    | C_layout -> cloop arr (Array.make dlen 0) f 0 dims; arr
-    | Fortran_layout -> floop arr (Array.make dlen 1) f (pred dlen) dims; arr
+    | C_layout -> cloop (borrow_ arr) (Array.make dlen 0) f 0 dims; arr
+    | Fortran_layout ->
+        floop (borrow_ arr) (Array.make dlen 1) f (pred dlen) dims; arr
 
   external num_dims
     : ('a : any) ('b : any) ('c : any).
@@ -235,7 +237,7 @@ module Array0 = struct
 
   let of_value kind layout v =
     let a = create kind layout in
-    set a v;
+    set (borrow_ a) v;
     a
   let init = of_value
 end
@@ -314,8 +316,8 @@ module Array1 = struct
     (kind : (a, b) kind) (layout : c layout) dim f =
     let arr = create kind layout dim in
     match layout with
-    | C_layout -> c_init arr dim f; arr
-    | Fortran_layout -> fortran_init arr dim f; arr
+    | C_layout -> c_init (borrow_ arr) dim f; arr
+    | Fortran_layout -> fortran_init (borrow_ arr) dim f; arr
   let of_array (type (a : value_or_null mod separable) (b : any) (c : any))
     (kind : (a, b) kind) (layout : c layout) data =
     let ba = create kind layout (Array.length data) in
@@ -324,7 +326,9 @@ module Array1 = struct
         C_layout -> 0
       | Fortran_layout -> 1
     in
-    for i = 0 to Array.length data - 1 do unsafe_set ba (i + ofs) data.(i) done;
+    for i = 0 to Array.length data - 1 do
+      unsafe_set (borrow_ ba) (i + ofs) data.(i)
+    done;
     ba
 end
 
@@ -414,8 +418,8 @@ module Array2 = struct
     (kind : (a, b) kind) (layout : c layout) dim1 dim2 f =
     let arr = create kind layout dim1 dim2 in
     match layout with
-    | C_layout -> c_init arr dim1 dim2 f; arr
-    | Fortran_layout -> fortran_init arr dim1 dim2 f; arr
+    | C_layout -> c_init (borrow_ arr) dim1 dim2 f; arr
+    | Fortran_layout -> fortran_init (borrow_ arr) dim1 dim2 f; arr
   let of_array (type (a : value_or_null mod separable) (b : any) (c : any))
     (kind : (a, b) kind) (layout: c layout) data =
     let dim1 = Array.length data in
@@ -431,7 +435,7 @@ module Array2 = struct
       if Array.length row <> dim2 then
         invalid_arg("Bigarray.Array2.of_array: non-rectangular data");
       for j = 0 to dim2 - 1 do
-        unsafe_set ba (i + ofs) (j + ofs) row.(j)
+        unsafe_set (borrow_ ba) (i + ofs) (j + ofs) row.(j)
       done
     done;
     ba
@@ -537,8 +541,8 @@ module Array3 = struct
     (kind : (a, b) kind) (layout : c layout) dim1 dim2 dim3 f =
     let arr = create kind layout dim1 dim2 dim3 in
     match layout with
-    | C_layout -> c_init arr dim1 dim2 dim3 f; arr
-    | Fortran_layout -> fortran_init arr dim1 dim2 dim3 f; arr
+    | C_layout -> c_init (borrow_ arr) dim1 dim2 dim3 f; arr
+    | Fortran_layout -> fortran_init (borrow_ arr) dim1 dim2 dim3 f; arr
   let of_array (type (a : value_or_null mod separable) (b : any) (c : any))
     (kind : (a, b) kind) (layout : c layout) data =
     let dim1 = Array.length data in
@@ -559,7 +563,7 @@ module Array3 = struct
         if Array.length col <> dim3 then
           invalid_arg("Bigarray.Array3.of_array: non-cubic data");
         for k = 0 to dim3 - 1 do
-          unsafe_set ba (i + ofs) (j + ofs) (k + ofs) col.(k)
+          unsafe_set (borrow_ ba) (i + ofs) (j + ofs) (k + ofs) col.(k)
         done
       done
     done;
