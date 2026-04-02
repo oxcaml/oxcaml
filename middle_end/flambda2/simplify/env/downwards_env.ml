@@ -667,16 +667,16 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
        the user's requests for these attributes basically all the time. As such
        inlining when these attributes are in effect affects the depth limit much
        less than in other scenarios. *)
+    let is_stub = Code.stub called_code in
+    let increment =
+      if is_stub
+      then 0
+      else if was_inline_always
+      then 1
+      else Flambda_features.Inlining.depth_scaling_factor
+    in
     Inlining_state.with_arguments arguments
-      (if Code.stub called_code
-       then t.inlining_state
-       else
-         let by =
-           if was_inline_always
-           then 1
-           else Flambda_features.Inlining.depth_scaling_factor
-         in
-         Inlining_state.increment_depth t.inlining_state ~by)
+      (Inlining_state.increment_depth t.inlining_state ~is_stub ~by:increment)
   in
   let inlined_debuginfo =
     Inlined_debuginfo.create ~called_code_id:(Code.code_id called_code)

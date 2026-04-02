@@ -808,7 +808,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         (* TODO inlining arguments *)
         Inlining_state.create
           ~arguments:(Inlining_arguments.create ~round:0)
-          ~depth
+          ~depth ~stub_depth:0
       | None -> Inlining_state.default ~round:0
     in
     let exn_continuation =
