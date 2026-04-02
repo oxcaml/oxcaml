@@ -136,6 +136,13 @@ let main () =
         [Context.minimizer (List.hd minimizers_to_run)])
     else Iterator.fix (List.map Context.minimizer minimizers_to_run)
   in
+  let named name =
+    Chamelon_lib.Context.minimizer
+      (Chamelon_lib.Utils.Smap.find name all_minimizers)
+  in
+  let schedule =
+    Iterator.(list [schedule; fix [named "cleanup"; named "delete-lines"]])
+  in
   (* LIST MINIMIZERS *)
   if !list_minimizers
   then (
