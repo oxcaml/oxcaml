@@ -377,13 +377,7 @@ and expression_desc =
   | Texp_hole of unique_use
   | Texp_quotation of expression
   | Texp_antiquotation of expression
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-  | Texp_eval of core_type * Jkind.sort
   | Texp_typed_hole
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-  | Texp_eval of core_type * Jkind.sort
-=======
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
 
 and ident_kind =
   | Id_value
@@ -1611,13 +1605,7 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_quotation exp ->
       fold_antiquote_exp (fold_antiquote_exp f) acc exp
   | Texp_antiquotation exp -> f acc exp
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-  | Texp_eval _ -> acc
   | Texp_typed_hole -> acc
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-  | Texp_eval _ -> acc
-=======
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
 
 and fold_antiquote_exp_opt f acc = function
   | None -> acc

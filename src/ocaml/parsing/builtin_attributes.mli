@@ -354,30 +354,8 @@ type tracing_probe =
 
    [%probe "my_probe" ~enabled_at_init:true arg]
 *)
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
 val get_tracing_probe_payload :
   Parsetree.payload -> (tracing_probe, unit) result
-
-(** Gets the payload of a [eval] extension node which evaluates quotes,
-    for example: [%eval: int] *)
-val get_eval_payload :
-  Parsetree.payload -> (Parsetree.core_type, unit) result
-
-val has_atomic: Parsetree.attributes -> bool
-=======
-val get_tracing_probe_payload :
-  Parsetree.payload -> (tracing_probe, unit) result
-
-val has_atomic: Parsetree.attributes -> bool
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
-val get_tracing_probe_payload :
-  Parsetree.payload -> (tracing_probe, unit) result
-
-(** Gets the payload of a [eval] extension node which evaluates quotes,
-    for example: [%eval: int] *)
-val get_eval_payload :
-  Parsetree.payload -> (Parsetree.core_type, unit) result
 
 val has_atomic: Parsetree.attributes -> bool
 

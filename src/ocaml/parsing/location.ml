@@ -278,14 +278,8 @@ let absolute_path s = (* This function could go into Filename *)
   aux s
 
 let show_filename file =
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-  (* if !Clflags.absname then absolute_path file else *) file
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-  if !Clflags.absname then absolute_path file else file
-=======
-  let file = if !Clflags.absname then absolute_path file else file in
+  let file = (* if !Clflags.absname then absolute_path file else *) file in
   rewrite_absolute_path file
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
 
 module Fmt = Format_doc
 module Doc = struct

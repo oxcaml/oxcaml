@@ -633,18 +633,6 @@ and expression_desc =
   | Texp_hole of unique_use (** _ *)
   | Texp_quotation of expression
   | Texp_antiquotation of expression
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-  | Texp_eval of core_type * Jkind.sort
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-  | Texp_eval of core_type * Jkind.sort
-
-and function_curry =
-  | More_args of { partial_mode : Mode.Alloc.l }
-=======
-
-and function_curry =
-  | More_args of { partial_mode : Mode.Alloc.l }
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
   (* merlin-specific: a [Texp_typed_hole] is a typed hole written by the user as a
       placeholder. This is in contrast to a Texp_hole, which is used in overwrite
       expressions *)

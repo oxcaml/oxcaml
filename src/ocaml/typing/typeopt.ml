@@ -880,19 +880,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         match non_consts with
         | [] -> assert false  (* See [List.for_all is_constant], above *)
         | _::_ ->
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
           (num_nodes_visited, Pvariant { consts; non_consts })
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-        fprintf ppf "@ %a"
-        (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env) err
-=======
-        fprintf ppf "@ %a"
-        (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           env) err
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
       end
     in
     num_nodes_visited, non_nullable raw_kind
@@ -1163,40 +1151,4 @@ let classify_lazy_argument : Typedtree.expression ->
     | Texp_ident _ ->
        `Identifier `Other
     | _ ->
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
        `Other
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-      fprintf ppf "A representable layout is required here.@ %a"
-        (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env) err
-  | Unsupported_product_in_lazy const ->
-      fprintf ppf
-        "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
-=======
-      fprintf ppf "A representable layout is required here.@ %a"
-        (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           env) err
-  | Unsupported_product_in_lazy const ->
-      fprintf ppf
-        "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-          Printtyp.type_expr ty
-          (Jkind.Violation.report_with_offender
-             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-             ~level:(Ctype.get_current_level ()) env) err
-      | None ->
-        fprintf ppf
-          "This array operation expects an array type, but %a does not appear@ \
-=======
-          Printtyp.type_expr ty
-          (Jkind.Violation.report_with_offender
-             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-             env) err
-      | None ->
-        fprintf ppf
-          "This array operation expects an array type, but %a does not appear@ \
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0

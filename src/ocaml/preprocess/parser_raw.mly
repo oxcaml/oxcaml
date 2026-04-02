@@ -3086,14 +3086,8 @@ spliceable_expr:
   /* BEGIN AVOID */
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
   /* END AVOID */
-  | LPAREN seq_expr type_constraint_with_modes RPAREN
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-  | LPAREN seq_expr type_constraint_with_modes RPAREN
-=======
   | LPAREN seq_expr opt_type_constraint_with_modes RPAREN
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
       { let (t, m) = $3 in
         mkexp_opt_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2
           t }
@@ -3111,14 +3105,8 @@ spliceable_expr:
   (*
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
   *)
-  | LPAREN seq_expr type_constraint_with_modes RPAREN
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-  | LPAREN seq_expr type_constraint_with_modes RPAREN
-=======
   | LPAREN seq_expr opt_type_constraint_with_modes RPAREN
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
       { let (t, m) = $3 in
         mkexp_opt_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2
           t }

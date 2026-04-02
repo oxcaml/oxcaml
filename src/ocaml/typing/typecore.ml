@@ -1219,13 +1219,7 @@ let mode_annots_from_pat pat =
    error system instead of the ad-hoc [Mode_mismatch] error variant. *)
 let apply_mode_annots ~loc ~env kind (m : Alloc.Const.Option.t) mode =
   let error axis =
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-    raise (error(loc, env, Param_mode_mismatch axis))
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-    raise (Error(loc, env, Param_mode_mismatch axis))
-=======
-    raise (Error(loc, env, Mode_mismatch (kind, axis)))
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
+    raise (error(loc, env, Mode_mismatch (kind, axis)))
   in
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m in
@@ -4764,18 +4758,8 @@ let rec is_nonexpansive exp =
   | Texp_probe_is_enabled _
   | Texp_src_pos
   | Texp_quotation _
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-  | Texp_array (_, _, [], _)
-  | Texp_typed_hole
-    (* CR metaprogramming mshinwell: Make sure this is correct for Texp_eval *)
-  | Texp_eval _ -> true
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-  | Texp_array (_, _, [], _)
-    (* CR metaprogramming mshinwell: Make sure this is correct for Texp_eval *)
-  | Texp_eval _ -> true
-=======
   | Texp_array (_, _, [], _) -> true
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
+  | Texp_typed_hole
   | Texp_let(_rec_flag, pat_exp_list, body) ->
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
       is_nonexpansive body
@@ -10911,16 +10895,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   if is_recursive then
     List.iter
       (fun {vb_pat=pat} -> match pat.pat_desc with
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-           Tpat_var _ -> ()
-         | _ -> raise(error(pat.pat_loc, env, Illegal_letrec_pat)))
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-           Tpat_var _ -> ()
-         | _ -> raise(Error(pat.pat_loc, env, Illegal_letrec_pat)))
-=======
            Tpat_var _ | Tpat_fun_layout _ -> ()
-         | _ -> raise(Error(pat.pat_loc, env, Illegal_letrec_pat)))
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
+         | _ -> raise(error(pat.pat_loc, env, Illegal_letrec_pat)))
       l;
   List.iter (fun vb ->
       if pattern_needs_partial_application_check vb.vb_pat then

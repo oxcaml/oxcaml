@@ -317,14 +317,8 @@ let iter_on_occurrences
         iter_field_pats ~namespace:Label pat_env fields
       | Tpat_record_unboxed_product (fields, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
-      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _
-||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
-      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ 
-=======
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _
       | Tpat_fun_layout _
->>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
       | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
       | Tpat_unboxed_tuple _ | Tpat_variant _ | Tpat_array _ | Tpat_lazy _
       | Tpat_value _ | Tpat_exception _ | Tpat_or _ -> ());
