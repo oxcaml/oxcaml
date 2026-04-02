@@ -2003,19 +2003,20 @@ module Big_module_of_unboxed_products_of_values = struct
   let x24 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
   let x25 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
   let x26 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let f64 = #0.
 end
 [%%expect{|
-Lines 1-28, characters 50-3:
+Lines 1-29, characters 50-3:
  1 | ..................................................struct
  2 |   let x1 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
  3 |   let x2 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
  4 |   let x3 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
  5 |   let x4 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 ...
-25 |   let x24 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 26 |   let x25 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 27 |   let x26 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-28 | end
+28 |   let f64 = #0.
+29 | end
 Error: Mixed modules may contain at most 254 value fields prior to the flat suffix, but this one contains 260.
 |}]
 
