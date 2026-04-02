@@ -124,6 +124,41 @@ module type Tree = sig
 
     val call : ('a, 'b) t -> key -> 'a -> 'b
   end
+
+  (* CR bclement: This module (and the modules below) are used as workarounds to
+     compensate for the lack of function specialisation: instead of specialising
+     at the function level, we inline at the module level. *)
+  module Merge_callback : sig
+    type ('a, 'b, 'c) t
+
+    val call_union : ('a, 'b, 'c) t -> key -> 'a -> 'b -> 'c option
+
+    val call_diff : ('a, 'b, 'c) t -> key -> 'a -> 'b -> 'c option
+  end
+
+  module Inter_callback : sig
+    type ('a, 'b, 'c) t
+
+    val call : ('a, 'b, 'c) t -> key -> 'a -> 'b -> 'c
+  end
+
+  module Compare_callback : sig
+    type ('a, 'b) t
+
+    val call : ('a, 'b) t -> 'a -> 'b -> int
+  end
+
+  module Equal_callback : sig
+    type ('a, 'b) t
+
+    val call : ('a, 'b) t -> 'a -> 'b -> bool
+  end
+
+  module Split_callback : sig
+    type ('a, 'b) t
+
+    val call : ('a, 'b) t -> 'a -> 'b
+  end
 end
 
 module Set0 = struct
@@ -180,6 +215,43 @@ module Set0 = struct
 
     let[@inline always] call f key _ = f key
   end
+
+  module Merge_callback = struct
+    type (_, _, 'c) t = 'c is_value
+
+    let[@inline always] call_union (type a) (Unit : a is_value) _ _ _ : a option
+        =
+      Some ()
+
+    let[@inline always] call_diff (type a) (Unit : a is_value) _ _ _ : a option
+        =
+      None
+  end
+
+  module Inter_callback = struct
+    type (_, _, 'c) t = 'c is_value
+
+    let[@inline always] call (type a) (Unit : a is_value) _ _ _ : a = ()
+  end
+
+  module Compare_callback = struct
+    type (_, _) t = unit
+
+    let[@inline always] call _ _ _ = 0
+  end
+
+  module Equal_callback = struct
+    type (_, _) t = unit
+
+    let[@inline always] call _ _ _ = true
+  end
+
+  module Split_callback = struct
+    type ('a, 'b) t = True : 'a is_value -> ('a, bool) t [@@unboxed]
+
+    let[@inline always] call (type a b) (True Unit : (a, b) t) (() : a) : b =
+      true
+  end
 end
 
 module _ : Tree = Set0
@@ -224,6 +296,38 @@ module Map0 = struct
 
     let[@inline always] of_func Any f = f
   end
+
+  module Merge_callback = struct
+    type ('a, 'b, 'c) t = key -> 'a -> 'b -> 'c option
+
+    let[@inline always] call_union f key t t' = f key t t'
+
+    let[@inline always] call_diff f key t t' = f key t t'
+  end
+
+  module Inter_callback = struct
+    type ('a, 'b, 'c) t = key -> 'a -> 'b -> 'c
+
+    let[@inline always] call f key t t' = f key t t'
+  end
+
+  module Compare_callback = struct
+    type ('a, 'b) t = 'a -> 'b -> int
+
+    let[@inline always] call f t t' = f t t'
+  end
+
+  module Equal_callback = struct
+    type ('a, 'b) t = 'a -> 'b -> bool
+
+    let[@inline always] call f t t' = f t t'
+  end
+
+  module Split_callback = struct
+    type (_, _) t = Option : ('a, 'a option) t
+
+    let[@inline always] call (type a b) (Option : (a, b) t) (a : a) : b = Some a
+  end
 end
 
 module _ : Tree = Map0
@@ -245,11 +349,11 @@ module Tree_operations (Tree : Tree) : sig
 
   val remove : key -> 'a t -> 'a t
 
-  val union : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val union : ('a, 'a, 'a) Merge_callback.t -> 'a t -> 'a t -> 'a t
 
-  val union_sharing : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val union_sharing : ('a, 'a, 'a) Merge_callback.t -> 'a t -> 'a t -> 'a t
 
-  val union_shared : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val union_shared : ('a, 'a, 'a) Merge_callback.t -> 'a t -> 'a t -> 'a t
 
   val update_many :
     (key -> 'a option -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
@@ -258,17 +362,18 @@ module Tree_operations (Tree : Tree) : sig
 
   val find : key -> 'a t -> 'a
 
-  val inter : 'c is_value -> (key -> 'a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t
+  val inter :
+    'c is_value -> ('a, 'b, 'c) Inter_callback.t -> 'a t -> 'b t -> 'c t
 
   val inter_domain_is_non_empty : 'a t -> 'b t -> bool
 
   val diff_domains : 'a t -> 'b t -> 'a t
 
-  val diff : (key -> 'a -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
+  val diff : ('a, 'b, 'a) Merge_callback.t -> 'a t -> 'b t -> 'a t
 
-  val diff_sharing : (key -> 'a -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
+  val diff_sharing : ('a, 'b, 'a) Merge_callback.t -> 'a t -> 'b t -> 'a t
 
-  val diff_shared : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val diff_shared : ('a, 'a, 'a) Merge_callback.t -> 'a t -> 'a t -> 'a t
 
   val cardinal : _ t -> int
 
@@ -296,12 +401,16 @@ module Tree_operations (Tree : Tree) : sig
 
   val max_binding_opt : 'a t -> 'a Binding.t option
 
-  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+  val equal : ('a, 'a) Equal_callback.t -> 'a t -> 'a t -> bool
 
-  val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
+  val compare : ('a, 'a) Compare_callback.t -> 'a t -> 'a t -> int
 
   val split :
-    found:('a -> 'b) -> not_found:'b -> key -> 'a t -> 'a t * 'b * 'a t
+    found:('a, 'b) Split_callback.t ->
+    not_found:'b ->
+    key ->
+    'a t ->
+    'a t * 'b * 'a t
 
   val to_list : 'a t -> 'a Binding.t list
 
@@ -339,13 +448,6 @@ module Tree_operations (Tree : Tree) : sig
   val to_seq : 'a t -> 'a Binding.t Seq.t
 
   val of_list : 'a is_value -> 'a Binding.t list -> 'a t
-
-  val disjoint_union :
-    ?eq:('a -> 'a -> bool) ->
-    print:(Format.formatter -> key -> unit) ->
-    'a t ->
-    'a t ->
-    'a t
 
   val map_keys : (key -> key) -> 'a t -> 'a t
 
@@ -671,7 +773,9 @@ end = struct
       ~only_left:(fun t0 -> t0)
       ~only_right:(fun t1 -> t1)
       ~both_sides:(fun t0 t1 -> union f t0 t1)
-      iv f t0 t1
+      iv
+      (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
+      t0 t1
 
   (* [_sharing] functions are guaranteed to share with their first argument
      only.
@@ -690,7 +794,9 @@ end = struct
       ~only_left:(fun t0 -> t0)
       ~only_right:(fun t1 -> t1)
       ~both_sides:(fun t0 t1 -> union_sharing f t0 t1)
-      iv f t0 t1
+      iv
+      (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
+      t0 t1
 
   let rec union_shared f t0 t1 =
     let iv = is_value_of t0 in
@@ -701,7 +807,9 @@ end = struct
       ~only_left:(fun t0 -> t0)
       ~only_right:(fun t1 -> t1)
       ~both_sides:(fun t0 t1 -> union_shared f t0 t1)
-      iv f t0 t1
+      iv
+      (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
+      t0 t1
 
   let rec diff f t0 t1 =
     let iv = is_value_of t0 in
@@ -709,7 +817,9 @@ end = struct
       ~only_left:(fun t0 -> t0)
       ~only_right:(fun _ -> empty iv)
       ~both_sides:(fun t0 t1 -> diff f t0 t1)
-      iv f t0 t1
+      iv
+      (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
+      t0 t1
 
   let rec diff_sharing f t0 t1 =
     let iv = is_value_of t0 in
@@ -717,7 +827,9 @@ end = struct
       ~only_left:(fun t0 -> t0)
       ~only_right:(fun _ -> empty iv)
       ~both_sides:(fun t0 t1 -> diff_sharing f t0 t1)
-      iv f t0 t1
+      iv
+      (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
+      t0 t1
 
   let rec diff_shared f t0 t1 =
     let iv = is_value_of t0 in
@@ -725,7 +837,9 @@ end = struct
       ~only_left:(fun t0 -> t0)
       ~only_right:(fun _ -> empty iv)
       ~both_sides:(fun t0 t1 -> diff_shared f t0 t1)
-      iv f t0 t1
+      iv
+      (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
+      t0 t1
 
   (* CR mshinwell: rename to subset_domain and inter_domain? *)
 
@@ -761,11 +875,11 @@ end = struct
     | Leaf (i, d0), _ -> (
       match find i t1 with
       | exception Not_found -> empty iv
-      | d1 -> leaf iv i (f i d0 d1))
+      | d1 -> leaf iv i (Inter_callback.call f i d0 d1))
     | _, Leaf (i, d1) -> (
       match find i t0 with
       | exception Not_found -> empty iv
-      | d0 -> leaf iv i (f i d0 d1))
+      | d0 -> leaf iv i (Inter_callback.call f i d0 d1))
     | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
       if equal_prefix prefix0 bit0 prefix1 bit1
       then branch prefix0 bit0 (inter iv f t00 t10) (inter iv f t01 t11)
@@ -961,7 +1075,7 @@ end = struct
     else
       match descr t0, descr t1 with
       | Empty, Empty -> assert false (* already covered *)
-      | Leaf (i, d0), Leaf (j, d1) -> i = j && f d0 d1
+      | Leaf (i, d0), Leaf (j, d1) -> i = j && Equal_callback.call f d0 d1
       | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
         if equal_prefix prefix0 bit0 prefix1 bit1
         then equal f t00 t10 && equal f t01 t11
@@ -976,7 +1090,7 @@ end = struct
       | Empty, Empty -> assert false (* already covered *)
       | Leaf (i, d0), Leaf (j, d1) ->
         let c = if i = j then 0 else if i < j then -1 else 1 in
-        if c <> 0 then c else f d0 d1
+        if c <> 0 then c else Compare_callback.call f d0 d1
       | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
         let c = compare_prefix prefix0 bit0 prefix1 bit1 in
         if c = 0
@@ -1004,7 +1118,7 @@ end = struct
       | Leaf (j, d) ->
         let iv = is_value_of t in
         if i = j
-        then empty iv, found d, empty iv
+        then empty iv, Split_callback.call found d, empty iv
         else if j < i
         then singleton iv j d, not_found, empty iv
         else empty iv, not_found, singleton iv j d
@@ -1237,21 +1351,6 @@ end = struct
 
   let merge f t0 t1 = merge' f t0 t1
 
-  let[@inline always] disjoint_union ?eq ~print t1 t2 =
-    if t1 == t2
-    then t1
-    else
-      let fail key =
-        Misc.fatal_errorf
-          "Patricia_tree.disjoint_union: key %a is in intersection" print key
-      in
-      union
-        (fun key datum1 datum2 ->
-          match eq with
-          | None -> fail key
-          | Some eq -> if eq datum1 datum2 then Some datum1 else fail key)
-        t1 t2
-
   let map_keys f t =
     let iv = is_value_of t in
     fold (Callback.of_func iv (fun i d acc -> add (f i) d acc)) t (empty iv)
@@ -1300,21 +1399,27 @@ module Set = struct
 
   let add i t = Ops.add i () t
 
-  let union t0 t1 = Ops.union (fun _ () () -> Some ()) t0 t1
+  (* CR bclement: This should just be `Ops.union (fun _ _ _ -> Some ())` once we
+     have function specialisation, see the comment on
+     {!module-Merge_callback}. *)
+  let union t0 t1 = Ops.union (Set0.is_value_of t0) t0 t1
 
-  let union_shared t0 t1 = Ops.union_shared (fun _ () () -> Some ()) t0 t1
+  let union_shared t0 t1 = Ops.union_shared (Set0.is_value_of t0) t0 t1
 
-  let union_sharing t0 t1 = Ops.union_sharing (fun _ () () -> Some ()) t0 t1
+  let union_sharing t0 t1 = Ops.union_sharing (Set0.is_value_of t0) t0 t1
 
   let diff = Ops.diff_domains
 
-  let diff_sharing t0 t1 = Ops.diff_sharing (fun _ () () -> None) t0 t1
+  (* CR bclement: This should just be `Ops.diff_sharing (fun _ _ _ -> None)`
+     once we have function specialisation, see the comment on
+     {!module-Merge_callback}. *)
+  let diff_sharing t0 t1 = Ops.diff_sharing (Set0.is_value_of t0) t0 t1
 
-  let diff_shared t0 t1 = Ops.diff_shared (fun _ () () -> None) t0 t1
+  let diff_shared t0 t1 = Ops.diff_shared (Set0.is_value_of t0) t0 t1
 
   let disjoint t0 t1 = not (Ops.inter_domain_is_non_empty t0 t1)
 
-  let inter t0 t1 = Ops.inter Unit (fun _ () () -> ()) t0 t1
+  let inter t0 t1 = Ops.inter Unit (Set0.is_value_of t0) t0 t1
 
   let rec union_list ts =
     match ts with [] -> empty | t :: ts -> union t (union_list ts)
@@ -1337,11 +1442,19 @@ module Set = struct
 
   let max_elt_opt = Ops.max_binding_opt
 
-  let equal t0 t1 = Ops.equal (fun () () -> true) t0 t1
+  (* CR bclement: This should just be `Ops.equal (fun _ _ -> true)` once we have
+     function specialisation, see the comment on {!module-Merge_callback}. *)
+  let equal t0 t1 = Ops.equal () t0 t1
 
-  let compare t0 t1 = Ops.compare (fun () () -> 0) t0 t1
+  (* CR bclement: This should just be `Ops.compare (fun _ _ -> 0)` once we have
+     function specialisation, see the comment on {!module-Merge_callback}. *)
+  let compare t0 t1 = Ops.compare () t0 t1
 
-  let split i t = Ops.split ~found:(fun () -> true) ~not_found:false i t
+  (* CR bclement: This should just be `Ops.split ~found:(fun _ -> true)` once we
+     have function specialisation, see the comment on
+     {!module-Merge_callback}. *)
+  let split i t =
+    Ops.split ~found:(True (Set0.is_value_of t)) ~not_found:false i t
 
   let find elt t = if mem elt t then elt else raise Not_found
 
@@ -1361,7 +1474,10 @@ module Map = struct
 
   let inter f t0 t1 = Ops.inter Any f t0 t1
 
-  let split i t = Ops.split ~found:(fun a -> Some a) ~not_found:None i t
+  (* CR bclement: This should just be `Ops.split ~found:(fun a -> Some a)` once
+     we have function specialisation, see the comment on
+     {!module-Merge_callback}. *)
+  let split i t = Ops.split ~found:Option ~not_found:None i t
 
   let bindings s = Ops.to_list s
 
@@ -1424,9 +1540,22 @@ struct
       in
       pp ppf t
 
-    let disjoint_union ?eq ?print t1 t2 =
+    let[@inline always] disjoint_union ?eq ?print t1 t2 =
       ignore print;
-      Ops.disjoint_union ~print:Key.print ?eq t1 t2
+      if t1 == t2
+      then t1
+      else
+        let fail key =
+          Misc.fatal_errorf
+            "Patricia_tree.disjoint_union: key %a is in intersection" Key.print
+            key
+        in
+        union
+          (fun key datum1 datum2 ->
+            match eq with
+            | None -> fail key
+            | Some eq -> if eq datum1 datum2 then Some datum1 else fail key)
+          t1 t2
 
     let [@ocamlformat "disable"] print print_datum ppf t =
       if is_empty t then
