@@ -1006,11 +1006,6 @@ natruntop:
 	$(MAKE) ocamlnat
 	@$(RUN_OCAMLNAT)
 
-# Native dynlink
-
-otherlibs/dynlink/dynlink.cmxa: otherlibs/dynlink/native/dynlink.ml
-	$(MAKE) -C otherlibs/dynlink allopt
-
 # Cleanup the lexer
 
 partialclean::
