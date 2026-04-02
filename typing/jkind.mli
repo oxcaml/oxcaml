@@ -560,9 +560,6 @@ val default_to_value : 'd Types.jkind -> unit
     jkinds - raises on Any. *)
 val sort_of_jkind : Env.t -> Types.jkind_l -> sort
 
-(** Like [Sort.default_to_value_and_get], but never mutates sort variables. *)
-val default_sort_to_value_without_mutation : sort -> Sort.Const.t
-
 (** Gets the layout of a jkind; returns [None] if the layout is still unknown,
     or the (fully expanded) kind is abstract. Never does mutation. *)
 val get_layout : Env.t -> 'd Types.jkind -> Layout.Const.t option

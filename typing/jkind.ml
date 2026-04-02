@@ -2414,6 +2414,15 @@ let extract_layout : 'l 'r. _ -> ('l * 'r) jkind -> _ =
 
 let extract_layout_opt env t = extract_layout env t |> Result.to_option
 
+let rec default_sort_to_value_without_mutation sort =
+  match (Sort.get sort : Jkind_types.Sort.t) with
+  | Jkind_types.Sort.Var _ -> Sort.Const.value
+  | Jkind_types.Sort.Base b -> Jkind_types.Sort.Const.Base b
+  | Jkind_types.Sort.Product sorts ->
+    Jkind_types.Sort.Const.Product
+      (List.map default_sort_to_value_without_mutation sorts)
+  | Jkind_types.Sort.Univar uv -> Jkind_types.Sort.Const.Univar uv
+
 let rec layout_const_defaulting_to_value_without_mutation :
     _ Layout.t -> Layout.Const.t = function
   | Any sa -> Jkind_types.Layout.Const.Any sa
@@ -2421,15 +2430,6 @@ let rec layout_const_defaulting_to_value_without_mutation :
     Jkind_types.Layout.Const.Product
       (List.map layout_const_defaulting_to_value_without_mutation layouts)
   | Sort (sort, sa) ->
-    let rec default_sort_to_value_without_mutation sort =
-      match (Sort.get sort : Jkind_types.Sort.t) with
-      | Jkind_types.Sort.Var _ -> Sort.Const.value
-      | Jkind_types.Sort.Base b -> Jkind_types.Sort.Const.Base b
-      | Jkind_types.Sort.Product sorts ->
-        Jkind_types.Sort.Const.Product
-          (List.map default_sort_to_value_without_mutation sorts)
-      | Jkind_types.Sort.Univar uv -> Jkind_types.Sort.Const.Univar uv
-    in
     Layout.Const.of_sort_const (default_sort_to_value_without_mutation sort) sa
 
 let get_layout_defaulting_to_value env jkind =
@@ -2466,15 +2466,6 @@ let sort_of_jkind env (t : jkind_l) : sort =
       Misc.fatal_error "Jkind.sort_of_jkind: unable to expand jkind abbrev"
   in
   sort_of_layout layout
-
-let rec default_sort_to_value_without_mutation sort =
-  match (Sort.get sort : Jkind_types.Sort.t) with
-  | Jkind_types.Sort.Var _ -> Sort.Const.value
-  | Jkind_types.Sort.Base b -> Jkind_types.Sort.Const.Base b
-  | Jkind_types.Sort.Product sorts ->
-    Jkind_types.Sort.Const.Product
-      (List.map default_sort_to_value_without_mutation sorts)
-  | Jkind_types.Sort.Univar uv -> Jkind_types.Sort.Const.Univar uv
 
 let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
   let jk, _ =
