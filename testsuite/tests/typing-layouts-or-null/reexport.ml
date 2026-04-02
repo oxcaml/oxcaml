@@ -28,6 +28,21 @@ end
 module Or_null : sig type 'a t = 'a or_null end
 |}]
 
+module Or_null_via_attr = struct
+  type ('a : value) t : value_or_null = 'a or_null =
+    | Null
+    | This of 'a
+  [@@or_null]
+end
+let n = Or_null_via_attr.Null
+let t v = Or_null_via_attr.This v
+[%%expect{|
+module Or_null_via_attr :
+  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null] end
+val n : 'a Or_null_via_attr.t = Or_null_via_attr.Null
+val t : 'a -> 'a Or_null_via_attr.t = <fun>
+|}]
+
 (* Omitting the type representation leaves constructors unexported. *)
 
 let n = Or_null.Null

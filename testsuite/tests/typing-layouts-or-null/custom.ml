@@ -427,8 +427,6 @@ Error: Signature mismatch:
        Hint: add [@@or_null] or [@@or_null_reexport].
 |}]
 
-(* CR or-null: allow re-exporting custom [@@or_null] types. *)
-
 module M : sig
   type ('a : value) t1 : value_or_null =
     | Nope
@@ -452,11 +450,60 @@ end = struct
 end
 
 [%%expect{|
-Lines 17-20, characters 2-13:
-17 | ..type ('a : value) t2 = 'a t1 =
-18 |     | Nope
-19 |     | Yep of 'a
-20 |   [@@or_null]
-Error: Invalid [@or_null] declaration:
-       it must define a fresh variant, not an alias with an explicit manifest.
+module M :
+  sig
+    type 'a t1 = Nope | Yep of 'a [@@or_null]
+    type 'a t2 = 'a t1 = Nope | Yep of 'a [@@or_null]
+  end
+|}]
+
+let x : int M.t2 = M.Yep 3
+
+[%%expect{|
+val x : int M.t2 = M.Yep 3
+|}]
+
+type ('a : value) t1 : value_or_null =
+  | Nope
+  | Yep of 'a
+[@@or_null]
+
+type ('a : value) t2 = 'a t1
+
+[%%expect{|
+type 'a t1 = Nope | Yep of 'a [@@or_null]
+type 'a t2 = 'a t1
+|}]
+
+type ('a : value) t1 : value_or_null =
+  | Nope
+  | Yep of 'a
+[@@or_null]
+
+type ('a : value) t2 = 'a t1 [@@or_null]
+
+[%%expect{|
+type 'a t1 = Nope | Yep of 'a [@@or_null]
+type 'a t2 = 'a t1
+|}]
+
+type ('a : value) t1 : value_or_null =
+  | Nope
+  | Yep of 'a
+[@@or_null]
+
+type ('a : value) t2 = 'a t1 =
+  | Nope
+  | Yep of 'a
+[@@or_null]
+
+type ('a : value) t3 = 'a t2 =
+  | Nope
+  | Yep of 'a
+[@@or_null]
+
+[%%expect{|
+type 'a t1 = Nope | Yep of 'a [@@or_null]
+type 'a t2 = 'a t1 = Nope | Yep of 'a [@@or_null]
+type 'a t3 = 'a t2 = Nope | Yep of 'a [@@or_null]
 |}]

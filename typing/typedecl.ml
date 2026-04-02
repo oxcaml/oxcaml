@@ -186,11 +186,6 @@ let check_or_null_decl bad sdecl =
   | Some _ ->
     bad "it must not also use [@@boxed] or [@@unboxed]"
   end;
-  begin match sdecl.ptype_manifest with
-  | None -> ()
-  | Some _ ->
-    bad "it must define a fresh variant, not an alias with an explicit manifest"
-  end;
   match sdecl.ptype_private with
   | Private ->
     bad "private types are not supported with [@@or_null]"
