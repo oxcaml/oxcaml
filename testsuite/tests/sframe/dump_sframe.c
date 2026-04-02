@@ -1,8 +1,10 @@
-/* Standalone SFrame v2 section dumper for ELF object files.
+/* Standalone SFrame v3 section dumper for ELF object files.
    Usage: dump_sframe <file.o>
 
    Reads the .sframe section from an ELF object file and prints a
-   human-readable dump of the header, FDEs, and FREs. */
+   human-readable dump of the header, FDEs, and FREs.
+
+   See https://sourceware.org/binutils/docs/sframe-spec.html */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,30 +12,29 @@
 #include <stdint.h>
 #include <elf.h>
 
-/* ---- SFrame v2 format definitions ---- */
+/* ---- SFrame v3 format definitions ---- */
 
 #define SFRAME_MAGIC           0xdee2
-#define SFRAME_VERSION_2       2
+#define SFRAME_VERSION_3       3
 
 #define SFRAME_F_FDE_SORTED           0x1
-#define SFRAME_F_FRAME_POINTER        0x2
 #define SFRAME_F_FDE_FUNC_START_PCREL 0x4
 
 #define SFRAME_ABI_AARCH64_ENDIAN_BIG    1
 #define SFRAME_ABI_AARCH64_ENDIAN_LITTLE 2
 #define SFRAME_ABI_AMD64_ENDIAN_LITTLE   3
 
-#define SFRAME_FDE_TYPE_PCINC  0
+#define SFRAME_FDE_PCTYPE_INC  0
 
 #define SFRAME_FRE_TYPE_ADDR1  0
 #define SFRAME_FRE_TYPE_ADDR2  1
 #define SFRAME_FRE_TYPE_ADDR4  2
 
-#define SFRAME_FRE_OFFSET_1B   0
-#define SFRAME_FRE_OFFSET_2B   1
-#define SFRAME_FRE_OFFSET_4B   2
+#define SFRAME_FRE_DATAWORD_1B 0
+#define SFRAME_FRE_DATAWORD_2B 1
+#define SFRAME_FRE_DATAWORD_4B 2
 
-/* SFrame header (28 bytes) */
+/* SFrame header (28 bytes, same layout as v2) */
 struct sframe_header {
   uint16_t sfh_preamble_magic;
   uint8_t  sfh_preamble_version;
@@ -47,18 +48,26 @@ struct sframe_header {
   uint32_t sfh_fre_len;
   uint32_t sfh_fdeoff;
   uint32_t sfh_freoff;
-};
+} __attribute__((packed));
 
-/* SFrame FDE (20 bytes) */
-struct sframe_fde {
-  int32_t  sfde_func_start_address;
-  uint32_t sfde_func_size;
-  uint32_t sfde_func_start_fre_off;
-  uint32_t sfde_func_num_fres;
-  uint8_t  sfde_func_info;
-  uint8_t  sfde_func_rep_size;
-  uint16_t sfde_func_padding2;
-};
+/* SFrame v3 FDE Index (16 bytes) */
+struct sframe_fde_idx {
+  int64_t  sfdi_func_start_offset;
+  uint32_t sfdi_func_size;
+  uint32_t sfdi_func_start_fre_off;
+} __attribute__((packed));
+
+/* SFrame v3 FDE Attribute (5 bytes) */
+struct sframe_fde_attr {
+  uint16_t sfda_func_num_fres;
+  uint8_t  sfda_func_info;
+  uint8_t  sfda_func_info2;
+  uint8_t  sfda_func_rep_size;
+} __attribute__((packed));
+
+/* Combined v3 FDE size */
+#define SFRAME_V3_FDE_SIZE \
+  (sizeof(struct sframe_fde_idx) + sizeof(struct sframe_fde_attr))
 
 /* ---- Helpers ---- */
 
@@ -75,15 +84,12 @@ static void print_flags(uint8_t flags) {
   int first = 1;
   if (flags & SFRAME_F_FDE_SORTED)
     { printf("%sFDE_SORTED", first ? "" : ","); first = 0; }
-  if (flags & SFRAME_F_FRAME_POINTER)
-    { printf("%sFRAME_POINTER", first ? "" : ","); first = 0; }
   if (flags & SFRAME_F_FDE_FUNC_START_PCREL)
     { printf("%sFDE_FUNC_START_PCREL", first ? "" : ","); first = 0; }
   if (first) printf("NONE");
 }
 
-/* Find a section by name in an ELF64 file. Returns pointer to section
-   data within the mapped buffer, or NULL. Sets *out_size. */
+/* Find a section by name in an ELF64 file. */
 static const uint8_t *find_section(const uint8_t *buf, size_t buflen,
                                    const char *name, size_t *out_size) {
   if (buflen < sizeof(Elf64_Ehdr)) return NULL;
@@ -115,11 +121,10 @@ static const uint8_t *find_section(const uint8_t *buf, size_t buflen,
   return NULL;
 }
 
-/* ---- Main dump logic ---- */
+/* ---- FRE dumping ---- */
 
 static int dump_fre(const uint8_t *fre_data, size_t fre_avail,
                     uint8_t fre_type, int is_amd64) {
-  /* Read start address */
   uint32_t start_addr;
   size_t addr_size;
   switch (fre_type) {
@@ -136,55 +141,53 @@ static int dump_fre(const uint8_t *fre_data, size_t fre_avail,
   memcpy(&start_addr, fre_data, addr_size);
   const uint8_t *p = fre_data + addr_size;
 
-  /* Info byte */
   uint8_t info = *p++;
-  int base_reg_id   = info & 0x1;
-  int offset_count  = (info >> 1) & 0xf;
-  int offset_size   = (info >> 5) & 0x3;
-  int mangled_ra    = (info >> 7) & 0x1;
+  int base_reg_id     = info & 0x1;
+  int dataword_count  = (info >> 1) & 0xf;
+  int dataword_size   = (info >> 5) & 0x3;
+  int mangled_ra      = (info >> 7) & 0x1;
 
-  size_t off_bytes;
-  switch (offset_size) {
-    case SFRAME_FRE_OFFSET_1B: off_bytes = 1; break;
-    case SFRAME_FRE_OFFSET_2B: off_bytes = 2; break;
-    case SFRAME_FRE_OFFSET_4B: off_bytes = 4; break;
+  size_t dw_bytes;
+  switch (dataword_size) {
+    case SFRAME_FRE_DATAWORD_1B: dw_bytes = 1; break;
+    case SFRAME_FRE_DATAWORD_2B: dw_bytes = 2; break;
+    case SFRAME_FRE_DATAWORD_4B: dw_bytes = 4; break;
     default: return -1;
   }
 
-  size_t total = addr_size + 1 + offset_count * off_bytes;
+  size_t total = addr_size + 1 + dataword_count * dw_bytes;
   if (fre_avail < total) return -1;
 
-  /* Read offsets as signed values */
-  int32_t offsets[15];
-  for (int i = 0; i < offset_count; i++) {
+  /* Read data words as signed values */
+  int32_t dwords[15];
+  for (int i = 0; i < dataword_count; i++) {
     int32_t val = 0;
-    memcpy(&val, p, off_bytes);
-    /* Sign-extend for 1-byte and 2-byte */
-    if (off_bytes == 1 && (val & 0x80)) val |= ~0xff;
-    if (off_bytes == 2 && (val & 0x8000)) val |= ~0xffff;
-    offsets[i] = val;
-    p += off_bytes;
+    memcpy(&val, p, dw_bytes);
+    if (dw_bytes == 1 && (val & 0x80)) val |= ~0xff;
+    if (dw_bytes == 2 && (val & 0x8000)) val |= ~0xffff;
+    dwords[i] = val;
+    p += dw_bytes;
   }
 
   printf("    FRE: start_addr=+%u, %s", start_addr,
          base_reg_id ? "FP" : "SP");
 
-  /* Offset interpretation depends on ABI.
-     AMD64: offset[0]=CFA, offset[1]=FP (optional). RA is fixed.
-     AArch64: offset[0]=CFA, offset[1]=RA (optional),
-              offset[2]=FP (optional). */
+  /* Data word interpretation depends on ABI.
+     AMD64: dword[0]=CFA, dword[1]=FP (optional). RA is fixed.
+     AArch64: dword[0]=CFA, dword[1]=RA (optional),
+              dword[2]=FP (optional). */
   int idx = 0;
-  if (idx < offset_count)
-    printf(", cfa_offset=%+d", offsets[idx++]);
+  if (idx < dataword_count)
+    printf(", cfa_offset=%+d", dwords[idx++]);
 
   if (is_amd64) {
-    if (idx < offset_count)
-      printf(", fp_offset=%+d", offsets[idx++]);
+    if (idx < dataword_count)
+      printf(", fp_offset=%+d", dwords[idx++]);
   } else {
-    if (idx < offset_count)
-      printf(", ra_offset=%+d", offsets[idx++]);
-    if (idx < offset_count)
-      printf(", fp_offset=%+d", offsets[idx++]);
+    if (idx < dataword_count)
+      printf(", ra_offset=%+d", dwords[idx++]);
+    if (idx < dataword_count)
+      printf(", fp_offset=%+d", dwords[idx++]);
   }
 
   if (mangled_ra) printf(" [signed-ra]");
@@ -192,6 +195,8 @@ static int dump_fre(const uint8_t *fre_data, size_t fre_avail,
 
   return (int)total;
 }
+
+/* ---- Section dumping ---- */
 
 static void dump_sframe(const uint8_t *data, size_t size) {
   if (size < sizeof(struct sframe_header)) {
@@ -204,6 +209,11 @@ static void dump_sframe(const uint8_t *data, size_t size) {
 
   if (hdr.sfh_preamble_magic != SFRAME_MAGIC) {
     fprintf(stderr, "Bad SFrame magic: 0x%04x\n", hdr.sfh_preamble_magic);
+    return;
+  }
+  if (hdr.sfh_preamble_version != SFRAME_VERSION_3) {
+    fprintf(stderr, "Unsupported SFrame version: %d (expected %d)\n",
+            hdr.sfh_preamble_version, SFRAME_VERSION_3);
     return;
   }
 
@@ -227,23 +237,27 @@ static void dump_sframe(const uint8_t *data, size_t size) {
   const uint8_t *fre_base = after_hdr + hdr.sfh_freoff;
 
   for (uint32_t i = 0; i < hdr.sfh_num_fdes; i++) {
-    struct sframe_fde fde;
-    memcpy(&fde, fde_base + i * sizeof(struct sframe_fde),
-           sizeof(struct sframe_fde));
+    const uint8_t *fde_ptr = fde_base + i * SFRAME_V3_FDE_SIZE;
 
-    uint8_t fre_type = fde.sfde_func_info & 0xf;
-    uint8_t fde_type = (fde.sfde_func_info >> 4) & 0x1;
+    struct sframe_fde_idx idx;
+    memcpy(&idx, fde_ptr, sizeof(idx));
+
+    struct sframe_fde_attr attr;
+    memcpy(&attr, fde_ptr + sizeof(idx), sizeof(attr));
+
+    uint8_t fre_type = attr.sfda_func_info & 0xf;
+    uint8_t pctype   = (attr.sfda_func_info >> 4) & 0x1;
 
     printf("  FDE %u: size=%u, num_fres=%u, type=%s, fre_type=ADDR%d\n",
-           i, fde.sfde_func_size, fde.sfde_func_num_fres,
-           fde_type == SFRAME_FDE_TYPE_PCINC ? "PCINC" : "PCMASK",
+           i, idx.sfdi_func_size, attr.sfda_func_num_fres,
+           pctype == SFRAME_FDE_PCTYPE_INC ? "PCINC" : "PCMASK",
            fre_type == SFRAME_FRE_TYPE_ADDR1 ? 1 :
            fre_type == SFRAME_FRE_TYPE_ADDR2 ? 2 : 4);
 
-    const uint8_t *fre_ptr = fre_base + fde.sfde_func_start_fre_off;
+    const uint8_t *fre_ptr = fre_base + idx.sfdi_func_start_fre_off;
     size_t fre_remain = (fre_base + hdr.sfh_fre_len) - fre_ptr;
 
-    for (uint32_t j = 0; j < fde.sfde_func_num_fres; j++) {
+    for (uint32_t j = 0; j < attr.sfda_func_num_fres; j++) {
       int consumed = dump_fre(fre_ptr, fre_remain, fre_type, is_amd64);
       if (consumed < 0) {
         fprintf(stderr, "    (error reading FRE %u)\n", j);

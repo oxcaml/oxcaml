@@ -27,13 +27,12 @@
 
 open Asm_targets
 
-(** Emission of SFrame (Simple Frame format) version 2 (errata 1) stack trace
-    information.
+(** Emission of SFrame v3 (Simple Frame format) stack trace information.
 
     SFrame is a simple stack unwinding format that tracks the Canonical Frame
     Address (CFA), Frame Pointer (FP), and Return Address (RA) for each
     function. See
-    {{:https://sourceware.org/binutils/docs-2.45/sframe-spec.html} the SFrame
+    {{:https://sourceware.org/binutils/docs/sframe-spec.html} the SFrame
      specification}.
 
     This module collects frame state changes during code emission and emits a

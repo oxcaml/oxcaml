@@ -1,5 +1,5 @@
 SFrame header:
-  Version: 2
+  Version: 3
   Flags: FDE_SORTED,FDE_FUNC_START_PCREL
   ABI/arch: AARCH64_LITTLE
   Fixed FP offset: 0

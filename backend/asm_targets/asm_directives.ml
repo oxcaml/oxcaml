@@ -1134,7 +1134,7 @@ let between_labels_64_bit_with_offsets ?comment:_comment ~upper ~upper_offset
   in
   const_machine_width (force_assembly_time_constant expr)
 
-let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
+let between_this_and_label_offset_expr ~upper ~offset_upper width =
   let upper_section = Asm_label.section upper in
   (match !current_section_ref with
   | None -> not_initialized ()
@@ -1147,7 +1147,13 @@ let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
         this_section);
   let offset_upper = Targetint.to_int64 offset_upper in
   let expr = Add (Sub (Label upper, This), Signed_int offset_upper) in
-  const expr Thirty_two
+  const expr width
+
+let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
+  between_this_and_label_offset_expr ~upper ~offset_upper Thirty_two
+
+let between_this_and_label_offset_64bit_expr ~upper ~offset_upper =
+  between_this_and_label_offset_expr ~upper ~offset_upper Sixty_four
 
 let between_symbol_in_current_unit_and_label_offset ?comment:_comment ~upper
     ~lower ~offset_upper () =
