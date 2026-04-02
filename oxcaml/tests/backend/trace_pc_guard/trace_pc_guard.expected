@@ -1,0 +1,11 @@
+init calls: 1
+guards registered: true
+hits with the gate closed: 0
+if: both arms cover more than one: true
+match: all cases cover more than one: true
+loop: iterating covers more than not: true
+try: the handler adds coverage: true
+values preserved across probes: true true true
+vectors preserved across probes: true true
+callback called with an aligned stack: true
+results: big negative 55 0

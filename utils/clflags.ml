@@ -346,6 +346,7 @@ let inlining_report = ref false    (* -inlining-report *)
 
 let afl_instrument = ref Config.afl_instrument (* -afl-instrument *)
 let afl_inst_ratio = ref 100           (* -afl-inst-ratio *)
+let trace_pc_guard = ref false         (* -trace-pc-guard *)
 
 let function_sections = ref false      (* -function-sections *)
 let probes = ref Config.probes         (* -probes *)

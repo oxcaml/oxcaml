@@ -659,11 +659,19 @@ let register_primary_file ~file_emitter ~sourcefile =
     file_emitter ~file_num:0 ~file_name:sourcefile;
     file_pos_nums := (sourcefile, 0) :: !file_pos_nums)
 
+let debug_line_info_enabled () =
+  is_cfi_enabled () && (!Clflags.debug || Config.with_frame_pointers)
+
+let has_source_line dbg =
+  match List.rev (Debuginfo.Dbg.to_list (Debuginfo.get_dbg dbg)) with
+  | [] -> false
+  | { Debuginfo.dinfo_line; _ } :: _ -> dinfo_line > 0
+
 (* We only display .file if the file has not been seen before. We display .loc
    for every instruction. *)
 let emit_debug_info_gen ?discriminator dbg file_emitter loc_emitter =
   let dbg = Debuginfo.Dbg.to_list (Debuginfo.get_dbg dbg) in
-  if is_cfi_enabled () && (!Clflags.debug || Config.with_frame_pointers)
+  if debug_line_info_enabled ()
   then
     match List.rev dbg with
     | [] -> ()
@@ -676,6 +684,17 @@ let emit_debug_info_gen ?discriminator dbg file_emitter loc_emitter =
           get_file_num ~file_emitter (Debuginfo.item_file_path item)
         in
         loc_emitter ~file_num ~line ~col ?discriminator ()
+
+let emit_no_source_line_gen ~file_dbg file_emitter loc_emitter =
+  if debug_line_info_enabled ()
+  then
+    let file_name =
+      match Debuginfo.to_file_path file_dbg with
+      | Some file_name -> file_name
+      | None -> !Location.input_name
+    in
+    let file_num = get_file_num ~file_emitter file_name in
+    loc_emitter ~file_num ~line:0 ~col:0 ?discriminator:None ()
 
 let binary_backend_available = ref false
 

@@ -313,6 +313,8 @@ let read_one_param ppf position name v =
   | "afl-instrument" -> set "afl-instrument" [ Clflags.afl_instrument ] v
   | "afl-inst-ratio" ->
       int_setter ppf "afl-inst-ratio" afl_inst_ratio v
+  | "trace-pc-guard" ->
+      set "trace-pc-guard" [ Clflags.trace_pc_guard ] v
   | "annot" -> set "annot" [ Clflags.annotations ] v
   | "absname" -> set "absname" [ Clflags.absname ] v
   | "compat-32" -> set "compat-32" [ bytecode_compatible_32 ] v

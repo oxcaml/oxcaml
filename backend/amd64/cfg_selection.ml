@@ -232,7 +232,7 @@ let pseudoregs_for_operation op arg res =
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
       | Istore_int (_, _, _)
-      | Ilfence | Isfence | Imfence
+      | Ilfence | Isfence | Imfence | Itrace_pc_guard _
       | Ioffset_loc (_, _)
       | Irdtsc | Icldemote _ | Iprefetch _ )
   | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
