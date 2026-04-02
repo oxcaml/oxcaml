@@ -32,6 +32,10 @@ exception Cannot_apply
 exception Incompatible
   (* Raised from [mcomp] *)
 
+val generalize : type_expr -> unit
+val generalize_structure: type_expr -> unit
+val generalize_class_type_structure : class_type -> unit
+
 (* All the following wrapper functions revert to the original level,
    even in case of exception. *)
 val with_local_level_generalize:
