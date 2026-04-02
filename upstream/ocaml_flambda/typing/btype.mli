@@ -72,6 +72,13 @@ val newgenstub: scope:int -> jkind_lr -> type_expr
         (* Return a fresh generic node, to be instantiated
            by [Transient_expr.set_stub_desc] *)
 
+val new_quote_ty: type_expr -> type_expr
+        (* Quote a type expression *)
+val new_splice_ty: type_expr -> type_expr
+        (* Splice a type expression *)
+val new_quote_eval_ty: type_expr -> type_expr
+        (* Quote-eval a type expression *)
+
 (**** Types ****)
 
 val is_Tvar: type_expr -> bool
@@ -704,6 +711,9 @@ module Jkind0 : sig
 
     (** The jkind of a float. *)
     val for_float : Ident.t -> jkind_l
+
+    (** The jkind of a quoted expression, [_ expr]. *)
+    val for_expr : Types.jkind_l
 
     (** The jkind for [array] type arguments. *)
     val for_array_argument : jkind_lr

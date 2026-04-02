@@ -379,8 +379,7 @@ end = struct
     in
     begin match Env.find_implicit_jkind name env with
     | Some implicit_jkind
-      when not (Jkind.equate ~level:(get_current_level ()) env original_jkind
-                  implicit_jkind) ->
+      when not (Jkind.equate env original_jkind implicit_jkind) ->
         raise (Error (loc, env,
           Mismatched_jkind_annotation { name; explicit_jkind = original_jkind;
                                         implicit_jkind }))
@@ -437,7 +436,7 @@ end = struct
   let check_jkind env loc name v jkind_info =
     match get_desc v with
     | Tvar { jkind } | Tunivar { jkind } when
-        not (Jkind.equate ~level:(get_current_level ()) env jkind
+        not (Jkind.equate env jkind
                jkind_info.original_jkind) ->
       let reason =
         Bad_univar_jkind { name; jkind_info; inferred_jkind = jkind }
@@ -695,8 +694,7 @@ let transl_type_param env path jkind_default styp =
           Jkind.of_annotation ~context:(Type_parameter (path, name)) env
             jkind_annot
         in
-        if not (Jkind.equate ~level:(get_current_level ()) env jkind
-                  implicit_jkind) then
+        if not (Jkind.equate env jkind implicit_jkind) then
           raise (Error (loc, env,
             Mismatched_jkind_annotation
               { name = var_name; explicit_jkind = jkind;
@@ -1322,7 +1320,7 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
     | Some jkind_annot, None -> jkind_of_annot jkind_annot, None
     | Some jkind_annot, Some implicit_jkind ->
       let jkind = jkind_of_annot jkind_annot in
-      if not (Jkind.equate ~level:(get_current_level ()) env jkind
+      if not (Jkind.equate env jkind
                 implicit_jkind) then
         raise (Error (alias_loc, env,
             Mismatched_jkind_annotation { name = alias; explicit_jkind = jkind;
@@ -1874,7 +1872,7 @@ let report_error_doc env ppf =
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
                Style.as_inline_code Printtyp.type_expr ppf typ)
-           ~level:(get_current_level ()) env) err
+           env) err
   | Non_sort {vloc; typ; err} ->
     let s =
       match vloc with
@@ -1885,13 +1883,13 @@ let report_error_doc env ppf =
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
                Style.as_inline_code Printtyp.type_expr ppf typ)
-           ~level:(get_current_level ()) env) err
+           env) err
   | Bad_jkind_annot(ty, violation) ->
     fprintf ppf "@[<b 2>Bad layout annotation:@ %a@]"
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf ->
              Style.as_inline_code Printtyp.type_expr ppf ty)
-         ~level:(get_current_level ()) env) violation
+         env) violation
   | Did_you_mean_unboxed lid ->
     fprintf ppf "@[%a isn't a class type.@ \
                  Did you mean the unboxed type %a?@]"
