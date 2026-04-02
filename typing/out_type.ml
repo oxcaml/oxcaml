@@ -319,6 +319,61 @@ let indexed_name namespace id =
   in
   human_id id index
 
+<<<<<<< oxcaml
+(** Associate a name to the identifier [id] within [namespace] *)
+let ident_name_simple namespace id =
+  match namespace, !enabled with
+  | None, _ | _, false -> Out_name.create (Ident.name id)
+  | Some namespace, true ->
+    if fuzzy_id namespace id then Out_name.create (Ident.name id)
+    else
+      let name = Ident.name id in
+      match M.find name (get namespace) with
+      | Uniquely_associated_to (id',r) when Ident.same id id' ->
+          r
+      | Need_unique_name map ->
+          let hid, m = find_hid id map in
+          Conflicts.collect_explanation namespace hid id;
+          set namespace @@ M.add name (Need_unique_name m) (get namespace);
+          Out_name.create (human_unique hid id)
+      | Uniquely_associated_to (id',r) ->
+          let hid', m = find_hid id' Ident.Map.empty in
+          let hid, m = find_hid id m in
+          Out_name.set r (human_unique hid' id');
+          List.iter (fun (id,hid) -> Conflicts.collect_explanation namespace hid id)
+            [id, hid; id', hid' ];
+          set namespace @@ M.add name (Need_unique_name m) (get namespace);
+          Out_name.create (human_unique hid id)
+      | Associated_to_pervasives r ->
+          Out_name.set r ("Stdlib." ^ Out_name.print r);
+          let hid, m = find_hid id Ident.Map.empty in
+          set namespace @@ M.add name (Need_unique_name m) (get namespace);
+          Out_name.create (human_unique hid id)
+      | exception Not_found ->
+          let r = Out_name.create name in
+          set namespace
+          @@ M.add name (Uniquely_associated_to (id,r) ) (get namespace);
+          r
+
+(** Same as {!ident_name_simple} but lookup to existing named identifiers
+    in the current {!printing_env} *)
+let ident_name namespace id =
+  begin match env_ident namespace (Ident.name id) with
+  | Some id' -> ignore (ident_name_simple namespace id')
+  | None -> ()
+  end;
+  ident_name_simple namespace id
+||||||| upstream-base
+let ident_name namespace id =
+  match namespace, !enabled with
+  | None, _ | _, false -> Out_name.create (Ident.name id)
+  | Some namespace, true ->
+      if fuzzy_id namespace id then Out_name.create (Ident.name id)
+      else
+        let name = indexed_name namespace id in
+        Conflicts.collect_explanation namespace id ~name;
+        Out_name.create name
+=======
 let ident_name namespace id =
   match namespace, !enabled with
   | None, _ | _, false -> Out_name.create (Ident.name id)
@@ -328,8 +383,15 @@ let ident_name namespace id =
         let name = indexed_name namespace id in
         Ident_conflicts.collect_explanation namespace id ~name;
         Out_name.create name
+>>>>>>> upstream-incoming
 end
+<<<<<<< oxcaml
+let ident_name = Naming_context.ident_name
+||||||| upstream-base
+let ident_name = Naming_context.ident_name
+=======
 let ident_name = Ident_names.ident_name
+>>>>>>> upstream-incoming
 
 (* Print a path *)
 
