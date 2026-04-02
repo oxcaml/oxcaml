@@ -1903,12 +1903,11 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lend -> ()
   | Lprologue ->
     assert !prologue_required;
-    (* Shrink-wrap can place prologues in non-entry blocks.  A
-       Lepilogue_close on an adjacent path may have left the CFA offset in a
-       wrong state.  Since any prologue block is reachable only when
-       stack_offset = 0 (guaranteed by can_place_prologues), the CFA is
-       always rsp+8 here; reset it explicitly before the relative adjustments
-       below. *)
+    (* Shrink-wrap can place prologues in non-entry blocks. A Lepilogue_close on
+       an adjacent path may have left the CFA offset in a wrong state. Since any
+       prologue block is reachable only when stack_offset = 0 (guaranteed by
+       can_place_prologues), the CFA is always rsp+8 here; reset it explicitly
+       before the relative adjustments below. *)
     D.cfi_def_cfa_offset ~bytes:8;
     if fp
     then (
