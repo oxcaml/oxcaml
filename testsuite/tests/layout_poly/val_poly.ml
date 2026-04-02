@@ -375,9 +375,9 @@ module F :
     end
 |}]
 
-(* CR zqian: the error message should mention modal bounds; this is because (it
-seems like) jkind error reporting happens outside of the inclusion check (where
-the abstract univar are marked equal). *)
+(* CR zqian: the error message prints <genvar> because jkind error elaboration
+happens outside of the jkind checking (where the genvar has a proper name like
+[l]. *)
 module F (M : sig
   val bar : layout_ x. ('a : x mod contended) ('b : x). 'a -> 'b
 end) : sig
@@ -399,9 +399,9 @@ Error: Signature mismatch:
        is not included in
          val bar : layout_ l. ('a : l) ('b : l). 'a -> 'b
        The type "'a -> 'b" is not compatible with the type "'c -> 'd"
-       The kind of 'a is 's1
+       The kind of 'a is <genvar>
          because of the definition of bar at line 4, characters 2-50.
-       But the kind of 'a must be representable
+       But the kind of 'a must be a subkind of <genvar> mod contended
          because of the definition of bar at line 2, characters 2-64.
 |}]
 
@@ -443,9 +443,9 @@ Error: Signature mismatch:
        is not included in
          val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
        The type "'a -> 'b" is not compatible with the type "'a -> 'c"
-       The kind of 'a is 's2
+       The kind of 'a is <genvar>
          because of the definition of bar at line 4, characters 2-64.
-       But the kind of 'a must be representable
+       But the kind of 'a must be a subkind of <genvar> mod contended
          because of the definition of bar at line 2, characters 2-78.
 |}]
 

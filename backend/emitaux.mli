@@ -52,6 +52,10 @@ val record_frame_descr :
   (* Location, if any *)
   unit
 
+(** [with_snapshot f] runs [f] and returns its result, but also ensures that the
+    state of this [Emitaux] module is unchanged after [f] returns. *)
+val with_snapshot : f:(unit -> 'a) -> 'a
+
 type emit_frame_actions =
   { efa_code_label : Label.t -> unit;
     efa_data_label : Label.t -> unit;

@@ -278,6 +278,10 @@ let run :
             match Label.Tbl.find_opt rewrites successor_label with
             | None -> successor_label
             | Some new_successor_label -> new_successor_label));
+    (* note: `register_predecessors_for_all_blocks` only adds predecessors, so
+       we must first clear all predecessor sets to avoid stale entries. *)
+    Cfg.iter_blocks cfg ~f:(fun _label block ->
+        block.predecessors <- Label.Set.empty);
     Cfg.register_predecessors_for_all_blocks cfg;
     (* CR-someday xclerc for xclerc: calling `Cfg_simplify.run` is probably
        overkill (we just want to remove unreachable blocks), and also

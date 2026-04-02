@@ -34,7 +34,8 @@ let _dummy = (Ok (Obj.magic 0), Err "")
 module Jit = struct
   type t =
     {
-      load : Format.formatter -> Lambda.program -> evaluation_outcome;
+      load : phrase_name:string -> Format.formatter -> Lambda.program
+        -> evaluation_outcome;
       lookup_symbol : string -> Obj.t option;
     }
 end
@@ -348,7 +349,7 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   in
   match !jit with
   | None -> default_load ppf program
-  | Some {Jit.load; _} -> load ppf program
+  | Some {Jit.load; _} -> load ~phrase_name:!phrase_name ppf program
 
 let outval_of_id env id val_type =
   let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
@@ -406,7 +407,7 @@ let name_expression ~loc ~attrs sort exp =
       val_zero_alloc = Zero_alloc.default;
       val_modalities = Mode.Modality.(Const.id |> of_const);
       val_uid = Uid.internal_not_actually_unique;
-      val_lpoly = []; }
+      val_lpoly = Lpoly.determined []; }
   in
   let sg = [Sig_value(id, vd, Exported)] in
   let pat =

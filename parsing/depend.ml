@@ -183,7 +183,8 @@ let add_type_declaration bv td =
       List.iter (fun pld -> add_type bv pld.pld_type) lbls
   | Ptype_open -> () in
   add_tkind td.ptype_kind;
-  List.iter (fun (ty, _) -> add_type bv ty) td.ptype_params
+  List.iter (fun (ty, _) -> add_type bv ty) td.ptype_params;
+  add_opt add_jkind bv td.ptype_jkind_annotation
 
 let add_extension_constructor bv ext =
   match ext.pext_kind with

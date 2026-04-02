@@ -36,7 +36,8 @@ val spawn : (unit -> 'a) -> 'a t @@ nonportable
    "User programs should never spawn domains. To execute a function on a \
     domain, use [Multicore] from the threading library. This is because \
     spawning more than [recommended_domain_count] domains (the CPU core count) \
-    will significantly degrade GC performance."]
+    will significantly degrade GC performance. Using both [Domain.spawn] and \
+    [Multicore] can cause [Multicore] to abort."]
 [@@alert unsafe_multidomain "Use [Domain.Safe.spawn]."]
 (** [spawn f] creates a new domain that runs in parallel with the
     current domain.
@@ -259,7 +260,8 @@ module Safe : sig @@ portable
      "User programs should never spawn domains. To execute a function on a \
       domain, use [Multicore] from the threading library. This is because \
       spawning more than [recommended_domain_count] domains (the CPU core \
-      count) will significantly degrade GC performance."]
+      count) will significantly degrade GC performance. Using both \
+      [Domain.spawn] and [Multicore] can cause [Multicore] to abort."]
   (** Like {!spawn}, but enforces thread-safety via modes. In particular, the provided
       computation must be [portable], and so cannot close over and interact with any
       unsynchronized mutable data in the current domain. *)

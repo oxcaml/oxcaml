@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
@@ -778,8 +779,8 @@ ext_cas_int:
   movq  %rbx, %rax
   sarq  $1, %rdi
   sarq  $1, %rax
-  decq  %rsi
-  lock cmpxchgq %rdi, (%rsi)
+  leaq  -1(%rsi), %rbx
+  lock cmpxchgq %rdi, (%rbx)
   sete  %al
   movzbq %al, %rax
   salq  $1, %rax
@@ -796,8 +797,8 @@ let ext_fetch_add_int64
 ext_fetch_add_int64:
   movq  %rax, %rdi
   movq  %rbx, %rax
-  decq  %rdi
-  lock xaddq %rax, (%rdi)
+  leaq  -1(%rdi), %rbx
+  lock xaddq %rax, (%rbx)
   ret
 |}]
 
@@ -823,8 +824,8 @@ let ext_fetch_add_nativeint
 ext_fetch_add_nativeint:
   movq  %rax, %rdi
   movq  %rbx, %rax
-  decq  %rdi
-  lock xaddq %rax, (%rdi)
+  leaq  -1(%rdi), %rbx
+  lock xaddq %rax, (%rbx)
   ret
 |}]
 

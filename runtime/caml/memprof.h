@@ -54,6 +54,9 @@ extern void caml_memprof_sample_young(uintnat wosize, int from_caml,
 
 extern void caml_memprof_update_suspended(_Bool);
 
+/* Returns true if Memprof needs to do work in response to interrupts
+   by other domains (via Gc.Memprof.enlist_all_domains) */
+extern bool caml_memprof_pending_external_interrupt(caml_domain_state*);
 
 /*** GC interface ***/
 
@@ -89,10 +92,10 @@ extern void caml_memprof_set_trigger(caml_domain_state *state);
 
 /*** Callbacks ***/
 
-/* Run any pending callbacks for the current domain (or adopted from a
- * terminated domain). */
+/* Run any pending callbacks or other memprof actions for the current
+ * domain (or adopted from a terminated domain). */
 
-extern value caml_memprof_run_callbacks_exn(void);
+extern value caml_memprof_do_pending_exn(void);
 
 
 /*** Multi-domain support. ***/

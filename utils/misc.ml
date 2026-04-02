@@ -327,6 +327,13 @@ module Stdlib = struct
       | None -> Format.pp_print_string ppf "None"
       | Some contents ->
         Format.fprintf ppf "@[(Some@ %a)@]" print_contents contents
+
+    let map_sharing f t =
+      match t with
+      | None -> t
+      | Some x ->
+        let y = f x in
+        if y == x then t else Some y
   end
 
   module Array = struct

@@ -42,12 +42,20 @@ let build : State.t -> Cfg_with_infos.t -> unit =
     if debug && Reg.set_has_collisions live.across
     then fatal "live set has physical register collisions";
     if Array.length def > 0
-    then
+    then begin
       Reg.Set.iter
         (fun reg1 ->
           if move_src == Reg.dummy || not (Reg.same reg1 move_src)
           then Array.iter def ~f:(fun reg2 -> State.add_edge state reg1 reg2))
         live.across;
+      (* Add interference edges between all pairs of results, since they are all
+         defined simultaneously and must be in different registers. *)
+      for i = 0 to Array.length def - 2 do
+        for j = i + 1 to Array.length def - 1 do
+          State.add_edge state def.(i) def.(j)
+        done
+      done
+    end;
     if Array.length destroyed > 0
     then
       Reg.Set.iter
@@ -257,19 +265,6 @@ let select_spilling_register_using_heuristics : State.t -> SpillCosts.t -> Reg.t
     =
  fun state costs ->
   match Lazy.force Spilling_heuristics.value with
-  | Set_choose -> (
-    (* This is the "heuristics" from the IRC paper: pick any candidate, just try
-       to avoid any of the temporaries introduces for spilling. *)
-    let spill_work_list = State.spill_work_list state in
-    match
-      Reg.Set.choose_opt
-        (State.diff_all_introduced_temporaries state spill_work_list)
-    with
-    | Some reg -> reg
-    | None -> (
-      match Reg.Set.choose_opt spill_work_list with
-      | Some reg -> reg
-      | None -> fatal "spill_work_list is empty"))
   | Flat_uses | Hierarchical_uses -> (
     (* note: this assumes that `Reg.spill_cost` has been updated as needed (only
        when `rewrite` is called); the value computed here can however not be
@@ -423,6 +418,8 @@ let rewrite :
    seems to be fine with 4 *)
 let max_rounds = 50
 
+exception Function_is_too_complex
+
 module For_testing = struct
   let rounds = ref (-1)
 end
@@ -453,6 +450,14 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
     if debug then log "%s -- %s" prefix (work_lists_desc state)
   in
   build state cfg_with_infos;
+  if round = 1
+  then begin
+    match Lazy.force Interf_threshold.value with
+    | None -> ()
+    | Some threshold ->
+      if State.get_max_degree state > threshold
+      then raise Function_is_too_complex
+  end;
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   if debug
   then (
@@ -484,9 +489,6 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
         | None ->
           let costs =
             match Lazy.force Spilling_heuristics.value with
-            | Set_choose ->
-              (* note: `spill_cost` will not be used by the heuristics *)
-              SpillCosts.empty ()
             | Flat_uses -> SpillCosts.compute cfg_with_infos ~flat:true ()
             | Hierarchical_uses ->
               SpillCosts.compute cfg_with_infos ~flat:false ()
@@ -518,7 +520,7 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
       State.invariant state;
       main ~round:(succ round) state cfg_with_infos)
 
-let run : Cfg_with_infos.t -> Cfg_with_infos.t =
+let run : Cfg_with_infos.t -> Cfg_with_infos.t option =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
@@ -538,16 +540,18 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
       ~stack_slots ~affinity ()
   in
   Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
-  main ~round:1 state cfg_with_infos;
-  if debug then log_cfg_with_infos cfg_with_infos;
-  Regalloc_rewrite.postlude
-    (module State)
-    (module Utils)
-    state
-    ~f:(fun () ->
-      State.update_register_locations state;
-      Reg.Set.iter
-        (fun reg -> State.set_degree state reg 0)
-        (all_precolored_regs ()))
-    cfg_with_infos;
-  cfg_with_infos
+  match main ~round:1 state cfg_with_infos with
+  | exception Function_is_too_complex -> None
+  | () ->
+    if debug then log_cfg_with_infos cfg_with_infos;
+    Regalloc_rewrite.postlude
+      (module State)
+      (module Utils)
+      state
+      ~f:(fun () ->
+        State.update_register_locations state;
+        Reg.Set.iter
+          (fun reg -> State.set_degree state reg 0)
+          (all_precolored_regs ()))
+      cfg_with_infos;
+    Some cfg_with_infos

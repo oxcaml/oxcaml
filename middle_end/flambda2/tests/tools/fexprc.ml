@@ -28,6 +28,9 @@ let parse_flambda filename =
 module Options = Oxcaml_args.Make_optcomp_options (Oxcaml_args.Default.Optmain)
 
 let _ =
+  (* Setting [Clflags.native_code := true] is how we tell the option parsing
+     machinery that we are going to use flambda2. *)
+  Clflags.native_code := true;
   let file_action = ref (fun () -> Misc.fatal_error "Missing a flambda file") in
   let defer_file file =
     let ext = Filename.extension file in
@@ -41,4 +44,5 @@ let _ =
   Clflags.add_arguments __LOC__ (Arch.command_line_options @ Options.list);
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Compenv.parse_arguments (ref Sys.argv) defer_file "fexprc";
+  Compmisc.read_clflags_from_env ();
   !file_action ()

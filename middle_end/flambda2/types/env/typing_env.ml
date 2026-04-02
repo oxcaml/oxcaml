@@ -551,7 +551,28 @@ let binding_time_and_mode_of_simple t simple =
     ~const:(fun _ -> Binding_time.With_name_mode.consts)
     ~name:(fun name ~coercion:_ -> binding_time_and_mode t name)
 
+let variable_definitely_not_in_scope t var =
+  (* If we have an equation, we might be in scope.
+
+     If we have no equation, and we are from the current compilation unit, we
+     are definitely not in scope (we add an equation with an unknown type and
+     the binding time when defining a variable).
+
+     If we have no equation, but we are defined in another compilation unit, we
+     are either in scope (defined in the other compilation unit), or there is a
+     inconsistency. We ignore that last possibility and simply say that
+     variables defined in another compilation unit might be in scope. *)
+  (not (Name.Map.mem (Name.var var) (names_to_types t)))
+  && Compilation_unit.is_current (Variable.compilation_unit var)
+
 let mem ?min_name_mode t name =
+  (* CR bclement: Consider checking the compilation unit instead of the
+     [get_imported_names] map so that we treat variables from missing cmxes as
+     being in the environment (see also the comment in
+     [variable_definitely_not_in_scope]).
+
+     If we do this, we can get rid of [variable_definitely_not_in_scope] and use
+     [mem] directly instead. *)
   Name.pattern_match name
     ~var:(fun _var ->
       let name_mode =

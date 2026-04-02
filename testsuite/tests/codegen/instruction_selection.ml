@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
@@ -42,7 +43,6 @@ initialize_t:
 |}]
 
 
-(* CR ttebbi: We should use lea instead of add instructions to save moves. *)
 let f x =
   let x1 = x + 1 in
   let x2 = x1 + x in
@@ -51,8 +51,7 @@ let f x =
 ;;
 [%%expect_asm X86_64{|
 f:
-  movq  %rax, %rbx
-  addq  $2, %rbx
+  leaq  2(%rax), %rbx
   leaq  (%rbx,%rax), %rdi
   addq  %rdi, %rbx
   leaq  -3(%rax,%rbx), %rax

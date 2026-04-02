@@ -1,6 +1,7 @@
 (* TEST
  flags += " -O3";
  flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
  only-default-codegen;
@@ -284,8 +285,8 @@ double_match:
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)
-  addq  $2, %rdi
-  movq  %rdi, (%rax)
+  leaq  2(%rdi), %rbx
+  movq  %rbx, (%rax)
 .L119:
   movq  (%rax), %rax
   movq  %rsi, 64(%r14)

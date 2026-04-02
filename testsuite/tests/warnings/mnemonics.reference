@@ -1,3 +1,5 @@
 Constructors without associated mnemonic:
 All_clauses_guarded
 Modal_axis_specified_twice
+Useless_lpoly
+Lpoly_in_letrec

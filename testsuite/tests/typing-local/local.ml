@@ -1208,6 +1208,16 @@ Error: This function takes a parameter which is "local",
        but was expected to take a parameter which is "global".
 |}]
 
+let rec f1 () = f2 ()
+and f2 () : string @ local = exclave_ "hi"
+[%%expect{|
+Line 2, characters 7-42:
+2 | and f2 () : string @ local = exclave_ "hi"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This function has a return value which is "local",
+       but was expected to have a return value which is "global".
+|}]
+
 (* Return mode must be greater than the type *)
 
 let foo : unit -> local_ string = fun () -> "hello"
