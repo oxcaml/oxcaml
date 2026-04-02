@@ -382,7 +382,7 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
   match desc with
   | Tpat_any | Tpat_var _ | Tpat_constant _
   | Tpat_variant (_, None, _)
-  | Tpat_unboxed_bool _ | Tpat_unboxed_unit -> id_fold
+  | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> id_fold
   | Tpat_alias { pattern = p; _ }
   | Tpat_variant (_, Some p, _)
   | Tpat_lazy p

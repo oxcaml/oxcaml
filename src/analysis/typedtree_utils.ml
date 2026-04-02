@@ -26,7 +26,8 @@ let let_bound_vars bindings =
   List.filter_map
     ~f:(fun value_binding ->
       match value_binding.Typedtree.vb_pat.pat_desc with
-      | Tpat_var { id; name; _ } -> Some (id, name)
+      | Tpat_var { id; name; _ } | Tpat_fun_layout { id; name; _ } ->
+        Some (id, name)
       | Typedtree.Tpat_any
       | Typedtree.Tpat_alias _
       | Typedtree.Tpat_constant _

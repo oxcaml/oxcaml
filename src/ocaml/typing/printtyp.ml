@@ -1558,11 +1558,14 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_splice (tree_of_typexp mode alloc_mode ty)
     | Tquote_eval ty ->
         (* We use [Predef]'s [eval] as the syntax, so we need to quote [ty]. *)
-        let ty = newgenty (Tquote ty) in
-        let p', s = best_type_path Predef.path_eval in
-        let tyl = apply_subst s [ty] in
-        Internal_names.add p';
-        Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl)
+        (match best_type_path Predef.path_eval with
+        | Nth _ ->
+          failwith "printtyp: unexpected Nth as result of best_type_path for eval"
+        | Path (s, p') ->
+          let ty = newgenty (Tquote ty) in
+          let tyl = apply_subst_opt s [ty] in
+          Internal_names.add p';
+          Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl))
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->

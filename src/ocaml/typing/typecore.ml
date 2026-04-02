@@ -363,6 +363,7 @@ let deep_copy () =
         | Tpackage (p,ltl) ->
           Tpackage (p, List.map (fun (l, tl) -> l, copy tl) ltl)
         | Tquote t -> Tquote (copy t)
+        | Tquote_eval t -> Tquote_eval (copy t)
         | Tsplice t -> Tsplice (copy t)
         | Tlink _ | Tsubst _ -> assert false
       in
@@ -5994,7 +5995,7 @@ let create_merlin_type_error_node loc env ty_expected ~attributes =
               { Types.val_type = ty_expected;
                 val_kind =
                   Val_reg (Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())));
-                val_lpoly = [];
+                val_lpoly = Lpoly.determined [];
                 val_loc = loc;
                 val_attributes = [];
                 val_uid = Uid.internal_not_actually_unique;
