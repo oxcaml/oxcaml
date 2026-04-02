@@ -1696,8 +1696,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
             | Ibased _ -> None, None)
           | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
           | Isextend32 | Izextend32 | Ineg | Irdtsc | Irdpmc | Ilfence | Isfence
-          | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Iprefetch _
-          | Icldemote _ | Illvm_intrinsic _ ->
+          | Imfence | Itrace_pc_guard _ | Ipackf32 | Isimd _ | Isimd_mem _
+          | Iprefetch _ | Icldemote _ | Illvm_intrinsic _ ->
             assert false)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
         | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
@@ -1813,9 +1813,9 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | Specific (Istore_int (n, _addr, _is_assign)) -> Int64.of_nativeint n
           | Specific
               ( Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _
-              | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
-              | Isimd _ | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32
-              | Izextend32 | Ineg | Illvm_intrinsic _ )
+              | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
+              | Itrace_pc_guard _ | Ipackf32 | Isimd _ | Isimd_mem _ | Ilea _
+              | Ibswap _ | Isextend32 | Izextend32 | Ineg | Illvm_intrinsic _ )
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Int128op _
           | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
           | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
@@ -1918,7 +1918,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     | Isimd_mem _ ->
       Misc.fatal_error "Unexpected simd operation with memory arguments"
     | Ioffset_loc _ | Ibswap _ | Ineg | Irdtsc | Irdpmc | Ilfence | Isfence
-    | Imfence | Ipackf32 | Isimd _ | Iprefetch _ | Icldemote _ ->
+    | Imfence | Itrace_pc_guard _ | Ipackf32 | Isimd _ | Iprefetch _
+    | Icldemote _ ->
       None
     | Illvm_intrinsic intr ->
       Misc.fatal_errorf

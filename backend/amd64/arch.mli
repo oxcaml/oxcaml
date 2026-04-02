@@ -117,6 +117,8 @@ type specific_operation =
         addr: addressing_mode;
       }
   | Illvm_intrinsic of string
+  | Itrace_pc_guard of int             (* coverage probe, see
+                                          [Cfg_trace_pc_guard] *)
 
 and float_operation =
   | Ifloatadd
@@ -196,6 +198,11 @@ val float_cond_and_need_swap
   :  Scalar.Float_comparison.t -> X86_ast.float_condition * bool
 
 val isomorphic_specific_operation : specific_operation -> specific_operation -> bool
+
+(** The operation implementing the coverage probe with the given guard index
+    for [-trace-pc-guard], if supported by the target. *)
+val trace_pc_guard_operation : int -> specific_operation option
+
 (* addressing mode functions *)
 
 val equal_addressing_mode_without_displ : addressing_mode -> addressing_mode -> bool

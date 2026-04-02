@@ -338,6 +338,8 @@ type specific_operation =
         addr: addressing_mode;
       }
   | Illvm_intrinsic of string
+  | Itrace_pc_guard of int             (* coverage probe, see
+                                          [Cfg_trace_pc_guard] *)
 
 (* CR yusumez: [Illvm_intrinsic] exists to pass extcalls with builtin = true to
    the LLVM backend. Ideally, we'd want this variant to contain the LLVM
@@ -447,6 +449,7 @@ let fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta =
     end
   | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ | Isextend32
   | Izextend32 | Ineg | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
+  | Itrace_pc_guard _
   | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _
   | Illvm_intrinsic _ ->
     None
@@ -558,6 +561,8 @@ let print_specific_operation printreg op ppf arg =
         printreg arg.(0)
   | Illvm_intrinsic name ->
       fprintf ppf "llvm_intrinsic %s" name
+  | Itrace_pc_guard n ->
+      fprintf ppf "trace_pc_guard %d" n
 
 let specific_operation_name : specific_operation -> string = fun op ->
   match op with
@@ -581,6 +586,7 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Icldemote _ -> "cldemote"
   | Iprefetch _ -> "prefetch"
   | Illvm_intrinsic _ -> "llvm_intrinsic"
+  | Itrace_pc_guard _ -> "trace_pc_guard"
 
 (* Are we using the Windows 64-bit ABI? *)
 let win64 =
@@ -595,7 +601,7 @@ let operation_is_pure = function
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Ineg
   | Ifloatarithmem _  -> true
   | Irdtsc | Irdpmc
-  | Ilfence | Isfence | Imfence
+  | Ilfence | Isfence | Imfence | Itrace_pc_guard _
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
   | Icldemote _ | Iprefetch _ -> false
   | Ipackf32 -> true
@@ -612,7 +618,7 @@ let operation_allocates = function
   | Ifloatarithmem _
   | Irdtsc | Irdpmc  | Ipackf32
   | Isimd _ | Isimd_mem _
-  | Ilfence | Isfence | Imfence
+  | Ilfence | Isfence | Imfence | Itrace_pc_guard _
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
   | Icldemote _ | Iprefetch _ -> false
   | Illvm_intrinsic _intr ->
@@ -712,11 +718,13 @@ let equal_specific_operation left right =
   | Isimd_mem (l,al), Isimd_mem (r,ar) ->
     Simd.Mem.equal_operation l r && equal_addressing_mode al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
+  | Itrace_pc_guard l, Itrace_pc_guard r ->
+    Int.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
      Isextend32 | Izextend32 | Ineg |
      Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
-     Illvm_intrinsic _), _ ->
+     Illvm_intrinsic _ | Itrace_pc_guard _), _ ->
     false
 
 (* addressing mode functions *)
@@ -827,9 +835,13 @@ let isomorphic_specific_operation op1 op2 =
   | Isimd_mem (l,al), Isimd_mem (r,ar) ->
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
+  | Itrace_pc_guard l, Itrace_pc_guard r ->
+    Int.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
      Isextend32 | Izextend32 | Ineg |
      Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
-     Illvm_intrinsic _), _ ->
+     Illvm_intrinsic _ | Itrace_pc_guard _), _ ->
     false
+
+let trace_pc_guard_operation n = Some (Itrace_pc_guard n)

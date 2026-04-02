@@ -53,6 +53,11 @@ let runtime_lib () =
 
 (* Second pass: generate the startup file and link it with everything else *)
 
+(* The startup file contains only generated code (entry point, generic
+   functions, tables), which is not worth recording coverage for. *)
+let without_trace_pc_guard f =
+  Misc.protect_refs [Misc.R (Clflags.trace_pc_guard, false)] f
+
 let named_startup_file () =
   !Clflags.keep_startup_file || !Emitaux.binary_backend_available
 
@@ -237,6 +242,7 @@ let link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
       Profile.record_call "make_shared_startup_file" (fun () ->
+          without_trace_pc_guard @@ fun () ->
           make_shared_startup_file unix ~ppf_dump
             ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
             units_tolink));
@@ -438,6 +444,7 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
       Profile.record_call "make_startup_file" (fun () ->
+          without_trace_pc_guard @@ fun () ->
           make_startup_file linkenv unix ~ppf_dump
             ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
             units_tolink cached_genfns_imports));

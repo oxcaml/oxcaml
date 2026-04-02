@@ -46,6 +46,9 @@ module L = Asm_targets.Asm_label
 (* Name of current function *)
 let function_name = ref ""
 
+(* Debuginfo of current function *)
+let function_dbg = ref Debuginfo.none
+
 (* These callbacks are just instrumentation for expect_asm tests. *)
 let expect_asm_callbacks = ref []
 
@@ -220,6 +223,16 @@ let emit_debug_info_linear i =
   match i.fdo with
   | None -> emit_debug_info i.dbg
   | Some { discriminator; dbg } -> emit_debug_info ~discriminator dbg
+
+(* The callback of a coverage probe records its return address, which coverage
+   tools map to a source line. A probe whose debuginfo has no source line is
+   given line 0 ("no source line"), so that it is not attributed to the line of
+   the code that precedes it. *)
+let emit_trace_pc_guard_debug_info dbg =
+  if Emitaux.has_source_line dbg
+  then emit_debug_info dbg
+  else
+    Emitaux.emit_no_source_line_gen ~file_dbg:!function_dbg file_emitter D.loc
 
 let fp = Config.with_frame_pointers
 
@@ -685,6 +698,23 @@ let emit_local_realloc lr =
   emit_debug_info lr.lr_dbg;
   emit_call (global_gc_sym "caml_call_local_realloc" ~simd:lr.lr_save_simd);
   I.jmp (emit_asm_label_arg lr.lr_return_lbl)
+
+(* Record out-of-line calls to [__sanitizer_cov_trace_pc_guard], see
+   [Itrace_pc_guard] *)
+
+type trace_pc_guard_call =
+  { tpg_lbl : L.t;
+    tpg_return_lbl : L.t;
+    tpg_guard : L.t;
+    tpg_live : Reg.Set.t;
+    tpg_dbg : Debuginfo.t
+  }
+
+let trace_pc_guard_sites = ref ([] : trace_pc_guard_call list)
+
+(* The guards of the current unit, one per probe, most recent first. They are
+   emitted by [end_assembly]. *)
+let trace_pc_guards = ref ([] : L.t list)
 
 (* Record calls to caml_ml_array_bound_error and caml_ml_array_align_error. In
    -g mode we maintain one call per bound check site. Without -g, we can share a
@@ -2633,6 +2663,25 @@ let emit_instr ~first ~last ~fallthrough i =
     assert (equal_reg64 (arg64 i 0) RCX);
     I.rdpmc ();
     emit_combine_edx_eax i.res.(0)
+  | Lop (Specific (Itrace_pc_guard _)) ->
+    (* if (__sancov_should_track) goto slow path. The gate is defined hidden in
+       this unit (see [end_assembly]), so it can be addressed PC-relatively,
+       even in position-independent code. *)
+    I.cmp (int 0) (mem64_rip QWORD (emit_symbol Cfg_trace_pc_guard.gate));
+    let lbl_call = L.create Text in
+    let lbl_return = L.create Text in
+    I.jne (emit_asm_label_arg lbl_call);
+    D.define_label lbl_return;
+    let guard = L.create Trace_pc_guards in
+    trace_pc_guards := guard :: !trace_pc_guards;
+    trace_pc_guard_sites
+      := { tpg_lbl = lbl_call;
+           tpg_return_lbl = lbl_return;
+           tpg_guard = guard;
+           tpg_live = i.live;
+           tpg_dbg = i.dbg
+         }
+         :: !trace_pc_guard_sites
   | Lop (Specific Ilfence) -> I.lfence ()
   | Lop (Specific Isfence) -> I.sfence ()
   | Lop (Specific Imfence) -> I.mfence ()
@@ -2862,6 +2911,95 @@ let emit_function_type_and_size fun_sym =
 
 (* Emission of a function declaration *)
 
+(* The slow path of an [Itrace_pc_guard] probe calls
+   [__sanitizer_cov_trace_pc_guard(&guard)] on the C stack (or, without stack
+   checks, an aligned stack below the current one), saving every live register
+   that the C calling convention does not preserve, so that the probe clobbers
+   no register (see [Proc.destroyed_at_basic]).
+
+   [r11] holds the original stack pointer while switching stacks. If [r11] is
+   live at the probe, it is first pushed on the current stack. Like the return
+   address pushed by a call to [caml_call_gc], this word lies within the red
+   zone that the runtime keeps below the stack frames of OCaml code
+   ([Stack_threshold]). The other registers are saved in a frame on the C stack,
+   whose first slot holds the stack pointer from before the switch (after the
+   push, if any). *)
+let emit_trace_pc_guard_call tpg =
+  D.define_label tpg.tpg_lbl;
+  emit_trace_pc_guard_debug_info tpg.tpg_dbg;
+  let must_save (r : Reg.t) =
+    Reg.is_reg r
+    &&
+    match r.typ with
+    | Int | Val | Addr -> (
+      match reg64 r with
+      | RAX | RDI | RSI | RDX | RCX | R8 | R9 | R10 -> true
+      (* [r11] is pushed separately. *)
+      | R11 | RBX | RBP | RSP | R12 | R13 | R14 | R15 -> false)
+    | Float | Float32 | Vec128 | Valx2 | Vec256 | Vec512 | Mask -> true
+  in
+  let r11_live =
+    Reg.Set.exists
+      (fun (r : Reg.t) ->
+        Reg.is_reg r
+        &&
+        match r.typ with
+        | Int | Val | Addr -> (
+          match reg64 r with
+          | R11 -> true
+          | RAX | RDI | RSI | RDX | RCX | R8 | R9 | R10 | RBX | RBP | RSP | R12
+          | R13 | R14 | R15 ->
+            false)
+        | Float | Float32 | Vec128 | Valx2 | Vec256 | Vec512 | Mask -> false)
+      tpg.tpg_live
+  in
+  let slot_size (r : Reg.t) =
+    match r.typ with
+    | Int | Val | Addr | Mask | Float | Float32 -> 8
+    | Vec128 | Valx2 -> 16
+    | Vec256 -> 32
+    | Vec512 -> 64
+  in
+  (* The first slot holds the original stack pointer. The frame is 16-byte
+     aligned, and so is every vector slot, since [move] uses aligned moves for
+     [Vec128] and [Valx2] stack slots. *)
+  let saved, size =
+    Reg.Set.fold
+      (fun r (saved, offset) ->
+        if must_save r
+        then
+          let offset = Misc.align offset (Int.min (slot_size r) 16) in
+          (r, offset) :: saved, offset + slot_size r
+        else saved, offset)
+      tpg.tpg_live ([], 8)
+  in
+  let frame_size = Misc.align size 16 in
+  (* [Outgoing] slots are addressed relative to the stack pointer, independently
+     of the frame. *)
+  let slot (r : Reg.t) offset =
+    Reg.create_at_location r.typ (Stack (Outgoing offset))
+  in
+  if r11_live
+  then (
+    I.push r11;
+    D.cfi_adjust_cfa_offset ~bytes:8);
+  I.mov rsp r11;
+  if Config.no_stack_checks
+  then I.and_ (int (-16)) rsp
+  else I.mov (domain_field Domainstate.Domain_c_stack) rsp;
+  I.sub (int frame_size) rsp;
+  I.mov r11 (mem64 QWORD 0 (Scalar RSP));
+  List.iter (fun (r, offset) -> move r (slot r offset)) saved;
+  I.lea (mem64_rip NONE (L.encode tpg.tpg_guard)) rdi;
+  emit_call (Cmm.global_symbol Cfg_trace_pc_guard.callback);
+  List.iter (fun (r, offset) -> move (slot r offset) r) saved;
+  I.mov (mem64 QWORD 0 (Scalar RSP)) rsp;
+  if r11_live
+  then (
+    I.pop r11;
+    D.cfi_adjust_cfa_offset ~bytes:(-8));
+  I.jmp (emit_asm_label_arg tpg.tpg_return_lbl)
+
 let fundecl fundecl =
   let fun_end_label, fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
@@ -2869,12 +3007,14 @@ let fundecl fundecl =
     | Some { fun_end_label; fundecl } -> Some fun_end_label, fundecl
   in
   function_name := fundecl.fun_name;
+  function_dbg := fundecl.fun_dbg;
   fastcode_flag := fundecl.fun_fast;
   tailrec_entry_point := fundecl.fun_tailrec_entry_point_label;
   contains_calls := fundecl.fun_contains_calls;
   stack_offset := 0;
   call_gc_sites := [];
   local_realloc_sites := [];
+  trace_pc_guard_sites := [];
   clear_safety_checks ();
   clear_stack_realloc ();
   Stack_class.Tbl.copy_values ~from:fundecl.fun_num_stack_slots
@@ -2916,6 +3056,7 @@ let fundecl fundecl =
   let fun_body_end = current_output_pos () in
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
+  List.iter emit_trace_pc_guard_call !trace_pc_guard_sites;
   let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();
@@ -2970,6 +3111,7 @@ let reset_all () =
   Probe_emission.reset ();
   reset_traps ();
   float_constants := [];
+  trace_pc_guards := [];
   all_functions := []
 
 let begin_assembly unix =
@@ -3307,6 +3449,29 @@ let end_assembly () =
     D.switch_to_section Sixtyfour_byte_literals;
     D.align ~fill:Zero ~bytes:64;
     List.iter (fun (cst, lbl) -> emit_vec512_constant cst lbl) !vec512_constants);
+  if not (Misc.Stdlib.List.is_empty !trace_pc_guards)
+  then (
+    D.switch_to_section Trace_pc_guards;
+    D.align ~fill:Zero ~bytes:4;
+    List.iter
+      (fun lbl ->
+        D.define_label lbl;
+        D.int32 0l)
+      (List.rev !trace_pc_guards);
+    (* The gate, defined as by clang: every instrumented unit has a zero
+       default, which a strong definition elsewhere (e.g. in the coverage
+       runtime) overrides. Being hidden, it is resolved within the linked
+       object, which lets probes address it PC-relatively. *)
+    let gate = S.create_global Cfg_trace_pc_guard.gate in
+    add_def_symbol Cfg_trace_pc_guard.gate;
+    D.hidden gate;
+    D.type_symbol gate ~ty:Object;
+    D.switch_to_section Trace_pc_guard_gate;
+    D.weak gate;
+    D.align ~fill:Zero ~bytes:8;
+    D.define_symbol_label ~section:Trace_pc_guard_gate gate;
+    D.int64 0L;
+    D.size gate);
   (* Emit probe handler wrappers *)
   List.iter emit_probe_handler_wrapper (Probe_emission.get_probes ());
   emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");

@@ -419,3 +419,5 @@ let equal_addressing_mode_without_displ (addressing_mode_1: addressing_mode)
 let addressing_offset_in_bytes (_addressing_mode_1: addressing_mode)
       (_addressing_mode_2 : addressing_mode) ~arg_offset_in_bytes:_ _ _ =
   None
+
+let trace_pc_guard_operation _ = None

@@ -37,7 +37,7 @@ let class_of_operation (op : Operation.t)
     | Ioffset_loc(_, _) -> Class (Op_store true)
     | Ifloatarithmem _ -> Class (Op_load Mutable)
     | Ibswap _ -> Use_default
-    | Irdtsc | Irdpmc -> Class Op_other
+    | Irdtsc | Irdpmc | Itrace_pc_guard _ -> Class Op_other
     | Ilfence | Imfence ->
       (* A load that follows a load fence must not be satisfied by an equation
          over a load that precedes the fence: that would effectively hoist the

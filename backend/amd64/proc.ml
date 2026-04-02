@@ -689,6 +689,10 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Alloc _) ->
     destroyed_at_alloc_or_poll
   | Op (Specific Ipackf32) -> [||]
+  | Op (Specific (Itrace_pc_guard _)) ->
+    (* The probe tests the gate in memory, and its out-of-line slow path
+       preserves all registers. *)
+    [||]
   | Op (Specific (Isimd op)) ->
     destroyed_by_simd_op op
   | Op (Specific (Isimd_mem (op,_))) ->
