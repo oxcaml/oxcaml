@@ -2375,7 +2375,58 @@ type r_254 =
     f253 : string;
     f254 : string;
   }
-
+type r_254_f64 =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+    f64 : float#;
+  }
+type r_255 =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+    f255 : string;
+  }
+type r_255_void =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+    f255 : #(string * unit#);
+    v : unit#;
+  }
 [%%expect{|
 type eight_values
   : value & value & value & value & value & value & value & value
@@ -2401,9 +2452,61 @@ type r_254 = {
   f253 : string;
   f254 : string;
 }
+type r_254_f64 = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+  f64 : float#;
+}
+type r_255 = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+  f255 : string;
+}
+type r_255_void = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+  f255 : #(string * unit#);
+  v : unit#;
+}
 |}]
 
-type r_255 =
+type r_255_f64 =
   { a : thirty_two_values#;
     b : thirty_two_values#;
     c : thirty_two_values#;
@@ -2418,21 +2521,21 @@ type r_255 =
     f252 : string;
     f253 : string;
     f254 : string;
-    f255 : string;
+    f255 : #(string * unit#);
+    f64 : float#;
   }
-
 [%%expect{|
-Lines 1-17, characters 0-3:
- 1 | type r_255 =
+Lines 1-18, characters 0-3:
+ 1 | type r_255_f64 =
  2 |   { a : thirty_two_values#;
  3 |     b : thirty_two_values#;
  4 |     c : thirty_two_values#;
  5 |     d : thirty_two_values#;
 ...
-14 |     f253 : string;
 15 |     f254 : string;
-16 |     f255 : string;
-17 |   }
+16 |     f255 : #(string * unit#);
+17 |     f64 : float#;
+18 |   }
 Error: Mixed records may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
 |}]
 
