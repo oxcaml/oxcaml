@@ -2,6 +2,11 @@ t_uniform1: uniform
 t_uniform2.0: uniform
 t_uniform2.1: uniform
 t_uniform3: uniform
+t_uniform_vv: mixed (scannable_prefix_len = 1)
+t_uniform_vv rec: mixed (scannable_prefix_len = 2)
+t_uniform_vu: mixed (scannable_prefix_len = 2)
+t_uniform_vu_variant: mixed (scannable_prefix_len = 2)
+t_uniform_vu_variant rec: mixed (scannable_prefix_len = 1)
 t_mixed0: mixed (scannable_prefix_len = 1)
 t_mixed1: mixed (scannable_prefix_len = 2)
 t_mixed2: mixed (scannable_prefix_len = 3)
