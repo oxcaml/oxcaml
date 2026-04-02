@@ -250,7 +250,10 @@ let bind_fields fields arg_fields hole =
           (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
         (* CR sspies: Missing debug uid. *)
       in
-      RE.create_let bp (Named.create_simple (Simple.var arg)) ~body:hole)
+      let simple = Simple.var arg in
+      RE.create_let bp
+        (Named.create_simple simple)
+        ~size_of_defining_expr:(Code_size.simple simple) ~body:hole)
     fields arg_fields hole
 
 let bound_vars_will_be_unboxed env bvs =
@@ -655,7 +658,9 @@ let rebuild_named_default_case env (named : Named.t) =
       =
     let arg = get_simple_unboxable env base in
     match Field.Map.find field arg with
-    | Not_unboxed var -> Named.create_simple (Simple.var var)
+    | Not_unboxed var ->
+      let simple = Simple.var var in
+      Named.create_simple simple, Code_size.simple simple
     | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
     | exception Not_found -> (
       match mut with
@@ -668,9 +673,9 @@ let rebuild_named_default_case env (named : Named.t) =
           Field.print field Simple.print base Field.Set.print
           (Field.Map.keys arg)
       | Mutable ->
-        Named.create_prim
-          (P.Nullary (Invalid (Field.kind field)))
-          Debuginfo.none)
+        let prim = P.Nullary (Invalid (Field.kind field)) in
+        ( Named.create_prim prim Debuginfo.none,
+          Code_size.prim ~machine_width:env.machine_width prim ))
   in
   let[@local] rewrite_field_access_chg_repr ?(mut : Mutability.t = Immutable)
       arg field dbg =
@@ -678,8 +683,8 @@ let rebuild_named_default_case env (named : Named.t) =
       match Field.Map.find field arg_fields with
       | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
       | Not_unboxed r -> f r
-      | exception Not_found ->
-        (match mut with
+      | exception Not_found -> (
+        match mut with
         | Immutable | Immutable_unique ->
           Misc.fatal_errorf
             "In [rewrite_field_access_chg_repr], an immutable field load for \
@@ -688,38 +693,46 @@ let rebuild_named_default_case env (named : Named.t) =
              %a@.Expected fields are: %a@."
             Field.print field Simple.print arg Field.Set.print
             (Field.Map.keys arg_fields)
-        | Mutable -> Named.create_prim (P.Nullary (Invalid (Field.kind field))))
-          dbg
+        | Mutable ->
+          let prim = P.Nullary (Invalid (Field.kind field)) in
+          ( Named.create_prim prim dbg,
+            Code_size.prim ~machine_width:env.machine_width prim ))
     in
     let arg_repr = get_simple_changed_repr env arg in
     match arg_repr with
     | Block_representation (arg_fields, _size) ->
       get_field arg_fields ~f:(fun (field, kind) ->
-          Named.create_prim
-            (P.Unary
-               ( Block_load
-                   { field = Target_ocaml_int.of_int env.machine_width field;
-                     kind;
-                     mut = Immutable
-                   },
-                 arg ))
-            dbg)
+          let prim =
+            P.Unary
+              ( Block_load
+                  { field = Target_ocaml_int.of_int env.machine_width field;
+                    kind;
+                    mut = Immutable
+                  },
+                arg )
+          in
+          ( Named.create_prim prim dbg,
+            Code_size.prim ~machine_width:env.machine_width prim ))
     | Closure_representation (arg_fields, function_slots, current_function_slot)
       ->
       get_field arg_fields ~f:(fun value_slot ->
-          Named.create_prim
-            (P.Unary
-               ( Project_value_slot
-                   { value_slot;
-                     project_from =
-                       Function_slot.Map.find current_function_slot
-                         function_slots
-                   },
-                 arg ))
-            dbg)
+          let prim =
+            P.Unary
+              ( Project_value_slot
+                  { value_slot;
+                    project_from =
+                      Function_slot.Map.find current_function_slot
+                        function_slots
+                  },
+                arg )
+          in
+          ( Named.create_prim prim dbg,
+            Code_size.prim ~machine_width:env.machine_width prim ))
   in
   match[@ocaml.warning "-fragile-match"] named with
-  | Simple simple -> Named.create_simple (rewrite_simple env simple)
+  | Simple simple ->
+    let simple = rewrite_simple env simple in
+    Named.create_simple simple, Code_size.simple simple
   | Prim (Unary (Block_load { kind; field; mut; _ }, arg), _dbg)
     when simple_is_unboxable env arg ->
     let kind = P.Block_access_kind.element_kind_for_load kind in
@@ -748,7 +761,8 @@ let rebuild_named_default_case env (named : Named.t) =
     rewrite_field_access_chg_repr arg Field.get_tag dbg
   | Prim (prim, dbg) ->
     let prim = P.map_args (rewrite_simple env) prim in
-    Named.create_prim prim dbg
+    ( Named.create_prim prim dbg,
+      Code_size.prim ~machine_width:env.machine_width prim )
   | Set_of_closures s ->
     Misc.fatal_errorf
       "[rebuild_named_default_case] called on set of closures:@ %a@."
@@ -757,7 +771,7 @@ let rebuild_named_default_case env (named : Named.t) =
     Misc.fatal_errorf
       "[rebuild_named_default_case] called on static consts:@ %a@."
       Static_const_group.print sc
-  | Rec_info r -> Named.create_rec_info r
+  | Rec_info r -> Named.create_rec_info r, Code_size.zero
 
 let rewrite_apply_cont_expr env ac =
   let cont = Apply_cont_expr.continuation ac in
@@ -801,7 +815,7 @@ let make_apply_wrapper env
   | Never_returns ->
     let apply = make_apply ~continuation:Never_returns in
     RE.from_expr ~expr:(Expr.create_apply apply)
-      ~free_names:(Apply.free_names apply)
+      ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
   | Return return_cont -> (
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
@@ -901,6 +915,7 @@ let make_apply_wrapper env
         let apply = make_apply ~continuation:(Return return_cont) in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
+          ~code_size:(Code_size.apply apply)
       else
         let apply_expr = Expr.create_apply apply in
         let handler =
@@ -910,6 +925,7 @@ let make_apply_wrapper env
           RE.from_expr
             ~expr:(Expr.create_apply_cont apply_cont)
             ~free_names:(Apply_cont_expr.free_names apply_cont)
+            ~code_size:(Code_size.apply_cont apply_cont)
         in
         let cont_handler =
           RE.create_continuation_handler
@@ -919,6 +935,7 @@ let make_apply_wrapper env
         in
         let body =
           RE.from_expr ~expr:apply_expr ~free_names:(Apply.free_names apply)
+            ~code_size:(Code_size.apply apply)
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
     | Invalid ->
@@ -943,7 +960,7 @@ let make_apply_wrapper env
                     (Format.asprintf "Function call to %a never returns"
                        Simple.print
                        (Option.get (Apply.callee apply)))))
-            ~free_names:Name_occurrences.empty
+            ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
         in
         let cont_handler =
           RE.create_continuation_handler
@@ -953,12 +970,14 @@ let make_apply_wrapper env
         let body =
           RE.from_expr ~expr:(Expr.create_apply apply)
             ~free_names:(Apply.free_names apply)
+            ~code_size:(Code_size.apply apply)
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
       else
         let apply = make_apply ~continuation:Never_returns in
         RE.from_expr ~expr:(Expr.create_apply apply)
-          ~free_names:(Apply.free_names apply))
+          ~free_names:(Apply.free_names apply)
+          ~code_size:(Code_size.apply apply))
 
 let rewrite_call_kind env (call_kind : Call_kind.t) =
   let rewrite_simple = rewrite_simple env in
@@ -1087,7 +1106,7 @@ let rebuild_apply env apply =
                  "[This invalid should not appear in the output code] Callee \
                   or one of the args has no source for apply %a"
                  Apply.print apply)))
-      ~free_names:Name_occurrences.empty
+      ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
   else
     (* CR ncourant: we never rewrite alloc_mode. This is currently ok because we
        never remove begin- or end-region primitives, but might be needed later
@@ -1144,7 +1163,7 @@ let rebuild_apply env apply =
                   (Format.asprintf
                      "Unboxed callee %a cannot actually be a function"
                      Simple.print callee)))
-          ~free_names:Name_occurrences.empty
+          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
       | None | Some _ ->
         (* Format.eprintf "NOT CHANGING CALLING CONVENTION %a@." Apply.print
            apply; *)
@@ -1394,18 +1413,20 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
                 (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
               (* CR sspies: Missing debug uid. *)
             in
-            let named =
-              Named.create_prim
-                (P.Unary
-                   ( Block_load
-                       { field = Target_ocaml_int.of_int env.machine_width field;
-                         kind;
-                         mut = Immutable
-                       },
-                     oarg ))
-                dbg
+            let prim =
+              P.Unary
+                ( Block_load
+                    { field = Target_ocaml_int.of_int env.machine_width field;
+                      kind;
+                      mut = Immutable
+                    },
+                  oarg )
             in
-            RE.create_let bp named ~body:hole)
+            let named = Named.create_prim prim dbg in
+            let size_of_defining_expr =
+              Code_size.prim ~machine_width:env.machine_width prim
+            in
+            RE.create_let bp named ~size_of_defining_expr ~body:hole)
           (Unboxed to_bind) arg hole)
     | Closure_representation (arg_fields, function_slots, current_function_slot)
       -> (
@@ -1423,19 +1444,21 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
                 (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
               (* CR sspies: Missing debug uid. *)
             in
-            let named =
-              Named.create_prim
-                (P.Unary
-                   ( Project_value_slot
-                       { value_slot;
-                         project_from =
-                           Function_slot.Map.find current_function_slot
-                             function_slots
-                       },
-                     oarg ))
-                dbg
+            let prim =
+              P.Unary
+                ( Project_value_slot
+                    { value_slot;
+                      project_from =
+                        Function_slot.Map.find current_function_slot
+                          function_slots
+                    },
+                  oarg )
             in
-            RE.create_let bp named ~body:hole)
+            let named = Named.create_prim prim dbg in
+            let size_of_defining_expr =
+              Code_size.prim ~machine_width:env.machine_width prim
+            in
+            RE.create_let bp named ~size_of_defining_expr ~body:hole)
           (Unboxed to_bind) arg hole))
 
 let rebuild_singleton_binding_which_is_being_unboxed env bv
@@ -1488,7 +1511,9 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
               (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
             (* CR sspies: Missing debug uid. *)
           in
-          RE.create_let bp (Named.create_simple simple) ~body:hole
+          RE.create_let bp
+            (Named.create_simple simple)
+            ~size_of_defining_expr:(Code_size.simple simple) ~body:hole
         | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
       to_bind hole
   | Prim (Unary (Block_load { field; kind; _ }, arg), dbg) ->
@@ -1555,7 +1580,8 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                        Name_mode.normal)
                   (* CR sspies: Missing debug uid. *)
                 in
-                RE.create_let bp (Named.create_simple arg) ~body:hole
+                RE.create_let bp (Named.create_simple arg)
+                  ~size_of_defining_expr:(Code_size.simple arg) ~body:hole
             | Block _ | Is_int | Get_tag | Function_slot _ | Call_witness _
             | Return_of_call _ | Code_id_of_call_witness ->
               Misc.fatal_errorf
@@ -1585,17 +1611,19 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
           Bound_var.print bv
       | Closure_representation (_, fss, _) -> fss
     in
-    let named =
-      Named.create_prim
-        (Unary
-           ( Project_function_slot
-               { move_to = Function_slot.Map.find move_to fss;
-                 move_from = Function_slot.Map.find move_from fss
-               },
-             arg ))
-        dbg
+    let prim : P.t =
+      Unary
+        ( Project_function_slot
+            { move_to = Function_slot.Map.find move_to fss;
+              move_from = Function_slot.Map.find move_from fss
+            },
+          arg )
     in
-    RE.create_let bp named ~body:hole
+    let named = Named.create_prim prim dbg in
+    let size_of_defining_expr =
+      Code_size.prim ~machine_width:env.machine_width prim
+    in
+    RE.create_let bp named ~size_of_defining_expr ~body:hole
   | Prim (Variadic (Make_block (kind, _mut, alloc_mode), args), dbg) ->
     let fields =
       Option.get
@@ -1663,18 +1691,20 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
           | None -> Simple.const_zero env.machine_width
           | Some x -> x)
     in
-    let named =
-      Named.create_prim
-        (P.Variadic
-           ( Make_block
-               ( P.Block_kind.Values
-                   (Tag.Scannable.zero, List.map (fun _ -> KS.any_value) args),
-                 Immutable,
-                 alloc_mode ),
-             args ))
-        dbg
+    let prim =
+      P.Variadic
+        ( Make_block
+            ( P.Block_kind.Values
+                (Tag.Scannable.zero, List.map (fun _ -> KS.any_value) args),
+              Immutable,
+              alloc_mode ),
+          args )
     in
-    RE.create_let bp named ~body:hole
+    let named = Named.create_prim prim dbg in
+    let size_of_defining_expr =
+      Code_size.prim ~machine_width:env.machine_width prim
+    in
+    RE.create_let bp named ~size_of_defining_expr ~body:hole
   | _ ->
     (* In a situation such as:
      *   x is a variable whose representation is being changed
@@ -1686,8 +1716,10 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     (* CR ncourant: should we check that we are in one of the cases we expect?
        That would be only the projections so block load, project_value_slot and
        project_function_slot. *)
-    let defining_expr = rebuild_named_default_case env defining_expr in
-    RE.create_let bp defining_expr ~body:hole
+    let defining_expr, size_of_defining_expr =
+      rebuild_named_default_case env defining_expr
+    in
+    RE.create_let bp defining_expr ~size_of_defining_expr ~body:hole
 
 let rebuild_make_block_default_case env (bp : Bound_pattern.t)
     ~(block_kind : P.Block_kind.t) ~mutability ~alloc_mode ~fields ~hole dbg =
@@ -1741,10 +1773,13 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
         else poison ~machine_width:env.machine_width kind)
       fields
   in
+  let prim : P.t =
+    Variadic (Make_block (block_kind, mutability, alloc_mode), fields)
+  in
   RE.create_let bp
-    (Named.create_prim
-       (Variadic (Make_block (block_kind, mutability, alloc_mode), fields))
-       dbg)
+    (Named.create_prim prim dbg)
+    ~size_of_defining_expr:
+      (Code_size.prim ~machine_width:env.machine_width prim)
     ~body:hole
 
 let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures ~hole =
@@ -1766,10 +1801,12 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures ~hole =
     let set_of_closures, res =
       rewrite_set_of_closures env res ~bound set_of_closures ~is_phantom
     in
-    ( RE.create_let bound_pattern
+    let expr =
+      RE.create_let bound_pattern
         (Named.create_set_of_closures set_of_closures)
-        ~body:hole,
-      res )
+        ~size_of_defining_expr ~body:hole
+    in
+    expr, res
 
 let rebuild_let_expr_singleton (env : env) res bv ~(defining_expr : Named.t)
     ~hole : RE.t * rebuild_result =
@@ -1802,8 +1839,12 @@ let rebuild_let_expr_singleton (env : env) res bv ~(defining_expr : Named.t)
           ~mutability ~alloc_mode ~fields ~hole dbg,
         res )
     | _ ->
-      let defining_expr = rebuild_named_default_case env defining_expr in
-      RE.create_let bound_pattern defining_expr ~body:hole, res
+      let defining_expr, size_of_defining_expr =
+        rebuild_named_default_case env defining_expr
+      in
+      ( RE.create_let bound_pattern defining_expr ~size_of_defining_expr
+          ~body:hole,
+        res )
 
 let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
   let bound_and_group =
@@ -1873,6 +1914,7 @@ let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
   ( RE.create_let
       (Bound_pattern.static (Bound_static.create bound_static))
       (Named.create_static_consts group)
+      ~size_of_defining_expr:(Code_size.static_consts ())
       ~body:hole,
     res )
 
@@ -1890,7 +1932,7 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
              (Message
                 (Format.asprintf "Dead variable in bound pattern: %a"
                    Bound_pattern.print bound_pattern)))
-        ~free_names:Name_occurrences.empty,
+        ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid,
       res )
   else
     let subexpr, res =
@@ -1943,7 +1985,7 @@ and rebuild_holed (env : env) res (rev_expr : Rev_expr.rev_expr_holed)
             in
             ( RE.from_expr
                 ~expr:(Expr.create_invalid (Message msg))
-                ~free_names:Name_occurrences.empty,
+                ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid,
               res )
         in
         let l = get_parameters parameters_to_keep in
@@ -2002,7 +2044,7 @@ and rebuild_expr (env : env) (res : rebuild_result)
     | Invalid { message } ->
       RE.from_expr
         ~expr:(Expr.create_invalid (Message message))
-        ~free_names:Name_occurrences.empty
+        ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
     | Apply_cont ac -> (
       match rewrite_apply_cont_expr env ac with
       | None ->
@@ -2012,11 +2054,11 @@ and rebuild_expr (env : env) (res : rebuild_result)
                (Message
                   (Format.asprintf "Dead variable in apply cont: %a"
                      Apply_cont_expr.print ac)))
-          ~free_names:Name_occurrences.empty
+          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
       | Some ac ->
         let expr = Expr.create_apply_cont ac in
         let free_names = Apply_cont_expr.free_names ac in
-        RE.from_expr ~expr ~free_names)
+        RE.from_expr ~expr ~free_names ~code_size:(Code_size.apply_cont ac))
     | Switch switch ->
       let arms =
         Target_ocaml_int.Map.filter_map
@@ -2027,7 +2069,7 @@ and rebuild_expr (env : env) (res : rebuild_result)
       then
         RE.from_expr
           ~expr:(Expr.create_invalid Zero_switch_arms)
-          ~free_names:Name_occurrences.empty
+          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
       else
         let switch =
           Switch_expr.create
@@ -2039,7 +2081,7 @@ and rebuild_expr (env : env) (res : rebuild_result)
         in
         let expr = Expr.create_switch switch in
         let free_names = Switch_expr.free_names switch in
-        RE.from_expr ~expr ~free_names
+        RE.from_expr ~expr ~free_names ~code_size:(Code_size.switch switch)
     | Apply apply -> rebuild_apply env apply
   in
   rebuild_holed env res holed_expr expr
@@ -2106,7 +2148,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       in
       ( RE.from_expr
           ~expr:(Expr.create_invalid (Message msg))
-          ~free_names:Name_occurrences.empty,
+          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid,
         res )
   in
   let code_metadata =
