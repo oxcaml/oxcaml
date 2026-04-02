@@ -241,6 +241,13 @@ let compute_static_size lam =
             Block (Float_record size)
         | Record_inlined (_, Constructor_mixed shape,
                           (Variant_boxed _ | Variant_extensible))
+          when Types.mixed_product_shape_is_all_value_or_void shape ->
+            Block (Regular_block size)
+        | Record_mixed shape
+          when Types.mixed_product_shape_is_all_value_or_void shape ->
+            Block (Regular_block size)
+        | Record_inlined (_, Constructor_mixed shape,
+                          (Variant_boxed _ | Variant_extensible))
         | Record_mixed shape ->
             Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
         | Record_unboxed | Record_ufloat

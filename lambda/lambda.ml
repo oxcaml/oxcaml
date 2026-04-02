@@ -694,21 +694,20 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
   | None -> All_value
   | Some vks -> Shape (Array.of_list (List.map (fun vk -> Value vk) vks))
 
+let rec is_value_or_void_element : _ mixed_block_element -> bool = function
+  | Value _ -> true
+  | Product elts -> Array.for_all is_value_or_void_element elts
+  | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
+  | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+    false
+
 let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
     =
   match shape with
   | All_value -> None
   | Shape shape ->
-    let is_uniform =
-      Array.for_all
-        (function
-          | Value _ -> true
-          (* CR layout poly: This function probably shouldn't exist at all
-             and we should merge mixed_block_shape and block_shape. *)
-          | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
-          | _ -> false)
-        shape
-    in
+    let is_uniform = Array.for_all is_value_or_void_element shape in
     if is_uniform then None else Some shape
 
 let is_uniform_block_shape (shape : block_shape) : bool =
@@ -1897,8 +1896,12 @@ let block_of_module_representation ~loc = function
             error ~loc (Slambda_unsupported "mixed modules"))
         0 shape
     in
-    Typedecl.assert_mixed_product_support loc Module
-      ~value_prefix_len:(count_values shape);
+    (* All-value/void shapes compile to uniform blocks, so the scannable
+       prefix length limit doesn't apply. *)
+    if not (Array.for_all is_value_or_void_element shape)
+    then
+      Typedecl.assert_mixed_product_support loc Module
+        ~value_prefix_len:(count_values shape);
     Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a sequence of expressions *)

@@ -1792,8 +1792,16 @@ module Element_repr = struct
         (function ((Unboxed_element _ | Void), _) -> true | _ -> false) ts
     in
     if not mixed then None else begin
-      assert_mixed_product_support loc kind ~value_prefix_len:boxed_elements;
-      Some (List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list)
+      let shape =
+        List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list
+      in
+      (* All-value/void shapes will compile to uniform blocks, so the
+         scannable prefix length limit doesn't apply. *)
+      if not (Types.mixed_product_shape_is_all_value_or_void shape)
+      then
+        assert_mixed_product_support loc kind
+          ~value_prefix_len:boxed_elements;
+      Some shape
     end
 end
 
