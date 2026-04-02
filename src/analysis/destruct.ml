@@ -127,7 +127,11 @@ let rec gen_patterns ?(recurse = true) env type_expr =
                  Ctype.Pattern_env.make env ~equations_scope:0
                    ~allow_recursive_equations:true
                in
-               Ctype.unify_gadt pattern_env type_expr typ);
+               (* This function is run within a [Printtyp.wrap_printing_env] (this happens
+                  in query_commands.ml), which calls [Env.without_cmis] to avoid loading
+                  cmis for printing. But we may need to load cmis during this unification,
+                  so we wrap in a [Env.with_cmis]. *)
+               Env.with_cmis (fun () -> Ctype.unify_gadt pattern_env type_expr typ));
             true
           with Ctype.Unify _trace -> false
         in
