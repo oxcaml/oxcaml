@@ -109,7 +109,9 @@ module Genarray = struct
      = "caml_ba_create"
   external get
      : ('a : value_or_null) ('b : any) ('c : any).
-       (('a, 'b, 'c) t[@local_opt]) @ shared -> (int array[@local_opt]) -> 'a
+       (('a, 'b, 'c) t[@local_opt]) @ read shared
+       -> (int array[@local_opt])
+       -> 'a
      @@ portable
      = "caml_ba_get_generic"
   external set
@@ -190,7 +192,8 @@ module Genarray = struct
      = "caml_ba_slice"
   external blit
      : ('a : any) ('b : any) ('c : any).
-       (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+       (('a, 'b, 'c) t[@local_opt]) @ read shared
+       -> (('a, 'b, 'c) t[@local_opt])
        -> unit
      @@ portable
      = "caml_ba_blit"
@@ -224,7 +227,7 @@ module Array0 = struct
 
   external blit
     : ('a : any) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      (('a, 'b, 'c) t[@local_opt]) @ read shared -> (('a, 'b, 'c) t[@local_opt])
       -> unit
     @@ portable
     = "caml_ba_blit"
@@ -246,7 +249,7 @@ module Array1 = struct
     Genarray.create kind layout [|dim|]
   external get
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> ('a[@local_opt])
+      (('a, 'b, 'c) t[@local_opt]) @ read shared -> int -> ('a[@local_opt])
     @@ portable
     = "%caml_ba_ref_1"
   external set
@@ -256,7 +259,7 @@ module Array1 = struct
     = "%caml_ba_set_1"
   external unsafe_get
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> ('a[@local_opt])
+      (('a, 'b, 'c) t[@local_opt]) @ read shared -> int -> ('a[@local_opt])
     @@ portable
     = "%caml_ba_unsafe_ref_1"
   external unsafe_set
@@ -298,7 +301,7 @@ module Array1 = struct
     | Fortran_layout -> (Genarray.slice_right a [|n|]: (a, b, c) Genarray.t)
   external blit
     : ('a : any) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      (('a, 'b, 'c) t[@local_opt]) @ read shared -> (('a, 'b, 'c) t[@local_opt])
       -> unit
     @@ portable
     = "caml_ba_blit"
@@ -334,7 +337,10 @@ module Array2 = struct
     Genarray.create kind layout [|dim1; dim2|]
   external get
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> ('a[@local_opt])
+      (('a, 'b, 'c) t[@local_opt]) @ read shared
+      -> int
+      -> int
+      -> ('a[@local_opt])
     @@ portable
     = "%caml_ba_ref_2"
   external set
@@ -344,7 +350,10 @@ module Array2 = struct
     = "%caml_ba_set_2"
   external unsafe_get
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> ('a[@local_opt])
+      (('a, 'b, 'c) t[@local_opt]) @ read shared
+      -> int
+      -> int
+      -> ('a[@local_opt])
     @@ portable
     = "%caml_ba_unsafe_ref_2"
   external unsafe_set
@@ -390,7 +399,7 @@ module Array2 = struct
   let slice_right a n = Genarray.slice_right a [|n|]
   external blit
     : ('a : any) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      (('a, 'b, 'c) t[@local_opt]) @ read shared -> (('a, 'b, 'c) t[@local_opt])
       -> unit
     @@ portable
     = "caml_ba_blit"
@@ -443,7 +452,7 @@ module Array3 = struct
     Genarray.create kind layout [|dim1; dim2; dim3|]
   external get
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> int
+      (('a, 'b, 'c) t[@local_opt]) @ read shared -> int -> int -> int
       -> ('a[@local_opt])
     @@ portable
     = "%caml_ba_ref_3"
@@ -455,7 +464,7 @@ module Array3 = struct
      = "%caml_ba_set_3"
   external unsafe_get
      : ('a : value_or_null) ('b : any) ('c : any).
-       (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> int
+       (('a, 'b, 'c) t[@local_opt]) @ read shared -> int -> int -> int
        -> ('a[@local_opt])
      @@ portable
      = "%caml_ba_unsafe_ref_3"
@@ -509,8 +518,9 @@ module Array3 = struct
   let slice_right_2 a n = Genarray.slice_right a [|n|]
   external blit
     : ('a : any) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) ->
-      unit
+      (('a, 'b, 'c) t[@local_opt]) @ read shared
+      -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     @@ portable
     = "caml_ba_blit"
   external fill
