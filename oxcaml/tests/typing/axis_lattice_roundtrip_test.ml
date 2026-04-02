@@ -1,5 +1,24 @@
 open Axis_lattice
 
+module Opposite (L : Mode_intf.Lattice) : Mode_intf.Lattice with type t = L.t =
+struct
+  type t = L.t
+
+  let min = L.max
+
+  let max = L.min
+
+  let le a b = L.le b a
+
+  let equal = L.equal
+
+  let join = L.meet
+
+  let meet = L.join
+
+  let print = L.print
+end
+
 type sample =
   { areality : Mode.Regionality.Const.t;
     linearity : Mode.Linearity.Const.t;
@@ -43,9 +62,7 @@ let lattice_of_sample sample =
 
 let base_samples = [sample_of_lattice bot; sample_of_lattice top]
 
-let base_bot_sample = sample_of_lattice bot
-
-let check_roundtrip label sample =
+let check_lattic_roundtrip label sample =
   let roundtripped = sample_of_lattice (lattice_of_sample sample) in
   if roundtripped <> sample
   then failwith (Format.asprintf "axis roundtrip failed: %s" label)
@@ -91,135 +108,74 @@ let mod_bounds_of_sample sample =
     ~externality:sample.externality ~nullability:sample.nullability
     ~separability:sample.separability
 
-let check_values label update values =
-  List.iter
-    (fun value ->
-      List.iter
-        (fun base_sample -> check_roundtrip label (update base_sample value))
-        base_samples)
-    values
+let check_mod_bounds_roundtrip label sample =
+  let bounds = mod_bounds_of_sample sample in
+  let roundtripped =
+    bounds |> Btype.Jkind0.Mod_bounds.to_axis_lattice
+    |> Btype.Jkind0.Mod_bounds.of_axis_lattice
+  in
+  if not (Btype.Jkind0.Mod_bounds.equal bounds roundtripped)
+  then failwith (Format.asprintf "mod_bounds roundtrip failed: %s" label)
 
-let check_mod_bounds_roundtrip label update values =
+let check_roundtripping label update values =
   List.iter
     (fun value ->
       List.iter
         (fun base_sample ->
           let sample = update base_sample value in
-          let bounds = mod_bounds_of_sample sample in
-          let roundtripped =
-            bounds |> Btype.Jkind0.Mod_bounds.to_axis_lattice
-            |> Btype.Jkind0.Mod_bounds.of_axis_lattice
-          in
-          if not (Btype.Jkind0.Mod_bounds.equal bounds roundtripped)
-          then
-            failwith (Format.asprintf "mod_bounds roundtrip failed: %s" label))
+          check_lattic_roundtrip label sample;
+          check_mod_bounds_roundtrip label sample)
         base_samples)
     values
 
-let level_of_statefulness = function
-  | Mode.Statefulness.Const.Stateless -> 0
-  | Mode.Statefulness.Const.Writing -> 1
-  | Mode.Statefulness.Const.Reading -> 2
-  | Mode.Statefulness.Const.Stateful -> 3
+let co_sub_reference_impl (type t)
+    (module Axis : Mode_intf.Lattice with type t = t) (all_values : t list)
+    (a : t) (b : t) =
+  (* co_sub(a, b) = meet { c | a <= join(b, c) } *)
+  List.fold_left
+    (fun acc c -> if Axis.le a (Axis.join b c) then Axis.meet acc c else acc)
+    Axis.max all_values
 
-let statefulness_of_level = function
-  | 0 -> Mode.Statefulness.Const.Stateless
-  | 1 -> Mode.Statefulness.Const.Writing
-  | 2 -> Mode.Statefulness.Const.Reading
-  | 3 -> Mode.Statefulness.Const.Stateful
-  | _ -> invalid_arg "statefulness_of_level"
-
-let level_of_visibility = function
-  | Mode.Visibility.Const.Immutable -> 0
-  | Mode.Visibility.Const.Read -> 1
-  | Mode.Visibility.Const.Write -> 2
-  | Mode.Visibility.Const.Read_write -> 3
-
-let visibility_of_level = function
-  | 0 -> Mode.Visibility.Const.Immutable
-  | 1 -> Mode.Visibility.Const.Read
-  | 2 -> Mode.Visibility.Const.Write
-  | 3 -> Mode.Visibility.Const.Read_write
-  | _ -> invalid_arg "visibility_of_level"
-
-let statefulness_co_sub lhs rhs =
-  statefulness_of_level
-    (level_of_statefulness lhs land (lnot (level_of_statefulness rhs) land 0b11))
-
-let visibility_co_sub lhs rhs =
-  visibility_of_level
-    (level_of_visibility lhs land (lnot (level_of_visibility rhs) land 0b11))
-
-let check_statefulness_laws () =
-  let values =
-    [ Mode.Statefulness.Const.Stateless;
-      Mode.Statefulness.Const.Writing;
-      Mode.Statefulness.Const.Reading;
-      Mode.Statefulness.Const.Stateful ]
-  in
+let check_operations (type t) (module Axis : Mode_intf.Lattice with type t = t)
+    label update extract (all_values : t list) =
   List.iter
     (fun lhs_value ->
       List.iter
         (fun rhs_value ->
-          let lhs =
-            lattice_of_sample { base_bot_sample with statefulness = lhs_value }
-          in
-          let rhs =
-            lattice_of_sample { base_bot_sample with statefulness = rhs_value }
-          in
-          let expect_value op_name actual expected =
-            if actual <> expected
-            then failwith (Format.asprintf "statefulness %s mismatch" op_name)
-          in
-          expect_value "join"
-            (statefulness (join lhs rhs))
-            (Mode.Statefulness.Const.join lhs_value rhs_value);
-          expect_value "meet"
-            (statefulness (meet lhs rhs))
-            (Mode.Statefulness.Const.meet lhs_value rhs_value);
-          expect_value "co_sub"
-            (statefulness (co_sub lhs rhs))
-            (statefulness_co_sub lhs_value rhs_value);
-          let expected_leq = Mode.Statefulness.Const.le lhs_value rhs_value in
-          if leq lhs rhs <> expected_leq
-          then failwith "statefulness leq mismatch")
-        values)
-    values
+          List.iter
+            (fun base_sample ->
+              let lhs = lattice_of_sample (update base_sample lhs_value) in
+              let rhs = lattice_of_sample (update base_sample rhs_value) in
+              let expect_value op_name actual expected =
+                if not (Axis.equal actual expected)
+                then
+                  failwith
+                    (Format_doc.asprintf
+                       "%s %s mismatch; expected=%a, actual=%a (lhs=%a, rhs=%a)"
+                       label op_name Axis.print expected Axis.print actual
+                       Axis.print lhs_value Axis.print rhs_value)
+              in
+              expect_value "join"
+                (extract (join lhs rhs))
+                (Axis.join lhs_value rhs_value);
+              expect_value "meet"
+                (extract (meet lhs rhs))
+                (Axis.meet lhs_value rhs_value);
+              expect_value "co_sub"
+                (extract (co_sub lhs rhs))
+                (co_sub_reference_impl
+                   (module Axis)
+                   all_values lhs_value rhs_value);
+              let expected_leq = Axis.le lhs_value rhs_value in
+              if leq lhs rhs <> expected_leq
+              then failwith "statefulness leq mismatch")
+            base_samples)
+        all_values)
+    all_values
 
-let check_visibility_laws () =
-  let values =
-    [ Mode.Visibility.Const.Immutable;
-      Mode.Visibility.Const.Read;
-      Mode.Visibility.Const.Write;
-      Mode.Visibility.Const.Read_write ]
-  in
-  List.iter
-    (fun lhs_value ->
-      List.iter
-        (fun rhs_value ->
-          let lhs =
-            lattice_of_sample { base_bot_sample with visibility = lhs_value }
-          in
-          let rhs =
-            lattice_of_sample { base_bot_sample with visibility = rhs_value }
-          in
-          let expect_value op_name actual expected =
-            if actual <> expected
-            then failwith (Format.asprintf "visibility %s mismatch" op_name)
-          in
-          expect_value "join"
-            (visibility (join lhs rhs))
-            (Mode.Visibility.Const.meet lhs_value rhs_value);
-          expect_value "meet"
-            (visibility (meet lhs rhs))
-            (Mode.Visibility.Const.join lhs_value rhs_value);
-          expect_value "co_sub"
-            (visibility (co_sub lhs rhs))
-            (visibility_co_sub lhs_value rhs_value);
-          let expected_leq = Mode.Visibility.Const.le rhs_value lhs_value in
-          if leq lhs rhs <> expected_leq then failwith "visibility leq mismatch")
-        values)
-    values
+let check_axis axis label update extract all_values =
+  check_roundtripping label update all_values;
+  check_operations axis label update extract all_values
 
 let all_axis_sets =
   List.fold_right
@@ -290,72 +246,97 @@ let check_of_axis_set () =
     all_axis_sets
 
 let () =
-  check_values "areality"
+  check_axis
+    (module Mode.Regionality.Const)
+    "areality"
     (fun sample areality -> { sample with areality })
+    areality
     [ Mode.Regionality.Const.Global;
       Mode.Regionality.Const.Regional;
       Mode.Regionality.Const.Local ];
-  check_values "linearity"
+  check_axis
+    (module Mode.Linearity.Const)
+    "linearity"
     (fun sample linearity -> { sample with linearity })
+    linearity
     [Mode.Linearity.Const.Many; Mode.Linearity.Const.Once];
-  check_values "uniqueness"
+  check_axis
+    (module Opposite (Mode.Uniqueness.Const))
+    "uniqueness"
     (fun sample uniqueness -> { sample with uniqueness })
+    uniqueness
     [Mode.Uniqueness.Const.Unique; Mode.Uniqueness.Const.Aliased];
-  check_values "portability"
+  check_axis
+    (module Mode.Portability.Const)
+    "portability"
     (fun sample portability -> { sample with portability })
+    portability
     [ Mode.Portability.Const.Portable;
       Mode.Portability.Const.Shareable;
       Mode.Portability.Const.Nonportable ];
-  check_values "contention"
+  check_axis
+    (module Opposite (Mode.Contention.Const))
+    "contention"
     (fun sample contention -> { sample with contention })
+    contention
     [ Mode.Contention.Const.Uncontended;
       Mode.Contention.Const.Shared;
       Mode.Contention.Const.Contended ];
-  check_values "forkable"
+  check_axis
+    (module Mode.Forkable.Const)
+    "forkable"
     (fun sample forkable -> { sample with forkable })
+    forkable
     [Mode.Forkable.Const.Forkable; Mode.Forkable.Const.Unforkable];
-  check_values "yielding"
+  check_axis
+    (module Mode.Yielding.Const)
+    "yielding"
     (fun sample yielding -> { sample with yielding })
+    yielding
     [Mode.Yielding.Const.Unyielding; Mode.Yielding.Const.Yielding];
-  check_values "statefulness"
+  check_axis
+    (module Mode.Statefulness.Const)
+    "statefulness"
     (fun sample statefulness -> { sample with statefulness })
+    statefulness
     [ Mode.Statefulness.Const.Stateless;
       Mode.Statefulness.Const.Writing;
       Mode.Statefulness.Const.Reading;
       Mode.Statefulness.Const.Stateful ];
-  check_values "visibility"
+  check_axis
+    (module Opposite (Mode.Visibility.Const))
+    "visibility"
     (fun sample visibility -> { sample with visibility })
+    visibility
     [ Mode.Visibility.Const.Immutable;
       Mode.Visibility.Const.Read;
       Mode.Visibility.Const.Write;
       Mode.Visibility.Const.Read_write ];
-  check_mod_bounds_roundtrip "statefulness"
-    (fun sample statefulness -> { sample with statefulness })
-    [ Mode.Statefulness.Const.Stateless;
-      Mode.Statefulness.Const.Writing;
-      Mode.Statefulness.Const.Reading;
-      Mode.Statefulness.Const.Stateful ];
-  check_mod_bounds_roundtrip "visibility"
-    (fun sample visibility -> { sample with visibility })
-    [ Mode.Visibility.Const.Immutable;
-      Mode.Visibility.Const.Read;
-      Mode.Visibility.Const.Write;
-      Mode.Visibility.Const.Read_write ];
-  check_statefulness_laws ();
-  check_visibility_laws ();
-  check_values "staticity"
+  check_axis
+    (module Opposite (Mode.Staticity.Const))
+    "staticity"
     (fun sample staticity -> { sample with staticity })
+    staticity
     [Mode.Staticity.Static; Mode.Staticity.Dynamic];
-  check_values "externality"
+  check_axis
+    (module Jkind_axis.Externality)
+    "externality"
     (fun sample externality -> { sample with externality })
+    externality
     [ Jkind_axis.Externality.External;
       Jkind_axis.Externality.External64;
       Jkind_axis.Externality.Internal ];
-  check_values "nullability"
+  check_axis
+    (module Jkind_axis.Nullability)
+    "nullability"
     (fun sample nullability -> { sample with nullability })
+    nullability
     [Jkind_axis.Nullability.Non_null; Jkind_axis.Nullability.Maybe_null];
-  check_values "separability"
+  check_axis
+    (module Jkind_axis.Separability)
+    "separability"
     (fun sample separability -> { sample with separability })
+    separability
     [ Jkind_axis.Separability.Non_float;
       Jkind_axis.Separability.Separable;
       Jkind_axis.Separability.Maybe_separable ];
