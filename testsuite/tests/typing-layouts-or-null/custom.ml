@@ -229,21 +229,31 @@ Error: Invalid [@or_null] declaration:
        GADT constructors are not supported with [@@or_null].
 |}]
 
-type ('a : value_or_null) bad_jkind =
+type ('a : value_or_null) widened_bad_jkind =
   | A
   | B of 'a
 [@@or_null]
 
 [%%expect{|
-Line 1, characters 6-24:
-1 | type ('a : value_or_null) bad_jkind =
-          ^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a" is value_or_null
-         because of the annotation on 'a in the declaration of the type
-                                      bad_jkind.
-       But the kind of type "'a" must be a subkind of
-           value_or_null mod non_null
-         because the type argument of bad_jkind has kind value.
+type ('a : value_or_null mod non_null) widened_bad_jkind = A | B of 'a [@@or_null]
+|}]
+
+type ('a : any) widened_any : value_or_null =
+  | A
+  | B of 'a
+[@@or_null]
+
+[%%expect{|
+type ('a : value_or_null mod non_null) widened_any = A | B of 'a [@@or_null]
+|}]
+
+type ('a : value_or_null) widened_nullable : value_or_null =
+  | A
+  | B of 'a
+[@@or_null]
+
+[%%expect{|
+type ('a : value_or_null mod non_null) widened_nullable = A | B of 'a [@@or_null]
 |}]
 
 type ('a : value) wrong_result_kind : value =
@@ -276,7 +286,7 @@ Line 1, characters 6-18:
 Error: The layout of type "'a" is float64
          because of the annotation on 'a in the declaration of the type
                                       wrong_payload_kind.
-       But the layout of type "'a" must be a sublayout of value
+       But the layout of type "'a" must overlap with value
          because the type argument of wrong_payload_kind has layout value.
 |}]
 

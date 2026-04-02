@@ -1011,18 +1011,13 @@ let transl_declaration env sdecl (id, uid) =
         if custom_or_null then begin
           check_or_null_variant_shape path params sdecl scstrs;
           match sdecl.ptype_params, params with
-          | [({ ptyp_desc = Ptyp_var (_, jkind_annot);
+          | [({ ptyp_desc = Ptyp_var (_, _);
                 ptyp_loc;
                 _
               }, _)],
             [param] ->
             let required = Btype.Jkind0.for_or_null_argument id in
-            let check =
-              match jkind_annot with
-              | None -> Ctype.constrain_type_jkind env param required
-              | Some _ -> Ctype.check_type_jkind env param required
-            in
-            begin match check with
+            begin match Ctype.constrain_type_jkind env param required with
             | Ok () -> ()
             | Error err ->
               raise
