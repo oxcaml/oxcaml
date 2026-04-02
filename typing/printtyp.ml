@@ -27,31 +27,36 @@ module Doc = struct
   let ident ppf id = Fmt.pp_print_string ppf
       (Out_name.print (ident_name None id))
 
-let instance_name global =
-  (* Construct the stopgap syntax and then shove it in a string with the
-     attribute after it. *)
-  (* CR lmaurer: This is hacky and it loses the state of the [out_name]s that
-     comprise the [out_ident]. Should presumably have a new constructor for
-     [out_ident] instead? *)
-  let rec string_of_global global =
-    (* We can avoid calling [ident_name_simple] here because instance names are
-       always global (which is bad - but the syntax is currently bad anyway) *)
-    let ({ head; args } : Global_module.Name.t) = global in
-    String.concat "" (head :: List.map string_of_arg args)
-  and string_of_arg arg =
-    let ({ param; value } : Global_module.Name.argument) = arg in
-    Printf.sprintf "(%s)(%s)"
-      (Global_module.Parameter_name.to_string param) (string_of_global value)
-  in
-  let printed_name =
-    string_of_global global ^ " [@jane.non_erasable.instances]"
-  in
-  { printed_name }
-
-
+  (* let instance_name global =
+   *   (* Construct the stopgap syntax and then shove it in a string with the
+   *     attribute after it. *)
+   *   (* CR lmaurer: This is hacky and it loses the state of the [out_name]s that
+   *     comprise the [out_ident]. Should presumably have a new constructor for
+   *     [out_ident] instead? *)
+   *   let rec string_of_global global =
+   *     (* We can avoid calling [ident_name_simple] here because instance names are
+   *       always global (which is bad - but the syntax is currently bad anyway) *)
+   *     let ({ head; args } : Global_module.Name.t) = global in
+   *     String.concat "" (head :: List.map string_of_arg args)
+   *   and string_of_arg arg =
+   *     let ({ param; value } : Global_module.Name.argument) = arg in
+   *     Printf.sprintf "(%s)(%s)"
+   *       (Global_module.Parameter_name.to_string param) (string_of_global value)
+   *   in
+   *   let printed_name =
+   *     string_of_global global ^ " [@jane.non_erasable.instances]"
+   *   in
+   *   { printed_name } *)
 
   let typexp mode ppf ty =
     !Oprint.out_type ppf (tree_of_typexp mode ty)
+
+  let modality ?(id = fun _ppf () -> ()) ax ppf modality =
+    if Mode.Modality.Per_axis.is_id ax modality then
+      id ppf ()
+    else
+      Fmt.asprintf "%a" (Mode.Modality.Per_axis.print ax) modality
+      |> !Oprint.out_modality ppf
 
   let type_expansion k ppf e =
     pp_type_expansion ppf (trees_of_type_expansion k e)
@@ -157,6 +162,10 @@ let longident = Fmt.compat longident
 let path = Fmt.compat path
 let type_path = Fmt.compat type_path
 let type_expr = Fmt.compat type_expr
+
+let modality ?id ax =
+  Fmt.compat (modality ?id:(Option.map Fmt.deprecated id) ax)
+
 let type_scheme = Fmt.compat type_scheme
 let shared_type_scheme = Fmt.compat shared_type_scheme
 
@@ -177,50 +186,30 @@ let class_declaration = Fmt.compat1 class_declaration
 let class_type = Fmt.compat class_type
 let cltype_declaration = Fmt.compat1 cltype_declaration
 
+(* CR rtjoa: where to put *)
+(** Compatibility module for Format printers *)
+(* module Compat = struct
+ *   let longident = Fmt.compat longident
+ *   let path = Fmt.compat path
+ *   let type_expr = Fmt.compat type_expr
+ *   let shared_type_scheme = Fmt.compat shared_type_scheme
+ *   let signature = Fmt.compat signature
+ *   let class_type = Fmt.compat class_type
+ *   let modtype = Fmt.compat modtype
+ *   let string_of_label (lbl : Asttypes.arg_label) =
+ *     let lbl : Types.arg_label = match lbl with
+ *       | Nolabel -> Nolabel
+ *       | Labelled s -> Labelled s
+ *       | Optional s -> Optional s
+ *     in
+ *     string_of_label lbl
+ * end *)
+
 (* Print a signature body (used by -i when compiling a .ml) *)
 let printed_signature sourcefile ppf sg =
   (* we are tracking any collision event for warning 63 *)
   Ident_conflicts.reset ();
   let t = tree_of_signature sg in
-<<<<<<< oxcaml
-  if Warnings.(is_active @@ Erroneous_printed_signature "")
-  && Conflicts.exists ()
-  then begin
-    let conflicts = Format_doc.asprintf "%t" Conflicts.print_explanations in
-    Location.prerr_warning (Location.in_file sourcefile)
-      (Warnings.Erroneous_printed_signature conflicts);
-    Warnings.check_fatal ()
-  end;
-  compat print_signature ppf t
-
-(** Compatibility module for Format printers *)
-module Compat = struct
-  let longident = Fmt.compat longident
-  let path = Fmt.compat path
-  let type_expr = Fmt.compat type_expr
-  let shared_type_scheme = Fmt.compat shared_type_scheme
-  let signature = Fmt.compat signature
-  let class_type = Fmt.compat class_type
-  let modtype = Fmt.compat modtype
-  let string_of_label (lbl : Asttypes.arg_label) =
-    let lbl : Types.arg_label = match lbl with
-      | Nolabel -> Nolabel
-      | Labelled s -> Labelled s
-      | Optional s -> Optional s
-    in
-    string_of_label lbl
-end
-||||||| upstream-base
-  if Warnings.(is_active @@ Erroneous_printed_signature "")
-  && Conflicts.exists ()
-  then begin
-    let conflicts = Format.asprintf "%t" Conflicts.print_explanations in
-    Location.prerr_warning (Location.in_file sourcefile)
-      (Warnings.Erroneous_printed_signature conflicts);
-    Warnings.check_fatal ()
-  end;
-  fprintf ppf "%a" print_signature t
-=======
   if Warnings.(is_active @@ Erroneous_printed_signature "") then
     begin match Ident_conflicts.err_msg () with
     | None -> ()
@@ -231,4 +220,6 @@ end
         Warnings.check_fatal ()
     end;
   Fmt.compat print_signature ppf t
->>>>>>> upstream-incoming
+
+(* CR rtjoa: move? *)
+let () = Jkind.set_printtyp_path path
