@@ -196,7 +196,7 @@ let check_or_null_variant_shape _path params sdecl scstrs =
   end;
   let param_name =
     match sdecl.ptype_params, params with
-    | [({ ptyp_desc = Ptyp_var (name, _); _ }, _)], [param] -> name, param
+    | [({ ptyp_desc = Ptyp_var (name, _); _ }, _)], [_] -> name
     | [_], [_] ->
       bad "its single type parameter must be written as a type variable"
     | _ ->
@@ -219,9 +219,8 @@ let check_or_null_variant_shape _path params sdecl scstrs =
       | Pcstr_tuple
           [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }],
         Pcstr_tuple [] ->
-        if String.equal name (fst param_name)
-        then snd param_name
-        else bad "its payload constructor must carry the sole type parameter"
+        if not (String.equal name param_name) then
+          bad "its payload constructor must carry the sole type parameter"
       | _ ->
         bad
           "it must have exactly one nullary constructor and one unary \
@@ -234,8 +233,7 @@ let check_or_null_variant_shape _path params sdecl scstrs =
   | Private ->
     bad "private types are not supported with [@@or_null]"
   | Public ->
-    let _payload_param = find_constructors scstrs in
-    ()
+    find_constructors scstrs
 
 (* [make_params] creates sort variables - these can be defaulted away (as in
    transl_type_decl) or unified with existing sort-variable-free types (as in
