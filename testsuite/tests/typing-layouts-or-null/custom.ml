@@ -279,3 +279,163 @@ Error: The layout of type "'a" is float64
        But the layout of type "'a" must be a sublayout of value
          because the type argument of wrong_payload_kind has layout value.
 |}]
+
+module M : sig
+  type 'a t
+end = struct
+  type ('a : value) t : value_or_null =
+    | Nope
+    | Yep of 'a
+  [@@or_null]
+end
+
+[%%expect{|
+Lines 3-8, characters 6-3:
+3 | ......struct
+4 |   type ('a : value) t : value_or_null =
+5 |     | Nope
+6 |     | Yep of 'a
+7 |   [@@or_null]
+8 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = Nope | Yep of 'a [@@or_null] end
+       is not included in
+         sig type 'a t end
+       Type declarations do not match:
+         type 'a t = Nope | Yep of 'a [@@or_null]
+       is not included in
+         type 'a t
+       The kind of the first is value_or_null
+         because of the definition of t at lines 4-7, characters 2-13.
+       But the kind of the first must be a subkind of value
+         because of the definition of t at line 2, characters 2-11.
+|}]
+
+module M : sig
+  type ('a : value) t : value_or_null
+end = struct
+  type ('a : value) t : value_or_null =
+    | Nope
+    | Yep of 'a
+  [@@or_null]
+end
+
+[%%expect{|
+module M : sig type 'a t : value_or_null end
+|}]
+
+module M : sig
+  type ('a : value) t =
+    | Nope
+    | Yep of 'a
+end = struct
+  type ('a : value) t : value_or_null =
+    | Nope
+    | Yep of 'a
+  [@@or_null]
+end
+
+[%%expect{|
+Lines 5-10, characters 6-3:
+ 5 | ......struct
+ 6 |   type ('a : value) t : value_or_null =
+ 7 |     | Nope
+ 8 |     | Yep of 'a
+ 9 |   [@@or_null]
+10 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = Nope | Yep of 'a [@@or_null] end
+       is not included in
+         sig type 'a t = Nope | Yep of 'a end
+       Type declarations do not match:
+         type 'a t = Nope | Yep of 'a [@@or_null]
+       is not included in
+         type 'a t = Nope | Yep of 'a
+       Their internal representations differ:
+       the first declaration has a constructor represented as a null pointer.
+       Hint: add [@@or_null] or [@@or_null_reexport].
+|}]
+
+module M : sig
+  type ('a : value) t : value_or_null =
+    | Nope
+    | Yep of 'a
+  [@@or_null]
+end = struct
+  type ('a : value) t : value_or_null =
+    | Nope
+    | Yep of 'a
+  [@@or_null]
+end
+
+[%%expect{|
+module M : sig type 'a t = Nope | Yep of 'a [@@or_null] end
+|}]
+
+module M : sig
+  type ('a : value) t : value_or_null =
+    | Nope
+    | Yep of 'a
+  [@@or_null]
+end = struct
+  type ('a : value) t =
+    | Nope
+    | Yep of 'a
+end
+
+[%%expect{|
+Lines 6-10, characters 6-3:
+ 6 | ......struct
+ 7 |   type ('a : value) t =
+ 8 |     | Nope
+ 9 |     | Yep of 'a
+10 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = Nope | Yep of 'a end
+       is not included in
+         sig type 'a t = Nope | Yep of 'a [@@or_null] end
+       Type declarations do not match:
+         type 'a t = Nope | Yep of 'a
+       is not included in
+         type 'a t = Nope | Yep of 'a [@@or_null]
+       Their internal representations differ:
+       the second declaration has a constructor represented as a null pointer.
+       Hint: add [@@or_null] or [@@or_null_reexport].
+|}]
+
+(* CR or-null: allow re-exporting custom [@@or_null] types. *)
+
+module M : sig
+  type ('a : value) t1 : value_or_null =
+    | Nope
+    | Yep of 'a
+  [@@or_null]
+
+  type ('a : value) t2 = 'a t1 =
+    | Nope
+    | Yep of 'a
+  [@@or_null]
+end = struct
+  type ('a : value) t1 : value_or_null =
+    | Nope
+    | Yep of 'a
+  [@@or_null]
+
+  type ('a : value) t2 = 'a t1 =
+    | Nope
+    | Yep of 'a
+  [@@or_null]
+end
+
+[%%expect{|
+Lines 17-20, characters 2-13:
+17 | ..type ('a : value) t2 = 'a t1 =
+18 |     | Nope
+19 |     | Yep of 'a
+20 |   [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must define a fresh variant, not an alias with an explicit manifest.
+|}]
