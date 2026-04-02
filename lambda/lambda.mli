@@ -1277,13 +1277,17 @@ val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
 val block_shape_of_value_kinds : value_kind list option -> block_shape
 
+(* Returns whether a mixed block element contains only values (or void).
+   Products of values and empty products (void) are considered value-like. *)
+val is_value_or_void_element : _ mixed_block_element -> bool
+
 (* Returns whether the block shape represents a block containing only values.
    Errors if there's a splice variable *)
 val is_uniform_block_shape : block_shape -> bool
 
-(* Returns [None] if contains all values,
-   returns the [mixed_block_shape] if it has at least one non-value.
-   Errors if there's a splice variable *)
+(* Returns [None] if contains all values (including products of values
+   and void), returns the [mixed_block_shape] if it has at least one
+   non-value. Errors if there's a splice variable *)
 val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
 
 val transl_mixed_product_shape_for_read :

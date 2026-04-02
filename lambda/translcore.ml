@@ -548,6 +548,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             | exception Not_constant -> None
             | constants -> (
               match cstr.cstr_shape with
+              | Constructor_mixed shape
+                when Types.mixed_product_shape_is_all_value_or_void shape ->
+                  Some (Const_block(runtime_tag, constants))
               | Constructor_mixed shape ->
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
@@ -2222,6 +2225,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lconst(match cl with [v] -> v | _ -> assert false)
         | Record_float ->
             Lconst(Const_float_block(List.map extract_float cl))
+        | Record_mixed shape
+          when Types.mixed_product_shape_is_all_value_or_void shape ->
+            Lconst(Const_block(0, cl))
         | Record_mixed shape ->
             if !Clflags.native_code then
               let shape = Lambda.transl_mixed_product_shape shape in
@@ -2231,6 +2237,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  be supported in bytecode. See symtable.ml for the difficulty.
               *)
               raise Not_constant
+        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+          when Types.mixed_product_shape_is_all_value_or_void shape ->
+            Lconst(Const_block(0, cl))
         | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
         | Record_ufloat ->
             (* CR layouts v5.1: We should support structured constants for
