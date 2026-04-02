@@ -33,7 +33,10 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
         } =
     Traverse.run unit
   in
-  let solved_dep = Dep_solver.fixpoint deps in
+  let solved_dep =
+    Profile.record_call ~accumulate:true "solver" (fun () ->
+        Dep_solver.fixpoint deps)
+  in
   let () =
     if debug_print
     then (
