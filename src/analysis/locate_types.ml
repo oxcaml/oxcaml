@@ -78,6 +78,8 @@ let rec create_type_tree ty : Type_tree.t =
     in
     { data = Poly_variant; children }
   | Tquote_eval ty ->
+    (* CR-someday liam923: Use a different constructor than Type_ref to represent this
+       case. *)
     let ty_without_args =
       Btype.newgenty (Tconstr (Predef.path_eval, [], ref Types.Mnil))
     in
@@ -85,7 +87,10 @@ let rec create_type_tree ty : Type_tree.t =
     { data = Type_ref { path = Predef.path_eval; ty = ty_without_args };
       children
     }
-  | Tquote ty -> create_type_tree ty
+  | Tquote ty ->
+    (* CR-someday liam923: Wrap this in something to indicate that it's inside a
+       Tquote. *)
+    create_type_tree ty
   | Tnil
   | Tvar _
   | Tsubst _
