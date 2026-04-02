@@ -194,7 +194,7 @@ let check_or_null_variant_shape _path params sdecl scstrs =
   | Some _ ->
     bad "it must define a fresh variant, not an alias with an explicit manifest"
   end;
-  let param_name =
+  let type_param_name =
     match sdecl.ptype_params, params with
     | [({ ptyp_desc = Ptyp_var (name, _); _ }, _)], [_] -> name
     | [_], [_] ->
@@ -208,7 +208,7 @@ let check_or_null_variant_shape _path params sdecl scstrs =
     | Some _ ->
       bad "GADT constructors are not supported with [@@or_null]"
   in
-  let find_constructors = function
+  let check_constructors = function
     | [c1; c2] ->
       check_no_gadt c1;
       check_no_gadt c2;
@@ -219,7 +219,7 @@ let check_or_null_variant_shape _path params sdecl scstrs =
       | Pcstr_tuple
           [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }],
         Pcstr_tuple [] ->
-        if not (String.equal name param_name) then
+        if not (String.equal name type_param_name) then
           bad "its payload constructor must carry the sole type parameter"
       | _ ->
         bad
@@ -233,7 +233,7 @@ let check_or_null_variant_shape _path params sdecl scstrs =
   | Private ->
     bad "private types are not supported with [@@or_null]"
   | Public ->
-    find_constructors scstrs
+    check_constructors scstrs
 
 (* [make_params] creates sort variables - these can be defaulted away (as in
    transl_type_decl) or unified with existing sort-variable-free types (as in
