@@ -19,12 +19,7 @@ open Path
 open Asttypes
 open Parsetree
 open Types
-<<<<<<< oxcaml
 open Mode
-||||||| upstream-base
-open Format
-=======
->>>>>>> upstream-incoming
 open Format_doc
 
 module Style = Misc.Style
@@ -94,7 +89,7 @@ type error =
   | Invalid_type_subst_rhs
   | Non_packable_local_modtype_subst of Path.t
   | With_cannot_remove_packed_modtype of Path.t * module_type
-<<<<<<< oxcaml
+  | Cannot_alias of Path.t
   | Strengthening_mismatch of Longident.t * Includemod.explanation
   | Cannot_pack_parameter
   | Compiling_as_parameterised_parameter
@@ -108,10 +103,6 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
-||||||| upstream-base
-=======
-  | Cannot_alias of Path.t
->>>>>>> upstream-incoming
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -484,7 +475,6 @@ let path_is_strict_prefix =
        Ident.same ident1 ident2
        && list_is_strict_prefix l1 ~prefix:l2
 
-<<<<<<< oxcaml
 let rec instance_name ~loc env syntax =
   let { pmod_instance_head = head; pmod_instance_args = args } = syntax in
   let args =
@@ -499,10 +489,6 @@ let rec instance_name ~loc env syntax =
   | Error (Duplicate { name; value1 = _; value2 = _ }) ->
     raise (Error (loc, env, Duplicate_parameter_name name))
 
-||||||| upstream-base
-let iterator_with_env env =
-=======
->>>>>>> upstream-incoming
 let iterator_with_env super env =
   let env = ref (lazy env) in
   env, { super with
