@@ -538,7 +538,7 @@ let u (type unused) = ()
 Line 1, characters 12-18:
 1 | let u (type unused) = ()
                 ^^^^^^
-                Warning 34 [unused-type-declaration]: unused type "unused".
+Warning 34 [unused-type-declaration]: unused type "unused".
 
 val u : unit = ()
 |}]
@@ -676,14 +676,14 @@ let f (x1 : int as 'unused1) (x2 : int as 'unused2)
       (x3 : int as 'used1) (x4 : 'used1) (x5 : 'used2) = (x1, x2, x3, x4, x5)
 
 [%%expect{|
-Line 1, characters 19-27:
+Line 1, characters 20-27:
 1 | let f (x1 : int as 'unused1) (x2 : int as 'unused2)
-                       ^^^^^^^^
+                        ^^^^^^^
 Warning 34 [unused-type-declaration]: unused type alias "'unused1".
 
-Line 1, characters 42-50:
+Line 1, characters 43-50:
 1 | let f (x1 : int as 'unused1) (x2 : int as 'unused2)
-                                              ^^^^^^^^
+                                               ^^^^^^^
 Warning 34 [unused-type-declaration]: unused type alias "'unused2".
 
 val f : int -> int -> int -> int -> 'used2 -> int * int * int * int * 'used2 =

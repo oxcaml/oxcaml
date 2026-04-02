@@ -11,8 +11,8 @@ let marray  : int   array = [|1;2;3;4;5|];;
 let mfarray : float array = [|1.5;2.5;3.5;4.5;5.5|];;
 
 [%%expect{|
-val iarray : int iarray = [|1; 2; 3; 4; 5|]
-val ifarray : float iarray = [|1.5; 2.5; 3.5; 4.5; 5.5|]
+val iarray : int iarray = [:1; 2; 3; 4; 5:]
+val ifarray : float iarray = [:1.5; 2.5; 3.5; 4.5; 5.5:]
 val marray : int array = [|1; 2; 3; 4; 5|]
 val mfarray : float array = [|1.5; 2.5; 3.5; 4.5; 5.5|]
 |}];;

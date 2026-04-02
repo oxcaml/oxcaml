@@ -41,8 +41,8 @@ end
 Line 2, characters 2-24:
 2 |   [@@@implicit_kind: 'a]
       ^^^^^^^^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'implicit_kind'.
-implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
+Warning 47 [attribute-payload]: illegal payload for attribute "implicit_kind".
+  implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
 
 module type S1 = sig end
 |}]
@@ -58,8 +58,8 @@ end
 Line 2, characters 2-25:
 2 |   [@@@implicit_kind: int]
       ^^^^^^^^^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'implicit_kind'.
-implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
+Warning 47 [attribute-payload]: illegal payload for attribute "implicit_kind".
+  implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
 
 module type S2 = sig end
 |}]
@@ -89,8 +89,8 @@ end
 Line 2, characters 2-34:
 2 |   [@@@implicit_kind: (_ : bits32)]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'implicit_kind'.
-implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
+Warning 47 [attribute-payload]: illegal payload for attribute "implicit_kind".
+  implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
 
 module type S4 = sig val a : 'a -> 'b end
 |}]

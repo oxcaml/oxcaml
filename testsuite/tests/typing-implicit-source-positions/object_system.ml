@@ -136,7 +136,8 @@ let position = (o ())#pos
 Line 2, characters 10-16:
 2 |   inherit parent call_pos ()
               ^^^^^^
-Warning 6 [labels-omitted]: label call_pos was omitted in the application of this function.
+Warning 6 [labels-omitted]: label "call_pos" was omitted in the application of
+  this function.
 
 val o : call_pos:[%call_pos] -> unit -> parent = <fun>
 val position : lexing_position =

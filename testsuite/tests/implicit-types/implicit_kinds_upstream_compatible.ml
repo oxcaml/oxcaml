@@ -27,7 +27,7 @@ Line 4, characters 2-27:
 4 |   val g : 'elt array -> int
       ^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: Usage of layout immediate/immediate64 in g
-can't be erased for compatibility with upstream OCaml.
+  can't be erased for compatibility with upstream OCaml.
 
 module type S2 = sig val g : ('elt : immediate). 'elt array -> int end
 |}]

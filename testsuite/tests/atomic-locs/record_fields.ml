@@ -17,7 +17,7 @@ module Atomic = struct
   end
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Atomic/288"
+(apply (field_imm 1 (global Toploop!)) "Atomic/292"
   (let (Loc = (makeblock 0)) (makeblock 0 Loc)))
 module Atomic :
   sig
@@ -55,7 +55,7 @@ module Basic = struct
     Atomic.Loc.compare_and_set (get_loc r) oldv newv
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Basic/328"
+(apply (field_imm 1 (global Toploop!)) "Basic/332"
   (let
     (get = (function {nlocal = 0} r (atomic_load_field_ptr r 1))
      get_imm = (function {nlocal = 0} r : int (atomic_load_field_imm r 1))
@@ -190,7 +190,7 @@ end : sig
   type t = { mutable x : int [@atomic] }
 end)
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Ok/363" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Ok/367" (makeblock 0))
 module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
@@ -204,7 +204,7 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record/371"
+(apply (field_imm 1 (global Toploop!)) "Inline_record/375"
   (let
     (test =
        (function {nlocal = 0} param : int (atomic_load_field_imm param 0)))
@@ -226,7 +226,7 @@ module Extension_with_inline_record = struct
   let () = assert (test (A { x = 42 }) = 42)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/379"
+(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/383"
   (let
     (A =
        (makeblock_unique 248 "Extension_with_inline_record.A"
@@ -259,11 +259,11 @@ end
 Line 3, characters 2-53:
 3 |   type t = { x : float; mutable y : float [@atomic] }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 214 [atomic-float-record-boxed]: This record contains atomic
-float fields, which prevents the float record optimization. The
-fields of this record will be boxed instead of being
-represented as a flat float array.
-(apply (field_imm 1 (global Toploop!)) "Float_records/405"
+Warning 214 [atomic-float-record-boxed]: This record contains atomic float fields,
+  which prevents the float record optimization.
+  The fields of this record will be boxed instead of being
+  represented as a flat float array.
+(apply (field_imm 1 (global Toploop!)) "Float_records/409"
   (let
     (mk_flat =
        (function {nlocal = 0} x[value<float>] y[value<float>]
@@ -299,10 +299,10 @@ Lines 1-5, characters 0-1:
 3 |   mutable y : float [@atomic];
 4 |   mutable z : float [@atomic];
 5 | }
-Warning 214 [atomic-float-record-boxed]: This record contains atomic
-float fields, which prevents the float record optimization. The
-fields of this record will be boxed instead of being
-represented as a flat float array.
+Warning 214 [atomic-float-record-boxed]: This record contains atomic float fields,
+  which prevents the float record optimization.
+  The fields of this record will be boxed instead of being
+  represented as a flat float array.
 0
 
 type all_atomic_floats = {
@@ -327,10 +327,10 @@ Lines 1-6, characters 0-1:
 4 |   mutable c : float;
 5 |   mutable d : float [@atomic];
 6 | }
-Warning 214 [atomic-float-record-boxed]: This record contains atomic
-float fields, which prevents the float record optimization. The
-fields of this record will be boxed instead of being
-represented as a flat float array.
+Warning 214 [atomic-float-record-boxed]: This record contains atomic float fields,
+  which prevents the float record optimization.
+  The fields of this record will be boxed instead of being
+  represented as a flat float array.
 0
 
 type mixed_atomic_floats = {
@@ -391,10 +391,10 @@ Lines 1-3, characters 0-1:
 1 | type single_atomic_float = {
 2 |   mutable value : float [@atomic];
 3 | }
-Warning 214 [atomic-float-record-boxed]: This record contains atomic
-float fields, which prevents the float record optimization. The
-fields of this record will be boxed instead of being
-represented as a flat float array.
+Warning 214 [atomic-float-record-boxed]: This record contains atomic float fields,
+  which prevents the float record optimization.
+  The fields of this record will be boxed instead of being
+  represented as a flat float array.
 0
 
 type single_atomic_float = { mutable value : float [@atomic]; }
@@ -426,10 +426,10 @@ Lines 2-4, characters 0-1:
 2 | type not_suppressed_atomic_float = {
 3 |   mutable a : float [@atomic];
 4 | }
-Warning 214 [atomic-float-record-boxed]: This record contains atomic
-float fields, which prevents the float record optimization. The
-fields of this record will be boxed instead of being
-represented as a flat float array.
+Warning 214 [atomic-float-record-boxed]: This record contains atomic float fields,
+  which prevents the float record optimization.
+  The fields of this record will be boxed instead of being
+  represented as a flat float array.
 0
 
 type not_suppressed_atomic_float = { mutable a : float [@atomic]; }
@@ -480,10 +480,10 @@ end
 Line 5, characters 14-19:
 5 |   let warning { x } = x
                   ^^^^^
-Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
-y
-Either bind these labels explicitly or add '; _' to the pattern.
-(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/488"
+Warning 9 [missing-record-field-pattern]: the following labels are not bound
+  in this record pattern: "y".
+  Either bind these labels explicitly or add "; _" to the pattern.
+(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/492"
   (let
     (warning = (function {nlocal = 0} param : int (field_int 0 param))
      allowed = (function {nlocal = 0} param : int (field_int 0 param))

@@ -24,7 +24,7 @@ Line 5, characters 8-9:
             ^
 Warning 32 [unused-value-declaration]: unused value "x".
 
-module M : sig module F2 : U -> U end
+module M : sig module F2 : functor U -> U end
 |}]
 
 module N : sig
@@ -43,7 +43,7 @@ Line 5, characters 8-9:
             ^
 Warning 32 [unused-value-declaration]: unused value "x".
 
-module N : sig module F2 : U -> U end
+module N : sig module F2 : functor U -> U end
 |}]
 
 
@@ -54,5 +54,5 @@ Line 1, characters 25-31:
                              ^^^^^^
 Warning 34 [unused-type-declaration]: unused type "s".
 
-module F : (X : sig type t type s end) -> sig type t = X.t end
+module F : functor (X : sig type t type s end) -> sig type t = X.t end
 |}]

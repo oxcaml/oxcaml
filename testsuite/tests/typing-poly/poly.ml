@@ -1799,7 +1799,7 @@ end
 [%%expect{|
 external reraise : exn -> 'a = "%reraise"
 module M :
-  () ->
+  functor () ->
     sig
       val f : ('a : any). 'a -> 'a
       val g : ('a : any). 'a -> 'a
