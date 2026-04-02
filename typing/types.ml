@@ -964,6 +964,19 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
+let rec mixed_block_element_is_value_or_void
+    (elt : mixed_block_element) : bool =
+  match elt with
+  | Value | Void -> true
+  | Product elts -> Array.for_all mixed_block_element_is_value_or_void elts
+  | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+    false
+
+let mixed_product_shape_is_all_value_or_void
+    (shape : mixed_product_shape) : bool =
+  Array.for_all mixed_block_element_is_value_or_void shape
+
 let find_unboxed_type decl =
   match decl.type_kind with
     Type_record ([{ld_type = arg; ld_modalities = ms; _}], Record_unboxed, _)
