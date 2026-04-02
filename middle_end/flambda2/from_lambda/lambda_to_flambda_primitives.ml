@@ -2095,13 +2095,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           { length = Target_ocaml_int.of_int machine_width num_fields }
       | Record_inlined
           (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
-        when Types.mixed_product_shape_is_all_value_or_void shape ->
+        when Mixed_product_bytes.typing_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
       | Record_mixed shape
-        when Types.mixed_product_shape_is_all_value_or_void shape ->
+        when Mixed_product_bytes.typing_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.zero;
             length = Target_ocaml_int.of_int machine_width num_fields
@@ -2585,7 +2585,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pmixedfield (field_path, shape, sem), [[arg]] ->
     if List.length field_path < 1
     then Misc.fatal_error "Pmixedfield: field_path must be non-empty";
-    let is_uniform = Array.for_all L.is_value_or_void_element shape in
+    let is_uniform = Mixed_product_bytes.shape_is_all_value shape in
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
         ~print_locality:Printlambda.locality_mode
@@ -2671,7 +2671,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[block]; values] ) ->
     if List.length field_path < 1
     then Misc.fatal_error "Psetmixedfield: field_path must be non-empty";
-    let is_uniform = Array.for_all L.is_value_or_void_element shape in
+    let is_uniform = Mixed_product_bytes.shape_is_all_value shape in
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
         ~print_locality:(fun ppf () -> Format.fprintf ppf "()")

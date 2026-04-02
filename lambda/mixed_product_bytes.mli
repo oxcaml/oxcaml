@@ -54,7 +54,17 @@ val add : t -> t -> t
 
 val count : _ Lambda.mixed_block_element -> t
 
+val count_types_shape : Types.mixed_product_shape -> t
+
 val has_value_and_flat : t -> bool
+
+val all_value : t -> bool
+
+val shape_is_all_value : _ Lambda.mixed_block_element array -> bool
+
+val value_prefix_len : t -> int
+
+val typing_shape_is_all_value : Types.mixed_product_shape -> bool
 
 (** A path into a mixed block element (identifying some subelement) can be
     considered to partition the mixed block element into three parts: to the

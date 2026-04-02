@@ -1012,27 +1012,10 @@ module With_subkind = struct
                       ( Scannable Value_only,
                         List.map (from_lambda_value_kind ~machine_width) fields
                       )
-                    | Constructor_mixed mixed_block_shape
-                      when Array.for_all Lambda.is_value_or_void_element
-                             mixed_block_shape ->
-                      let rec collect_value_kinds acc
-                          (elt : _ Lambda.mixed_block_element) =
-                        match elt with
-                        | Value vk ->
-                          from_lambda_value_kind vk ~machine_width :: acc
-                        | Product elts ->
-                          Array.fold_left collect_value_kinds acc elts
-                        | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
-                        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
-                        | Untagged_immediate | Splice_variable _ ->
-                          assert false
-                      in
-                      let fields =
-                        Array.fold_left collect_value_kinds [] mixed_block_shape
-                        |> List.rev
-                      in
-                      Scannable Value_only, fields
                     | Constructor_mixed mixed_block_shape ->
+                      let is_uniform =
+                        Mixed_product_bytes.shape_is_all_value mixed_block_shape
+                      in
                       let mixed_block_shape =
                         Mixed_block_lambda_shape.of_mixed_block_elements
                           ~print_locality:(fun ppf () ->
@@ -1058,20 +1041,23 @@ module With_subkind = struct
                         | Word -> naked_nativeint
                         | Untagged_immediate -> naked_immediate
                       in
-                      let fields : t array =
+                      let fields : t list =
                         let flattened_reordered_shape =
                           Mixed_block_lambda_shape.flattened_reordered_shape
                             mixed_block_shape
                         in
-                        Array.map from_mixed_block_element
-                          flattened_reordered_shape
+                        Array.to_list
+                          (Array.map from_mixed_block_element
+                             flattened_reordered_shape)
                       in
-                      let mixed_block_shape =
-                        Mixed_block_shape.from_mixed_block_shape
-                          mixed_block_shape
-                      in
-                      ( Scannable (Mixed_record mixed_block_shape),
-                        Array.to_list fields )
+                      if is_uniform
+                      then Scannable Value_only, fields
+                      else
+                        let mixed_block_shape =
+                          Mixed_block_shape.from_mixed_block_shape
+                            mixed_block_shape
+                        in
+                        Scannable (Mixed_record mixed_block_shape), fields
                   in
                   Tag.Scannable.Map.add tag shape_and_fields non_consts
                 | None ->

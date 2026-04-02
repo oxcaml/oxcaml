@@ -65,7 +65,31 @@ let rec count (el : _ Lambda.mixed_block_element) : t =
   | Splice_variable _ ->
     Misc.fatal_error "Mixed_product_bytes_count: layout poly not supported"
 
+let rec count_types_element (elt : Types.mixed_block_element) : t =
+  match elt with
+  | Value -> { value = 8; flat = 0 }
+  | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
+  | Untagged_immediate ->
+    { value = 0; flat = 8 }
+  | Vec128 -> { value = 0; flat = 16 }
+  | Vec256 -> { value = 0; flat = 32 }
+  | Vec512 -> { value = 0; flat = 64 }
+  | Product elts ->
+    Array.fold_left (fun acc e -> add acc (count_types_element e)) zero elts
+  | Void -> zero
+
+let count_types_shape shape =
+  Array.fold_left (fun acc elt -> add acc (count_types_element elt)) zero shape
+
 let has_value_and_flat { value; flat } = value > 0 && flat > 0
+
+let all_value { flat; _ } = Byte_count.is_zero flat
+
+let shape_is_all_value shape = all_value (count (Product shape))
+
+let value_prefix_len t = Byte_count.on_64_bit_arch t.value / 8
+
+let typing_shape_is_all_value shape = all_value (count_types_shape shape)
 
 module Wrt_path = struct
   type nonrec t =

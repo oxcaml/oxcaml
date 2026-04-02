@@ -1257,11 +1257,6 @@ val record_form_to_string : _ record_form -> string
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
-val mixed_block_element_is_value_or_void : mixed_block_element -> bool
-
-val mixed_product_shape_is_all_value_or_void :
-  mixed_product_shape -> bool
-
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that
     correspond to a run-time value: values, extensions, modules, classes.

@@ -707,8 +707,9 @@ let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
   match shape with
   | All_value -> None
   | Shape shape ->
-    let is_uniform = Array.for_all is_value_or_void_element shape in
-    if is_uniform then None else Some shape
+    if Array.for_all is_value_or_void_element shape
+    then None
+    else Some shape
 
 let is_uniform_block_shape (shape : block_shape) : bool =
   Option.is_none (mixed_block_of_block_shape shape)
@@ -1877,32 +1878,6 @@ let transl_prim mod_name name =
   | path, _ -> transl_value_path Loc_unknown env path
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
-
-let block_of_module_representation ~loc = function
-  | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
-  | Module_mixed (shape, _) ->
-    let rec count_values shape =
-      Array.fold_left
-        (fun acc elt ->
-          match elt with
-          | Value _ -> acc + 1
-          | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-          | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate -> acc
-          | Product product_shape -> acc + count_values product_shape
-          (* CR layout poly: We need to support this for relatively simple
-             layout poly usecases, however it should be easy to move this assert
-             to after slambdaeval (or maybe during?). *)
-          | Splice_variable _ ->
-            error ~loc (Slambda_unsupported "mixed modules"))
-        0 shape
-    in
-    (* All-value/void shapes compile to uniform blocks, so the scannable
-       prefix length limit doesn't apply. *)
-    if not (Array.for_all is_value_or_void_element shape)
-    then
-      Typedecl.assert_mixed_product_support loc Module
-        ~value_prefix_len:(count_values shape);
-    Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 
