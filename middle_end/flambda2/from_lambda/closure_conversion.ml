@@ -233,20 +233,6 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       SC.block (Tag.Scannable.create_exn tag) Immutable Value_only fields
     in
     register_const acc dbg const "const_block"
-  | Const_mixed_block (tag, shape, args)
-    when Lambda.is_uniform_block_shape (Shape shape) ->
-    (* All-value (incl. products/void) mixed block: emit as a uniform block *)
-    let acc, fields =
-      List.fold_left_map
-        (fun acc c ->
-          let acc, field, _name = declare_const acc dbg c in
-          acc, field)
-        acc args
-    in
-    let const : SC.t =
-      SC.block (Tag.Scannable.create_exn tag) Immutable Value_only fields
-    in
-    register_const acc dbg const "const_block"
   | Const_mixed_block (tag, shape, args) ->
     let shape =
       Mixed_block_shape.of_mixed_block_elements
