@@ -106,6 +106,20 @@ let () =
 ;;
 
 let () =
+  let bytes = Marshal.to_bytes Nope [] in
+  match Marshal.from_bytes bytes 0 with
+  | Nope -> ()
+  | _ -> assert false
+;;
+
+let () =
+  let bytes = Marshal.to_bytes Nope_last [] in
+  match Marshal.from_bytes bytes 0 with
+  | Nope_last -> ()
+  | _ -> assert false
+;;
+
+let () =
   assert (Nope = Nope);
   assert (Yep 4 = Yep 4);
   assert (Nope <> Yep 4);
