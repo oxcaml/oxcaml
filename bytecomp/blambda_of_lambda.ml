@@ -527,6 +527,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pmakeblock (tag, _mut, shape, _) -> (
       match Lambda.mixed_block_of_block_shape shape with
       | None -> pseudo_event (variadic (Makeblock { tag }))
+      | Some shape when Lambda.mixed_block_shape_is_all_value shape ->
+        (* All-value/void: emit a normal block, not a faux mixed block *)
+        pseudo_event (variadic (Makeblock { tag }))
       | Some shape ->
         (* There is no notion of a mixed block at runtime in bytecode.
               Further, source-level unboxed types are represented as boxed in

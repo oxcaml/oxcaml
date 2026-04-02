@@ -1286,6 +1286,10 @@ val is_uniform_block_shape : block_shape -> bool
    Errors if there's a splice variable *)
 val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
 
+(* Returns whether a mixed block shape contains only values or void
+   (empty products or products of only values/void). *)
+val mixed_block_shape_is_all_value : mixed_block_shape -> bool
+
 val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
   -> Types.mixed_product_shape

@@ -257,6 +257,8 @@ let compute_static_size lam =
            produced by [mixed_block_of_block_shape]). *)
         (match Lambda.mixed_block_of_block_shape shape with
          | None -> Block (Regular_block (List.length args))
+         | Some arr when Lambda.mixed_block_shape_is_all_value arr ->
+           Block (Regular_block (List.length args))
          | Some arr -> Block (Mixed_record arr))
     | Pmakelazyblock _ ->
         Block (Regular_block (List.length args))

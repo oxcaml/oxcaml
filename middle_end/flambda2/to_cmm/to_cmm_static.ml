@@ -361,6 +361,10 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
       | Value_only ->
         ( List.init num_fields (fun _ -> Flambda_kind.value),
           C.black_block_header tag num_fields )
+      | Mixed_record shape when Array.length (MBS.flat_suffix shape) = 0 ->
+        (* All-value/void: emit as a normal (uniform) block *)
+        ( MBS.field_kinds shape |> Array.to_list,
+          C.black_block_header tag num_fields )
       | Mixed_record shape ->
         ( MBS.field_kinds shape |> Array.to_list,
           C.black_mixed_block_header tag (MBS.size_in_words shape)
@@ -373,6 +377,8 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     let update_kinds =
       match shape with
       | Value_only -> List.map (fun _ -> UK.pointers) fields
+      | Mixed_record shape when Array.length (MBS.flat_suffix shape) = 0 ->
+        List.map (fun _ -> UK.pointers) fields
       | Mixed_record shape ->
         let value_prefix =
           List.init (MBS.value_prefix_size shape) (fun _ -> UK.pointers)

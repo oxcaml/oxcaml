@@ -126,6 +126,11 @@ let make_block ~dbg kind alloc_mode args =
   | Naked_floats ->
     let tag = Tag.to_int Tag.double_array_tag in
     C.make_float_alloc ~mode dbg ~tag args
+  | Mixed (tag, shape)
+    when Array.length (K.Mixed_block_shape.flat_suffix shape) = 0 ->
+    (* All-value/void: emit as a normal (uniform) block *)
+    let tag = Tag.Scannable.to_int tag in
+    C.make_alloc ~mode dbg ~tag args
   | Mixed (tag, shape) ->
     let value_prefix_size = K.Mixed_block_shape.value_prefix_size shape in
     let args_memory_chunks =
