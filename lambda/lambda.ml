@@ -692,20 +692,20 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
 
 let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
     =
+  let rec all_values : type a. a mixed_block_element -> bool =
+    fun elem ->
+    match elem with
+    | Value _ -> true
+    | Product elems -> Array.for_all all_values elems
+    (* CR layout poly: This function probably shouldn't exist at all
+        and we should merge mixed_block_shape and block_shape. *)
+    | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
+    | _ -> false
+  in
   match shape with
   | All_value -> None
   | Shape shape ->
-    let is_uniform =
-      Array.for_all
-        (function
-          | Value _ -> true
-          (* CR layout poly: This function probably shouldn't exist at all
-             and we should merge mixed_block_shape and block_shape. *)
-          | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
-          | _ -> false)
-        shape
-    in
-    if is_uniform then None else Some shape
+    if Array.for_all all_values shape then None else Some shape
 
 let is_uniform_block_shape (shape : block_shape) : bool =
   Option.is_none (mixed_block_of_block_shape shape)

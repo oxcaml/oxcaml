@@ -122,26 +122,24 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
   match shape with
   | All_value -> List.init num_fields (fun _field -> K.With_subkind.any_value)
   | Shape shape ->
-    let shape_length = Array.length shape in
-    if num_fields <> shape_length
+    (* This function is only called for uniform (value-product) block shapes *)
+    let rec flatten (elem : unit L.mixed_block_element) =
+      match elem with
+      | L.Value vk -> [K.With_subkind.from_lambda_value_kind ~machine_width vk]
+      | Product sub -> Array.to_list sub |> List.concat_map flatten
+      | Float_boxed ()
+      | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+      | Vec512 | Word | Untagged_immediate | Splice_variable _ ->
+        Misc.fatal_error "convert_block_shape: non-uniform shape"
+    in
+    let result = Array.to_list shape |> List.concat_map flatten in
+    if List.length result <> num_fields
     then
       Misc.fatal_errorf
         "Flambda_arity.of_block_shape: num_fields is %d yet the shape has %d \
          fields"
-        num_fields shape_length;
-    (* This function is only called for uniform block shapes *)
-    Array.to_list
-      (Array.map
-         (fun (elem : unit L.mixed_block_element) ->
-           match elem with
-           | L.Value vk ->
-             K.With_subkind.from_lambda_value_kind ~machine_width vk
-           | Float_boxed ()
-           | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-           | Vec256 | Vec512 | Word | Untagged_immediate | Product _
-           | Splice_variable _ ->
-             Misc.fatal_error "convert_block_shape: non-uniform shape")
-         shape)
+        num_fields (List.length result);
+    result
 
 let check_float_array_optimisation_enabled name =
   if not (Flambda_features.flat_float_array ())
