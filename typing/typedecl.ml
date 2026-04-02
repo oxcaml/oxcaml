@@ -237,17 +237,6 @@ let check_or_null_variant_shape _path params sdecl scstrs =
     let _payload_param = find_constructors scstrs in
     ()
 
-let custom_or_null_jkind path param =
-  let why : Jkind.History.value_or_null_creation_reason =
-    Jkind.History.Type_argument
-      { parent_path = path; position = 1; arity = 1 }
-  in
-  Jkind.Builtin.value_or_null ~why
-  |> Btype.Jkind0.add_with_bounds
-       ~modality:Mode.Modality.Const.id
-       ~type_expr:param
-  |> Jkind.mark_best
-
 (* [make_params] creates sort variables - these can be defaulted away (as in
    transl_type_decl) or unified with existing sort-variable-free types (as in
    transl_with_constraint). *)
@@ -1078,7 +1067,8 @@ let transl_declaration env sdecl (id, uid) =
         let rep, jkind =
           if custom_or_null then
             match params with
-            | [param] -> Variant_with_null, custom_or_null_jkind path param
+            | [param] ->
+              Variant_with_null, Btype.Jkind0.for_variant_with_null_result path param
             | _ -> assert false
           else if unbox then
             Variant_unboxed,
