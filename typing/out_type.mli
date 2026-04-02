@@ -134,7 +134,8 @@ val prepared_constructor : constructor_declaration printer
 val tree_of_extension_constructor:
     Ident.t -> extension_constructor -> ext_status -> out_sig_item
 val extension_constructor_args_and_ret_type_subtree:
-  constructor_arguments -> type_expr option -> out_type list * out_type option
+  constructor_arguments -> type_expr option ->
+  (out_type * out_modality list) list * (out_vars_jkinds * out_type) option
 val add_extension_constructor_to_preparation :
     extension_constructor -> unit
 val prepared_extension_constructor:
