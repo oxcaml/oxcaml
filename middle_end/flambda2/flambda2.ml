@@ -213,6 +213,7 @@ let flambda_to_flambda0 : type m.
                 Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
                   ~final_typing_env flambda)
           in
+          print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf flambda;
           print_fexpr "reaper"
             (Flambda_features.dump_fexpr (This_pass "reaper"))
             ppf flambda;
