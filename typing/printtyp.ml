@@ -79,7 +79,7 @@ module Doc = struct
     prepared_type_scheme ppf ty
 
   let path ppf p =
-    !Oprint.out_ident ppf (tree_of_path ~disambiguation:false p)
+    !Oprint.out_ident ppf (tree_of_path p)
 
   let () = Env.print_path := path
 
@@ -110,7 +110,7 @@ module Doc = struct
 
   let constructor_arguments ppf a =
     let tys = tree_of_constructor_arguments a in
-    !Oprint.out_type ppf (Otyp_tuple (List.map (fun t -> None, t) tys))
+    !Oprint.out_constr_args ppf tys
 
   let label ppf l =
     prepare_for_printing [l.Types.ld_type];
@@ -221,5 +221,5 @@ let printed_signature sourcefile ppf sg =
     end;
   Fmt.compat print_signature ppf t
 
-(* CR rtjoa: move? *)
-let () = Jkind.set_printtyp_path path
+let () = Jkind.set_printtyp_path Doc.path
+let () = Mode.print_longident := Doc.longident
