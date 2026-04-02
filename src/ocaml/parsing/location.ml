@@ -278,7 +278,8 @@ let absolute_path s = (* This function could go into Filename *)
   aux s
 
 let show_filename file =
-  (* if !Clflags.absname then absolute_path file else *) file
+  let file = (* if !Clflags.absname then absolute_path file else *) file in
+  rewrite_absolute_path file
 
 module Fmt = Format_doc
 module Doc = struct

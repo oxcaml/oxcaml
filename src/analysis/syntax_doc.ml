@@ -251,14 +251,20 @@ let get_mode_doc (Atom (axis, mode) : Mode.Alloc.atom) =
       Some
         "The mutable parts of values with this mode can be read, but not \
          written"
+    | Monadic Visibility, Write ->
+      Some
+        "The mutable parts of values with this mode can be written, but not \
+         read"
     | Monadic Visibility, Read_write ->
       Some "The mutable parts of values with this mode can be fully accessed"
     | Comonadic Statefulness, Stateful ->
       Some "Functions with this mode can read and write mutable data"
-    | Comonadic Statefulness, Observing ->
+    | Comonadic Statefulness, Reading ->
       Some "Functions with this mode can read but not write mutable data"
     | Comonadic Statefulness, Stateless ->
       Some "Functions with this mode cannot access mutable data"
+    | Comonadic Statefulness, Writing ->
+      Some "Functions with this mode can write but not read mutable data"
     | Comonadic Forkable, Forkable ->
       Some "Functions with this mode may be executed concurrently."
     | Comonadic Forkable, Unforkable ->

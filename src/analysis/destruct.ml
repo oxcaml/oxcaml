@@ -127,7 +127,11 @@ let rec gen_patterns ?(recurse = true) env type_expr =
                  Ctype.Pattern_env.make env ~equations_scope:0
                    ~allow_recursive_equations:true
                in
-               Ctype.unify_gadt pattern_env type_expr typ);
+               (* This function is run within a [Printtyp.wrap_printing_env] (this happens
+                  in query_commands.ml), which calls [Env.without_cmis] to avoid loading
+                  cmis for printing. But we may need to load cmis during this unification,
+                  so we wrap in a [Env.with_cmis]. *)
+               Env.with_cmis (fun () -> Ctype.unify_gadt pattern_env type_expr typ));
             true
           with Ctype.Unify _trace -> false
         in
@@ -372,7 +376,8 @@ let rec subst_patt initial ~by patt =
     | Tpat_var _
     | Tpat_constant _
     | Tpat_unboxed_bool _
-    | Tpat_unboxed_unit -> patt
+    | Tpat_unboxed_unit
+    | Tpat_fun_layout _ -> patt
     | Tpat_alias ({ pattern = p; _ } as alias) ->
       { patt with pat_desc = Tpat_alias { alias with pattern = f p } }
     | Tpat_tuple lst ->
@@ -415,7 +420,8 @@ let rec rm_sub patt sub =
   | Tpat_var _
   | Tpat_constant _
   | Tpat_unboxed_bool _
-  | Tpat_unboxed_unit -> patt
+  | Tpat_unboxed_unit
+  | Tpat_fun_layout _ -> patt
   | Tpat_alias ({ pattern = p; _ } as alias) ->
     { patt with pat_desc = Tpat_alias { alias with pattern = f p } }
   | Tpat_tuple lst ->
@@ -540,7 +546,7 @@ let find_branch patterns sub =
       match patt.pat_desc with
       | Tpat_any | Tpat_var _ | Tpat_constant _
       | Tpat_variant (_, None, _)
-      | Tpat_unboxed_bool _ | Tpat_unboxed_unit -> false
+      | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> false
       | Tpat_alias { pattern = p; _ }
       | Tpat_variant (_, Some p, _)
       | Tpat_lazy p -> is_sub_patt p ~sub
@@ -623,7 +629,7 @@ module Conv = struct
       | Tpat_var { name = { txt = "*extension*"; _ } as nm; _ } ->
         (* PR#7330 *)
         mkpat (Ppat_var nm)
-      | Tpat_any | Tpat_var _ -> mkpat Ppat_any
+      | Tpat_any | Tpat_var _ | Tpat_fun_layout _ -> mkpat Ppat_any
       | Tpat_constant c -> mkpat (Ppat_constant (Untypeast.constant c))
       | Tpat_alias { pattern = p; _ } -> loop p
       | Tpat_tuple lst ->

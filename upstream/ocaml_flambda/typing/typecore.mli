@@ -71,6 +71,9 @@ type pattern_variable =
     pv_as_var: bool;
     pv_attributes: Typedtree.attributes;
     pv_sort: Jkind.Sort.t;
+    pv_lpoly: Types.Lpoly.t;
+    (** Not yet determined; gets determined during generalization in
+        [type_let]. *)
   }
 
 val mk_expected:
@@ -200,6 +203,8 @@ type unsupported_stack_allocation =
   | List_comprehension
   | Array_comprehension
 
+type mode_mismatch_kind = Parameter | Return
+
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
   | Constructor_labeled_arg
@@ -299,6 +304,7 @@ type error =
   | Illegal_letrec_pat
   | Illegal_letrec_expr
   | Illegal_mutable_pat
+  | Mixed_poly_nonpoly_bindings
   | Illegal_class_expr
   | Letop_type_clash of string * Errortrace.unification_error
   | Andop_type_clash of string * Errortrace.unification_error
@@ -320,7 +326,7 @@ type error =
   | Submode_failed of Mode.Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
-  | Param_mode_mismatch of Mode.Alloc.equate_error
+  | Mode_mismatch of mode_mismatch_kind * Mode.Alloc.equate_error
   | Uncurried_function_escapes of Mode.Alloc.error
   | Function_returns_local
   | Tail_call_local_returning
@@ -341,7 +347,6 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Eval_format
   | Let_poly_not_yet_implemented
   | Layout_poly_inst_not_yet_supported
 

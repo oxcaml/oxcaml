@@ -126,6 +126,10 @@ let newgenvar ?name jkind = newgenty (Tvar { name; jkind })
 let newgenstub ~scope jkind =
   newty3 ~level:generic_level ~scope (Tvar { name=None; jkind })
 
+let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
+let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
+let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
+
 (**** Check some types ****)
 
 let is_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false
@@ -308,6 +312,7 @@ let fold_type_expr f init ty =
       f result (row_more row)
   | Tquote ty           -> f init ty
   | Tsplice ty          -> f init ty
+  | Tquote_eval ty      -> f init ty
   | Tfield (_, _, ty1, ty2) ->
       let result = f init ty1 in
       f result ty2
@@ -526,6 +531,7 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tvariant _          -> assert false (* too ambiguous *)
   | Tquote ty           -> Tquote (f ty)
   | Tsplice ty          -> Tsplice (f ty)
+  | Tquote_eval ty      -> Tquote_eval (f ty)
   | Tfield (p, k, ty1, ty2) ->
       Tfield (p, field_kind_internal_repr k, f ty1, f ty2)
       (* the kind is kept shared, with indirections removed for performance *)
@@ -2427,6 +2433,15 @@ module Jkind0 = struct
           with_bounds = No_with_bounds
         }
         ~annotation:None ~why:(Primitive ident)
+      |> mark_best
+
+    let for_expr =
+      fresh_jkind
+        { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
+          mod_bounds = Mod_bounds.for_arrow;
+          with_bounds = No_with_bounds
+        }
+        ~annotation:None ~why:(Value_creation Quoted_expression)
       |> mark_best
 
     let for_array_argument =

@@ -523,7 +523,7 @@ module Gen = struct
                     (* CR-someday: this sort should be based on the jkind of [tyleft]. But
                        this isn't important since this value is just used for printing. *)
                     Val_reg (Base Value);
-                  val_lpoly = [];
+                  val_lpoly = Lpoly.determined [];
                   val_loc = Location.none;
                   val_attributes = [];
                   val_zero_alloc = Zero_alloc.default;
@@ -564,7 +564,7 @@ module Gen = struct
           List.map choices ~f:(fun choice ->
               Ast_helper.Exp.unboxed_tuple choice)
         | Tvariant row_desc -> variant env rtyp row_desc
-        | Tquote _ | Tsplice _ -> []
+        | Tquote _ | Tsplice _ | Tquote_eval _ -> []
         | Trepr (ty, _) ->
           (* CR modes: This isn't quite right, but it's probably good enough. *)
           exp_or_hole env ty

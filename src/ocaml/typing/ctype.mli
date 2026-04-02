@@ -79,6 +79,8 @@ val set_levels: levels -> unit
 
 val create_scope : unit -> int
 
+val mark_toplevel_in_quotations : Env.t -> Env.t
+
 val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
 val newvar: ?name:string -> jkind_lr -> type_expr
@@ -197,8 +199,11 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       allow_recursive_equations : bool;
       (* true iff checking counter examples *)
+      is_lpoly : bool;
+      (* true iff the pattern is under let poly_ *)
     }
-  val make: Env.t -> equations_scope:int -> allow_recursive_equations:bool -> t
+  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+    -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
 end
@@ -259,6 +264,11 @@ val apply:
            New nodes default to generic level except if [use_current_level] is
            set to true.
            Exception [Cannot_apply] is raised in case of failure. *)
+
+val reduce_head: expand_eval:bool -> Env.t -> type_expr -> type_expr
+(** Exhaustively beta-reduce head-position quotes, splices and quote-evals.
+    If [expand_eval] is true, expands [Predef]'s [eval]s into [Tquote_eval]
+    enabling further reductions. *)
 
 val try_expand_once_opt: Env.t -> type_expr -> type_expr
 val try_expand_safe_opt: Env.t -> type_expr -> type_expr

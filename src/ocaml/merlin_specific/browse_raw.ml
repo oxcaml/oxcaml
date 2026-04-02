@@ -382,7 +382,7 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
   match desc with
   | Tpat_any | Tpat_var _ | Tpat_constant _
   | Tpat_variant (_, None, _)
-  | Tpat_unboxed_bool _ | Tpat_unboxed_unit -> id_fold
+  | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> id_fold
   | Tpat_alias { pattern = p; _ }
   | Tpat_variant (_, Some p, _)
   | Tpat_lazy p
@@ -532,7 +532,6 @@ let rec of_expression_desc loc = function
   | Texp_hole _ -> id_fold
   | Texp_quotation exp -> of_expression exp
   | Texp_antiquotation exp -> of_expression exp
-  | Texp_eval (ct, _) -> of_core_type ct
 
 (* We should consider taking into account param.fp_loc at some point, as it
    allows us to respond with the *parameter*'s type (as opposed to the

@@ -491,7 +491,7 @@ let enter_ancestor_met ~loc name ~sign ~meths ~cl_num ~ty ~attrs met_env =
   let kind = Val_anc (sign, meths, cl_num) in
   let desc =
     { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
-      val_lpoly = [];
+      val_lpoly = Lpoly.determined [];
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       Types.val_loc = loc;
@@ -508,7 +508,7 @@ let add_self_met loc id sign self_var_kind vars cl_num
   let kind = Val_self (sign, self_var_kind, vars, cl_num) in
   let desc =
     { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
-      val_lpoly = [];
+      val_lpoly = Lpoly.determined [];
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       Types.val_loc = loc;
@@ -525,7 +525,7 @@ let add_instance_var_met loc label id sign cl_num attrs met_env =
   let kind = Val_ivar (mut, cl_num) in
   let desc =
     { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
-      val_lpoly = [];
+      val_lpoly = Lpoly.determined [];
       val_attributes = attrs;
       Types.val_loc = loc;
       val_zero_alloc = Zero_alloc.default;
@@ -1488,7 +1488,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                {val_type = expr.exp_type;
                 val_modalities = Modality.undefined;
                 val_kind = Val_ivar (Immutable, cl_num);
-                val_lpoly = [];
+                val_lpoly = Lpoly.determined [];
                 val_attributes = [];
                 val_zero_alloc = Zero_alloc.default;
                 Types.val_loc = vd.val_loc;
@@ -2401,7 +2401,6 @@ let report_error_doc env ppf =
       "@[Variables bound in a class must have layout value.@ %a@]"
       (Jkind.Violation.report_with_name
          ~name:nm
-         ~level:(Ctype.get_current_level ())
          env)
       err
   | Non_value_let_binding (nm, sort) ->

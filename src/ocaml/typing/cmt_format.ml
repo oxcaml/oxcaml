@@ -282,8 +282,7 @@ let iter_on_occurrences
       (* CR-someday let_mutable: maybe iterate on mutvar? *)
       | Texp_mutvar _ | Texp_setmutvar _
       | Texp_open _ | Texp_src_pos | Texp_overwrite _
-      | Texp_hole _  | Texp_quotation _ | Texp_antiquotation _
-      | Texp_eval _ -> ());
+      | Texp_hole _  | Texp_quotation _ | Texp_antiquotation _ -> ());
       default_iterator.expr sub e);
 
   (* Remark: some types get iterated over twice due to how constraints are
@@ -319,6 +318,7 @@ let iter_on_occurrences
       | Tpat_record_unboxed_product (fields, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _
+      | Tpat_fun_layout _
       | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
       | Tpat_unboxed_tuple _ | Tpat_variant _ | Tpat_array _ | Tpat_lazy _
       | Tpat_value _ | Tpat_exception _ | Tpat_or _ -> ());

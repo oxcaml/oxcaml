@@ -308,6 +308,7 @@ let pat
   | Tpat_or (p1, p2, _) ->
       sub.pat sub p1;
       sub.pat sub p2
+  | Tpat_fun_layout { name = s; _ } -> iter_loc sub s
 
 let extra sub = function
   | Texp_constraint (cty) -> sub.typ sub cty
@@ -506,7 +507,6 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_hole _ -> ()
   | Texp_quotation exp -> sub.expr sub exp
   | Texp_antiquotation exp -> sub.expr sub exp
-  | Texp_eval (typ, _) -> sub.typ sub typ
 
 let package_type sub {pack_fields; pack_txt; _} =
   List.iter (fun (lid, p) -> iter_loc sub lid; sub.typ sub p) pack_fields;

@@ -452,7 +452,8 @@ module type S = sig
     module Const : sig
       type t =
         | Stateless
-        | Observing
+        | Writing
+        | Reading
         | Stateful
 
       include Const with type t := t
@@ -462,7 +463,9 @@ module type S = sig
 
     val stateless : lr
 
-    val observing : lr
+    val writing : lr
+
+    val reading : lr
 
     val stateful : lr
   end
@@ -472,6 +475,7 @@ module type S = sig
       type t =
         | Read_write
         | Read
+        | Write
         | Immutable
 
       include Const with type t := t
@@ -482,6 +486,8 @@ module type S = sig
     val immutable : lr
 
     val read : lr
+
+    val write : lr
 
     val read_write : lr
   end

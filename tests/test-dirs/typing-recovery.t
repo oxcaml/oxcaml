@@ -616,10 +616,6 @@ make sure we also handle that correctly in structures:
             value_mode global,many,portable,forkable,unyielding,stateless;imply_const(aliased,contended,immutable,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
           expression (test_ct.ml[1,0+17]..test_ct.ml[1,0+18])
             extra
-              Texp_mode
-              alloc_const_option_mode None,None,None,None,None,None,None,None,None,None
-              None,None,None,None,None,None,None,None,None,None
-              []
               Texp_constraint
               core_type (test_ct.ml[1,0+11]..test_ct.ml[1,0+14])
                 Ttyp_constr \"int/1!\"
@@ -652,10 +648,6 @@ make sure we also handle that correctly in structures:
             value_mode meet_const(local,once,nonportable,unforkable,yielding,stateful)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
           expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+28])
             extra
-              Texp_mode
-              alloc_const_option_mode None,None,None,None,None,None,None,None,None,None
-              None,None,None,None,None,None,None,None,None,None
-              []
               Texp_constraint
               core_type (test_ct.ml[3,20+11]..test_ct.ml[3,20+21])
                 Ttyp_tuple
@@ -670,7 +662,7 @@ make sure we also handle that correctly in structures:
                     None
                 ]
             Texp_tuple
-            alloc_mode meet(local,once,nonportable,unforkable,yielding,stateful,map_comonadic(regional_to_global)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]));unique,uncontended,read_write,static
+            alloc_mode map_comonadic(regional_to_global)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet_const(unique,uncontended,read_write,static)(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
             [
               Label: None
                 expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+25])
@@ -706,10 +698,6 @@ make sure we also handle that correctly in structures:
             value_mode global,many,portable,forkable,unyielding,stateless;imply_const(unique,contended,immutable,static)(modevar#11[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
           expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+27])
             extra
-              Texp_mode
-              alloc_const_option_mode None,None,None,None,None,None,None,None,None,None
-              None,None,None,None,None,None,None,None,None,None
-              []
               Texp_constraint
               core_type (test_ct.ml[5,50+11]..test_ct.ml[5,50+20])
                 Ttyp_tuple
@@ -724,7 +712,7 @@ make sure we also handle that correctly in structures:
                     []
                 ]
             Texp_tuple
-            alloc_mode global,once,nonportable,unforkable,yielding,stateful;unique,contended,immutable,static
+            alloc_mode global,once,nonportable,unforkable,yielding,stateful;meet_const(unique,contended,immutable,static)(modevar#11[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
             [
               Label: None
                 expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+24])

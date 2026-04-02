@@ -2050,6 +2050,7 @@ and pattern_match_barrier pat paths : UF.t =
   | Tpat_or _ -> no_memory_access ()
   | Tpat_any -> no_memory_access ()
   | Tpat_var _ -> no_memory_access ()
+  | Tpat_fun_layout _ -> no_memory_access ()
   | Tpat_alias _ -> no_memory_access ()
   | Tpat_constant _ ->
     (* This is necessary since we can not guarantee that
@@ -2096,6 +2097,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       Ienv.Extension.disjunct ext0 ext1, UF.choose uf0 uf1
     | Tpat_any -> Ienv.Extension.empty, UF.unused
     | Tpat_var { id; _ } -> Ienv.Extension.singleton id paths, UF.unused
+    | Tpat_fun_layout { id; _ } -> Ienv.Extension.singleton id paths, UF.unused
     | Tpat_alias { pattern = pat'; id; _ } ->
       let ext0 = Ienv.Extension.singleton id paths in
       let ext1, uf = pattern_match_single pat' paths in
@@ -2667,9 +2669,6 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_antiquotation e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.antiquote uf
-  | Texp_eval _ ->
-    (* CR metaprogramming mshinwell: Make sure this is correct *)
-    UF.unused
 
 and check_uniqueness_exp ~borrows ~overwrite (ienv : Ienv.t) exp : UF.t =
   let loc = exp.exp_loc in

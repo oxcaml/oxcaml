@@ -46,6 +46,23 @@ module Sort = struct
     univar_pairs := pairs @ old_univars;
     Misc.try_finally f ~always:(fun () -> univar_pairs := old_univars)
 
+  (* Special sentinel levels stored in [var.level] when [contents = None]:
+     - [level_generic]: a generalized sort variable (genvar), used for layout
+       polymorphism and must be quantified. That is, they can only appear under
+       [instance_map], etc.)
+     - [level_rigid]: a rigid sort variable that cannot be unified.
+     - [level_fresh]: a freshly-created unifiable sort variable whose level has
+       not yet been set; it will be lowered via [update_level] as soon as it is
+       unified with another variable.
+     When [contents = Some t], [level] is meaningless. *)
+  (* CR-soon zqian: Add the invariant that, when [contents = Some v], we have
+    [level >= v.level]. This can improve performance. *)
+  let level_generic = Ident.highest_scope
+
+  let level_rigid = Ident.highest_scope - 1
+
+  let level_fresh = Ident.highest_scope - 2
+
   type t =
     | Var of var
     | Base of base
@@ -54,19 +71,17 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
-      mutable level : int;
-      (* When [contents = None], [level = Ident.highest_scope] indicates
-        generic sort variables, and [level = Ident.highest_scope - 1] indicates
-        rigid variables. When [contents = Some t], [level] is meaningless and
-        the variable means whatever [t] means. *)
-      (* CR-soon zqian: Add the invariant that, when [contents = Some v], we
-         have [level >= v.level]. This can improve performance. *)
+      mutable level : int;  (** See comments on [level_generic] *)
       uid : int (* For debugging / printing only *)
     }
 
-  let is_rigidvar var = var.level = Ident.highest_scope - 1
+  let is_rigidvar var =
+    assert (Option.is_none var.contents);
+    var.level = level_rigid
 
-  let is_genvar var = var.level = Ident.highest_scope
+  let is_genvar var =
+    assert (Option.is_none var.contents);
+    var.level = level_generic
 
   let equal_base b1 b2 =
     match b1, b2 with
@@ -384,42 +399,13 @@ module Sort = struct
       log_change (u, Clevel u.level);
       u.level <- new_level)
 
-  let sub_map : (var * t option ref) list ref = ref []
-
   let[@inline] set : var -> t option -> unit =
    fun v t_op ->
     log_change (v, Ccontents v.contents);
-    let is_genvar = is_genvar v && Option.is_none v.contents in
     v.contents <- t_op;
     match t_op with
     | None -> ()
-    | Some t ->
-      if is_genvar
-      then begin
-        (* CR-soon zqian: unquantified genvar are nonsense and we should fatal
-           error. *)
-        match List.assq_opt v !sub_map with
-        | Some r -> r := Some t
-        | None -> ()
-      end;
-      t_iter ~f:(fun u -> update_level u v) t
-
-  let sub_with vars f =
-    let pairs =
-      List.map
-        (fun v ->
-          assert (Option.is_none v.contents);
-          assert (is_genvar v);
-          v, ref None)
-        vars
-    in
-    let old_map = !sub_map in
-    sub_map := pairs @ old_map;
-    Misc.try_finally
-      (fun () ->
-        let result = f () in
-        List.map (fun (_, r) -> !r) pairs, result)
-      ~always:(fun () -> sub_map := old_map)
+    | Some t -> t_iter ~f:(fun u -> update_level u v) t
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save
@@ -577,13 +563,21 @@ module Sort = struct
 
   let last_var_uid = ref 0
 
-  let new_var ~level =
+  let new_var_unsafe ~level =
     incr last_var_uid;
-    Var { contents = None; uid = !last_var_uid; level }
+    { contents = None; uid = !last_var_uid; level }
 
-  let new_genvar () =
-    incr last_var_uid;
-    { contents = None; uid = !last_var_uid; level = Ident.highest_scope }
+  let new_var ~level =
+    (* Guard against accidentally creating a genvar or rigidvar via this path:
+       those require special handling (instance_map registration for genvars;
+       refusal to unify for rigidvars). [level_fresh] is intentionally
+       not guarded here — it behaves like any other unifiable variable and its
+       level is simply lowered by [update_level] upon unification. *)
+    if level >= level_rigid
+    then Misc.fatal_error "Jkind_types.new_var: level >= level_rigid";
+    new_var_unsafe ~level
+
+  let new_genvar () = new_var_unsafe ~level:level_generic
 
   let instance_map : (var * var) list ref = ref []
 
@@ -591,10 +585,8 @@ module Sort = struct
     let new_vars =
       List.map
         (fun v ->
-          assert (Option.is_none v.contents);
           assert (is_genvar v);
-          incr last_var_uid;
-          let v' = { contents = None; uid = !last_var_uid; level } in
+          let v' = new_var_unsafe ~level in
           v, v')
         vars
     in
@@ -608,13 +600,7 @@ module Sort = struct
 
   let rec instance_var v =
     match v.contents with
-    | None when is_genvar v ->
-      (* CR-soon zqian: unquantified genvar are nonsense and we should fatal_error. *)
-      begin match List.assq_opt v !instance_map with
-      | Some v' -> Var v'
-      | None -> Var v
-      end
-    | None -> Var v
+    | None -> if is_genvar v then Var (List.assq v !instance_map) else Var v
     | Some t -> instance t
 
   and instance : t -> t = function
@@ -635,6 +621,82 @@ module Sort = struct
         if result != s then set r (Some result);
         (* path compression *)
         result)
+
+  let rec get_representable : t -> t option = function
+    | (Base _ | Univar _) as t -> Some t
+    | Product ts -> begin
+      match get_representable_product ts with
+      | None -> None
+      | Some ts' -> Some (Product ts')
+    end
+    | Var v -> get_representable_var v
+
+  and get_representable_product : t list -> t list option =
+   fun ts ->
+    List.fold_right
+      (fun t acc ->
+        match acc, get_representable t with
+        | None, _ | _, None -> None
+        | Some ts, Some t -> Some (t :: ts))
+      ts (Some [])
+
+  and get_representable_var : var -> t option =
+   fun v ->
+    match v.contents with
+    | None -> begin if is_rigidvar v then Some (Var v) else None end
+    | Some t -> get_representable t
+
+  let rec subst s t =
+    match t with
+    | Var v -> begin
+      match v.contents with
+      | None -> begin match List.assq_opt v s with Some t -> t | None -> t end
+      | Some t -> subst s t
+    end
+    | Base _ | Univar _ -> t
+    | Product ts -> Product (List.map (subst s) ts)
+
+  (* Sort generalization context for let poly_ *)
+  let in_sort_generalization_context : var list ref option ref = ref None
+
+  (* Generalize sort variables when in sort generalization context.
+     This is called from Ctype.generalize when processing let poly_ bindings.
+     For each free sort variable, the level is set to Ident.highest_scope,
+     making it a generic sort variable (genvar), and the var is accumulated.
+     The level is also used to mark the variable as visited, avoiding infinite
+     loops when traversing sort variable graphs. *)
+  let rec generalize_rec ~current_level ~vars_ref sort =
+    match sort with
+    | Var v ->
+      if v.level > current_level && v.level <> Ident.highest_scope
+      then begin
+        (* Mark as visited / make generic *)
+        v.level <- Ident.highest_scope;
+        match v.contents with
+        | Some s -> generalize_rec ~current_level ~vars_ref s
+        | None ->
+          (* The var is now a genvar; accumulate it *)
+          vars_ref := v :: !vars_ref
+      end
+    | Product sorts -> List.iter (generalize_rec ~current_level ~vars_ref) sorts
+    | Base _ | Univar _ -> ()
+
+  let generalize ~current_level sort =
+    match !in_sort_generalization_context with
+    | None -> () (* Not in generalization context *)
+    | Some vars_ref -> generalize_rec ~current_level ~vars_ref sort
+
+  (* Wrapper to run a function in sort generalization context. Returns the
+     result of [f] and the vars generalized during [f]. *)
+  let generalize_with f =
+    let vars_ref = ref [] in
+    let old_context = !in_sort_generalization_context in
+    in_sort_generalization_context := Some vars_ref;
+    let result =
+      Misc.try_finally f ~always:(fun () ->
+          in_sort_generalization_context := old_context)
+    in
+    result, List.rev !vars_ref
 
   let rec default_to_value_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
@@ -794,8 +856,8 @@ module Sort = struct
     | Equal_mutated_both ->
       true
 
-  let decompose_into_product ~level t n =
-    let ts = List.init n (fun _ -> new_var ~level) in
+  let decompose_into_product t n =
+    let ts = List.init n (fun _ -> of_var (new_var ~level:level_fresh)) in
     if equate t (Product ts) then Some ts else None
 
   (*** pretty printing ***)
@@ -979,6 +1041,6 @@ module Layout = struct
   let get_const t = get_const Const.of_sort t
 
   let of_new_sort_var ~level =
-    let sort = Sort.new_var ~level in
+    let sort = Sort.(of_var (new_var ~level)) in
     Sort (sort, Scannable_axes.max), sort
 end

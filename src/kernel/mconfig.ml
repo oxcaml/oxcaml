@@ -471,6 +471,8 @@ let ocaml_ignored_flags =
     "-no-keep-docs";
     "-keep-locs";
     "-linkall";
+    "-requires-metaprogramming";
+    "-uses-metaprogramming";
     "-make_runtime";
     "-make-runtime";
     "-modern";
@@ -570,6 +572,11 @@ let ocaml_ignored_flags =
     "-ddebug-invariants";
     "-cfg-peephole-optimize";
     "-no-cfg-peephole-optimize";
+    "-x86-peephole-optimize";
+    "-no-x86-peephole-optimize";
+    "-no-x86-peephole-remove-mov-to-dead-register";
+    "-no-x86-peephole-remove-redundant-cmp";
+    "-no-x86-peephole-combine-add-rsp";
     "-verbose-types";
     "-no-verbose-types";
     "-fsse3";

@@ -262,9 +262,6 @@ let classify_expression : Typedtree.expression -> sd =
           (* other cases compile to a lazy block holding a function *)
           Static
       end
-    | Texp_eval _ ->
-      (* CR metaprogramming mshinwell: Make sure this is correct *)
-      Static
 
     | Texp_new _
     | Texp_instvar _
@@ -1099,9 +1096,6 @@ let rec expression : Typedtree.expression -> term_judg =
         expression e << Dereference
     | Texp_antiquotation e ->
         expression e << Dereference
-    | Texp_eval _ ->
-      (* CR metaprogramming mshinwell: Make sure this is correct *)
-      empty
 
 (* Function bodies.
     G |-{body} b : m
@@ -1528,6 +1522,7 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
   fun pat -> match pat.pat_desc with
     | Tpat_any -> false
     | Tpat_var _ -> false
+    | Tpat_fun_layout _ -> false
     | Tpat_alias { pattern = pat; _ } -> is_destructuring_pattern pat
     | Tpat_constant _ -> true
     | Tpat_unboxed_unit -> true

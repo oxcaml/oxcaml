@@ -395,9 +395,13 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
       let mk = if ghost then ghexp else mkexp in
       mk ~loc (Pexp_coerce(e, t1, t2))
 
-let mkexp_opt_type_constraint_with_modes ?ghost ~loc ~modes e = function
-  | None -> e
-  | Some c -> mkexp_type_constraint_with_modes ?ghost ~loc ~modes e c
+let mkexp_opt_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
+  match t, modes with
+  | None, [] -> e
+  | None, _ :: _ ->
+     let mk = if ghost then ghexp_constraint else mkexp_constraint in
+     mk ~loc ~exp:e ~cty:None ~modes
+  | Some c, _ -> mkexp_type_constraint_with_modes ~ghost ~loc ~modes e c
 
 (* Helper functions for desugaring array indexing operators *)
 type paren_kind = Paren | Brace | Bracket
@@ -763,6 +767,7 @@ let expr_of_let_bindings ~loc lbs body =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+          ~poly:lb.lb_is_poly
           ~modes:lb.lb_modes
           ?value_constraint:lb.lb_constraint  lb.lb_pattern lb.lb_expression)
       lbs.lbs_bindings
@@ -783,6 +788,7 @@ let class_of_let_bindings ~loc lbs body =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+          ~poly:lb.lb_is_poly
           ~modes:lb.lb_modes
           ?value_constraint:lb.lb_constraint lb.lb_pattern lb.lb_expression)
       lbs.lbs_bindings
@@ -3081,9 +3087,10 @@ spliceable_expr:
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
   /* END AVOID */
-  | LPAREN seq_expr type_constraint_with_modes RPAREN
+  | LPAREN seq_expr opt_type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
-        mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
+        mkexp_opt_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2
+          t }
   | mkrhs(val_longident)
       { mkexp ~loc:$sloc (Pexp_ident ($1)) }
   /* BEGIN AVOID */
@@ -3099,9 +3106,10 @@ spliceable_expr:
   | LPAREN seq_expr error
       { unclosed "(" $loc($1) ")" $loc($3) }
   *)
-  | LPAREN seq_expr type_constraint_with_modes RPAREN
+  | LPAREN seq_expr opt_type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
-        mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
+        mkexp_opt_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2
+          t }
   | indexop_expr(DOT, seq_expr, { None })
       { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
   (* Immutable array indexing is a regular operator, so it doesn't need its own
@@ -3769,6 +3777,13 @@ type_constraint:
 //  | COLON error                                 { syntax_error() }
 //  | COLONGREATER error                          { syntax_error() }
 ;
+
+%inline opt_type_constraint_with_modes:
+  | type_constraint_with_modes
+    { let ty, modes = $1 in
+      Some ty, modes }
+  | COLON at_mode_expr
+    { None, $2 }
 
 %inline constraint_:
   | type_constraint_with_modes
