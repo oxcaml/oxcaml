@@ -2214,6 +2214,7 @@ let try_expand_once = try_expand_once_gen expand_abbrev
 let try_expand_safe env ty =
   let snap = Btype.snapshot () in
   try try_expand_once env ty
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
   with Escape _ ->
     Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
 
@@ -2228,7 +2229,6 @@ let rec try_expand_head ?(fuel = 5000)
      unsure why (they believe is was due to merging changes in Printtyp when merging
      5.2 compiler changes). This is a cheap and dirty solution to prevent crashing. *)
   if fuel <= 0 then raise Cannot_expand;
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
   let ty' = try_once env ty in
   try try_expand_head ~fuel:(fuel - 1) try_once env ty'
 ||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e

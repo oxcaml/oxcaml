@@ -532,7 +532,6 @@ let rec of_expression_desc loc = function
   | Texp_hole _ -> id_fold
   | Texp_quotation exp -> of_expression exp
   | Texp_antiquotation exp -> of_expression exp
-  | Texp_eval (ct, _) -> of_core_type ct
 
 (* We should consider taking into account param.fp_loc at some point, as it
    allows us to respond with the *parameter*'s type (as opposed to the

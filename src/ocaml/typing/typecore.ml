@@ -4758,8 +4758,8 @@ let rec is_nonexpansive exp =
   | Texp_probe_is_enabled _
   | Texp_src_pos
   | Texp_quotation _
-  | Texp_array (_, _, [], _) -> true
-  | Texp_typed_hole
+  | Texp_array (_, _, [], _)
+  | Texp_typed_hole -> true
   | Texp_let(_rec_flag, pat_exp_list, body) ->
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
       is_nonexpansive body
@@ -5993,7 +5993,7 @@ let create_merlin_type_error_node loc env ty_expected ~attributes =
             desc =
               { Types.val_type = ty_expected;
                 val_kind =
-                  Val_reg (Jkind.Sort.new_var ~level:(Ctype.get_current_level ()));
+                  Val_reg (Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())));
                 val_lpoly = [];
                 val_loc = loc;
                 val_attributes = [];
@@ -8517,7 +8517,7 @@ and type_function
       in
       let ret_info =
         { ret_mode = { mode_modes = Alloc.newvar (); mode_desc = [] };
-          ret_sort = Jkind.Sort.new_var ~level:(Ctype.get_current_level ());
+          ret_sort = Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ()));
         }
       in
       { function_ = fun_ty, [], fun_body;
@@ -8584,7 +8584,7 @@ and type_function_
                   | Some { ret_mode; ret_sort } -> ret_mode, ret_sort
                   | None ->
                     ({ mode_modes = Alloc.newvar (); mode_desc = [] },
-                     Jkind.Sort.new_var ~level:(Ctype.get_current_level ()))
+                     Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())))
                 in
                 let alloc_mode = Alloc.disallow_left @@
                   match fun_alloc_mode with

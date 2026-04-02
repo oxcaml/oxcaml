@@ -93,7 +93,6 @@ let expr_tail_positions = function
   | Texp_hole _
   | Texp_quotation _
   | Texp_antiquotation _
-  | Texp_eval _
   | Texp_unboxed_unit
   | Texp_unboxed_bool _ -> []
   | Texp_match (_, _, cs, _) -> List.map cs ~f:(fun c -> Case c)
