@@ -2807,7 +2807,10 @@ let rewrite_typing_env result ~unit_symbol:_ typing_env =
               Rewriter.Many_sources_usages
                 (get_direct_usages db (Code_id_or_name.Map.singleton sym ())) )
   in
-  let r = TypesRewrite.rewrite typing_env symbol_metadata in
+  let r =
+    Profile.record_call ~accumulate:true "types" (fun () ->
+        TypesRewrite.rewrite typing_env symbol_metadata)
+  in
   if Lazy.force debug_types
   then Format.eprintf "NEW typing env: %a@." Typing_env.print r;
   r
@@ -3044,37 +3047,43 @@ let fixpoint (graph : Global_flow_graph.graph) =
       ~with_provenance:(Flambda_features.debug_reaper "prov")
       datalog
   in
-  let db = Datalog.Schedule.run ~stats datalog_schedule datalog in
   let db =
-    List.fold_left
-      (fun db rule -> Datalog.Schedule.run ~stats rule db)
-      db field_of_constructor_is_used_rules
-  in
-  (* We need to do this after [field_of_constructor_is_used] is computed, so
-     that we prevent unboxing based on the number of fields actually used. *)
-  let db =
-    let max_unbox_size = Flambda_features.reaper_max_unbox_size () in
-    Datalog.set_table cannot_unbox0_tbl
-      (Code_id_or_name.Map.filter_map
-         (fun _block fields ->
-           let num_used_fields =
-             Field.Map.fold
-               (fun field () acc ->
-                 if
-                   Field.is_real_field field
-                   && not (Field.is_function_slot field)
-                 then acc + 1
-                 else acc)
-               fields 0
-           in
-           if num_used_fields > max_unbox_size then Some () else None)
-         (Datalog.get_table field_of_constructor_is_used_tbl db))
-      db
+    Profile.record_call ~accumulate:true "analysis" (fun () ->
+        Datalog.Schedule.run ~stats datalog_schedule datalog)
   in
   let db =
-    List.fold_left
-      (fun db rule -> Datalog.Schedule.run ~stats rule db)
-      db datalog_rules
+    Profile.record_call ~accumulate:true "compute_field_usages" (fun () ->
+        List.fold_left
+          (fun db rule -> Datalog.Schedule.run ~stats rule db)
+          db field_of_constructor_is_used_rules)
+  in
+  let db =
+    Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
+        (* We need to do this after [field_of_constructor_is_used] is computed,
+           so that we prevent unboxing based on the number of fields actually
+           used. *)
+        let db =
+          let max_unbox_size = Flambda_features.reaper_max_unbox_size () in
+          Datalog.set_table cannot_unbox0_tbl
+            (Code_id_or_name.Map.filter_map
+               (fun _block fields ->
+                 let num_used_fields =
+                   Field.Map.fold
+                     (fun field () acc ->
+                       if
+                         Field.is_real_field field
+                         && not (Field.is_function_slot field)
+                       then acc + 1
+                       else acc)
+                     fields 0
+                 in
+                 if num_used_fields > max_unbox_size then Some () else None)
+               (Datalog.get_table field_of_constructor_is_used_tbl db))
+            db
+        in
+        List.fold_left
+          (fun db rule -> Datalog.Schedule.run ~stats rule db)
+          db datalog_rules)
   in
   if
     Flambda_features.debug_reaper "stats"
@@ -3094,118 +3103,119 @@ let fixpoint (graph : Global_flow_graph.graph) =
             Format.asprintf "%a" Code_id_or_name.print node)
   in
   let has_to_be_unboxed code_or_name = has_to_be_unboxed [code_or_name] db in
-  let unboxed =
-    Datalog.Cursor.fold query_to_unbox db ~init:Code_id_or_name.Map.empty
-      ~f:(fun [code_or_name; to_patch] unboxed ->
-        (* CR-someday ncourant: produce ghost makeblocks/set of closures for
-           debugging *)
-        let new_name =
-          Format.asprintf "%s_into_%s"
-            (name_of_node code_or_name)
-            (name_of_node to_patch)
+  let unboxed, changed_representation =
+    Profile.record_call ~accumulate:true "compute_unboxing_variables" (fun () ->
+        let unboxed =
+          Datalog.Cursor.fold query_to_unbox db ~init:Code_id_or_name.Map.empty
+            ~f:(fun [code_or_name; to_patch] unboxed ->
+              (* CR-someday ncourant: produce ghost makeblocks/set of closures
+                 for debugging *)
+              let new_name =
+                Format.asprintf "%s_into_%s"
+                  (name_of_node code_or_name)
+                  (name_of_node to_patch)
+              in
+              let fields =
+                mk_unboxed_fields ~has_to_be_unboxed
+                  ~mk:(fun kind name -> Variable.create name kind)
+                  db code_or_name
+                  (get_fields db
+                     (get_all_usages ~follow_known_arity_calls:true db
+                        (Code_id_or_name.Map.singleton to_patch ())))
+                  new_name
+              in
+              Code_id_or_name.Map.add to_patch fields unboxed)
         in
-        let fields =
-          mk_unboxed_fields ~has_to_be_unboxed
-            ~mk:(fun kind name -> Variable.create name kind)
-            db code_or_name
-            (get_fields db
-               (get_all_usages ~follow_known_arity_calls:true db
-                  (Code_id_or_name.Map.singleton to_patch ())))
-            new_name
-        in
-        Code_id_or_name.Map.add to_patch fields unboxed)
-  in
-  if Flambda_features.debug_reaper "unbox"
-  then
-    Format.printf "TO UNBOX: %a@."
-      (Code_id_or_name.Map.print
-         (Field.Map.print (pp_unboxed_elt Variable.print)))
-      unboxed;
-  let changed_representation = ref Code_id_or_name.Map.empty in
-  Datalog.Cursor.iter query_to_change_representation db
-    ~f:(fun [code_id_or_name] ->
-      (* This can happen because we change the representation of each function
-         slot of a set of closures at the same time. *)
-      if Code_id_or_name.Map.mem code_id_or_name !changed_representation
-      then ()
-      else
-        let add_to_s repr alloc_point =
-          Datalog.Cursor.iter_with_parameters query_dominated_by [alloc_point]
-            db ~f:(fun [c] ->
-              changed_representation
-                := Code_id_or_name.Map.add c (repr, alloc_point)
-                     !changed_representation)
-        in
-        match get_set_of_closures_def db code_id_or_name with
-        | Not_a_set_of_closures ->
-          let r = ref ~-1 in
-          let mk _kind _name =
-            (* XXX fixme, disabled for now *)
-            (* TODO depending on the kind, use two counters; then produce a
+        if Flambda_features.debug_reaper "unbox"
+        then
+          Format.printf "TO UNBOX: %a@."
+            (Code_id_or_name.Map.print
+               (Field.Map.print (pp_unboxed_elt Variable.print)))
+            unboxed;
+        let changed_representation = ref Code_id_or_name.Map.empty in
+        Datalog.Cursor.iter query_to_change_representation db
+          ~f:(fun [code_id_or_name] ->
+            (* This can happen because we change the representation of each
+               function slot of a set of closures at the same time. *)
+            if Code_id_or_name.Map.mem code_id_or_name !changed_representation
+            then ()
+            else
+              let add_to_s repr alloc_point =
+                Datalog.Cursor.iter_with_parameters query_dominated_by
+                  [alloc_point] db ~f:(fun [c] ->
+                    changed_representation
+                      := Code_id_or_name.Map.add c (repr, alloc_point)
+                           !changed_representation)
+              in
+              match get_set_of_closures_def db code_id_or_name with
+              | Not_a_set_of_closures ->
+                let r = ref ~-1 in
+                let mk _kind _name =
+                  (* XXX fixme, disabled for now *)
+                  (* TODO depending on the kind, use two counters; then produce a
                mixed block; map_unboxed_fields should help with that *)
-            incr r;
-            ( !r,
-              Flambda_primitive.(
-                Block_access_kind.Values
-                  { tag = Unknown;
-                    size = Unknown;
-                    field_kind = Block_access_field_kind.Any_value
-                  }) )
-          in
-          let uses =
-            get_all_usages ~follow_known_arity_calls:false db
-              (Code_id_or_name.Map.singleton code_id_or_name ())
-          in
-          let repr =
-            mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name
-              (get_fields db uses) ""
-          in
-          add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
-        | Set_of_closures l ->
-          let mk kind name =
-            Value_slot.create
-              (Compilation_unit.get_current_exn ())
-              ~name ~is_always_immediate:false kind
-          in
-          let fields =
-            get_fields_usage_of_constructors db
-              (List.fold_left
-                 (fun acc (_, x) -> Code_id_or_name.Map.add x () acc)
-                 Code_id_or_name.Map.empty l)
-          in
-          let repr =
-            mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name fields
-              "unboxed"
-          in
-          let fss =
-            List.fold_left
-              (fun acc (fs, _) ->
-                Function_slot.Map.add fs
-                  (Function_slot.create
-                     (Compilation_unit.get_current_exn ())
-                     ~name:(Function_slot.name fs) ~is_always_immediate:false
-                     Flambda_kind.value)
-                  acc)
-              Function_slot.Map.empty l
-          in
-          List.iter
-            (fun (fs, f) -> add_to_s (Closure_representation (repr, fss, fs)) f)
-            l);
-  if Flambda_features.debug_reaper "unbox"
-  then
-    Format.eprintf "@.TO_CHG: %a@."
-      (Code_id_or_name.Map.print (fun ff (repr, alloc_point) ->
-           Format.fprintf ff "[from %a]%a" Code_id_or_name.print alloc_point
-             pp_changed_representation repr))
-      !changed_representation;
+                  incr r;
+                  ( !r,
+                    Flambda_primitive.(
+                      Block_access_kind.Values
+                        { tag = Unknown;
+                          size = Unknown;
+                          field_kind = Block_access_field_kind.Any_value
+                        }) )
+                in
+                let uses =
+                  get_all_usages ~follow_known_arity_calls:false db
+                    (Code_id_or_name.Map.singleton code_id_or_name ())
+                in
+                let repr =
+                  mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name
+                    (get_fields db uses) ""
+                in
+                add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
+              | Set_of_closures l ->
+                let mk kind name =
+                  Value_slot.create
+                    (Compilation_unit.get_current_exn ())
+                    ~name ~is_always_immediate:false kind
+                in
+                let fields =
+                  get_fields_usage_of_constructors db
+                    (List.fold_left
+                       (fun acc (_, x) -> Code_id_or_name.Map.add x () acc)
+                       Code_id_or_name.Map.empty l)
+                in
+                let repr =
+                  mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name
+                    fields "unboxed"
+                in
+                let fss =
+                  List.fold_left
+                    (fun acc (fs, _) ->
+                      Function_slot.Map.add fs
+                        (Function_slot.create
+                           (Compilation_unit.get_current_exn ())
+                           ~name:(Function_slot.name fs)
+                           ~is_always_immediate:false Flambda_kind.value)
+                        acc)
+                    Function_slot.Map.empty l
+                in
+                List.iter
+                  (fun (fs, f) ->
+                    add_to_s (Closure_representation (repr, fss, fs)) f)
+                  l);
+        if Flambda_features.debug_reaper "unbox"
+        then
+          Format.eprintf "@.TO_CHG: %a@."
+            (Code_id_or_name.Map.print (fun ff (repr, alloc_point) ->
+                 Format.fprintf ff "[from %a]%a" Code_id_or_name.print
+                   alloc_point pp_changed_representation repr))
+            !changed_representation;
+        unboxed, !changed_representation)
+  in
   if
     Flambda_features.reaper_unbox ()
     && Flambda_features.reaper_change_calling_conventions ()
-  then
-    { db;
-      unboxed_fields = unboxed;
-      changed_representation = !changed_representation
-    }
+  then { db; unboxed_fields = unboxed; changed_representation }
   else
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;
