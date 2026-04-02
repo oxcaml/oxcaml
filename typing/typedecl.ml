@@ -2178,23 +2178,10 @@ let rec update_decl_jkind env dpath decl =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
-      let payload =
-        List.find_opt
-          (fun cd ->
-             match cd.Types.cd_args with
-             | Cstr_tuple [_] -> true
-             | Cstr_tuple [] -> false
-             | Cstr_tuple (_ :: _ :: _) | Cstr_record _ -> assert false)
-          cstrs
-      in
-      begin match payload with
+      begin match Datarepr.find_variant_with_null_payload cstrs with
       | Some
-          ({ Types.cd_uid;
-             cd_args =
-               Cstr_tuple
-                 [{ ca_type = ty; ca_modalities = modality }];
-             _
-           } as _payload) ->
+          { payload_cstr = { Types.cd_uid; _ };
+            payload_arg = { ca_type = ty; ca_modalities = modality; _ } } ->
         let jkind = Ctype.type_jkind env ty in
         let sort = Jkind.sort_of_jkind env jkind in
         let ca_sort = Jkind.Sort.default_to_value_and_get sort in
@@ -2223,7 +2210,7 @@ let rec update_decl_jkind env dpath decl =
             "Typedecl.update_variant_kind: Variant_with_null payload is \
              already maybe-null"
         end
-      | Some _ | None ->
+      | None ->
         Misc.fatal_error "Invalid constructor for Variant_with_null"
       end
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin

@@ -2522,21 +2522,14 @@ let unbox_once env ty =
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
         | Type_variant (cstrs, Variant_with_null, _) ->
-          let payload =
-            List.find_opt
-              (fun cd ->
-                 match cd.cd_args with
-                 | Cstr_tuple [_] -> true
-                 | Cstr_tuple [] -> false
-                 | Cstr_tuple (_ :: _ :: _) | Cstr_record _ -> assert false)
-              cstrs
-          in
-          begin match payload with
-          | Some { cd_args = Cstr_tuple [arg]; _ } ->
+          begin match Datarepr.find_variant_with_null_payload cstrs with
+          | Some
+              { payload_arg = { ca_type = ty; ca_modalities = modality; _ };
+                _ } ->
             Stepped_or_null
-              { ty = apply arg.ca_type ~extra_substs:[];
-                modality = arg.ca_modalities }
-          | Some _ | None ->
+              { ty = apply ty ~extra_substs:[];
+                modality }
+          | None ->
             Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->

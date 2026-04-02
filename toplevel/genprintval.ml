@@ -489,15 +489,11 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                       | Datarepr.Constr_not_found | Not_found ->
                         match rep with
                         | Variant_with_null ->
-                          List.find
-                            (fun ({ cd_args; _ } :
-                                   Types.constructor_declaration) ->
-                               match cd_args with
-                               | Cstr_tuple [_] | Cstr_record [_] -> true
-                               | Cstr_tuple [] -> false
-                               | Cstr_tuple (_ :: _ :: _) | Cstr_record []
-                               | Cstr_record (_ :: _ :: _) -> assert false)
-                            constr_list
+                          (match
+                             Datarepr.find_variant_with_null_payload constr_list
+                           with
+                           | Some { payload_cstr; _ } -> payload_cstr
+                           | None -> raise Datarepr.Constr_not_found)
                         | _ -> raise Datarepr.Constr_not_found
                     in
                     let type_params =
