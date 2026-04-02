@@ -145,6 +145,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "@[<2>exception@ %a@]" pretty_arg v
   | Tpat_or _ ->
       fprintf ppf "@[(%a)@]" pretty_or v
+  | Tpat_fun_layout { id; _ } -> fprintf ppf "%s" (Ident.name id)
 
 and pretty_car ppf v = match v.pat_desc with
 | Tpat_construct (_,cstr, [_ ; _], None)

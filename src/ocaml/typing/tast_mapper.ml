@@ -365,6 +365,8 @@ let pat
         Tpat_alias { pattern = sub.pat sub pattern; id;
                      name = map_loc sub name; uid;
                      sort; mode; type_expr }
+    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly } ->
+        Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode; lpoly }
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -710,8 +712,6 @@ let expr sub x =
         Texp_quotation (sub.expr sub exp)
     | Texp_antiquotation exp ->
         Texp_antiquotation (sub.expr sub exp)
-    | Texp_eval (typ, sort) ->
-        Texp_eval (sub.typ sub typ, sort)
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}

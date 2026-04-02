@@ -64,6 +64,7 @@ and ident_atomic_loc = ident_create "atomic_loc"
 (* CR metaprogramming aivaskovic: there is a question about naming;
    keep `expr` for now instead of `code` *)
 and ident_code = ident_create "expr"
+and ident_eval = ident_create "eval"
 
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
@@ -117,6 +118,7 @@ and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_atomic_loc = Pident ident_atomic_loc
 and path_code = Pident ident_code
+and path_eval = Pident ident_eval
 
 and path_or_null = Pident ident_or_null
 
@@ -201,6 +203,7 @@ and type_floatarray = newgenty (Tconstr(path_floatarray, [], ref Mnil))
 and type_lexing_position = newgenty (Tconstr(path_lexing_position, [], ref Mnil))
 and type_atomic_loc t = newgenty (Tconstr(path_atomic_loc, [t], ref Mnil))
 and type_code t = newgenty (Tconstr(path_code, [t], ref Mnil))
+and type_eval t = newgenty (Tquote_eval (newgenty (Tsplice t)))
 
 and type_unboxed_unit = newgenty (Tconstr(path_unboxed_unit, [], ref Mnil))
 and type_unboxed_bool = newgenty (Tconstr(path_unboxed_bool, [], ref Mnil))
@@ -436,6 +439,7 @@ let mk_add_type add_type =
   add_type_with_jkind, add_type
 
 let mk_add_type1 add_type type_ident
+      ?manifest
       ?(kind=fun _ -> Type_abstract Definition)
       ~jkind
       ?(param_jkind=Jkind.Builtin.value ~why:(
@@ -453,7 +457,7 @@ let mk_add_type1 add_type type_ident
       type_jkind = Jkind.mark_best (jkind param);
       type_loc = Location.none;
       type_private = Asttypes.Public;
-      type_manifest = None;
+      type_manifest = Option.map (fun f -> f param) manifest;
       type_variance = [variance];
       type_separability = [separability];
       type_is_newtype = false;
@@ -724,14 +728,6 @@ let build_initial_env add_type add_extension add_jkind empty_env =
            ~modality:Mode.Modality.Const.id
            ~type_expr:param)
   |> add_type ident_string ~jkind:Jkind.Const.Builtin.immutable_data
-  |> add_type1 ident_code
-       ~variance:Variance.covariant
-       ~separability:Separability.Ind
-       ~jkind:(fun param ->
-         Jkind.Builtin.immutable_data ~why:Tquote |>
-           Jkind.add_with_bounds
-             ~modality:Mode.Modality.Const.id
-             ~type_expr:param)
   |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit
        ~kind:(variant [cstr ident_void []])
@@ -859,6 +855,39 @@ let add_or_null add_type env =
   ~kind:or_null_kind
   ~param_jkind:(Jkind.for_or_null_argument ident_or_null)
   ~jkind:or_null_jkind
+
+let add_runtime_metaprogramming_types add_type env =
+  let add_type1 = mk_add_type1 add_type in
+  env
+  |> add_type1 ident_code
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~jkind:(fun param ->
+         Jkind.for_expr |>
+           Jkind.add_with_bounds
+             ~modality:Mode.Modality.Const.id
+             ~type_expr:param)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_code;
+           position = 1;
+           arity = 1;
+         }))
+  |> add_type1 ident_eval
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~manifest:type_eval
+       ~jkind:(fun param ->
+         Jkind.Builtin.any ~why:Evaluated_quote |>
+           Jkind.add_with_bounds
+             ~modality:Mode.Modality.Const.id
+             ~type_expr:param)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_eval;
+           position = 1;
+           arity = 1;
+         }))
 
 let builtin_values =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns

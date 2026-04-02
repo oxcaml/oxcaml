@@ -163,7 +163,6 @@ type module_unbound_reason =
 type stage_lock =
   | Quotation_lock
   | Splice_lock
-  | Toplevel_lock_for_directive
 
 type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
@@ -707,6 +706,7 @@ type t = {
   short_paths: Short_paths.t option;
   short_paths_additions: short_paths_addition list;
   stage: stage;
+  toplevel_scope: int
 }
 
 and module_components =
@@ -873,6 +873,7 @@ type no_open_quotations_context =
   | Open_qt
   | Object_field_with_attribute_qt
   | Variant_tag_with_attribute_qt
+  | Jkind_annotation_qt
 
 let print_structure_components_reason ppf = function
   | Project -> Format_doc.fprintf ppf "have any components"
@@ -1022,6 +1023,7 @@ let empty = {
   short_paths = None;
   short_paths_additions = [];
   stage = 0;
+  toplevel_scope = Ident.lowest_scope
  }
 
 let in_signature b env =
@@ -3171,8 +3173,8 @@ let enter_splice ~loc env =
     raise (Error (Toplevel_splice loc));
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
 
-let mark_toplevel_in_quotations env =
-  add_stage_lock Toplevel_lock_for_directive env
+let mark_toplevel_in_quotations ~scope env =
+  { env with toplevel_scope = scope }
 
 let check_no_open_quotations loc env context =
   if env.stage = 0
@@ -3186,8 +3188,7 @@ let stage_locks_offset locks =
     (fun lock rel_stage ->
        match lock with
        | Quotation_lock -> rel_stage + 1
-       | Splice_lock -> rel_stage - 1
-       | Toplevel_lock_for_directive -> 0)
+       | Splice_lock -> rel_stage - 1)
     locks 0
 
 (* Insertion of all components of a signature *)
@@ -3409,7 +3410,8 @@ let add_language_extension_types env =
     |> add SIMD Alpha Predef.add_simd_alpha_extension_types
     |> add Small_numbers Stable Predef.add_small_number_extension_types
     |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
-    |> add Layouts Stable Predef.add_or_null)
+    |> add Layouts Stable Predef.add_or_null
+    |> add Runtime_metaprogramming () Predef.add_runtime_metaprogramming_types)
 
 (* Some predefined types are part of language extensions, and we don't want to
    make them available in the initial environment if those extensions are not
@@ -3525,13 +3527,11 @@ let may_lookup_error report_errors loc env err =
   if report_errors then lookup_error loc env err
   else raise Not_found
 
-let rec path_head_is_global_or_predef = function
-    Pident id -> Ident.is_global_or_predef id
-  | Pdot(p, _) | Pextra_ty (p, _) -> path_head_is_global_or_predef p
-  | Papply _ -> false
+let path_is_toplevel_in_quotations env path =
+  Path.scope path <= env.toplevel_scope
 
-let does_not_cross_quotation path locks =
-  if path_head_is_global_or_predef path
+let does_not_cross_quotation env path locks =
+  if path_is_toplevel_in_quotations env path
   then Ok ()
   else
     (match stage_locks_offset locks with
@@ -3540,14 +3540,14 @@ let does_not_cross_quotation path locks =
 
 let check_cross_quotation ~errors ~loc_use ~loc_def env path lid
       locks =
-  match does_not_cross_quotation path locks with
+  match does_not_cross_quotation env path locks with
   | Ok () -> ()
   | Error n ->
     may_lookup_error errors loc_use env
       (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
 
-let assert_does_not_cross_quotation ~loc_use ~loc_def path locks =
-  match does_not_cross_quotation path locks with
+let assert_does_not_cross_quotation ~loc_use ~loc_def env path locks =
+  match does_not_cross_quotation env path locks with
   | Ok () -> ()
   | Error _ ->
       Misc.fatal_errorf_doc
@@ -3928,7 +3928,7 @@ let lookup_all_ident_labels (type rep) ~(record_form : rep record_form) ~errors
   let lbls_filtered =
     List.filter_map
       (fun (path, lbl, (locks, use_fn)) ->
-         does_not_cross_quotation path locks
+         does_not_cross_quotation env path locks
          |> Result.map (fun () -> (path, lbl, use_fn))
          |> Result.to_option)
       lbls
@@ -3961,7 +3961,7 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
     List.filter_map
       (fun (path, cda, (locks, use_fn)) ->
          let stage_locks, locks = partition_locks locks in
-         does_not_cross_quotation path stage_locks
+         does_not_cross_quotation env path stage_locks
          |> Result.map (fun () -> (path, cda, (locks, use_fn)))
          |> Result.to_option)
       cstrs
@@ -4451,7 +4451,7 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
       path, mda.mda_declaration.md_loc
   in
   let stage_locks, locks = partition_locks locks in
-  assert_does_not_cross_quotation ~loc_use:loc ~loc_def path stage_locks;
+  assert_does_not_cross_quotation env ~loc_use:loc ~loc_def path stage_locks;
   path, locks
 
 let lookup_value_lazy ~errors ~use ~loc lid env =
@@ -5027,8 +5027,8 @@ let env_of_only_summary env_from_summary env =
 
 (* Forward declartions that must refer to type t *)
 let report_jkind_violation_with_offender =
-  ref ((fun ~offender:_ ~level:_ _ _ _ -> assert false)
-       : offender:(Format_doc.formatter -> unit) -> level:int -> t ->
+  ref ((fun ~offender:_ _ _ _ -> assert false)
+       : offender:(Format_doc.formatter -> unit) -> t ->
          Format_doc.formatter -> Jkind.Violation.t -> unit)
 
 (* Error report *)
@@ -5142,6 +5142,8 @@ let print_unsupported_quotation ppf =
       fprintf ppf "Adding attributes on fields in object types"
   | Variant_tag_with_attribute_qt ->
       fprintf ppf "Adding attributes on tags in polymorphic variant types"
+  | Jkind_annotation_qt ->
+      fprintf ppf "Annotating types with kinds"
 
 let print_unbound_in_quotation ppf =
   function
@@ -5150,7 +5152,7 @@ let print_unbound_in_quotation ppf =
 
 let quoted_longident = Style.as_inline_code pp_longident
 
-let report_lookup_error_doc ~level _loc env ppf = function
+let report_lookup_error_doc _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
       fprintf ppf "Unbound value %a" quoted_longident lid;
       spellcheck ppf extract_values env lid;
@@ -5358,7 +5360,7 @@ let report_lookup_error_doc ~level _loc env ppf = function
         quoted_longident lid
         (fun v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
-           ~level env v)
+           env v)
         err
   | No_unboxed_version (lid, decl) ->
       fprintf ppf "@[The type %a has no unboxed version.@]"
@@ -5408,7 +5410,7 @@ let report_lookup_error_doc ~level _loc env ppf = function
         quoted_longident lid
         print_stage avail_stage
 
-let report_error_doc ~level ppf = function
+let report_error_doc ppf = function
   | Missing_module(_, path1, path2) ->
       fprintf ppf "@[@[<hov>";
       if Path.same path1 path2 then
@@ -5430,7 +5432,7 @@ let report_error_doc ~level ppf = function
         "@[<hov>The implicit kind for %a is already defined at %a.@]"
         Style.inline_code name
         (Location.Doc.loc ~capitalize_first:false) defined_at
-  | Lookup_error(loc, t, err) -> report_lookup_error_doc ~level loc t ppf err
+  | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t ppf err
   | Incomplete_instantiation { unset_param } ->
       fprintf ppf "@[<hov>Not enough instance arguments: the parameter@ %a@ is \
                    required.@]"
@@ -5469,7 +5471,7 @@ let () =
           in
           Some
             (error_of_printer
-               (report_error_doc ~level:Btype.generic_level) err)
+               report_error_doc err)
       | _ ->
           None
     )
@@ -5798,6 +5800,6 @@ let () =
   in
   Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
 
-let report_lookup_error ~level loc t =
-  Format_doc.compat (report_lookup_error_doc ~level loc t)
-let report_error ~level = Format_doc.compat (report_error_doc ~level)
+let report_lookup_error loc t =
+  Format_doc.compat (report_lookup_error_doc loc t)
+let report_error = Format_doc.compat report_error_doc

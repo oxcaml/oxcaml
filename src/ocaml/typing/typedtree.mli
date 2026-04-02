@@ -227,6 +227,19 @@ and 'k pattern_desc =
       type_expr: Types.type_expr;
     } -> value pattern_desc
         (** P as a *)
+  | Tpat_fun_layout : {
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.Value.l;
+      lpoly: Types.Lpoly.t;
+    } -> value pattern_desc
+        (** x with layout polymorphism, used in let poly_ bindings.
+            [lpoly] is [pending] during type-checking and guaranteed
+            [determined] after [type_let] returns. It may be determined with
+            an empty list of sort vars if no layout poly is actually inferred
+            (in which case a [Useless_lpoly] warning is emitted). *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc
@@ -620,7 +633,18 @@ and expression_desc =
   | Texp_hole of unique_use (** _ *)
   | Texp_quotation of expression
   | Texp_antiquotation of expression
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-35
   | Texp_eval of core_type * Jkind.sort
+||||||| oxcaml/oxcaml:c7fb58867d3810c3341ff1b3fdba02d12cc76d3e
+  | Texp_eval of core_type * Jkind.sort
+
+and function_curry =
+  | More_args of { partial_mode : Mode.Alloc.l }
+=======
+
+and function_curry =
+  | More_args of { partial_mode : Mode.Alloc.l }
+>>>>>>> oxcaml/oxcaml:8cb0afc52527bb3d38ecf4277e6929e0c7a6a4b0
   (* merlin-specific: a [Texp_typed_hole] is a typed hole written by the user as a
       placeholder. This is in contrast to a Texp_hole, which is used in overwrite
       expressions *)
