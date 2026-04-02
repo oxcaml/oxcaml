@@ -2879,7 +2879,7 @@ let constrain_type_jkind ~fixed env ty jkind =
            (Format_doc.compat (Jkind.format env))
            jkind;
        let sub_result =
-         Ikind.sub_or_intersect ~type_equal ~context ~level:!current_level env
+         Ikind.sub_or_intersect ~type_equal ~context env
            ty's_jkind jkind
        in
        if !Clflags.ikinds_debug
@@ -8123,7 +8123,7 @@ let check_decl_jkind env decl jkind =
     Ikind.sub_jkind_l
       ~origin:
         (Format.asprintf "ctype:decl %a" Location.print_loc decl.type_loc)
-      ~type_equal ~context ~level:!current_level env decl_jkind jkind
+      ~type_equal ~context env decl_jkind jkind
   with
   | Ok () -> Ok ()
   | Error _ as err ->
@@ -8136,7 +8136,7 @@ let check_decl_jkind env decl jkind =
           ~origin:
             (Format.asprintf "ctype:manifest %a"
                Location.print_loc decl.type_loc)
-          ~type_equal ~context ~level:!current_level env ty_jkind jkind
+          ~type_equal ~context env ty_jkind jkind
       with
       | Ok () -> Ok ()
       | Error _ as err -> err
@@ -8156,7 +8156,7 @@ let constrain_decl_jkind env decl jkind =
     match
       (* Use Ikind when enabled so axis constraints are checked; it falls
          back to [Jkind.sub_or_error] when ikinds are disabled. *)
-      Ikind.sub_or_error ~type_equal ~context ~level:!current_level env
+      Ikind.sub_or_error ~type_equal ~context env
         decl.type_jkind jkind
     with
     | Ok () as ok -> ok

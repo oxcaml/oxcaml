@@ -1078,7 +1078,7 @@ let compute_subcheck_polys ~context:_ env
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
-    ~(context : Jkind.jkind_context) ~level:_level env (sub : Types.jkind_l)
+    ~(context : Jkind.jkind_context) env (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
   if not (enable_sub_jkind_l && !Clflags.ikinds)
@@ -1234,12 +1234,11 @@ let fast_sub_of_sort_super :
 let fast_sub :
     type r1 l2.
     context:Jkind.jkind_context ->
-    level:int ->
     Env.t ->
     (Allowance.allowed * r1) Types.jkind ->
     (l2 * Allowance.allowed) Types.jkind ->
     bool =
- fun ~context:_ ~level:_ _env
+ fun ~context:_ _env
     (sub : (Allowance.allowed * r1) Types.jkind)
     (super : (l2 * Allowance.allowed) Types.jkind) ->
   match super.jkind with
@@ -1262,7 +1261,7 @@ let fast_sub :
 
 let sub_or_intersect ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
-    ~(context : Jkind.jkind_context) ~level env
+    ~(context : Jkind.jkind_context) env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
   let debug_polys ?polys ~outcome () =
@@ -1334,7 +1333,7 @@ let sub_or_intersect ?origin
   in
   if not (enable_sub_or_intersect && !Clflags.ikinds)
   then Jkind.sub_or_intersect ~type_equal ~context env t1 t2
-  else if fast_sub ~context ~level env t1 t2
+  else if fast_sub ~context env t1 t2
   then (
     if !Clflags.ikinds_debug
     then (
@@ -1347,7 +1346,7 @@ let sub_or_intersect ?origin
 
 let sub_or_error ?origin:_origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
-    ~(context : Jkind.jkind_context) ~level:_level env
+    ~(context : Jkind.jkind_context) env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) :
     (unit, Jkind.Violation.t) result =

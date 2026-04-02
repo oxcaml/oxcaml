@@ -28,7 +28,6 @@ val sub_jkind_l :
   ?origin:string ->
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:Jkind.jkind_context ->
-  level:int ->
   Env.t ->
   Types.jkind_l ->
   Types.jkind_l ->
@@ -51,7 +50,6 @@ val sub_or_intersect :
   ?origin:string ->
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:Jkind.jkind_context ->
-  level:int ->
   Env.t ->
   (Allowance.allowed * 'r1) Types.jkind ->
   ('l2 * Allowance.allowed) Types.jkind ->
@@ -61,7 +59,6 @@ val sub_or_error :
   ?origin:string ->
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:Jkind.jkind_context ->
-  level:int ->
   Env.t ->
   (Allowance.allowed * 'r1) Types.jkind ->
   ('l2 * Allowance.allowed) Types.jkind ->
