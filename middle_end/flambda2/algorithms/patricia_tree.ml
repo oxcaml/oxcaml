@@ -20,14 +20,35 @@ external int_clz : int -> (int[@untagged])
   = "caml_int_clz_tagged_to_tagged" "caml_int_clz_tagged_to_untagged"
 [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-(* A bit [b], represented as a bitmask with only [b] set. This makes testing an
-   individual bit very cheap. *)
-type bit = int
+(* A bit-packed pair of a bit [b] and prefix [p] matching the beginning
+   (big-endian) of every key in a subtree, up to bit [b].
 
-(* A sequence of bits matched by the beginning (big-endian) of every key in a
-   subtree. It has some length, represented as the first [bit] after the entire
-   prefix. *)
-type prefix = int
+   The bit [b] is represented as a bitmask with only [b] set. This makes testing
+   an individual bit very cheap.
+
+   The prefix is represented as a sequence of bits matched by the beginning
+   (big-endian) of every key in a subtree. It has some length, represented as
+   the first [bit] after the entire prefix.
+
+   This is represented as the logical "or" of the bit and the prefix. The
+   representation is:
+ *)
+(*
+ *           ____ bit [b] is the least significant bit
+ *          /
+ * <prefix>100..00
+ * \______/
+ *   arbitrary prefix leading to [b]
+ *)
+type prefix_and_bit = int
+
+let[@inline always] unpack prefix_and_bit =
+  (* This computes the least significant bit in [0]. *)
+  let bit = prefix_and_bit land -prefix_and_bit in
+  let prefix = prefix_and_bit lxor bit in
+  prefix, bit
+
+let[@inline always] pack prefix bit = prefix lor bit
 
 let zero_bit i bit = i land bit = 0
 
@@ -44,14 +65,21 @@ let mask i bit = i land -(bit lsl 1)
    match [prefix] at every position strictly higher than [bit]? *)
 let match_prefix i prefix bit = mask i bit = prefix
 
-let equal_prefix prefix0 bit0 prefix1 bit1 = bit0 = bit1 && prefix0 = prefix1
+let match_prefix_and_bit i prefix_and_bit =
+  (* CR bclement: There might be better ways to compute this, such as [mask (i
+     lxor prefix_and_bit) (prefix_and_bit land -prefix_and_bit) = 0] which would
+     avoid a [xor], but it's not clear that the assembly is better due to this
+     operating on tagged integers. *)
+  let prefix, bit = unpack prefix_and_bit in
+  match_prefix i prefix bit
 
 let higher bit0 bit1 =
-  (* Need to do _unsigned_ int comparison *)
-  match bit0 < 0, bit1 < 0 with
-  | false, false -> bit0 > bit1
-  | _, true -> false (* the only bit < 0 is 0x4000..., which is the highest *)
-  | true, false -> true
+  (* We need to do _unsigned_ int comparison on bits.
+
+     The only bit <= 0 (where signed and unsigned comparison would differ) is
+     0x4000..., which becomes 0x3fff... when subtracting 1, and all other bits
+     are > 0. *)
+  bit0 - 1 > bit1 - 1
 
 (* Is [prefix0], of length [bit0], a sub-prefix of [prefix1], of length
    [bit1]? *)
@@ -95,7 +123,7 @@ module type Tree = sig
      If the prefix is P, we require that [t0] has prefix P0 and [t1] has prefix
      P1 (note that this is big-endian notation). For efficiency, [t0] and [t1]
      are assumed to be non-empty. *)
-  val branch : prefix -> bit -> 'a t -> 'a t -> 'a t
+  val branch : prefix_and_bit -> 'a t -> 'a t -> 'a t
 
   (* A view on a given node, corresponding to which of [empty], [leaf], or
      [branch] constructed it. Passing the fields back in as arguments will
@@ -103,7 +131,7 @@ module type Tree = sig
   type 'a descr =
     | Empty
     | Leaf of key * 'a
-    | Branch of prefix * bit * 'a t * 'a t
+    | Branch of prefix_and_bit * 'a t * 'a t
 
   val descr : 'a t -> 'a descr
 
@@ -165,7 +193,7 @@ module Set0 = struct
   type 'a t =
     | Empty : unit t
     | Leaf : key -> unit t
-    | Branch : prefix * bit * unit t * unit t -> unit t
+    | Branch : prefix_and_bit * unit t * unit t -> unit t
 
   type 'a is_value = Unit : unit is_value
 
@@ -182,19 +210,20 @@ module Set0 = struct
   let[@inline always] leaf (type a) (Unit : a is_value) elt (() : a) : a t =
     Leaf elt
 
-  let[@inline always] branch (type a) prefix bit (t0 : a t) (t1 : a t) : a t =
+  let[@inline always] branch (type a) prefix_and_bit (t0 : a t) (t1 : a t) : a t
+      =
     let Unit = is_value_of t0 in
-    Branch (prefix, bit, t0, t1)
+    Branch (prefix_and_bit, t0, t1)
 
   type 'a descr =
     | Empty
     | Leaf of key * 'a
-    | Branch of prefix * bit * 'a t * 'a t
+    | Branch of prefix_and_bit * 'a t * 'a t
 
   let descr (type a) : a t -> a descr = function
     | Empty -> Empty
     | Leaf elt -> Leaf (elt, ())
-    | Branch (prefix, bit, t0, t1) -> Branch (prefix, bit, t0, t1)
+    | Branch (prefix_and_bit, t0, t1) -> Branch (prefix_and_bit, t0, t1)
 
   module Binding = struct
     type _ t = key
@@ -260,7 +289,7 @@ module Map0 = struct
   type 'a t =
     | Empty
     | Leaf of key * 'a
-    | Branch of prefix * bit * 'a t * 'a t
+    | Branch of prefix_and_bit * 'a t * 'a t
 
   type _ is_value = Any : 'a is_value
 
@@ -270,12 +299,13 @@ module Map0 = struct
 
   let[@inline always] leaf Any i d = Leaf (i, d)
 
-  let[@inline always] branch prefix bit t0 t1 = Branch (prefix, bit, t0, t1)
+  let[@inline always] branch prefix_and_bit t0 t1 =
+    Branch (prefix_and_bit, t0, t1)
 
   type 'a descr = 'a t =
     | Empty
     | Leaf of key * 'a
-    | Branch of prefix * bit * 'a t * 'a t
+    | Branch of prefix_and_bit * 'a t * 'a t
 
   let descr = Fun.id
 
@@ -466,15 +496,16 @@ end = struct
   (* A relaxed version of [Tree.branch], allowing [t0] and/or [t1] to be empty.
      It still requires that [t0] and [t1] have prefix [P0] and [P1],
      respectively, where [P] is the bits in [prefix] lower than [bit]. *)
-  let branch prefix bit t0 t1 =
+  let branch prefix_and_bit t0 t1 =
     match (descr [@inlined hint]) t0, (descr [@inlined hint]) t1 with
     | Empty, _ -> t1
     | _, Empty -> t0
-    | (Leaf _ | Branch _), (Leaf _ | Branch _) -> Tree.branch prefix bit t0 t1
+    | (Leaf _ | Branch _), (Leaf _ | Branch _) ->
+      Tree.branch prefix_and_bit t0 t1
   [@@inline always]
 
-  let branch_non_empty prefix bit t0 t1 =
-    (Tree.branch [@inlined hint]) prefix bit t0 t1
+  let branch_non_empty prefix_and_bit t0 t1 =
+    (Tree.branch [@inlined hint]) prefix_and_bit t0 t1
   [@@inline always]
 
   let is_empty t =
@@ -486,7 +517,8 @@ end = struct
     match descr t with
     | Empty -> false
     | Leaf (j, _) -> j = i
-    | Branch (prefix, bit, t0, t1) ->
+    | Branch (prefix_and_bit, t0, t1) ->
+      let prefix, bit = unpack prefix_and_bit in
       if not (match_prefix i prefix bit)
       then false
       else if zero_bit i bit
@@ -501,8 +533,8 @@ end = struct
   let join prefix0 t0 prefix1 t1 =
     let bit = branching_bit prefix0 prefix1 in
     if zero_bit prefix0 bit
-    then branch (mask prefix0 bit) bit t0 t1
-    else branch (mask prefix0 bit) bit t1 t0
+    then branch (pack (mask prefix0 bit) bit) t0 t1
+    else branch (pack (mask prefix0 bit) bit) t1 t0
 
   (* CR mshinwell: This is now [add_or_replace], like [Map] *)
   let rec add i d t =
@@ -510,12 +542,13 @@ end = struct
     match descr t with
     | Empty -> leaf iv i d
     | Leaf (j, _) -> if i = j then leaf iv i d else join i (leaf iv i d) j t
-    | Branch (prefix, bit, t0, t1) ->
+    | Branch (prefix_and_bit, t0, t1) ->
+      let prefix, bit = unpack prefix_and_bit in
       if match_prefix i prefix bit
       then
         if zero_bit i bit
-        then branch_non_empty prefix bit (add i d t0) t1
-        else branch_non_empty prefix bit t0 (add i d t1)
+        then branch_non_empty prefix_and_bit (add i d t0) t1
+        else branch_non_empty prefix_and_bit t0 (add i d t1)
       else join i (leaf iv i d) prefix t
 
   let rec replace key f t =
@@ -528,12 +561,13 @@ end = struct
         let datum = f datum in
         leaf iv key datum
       else t
-    | Branch (prefix, bit, t0, t1) ->
+    | Branch (prefix_and_bit, t0, t1) ->
+      let prefix, bit = unpack prefix_and_bit in
       if match_prefix key prefix bit
       then
         if zero_bit key bit
-        then branch_non_empty prefix bit (replace key f t0) t1
-        else branch_non_empty prefix bit t0 (replace key f t1)
+        then branch_non_empty prefix_and_bit (replace key f t0) t1
+        else branch_non_empty prefix_and_bit t0 (replace key f t1)
       else t
 
   let rec update key f t =
@@ -551,12 +585,13 @@ end = struct
         match f None with
         | None -> t
         | Some datum -> join key (leaf iv key datum) key' t)
-    | Branch (prefix, bit, t0, t1) -> (
+    | Branch (prefix_and_bit, t0, t1) -> (
+      let prefix, bit = unpack prefix_and_bit in
       if match_prefix key prefix bit
       then
         if zero_bit key bit
-        then branch prefix bit (update key f t0) t1
-        else branch prefix bit t0 (update key f t1)
+        then branch prefix_and_bit (update key f t0) t1
+        else branch prefix_and_bit t0 (update key f t1)
       else
         match f None with
         | None -> t
@@ -567,12 +602,13 @@ end = struct
     match descr t with
     | Empty -> empty iv
     | Leaf (j, _) -> if i = j then empty iv else t
-    | Branch (prefix, bit, t0, t1) ->
+    | Branch (prefix_and_bit, t0, t1) ->
+      let prefix, bit = unpack prefix_and_bit in
       if match_prefix i prefix bit
       then
         if zero_bit i bit
-        then branch prefix bit (remove i t0) t1
-        else branch prefix bit t0 (remove i t1)
+        then branch prefix_and_bit (remove i t0) t1
+        else branch prefix_and_bit t0 (remove i t1)
       else t
 
   (* [pattern_match_pair t0 t1 ~join ~leaf ~branch] deconstructs two trees
@@ -599,7 +635,7 @@ end = struct
      returning sets and maps. *)
   let[@inline always] pattern_match_pair t0 t1 ~join ~leaf
       ~(branch :
-         ?t00:_ t -> ?t01:_ t -> ?t10:_ t -> ?t11:_ t -> prefix -> bit -> _) =
+         ?t00:_ t -> ?t01:_ t -> ?t10:_ t -> ?t11:_ t -> prefix_and_bit -> _) =
     let descr0 = (descr [@inlined hint]) t0 in
     let descr1 = (descr [@inlined hint]) t1 in
     match descr0, descr1 with
@@ -616,35 +652,40 @@ end = struct
       then (leaf [@inlined hint]) i0 d0 d1
       else (join [@inlined hint]) descr0 descr1
     (* Leaf/Branch cases *)
-    | Leaf (i, _), Branch (prefix, bit, t10, t11) ->
+    | Leaf (i, _), Branch (prefix_and_bit, t10, t11) ->
+      let prefix, bit = unpack prefix_and_bit in
       if match_prefix i prefix bit
       then
         if zero_bit i bit
-        then (branch [@inlined hint]) prefix bit ~t00:t0 ~t10 ~t11
-        else (branch [@inlined hint]) prefix bit ~t01:t0 ~t10 ~t11
+        then (branch [@inlined hint]) prefix_and_bit ~t00:t0 ~t10 ~t11
+        else (branch [@inlined hint]) prefix_and_bit ~t01:t0 ~t10 ~t11
       else (join [@inlined hint]) descr0 descr1
-    | Branch (prefix, bit, t00, t01), Leaf (i, _) ->
+    | Branch (prefix_and_bit, t00, t01), Leaf (i, _) ->
+      let prefix, bit = unpack prefix_and_bit in
       if match_prefix i prefix bit
       then
         if zero_bit i bit
-        then (branch [@inlined hint]) prefix bit ~t00 ~t01 ~t10:t1
-        else (branch [@inlined hint]) prefix bit ~t00 ~t01 ~t11:t1
+        then (branch [@inlined hint]) prefix_and_bit ~t00 ~t01 ~t10:t1
+        else (branch [@inlined hint]) prefix_and_bit ~t00 ~t01 ~t11:t1
       else (join [@inlined hint]) descr0 descr1
     (* Branch/Branch case *)
-    | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
-      if equal_prefix prefix0 bit0 prefix1 bit1
-      then (branch [@inlined hint]) prefix0 bit0 ~t00 ~t01 ~t10 ~t11
-      else if includes_prefix prefix0 bit0 prefix1 bit1
-      then
-        if zero_bit prefix1 bit0
-        then (branch [@inlined hint]) prefix0 bit0 ~t00 ~t01 ~t10:t1
-        else (branch [@inlined hint]) prefix0 bit0 ~t00 ~t01 ~t11:t1
-      else if includes_prefix prefix1 bit1 prefix0 bit0
-      then
-        if zero_bit prefix0 bit1
-        then (branch [@inlined hint]) prefix1 bit1 ~t00:t0 ~t10 ~t11
-        else (branch [@inlined hint]) prefix1 bit1 ~t01:t0 ~t10 ~t11
-      else (join [@inlined hint]) descr0 descr1
+    | Branch (prefix_and_bit0, t00, t01), Branch (prefix_and_bit1, t10, t11) ->
+      if prefix_and_bit0 = prefix_and_bit1
+      then (branch [@inlined hint]) prefix_and_bit0 ~t00 ~t01 ~t10 ~t11
+      else
+        let prefix0, bit0 = unpack prefix_and_bit0 in
+        let prefix1, bit1 = unpack prefix_and_bit1 in
+        if includes_prefix prefix0 bit0 prefix1 bit1
+        then
+          if zero_bit prefix1 bit0
+          then (branch [@inlined hint]) prefix_and_bit0 ~t00 ~t01 ~t10:t1
+          else (branch [@inlined hint]) prefix_and_bit0 ~t00 ~t01 ~t11:t1
+        else if includes_prefix prefix1 bit1 prefix0 bit0
+        then
+          if zero_bit prefix0 bit1
+          then (branch [@inlined hint]) prefix_and_bit1 ~t00:t0 ~t10 ~t11
+          else (branch [@inlined hint]) prefix_and_bit1 ~t01:t0 ~t10 ~t11
+        else (join [@inlined hint]) descr0 descr1
 
   (* The following [phys_eq_XXX] helpers are used by [pattern_match_pair_merge]
      below to exploit physical equality.
@@ -728,16 +769,20 @@ end = struct
           match descr0, descr1 with
           (* Calling [only_right] even when both sides are empty is semantically
              correct and leads to slighly better code generation, see the note
-             in [pattern_match_pair]. *)
+             in [pattern_match_pair].
+
+             We know that the subtrees are disjoint, so it is OK to treat the
+             [prefix_and_bit] from the [Branch] nodes are [prefix]: there must
+             be a differing bit in the shortest [prefix] part. *)
           | Empty, _ -> (only_right [@inlined hint]) t1
           | _, Empty -> (only_left [@inlined hint]) t0
-          | ( (Leaf (prefix0, _) | Branch (prefix0, _, _, _)),
-              (Leaf (prefix1, _) | Branch (prefix1, _, _, _)) ) ->
+          | ( (Leaf (prefix0, _) | Branch (prefix0, _, _)),
+              (Leaf (prefix1, _) | Branch (prefix1, _, _)) ) ->
             join prefix0
               ((only_left [@inlined hint]) t0)
               prefix1
               ((only_right [@inlined hint]) t1))
-        ~branch:(fun ?t00 ?t01 ?t10 ?t11 prefix bit ->
+        ~branch:(fun ?t00 ?t01 ?t10 ?t11 prefix_and_bit ->
           (* We expect all of the constructors for the arguments to be
              statically known here, so the matches below should get simplified
              to a single path depending on context. *)
@@ -753,14 +798,14 @@ end = struct
           let t1' = both_sides' t01 t11 in
           let[@local] branch1 () =
             match t10, t11 with
-            | None, _ | _, None -> branch prefix bit t0' t1'
+            | None, _ | _, None -> branch prefix_and_bit t0' t1'
             | Some t10, Some t11 -> (
               match
                 (phys_eq_check_branch_right [@inlined hint]) ~orig_t:t1
                   ~orig_t0:t10 ~orig_t1:t11 t0' t1'
               with
               | Some t' -> t'
-              | None -> branch prefix bit t0' t1')
+              | None -> branch prefix_and_bit t0' t1')
           in
           let[@local] branch0 () =
             match t00, t01 with
@@ -902,19 +947,23 @@ end = struct
     | _, Empty -> false
     | Branch _, Leaf _ -> false
     | Leaf (i, _), _ -> mem i t1
-    | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
-      if equal_prefix prefix0 bit0 prefix1 bit1
+    | Branch (prefix_and_bit0, t00, t01), Branch (prefix_and_bit1, t10, t11) ->
+      if prefix_and_bit0 = prefix_and_bit1
       then subset t00 t10 && subset t01 t11
-      else if includes_prefix prefix1 bit1 prefix0 bit0
-      then if zero_bit prefix0 bit1 then subset t0 t10 else subset t0 t11
-      else false
+      else
+        let prefix0, bit0 = unpack prefix_and_bit0 in
+        let prefix1, bit1 = unpack prefix_and_bit1 in
+        if includes_prefix prefix1 bit1 prefix0 bit0
+        then if zero_bit prefix0 bit1 then subset t0 t10 else subset t0 t11
+        else false
 
   (* CR lmaurer: Should use [raise_notrace] internally *)
   let rec find i t =
     match descr t with
     | Empty -> raise Not_found
     | Leaf (j, d) -> if j = i then d else raise Not_found
-    | Branch (prefix, bit, t0, t1) ->
+    | Branch (prefix_and_bit, t0, t1) ->
+      let prefix, bit = unpack prefix_and_bit in
       if not (match_prefix i prefix bit)
       then raise Not_found
       else if zero_bit i bit
@@ -933,37 +982,43 @@ end = struct
       match find i t0 with
       | exception Not_found -> empty iv
       | d0 -> leaf iv i (Inter_callback.call f i d0 d1))
-    | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
-      if equal_prefix prefix0 bit0 prefix1 bit1
-      then branch prefix0 bit0 (inter iv f t00 t10) (inter iv f t01 t11)
-      else if includes_prefix prefix0 bit0 prefix1 bit1
-      then
-        if zero_bit prefix1 bit0 then inter iv f t00 t1 else inter iv f t01 t1
-      else if includes_prefix prefix1 bit1 prefix0 bit0
-      then
-        if zero_bit prefix0 bit1 then inter iv f t0 t10 else inter iv f t0 t11
-      else empty iv
+    | Branch (prefix_and_bit0, t00, t01), Branch (prefix_and_bit1, t10, t11) ->
+      if prefix_and_bit0 = prefix_and_bit1
+      then branch prefix_and_bit0 (inter iv f t00 t10) (inter iv f t01 t11)
+      else
+        let prefix0, bit0 = unpack prefix_and_bit0 in
+        let prefix1, bit1 = unpack prefix_and_bit1 in
+        if includes_prefix prefix0 bit0 prefix1 bit1
+        then
+          if zero_bit prefix1 bit0 then inter iv f t00 t1 else inter iv f t01 t1
+        else if includes_prefix prefix1 bit1 prefix0 bit0
+        then
+          if zero_bit prefix0 bit1 then inter iv f t0 t10 else inter iv f t0 t11
+        else empty iv
 
   let rec inter_domain_is_non_empty t0 t1 =
     match descr t0, descr t1 with
     | Empty, _ | _, Empty -> false
     | Leaf (i, _), _ -> mem i t1
     | _, Leaf (i, _) -> mem i t0
-    | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
-      if equal_prefix prefix0 bit0 prefix1 bit1
+    | Branch (prefix_and_bit0, t00, t01), Branch (prefix_and_bit1, t10, t11) ->
+      if prefix_and_bit0 = prefix_and_bit1
       then
         inter_domain_is_non_empty t00 t10 || inter_domain_is_non_empty t01 t11
-      else if includes_prefix prefix0 bit0 prefix1 bit1
-      then
-        if zero_bit prefix1 bit0
-        then inter_domain_is_non_empty t00 t1
-        else inter_domain_is_non_empty t01 t1
-      else if includes_prefix prefix1 bit1 prefix0 bit0
-      then
-        if zero_bit prefix0 bit1
-        then inter_domain_is_non_empty t0 t10
-        else inter_domain_is_non_empty t0 t11
-      else false
+      else
+        let prefix0, bit0 = unpack prefix_and_bit0 in
+        let prefix1, bit1 = unpack prefix_and_bit1 in
+        if includes_prefix prefix0 bit0 prefix1 bit1
+        then
+          if zero_bit prefix1 bit0
+          then inter_domain_is_non_empty t00 t1
+          else inter_domain_is_non_empty t01 t1
+        else if includes_prefix prefix1 bit1 prefix0 bit0
+        then
+          if zero_bit prefix0 bit1
+          then inter_domain_is_non_empty t0 t10
+          else inter_domain_is_non_empty t0 t11
+        else false
 
   (* CR bclement: this could probably be removed now that we have a more generic
      [diff]. *)
@@ -974,35 +1029,47 @@ end = struct
     | _, Empty -> t0
     | Leaf (i, _), _ -> if mem i t1 then empty iv else t0
     | _, Leaf (i, _) -> remove i t0
-    | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
-      if equal_prefix prefix0 bit0 prefix1 bit1
-      then branch prefix0 bit0 (diff_domains t00 t10) (diff_domains t01 t11)
-      else if includes_prefix prefix0 bit0 prefix1 bit1
-      then
-        if zero_bit prefix1 bit0
-        then branch prefix0 bit0 (diff_domains t00 t1) t01
-        else branch prefix0 bit0 t00 (diff_domains t01 t1)
-      else if includes_prefix prefix1 bit1 prefix0 bit0
-      then
-        if zero_bit prefix0 bit1
-        then diff_domains t0 t10
-        else diff_domains t0 t11
-      else t0
+    | Branch (prefix_and_bit0, t00, t01), Branch (prefix_and_bit1, t10, t11) ->
+      if prefix_and_bit0 = prefix_and_bit1
+      then branch prefix_and_bit0 (diff_domains t00 t10) (diff_domains t01 t11)
+      else
+        let prefix0, bit0 = unpack prefix_and_bit0 in
+        let prefix1, bit1 = unpack prefix_and_bit1 in
+        if includes_prefix prefix0 bit0 prefix1 bit1
+        then
+          if zero_bit prefix1 bit0
+          then branch prefix_and_bit0 (diff_domains t00 t1) t01
+          else branch prefix_and_bit0 t00 (diff_domains t01 t1)
+        else if includes_prefix prefix1 bit1 prefix0 bit0
+        then
+          if zero_bit prefix0 bit1
+          then diff_domains t0 t10
+          else diff_domains t0 t11
+        else t0
 
   let rec cardinal t =
     match descr t with
     | Empty -> 0
     | Leaf _ -> 1
-    | Branch (_, _, t0, t1) -> cardinal t0 + cardinal t1
+    | Branch (_, t0, t1) -> cardinal t0 + cardinal t1
 
-  let[@inline always] order_branches bit t0 t1 =
-    if bit < 0 then t1, t0 else t0, t1
+  let[@inline always] order_branches prefix_and_bit t0 t1 =
+    (* [t0] is ordered first, unless the bit encoded in [prefix_and_bit] is
+       negative (i.e. it is the most significant bit), in which case [t1] must
+       be ordered first.
+
+       The most significant bit must have an empty prefix, so shifting it to the
+       left is always zero.
+
+       All other bits are non-zero, so all other [prefix_and_bit] have a
+       non-zero bit that is not the most significant. *)
+    if prefix_and_bit lsl 1 = 0 then t1, t0 else t0, t1
 
   let rec unsigned_iter f t =
     match descr t with
     | Empty -> ()
     | Leaf (key, d) -> Callback.call f key d
-    | Branch (_, _, t0, t1) ->
+    | Branch (_, t0, t1) ->
       unsigned_iter f t0;
       unsigned_iter f t1
 
@@ -1010,8 +1077,8 @@ end = struct
     match descr t with
     | Empty -> ()
     | Leaf (key, d) -> Callback.call f key d
-    | Branch (_, bit, t0, t1) ->
-      let t0, t1 = order_branches bit t0 t1 in
+    | Branch (prefix_and_bit, t0, t1) ->
+      let t0, t1 = order_branches prefix_and_bit t0 t1 in
       unsigned_iter f t0;
       unsigned_iter f t1
 
@@ -1019,42 +1086,42 @@ end = struct
     match descr t with
     | Empty -> acc
     | Leaf (key, d) -> Callback.call f key d acc
-    | Branch (_, _, t0, t1) -> unsigned_fold f t1 (unsigned_fold f t0 acc)
+    | Branch (_, t0, t1) -> unsigned_fold f t1 (unsigned_fold f t0 acc)
 
   let fold f t acc =
     match descr t with
     | Empty -> acc
     | Leaf (key, d) -> Callback.call f key d acc
-    | Branch (_, bit, t0, t1) ->
-      let t0, t1 = order_branches bit t0 t1 in
+    | Branch (prefix_and_bit, t0, t1) ->
+      let t0, t1 = order_branches prefix_and_bit t0 t1 in
       unsigned_fold f t1 (unsigned_fold f t0 acc)
 
   let rec unsigned_for_all p t =
     match descr t with
     | Empty -> true
     | Leaf (key, d) -> Callback.call p key d
-    | Branch (_, _, t0, t1) -> unsigned_for_all p t0 && unsigned_for_all p t1
+    | Branch (_, t0, t1) -> unsigned_for_all p t0 && unsigned_for_all p t1
 
   let for_all p t =
     match descr t with
     | Empty -> true
     | Leaf (key, d) -> Callback.call p key d
-    | Branch (_, bit, t0, t1) ->
-      let t0, t1 = order_branches bit t0 t1 in
+    | Branch (prefix_and_bit, t0, t1) ->
+      let t0, t1 = order_branches prefix_and_bit t0 t1 in
       unsigned_for_all p t0 && unsigned_for_all p t1
 
   let rec unsigned_exists p t =
     match descr t with
     | Empty -> false
     | Leaf (key, d) -> Callback.call p key d
-    | Branch (_, _, t0, t1) -> unsigned_exists p t0 || unsigned_exists p t1
+    | Branch (_, t0, t1) -> unsigned_exists p t0 || unsigned_exists p t1
 
   let exists p t =
     match descr t with
     | Empty -> false
     | Leaf (key, d) -> Callback.call p key d
-    | Branch (_, bit, t0, t1) ->
-      let t0, t1 = order_branches bit t0 t1 in
+    | Branch (prefix_and_bit, t0, t1) ->
+      let t0, t1 = order_branches prefix_and_bit t0 t1 in
       unsigned_exists p t0 || unsigned_exists p t1
 
   let filter p t =
@@ -1063,7 +1130,8 @@ end = struct
       match descr t with
       | Empty -> t
       | Leaf (i, d) -> if Callback.call p i d then t else empty iv
-      | Branch (prefix, bit, t0, t1) -> branch prefix bit (loop t0) (loop t1)
+      | Branch (prefix_and_bit, t0, t1) ->
+        branch prefix_and_bit (loop t0) (loop t1)
     in
     loop t
 
@@ -1076,7 +1144,7 @@ end = struct
         if Callback.call p i d
         then add i d true_, false_
         else true_, add i d false_
-      | Branch (_, _, t0, t1) -> loop (loop acc t0) t1
+      | Branch (_, t0, t1) -> loop (loop acc t0) t1
     in
     let empty = empty (is_value_of t) in
     loop (empty, empty) t
@@ -1085,7 +1153,7 @@ end = struct
     match descr t with
     | Empty -> raise Not_found
     | Leaf (key, d) -> Binding.create key d
-    | Branch (_, _, t0, _) -> choose t0
+    | Branch (_, t0, _) -> choose t0
 
   let choose_opt t =
     match choose t with exception Not_found -> None | choice -> Some choice
@@ -1094,14 +1162,15 @@ end = struct
     match descr t with
     | Empty -> raise Not_found
     | Leaf (key, d) -> Binding.create key d
-    | Branch (_, _, t0, _) -> unsigned_min_binding t0
+    | Branch (_, t0, _) -> unsigned_min_binding t0
 
   let min_binding t =
     match descr t with
     | Empty -> raise Not_found
     | Leaf (key, d) -> Binding.create key d
-    | Branch (_, bit, t0, t1) ->
-      unsigned_min_binding (if bit < 0 then t1 else t0)
+    | Branch (prefix_and_bit, t0, t1) ->
+      let t0, _ = order_branches prefix_and_bit t0 t1 in
+      unsigned_min_binding t0
 
   let min_binding_opt t =
     match min_binding t with exception Not_found -> None | min -> Some min
@@ -1110,14 +1179,15 @@ end = struct
     match descr t with
     | Empty -> raise Not_found
     | Leaf (key, d) -> Binding.create key d
-    | Branch (_, _, _, t1) -> unsigned_max_binding t1
+    | Branch (_, _, t1) -> unsigned_max_binding t1
 
   let max_binding t =
     match descr t with
     | Empty -> raise Not_found
     | Leaf (key, d) -> Binding.create key d
-    | Branch (_, bit, t0, t1) ->
-      unsigned_max_binding (if bit < 0 then t0 else t1)
+    | Branch (prefix_and_bit, t0, t1) ->
+      let _, t1 = order_branches prefix_and_bit t0 t1 in
+      unsigned_max_binding t1
 
   let max_binding_opt t =
     match max_binding t with exception Not_found -> None | max -> Some max
@@ -1129,8 +1199,9 @@ end = struct
       match descr t0, descr t1 with
       | Empty, Empty -> assert false (* already covered *)
       | Leaf (i, d0), Leaf (j, d1) -> i = j && Equal_callback.call f d0 d1
-      | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
-        if equal_prefix prefix0 bit0 prefix1 bit1
+      | Branch (prefix_and_bit0, t00, t01), Branch (prefix_and_bit1, t10, t11)
+        ->
+        if prefix_and_bit0 = prefix_and_bit1
         then equal f t00 t10 && equal f t01 t11
         else false
       | (Empty | Leaf _ | Branch _), _ -> false
@@ -1144,7 +1215,10 @@ end = struct
       | Leaf (i, d0), Leaf (j, d1) ->
         let c = if i = j then 0 else if i < j then -1 else 1 in
         if c <> 0 then c else Compare_callback.call f d0 d1
-      | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
+      | Branch (prefix_and_bit0, t00, t01), Branch (prefix_and_bit1, t10, t11)
+        ->
+        let prefix0, bit0 = unpack prefix_and_bit0 in
+        let prefix1, bit1 = unpack prefix_and_bit1 in
         let c = compare_prefix prefix0 bit0 prefix1 bit1 in
         if c = 0
         then
@@ -1175,16 +1249,17 @@ end = struct
         else if j < i
         then singleton iv j d, not_found, empty iv
         else empty iv, not_found, singleton iv j d
-      | Branch (prefix, bit, t0, t1) ->
+      | Branch (prefix_and_bit, t0, t1) ->
+        let prefix, bit = unpack prefix_and_bit in
         if match_prefix i prefix bit
         then
           if zero_bit i bit
           then
             let lt, mem, gt = loop t0 in
-            lt, mem, branch prefix bit gt t1
+            lt, mem, branch prefix_and_bit gt t1
           else
             let lt, mem, gt = loop t1 in
-            branch prefix bit t0 lt, mem, gt
+            branch prefix_and_bit t0 lt, mem, gt
         else if i < prefix
         then empty (is_value_of t), not_found, t
         else t, not_found, empty (is_value_of t)
@@ -1193,15 +1268,15 @@ end = struct
 
   let split ~found ~not_found i t =
     match descr t with
-    | Branch (_, bit, t0, t1) when bit < 0 ->
+    | Branch (prefix_and_bit, t0, t1) when prefix_and_bit lsl 1 = 0 ->
       (* prefix is necessarily empty *)
       if i < 0
       then
         let lt, mem, gt = same_sign_split ~found ~not_found i t1 in
-        lt, mem, branch 0 bit t0 gt
+        lt, mem, branch prefix_and_bit t0 gt
       else
         let lt, mem, gt = same_sign_split ~found ~not_found i t0 in
-        branch 0 bit lt t1, mem, gt
+        branch prefix_and_bit lt t1, mem, gt
     | Empty | Leaf _ | Branch _ ->
       (same_sign_split [@inlined hint]) ~found ~not_found i t
 
@@ -1210,13 +1285,13 @@ end = struct
       match descr t with
       | Empty -> acc
       | Leaf (i, d) -> Binding.create i d :: acc
-      | Branch (_, _, t0, t1) -> loop (loop acc t1) t0
+      | Branch (_, t0, t1) -> loop (loop acc t1) t0
     in
     match descr t with
     | Empty -> []
     | Leaf (i, d) -> [Binding.create i d]
-    | Branch (_, bit, t0, t1) ->
-      let t0, t1 = order_branches bit t0 t1 in
+    | Branch (prefix_and_bit, t0, t1) ->
+      let t0, t1 = order_branches prefix_and_bit t0 t1 in
       loop (loop [] t1) t0
 
   (* [merge_left] and [merge_right] are just [filter_map] under another name,
@@ -1230,15 +1305,15 @@ end = struct
     match (descr [@inlined hint]) t0 with
     | Empty -> empty iv
     | Leaf (i, d) -> leaf_or_empty iv i (f i (Some d) None)
-    | Branch (prefix, bit, t00, t01) ->
-      branch prefix bit (merge_left iv f t00) (merge_left iv f t01)
+    | Branch (prefix_and_bit, t00, t01) ->
+      branch prefix_and_bit (merge_left iv f t00) (merge_left iv f t01)
 
   let rec merge_right iv f t1 =
     match (descr [@inlined hint]) t1 with
     | Empty -> empty iv
     | Leaf (i, d) -> leaf_or_empty iv i (f i None (Some d))
-    | Branch (prefix, bit, t10, t11) ->
-      branch prefix bit (merge_right iv f t10) (merge_right iv f t11)
+    | Branch (prefix_and_bit, t10, t11) ->
+      branch prefix_and_bit (merge_right iv f t10) (merge_right iv f t11)
 
   let rec merge' iv f t0 t1 =
     pattern_match_pair_merge
@@ -1261,8 +1336,8 @@ end = struct
     match descr t with
     | Empty -> empty iv
     | Leaf (k, datum) -> leaf iv k (f datum)
-    | Branch (prefix, bit, t0, t1) ->
-      branch_non_empty prefix bit (map iv f t0) (map iv f t1)
+    | Branch (prefix_and_bit, t0, t1) ->
+      branch_non_empty prefix_and_bit (map iv f t0) (map iv f t1)
 
   let rec map_sharing f t =
     let iv = is_value_of t in
@@ -1271,25 +1346,27 @@ end = struct
     | Leaf (k, v) ->
       let v' = f v in
       if v == v' then t else leaf iv k v'
-    | Branch (prefix, bit, t0, t1) ->
+    | Branch (prefix_and_bit, t0, t1) ->
       let t0' = map_sharing f t0 in
       let t1' = map_sharing f t1 in
-      if t0' == t0 && t1' == t1 then t else branch_non_empty prefix bit t0' t1'
+      if t0' == t0 && t1' == t1
+      then t
+      else branch_non_empty prefix_and_bit t0' t1'
 
   let rec mapi iv f t =
     match descr t with
     | Empty -> empty iv
     | Leaf (key, datum) -> leaf iv key (Callback.call f key datum)
-    | Branch (prefix, bit, t0, t1) ->
-      branch_non_empty prefix bit (mapi iv f t0) (mapi iv f t1)
+    | Branch (prefix_and_bit, t0, t1) ->
+      branch_non_empty prefix_and_bit (mapi iv f t0) (mapi iv f t1)
 
   let rec filter_map iv f t =
     match descr t with
     | Empty -> empty iv
     | Leaf (k, d) -> (
       match f k d with None -> empty iv | Some d' -> leaf iv k d')
-    | Branch (prefix, bit, t0, t1) ->
-      branch prefix bit (filter_map iv f t0) (filter_map iv f t1)
+    | Branch (prefix_and_bit, t0, t1) ->
+      branch prefix_and_bit (filter_map iv f t0) (filter_map iv f t1)
 
   (* See comment about [merge_right]; this is just a specialized version of
      [filter_map] *)
@@ -1297,8 +1374,8 @@ end = struct
     match (descr [@inlined hint]) t1 with
     | Empty -> empty iv
     | Leaf (k, d1) -> leaf_or_empty iv k (f k None d1)
-    | Branch (prefix, bit, t10, t11) ->
-      branch prefix bit
+    | Branch (prefix_and_bit, t10, t11) ->
+      branch prefix_and_bit
         (update_many_right iv f t10)
         (update_many_right iv f t11)
 
@@ -1321,10 +1398,10 @@ end = struct
       | None -> empty iv
       | Some d' when d == d' -> t
       | Some d' -> leaf iv k d')
-    | Branch (prefix, bit, t0, t1) ->
+    | Branch (prefix_and_bit, t0, t1) ->
       let t0' = filter_map_sharing f t0 in
       let t1' = filter_map_sharing f t1 in
-      if t0' == t0 && t1' == t1 then t else branch prefix bit t0' t1'
+      if t0' == t0 && t1' == t1 then t else branch prefix_and_bit t0' t1'
 
   (* NB: an iterator [Next (binding, rest)] is positioned on the binding
      [binding] and then will iterate on the trees in [rest] in order.
@@ -1344,14 +1421,15 @@ end = struct
     match descr t with
     | Empty -> Done
     | Leaf (k, d) -> Next (Binding.create k d, rest)
-    | Branch (_, _, t0, t1) -> iterator0 t0 (t1 :: rest)
+    | Branch (_, t0, t1) -> iterator0 t0 (t1 :: rest)
 
   let iterator t =
     match descr t with
     | Empty -> Done
     | Leaf (k, d) -> Next (Binding.create k d, [])
-    | Branch (_prefix, bit, t0, t1) ->
-      if bit < 0 then iterator0 t1 [t0] else iterator0 t0 [t1]
+    | Branch (prefix_and_bit, t0, t1) ->
+      let t0, t1 = order_branches prefix_and_bit t0 t1 in
+      iterator0 t0 [t1]
 
   let current it = match it with Done -> None | Next (b, _) -> Some b
 
@@ -1365,9 +1443,14 @@ end = struct
   let rec seek0 k t rest =
     match descr t, rest with
     | Leaf (i, d), _ when k <= i -> Next (Binding.create i d, rest)
-    | Branch (prefix, bit, t0, t1), _ when match_prefix k prefix bit ->
+    | Branch (prefix_and_bit, t0, t1), _
+      when match_prefix_and_bit k prefix_and_bit ->
+      let _, bit = unpack prefix_and_bit in
       if zero_bit k bit then seek0 k t0 (t1 :: rest) else seek0 k t1 rest
-    | Branch (prefix, _, t0, t1), _ when k <= prefix -> iterator0 t0 (t1 :: rest)
+    | Branch (prefix_and_bit, t0, t1), _
+      when let prefix, _ = unpack prefix_and_bit in
+           k <= prefix ->
+      iterator0 t0 (t1 :: rest)
     | (Empty | Leaf _ | Branch _), [] -> Done
     | (Empty | Leaf _ | Branch _), t' :: rest' -> seek0 k t' rest'
 
@@ -1387,14 +1470,14 @@ end = struct
         match descr t0 with
         | Empty -> aux r ()
         | Leaf (key, value) -> Seq.Cons (Binding.create key value, aux r)
-        | Branch (_, _, t1, t2) -> aux (t1 :: t2 :: r) ())
+        | Branch (_, t1, t2) -> aux (t1 :: t2 :: r) ())
     in
     fun () ->
       match descr t with
       | Empty -> Seq.Nil
       | Leaf (key, value) -> Seq.Cons (Binding.create key value, aux [])
-      | Branch (_, bit, t0, t1) ->
-        let t0, t1 = order_branches bit t0 t1 in
+      | Branch (prefix_and_bit, t0, t1) ->
+        let t0, t1 = order_branches prefix_and_bit t0 t1 in
         aux [t0; t1] ()
 
   let[@inline always] of_list iv l =
@@ -1413,7 +1496,8 @@ end = struct
       match descr t with
       | Empty -> false (* [Empty] should only occur at top level *)
       | Leaf (i, _) -> (bit = 0 && prefix = i) || match_prefix i prefix bit
-      | Branch (prefix', bit', t0, t1) ->
+      | Branch (prefix_and_bit', t0, t1) ->
+        let prefix', bit' = unpack prefix_and_bit' in
         (* CR-someday lmaurer: Should check that [bit'] has a POPCOUNT of 1 *)
         let prefix0 =
           (* This should be a no-op, since [prefix'] should already have a zero
@@ -1441,7 +1525,7 @@ module Set = struct
   and 'a t0 = 'a Set0.t =
     | Empty : unit t0
     | Leaf : elt -> unit t0
-    | Branch : elt * elt * unit t0 * unit t0 -> unit t0
+    | Branch : prefix_and_bit * unit t0 * unit t0 -> unit t0
 
   module Ops = Tree_operations (Set0)
   include Ops
@@ -1481,7 +1565,7 @@ module Set = struct
     let rec loop f acc = function
       | Empty -> acc
       | Leaf i -> ( match f i with None -> acc | Some j -> add j acc)
-      | Branch (_, _, t0, t1) -> loop f (loop f acc t0) t1
+      | Branch (_, t0, t1) -> loop f (loop f acc t0) t1
     in
     loop f Empty t
 
@@ -1587,8 +1671,8 @@ struct
         match t with
         | Empty -> Format.pp_print_string ppf "()"
         | Leaf (k, v) -> Format.fprintf ppf "@[<hv 1>(%x@ %a)@]" k print_datum v
-        | Branch (k1, k2, l, r) ->
-          Format.fprintf ppf "@[<hv 1>(branch@ %x@ %x@ %a@ %a)@]" k1 k2 pp l
+        | Branch (k, l, r) ->
+          Format.fprintf ppf "@[<hv 1>(branch@ %x@ %a@ %a)@]" k pp l
             pp r
       in
       pp ppf t
