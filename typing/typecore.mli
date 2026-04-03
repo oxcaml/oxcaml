@@ -171,6 +171,7 @@ val type_option_some:
 val type_option_none:
         Env.t -> type_expr -> Location.t -> Typedtree.expression
 val generalizable: int -> type_expr -> bool
+val generalize_structure_exp: Typedtree.expression -> unit
 val reset_delayed_checks: unit -> unit
 val force_delayed_checks: unit -> unit
 
