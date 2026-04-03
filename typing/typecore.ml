@@ -4894,6 +4894,7 @@ let rec maybe_computation exp =
   | Texp_src_pos
   | Texp_overwrite _
   | Texp_antiquotation _
+  | Texp_apply_layout _
     -> true
 
 let annotate_recursive_bindings env valbinds =
