@@ -1124,9 +1124,11 @@ and with_constraint =
     Twith_type of type_declaration
   | Twith_module of Path.t * Longident.t loc
   | Twith_modtype of module_type
+  | Twith_jkind of jkind_declaration
   | Twith_typesubst of type_declaration
   | Twith_modsubst of Path.t * Longident.t loc
   | Twith_modtypesubst of module_type
+  | Twith_jkindsubst of jkind_declaration
 
 and core_type =
   { mutable ctyp_desc : core_type_desc;

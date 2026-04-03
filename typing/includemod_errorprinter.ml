@@ -1118,6 +1118,8 @@ let all env = function
       signature ~expansion_token:true ~env ~before:[first] ~ctx:[] diff.symptom
   | In_Type_declaration (id,reason) ->
       [Location.msg "%t" (core env id reason)]
+  | In_Jkind_declaration (id,reason) ->
+      [Location.msg "%t" (core env id reason)]
   | In_Module_type diff ->
       module_type ~expansion_token:true ~eqmode:false ~before:[] ~env ~ctx:[]
         diff

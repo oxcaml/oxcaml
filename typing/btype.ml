@@ -381,6 +381,7 @@ type 'a type_iterators =
     it_class_declaration: 'a type_iterators -> class_declaration -> unit;
     it_class_type_declaration:
         'a type_iterators -> class_type_declaration -> unit;
+    it_jkind_declaration : 'a type_iterators -> jkind_declaration -> unit;
     it_functor_param: 'a type_iterators -> functor_parameter -> unit;
     it_module_type: 'a type_iterators -> module_type -> unit;
     it_class_type: 'a type_iterators -> class_type -> unit;
@@ -403,8 +404,7 @@ let type_iterators_without_type_expr =
     | Sig_modtype (_, mtd, _)       -> it.it_modtype_declaration it mtd
     | Sig_class (_, cd, _, _)       -> it.it_class_declaration it cd
     | Sig_class_type (_, ctd, _, _) -> it.it_class_type_declaration it ctd
-    | Sig_jkind (_ , _jkd, _)       -> ()
-    (* currently jkind declarations have nothing interesting to iterate over *)
+    | Sig_jkind (_ , jkd, _)        -> it.it_jkind_declaration it jkd
   and it_value_description it vd =
     it.it_type_expr it vd.val_type
   and it_type_declaration it td =
@@ -430,6 +430,13 @@ let type_iterators_without_type_expr =
     List.iter (it.it_type_expr it) ctd.clty_params;
     it.it_class_type it ctd.clty_type;
     it.it_path ctd.clty_path
+  and it_jkind_declaration it jkd =
+    match jkd.jkind_manifest with
+    | None -> ()
+    | Some { base = Kconstr p; mod_bounds = _; with_bounds = No_with_bounds } ->
+      it.it_path p
+    | Some { base = Layout _; mod_bounds = _; with_bounds = No_with_bounds } ->
+      ()
   and it_functor_param it = function
     | Unit -> ()
     | Named (_, mt, _) -> it.it_module_type it mt
@@ -463,6 +470,7 @@ let type_iterators_without_type_expr =
   { it_path; it_type_expr = (fun _ _ -> ()); it_do_type_expr = (fun _ _ -> ());
     it_type_kind; it_class_type; it_functor_param; it_module_type;
     it_signature; it_class_type_declaration; it_class_declaration;
+    it_jkind_declaration;
     it_modtype_declaration; it_module_declaration; it_extension_constructor;
     it_type_declaration; it_value_description; it_signature_item; }
 
@@ -1045,6 +1053,15 @@ module Jkind0 = struct
       let nullability = Nullability.join (nullability t1) (nullability t2) in
       let separability =
         Separability.join (separability t1) (separability t2)
+      in
+      create crossing ~externality ~nullability ~separability
+
+    let meet t1 t2 =
+      let crossing = Crossing.meet (crossing t1) (crossing t2) in
+      let externality = Externality.meet (externality t1) (externality t2) in
+      let nullability = Nullability.meet (nullability t1) (nullability t2) in
+      let separability =
+        Separability.meet (separability t1) (separability t2)
       in
       create crossing ~externality ~nullability ~separability
 

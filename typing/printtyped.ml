@@ -1248,6 +1248,12 @@ and with_constraint i ppf x =
   | Twith_modtypesubst mty ->
       line i ppf "Twith_modtype\n";
       module_type (i+1) ppf mty
+  | Twith_jkind kd ->
+      line i ppf "Twith_jkind\n";
+      jkind_declaration (i+1) ppf kd;
+  | Twith_jkindsubst kd ->
+      line i ppf "Twith_jkindsubst\n";
+      jkind_declaration (i+1) ppf kd;
 
 and module_expr i ppf x =
   line i ppf "module_expr %a\n" fmt_location x.mod_loc;
