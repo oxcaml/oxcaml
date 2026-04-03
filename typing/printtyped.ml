@@ -103,7 +103,6 @@ let fmt_mutable_flag f x =
   | Immutable -> fprintf f "Immutable"
   | Mutable -> fprintf f "Mutable"
 
-<<<<<<< oxcaml
 let fmt_mutable_mode_flag f (x : Types.mutability) =
   match x with
   | Immutable -> fprintf f "Immutable"
@@ -113,13 +112,6 @@ let fmt_mutable_mode_flag f (x : Types.mutability) =
   | Mutable { mode; atomic = Atomic } ->
     fprintf f "Atomic(%a)"
       (Format_doc.compat (Mode.Value.Comonadic.print ())) mode
-||||||| upstream-base
-=======
-let fmt_atomic_flag f x =
-  match x with
-  | Nonatomic -> fprintf f "Nonatomic"
-  | Atomic -> fprintf f "Atomic"
->>>>>>> upstream-incoming
 
 let fmt_virtual_flag f x =
   match x with
@@ -156,7 +148,6 @@ let fmt_partiality f x =
   | Total -> ()
   | Partial -> fprintf f " (Partial)"
 
-<<<<<<< oxcaml
 let fmt_index_kind f = function
   | Index_int -> fprintf f "Index_int"
   | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
@@ -164,13 +155,11 @@ let fmt_index_kind f = function
   | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
   | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
   | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
-||||||| upstream-base
-=======
+
 let fmt_presence f x =
   match x with
   | Types.Mp_present -> fprintf f "(Present)"
   | Types.Mp_absent -> fprintf f "(Absent)"
->>>>>>> upstream-incoming
 
 let line i f s (*...*) =
   fprintf f "%s" (String.make (2*i) ' ');
@@ -228,11 +217,6 @@ let typevar_jkind ~print_quote ppf (v, l) =
       fprintf ppf " (%a : %a)"
         pptv v
         Pprintast.jkind_annotation jkind
-
-let tuple_component_label i ppf = function
-  | None -> line i ppf "Label: None\n"
-  | Some s -> line i ppf "Label: Some \"%s\"\n" s
-;;
 
 let tuple_component_label i ppf = function
   | None -> line i ppf "Label: None\n"
@@ -382,14 +366,9 @@ let rec core_type i ppf x =
   | Ttyp_tuple l ->
       line i ppf "Ttyp_tuple\n";
       list i labeled_core_type ppf l;
-<<<<<<< oxcaml
   | Ttyp_unboxed_tuple l ->
       line i ppf "Ttyp_unboxed_tuple\n";
       list i labeled_core_type ppf l;
-||||||| upstream-base
-      list i core_type ppf l;
-=======
->>>>>>> upstream-incoming
   | Ttyp_constr (li, _, l) ->
       line i ppf "Ttyp_constr %a\n" fmt_path li;
       list i core_type ppf l;
@@ -448,10 +427,6 @@ and labeled_core_type i ppf (l, t) =
   tuple_component_label i ppf l;
   core_type i ppf t
 
-and labeled_core_type i ppf (l, t) =
-  tuple_component_label i ppf l;
-  core_type i ppf t
-
 and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident s;
   core_type i ppf t
@@ -465,17 +440,17 @@ and label_ambiguity i ppf = function
 and poly_param : type a. _ -> _ -> a poly_param -> unit =
   fun i ppf -> function
   | Param ty ->
-    line i ppf "Param %a\n" (Format_doc.compat Printtyp.raw_type_expr) ty
+    line i ppf "Param %a\n" Rawprinttyp.type_expr ty
   | Arrow args ->
     line i ppf "Arrow\n";
     list (i+1) (fun i ppf (label, ty) ->
         arg_label i ppf label;
         option i (fun i f ->
-          line i f "%a" (Format_doc.compat Printtyp.raw_type_expr)) ppf ty)
+          line i f "%a" Rawprinttyp.type_expr) ppf ty)
       ppf args
   | Method ({txt}, ty) ->
     fprintf ppf "Method %s %a\n" txt
-      (Format_doc.compat Printtyp.raw_type_expr) ty
+      Rawprinttyp.type_expr ty
 
 and type_inspection : type a. _ -> _ -> a type_inspection -> unit =
   fun i ppf -> function
@@ -493,19 +468,11 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   List.iter (pattern_extra i ppf) x.pat_extra;
   match x.pat_desc with
   | Tpat_any -> line i ppf "Tpat_any\n";
-<<<<<<< oxcaml
   | Tpat_var (s,_,_,sort,m) ->
       line i ppf "Tpat_var \"%a\"\n" fmt_ident s;
       line i ppf "sort %a\n" fmt_sort sort;
       value_mode i ppf m
   | Tpat_alias (p, s,_,_,sort,m,_) ->
-||||||| upstream-base
-  | Tpat_var (s,_) -> line i ppf "Tpat_var \"%a\"\n" fmt_ident s;
-  | Tpat_alias (p, s,_) ->
-=======
-  | Tpat_var (s,_,_) -> line i ppf "Tpat_var \"%a\"\n" fmt_ident s;
-  | Tpat_alias (p, s,_,_,_) ->
->>>>>>> upstream-incoming
       line i ppf "Tpat_alias \"%a\"\n" fmt_ident s;
       line i ppf "sort %a\n" fmt_sort sort;
       value_mode i ppf m;
@@ -516,14 +483,9 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_tuple (l) ->
       line i ppf "Tpat_tuple\n";
       list i labeled_pattern ppf l;
-<<<<<<< oxcaml
   | Tpat_unboxed_tuple (l) ->
       line i ppf "Tpat_unboxed_tuple\n";
       list i labeled_pattern_with_sorts ppf l;
-||||||| upstream-base
-      list i pattern ppf l;
-=======
->>>>>>> upstream-incoming
   | Tpat_construct (li, _, po, vto) ->
       line i ppf "Tpat_construct %a\n" fmt_longident li;
       list i pattern ppf po;
@@ -542,20 +504,12 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_record (l, _c) ->
       line i ppf "Tpat_record\n";
       list i longident_x_pattern ppf l;
-<<<<<<< oxcaml
   | Tpat_record_unboxed_product (l, _c) ->
       line i ppf "Tpat_record_unboxed_product\n";
       list i longident_x_pattern ppf l;
   | Tpat_array (am, arg_sort, l) ->
       line i ppf "Tpat_array %a\n" fmt_mutable_mode_flag am;
       line i ppf "%a\n" fmt_sort arg_sort;
-||||||| upstream-base
-  | Tpat_array (l) ->
-      line i ppf "Tpat_array\n";
-=======
-  | Tpat_array (am, l) ->
-      line i ppf "Tpat_array %a\n" fmt_mutable_flag am;
->>>>>>> upstream-incoming
       list i pattern ppf l;
   | Tpat_lazy p ->
       line i ppf "Tpat_lazy\n";
@@ -571,7 +525,6 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       pattern i ppf p1;
       pattern i ppf p2;
 
-<<<<<<< oxcaml
 and labeled_pattern : type k . _ -> _ -> string option * k general_pattern -> unit =
   fun i ppf (label, x) ->
     tuple_component_label i ppf label;
@@ -584,20 +537,9 @@ and labeled_pattern_with_sorts :
     pattern i ppf x;
     line i ppf "%a\n" fmt_sort sort
 
-and pattern_extra i ppf (extra_pat, _, attrs) =
-||||||| upstream-base
-and pattern_extra i ppf (extra_pat, _, attrs) =
-=======
-and labeled_pattern
-  : type k . _ -> _ -> string option * k general_pattern -> unit =
-  fun i ppf (label, x) ->
-    tuple_component_label i ppf label;
-    pattern i ppf x
-
 and pattern_extra i ppf (extra_pat, loc, attrs) =
   line i ppf "extra %a\n" fmt_location loc;
   let i = i + 1 in
->>>>>>> upstream-incoming
   match extra_pat with
   | Tpat_unpack ->
      line i ppf "Tpat_extra_unpack\n";
@@ -629,44 +571,20 @@ and function_body i ppf (body : function_body) =
         fc_partial; fc_env = _; fc_ret_type = _ }
     ->
       line i ppf "Tfunction_cases%a %a\n"
-<<<<<<< oxcaml
         fmt_partiality fc_partial
         fmt_location fc_loc;
+      let i = i+1 in
       alloc_mode_raw i ppf fc_arg_mode;
       line i ppf "%a\n" fmt_sort fc_arg_sort;
-      attributes (i+1) ppf fc_attributes;
-      List.iter (fun e -> expression_extra (i+1) ppf e []) fc_exp_extra;
-      list (i+1) case ppf fc_cases
-||||||| upstream-base
-        fmt_partiality partial
-        fmt_location loc;
-      attributes (i+1) ppf attrs;
-      Option.iter (fun e -> expression_extra (i+1) ppf e []) exp_extra;
-      list (i+1) case ppf cases
-=======
-        fmt_partiality partial
-        fmt_location loc;
-      let i = i+1 in
-      attributes i ppf attrs;
-      Option.iter (fun e -> expression_extra i ppf (e, loc, [])) exp_extra;
-      list i case ppf cases
->>>>>>> upstream-incoming
+      attributes i ppf fc_attributes;
+      List.iter (fun e -> expression_extra i ppf (e, fc_loc, [])) fc_exp_extra;
+      list i case ppf fc_cases
 
-<<<<<<< oxcaml
-and expression_extra i ppf x attrs =
-  match x with
-  | Texp_constraint (ct) ->
-||||||| upstream-base
-and expression_extra i ppf x attrs =
-  match x with
-  | Texp_constraint ct ->
-=======
 and expression_extra i ppf (extra, loc, attrs) =
   line i ppf "extra %a\n" fmt_location loc;
   let i = i + 1 in
   match extra with
   | Texp_constraint ct ->
->>>>>>> upstream-incoming
       line i ppf "Texp_constraint\n";
       attributes i ppf attrs;
       core_type i ppf ct;
@@ -757,62 +675,27 @@ and expression i ppf x =
       Option.iter (zero_alloc_assume i ppf) za;
       expression i ppf e;
       list i label_x_apply_arg ppf l;
-<<<<<<< oxcaml
-  | Texp_match (e, sort, l, partial) ->
-      line i ppf "Texp_match%a\n"
-        fmt_partiality partial;
-||||||| upstream-base
-      list i label_x_expression ppf l;
-  | Texp_match (e, l, partial) ->
-      line i ppf "Texp_match%a\n"
-        fmt_partiality partial;
-=======
-  | Texp_match (e, l1, l2, partial) ->
+  | Texp_match (e, sort, l1, l2, partial) ->
       line i ppf "Texp_match%a\n" fmt_partiality partial;
->>>>>>> upstream-incoming
       expression i ppf e;
-<<<<<<< oxcaml
       line i ppf "%a\n" fmt_sort sort;
-      list i case ppf l;
-  | Texp_try (e, l) ->
-||||||| upstream-base
-      list i case ppf l;
-  | Texp_try (e, l) ->
-=======
       list i case ppf l1;
       list i case ppf l2;
   | Texp_try (e, l1, l2) ->
->>>>>>> upstream-incoming
       line i ppf "Texp_try\n";
       expression i ppf e;
-<<<<<<< oxcaml
-      list i case ppf l;
+      list i case ppf l1;
+      list i case ppf l2;
   | Texp_unboxed_unit -> line i ppf "Texp_unboxed_unit\n";
   | Texp_unboxed_bool b -> line i ppf "Texp_unboxed_bool %a\n" fmt_bool b;
   | Texp_tuple (l, am) ->
-||||||| upstream-base
-      list i case ppf l;
-  | Texp_tuple (l) ->
-=======
-      list i case ppf l1;
-      list i case ppf l2;
-  | Texp_tuple (l) ->
->>>>>>> upstream-incoming
       line i ppf "Texp_tuple\n";
-<<<<<<< oxcaml
       alloc_mode i ppf am;
       list i labeled_expression ppf l;
   | Texp_unboxed_tuple l ->
       line i ppf "Texp_unboxed_tuple\n";
       list i labeled_sorted_expression ppf l;
   | Texp_construct (li, _, eo, am) ->
-||||||| upstream-base
-      list i expression ppf l;
-  | Texp_construct (li, _, eo) ->
-=======
-      list i labeled_expression ppf l;
-  | Texp_construct (li, _, eo) ->
->>>>>>> upstream-incoming
       line i ppf "Texp_construct %a\n" fmt_longident li;
       alloc_mode_option i ppf am;
       list i expression ppf eo;
@@ -853,22 +736,10 @@ and expression i ppf x =
       expression i ppf e1;
       longident i ppf li;
       expression i ppf e2;
-<<<<<<< oxcaml
   | Texp_array (amut, sort, l, amode) ->
       line i ppf "Texp_array %a\n" fmt_mutable_mode_flag amut;
       line i ppf "%a\n" fmt_sort sort;
       alloc_mode i ppf amode;
-||||||| upstream-base
-  | Texp_array (l) ->
-      line i ppf "Texp_array\n";
-=======
-  | Texp_atomic_loc (e, li, _) ->
-      line i ppf "Texp_atomic_loc\n";
-      expression i ppf e;
-      longident i ppf li;
-  | Texp_array (mut, l) ->
-      line i ppf "Texp_array %a\n" fmt_mutable_flag mut;
->>>>>>> upstream-incoming
       list i expression ppf l;
   | Texp_idx (ba, uas) ->
       line i ppf "Texp_idx\n";
@@ -1476,26 +1347,11 @@ and constructor_arguments i ppf = function
   | Cstr_tuple l -> list i field_decl ppf l
   | Cstr_record l -> list i label_decl ppf l
 
-<<<<<<< oxcaml
 and label_decl i ppf {ld_id; ld_name = _; ld_mutable; ld_type; ld_loc;
                       ld_attributes; ld_modalities} =
-||||||| upstream-base
-and label_decl i ppf {ld_id; ld_name = _; ld_mutable; ld_type; ld_loc;
-                      ld_attributes} =
-=======
-and label_decl i ppf {ld_id; ld_name= _; ld_mutable; ld_atomic; ld_type; ld_loc;
-                      ld_attributes} =
->>>>>>> upstream-incoming
   line i ppf "%a\n" fmt_location ld_loc;
   attributes i ppf ld_attributes;
-<<<<<<< oxcaml
   line (i+1) ppf "%a\n" fmt_mutable_mode_flag ld_mutable;
-||||||| upstream-base
-  line (i+1) ppf "%a\n" fmt_mutable_flag ld_mutable;
-=======
-  line (i+1) ppf "%a\n" fmt_mutable_flag ld_mutable;
-  line (i+1) ppf "%a\n" fmt_atomic_flag ld_atomic;
->>>>>>> upstream-incoming
   line (i+1) ppf "%a" fmt_ident ld_id;
   core_type (i+1) ppf ld_type;
   modalities (i+1) ppf ld_modalities
@@ -1596,7 +1452,6 @@ and record_field
 and label_x_apply_arg i ppf (l, e) =
   line i ppf "<arg>\n";
   arg_label (i+1) ppf l;
-<<<<<<< oxcaml
   (match e with Omitted _ -> () | Arg (e, _) -> expression (i+1) ppf e)
 
 and labeled_expression i ppf (l, e) =
@@ -1607,15 +1462,6 @@ and labeled_sorted_expression i ppf (l, e, s) =
   tuple_component_label i ppf l;
   expression (i+1) ppf e;
   line i ppf "%a\n" fmt_sort s;
-||||||| upstream-base
-  (match e with None -> () | Some e -> expression (i+1) ppf e)
-=======
-  (match e with Omitted () -> () | Arg e -> expression (i+1) ppf e)
-
-and labeled_expression i ppf (l, e) =
-  tuple_component_label i ppf l;
-  expression (i+1) ppf e;
->>>>>>> upstream-incoming
 
 and ident_x_expression_def i ppf (l, e) =
   line i ppf "<def> \"%a\"\n" fmt_ident l;
