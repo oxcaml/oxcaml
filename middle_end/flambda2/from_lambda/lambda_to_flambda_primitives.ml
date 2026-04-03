@@ -2095,13 +2095,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           { length = Target_ocaml_int.of_int machine_width num_fields }
       | Record_inlined
           (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
-        when Mixed_product_bytes.typing_shape_is_all_value shape ->
+        when Mixed_product_bytes.types_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
       | Record_mixed shape
-        when Mixed_product_bytes.typing_shape_is_all_value shape ->
+        when Mixed_product_bytes.types_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.zero;
             length = Target_ocaml_int.of_int machine_width num_fields

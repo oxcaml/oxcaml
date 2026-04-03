@@ -241,10 +241,10 @@ let compute_static_size lam =
             Block (Float_record size)
         | Record_inlined (_, Constructor_mixed shape,
                           (Variant_boxed _ | Variant_extensible))
-          when Mixed_product_bytes.typing_shape_is_all_value shape ->
+          when Mixed_product_bytes.types_shape_is_all_value shape ->
             Block (Regular_block size)
         | Record_mixed shape
-          when Mixed_product_bytes.typing_shape_is_all_value shape ->
+          when Mixed_product_bytes.types_shape_is_all_value shape ->
             Block (Regular_block size)
         | Record_inlined (_, Constructor_mixed shape,
                           (Variant_boxed _ | Variant_extensible))

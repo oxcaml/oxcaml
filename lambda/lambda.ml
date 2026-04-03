@@ -694,6 +694,8 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
   | None -> All_value
   | Some vks -> Shape (Array.of_list (List.map (fun vk -> Value vk) vks))
 
+(* CR rtjoa: This function is redundant with [Mixed_product_bytes], but it's
+   duplicated for now. We should fix the module dependency structure *)
 let rec is_value_or_void_element : _ mixed_block_element -> bool = function
   | Value _ -> true
   | Product elts -> Array.for_all is_value_or_void_element elts
