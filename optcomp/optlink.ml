@@ -64,7 +64,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     then
       (* This is a cmx file. It must be linked in any case. Read the infos to
          see which modules it requires. *)
-      let info, crc = read_unit_info file_name in
+      let info, crc = read_unit_info_for_linking file_name in
       Unit (file_name, info, crc)
     else if Filename.check_suffix file_name Backend.ext_flambda_lib
     then

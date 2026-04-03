@@ -33,3 +33,7 @@ val serialize : t -> string array * int array * int
 val from_array : Obj.t array -> t
 
 val concat : t -> t -> t
+
+val suffix : t -> int -> t
+(** [suffix t n] returns a view of [t] with the first [n] sections dropped.
+    No sections are loaded eagerly. *)

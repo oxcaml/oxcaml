@@ -110,8 +110,15 @@ let read_unit_info filename =
     (* This consumes the channel *)
     let sections = File_sections.create uir.uir_section_toc filename ic ~first_section_offset in
     let export_info =
-      Option.map (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
-        uir.uir_export_info
+      if not uir.uir_has_export_info then None
+      else
+        (* Section 0 holds the raw export-info value; code-body sections follow
+           at indices 1..N. *)
+        let raw : Flambda2_cmx.Flambda_cmx_format.raw =
+          Obj.obj (File_sections.get sections 0)
+        in
+        let code_sections = File_sections.suffix sections 1 in
+        Some (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections:code_sections raw)
     in
     let ui = {
       ui_unit = uir.uir_unit;
@@ -123,6 +130,44 @@ let read_unit_info filename =
       ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
       ui_generic_fns = uir.uir_generic_fns;
       ui_export_info = export_info;
+      ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
+      ui_force_link = uir.uir_force_link;
+      ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+    }
+    in
+    (ui, crc)
+  with End_of_file | Failure _ ->
+    close_in ic;
+    raise(Error(Corrupted_unit_info(filename)))
+
+(* Like [read_unit_info] but skips the export info entirely.  Used by the
+   linker, which never needs cross-module optimisation data.  With the new
+   .cmx format the export info is in sections (not inline in the Marshal block),
+   so [input_value] is now cheap regardless; this function additionally avoids
+   instantiating the File_sections lazy-loading infrastructure. *)
+let read_unit_info_for_linking filename =
+  let ic = open_in_bin filename in
+  try
+    let buffer = really_input_string ic (String.length cmx_magic_number) in
+    if buffer <> cmx_magic_number then begin
+      close_in ic;
+      raise(Error(Not_a_unit_info filename))
+    end;
+    let uir = (input_value ic : unit_infos_raw) in
+    let first_section_offset = pos_in ic in
+    seek_in ic (first_section_offset + uir.uir_sections_length);
+    let crc = Digest.input ic in
+    close_in ic;
+    let ui = {
+      ui_unit = uir.uir_unit;
+      ui_defines = uir.uir_defines;
+      ui_format = uir.uir_format;
+      ui_arg_descr = uir.uir_arg_descr;
+      ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
+      ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
+      ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
+      ui_generic_fns = uir.uir_generic_fns;
+      ui_export_info = None;
       ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
       ui_force_link = uir.uir_force_link;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
@@ -265,12 +310,17 @@ let ensure_sharing_between_cmi_and_cmx_imports cmi_imports cmx_imports =
 *)
 
 let write_unit_info info filename =
-  let raw_export_info, sections =
+  let has_export_info, sections =
     match info.ui_export_info with
-    | None -> None, File_sections.empty
-    | Some info ->
-      let info, sections = Flambda2_cmx.Flambda_cmx_format.to_raw info in
-      Some info, sections
+    | None -> false, File_sections.empty
+    | Some export_info ->
+      let raw, code_sections = Flambda2_cmx.Flambda_cmx_format.to_raw export_info in
+      (* Section 0: the raw export-info value itself (typing envs, code metadata).
+         Code-body sections follow at indices 1..N.  This keeps the large
+         cross-module optimisation data out of the inline Marshal block, so the
+         linker can cheaply deserialise .cmx headers without loading it. *)
+      let export_section = File_sections.from_array [| Obj.repr raw |] in
+      true, File_sections.concat export_section code_sections
   in
   let serialized_sections, toc, total_length = File_sections.serialize sections in
   let raw_info = {
@@ -282,7 +332,7 @@ let write_unit_info info filename =
     uir_quoted_globals = Array.of_list info.ui_quoted_globals;
     uir_format = info.ui_format;
     uir_generic_fns = info.ui_generic_fns;
-    uir_export_info = raw_export_info;
+    uir_has_export_info = has_export_info;
     uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
     uir_force_link = info.ui_force_link;
     uir_section_toc = toc;

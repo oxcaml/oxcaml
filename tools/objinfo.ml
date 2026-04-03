@@ -350,19 +350,24 @@ let print_cmx_infos (uir, sections, crc) =
     (fun f -> Array.iter f uir.uir_imports_cmx)
     (fun f -> Array.iter f uir.uir_quoted_globals);
   begin
-    match uir.uir_export_info with
-    | None ->
+    if not uir.uir_has_export_info then
       printf "Flambda 2 unit (with no export information)\n"
-    | Some _ when !no_code && !no_approx ->
+    else if !no_code && !no_approx then
       printf "Flambda 2 unit with export information\n"
-    | Some cmx ->
+    else begin
       printf "Flambda 2 export information:\n";
       flush stdout;
       let print_typing_env = not !no_approx in
       let print_code = not !no_code in
       let print_offsets = print_code && print_typing_env in
-      let cmx = Flambda2_cmx.Flambda_cmx_format.from_raw cmx ~sections in
+      (* Section 0 holds the raw export info; code-body sections follow. *)
+      let raw : Flambda2_cmx.Flambda_cmx_format.raw =
+        Obj.obj (Oxcaml_utils.File_sections.get sections 0)
+      in
+      let code_sections = Oxcaml_utils.File_sections.suffix sections 1 in
+      let cmx = Flambda2_cmx.Flambda_cmx_format.from_raw raw ~sections:code_sections in
       Format.printf "%a\n%!" (Flambda2_cmx.Flambda_cmx_format.print ~print_typing_env ~print_code ~print_offsets) cmx
+    end
   end;
   print_generic_fns uir.uir_generic_fns;
   printf "Force link: %s\n" (if uir.uir_force_link then "YES" else "no");

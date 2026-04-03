@@ -86,7 +86,14 @@ type unit_infos_raw =
     uir_quoted_globals: Compilation_unit.Name.t array;
     uir_format: Lambda.main_module_block_format;
     uir_generic_fns: generic_fns;
-    uir_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
+    uir_has_export_info: bool;
+    (* When true, section 0 of the sections block holds the serialised
+       Flambda2_cmx.Flambda_cmx_format.raw value; code-body sections occupy
+       indices 1..N.  This keeps the large typing-environment data out of the
+       inline Marshal block so that the linker can deserialise .cmx headers
+       cheaply without loading cross-module optimisation data it does not need.
+       When false, there are no export-info sections (code-body sections start
+       at index 0 as before this change). *)
     uir_zero_alloc_info: Zero_alloc_info.Raw.t;
     uir_force_link: bool;
     uir_section_toc: int array;    (* Byte offsets of sections in .cmx

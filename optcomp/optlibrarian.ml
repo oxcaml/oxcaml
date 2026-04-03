@@ -38,13 +38,10 @@ end) : S = struct
       try Load_path.find name
       with Not_found -> raise (Error (File_not_found name))
     in
-    let info, crc = Compilenv.read_unit_info filename in
+    (* The librarian does not need cross-module optimisation data; use the fast
+       path that skips loading it from the section cache. *)
+    let info, crc = Compilenv.read_unit_info_for_linking filename in
     info.ui_force_link <- info.ui_force_link || !Clflags.link_everything;
-    (* There is no need to keep the approximation in the flambda library file,
-       since the compiler will go looking directly for flambda object files. The
-       linker, which is the only one that reads library files, does not need the
-       approximation. *)
-    info.ui_export_info <- None;
     ( Filename.chop_suffix filename Backend.ext_flambda_obj ^ Backend.ext_obj,
       (info, crc) )
 

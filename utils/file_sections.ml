@@ -111,6 +111,26 @@ let from_array t = In_memory (Array.copy t)
 
 let concat t1 t2 = Cat (length t1 + length t2, t1, t2)
 
+(* Return a view of [t] with the first [n] sections dropped.  No sections are
+   loaded eagerly; pending sections remain pending. *)
+let rec suffix t n =
+  if n <= 0 then t
+  else
+    let total = length t in
+    let result = total - n in
+    if result <= 0 then In_memory [||]
+    else
+      match t with
+      | In_memory arr ->
+        In_memory (Array.sub arr n (Array.length arr - n))
+      | From_file { sections; channel } ->
+        let len = Array.length sections in
+        From_file { sections = Array.sub sections n (len - n); channel }
+      | Cat (_, t1, t2) ->
+        let n1 = length t1 in
+        if n >= n1 then suffix t2 (n - n1)
+        else concat (suffix t1 n) t2
+
 let compute_toc serialized_sections =
   let toc = Array.make (Array.length serialized_sections) 0 in
   let length = ref 0 in

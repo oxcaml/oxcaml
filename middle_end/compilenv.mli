@@ -61,6 +61,10 @@ val new_const_symbol : unit -> string
 
 val read_unit_info: string -> unit_infos * Digest.t
         (* Read infos and MD5 from a [.cmx] file. *)
+val read_unit_info_for_linking: string -> unit_infos * Digest.t
+        (* Like [read_unit_info] but does not load cross-module optimisation
+           data (export info).  Suitable for use in the linker, which only
+           needs import lists, CRCs, generic-function signatures, and flags. *)
 val write_unit_info: unit_infos -> string -> unit
         (* Save the given infos in the given file *)
 val save_unit_info:

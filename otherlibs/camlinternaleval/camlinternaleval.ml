@@ -109,9 +109,16 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             (Array.map (fun s -> Marshal.from_string s 0) sections)
         in
         let export_info =
-          Option.map
-            (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
-            uir.uir_export_info
+          if not uir.uir_has_export_info
+          then None
+          else
+            let raw : Flambda2_cmx.Flambda_cmx_format.raw =
+              Obj.obj (Oxcaml_utils.File_sections.get sections 0)
+            in
+            let code_sections = Oxcaml_utils.File_sections.suffix sections 1 in
+            Some
+              (Flambda2_cmx.Flambda_cmx_format.from_raw raw
+                 ~sections:code_sections)
         in
         let ui : Cmx_format.unit_infos =
           { ui_unit = uir.uir_unit;

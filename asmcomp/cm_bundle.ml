@@ -90,12 +90,17 @@ let cmx_bundle ~quoted_globals =
   in
   ListLabels.map (CU.Name.Map.data unit_infos)
     ~f:(fun (info : Cmx_format.unit_infos) ->
-      let raw_export_info, sections =
+      let has_export_info, sections =
         match info.ui_export_info with
-        | None -> None, Oxcaml_utils.File_sections.empty
-        | Some info ->
-          let info, sections = Flambda2_cmx.Flambda_cmx_format.to_raw info in
-          Some info, sections
+        | None -> false, Oxcaml_utils.File_sections.empty
+        | Some export_info ->
+          let raw, code_sections =
+            Flambda2_cmx.Flambda_cmx_format.to_raw export_info
+          in
+          let export_section =
+            Oxcaml_utils.File_sections.from_array [| Obj.repr raw |]
+          in
+          true, Oxcaml_utils.File_sections.concat export_section code_sections
       in
       let serialized_sections, toc, total_length =
         Oxcaml_utils.File_sections.serialize sections
@@ -109,7 +114,7 @@ let cmx_bundle ~quoted_globals =
           uir_quoted_globals = Array.of_list info.ui_quoted_globals;
           uir_format = info.ui_format;
           uir_generic_fns = info.ui_generic_fns;
-          uir_export_info = raw_export_info;
+          uir_has_export_info = has_export_info;
           uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
           uir_force_link = info.ui_force_link;
           uir_section_toc = toc;
