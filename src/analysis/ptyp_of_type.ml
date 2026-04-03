@@ -73,7 +73,7 @@ and core_type type_expr =
     Typ.constr loc @@ List.map ~f:core_type type_exprs
   | Tquote_eval ty ->
     let loc = Untypeast.lident_of_path Predef.path_eval |> Location.mknoloc in
-    Typ.constr loc @@ [ core_type ty ]
+    Typ.constr loc [ Typ.quote (core_type ty) ]
   | Tobject (type_expr, _class_) ->
     let rec aux acc type_expr =
       match get_desc type_expr with
