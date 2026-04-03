@@ -2061,6 +2061,10 @@ void caml_handle_gc_interrupt(void)
    [false] argument. In this case, all tick requests will be ignored.
  */
 
+/* Debug knob: set OCAML_TICK_USE_USLEEP=1 to fall back to usleep instead of
+   epoll, for performance comparison. */
+static bool tick_thread_use_usleep = false;
+
 #ifdef HAS_INTERRUPTIBLE_TICK
 
 /* Interruptible wait helpers for the tick thread.
@@ -2257,6 +2261,8 @@ static void caml_do_tick_all_domains(void)
 static void* caml_tick(void *arg)
 {
   (void)arg;
+  char *env = getenv("OCAML_TICK_USE_USLEEP");
+  tick_thread_use_usleep = (env != NULL && env[0] == '1');
   while (!atomic_load_acquire(&tick_thread.stop)) {
     /* We re-calculate the interval each iteration of the loop so that the
        per-domain tick interval can be changed. We use the (quite loose)
@@ -2266,7 +2272,14 @@ static void* caml_tick(void *arg)
     uintnat interval = caml_effective_tick_interval_usec();
 
 #ifdef HAS_INTERRUPTIBLE_TICK
-    if (interval == 0) {
+    if (tick_thread_use_usleep) {
+      if (interval > 0) {
+        usleep(interval);
+        caml_do_tick_all_domains();
+      } else {
+        usleep(Tick_poll_interval_usec);
+      }
+    } else if (interval == 0) {
       /* No domain wants ticks; sleep until woken by the eventfd. */
       tick_thread_wait();
     } else {
