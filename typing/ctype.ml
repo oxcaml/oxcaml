@@ -3020,7 +3020,7 @@ let constrain_type_jkind ~fixed env ty jkind =
             with
             | Ok jkind ->
               (match
-                estimate_jkind_and_loop ~fuel ~expanded:false ty jkind
+                estimate_jkind_and_loop ~fuel ~expanded:false env ty jkind
               with
               | Ok () -> Ok ()
               | Error _ ->
@@ -3041,7 +3041,7 @@ let constrain_type_jkind ~fixed env ty jkind =
              if not expanded
              then
                let ty = expand_head_opt env ty in
-               estimate_jkind_and_loop ~fuel ~expanded:true ty jkind
+               estimate_jkind_and_loop ~fuel ~expanded:true env ty jkind
              else
                begin match unbox_once env ty with
                | Missing path ->
@@ -3054,8 +3054,8 @@ let constrain_type_jkind ~fixed env ty jkind =
                       (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
                | Stepped { ty; modality } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
-                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false ty
-                    jkind
+                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false
+                    env ty jkind
                | Stepped_or_null { ty; modality } ->
                  or_null ~fuel:(fuel - 1) ty modality
                | Stepped_record_unboxed_product tys_modalities ->
@@ -3071,7 +3071,7 @@ let constrain_type_jkind ~fixed env ty jkind =
           | _ ->
             Error (Jkind.Violation.of_ ~context env
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
-  and estimate_jkind_and_loop ~fuel ~expanded ty jkind : _ result =
+  and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
        constrain layouts. So we still continue, but we avoid performing any
@@ -3083,7 +3083,7 @@ let constrain_type_jkind ~fixed env ty jkind =
     let ty's_jkind = estimate_type_jkind ~ignore_mod_bounds env ty in
     loop ~fuel ~expanded env ty ty's_jkind jkind
   in
-  estimate_jkind_and_loop ~fuel:100 ~expanded:false ty
+  estimate_jkind_and_loop ~fuel:100 ~expanded:false env ty
     (Jkind.disallow_left jkind)
 
 let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
