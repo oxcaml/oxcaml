@@ -77,9 +77,11 @@ module Mode_axis_pair = struct
     | "once" -> comonadic Linearity Once
     | "many" -> comonadic Linearity Many
     | "nonportable" -> comonadic Portability Nonportable
+    | "corruptible" -> comonadic Portability Corruptible
     | "shareable" -> comonadic Portability Shareable
     | "portable" -> comonadic Portability Portable
     | "contended" -> monadic Contention Contended
+    | "corrupted" -> monadic Contention Corrupted
     | "shared" -> monadic Contention Shared
     | "uncontended" -> monadic Contention Uncontended
     | "unforkable" -> comonadic Forkable Unforkable
@@ -233,7 +235,8 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       match a with
       | Immutable -> Contended
       | Read -> Shared
-      | Read_write | Write -> Uncontended
+      | Write -> Corrupted
+      | Read_write -> Uncontended
     in
     [Atom (Monadic Contention, Join_const b)]
   | Comonadic Statefulness, Meet_const a ->
@@ -241,7 +244,8 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       match a with
       | Stateless -> Portable
       | Reading -> Shareable
-      | Stateful | Writing -> Nonportable
+      | Writing -> Corruptible
+      | Stateful -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_const b)]
   | _ -> []
@@ -386,7 +390,8 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     | (Some _ as c), _ | c, None -> c
     | None, Some Visibility.Const.Immutable -> Some Contention.Const.Contended
     | None, Some Visibility.Const.Read -> Some Contention.Const.Shared
-    | None, Some Visibility.Const.(Read_write | Write) ->
+    | None, Some Visibility.Const.Write -> Some Contention.Const.Corrupted
+    | None, Some Visibility.Const.Read_write ->
       Some Contention.Const.Uncontended
   in
   (* Likewise for [portability]. *)
@@ -395,7 +400,9 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     | (Some _ as p), _ | p, None -> p
     | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
     | None, Some Statefulness.Const.Reading -> Some Portability.Const.Shareable
-    | None, Some Statefulness.Const.(Stateful | Writing) ->
+    | None, Some Statefulness.Const.Writing ->
+      Some Portability.Const.Corruptible
+    | None, Some Statefulness.Const.Stateful ->
       Some Portability.Const.Nonportable
   in
   { annots with forkable; yielding; contention; portability }
