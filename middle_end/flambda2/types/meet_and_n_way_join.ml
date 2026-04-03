@@ -1012,16 +1012,45 @@ and meet_head_of_kind_value_non_null env
 and meet_array_type env (element_kind1, length1, contents1, alloc_mode1)
     (element_kind2, length2, contents2, alloc_mode2) =
   let element_kind = meet_array_element_kinds element_kind1 element_kind2 in
-  combine_results env
-    ~rebuild:(fun (length, (contents, (alloc_mode, ()))) ->
-      TG.Head_of_kind_value_non_null.create_array_with_contents ~element_kind
-        ~length contents alloc_mode)
-    ~meet_ops:
-      [ meet;
-        meet_array_contents ~meet_element_kind:element_kind;
-        meet_alloc_mode ]
-    ~left_inputs:[length1; contents1; alloc_mode1]
-    ~right_inputs:[length2; contents2; alloc_mode2]
+  let rebuild (length, (contents, (alloc_mode, ()))) =
+    TG.Head_of_kind_value_non_null.create_array_with_contents ~element_kind
+      ~length contents alloc_mode
+  in
+  let sub_result =
+    combine_results env ~rebuild
+      ~meet_ops:
+        [ meet;
+          meet_array_contents ~meet_element_kind:element_kind;
+          meet_alloc_mode ]
+      ~left_inputs:[length1; contents1; alloc_mode1]
+      ~right_inputs:[length2; contents2; alloc_mode2]
+  in
+  (* [element_kind] is computed outside of [combine_results], so the
+     classification returned above does not account for it. If the meet changed
+     [element_kind] relative to one side, that side can no longer be returned
+     verbatim—we must produce [New_result] instead. *)
+  let ek_equal = Or_unknown_or_bottom.equal K.With_subkind.equal in
+  let ek_matches_left = ek_equal element_kind1 element_kind in
+  let ek_matches_right = ek_equal element_kind2 element_kind in
+  match sub_result with
+  | Bottom _ -> sub_result
+  | Ok (sub_rv, env) ->
+    let ek_matches_sub =
+      match sub_rv with
+      | Both_inputs -> ek_matches_left || ek_matches_right
+      | Left_input -> ek_matches_left
+      | Right_input -> ek_matches_right
+      | New_result _ -> false
+    in
+    if ek_matches_sub
+    then sub_result
+    else
+      let result =
+        extract_value sub_rv
+          (rebuild (length1, (contents1, (alloc_mode1, ()))))
+          (rebuild (length2, (contents2, (alloc_mode2, ()))))
+      in
+      Ok (New_result result, env)
 
 and meet_array_contents env (array_contents1 : TG.array_contents Or_unknown.t)
     (array_contents2 : TG.array_contents Or_unknown.t)
