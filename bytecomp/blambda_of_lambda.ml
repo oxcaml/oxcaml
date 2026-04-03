@@ -1174,8 +1174,33 @@ and make_unsigned_comparison size signed_comparison x y =
    (pop)
 *)
 
+let thunkify_compilation_unit_initialization ~thunk_name blam =
+  (* Transforms [blam] into something like [let thunk () = blam in thunk ()].
+     Assumes no free variables in [blam]. *)
+  let thunk = Ident.create_local thunk_name in
+  Blambda.Let
+    { id = thunk;
+      arg =
+        Function
+          { params = [Ident.create_local "null"];
+            body = blam;
+            free_variables = Ident.Set.empty
+          };
+      body =
+        Apply { func = Var thunk; args = [Const Const_null]; nontail = false }
+    }
+
 let blambda_of_lambda ~compilation_unit x =
   let blam = comp_expr x in
   match compilation_unit with
   | None -> blam
-  | Some cu -> Blambda.Prim (Blambda.Setglobal cu, [blam])
+  | Some cu ->
+    let blam =
+      if !Clflags.thunkify_cu_init
+      then
+        thunkify_compilation_unit_initialization
+          ~thunk_name:("init_" ^ Compilation_unit.full_path_as_string cu)
+          blam
+      else blam
+    in
+    Blambda.Prim (Blambda.Setglobal cu, [blam])
