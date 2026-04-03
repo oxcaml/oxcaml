@@ -464,21 +464,23 @@ let[@inline always] join_unknown join_contents (env : Join_env.t)
 (* Note: Bottom is a valid element kind for empty arrays, so this function never
    leads to a general Bottom result *)
 let meet_array_element_kinds (element_kind1 : _ Or_unknown_or_bottom.t)
-    (element_kind2 : _ Or_unknown_or_bottom.t) : _ Or_unknown_or_bottom.t =
+    (element_kind2 : _ Or_unknown_or_bottom.t) :
+    _ Or_unknown_or_bottom.t meet_return_value =
   match element_kind1, element_kind2 with
-  | Unknown, Unknown -> Unknown
-  | Bottom, _ | _, Bottom -> Bottom
-  | Unknown, Ok kind | Ok kind, Unknown -> Ok kind
-  | Ok element_kind1, Ok element_kind2 ->
-    if
-      Flambda_kind.With_subkind.compatible element_kind1
-        ~when_used_at:element_kind2
-    then Ok element_kind1
-    else if
-      Flambda_kind.With_subkind.compatible element_kind2
-        ~when_used_at:element_kind1
-    then Ok element_kind2
-    else Bottom
+  | Unknown, Unknown | Bottom, Bottom -> Both_inputs
+  | Bottom, _ | Ok _, Unknown -> Left_input
+  | _, Bottom | Unknown, Ok _ -> Right_input
+  | Ok element_kind1, Ok element_kind2 -> (
+    match
+      ( Flambda_kind.With_subkind.compatible element_kind1
+          ~when_used_at:element_kind2,
+        Flambda_kind.With_subkind.compatible element_kind2
+          ~when_used_at:element_kind1 )
+    with
+    | true, true -> Both_inputs
+    | true, false -> Left_input
+    | false, true -> Right_input
+    | false, false -> New_result Bottom)
 
 let join_array_element_kinds (element_kind1 : _ Or_unknown_or_bottom.t)
     (element_kind2 : _ Or_unknown_or_bottom.t) : _ Or_unknown_or_bottom.t =
@@ -871,45 +873,20 @@ and meet_head_of_kind_value_non_null env
 and meet_array_type env (element_kind1, length1, contents1, alloc_mode1)
     (element_kind2, length2, contents2, alloc_mode2) =
   let element_kind = meet_array_element_kinds element_kind1 element_kind2 in
-  let rebuild (length, (contents, (alloc_mode, ()))) =
-    TG.Head_of_kind_value_non_null.create_array_with_contents ~element_kind
-      ~length contents alloc_mode
+  let meet_element_kind =
+    extract_value element_kind element_kind1 element_kind2
   in
-  let sub_result =
-    combine_results env ~rebuild
-      ~meet_ops:
-        [ meet;
-          meet_array_contents ~meet_element_kind:element_kind;
-          meet_alloc_mode ]
-      ~left_inputs:[length1; contents1; alloc_mode1]
-      ~right_inputs:[length2; contents2; alloc_mode2]
-  in
-  (* [element_kind] is computed outside of [combine_results], so the
-     classification returned above does not account for it. If the meet changed
-     [element_kind] relative to one side, that side can no longer be returned
-     verbatim—we must produce [New_result] instead. *)
-  let ek_equal = Or_unknown_or_bottom.equal K.With_subkind.equal in
-  let ek_matches_left = ek_equal element_kind1 element_kind in
-  let ek_matches_right = ek_equal element_kind2 element_kind in
-  match sub_result with
-  | Bottom _ -> sub_result
-  | Ok (sub_rv, env) ->
-    let ek_matches_sub =
-      match sub_rv with
-      | Both_inputs -> ek_matches_left || ek_matches_right
-      | Left_input -> ek_matches_left
-      | Right_input -> ek_matches_right
-      | New_result _ -> false
-    in
-    if ek_matches_sub
-    then sub_result
-    else
-      let result =
-        extract_value sub_rv
-          (rebuild (length1, (contents1, (alloc_mode1, ()))))
-          (rebuild (length2, (contents2, (alloc_mode2, ()))))
-      in
-      Ok (New_result result, env)
+  combine_results env
+    ~rebuild:(fun (length, (contents, (alloc_mode, (element_kind, ())))) ->
+      TG.Head_of_kind_value_non_null.create_array_with_contents ~element_kind
+        ~length contents alloc_mode)
+    ~meet_ops:
+      [ meet;
+        meet_array_contents ~meet_element_kind;
+        meet_alloc_mode;
+        (fun env _element_kind1 _element_kind2 -> Ok (element_kind, env)) ]
+    ~left_inputs:[length1; contents1; alloc_mode1; element_kind1]
+    ~right_inputs:[length2; contents2; alloc_mode2; element_kind2]
 
 and meet_array_contents env (array_contents1 : TG.array_contents Or_unknown.t)
     (array_contents2 : TG.array_contents Or_unknown.t)
