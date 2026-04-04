@@ -83,14 +83,15 @@ fun x y z -> (function | w -> x y z w)
 run {| let foo : 'a. 'a -> 'a = fun x -> x in foo |}
 
 [%%expect{|
-let foo : 'a . 'a -> 'a = fun x -> x in foo
+let foo : ('a : value) . 'a -> 'a = fun x -> x in foo
 - : unit = ()
 |}];;
 
 run {| let foo : type a . a -> a = fun x -> x in foo |}
 
 [%%expect{|
-let foo : 'a . 'a -> 'a = fun (type a) -> (fun x -> x : a -> a) in foo
+let foo : ('a : value) . 'a -> 'a = fun (type a) -> (fun x -> x : a -> a) in
+foo
 - : unit = ()
 |}];;
 
@@ -106,7 +107,8 @@ let (foo : 'a -> 'a) = ((fun x -> x : 'a -> 'a) : @ portable) in foo
 run {| let foo : 'a . ('a -> 'a) @ portable = fun x -> x in foo |}
 
 [%%expect{|
-let foo : 'a . ('a -> 'a) @ portable = (fun x -> x : @ portable) in foo
+let foo : ('a : value) . ('a -> 'a) @ portable = (fun x -> x : @ portable) in
+foo
 - : unit = ()
 |}];;
 
