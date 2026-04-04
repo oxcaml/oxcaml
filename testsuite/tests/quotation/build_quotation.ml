@@ -7,9 +7,11 @@
 
 (* Preamble types for use in tests *)
 
-type existential = Exists : 'a -> existential
+module E = struct
+  type existential = Exists : 'a -> existential
+end
 [%%expect {|
-type existential = Exists : 'a -> existential
+module E : sig type existential = Exists : 'a -> existential end
 |}];;
 #mark_toplevel_in_quotations;;
 
@@ -328,9 +330,9 @@ Uncaught exception: Stdlib.Exit
 |}];;
 
 (* CR metaprogramming jbachurski: We should support this (ticket 6791). *)
-<[ function Exists (type a) (x : a) -> ignore (x : a) ]>
+<[ function E.Exists (type a) (x : a) -> ignore (x : a) ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-35]:
+>> Fatal error: Translquote [at Line 1, characters 12-37]:
 Constructor patterns introducing locally abstract types are not supported in quotes.
 Uncaught exception: Misc.Fatal_error
 
@@ -1379,93 +1381,131 @@ Error: Annotating types with kinds
 (* Variable *)
 <[ fun (x : ('a : immediate)) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 4, characters 18-27]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 4, characters 18-27:
+4 | <[ fun (x : ('a : immediate)) -> x ]>
+                      ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 4, characters 18-27.
 |}];;
 (* Alias *)
 <[ fun (x : ('a as ('b : immediate))) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 25-34]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 25-34:
+1 | <[ fun (x : ('a as ('b : immediate))) -> x ]>
+                             ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 25-34.
 |}];;
 (* Universal quantifier *)
 <[ let f : ('a : immediate). 'a -> 'a = fun x -> x in f ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 17-26]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 17-26:
+1 | <[ let f : ('a : immediate). 'a -> 'a = fun x -> x in f ]>
+                     ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-26.
 |}];;
 <[ let f : ('a : value) ('b : immediate). #('a * 'b) -> 'a =
     fun #(x, y) -> x
    in f ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 30-39]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 17-22:
+1 | <[ let f : ('a : value) ('b : immediate). #('a * 'b) -> 'a =
+                     ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-22.
 |}];;
 (* Locally abstract type *)
 (* handled differently depending if [type] is the initial parameter *)
 <[ fun (type t : immediate) (x : t) -> x ]> (* initial *)
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 17-26]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 17-26:
+1 | <[ fun (type t : immediate) (x : t) -> x ]> (* initial *)
+                     ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-26.
 |}];;
 <[ fun () (type t : immediate) (x : t) -> x ]> (* non-initial *)
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 20-29]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 20-29:
+1 | <[ fun () (type t : immediate) (x : t) -> x ]> (* non-initial *)
+                        ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 20-29.
 |}];;
 <[ fun (type s : value) (x : s)
        (type t : immediate) (y : t) -> #(x, y) ]> (* both *)
 [%%expect {|
->> Fatal error: Translquote [at Line 2, characters 17-26]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 17-22:
+1 | <[ fun (type s : value) (x : s)
+                     ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-22.
 |}];;
 <[ fun (type (s : immediate) (t : immediate))
        (x : s) (y : t) -> #(x, y) ]> (* double initial *)
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 34-43]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 18-27:
+1 | <[ fun (type (s : immediate) (t : immediate))
+                      ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 18-27.
 |}];;
 <[ fun (type (s : immediate)) (type (t : immediate))
        (x : s) (y : t) -> #(x, y) ]> (* split double initial *)
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 41-50]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 18-27:
+1 | <[ fun (type (s : immediate)) (type (t : immediate))
+                      ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 18-27.
 |}];;
 <[ fun () (type (s : immediate)) (type (t : immediate))
        (x : s) (y : t) -> #(x, y) ]> (* double non-initial *)
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 44-53]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 21-30:
+1 | <[ fun () (type (s : immediate)) (type (t : immediate))
+                         ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 21-30.
 |}];;
 <[ fun () (type (s : immediate) (t : immediate))
        (x : s) (y : t) -> #(x, y) ]> (* split double non-initial *)
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 37-46]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 21-30:
+1 | <[ fun () (type (s : immediate) (t : immediate))
+                         ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 21-30.
 |}];;
 (* Universally quantified locally abstract type *)
 <[ let f : type (a : immediate). a -> a = fun x -> x in f ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 21-30]: no support for jkind annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 21-30:
+1 | <[ let f : type (a : immediate). a -> a = fun x -> x in f ]>
+                         ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 21-30.
 |}];;
 (* Constructor with locally abstract type *)
-<[ function Exists (type a : immediate) (x : a) -> ignore (x : a) ]>
+<[ function E.Exists (type a : immediate) (x : a) -> ignore (x : a) ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-47]:
-Constructor patterns introducing locally abstract types are not supported in quotes.
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 31-40:
+1 | <[ function E.Exists (type a : immediate) (x : a) -> ignore (x : a) ]>
+                                   ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 31-40.
 |}];;
