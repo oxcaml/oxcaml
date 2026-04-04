@@ -1,0 +1,9 @@
+(ocamllex
+ (modules lexer))
+
+(menhir
+ (modules parser))
+
+(library
+ (name lattice_gen_lib)
+ (wrapped false))

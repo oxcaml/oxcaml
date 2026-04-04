@@ -1,0 +1,3 @@
+(executable
+ (name lattice_gen)
+ (libraries lattice_gen_lib))

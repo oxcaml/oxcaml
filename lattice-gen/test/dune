@@ -1,0 +1,15 @@
+(test
+ (name test_semantics)
+ (libraries lattice_gen_lib unix)
+ (deps
+  example.lattice
+  compiler_structure.lattice
+  compiler_structure_kind_subbed.lattice
+  chains.lattice
+  diamond.lattice
+  sampled_product.lattice))
+
+(cram
+ (deps
+  example.lattice
+  ../bin/lattice_gen.exe))

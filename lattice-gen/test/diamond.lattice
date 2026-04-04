@@ -1,0 +1,4 @@
+Diamond = [
+  BottomElt < Left < TopElt;
+  BottomElt < Right < TopElt
+]

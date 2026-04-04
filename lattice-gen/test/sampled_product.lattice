@@ -1,0 +1,11 @@
+Axis = [
+  A0 < A1 < A2 < A3
+]
+
+Big = {
+  f1 : Axis;
+  f2 : Axis ^op;
+  f3 : Axis;
+  f4 : Axis ^op;
+  f5 : Axis;
+}

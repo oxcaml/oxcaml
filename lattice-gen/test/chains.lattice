@@ -1,0 +1,7 @@
+Ascending = [
+  Low < Mid < High
+]
+
+Descending = [
+  Upper > Center > Lower
+]

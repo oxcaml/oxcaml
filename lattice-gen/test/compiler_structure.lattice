@@ -1,0 +1,143 @@
+Locality = [
+  Global < Local
+]
+
+Regionality = [
+  Global < Regional < Local
+]
+
+Locality <= Regionality via {
+  Global -> Global;
+  Local -> Local;
+} aliases {
+  embed = Locality_as_regionality;
+  left1 = Regional_to_local;
+  right1 = Regional_to_global;
+  left2 = Local_to_regional;
+  right2 = Global_to_regional;
+}
+
+Uniqueness = [
+  Unique < Aliased
+]
+
+Linearity = [
+  Many < Once
+]
+
+Portability = [
+  Portable < Shareable < Nonportable
+]
+
+Contention = [
+  Uncontended < Shared < Contended
+]
+
+Forkable = [
+  Forkable < Unforkable
+]
+
+Yielding = [
+  Unyielding < Yielding
+]
+
+Staticity = [
+  Static < Dynamic
+]
+
+Statefulness = [
+  Stateless < Writing < Stateful;
+  Stateless < Reading < Stateful
+]
+
+Visibility = [
+  Read_write < Read < Immutable;
+  Read_write < Write < Immutable
+]
+
+Externality = [
+  External_ < External64 < Internal
+]
+
+Nullability = [
+  Non_null < Maybe_null
+]
+
+Separability = [
+  Non_float < Separable < Maybe_separable
+]
+
+Pointerness = [
+  Non_pointer < Maybe_pointer
+]
+
+Monadic = {
+  uniqueness : Uniqueness;
+  contention : Contention;
+  visibility : Visibility;
+  staticity : Staticity;
+}
+
+Comonadic_with_locality = {
+  areality : Locality;
+  linearity : Linearity;
+  portability : Portability;
+  forkable : Forkable;
+  yielding : Yielding;
+  statefulness : Statefulness;
+}
+
+Comonadic_with_regionality = {
+  areality : Regionality;
+  linearity : Linearity;
+  portability : Portability;
+  forkable : Forkable;
+  yielding : Yielding;
+  statefulness : Statefulness;
+}
+
+Value = {
+  comonadic : Comonadic_with_regionality;
+  monadic : Monadic;
+}
+
+Alloc = {
+  comonadic : Comonadic_with_locality;
+  monadic : Monadic;
+}
+
+Scannable_axes = {
+  pointerness : Pointerness;
+}
+
+Packed_axes_raw = {
+  areality : Regionality;
+  uniqueness : Uniqueness;
+  linearity : Linearity;
+  contention : Contention;
+  portability : Portability;
+  forkable : Forkable;
+  yielding : Yielding;
+  statefulness : Statefulness;
+  visibility : Visibility;
+  staticity : Staticity;
+  externality : Externality;
+  nullability : Nullability;
+  separability : Separability;
+}
+
+Packed_axes_kind_view = {
+  areality : Regionality;
+  uniqueness : Uniqueness ^op;
+  linearity : Linearity;
+  contention : Contention ^op;
+  portability : Portability;
+  forkable : Forkable;
+  yielding : Yielding;
+  statefulness : Statefulness;
+  visibility : Visibility ^op;
+  staticity : Staticity ^op;
+  externality : Externality;
+  nullability : Nullability;
+  separability : Separability;
+}
