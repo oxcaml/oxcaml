@@ -1,5 +1,5 @@
   $ ../bin/lattice_gen.exe example.lattice --ml actual.ml --mli actual.mli --test-ml actual_test.ml
-  $ sed -n '1,28p' actual.mli
+  $ sed -n '1,36p' actual.mli
   module Locality : sig
     type t = private int
   
@@ -27,7 +27,15 @@
       val to_int : t -> int
       val of_int_exn : int -> t
     end
-  end
+    module Const : sig
+      type nonrec t = t
+  
+      val min : t
+      val max : t
+      val le : t -> t -> bool
+      val equal : t -> t -> bool
+      val join : t -> t -> t
+      val meet : t -> t -> t
   $ sed -n '1,20p' actual_test.ml
   open Actual
   

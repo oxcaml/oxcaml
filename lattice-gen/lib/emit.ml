@@ -160,6 +160,24 @@ let field_module_name (field : field) ~in_op =
   let opposite = if in_op then not field.declared_opposite else field.declared_opposite in
   if opposite then Name.op_module_name field.lattice_name else field.lattice_name
 
+let axis_ctor_name field_name = String.capitalize_ascii field_name
+
+let field_module_alias_name (field : field) = "Field_" ^ axis_ctor_name field.name
+
+let legacy_value_name name =
+  match name with
+  | "Locality" | "Regionality" -> "global"
+  | "Uniqueness" -> "aliased"
+  | "Linearity" -> "many"
+  | "Portability" -> "nonportable"
+  | "Contention" -> "uncontended"
+  | "Forkable" -> "forkable"
+  | "Yielding" -> "unyielding"
+  | "Statefulness" -> "stateful"
+  | "Visibility" -> "read_write"
+  | "Staticity" -> "dynamic"
+  | _ -> "top"
+
 let add_repr_sig buf =
   Buffer.add_string
     buf
@@ -199,6 +217,20 @@ let add_base_sig buf (base : base) module_name =
     \  val pp : Format.formatter -> t -> unit\n\
     \  val show : t -> string\n\n";
   add_repr_sig buf;
+  bprintf
+    buf
+    "  module Const : sig\n\
+    \    type nonrec t = t\n\
+    \n\
+    \    val min : t\n\
+    \    val max : t\n\
+    \    val le : t -> t -> bool\n\
+    \    val equal : t -> t -> bool\n\
+    \    val join : t -> t -> t\n\
+    \    val meet : t -> t -> t\n\
+    \    val print : Format.formatter -> t -> unit\n\
+    \    val legacy : t\n\
+    \  end\n";
   Buffer.add_string buf "end\n\n"
 
 let add_product_view_sig buf (product : product) _module_name ~in_op =
@@ -236,9 +268,12 @@ let add_product_sig buf (product : product) module_name ~in_op =
     (fun (field : field) ->
       let field_module = field_module_name field ~in_op in
       bprintf buf "  val %s : t -> %s.t\n" field.name field_module;
+      bprintf buf "  val proj_%s : t -> %s.t\n" field.name field_module;
       bprintf buf "  val with_%s : %s.t -> t -> t\n" field.name field_module;
       bprintf buf "  val %s_bot : %s.t -> t\n" field.name field_module;
-      bprintf buf "  val %s_top : %s.t -> t\n" field.name field_module)
+      bprintf buf "  val %s_top : %s.t -> t\n" field.name field_module;
+      bprintf buf "  val min_with_%s : %s.t -> t\n" field.name field_module;
+      bprintf buf "  val max_with_%s : %s.t -> t\n" field.name field_module)
     product.fields;
   Buffer.add_string
     buf
@@ -260,6 +295,46 @@ let add_product_sig buf (product : product) module_name ~in_op =
     product.fields;
   Buffer.add_string buf "  end\n\n";
   add_repr_sig buf;
+  Buffer.add_string buf "  module Axis : sig\n";
+  Buffer.add_string buf "    type _ t =\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | %s : %s.t t\n"
+        (axis_ctor_name field.name)
+        (field_module_name field ~in_op))
+    product.fields;
+  Buffer.add_string
+    buf
+    "\n\
+    \    type packed = P : 'a t -> packed\n\
+    \n\
+    \    val all : packed list\n\
+    \    val print : Format.formatter -> 'a t -> unit\n\
+    \  end\n\n";
+  bprintf
+    buf
+    "  module Const : sig\n\
+    \    type nonrec t = t\n\
+    \    type 'a axis = 'a Axis.t\n\
+    \n\
+    \    val min : t\n\
+    \    val max : t\n\
+    \    val le : t -> t -> bool\n\
+    \    val equal : t -> t -> bool\n\
+    \    val join : t -> t -> t\n\
+    \    val meet : t -> t -> t\n\
+    \    val print : Format.formatter -> t -> unit\n\
+    \    val legacy : t\n\
+    \n\
+    \    val split : t -> view\n\
+    \    val merge : view -> t\n\
+    \n\
+    \    val proj : 'a axis -> t -> 'a\n\
+    \    val min_with : 'a axis -> 'a -> t\n\
+    \    val max_with : 'a axis -> 'a -> t\n\
+    \  end\n";
   Buffer.add_string buf "end\n\n"
 
 let add_embedding_sig buf (embedding : embedding) =
@@ -342,7 +417,23 @@ let add_base_ml buf (base : base) module_name descriptor =
     descriptor.bits
     descriptor.mask;
   add_repr_validator_ml buf base.repr_validator;
-  Buffer.add_string buf "  end\nend\n\n"
+  bprintf
+    buf
+    "  end\n\
+    \  module Const = struct\n\
+    \    type nonrec t = t\n\
+    \n\
+    \    let min = bottom\n\
+    \    let max = top\n\
+    \    let le = leq\n\
+    \    let equal = equal\n\
+    \    let join = join\n\
+    \    let meet = meet\n\
+    \    let print = pp\n\
+    \    let legacy = %s\n\
+    \  end\n\
+    end\n\n"
+    (legacy_value_name base.name)
 
 let add_product_ml buf (product : product) module_name descriptor ~in_op =
   bprintf buf "module %s = struct\n" module_name;
@@ -355,6 +446,14 @@ let add_product_ml buf (product : product) module_name descriptor ~in_op =
       bprintf buf "    %s : %s.t;\n" field.name (field_module_name field ~in_op))
     product.fields;
   Buffer.add_string buf "  }\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "  module %s = %s\n"
+        (field_module_alias_name field)
+        (field_module_name field ~in_op))
+    product.fields;
   Buffer.add_string buf "  module Layout = struct\n";
   List.iter
     (fun (field : field) ->
@@ -389,6 +488,7 @@ let add_product_ml buf (product : product) module_name descriptor ~in_op =
          else Printf.sprintf "(t lsr %d)" field.shift)
         field.raw_mask
         field_module;
+      bprintf buf "  let proj_%s = %s\n" field.name field.name;
       bprintf
         buf
         "  let[@inline] with_%s value t = (t land lnot Layout.%s_mask) lor %s\n"
@@ -421,7 +521,9 @@ let add_product_ml buf (product : product) module_name descriptor ~in_op =
         buf
         "  let[@inline] %s_top value = with_%s value top\n"
         field.name
-        field.name)
+        field.name;
+      bprintf buf "  let min_with_%s = %s_bot\n" field.name field.name;
+      bprintf buf "  let max_with_%s = %s_top\n" field.name field.name)
     product.fields;
   Buffer.add_string buf "  let pp ppf t =\n";
   if product.fields = []
@@ -455,6 +557,99 @@ let add_product_ml buf (product : product) module_name descriptor ~in_op =
     descriptor.bits
     descriptor.mask;
   add_repr_validator_ml buf product.repr_validator;
+  Buffer.add_string buf "  end\n";
+  Buffer.add_string buf "  module Axis = struct\n";
+  Buffer.add_string buf "    type _ t =\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | %s : %s.t t\n"
+        (axis_ctor_name field.name)
+        (field_module_name field ~in_op))
+    product.fields;
+  Buffer.add_string buf "\n    type packed = P : 'a t -> packed\n\n";
+  Buffer.add_string buf "    let all = [\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf buf "      P %s;\n" (axis_ctor_name field.name))
+    product.fields;
+  Buffer.add_string buf "    ]\n";
+  Buffer.add_string
+    buf
+    "    let print : type a. Format.formatter -> a t -> unit = fun ppf -> function\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | %s -> Format.pp_print_string ppf %S\n"
+        (axis_ctor_name field.name)
+        field.name)
+    product.fields;
+  Buffer.add_string buf "  end\n";
+  Buffer.add_string
+    buf
+    "  module Const = struct\n\
+    \    type nonrec t = t\n\
+    \    type 'a axis = 'a Axis.t\n\
+    \n\
+    \    let min = bottom\n\
+    \    let max = top\n\
+    \    let le = leq\n\
+    \    let equal = equal\n\
+    \    let join = join\n\
+    \    let meet = meet\n\
+    \    let print = pp\n\
+    \n\
+    \    let split = view\n\
+    \    let merge = of_view\n\
+    \n";
+  Buffer.add_string buf "    let legacy =\n      make ";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "~%s:%s.Const.legacy "
+        field.name
+        (field_module_alias_name field))
+    product.fields;
+  Buffer.add_string buf "\n";
+  Buffer.add_string
+    buf
+    "    let[@inline] proj : type a. a axis -> t -> a = fun axis t ->\n\
+    \      match axis with\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | Axis.%s -> %s t\n"
+        (axis_ctor_name field.name)
+        field.name)
+    product.fields;
+  Buffer.add_string
+    buf
+    "    let[@inline] min_with : type a. a axis -> a -> t = fun axis value ->\n\
+    \      match axis with\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | Axis.%s -> %s_bot value\n"
+        (axis_ctor_name field.name)
+        field.name)
+    product.fields;
+  Buffer.add_string
+    buf
+    "    let[@inline] max_with : type a. a axis -> a -> t = fun axis value ->\n\
+    \      match axis with\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | Axis.%s -> %s_top value\n"
+        (axis_ctor_name field.name)
+        field.name)
+    product.fields;
   Buffer.add_string buf "  end\nend\n\n"
 
 let find_base model name =
@@ -506,6 +701,71 @@ let add_embedding_ml buf model (embedding : embedding) =
     embedding.aliases;
   Buffer.add_string buf "end\n\n"
 
+type exported_alias =
+  { alias_name : string;
+    module_name : string;
+    morphism : morphism
+  }
+
+let collect_exported_aliases model =
+  let seen = Hashtbl.create 16 in
+  let add seen alias =
+    if Hashtbl.mem seen alias.alias_name
+    then failwith ("duplicate top-level alias export: " ^ alias.alias_name);
+    Hashtbl.add seen alias.alias_name ()
+  in
+  List.fold_left
+    (fun acc ->
+      function
+      | Lattice _ -> acc
+      | Embedding embedding ->
+        List.fold_left
+          (fun acc (alias_name, slot) ->
+            let alias =
+              { alias_name;
+                module_name = embedding.module_name;
+                morphism = morphism_of_slot embedding slot
+              }
+            in
+            add seen alias;
+            acc @ [ alias ])
+          acc
+          embedding.aliases)
+    []
+    model.items
+
+let add_exported_aliases_sig buf aliases =
+  List.iter
+    (fun alias ->
+      bprintf
+        buf
+        "val %s : %s.t -> %s.t\n"
+        alias.alias_name
+        alias.morphism.domain
+        alias.morphism.codomain)
+    aliases;
+  if aliases <> [] then Buffer.add_string buf "\n"
+
+let add_exported_aliases_ml buf aliases =
+  List.iter
+    (fun alias ->
+      bprintf
+        buf
+        "let %s = %s.%s\n"
+        alias.alias_name
+        alias.module_name
+        alias.alias_name)
+    aliases;
+  if aliases <> [] then Buffer.add_string buf "\n"
+
+let add_exported_aliases_top_sig buf model =
+  let aliases = collect_exported_aliases model in
+  add_exported_aliases_sig buf aliases
+
+let add_exported_aliases_top_ml buf model =
+  let aliases = collect_exported_aliases model in
+  add_exported_aliases_ml buf aliases
+
 let values_var_name module_name = "values_" ^ Name.snake_case module_name
 
 let add_test_runtime_ml buf root_module =
@@ -533,6 +793,19 @@ let safe_product limit a b =
 let should_exhaust sizes =
   List.fold_left (safe_product exhaustive_threshold) 1 sizes
   <= exhaustive_threshold
+
+let iter1 xs f =
+  let xs = Array.of_list xs in
+  let nx = Array.length xs in
+  if should_exhaust [ nx ]
+  then
+    for i = 0 to nx - 1 do
+      f xs.(i)
+    done
+  else
+    for _ = 1 to sample_count do
+      f xs.(Random.State.int rng nx)
+    done
 
 let iter2 xs ys f =
   let xs = Array.of_list xs in
@@ -618,7 +891,7 @@ let check_repr ~name ~values ~mask ~to_int ~of_int_exn ~show =
   done
 
 let check_name_roundtrip ~name ~values ~to_name ~of_name ~show =
-  List.iter
+  iter1 values
     (fun value ->
       let text = to_name value in
       match of_name text with
@@ -628,7 +901,6 @@ let check_name_roundtrip ~name ~values ~to_name ~of_name ~show =
           name (show value)
       | None ->
         fail "%s: of_name rejected %S" name text)
-    values
 
 let check_valid ~name ~to_int ~of_int_exn ~show value =
   let i = to_int value in
@@ -656,7 +928,7 @@ let check_lattice
   =
   check_valid ~name ~to_int ~of_int_exn ~show bottom;
   check_valid ~name ~to_int ~of_int_exn ~show top;
-  List.iter
+  iter1 values
     (fun value ->
       ensure (leq value value)
         "%s: reflexivity failed for %s"
@@ -666,8 +938,7 @@ let check_lattice
         name (show value);
       ensure (leq value top)
         "%s: %s is not <= top"
-        name (show value))
-    values;
+        name (show value));
   iter2 values values
     (fun x y ->
       let join_xy = join x y in
@@ -860,7 +1131,7 @@ let check_function_equality
     ~of_int_exn
     ~show
   =
-  List.iter
+  iter1 values
     (fun value ->
       let fv = f value in
       let gv = g value in
@@ -869,17 +1140,15 @@ let check_function_equality
       ensure (fv = gv)
         "%s: extensional equality failed"
         name)
-    values
 
 let check_product_roundtrip ~name ~values ~view ~of_view ~to_int ~of_int_exn ~show =
-  List.iter
+  iter1 values
     (fun value ->
       let rebuilt = of_view (view value) in
       check_valid ~name ~to_int ~of_int_exn ~show rebuilt;
       ensure (rebuilt = value)
         "%s: view/of_view roundtrip failed"
         name)
-    values
 
 let check_field_projection
     ~name
@@ -898,7 +1167,7 @@ let check_field_projection
     ~field_of_int_exn
     ~field_show
   =
-  List.iter
+  iter1 product_values
     (fun product ->
       let field_product = field product in
       let rebuilt = with_field field_product product in
@@ -916,8 +1185,7 @@ let check_field_projection
         rebuilt;
       ensure (rebuilt = product)
         "%s: with_field/field roundtrip failed"
-        name)
-    product_values;
+        name);
   iter2 field_values product_values
     (fun field_value product ->
       let updated = with_field field_value product in
@@ -1228,7 +1496,7 @@ let add_product_test_ml buf (product : product) =
     product.name
     product.name
     product.name;
-  bprintf buf "  List.iter (fun value ->\n";
+  bprintf buf "  iter1 %s (fun value ->\n" values_name;
   bprintf buf "    let made = %s.make " product.name;
   List.iter
     (fun (field : field) ->
@@ -1244,7 +1512,7 @@ let add_product_test_ml buf (product : product) =
     product.name
     product.name
     (product.name ^ ": make/projection roundtrip failed");
-  bprintf buf ") %s;\n" values_name;
+  Buffer.add_string buf ");\n";
   List.iter
     (fun (field : field) ->
       let field_module = field_module_name field ~in_op:false in
@@ -1270,7 +1538,82 @@ let add_product_test_ml buf (product : product) =
         product.name
         field_module
         field_module
-        field_module)
+        field_module;
+      bprintf
+        buf
+        "  check_function_equality ~name:%S ~values:%s ~f:%s.proj_%s ~g:%s.%s ~to_int:%s.Repr.to_int ~of_int_exn:%s.Repr.of_int_exn ~show:%s.show;\n"
+        (product.name ^ ".proj_" ^ field.name)
+        values_name
+        product.name
+        field.name
+        product.name
+        field.name
+        field_module
+        field_module
+        field_module;
+      bprintf
+        buf
+        "  check_function_equality ~name:%S ~values:%s ~f:%s.min_with_%s ~g:%s.%s_bot ~to_int:%s.Repr.to_int ~of_int_exn:%s.Repr.of_int_exn ~show:%s.show;\n"
+        (product.name ^ ".min_with_" ^ field.name)
+        field_values_name
+        product.name
+        field.name
+        product.name
+        field.name
+        product.name
+        product.name
+        product.name;
+      bprintf
+        buf
+        "  check_function_equality ~name:%S ~values:%s ~f:%s.max_with_%s ~g:%s.%s_top ~to_int:%s.Repr.to_int ~of_int_exn:%s.Repr.of_int_exn ~show:%s.show;\n"
+        (product.name ^ ".max_with_" ^ field.name)
+        field_values_name
+        product.name
+        field.name
+        product.name
+        field.name
+        product.name
+        product.name
+        product.name;
+      bprintf
+        buf
+        "  check_function_equality ~name:%S ~values:%s ~f:(%s.Const.proj %s.Axis.%s) ~g:%s.%s ~to_int:%s.Repr.to_int ~of_int_exn:%s.Repr.of_int_exn ~show:%s.show;\n"
+        (product.name ^ ".Const.proj." ^ field.name)
+        values_name
+        product.name
+        product.name
+        (axis_ctor_name field.name)
+        product.name
+        field.name
+        field_module
+        field_module
+        field_module;
+      bprintf
+        buf
+        "  check_function_equality ~name:%S ~values:%s ~f:(%s.Const.min_with %s.Axis.%s) ~g:%s.%s_bot ~to_int:%s.Repr.to_int ~of_int_exn:%s.Repr.of_int_exn ~show:%s.show;\n"
+        (product.name ^ ".Const.min_with." ^ field.name)
+        field_values_name
+        product.name
+        product.name
+        (axis_ctor_name field.name)
+        product.name
+        field.name
+        product.name
+        product.name
+        product.name;
+      bprintf
+        buf
+        "  check_function_equality ~name:%S ~values:%s ~f:(%s.Const.max_with %s.Axis.%s) ~g:%s.%s_top ~to_int:%s.Repr.to_int ~of_int_exn:%s.Repr.of_int_exn ~show:%s.show;\n"
+        (product.name ^ ".Const.max_with." ^ field.name)
+        field_values_name
+        product.name
+        product.name
+        (axis_ctor_name field.name)
+        product.name
+        field.name
+        product.name
+        product.name
+        product.name)
     product.fields;
   Buffer.add_string buf "  ()\n\n"
 
@@ -1408,6 +1751,25 @@ let add_embedding_test_ml buf (embedding : embedding) =
     embedding.aliases;
   Buffer.add_string buf "  ()\n\n"
 
+let add_exported_aliases_test_ml buf model =
+  let aliases = collect_exported_aliases model in
+  List.iter
+    (fun alias ->
+      bprintf
+        buf
+        "let () =\n\
+        \  check_function_equality ~name:%S ~values:%s ~f:%s ~g:%s.%s ~to_int:%s.Repr.to_int ~of_int_exn:%s.Repr.of_int_exn ~show:%s.show;\n\
+        \  ()\n\n"
+        alias.alias_name
+        (values_var_name alias.morphism.domain)
+        alias.alias_name
+        alias.module_name
+        alias.alias_name
+        alias.morphism.codomain
+        alias.morphism.codomain
+        alias.morphism.codomain)
+    aliases
+
 let add_test_ml buf model ~root_module =
   add_test_runtime_ml buf root_module;
   add_values_bindings_ml buf model;
@@ -1416,7 +1778,8 @@ let add_test_ml buf model ~root_module =
       | Lattice (Base base) -> add_base_test_ml buf base
       | Lattice (Product product) -> add_product_test_ml buf product
       | Embedding embedding -> add_embedding_test_ml buf embedding)
-    model.items
+    model.items;
+  add_exported_aliases_test_ml buf model
 
 let render ~root_module model =
   let mli = Buffer.create 4096 in
@@ -1444,6 +1807,8 @@ let render ~root_module model =
         add_embedding_sig mli embedding;
         add_embedding_ml ml model embedding)
     model.items;
+  add_exported_aliases_top_sig mli model;
+  add_exported_aliases_top_ml ml model;
   { ml = Buffer.contents ml;
     mli = Buffer.contents mli;
     test_ml = Buffer.contents test_ml

@@ -8,6 +8,9 @@ It covers:
 * named **embeddings** between base lattices
 * generated operations `join`, `meet`, `leq`, `sub`, `imply`
 * product-field projections and their adjoints
+* a public convenience layer with nested `Const` modules on lattices and
+  nested `Axis` / `Const` modules on products
+* optional top-level re-exports of embedding aliases
 
 It does **not** cover the function-space lattices such as `Modality.*` / `Crossing.*`. Those should be a later extension.
 
@@ -311,6 +314,19 @@ For each explicit embedding `S <= B`, it generates:
 
 The generated code is ordinary OCaml modules.
 
+For products, the generator also emits explicit concrete projection/adjoint
+names:
+
+* `proj_<field>`
+* `min_with_<field>`
+* `max_with_<field>`
+
+as synonyms for the immediate field projection and its two canonical adjoints.
+
+If an embedding declares aliases, those aliases are also re-exported at the file
+top level as value bindings of the same names, provided the generated top-level
+value namespace stays collision-free.
+
 If requested, the generator also emits one ordinary OCaml test module that
 checks the generated modules.
 
@@ -355,8 +371,11 @@ Concretely:
 * lattice module names must be globally distinct
 * element value names must be distinct within one generated lattice module
 * field names must be distinct within one generated product module
+* generated `proj_<field>`, `min_with_<field>`, and `max_with_<field>` names
+  must also be distinct within one generated product module
 * embedding-function names and aliases must be distinct within one generated
   embedding module
+* top-level re-exported embedding aliases must be globally distinct
 
 Lattice names are preserved as module names and must therefore be valid OCaml module identifiers.
 
@@ -403,6 +422,19 @@ module Locality : sig
     val mask      : int
     val to_int    : t -> int
     val of_int_exn: int -> t
+  end
+
+  module Const : sig
+    type t = Locality.t
+
+    val min    : t
+    val max    : t
+    val le     : t -> t -> bool
+    val equal  : t -> t -> bool
+    val join   : t -> t -> t
+    val meet   : t -> t -> t
+    val print  : Format.formatter -> t -> unit
+    val legacy : t
   end
 end
 
@@ -485,6 +517,10 @@ module State : sig
   val flag  : t -> Bool_op.t
   val shape : t -> Diamond.t
 
+  val proj_sev   : t -> Severity.t
+  val proj_flag  : t -> Bool_op.t
+  val proj_shape : t -> Diamond.t
+
   val with_sev   : Severity.t -> t -> t
   val with_flag  : Bool_op.t -> t -> t
   val with_shape : Diamond.t -> t -> t
@@ -492,10 +528,16 @@ module State : sig
   (* projection adjoints *)
   val sev_bot   : Severity.t -> t
   val sev_top   : Severity.t -> t
+  val min_with_sev : Severity.t -> t
+  val max_with_sev : Severity.t -> t
   val flag_bot  : Bool_op.t -> t
   val flag_top  : Bool_op.t -> t
+  val min_with_flag : Bool_op.t -> t
+  val max_with_flag : Bool_op.t -> t
   val shape_bot : Diamond.t -> t
   val shape_top : Diamond.t -> t
+  val min_with_shape : Diamond.t -> t
+  val max_with_shape : Diamond.t -> t
 
   val bottom : t
   val top    : t
@@ -524,6 +566,39 @@ module State : sig
     val mask      : int
     val to_int    : t -> int
     val of_int_exn: int -> t
+  end
+
+  module Axis : sig
+    type _ t =
+      | Sev : Severity.t t
+      | Flag : Bool_op.t t
+      | Shape : Diamond.t t
+
+    type packed = P : 'a t -> packed
+
+    val all : packed list
+    val print : Format.formatter -> 'a t -> unit
+  end
+
+  module Const : sig
+    type t = State.t
+    type 'a axis = 'a Axis.t
+
+    val min    : t
+    val max    : t
+    val le     : t -> t -> bool
+    val equal  : t -> t -> bool
+    val join   : t -> t -> t
+    val meet   : t -> t -> t
+    val print  : Format.formatter -> t -> unit
+    val legacy : t
+
+    val split : t -> view
+    val merge : view -> t
+
+    val proj     : 'a axis -> t -> 'a
+    val min_with : 'a axis -> 'a -> t
+    val max_with : 'a axis -> 'a -> t
   end
 end
 
@@ -596,6 +671,14 @@ val regional_to_local       : Regionality.t -> Locality.t
 val regional_to_global      : Regionality.t -> Locality.t
 val local_to_regional       : Locality.t -> Regionality.t
 val global_to_regional      : Locality.t -> Regionality.t
+```
+
+The same aliases are also re-exported at the generated file top level:
+
+```ocaml
+val locality_as_regionality : Locality.t -> Regionality.t
+val regional_to_local       : Regionality.t -> Locality.t
+...
 ```
 
 In finite proper embeddings, the maximal adjoint chain is finite.

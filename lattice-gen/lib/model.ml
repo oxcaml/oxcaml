@@ -440,7 +440,14 @@ let check_product_field_names (fields : Ast.field list) loc =
       List.iter
         (fun generated ->
           ensure_unique_name used generated (located_loc field.name) "value")
-        [ name; "with_" ^ name; name ^ "_bot"; name ^ "_top" ])
+        [ name;
+          "with_" ^ name;
+          name ^ "_bot";
+          name ^ "_top";
+          "proj_" ^ name;
+          "min_with_" ^ name;
+          "max_with_" ^ name
+        ])
     fields;
   ignore loc
 
