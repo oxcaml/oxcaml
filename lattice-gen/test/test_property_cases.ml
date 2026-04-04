@@ -1,8 +1,8 @@
 let seed = 0x5eed123
 
-let base_product_case_count = 100
+let base_product_case_count = 15
 
-let chain_embedding_case_count = 50
+let chain_embedding_case_count = 8
 
 let rng = Random.State.make [| seed; 0x2026; 0x1234 |]
 

@@ -192,6 +192,15 @@ A field type `T ^op` means:
 * same carrier as `T`
 * opposite lattice structure
 
+Internally, every declared product also induces a derived object/axis model:
+
+* one product object for the product as a whole
+* one axis object per field
+* canonical generated names for projection and adjoint operations on that axis
+
+This derived model is generator-internal; it does not require extra surface DSL
+syntax.
+
 ---
 
 ## 2.5 Explicit embeddings

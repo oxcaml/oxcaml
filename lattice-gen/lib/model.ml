@@ -50,9 +50,26 @@ type field =
     layout_mask : int
   }
 
+type axis_object =
+  { name : string;
+    ctor_name : string;
+    carrier_name : string;
+    declared_opposite : bool;
+    shift : int;
+    raw_mask : int;
+    layout_mask : int;
+    proj_name : string;
+    with_name : string;
+    bot_name : string;
+    top_name : string;
+    min_with_name : string;
+    max_with_name : string
+  }
+
 type product =
   { name : string;
     fields : field list;
+    axes : axis_object list;
     repr_validator : repr_validator;
     descriptor : descriptor;
     op_descriptor : descriptor
@@ -82,9 +99,23 @@ type item =
   | Lattice of lattice
   | Embedding of embedding
 
+type object_shape =
+  | Base_object
+  | Product_object of axis_object list
+
+type lattice_object =
+  { name : string;
+    opposite_name : string;
+    shape : object_shape;
+    repr_validator : repr_validator;
+    descriptor : descriptor;
+    op_descriptor : descriptor
+  }
+
 type t =
   { items : item list;
-    lattices : lattice String_map.t
+    lattices : lattice String_map.t;
+    objects : lattice_object String_map.t
   }
 
 let opp_descriptor (desc : descriptor) =
@@ -451,6 +482,22 @@ let check_product_field_names (fields : Ast.field list) loc =
     fields;
   ignore loc
 
+let axis_object_of_field (field : field) =
+  { name = field.name;
+    ctor_name = String.capitalize_ascii field.name;
+    carrier_name = field.lattice_name;
+    declared_opposite = field.declared_opposite;
+    shift = field.shift;
+    raw_mask = field.raw_mask;
+    layout_mask = field.layout_mask;
+    proj_name = "proj_" ^ field.name;
+    with_name = "with_" ^ field.name;
+    bot_name = field.name ^ "_bot";
+    top_name = field.name ^ "_top";
+    min_with_name = "min_with_" ^ field.name;
+    max_with_name = "max_with_" ^ field.name
+  }
+
 let shift_round amount (round : round) =
   { round with mask = round.mask lsl amount }
 
@@ -527,6 +574,24 @@ let combine_repr_validators repr_validators =
   { combined with down = merge_rounds combined.down }
 
 let name_of_lattice = function Base base -> base.name | Product product -> product.name
+
+let object_of_lattice = function
+  | Base base ->
+    { name = base.name;
+      opposite_name = Name.op_module_name base.name;
+      shape = Base_object;
+      repr_validator = base.repr_validator;
+      descriptor = base.descriptor;
+      op_descriptor = base.op_descriptor
+    }
+  | Product product ->
+    { name = product.name;
+      opposite_name = Name.op_module_name product.name;
+      shape = Product_object product.axes;
+      repr_validator = product.repr_validator;
+      descriptor = product.descriptor;
+      op_descriptor = product.op_descriptor
+    }
 
 let finite_of_lattice = function
   | Base base -> base.logical
@@ -762,6 +827,7 @@ let resolve ast =
         let product =
           { name = lattice_name;
             fields = resolved_fields;
+            axes = List.map axis_object_of_field resolved_fields;
             repr_validator;
             descriptor;
             op_descriptor
@@ -881,4 +947,12 @@ let resolve ast =
         in
         items := !items @ [ Embedding embedding ])
     ast;
-  { items = !items; lattices = !lattices }
+  let objects =
+    String_map.fold
+      (fun _ lattice acc ->
+        let object_ = object_of_lattice lattice in
+        String_map.add object_.name object_ acc)
+      !lattices
+      String_map.empty
+  in
+  { items = !items; lattices = !lattices; objects }

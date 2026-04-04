@@ -72,6 +72,10 @@ let expect_error ~name ~source ~needle =
     if not (contains message needle)
     then failf "unexpected error for %s: %s" name message
 
+let resolve_model ~name ~source =
+  let ast = Parse.from_string ~input_name:(name ^ ".lattice") source in
+  Model.resolve ast
+
 let load_fixture name = read_file name
 
 let expect_generated_ml_excludes ~name ~source needles =
@@ -107,6 +111,23 @@ let compile_and_run_generated_test ~dir =
      ocamlc -c generated.ml && \
      ocamlc -o generated_test generated.cmo generated_test.ml && \
      ./generated_test"
+
+let compile_generated_case ~name ~source =
+  with_temp_dir ("lattice-gen-" ^ name ^ "-") (fun dir ->
+    try
+      ignore (generate_case_files ~dir ~source);
+      run_command
+        ~cwd:dir
+        "ocamlc -c generated.mli && \
+         ocamlc -c generated.ml && \
+         ocamlc -o generated_test generated.cmo generated_test.ml"
+    with
+    | exn ->
+      failf
+        "generated compile case %s failed\nsource:\n%s\nerror: %s"
+        name
+        source
+        (Printexc.to_string exn))
 
 let run_generated_case ~name ~source =
   with_temp_dir ("lattice-gen-" ^ name ^ "-") (fun dir ->

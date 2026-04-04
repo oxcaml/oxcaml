@@ -164,6 +164,10 @@ let axis_ctor_name field_name = String.capitalize_ascii field_name
 
 let field_module_alias_name (field : field) = "Field_" ^ axis_ctor_name field.name
 
+let axis_module_name (axis : axis_object) ~in_op =
+  let opposite = if in_op then not axis.declared_opposite else axis.declared_opposite in
+  if opposite then Name.op_module_name axis.carrier_name else axis.carrier_name
+
 let legacy_value_name name =
   match name with
   | "Locality" | "Regionality" -> "global"
@@ -298,13 +302,13 @@ let add_product_sig buf (product : product) module_name ~in_op =
   Buffer.add_string buf "  module Axis : sig\n";
   Buffer.add_string buf "    type _ t =\n";
   List.iter
-    (fun (field : field) ->
+    (fun (axis : axis_object) ->
       bprintf
         buf
         "      | %s : %s.t t\n"
-        (axis_ctor_name field.name)
-        (field_module_name field ~in_op))
-    product.fields;
+        axis.ctor_name
+        (axis_module_name axis ~in_op))
+    product.axes;
   Buffer.add_string
     buf
     "\n\
@@ -561,31 +565,31 @@ let add_product_ml buf (product : product) module_name descriptor ~in_op =
   Buffer.add_string buf "  module Axis = struct\n";
   Buffer.add_string buf "    type _ t =\n";
   List.iter
-    (fun (field : field) ->
+    (fun (axis : axis_object) ->
       bprintf
         buf
         "      | %s : %s.t t\n"
-        (axis_ctor_name field.name)
-        (field_module_name field ~in_op))
-    product.fields;
+        axis.ctor_name
+        (axis_module_name axis ~in_op))
+    product.axes;
   Buffer.add_string buf "\n    type packed = P : 'a t -> packed\n\n";
   Buffer.add_string buf "    let all = [\n";
   List.iter
-    (fun (field : field) ->
-      bprintf buf "      P %s;\n" (axis_ctor_name field.name))
-    product.fields;
+    (fun (axis : axis_object) ->
+      bprintf buf "      P %s;\n" axis.ctor_name)
+    product.axes;
   Buffer.add_string buf "    ]\n";
   Buffer.add_string
     buf
     "    let print : type a. Format.formatter -> a t -> unit = fun ppf -> function\n";
   List.iter
-    (fun (field : field) ->
+    (fun (axis : axis_object) ->
       bprintf
         buf
         "      | %s -> Format.pp_print_string ppf %S\n"
-        (axis_ctor_name field.name)
-        field.name)
-    product.fields;
+        axis.ctor_name
+        axis.name)
+    product.axes;
   Buffer.add_string buf "  end\n";
   Buffer.add_string
     buf
@@ -619,37 +623,37 @@ let add_product_ml buf (product : product) module_name descriptor ~in_op =
     "    let[@inline] proj : type a. a axis -> t -> a = fun axis t ->\n\
     \      match axis with\n";
   List.iter
-    (fun (field : field) ->
+    (fun (axis : axis_object) ->
       bprintf
         buf
         "      | Axis.%s -> %s t\n"
-        (axis_ctor_name field.name)
-        field.name)
-    product.fields;
+        axis.ctor_name
+        axis.name)
+    product.axes;
   Buffer.add_string
     buf
     "    let[@inline] min_with : type a. a axis -> a -> t = fun axis value ->\n\
     \      match axis with\n";
   List.iter
-    (fun (field : field) ->
+    (fun (axis : axis_object) ->
       bprintf
         buf
         "      | Axis.%s -> %s_bot value\n"
-        (axis_ctor_name field.name)
-        field.name)
-    product.fields;
+        axis.ctor_name
+        axis.name)
+    product.axes;
   Buffer.add_string
     buf
     "    let[@inline] max_with : type a. a axis -> a -> t = fun axis value ->\n\
     \      match axis with\n";
   List.iter
-    (fun (field : field) ->
+    (fun (axis : axis_object) ->
       bprintf
         buf
         "      | Axis.%s -> %s_top value\n"
-        (axis_ctor_name field.name)
-        field.name)
-    product.fields;
+        axis.ctor_name
+        axis.name)
+    product.axes;
   Buffer.add_string buf "  end\nend\n\n"
 
 let find_base model name =
@@ -774,6 +778,8 @@ let add_test_runtime_ml buf root_module =
     buf
     {|let exhaustive_threshold = 256
 
+let repr_exhaustive_threshold = 4096
+
 let sample_count = 200
 
 let rng = Random.State.make [| 0x51ed; 0x1234; 0x2026 |]
@@ -851,12 +857,31 @@ let iter3 xs ys zs f =
     done
 
 let values_of_repr mask of_int_exn =
-  let acc = ref [] in
-  for i = 0 to mask do
-    try acc := of_int_exn i :: !acc with
-    | Invalid_argument _ -> ()
-  done;
-  List.rev !acc
+  if mask <= repr_exhaustive_threshold
+  then (
+    let acc = ref [] in
+    for i = 0 to mask do
+      try acc := of_int_exn i :: !acc with
+      | Invalid_argument _ -> ()
+    done;
+    List.rev !acc)
+  else (
+    let acc = ref [] in
+    let target = max exhaustive_threshold sample_count in
+    let try_add i =
+      try
+        let value = of_int_exn i in
+        if not (List.exists (( = ) value) !acc) then acc := value :: !acc
+      with
+      | Invalid_argument _ -> ()
+    in
+    List.iter try_add [ 0; mask; mask land lnot 1; mask lsr 1; 1 ];
+    let attempts = ref 0 in
+    while List.length !acc < target && !attempts < target * 32 do
+      incr attempts;
+      try_add (Random.State.int rng (mask + 1))
+    done;
+    List.rev !acc)
 
 let check_repr ~name ~values ~mask ~to_int ~of_int_exn ~show =
   ensure (values <> []) "%s: no values enumerated" name;
@@ -875,20 +900,32 @@ let check_repr ~name ~values ~mask ~to_int ~of_int_exn ~show =
         "%s: of_int_exn/to_int roundtrip failed for %s"
         name (show value))
     values;
-  for i = 0 to mask do
-    match try Some (of_int_exn i) with Invalid_argument _ -> None with
-    | Some value ->
-      ensure valid.(i)
-        "%s: of_int_exn accepted invalid representation %d (%s)"
-        name i (show value);
-      ensure (to_int value = i)
-        "%s: to_int/of_int_exn roundtrip failed for %d"
-        name i
-    | None ->
-      ensure (not valid.(i))
-        "%s: of_int_exn rejected valid representation %d"
-        name i
-  done
+  if mask <= repr_exhaustive_threshold
+  then
+    for i = 0 to mask do
+      match try Some (of_int_exn i) with Invalid_argument _ -> None with
+      | Some value ->
+        ensure valid.(i)
+          "%s: of_int_exn accepted invalid representation %d (%s)"
+          name i (show value);
+        ensure (to_int value = i)
+          "%s: to_int/of_int_exn roundtrip failed for %d"
+          name i
+      | None ->
+        ensure (not valid.(i))
+          "%s: of_int_exn rejected valid representation %d"
+          name i
+    done
+  else
+    for _ = 1 to sample_count * 4 do
+      let i = Random.State.int rng (mask + 1) in
+      match try Some (of_int_exn i) with Invalid_argument _ -> None with
+      | Some value ->
+        ensure (to_int value = i)
+          "%s: sampled to_int/of_int_exn roundtrip failed for %d"
+          name i
+      | None -> ()
+    done
 
 let check_name_roundtrip ~name ~values ~to_name ~of_name ~show =
   iter1 values

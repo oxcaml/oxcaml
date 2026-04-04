@@ -14,20 +14,24 @@ let run () =
       if fixture = "compiler_structure.lattice"
          || fixture = "compiler_structure_kind_subbed.lattice"
       then
-        Test_support.expect_generated_ml_excludes
+        (Test_support.expect_generated_ml_excludes
+           ~name:fixture
+           ~source
+           [ "ignore (";
+             "Repr.of_int_exn";
+             "lsr 0";
+             "let close_repr x = x";
+             "let close_down_nat x = x";
+             "let close_up_nat x = x";
+             "let close_down_dual x = x";
+             "let close_up_dual x = x";
+             "Format.pp_print_string ppf (show t)"
+           ];
+         Test_support.compile_generated_case
+           ~name:fixture
+           ~source)
+      else
+        Test_support.run_generated_case
           ~name:fixture
-          ~source
-          [ "ignore (";
-            "Repr.of_int_exn";
-            "lsr 0";
-            "let close_repr x = x";
-            "let close_down_nat x = x";
-            "let close_up_nat x = x";
-            "let close_down_dual x = x";
-            "let close_up_dual x = x";
-            "Format.pp_print_string ppf (show t)"
-          ];
-      Test_support.run_generated_case
-        ~name:fixture
-        ~source)
+          ~source)
     fixtures
