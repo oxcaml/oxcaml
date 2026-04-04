@@ -167,10 +167,9 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
       dual_mask)
 
 let field_module_name (field : field) ~in_op =
-  let opposite = if in_op then not field.declared_opposite else field.declared_opposite in
-  if opposite then Name.op_module_name field.lattice_name else field.lattice_name
+  Emit_common.field_module_name field ~in_op
 
-let axis_ctor_name field_name = String.capitalize_ascii field_name
+let axis_ctor_name = Emit_common.axis_ctor_name
 
 let field_module_alias_name (field : field) = "Field_" ^ axis_ctor_name field.name
 
@@ -1479,16 +1478,7 @@ let find_base model name =
   | Base base -> base
   | Product _ -> invalid_arg "expected a base lattice"
 
-let morphism_of_slot (embedding : embedding) slot =
-  if slot = "embed"
-  then embedding.embed
-  else if String.length slot >= 4 && String.sub slot 0 4 = "left"
-  then
-    List.nth embedding.left_chain
-      (int_of_string (String.sub slot 4 (String.length slot - 4)) - 1)
-  else
-    List.nth embedding.right_chain
-      (int_of_string (String.sub slot 5 (String.length slot - 5)) - 1)
+let morphism_of_slot = Emit_common.morphism_of_slot
 
 let add_morphism_ml buf model name morphism =
   let domain = find_base model morphism.domain in
@@ -1523,38 +1513,13 @@ let add_embedding_ml buf model (embedding : embedding) =
     embedding.aliases;
   Buffer.add_string buf "end\n\n"
 
-type exported_alias =
+type exported_alias = Emit_common.exported_alias =
   { alias_name : string;
     module_name : string;
     morphism : morphism
   }
 
-let collect_exported_aliases model =
-  let seen = Hashtbl.create 16 in
-  let add seen alias =
-    if Hashtbl.mem seen alias.alias_name
-    then failwith ("duplicate top-level alias export: " ^ alias.alias_name);
-    Hashtbl.add seen alias.alias_name ()
-  in
-  List.fold_left
-    (fun acc ->
-      function
-      | Lattice _ -> acc
-      | Embedding embedding ->
-        List.fold_left
-          (fun acc (alias_name, slot) ->
-            let alias =
-              { alias_name;
-                module_name = embedding.module_name;
-                morphism = morphism_of_slot embedding slot
-              }
-            in
-            add seen alias;
-            acc @ [ alias ])
-          acc
-          embedding.aliases)
-    []
-    model.items
+let collect_exported_aliases = Emit_common.collect_exported_aliases
 
 let add_exported_aliases_sig buf aliases =
   List.iter

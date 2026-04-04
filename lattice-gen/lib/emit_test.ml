@@ -2,60 +2,23 @@ open Model
 
 let bprintf = Printf.bprintf
 
-let values_var_name module_name = "values_" ^ Name.snake_case module_name
+let values_var_name = Emit_common.values_var_name
 
-let const_module_name module_name = module_name ^ ".Const"
+let const_module_name = Emit_common.const_module_name
 
-let field_module_name (field : field) ~in_op =
-  if in_op && field.declared_opposite
-  then field.lattice_name
-  else if in_op then Name.op_module_name field.lattice_name else field.lattice_name
+let field_module_name = Emit_common.field_module_name
 
-let axis_ctor_name field_name = String.capitalize_ascii field_name
+let axis_ctor_name = Emit_common.axis_ctor_name
 
-let morphism_of_slot (embedding : embedding) slot =
-  if slot = "embed"
-  then embedding.embed
-  else if String.length slot >= 4 && String.sub slot 0 4 = "left"
-  then
-    List.nth embedding.left_chain
-      (int_of_string (String.sub slot 4 (String.length slot - 4)) - 1)
-  else
-    List.nth embedding.right_chain
-      (int_of_string (String.sub slot 5 (String.length slot - 5)) - 1)
+let morphism_of_slot = Emit_common.morphism_of_slot
 
-type exported_alias =
+type exported_alias = Emit_common.exported_alias =
   { alias_name : string;
     module_name : string;
     morphism : morphism
   }
 
-let collect_exported_aliases model =
-  let seen = Hashtbl.create 16 in
-  let add seen alias =
-    if Hashtbl.mem seen alias.alias_name
-    then failwith ("duplicate top-level alias export: " ^ alias.alias_name);
-    Hashtbl.add seen alias.alias_name ()
-  in
-  List.fold_left
-    (fun acc ->
-      function
-      | Lattice _ -> acc
-      | Embedding embedding ->
-        List.fold_left
-          (fun acc (alias_name, slot) ->
-            let alias =
-              { alias_name;
-                module_name = embedding.module_name;
-                morphism = morphism_of_slot embedding slot
-              }
-            in
-            add seen alias;
-            acc @ [ alias ])
-          acc
-          embedding.aliases)
-    []
-    model.items
+let collect_exported_aliases = Emit_common.collect_exported_aliases
 
 let add_test_runtime_ml buf root_module =
   bprintf buf "open %s\n\n" root_module;
