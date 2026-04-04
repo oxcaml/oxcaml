@@ -123,6 +123,13 @@ jobs:
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
+          - name: runtime5 dissector-assembler (aarch64-linux)
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-arm64-8x
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
+            oxcaml_llvm_source_branch: llvmize-oxcaml
+            dissector_assembler: true
+
           - name: runtime4 regalloc (x86_64-linux)
             config: --disable-runtime5
             os: warp-ubuntu-latest-x64-8x
