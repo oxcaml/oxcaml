@@ -220,6 +220,55 @@ let enter_type ?abstract_abbrevs rec_flag env sdecl (id, uid) =
   let arity = List.length sdecl.ptype_params in
   let path = Path.Pident id in
   let any = Jkind.Builtin.any ~why:Initial_typedecl_env in
+  let unbox = Builtin_attributes.has_unboxed sdecl.ptype_attributes in
+  let recursive_unknown_reason =
+    match sdecl.ptype_kind with
+    | Ptype_record_unboxed_product _ ->
+      Some Jkind.History.Unboxed_record_type
+    | Ptype_record _ | Ptype_variant _ ->
+      Some Jkind.History.Old_style_unboxed_type
+    | Ptype_abstract | Ptype_open -> None
+  in
+  let needs_recursive_unknown =
+    match sdecl.ptype_kind with
+    | Ptype_record_unboxed_product _ -> true
+    | Ptype_record _ | Ptype_variant _ -> unbox
+    | Ptype_abstract | Ptype_open -> false
+  in
+  let has_derived_unboxed_version =
+    match sdecl.ptype_kind with
+    | Ptype_record _ -> not unbox
+    | Ptype_abstract | Ptype_variant _ | Ptype_record_unboxed_product _
+    | Ptype_open -> false
+  in
+  let recursive_unknown =
+    if rec_flag = Asttypes.Recursive
+       && Option.is_none sdecl.ptype_jkind_annotation
+       && Option.is_none sdecl.ptype_manifest
+       && needs_recursive_unknown
+    then
+      Some
+        (Jkind.of_new_sort
+           ~why:
+             (match recursive_unknown_reason with
+              | Some reason -> reason
+              | None -> assert false)
+           ~level:(Ctype.get_current_level ()))
+    else
+      None
+  in
+  let recursive_unknown_unboxed =
+    if rec_flag = Asttypes.Recursive
+       && Option.is_none sdecl.ptype_jkind_annotation
+       && Option.is_none sdecl.ptype_manifest
+       && has_derived_unboxed_version
+    then
+      Some
+        (Jkind.of_new_sort ~why:Jkind.History.Old_style_unboxed_type
+           ~level:(Ctype.get_current_level ()))
+    else
+      None
+  in
 
   (* There is some trickiness going on here with the jkind.  It expands on an
      old trick used in the manifest of [decl] below.
@@ -275,11 +324,14 @@ let enter_type ?abstract_abbrevs rec_flag env sdecl (id, uid) =
      are checked and then unified with the real manifest and checked against the
      kind. *)
   let type_jkind =
-    Jkind.of_type_decl_overapproximate_unknown
-      env
-      ~context:(Type_declaration path)
-      sdecl
-    |> Option.value ~default:(Jkind.disallow_right any)
+    match recursive_unknown with
+    | Some jkind -> Jkind.disallow_right jkind
+    | None ->
+      Jkind.of_type_decl_overapproximate_unknown
+        env
+        ~context:(Type_declaration path)
+        sdecl
+      |> Option.value ~default:(Jkind.disallow_right any)
   in
   let abstract_source, type_manifest, unboxed_type_manifest =
     match sdecl.ptype_manifest, abstract_abbrevs with
@@ -289,7 +341,14 @@ let enter_type ?abstract_abbrevs rec_flag env sdecl (id, uid) =
        an annotation here, and doing so with separated left- and right-jkinds
        is hard to do. *)
     | None, _ | Some _, None ->
-      Definition, Some (Ctype.newvar any), Some (Ctype.newvar any)
+      let manifest_jkind =
+        Option.value recursive_unknown ~default:any
+      in
+      ( Definition,
+        Some (Ctype.newvar manifest_jkind),
+        Some
+          (Ctype.newvar
+             (Option.value recursive_unknown_unboxed ~default:any)) )
     | Some _, Some reason -> reason, None, None
 in
   let type_params =
@@ -302,10 +361,15 @@ in
   (* In the temporary environment, all types get an unboxed version.
      See Note [Typechecking unboxed versions of types]. *)
   let type_unboxed_version =
+    let type_unboxed_version_jkind =
+      match recursive_unknown_unboxed with
+      | Some jkind -> Jkind.disallow_right jkind
+      | None -> type_jkind
+    in
     Some { type_params;
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
-      type_jkind;
+      type_jkind = type_unboxed_version_jkind;
       type_private = sdecl.ptype_private;
       type_manifest = unboxed_type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -892,6 +956,26 @@ let transl_declaration env sdecl (id, uid) =
       let cty = transl_simple_type ~new_var_jkind:Any env ~closed:no_row Mode.Alloc.Const.legacy sty in
       Some cty, Some cty.ctyp_type
   in
+  let recursive_default_jkind =
+    match Env.find_type path env with
+    | decl -> begin
+        match decl.type_manifest with
+        | Some ty -> begin
+            match get_desc ty with
+            | Tvar { jkind } | Tunivar { jkind } -> begin
+                match jkind.Types.history with
+                | Creation (Concrete_creation Jkind.History.Unboxed_record_type)
+                | Creation
+                    (Concrete_creation Jkind.History.Old_style_unboxed_type) ->
+                  Some (Jkind.disallow_right jkind)
+                | _ -> None
+              end
+            | _ -> None
+          end
+        | None -> None
+      end
+    | exception Not_found -> None
+  in
   (* jkind_default is the jkind to use for now as the type_jkind when there
      is no annotation and no manifest.
      See Note [Default jkinds in transl_declaration].
@@ -980,7 +1064,7 @@ let transl_declaration env sdecl (id, uid) =
         let rep, jkind =
           if unbox then
             Variant_unboxed,
-            Jkind.of_new_sort ~why:Old_style_unboxed_type
+            Jkind.of_new_sort ~why:Jkind.History.Old_style_unboxed_type
               ~level:(Ctype.get_current_level ())
           else
             (* We mark all arg sorts "void" here.  They are updated later,
@@ -1011,7 +1095,7 @@ let transl_declaration env sdecl (id, uid) =
           let rep, jkind =
             if unbox then
               Record_unboxed,
-              Jkind.of_new_sort ~why:Old_style_unboxed_type
+              Jkind.of_new_sort ~why:Jkind.History.Old_style_unboxed_type
                 ~level:(Ctype.get_current_level ())
             else
             (* Note this is inaccurate, using `Record_boxed` in cases where the
@@ -1058,7 +1142,7 @@ let transl_declaration env sdecl (id, uid) =
       match jkind_from_annotation, man with
       | Some annot, _ -> annot
       | None, Some _ -> Jkind.Builtin.any ~why:Initial_typedecl_env
-      | None, None -> jkind_default
+      | None, None -> Option.value recursive_default_jkind ~default:jkind_default
     in
     let jkind =
       (* Hack: unboxed records are given a product-of-[any]s layout
@@ -1231,7 +1315,8 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
     (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
     let jkind =
       Jkind.Builtin.product_of_sorts ~why:Unboxed_record
-        ~level:(Ctype.get_current_level ()) (List.length lbls) in
+        ~level:(Ctype.get_current_level ()) (List.length lbls)
+    in
     let kind =
       Type_record_unboxed_product(lbls_unboxed, Record_unboxed_product, umc)
     in
@@ -1602,6 +1687,15 @@ let check_abbrev env sdecl (id, decl) =
    including which fields of a record are void.  This would be hard to do during
    [transl_declaration] due to mutually recursive types.
 *)
+let metadata_sort_of_jkind env jkind =
+  match Jkind.get_layout env jkind with
+  | Some layout -> begin
+      match Jkind.Layout.Const.get_sort layout with
+      | Some sort -> sort
+      | None -> Jkind.Sort.Const.value
+    end
+  | None -> Jkind.Sort.Const.value
+
 (* [update_label_sorts] additionally returns whether all the jkinds
    were void, and the jkinds of the labels *)
 (* CR reisenberg: remove all_void return *)
@@ -1618,9 +1712,7 @@ let update_label_sorts env loc lbls named =
   let lbls_and_jkinds =
     List.mapi (fun idx (Types.{ld_type} as lbl) ->
       let jkind = Ctype.type_jkind env ld_type in
-      (* Next line guaranteed to be safe because of [check_representable] *)
-      let sort = Jkind.sort_of_jkind env jkind in
-      let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+      let ld_sort = metadata_sort_of_jkind env jkind in
       update idx ld_sort;
       {lbl with ld_sort}, jkind
     ) lbls
@@ -1645,9 +1737,7 @@ let update_constructor_arguments_sorts env loc cd_args sorts =
     let args_and_jkinds =
       List.mapi (fun idx ({Types.ca_type; _} as arg) ->
           let jkind = Ctype.type_jkind env ca_type in
-          (* Next line guaranteed to be safe because of [check_representable] *)
-          let sort = Jkind.sort_of_jkind env jkind in
-          let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+          let ca_sort = metadata_sort_of_jkind env jkind in
           update idx ca_sort;
           {arg with ca_sort}, jkind)
         args
@@ -1741,17 +1831,27 @@ module Element_repr = struct
     in
     of_t t
 
-  let classify env ty jkind =
+  (* During recursive typedecl solving, field jkinds may still be unresolved
+     placeholders. For mixed-block classification we must not default those
+     placeholders to [value], so fall back to structural unboxing information
+     instead. *)
+  let rec classify_unresolved_recursive_field env ty =
+    let ty = Ctype.expand_head_opt env ty in
+    match Ctype.contained_without_boxing env ty with
+    | [] -> Value_element
+    | [ty] -> classify env ty (Ctype.type_jkind env ty)
+    | tys ->
+      Unboxed_element
+        (Product
+           (tys
+            |> List.map (fun ty -> classify env ty (Ctype.type_jkind env ty))
+            |> Array.of_list))
+
+  and classify : type l r. Env.t -> Types.type_expr -> (l * r) Types.jkind -> t =
+    fun env ty jkind ->
     if is_float env ty
     then Float_element
     else
-      let layout = Jkind.get_layout_defaulting_to_value env jkind in
-      let sort =
-        match Option.bind layout Jkind.Layout.Const.get_sort with
-        | None ->
-          Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
-        | Some s -> s
-      in
       let rec sort_to_t : Jkind_types.Sort.Const.t -> t = function
       | Base Value -> Value_element
       | Base Float64 -> Unboxed_element Float64
@@ -1771,7 +1871,13 @@ module Element_repr = struct
       | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
       | Genvar _ -> Misc.fatal_error "sort_to_t: unexpected genvar"
       in
-      sort_to_t sort
+      match Jkind.get_layout env jkind with
+      | Some layout -> begin
+          match Jkind.Layout.Const.get_sort layout with
+          | Some sort -> sort_to_t sort
+          | None -> classify_unresolved_recursive_field env ty
+        end
+      | None -> classify_unresolved_recursive_field env ty
 
   let mixed_product_shape loc ts kind =
     let boxed_elements =
@@ -1905,10 +2011,7 @@ let rec update_decl_jkind env dpath decl =
         Ctype.type_jkind env ld_type |>
         Jkind.apply_modality_l lbl.ld_modalities
       in
-      (* This next line is guaranteed to be OK because of a call to
-         [check_representable] *)
-      let sort = Jkind.sort_of_jkind env jkind in
-      let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+      let ld_sort = metadata_sort_of_jkind env jkind in
       [{lbl with ld_sort}], Record_unboxed, jkind
     | _, Record_boxed sorts ->
       let lbls, _all_void, jkinds =
@@ -2084,16 +2187,14 @@ let rec update_decl_jkind env dpath decl =
         match cd_args with
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
             let jkind = Ctype.type_jkind env ty in
-            let sort = Jkind.sort_of_jkind env jkind in
-            let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+            let ca_sort = metadata_sort_of_jkind env jkind in
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
             Variant_unboxed, jkind
           end
         | Cstr_record [{ld_type} as lbl] -> begin
             let jkind = Ctype.type_jkind env ld_type in
-            let sort = Jkind.sort_of_jkind env jkind in
-            let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+            let ld_sort = metadata_sort_of_jkind env jkind in
             [{ cstr with Types.cd_args =
                            Cstr_record [{ lbl with ld_sort }] }],
             Variant_unboxed, jkind
@@ -2180,10 +2281,7 @@ let rec update_decl_jkind env dpath decl =
           let (lbls, layouts) =
             List.map (fun (Types.{ld_type} as lbl) ->
               let jkind = Ctype.type_jkind env ld_type in
-              (* This next line is guaranteed to be OK because of a call to
-                 [check_representable] *)
-              let sort = Jkind.sort_of_jkind env jkind in
-              let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+              let ld_sort = metadata_sort_of_jkind env jkind in
               let layout =
                 match Jkind.extract_layout env jkind with
                 | Ok l -> l

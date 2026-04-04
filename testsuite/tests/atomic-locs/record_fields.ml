@@ -548,6 +548,27 @@ Line 4, characters 4-33:
 Error: Atomic record fields are not permitted in mixed blocks.
 |}]
 
+module Mixed_blocks_rec_alias = struct
+  type t = {
+    padding : u;
+    mutable field : int [@atomic]
+  }
+
+  and u = v
+
+  and v = #{
+    x : int#;
+    y : float#
+  }
+end
+
+[%%expect{|
+Line 4, characters 4-33:
+4 |     mutable field : int [@atomic]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields are not permitted in mixed blocks.
+|}]
+
 (* Test atomic record fields with non-value layouts *)
 
 module Non_value_atomic = struct

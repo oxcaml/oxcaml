@@ -2771,6 +2771,7 @@ module Format_history = struct
          representable at call sites)"
     | Peek_or_poke ->
       fprintf ppf "it's the type being used for a peek or poke primitive"
+    | Unboxed_record_type -> fprintf ppf "it is an unboxed record"
     | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
     | Array_element -> fprintf ppf "it's the type of an array element"
     | Idx_element ->
@@ -3704,6 +3705,7 @@ module Debug_printers = struct
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
+    | Unboxed_record_type -> fprintf ppf "Unboxed_record_type"
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
