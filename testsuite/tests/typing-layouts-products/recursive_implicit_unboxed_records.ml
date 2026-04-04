@@ -103,26 +103,17 @@ and u = { t1 : t; t2 : t; }
 type t = { u : u# }
 and u = { x : #(unit * unit); y : unit }
 [%%expect{|
-Line 2, characters 0-40:
-2 | and u = { x : #(unit * unit); y : unit }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "u#" is (value & value) & value
-         because it is an unboxed record.
-       But the layout of type "u#" must be a sublayout of value & value
-         because it is an unboxed record.
+type t = { u : u#; }
+and u = { x : #(unit * unit); y : unit; }
 |}]
 
 type 'a operation = Resume of 'a resumable#
 and 'a suspended = { run : 'a -> unit; ctx : string }
 and 'a resumable = { suspended : 'a suspended#; x : 'a }
 [%%expect{|
-Line 3, characters 0-56:
-3 | and 'a resumable = { suspended : 'a suspended#; x : 'a }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "resumable#" is (value & value) & value
-         because it is an unboxed record.
-       But the layout of type "resumable#" must be a sublayout of value & value
-         because it is an unboxed record.
+type 'a operation = Resume of 'a resumable#
+and 'a suspended = { run : 'a -> unit; ctx : string; }
+and 'a resumable = { suspended : 'a suspended#; x : 'a; }
 |}]
 
 module Kinds = struct
@@ -143,26 +134,16 @@ and ('a : Kinds.single) suspended_k = { run_k : 'a -> unit; ctx_k : string }
 and ('a : Kinds.single) resumable_k =
   { suspended_k : 'a suspended_k#; x_k : 'a }
 [%%expect{|
-Lines 3-4, characters 0-45:
-3 | and ('a : Kinds.single) resumable_k =
-4 |   { suspended_k : 'a suspended_k#; x_k : 'a }
-Error: The layout of type "resumable_k#" is (value & value) & value
-         because it is an unboxed record.
-       But the layout of type "resumable_k#" must be a sublayout of
-           value & value
-         because it is an unboxed record.
+type 'a operation_k = Resume_k of 'a resumable_k#
+and 'a suspended_k = { run_k : 'a -> unit; ctx_k : string; }
+and 'a resumable_k = { suspended_k : 'a suspended_k#; x_k : 'a; }
 |}]
 
 type t_kind = { u_kind : u_kind# }
 and u_kind = { x_kind : pairish; y_kind : unit }
 [%%expect{|
-Line 2, characters 0-48:
-2 | and u_kind = { x_kind : pairish; y_kind : unit }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "u_kind#" is (value & value) & value
-         because it is an unboxed record.
-       But the layout of type "u_kind#" must be a sublayout of value & value
-         because it is an unboxed record.
+type t_kind = { u_kind : u_kind#; }
+and u_kind = { x_kind : pairish; y_kind : unit; }
 |}]
 
 type t_bad_kind = { u_bad_kind : u_bad_kind# }
@@ -172,24 +153,19 @@ and u_bad_kind : Kinds.pair =
 Lines 2-3, characters 0-52:
 2 | and u_bad_kind : Kinds.pair =
 3 |   { x_bad_kind : #(unit * unit); y_bad_kind : unit }
-Error: The layout of type "u_bad_kind#" is (value & value) & value
-         because it is an unboxed record.
-       But the layout of type "u_bad_kind#" must be a sublayout of
-           value & value
-         because it is an unboxed record.
+Error: The layout of type "u_bad_kind" is value
+         because it's a boxed record type.
+       But the layout of type "u_bad_kind" must be a sublayout of value & value
+         because of the annotation on the declaration of the type u_bad_kind.
 |}]
 
 type a_chain = { b_chain : b_chain# }
 and b_chain = { c_chain : c_chain#; z_chain : unit }
 and c_chain = { x_chain : #(unit * unit); y_chain : unit }
 [%%expect{|
-Line 2, characters 0-52:
-2 | and b_chain = { c_chain : c_chain#; z_chain : unit }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "b_chain#" is (value & value) & value
-         because it is an unboxed record.
-       But the layout of type "b_chain#" must be a sublayout of value & value
-         because it is an unboxed record.
+type a_chain = { b_chain : b_chain#; }
+and b_chain = { c_chain : c_chain#; z_chain : unit; }
+and c_chain = { x_chain : #(unit * unit); y_chain : unit; }
 |}]
 
 (* Guarded by a function *)
