@@ -54,19 +54,19 @@ exception Error of Location.t * error
 (* Compute variance *)
 
 let get_variance ty visited =
-  try TypeMap.find ty !visited with Not_found -> Variance.null
+  try TypeMap.find ty !visited |> snd with Not_found -> Variance.null
 
 let compute_variance env visited vari ty =
-  let rec compute_variance_rec vari ty =
+  let rec compute_variance_rec env vari ty =
     (* Format.eprintf "%a: %x@." Printtyp.type_expr ty (Obj.magic vari); *)
     let vari' = get_variance ty visited in
     if Variance.subset vari vari' then () else
     let vari = Variance.union vari vari' in
-    visited := TypeMap.add ty vari !visited;
-    let compute_same = compute_variance_rec vari in
+    visited := TypeMap.add ty (env, vari) !visited;
+    let compute_same = compute_variance_rec env vari in
     match get_desc ty with
       Tarrow (_, ty1, ty2, _) ->
-        compute_variance_rec (Variance.conjugate vari) ty1;
+        compute_variance_rec env (Variance.conjugate vari) ty1;
         compute_same ty2
     | Ttuple tl ->
         List.iter (fun (_,t) -> compute_same t) tl
@@ -78,19 +78,19 @@ let compute_variance env visited vari ty =
           try
             let decl = Env.find_type path env in
             List.iter2
-              (fun ty v -> compute_variance_rec (compose vari v) ty)
+              (fun ty v -> compute_variance_rec env (compose vari v) ty)
               tl decl.type_variance
           with Not_found ->
-            List.iter (compute_variance_rec unknown) tl
+            List.iter (compute_variance_rec env unknown) tl
         end
     | Tobject (ty, _) ->
         compute_same ty
     | Tquote ty ->
-        compute_same ty
+        compute_variance_rec (Env.enter_quotation env) vari ty
     | Tsplice ty ->
-        compute_same ty
+        compute_variance_rec (Env.enter_splice ~loc:Location.none env) vari ty
     | Tquote_eval ty ->
-        compute_same ty
+        compute_variance_rec (Env.enter_quotation env) vari ty
     | Tfield (_, _, ty1, ty2) ->
         compute_same ty1;
         compute_same ty2
@@ -104,7 +104,7 @@ let compute_variance env visited vari ty =
                 compute_same ty
             | Reither (_, tyl, _) ->
                 let v = Variance.(inter vari unknown) in (* cf PR#7269 *)
-                List.iter (compute_variance_rec v) tyl
+                List.iter (compute_variance_rec env v) tyl
             | _ -> ())
           (row_fields row);
         compute_same (row_more row)
@@ -113,9 +113,9 @@ let compute_variance env visited vari ty =
     | Tvar _ | Tnil | Tlink _ | Tunivar _ | Tof_kind _ -> ()
     | Tpackage (_, fl) ->
         let v = Variance.(compose vari full) in
-        List.iter (fun (_, ty) -> compute_variance_rec v ty) fl
+        List.iter (fun (_, ty) -> compute_variance_rec env v ty) fl
   in
-  compute_variance_rec vari ty
+  compute_variance_rec env vari ty
 
 let make p n i =
   let open Variance in
@@ -148,7 +148,7 @@ let compute_variance_type env ~check (required, loc) decl tyl =
       (fun ty ->
         if Btype.is_Tvar ty || mem Inj (get_variance ty tvl) then () else
         let visited = ref TypeSet.empty in
-        let rec check ty =
+        let rec check env ty =
           if TypeSet.mem ty !visited then () else begin
             visited := TypeSet.add ty !visited;
             if mem Inj (get_variance ty tvl) then () else
@@ -157,16 +157,16 @@ let compute_variance_type env ~check (required, loc) decl tyl =
             | Tconstr _ ->
                 let old = !visited in
                 begin try
-                  Btype.iter_type_expr check ty
+                  Ctype.iter_type_expr_with_stages check env ty
                 with Exit ->
                   visited := old;
                   let ty' = Ctype.expand_head_opt env ty in
-                  if eq_type ty ty' then raise Exit else check ty'
+                  if eq_type ty ty' then raise Exit else check env ty'
                 end
-            | _ -> Btype.iter_type_expr check ty
+            | _ -> Ctype.iter_type_expr_with_stages check env ty
           end
         in
-        try check ty; compute_variance env tvl injective ty
+        try check env ty; compute_variance env tvl injective ty
         with Exit -> ())
       params;
   begin match check with
@@ -201,7 +201,7 @@ let compute_variance_type env ~check (required, loc) decl tyl =
         compute_variance env tvl2 v ty)
       params required;
     let visited = ref TypeSet.empty in
-    let rec check ty =
+    let rec check env ty =
       if TypeSet.mem ty !visited then () else
       let visited' = TypeSet.add ty !visited in
       visited := visited';
@@ -209,8 +209,11 @@ let compute_variance_type env ~check (required, loc) decl tyl =
       let snap = Btype.snapshot () in
       let v2 =
         TypeMap.fold
-          (fun t vt v ->
-             if Ctype.is_equal env false [ty] [t] then union vt v else v)
+          (fun t (env', vt) v ->
+             (* Only check type subterms that occur at the same stage *)
+             if Env.stage env = Env.stage env' &&
+                Ctype.is_equal env false [ty] [t]
+             then union vt v else v)
           !tvl2 null in
       Btype.backtrack snap;
       let (c1,n1) = get_upper v1 and (c2,n2,i2) = get_lower v2 in
@@ -233,11 +236,10 @@ let compute_variance_type env ~check (required, loc) decl tyl =
                      , Bad_variance ( variance_error
                                     , (c1,n1,false)
                                     , (c2,n2,false))))
-        | None ->
-            Btype.iter_type_expr check ty
+        | None -> Ctype.iter_type_expr_with_stages check env ty
       end
     in
-    List.iter (fun (_,ty) -> check ty) tyl;
+    List.iter (fun (_,ty) -> check env ty) tyl;
   end;
   List.map2
     (fun ty (p, n, _i) ->
