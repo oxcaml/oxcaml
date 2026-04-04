@@ -4,6 +4,9 @@ type outputs = Emit.outputs =
     test_ml : string
   }
 
+type render_config = Render_config.t =
+  { include_solver : bool }
+
 let root_module_of_path path =
   let base = Filename.basename path in
   let stem =
@@ -15,7 +18,7 @@ let root_module_of_path path =
   then invalid_arg ("invalid OCaml module basename for generated output: " ^ path);
   module_name
 
-let render_string ?root_module ~input_name source =
+let render_string ?(config = Render_config.default) ?root_module ~input_name source =
   let ast = Parse.from_string ~input_name source in
   let model = Model.resolve ast in
   let root_module =
@@ -23,11 +26,11 @@ let render_string ?root_module ~input_name source =
     | Some root_module -> root_module
     | None -> root_module_of_path input_name
   in
-  Emit.render ~root_module model
+  Emit.render ~config ~root_module model
 
-let render_file ?root_module input_path =
+let render_file ?(config = Render_config.default) ?root_module input_path =
   let source = In_channel.with_open_bin input_path In_channel.input_all in
-  render_string ?root_module ~input_name:input_path source
+  render_string ~config ?root_module ~input_name:input_path source
 
 let write_file path contents =
   let oc = open_out path in
@@ -35,9 +38,21 @@ let write_file path contents =
     ~finally:(fun () -> close_out oc)
     (fun () -> output_string oc contents)
 
-let generate_to_files ~input_path ~ml_path ~mli_path ?test_ml_path () =
+let write_solver_runtime path =
+  write_file path Solver_runtime_source.contents
+
+let generate_to_files
+    ?(config = Render_config.default)
+    ~input_path
+    ~ml_path
+    ~mli_path
+    ?test_ml_path
+    ()
+  =
   let root_module = root_module_of_path ml_path in
-  let outputs = render_file ~root_module input_path in
+  let outputs = render_file ~config ~root_module input_path in
   write_file ml_path outputs.ml;
   write_file mli_path outputs.mli;
+  if config.include_solver
+  then write_solver_runtime (Filename.concat (Filename.dirname ml_path) "solver_runtime.ml");
   Option.iter (fun path -> write_file path outputs.test_ml) test_ml_path

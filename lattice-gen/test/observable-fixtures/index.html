@@ -1,0 +1,62 @@
+<html>
+  <head>
+    <title>Lattice Observable Fixtures</title>
+    <style>
+      body {
+        margin: 2rem auto;
+        max-width: 56rem;
+        padding: 0 1rem;
+        font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
+        color: #0f172a;
+        background: #f8fafc;
+      }
+
+      h1 {
+        margin-bottom: 0.5rem;
+      }
+
+      code, pre {
+        font: 13px/1.45 Menlo, Monaco, Consolas, monospace;
+      }
+
+      .card {
+        margin: 1rem 0;
+        padding: 1rem 1.25rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        background: white;
+      }
+
+      ul {
+        padding-left: 1.25rem;
+      }
+    </style>
+  <link rel="stylesheet" href="lattice-observable.css" data-lattice-observable="css">
+<script src="lattice-observable.js" data-lattice-observable="js"></script>
+</head>
+  <body>
+    <h1>Observable Fixture Pages</h1>
+    <p>
+      These pages are source fixtures for
+      <code>lattice_gen observable</code>. After running
+      <code>observable --update</code>, each page gets generated
+      <code>&lt;out&gt;</code> and <code>&lt;ocaml-out&gt;</code> blocks.
+    </p>
+
+    <div class="card">
+      <h2>Fixtures</h2>
+      <ul>
+        <li><a href="basic.html">basic.html</a> - single <code>&lt;lat&gt;</code> plus one <code>&lt;ocaml&gt;</code></li>
+        <li><a href="multi-lat.html">multi-lat.html</a> - multiple lattices, default root-module naming, cumulative OCaml state</li>
+        <li><a href="filtered.html">filtered.html</a> - <code>include-solver="false"</code></li>
+        <li><a href="cumulative.html">cumulative.html</a> - later OCaml blocks can see earlier OCaml bindings and lattices</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Refresh Outputs</h2>
+      <pre><code>cd /Users/julesjacobs/git/jujacobs/lattice-gen/lattice-gen
+./_build/default/bin/lattice_gen.exe observable --update test/observable-fixtures</code></pre>
+    </div>
+  </body>
+</html>

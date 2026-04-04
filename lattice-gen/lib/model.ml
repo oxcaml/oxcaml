@@ -66,6 +66,18 @@ type axis_object =
     max_with_name : string
   }
 
+type solver_orientation =
+  | Positive
+  | Negative
+
+type solver_axis =
+  { axis : axis_object;
+    carrier_object_name : string;
+    proj_ctor_name : string;
+    min_with_ctor_name : string;
+    max_with_ctor_name : string
+  }
+
 type product =
   { name : string;
     fields : field list;
@@ -112,10 +124,24 @@ type lattice_object =
     op_descriptor : descriptor
   }
 
+type solver_object_shape =
+  | Solver_base
+  | Solver_product of solver_axis list
+
+type solver_object =
+  { name : string;
+    object_ctor_name : string;
+    orientation : solver_orientation;
+    shape : solver_object_shape;
+    repr_validator : repr_validator;
+    descriptor : descriptor
+  }
+
 type t =
   { items : item list;
     lattices : lattice String_map.t;
-    objects : lattice_object String_map.t
+    objects : lattice_object String_map.t;
+    solver_objects : solver_object String_map.t
   }
 
 let opp_descriptor (desc : descriptor) =
@@ -575,6 +601,21 @@ let combine_repr_validators repr_validators =
 
 let name_of_lattice = function Base base -> base.name | Product product -> product.name
 
+let solver_object_ctor_name name = "Obj_" ^ name
+
+let solver_proj_ctor_name product_name axis =
+  "Proj_" ^ product_name ^ "_" ^ axis.ctor_name
+
+let solver_min_with_ctor_name product_name axis =
+  "Min_with_" ^ product_name ^ "_" ^ axis.ctor_name
+
+let solver_max_with_ctor_name product_name axis =
+  "Max_with_" ^ product_name ^ "_" ^ axis.ctor_name
+
+let solver_axis_carrier_name (axis : axis_object) ~in_op =
+  let opposite = if in_op then not axis.declared_opposite else axis.declared_opposite in
+  if opposite then Name.op_module_name axis.carrier_name else axis.carrier_name
+
 let object_of_lattice = function
   | Base base ->
     { name = base.name;
@@ -592,6 +633,57 @@ let object_of_lattice = function
       descriptor = product.descriptor;
       op_descriptor = product.op_descriptor
     }
+
+let solver_axis_of_axis product_name axis ~in_op =
+  let module_name =
+    if in_op then Name.op_module_name product_name else product_name
+  in
+  { axis;
+    carrier_object_name = solver_axis_carrier_name axis ~in_op;
+    proj_ctor_name = solver_proj_ctor_name module_name axis;
+    min_with_ctor_name = solver_min_with_ctor_name module_name axis;
+    max_with_ctor_name = solver_max_with_ctor_name module_name axis
+  }
+
+let solver_objects_of_lattice = function
+  | Base base ->
+    [ { name = base.name;
+        object_ctor_name = solver_object_ctor_name base.name;
+        orientation = Positive;
+        shape = Solver_base;
+        repr_validator = base.repr_validator;
+        descriptor = base.descriptor
+      };
+      { name = Name.op_module_name base.name;
+        object_ctor_name = solver_object_ctor_name (Name.op_module_name base.name);
+        orientation = Positive;
+        shape = Solver_base;
+        repr_validator = base.repr_validator;
+        descriptor = base.op_descriptor
+      } ]
+  | Product product ->
+    [ { name = product.name;
+        object_ctor_name = solver_object_ctor_name product.name;
+        orientation = Positive;
+        shape =
+          Solver_product
+            (List.map
+               (fun axis -> solver_axis_of_axis product.name axis ~in_op:false)
+               product.axes);
+        repr_validator = product.repr_validator;
+        descriptor = product.descriptor
+      };
+      { name = Name.op_module_name product.name;
+        object_ctor_name = solver_object_ctor_name (Name.op_module_name product.name);
+        orientation = Positive;
+        shape =
+          Solver_product
+            (List.map
+               (fun axis -> solver_axis_of_axis product.name axis ~in_op:true)
+               product.axes);
+        repr_validator = product.repr_validator;
+        descriptor = product.op_descriptor
+      } ]
 
 let finite_of_lattice = function
   | Base base -> base.logical
@@ -955,4 +1047,15 @@ let resolve ast =
       !lattices
       String_map.empty
   in
-  { items = !items; lattices = !lattices; objects }
+  let solver_objects =
+    String_map.fold
+      (fun _ lattice acc ->
+        List.fold_left
+          (fun acc (object_ : solver_object) ->
+            String_map.add object_.name object_ acc)
+          acc
+          (solver_objects_of_lattice lattice))
+      !lattices
+      String_map.empty
+  in
+  { items = !items; lattices = !lattices; objects; solver_objects }

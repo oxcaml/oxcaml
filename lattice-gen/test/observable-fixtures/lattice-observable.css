@@ -1,0 +1,175 @@
+
+lat,
+ocaml {
+  display: block;
+  margin: 0.9rem 0;
+}
+
+.lattice-observable {
+  border: 1px solid #d7dde6;
+  border-radius: 10px;
+  margin: 0.75rem 0;
+  overflow: hidden;
+  background: #f8fafc;
+  color: #0f172a;
+  font: 13px/1.45 Menlo, Monaco, Consolas, monospace;
+}
+
+.lattice-observable__header {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid #d7dde6;
+  background: #eef3f8;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+}
+
+.lattice-observable__title {
+  font-weight: 600;
+}
+
+.lattice-observable__meta {
+  color: #475569;
+}
+
+.lattice-observable__tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.55rem 0.75rem 0;
+  background: #f8fafc;
+}
+
+.lattice-observable__tab {
+  border: 1px solid #cbd5e1;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 0.35rem 0.7rem;
+  background: #e2e8f0;
+  color: #334155;
+  cursor: pointer;
+  font: 12px/1.2 ui-sans-serif, system-ui, sans-serif;
+}
+
+.lattice-observable__tab.is-active {
+  background: #0f172a;
+  color: white;
+  border-color: #0f172a;
+}
+
+.lattice-observable__panel {
+  display: none;
+  margin: 0;
+  padding: 0.9rem;
+  overflow-x: auto;
+  background: white;
+  border-top: 1px solid #d7dde6;
+}
+
+.lattice-observable__panel.is-active {
+  display: block;
+}
+
+.lattice-observable__panel,
+.lattice-source__code {
+  white-space: pre;
+}
+
+.lattice-source {
+  border: 1px solid #d7dde6;
+  border-radius: 10px;
+  margin: 0.75rem 0;
+  overflow: hidden;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.lattice-source__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid #d7dde6;
+  background: #eef3f8;
+  font: 12px/1.2 ui-sans-serif, system-ui, sans-serif;
+}
+
+.lattice-source__title {
+  font-weight: 600;
+}
+
+.lattice-source__meta {
+  color: #475569;
+}
+
+.lattice-source__code {
+  margin: 0;
+  padding: 0.9rem;
+  overflow-x: auto;
+  background: white;
+  color: #0f172a;
+  font: 13px/1.45 Menlo, Monaco, Consolas, monospace;
+}
+
+.lattice-source--lat .lattice-source__header {
+  background: linear-gradient(90deg, #eef6ff, #f8fafc);
+}
+
+.lattice-source--ocaml .lattice-source__header {
+  background: linear-gradient(90deg, #f3fdf7, #f8fafc);
+}
+
+.tok-keyword {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.tok-type {
+  color: #0f766e;
+}
+
+.tok-ctor {
+  color: #b45309;
+}
+
+.tok-number {
+  color: #1d4ed8;
+}
+
+.tok-string {
+  color: #047857;
+}
+
+.tok-comment {
+  color: #64748b;
+  font-style: italic;
+}
+
+.tok-op {
+  color: #be123c;
+}
+
+.tok-punct {
+  color: #475569;
+}
+
+.tok-ident {
+  color: #0f172a;
+}
+
+.lattice-observable--error {
+  border-color: #e11d48;
+}
+
+.lattice-observable--error .lattice-observable__header {
+  background: #fff1f2;
+  border-bottom-color: #fecdd3;
+}
+
+.lattice-observable--ok .lattice-observable__header {
+  background: #ecfdf5;
+  border-bottom-color: #bbf7d0;
+}

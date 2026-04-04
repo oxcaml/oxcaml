@@ -6,4 +6,5 @@
 
 (library
  (name lattice_gen_lib)
- (wrapped false))
+ (wrapped false)
+ (libraries unix))

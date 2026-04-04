@@ -4,12 +4,22 @@
  (deps
   example.lattice
   compiler_structure.lattice
-  compiler_structure_kind_subbed.lattice
-  chains.lattice
+ compiler_structure_kind_subbed.lattice
+ chains.lattice
   diamond.lattice
-  sampled_product.lattice))
+  sampled_product.lattice
+  observable_input.html
+  observable-fixtures/basic.html
+  observable-fixtures/cumulative.html
+  observable-fixtures/filtered.html
+  observable-fixtures/multi-lat.html))
 
 (cram
  (deps
   example.lattice
+  observable_input.html
+  observable-fixtures/basic.html
+  observable-fixtures/cumulative.html
+  observable-fixtures/filtered.html
+  observable-fixtures/multi-lat.html
   ../bin/lattice_gen.exe))
