@@ -5,6 +5,18 @@
 
 #syntax quotations on
 
+(* Preamble types for use in tests *)
+
+module E = struct
+  type existential = Exists : 'a -> existential
+end
+[%%expect {|
+module E : sig type existential = Exists : 'a -> existential end
+|}];;
+#mark_toplevel_in_quotations;;
+
+(* Tests *)
+
 <[ 42 ]>;;
 [%%expect {|
 - : <[int]> expr = <[42]>
@@ -307,6 +319,23 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 [%%expect {|
 - : <[('a. 'a -> 'a) -> $('b) -> $('b)]> expr =
 <[fun (f : 'a. 'a -> 'a) -> f f]>
+|}];;
+
+(* CR metaprogramming jbachurski: This should fail an assertion (ticket 6789).
+   We should also support this construct (ticket 6790). *)
+<[ let f : type a. a -> a = fun x -> x in f ]>
+[%%expect {|
+Uncaught exception: Stdlib.Exit
+
+|}];;
+
+(* CR metaprogramming jbachurski: We should support this (ticket 6791). *)
+<[ function E.Exists (type a) (x : a) -> ignore (x : a) ]>
+[%%expect {|
+>> Fatal error: Translquote [at Line 1, characters 12-37]:
+Constructor patterns introducing locally abstract types are not supported in quotes.
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 <[ fun x -> fun x -> fun x -> 42 ]>;;
@@ -1345,4 +1374,138 @@ Error: Annotating types with kinds
      $('a) @ local unique -> $('b) @ local unique]>
     expr
 = <[fun (f : _ @ local unique -> _ @ local unique) -> f]>
+|}];;
+
+(** Jkind annotations **)
+
+(* Variable *)
+<[ fun (x : ('a : immediate)) -> x ]>
+[%%expect {|
+Line 4, characters 18-27:
+4 | <[ fun (x : ('a : immediate)) -> x ]>
+                      ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 4, characters 18-27.
+|}];;
+(* Alias *)
+<[ fun (x : ('a as ('b : immediate))) -> x ]>
+[%%expect {|
+Line 1, characters 25-34:
+1 | <[ fun (x : ('a as ('b : immediate))) -> x ]>
+                             ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 25-34.
+|}];;
+(* Universal quantifier *)
+<[ let f : ('a : immediate). 'a -> 'a = fun x -> x in f ]>
+[%%expect {|
+Line 1, characters 17-26:
+1 | <[ let f : ('a : immediate). 'a -> 'a = fun x -> x in f ]>
+                     ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-26.
+|}];;
+<[ let f : ('a : value) ('b : immediate). #('a * 'b) -> 'a =
+    fun #(x, y) -> x
+   in f ]>
+[%%expect {|
+Line 1, characters 17-22:
+1 | <[ let f : ('a : value) ('b : immediate). #('a * 'b) -> 'a =
+                     ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-22.
+|}];;
+(* Locally abstract type *)
+(* handled differently depending if [type] is the initial parameter *)
+<[ fun (type t : immediate) (x : t) -> x ]> (* initial *)
+[%%expect {|
+Line 1, characters 17-26:
+1 | <[ fun (type t : immediate) (x : t) -> x ]> (* initial *)
+                     ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-26.
+|}];;
+<[ fun () (type t : immediate) (x : t) -> x ]> (* non-initial *)
+[%%expect {|
+Line 1, characters 20-29:
+1 | <[ fun () (type t : immediate) (x : t) -> x ]> (* non-initial *)
+                        ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 20-29.
+|}];;
+<[ fun (type s : value) (x : s)
+       (type t : immediate) (y : t) -> #(x, y) ]> (* both *)
+[%%expect {|
+Line 1, characters 17-22:
+1 | <[ fun (type s : value) (x : s)
+                     ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-22.
+|}];;
+<[ fun (type (s : immediate) (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* double initial *)
+[%%expect {|
+Line 1, characters 18-27:
+1 | <[ fun (type (s : immediate) (t : immediate))
+                      ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 18-27.
+|}];;
+<[ fun (type (s : immediate)) (type (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* split double initial *)
+[%%expect {|
+Line 1, characters 18-27:
+1 | <[ fun (type (s : immediate)) (type (t : immediate))
+                      ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 18-27.
+|}];;
+<[ fun () (type (s : immediate)) (type (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* double non-initial *)
+[%%expect {|
+Line 1, characters 21-30:
+1 | <[ fun () (type (s : immediate)) (type (t : immediate))
+                         ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 21-30.
+|}];;
+<[ fun () (type (s : immediate) (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* split double non-initial *)
+[%%expect {|
+Line 1, characters 21-30:
+1 | <[ fun () (type (s : immediate) (t : immediate))
+                         ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 21-30.
+|}];;
+(* Universally quantified locally abstract type *)
+<[ let f : type (a : immediate). a -> a = fun x -> x in f ]>
+[%%expect {|
+Line 1, characters 21-30:
+1 | <[ let f : type (a : immediate). a -> a = fun x -> x in f ]>
+                         ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 21-30.
+|}];;
+(* Constructor with locally abstract type *)
+<[ function E.Exists (type a : immediate) (x : a) -> ignore (x : a) ]>
+[%%expect {|
+Line 1, characters 31-40:
+1 | <[ function E.Exists (type a : immediate) (x : a) -> ignore (x : a) ]>
+                                   ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 31-40.
 |}];;
