@@ -1,0 +1,255 @@
+<html>
+  <head>
+    <title>Proposed Morph Syntax</title>
+    <style>
+      body {
+        margin: 2rem auto;
+        max-width: 64rem;
+        padding: 0 1rem;
+        font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
+        color: #0f172a;
+        background: #f8fafc;
+      }
+
+      h1 {
+        margin-bottom: 0.4rem;
+      }
+
+      p {
+        margin: 0.75rem 0;
+      }
+
+      .card {
+        margin: 1rem 0;
+        padding: 1rem 1.25rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        background: white;
+      }
+
+      .note {
+        color: #475569;
+      }
+    </style>
+    <link rel="stylesheet" href="lattice-observable.css" data-lattice-observable="css">
+    <script src="lattice-observable.js" data-lattice-observable="js"></script>
+  </head>
+  <body>
+    <h1>Proposed Morph Syntax</h1>
+    <p class="note">
+      This page is a design sketch for named primitive morph declarations.
+      It is not a runnable <code>lattice_gen observable</code> fixture yet,
+      because the parser does not support this syntax today.
+    </p>
+
+    <div class="card">
+      <p>
+        The idea is to use <code>[...]</code> for primitive element-by-element
+        morph tables, and record-style <code>{...}</code> expressions for named
+        structural product bridges:
+      </p>
+
+      <lat>
+Locality = [Global &lt; Local]
+Regionality = [Global &lt; Regional &lt; Local]
+Uniqueness = [Aliased &gt; Unique]
+Linearity = [Many &lt; Once]
+Portability = [Portable &lt; Shareable &lt; Nonportable]
+Contention = [Contended &gt; Shared &gt; Uncontended]
+Forkable = [Forkable &lt; Unforkable]
+Yielding = [Unyielding &lt; Yielding]
+Staticity = [Dynamic &gt; Static]
+Statefulness = [Stateless &lt; Writing &lt; Stateful; Stateless &lt; Reading &lt; Stateful]
+Visibility = [Immutable &gt; Read &gt; Read_write; Immutable &gt; Write &gt; Read_write]
+Externality = [External_ &lt; External64 &lt; Internal]
+Nullability = [Non_null &lt; Maybe_null]
+Separability = [Non_float &lt; Separable &lt; Maybe_separable]
+Pointerness = [Non_pointer &lt; Maybe_pointer]
+
+locality_as_regionality : Locality -&gt; Regionality = [
+  Global -&gt; Global;
+  Local -&gt; Local;
+]
+
+regional_to_local : Regionality -&gt; Locality = [
+  Global -&gt; Global;
+  Regional -&gt; Local;
+  Local -&gt; Local;
+]
+
+regional_to_global : Regionality -&gt; Locality = [
+  Global -&gt; Global;
+  Regional -&gt; Global;
+  Local -&gt; Local;
+]
+
+linear_to_unique : Linearity -&gt; Uniqueness^op = [
+  Many -&gt; Aliased;
+  Once -&gt; Unique;
+]
+
+unique_to_linear : Uniqueness^op -&gt; Linearity = [
+  Aliased -&gt; Many;
+  Unique -&gt; Once;
+]
+
+portable_to_contended : Portability -&gt; Contention^op = [
+  Portable -&gt; Contended;
+  Shareable -&gt; Shared;
+  Nonportable -&gt; Uncontended;
+]
+
+contended_to_portable : Contention^op -&gt; Portability = [
+  Contended -&gt; Portable;
+  Shared -&gt; Shareable;
+  Uncontended -&gt; Nonportable;
+]
+
+statefulness_to_visibility : Statefulness -&gt; Visibility^op = [
+  Stateless -&gt; Immutable;
+  Reading -&gt; Read;
+  Writing -&gt; Write;
+  Stateful -&gt; Read_write;
+]
+
+visibility_to_statefulness : Visibility^op -&gt; Statefulness = [
+  Immutable -&gt; Stateless;
+  Read -&gt; Reading;
+  Write -&gt; Writing;
+  Read_write -&gt; Stateful;
+]
+
+Monadic = {
+  uniqueness : Uniqueness;
+  contention : Contention;
+  visibility : Visibility;
+  staticity : Staticity;
+}
+
+Comonadic = {
+  linearity : Linearity;
+  portability : Portability;
+  forkable : Forkable;
+  yielding : Yielding;
+  statefulness : Statefulness;
+}
+
+Comonadic_with_locality = {
+  areality : Locality;
+  comonadic : Comonadic;
+}
+
+Comonadic_with_regionality = {
+  areality : Regionality;
+  comonadic : Comonadic;
+}
+
+Value = {
+  comonadic : Comonadic_with_regionality;
+  monadic : Monadic;
+}
+
+Alloc = {
+  comonadic : Comonadic_with_locality;
+  monadic : Monadic;
+}
+
+Scannable_axes = {
+  externality : Externality;
+  nullability : Nullability;
+  separability : Separability;
+  pointerness : Pointerness;
+}
+
+Kind_axes = {
+  comonadic : Comonadic_with_locality;
+  monadic : Monadic^op;
+  scannable : Scannable_axes;
+}
+
+comonadic_locality_as_regionality :
+  Comonadic_with_locality -&gt; Comonadic_with_regionality = {
+  areality = locality_as_regionality(areality);
+  comonadic = comonadic;
+}
+
+comonadic_regional_to_local :
+  Comonadic_with_regionality -&gt; Comonadic_with_locality = {
+  areality = regional_to_local(areality);
+  comonadic = comonadic;
+}
+
+comonadic_regional_to_global :
+  Comonadic_with_regionality -&gt; Comonadic_with_locality = {
+  areality = regional_to_global(areality);
+  comonadic = comonadic;
+}
+
+comonadic_local_to_regional :
+  Comonadic_with_locality -&gt; Comonadic_with_regionality = {
+  areality = locality_as_regionality(areality);
+  comonadic = comonadic;
+}
+
+comonadic_to_monadic_min : Comonadic -&gt; Monadic^op = {
+  uniqueness = linear_to_unique(linearity);
+  contention = portable_to_contended(portability);
+  visibility = statefulness_to_visibility(statefulness);
+  staticity = min;
+}
+
+comonadic_to_monadic_max : Comonadic -&gt; Monadic^op = {
+  uniqueness = linear_to_unique(linearity);
+  contention = portable_to_contended(portability);
+  visibility = statefulness_to_visibility(statefulness);
+  staticity = max;
+}
+
+monadic_to_comonadic_min : Monadic^op -&gt; Comonadic = {
+  linearity = unique_to_linear(uniqueness);
+  portability = contended_to_portable(contention);
+  statefulness = visibility_to_statefulness(visibility);
+  forkable = min;
+  yielding = min;
+}
+
+monadic_to_comonadic_max : Monadic^op -&gt; Comonadic = {
+  linearity = unique_to_linear(uniqueness);
+  portability = contended_to_portable(contention);
+  statefulness = visibility_to_statefulness(visibility);
+  forkable = max;
+  yielding = max;
+}
+
+alloc_as_value : Alloc -&gt; Value = {
+  comonadic = comonadic_locality_as_regionality(comonadic);
+  monadic = monadic;
+}
+
+alloc_to_value_l2r : Alloc -&gt; Value = {
+  comonadic = comonadic_local_to_regional(comonadic);
+  monadic = monadic;
+}
+
+value_to_alloc_r2l : Value -&gt; Alloc = {
+  comonadic = comonadic_regional_to_local(comonadic);
+  monadic = monadic;
+}
+
+value_to_alloc_r2g : Value -&gt; Alloc = {
+  comonadic = comonadic_regional_to_global(comonadic);
+  monadic = monadic;
+}
+      </lat>
+    </div>
+
+    <div class="card">
+      <p>
+        In this sketch, users explicitly name the semantic product bridges the
+        compiler cares about, while simpler structural morphs such as
+        projections, <code>min_with</code>, and <code>max_with</code> can still
+        be derived automatically.
+      </p>
+    </div>
+  </body>
+</html>
