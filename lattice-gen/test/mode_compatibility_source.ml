@@ -87,7 +87,8 @@ module type Product_like = sig
   type r = (Allowance.disallowed * Allowance.allowed) t
   type lr = (Allowance.allowed * Allowance.allowed) t
   type ('a, 'd) axis_mode constraint 'd = 'l * 'r
-  type simple_error = { left : const; right : const }
+  type 'a simple_axerror
+  type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
   type error = simple_error
   type equate_step =
     | Left_le_right

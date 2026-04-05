@@ -26,6 +26,23 @@ let run () =
              "let close_up_dual x = x";
              "Format.pp_print_string ppf (show t)"
            ];
+         Test_support.expect_generated_ml_contains
+           ~name:fixture
+           ~source
+           [ "module Lattices_const = struct";
+             "module Lattices_univ = struct";
+             "module Solver_support = Solver_runtime.Make (Lattices_univ)"
+           ];
+         Test_support.expect_generated_ml_suffix_excludes
+           ~name:fixture
+           ~source
+           ~after:"module Lattices_univ = struct"
+           [ " lsr ";
+             " lsl ";
+             " land lnot Layout.";
+             "raw_mask";
+             "layout_mask"
+           ];
          Test_support.compile_generated_case
            ~name:fixture
            ~source)

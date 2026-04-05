@@ -50,8 +50,9 @@ NoSolver = [
   let legacy = Base.legacy
 end
 
-module NoSolver = struct
-  module Const = struct
+module Lattices_const = struct
+  [@@@warning &quot;-32-37&quot;]
+  module NoSolver = struct
     type t = int
     let a = 0
     let b = 1
@@ -95,17 +96,100 @@ module NoSolver = struct
     let print = pp
     let legacy = top
   end
+
+  module NoSolver_op = struct
+    include Make_const_op (NoSolver)
+    let a = NoSolver.a
+    let b = NoSolver.b
+    let name = NoSolver.name
+    let of_name = NoSolver.of_name
+  end
+
+  type _ obj =
+    | Obj_NoSolver : NoSolver.t obj
+    | Obj_NoSolver_op : NoSolver_op.t obj
+
+  let obj_index : type a. a obj -&gt; int = function
+    | Obj_NoSolver -&gt; 0
+    | Obj_NoSolver_op -&gt; 1
+
+  let min : type a. a obj -&gt; a = function
+    | Obj_NoSolver -&gt; NoSolver.bottom
+    | Obj_NoSolver_op -&gt; NoSolver_op.bottom
+
+  let max : type a. a obj -&gt; a = function
+    | Obj_NoSolver -&gt; NoSolver.top
+    | Obj_NoSolver_op -&gt; NoSolver_op.top
+
+  let legacy : type a. a obj -&gt; a = function
+    | Obj_NoSolver -&gt; NoSolver.legacy
+    | Obj_NoSolver_op -&gt; NoSolver_op.legacy
+
+  let le : type a. a obj -&gt; a -&gt; a -&gt; bool = fun obj x y -&gt;
+      match obj with
+      | Obj_NoSolver -&gt; NoSolver.leq x y
+      | Obj_NoSolver_op -&gt; NoSolver_op.leq x y
+
+  let equal : type a. a obj -&gt; a -&gt; a -&gt; bool = fun obj x y -&gt;
+      match obj with
+      | Obj_NoSolver -&gt; NoSolver.equal x y
+      | Obj_NoSolver_op -&gt; NoSolver_op.equal x y
+
+  let join : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
+      match obj with
+      | Obj_NoSolver -&gt; NoSolver.join x y
+      | Obj_NoSolver_op -&gt; NoSolver_op.join x y
+
+  let meet : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
+      match obj with
+      | Obj_NoSolver -&gt; NoSolver.meet x y
+      | Obj_NoSolver_op -&gt; NoSolver_op.meet x y
+
+  let sub : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
+      match obj with
+      | Obj_NoSolver -&gt; NoSolver.sub x y
+      | Obj_NoSolver_op -&gt; NoSolver_op.sub x y
+
+  let imply : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
+      match obj with
+      | Obj_NoSolver -&gt; NoSolver.imply x y
+      | Obj_NoSolver_op -&gt; NoSolver_op.imply x y
+
+  let print : type a. a obj -&gt; Format_doc.formatter -&gt; a -&gt; unit = fun obj ppf x -&gt;
+      match obj with
+      | Obj_NoSolver -&gt; Format_doc.pp_print_string ppf (NoSolver.show x)
+      | Obj_NoSolver_op -&gt; Format_doc.pp_print_string ppf (NoSolver_op.show x)
+
+  let _ = legacy, sub, imply
+
+  let equal_obj : type a b. a obj -&gt; b obj -&gt; (a, b) Misc.eq option =
+   fun obj1 obj2 -&gt;
+    match obj1, obj2 with
+    | Obj_NoSolver, Obj_NoSolver -&gt; Some Misc.Refl
+    | Obj_NoSolver_op, Obj_NoSolver_op -&gt; Some Misc.Refl
+    | _ -&gt; None
+
+  let compare_obj : type a b. a obj -&gt; b obj -&gt; (a, b) Misc.comparison =
+   fun obj1 obj2 -&gt;
+    match equal_obj obj1 obj2 with
+    | Some Misc.Refl -&gt; Misc.Equal
+    | None -&gt;
+      if obj_index obj1 &lt; obj_index obj2 then Misc.Less_than else Misc.Greater_than
+
+  let print_obj : type a. Format_doc.formatter -&gt; a obj -&gt; unit =
+   fun ppf -&gt; function
+    | Obj_NoSolver -&gt; Format_doc.fprintf ppf &quot;NoSolver&quot;
+    | Obj_NoSolver_op -&gt; Format_doc.fprintf ppf &quot;NoSolver_op&quot;
+
+end
+
+module NoSolver = struct
+  module Const = Lattices_const.NoSolver
   type const = Const.t
 end
 
 module NoSolver_op = struct
-  module Const = struct
-    include Make_const_op (NoSolver.Const)
-    let a = NoSolver.Const.a
-    let b = NoSolver.Const.b
-    let name = NoSolver.Const.name
-    let of_name = NoSolver.Const.of_name
-  end
+  module Const = Lattices_const.NoSolver_op
   type const = Const.t
 end
 

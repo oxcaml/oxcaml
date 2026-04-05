@@ -50,244 +50,9 @@ Locality = [
   let legacy = Base.legacy
 end
 
-module Solver_support_base = struct
-  open Allowance
-  open Misc
-  module Fmt = Format_doc
-
-  module Solver_obj_Locality = struct
-    type t = int
-    let bottom = 0
-    let top = 1
-    let[@inline] leq x y = (x land y) = x
-    let[@inline] equal (x : t) (y : t) = x = y
-    let[@inline] join x y = x lor y
-    let[@inline] meet x y = x land y
-    let[@inline] sub x y =
-      let zxy = x land lnot y in
-      zxy
-    let[@inline] imply x y =
-      let zxy = x land lnot y in
-      lnot zxy land 1
-    let pp ppf = function
-      | 0 -&gt; Fmt.pp_print_string ppf &quot;Global&quot;
-      | 1 -&gt; Fmt.pp_print_string ppf &quot;Local&quot;
-      | _ -&gt; invalid_arg &quot;invalid lattice element&quot;
-    let _ = sub, imply
-  end
-
-  module Solver_obj_Locality_op = struct
-    type t = int
-    let bottom = 1
-    let top = 0
-    let[@inline] leq x y = (x land y) = y
-    let[@inline] equal (x : t) (y : t) = x = y
-    let[@inline] join x y = x land y
-    let[@inline] meet x y = x lor y
-    let[@inline] sub x y =
-      let zyx = y land lnot x in
-      lnot zyx land 1
-    let[@inline] imply x y =
-      let zyx = y land lnot x in
-      zyx
-    let pp ppf = function
-      | 0 -&gt; Fmt.pp_print_string ppf &quot;Global&quot;
-      | 1 -&gt; Fmt.pp_print_string ppf &quot;Local&quot;
-      | _ -&gt; invalid_arg &quot;invalid lattice element&quot;
-    let _ = sub, imply
-  end
-
-  type _ obj =
-    | Obj_Locality : int obj
-    | Obj_Locality_op : int obj
-
-  let obj_index : type a. a obj -&gt; int = function
-    | Obj_Locality -&gt; 0
-    | Obj_Locality_op -&gt; 1
-
-  type (_, _, _) morph =
-    | Id : (&#39;a, &#39;a, &#39;l * &#39;r) morph
-    | Compose :
-        (&#39;b, &#39;c, &#39;l * &#39;r) morph * (&#39;a, &#39;b, &#39;l * &#39;r) morph
-        -&gt; (&#39;a, &#39;c, &#39;l * &#39;r) morph
-    constraint &#39;d = _ * _
-  [@@ocaml.warning &quot;-62&quot;]
-
-  include Magic_allow_disallow (struct
-    type (&#39;a, &#39;b, &#39;d) sided = (&#39;a, &#39;b, &#39;d) morph constraint &#39;d = &#39;l * &#39;r
-
-    let disallow_right : type a b l r.
-        (a, b, l * r) sided -&gt; (a, b, l * disallowed) sided = Obj.magic
-    let disallow_left : type a b l r.
-        (a, b, l * r) sided -&gt; (a, b, disallowed * r) sided = Obj.magic
-    let allow_right : type a b l r.
-        (a, b, l * allowed) sided -&gt; (a, b, l * r) sided = Obj.magic
-    let allow_left : type a b l r.
-        (a, b, allowed * r) sided -&gt; (a, b, l * r) sided = Obj.magic
-  end)
-
-  module C = struct
-    type nonrec &#39;a obj = &#39;a obj
-    type nonrec (&#39;a, &#39;b, &#39;d) morph = (&#39;a, &#39;b, &#39;d) morph constraint &#39;d = &#39;l * &#39;r
-
-    let rec src : type a b l r. b obj -&gt; (a, b, l * r) morph -&gt; a obj =
-     fun dst -&gt; function
-      | Id -&gt; dst
-      | Compose (f, g) -&gt; src (src dst f) g
-
-    let id = Id
-
-    let compose : type a b c l r.
-        c obj -&gt; (b, c, l * r) morph -&gt; (a, b, l * r) morph -&gt; (a, c, l * r) morph =
-     fun _dst f g -&gt;
-      match f, g with
-      | Id, g -&gt; g
-      | f, Id -&gt; f
-      | _ -&gt; Compose (f, g)
-
-    let rec left_adjoint : type a b l.
-        b obj -&gt; (a, b, l * allowed) morph -&gt; (b, a, left_only) morph =
-     fun dst -&gt; function
-      | Id -&gt; Id
-      | Compose (f, g) -&gt;
-        Compose (left_adjoint (src dst f) g, left_adjoint dst f)
-
-    let rec right_adjoint : type a b r.
-        b obj -&gt; (a, b, allowed * r) morph -&gt; (b, a, right_only) morph =
-     fun dst -&gt; function
-      | Id -&gt; Id
-      | Compose (f, g) -&gt;
-        Compose (right_adjoint (src dst f) g, right_adjoint dst f)
-
-    include Magic_allow_disallow (struct
-      type (&#39;a, &#39;b, &#39;d) sided = (&#39;a, &#39;b, &#39;d) morph constraint &#39;d = &#39;l * &#39;r
-
-      let disallow_right : type a b l r.
-          (a, b, l * r) sided -&gt; (a, b, l * disallowed) sided = Obj.magic
-      let disallow_left : type a b l r.
-          (a, b, l * r) sided -&gt; (a, b, disallowed * r) sided = Obj.magic
-      let allow_right : type a b l r.
-          (a, b, l * allowed) sided -&gt; (a, b, l * r) sided = Obj.magic
-      let allow_left : type a b l r.
-          (a, b, allowed * r) sided -&gt; (a, b, l * r) sided = Obj.magic
-    end)
-
-    let rec apply : type a b l r. b obj -&gt; (a, b, l * r) morph -&gt; a -&gt; b =
-     fun dst morph x -&gt;
-      match morph with
-      | Id -&gt; x
-      | Compose (f, g) -&gt; apply dst f (apply (src dst f) g x)
-
-    let rec morph_key : type a b l r. (a, b, l * r) morph -&gt; string = function
-      | Id -&gt; &quot;Id&quot;
-      | Compose (f, g) -&gt; &quot;Compose(&quot; ^ morph_key f ^ &quot;,&quot; ^ morph_key g ^ &quot;)&quot;
-
-    let equal_morph : type a0 a1 b l0 r0 l1 r1.
-        b obj -&gt;
-        (a0, b, l0 * r0) morph -&gt;
-        (a1, b, l1 * r1) morph -&gt;
-        (a0, a1) Misc.eq option =
-     fun _dst m1 m2 -&gt;
-      if String.equal (morph_key m1) (morph_key m2)
-      then Some (Obj.magic Misc.Refl)
-      else None
-
-    let compare_morph : type a0 a1 b l0 r0 l1 r1.
-        b obj -&gt;
-        (a0, b, l0 * r0) morph -&gt;
-        (a1, b, l1 * r1) morph -&gt;
-        (a0, a1) Misc.comparison =
-     fun _dst m1 m2 -&gt;
-      if String.equal (morph_key m1) (morph_key m2)
-      then Obj.magic Equal
-      else if String.compare (morph_key m1) (morph_key m2) &lt; 0
-      then Less_than
-      else Greater_than
-
-    let print_morph : type a b l r. b obj -&gt; Fmt.formatter -&gt; (a, b, l * r) morph -&gt; unit =
-     fun _dst ppf morph -&gt; Fmt.fprintf ppf &quot;%s&quot; (morph_key morph)
-
-    let min : type a. a obj -&gt; a = function
-      | Obj_Locality -&gt; Solver_obj_Locality.bottom
-      | Obj_Locality_op -&gt; Solver_obj_Locality_op.bottom
-
-    let max : type a. a obj -&gt; a = function
-      | Obj_Locality -&gt; Solver_obj_Locality.top
-      | Obj_Locality_op -&gt; Solver_obj_Locality_op.top
-
-    let le : type a. a obj -&gt; a -&gt; a -&gt; bool = fun obj x y -&gt;
-      match obj with
-      | Obj_Locality -&gt; Solver_obj_Locality.leq x y
-      | Obj_Locality_op -&gt; Solver_obj_Locality_op.leq x y
-
-    let equal : type a. a obj -&gt; a -&gt; a -&gt; bool = fun obj x y -&gt;
-      match obj with
-      | Obj_Locality -&gt; Solver_obj_Locality.equal x y
-      | Obj_Locality_op -&gt; Solver_obj_Locality_op.equal x y
-
-    let join : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
-      match obj with
-      | Obj_Locality -&gt; Solver_obj_Locality.join x y
-      | Obj_Locality_op -&gt; Solver_obj_Locality_op.join x y
-
-    let meet : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
-      match obj with
-      | Obj_Locality -&gt; Solver_obj_Locality.meet x y
-      | Obj_Locality_op -&gt; Solver_obj_Locality_op.meet x y
-
-    let print : type a. a obj -&gt; Fmt.formatter -&gt; a -&gt; unit = fun obj ppf x -&gt;
-      match obj with
-      | Obj_Locality -&gt; Solver_obj_Locality.pp ppf x
-      | Obj_Locality_op -&gt; Solver_obj_Locality_op.pp ppf x
-
-    let equal_obj : type a b. a obj -&gt; b obj -&gt; (a, b) Misc.eq option =
-     fun obj1 obj2 -&gt;
-      match obj1, obj2 with
-      | Obj_Locality, Obj_Locality -&gt; Some Misc.Refl
-      | Obj_Locality_op, Obj_Locality_op -&gt; Some Misc.Refl
-      | _ -&gt; None
-
-    let compare_obj : type a b. a obj -&gt; b obj -&gt; (a, b) Misc.comparison =
-     fun obj1 obj2 -&gt;
-      match equal_obj obj1 obj2 with
-      | Some Misc.Refl -&gt; Equal
-      | None -&gt;
-        if obj_index obj1 &lt; obj_index obj2 then Less_than else Greater_than
-
-    let print_obj : type a. Fmt.formatter -&gt; a obj -&gt; unit =
-     fun ppf -&gt; function
-      | Obj_Locality -&gt; Fmt.fprintf ppf &quot;Locality&quot;
-      | Obj_Locality_op -&gt; Fmt.fprintf ppf &quot;Locality_op&quot;
-  end
-
-end
-
-module Solver_support = struct
-  include Solver_support_base
-  include Solver_runtime.Make (Solver_support_base.C)
-end
-
-module Make_solver_module
-    (Const_desc : sig
-      type t
-      module Repr : sig
-        val to_int : t -&gt; int
-      end
-      val legacy : t
-    end)
-    (Obj_desc : sig
-      val obj : int Solver_support_base.obj
-    end) =
-struct
-  include Solver_support.Positive_gen (Obj_desc)
-
-  let of_const_value c = of_const (Const_desc.Repr.to_int c)
-  let legacy = of_const_value Const_desc.legacy
-  let show ?verbose t = Format_doc.asprintf &quot;%a&quot; (print ?verbose) t
-end
-
-module Locality = struct
-  module Const = struct
+module Lattices_const = struct
+  [@@@warning &quot;-32-37&quot;]
+  module Locality = struct
     type t = int
     let global = 0
     let local = 1
@@ -331,27 +96,298 @@ module Locality = struct
     let print = pp
     let legacy = global
   end
+
+  module Locality_op = struct
+    include Make_const_op (Locality)
+    let global = Locality.global
+    let local = Locality.local
+    let name = Locality.name
+    let of_name = Locality.of_name
+  end
+
+  type _ obj =
+    | Obj_Locality : Locality.t obj
+    | Obj_Locality_op : Locality_op.t obj
+
+  let obj_index : type a. a obj -&gt; int = function
+    | Obj_Locality -&gt; 0
+    | Obj_Locality_op -&gt; 1
+
+  let min : type a. a obj -&gt; a = function
+    | Obj_Locality -&gt; Locality.bottom
+    | Obj_Locality_op -&gt; Locality_op.bottom
+
+  let max : type a. a obj -&gt; a = function
+    | Obj_Locality -&gt; Locality.top
+    | Obj_Locality_op -&gt; Locality_op.top
+
+  let legacy : type a. a obj -&gt; a = function
+    | Obj_Locality -&gt; Locality.legacy
+    | Obj_Locality_op -&gt; Locality_op.legacy
+
+  let le : type a. a obj -&gt; a -&gt; a -&gt; bool = fun obj x y -&gt;
+      match obj with
+      | Obj_Locality -&gt; Locality.leq x y
+      | Obj_Locality_op -&gt; Locality_op.leq x y
+
+  let equal : type a. a obj -&gt; a -&gt; a -&gt; bool = fun obj x y -&gt;
+      match obj with
+      | Obj_Locality -&gt; Locality.equal x y
+      | Obj_Locality_op -&gt; Locality_op.equal x y
+
+  let join : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
+      match obj with
+      | Obj_Locality -&gt; Locality.join x y
+      | Obj_Locality_op -&gt; Locality_op.join x y
+
+  let meet : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
+      match obj with
+      | Obj_Locality -&gt; Locality.meet x y
+      | Obj_Locality_op -&gt; Locality_op.meet x y
+
+  let sub : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
+      match obj with
+      | Obj_Locality -&gt; Locality.sub x y
+      | Obj_Locality_op -&gt; Locality_op.sub x y
+
+  let imply : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
+      match obj with
+      | Obj_Locality -&gt; Locality.imply x y
+      | Obj_Locality_op -&gt; Locality_op.imply x y
+
+  let print : type a. a obj -&gt; Format_doc.formatter -&gt; a -&gt; unit = fun obj ppf x -&gt;
+      match obj with
+      | Obj_Locality -&gt; Format_doc.pp_print_string ppf (Locality.show x)
+      | Obj_Locality_op -&gt; Format_doc.pp_print_string ppf (Locality_op.show x)
+
+  let _ = legacy, sub, imply
+
+  let equal_obj : type a b. a obj -&gt; b obj -&gt; (a, b) Misc.eq option =
+   fun obj1 obj2 -&gt;
+    match obj1, obj2 with
+    | Obj_Locality, Obj_Locality -&gt; Some Misc.Refl
+    | Obj_Locality_op, Obj_Locality_op -&gt; Some Misc.Refl
+    | _ -&gt; None
+
+  let compare_obj : type a b. a obj -&gt; b obj -&gt; (a, b) Misc.comparison =
+   fun obj1 obj2 -&gt;
+    match equal_obj obj1 obj2 with
+    | Some Misc.Refl -&gt; Misc.Equal
+    | None -&gt;
+      if obj_index obj1 &lt; obj_index obj2 then Misc.Less_than else Misc.Greater_than
+
+  let print_obj : type a. Format_doc.formatter -&gt; a obj -&gt; unit =
+   fun ppf -&gt; function
+    | Obj_Locality -&gt; Format_doc.fprintf ppf &quot;Locality&quot;
+    | Obj_Locality_op -&gt; Format_doc.fprintf ppf &quot;Locality_op&quot;
+
+end
+
+module Lattices_univ = struct
+  [@@@warning &quot;-32-37&quot;]
+  include Lattices_const
+  open Allowance
+  open Misc
+  module Fmt = Format_doc
+
+  type (&#39;a, &#39;b, &#39;d) morph =
+    | Id : (&#39;a, &#39;a, &#39;l * &#39;r) morph
+    | Compose :
+        (&#39;b, &#39;c, &#39;l * &#39;r) morph * (&#39;a, &#39;b, &#39;l * &#39;r) morph
+        -&gt; (&#39;a, &#39;c, &#39;l * &#39;r) morph
+    constraint &#39;d = _ * _
+  [@@ocaml.warning &quot;-62&quot;]
+
+  include Magic_allow_disallow (struct
+    type (&#39;a, &#39;b, &#39;d) sided = (&#39;a, &#39;b, &#39;d) morph constraint &#39;d = &#39;l * &#39;r
+
+    let disallow_right : type a b l r.
+        (a, b, l * r) sided -&gt; (a, b, l * disallowed) sided = Obj.magic
+    let disallow_left : type a b l r.
+        (a, b, l * r) sided -&gt; (a, b, disallowed * r) sided = Obj.magic
+    let allow_right : type a b l r.
+        (a, b, l * allowed) sided -&gt; (a, b, l * r) sided = Obj.magic
+    let allow_left : type a b l r.
+        (a, b, allowed * r) sided -&gt; (a, b, l * r) sided = Obj.magic
+  end)
+
+  let rec src : type a b l r. b obj -&gt; (a, b, l * r) morph -&gt; a obj =
+   fun dst -&gt; function
+    | Id -&gt; dst
+    | Compose (f, g) -&gt; src (src dst f) g
+
+  let id = Id
+
+  let maybe_compose : type a b c l r.
+      c obj -&gt; (b, c, l * r) morph -&gt; (a, b, l * r) morph -&gt; (a, c, l * r) morph =
+   fun _dst f g -&gt;
+    match f, g with
+    | Id, g -&gt; g
+    | f, Id -&gt; f
+    | _ -&gt; Compose (f, g)
+
+  let compose = maybe_compose
+
+  let rec left_adjoint : type a b l.
+      b obj -&gt; (a, b, l * allowed) morph -&gt; (b, a, left_only) morph =
+   fun dst -&gt; function
+    | Id -&gt; Id
+    | Compose (f, g) -&gt;
+      Compose (left_adjoint (src dst f) g, left_adjoint dst f)
+
+  let rec right_adjoint : type a b r.
+      b obj -&gt; (a, b, allowed * r) morph -&gt; (b, a, right_only) morph =
+   fun dst -&gt; function
+    | Id -&gt; Id
+    | Compose (f, g) -&gt;
+      Compose (right_adjoint (src dst f) g, right_adjoint dst f)
+
+  let rec apply : type a b l r. b obj -&gt; (a, b, l * r) morph -&gt; a -&gt; b =
+   fun dst morph x -&gt;
+    match morph with
+    | Id -&gt; x
+    | Compose (f, g) -&gt; apply dst f (apply (src dst f) g x)
+
+  let rec morph_key : type a b l r. (a, b, l * r) morph -&gt; string = function
+    | Id -&gt; &quot;Id&quot;
+    | Compose (f, g) -&gt; &quot;Compose(&quot; ^ morph_key f ^ &quot;,&quot; ^ morph_key g ^ &quot;)&quot;
+
+  let equal_morph : type a0 a1 b l0 r0 l1 r1.
+      b obj -&gt;
+      (a0, b, l0 * r0) morph -&gt;
+      (a1, b, l1 * r1) morph -&gt;
+      (a0, a1) Misc.eq option =
+   fun _dst m1 m2 -&gt;
+    if String.equal (morph_key m1) (morph_key m2)
+    then Some (Obj.magic Misc.Refl)
+    else None
+
+  let compare_morph : type a0 a1 b l0 r0 l1 r1.
+      b obj -&gt;
+      (a0, b, l0 * r0) morph -&gt;
+      (a1, b, l1 * r1) morph -&gt;
+      (a0, a1) Misc.comparison =
+   fun _dst m1 m2 -&gt;
+    if String.equal (morph_key m1) (morph_key m2)
+    then Obj.magic Equal
+    else if String.compare (morph_key m1) (morph_key m2) &lt; 0
+    then Less_than
+    else Greater_than
+
+  let print_morph : type a b l r. b obj -&gt; Fmt.formatter -&gt; (a, b, l * r) morph -&gt; unit =
+   fun _dst ppf morph -&gt; Fmt.fprintf ppf &quot;%s&quot; (morph_key morph)
+
+end
+
+module Solver_support = Solver_runtime.Make (Lattices_univ)
+
+module Make_solver_core
+    (Const_desc : sig
+      type t
+      module Repr : sig
+        val to_int : t -&gt; int
+      end
+      val legacy : t
+    end)
+    (Obj_desc : sig
+      val obj : int Solver_support.obj
+    end) =
+struct
+  include Solver_support.Positive_gen (Obj_desc)
+
+  let of_const_value c = of_const (Const_desc.Repr.to_int c)
+  let legacy = of_const_value Const_desc.legacy
+  let show ?verbose t = Format_doc.asprintf &quot;%a&quot; (print ?verbose) t
+end
+
+module Make_solver_module
+    (Const_desc : sig
+      type t
+      val pp : Format.formatter -&gt; t -&gt; unit
+      module Repr : sig
+        val to_int : t -&gt; int
+        val of_int_exn : int -&gt; t
+      end
+      val legacy : t
+    end)
+    (Obj_desc : sig
+      val obj : int Solver_support.obj
+    end) =
+struct
+  include Make_solver_core (struct
+    type t = Const_desc.t
+    module Repr = struct
+      let to_int = Const_desc.Repr.to_int
+    end
+    let legacy = Const_desc.legacy
+  end) (Obj_desc)
+
+  type simple_error = {
+    left : Const_desc.t;
+    right : Const_desc.t;
+  }
+
+  type error = simple_error
+
+  type equate_step =
+    | Left_le_right
+    | Right_le_left
+
+  type equate_error = equate_step * error
+
+  let error_of_raw ({ left; right; _ } : int Solver_support.Raw.error_raw) =
+    {
+      left = Const_desc.Repr.of_int_exn left;
+      right = Const_desc.Repr.of_int_exn right;
+    }
+
+  let to_simple_error error = error
+
+  let print_error ppf { left; right } =
+    Format.fprintf ppf &quot;%a &lt;= %a does not hold&quot; Const_desc.pp left Const_desc.pp right
+
+  let print_equate_error ppf = function
+    | Left_le_right, error -&gt;
+      Format.fprintf ppf &quot;Left_le_right: %a&quot; print_error error
+    | Right_le_left, error -&gt;
+      Format.fprintf ppf &quot;Right_le_left: %a&quot; print_error error
+
+  let submode a b = Result.map_error error_of_raw (submode_raw a b)
+
+  let submode_exn a b =
+    match submode a b with
+    | Ok () -&gt; ()
+    | Error error -&gt; invalid_arg (Format.asprintf &quot;%a&quot; print_error error)
+
+  let equate a b =
+    Result.map_error
+      (fun (forward, error) -&gt;
+        ((if forward then Left_le_right else Right_le_left), error_of_raw error))
+      (equate_raw a b)
+
+  let equate_exn a b =
+    match equate a b with
+    | Ok () -&gt; ()
+    | Error error -&gt; invalid_arg (Format.asprintf &quot;%a&quot; print_equate_error error)
+end
+
+module Locality = struct
+  module Const = Lattices_const.Locality
   type const = Const.t
 
   include Make_solver_module (Const) (struct
-    let obj = Solver_support_base.Obj_Locality
+    let obj = Lattices_univ.Obj_Locality
   end)
   let global = of_const_value Const.global
   let local = of_const_value Const.local
 end
 
 module Locality_op = struct
-  module Const = struct
-    include Make_const_op (Locality.Const)
-    let global = Locality.Const.global
-    let local = Locality.Const.local
-    let name = Locality.Const.name
-    let of_name = Locality.Const.of_name
-  end
+  module Const = Lattices_const.Locality_op
   type const = Const.t
 
   include Make_solver_module (Const) (struct
-    let obj = Solver_support_base.Obj_Locality_op
+    let obj = Lattices_univ.Obj_Locality_op
   end)
   let global = of_const_value Const.global
   let local = of_const_value Const.local
@@ -400,6 +436,19 @@ end
   type r = (Allowance.disallowed * Allowance.allowed) t
   type lr = (Allowance.allowed * Allowance.allowed) t
 
+  type simple_error = {
+    left : const;
+    right : const;
+  }
+
+  type error = simple_error
+
+  type equate_step =
+    | Left_le_right
+    | Right_le_left
+
+  type equate_error = equate_step * error
+
   val min : lr
   val max : lr
   val legacy : lr
@@ -411,9 +460,13 @@ end
   val newvar_above : l -&gt; (&#39;l * &#39;r) t * bool
   val newvar_below : r -&gt; (&#39;l * &#39;r) t * bool
 
-  val submode : l -&gt; r -&gt; (unit, string) result
+  val to_simple_error : error -&gt; simple_error
+  val print_error : Format.formatter -&gt; error -&gt; unit
+  val print_equate_error : Format.formatter -&gt; equate_error -&gt; unit
+
+  val submode : l -&gt; r -&gt; (unit, error) result
   val submode_exn : l -&gt; r -&gt; unit
-  val equate : lr -&gt; lr -&gt; (unit, string) result
+  val equate : lr -&gt; lr -&gt; (unit, equate_error) result
   val equate_exn : lr -&gt; lr -&gt; unit
 
   val join : l list -&gt; l
@@ -473,6 +526,19 @@ module Locality_op : sig
   type r = (Allowance.disallowed * Allowance.allowed) t
   type lr = (Allowance.allowed * Allowance.allowed) t
 
+  type simple_error = {
+    left : const;
+    right : const;
+  }
+
+  type error = simple_error
+
+  type equate_step =
+    | Left_le_right
+    | Right_le_left
+
+  type equate_error = equate_step * error
+
   val min : lr
   val max : lr
   val legacy : lr
@@ -484,9 +550,13 @@ module Locality_op : sig
   val newvar_above : l -&gt; (&#39;l * &#39;r) t * bool
   val newvar_below : r -&gt; (&#39;l * &#39;r) t * bool
 
-  val submode : l -&gt; r -&gt; (unit, string) result
+  val to_simple_error : error -&gt; simple_error
+  val print_error : Format.formatter -&gt; error -&gt; unit
+  val print_equate_error : Format.formatter -&gt; equate_error -&gt; unit
+
+  val submode : l -&gt; r -&gt; (unit, error) result
   val submode_exn : l -&gt; r -&gt; unit
-  val equate : lr -&gt; lr -&gt; (unit, string) result
+  val equate : lr -&gt; lr -&gt; (unit, equate_error) result
   val equate_exn : lr -&gt; lr -&gt; unit
 
   val join : l list -&gt; l

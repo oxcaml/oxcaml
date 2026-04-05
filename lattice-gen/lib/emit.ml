@@ -194,8 +194,6 @@ let legacy_value_name name =
   | "Staticity" -> "dynamic"
   | _ -> "top"
 
-let solver_ops_module_name name = "Solver_obj_" ^ name
-
 let solver_object_ctor_name_of_name name = Model.solver_object_ctor_name name
 
 let solver_objects_in_order model =
@@ -213,23 +211,6 @@ let solver_objects_in_order model =
       | Embedding _ -> acc)
     []
     model.items
-
-let chop_op_suffix name =
-  let suffix = "_op" in
-  let name_len = String.length name in
-  let suffix_len = String.length suffix in
-  if name_len >= suffix_len
-     && String.sub name (name_len - suffix_len) suffix_len = suffix
-  then Some (String.sub name 0 (name_len - suffix_len))
-  else None
-
-let underlying_lattice_of_solver_object model (object_ : solver_object) =
-  match String_map.find_opt object_.name model.lattices with
-  | Some lattice -> lattice
-  | None -> (
-    match chop_op_suffix object_.name with
-    | Some name -> String_map.find name model.lattices
-    | None -> invalid_arg ("unknown solver object: " ^ object_.name))
 
 let add_solver_items_sig buf =
   Buffer.add_string
@@ -283,10 +264,55 @@ let add_solver_items_sig buf =
     \  val zap_to_ceil : r -> const\n"
 
 let add_product_solver_items_sig buf (product : product) ~in_op:_ =
-  add_solver_items_sig buf;
   Buffer.add_string
     buf
-    "\n\
+    "  type 'd t constraint 'd = 'l * 'r\n\
+    \n\
+    \  type l = (Allowance.allowed * Allowance.disallowed) t\n\
+    \  type r = (Allowance.disallowed * Allowance.allowed) t\n\
+    \  type lr = (Allowance.allowed * Allowance.allowed) t\n\
+    \n\
+    \  type 'a simple_axerror\n\
+    \n\
+    \  type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error\n\
+    \n\
+    \  type error = simple_error\n\
+    \n\
+    \  type equate_step =\n\
+    \    | Left_le_right\n\
+    \    | Right_le_left\n\
+    \n\
+    \  type equate_error = equate_step * error\n\
+    \n\
+    \  val min : lr\n\
+    \  val max : lr\n\
+    \  val legacy : lr\n\
+    \n\
+    \  val of_const : const -> ('l * 'r) t\n\
+    \  val to_const_exn : lr -> const\n\
+    \n\
+    \  val newvar : unit -> ('l * 'r) t\n\
+    \  val newvar_above : l -> ('l * 'r) t * bool\n\
+    \  val newvar_below : r -> ('l * 'r) t * bool\n\
+    \n\
+    \  val to_simple_error : error -> simple_error\n\
+    \  val print_error : Format.formatter -> error -> unit\n\
+    \  val print_equate_error : Format.formatter -> equate_error -> unit\n\
+    \n\
+    \  val submode : l -> r -> (unit, error) result\n\
+    \  val submode_exn : l -> r -> unit\n\
+    \  val equate : lr -> lr -> (unit, equate_error) result\n\
+    \  val equate_exn : lr -> lr -> unit\n\
+    \n\
+    \  val join : l list -> l\n\
+    \  val meet : r list -> r\n\
+    \n\
+    \  val print : ?verbose:bool -> Format_doc.formatter -> ('l * 'r) t -> unit\n\
+    \  val show : ?verbose:bool -> ('l * 'r) t -> string\n\
+    \n\
+    \  val zap_to_floor : l -> const\n\
+    \  val zap_to_ceil : r -> const\n\
+    \n\
     \  type ('a, 'd) axis_mode constraint 'd = 'l * 'r\n\
     \n\
     \  val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) axis_mode\n\
@@ -529,72 +555,405 @@ let add_embedding_sig buf (embedding : embedding) =
     embedding.aliases;
   Buffer.add_string buf "end\n\n"
 
-let add_solver_object_ops_ml buf model (object_ : solver_object) =
-  let ops_module = solver_ops_module_name object_.name in
-  bprintf buf "  module %s = struct\n" ops_module;
-  Buffer.add_string buf "    type t = int\n";
-  add_specialized_ops_ml ~indent:"    " buf object_.descriptor;
-  (match underlying_lattice_of_solver_object model object_, object_.shape with
-   | Base base, Solver_base ->
-     Buffer.add_string buf "    let pp ppf = function\n";
-     Array.iteri
-       (fun i elt ->
-         bprintf
-           buf
-           "      | %d -> Fmt.pp_print_string ppf %S\n"
-           base.element_values.(i)
-           elt)
-       base.element_names;
-     Buffer.add_string
-       buf
-       "      | _ -> invalid_arg \"invalid lattice element\"\n"
-   | Product product, Solver_product axes ->
-     Buffer.add_string buf "    let pp ppf t =\n";
-     if product.fields = []
-     then Buffer.add_string buf "      Fmt.pp_print_string ppf \"{}\"\n"
-     else (
-       Buffer.add_string buf "      Fmt.pp_print_string ppf \"{ \";\n";
-       List.iteri
-         (fun i (field : field) ->
-           let axis =
-             List.find
-               (fun (axis : solver_axis) -> axis.axis.name = field.name)
-               axes
-           in
-           let carrier_ops = solver_ops_module_name axis.carrier_object_name in
-           if i > 0
-           then Buffer.add_string buf "      Fmt.pp_print_string ppf \"; \";\n";
-           bprintf
-             buf
-             "      Fmt.pp_print_string ppf %S;\n\
-             \      %s.pp ppf (%s);\n"
-             (field.name ^ " = ")
-             carrier_ops
-             (if field.shift = 0
-              then Printf.sprintf "(t land %d)" field.raw_mask
-              else
-                Printf.sprintf "((t lsr %d) land %d)" field.shift field.raw_mask))
-         product.fields;
-       Buffer.add_string buf "      Fmt.pp_print_string ppf \" }\"\n")
-   | Base _, Solver_product _ | Product _, Solver_base ->
-     invalid_arg "solver object shape mismatch");
-  Buffer.add_string buf "    let _ = sub, imply\n";
-  Buffer.add_string buf "  end\n\n"
+let add_base_const_module_ml buf (base : base) module_name descriptor =
+  if module_name = base.name
+  then (
+    bprintf buf "  module %s = struct\n" module_name;
+    Buffer.add_string buf "    type t = int\n";
+    Array.iteri
+      (fun i (_ : string) ->
+        bprintf
+          buf
+          "    let %s = %d\n"
+          base.element_value_names.(i)
+          base.element_values.(i))
+      base.element_names;
+    add_specialized_ops_ml ~indent:"    " buf descriptor;
+    Buffer.add_string buf "    let name = function\n";
+    Array.iteri
+      (fun i elt ->
+        bprintf buf "      | %d -> %S\n" base.element_values.(i) elt)
+      base.element_names;
+    Buffer.add_string buf "      | _ -> invalid_arg \"invalid lattice element\"\n";
+    Buffer.add_string buf "    let of_name = function\n";
+    Array.iteri
+      (fun i elt ->
+        bprintf buf "      | %S -> Some %s\n" elt base.element_value_names.(i))
+      base.element_names;
+    Buffer.add_string buf "      | _ -> None\n";
+    Buffer.add_string buf "    let pp ppf = function\n";
+    Array.iteri
+      (fun i elt ->
+        bprintf
+          buf
+          "      | %d -> Format.pp_print_string ppf %S\n"
+          base.element_values.(i)
+          elt)
+      base.element_names;
+    Buffer.add_string
+      buf
+      "      | _ -> invalid_arg \"invalid lattice element\"\n\
+      \    let show t = Format.asprintf \"%a\" pp t\n\
+      \    module Repr = struct\n";
+    bprintf
+      buf
+      "      let bits = %d\n\
+      \      let mask = %d\n\
+      \      let to_int (x : t) = x\n"
+      descriptor.bits
+      descriptor.mask;
+    add_repr_validator_ml ~indent:"      " buf base.repr_validator;
+    bprintf
+      buf
+      "    end\n\
+      \n\
+      \    let min = bottom\n\
+      \    let max = top\n\
+      \    let le = leq\n\
+      \    let print = pp\n\
+      \    let legacy = %s\n\
+      \  end\n\n"
+      (legacy_value_name base.name))
+  else (
+    bprintf buf "  module %s = struct\n" module_name;
+    bprintf buf "    include Make_const_op (%s)\n" base.name;
+    Array.iteri
+      (fun i (_ : string) ->
+        bprintf
+          buf
+          "    let %s = %s.%s\n"
+          base.element_value_names.(i)
+          base.name
+          base.element_value_names.(i))
+      base.element_names;
+    bprintf buf "    let name = %s.name\n" base.name;
+    bprintf buf "    let of_name = %s.of_name\n" base.name;
+    Buffer.add_string buf "  end\n\n")
 
-let add_solver_support_ml buf model =
+let add_product_const_module_ml
+    buf
+    (product : product)
+    module_name
+    descriptor
+    ~in_op
+  =
+  bprintf buf "  module %s = struct\n" module_name;
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "    module %s = %s\n"
+        (field_module_alias_name field)
+        (field_module_name field ~in_op))
+    product.fields;
+  if in_op
+  then (
+    bprintf buf "    include Make_const_op (%s)\n" product.name;
+    bprintf buf "    type view = %s.view = {\n" product.name;
+    List.iter
+      (fun (field : field) ->
+        bprintf
+          buf
+          "      %s : %s.t;\n"
+          field.name
+          (field_module_alias_name field))
+      product.fields;
+    Buffer.add_string buf "    }\n\n";
+    bprintf buf "    module Layout = %s.Layout\n" product.name;
+    bprintf buf "    module Axis = %s.Axis\n" product.name;
+    bprintf buf "    let make = %s.make\n" product.name;
+    bprintf buf "    let view = %s.view\n" product.name;
+    bprintf buf "    let of_view = %s.of_view\n" product.name;
+    List.iter
+      (fun (field : field) ->
+        bprintf buf "    let %s = %s.%s\n" field.name product.name field.name;
+        bprintf buf "    let proj_%s = %s.proj_%s\n" field.name product.name field.name;
+        bprintf buf "    let with_%s = %s.with_%s\n" field.name product.name field.name;
+        bprintf buf "    let %s_bot = %s.%s_bot\n" field.name product.name field.name;
+        bprintf buf "    let %s_top = %s.%s_top\n" field.name product.name field.name;
+        bprintf
+          buf
+          "    let min_with_%s = %s.min_with_%s\n"
+          field.name
+          product.name
+          field.name;
+        bprintf
+          buf
+          "    let max_with_%s = %s.max_with_%s\n"
+          field.name
+          product.name
+          field.name)
+      product.fields;
+    bprintf buf "    let split = %s.split\n" product.name;
+    bprintf buf "    let merge = %s.merge\n" product.name;
+    bprintf buf "    let proj = %s.proj\n" product.name;
+    bprintf buf "    let min_with = %s.min_with\n" product.name;
+    bprintf buf "    let max_with = %s.max_with\n" product.name;
+    Buffer.add_string buf "  end\n\n")
+  else (
+    Buffer.add_string buf "    type t = int\n";
+    Buffer.add_string buf "    type view = {\n";
+    List.iter
+      (fun (field : field) ->
+        bprintf
+          buf
+          "      %s : %s.t;\n"
+          field.name
+          (field_module_alias_name field))
+      product.fields;
+    Buffer.add_string buf "    }\n\n";
+    Buffer.add_string buf "    module Layout = struct\n";
+    List.iter
+      (fun (field : field) ->
+        bprintf buf "      let %s_shift = %d\n" field.name field.shift;
+        bprintf buf "      let %s_mask = %d\n" field.name field.layout_mask)
+      product.fields;
+    Buffer.add_string buf "    end\n";
+    Buffer.add_string buf "    let[@inline] make ";
+    List.iter (fun (field : field) -> bprintf buf "~%s " field.name) product.fields;
+    Buffer.add_string buf "=\n      ";
+    let parts =
+      List.map
+        (fun (field : field) ->
+          if field.shift = 0
+          then field.name
+          else Printf.sprintf "(%s lsl %d)" field.name field.shift)
+        product.fields
+    in
+    Buffer.add_string buf (String.concat " lor " parts);
+    Buffer.add_string buf "\n";
+    List.iter
+      (fun (field : field) ->
+        let field_module = field_module_alias_name field in
+        bprintf
+          buf
+          "    let[@inline] %s t = (%s land %d : %s.t)\n"
+          field.name
+          (if field.shift = 0
+           then "t"
+           else Printf.sprintf "(t lsr %d)" field.shift)
+          field.raw_mask
+          field_module;
+        bprintf buf "    let proj_%s = %s\n" field.name field.name;
+        bprintf
+          buf
+          "    let[@inline] with_%s value t = (t land lnot Layout.%s_mask) lor %s\n"
+          field.name
+          field.name
+          (if field.shift = 0
+           then "value"
+           else Printf.sprintf "(value lsl %d)" field.shift))
+      product.fields;
+    Buffer.add_string buf "    let[@inline] of_view view =\n";
+    Buffer.add_string buf "      make ";
+    List.iter
+      (fun (field : field) -> bprintf buf "~%s:view.%s " field.name field.name)
+      product.fields;
+    Buffer.add_string buf "\n";
+    Buffer.add_string buf "    let[@inline] view t =\n      {\n";
+    List.iter
+      (fun (field : field) -> bprintf buf "        %s = %s t;\n" field.name field.name)
+      product.fields;
+    Buffer.add_string buf "      }\n";
+    add_specialized_ops_ml ~indent:"    " buf descriptor;
+    List.iter
+      (fun (field : field) ->
+        bprintf
+          buf
+          "    let[@inline] %s_bot value = with_%s value bottom\n"
+          field.name
+          field.name;
+        bprintf
+          buf
+          "    let[@inline] %s_top value = with_%s value top\n"
+          field.name
+          field.name;
+        bprintf buf "    let min_with_%s = %s_bot\n" field.name field.name;
+        bprintf buf "    let max_with_%s = %s_top\n" field.name field.name)
+      product.fields;
+    Buffer.add_string buf "    let pp ppf t =\n";
+    if product.fields = []
+    then Buffer.add_string buf "      Format.pp_print_string ppf \"{}\"\n"
+    else (
+      Buffer.add_string buf "      let v = view t in\n";
+      Buffer.add_string buf "      Format.pp_print_string ppf \"{ \";\n";
+      List.iteri
+        (fun i field ->
+          let field : field = field in
+          if i > 0
+          then Buffer.add_string buf "      Format.pp_print_string ppf \"; \";\n";
+          bprintf
+            buf
+            "      Format.pp_print_string ppf %S;\n\
+            \      %s.pp ppf v.%s;\n"
+            (field.name ^ " = ")
+            (field_module_alias_name field)
+            field.name)
+        product.fields;
+      Buffer.add_string buf "      Format.pp_print_string ppf \" }\"\n");
+    Buffer.add_string
+      buf
+      "    let show t = Format.asprintf \"%a\" pp t\n\
+      \    module Repr = struct\n";
+    bprintf
+      buf
+      "      let bits = %d\n\
+      \      let mask = %d\n\
+      \      let to_int (x : t) = x\n"
+      descriptor.bits
+      descriptor.mask;
+    add_repr_validator_ml ~indent:"      " buf product.repr_validator;
+    Buffer.add_string
+      buf
+      "    end\n\
+      \n\
+      \    let min = bottom\n\
+      \    let max = top\n\
+      \    let le = leq\n\
+      \    let print = pp\n\
+      \n";
+    Buffer.add_string buf "    let split = view\n    let merge = of_view\n\n";
+    Buffer.add_string buf "    let legacy =\n      make ";
+    List.iter
+      (fun (field : field) ->
+        bprintf
+          buf
+          "~%s:%s.legacy "
+          field.name
+          (field_module_alias_name field))
+      product.fields;
+    Buffer.add_string buf "\n";
+    Buffer.add_string buf "    module Axis = struct\n";
+    Buffer.add_string buf "      type _ t =\n";
+    List.iter
+      (fun (axis : axis_object) ->
+        bprintf
+          buf
+          "        | %s : %s.t t\n"
+          axis.ctor_name
+          (field_module_alias_name
+             (List.find (fun (field : field) -> field.name = axis.name) product.fields)))
+      product.axes;
+    Buffer.add_string buf "\n      type packed = P : 'a t -> packed\n\n";
+    Buffer.add_string
+      buf
+      "      let compare : type a b. a t -> b t -> (a, b) Misc.comparison =\n\
+      \        fun left right ->\n\
+      \          match left, right with\n";
+    List.iteri
+      (fun i (left_axis : axis_object) ->
+        bprintf
+          buf
+          "          | %s, %s -> Misc.Equal\n"
+          left_axis.ctor_name
+          left_axis.ctor_name;
+        List.iteri
+          (fun j (right_axis : axis_object) ->
+            if i <> j
+            then
+              bprintf
+                buf
+                "          | %s, %s -> Misc.%s\n"
+                left_axis.ctor_name
+                right_axis.ctor_name
+                (if i < j then "Less_than" else "Greater_than"))
+          product.axes)
+      product.axes;
+    Buffer.add_string buf "\n";
+    Buffer.add_string buf "      let all = [\n";
+    List.iter
+      (fun (axis : axis_object) ->
+        bprintf buf "        P %s;\n" axis.ctor_name)
+      product.axes;
+    Buffer.add_string buf "      ]\n";
+    Buffer.add_string
+      buf
+      "      let print : type a. Format.formatter -> a t -> unit = fun ppf -> function\n";
+    List.iter
+      (fun (axis : axis_object) ->
+        bprintf
+          buf
+          "        | %s -> Format.pp_print_string ppf %S\n"
+          axis.ctor_name
+          axis.name)
+      product.axes;
+    Buffer.add_string
+      buf
+      "      let proj : type a. a t -> int -> a = fun axis t ->\n\
+      \        match axis with\n";
+    List.iter
+      (fun (axis : axis_object) ->
+        bprintf buf "        | %s -> %s t\n" axis.ctor_name axis.name)
+      product.axes;
+    Buffer.add_string
+      buf
+      "      let set : type a. a t -> a -> int -> int = fun axis value t ->\n\
+      \        match axis with\n";
+    List.iter
+      (fun (axis : axis_object) ->
+        bprintf buf "        | %s -> with_%s value t\n" axis.ctor_name axis.name)
+      product.axes;
+    Buffer.add_string
+      buf
+      "      let min_with : type a. a t -> a -> int = fun axis value ->\n\
+      \        match axis with\n";
+    List.iter
+      (fun (axis : axis_object) ->
+        bprintf buf "        | %s -> %s_bot value\n" axis.ctor_name axis.name)
+      product.axes;
+    Buffer.add_string
+      buf
+      "      let max_with : type a. a t -> a -> int = fun axis value ->\n\
+      \        match axis with\n";
+    List.iter
+      (fun (axis : axis_object) ->
+        bprintf buf "        | %s -> %s_top value\n" axis.ctor_name axis.name)
+      product.axes;
+    Buffer.add_string
+      buf
+      "      let _ = set\n\
+      \    end\n\
+      \n\
+      \    let proj = Axis.proj\n\
+      \    let min_with = Axis.min_with\n\
+      \    let max_with = Axis.max_with\n\
+      \  end\n\n")
+
+let add_lattices_const_ml buf model =
   let solver_objects = solver_objects_in_order model in
-  Buffer.add_string buf "module Solver_support_base = struct\n";
-  Buffer.add_string buf "  open Allowance\n";
-  Buffer.add_string buf "  open Misc\n";
-  Buffer.add_string buf "  module Fmt = Format_doc\n\n";
-  List.iter (add_solver_object_ops_ml buf model) solver_objects;
+  Buffer.add_string buf "module Lattices_const = struct\n  [@@@warning \"-32-37\"]\n";
+  List.iter
+    (function
+      | Lattice (Base base) ->
+        add_base_const_module_ml buf base base.name base.descriptor;
+        add_base_const_module_ml
+          buf
+          base
+          (Name.op_module_name base.name)
+          base.op_descriptor
+      | Lattice (Product product) ->
+        add_product_const_module_ml
+          buf
+          product
+          product.name
+          product.descriptor
+          ~in_op:false;
+        add_product_const_module_ml
+          buf
+          product
+          (Name.op_module_name product.name)
+          product.op_descriptor
+          ~in_op:true
+      | Embedding _ -> ())
+    model.items;
   Buffer.add_string buf "  type _ obj =\n";
   List.iter
     (fun (object_ : solver_object) ->
       bprintf
         buf
-        "    | %s : int obj\n"
-        object_.object_ctor_name)
+        "    | %s : %s.t obj\n"
+        object_.object_ctor_name
+        object_.name)
     solver_objects;
   Buffer.add_string buf "\n";
   Buffer.add_string buf "  let obj_index : type a. a obj -> int = function\n";
@@ -603,8 +962,107 @@ let add_solver_support_ml buf model =
       bprintf buf "    | %s -> %d\n" object_.object_ctor_name i)
     solver_objects;
   Buffer.add_string buf "\n";
-  Buffer.add_string buf "  type (_, _, _) morph =\n";
-  Buffer.add_string buf "    | Id : ('a, 'a, 'l * 'r) morph\n";
+  let emit_obj_dispatch fn =
+    let header =
+      match fn with
+      | "min" | "max" | "legacy" ->
+        Printf.sprintf "  let %s : type a. a obj -> a = function\n" fn
+      | "print" ->
+        "  let print : type a. a obj -> Format_doc.formatter -> a -> unit = fun obj ppf x ->\n      match obj with\n"
+      | "le" | "equal" ->
+        Printf.sprintf
+          "  let %s : type a. a obj -> a -> a -> bool = fun obj x y ->\n      match obj with\n"
+          fn
+      | "join" | "meet" | "sub" | "imply" ->
+        Printf.sprintf
+          "  let %s : type a. a obj -> a -> a -> a = fun obj x y ->\n      match obj with\n"
+          fn
+      | _ -> invalid_arg "emit_obj_dispatch"
+    in
+    Buffer.add_string buf header;
+    List.iter
+      (fun (object_ : solver_object) ->
+        let prefix = object_.name in
+        match fn with
+        | "min" ->
+          bprintf buf "    | %s -> %s.bottom\n" object_.object_ctor_name prefix
+        | "max" ->
+          bprintf buf "    | %s -> %s.top\n" object_.object_ctor_name prefix
+        | "legacy" ->
+          bprintf buf "    | %s -> %s.legacy\n" object_.object_ctor_name prefix
+        | "le" ->
+          bprintf buf "      | %s -> %s.leq x y\n" object_.object_ctor_name prefix
+        | "equal" ->
+          bprintf buf "      | %s -> %s.equal x y\n" object_.object_ctor_name prefix
+        | "join" ->
+          bprintf buf "      | %s -> %s.join x y\n" object_.object_ctor_name prefix
+        | "meet" ->
+          bprintf buf "      | %s -> %s.meet x y\n" object_.object_ctor_name prefix
+        | "sub" ->
+          bprintf buf "      | %s -> %s.sub x y\n" object_.object_ctor_name prefix
+        | "imply" ->
+          bprintf buf "      | %s -> %s.imply x y\n" object_.object_ctor_name prefix
+        | "print" ->
+          bprintf
+            buf
+            "      | %s -> Format_doc.pp_print_string ppf (%s.show x)\n"
+            object_.object_ctor_name
+            prefix
+        | _ -> ())
+      solver_objects;
+    Buffer.add_string buf "\n"
+  in
+  List.iter emit_obj_dispatch [ "min"; "max"; "legacy"; "le"; "equal"; "join"; "meet"; "sub"; "imply"; "print" ];
+  Buffer.add_string buf "  let _ = legacy, sub, imply\n\n";
+  Buffer.add_string
+    buf
+    "  let equal_obj : type a b. a obj -> b obj -> (a, b) Misc.eq option =\n\
+    \   fun obj1 obj2 ->\n\
+    \    match obj1, obj2 with\n";
+  List.iter
+    (fun (object_ : solver_object) ->
+      bprintf
+        buf
+        "    | %s, %s -> Some Misc.Refl\n"
+        object_.object_ctor_name
+        object_.object_ctor_name)
+    solver_objects;
+  Buffer.add_string
+    buf
+    "    | _ -> None\n\
+    \n\
+    \  let compare_obj : type a b. a obj -> b obj -> (a, b) Misc.comparison =\n\
+    \   fun obj1 obj2 ->\n\
+    \    match equal_obj obj1 obj2 with\n\
+    \    | Some Misc.Refl -> Misc.Equal\n\
+    \    | None ->\n\
+    \      if obj_index obj1 < obj_index obj2 then Misc.Less_than else Misc.Greater_than\n\
+    \n\
+    \  let print_obj : type a. Format_doc.formatter -> a obj -> unit =\n\
+    \   fun ppf -> function\n";
+  List.iter
+    (fun (object_ : solver_object) ->
+      bprintf
+        buf
+        "    | %s -> Format_doc.fprintf ppf %S\n"
+        object_.object_ctor_name
+        object_.name)
+    solver_objects;
+  Buffer.add_string buf "\nend\n\n"
+
+let add_lattices_univ_ml buf model =
+  let solver_objects = solver_objects_in_order model in
+  Buffer.add_string
+    buf
+    "module Lattices_univ = struct\n\
+    \  [@@@warning \"-32-37\"]\n\
+    \  include Lattices_const\n\
+    \  open Allowance\n\
+    \  open Misc\n\
+    \  module Fmt = Format_doc\n\
+    \n\
+    \  type ('a, 'b, 'd) morph =\n\
+    \    | Id : ('a, 'a, 'l * 'r) morph\n";
   List.iter
     (fun (object_ : solver_object) ->
       match object_.shape with
@@ -614,12 +1072,18 @@ let add_solver_support_ml buf model =
           (fun (axis : solver_axis) ->
             bprintf
               buf
-              "    | %s : (int, int, 'l * 'r) morph\n\
-              \    | %s : (int, int, 'l * disallowed) morph\n\
-              \    | %s : (int, int, disallowed * 'r) morph\n"
+              "    | %s : (%s.t, %s.t, 'l * 'r) morph\n\
+              \    | %s : (%s.t, %s.t, 'l * disallowed) morph\n\
+              \    | %s : (%s.t, %s.t, disallowed * 'r) morph\n"
               axis.proj_ctor_name
+              axis.carrier_object_name
+              object_.name
               axis.min_with_ctor_name
-              axis.max_with_ctor_name)
+              axis.carrier_object_name
+              object_.name
+              axis.max_with_ctor_name
+              axis.carrier_object_name
+              object_.name)
           axes)
     solver_objects;
   Buffer.add_string
@@ -643,13 +1107,9 @@ let add_solver_support_ml buf model =
     \        (a, b, allowed * r) sided -> (a, b, l * r) sided = Obj.magic\n\
     \  end)\n\
     \n\
-    \  module C = struct\n\
-    \    type nonrec 'a obj = 'a obj\n\
-    \    type nonrec ('a, 'b, 'd) morph = ('a, 'b, 'd) morph constraint 'd = 'l * 'r\n\
-    \n\
-    \    let rec src : type a b l r. b obj -> (a, b, l * r) morph -> a obj =\n\
-    \     fun dst -> function\n\
-    \      | Id -> dst\n";
+    \  let rec src : type a b l r. b obj -> (a, b, l * r) morph -> a obj =\n\
+    \   fun dst -> function\n\
+    \    | Id -> dst\n";
   List.iter
     (fun (object_ : solver_object) ->
       match object_.shape with
@@ -659,9 +1119,9 @@ let add_solver_support_ml buf model =
           (fun (axis : solver_axis) ->
             bprintf
               buf
-              "      | %s -> %s\n\
-              \      | %s -> %s\n\
-              \      | %s -> %s\n"
+              "    | %s -> %s\n\
+              \    | %s -> %s\n\
+              \    | %s -> %s\n"
               axis.proj_ctor_name
               (solver_object_ctor_name_of_name object_.name)
               axis.min_with_ctor_name
@@ -672,22 +1132,24 @@ let add_solver_support_ml buf model =
     solver_objects;
   Buffer.add_string
     buf
-    "      | Compose (f, g) -> src (src dst f) g\n\
+    "    | Compose (f, g) -> src (src dst f) g\n\
     \n\
-    \    let id = Id\n\
+    \  let id = Id\n\
     \n\
-    \    let compose : type a b c l r.\n\
-    \        c obj -> (b, c, l * r) morph -> (a, b, l * r) morph -> (a, c, l * r) morph =\n\
-    \     fun _dst f g ->\n\
-    \      match f, g with\n\
-    \      | Id, g -> g\n\
-    \      | f, Id -> f\n\
-    \      | _ -> Compose (f, g)\n\
+    \  let maybe_compose : type a b c l r.\n\
+    \      c obj -> (b, c, l * r) morph -> (a, b, l * r) morph -> (a, c, l * r) morph =\n\
+    \   fun _dst f g ->\n\
+    \    match f, g with\n\
+    \    | Id, g -> g\n\
+    \    | f, Id -> f\n\
+    \    | _ -> Compose (f, g)\n\
     \n\
-    \    let rec left_adjoint : type a b l.\n\
-    \        b obj -> (a, b, l * allowed) morph -> (b, a, left_only) morph =\n\
-    \     fun dst -> function\n\
-    \      | Id -> Id\n";
+    \  let compose = maybe_compose\n\
+    \n\
+    \  let rec left_adjoint : type a b l.\n\
+    \      b obj -> (a, b, l * allowed) morph -> (b, a, left_only) morph =\n\
+    \   fun dst -> function\n\
+    \    | Id -> Id\n";
   List.iter
     (fun (object_ : solver_object) ->
       match object_.shape with
@@ -697,8 +1159,8 @@ let add_solver_support_ml buf model =
           (fun (axis : solver_axis) ->
             bprintf
               buf
-              "      | %s -> %s\n\
-              \      | %s -> %s\n"
+              "    | %s -> %s\n\
+              \    | %s -> %s\n"
               axis.proj_ctor_name
               axis.min_with_ctor_name
               axis.max_with_ctor_name
@@ -707,13 +1169,13 @@ let add_solver_support_ml buf model =
     solver_objects;
   Buffer.add_string
     buf
-    "      | Compose (f, g) ->\n\
-    \        Compose (left_adjoint (src dst f) g, left_adjoint dst f)\n\
+    "    | Compose (f, g) ->\n\
+    \      Compose (left_adjoint (src dst f) g, left_adjoint dst f)\n\
     \n\
-    \    let rec right_adjoint : type a b r.\n\
-    \        b obj -> (a, b, allowed * r) morph -> (b, a, right_only) morph =\n\
-    \     fun dst -> function\n\
-    \      | Id -> Id\n";
+    \  let rec right_adjoint : type a b r.\n\
+    \      b obj -> (a, b, allowed * r) morph -> (b, a, right_only) morph =\n\
+    \   fun dst -> function\n\
+    \    | Id -> Id\n";
   List.iter
     (fun (object_ : solver_object) ->
       match object_.shape with
@@ -723,8 +1185,8 @@ let add_solver_support_ml buf model =
           (fun (axis : solver_axis) ->
             bprintf
               buf
-              "      | %s -> %s\n\
-              \      | %s -> %s\n"
+              "    | %s -> %s\n\
+              \    | %s -> %s\n"
               axis.proj_ctor_name
               axis.max_with_ctor_name
               axis.min_with_ctor_name
@@ -733,71 +1195,45 @@ let add_solver_support_ml buf model =
     solver_objects;
   Buffer.add_string
     buf
-    "      | Compose (f, g) ->\n\
-    \        Compose (right_adjoint (src dst f) g, right_adjoint dst f)\n\
+    "    | Compose (f, g) ->\n\
+    \      Compose (right_adjoint (src dst f) g, right_adjoint dst f)\n\
     \n\
-    \    include Magic_allow_disallow (struct\n\
-    \      type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph constraint 'd = 'l * 'r\n\
-    \n\
-    \      let disallow_right : type a b l r.\n\
-    \          (a, b, l * r) sided -> (a, b, l * disallowed) sided = Obj.magic\n\
-    \      let disallow_left : type a b l r.\n\
-    \          (a, b, l * r) sided -> (a, b, disallowed * r) sided = Obj.magic\n\
-    \      let allow_right : type a b l r.\n\
-    \          (a, b, l * allowed) sided -> (a, b, l * r) sided = Obj.magic\n\
-    \      let allow_left : type a b l r.\n\
-    \          (a, b, allowed * r) sided -> (a, b, l * r) sided = Obj.magic\n\
-    \    end)\n\
-    \n\
-    \    let rec apply : type a b l r. b obj -> (a, b, l * r) morph -> a -> b =\n\
-    \     fun dst morph x ->\n\
-    \      match morph with\n\
-    \      | Id -> x\n";
+    \  let rec apply : type a b l r. b obj -> (a, b, l * r) morph -> a -> b =\n\
+    \   fun dst morph x ->\n\
+    \    match morph with\n\
+    \    | Id -> x\n";
   List.iter
     (fun (object_ : solver_object) ->
       match object_.shape with
       | Solver_base -> ()
       | Solver_product axes ->
-        let bottom_expr =
-          Printf.sprintf "%s.bottom" (solver_ops_module_name object_.name)
-        in
-        let top_expr =
-          Printf.sprintf "%s.top" (solver_ops_module_name object_.name)
-        in
         List.iter
           (fun (axis : solver_axis) ->
-            let field = axis.axis in
-            let placed =
-              if field.shift = 0
-              then "x"
-              else Printf.sprintf "(x lsl %d)" field.shift
-            in
             bprintf
               buf
-              "      | %s -> %s\n\
-              \      | %s -> ((%s land lnot %d) lor %s)\n\
-              \      | %s -> ((%s land lnot %d) lor %s)\n"
+              "    | %s -> %s.Axis.proj %s.Axis.%s x\n\
+              \    | %s -> %s.Axis.min_with %s.Axis.%s x\n\
+              \    | %s -> %s.Axis.max_with %s.Axis.%s x\n"
               axis.proj_ctor_name
-              (if field.shift = 0
-               then Printf.sprintf "(x land %d)" field.raw_mask
-               else
-                 Printf.sprintf "((x lsr %d) land %d)" field.shift field.raw_mask)
+              object_.name
+              object_.name
+              axis.axis.ctor_name
               axis.min_with_ctor_name
-              bottom_expr
-              field.layout_mask
-              placed
+              object_.name
+              object_.name
+              axis.axis.ctor_name
               axis.max_with_ctor_name
-              top_expr
-              field.layout_mask
-              placed)
+              object_.name
+              object_.name
+              axis.axis.ctor_name)
           axes)
     solver_objects;
   Buffer.add_string
     buf
-    "      | Compose (f, g) -> apply dst f (apply (src dst f) g x)\n\
+    "    | Compose (f, g) -> apply dst f (apply (src dst f) g x)\n\
     \n\
-    \    let rec morph_key : type a b l r. (a, b, l * r) morph -> string = function\n\
-    \      | Id -> \"Id\"\n";
+    \  let rec morph_key : type a b l r. (a, b, l * r) morph -> string = function\n\
+    \    | Id -> \"Id\"\n";
   List.iter
     (fun (object_ : solver_object) ->
       match object_.shape with
@@ -807,9 +1243,9 @@ let add_solver_support_ml buf model =
           (fun (axis : solver_axis) ->
             bprintf
               buf
-              "      | %s -> %S\n\
-              \      | %s -> %S\n\
-              \      | %s -> %S\n"
+              "    | %s -> %S\n\
+              \    | %s -> %S\n\
+              \    | %s -> %S\n"
               axis.proj_ctor_name
               axis.proj_ctor_name
               axis.min_with_ctor_name
@@ -820,158 +1256,36 @@ let add_solver_support_ml buf model =
     solver_objects;
   Buffer.add_string
     buf
-    "      | Compose (f, g) -> \"Compose(\" ^ morph_key f ^ \",\" ^ morph_key g ^ \")\"\n\
+    "    | Compose (f, g) -> \"Compose(\" ^ morph_key f ^ \",\" ^ morph_key g ^ \")\"\n\
     \n\
-    \    let equal_morph : type a0 a1 b l0 r0 l1 r1.\n\
-    \        b obj ->\n\
-    \        (a0, b, l0 * r0) morph ->\n\
-    \        (a1, b, l1 * r1) morph ->\n\
-    \        (a0, a1) Misc.eq option =\n\
-    \     fun _dst m1 m2 ->\n\
-    \      if String.equal (morph_key m1) (morph_key m2)\n\
-    \      then Some (Obj.magic Misc.Refl)\n\
-    \      else None\n\
+    \  let equal_morph : type a0 a1 b l0 r0 l1 r1.\n\
+    \      b obj ->\n\
+    \      (a0, b, l0 * r0) morph ->\n\
+    \      (a1, b, l1 * r1) morph ->\n\
+    \      (a0, a1) Misc.eq option =\n\
+    \   fun _dst m1 m2 ->\n\
+    \    if String.equal (morph_key m1) (morph_key m2)\n\
+    \    then Some (Obj.magic Misc.Refl)\n\
+    \    else None\n\
     \n\
-    \    let compare_morph : type a0 a1 b l0 r0 l1 r1.\n\
-    \        b obj ->\n\
-    \        (a0, b, l0 * r0) morph ->\n\
-    \        (a1, b, l1 * r1) morph ->\n\
-    \        (a0, a1) Misc.comparison =\n\
-    \     fun _dst m1 m2 ->\n\
-    \      if String.equal (morph_key m1) (morph_key m2)\n\
-    \      then Obj.magic Equal\n\
-    \      else if String.compare (morph_key m1) (morph_key m2) < 0\n\
-    \      then Less_than\n\
-    \      else Greater_than\n\
+    \  let compare_morph : type a0 a1 b l0 r0 l1 r1.\n\
+    \      b obj ->\n\
+    \      (a0, b, l0 * r0) morph ->\n\
+    \      (a1, b, l1 * r1) morph ->\n\
+    \      (a0, a1) Misc.comparison =\n\
+    \   fun _dst m1 m2 ->\n\
+    \    if String.equal (morph_key m1) (morph_key m2)\n\
+    \    then Obj.magic Equal\n\
+    \    else if String.compare (morph_key m1) (morph_key m2) < 0\n\
+    \    then Less_than\n\
+    \    else Greater_than\n\
     \n\
-    \    let print_morph : type a b l r. b obj -> Fmt.formatter -> (a, b, l * r) morph -> unit =\n\
-    \     fun _dst ppf morph -> Fmt.fprintf ppf \"%s\" (morph_key morph)\n\
-    \n\
-    \    let min : type a. a obj -> a = function\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "      | %s -> %s.bottom\n"
-        object_.object_ctor_name
-        (solver_ops_module_name object_.name))
-    solver_objects;
-  Buffer.add_string buf "\n    let max : type a. a obj -> a = function\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "      | %s -> %s.top\n"
-        object_.object_ctor_name
-        (solver_ops_module_name object_.name))
-    solver_objects;
-  Buffer.add_string buf "\n    let le : type a. a obj -> a -> a -> bool = fun obj x y ->\n";
-  Buffer.add_string buf "      match obj with\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "      | %s -> %s.leq x y\n"
-        object_.object_ctor_name
-        (solver_ops_module_name object_.name))
-    solver_objects;
-  Buffer.add_string
-    buf
-    "\n\
-    \    let equal : type a. a obj -> a -> a -> bool = fun obj x y ->\n\
-    \      match obj with\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "      | %s -> %s.equal x y\n"
-        object_.object_ctor_name
-        (solver_ops_module_name object_.name))
-    solver_objects;
-  Buffer.add_string
-    buf
-    "\n\
-    \    let join : type a. a obj -> a -> a -> a = fun obj x y ->\n\
-    \      match obj with\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "      | %s -> %s.join x y\n"
-        object_.object_ctor_name
-        (solver_ops_module_name object_.name))
-    solver_objects;
-  Buffer.add_string
-    buf
-    "\n\
-    \    let meet : type a. a obj -> a -> a -> a = fun obj x y ->\n\
-    \      match obj with\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "      | %s -> %s.meet x y\n"
-        object_.object_ctor_name
-        (solver_ops_module_name object_.name))
-    solver_objects;
-  Buffer.add_string
-    buf
-    "\n\
-    \    let print : type a. a obj -> Fmt.formatter -> a -> unit = fun obj ppf x ->\n\
-    \      match obj with\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "      | %s -> %s.pp ppf x\n"
-        object_.object_ctor_name
-        (solver_ops_module_name object_.name))
-    solver_objects;
-  Buffer.add_string
-    buf
-    "\n\
-    \    let equal_obj : type a b. a obj -> b obj -> (a, b) Misc.eq option =\n\
-    \     fun obj1 obj2 ->\n\
-    \      match obj1, obj2 with\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "      | %s, %s -> Some Misc.Refl\n"
-        object_.object_ctor_name
-        object_.object_ctor_name)
-    solver_objects;
-  Buffer.add_string buf "      | _ -> None\n";
-  Buffer.add_string
-    buf
-    "\n\
-    \    let compare_obj : type a b. a obj -> b obj -> (a, b) Misc.comparison =\n\
-    \     fun obj1 obj2 ->\n\
-    \      match equal_obj obj1 obj2 with\n\
-    \      | Some Misc.Refl -> Equal\n\
-    \      | None ->\n\
-    \        if obj_index obj1 < obj_index obj2 then Less_than else Greater_than\n\
-    \n\
-    \    let print_obj : type a. Fmt.formatter -> a obj -> unit =\n\
-    \     fun ppf -> function\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "      | %s -> Fmt.fprintf ppf %S\n"
-        object_.object_ctor_name
-        object_.name)
-    solver_objects;
-  Buffer.add_string
-    buf
-    "  end\n\
+    \  let print_morph : type a b l r. b obj -> Fmt.formatter -> (a, b, l * r) morph -> unit =\n\
+    \   fun _dst ppf morph -> Fmt.fprintf ppf \"%s\" (morph_key morph)\n\
     \n\
     end\n\
     \n\
-    module Solver_support = struct\n\
-    \  include Solver_support_base\n\
-    \  include Solver_runtime.Make (Solver_support_base.C)\n\
-    end\n\n"
+    module Solver_support = Solver_runtime.Make (Lattices_univ)\n\n"
 
 let add_const_op_functor_ml buf =
   Buffer.add_string
@@ -1018,7 +1332,26 @@ let add_const_op_functor_ml buf =
 let add_solver_wrapper_functor_ml buf =
   Buffer.add_string
     buf
-    "module Make_solver_module\n\
+    "module Make_solver_core\n\
+    \    (Const_desc : sig\n\
+    \      type t\n\
+    \      module Repr : sig\n\
+    \        val to_int : t -> int\n\
+    \      end\n\
+    \      val legacy : t\n\
+    \    end)\n\
+    \    (Obj_desc : sig\n\
+    \      val obj : int Solver_support.obj\n\
+    \    end) =\n\
+    struct\n\
+    \  include Solver_support.Positive_gen (Obj_desc)\n\
+    \n\
+    \  let of_const_value c = of_const (Const_desc.Repr.to_int c)\n\
+    \  let legacy = of_const_value Const_desc.legacy\n\
+    \  let show ?verbose t = Format_doc.asprintf \"%a\" (print ?verbose) t\n\
+    end\n\
+    \n\
+    module Make_solver_module\n\
     \    (Const_desc : sig\n\
     \      type t\n\
     \      val pp : Format.formatter -> t -> unit\n\
@@ -1029,12 +1362,16 @@ let add_solver_wrapper_functor_ml buf =
     \      val legacy : t\n\
     \    end)\n\
     \    (Obj_desc : sig\n\
-    \      val obj : int Solver_support_base.obj\n\
+    \      val obj : int Solver_support.obj\n\
     \    end) =\n\
     struct\n\
-    \  include Solver_support.Positive_gen (Obj_desc)\n\
-    \n\
-    \  let of_const_value c = of_const (Const_desc.Repr.to_int c)\n\
+    \  include Make_solver_core (struct\n\
+    \    type t = Const_desc.t\n\
+    \    module Repr = struct\n\
+    \      let to_int = Const_desc.Repr.to_int\n\
+    \    end\n\
+    \    let legacy = Const_desc.legacy\n\
+    \  end) (Obj_desc)\n\
     \n\
     \  type simple_error = {\n\
     \    left : Const_desc.t;\n\
@@ -1083,129 +1420,36 @@ let add_solver_wrapper_functor_ml buf =
     \    match equate a b with\n\
     \    | Ok () -> ()\n\
     \    | Error error -> invalid_arg (Format.asprintf \"%a\" print_equate_error error)\n\
-    \  let legacy = of_const_value Const_desc.legacy\n\
-    \  let show ?verbose t = Format_doc.asprintf \"%a\" (print ?verbose) t\n\
     end\n\n"
 
-let add_base_ml buf (base : base) module_name descriptor ~include_solver =
-  if module_name = base.name
+let add_base_ml buf (base : base) module_name _descriptor ~include_solver =
+  bprintf buf "module %s = struct\n" module_name;
+  bprintf buf "  module Const = Lattices_const.%s\n" module_name;
+  Buffer.add_string buf "  type const = Const.t\n";
+  if include_solver
   then (
-    bprintf buf "module %s = struct\n" module_name;
-    Buffer.add_string buf "  module Const = struct\n";
-    Buffer.add_string buf "    type t = int\n";
-    Array.iteri
-      (fun i (_ : string) ->
-        bprintf buf "    let %s = %d\n" base.element_value_names.(i) base.element_values.(i))
-      base.element_names;
-    add_specialized_ops_ml ~indent:"    " buf descriptor;
-    Buffer.add_string buf "    let name = function\n";
-    Array.iteri
-      (fun i elt ->
-        bprintf buf "      | %d -> %S\n" base.element_values.(i) elt)
-      base.element_names;
-    Buffer.add_string buf "      | _ -> invalid_arg \"invalid lattice element\"\n";
-    Buffer.add_string buf "    let of_name = function\n";
-    Array.iteri
-      (fun i elt ->
-        bprintf buf "      | %S -> Some %s\n" elt base.element_value_names.(i))
-      base.element_names;
-    Buffer.add_string buf "      | _ -> None\n";
-    Buffer.add_string buf "    let pp ppf = function\n";
-    Array.iteri
-      (fun i elt ->
-        bprintf
-          buf
-          "      | %d -> Format.pp_print_string ppf %S\n"
-          base.element_values.(i)
-          elt)
-      base.element_names;
-    Buffer.add_string
-      buf
-      "      | _ -> invalid_arg \"invalid lattice element\"\n\
-      \    let show t = Format.asprintf \"%a\" pp t\n\
-      \    module Repr = struct\n";
     bprintf
       buf
-      "      let bits = %d\n\
-      \      let mask = %d\n\
-      \      let to_int (x : t) = x\n"
-      descriptor.bits
-      descriptor.mask;
-    add_repr_validator_ml ~indent:"      " buf base.repr_validator;
-    bprintf
-      buf
-      "    end\n\
-      \n\
-      \    let min = bottom\n\
-      \    let max = top\n\
-      \    let le = leq\n\
-      \    let print = pp\n\
-      \    let legacy = %s\n\
-      \  end\n"
-      (legacy_value_name base.name);
-    Buffer.add_string buf "  type const = Const.t\n";
-    if include_solver
-    then (
-      bprintf
-        buf
-        "\n\
-        \  include Make_solver_module (Const) (struct\n\
-        \    let obj = Solver_support_base.%s\n\
-        \  end)\n"
-        (solver_object_ctor_name_of_name module_name);
-      Array.iteri
-        (fun i (_ : string) ->
-          bprintf
-            buf
-            "  let %s = of_const_value Const.%s\n"
-            base.element_value_names.(i)
-            base.element_value_names.(i))
-        base.element_names);
-    Buffer.add_string buf "end\n\n")
-  else (
-    bprintf buf "module %s = struct\n" module_name;
-    bprintf buf "  module Const = struct\n    include Make_const_op (%s.Const)\n" base.name;
+      "\n\
+      \  include Make_solver_module (Const) (struct\n\
+      \    let obj = Lattices_univ.%s\n\
+      \  end)\n"
+      (solver_object_ctor_name_of_name module_name);
     Array.iteri
       (fun i (_ : string) ->
         bprintf
           buf
-          "    let %s = %s.Const.%s\n"
+          "  let %s = of_const_value Const.%s\n"
           base.element_value_names.(i)
-          base.name
           base.element_value_names.(i))
-      base.element_names;
-    Buffer.add_string
-      buf
-      "    let name = "
-      ;
-    bprintf buf "%s.Const.name\n" base.name;
-    bprintf buf "    let of_name = %s.Const.of_name\n" base.name;
-    Buffer.add_string buf "  end\n";
-    Buffer.add_string buf "  type const = Const.t\n";
-    if include_solver
-    then (
-      bprintf
-        buf
-        "\n\
-        \  include Make_solver_module (Const) (struct\n\
-        \    let obj = Solver_support_base.%s\n\
-        \  end)\n"
-        (solver_object_ctor_name_of_name module_name);
-      Array.iteri
-        (fun i (_ : string) ->
-          bprintf
-            buf
-            "  let %s = of_const_value Const.%s\n"
-            base.element_value_names.(i)
-            base.element_value_names.(i))
-        base.element_names);
-    Buffer.add_string buf "end\n\n")
+      base.element_names);
+  Buffer.add_string buf "end\n\n"
 
 let add_product_ml
     buf
     (product : product)
     module_name
-    descriptor
+    _descriptor
     ~in_op
     ~include_solver
   =
@@ -1218,278 +1462,122 @@ let add_product_ml
         (field_module_alias_name field)
         (field_module_name field ~in_op))
     product.fields;
-  Buffer.add_string buf "  module Axis = struct\n";
-  Buffer.add_string buf "    type _ t =\n";
-  List.iter
-    (fun (axis : axis_object) ->
-      bprintf
-        buf
-        "      | %s : %s.Const.t t\n"
-        axis.ctor_name
-        (field_module_alias_name
-           (List.find (fun (field : field) -> field.name = axis.name) product.fields)))
-    product.axes;
-  Buffer.add_string buf "\n    type packed = P : 'a t -> packed\n\n";
-  Buffer.add_string
-    buf
-    "    let compare : type a b. a t -> b t -> (a, b) Misc.comparison =\n\
-    \      fun left right ->\n\
-    \        match left, right with\n";
-  List.iteri
-    (fun i (left_axis : axis_object) ->
-      bprintf buf "        | %s, %s -> Equal\n" left_axis.ctor_name left_axis.ctor_name;
-      List.iteri
-        (fun j (right_axis : axis_object) ->
-          if i <> j
-          then
-            bprintf
-              buf
-              "        | %s, %s -> %s\n"
-              left_axis.ctor_name
-              right_axis.ctor_name
-              (if i < j then "Less_than" else "Greater_than"))
-        product.axes)
-    product.axes;
-  Buffer.add_string buf "\n";
-  Buffer.add_string buf "    let all = [\n";
-  List.iter
-    (fun (axis : axis_object) ->
-      bprintf buf "      P %s;\n" axis.ctor_name)
-    product.axes;
-  Buffer.add_string buf "    ]\n";
-  Buffer.add_string
-    buf
-    "    let print : type a. Format.formatter -> a t -> unit = fun ppf -> function\n";
-  List.iter
-    (fun (axis : axis_object) ->
-      bprintf
-        buf
-        "      | %s -> Format.pp_print_string ppf %S\n"
-        axis.ctor_name
-        axis.name)
-    product.axes;
-  Buffer.add_string buf "  end\n";
-  Buffer.add_string buf "  module Const = struct\n";
-  if in_op
-  then bprintf buf "    include Make_const_op (%s.Const)\n" product.name
-  else Buffer.add_string buf "    type t = int\n";
-  Buffer.add_string buf "    type view = {\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "      %s : %s.Const.t;\n"
-        field.name
-        (field_module_alias_name field))
-    product.fields;
-  Buffer.add_string buf "    }\n\n";
-  if in_op
-  then bprintf buf "    module Layout = %s.Const.Layout\n" product.name
-  else (
-    Buffer.add_string buf "    module Layout = struct\n";
-    List.iter
-      (fun (field : field) ->
-        bprintf buf "      let %s_shift = %d\n" field.name field.shift;
-        bprintf buf "      let %s_mask = %d\n" field.name field.layout_mask)
-      product.fields;
-    Buffer.add_string buf "    end\n");
-  Buffer.add_string buf "    let[@inline] make ";
-  List.iter (fun (field : field) -> bprintf buf "~%s " field.name) product.fields;
-  if in_op
-  then (
-    Buffer.add_string buf "=\n      ";
-    bprintf buf "%s.Const.make " product.name;
-    List.iter (fun (field : field) -> bprintf buf "~%s " field.name) product.fields;
-    Buffer.add_string buf "\n")
-  else (
-    Buffer.add_string buf "=\n      ";
-    let parts =
-      List.map
-        (fun (field : field) ->
-          if field.shift = 0
-          then field.name
-          else Printf.sprintf "(%s lsl %d)" field.name field.shift)
-        product.fields
-    in
-    Buffer.add_string buf (String.concat " lor " parts);
-    Buffer.add_string buf "\n");
-  List.iter
-    (fun (field : field) ->
-      let field_module = field_const_module_name field in
-      if in_op
-      then
-        bprintf
-          buf
-          "    let %s = %s.Const.%s\n"
-          field.name
-          product.name
-          field.name
-      else
-        bprintf
-          buf
-          "    let[@inline] %s t = (%s land %d : %s.t)\n"
-          field.name
-          (if field.shift = 0
-           then "t"
-           else Printf.sprintf "(t lsr %d)" field.shift)
-          field.raw_mask
-          field_module;
-      bprintf buf "    let proj_%s = %s\n" field.name field.name;
-      if in_op
-      then
-        bprintf
-          buf
-          "    let with_%s = %s.Const.with_%s\n"
-          field.name
-          product.name
-          field.name
-      else
-        bprintf
-          buf
-          "    let[@inline] with_%s value t = (t land lnot Layout.%s_mask) lor %s\n"
-          field.name
-          field.name
-          (if field.shift = 0
-           then "value"
-           else Printf.sprintf "(value lsl %d)" field.shift))
-    product.fields;
-  Buffer.add_string buf "    let[@inline] of_view view =\n";
-  Buffer.add_string buf "      make ";
-  List.iter
-    (fun (field : field) -> bprintf buf "~%s:view.%s " field.name field.name)
-    product.fields;
-  Buffer.add_string buf "\n";
-  Buffer.add_string buf "    let[@inline] view t =\n      {\n";
-  List.iter
-    (fun (field : field) -> bprintf buf "        %s = %s t;\n" field.name field.name)
-    product.fields;
-  Buffer.add_string buf "      }\n";
-  if not in_op then add_specialized_ops_ml ~indent:"    " buf descriptor;
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "    let[@inline] %s_bot value = with_%s value bottom\n"
-        field.name
-        field.name;
-      bprintf
-        buf
-        "    let[@inline] %s_top value = with_%s value top\n"
-        field.name
-        field.name;
-      bprintf buf "    let min_with_%s = %s_bot\n" field.name field.name;
-      bprintf buf "    let max_with_%s = %s_top\n" field.name field.name)
-    product.fields;
-  if in_op
-  then (
-    bprintf buf "    let pp = %s.Const.pp\n" product.name;
-    bprintf buf "    let show = %s.Const.show\n" product.name)
-  else (
-    Buffer.add_string buf "    let pp ppf t =\n";
-    if product.fields = []
-    then Buffer.add_string buf "      Format.pp_print_string ppf \"{}\"\n"
-    else (
-      Buffer.add_string buf "      let v = view t in\n";
-      Buffer.add_string buf "      Format.pp_print_string ppf \"{ \";\n";
-      List.iteri
-        (fun i field ->
-          let field : field = field in
-          if i > 0
-          then Buffer.add_string buf "      Format.pp_print_string ppf \"; \";\n";
-          bprintf
-            buf
-            "      Format.pp_print_string ppf %S;\n\
-            \      %s.pp ppf v.%s;\n"
-            (field.name ^ " = ")
-            (field_const_module_name field)
-            field.name)
-        product.fields;
-      Buffer.add_string buf "      Format.pp_print_string ppf \" }\"\n");
-    Buffer.add_string
-      buf
-      "    let show t = Format.asprintf \"%a\" pp t\n\
-      \    module Repr = struct\n";
-    bprintf
-      buf
-      "      let bits = %d\n\
-      \      let mask = %d\n\
-      \      let to_int (x : t) = x\n"
-      descriptor.bits
-      descriptor.mask;
-    add_repr_validator_ml ~indent:"      " buf product.repr_validator;
-    Buffer.add_string
-      buf
-      "    end\n\
-      \n\
-      \    let min = bottom\n\
-      \    let max = top\n\
-      \    let le = leq\n\
-      \    let print = pp\n\
-      \n");
-  Buffer.add_string buf "    let split = view\n    let merge = of_view\n\n";
-  Buffer.add_string buf "    let legacy =\n      make ";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "~%s:%s.Const.legacy "
-        field.name
-        (field_module_alias_name field))
-    product.fields;
-  Buffer.add_string buf "\n";
-  Buffer.add_string
-    buf
-    "    let[@inline] proj : type a. a Axis.t -> t -> a = fun axis t ->\n\
-    \      match axis with\n";
-  List.iter
-    (fun (axis : axis_object) ->
-      bprintf
-        buf
-        "      | Axis.%s -> %s t\n"
-        axis.ctor_name
-        axis.name)
-    product.axes;
-  Buffer.add_string
-    buf
-    "    let[@inline] min_with : type a. a Axis.t -> a -> t = fun axis value ->\n\
-    \      match axis with\n";
-  List.iter
-    (fun (axis : axis_object) ->
-      bprintf
-        buf
-        "      | Axis.%s -> %s_bot value\n"
-        axis.ctor_name
-        axis.name)
-    product.axes;
-  Buffer.add_string
-    buf
-    "    let[@inline] max_with : type a. a Axis.t -> a -> t = fun axis value ->\n\
-    \      match axis with\n";
-  List.iter
-    (fun (axis : axis_object) ->
-      bprintf
-        buf
-        "      | Axis.%s -> %s_top value\n"
-        axis.ctor_name
-        axis.name)
-    product.axes;
-  Buffer.add_string buf "  end\n";
+  bprintf buf "  module Axis = Lattices_const.%s.Axis\n" module_name;
+  bprintf buf "  module Const = Lattices_const.%s\n" module_name;
   Buffer.add_string buf "  type const = Const.t\n";
   if include_solver
   then (
     bprintf
       buf
       "\n\
-      \  include Make_solver_module (Const) (struct\n\
-      \    let obj = Solver_support_base.%s\n\
+      \  include Make_solver_core (Const) (struct\n\
+      \    let obj = Lattices_univ.%s\n\
       \  end)\n\
+      \n"
+      (solver_object_ctor_name_of_name module_name);
+    Buffer.add_string
+      buf
+      "  type 'a simple_axerror = {\n\
+      \    left : 'a;\n\
+      \    right : 'a;\n\
+      \  }\n\
+      \n\
+      \  type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error\n\
+      \n\
+      \  type error = simple_error\n\
+      \n\
+      \  type equate_step =\n\
+      \    | Left_le_right\n\
+      \    | Right_le_left\n\
+      \n\
+      \  type equate_error = equate_step * error\n\
+      \n\
+      \  let error_of_raw ({ left; right; _ } : int Solver_support.Raw.error_raw) =\n\
+      \    let left = Const.Repr.of_int_exn left in\n\
+      \    let right = Const.Repr.of_int_exn right in\n\
+      \    let left_view = Const.view left in\n\
+      \    let right_view = Const.view right in\n";
+    List.iteri
+      (fun i (axis : axis_object) ->
+        let field =
+          List.find (fun (field : field) -> field.name = axis.name) product.fields
+        in
+        let field_module = field_module_alias_name field in
+        bprintf
+          buf
+          "  %sif not (%s.Const.le left_view.%s right_view.%s) then\n\
+          \    Error (Axis.%s, { left = left_view.%s; right = right_view.%s })\n"
+          (if i = 0 then "" else "else ")
+          field_module
+          field.name
+          field.name
+          axis.ctor_name
+          field.name
+          field.name)
+      product.axes;
+    Buffer.add_string
+      buf
+      "  else\n\
+      \    invalid_arg \"product error_of_raw: no failing axis\"\n\
+      \n\
+      \  let to_simple_error error = error\n\
+      \n\
+      \  let print_axerror pp ppf { left; right } =\n\
+      \    Format.fprintf ppf \"%a <= %a does not hold\" pp left pp right\n\
+      \n\
+      \  let print_error : Format.formatter -> error -> unit =\n\
+      \   fun ppf (Error (axis, error)) ->\n\
+      \    match axis, error with\n";
+    List.iter
+      (fun (axis : axis_object) ->
+        let field =
+          List.find (fun (field : field) -> field.name = axis.name) product.fields
+        in
+        let field_module = field_module_alias_name field in
+        bprintf
+          buf
+          "    | Axis.%s, error ->\n\
+          \      Format.fprintf ppf \"%%a: %%a\"\n\
+          \        Axis.print\n\
+          \        Axis.%s\n\
+          \        (print_axerror %s.Const.pp)\n\
+          \        error\n"
+          axis.ctor_name
+          axis.ctor_name
+          field_module)
+      product.axes;
+    Buffer.add_string
+      buf
+      "\n\
+      \  let print_equate_error ppf = function\n\
+      \    | Left_le_right, error ->\n\
+      \      Format.fprintf ppf \"Left_le_right: %a\" print_error error\n\
+      \    | Right_le_left, error ->\n\
+      \      Format.fprintf ppf \"Right_le_left: %a\" print_error error\n\
+      \n\
+      \  let submode a b = Result.map_error error_of_raw (submode_raw a b)\n\
+      \n\
+      \  let submode_exn a b =\n\
+      \    match submode a b with\n\
+      \    | Ok () -> ()\n\
+      \    | Error error -> invalid_arg (Format.asprintf \"%a\" print_error error)\n\
+      \n\
+      \  let equate a b =\n\
+      \    Result.map_error\n\
+      \      (fun (forward, error) ->\n\
+      \        ((if forward then Left_le_right else Right_le_left), error_of_raw error))\n\
+      \      (equate_raw a b)\n\
+      \n\
+      \  let equate_exn a b =\n\
+      \    match equate a b with\n\
+      \    | Ok () -> ()\n\
+      \    | Error error -> invalid_arg (Format.asprintf \"%a\" print_equate_error error)\n\
       \n\
       \  type ('a, 'd) axis_mode = (int, 'd) Solver_support.Raw.mode constraint 'd = 'l * 'r\n\
       \n\
       \  let proj : type a l r. a Axis.t -> (l * r) t -> (a, l * r) axis_mode =\n\
       \   fun axis m ->\n\
-      \    match axis with\n"
-      (solver_object_ctor_name_of_name module_name);
+      \    match axis with\n";
     List.iter
       (fun (axis : axis_object) ->
         bprintf
@@ -1499,8 +1587,8 @@ let add_product_ml
           axis.ctor_name
           (Printf.sprintf
              "Solver_support.Raw.apply\n\
-             \        Solver_support_base.%s\n\
-             \        Solver_support_base.%s\n\
+             \        Lattices_univ.%s\n\
+             \        Lattices_univ.%s\n\
              \        m"
              (solver_object_ctor_name_of_name (axis_module_name axis ~in_op))
              (solver_proj_ctor_name module_name axis)))
@@ -1519,8 +1607,8 @@ let add_product_ml
           axis.ctor_name
           (Printf.sprintf
              "Solver_support.Raw.apply\n\
-             \        Solver_support_base.%s\n\
-             \        Solver_support_base.%s\n\
+             \        Lattices_univ.%s\n\
+             \        Lattices_univ.%s\n\
              \        (Solver_support.Raw.disallow_right m)"
              (solver_object_ctor_name_of_name module_name)
              (solver_min_with_ctor_name module_name axis)))
@@ -1539,8 +1627,8 @@ let add_product_ml
           axis.ctor_name
           (Printf.sprintf
              "Solver_support.Raw.apply\n\
-             \        Solver_support_base.%s\n\
-             \        Solver_support_base.%s\n\
+             \        Lattices_univ.%s\n\
+             \        Lattices_univ.%s\n\
              \        (Solver_support.Raw.disallow_left m)"
              (solver_object_ctor_name_of_name module_name)
              (solver_max_with_ctor_name module_name axis)))
@@ -1651,9 +1739,10 @@ let render ?(config = Render_config.default) ~root_module model =
   let test_ml = Buffer.create 8192 in
   add_test_ml test_ml model ~root_module;
   add_const_op_functor_ml ml;
+  add_lattices_const_ml ml model;
   if config.include_solver
   then (
-    add_solver_support_ml ml model;
+    add_lattices_univ_ml ml model;
     add_solver_wrapper_functor_ml ml);
   List.iter
     (function

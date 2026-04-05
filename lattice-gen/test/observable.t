@@ -21,10 +21,10 @@
   <div class="lattice-observable lat-observable" data-default-tab="ml">
   <div class="lattice-observable__header"><span class="lattice-observable__title">Demo</span><span class="lattice-observable__meta">generated lattice library</span></div>
   <div class="lattice-observable__tabs"><button class="lattice-observable__tab is-active" data-lattice-tab="ml">Demo.ml</button><button class="lattice-observable__tab" data-lattice-tab="mli">Demo.mli</button><button class="lattice-observable__tab" data-lattice-tab="test">Demo_test.ml</button></div>
-  <pre class="lattice-observable__panel is-active" data-lattice-panel="ml">module Solver_support_base = struct
-    open Allowance
-    open Misc
-    module Fmt = Format_doc
+  <pre class="lattice-observable__panel is-active" data-lattice-panel="ml">module Make_const_op (Base : sig
+    type t
+    val bottom : t
+    val top : t
   $ python3 - <<'PY'
   > text = open("pages/basic.html").read()
   > start = text.index("<ocaml-out>")

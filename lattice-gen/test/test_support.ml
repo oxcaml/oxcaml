@@ -185,6 +185,41 @@ let expect_generated_ml_excludes ~name ~source needles =
         needle)
     needles
 
+let expect_generated_ml_contains ~name ~source needles =
+  let outputs =
+    Generate.render_string ~root_module:"Generated" ~input_name:name source
+  in
+  List.iter
+    (fun needle ->
+      ensure (contains outputs.ml needle)
+        "generated output for %s is missing %S"
+        name
+        needle)
+    needles
+
+let expect_generated_ml_suffix_excludes ~name ~source ~after needles =
+  let outputs =
+    Generate.render_string ~root_module:"Generated" ~input_name:name source
+  in
+  let ml = outputs.ml in
+  let marker_len = String.length after in
+  let rec find_from i =
+    if i + marker_len > String.length ml
+    then failf "generated output for %s is missing marker %S" name after
+    else if String.sub ml i marker_len = after
+    then String.sub ml i (String.length ml - i)
+    else find_from (i + 1)
+  in
+  let suffix = find_from 0 in
+  List.iter
+    (fun needle ->
+      ensure (not (contains suffix needle))
+        "generated output for %s unexpectedly contains %S after %S"
+        name
+        needle
+        after)
+    needles
+
 let generate_case_files ~dir ~source =
   let input_path = Filename.concat dir "input.lattice" in
   let ml_path = Filename.concat dir "generated.ml" in
