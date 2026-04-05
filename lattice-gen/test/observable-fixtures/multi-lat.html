@@ -244,13 +244,13 @@ Locality = [
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -274,7 +274,7 @@ Locality = [
     | &quot;Local&quot; -&gt; Some local
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = global
 
@@ -300,15 +300,15 @@ end
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -358,13 +358,13 @@ Extra = [
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -388,9 +388,9 @@ Extra = [
     | &quot;B&quot; -&gt; Some b
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let legacy = top
+  let legacy = max
 
   let view x =
     if equal x a then A
@@ -414,15 +414,15 @@ end
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option

@@ -470,13 +470,13 @@ value_r2g : Value -> Value = {
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -500,7 +500,7 @@ value_r2g : Value -> Value = {
     | &quot;Local&quot; -&gt; Some local
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = global
 
@@ -538,13 +538,13 @@ module Regionality = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 1) lsl 1) in
     x
-  let bottom = 0
-  let top = 3
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 3
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -572,7 +572,7 @@ module Regionality = struct
     | &quot;Local&quot; -&gt; Some local
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = global
 
@@ -602,13 +602,13 @@ module Uniqueness = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
+  let min = 1
+  let max = 0
+  let[@inline] le x y = (x land y) = y
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x land y
   let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zyx = y land lnot x in
     lnot zyx land 1
   let[@inline] imply x y =
@@ -632,7 +632,7 @@ module Uniqueness = struct
     | &quot;Unique&quot; -&gt; Some unique
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = aliased
 
@@ -660,13 +660,13 @@ module Linearity = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -690,7 +690,7 @@ module Linearity = struct
     | &quot;Once&quot; -&gt; Some once
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = many
 
@@ -728,13 +728,13 @@ module Portability = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 1) lsl 1) in
     x
-  let bottom = 0
-  let top = 3
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 3
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -762,7 +762,7 @@ module Portability = struct
     | &quot;Nonportable&quot; -&gt; Some nonportable
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = nonportable
 
@@ -802,13 +802,13 @@ module Contention = struct
   let[@inline] close_up_dual x =
     let x = x lor ((x land 1) lsl 1) in
     x
-  let bottom = 3
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
+  let min = 3
+  let max = 0
+  let[@inline] le x y = (x land y) = y
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x land y
   let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zyx = y land lnot x in
     lnot (close_up_dual zyx) land 3
   let[@inline] imply x y =
@@ -836,7 +836,7 @@ module Contention = struct
     | &quot;Uncontended&quot; -&gt; Some uncontended
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = uncontended
 
@@ -866,13 +866,13 @@ module Forkable = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -896,7 +896,7 @@ module Forkable = struct
     | &quot;Unforkable&quot; -&gt; Some unforkable
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = forkable
 
@@ -924,13 +924,13 @@ module Yielding = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -954,7 +954,7 @@ module Yielding = struct
     | &quot;Yielding&quot; -&gt; Some yielding
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = unyielding
 
@@ -982,13 +982,13 @@ module Staticity = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
+  let min = 1
+  let max = 0
+  let[@inline] le x y = (x land y) = y
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x land y
   let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zyx = y land lnot x in
     lnot zyx land 1
   let[@inline] imply x y =
@@ -1012,7 +1012,7 @@ module Staticity = struct
     | &quot;Static&quot; -&gt; Some static
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = dynamic
 
@@ -1040,13 +1040,13 @@ module Statefulness = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 3
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 3
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -1078,7 +1078,7 @@ module Statefulness = struct
     | &quot;Reading&quot; -&gt; Some reading
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = stateful
 
@@ -1110,13 +1110,13 @@ module Visibility = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 3
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
+  let min = 3
+  let max = 0
+  let[@inline] le x y = (x land y) = y
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x land y
   let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zyx = y land lnot x in
     lnot zyx land 3
   let[@inline] imply x y =
@@ -1148,7 +1148,7 @@ module Visibility = struct
     | &quot;Write&quot; -&gt; Some write
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = read_write
 
@@ -1190,13 +1190,13 @@ module Externality = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 1) lsl 1) in
     x
-  let bottom = 0
-  let top = 3
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 3
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -1224,9 +1224,9 @@ module Externality = struct
     | &quot;Internal&quot; -&gt; Some internal
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let legacy = top
+  let legacy = max
 
   let view x =
     if equal x external_ then External_
@@ -1254,13 +1254,13 @@ module Nullability = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -1284,9 +1284,9 @@ module Nullability = struct
     | &quot;Maybe_null&quot; -&gt; Some maybe_null
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let legacy = top
+  let legacy = max
 
   let view x =
     if equal x non_null then Non_null
@@ -1322,13 +1322,13 @@ module Separability = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 1) lsl 1) in
     x
-  let bottom = 0
-  let top = 3
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 3
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -1356,9 +1356,9 @@ module Separability = struct
     | &quot;Maybe_separable&quot; -&gt; Some maybe_separable
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let legacy = top
+  let legacy = max
 
   let view x =
     if equal x non_float then Non_float
@@ -1386,13 +1386,13 @@ module Pointerness = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -1416,9 +1416,9 @@ module Pointerness = struct
     | &quot;Maybe_pointer&quot; -&gt; Some maybe_pointer
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let legacy = top
+  let legacy = max
 
   let view x =
     if equal x non_pointer then Non_pointer
@@ -1454,13 +1454,13 @@ module Monadic = struct
   let[@inline] close_up_dual x =
     let x = x lor ((x land 2) lsl 1) in
     x
-  let bottom = 63
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
+  let min = 63
+  let max = 0
+  let[@inline] le x y = (x land y) = y
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x land y
   let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zyx = y land lnot x in
     lnot (close_up_dual zyx) land 63
   let[@inline] imply x y =
@@ -1505,23 +1505,23 @@ module Monadic = struct
 
   let proj_uniqueness t = (t lsr 0) land 1
   let with_uniqueness x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_uniqueness x = with_uniqueness x bottom
-  let max_with_uniqueness x = with_uniqueness x top
+  let min_with_uniqueness x = with_uniqueness x min
+  let max_with_uniqueness x = with_uniqueness x max
 
   let proj_contention t = (t lsr 1) land 3
   let with_contention x t = (t land lnot 6) lor ((x land 3) lsl 1)
-  let min_with_contention x = with_contention x bottom
-  let max_with_contention x = with_contention x top
+  let min_with_contention x = with_contention x min
+  let max_with_contention x = with_contention x max
 
   let proj_visibility t = (t lsr 3) land 3
   let with_visibility x t = (t land lnot 24) lor ((x land 3) lsl 3)
-  let min_with_visibility x = with_visibility x bottom
-  let max_with_visibility x = with_visibility x top
+  let min_with_visibility x = with_visibility x min
+  let max_with_visibility x = with_visibility x max
 
   let proj_staticity t = (t lsr 5) land 1
   let with_staticity x t = (t land lnot 32) lor ((x land 1) lsl 5)
-  let min_with_staticity x = with_staticity x bottom
-  let max_with_staticity x = with_staticity x top
+  let min_with_staticity x = with_staticity x min
+  let max_with_staticity x = with_staticity x max
 
   let name x =
     let view = view x in
@@ -1541,7 +1541,7 @@ module Monadic = struct
     Buffer.add_string b &quot; }&quot;;
     Buffer.contents b
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
 end
 
@@ -1569,13 +1569,13 @@ module Comonadic = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 2) lsl 1) in
     x
-  let bottom = 0
-  let top = 127
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 127
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -1625,28 +1625,28 @@ module Comonadic = struct
 
   let proj_linearity t = (t lsr 0) land 1
   let with_linearity x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_linearity x = with_linearity x bottom
-  let max_with_linearity x = with_linearity x top
+  let min_with_linearity x = with_linearity x min
+  let max_with_linearity x = with_linearity x max
 
   let proj_portability t = (t lsr 1) land 3
   let with_portability x t = (t land lnot 6) lor ((x land 3) lsl 1)
-  let min_with_portability x = with_portability x bottom
-  let max_with_portability x = with_portability x top
+  let min_with_portability x = with_portability x min
+  let max_with_portability x = with_portability x max
 
   let proj_forkable t = (t lsr 3) land 1
   let with_forkable x t = (t land lnot 8) lor ((x land 1) lsl 3)
-  let min_with_forkable x = with_forkable x bottom
-  let max_with_forkable x = with_forkable x top
+  let min_with_forkable x = with_forkable x min
+  let max_with_forkable x = with_forkable x max
 
   let proj_yielding t = (t lsr 4) land 1
   let with_yielding x t = (t land lnot 16) lor ((x land 1) lsl 4)
-  let min_with_yielding x = with_yielding x bottom
-  let max_with_yielding x = with_yielding x top
+  let min_with_yielding x = with_yielding x min
+  let max_with_yielding x = with_yielding x max
 
   let proj_statefulness t = (t lsr 5) land 3
   let with_statefulness x t = (t land lnot 96) lor ((x land 3) lsl 5)
-  let min_with_statefulness x = with_statefulness x bottom
-  let max_with_statefulness x = with_statefulness x top
+  let min_with_statefulness x = with_statefulness x min
+  let max_with_statefulness x = with_statefulness x max
 
   let name x =
     let view = view x in
@@ -1669,7 +1669,7 @@ module Comonadic = struct
     Buffer.add_string b &quot; }&quot;;
     Buffer.contents b
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
 end
 
@@ -1697,13 +1697,13 @@ module Comonadic_with_locality = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 4) lsl 1) in
     x
-  let bottom = 0
-  let top = 255
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 255
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -1738,13 +1738,13 @@ module Comonadic_with_locality = struct
 
   let proj_areality t = (t lsr 0) land 1
   let with_areality x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_areality x = with_areality x bottom
-  let max_with_areality x = with_areality x top
+  let min_with_areality x = with_areality x min
+  let max_with_areality x = with_areality x max
 
   let proj_comonadic t = (t lsr 1) land 127
   let with_comonadic x t = (t land lnot 254) lor ((x land 127) lsl 1)
-  let min_with_comonadic x = with_comonadic x bottom
-  let max_with_comonadic x = with_comonadic x top
+  let min_with_comonadic x = with_comonadic x min
+  let max_with_comonadic x = with_comonadic x max
 
   let name x =
     let view = view x in
@@ -1758,7 +1758,7 @@ module Comonadic_with_locality = struct
     Buffer.add_string b &quot; }&quot;;
     Buffer.contents b
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
 end
 
@@ -1786,13 +1786,13 @@ module Comonadic_with_regionality = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 9) lsl 1) in
     x
-  let bottom = 0
-  let top = 511
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 511
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -1827,13 +1827,13 @@ module Comonadic_with_regionality = struct
 
   let proj_areality t = (t lsr 0) land 3
   let with_areality x t = (t land lnot 3) lor ((x land 3) lsl 0)
-  let min_with_areality x = with_areality x bottom
-  let max_with_areality x = with_areality x top
+  let min_with_areality x = with_areality x min
+  let max_with_areality x = with_areality x max
 
   let proj_comonadic t = (t lsr 2) land 127
   let with_comonadic x t = (t land lnot 508) lor ((x land 127) lsl 2)
-  let min_with_comonadic x = with_comonadic x bottom
-  let max_with_comonadic x = with_comonadic x top
+  let min_with_comonadic x = with_comonadic x min
+  let max_with_comonadic x = with_comonadic x max
 
   let name x =
     let view = view x in
@@ -1847,7 +1847,7 @@ module Comonadic_with_regionality = struct
     Buffer.add_string b &quot; }&quot;;
     Buffer.contents b
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
 end
 
@@ -1881,9 +1881,9 @@ module Value = struct
   let[@inline] close_up_dual x =
     let x = x lor ((x land 1033) lsl 1) in
     x
-  let bottom = 32256
-  let top = 511
-  let[@inline] leq x y =
+  let min = 32256
+  let max = 511
+  let[@inline] le x y =
     (((x land lnot y) land 511) = 0)
     &amp;&amp; (((y land lnot x) land 32256) = 0)
   let[@inline] equal (x : t) (y : t) = x = y
@@ -1895,7 +1895,7 @@ module Value = struct
     let o = x lor y in
     let a = x land y in
     (a land 511) lor (o land 32256)
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     let zyx = y land lnot x in
     ((close_down_nat zxy) land 511)
@@ -1934,13 +1934,13 @@ module Value = struct
 
   let proj_comonadic t = (t lsr 0) land 511
   let with_comonadic x t = (t land lnot 511) lor ((x land 511) lsl 0)
-  let min_with_comonadic x = with_comonadic x bottom
-  let max_with_comonadic x = with_comonadic x top
+  let min_with_comonadic x = with_comonadic x min
+  let max_with_comonadic x = with_comonadic x max
 
   let proj_monadic t = (t lsr 9) land 63
   let with_monadic x t = (t land lnot 32256) lor ((x land 63) lsl 9)
-  let min_with_monadic x = with_monadic x bottom
-  let max_with_monadic x = with_monadic x top
+  let min_with_monadic x = with_monadic x min
+  let max_with_monadic x = with_monadic x max
 
   let name x =
     let view = view x in
@@ -1954,7 +1954,7 @@ module Value = struct
     Buffer.add_string b &quot; }&quot;;
     Buffer.contents b
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
 end
 
@@ -1988,9 +1988,9 @@ module Alloc = struct
   let[@inline] close_up_dual x =
     let x = x lor ((x land 516) lsl 1) in
     x
-  let bottom = 16128
-  let top = 255
-  let[@inline] leq x y =
+  let min = 16128
+  let max = 255
+  let[@inline] le x y =
     (((x land lnot y) land 255) = 0)
     &amp;&amp; (((y land lnot x) land 16128) = 0)
   let[@inline] equal (x : t) (y : t) = x = y
@@ -2002,7 +2002,7 @@ module Alloc = struct
     let o = x lor y in
     let a = x land y in
     (a land 255) lor (o land 16128)
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     let zyx = y land lnot x in
     ((close_down_nat zxy) land 255)
@@ -2041,13 +2041,13 @@ module Alloc = struct
 
   let proj_comonadic t = (t lsr 0) land 255
   let with_comonadic x t = (t land lnot 255) lor ((x land 255) lsl 0)
-  let min_with_comonadic x = with_comonadic x bottom
-  let max_with_comonadic x = with_comonadic x top
+  let min_with_comonadic x = with_comonadic x min
+  let max_with_comonadic x = with_comonadic x max
 
   let proj_monadic t = (t lsr 8) land 63
   let with_monadic x t = (t land lnot 16128) lor ((x land 63) lsl 8)
-  let min_with_monadic x = with_monadic x bottom
-  let max_with_monadic x = with_monadic x top
+  let min_with_monadic x = with_monadic x min
+  let max_with_monadic x = with_monadic x max
 
   let name x =
     let view = view x in
@@ -2061,7 +2061,7 @@ module Alloc = struct
     Buffer.add_string b &quot; }&quot;;
     Buffer.contents b
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
 end
 
@@ -2089,13 +2089,13 @@ module Scannable_axes = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 9) lsl 1) in
     x
-  let bottom = 0
-  let top = 63
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 63
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -2140,23 +2140,23 @@ module Scannable_axes = struct
 
   let proj_externality t = (t lsr 0) land 3
   let with_externality x t = (t land lnot 3) lor ((x land 3) lsl 0)
-  let min_with_externality x = with_externality x bottom
-  let max_with_externality x = with_externality x top
+  let min_with_externality x = with_externality x min
+  let max_with_externality x = with_externality x max
 
   let proj_nullability t = (t lsr 2) land 1
   let with_nullability x t = (t land lnot 4) lor ((x land 1) lsl 2)
-  let min_with_nullability x = with_nullability x bottom
-  let max_with_nullability x = with_nullability x top
+  let min_with_nullability x = with_nullability x min
+  let max_with_nullability x = with_nullability x max
 
   let proj_separability t = (t lsr 3) land 3
   let with_separability x t = (t land lnot 24) lor ((x land 3) lsl 3)
-  let min_with_separability x = with_separability x bottom
-  let max_with_separability x = with_separability x top
+  let min_with_separability x = with_separability x min
+  let max_with_separability x = with_separability x max
 
   let proj_pointerness t = (t lsr 5) land 1
   let with_pointerness x t = (t land lnot 32) lor ((x land 1) lsl 5)
-  let min_with_pointerness x = with_pointerness x bottom
-  let max_with_pointerness x = with_pointerness x top
+  let min_with_pointerness x = with_pointerness x min
+  let max_with_pointerness x = with_pointerness x max
 
   let name x =
     let view = view x in
@@ -2176,7 +2176,7 @@ module Scannable_axes = struct
     Buffer.add_string b &quot; }&quot;;
     Buffer.contents b
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
 end
 
@@ -2194,13 +2194,13 @@ module Uniqueness_op = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -2224,7 +2224,7 @@ module Uniqueness_op = struct
     | &quot;Unique&quot; -&gt; Some unique
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = aliased
 
@@ -2262,13 +2262,13 @@ module Contention_op = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 1) lsl 1) in
     x
-  let bottom = 0
-  let top = 3
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 3
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -2296,7 +2296,7 @@ module Contention_op = struct
     | &quot;Uncontended&quot; -&gt; Some uncontended
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = uncontended
 
@@ -2326,13 +2326,13 @@ module Visibility_op = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 3
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 3
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -2364,7 +2364,7 @@ module Visibility_op = struct
     | &quot;Write&quot; -&gt; Some write
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = read_write
 
@@ -2396,13 +2396,13 @@ module Staticity_op = struct
     if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
     x
 
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     zxy
   let[@inline] imply x y =
@@ -2426,7 +2426,7 @@ module Staticity_op = struct
     | &quot;Static&quot; -&gt; Some static
     | _ -&gt; None
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = dynamic
 
@@ -2464,13 +2464,13 @@ module Monadic_op = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 2) lsl 1) in
     x
-  let bottom = 0
-  let top = 63
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 63
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -2515,23 +2515,23 @@ module Monadic_op = struct
 
   let proj_uniqueness t = (t lsr 0) land 1
   let with_uniqueness x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_uniqueness x = with_uniqueness x bottom
-  let max_with_uniqueness x = with_uniqueness x top
+  let min_with_uniqueness x = with_uniqueness x min
+  let max_with_uniqueness x = with_uniqueness x max
 
   let proj_contention t = (t lsr 1) land 3
   let with_contention x t = (t land lnot 6) lor ((x land 3) lsl 1)
-  let min_with_contention x = with_contention x bottom
-  let max_with_contention x = with_contention x top
+  let min_with_contention x = with_contention x min
+  let max_with_contention x = with_contention x max
 
   let proj_visibility t = (t lsr 3) land 3
   let with_visibility x t = (t land lnot 24) lor ((x land 3) lsl 3)
-  let min_with_visibility x = with_visibility x bottom
-  let max_with_visibility x = with_visibility x top
+  let min_with_visibility x = with_visibility x min
+  let max_with_visibility x = with_visibility x max
 
   let proj_staticity t = (t lsr 5) land 1
   let with_staticity x t = (t land lnot 32) lor ((x land 1) lsl 5)
-  let min_with_staticity x = with_staticity x bottom
-  let max_with_staticity x = with_staticity x top
+  let min_with_staticity x = with_staticity x min
+  let max_with_staticity x = with_staticity x max
 
   let name x =
     let view = view x in
@@ -2551,7 +2551,7 @@ module Monadic_op = struct
     Buffer.add_string b &quot; }&quot;;
     Buffer.contents b
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
 end
 
@@ -2579,13 +2579,13 @@ module Kind_axes = struct
   let[@inline] close_up_nat x =
     let x = x lor ((x land 147972) lsl 1) in
     x
-  let bottom = 0
-  let top = 1048575
-  let[@inline] leq x y = (x land y) = x
+  let min = 0
+  let max = 1048575
+  let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
-  let[@inline] sub x y =
+  let[@inline] subtract x y =
     let zxy = x land lnot y in
     close_down_nat zxy
   let[@inline] imply x y =
@@ -2625,18 +2625,18 @@ module Kind_axes = struct
 
   let proj_comonadic t = (t lsr 0) land 255
   let with_comonadic x t = (t land lnot 255) lor ((x land 255) lsl 0)
-  let min_with_comonadic x = with_comonadic x bottom
-  let max_with_comonadic x = with_comonadic x top
+  let min_with_comonadic x = with_comonadic x min
+  let max_with_comonadic x = with_comonadic x max
 
   let proj_monadic t = (t lsr 8) land 63
   let with_monadic x t = (t land lnot 16128) lor ((x land 63) lsl 8)
-  let min_with_monadic x = with_monadic x bottom
-  let max_with_monadic x = with_monadic x top
+  let min_with_monadic x = with_monadic x min
+  let max_with_monadic x = with_monadic x max
 
   let proj_scannable t = (t lsr 14) land 63
   let with_scannable x t = (t land lnot 1032192) lor ((x land 63) lsl 14)
-  let min_with_scannable x = with_scannable x bottom
-  let max_with_scannable x = with_scannable x top
+  let min_with_scannable x = with_scannable x min
+  let max_with_scannable x = with_scannable x max
 
   let name x =
     let view = view x in
@@ -2653,7 +2653,7 @@ module Kind_axes = struct
     Buffer.add_string b &quot; }&quot;;
     Buffer.contents b
 
-  let pp ppf x = Format.pp_print_string ppf (name x)
+  let print ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
 end
 
@@ -2790,15 +2790,15 @@ and
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -2822,15 +2822,15 @@ module Regionality : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -2856,15 +2856,15 @@ module Uniqueness : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -2888,15 +2888,15 @@ module Linearity : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -2920,15 +2920,15 @@ module Portability : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -2954,15 +2954,15 @@ module Contention : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -2988,15 +2988,15 @@ module Forkable : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3020,15 +3020,15 @@ module Yielding : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3052,15 +3052,15 @@ module Staticity : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3084,15 +3084,15 @@ module Statefulness : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3120,15 +3120,15 @@ module Visibility : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3156,15 +3156,15 @@ module Externality : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3190,15 +3190,15 @@ module Nullability : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3222,15 +3222,15 @@ module Separability : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3256,15 +3256,15 @@ module Pointerness : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3288,15 +3288,15 @@ module Monadic : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
 
@@ -3344,15 +3344,15 @@ module Comonadic : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
 
@@ -3406,15 +3406,15 @@ module Comonadic_with_locality : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
 
@@ -3450,15 +3450,15 @@ module Comonadic_with_regionality : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
 
@@ -3494,15 +3494,15 @@ module Value : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
 
@@ -3538,15 +3538,15 @@ module Alloc : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
 
@@ -3582,15 +3582,15 @@ module Scannable_axes : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
 
@@ -3638,15 +3638,15 @@ module Uniqueness_op : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3670,15 +3670,15 @@ module Contention_op : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3704,15 +3704,15 @@ module Visibility_op : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3740,15 +3740,15 @@ module Staticity_op : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
   val of_name : string -&gt; t option
@@ -3772,15 +3772,15 @@ module Monadic_op : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
 
@@ -3828,15 +3828,15 @@ module Kind_axes : sig
     val from_int_unsafe : int -&gt; t
   end
 
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
+  val print : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
 

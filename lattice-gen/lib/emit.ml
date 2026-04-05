@@ -56,13 +56,13 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
     let has_close_up_nat =
       add_schedule_fn_ml ~indent buf "close_up_nat" desc.up_nat `Up
     in
-    bprintf buf "%slet bottom = 0\n" indent;
-    bprintf buf "%slet top = %d\n" indent desc.mask;
-    bprintf buf "%slet[@inline] leq x y = (x land y) = x\n" indent;
+    bprintf buf "%slet min = 0\n" indent;
+    bprintf buf "%slet max = %d\n" indent desc.mask;
+    bprintf buf "%slet[@inline] le x y = (x land y) = x\n" indent;
     bprintf buf "%slet[@inline] equal (x : t) (y : t) = x = y\n" indent;
     bprintf buf "%slet[@inline] join x y = x lor y\n" indent;
     bprintf buf "%slet[@inline] meet x y = x land y\n" indent;
-    bprintf buf "%slet[@inline] sub x y =\n" indent;
+    bprintf buf "%slet[@inline] subtract x y =\n" indent;
     bprintf buf "%s  let zxy = x land lnot y in\n" indent;
     bprintf
       buf
@@ -86,13 +86,13 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
     let has_close_up_dual =
       add_schedule_fn_ml ~indent buf "close_up_dual" desc.up_dual `Up
     in
-    bprintf buf "%slet bottom = %d\n" indent desc.mask;
-    bprintf buf "%slet top = 0\n" indent;
-    bprintf buf "%slet[@inline] leq x y = (x land y) = y\n" indent;
+    bprintf buf "%slet min = %d\n" indent desc.mask;
+    bprintf buf "%slet max = 0\n" indent;
+    bprintf buf "%slet[@inline] le x y = (x land y) = y\n" indent;
     bprintf buf "%slet[@inline] equal (x : t) (y : t) = x = y\n" indent;
     bprintf buf "%slet[@inline] join x y = x land y\n" indent;
     bprintf buf "%slet[@inline] meet x y = x lor y\n" indent;
-    bprintf buf "%slet[@inline] sub x y =\n" indent;
+    bprintf buf "%slet[@inline] subtract x y =\n" indent;
     bprintf buf "%s  let zyx = y land lnot x in\n" indent;
     bprintf
       buf
@@ -121,9 +121,9 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
     let has_close_up_dual =
       add_schedule_fn_ml ~indent buf "close_up_dual" desc.up_dual `Up
     in
-    bprintf buf "%slet bottom = %d\n" indent dual_mask;
-    bprintf buf "%slet top = %d\n" indent nat_mask;
-    bprintf buf "%slet[@inline] leq x y =\n" indent;
+    bprintf buf "%slet min = %d\n" indent dual_mask;
+    bprintf buf "%slet max = %d\n" indent nat_mask;
+    bprintf buf "%slet[@inline] le x y =\n" indent;
     bprintf buf "%s  (((x land lnot y) land %d) = 0)\n" indent nat_mask;
     bprintf buf "%s  && (((y land lnot x) land %d) = 0)\n" indent dual_mask;
     bprintf buf "%slet[@inline] equal (x : t) (y : t) = x = y\n" indent;
@@ -135,7 +135,7 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
     bprintf buf "%s  let o = x lor y in\n" indent;
     bprintf buf "%s  let a = x land y in\n" indent;
     bprintf buf "%s  (a land %d) lor (o land %d)\n" indent nat_mask dual_mask;
-    bprintf buf "%slet[@inline] sub x y =\n" indent;
+    bprintf buf "%slet[@inline] subtract x y =\n" indent;
     bprintf buf "%s  let zxy = x land lnot y in\n" indent;
     bprintf buf "%s  let zyx = y land lnot x in\n" indent;
     bprintf
@@ -190,7 +190,7 @@ let legacy_value_name name =
   | "Statefulness" -> "stateful"
   | "Visibility" -> "read_write"
   | "Staticity" -> "dynamic"
-  | _ -> "top"
+  | _ -> "max"
 
 let view_ctor_name value_name = String.capitalize_ascii value_name
 
@@ -205,15 +205,15 @@ let add_common_sig_items_base buf =
     \    val from_int_unsafe : int -> t\n\
     \  end\n\
     \n\
-    \  val bottom : t\n\
-    \  val top : t\n\
-    \  val leq : t -> t -> bool\n\
+    \  val min : t\n\
+    \  val max : t\n\
+    \  val le : t -> t -> bool\n\
     \  val equal : t -> t -> bool\n\
     \  val join : t -> t -> t\n\
     \  val meet : t -> t -> t\n\
-    \  val sub : t -> t -> t\n\
+    \  val subtract : t -> t -> t\n\
     \  val imply : t -> t -> t\n\
-    \  val pp : Format.formatter -> t -> unit\n\
+    \  val print : Format.formatter -> t -> unit\n\
     \  val show : t -> string\n\
     \  val name : t -> string\n\
     \  val of_name : string -> t option\n\
@@ -230,15 +230,15 @@ let add_common_sig_items_product buf =
     \    val from_int_unsafe : int -> t\n\
     \  end\n\
     \n\
-    \  val bottom : t\n\
-    \  val top : t\n\
-    \  val leq : t -> t -> bool\n\
+    \  val min : t\n\
+    \  val max : t\n\
+    \  val le : t -> t -> bool\n\
     \  val equal : t -> t -> bool\n\
     \  val join : t -> t -> t\n\
     \  val meet : t -> t -> t\n\
-    \  val sub : t -> t -> t\n\
+    \  val subtract : t -> t -> t\n\
     \  val imply : t -> t -> t\n\
-    \  val pp : Format.formatter -> t -> unit\n\
+    \  val print : Format.formatter -> t -> unit\n\
     \  val show : t -> string\n\
     \  val name : t -> string\n"
 
@@ -269,7 +269,7 @@ let add_name_functions_ml buf cases legacy =
       bprintf buf "    | %S -> Some %s\n" display_name value_name)
     cases;
   Buffer.add_string buf "    | _ -> None\n\n";
-  Buffer.add_string buf "  let pp ppf x = Format.pp_print_string ppf (name x)\n";
+  Buffer.add_string buf "  let print ppf x = Format.pp_print_string ppf (name x)\n";
   Buffer.add_string buf "  let show x = name x\n";
   bprintf buf "  let legacy = %s\n" legacy
 
@@ -439,12 +439,12 @@ let add_product_ml buf (product : product) module_name desc ~in_op =
         field.shift;
       bprintf
         buf
-        "  let %s x = %s x bottom\n"
+        "  let %s x = %s x min\n"
         (min_with_name field)
         (with_name field);
       bprintf
         buf
-        "  let %s x = %s x top\n"
+        "  let %s x = %s x max\n"
         (max_with_name field)
         (with_name field);
       Buffer.add_char buf '\n')
@@ -465,7 +465,7 @@ let add_product_ml buf (product : product) module_name desc ~in_op =
     product.fields;
   Buffer.add_string buf "    Buffer.add_string b \" }\";\n";
   Buffer.add_string buf "    Buffer.contents b\n\n";
-  Buffer.add_string buf "  let pp ppf x = Format.pp_print_string ppf (name x)\n";
+  Buffer.add_string buf "  let print ppf x = Format.pp_print_string ppf (name x)\n";
   Buffer.add_string buf "  let show x = name x\n";
   Buffer.add_string buf "end\n\n"
 
@@ -922,12 +922,12 @@ let add_bridge_ml buf model kernels (bridge : product_bridge) =
          | Min ->
            bprintf
              buf
-             "%s.bottom"
+             "%s.min"
              (product_field_module_name model core.target assignment.target_field)
          | Max ->
            bprintf
              buf
-             "%s.top"
+             "%s.max"
              (product_field_module_name model core.target assignment.target_field));
         Buffer.add_string buf ")\n")
       bridge.assignments

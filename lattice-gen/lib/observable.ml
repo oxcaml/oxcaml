@@ -1002,31 +1002,31 @@ let check_base_lattice
     ~from_int_unsafe
     ~view
     ~of_view
-    ~bottom
-    ~top
-    ~leq
+    ~min
+    ~max
+    ~le
     ~equal
     ~join
     ~meet
-    ~sub
+    ~subtract
     ~imply
-    ~pp
+    ~print
     ~show
     ~name_fn
     ~of_name
     ~legacy
-    ~ref_bottom
-    ~ref_top
-    ~ref_leq
+    ~ref_min
+    ~ref_max
+    ~ref_le
     ~ref_join
     ~ref_meet
-    ~ref_sub
+    ~ref_subtract
     ~ref_imply
     ~ref_name
   =
   check_public_repr ~name ~valid_reprs ~to_int_unsafe ~from_int_unsafe;
-  ensure (to_int_unsafe bottom = ref_bottom) "%s: bottom mismatch" name;
-  ensure (to_int_unsafe top = ref_top) "%s: top mismatch" name;
+  ensure (to_int_unsafe min = ref_min) "%s: min mismatch" name;
+  ensure (to_int_unsafe max = ref_max) "%s: max mismatch" name;
   ensure (array_mem values legacy) "%s: legacy is invalid" name;
   iter1 values
     (fun x ->
@@ -1042,8 +1042,8 @@ let check_base_lattice
       ensure (show x = expected_name)
         "%s: show mismatch for %d"
         name x_i;
-      ensure (Format.asprintf "%a" pp x = expected_name)
-        "%s: pp mismatch for %d"
+      ensure (Format.asprintf "%a" print x = expected_name)
+        "%s: print mismatch for %d"
         name x_i;
       match of_name expected_name with
       | Some y ->
@@ -1058,8 +1058,8 @@ let check_base_lattice
       ensure (equal x y = (x_i = y_i))
         "%s: equal mismatch for %d and %d"
         name x_i y_i;
-      ensure (leq x y = ref_leq x_i y_i)
-        "%s: leq mismatch for %d and %d"
+      ensure (le x y = ref_le x_i y_i)
+        "%s: le mismatch for %d and %d"
         name x_i y_i;
       ensure (to_int_unsafe (join x y) = ref_join x_i y_i)
         "%s: join mismatch for %d and %d"
@@ -1067,8 +1067,8 @@ let check_base_lattice
       ensure (to_int_unsafe (meet x y) = ref_meet x_i y_i)
         "%s: meet mismatch for %d and %d"
         name x_i y_i;
-      ensure (to_int_unsafe (sub x y) = ref_sub x_i y_i)
-        "%s: sub mismatch for %d and %d"
+      ensure (to_int_unsafe (subtract x y) = ref_subtract x_i y_i)
+        "%s: subtract mismatch for %d and %d"
         name x_i y_i;
       ensure (to_int_unsafe (imply x y) = ref_imply x_i y_i)
         "%s: imply mismatch for %d and %d"
@@ -1079,7 +1079,7 @@ let check_base_lattice
       let join_xy = join x y in
       let meet_yz = meet y z in
       let meet_xy = meet x y in
-      let sub_xy = sub x y in
+      let sub_xy = subtract x y in
       let imply_xy = imply x y in
       ensure (join x (join y z) = join (join x y) z)
         "%s: join associativity failed"
@@ -1087,10 +1087,10 @@ let check_base_lattice
       ensure (meet x (meet y z) = meet (meet x y) z)
         "%s: meet associativity failed"
         name;
-      ensure ((leq sub_xy z) = (leq x join_yz))
+      ensure ((le sub_xy z) = (le x join_yz))
         "%s: subtraction residuation failed"
         name;
-      ensure ((leq z imply_xy) = (leq (meet z x) y))
+      ensure ((le z imply_xy) = (le (meet z x) y))
         "%s: implication residuation failed"
         name)
 
@@ -1100,29 +1100,29 @@ let check_product_lattice
     ~valid_reprs
     ~to_int_unsafe
     ~from_int_unsafe
-    ~bottom
-    ~top
-    ~leq
+    ~min
+    ~max
+    ~le
     ~equal
     ~join
     ~meet
-    ~sub
+    ~subtract
     ~imply
-    ~pp
+    ~print
     ~show
     ~name_fn
-    ~ref_bottom
-    ~ref_top
-    ~ref_leq
+    ~ref_min
+    ~ref_max
+    ~ref_le
     ~ref_join
     ~ref_meet
-    ~ref_sub
+    ~ref_subtract
     ~ref_imply
     ~ref_name
   =
   check_public_repr ~name ~valid_reprs ~to_int_unsafe ~from_int_unsafe;
-  ensure (to_int_unsafe bottom = ref_bottom) "%s: bottom mismatch" name;
-  ensure (to_int_unsafe top = ref_top) "%s: top mismatch" name;
+  ensure (to_int_unsafe min = ref_min) "%s: min mismatch" name;
+  ensure (to_int_unsafe max = ref_max) "%s: max mismatch" name;
   iter1 values
     (fun x ->
       let x_i = to_int_unsafe x in
@@ -1134,8 +1134,8 @@ let check_product_lattice
       ensure (show x = expected_name)
         "%s: show mismatch for %d"
         name x_i;
-      ensure (Format.asprintf "%a" pp x = expected_name)
-        "%s: pp mismatch for %d"
+      ensure (Format.asprintf "%a" print x = expected_name)
+        "%s: print mismatch for %d"
         name x_i);
   iter2 values values
     (fun x y ->
@@ -1144,8 +1144,8 @@ let check_product_lattice
       ensure (equal x y = (x_i = y_i))
         "%s: equal mismatch for %d and %d"
         name x_i y_i;
-      ensure (leq x y = ref_leq x_i y_i)
-        "%s: leq mismatch for %d and %d"
+      ensure (le x y = ref_le x_i y_i)
+        "%s: le mismatch for %d and %d"
         name x_i y_i;
       ensure (to_int_unsafe (join x y) = ref_join x_i y_i)
         "%s: join mismatch for %d and %d"
@@ -1153,8 +1153,8 @@ let check_product_lattice
       ensure (to_int_unsafe (meet x y) = ref_meet x_i y_i)
         "%s: meet mismatch for %d and %d"
         name x_i y_i;
-      ensure (to_int_unsafe (sub x y) = ref_sub x_i y_i)
-        "%s: sub mismatch for %d and %d"
+      ensure (to_int_unsafe (subtract x y) = ref_subtract x_i y_i)
+        "%s: subtract mismatch for %d and %d"
         name x_i y_i;
       ensure (to_int_unsafe (imply x y) = ref_imply x_i y_i)
         "%s: imply mismatch for %d and %d"
@@ -1162,7 +1162,7 @@ let check_product_lattice
   iter3 values values values
     (fun x y z ->
       let join_yz = join y z in
-      let sub_xy = sub x y in
+      let sub_xy = subtract x y in
       let imply_xy = imply x y in
       ensure (join x (join y z) = join (join x y) z)
         "%s: join associativity failed"
@@ -1170,10 +1170,10 @@ let check_product_lattice
       ensure (meet x (meet y z) = meet (meet x y) z)
         "%s: meet associativity failed"
         name;
-      ensure ((leq sub_xy z) = (leq x join_yz))
+      ensure ((le sub_xy z) = (le x join_yz))
         "%s: subtraction residuation failed"
         name;
-      ensure ((leq z imply_xy) = (leq (meet z x) y))
+      ensure ((le z imply_xy) = (le (meet z x) y))
         "%s: implication residuation failed"
         name)
 
@@ -1205,25 +1205,25 @@ let emit_lattice_checks buf model =
            \    ~from_int_unsafe:%s.Repr.from_int_unsafe\n\
            \    ~view:%s.view\n\
            \    ~of_view:%s.of_view\n\
-           \    ~bottom:%s.bottom\n\
-           \    ~top:%s.top\n\
-           \    ~leq:%s.leq\n\
+           \    ~min:%s.min\n\
+           \    ~max:%s.max\n\
+           \    ~le:%s.le\n\
            \    ~equal:%s.equal\n\
            \    ~join:%s.join\n\
            \    ~meet:%s.meet\n\
-           \    ~sub:%s.sub\n\
+           \    ~subtract:%s.subtract\n\
            \    ~imply:%s.imply\n\
-           \    ~pp:%s.pp\n\
+           \    ~print:%s.print\n\
            \    ~show:%s.show\n\
            \    ~name_fn:%s.name\n\
            \    ~of_name:%s.of_name\n\
            \    ~legacy:%s.legacy\n\
-           \    ~ref_bottom:%s\n\
-           \    ~ref_top:%s\n\
-           \    ~ref_leq:%s\n\
+           \    ~ref_min:%s\n\
+           \    ~ref_max:%s\n\
+           \    ~ref_le:%s\n\
            \    ~ref_join:%s\n\
            \    ~ref_meet:%s\n\
-           \    ~ref_sub:%s\n\
+           \    ~ref_subtract:%s\n\
            \    ~ref_imply:%s\n\
            \    ~ref_name:%s\n\n"
           module_name
@@ -1264,23 +1264,23 @@ let emit_lattice_checks buf model =
            \    ~valid_reprs:%s\n\
            \    ~to_int_unsafe:%s.Repr.to_int_unsafe\n\
            \    ~from_int_unsafe:%s.Repr.from_int_unsafe\n\
-           \    ~bottom:%s.bottom\n\
-           \    ~top:%s.top\n\
-           \    ~leq:%s.leq\n\
+           \    ~min:%s.min\n\
+           \    ~max:%s.max\n\
+           \    ~le:%s.le\n\
            \    ~equal:%s.equal\n\
            \    ~join:%s.join\n\
            \    ~meet:%s.meet\n\
-           \    ~sub:%s.sub\n\
+           \    ~subtract:%s.subtract\n\
            \    ~imply:%s.imply\n\
-           \    ~pp:%s.pp\n\
+           \    ~print:%s.print\n\
            \    ~show:%s.show\n\
            \    ~name_fn:%s.name\n\
-           \    ~ref_bottom:%s\n\
-           \    ~ref_top:%s\n\
-           \    ~ref_leq:%s\n\
+           \    ~ref_min:%s\n\
+           \    ~ref_max:%s\n\
+           \    ~ref_le:%s\n\
            \    ~ref_join:%s\n\
            \    ~ref_meet:%s\n\
-           \    ~ref_sub:%s\n\
+           \    ~ref_subtract:%s\n\
            \    ~ref_imply:%s\n\
            \    ~ref_name:%s\n\n"
           module_name
