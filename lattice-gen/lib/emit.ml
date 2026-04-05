@@ -402,6 +402,8 @@ let add_product_sig buf (product : product) module_name ~in_op ~include_solver =
     "\n\
     \    type packed = P : 'a t -> packed\n\
     \n\
+    \    val compare : 'a t -> 'b t -> ('a, 'b) Misc.comparison\n\
+    \n\
     \    val all : packed list\n\
     \    val print : Format.formatter -> 'a t -> unit\n\
     \  end\n\n";
@@ -1228,6 +1230,27 @@ let add_product_ml
            (List.find (fun (field : field) -> field.name = axis.name) product.fields)))
     product.axes;
   Buffer.add_string buf "\n    type packed = P : 'a t -> packed\n\n";
+  Buffer.add_string
+    buf
+    "    let compare : type a b. a t -> b t -> (a, b) Misc.comparison =\n\
+    \      fun left right ->\n\
+    \        match left, right with\n";
+  List.iteri
+    (fun i (left_axis : axis_object) ->
+      bprintf buf "        | %s, %s -> Equal\n" left_axis.ctor_name left_axis.ctor_name;
+      List.iteri
+        (fun j (right_axis : axis_object) ->
+          if i <> j
+          then
+            bprintf
+              buf
+              "        | %s, %s -> %s\n"
+              left_axis.ctor_name
+              right_axis.ctor_name
+              (if i < j then "Less_than" else "Greater_than"))
+        product.axes)
+    product.axes;
+  Buffer.add_string buf "\n";
   Buffer.add_string buf "    let all = [\n";
   List.iter
     (fun (axis : axis_object) ->

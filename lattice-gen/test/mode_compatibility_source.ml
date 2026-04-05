@@ -55,6 +55,7 @@ module type Product_axis_like = sig
   type 'a t
   type packed = P : 'a t -> packed
 
+  val compare : 'a t -> 'b t -> ('a, 'b) Misc.comparison
   val all : packed list
   val print : Format.formatter -> 'a t -> unit
 end
