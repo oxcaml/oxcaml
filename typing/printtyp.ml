@@ -27,27 +27,6 @@ module Doc = struct
   let ident ppf id = Fmt.pp_print_string ppf
       (Out_name.print (ident_name None id))
 
-  (* let instance_name global =
-   *   (* Construct the stopgap syntax and then shove it in a string with the
-   *     attribute after it. *)
-   *   (* CR lmaurer: This is hacky and it loses the state of the [out_name]s that
-   *     comprise the [out_ident]. Should presumably have a new constructor for
-   *     [out_ident] instead? *)
-   *   let rec string_of_global global =
-   *     (* We can avoid calling [ident_name_simple] here because instance names are
-   *       always global (which is bad - but the syntax is currently bad anyway) *)
-   *     let ({ head; args } : Global_module.Name.t) = global in
-   *     String.concat "" (head :: List.map string_of_arg args)
-   *   and string_of_arg arg =
-   *     let ({ param; value } : Global_module.Name.argument) = arg in
-   *     Printf.sprintf "(%s)(%s)"
-   *       (Global_module.Parameter_name.to_string param) (string_of_global value)
-   *   in
-   *   let printed_name =
-   *     string_of_global global ^ " [@jane.non_erasable.instances]"
-   *   in
-   *   { printed_name } *)
-
   let typexp mode ppf ty =
     !Oprint.out_type ppf (tree_of_typexp mode ty)
 
@@ -119,10 +98,6 @@ module Doc = struct
   let extension_constructor id ppf ext =
     !Oprint.out_sig_item ppf (tree_of_extension_constructor id ext Text_first)
 
-  (* Print an extension declaration *)
-
-
-
   let extension_only_constructor id ppf (ext:Types.extension_constructor) =
     reset_except_conflicts ();
     prepare_type_constructor_arguments ext.ext_args;
@@ -186,25 +161,6 @@ let class_declaration = Fmt.compat1 class_declaration
 let class_type = Fmt.compat class_type
 let cltype_declaration = Fmt.compat1 cltype_declaration
 
-(* CR rtjoa: where to put *)
-(** Compatibility module for Format printers *)
-(* module Compat = struct
- *   let longident = Fmt.compat longident
- *   let path = Fmt.compat path
- *   let type_expr = Fmt.compat type_expr
- *   let shared_type_scheme = Fmt.compat shared_type_scheme
- *   let signature = Fmt.compat signature
- *   let class_type = Fmt.compat class_type
- *   let modtype = Fmt.compat modtype
- *   let string_of_label (lbl : Asttypes.arg_label) =
- *     let lbl : Types.arg_label = match lbl with
- *       | Nolabel -> Nolabel
- *       | Labelled s -> Labelled s
- *       | Optional s -> Optional s
- *     in
- *     string_of_label lbl
- * end *)
-
 (* Print a signature body (used by -i when compiling a .ml) *)
 let printed_signature sourcefile ppf sg =
   (* we are tracking any collision event for warning 63 *)
@@ -220,6 +176,11 @@ let printed_signature sourcefile ppf sg =
         Warnings.check_fatal ()
     end;
   Fmt.compat print_signature ppf t
+
+let string_of_label : Types.arg_label -> string = function
+  | Nolabel -> ""
+  | Labelled s | Position s -> s
+  | Optional s -> "?" ^ s
 
 let () = Jkind.set_printtyp_path Doc.path
 let () = Mode.print_longident := Doc.longident

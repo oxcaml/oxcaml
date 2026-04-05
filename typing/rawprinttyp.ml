@@ -76,10 +76,6 @@ and labeled_type ppf (label, ty) =
   raw_type ppf ty
 and raw_type_list tl = raw_list raw_type tl
 and labeled_type_list tl = raw_list labeled_type tl
-(* and raw_lid_type_list tl =
- *   raw_list (fun ppf (lid, typ) ->
- *              fprintf ppf "(@,%a,@,%a)" longident lid raw_type typ)
- *     tl *)
 and raw_lid_type_list tl =
   raw_list (fun ppf (lid, typ) ->
              let lid = Longident.unflatten lid |> Option.get in
@@ -180,8 +176,6 @@ and raw_field ppf rf =
           fprintf ppf "RFpresent None"
       | Some t ->
           fprintf ppf  "@[<1>RFpresent(Some@,%a)@]" raw_type t)
-    (* CR rtjoa:  *)
-    (* maybe (_,e) *)
     ~either:(fun c tl m (_,e) ->
       fprintf ppf "@[<hov1>RFeither(%B,@,%a,@,%B,@,@[<1>ref%t@])@]" c
         raw_type_list tl m

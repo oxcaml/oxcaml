@@ -1176,8 +1176,6 @@ let reset_except_conflicts () =
   Variable_names.reset_names (); Aliases.reset (); Internal_names.reset ()
 
 let reset () =
-  (* CR rtjoa:  *)
-  (* reset_naming_context (); *)
   Ident_conflicts.reset ();
   reset_except_conflicts ()
 
@@ -1828,7 +1826,7 @@ let tree_of_constructor_arguments = function
   | Cstr_tuple l -> List.map tree_of_typ_gf l
   | Cstr_record l -> [ Otyp_record (List.map tree_of_label l), [] ]
 
-let tree_of_constructor_args_and_ret_type args ret_type =
+let extension_constructor_args_and_ret_type_subtree args ret_type =
   match ret_type with
   | None -> (tree_of_constructor_arguments args, None)
   | Some res ->
@@ -1839,7 +1837,9 @@ let tree_of_constructor_args_and_ret_type args ret_type =
 
 let tree_of_single_constructor cd =
   let name = Ident.name cd.cd_id in
-  let args, ret = tree_of_constructor_args_and_ret_type cd.cd_args cd.cd_res in
+  let args, ret =
+    extension_constructor_args_and_ret_type_subtree cd.cd_args cd.cd_res
+  in
   {
       ocstr_name = name;
       ocstr_args = args;
@@ -2103,13 +2103,6 @@ let add_extension_constructor_to_preparation ext =
   prepare_type_constructor_arguments ext.ext_args;
   Option.iter prepare_type ext.ext_ret_type
 
-(* CR rtjoa: delete one of these? *)
-let extension_constructor_args_and_ret_type_subtree ext_args ext_ret_type =
-  tree_of_constructor_args_and_ret_type ext_args ext_ret_type
-  (* let ret = Option.map (tree_of_typexp Type) ext_ret_type in
-   * let args = tree_of_constructor_arguments ext_args in
-   * (args, ret) *)
-
 let prepared_tree_of_extension_constructor
    id ext es
   =
@@ -2138,7 +2131,7 @@ let prepared_tree_of_extension_constructor
   in
   let name = Ident.name id in
   let args, ret =
-    tree_of_constructor_args_and_ret_type
+    extension_constructor_args_and_ret_type_subtree
       ext.ext_args
       ext.ext_ret_type
   in
@@ -2692,8 +2685,6 @@ and tree_of_module ?abbrev id md rs = wrap_mutation (fun () ->
 (* For the toplevel: merge with tree_of_signature? *)
 let print_items showval env x =
   Variable_names.refresh_weak();
-  (* CR rtjoa:  *)
-  (* reset_naming_context (); *)
   Ident_conflicts.reset ();
   let extend_val env (sigitem,outcome) = outcome, showval env sigitem in
   let post_process (env,l) = List.map (extend_val env) l in
