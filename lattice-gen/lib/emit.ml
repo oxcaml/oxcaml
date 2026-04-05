@@ -574,6 +574,243 @@ let source_element_name lattice_name index model =
   | Base base -> base.element_value_names.(index)
   | Product _ -> invalid_arg "primitive morph endpoints must be base lattices"
 
+type bit_term =
+  { negated : bool;
+    mask : int;
+    shift : int
+  }
+
+type bit_kernel =
+  { const : int;
+    terms : bit_term list
+  }
+
+let popcount x =
+  let rec loop n acc =
+    if n = 0 then acc else loop (n land (n - 1)) (acc + 1)
+  in
+  loop x 0
+
+let bit_positions mask =
+  let rec loop bit acc =
+    if bit >= Sys.int_size - 1
+    then List.rev acc
+    else
+      let acc = if mask land (1 lsl bit) <> 0 then bit :: acc else acc in
+      loop (bit + 1) acc
+  in
+  loop 0 []
+
+let descriptor_of_expr model (expr : lattice_expr) =
+  match String_map.find expr.name model.lattices with
+  | Base base -> if expr.opposite then base.op_descriptor else base.descriptor
+  | Product product ->
+    if expr.opposite then product.op_descriptor else product.descriptor
+
+let mask_of_expr model expr = (descriptor_of_expr model expr).mask
+
+let bottom_value_of_expr model expr =
+  let desc = descriptor_of_expr model expr in
+  dual_mask desc
+
+let top_value_of_expr model expr = (descriptor_of_expr model expr).nat_mask
+
+let normalize_kernel target_mask (kernel : bit_kernel) =
+  let groups = Hashtbl.create 8 in
+  List.iter
+    (fun (term : bit_term) ->
+      if term.mask <> 0
+      then (
+        let key = (term.negated, term.shift) in
+        let prev = Option.value (Hashtbl.find_opt groups key) ~default:0 in
+        Hashtbl.replace groups key (prev lor term.mask)))
+    kernel.terms;
+  let terms =
+    Hashtbl.to_seq groups
+    |> List.of_seq
+    |> List.map (fun ((negated, shift), mask) -> { negated; shift; mask })
+    |> List.sort (fun left right ->
+         match Bool.compare left.negated right.negated with
+         | 0 ->
+           let by_shift = Int.compare left.shift right.shift in
+           if by_shift <> 0 then by_shift else Int.compare left.mask right.mask
+         | n -> n)
+  in
+  { const = kernel.const land target_mask; terms }
+
+let find_field product field_name =
+  match List.find_opt (fun (field : field) -> String.equal field.name field_name) product.fields with
+  | Some field -> field
+  | None -> invalid_arg ("unknown field " ^ field_name)
+
+let effective_field_type root_expr (field : field) =
+  if root_expr.opposite then flip_expr field.ty else field.ty
+
+let synthesize_or_literal_cover ~inputs ~desired =
+  let n = Array.length desired in
+  if Array.for_all Fun.id desired
+  then Some (`Const_true, [])
+  else if Array.for_all not desired
+  then Some (`Const_false, [])
+  else (
+    let valid_inputs =
+      List.filter
+        (fun (_, truths) ->
+          let ok = ref true in
+          for i = 0 to n - 1 do
+            if truths.(i) && not desired.(i) then ok := false
+          done;
+          !ok)
+        inputs
+    in
+    let valid_inputs = Array.of_list valid_inputs in
+    let m = Array.length valid_inputs in
+    let best = ref None in
+    for subset = 1 to (1 lsl m) - 1 do
+      let subset_size = popcount subset in
+      if
+        match !best with
+        | None -> true
+        | Some (_, best_size) -> subset_size < best_size
+      then (
+        let covered = Array.make n false in
+        for literal = 0 to m - 1 do
+          if subset land (1 lsl literal) <> 0
+          then (
+            let _, truths = valid_inputs.(literal) in
+            for i = 0 to n - 1 do
+              covered.(i) <- covered.(i) || truths.(i)
+            done)
+        done;
+        if Array.for_all2 Bool.equal covered desired
+        then
+          let chosen =
+            Array.to_list valid_inputs
+            |> List.mapi (fun i literal -> (i, literal))
+            |> List.filter_map (fun (i, literal) ->
+                 if subset land (1 lsl i) <> 0 then Some (fst literal) else None)
+          in
+          best := Some (chosen, subset_size))
+    done;
+    Option.map (fun (chosen, _) -> (`Const_false, chosen)) !best)
+
+let synthesize_primitive_kernel model (primitive : primitive_morph) =
+  let core = primitive.core in
+  let source_base =
+    match String_map.find core.source.name model.lattices with
+    | Base base -> base
+    | Product _ -> invalid_arg "primitive morph endpoints must be base lattices"
+  in
+  let target_base =
+    match String_map.find core.target.name model.lattices with
+    | Base base -> base
+    | Product _ -> invalid_arg "primitive morph endpoints must be base lattices"
+  in
+  let source_mask = mask_of_expr model core.source in
+  let target_mask = mask_of_expr model core.target in
+  let source_bits = bit_positions source_mask in
+  let target_bits = bit_positions target_mask in
+  let source_values = source_base.element_values in
+  let target_values = Array.map (fun index -> target_base.element_values.(index)) core.map in
+  let n = Array.length target_values in
+  let literals =
+    List.concat_map
+      (fun bit ->
+        let truths = Array.init n (fun i -> source_values.(i) land (1 lsl bit) <> 0) in
+        let neg_truths = Array.init n (fun i -> not truths.(i)) in
+        [ ((false, bit), truths); ((true, bit), neg_truths) ])
+      source_bits
+  in
+  let terms = ref [] in
+  let const = ref 0 in
+  let failed = ref false in
+  List.iter
+    (fun target_bit ->
+      if not !failed
+      then (
+        let desired =
+          Array.init n (fun i -> target_values.(i) land (1 lsl target_bit) <> 0)
+        in
+        match synthesize_or_literal_cover ~inputs:literals ~desired with
+        | None -> failed := true
+        | Some (`Const_true, _) -> const := !const lor (1 lsl target_bit)
+        | Some (`Const_false, chosen) ->
+          List.iter
+            (fun (negated, source_bit) ->
+              terms :=
+                { negated; mask = 1 lsl source_bit; shift = target_bit - source_bit }
+                :: !terms)
+            chosen))
+    target_bits;
+  if !failed
+  then None
+  else Some (normalize_kernel target_mask { const = !const; terms = List.rev !terms })
+
+let render_term ~source_mask (term : bit_term) =
+  let dropped_low_bits shift =
+    if shift <= 0 then 0 else (1 lsl shift) - 1
+  in
+  let mask_is_redundant_for_right_shift =
+    if term.negated || term.shift >= 0
+    then false
+    else (
+      let shift = -term.shift in
+      let required_mask = source_mask land lnot (dropped_low_bits shift) in
+      term.mask = required_mask)
+  in
+  let atom =
+    match term.negated, term.mask = source_mask with
+    | false, true -> "x"
+    | true, true when term.shift = 0 ->
+      Printf.sprintf "(x lxor %d)" source_mask
+    | false, false when mask_is_redundant_for_right_shift -> "x"
+    | false, false -> Printf.sprintf "(x land %d)" term.mask
+    | true, _ -> Printf.sprintf "((lnot x) land %d)" term.mask
+  in
+  match term.shift with
+  | 0 -> atom
+  | shift when shift > 0 -> Printf.sprintf "(%s lsl %d)" atom shift
+  | shift -> Printf.sprintf "(%s lsr %d)" atom (-shift)
+
+let render_kernel_expr ~source_mask (kernel : bit_kernel) =
+  let pieces =
+    (if kernel.const <> 0 then [ string_of_int kernel.const ] else [])
+    @ List.map (render_term ~source_mask) kernel.terms
+  in
+  match pieces with
+  | [] -> "0"
+  | [ piece ] -> piece
+  | piece :: rest ->
+    piece
+    ^ List.fold_left
+        (fun acc next -> acc ^ "\n      lor " ^ next)
+        ""
+        rest
+
+let add_kernel_ml buf model name source_expr kernel =
+  let source_mask = mask_of_expr model source_expr in
+  bprintf buf "  %s x =\n" name;
+  bprintf buf "    %s\n" (render_kernel_expr ~source_mask kernel)
+
+let lift_kernel_through_field
+    ~(target_field : field)
+    ~(source_field : field)
+    ~(referenced : bit_kernel)
+  =
+  let target_mask = target_field.raw_mask lsl target_field.shift in
+  normalize_kernel
+    target_mask
+    { const = (referenced.const land target_field.raw_mask) lsl target_field.shift;
+      terms =
+        List.map
+          (fun (term : bit_term) ->
+            { negated = term.negated;
+              mask = term.mask lsl source_field.shift;
+              shift = term.shift + target_field.shift - source_field.shift
+            })
+          referenced.terms
+    }
+
 let product_field_module_name model (expr : lattice_expr) field_name =
   match String_map.find expr.name model.lattices with
   | Base _ -> invalid_arg "expected product lattice"
@@ -588,63 +825,179 @@ let product_field_module_name model (expr : lattice_expr) field_name =
     in
     module_name_of_expr effective_ty
 
-let add_primitive_morph_ml buf model (primitive : primitive_morph) =
-  let core = primitive.core in
-  let src_module = module_name_of_expr core.source in
-  let dst_module = module_name_of_expr core.target in
-  bprintf buf "  %s x =\n" core.name;
-  Array.iteri
-    (fun i target ->
-      let src_name = source_element_name core.source.name i model in
-      let dst_name = source_element_name core.target.name target model in
-      if i = 0
-      then
-        bprintf
-          buf
-          "    if %s.equal x %s.%s then %s.%s\n"
-          src_module
-          src_module
-          src_name
-          dst_module
-          dst_name
-      else
-        bprintf
-          buf
-          "    else if %s.equal x %s.%s then %s.%s\n"
-          src_module
-          src_module
-          src_name
-          dst_module
-          dst_name)
-    core.map;
-  bprintf buf "    else invalid_arg %S\n" core.name
+let kernel_of_bridge_assignment
+    model
+    resolve_kernel
+    (source_expr : lattice_expr)
+    (target_expr : lattice_expr)
+    (product : product)
+    (assignment : bridge_assignment)
+  =
+  let target_field = find_field product assignment.target_field in
+  let target_ty = effective_field_type target_expr target_field in
+  match assignment.expr with
+  | Source_field source_field_name ->
+    let source_product =
+      match String_map.find source_expr.name model.lattices with
+      | Product product -> product
+      | Base _ -> invalid_arg "expected product bridge source"
+    in
+    let source_field = find_field source_product source_field_name in
+    Some
+      (normalize_kernel
+         (target_field.raw_mask lsl target_field.shift)
+         { const = 0;
+           terms =
+             [ { negated = false;
+                 mask = source_field.raw_mask lsl source_field.shift;
+                 shift = target_field.shift - source_field.shift
+               } ]
+         })
+  | Morph_apply { morph_name; source_field } ->
+    let source_product =
+      match String_map.find source_expr.name model.lattices with
+      | Product product -> product
+      | Base _ -> invalid_arg "expected product bridge source"
+    in
+    let source_field = find_field source_product source_field in
+    (match resolve_kernel morph_name with
+     | None -> None
+     | Some referenced ->
+       Some
+         (lift_kernel_through_field
+            ~target_field
+            ~source_field
+            ~referenced))
+  | Min ->
+    Some
+      { const = (bottom_value_of_expr model target_ty land target_field.raw_mask) lsl target_field.shift;
+        terms = []
+      }
+  | Max ->
+    Some
+      { const = (top_value_of_expr model target_ty land target_field.raw_mask) lsl target_field.shift;
+        terms = []
+      }
 
-let add_bridge_ml buf model (bridge : product_bridge) =
+let build_morph_kernels model =
+  let kernels = Hashtbl.create (String_map.cardinal model.morphs) in
+  let visiting = Hashtbl.create 8 in
+  let rec resolve morph_name =
+    match Hashtbl.find_opt kernels morph_name with
+    | Some kernel -> Some kernel
+    | None ->
+      if Hashtbl.mem visiting morph_name then None
+      else (
+        Hashtbl.add visiting morph_name ();
+        let result =
+          match String_map.find morph_name model.morphs with
+          | Primitive primitive -> synthesize_primitive_kernel model primitive
+          | Bridge bridge ->
+            let core : morph_core = bridge.core in
+            let source_expr = core.source in
+            let target_expr = core.target in
+            let target_product =
+              match String_map.find target_expr.name model.lattices with
+              | Product product -> product
+              | Base _ -> invalid_arg "expected bridge target product"
+            in
+            let partials =
+              List.map
+                (fun assignment ->
+                  kernel_of_bridge_assignment
+                    model
+                    resolve
+                    source_expr
+                    target_expr
+                    target_product
+                    assignment)
+                bridge.assignments
+            in
+            if List.exists Option.is_none partials
+            then None
+            else
+              let partials = List.map Option.get partials in
+              Some
+                (normalize_kernel
+                   (mask_of_expr model target_expr)
+                   (List.fold_left
+                      (fun acc partial ->
+                        { const = acc.const lor partial.const;
+                          terms = acc.terms @ partial.terms
+                        })
+                      { const = 0; terms = [] }
+                      partials))
+        in
+        Hashtbl.remove visiting morph_name;
+        Option.iter (fun kernel -> Hashtbl.add kernels morph_name kernel) result;
+        result)
+  in
+  String_map.iter (fun name _ -> ignore (resolve name)) model.morphs;
+  kernels
+
+let add_primitive_morph_ml buf model kernels (primitive : primitive_morph) =
+  let core = primitive.core in
+  match Hashtbl.find_opt kernels core.name with
+  | Some kernel -> add_kernel_ml buf model core.name core.source kernel
+  | None ->
+    let src_module = module_name_of_expr core.source in
+    let dst_module = module_name_of_expr core.target in
+    bprintf buf "  %s x =\n" core.name;
+    Array.iteri
+      (fun i target ->
+        let src_name = source_element_name core.source.name i model in
+        let dst_name = source_element_name core.target.name target model in
+        if i = 0
+        then
+          bprintf
+            buf
+            "    if %s.equal x %s.%s then %s.%s\n"
+            src_module
+            src_module
+            src_name
+            dst_module
+            dst_name
+        else
+          bprintf
+            buf
+            "    else if %s.equal x %s.%s then %s.%s\n"
+            src_module
+            src_module
+            src_name
+            dst_module
+            dst_name)
+      core.map;
+    bprintf buf "    else invalid_arg %S\n" core.name
+
+let add_bridge_ml buf model kernels (bridge : product_bridge) =
   let core = bridge.core in
-  let src_module = module_name_of_expr core.source in
-  let dst_module = module_name_of_expr core.target in
-  bprintf buf "  %s x =\n" core.name;
-  bprintf buf "    %s.make\n" dst_module;
-  List.iter
-    (fun (assignment : bridge_assignment) ->
-      bprintf buf "      ~%s:(" assignment.target_field;
-      (match assignment.expr with
-       | Source_field source_field ->
-         bprintf buf "%s.proj_%s x" src_module source_field
-       | Morph_apply { morph_name; source_field } ->
-         bprintf buf "%s (%s.proj_%s x)" morph_name src_module source_field
-       | Min ->
-         bprintf
-           buf
-           "%s.bottom"
-           (product_field_module_name model core.target assignment.target_field)
-       | Max ->
-         bprintf
-           buf
-           "%s.top"
-           (product_field_module_name model core.target assignment.target_field));
-      Buffer.add_string buf ")\n")
-    bridge.assignments
+  match Hashtbl.find_opt kernels core.name with
+  | Some kernel -> add_kernel_ml buf model core.name core.source kernel
+  | None ->
+    let src_module = module_name_of_expr core.source in
+    let dst_module = module_name_of_expr core.target in
+    bprintf buf "  %s x =\n" core.name;
+    bprintf buf "    %s.make\n" dst_module;
+    List.iter
+      (fun (assignment : bridge_assignment) ->
+        bprintf buf "      ~%s:(" assignment.target_field;
+        (match assignment.expr with
+         | Source_field source_field ->
+           bprintf buf "%s.proj_%s x" src_module source_field
+         | Morph_apply { morph_name; source_field } ->
+           bprintf buf "%s (%s.proj_%s x)" morph_name src_module source_field
+         | Min ->
+           bprintf
+             buf
+             "%s.bottom"
+             (product_field_module_name model core.target assignment.target_field)
+         | Max ->
+           bprintf
+             buf
+             "%s.top"
+             (product_field_module_name model core.target assignment.target_field));
+        Buffer.add_string buf ")\n")
+      bridge.assignments
 
 let add_morphs_sig buf model =
   String_map.iter
@@ -663,19 +1016,20 @@ let add_morphs_sig buf model =
 
 let add_morphs_ml buf model =
   let morphs = String_map.bindings model.morphs |> List.map snd in
+  let kernels = build_morph_kernels model in
   match morphs with
   | [] -> ()
   | first :: rest ->
     Buffer.add_string buf "let rec\n";
     (match first with
-     | Primitive primitive -> add_primitive_morph_ml buf model primitive
-     | Bridge bridge -> add_bridge_ml buf model bridge);
+     | Primitive primitive -> add_primitive_morph_ml buf model kernels primitive
+     | Bridge bridge -> add_bridge_ml buf model kernels bridge);
     List.iter
       (fun morph ->
         Buffer.add_string buf "\nand\n";
         match morph with
-        | Primitive primitive -> add_primitive_morph_ml buf model primitive
-        | Bridge bridge -> add_bridge_ml buf model bridge)
+        | Primitive primitive -> add_primitive_morph_ml buf model kernels primitive
+        | Bridge bridge -> add_bridge_ml buf model kernels bridge)
       rest;
     Buffer.add_string buf "\n"
 

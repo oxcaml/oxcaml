@@ -36,6 +36,31 @@
 <!-- lattice-gen-scaffold:start -->
 
 <style>
+  lat {
+    --tok-comment: #64748b;
+    --tok-string: #0f766e;
+    --tok-number: #1d4ed8;
+    --tok-keyword: #7c3aed;
+    --tok-op: #b45309;
+    --tok-punct: #475569;
+    --tok-ctor: #be123c;
+    --tok-type: #0369a1;
+    --tok-ident: #0f172a;
+    display: block;
+    margin: 1.5rem 0;
+    padding: 1rem 1.1rem;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    border: 1px solid #dbe4f0;
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.98));
+    color: #0f172a;
+    font: 13px/1.6 Menlo, Monaco, Consolas, monospace;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    tab-size: 2;
+  }
+
   .lattice-generated {
     margin: 1.5rem 0;
     border: 1px solid #cbd5e1;
@@ -98,6 +123,15 @@
   }
 
   .lattice-generated pre {
+    --tok-comment: #94a3b8;
+    --tok-string: #86efac;
+    --tok-number: #93c5fd;
+    --tok-keyword: #c4b5fd;
+    --tok-op: #fbbf24;
+    --tok-punct: #cbd5e1;
+    --tok-ctor: #fda4af;
+    --tok-type: #67e8f9;
+    --tok-ident: #e2e8f0;
     margin: 0;
     padding: 1rem;
     overflow-x: auto;
@@ -106,10 +140,86 @@
     color: #e2e8f0;
     font: 12px/1.5 Menlo, Monaco, Consolas, monospace;
   }
+
+  .tok-comment { color: var(--tok-comment); }
+  .tok-string { color: var(--tok-string); }
+  .tok-number { color: var(--tok-number); }
+  .tok-keyword { color: var(--tok-keyword); font-weight: 600; }
+  .tok-op { color: var(--tok-op); }
+  .tok-punct { color: var(--tok-punct); }
+  .tok-ctor { color: var(--tok-ctor); }
+  .tok-type { color: var(--tok-type); }
+  .tok-ident { color: var(--tok-ident); }
 </style>
 <script>
   (() => {
+    const escapeHtml = text =>
+      text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const span = (cls, text) =>
+      '<span class="' + cls + '">' + escapeHtml(text) + '</span>';
+
+    const ocamlKeywords = new Set([
+      'and', 'as', 'begin', 'class', 'constraint', 'do', 'done', 'downto',
+      'else', 'end', 'exception', 'external', 'false', 'for', 'fun',
+      'function', 'functor', 'if', 'in', 'include', 'inherit', 'initializer',
+      'lazy', 'let', 'match', 'method', 'module', 'mutable', 'new', 'nonrec',
+      'object', 'of', 'open', 'or', 'private', 'rec', 'sig', 'struct', 'then',
+      'to', 'true', 'try', 'type', 'val', 'virtual', 'when', 'while', 'with'
+    ]);
+
+    const latticeKeywords = new Set(['id', 'max', 'min', 'op', 'via']);
+
+    const tokenRe =
+      /(\(\*[\s\S]*?\*\)|"(?:\\.|[^"\\])*"|\b\d+\b|\b[A-Z][A-Za-z0-9_']*\b|\b[a-z_][A-Za-z0-9_'-]*\b|->|<=|>=|<>|&&|\|\||[<>=|^:+\-*/]+|[][(){};,])/g;
+
+    const highlight = (text, language) => {
+      let out = '';
+      let last = 0;
+      text.replace(tokenRe, (token, _m, offset) => {
+        out += escapeHtml(text.slice(last, offset));
+        let cls;
+        if (token.startsWith('(*')) cls = 'tok-comment';
+        else if (token.startsWith('"')) cls = 'tok-string';
+        else if (/^\d+$/.test(token)) cls = 'tok-number';
+        else if (
+          /^[<>=|^:+\-*/]+$/.test(token) ||
+          /^(->|<=|>=|<>|&&|\|\|)$/.test(token)
+        ) cls = 'tok-op';
+        else if (/^[\[\](){};,]$/.test(token)) cls = 'tok-punct';
+        else if (/^[A-Z]/.test(token)) cls = language === 'lattice' ? 'tok-ident' : 'tok-ctor';
+        else if (language === 'ocaml' && ocamlKeywords.has(token)) cls = 'tok-keyword';
+        else if (language === 'lattice' && latticeKeywords.has(token)) cls = 'tok-keyword';
+        else cls = language === 'ocaml' ? 'tok-ident' : 'tok-type';
+        out += span(cls, token);
+        last = offset + token.length;
+        return token;
+      });
+      out += escapeHtml(text.slice(last));
+      return out;
+    };
+
+    const highlightLatBlocks = () => {
+      for (const block of document.querySelectorAll('lat')) {
+        const text = block.textContent.replace(/^\n+|\n+\s*$/g, '');
+        block.innerHTML = highlight(text, 'lattice');
+      }
+    };
+
+    const highlightGeneratedBlocks = () => {
+      for (const pre of document.querySelectorAll('.lattice-generated pre[data-language]')) {
+        pre.innerHTML = highlight(pre.textContent, pre.dataset.language);
+      }
+    };
+
     const init = () => {
+      highlightLatBlocks();
+      highlightGeneratedBlocks();
       const blocks = document.querySelectorAll('.lattice-generated');
       for (const block of blocks) {
         const tabs = block.querySelectorAll('.lattice-generated-tab');

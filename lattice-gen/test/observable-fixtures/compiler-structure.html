@@ -4504,178 +4504,124 @@ end
 
 let rec
   alloc_as_value x =
-    Value.make
-      ~comonadic:(comonadic_locality_as_regionality (Alloc.proj_comonadic x))
-      ~monadic:(Alloc.proj_monadic x)
+    (x land 1)
+      lor (x lsl 1)
 
 and
   alloc_to_value_l2r x =
-    Value.make
-      ~comonadic:(comonadic_local_to_regional (Alloc.proj_comonadic x))
-      ~monadic:(Alloc.proj_monadic x)
+    (x land 1)
+      lor ((x land 16382) lsl 1)
 
 and
   comonadic_local_to_regional x =
-    Comonadic_with_regionality.make
-      ~areality:(local_to_regional (Comonadic_with_locality.proj_areality x))
-      ~comonadic:(Comonadic_with_locality.proj_comonadic x)
+    (x land 1)
+      lor ((x land 254) lsl 1)
 
 and
   comonadic_locality_as_regionality x =
-    Comonadic_with_regionality.make
-      ~areality:(locality_as_regionality (Comonadic_with_locality.proj_areality x))
-      ~comonadic:(Comonadic_with_locality.proj_comonadic x)
+    (x land 1)
+      lor (x lsl 1)
 
 and
   comonadic_r2g x =
-    Comonadic_with_regionality.make
-      ~areality:(regional_r2g (Comonadic_with_regionality.proj_areality x))
-      ~comonadic:(Comonadic_with_regionality.proj_comonadic x)
+    ((x land 2) lsr 1)
+      lor (x land 510)
 
 and
   comonadic_regional_to_global x =
-    Comonadic_with_locality.make
-      ~areality:(regional_to_global (Comonadic_with_regionality.proj_areality x))
-      ~comonadic:(Comonadic_with_regionality.proj_comonadic x)
+    (x lsr 1)
 
 and
   comonadic_regional_to_local x =
-    Comonadic_with_locality.make
-      ~areality:(regional_to_local (Comonadic_with_regionality.proj_areality x))
-      ~comonadic:(Comonadic_with_regionality.proj_comonadic x)
+    ((x land 508) lsr 1)
+      lor (x land 1)
 
 and
   comonadic_to_monadic_max x =
-    Monadic_op.make
-      ~uniqueness:(linear_to_unique (Comonadic.proj_linearity x))
-      ~contention:(portable_to_contended (Comonadic.proj_portability x))
-      ~visibility:(statefulness_to_visibility (Comonadic.proj_statefulness x))
-      ~staticity:(Staticity_op.top)
+    32
+      lor ((x land 96) lsr 2)
+      lor (x land 7)
 
 and
   comonadic_to_monadic_min x =
-    Monadic_op.make
-      ~uniqueness:(linear_to_unique (Comonadic.proj_linearity x))
-      ~contention:(portable_to_contended (Comonadic.proj_portability x))
-      ~visibility:(statefulness_to_visibility (Comonadic.proj_statefulness x))
-      ~staticity:(Staticity_op.bottom)
+    ((x land 96) lsr 2)
+      lor (x land 7)
 
 and
   contended_to_portable x =
-    if Contention_op.equal x Contention_op.contended then Portability.portable
-    else if Contention_op.equal x Contention_op.shared then Portability.shareable
-    else if Contention_op.equal x Contention_op.uncontended then Portability.nonportable
-    else invalid_arg &quot;contended_to_portable&quot;
+    x
 
 and
   global_to_regional x =
-    if Locality.equal x Locality.global then Regionality.regional
-    else if Locality.equal x Locality.local then Regionality.local
-    else invalid_arg &quot;global_to_regional&quot;
+    1
+      lor (x lsl 1)
 
 and
   linear_to_unique x =
-    if Linearity.equal x Linearity.many then Uniqueness_op.aliased
-    else if Linearity.equal x Linearity.once then Uniqueness_op.unique
-    else invalid_arg &quot;linear_to_unique&quot;
+    x
 
 and
   local_to_regional x =
-    if Locality.equal x Locality.global then Regionality.global
-    else if Locality.equal x Locality.local then Regionality.regional
-    else invalid_arg &quot;local_to_regional&quot;
+    x
 
 and
   locality_as_regionality x =
-    if Locality.equal x Locality.global then Regionality.global
-    else if Locality.equal x Locality.local then Regionality.local
-    else invalid_arg &quot;locality_as_regionality&quot;
+    x
+      lor (x lsl 1)
 
 and
   monadic_to_comonadic_max x =
-    Comonadic.make
-      ~linearity:(unique_to_linear (Monadic_op.proj_uniqueness x))
-      ~portability:(contended_to_portable (Monadic_op.proj_contention x))
-      ~statefulness:(visibility_to_statefulness (Monadic_op.proj_visibility x))
-      ~forkable:(Forkable.top)
-      ~yielding:(Yielding.top)
+    24
+      lor (x land 7)
+      lor ((x land 24) lsl 2)
 
 and
   monadic_to_comonadic_min x =
-    Comonadic.make
-      ~linearity:(unique_to_linear (Monadic_op.proj_uniqueness x))
-      ~portability:(contended_to_portable (Monadic_op.proj_contention x))
-      ~statefulness:(visibility_to_statefulness (Monadic_op.proj_visibility x))
-      ~forkable:(Forkable.bottom)
-      ~yielding:(Yielding.bottom)
+    (x land 7)
+      lor ((x land 24) lsl 2)
 
 and
   portable_to_contended x =
-    if Portability.equal x Portability.portable then Contention_op.contended
-    else if Portability.equal x Portability.shareable then Contention_op.shared
-    else if Portability.equal x Portability.nonportable then Contention_op.uncontended
-    else invalid_arg &quot;portable_to_contended&quot;
+    x
 
 and
   regional_r2g x =
-    if Regionality.equal x Regionality.global then Regionality.global
-    else if Regionality.equal x Regionality.regional then Regionality.global
-    else if Regionality.equal x Regionality.local then Regionality.local
-    else invalid_arg &quot;regional_r2g&quot;
+    (x lsr 1)
+      lor (x land 2)
 
 and
   regional_to_global x =
-    if Regionality.equal x Regionality.global then Locality.global
-    else if Regionality.equal x Regionality.regional then Locality.global
-    else if Regionality.equal x Regionality.local then Locality.local
-    else invalid_arg &quot;regional_to_global&quot;
+    (x lsr 1)
 
 and
   regional_to_local x =
-    if Regionality.equal x Regionality.global then Locality.global
-    else if Regionality.equal x Regionality.regional then Locality.local
-    else if Regionality.equal x Regionality.local then Locality.local
-    else invalid_arg &quot;regional_to_local&quot;
+    (x land 1)
 
 and
   statefulness_to_visibility x =
-    if Statefulness.equal x Statefulness.stateless then Visibility_op.immutable
-    else if Statefulness.equal x Statefulness.writing then Visibility_op.write
-    else if Statefulness.equal x Statefulness.stateful then Visibility_op.read_write
-    else if Statefulness.equal x Statefulness.reading then Visibility_op.read
-    else invalid_arg &quot;statefulness_to_visibility&quot;
+    x
 
 and
   unique_to_linear x =
-    if Uniqueness_op.equal x Uniqueness_op.aliased then Linearity.many
-    else if Uniqueness_op.equal x Uniqueness_op.unique then Linearity.once
-    else invalid_arg &quot;unique_to_linear&quot;
+    x
 
 and
   value_r2g x =
-    Value.make
-      ~comonadic:(comonadic_r2g (Value.proj_comonadic x))
-      ~monadic:(Value.proj_monadic x)
+    ((x land 2) lsr 1)
+      lor (x land 32766)
 
 and
   value_to_alloc_r2g x =
-    Alloc.make
-      ~comonadic:(comonadic_regional_to_global (Value.proj_comonadic x))
-      ~monadic:(Value.proj_monadic x)
+    (x lsr 1)
 
 and
   value_to_alloc_r2l x =
-    Alloc.make
-      ~comonadic:(comonadic_regional_to_local (Value.proj_comonadic x))
-      ~monadic:(Value.proj_monadic x)
+    ((x land 32764) lsr 1)
+      lor (x land 1)
 
 and
   visibility_to_statefulness x =
-    if Visibility_op.equal x Visibility_op.immutable then Statefulness.stateless
-    else if Visibility_op.equal x Visibility_op.read then Statefulness.reading
-    else if Visibility_op.equal x Visibility_op.read_write then Statefulness.stateful
-    else if Visibility_op.equal x Visibility_op.write then Statefulness.writing
-    else invalid_arg &quot;visibility_to_statefulness&quot;
+    x
 
 </pre>
 </div>

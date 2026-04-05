@@ -10,7 +10,6 @@
  (libraries lattice_gen_lib unix)
  (deps
   example.lattice
-  compiler_structure.lattice
   chains.lattice
   diamond.lattice
   sampled_product.lattice
