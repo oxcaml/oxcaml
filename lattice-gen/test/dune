@@ -4,6 +4,7 @@
  test_semantics
  test_support
   test_bitwise
+  test_codegen_shapes
   test_negative_cases
   test_model_structure
   test_observable

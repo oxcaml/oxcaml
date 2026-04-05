@@ -14,47 +14,63 @@ let add_indented_block buf indent text =
   String.split_on_char '\n' text
   |> List.iter (fun line -> bprintf buf "%s%s\n" indent line)
 
+let add_inline_or_block buf indent head expr =
+  let compact = Bitwise.render expr in
+  let inline_line = Printf.sprintf "%s%s = %s" indent head compact in
+  if String.length inline_line <= 80
+  then bprintf buf "%s\n" inline_line
+  else (
+    bprintf buf "%s%s =\n" indent head;
+    add_indented_block
+      buf
+      (indent ^ "  ")
+      (Bitwise.render_pretty ~width:(max 32 (80 - String.length indent - 2)) expr))
+
 let render_bitwise_function_ml ?(indent = "  ") ?(bindings = []) buf name args expr =
   let avoid = args @ List.map fst bindings in
   let cse_bindings, expr = Bitwise.cse ~avoid expr in
-  bprintf buf "%slet[@inline] %s %s =\n" indent name (String.concat " " args);
-  let binding_width = max 32 (72 - String.length indent - 4) in
-  List.iter
-    (fun (binding_name, binding_expr) ->
-      let rendered = Bitwise.render_pretty ~width:binding_width binding_expr in
-      match String.split_on_char '\n' rendered with
-      | [ line ] ->
-        bprintf
-          buf
-          "%s  let %s = %s in\n"
-          indent
-          binding_name
-          line
-      | _ ->
-        bprintf buf "%s  let %s =\n" indent binding_name;
-        add_indented_block buf (indent ^ "    ") rendered;
-        bprintf buf "%s  in\n" indent)
-    bindings;
-  List.iter
-    (fun (binding : Bitwise.binding) ->
-      let rendered = Bitwise.render_pretty ~width:binding_width binding.expr in
-      match String.split_on_char '\n' rendered with
-      | [ line ] ->
-        bprintf
-          buf
-          "%s  let %s = %s in\n"
-          indent
-          binding.name
-          line
-      | _ ->
-        bprintf buf "%s  let %s =\n" indent binding.name;
-        add_indented_block buf (indent ^ "    ") rendered;
-        bprintf buf "%s  in\n" indent)
-    cse_bindings;
-  add_indented_block
-    buf
-    (indent ^ "  ")
-    (Bitwise.render_pretty ~width:(max 32 (72 - String.length indent - 2)) expr)
+  let head = Printf.sprintf "let[@inline] %s %s" name (String.concat " " args) in
+  if bindings = [] && cse_bindings = []
+  then add_inline_or_block buf indent head expr
+  else (
+    bprintf buf "%s%s =\n" indent head;
+    let binding_width = max 32 (80 - String.length indent - 4) in
+    List.iter
+      (fun (binding_name, binding_expr) ->
+        let rendered = Bitwise.render_pretty ~width:binding_width binding_expr in
+        match String.split_on_char '\n' rendered with
+        | [ line ] ->
+          bprintf
+            buf
+            "%s  let %s = %s in\n"
+            indent
+            binding_name
+            line
+        | _ ->
+          bprintf buf "%s  let %s =\n" indent binding_name;
+          add_indented_block buf (indent ^ "    ") rendered;
+          bprintf buf "%s  in\n" indent)
+      bindings;
+    List.iter
+      (fun (binding : Bitwise.binding) ->
+        let rendered = Bitwise.render_pretty ~width:binding_width binding.expr in
+        match String.split_on_char '\n' rendered with
+        | [ line ] ->
+          bprintf
+            buf
+            "%s  let %s = %s in\n"
+            indent
+            binding.name
+            line
+        | _ ->
+          bprintf buf "%s  let %s =\n" indent binding.name;
+          add_indented_block buf (indent ^ "    ") rendered;
+          bprintf buf "%s  in\n" indent)
+      cse_bindings;
+    add_indented_block
+      buf
+      (indent ^ "  ")
+      (Bitwise.render_pretty ~width:(max 32 (80 - String.length indent - 2)) expr))
 
 let build_schedule_expr expr rounds direction =
   List.fold_left
@@ -439,16 +455,16 @@ let add_product_ml buf (product : product) module_name (desc : descriptor) ~in_o
   Buffer.add_string buf "    }\n\n";
   List.iter
     (fun (field : field) ->
-      bprintf
+      add_inline_or_block
         buf
-        "  let[@inline] %s t = %s\n"
-        (proj_name field)
-        (Bitwise.render (view_field_expr field));
-      bprintf
+        "  "
+        (Printf.sprintf "let[@inline] %s t" (proj_name field))
+        (view_field_expr field);
+      add_inline_or_block
         buf
-        "  let[@inline] %s x t = %s\n"
-        (with_name field)
-        (Bitwise.render (with_field_expr field));
+        "  "
+        (Printf.sprintf "let[@inline] %s x t" (with_name field))
+        (with_field_expr field);
       Buffer.add_char buf '\n')
     product.fields;
   Buffer.add_string buf "  let print ppf x =\n";

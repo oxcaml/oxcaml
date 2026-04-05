@@ -1,12 +1,11 @@
 let run () =
   Test_support.with_temp_dir "observable-" (fun dir ->
-      let fixtures_src =
-        Filename.concat (Filename.concat (Sys.getcwd ()) "test") "observable-fixtures"
-      in
-      let fixtures_dst = Filename.concat dir "observable-fixtures" in
-      Test_support.copy_tree ~src:fixtures_src ~dst:fixtures_dst;
-      Observable.process_paths ~mode:Observable.Update ~test:false [ fixtures_dst ];
-      let basic = Test_support.read_file (Filename.concat fixtures_dst "basic.html") in
+      let fixtures_dir = Filename.concat (Filename.concat (Sys.getcwd ()) "test") "observable-fixtures" in
+      let basic_src = Filename.concat fixtures_dir "basic.html" in
+      let basic_dst = Filename.concat dir "basic.html" in
+      Test_support.copy_tree ~src:basic_src ~dst:basic_dst;
+      Observable.process_paths ~mode:Observable.Update ~test:false [ basic_dst ];
+      let basic = Test_support.read_file basic_dst in
       Test_support.ensure
         (Test_support.contains basic "lattice-gen-output:start")
         "basic observable page missing generated marker";
@@ -25,11 +24,8 @@ let run () =
       Test_support.ensure
         (Test_support.contains basic "module Locality = struct")
         "basic observable page missing generated module";
-      Observable.process_paths ~mode:Observable.Check ~test:false [ fixtures_dst ];
-      Observable.process_paths
-        ~mode:Observable.Check
-        ~test:true
-        [ Filename.concat fixtures_dst "basic.html" ];
+      Observable.process_paths ~mode:Observable.Check ~test:false [ basic_dst ];
+      Observable.process_paths ~mode:Observable.Check ~test:true [ basic_dst ];
       let bad_input =
         Filename.concat (Filename.concat (Sys.getcwd ()) "test") "observable_input.html"
       in

@@ -348,8 +348,8 @@ module Pretty = struct
         best indent rest
       | (indent, Cat (left, right)) :: rest ->
         best col ((indent, left) :: (indent, right) :: rest)
-      | (_, Nest (indent', doc)) :: rest ->
-        best col ((col + indent', doc) :: rest)
+      | (indent, Nest (indent', doc)) :: rest ->
+        best col ((indent' + indent, doc) :: rest)
       | (indent, Union (left, right)) :: rest ->
         if fits (width - col) [ (indent, left) ]
         then best col ((indent, left) :: rest)
@@ -452,30 +452,5 @@ let cse ?(avoid = []) root =
         bindings := !bindings @ [ { name; expr = t } ];
         var ~mask:t.mask name
   in
-  let extract_for_readability root =
-    let maybe_extract child =
-      let k = key child in
-      let occurrences = Option.value (Hashtbl.find_opt counts k) ~default:0 in
-      if
-        occurrences = 1
-        && size child > 4
-        &&
-        match child.node with
-        | Var _ | Const _ -> false
-        | _ -> true
-      then (
-        let name = fresh_name () in
-        Hashtbl.add avoid name ();
-        bindings := !bindings @ [ { name; expr = child } ];
-        var ~mask:child.mask name)
-      else child
-    in
-    match root.node with
-    | Or children when List.length children >= 3 ->
-      or_ (List.map maybe_extract children)
-    | And children when List.length children >= 3 ->
-      and_ (List.map maybe_extract children)
-    | _ -> root
-  in
-  let root = rewrite ~is_root:true root |> extract_for_readability in
+  let root = rewrite ~is_root:true root in
   (!bindings, root)
