@@ -125,7 +125,7 @@ end
 
 module Locality_check : Axis_like = Generated.Locality
 module Locality_op_check : Axis_like = Generated.Locality_op
-module Packed_axes_kind_view_check : Product_like = Generated.Packed_axes_kind_view
+module Kind_axes_check : Product_like = Generated.Kind_axes
 module Value_check : Product_like = Generated.Value
 module Alloc_check : Product_like = Generated.Alloc
 

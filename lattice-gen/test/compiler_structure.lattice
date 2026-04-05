@@ -1,10 +1,18 @@
-Locality = [
-  Global < Local
-]
-
-Regionality = [
-  Global < Regional < Local
-]
+Locality = [ Global < Local ]
+Regionality = [ Global < Regional < Local ]
+Uniqueness = [ Unique < Aliased ]
+Linearity = [ Many < Once ]
+Portability = [ Portable < Shareable < Nonportable ]
+Contention = [ Uncontended < Shared < Contended ]
+Forkable = [ Forkable < Unforkable ]
+Yielding = [ Unyielding < Yielding ]
+Staticity = [ Static < Dynamic ]
+Statefulness = [ Stateless < Writing < Stateful; Stateless < Reading < Stateful ]
+Visibility = [ Read_write < Read < Immutable; Read_write < Write < Immutable ]
+Externality = [ External_ < External64 < Internal ]
+Nullability = [ Non_null < Maybe_null ]
+Separability = [ Non_float < Separable < Maybe_separable ]
+Pointerness = [ Non_pointer < Maybe_pointer ]
 
 Locality <= Regionality via {
   Global -> Global;
@@ -17,60 +25,6 @@ Locality <= Regionality via {
   right2 = Global_to_regional;
 }
 
-Uniqueness = [
-  Unique < Aliased
-]
-
-Linearity = [
-  Many < Once
-]
-
-Portability = [
-  Portable < Shareable < Nonportable
-]
-
-Contention = [
-  Uncontended < Shared < Contended
-]
-
-Forkable = [
-  Forkable < Unforkable
-]
-
-Yielding = [
-  Unyielding < Yielding
-]
-
-Staticity = [
-  Static < Dynamic
-]
-
-Statefulness = [
-  Stateless < Writing < Stateful;
-  Stateless < Reading < Stateful
-]
-
-Visibility = [
-  Read_write < Read < Immutable;
-  Read_write < Write < Immutable
-]
-
-Externality = [
-  External_ < External64 < Internal
-]
-
-Nullability = [
-  Non_null < Maybe_null
-]
-
-Separability = [
-  Non_float < Separable < Maybe_separable
-]
-
-Pointerness = [
-  Non_pointer < Maybe_pointer
-]
-
 Monadic = {
   uniqueness : Uniqueness;
   contention : Contention;
@@ -78,8 +32,7 @@ Monadic = {
   staticity : Staticity;
 }
 
-Comonadic_with_locality = {
-  areality : Locality;
+Comonadic = {
   linearity : Linearity;
   portability : Portability;
   forkable : Forkable;
@@ -87,13 +40,14 @@ Comonadic_with_locality = {
   statefulness : Statefulness;
 }
 
+Comonadic_with_locality = {
+  areality : Locality;
+  comonadic : Comonadic;
+}
+
 Comonadic_with_regionality = {
   areality : Regionality;
-  linearity : Linearity;
-  portability : Portability;
-  forkable : Forkable;
-  yielding : Yielding;
-  statefulness : Statefulness;
+  comonadic : Comonadic;
 }
 
 Value = {
@@ -107,37 +61,14 @@ Alloc = {
 }
 
 Scannable_axes = {
+  externality : Externality;
+  nullability : Nullability;
+  separability : Separability;
   pointerness : Pointerness;
 }
 
-Packed_axes_raw = {
-  areality : Regionality;
-  uniqueness : Uniqueness;
-  linearity : Linearity;
-  contention : Contention;
-  portability : Portability;
-  forkable : Forkable;
-  yielding : Yielding;
-  statefulness : Statefulness;
-  visibility : Visibility;
-  staticity : Staticity;
-  externality : Externality;
-  nullability : Nullability;
-  separability : Separability;
-}
-
-Packed_axes_kind_view = {
-  areality : Regionality;
-  uniqueness : Uniqueness ^op;
-  linearity : Linearity;
-  contention : Contention ^op;
-  portability : Portability;
-  forkable : Forkable;
-  yielding : Yielding;
-  statefulness : Statefulness;
-  visibility : Visibility ^op;
-  staticity : Staticity ^op;
-  externality : Externality;
-  nullability : Nullability;
-  separability : Separability;
+Kind_axes = {
+  comonadic : Comonadic_with_locality;
+  monadic : Monadic ^op;
+  scannable : Scannable_axes;
 }
