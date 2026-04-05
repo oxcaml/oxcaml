@@ -21,8 +21,7 @@ open Types
 type namespace := Shape.Sig_component_kind.t
 
 val namespaced_ident: namespace -> Ident.t -> string
-(* CR rtjoa:  *)
-(* val string_of_label: Types.arg_label -> string *)
+val string_of_label: Types.arg_label -> string
 val string_of_path: Path.t -> string
 val strings_of_paths: namespace -> Path.t list -> string list
 (** Print a list of paths, using the same naming context to
