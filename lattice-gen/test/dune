@@ -2,11 +2,12 @@
  (name test_semantics)
  (libraries lattice_gen_lib unix)
  (deps
-  example.lattice
+ example.lattice
   compiler_structure.lattice
  compiler_structure_kind_subbed.lattice
  chains.lattice
   diamond.lattice
+  mode_compatibility_source.ml
   sampled_product.lattice
   observable_input.html
   observable-fixtures/basic.html

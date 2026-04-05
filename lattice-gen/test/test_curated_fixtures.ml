@@ -18,7 +18,6 @@ let run () =
            ~name:fixture
            ~source
            [ "ignore (";
-             "Repr.of_int_exn";
              "lsr 0";
              "let close_repr x = x";
              "let close_down_nat x = x";

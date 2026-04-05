@@ -243,6 +243,41 @@ let compile_generated_case ~name ~source =
         source
         (Printexc.to_string exn))
 
+let compile_generated_case_with_module ~name ~source ~module_name ~module_source =
+  with_temp_dir ("lattice-gen-" ^ name ^ "-") (fun dir ->
+    try
+      ignore (generate_case_files ~dir ~source);
+      write_file (Filename.concat dir (module_name ^ ".ml")) module_source;
+      write_file
+        (Filename.concat dir "dune")
+        (Printf.sprintf
+           {|(executable
+ (name %s)
+ (modules generated solver_runtime %s)
+ (flags (:standard -w -53))
+ (libraries ocamlcommon))
+|}
+           module_name
+           module_name);
+      let root = compiler_root () in
+      let rel_dir =
+        Filename.concat "lattice-gen-test-build" (Filename.basename dir)
+      in
+      run_command
+        ~cwd:root
+        (Printf.sprintf
+           "RUNTIME_DIR=runtime4 dune build --display=short %s/%s.exe"
+           rel_dir
+           module_name)
+    with
+    | exn ->
+      failf
+        "generated compile case %s with extra module %s failed\nsource:\n%s\nerror: %s"
+        name
+        module_name
+        source
+        (Printexc.to_string exn))
+
 let run_generated_case ~name ~source =
   with_temp_dir ("lattice-gen-" ^ name ^ "-") (fun dir ->
     try

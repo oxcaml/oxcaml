@@ -83,15 +83,12 @@ module Make (C : Solver_intf.Lattices_mono) = struct
     let log = Some log' in
     op ~log
 
-  let error_to_string obj ({ left; right; _ } : int Raw.error_raw) =
-    Fmt.asprintf "%a <= %a does not hold" (C.print obj) left (C.print obj) right
-
   let equate_from_submode submode_log m1 m2 ~log =
     match submode_log m1 m2 ~log with
-    | Error e -> Error (error_to_string, e, true)
+    | Error e -> Error (true, e)
     | Ok () -> (
       match submode_log m2 m1 ~log with
-      | Error e -> Error (error_to_string, e, false)
+      | Error e -> Error (false, e)
       | Ok () -> Ok ())
 
   module type OBJ = sig
@@ -113,32 +110,13 @@ module Make (C : Solver_intf.Lattices_mono) = struct
     let newvar_below m = Raw.newvar_below Obj_desc.obj m
     let submode_log a b ~log = Raw.submode () Obj_desc.obj a b ~log
 
-    let submode a b =
-      match try_with_log (submode_log a b) with
-      | Ok () -> Ok ()
-      | Error error -> Error (error_to_string Obj_desc.obj error)
+    let submode_raw a b = try_with_log (submode_log a b)
 
-    let submode_exn a b =
-      match submode a b with
-      | Ok () -> ()
-      | Error message -> invalid_arg message
-
-    let equate a b =
+    let equate_raw a b =
       let submode_log a b ~log = Raw.submode () Obj_desc.obj a b ~log in
       match try_with_log (equate_from_submode submode_log a b) with
       | Ok () -> Ok ()
-      | Error (to_string, error, forward) ->
-        let message =
-          if forward
-          then to_string Obj_desc.obj error
-          else to_string Obj_desc.obj error
-        in
-        Error message
-
-    let equate_exn a b =
-      match equate a b with
-      | Ok () -> ()
-      | Error message -> invalid_arg message
+      | Error (forward, error) -> Error (forward, error)
 
     let join modes = Raw.join Obj_desc.obj modes
     let meet modes = Raw.meet Obj_desc.obj modes

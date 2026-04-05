@@ -240,6 +240,19 @@ let add_solver_items_sig buf =
     \  type r = (Allowance.disallowed * Allowance.allowed) t\n\
     \  type lr = (Allowance.allowed * Allowance.allowed) t\n\
     \n\
+    \  type simple_error = {\n\
+    \    left : const;\n\
+    \    right : const;\n\
+    \  }\n\
+    \n\
+    \  type error = simple_error\n\
+    \n\
+    \  type equate_step =\n\
+    \    | Left_le_right\n\
+    \    | Right_le_left\n\
+    \n\
+    \  type equate_error = equate_step * error\n\
+    \n\
     \  val min : lr\n\
     \  val max : lr\n\
     \  val legacy : lr\n\
@@ -251,9 +264,13 @@ let add_solver_items_sig buf =
     \  val newvar_above : l -> ('l * 'r) t * bool\n\
     \  val newvar_below : r -> ('l * 'r) t * bool\n\
     \n\
-    \  val submode : l -> r -> (unit, string) result\n\
+    \  val to_simple_error : error -> simple_error\n\
+    \  val print_error : Format.formatter -> error -> unit\n\
+    \  val print_equate_error : Format.formatter -> equate_error -> unit\n\
+    \n\
+    \  val submode : l -> r -> (unit, error) result\n\
     \  val submode_exn : l -> r -> unit\n\
-    \  val equate : lr -> lr -> (unit, string) result\n\
+    \  val equate : lr -> lr -> (unit, equate_error) result\n\
     \  val equate_exn : lr -> lr -> unit\n\
     \n\
     \  val join : l list -> l\n\
@@ -1002,8 +1019,10 @@ let add_solver_wrapper_functor_ml buf =
     "module Make_solver_module\n\
     \    (Const_desc : sig\n\
     \      type t\n\
+    \      val pp : Format.formatter -> t -> unit\n\
     \      module Repr : sig\n\
     \        val to_int : t -> int\n\
+    \        val of_int_exn : int -> t\n\
     \      end\n\
     \      val legacy : t\n\
     \    end)\n\
@@ -1014,6 +1033,54 @@ let add_solver_wrapper_functor_ml buf =
     \  include Solver_support.Positive_gen (Obj_desc)\n\
     \n\
     \  let of_const_value c = of_const (Const_desc.Repr.to_int c)\n\
+    \n\
+    \  type simple_error = {\n\
+    \    left : Const_desc.t;\n\
+    \    right : Const_desc.t;\n\
+    \  }\n\
+    \n\
+    \  type error = simple_error\n\
+    \n\
+    \  type equate_step =\n\
+    \    | Left_le_right\n\
+    \    | Right_le_left\n\
+    \n\
+    \  type equate_error = equate_step * error\n\
+    \n\
+    \  let error_of_raw ({ left; right; _ } : int Solver_support.Raw.error_raw) =\n\
+    \    {\n\
+    \      left = Const_desc.Repr.of_int_exn left;\n\
+    \      right = Const_desc.Repr.of_int_exn right;\n\
+    \    }\n\
+    \n\
+    \  let to_simple_error error = error\n\
+    \n\
+    \  let print_error ppf { left; right } =\n\
+    \    Format.fprintf ppf \"%a <= %a does not hold\" Const_desc.pp left Const_desc.pp right\n\
+    \n\
+    \  let print_equate_error ppf = function\n\
+    \    | Left_le_right, error ->\n\
+    \      Format.fprintf ppf \"Left_le_right: %a\" print_error error\n\
+    \    | Right_le_left, error ->\n\
+    \      Format.fprintf ppf \"Right_le_left: %a\" print_error error\n\
+    \n\
+    \  let submode a b = Result.map_error error_of_raw (submode_raw a b)\n\
+    \n\
+    \  let submode_exn a b =\n\
+    \    match submode a b with\n\
+    \    | Ok () -> ()\n\
+    \    | Error error -> invalid_arg (Format.asprintf \"%a\" print_error error)\n\
+    \n\
+    \  let equate a b =\n\
+    \    Result.map_error\n\
+    \      (fun (forward, error) ->\n\
+    \        ((if forward then Left_le_right else Right_le_left), error_of_raw error))\n\
+    \      (equate_raw a b)\n\
+    \n\
+    \  let equate_exn a b =\n\
+    \    match equate a b with\n\
+    \    | Ok () -> ()\n\
+    \    | Error error -> invalid_arg (Format.asprintf \"%a\" print_equate_error error)\n\
     \  let legacy = of_const_value Const_desc.legacy\n\
     \  let show ?verbose t = Format_doc.asprintf \"%a\" (print ?verbose) t\n\
     end\n\n"
@@ -1230,7 +1297,7 @@ let add_product_ml
       then
         bprintf
           buf
-          "    let[@inline] %s = %s.Const.%s\n"
+          "    let %s = %s.Const.%s\n"
           field.name
           product.name
           field.name
@@ -1249,7 +1316,7 @@ let add_product_ml
       then
         bprintf
           buf
-          "    let[@inline] with_%s = %s.Const.with_%s\n"
+          "    let with_%s = %s.Const.with_%s\n"
           field.name
           product.name
           field.name
