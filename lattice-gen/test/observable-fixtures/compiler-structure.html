@@ -498,48 +498,6 @@ value_r2g : Value -> Value = {
   let legacy = global
 end
 
-module Locality_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
-
-  let global = 0
-  let local = 1
-
-  let name x =
-    if equal x global then &quot;Global&quot;
-    else if equal x local then &quot;Local&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Global&quot; -&gt; Some global
-    | &quot;Local&quot; -&gt; Some local
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = global
-end
-
 module Regionality = struct
   type t = int
 
@@ -573,61 +531,6 @@ module Regionality = struct
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot (close_up_nat zxy) land 3
-
-  let global = 0
-  let regional = 1
-  let local = 3
-
-  let name x =
-    if equal x global then &quot;Global&quot;
-    else if equal x regional then &quot;Regional&quot;
-    else if equal x local then &quot;Local&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Global&quot; -&gt; Some global
-    | &quot;Regional&quot; -&gt; Some regional
-    | &quot;Local&quot; -&gt; Some local
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = global
-end
-
-module Regionality_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2) lsr 1) in
-      x
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
-  let bottom = 3
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot (close_up_dual zyx) land 3
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    close_down_dual zyx
 
   let global = 0
   let regional = 1
@@ -692,48 +595,6 @@ module Uniqueness = struct
   let legacy = aliased
 end
 
-module Uniqueness_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] sub x y =
-    let zxy = x land lnot y in
-    zxy
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 1
-
-  let aliased = 0
-  let unique = 1
-
-  let name x =
-    if equal x aliased then &quot;Aliased&quot;
-    else if equal x unique then &quot;Unique&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Aliased&quot; -&gt; Some aliased
-    | &quot;Unique&quot; -&gt; Some unique
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = aliased
-end
-
 module Linearity = struct
   type t = int
 
@@ -757,48 +618,6 @@ module Linearity = struct
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot zxy land 1
-
-  let many = 0
-  let once = 1
-
-  let name x =
-    if equal x many then &quot;Many&quot;
-    else if equal x once then &quot;Once&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Many&quot; -&gt; Some many
-    | &quot;Once&quot; -&gt; Some once
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = many
-end
-
-module Linearity_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
 
   let many = 0
   let once = 1
@@ -851,61 +670,6 @@ module Portability = struct
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot (close_up_nat zxy) land 3
-
-  let portable = 0
-  let shareable = 1
-  let nonportable = 3
-
-  let name x =
-    if equal x portable then &quot;Portable&quot;
-    else if equal x shareable then &quot;Shareable&quot;
-    else if equal x nonportable then &quot;Nonportable&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Portable&quot; -&gt; Some portable
-    | &quot;Shareable&quot; -&gt; Some shareable
-    | &quot;Nonportable&quot; -&gt; Some nonportable
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = nonportable
-end
-
-module Portability_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2) lsr 1) in
-      x
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
-  let bottom = 3
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot (close_up_dual zyx) land 3
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    close_down_dual zyx
 
   let portable = 0
   let shareable = 1
@@ -983,61 +747,6 @@ module Contention = struct
   let legacy = uncontended
 end
 
-module Contention_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2) lsr 1) in
-      x
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_nat x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_nat x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
-  let bottom = 0
-  let top = 3
-  let[@inline] leq x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] sub x y =
-    let zxy = x land lnot y in
-    close_down_nat zxy
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot (close_up_nat zxy) land 3
-
-  let contended = 0
-  let shared = 1
-  let uncontended = 3
-
-  let name x =
-    if equal x contended then &quot;Contended&quot;
-    else if equal x shared then &quot;Shared&quot;
-    else if equal x uncontended then &quot;Uncontended&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Contended&quot; -&gt; Some contended
-    | &quot;Shared&quot; -&gt; Some shared
-    | &quot;Uncontended&quot; -&gt; Some uncontended
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = uncontended
-end
-
 module Forkable = struct
   type t = int
 
@@ -1061,48 +770,6 @@ module Forkable = struct
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot zxy land 1
-
-  let forkable = 0
-  let unforkable = 1
-
-  let name x =
-    if equal x forkable then &quot;Forkable&quot;
-    else if equal x unforkable then &quot;Unforkable&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Forkable&quot; -&gt; Some forkable
-    | &quot;Unforkable&quot; -&gt; Some unforkable
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = forkable
-end
-
-module Forkable_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
 
   let forkable = 0
   let unforkable = 1
@@ -1164,48 +831,6 @@ module Yielding = struct
   let legacy = unyielding
 end
 
-module Yielding_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
-
-  let unyielding = 0
-  let yielding = 1
-
-  let name x =
-    if equal x unyielding then &quot;Unyielding&quot;
-    else if equal x yielding then &quot;Yielding&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Unyielding&quot; -&gt; Some unyielding
-    | &quot;Yielding&quot; -&gt; Some yielding
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = unyielding
-end
-
 module Staticity = struct
   type t = int
 
@@ -1229,48 +854,6 @@ module Staticity = struct
   let[@inline] imply x y =
     let zyx = y land lnot x in
     zyx
-
-  let dynamic = 0
-  let static = 1
-
-  let name x =
-    if equal x dynamic then &quot;Dynamic&quot;
-    else if equal x static then &quot;Static&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Dynamic&quot; -&gt; Some dynamic
-    | &quot;Static&quot; -&gt; Some static
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = dynamic
-end
-
-module Staticity_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 0
-  let top = 1
-  let[@inline] leq x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] sub x y =
-    let zxy = x land lnot y in
-    zxy
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 1
 
   let dynamic = 0
   let static = 1
@@ -1338,54 +921,6 @@ module Statefulness = struct
   let legacy = stateful
 end
 
-module Statefulness_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 3
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 3
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
-
-  let stateless = 0
-  let writing = 2
-  let stateful = 3
-  let reading = 1
-
-  let name x =
-    if equal x stateless then &quot;Stateless&quot;
-    else if equal x writing then &quot;Writing&quot;
-    else if equal x stateful then &quot;Stateful&quot;
-    else if equal x reading then &quot;Reading&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Stateless&quot; -&gt; Some stateless
-    | &quot;Writing&quot; -&gt; Some writing
-    | &quot;Stateful&quot; -&gt; Some stateful
-    | &quot;Reading&quot; -&gt; Some reading
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = stateful
-end
-
 module Visibility = struct
   type t = int
 
@@ -1409,54 +944,6 @@ module Visibility = struct
   let[@inline] imply x y =
     let zyx = y land lnot x in
     zyx
-
-  let immutable = 0
-  let read = 1
-  let read_write = 3
-  let write = 2
-
-  let name x =
-    if equal x immutable then &quot;Immutable&quot;
-    else if equal x read then &quot;Read&quot;
-    else if equal x read_write then &quot;Read_write&quot;
-    else if equal x write then &quot;Write&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Immutable&quot; -&gt; Some immutable
-    | &quot;Read&quot; -&gt; Some read
-    | &quot;Read_write&quot; -&gt; Some read_write
-    | &quot;Write&quot; -&gt; Some write
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = read_write
-end
-
-module Visibility_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 0
-  let top = 3
-  let[@inline] leq x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] sub x y =
-    let zxy = x land lnot y in
-    zxy
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 3
 
   let immutable = 0
   let read = 1
@@ -1537,61 +1024,6 @@ module Externality = struct
   let legacy = top
 end
 
-module Externality_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2) lsr 1) in
-      x
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
-  let bottom = 3
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot (close_up_dual zyx) land 3
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    close_down_dual zyx
-
-  let external_ = 0
-  let external64 = 1
-  let internal = 3
-
-  let name x =
-    if equal x external_ then &quot;External_&quot;
-    else if equal x external64 then &quot;External64&quot;
-    else if equal x internal then &quot;Internal&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;External_&quot; -&gt; Some external_
-    | &quot;External64&quot; -&gt; Some external64
-    | &quot;Internal&quot; -&gt; Some internal
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = top
-end
-
 module Nullability = struct
   type t = int
 
@@ -1615,48 +1047,6 @@ module Nullability = struct
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot zxy land 1
-
-  let non_null = 0
-  let maybe_null = 1
-
-  let name x =
-    if equal x non_null then &quot;Non_null&quot;
-    else if equal x maybe_null then &quot;Maybe_null&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Non_null&quot; -&gt; Some non_null
-    | &quot;Maybe_null&quot; -&gt; Some maybe_null
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = top
-end
-
-module Nullability_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
 
   let non_null = 0
   let maybe_null = 1
@@ -1731,61 +1121,6 @@ module Separability = struct
   let legacy = top
 end
 
-module Separability_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2) lsr 1) in
-      x
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
-  let bottom = 3
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot (close_up_dual zyx) land 3
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    close_down_dual zyx
-
-  let non_float = 0
-  let separable = 1
-  let maybe_separable = 3
-
-  let name x =
-    if equal x non_float then &quot;Non_float&quot;
-    else if equal x separable then &quot;Separable&quot;
-    else if equal x maybe_separable then &quot;Maybe_separable&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Non_float&quot; -&gt; Some non_float
-    | &quot;Separable&quot; -&gt; Some separable
-    | &quot;Maybe_separable&quot; -&gt; Some maybe_separable
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = top
-end
-
 module Pointerness = struct
   type t = int
 
@@ -1809,48 +1144,6 @@ module Pointerness = struct
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot zxy land 1
-
-  let non_pointer = 0
-  let maybe_pointer = 1
-
-  let name x =
-    if equal x non_pointer then &quot;Non_pointer&quot;
-    else if equal x maybe_pointer then &quot;Maybe_pointer&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Non_pointer&quot; -&gt; Some non_pointer
-    | &quot;Maybe_pointer&quot; -&gt; Some maybe_pointer
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = top
-end
-
-module Pointerness_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
 
   let non_pointer = 0
   let maybe_pointer = 1
@@ -1944,85 +1237,21 @@ module Monadic = struct
   let with_uniqueness x t = (t land lnot 1) lor ((x land 1) lsl 0)
   let min_with_uniqueness x = with_uniqueness x bottom
   let max_with_uniqueness x = with_uniqueness x top
-  let uniqueness_bot = min_with_uniqueness Uniqueness.bottom
-  let uniqueness_top = max_with_uniqueness Uniqueness.top
 
   let proj_contention t = (t lsr 1) land 3
   let with_contention x t = (t land lnot 6) lor ((x land 3) lsl 1)
   let min_with_contention x = with_contention x bottom
   let max_with_contention x = with_contention x top
-  let contention_bot = min_with_contention Contention.bottom
-  let contention_top = max_with_contention Contention.top
 
   let proj_visibility t = (t lsr 3) land 3
   let with_visibility x t = (t land lnot 24) lor ((x land 3) lsl 3)
   let min_with_visibility x = with_visibility x bottom
   let max_with_visibility x = with_visibility x top
-  let visibility_bot = min_with_visibility Visibility.bottom
-  let visibility_top = max_with_visibility Visibility.top
 
   let proj_staticity t = (t lsr 5) land 1
   let with_staticity x t = (t land lnot 32) lor ((x land 1) lsl 5)
   let min_with_staticity x = with_staticity x bottom
   let max_with_staticity x = with_staticity x top
-  let staticity_bot = min_with_staticity Staticity.bottom
-  let staticity_top = max_with_staticity Staticity.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Uniqueness : Uniqueness.t t
-    type _ t += Contention : Contention.t t
-    type _ t += Visibility : Visibility.t t
-    type _ t += Staticity : Staticity.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Uniqueness;
-        Pack Contention;
-        Pack Visibility;
-        Pack Staticity;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Uniqueness -&gt; &quot;uniqueness&quot;
-      | Contention -&gt; &quot;contention&quot;
-      | Visibility -&gt; &quot;visibility&quot;
-      | Staticity -&gt; &quot;staticity&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Uniqueness -&gt; proj_uniqueness
-      | Contention -&gt; proj_contention
-      | Visibility -&gt; proj_visibility
-      | Staticity -&gt; proj_staticity
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Uniqueness -&gt; with_uniqueness
-      | Contention -&gt; with_contention
-      | Visibility -&gt; with_visibility
-      | Staticity -&gt; with_staticity
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Uniqueness -&gt; min_with_uniqueness
-      | Contention -&gt; min_with_contention
-      | Visibility -&gt; min_with_visibility
-      | Staticity -&gt; min_with_staticity
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Uniqueness -&gt; max_with_uniqueness
-      | Contention -&gt; max_with_contention
-      | Visibility -&gt; max_with_visibility
-      | Staticity -&gt; max_with_staticity
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
 
   let name x =
     let view = view x in
@@ -2044,196 +1273,6 @@ module Monadic = struct
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~uniqueness:Uniqueness.legacy
-      ~contention:Contention.legacy
-      ~visibility:Visibility.legacy
-      ~staticity:Staticity.legacy
-end
-
-module Monadic_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 4) lsr 1) in
-      x
-    let mask = 63
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_nat x =
-    let x = x lor ((x land 4) lsr 1) in
-    x
-  let[@inline] close_up_nat x =
-    let x = x lor ((x land 2) lsl 1) in
-    x
-  let bottom = 0
-  let top = 63
-  let[@inline] leq x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] sub x y =
-    let zxy = x land lnot y in
-    close_down_nat zxy
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot (close_up_nat zxy) land 63
-
-  type view = {
-    uniqueness : Uniqueness_op.t;
-    contention : Contention_op.t;
-    visibility : Visibility_op.t;
-    staticity : Staticity_op.t;
-  }
-
-  type nonrec product = t
-
-  let of_view view =
-    let uniqueness = (view.uniqueness land 1) lsl 0 in
-    let contention = (view.contention land 3) lsl 1 in
-    let visibility = (view.visibility land 3) lsl 3 in
-    let staticity = (view.staticity land 1) lsl 5 in
-    uniqueness lor contention lor visibility lor staticity
-
-  let view t =
-    {
-      uniqueness = (t lsr 0) land 1;
-      contention = (t lsr 1) land 3;
-      visibility = (t lsr 3) land 3;
-      staticity = (t lsr 5) land 1;
-    }
-
-  let make =
-    fun ~uniqueness -&gt;
-    fun ~contention -&gt;
-    fun ~visibility -&gt;
-    fun ~staticity -&gt;
-    of_view {
-      uniqueness;
-      contention;
-      visibility;
-      staticity;
-    }
-
-  let proj_uniqueness t = (t lsr 0) land 1
-  let with_uniqueness x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_uniqueness x = with_uniqueness x bottom
-  let max_with_uniqueness x = with_uniqueness x top
-  let uniqueness_bot = min_with_uniqueness Uniqueness_op.bottom
-  let uniqueness_top = max_with_uniqueness Uniqueness_op.top
-
-  let proj_contention t = (t lsr 1) land 3
-  let with_contention x t = (t land lnot 6) lor ((x land 3) lsl 1)
-  let min_with_contention x = with_contention x bottom
-  let max_with_contention x = with_contention x top
-  let contention_bot = min_with_contention Contention_op.bottom
-  let contention_top = max_with_contention Contention_op.top
-
-  let proj_visibility t = (t lsr 3) land 3
-  let with_visibility x t = (t land lnot 24) lor ((x land 3) lsl 3)
-  let min_with_visibility x = with_visibility x bottom
-  let max_with_visibility x = with_visibility x top
-  let visibility_bot = min_with_visibility Visibility_op.bottom
-  let visibility_top = max_with_visibility Visibility_op.top
-
-  let proj_staticity t = (t lsr 5) land 1
-  let with_staticity x t = (t land lnot 32) lor ((x land 1) lsl 5)
-  let min_with_staticity x = with_staticity x bottom
-  let max_with_staticity x = with_staticity x top
-  let staticity_bot = min_with_staticity Staticity_op.bottom
-  let staticity_top = max_with_staticity Staticity_op.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Uniqueness : Uniqueness_op.t t
-    type _ t += Contention : Contention_op.t t
-    type _ t += Visibility : Visibility_op.t t
-    type _ t += Staticity : Staticity_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Uniqueness;
-        Pack Contention;
-        Pack Visibility;
-        Pack Staticity;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Uniqueness -&gt; &quot;uniqueness&quot;
-      | Contention -&gt; &quot;contention&quot;
-      | Visibility -&gt; &quot;visibility&quot;
-      | Staticity -&gt; &quot;staticity&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Uniqueness -&gt; proj_uniqueness
-      | Contention -&gt; proj_contention
-      | Visibility -&gt; proj_visibility
-      | Staticity -&gt; proj_staticity
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Uniqueness -&gt; with_uniqueness
-      | Contention -&gt; with_contention
-      | Visibility -&gt; with_visibility
-      | Staticity -&gt; with_staticity
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Uniqueness -&gt; min_with_uniqueness
-      | Contention -&gt; min_with_contention
-      | Visibility -&gt; min_with_visibility
-      | Staticity -&gt; min_with_staticity
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Uniqueness -&gt; max_with_uniqueness
-      | Contention -&gt; max_with_contention
-      | Visibility -&gt; max_with_visibility
-      | Staticity -&gt; max_with_staticity
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
-
-  let name x =
-    let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Monadic_op { &quot;;
-    Buffer.add_string b &quot;uniqueness = &quot;;
-    Buffer.add_string b (Uniqueness_op.show view.uniqueness);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;contention = &quot;;
-    Buffer.add_string b (Contention_op.show view.contention);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;visibility = &quot;;
-    Buffer.add_string b (Visibility_op.show view.visibility);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;staticity = &quot;;
-    Buffer.add_string b (Staticity_op.show view.staticity);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~uniqueness:Uniqueness_op.legacy
-      ~contention:Contention_op.legacy
-      ~visibility:Visibility_op.legacy
-      ~staticity:Staticity_op.legacy
 end
 
 module Comonadic = struct
@@ -2315,99 +1354,26 @@ module Comonadic = struct
   let with_linearity x t = (t land lnot 1) lor ((x land 1) lsl 0)
   let min_with_linearity x = with_linearity x bottom
   let max_with_linearity x = with_linearity x top
-  let linearity_bot = min_with_linearity Linearity.bottom
-  let linearity_top = max_with_linearity Linearity.top
 
   let proj_portability t = (t lsr 1) land 3
   let with_portability x t = (t land lnot 6) lor ((x land 3) lsl 1)
   let min_with_portability x = with_portability x bottom
   let max_with_portability x = with_portability x top
-  let portability_bot = min_with_portability Portability.bottom
-  let portability_top = max_with_portability Portability.top
 
   let proj_forkable t = (t lsr 3) land 1
   let with_forkable x t = (t land lnot 8) lor ((x land 1) lsl 3)
   let min_with_forkable x = with_forkable x bottom
   let max_with_forkable x = with_forkable x top
-  let forkable_bot = min_with_forkable Forkable.bottom
-  let forkable_top = max_with_forkable Forkable.top
 
   let proj_yielding t = (t lsr 4) land 1
   let with_yielding x t = (t land lnot 16) lor ((x land 1) lsl 4)
   let min_with_yielding x = with_yielding x bottom
   let max_with_yielding x = with_yielding x top
-  let yielding_bot = min_with_yielding Yielding.bottom
-  let yielding_top = max_with_yielding Yielding.top
 
   let proj_statefulness t = (t lsr 5) land 3
   let with_statefulness x t = (t land lnot 96) lor ((x land 3) lsl 5)
   let min_with_statefulness x = with_statefulness x bottom
   let max_with_statefulness x = with_statefulness x top
-  let statefulness_bot = min_with_statefulness Statefulness.bottom
-  let statefulness_top = max_with_statefulness Statefulness.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Linearity : Linearity.t t
-    type _ t += Portability : Portability.t t
-    type _ t += Forkable : Forkable.t t
-    type _ t += Yielding : Yielding.t t
-    type _ t += Statefulness : Statefulness.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Linearity;
-        Pack Portability;
-        Pack Forkable;
-        Pack Yielding;
-        Pack Statefulness;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Linearity -&gt; &quot;linearity&quot;
-      | Portability -&gt; &quot;portability&quot;
-      | Forkable -&gt; &quot;forkable&quot;
-      | Yielding -&gt; &quot;yielding&quot;
-      | Statefulness -&gt; &quot;statefulness&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Linearity -&gt; proj_linearity
-      | Portability -&gt; proj_portability
-      | Forkable -&gt; proj_forkable
-      | Yielding -&gt; proj_yielding
-      | Statefulness -&gt; proj_statefulness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Linearity -&gt; with_linearity
-      | Portability -&gt; with_portability
-      | Forkable -&gt; with_forkable
-      | Yielding -&gt; with_yielding
-      | Statefulness -&gt; with_statefulness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Linearity -&gt; min_with_linearity
-      | Portability -&gt; min_with_portability
-      | Forkable -&gt; min_with_forkable
-      | Yielding -&gt; min_with_yielding
-      | Statefulness -&gt; min_with_statefulness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Linearity -&gt; max_with_linearity
-      | Portability -&gt; max_with_portability
-      | Forkable -&gt; max_with_forkable
-      | Yielding -&gt; max_with_yielding
-      | Statefulness -&gt; max_with_statefulness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
 
   let name x =
     let view = view x in
@@ -2432,220 +1398,6 @@ module Comonadic = struct
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~linearity:Linearity.legacy
-      ~portability:Portability.legacy
-      ~forkable:Forkable.legacy
-      ~yielding:Yielding.legacy
-      ~statefulness:Statefulness.legacy
-end
-
-module Comonadic_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 4) lsr 1) in
-      x
-    let mask = 127
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 4) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 2) lsl 1) in
-    x
-  let bottom = 127
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot (close_up_dual zyx) land 127
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    close_down_dual zyx
-
-  type view = {
-    linearity : Linearity_op.t;
-    portability : Portability_op.t;
-    forkable : Forkable_op.t;
-    yielding : Yielding_op.t;
-    statefulness : Statefulness_op.t;
-  }
-
-  type nonrec product = t
-
-  let of_view view =
-    let linearity = (view.linearity land 1) lsl 0 in
-    let portability = (view.portability land 3) lsl 1 in
-    let forkable = (view.forkable land 1) lsl 3 in
-    let yielding = (view.yielding land 1) lsl 4 in
-    let statefulness = (view.statefulness land 3) lsl 5 in
-    linearity lor portability lor forkable lor yielding lor statefulness
-
-  let view t =
-    {
-      linearity = (t lsr 0) land 1;
-      portability = (t lsr 1) land 3;
-      forkable = (t lsr 3) land 1;
-      yielding = (t lsr 4) land 1;
-      statefulness = (t lsr 5) land 3;
-    }
-
-  let make =
-    fun ~linearity -&gt;
-    fun ~portability -&gt;
-    fun ~forkable -&gt;
-    fun ~yielding -&gt;
-    fun ~statefulness -&gt;
-    of_view {
-      linearity;
-      portability;
-      forkable;
-      yielding;
-      statefulness;
-    }
-
-  let proj_linearity t = (t lsr 0) land 1
-  let with_linearity x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_linearity x = with_linearity x bottom
-  let max_with_linearity x = with_linearity x top
-  let linearity_bot = min_with_linearity Linearity_op.bottom
-  let linearity_top = max_with_linearity Linearity_op.top
-
-  let proj_portability t = (t lsr 1) land 3
-  let with_portability x t = (t land lnot 6) lor ((x land 3) lsl 1)
-  let min_with_portability x = with_portability x bottom
-  let max_with_portability x = with_portability x top
-  let portability_bot = min_with_portability Portability_op.bottom
-  let portability_top = max_with_portability Portability_op.top
-
-  let proj_forkable t = (t lsr 3) land 1
-  let with_forkable x t = (t land lnot 8) lor ((x land 1) lsl 3)
-  let min_with_forkable x = with_forkable x bottom
-  let max_with_forkable x = with_forkable x top
-  let forkable_bot = min_with_forkable Forkable_op.bottom
-  let forkable_top = max_with_forkable Forkable_op.top
-
-  let proj_yielding t = (t lsr 4) land 1
-  let with_yielding x t = (t land lnot 16) lor ((x land 1) lsl 4)
-  let min_with_yielding x = with_yielding x bottom
-  let max_with_yielding x = with_yielding x top
-  let yielding_bot = min_with_yielding Yielding_op.bottom
-  let yielding_top = max_with_yielding Yielding_op.top
-
-  let proj_statefulness t = (t lsr 5) land 3
-  let with_statefulness x t = (t land lnot 96) lor ((x land 3) lsl 5)
-  let min_with_statefulness x = with_statefulness x bottom
-  let max_with_statefulness x = with_statefulness x top
-  let statefulness_bot = min_with_statefulness Statefulness_op.bottom
-  let statefulness_top = max_with_statefulness Statefulness_op.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Linearity : Linearity_op.t t
-    type _ t += Portability : Portability_op.t t
-    type _ t += Forkable : Forkable_op.t t
-    type _ t += Yielding : Yielding_op.t t
-    type _ t += Statefulness : Statefulness_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Linearity;
-        Pack Portability;
-        Pack Forkable;
-        Pack Yielding;
-        Pack Statefulness;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Linearity -&gt; &quot;linearity&quot;
-      | Portability -&gt; &quot;portability&quot;
-      | Forkable -&gt; &quot;forkable&quot;
-      | Yielding -&gt; &quot;yielding&quot;
-      | Statefulness -&gt; &quot;statefulness&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Linearity -&gt; proj_linearity
-      | Portability -&gt; proj_portability
-      | Forkable -&gt; proj_forkable
-      | Yielding -&gt; proj_yielding
-      | Statefulness -&gt; proj_statefulness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Linearity -&gt; with_linearity
-      | Portability -&gt; with_portability
-      | Forkable -&gt; with_forkable
-      | Yielding -&gt; with_yielding
-      | Statefulness -&gt; with_statefulness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Linearity -&gt; min_with_linearity
-      | Portability -&gt; min_with_portability
-      | Forkable -&gt; min_with_forkable
-      | Yielding -&gt; min_with_yielding
-      | Statefulness -&gt; min_with_statefulness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Linearity -&gt; max_with_linearity
-      | Portability -&gt; max_with_portability
-      | Forkable -&gt; max_with_forkable
-      | Yielding -&gt; max_with_yielding
-      | Statefulness -&gt; max_with_statefulness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
-
-  let name x =
-    let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Comonadic_op { &quot;;
-    Buffer.add_string b &quot;linearity = &quot;;
-    Buffer.add_string b (Linearity_op.show view.linearity);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;portability = &quot;;
-    Buffer.add_string b (Portability_op.show view.portability);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;forkable = &quot;;
-    Buffer.add_string b (Forkable_op.show view.forkable);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;yielding = &quot;;
-    Buffer.add_string b (Yielding_op.show view.yielding);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;statefulness = &quot;;
-    Buffer.add_string b (Statefulness_op.show view.statefulness);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~linearity:Linearity_op.legacy
-      ~portability:Portability_op.legacy
-      ~forkable:Forkable_op.legacy
-      ~yielding:Yielding_op.legacy
-      ~statefulness:Statefulness_op.legacy
 end
 
 module Comonadic_with_locality = struct
@@ -2712,57 +1464,11 @@ module Comonadic_with_locality = struct
   let with_areality x t = (t land lnot 1) lor ((x land 1) lsl 0)
   let min_with_areality x = with_areality x bottom
   let max_with_areality x = with_areality x top
-  let areality_bot = min_with_areality Locality.bottom
-  let areality_top = max_with_areality Locality.top
 
   let proj_comonadic t = (t lsr 1) land 127
   let with_comonadic x t = (t land lnot 254) lor ((x land 127) lsl 1)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic Comonadic.bottom
-  let comonadic_top = max_with_comonadic Comonadic.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Areality : Locality.t t
-    type _ t += Comonadic : Comonadic.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Areality;
-        Pack Comonadic;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Areality -&gt; &quot;areality&quot;
-      | Comonadic -&gt; &quot;comonadic&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Areality -&gt; proj_areality
-      | Comonadic -&gt; proj_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Areality -&gt; with_areality
-      | Comonadic -&gt; with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Areality -&gt; min_with_areality
-      | Comonadic -&gt; min_with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Areality -&gt; max_with_areality
-      | Comonadic -&gt; max_with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
 
   let name x =
     let view = view x in
@@ -2778,148 +1484,6 @@ module Comonadic_with_locality = struct
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~areality:Locality.legacy
-      ~comonadic:Comonadic.legacy
-end
-
-module Comonadic_with_locality_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 8) lsr 1) in
-      x
-    let mask = 255
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 8) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 4) lsl 1) in
-    x
-  let bottom = 255
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot (close_up_dual zyx) land 255
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    close_down_dual zyx
-
-  type view = {
-    areality : Locality_op.t;
-    comonadic : Comonadic_op.t;
-  }
-
-  type nonrec product = t
-
-  let of_view view =
-    let areality = (view.areality land 1) lsl 0 in
-    let comonadic = (view.comonadic land 127) lsl 1 in
-    areality lor comonadic
-
-  let view t =
-    {
-      areality = (t lsr 0) land 1;
-      comonadic = (t lsr 1) land 127;
-    }
-
-  let make =
-    fun ~areality -&gt;
-    fun ~comonadic -&gt;
-    of_view {
-      areality;
-      comonadic;
-    }
-
-  let proj_areality t = (t lsr 0) land 1
-  let with_areality x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_areality x = with_areality x bottom
-  let max_with_areality x = with_areality x top
-  let areality_bot = min_with_areality Locality_op.bottom
-  let areality_top = max_with_areality Locality_op.top
-
-  let proj_comonadic t = (t lsr 1) land 127
-  let with_comonadic x t = (t land lnot 254) lor ((x land 127) lsl 1)
-  let min_with_comonadic x = with_comonadic x bottom
-  let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic Comonadic_op.bottom
-  let comonadic_top = max_with_comonadic Comonadic_op.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Areality : Locality_op.t t
-    type _ t += Comonadic : Comonadic_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Areality;
-        Pack Comonadic;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Areality -&gt; &quot;areality&quot;
-      | Comonadic -&gt; &quot;comonadic&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Areality -&gt; proj_areality
-      | Comonadic -&gt; proj_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Areality -&gt; with_areality
-      | Comonadic -&gt; with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Areality -&gt; min_with_areality
-      | Comonadic -&gt; min_with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Areality -&gt; max_with_areality
-      | Comonadic -&gt; max_with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
-
-  let name x =
-    let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Comonadic_with_locality_op { &quot;;
-    Buffer.add_string b &quot;areality = &quot;;
-    Buffer.add_string b (Locality_op.show view.areality);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;comonadic = &quot;;
-    Buffer.add_string b (Comonadic_op.show view.comonadic);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~areality:Locality_op.legacy
-      ~comonadic:Comonadic_op.legacy
 end
 
 module Comonadic_with_regionality = struct
@@ -2986,57 +1550,11 @@ module Comonadic_with_regionality = struct
   let with_areality x t = (t land lnot 3) lor ((x land 3) lsl 0)
   let min_with_areality x = with_areality x bottom
   let max_with_areality x = with_areality x top
-  let areality_bot = min_with_areality Regionality.bottom
-  let areality_top = max_with_areality Regionality.top
 
   let proj_comonadic t = (t lsr 2) land 127
   let with_comonadic x t = (t land lnot 508) lor ((x land 127) lsl 2)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic Comonadic.bottom
-  let comonadic_top = max_with_comonadic Comonadic.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Areality : Regionality.t t
-    type _ t += Comonadic : Comonadic.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Areality;
-        Pack Comonadic;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Areality -&gt; &quot;areality&quot;
-      | Comonadic -&gt; &quot;comonadic&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Areality -&gt; proj_areality
-      | Comonadic -&gt; proj_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Areality -&gt; with_areality
-      | Comonadic -&gt; with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Areality -&gt; min_with_areality
-      | Comonadic -&gt; min_with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Areality -&gt; max_with_areality
-      | Comonadic -&gt; max_with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
 
   let name x =
     let view = view x in
@@ -3052,148 +1570,6 @@ module Comonadic_with_regionality = struct
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~areality:Regionality.legacy
-      ~comonadic:Comonadic.legacy
-end
-
-module Comonadic_with_regionality_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 18) lsr 1) in
-      x
-    let mask = 511
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 18) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 9) lsl 1) in
-    x
-  let bottom = 511
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot (close_up_dual zyx) land 511
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    close_down_dual zyx
-
-  type view = {
-    areality : Regionality_op.t;
-    comonadic : Comonadic_op.t;
-  }
-
-  type nonrec product = t
-
-  let of_view view =
-    let areality = (view.areality land 3) lsl 0 in
-    let comonadic = (view.comonadic land 127) lsl 2 in
-    areality lor comonadic
-
-  let view t =
-    {
-      areality = (t lsr 0) land 3;
-      comonadic = (t lsr 2) land 127;
-    }
-
-  let make =
-    fun ~areality -&gt;
-    fun ~comonadic -&gt;
-    of_view {
-      areality;
-      comonadic;
-    }
-
-  let proj_areality t = (t lsr 0) land 3
-  let with_areality x t = (t land lnot 3) lor ((x land 3) lsl 0)
-  let min_with_areality x = with_areality x bottom
-  let max_with_areality x = with_areality x top
-  let areality_bot = min_with_areality Regionality_op.bottom
-  let areality_top = max_with_areality Regionality_op.top
-
-  let proj_comonadic t = (t lsr 2) land 127
-  let with_comonadic x t = (t land lnot 508) lor ((x land 127) lsl 2)
-  let min_with_comonadic x = with_comonadic x bottom
-  let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic Comonadic_op.bottom
-  let comonadic_top = max_with_comonadic Comonadic_op.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Areality : Regionality_op.t t
-    type _ t += Comonadic : Comonadic_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Areality;
-        Pack Comonadic;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Areality -&gt; &quot;areality&quot;
-      | Comonadic -&gt; &quot;comonadic&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Areality -&gt; proj_areality
-      | Comonadic -&gt; proj_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Areality -&gt; with_areality
-      | Comonadic -&gt; with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Areality -&gt; min_with_areality
-      | Comonadic -&gt; min_with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Areality -&gt; max_with_areality
-      | Comonadic -&gt; max_with_comonadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
-
-  let name x =
-    let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Comonadic_with_regionality_op { &quot;;
-    Buffer.add_string b &quot;areality = &quot;;
-    Buffer.add_string b (Regionality_op.show view.areality);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;comonadic = &quot;;
-    Buffer.add_string b (Comonadic_op.show view.comonadic);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~areality:Regionality_op.legacy
-      ~comonadic:Comonadic_op.legacy
 end
 
 module Value = struct
@@ -3278,57 +1654,11 @@ module Value = struct
   let with_comonadic x t = (t land lnot 511) lor ((x land 511) lsl 0)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic Comonadic_with_regionality.bottom
-  let comonadic_top = max_with_comonadic Comonadic_with_regionality.top
 
   let proj_monadic t = (t lsr 9) land 63
   let with_monadic x t = (t land lnot 32256) lor ((x land 63) lsl 9)
   let min_with_monadic x = with_monadic x bottom
   let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic Monadic.bottom
-  let monadic_top = max_with_monadic Monadic.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_regionality.t t
-    type _ t += Monadic : Monadic.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Comonadic;
-        Pack Monadic;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Comonadic -&gt; &quot;comonadic&quot;
-      | Monadic -&gt; &quot;monadic&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Comonadic -&gt; proj_comonadic
-      | Monadic -&gt; proj_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Comonadic -&gt; with_comonadic
-      | Monadic -&gt; with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; min_with_comonadic
-      | Monadic -&gt; min_with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; max_with_comonadic
-      | Monadic -&gt; max_with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
 
   let name x =
     let view = view x in
@@ -3344,166 +1674,6 @@ module Value = struct
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~comonadic:Comonadic_with_regionality.legacy
-      ~monadic:Monadic.legacy
-end
-
-module Value_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2066) lsr 1) in
-      x
-    let mask = 32767
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_nat x =
-    let x = x lor ((x land 2066) lsr 1) in
-    x
-  let[@inline] close_up_nat x =
-    let x = x lor ((x land 1033) lsl 1) in
-    x
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 2066) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 1033) lsl 1) in
-    x
-  let bottom = 511
-  let top = 32256
-  let[@inline] leq x y =
-    (((x land lnot y) land 32256) = 0)
-    &amp;&amp; (((y land lnot x) land 511) = 0)
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y =
-    let o = x lor y in
-    let a = x land y in
-    (o land 32256) lor (a land 511)
-  let[@inline] meet x y =
-    let o = x lor y in
-    let a = x land y in
-    (a land 32256) lor (o land 511)
-  let[@inline] sub x y =
-    let zxy = x land lnot y in
-    let zyx = y land lnot x in
-    ((close_down_nat zxy) land 32256)
-    lor ((lnot (close_up_dual zyx)) land 511)
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    let zyx = y land lnot x in
-    ((lnot (close_up_nat zxy)) land 32256)
-    lor ((close_down_dual zyx) land 511)
-
-  type view = {
-    comonadic : Comonadic_with_regionality_op.t;
-    monadic : Monadic_op.t;
-  }
-
-  type nonrec product = t
-
-  let of_view view =
-    let comonadic = (view.comonadic land 511) lsl 0 in
-    let monadic = (view.monadic land 63) lsl 9 in
-    comonadic lor monadic
-
-  let view t =
-    {
-      comonadic = (t lsr 0) land 511;
-      monadic = (t lsr 9) land 63;
-    }
-
-  let make =
-    fun ~comonadic -&gt;
-    fun ~monadic -&gt;
-    of_view {
-      comonadic;
-      monadic;
-    }
-
-  let proj_comonadic t = (t lsr 0) land 511
-  let with_comonadic x t = (t land lnot 511) lor ((x land 511) lsl 0)
-  let min_with_comonadic x = with_comonadic x bottom
-  let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic Comonadic_with_regionality_op.bottom
-  let comonadic_top = max_with_comonadic Comonadic_with_regionality_op.top
-
-  let proj_monadic t = (t lsr 9) land 63
-  let with_monadic x t = (t land lnot 32256) lor ((x land 63) lsl 9)
-  let min_with_monadic x = with_monadic x bottom
-  let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic Monadic_op.bottom
-  let monadic_top = max_with_monadic Monadic_op.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_regionality_op.t t
-    type _ t += Monadic : Monadic_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Comonadic;
-        Pack Monadic;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Comonadic -&gt; &quot;comonadic&quot;
-      | Monadic -&gt; &quot;monadic&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Comonadic -&gt; proj_comonadic
-      | Monadic -&gt; proj_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Comonadic -&gt; with_comonadic
-      | Monadic -&gt; with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; min_with_comonadic
-      | Monadic -&gt; min_with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; max_with_comonadic
-      | Monadic -&gt; max_with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
-
-  let name x =
-    let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Value_op { &quot;;
-    Buffer.add_string b &quot;comonadic = &quot;;
-    Buffer.add_string b (Comonadic_with_regionality_op.show view.comonadic);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;monadic = &quot;;
-    Buffer.add_string b (Monadic_op.show view.monadic);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~comonadic:Comonadic_with_regionality_op.legacy
-      ~monadic:Monadic_op.legacy
 end
 
 module Alloc = struct
@@ -3588,57 +1758,11 @@ module Alloc = struct
   let with_comonadic x t = (t land lnot 255) lor ((x land 255) lsl 0)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic Comonadic_with_locality.bottom
-  let comonadic_top = max_with_comonadic Comonadic_with_locality.top
 
   let proj_monadic t = (t lsr 8) land 63
   let with_monadic x t = (t land lnot 16128) lor ((x land 63) lsl 8)
   let min_with_monadic x = with_monadic x bottom
   let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic Monadic.bottom
-  let monadic_top = max_with_monadic Monadic.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_locality.t t
-    type _ t += Monadic : Monadic.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Comonadic;
-        Pack Monadic;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Comonadic -&gt; &quot;comonadic&quot;
-      | Monadic -&gt; &quot;monadic&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Comonadic -&gt; proj_comonadic
-      | Monadic -&gt; proj_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Comonadic -&gt; with_comonadic
-      | Monadic -&gt; with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; min_with_comonadic
-      | Monadic -&gt; min_with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; max_with_comonadic
-      | Monadic -&gt; max_with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
 
   let name x =
     let view = view x in
@@ -3654,166 +1778,6 @@ module Alloc = struct
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~comonadic:Comonadic_with_locality.legacy
-      ~monadic:Monadic.legacy
-end
-
-module Alloc_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 1032) lsr 1) in
-      x
-    let mask = 16383
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_nat x =
-    let x = x lor ((x land 1032) lsr 1) in
-    x
-  let[@inline] close_up_nat x =
-    let x = x lor ((x land 516) lsl 1) in
-    x
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 1032) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 516) lsl 1) in
-    x
-  let bottom = 255
-  let top = 16128
-  let[@inline] leq x y =
-    (((x land lnot y) land 16128) = 0)
-    &amp;&amp; (((y land lnot x) land 255) = 0)
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y =
-    let o = x lor y in
-    let a = x land y in
-    (o land 16128) lor (a land 255)
-  let[@inline] meet x y =
-    let o = x lor y in
-    let a = x land y in
-    (a land 16128) lor (o land 255)
-  let[@inline] sub x y =
-    let zxy = x land lnot y in
-    let zyx = y land lnot x in
-    ((close_down_nat zxy) land 16128)
-    lor ((lnot (close_up_dual zyx)) land 255)
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    let zyx = y land lnot x in
-    ((lnot (close_up_nat zxy)) land 16128)
-    lor ((close_down_dual zyx) land 255)
-
-  type view = {
-    comonadic : Comonadic_with_locality_op.t;
-    monadic : Monadic_op.t;
-  }
-
-  type nonrec product = t
-
-  let of_view view =
-    let comonadic = (view.comonadic land 255) lsl 0 in
-    let monadic = (view.monadic land 63) lsl 8 in
-    comonadic lor monadic
-
-  let view t =
-    {
-      comonadic = (t lsr 0) land 255;
-      monadic = (t lsr 8) land 63;
-    }
-
-  let make =
-    fun ~comonadic -&gt;
-    fun ~monadic -&gt;
-    of_view {
-      comonadic;
-      monadic;
-    }
-
-  let proj_comonadic t = (t lsr 0) land 255
-  let with_comonadic x t = (t land lnot 255) lor ((x land 255) lsl 0)
-  let min_with_comonadic x = with_comonadic x bottom
-  let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic Comonadic_with_locality_op.bottom
-  let comonadic_top = max_with_comonadic Comonadic_with_locality_op.top
-
-  let proj_monadic t = (t lsr 8) land 63
-  let with_monadic x t = (t land lnot 16128) lor ((x land 63) lsl 8)
-  let min_with_monadic x = with_monadic x bottom
-  let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic Monadic_op.bottom
-  let monadic_top = max_with_monadic Monadic_op.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_locality_op.t t
-    type _ t += Monadic : Monadic_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Comonadic;
-        Pack Monadic;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Comonadic -&gt; &quot;comonadic&quot;
-      | Monadic -&gt; &quot;monadic&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Comonadic -&gt; proj_comonadic
-      | Monadic -&gt; proj_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Comonadic -&gt; with_comonadic
-      | Monadic -&gt; with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; min_with_comonadic
-      | Monadic -&gt; min_with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; max_with_comonadic
-      | Monadic -&gt; max_with_monadic
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
-
-  let name x =
-    let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Alloc_op { &quot;;
-    Buffer.add_string b &quot;comonadic = &quot;;
-    Buffer.add_string b (Comonadic_with_locality_op.show view.comonadic);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;monadic = &quot;;
-    Buffer.add_string b (Monadic_op.show view.monadic);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~comonadic:Comonadic_with_locality_op.legacy
-      ~monadic:Monadic_op.legacy
 end
 
 module Scannable_axes = struct
@@ -3890,85 +1854,21 @@ module Scannable_axes = struct
   let with_externality x t = (t land lnot 3) lor ((x land 3) lsl 0)
   let min_with_externality x = with_externality x bottom
   let max_with_externality x = with_externality x top
-  let externality_bot = min_with_externality Externality.bottom
-  let externality_top = max_with_externality Externality.top
 
   let proj_nullability t = (t lsr 2) land 1
   let with_nullability x t = (t land lnot 4) lor ((x land 1) lsl 2)
   let min_with_nullability x = with_nullability x bottom
   let max_with_nullability x = with_nullability x top
-  let nullability_bot = min_with_nullability Nullability.bottom
-  let nullability_top = max_with_nullability Nullability.top
 
   let proj_separability t = (t lsr 3) land 3
   let with_separability x t = (t land lnot 24) lor ((x land 3) lsl 3)
   let min_with_separability x = with_separability x bottom
   let max_with_separability x = with_separability x top
-  let separability_bot = min_with_separability Separability.bottom
-  let separability_top = max_with_separability Separability.top
 
   let proj_pointerness t = (t lsr 5) land 1
   let with_pointerness x t = (t land lnot 32) lor ((x land 1) lsl 5)
   let min_with_pointerness x = with_pointerness x bottom
   let max_with_pointerness x = with_pointerness x top
-  let pointerness_bot = min_with_pointerness Pointerness.bottom
-  let pointerness_top = max_with_pointerness Pointerness.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Externality : Externality.t t
-    type _ t += Nullability : Nullability.t t
-    type _ t += Separability : Separability.t t
-    type _ t += Pointerness : Pointerness.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Externality;
-        Pack Nullability;
-        Pack Separability;
-        Pack Pointerness;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Externality -&gt; &quot;externality&quot;
-      | Nullability -&gt; &quot;nullability&quot;
-      | Separability -&gt; &quot;separability&quot;
-      | Pointerness -&gt; &quot;pointerness&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Externality -&gt; proj_externality
-      | Nullability -&gt; proj_nullability
-      | Separability -&gt; proj_separability
-      | Pointerness -&gt; proj_pointerness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Externality -&gt; with_externality
-      | Nullability -&gt; with_nullability
-      | Separability -&gt; with_separability
-      | Pointerness -&gt; with_pointerness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Externality -&gt; min_with_externality
-      | Nullability -&gt; min_with_nullability
-      | Separability -&gt; min_with_separability
-      | Pointerness -&gt; min_with_pointerness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Externality -&gt; max_with_externality
-      | Nullability -&gt; max_with_nullability
-      | Separability -&gt; max_with_separability
-      | Pointerness -&gt; max_with_pointerness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
 
   let name x =
     let view = view x in
@@ -3990,22 +1890,202 @@ module Scannable_axes = struct
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~externality:Externality.legacy
-      ~nullability:Nullability.legacy
-      ~separability:Separability.legacy
-      ~pointerness:Pointerness.legacy
 end
 
-module Scannable_axes_op = struct
+module Uniqueness_op = struct
+  type t = int
+
+  module Repr = struct
+    type nonrec t = t
+    let mask = 1
+    let of_int_exn x =
+      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+      x
+  end
+
+  let bottom = 0
+  let top = 1
+  let[@inline] leq x y = (x land y) = x
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
+  let[@inline] sub x y =
+    let zxy = x land lnot y in
+    zxy
+  let[@inline] imply x y =
+    let zxy = x land lnot y in
+    lnot zxy land 1
+
+  let aliased = 0
+  let unique = 1
+
+  let name x =
+    if equal x aliased then &quot;Aliased&quot;
+    else if equal x unique then &quot;Unique&quot;
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_name = function
+    | &quot;Aliased&quot; -&gt; Some aliased
+    | &quot;Unique&quot; -&gt; Some unique
+    | _ -&gt; None
+
+  let pp ppf x = Format.pp_print_string ppf (name x)
+  let show x = name x
+  let legacy = aliased
+end
+
+module Contention_op = struct
   type t = int
 
   module Repr = struct
     type nonrec t = t
     let[@inline] close_repr x =
-      let x = x lor ((x land 18) lsr 1) in
+      let x = x lor ((x land 2) lsr 1) in
+      x
+    let mask = 3
+    let of_int_exn x =
+      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
+      x
+  end
+
+  let[@inline] close_down_nat x =
+    let x = x lor ((x land 2) lsr 1) in
+    x
+  let[@inline] close_up_nat x =
+    let x = x lor ((x land 1) lsl 1) in
+    x
+  let bottom = 0
+  let top = 3
+  let[@inline] leq x y = (x land y) = x
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
+  let[@inline] sub x y =
+    let zxy = x land lnot y in
+    close_down_nat zxy
+  let[@inline] imply x y =
+    let zxy = x land lnot y in
+    lnot (close_up_nat zxy) land 3
+
+  let contended = 0
+  let shared = 1
+  let uncontended = 3
+
+  let name x =
+    if equal x contended then &quot;Contended&quot;
+    else if equal x shared then &quot;Shared&quot;
+    else if equal x uncontended then &quot;Uncontended&quot;
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_name = function
+    | &quot;Contended&quot; -&gt; Some contended
+    | &quot;Shared&quot; -&gt; Some shared
+    | &quot;Uncontended&quot; -&gt; Some uncontended
+    | _ -&gt; None
+
+  let pp ppf x = Format.pp_print_string ppf (name x)
+  let show x = name x
+  let legacy = uncontended
+end
+
+module Visibility_op = struct
+  type t = int
+
+  module Repr = struct
+    type nonrec t = t
+    let mask = 3
+    let of_int_exn x =
+      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+      x
+  end
+
+  let bottom = 0
+  let top = 3
+  let[@inline] leq x y = (x land y) = x
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
+  let[@inline] sub x y =
+    let zxy = x land lnot y in
+    zxy
+  let[@inline] imply x y =
+    let zxy = x land lnot y in
+    lnot zxy land 3
+
+  let immutable = 0
+  let read = 1
+  let read_write = 3
+  let write = 2
+
+  let name x =
+    if equal x immutable then &quot;Immutable&quot;
+    else if equal x read then &quot;Read&quot;
+    else if equal x read_write then &quot;Read_write&quot;
+    else if equal x write then &quot;Write&quot;
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_name = function
+    | &quot;Immutable&quot; -&gt; Some immutable
+    | &quot;Read&quot; -&gt; Some read
+    | &quot;Read_write&quot; -&gt; Some read_write
+    | &quot;Write&quot; -&gt; Some write
+    | _ -&gt; None
+
+  let pp ppf x = Format.pp_print_string ppf (name x)
+  let show x = name x
+  let legacy = read_write
+end
+
+module Staticity_op = struct
+  type t = int
+
+  module Repr = struct
+    type nonrec t = t
+    let mask = 1
+    let of_int_exn x =
+      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+      x
+  end
+
+  let bottom = 0
+  let top = 1
+  let[@inline] leq x y = (x land y) = x
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
+  let[@inline] sub x y =
+    let zxy = x land lnot y in
+    zxy
+  let[@inline] imply x y =
+    let zxy = x land lnot y in
+    lnot zxy land 1
+
+  let dynamic = 0
+  let static = 1
+
+  let name x =
+    if equal x dynamic then &quot;Dynamic&quot;
+    else if equal x static then &quot;Static&quot;
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_name = function
+    | &quot;Dynamic&quot; -&gt; Some dynamic
+    | &quot;Static&quot; -&gt; Some static
+    | _ -&gt; None
+
+  let pp ppf x = Format.pp_print_string ppf (name x)
+  let show x = name x
+  let legacy = dynamic
+end
+
+module Monadic_op = struct
+  type t = int
+
+  module Repr = struct
+    type nonrec t = t
+    let[@inline] close_repr x =
+      let x = x lor ((x land 4) lsr 1) in
       x
     let mask = 63
     let of_int_exn x =
@@ -4014,172 +2094,101 @@ module Scannable_axes_op = struct
       x
   end
 
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 18) lsr 1) in
+  let[@inline] close_down_nat x =
+    let x = x lor ((x land 4) lsr 1) in
     x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 9) lsl 1) in
+  let[@inline] close_up_nat x =
+    let x = x lor ((x land 2) lsl 1) in
     x
-  let bottom = 63
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
+  let bottom = 0
+  let top = 63
+  let[@inline] leq x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
   let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot (close_up_dual zyx) land 63
+    let zxy = x land lnot y in
+    close_down_nat zxy
   let[@inline] imply x y =
-    let zyx = y land lnot x in
-    close_down_dual zyx
+    let zxy = x land lnot y in
+    lnot (close_up_nat zxy) land 63
 
   type view = {
-    externality : Externality_op.t;
-    nullability : Nullability_op.t;
-    separability : Separability_op.t;
-    pointerness : Pointerness_op.t;
+    uniqueness : Uniqueness_op.t;
+    contention : Contention_op.t;
+    visibility : Visibility_op.t;
+    staticity : Staticity_op.t;
   }
 
   type nonrec product = t
 
   let of_view view =
-    let externality = (view.externality land 3) lsl 0 in
-    let nullability = (view.nullability land 1) lsl 2 in
-    let separability = (view.separability land 3) lsl 3 in
-    let pointerness = (view.pointerness land 1) lsl 5 in
-    externality lor nullability lor separability lor pointerness
+    let uniqueness = (view.uniqueness land 1) lsl 0 in
+    let contention = (view.contention land 3) lsl 1 in
+    let visibility = (view.visibility land 3) lsl 3 in
+    let staticity = (view.staticity land 1) lsl 5 in
+    uniqueness lor contention lor visibility lor staticity
 
   let view t =
     {
-      externality = (t lsr 0) land 3;
-      nullability = (t lsr 2) land 1;
-      separability = (t lsr 3) land 3;
-      pointerness = (t lsr 5) land 1;
+      uniqueness = (t lsr 0) land 1;
+      contention = (t lsr 1) land 3;
+      visibility = (t lsr 3) land 3;
+      staticity = (t lsr 5) land 1;
     }
 
   let make =
-    fun ~externality -&gt;
-    fun ~nullability -&gt;
-    fun ~separability -&gt;
-    fun ~pointerness -&gt;
+    fun ~uniqueness -&gt;
+    fun ~contention -&gt;
+    fun ~visibility -&gt;
+    fun ~staticity -&gt;
     of_view {
-      externality;
-      nullability;
-      separability;
-      pointerness;
+      uniqueness;
+      contention;
+      visibility;
+      staticity;
     }
 
-  let proj_externality t = (t lsr 0) land 3
-  let with_externality x t = (t land lnot 3) lor ((x land 3) lsl 0)
-  let min_with_externality x = with_externality x bottom
-  let max_with_externality x = with_externality x top
-  let externality_bot = min_with_externality Externality_op.bottom
-  let externality_top = max_with_externality Externality_op.top
+  let proj_uniqueness t = (t lsr 0) land 1
+  let with_uniqueness x t = (t land lnot 1) lor ((x land 1) lsl 0)
+  let min_with_uniqueness x = with_uniqueness x bottom
+  let max_with_uniqueness x = with_uniqueness x top
 
-  let proj_nullability t = (t lsr 2) land 1
-  let with_nullability x t = (t land lnot 4) lor ((x land 1) lsl 2)
-  let min_with_nullability x = with_nullability x bottom
-  let max_with_nullability x = with_nullability x top
-  let nullability_bot = min_with_nullability Nullability_op.bottom
-  let nullability_top = max_with_nullability Nullability_op.top
+  let proj_contention t = (t lsr 1) land 3
+  let with_contention x t = (t land lnot 6) lor ((x land 3) lsl 1)
+  let min_with_contention x = with_contention x bottom
+  let max_with_contention x = with_contention x top
 
-  let proj_separability t = (t lsr 3) land 3
-  let with_separability x t = (t land lnot 24) lor ((x land 3) lsl 3)
-  let min_with_separability x = with_separability x bottom
-  let max_with_separability x = with_separability x top
-  let separability_bot = min_with_separability Separability_op.bottom
-  let separability_top = max_with_separability Separability_op.top
+  let proj_visibility t = (t lsr 3) land 3
+  let with_visibility x t = (t land lnot 24) lor ((x land 3) lsl 3)
+  let min_with_visibility x = with_visibility x bottom
+  let max_with_visibility x = with_visibility x top
 
-  let proj_pointerness t = (t lsr 5) land 1
-  let with_pointerness x t = (t land lnot 32) lor ((x land 1) lsl 5)
-  let min_with_pointerness x = with_pointerness x bottom
-  let max_with_pointerness x = with_pointerness x top
-  let pointerness_bot = min_with_pointerness Pointerness_op.bottom
-  let pointerness_top = max_with_pointerness Pointerness_op.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Externality : Externality_op.t t
-    type _ t += Nullability : Nullability_op.t t
-    type _ t += Separability : Separability_op.t t
-    type _ t += Pointerness : Pointerness_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Externality;
-        Pack Nullability;
-        Pack Separability;
-        Pack Pointerness;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Externality -&gt; &quot;externality&quot;
-      | Nullability -&gt; &quot;nullability&quot;
-      | Separability -&gt; &quot;separability&quot;
-      | Pointerness -&gt; &quot;pointerness&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Externality -&gt; proj_externality
-      | Nullability -&gt; proj_nullability
-      | Separability -&gt; proj_separability
-      | Pointerness -&gt; proj_pointerness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Externality -&gt; with_externality
-      | Nullability -&gt; with_nullability
-      | Separability -&gt; with_separability
-      | Pointerness -&gt; with_pointerness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Externality -&gt; min_with_externality
-      | Nullability -&gt; min_with_nullability
-      | Separability -&gt; min_with_separability
-      | Pointerness -&gt; min_with_pointerness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Externality -&gt; max_with_externality
-      | Nullability -&gt; max_with_nullability
-      | Separability -&gt; max_with_separability
-      | Pointerness -&gt; max_with_pointerness
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
+  let proj_staticity t = (t lsr 5) land 1
+  let with_staticity x t = (t land lnot 32) lor ((x land 1) lsl 5)
+  let min_with_staticity x = with_staticity x bottom
+  let max_with_staticity x = with_staticity x top
 
   let name x =
     let view = view x in
     let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Scannable_axes_op { &quot;;
-    Buffer.add_string b &quot;externality = &quot;;
-    Buffer.add_string b (Externality_op.show view.externality);
+    Buffer.add_string b &quot;Monadic_op { &quot;;
+    Buffer.add_string b &quot;uniqueness = &quot;;
+    Buffer.add_string b (Uniqueness_op.show view.uniqueness);
     Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;nullability = &quot;;
-    Buffer.add_string b (Nullability_op.show view.nullability);
+    Buffer.add_string b &quot;contention = &quot;;
+    Buffer.add_string b (Contention_op.show view.contention);
     Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;separability = &quot;;
-    Buffer.add_string b (Separability_op.show view.separability);
+    Buffer.add_string b &quot;visibility = &quot;;
+    Buffer.add_string b (Visibility_op.show view.visibility);
     Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;pointerness = &quot;;
-    Buffer.add_string b (Pointerness_op.show view.pointerness);
+    Buffer.add_string b &quot;staticity = &quot;;
+    Buffer.add_string b (Staticity_op.show view.staticity);
     Buffer.add_string b &quot; }&quot;;
     Buffer.contents b
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~externality:Externality_op.legacy
-      ~nullability:Nullability_op.legacy
-      ~separability:Separability_op.legacy
-      ~pointerness:Pointerness_op.legacy
 end
 
 module Kind_axes = struct
@@ -4251,71 +2260,16 @@ module Kind_axes = struct
   let with_comonadic x t = (t land lnot 255) lor ((x land 255) lsl 0)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic Comonadic_with_locality.bottom
-  let comonadic_top = max_with_comonadic Comonadic_with_locality.top
 
   let proj_monadic t = (t lsr 8) land 63
   let with_monadic x t = (t land lnot 16128) lor ((x land 63) lsl 8)
   let min_with_monadic x = with_monadic x bottom
   let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic Monadic_op.bottom
-  let monadic_top = max_with_monadic Monadic_op.top
 
   let proj_scannable t = (t lsr 14) land 63
   let with_scannable x t = (t land lnot 1032192) lor ((x land 63) lsl 14)
   let min_with_scannable x = with_scannable x bottom
   let max_with_scannable x = with_scannable x top
-  let scannable_bot = min_with_scannable Scannable_axes.bottom
-  let scannable_top = max_with_scannable Scannable_axes.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_locality.t t
-    type _ t += Monadic : Monadic_op.t t
-    type _ t += Scannable : Scannable_axes.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Comonadic;
-        Pack Monadic;
-        Pack Scannable;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Comonadic -&gt; &quot;comonadic&quot;
-      | Monadic -&gt; &quot;monadic&quot;
-      | Scannable -&gt; &quot;scannable&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Comonadic -&gt; proj_comonadic
-      | Monadic -&gt; proj_monadic
-      | Scannable -&gt; proj_scannable
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Comonadic -&gt; with_comonadic
-      | Monadic -&gt; with_monadic
-      | Scannable -&gt; with_scannable
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; min_with_comonadic
-      | Monadic -&gt; min_with_monadic
-      | Scannable -&gt; min_with_scannable
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; max_with_comonadic
-      | Monadic -&gt; max_with_monadic
-      | Scannable -&gt; max_with_scannable
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
 
   let name x =
     let view = view x in
@@ -4334,172 +2288,6 @@ module Kind_axes = struct
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~comonadic:Comonadic_with_locality.legacy
-      ~monadic:Monadic_op.legacy
-      ~scannable:Scannable_axes.legacy
-end
-
-module Kind_axes_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 295944) lsr 1) in
-      x
-    let mask = 1048575
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 295944) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 147972) lsl 1) in
-    x
-  let bottom = 1048575
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot (close_up_dual zyx) land 1048575
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    close_down_dual zyx
-
-  type view = {
-    comonadic : Comonadic_with_locality_op.t;
-    monadic : Monadic.t;
-    scannable : Scannable_axes_op.t;
-  }
-
-  type nonrec product = t
-
-  let of_view view =
-    let comonadic = (view.comonadic land 255) lsl 0 in
-    let monadic = (view.monadic land 63) lsl 8 in
-    let scannable = (view.scannable land 63) lsl 14 in
-    comonadic lor monadic lor scannable
-
-  let view t =
-    {
-      comonadic = (t lsr 0) land 255;
-      monadic = (t lsr 8) land 63;
-      scannable = (t lsr 14) land 63;
-    }
-
-  let make =
-    fun ~comonadic -&gt;
-    fun ~monadic -&gt;
-    fun ~scannable -&gt;
-    of_view {
-      comonadic;
-      monadic;
-      scannable;
-    }
-
-  let proj_comonadic t = (t lsr 0) land 255
-  let with_comonadic x t = (t land lnot 255) lor ((x land 255) lsl 0)
-  let min_with_comonadic x = with_comonadic x bottom
-  let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic Comonadic_with_locality_op.bottom
-  let comonadic_top = max_with_comonadic Comonadic_with_locality_op.top
-
-  let proj_monadic t = (t lsr 8) land 63
-  let with_monadic x t = (t land lnot 16128) lor ((x land 63) lsl 8)
-  let min_with_monadic x = with_monadic x bottom
-  let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic Monadic.bottom
-  let monadic_top = max_with_monadic Monadic.top
-
-  let proj_scannable t = (t lsr 14) land 63
-  let with_scannable x t = (t land lnot 1032192) lor ((x land 63) lsl 14)
-  let min_with_scannable x = with_scannable x bottom
-  let max_with_scannable x = with_scannable x top
-  let scannable_bot = min_with_scannable Scannable_axes_op.bottom
-  let scannable_top = max_with_scannable Scannable_axes_op.top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_locality_op.t t
-    type _ t += Monadic : Monadic.t t
-    type _ t += Scannable : Scannable_axes_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Comonadic;
-        Pack Monadic;
-        Pack Scannable;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Comonadic -&gt; &quot;comonadic&quot;
-      | Monadic -&gt; &quot;monadic&quot;
-      | Scannable -&gt; &quot;scannable&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Comonadic -&gt; proj_comonadic
-      | Monadic -&gt; proj_monadic
-      | Scannable -&gt; proj_scannable
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Comonadic -&gt; with_comonadic
-      | Monadic -&gt; with_monadic
-      | Scannable -&gt; with_scannable
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; min_with_comonadic
-      | Monadic -&gt; min_with_monadic
-      | Scannable -&gt; min_with_scannable
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Comonadic -&gt; max_with_comonadic
-      | Monadic -&gt; max_with_monadic
-      | Scannable -&gt; max_with_scannable
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
-
-  let name x =
-    let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Kind_axes_op { &quot;;
-    Buffer.add_string b &quot;comonadic = &quot;;
-    Buffer.add_string b (Comonadic_with_locality_op.show view.comonadic);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;monadic = &quot;;
-    Buffer.add_string b (Monadic.show view.monadic);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;scannable = &quot;;
-    Buffer.add_string b (Scannable_axes_op.show view.scannable);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~comonadic:Comonadic_with_locality_op.legacy
-      ~monadic:Monadic.legacy
-      ~scannable:Scannable_axes_op.legacy
 end
 
 let rec
@@ -4652,60 +2440,7 @@ and
   val local : t
 end
 
-module Locality_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val global : t
-  val local : t
-end
-
 module Regionality : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val global : t
-  val regional : t
-  val local : t
-end
-
-module Regionality_op : sig
   type t = int
 
   module Repr : sig
@@ -4758,32 +2493,6 @@ module Uniqueness : sig
   val unique : t
 end
 
-module Uniqueness_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val aliased : t
-  val unique : t
-end
-
 module Linearity : sig
   type t = int
 
@@ -4810,60 +2519,7 @@ module Linearity : sig
   val once : t
 end
 
-module Linearity_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val many : t
-  val once : t
-end
-
 module Portability : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val portable : t
-  val shareable : t
-  val nonportable : t
-end
-
-module Portability_op : sig
   type t = int
 
   module Repr : sig
@@ -4917,60 +2573,7 @@ module Contention : sig
   val uncontended : t
 end
 
-module Contention_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val contended : t
-  val shared : t
-  val uncontended : t
-end
-
 module Forkable : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val forkable : t
-  val unforkable : t
-end
-
-module Forkable_op : sig
   type t = int
 
   module Repr : sig
@@ -5022,32 +2625,6 @@ module Yielding : sig
   val yielding : t
 end
 
-module Yielding_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val unyielding : t
-  val yielding : t
-end
-
 module Staticity : sig
   type t = int
 
@@ -5074,61 +2651,7 @@ module Staticity : sig
   val static : t
 end
 
-module Staticity_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val dynamic : t
-  val static : t
-end
-
 module Statefulness : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val stateless : t
-  val writing : t
-  val stateful : t
-  val reading : t
-end
-
-module Statefulness_op : sig
   type t = int
 
   module Repr : sig
@@ -5184,62 +2707,7 @@ module Visibility : sig
   val write : t
 end
 
-module Visibility_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val immutable : t
-  val read : t
-  val read_write : t
-  val write : t
-end
-
 module Externality : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val external_ : t
-  val external64 : t
-  val internal : t
-end
-
-module Externality_op : sig
   type t = int
 
   module Repr : sig
@@ -5292,60 +2760,7 @@ module Nullability : sig
   val maybe_null : t
 end
 
-module Nullability_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val non_null : t
-  val maybe_null : t
-end
-
 module Separability : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val non_float : t
-  val separable : t
-  val maybe_separable : t
-end
-
-module Separability_op : sig
   type t = int
 
   module Repr : sig
@@ -5398,32 +2813,6 @@ module Pointerness : sig
   val maybe_pointer : t
 end
 
-module Pointerness_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val non_pointer : t
-  val maybe_pointer : t
-end
-
 module Monadic : sig
   type t = int
 
@@ -5444,8 +2833,6 @@ module Monadic : sig
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
 
   type view = {
     uniqueness : Uniqueness.t;
@@ -5455,23 +2842,6 @@ module Monadic : sig
   }
 
   type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Uniqueness : Uniqueness.t t
-    type _ t += Contention : Contention.t t
-    type _ t += Visibility : Visibility.t t
-    type _ t += Staticity : Staticity.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
 
   val of_view : view -&gt; t
   val view : t -&gt; view
@@ -5485,109 +2855,18 @@ module Monadic : sig
   val with_uniqueness : Uniqueness.t -&gt; t -&gt; t
   val min_with_uniqueness : Uniqueness.t -&gt; t
   val max_with_uniqueness : Uniqueness.t -&gt; t
-  val uniqueness_bot : t
-  val uniqueness_top : t
   val proj_contention : t -&gt; Contention.t
   val with_contention : Contention.t -&gt; t -&gt; t
   val min_with_contention : Contention.t -&gt; t
   val max_with_contention : Contention.t -&gt; t
-  val contention_bot : t
-  val contention_top : t
   val proj_visibility : t -&gt; Visibility.t
   val with_visibility : Visibility.t -&gt; t -&gt; t
   val min_with_visibility : Visibility.t -&gt; t
   val max_with_visibility : Visibility.t -&gt; t
-  val visibility_bot : t
-  val visibility_top : t
   val proj_staticity : t -&gt; Staticity.t
   val with_staticity : Staticity.t -&gt; t -&gt; t
   val min_with_staticity : Staticity.t -&gt; t
   val max_with_staticity : Staticity.t -&gt; t
-  val staticity_bot : t
-  val staticity_top : t
-end
-
-module Monadic_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-
-  type view = {
-    uniqueness : Uniqueness_op.t;
-    contention : Contention_op.t;
-    visibility : Visibility_op.t;
-    staticity : Staticity_op.t;
-  }
-
-  type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Uniqueness : Uniqueness_op.t t
-    type _ t += Contention : Contention_op.t t
-    type _ t += Visibility : Visibility_op.t t
-    type _ t += Staticity : Staticity_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
-
-  val of_view : view -&gt; t
-  val view : t -&gt; view
-  val make :
-    uniqueness:Uniqueness_op.t -&gt;
-    contention:Contention_op.t -&gt;
-    visibility:Visibility_op.t -&gt;
-    staticity:Staticity_op.t -&gt;
-    t
-  val proj_uniqueness : t -&gt; Uniqueness_op.t
-  val with_uniqueness : Uniqueness_op.t -&gt; t -&gt; t
-  val min_with_uniqueness : Uniqueness_op.t -&gt; t
-  val max_with_uniqueness : Uniqueness_op.t -&gt; t
-  val uniqueness_bot : t
-  val uniqueness_top : t
-  val proj_contention : t -&gt; Contention_op.t
-  val with_contention : Contention_op.t -&gt; t -&gt; t
-  val min_with_contention : Contention_op.t -&gt; t
-  val max_with_contention : Contention_op.t -&gt; t
-  val contention_bot : t
-  val contention_top : t
-  val proj_visibility : t -&gt; Visibility_op.t
-  val with_visibility : Visibility_op.t -&gt; t -&gt; t
-  val min_with_visibility : Visibility_op.t -&gt; t
-  val max_with_visibility : Visibility_op.t -&gt; t
-  val visibility_bot : t
-  val visibility_top : t
-  val proj_staticity : t -&gt; Staticity_op.t
-  val with_staticity : Staticity_op.t -&gt; t -&gt; t
-  val min_with_staticity : Staticity_op.t -&gt; t
-  val max_with_staticity : Staticity_op.t -&gt; t
-  val staticity_bot : t
-  val staticity_top : t
 end
 
 module Comonadic : sig
@@ -5610,8 +2889,6 @@ module Comonadic : sig
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
 
   type view = {
     linearity : Linearity.t;
@@ -5622,24 +2899,6 @@ module Comonadic : sig
   }
 
   type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Linearity : Linearity.t t
-    type _ t += Portability : Portability.t t
-    type _ t += Forkable : Forkable.t t
-    type _ t += Yielding : Yielding.t t
-    type _ t += Statefulness : Statefulness.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
 
   val of_view : view -&gt; t
   val view : t -&gt; view
@@ -5654,124 +2913,22 @@ module Comonadic : sig
   val with_linearity : Linearity.t -&gt; t -&gt; t
   val min_with_linearity : Linearity.t -&gt; t
   val max_with_linearity : Linearity.t -&gt; t
-  val linearity_bot : t
-  val linearity_top : t
   val proj_portability : t -&gt; Portability.t
   val with_portability : Portability.t -&gt; t -&gt; t
   val min_with_portability : Portability.t -&gt; t
   val max_with_portability : Portability.t -&gt; t
-  val portability_bot : t
-  val portability_top : t
   val proj_forkable : t -&gt; Forkable.t
   val with_forkable : Forkable.t -&gt; t -&gt; t
   val min_with_forkable : Forkable.t -&gt; t
   val max_with_forkable : Forkable.t -&gt; t
-  val forkable_bot : t
-  val forkable_top : t
   val proj_yielding : t -&gt; Yielding.t
   val with_yielding : Yielding.t -&gt; t -&gt; t
   val min_with_yielding : Yielding.t -&gt; t
   val max_with_yielding : Yielding.t -&gt; t
-  val yielding_bot : t
-  val yielding_top : t
   val proj_statefulness : t -&gt; Statefulness.t
   val with_statefulness : Statefulness.t -&gt; t -&gt; t
   val min_with_statefulness : Statefulness.t -&gt; t
   val max_with_statefulness : Statefulness.t -&gt; t
-  val statefulness_bot : t
-  val statefulness_top : t
-end
-
-module Comonadic_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-
-  type view = {
-    linearity : Linearity_op.t;
-    portability : Portability_op.t;
-    forkable : Forkable_op.t;
-    yielding : Yielding_op.t;
-    statefulness : Statefulness_op.t;
-  }
-
-  type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Linearity : Linearity_op.t t
-    type _ t += Portability : Portability_op.t t
-    type _ t += Forkable : Forkable_op.t t
-    type _ t += Yielding : Yielding_op.t t
-    type _ t += Statefulness : Statefulness_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
-
-  val of_view : view -&gt; t
-  val view : t -&gt; view
-  val make :
-    linearity:Linearity_op.t -&gt;
-    portability:Portability_op.t -&gt;
-    forkable:Forkable_op.t -&gt;
-    yielding:Yielding_op.t -&gt;
-    statefulness:Statefulness_op.t -&gt;
-    t
-  val proj_linearity : t -&gt; Linearity_op.t
-  val with_linearity : Linearity_op.t -&gt; t -&gt; t
-  val min_with_linearity : Linearity_op.t -&gt; t
-  val max_with_linearity : Linearity_op.t -&gt; t
-  val linearity_bot : t
-  val linearity_top : t
-  val proj_portability : t -&gt; Portability_op.t
-  val with_portability : Portability_op.t -&gt; t -&gt; t
-  val min_with_portability : Portability_op.t -&gt; t
-  val max_with_portability : Portability_op.t -&gt; t
-  val portability_bot : t
-  val portability_top : t
-  val proj_forkable : t -&gt; Forkable_op.t
-  val with_forkable : Forkable_op.t -&gt; t -&gt; t
-  val min_with_forkable : Forkable_op.t -&gt; t
-  val max_with_forkable : Forkable_op.t -&gt; t
-  val forkable_bot : t
-  val forkable_top : t
-  val proj_yielding : t -&gt; Yielding_op.t
-  val with_yielding : Yielding_op.t -&gt; t -&gt; t
-  val min_with_yielding : Yielding_op.t -&gt; t
-  val max_with_yielding : Yielding_op.t -&gt; t
-  val yielding_bot : t
-  val yielding_top : t
-  val proj_statefulness : t -&gt; Statefulness_op.t
-  val with_statefulness : Statefulness_op.t -&gt; t -&gt; t
-  val min_with_statefulness : Statefulness_op.t -&gt; t
-  val max_with_statefulness : Statefulness_op.t -&gt; t
-  val statefulness_bot : t
-  val statefulness_top : t
 end
 
 module Comonadic_with_locality : sig
@@ -5794,8 +2951,6 @@ module Comonadic_with_locality : sig
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
 
   type view = {
     areality : Locality.t;
@@ -5803,21 +2958,6 @@ module Comonadic_with_locality : sig
   }
 
   type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Areality : Locality.t t
-    type _ t += Comonadic : Comonadic.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
 
   val of_view : view -&gt; t
   val view : t -&gt; view
@@ -5829,79 +2969,10 @@ module Comonadic_with_locality : sig
   val with_areality : Locality.t -&gt; t -&gt; t
   val min_with_areality : Locality.t -&gt; t
   val max_with_areality : Locality.t -&gt; t
-  val areality_bot : t
-  val areality_top : t
   val proj_comonadic : t -&gt; Comonadic.t
   val with_comonadic : Comonadic.t -&gt; t -&gt; t
   val min_with_comonadic : Comonadic.t -&gt; t
   val max_with_comonadic : Comonadic.t -&gt; t
-  val comonadic_bot : t
-  val comonadic_top : t
-end
-
-module Comonadic_with_locality_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-
-  type view = {
-    areality : Locality_op.t;
-    comonadic : Comonadic_op.t;
-  }
-
-  type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Areality : Locality_op.t t
-    type _ t += Comonadic : Comonadic_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
-
-  val of_view : view -&gt; t
-  val view : t -&gt; view
-  val make :
-    areality:Locality_op.t -&gt;
-    comonadic:Comonadic_op.t -&gt;
-    t
-  val proj_areality : t -&gt; Locality_op.t
-  val with_areality : Locality_op.t -&gt; t -&gt; t
-  val min_with_areality : Locality_op.t -&gt; t
-  val max_with_areality : Locality_op.t -&gt; t
-  val areality_bot : t
-  val areality_top : t
-  val proj_comonadic : t -&gt; Comonadic_op.t
-  val with_comonadic : Comonadic_op.t -&gt; t -&gt; t
-  val min_with_comonadic : Comonadic_op.t -&gt; t
-  val max_with_comonadic : Comonadic_op.t -&gt; t
-  val comonadic_bot : t
-  val comonadic_top : t
 end
 
 module Comonadic_with_regionality : sig
@@ -5924,8 +2995,6 @@ module Comonadic_with_regionality : sig
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
 
   type view = {
     areality : Regionality.t;
@@ -5933,21 +3002,6 @@ module Comonadic_with_regionality : sig
   }
 
   type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Areality : Regionality.t t
-    type _ t += Comonadic : Comonadic.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
 
   val of_view : view -&gt; t
   val view : t -&gt; view
@@ -5959,79 +3013,10 @@ module Comonadic_with_regionality : sig
   val with_areality : Regionality.t -&gt; t -&gt; t
   val min_with_areality : Regionality.t -&gt; t
   val max_with_areality : Regionality.t -&gt; t
-  val areality_bot : t
-  val areality_top : t
   val proj_comonadic : t -&gt; Comonadic.t
   val with_comonadic : Comonadic.t -&gt; t -&gt; t
   val min_with_comonadic : Comonadic.t -&gt; t
   val max_with_comonadic : Comonadic.t -&gt; t
-  val comonadic_bot : t
-  val comonadic_top : t
-end
-
-module Comonadic_with_regionality_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-
-  type view = {
-    areality : Regionality_op.t;
-    comonadic : Comonadic_op.t;
-  }
-
-  type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Areality : Regionality_op.t t
-    type _ t += Comonadic : Comonadic_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
-
-  val of_view : view -&gt; t
-  val view : t -&gt; view
-  val make :
-    areality:Regionality_op.t -&gt;
-    comonadic:Comonadic_op.t -&gt;
-    t
-  val proj_areality : t -&gt; Regionality_op.t
-  val with_areality : Regionality_op.t -&gt; t -&gt; t
-  val min_with_areality : Regionality_op.t -&gt; t
-  val max_with_areality : Regionality_op.t -&gt; t
-  val areality_bot : t
-  val areality_top : t
-  val proj_comonadic : t -&gt; Comonadic_op.t
-  val with_comonadic : Comonadic_op.t -&gt; t -&gt; t
-  val min_with_comonadic : Comonadic_op.t -&gt; t
-  val max_with_comonadic : Comonadic_op.t -&gt; t
-  val comonadic_bot : t
-  val comonadic_top : t
 end
 
 module Value : sig
@@ -6054,8 +3039,6 @@ module Value : sig
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
 
   type view = {
     comonadic : Comonadic_with_regionality.t;
@@ -6063,21 +3046,6 @@ module Value : sig
   }
 
   type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_regionality.t t
-    type _ t += Monadic : Monadic.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
 
   val of_view : view -&gt; t
   val view : t -&gt; view
@@ -6089,79 +3057,10 @@ module Value : sig
   val with_comonadic : Comonadic_with_regionality.t -&gt; t -&gt; t
   val min_with_comonadic : Comonadic_with_regionality.t -&gt; t
   val max_with_comonadic : Comonadic_with_regionality.t -&gt; t
-  val comonadic_bot : t
-  val comonadic_top : t
   val proj_monadic : t -&gt; Monadic.t
   val with_monadic : Monadic.t -&gt; t -&gt; t
   val min_with_monadic : Monadic.t -&gt; t
   val max_with_monadic : Monadic.t -&gt; t
-  val monadic_bot : t
-  val monadic_top : t
-end
-
-module Value_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-
-  type view = {
-    comonadic : Comonadic_with_regionality_op.t;
-    monadic : Monadic_op.t;
-  }
-
-  type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_regionality_op.t t
-    type _ t += Monadic : Monadic_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
-
-  val of_view : view -&gt; t
-  val view : t -&gt; view
-  val make :
-    comonadic:Comonadic_with_regionality_op.t -&gt;
-    monadic:Monadic_op.t -&gt;
-    t
-  val proj_comonadic : t -&gt; Comonadic_with_regionality_op.t
-  val with_comonadic : Comonadic_with_regionality_op.t -&gt; t -&gt; t
-  val min_with_comonadic : Comonadic_with_regionality_op.t -&gt; t
-  val max_with_comonadic : Comonadic_with_regionality_op.t -&gt; t
-  val comonadic_bot : t
-  val comonadic_top : t
-  val proj_monadic : t -&gt; Monadic_op.t
-  val with_monadic : Monadic_op.t -&gt; t -&gt; t
-  val min_with_monadic : Monadic_op.t -&gt; t
-  val max_with_monadic : Monadic_op.t -&gt; t
-  val monadic_bot : t
-  val monadic_top : t
 end
 
 module Alloc : sig
@@ -6184,8 +3083,6 @@ module Alloc : sig
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
 
   type view = {
     comonadic : Comonadic_with_locality.t;
@@ -6193,21 +3090,6 @@ module Alloc : sig
   }
 
   type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_locality.t t
-    type _ t += Monadic : Monadic.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
 
   val of_view : view -&gt; t
   val view : t -&gt; view
@@ -6219,79 +3101,10 @@ module Alloc : sig
   val with_comonadic : Comonadic_with_locality.t -&gt; t -&gt; t
   val min_with_comonadic : Comonadic_with_locality.t -&gt; t
   val max_with_comonadic : Comonadic_with_locality.t -&gt; t
-  val comonadic_bot : t
-  val comonadic_top : t
   val proj_monadic : t -&gt; Monadic.t
   val with_monadic : Monadic.t -&gt; t -&gt; t
   val min_with_monadic : Monadic.t -&gt; t
   val max_with_monadic : Monadic.t -&gt; t
-  val monadic_bot : t
-  val monadic_top : t
-end
-
-module Alloc_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-
-  type view = {
-    comonadic : Comonadic_with_locality_op.t;
-    monadic : Monadic_op.t;
-  }
-
-  type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_locality_op.t t
-    type _ t += Monadic : Monadic_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
-
-  val of_view : view -&gt; t
-  val view : t -&gt; view
-  val make :
-    comonadic:Comonadic_with_locality_op.t -&gt;
-    monadic:Monadic_op.t -&gt;
-    t
-  val proj_comonadic : t -&gt; Comonadic_with_locality_op.t
-  val with_comonadic : Comonadic_with_locality_op.t -&gt; t -&gt; t
-  val min_with_comonadic : Comonadic_with_locality_op.t -&gt; t
-  val max_with_comonadic : Comonadic_with_locality_op.t -&gt; t
-  val comonadic_bot : t
-  val comonadic_top : t
-  val proj_monadic : t -&gt; Monadic_op.t
-  val with_monadic : Monadic_op.t -&gt; t -&gt; t
-  val min_with_monadic : Monadic_op.t -&gt; t
-  val max_with_monadic : Monadic_op.t -&gt; t
-  val monadic_bot : t
-  val monadic_top : t
 end
 
 module Scannable_axes : sig
@@ -6314,8 +3127,6 @@ module Scannable_axes : sig
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
 
   type view = {
     externality : Externality.t;
@@ -6325,23 +3136,6 @@ module Scannable_axes : sig
   }
 
   type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Externality : Externality.t t
-    type _ t += Nullability : Nullability.t t
-    type _ t += Separability : Separability.t t
-    type _ t += Pointerness : Pointerness.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
 
   val of_view : view -&gt; t
   val view : t -&gt; view
@@ -6355,29 +3149,21 @@ module Scannable_axes : sig
   val with_externality : Externality.t -&gt; t -&gt; t
   val min_with_externality : Externality.t -&gt; t
   val max_with_externality : Externality.t -&gt; t
-  val externality_bot : t
-  val externality_top : t
   val proj_nullability : t -&gt; Nullability.t
   val with_nullability : Nullability.t -&gt; t -&gt; t
   val min_with_nullability : Nullability.t -&gt; t
   val max_with_nullability : Nullability.t -&gt; t
-  val nullability_bot : t
-  val nullability_top : t
   val proj_separability : t -&gt; Separability.t
   val with_separability : Separability.t -&gt; t -&gt; t
   val min_with_separability : Separability.t -&gt; t
   val max_with_separability : Separability.t -&gt; t
-  val separability_bot : t
-  val separability_top : t
   val proj_pointerness : t -&gt; Pointerness.t
   val with_pointerness : Pointerness.t -&gt; t -&gt; t
   val min_with_pointerness : Pointerness.t -&gt; t
   val max_with_pointerness : Pointerness.t -&gt; t
-  val pointerness_bot : t
-  val pointerness_top : t
 end
 
-module Scannable_axes_op : sig
+module Uniqueness_op : sig
   type t = int
 
   module Repr : sig
@@ -6399,65 +3185,145 @@ module Scannable_axes_op : sig
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  val aliased : t
+  val unique : t
+end
+
+module Contention_op : sig
+  type t = int
+
+  module Repr : sig
+    type nonrec t = t
+    val mask : int
+    val of_int_exn : int -&gt; t
+  end
+
+  val bottom : t
+  val top : t
+  val leq : t -&gt; t -&gt; bool
+  val equal : t -&gt; t -&gt; bool
+  val join : t -&gt; t -&gt; t
+  val meet : t -&gt; t -&gt; t
+  val sub : t -&gt; t -&gt; t
+  val imply : t -&gt; t -&gt; t
+  val pp : Format.formatter -&gt; t -&gt; unit
+  val show : t -&gt; string
+  val name : t -&gt; string
+  val of_name : string -&gt; t option
+  val legacy : t
+  val contended : t
+  val shared : t
+  val uncontended : t
+end
+
+module Visibility_op : sig
+  type t = int
+
+  module Repr : sig
+    type nonrec t = t
+    val mask : int
+    val of_int_exn : int -&gt; t
+  end
+
+  val bottom : t
+  val top : t
+  val leq : t -&gt; t -&gt; bool
+  val equal : t -&gt; t -&gt; bool
+  val join : t -&gt; t -&gt; t
+  val meet : t -&gt; t -&gt; t
+  val sub : t -&gt; t -&gt; t
+  val imply : t -&gt; t -&gt; t
+  val pp : Format.formatter -&gt; t -&gt; unit
+  val show : t -&gt; string
+  val name : t -&gt; string
+  val of_name : string -&gt; t option
+  val legacy : t
+  val immutable : t
+  val read : t
+  val read_write : t
+  val write : t
+end
+
+module Staticity_op : sig
+  type t = int
+
+  module Repr : sig
+    type nonrec t = t
+    val mask : int
+    val of_int_exn : int -&gt; t
+  end
+
+  val bottom : t
+  val top : t
+  val leq : t -&gt; t -&gt; bool
+  val equal : t -&gt; t -&gt; bool
+  val join : t -&gt; t -&gt; t
+  val meet : t -&gt; t -&gt; t
+  val sub : t -&gt; t -&gt; t
+  val imply : t -&gt; t -&gt; t
+  val pp : Format.formatter -&gt; t -&gt; unit
+  val show : t -&gt; string
+  val name : t -&gt; string
+  val of_name : string -&gt; t option
+  val legacy : t
+  val dynamic : t
+  val static : t
+end
+
+module Monadic_op : sig
+  type t = int
+
+  module Repr : sig
+    type nonrec t = t
+    val mask : int
+    val of_int_exn : int -&gt; t
+  end
+
+  val bottom : t
+  val top : t
+  val leq : t -&gt; t -&gt; bool
+  val equal : t -&gt; t -&gt; bool
+  val join : t -&gt; t -&gt; t
+  val meet : t -&gt; t -&gt; t
+  val sub : t -&gt; t -&gt; t
+  val imply : t -&gt; t -&gt; t
+  val pp : Format.formatter -&gt; t -&gt; unit
+  val show : t -&gt; string
+  val name : t -&gt; string
 
   type view = {
-    externality : Externality_op.t;
-    nullability : Nullability_op.t;
-    separability : Separability_op.t;
-    pointerness : Pointerness_op.t;
+    uniqueness : Uniqueness_op.t;
+    contention : Contention_op.t;
+    visibility : Visibility_op.t;
+    staticity : Staticity_op.t;
   }
 
   type nonrec product = t
 
-  module Axis : sig
-    type _ t = ..
-    type _ t += Externality : Externality_op.t t
-    type _ t += Nullability : Nullability_op.t t
-    type _ t += Separability : Separability_op.t t
-    type _ t += Pointerness : Pointerness_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
-
   val of_view : view -&gt; t
   val view : t -&gt; view
   val make :
-    externality:Externality_op.t -&gt;
-    nullability:Nullability_op.t -&gt;
-    separability:Separability_op.t -&gt;
-    pointerness:Pointerness_op.t -&gt;
+    uniqueness:Uniqueness_op.t -&gt;
+    contention:Contention_op.t -&gt;
+    visibility:Visibility_op.t -&gt;
+    staticity:Staticity_op.t -&gt;
     t
-  val proj_externality : t -&gt; Externality_op.t
-  val with_externality : Externality_op.t -&gt; t -&gt; t
-  val min_with_externality : Externality_op.t -&gt; t
-  val max_with_externality : Externality_op.t -&gt; t
-  val externality_bot : t
-  val externality_top : t
-  val proj_nullability : t -&gt; Nullability_op.t
-  val with_nullability : Nullability_op.t -&gt; t -&gt; t
-  val min_with_nullability : Nullability_op.t -&gt; t
-  val max_with_nullability : Nullability_op.t -&gt; t
-  val nullability_bot : t
-  val nullability_top : t
-  val proj_separability : t -&gt; Separability_op.t
-  val with_separability : Separability_op.t -&gt; t -&gt; t
-  val min_with_separability : Separability_op.t -&gt; t
-  val max_with_separability : Separability_op.t -&gt; t
-  val separability_bot : t
-  val separability_top : t
-  val proj_pointerness : t -&gt; Pointerness_op.t
-  val with_pointerness : Pointerness_op.t -&gt; t -&gt; t
-  val min_with_pointerness : Pointerness_op.t -&gt; t
-  val max_with_pointerness : Pointerness_op.t -&gt; t
-  val pointerness_bot : t
-  val pointerness_top : t
+  val proj_uniqueness : t -&gt; Uniqueness_op.t
+  val with_uniqueness : Uniqueness_op.t -&gt; t -&gt; t
+  val min_with_uniqueness : Uniqueness_op.t -&gt; t
+  val max_with_uniqueness : Uniqueness_op.t -&gt; t
+  val proj_contention : t -&gt; Contention_op.t
+  val with_contention : Contention_op.t -&gt; t -&gt; t
+  val min_with_contention : Contention_op.t -&gt; t
+  val max_with_contention : Contention_op.t -&gt; t
+  val proj_visibility : t -&gt; Visibility_op.t
+  val with_visibility : Visibility_op.t -&gt; t -&gt; t
+  val min_with_visibility : Visibility_op.t -&gt; t
+  val max_with_visibility : Visibility_op.t -&gt; t
+  val proj_staticity : t -&gt; Staticity_op.t
+  val with_staticity : Staticity_op.t -&gt; t -&gt; t
+  val min_with_staticity : Staticity_op.t -&gt; t
+  val max_with_staticity : Staticity_op.t -&gt; t
 end
 
 module Kind_axes : sig
@@ -6480,8 +3346,6 @@ module Kind_axes : sig
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
 
   type view = {
     comonadic : Comonadic_with_locality.t;
@@ -6490,22 +3354,6 @@ module Kind_axes : sig
   }
 
   type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_locality.t t
-    type _ t += Monadic : Monadic_op.t t
-    type _ t += Scannable : Scannable_axes.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
 
   val of_view : view -&gt; t
   val view : t -&gt; view
@@ -6518,94 +3366,14 @@ module Kind_axes : sig
   val with_comonadic : Comonadic_with_locality.t -&gt; t -&gt; t
   val min_with_comonadic : Comonadic_with_locality.t -&gt; t
   val max_with_comonadic : Comonadic_with_locality.t -&gt; t
-  val comonadic_bot : t
-  val comonadic_top : t
   val proj_monadic : t -&gt; Monadic_op.t
   val with_monadic : Monadic_op.t -&gt; t -&gt; t
   val min_with_monadic : Monadic_op.t -&gt; t
   val max_with_monadic : Monadic_op.t -&gt; t
-  val monadic_bot : t
-  val monadic_top : t
   val proj_scannable : t -&gt; Scannable_axes.t
   val with_scannable : Scannable_axes.t -&gt; t -&gt; t
   val min_with_scannable : Scannable_axes.t -&gt; t
   val max_with_scannable : Scannable_axes.t -&gt; t
-  val scannable_bot : t
-  val scannable_top : t
-end
-
-module Kind_axes_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-
-  type view = {
-    comonadic : Comonadic_with_locality_op.t;
-    monadic : Monadic.t;
-    scannable : Scannable_axes_op.t;
-  }
-
-  type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Comonadic : Comonadic_with_locality_op.t t
-    type _ t += Monadic : Monadic.t t
-    type _ t += Scannable : Scannable_axes_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
-
-  val of_view : view -&gt; t
-  val view : t -&gt; view
-  val make :
-    comonadic:Comonadic_with_locality_op.t -&gt;
-    monadic:Monadic.t -&gt;
-    scannable:Scannable_axes_op.t -&gt;
-    t
-  val proj_comonadic : t -&gt; Comonadic_with_locality_op.t
-  val with_comonadic : Comonadic_with_locality_op.t -&gt; t -&gt; t
-  val min_with_comonadic : Comonadic_with_locality_op.t -&gt; t
-  val max_with_comonadic : Comonadic_with_locality_op.t -&gt; t
-  val comonadic_bot : t
-  val comonadic_top : t
-  val proj_monadic : t -&gt; Monadic.t
-  val with_monadic : Monadic.t -&gt; t -&gt; t
-  val min_with_monadic : Monadic.t -&gt; t
-  val max_with_monadic : Monadic.t -&gt; t
-  val monadic_bot : t
-  val monadic_top : t
-  val proj_scannable : t -&gt; Scannable_axes_op.t
-  val with_scannable : Scannable_axes_op.t -&gt; t -&gt; t
-  val min_with_scannable : Scannable_axes_op.t -&gt; t
-  val max_with_scannable : Scannable_axes_op.t -&gt; t
-  val scannable_bot : t
-  val scannable_top : t
 end
 
 val alloc_as_value : Alloc.t -&gt; Value.t

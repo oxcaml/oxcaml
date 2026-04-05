@@ -170,15 +170,9 @@ let field_module_name (field : field) ~in_op =
   let opposite = if in_op then not field.ty.opposite else field.ty.opposite in
   if opposite then Name.op_module_name field.ty.name else field.ty.name
 
-let axis_ctor_name field_name = String.capitalize_ascii field_name
-
 let proj_name (field : field) = "proj_" ^ field.name
 
 let with_name (field : field) = "with_" ^ field.name
-
-let bot_name (field : field) = field.name ^ "_bot"
-
-let top_name (field : field) = field.name ^ "_top"
 
 let min_with_name (field : field) = "min_with_" ^ field.name
 
@@ -198,7 +192,7 @@ let legacy_value_name name =
   | "Staticity" -> "dynamic"
   | _ -> "top"
 
-let add_common_sig_items buf =
+let add_common_sig_items_base buf =
   Buffer.add_string
     buf
     "  type t = int\n\
@@ -222,6 +216,29 @@ let add_common_sig_items buf =
     \  val name : t -> string\n\
     \  val of_name : string -> t option\n\
     \  val legacy : t\n"
+
+let add_common_sig_items_product buf =
+  Buffer.add_string
+    buf
+    "  type t = int\n\
+    \n\
+    \  module Repr : sig\n\
+    \    type nonrec t = t\n\
+    \    val mask : int\n\
+    \    val of_int_exn : int -> t\n\
+    \  end\n\
+    \n\
+    \  val bottom : t\n\
+    \  val top : t\n\
+    \  val leq : t -> t -> bool\n\
+    \  val equal : t -> t -> bool\n\
+    \  val join : t -> t -> t\n\
+    \  val meet : t -> t -> t\n\
+    \  val sub : t -> t -> t\n\
+    \  val imply : t -> t -> t\n\
+    \  val pp : Format.formatter -> t -> unit\n\
+    \  val show : t -> string\n\
+    \  val name : t -> string\n"
 
 let add_common_ml_items buf desc repr_validator =
   Buffer.add_string buf "  type t = int\n\n";
@@ -253,7 +270,7 @@ let add_name_functions_ml buf cases legacy =
 
 let add_base_sig buf (base : base) module_name =
   bprintf buf "module %s : sig\n" module_name;
-  add_common_sig_items buf;
+  add_common_sig_items_base buf;
   Array.iteri
     (fun i value_name ->
       bprintf buf "  val %s : t\n" value_name;
@@ -280,7 +297,7 @@ let add_base_ml buf (base : base) module_name desc =
 
 let add_product_sig buf (product : product) module_name ~in_op =
   bprintf buf "module %s : sig\n" module_name;
-  add_common_sig_items buf;
+  add_common_sig_items_product buf;
   Buffer.add_string buf "\n  type view = {\n";
   List.iter
     (fun (field : field) ->
@@ -292,28 +309,6 @@ let add_product_sig buf (product : product) module_name ~in_op =
     product.fields;
   Buffer.add_string buf "  }\n\n";
   Buffer.add_string buf "  type nonrec product = t\n\n";
-  Buffer.add_string buf "  module Axis : sig\n";
-  Buffer.add_string buf "    type _ t = ..\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "    type _ t += %s : %s.t t\n"
-        (axis_ctor_name field.name)
-        (field_module_name field ~in_op))
-    product.fields;
-  Buffer.add_string
-    buf
-    "    type packed = Pack : 'a t -> packed\n\
-    \    val packed : 'a t -> packed\n\
-    \    val all : packed list\n\
-    \    val name : 'a t -> string\n\
-    \    val pp : Format.formatter -> 'a t -> unit\n\
-    \    val proj : 'a t -> product -> 'a\n\
-    \    val set : 'a t -> 'a -> product -> product\n\
-    \    val min_with : 'a t -> 'a -> product\n\
-    \    val max_with : 'a t -> 'a -> product\n\
-    \  end\n\n";
   Buffer.add_string buf "  val of_view : view -> t\n";
   Buffer.add_string buf "  val view : t -> view\n";
   Buffer.add_string buf "  val make :\n";
@@ -332,9 +327,7 @@ let add_product_sig buf (product : product) module_name ~in_op =
       bprintf buf "  val %s : t -> %s.t\n" (proj_name field) field_mod;
       bprintf buf "  val %s : %s.t -> t -> t\n" (with_name field) field_mod;
       bprintf buf "  val %s : %s.t -> t\n" (min_with_name field) field_mod;
-      bprintf buf "  val %s : %s.t -> t\n" (max_with_name field) field_mod;
-      bprintf buf "  val %s : t\n" (bot_name field);
-      bprintf buf "  val %s : t\n" (top_name field))
+      bprintf buf "  val %s : %s.t -> t\n" (max_with_name field) field_mod)
     product.fields;
   Buffer.add_string buf "end\n\n"
 
@@ -417,110 +410,8 @@ let add_product_ml buf (product : product) module_name desc ~in_op =
         "  let %s x = %s x top\n"
         (max_with_name field)
         (with_name field);
-      bprintf
-        buf
-        "  let %s = %s %s.bottom\n"
-        (bot_name field)
-        (min_with_name field)
-        (field_module_name field ~in_op);
-      bprintf
-        buf
-        "  let %s = %s %s.top\n\n"
-        (top_name field)
-        (max_with_name field)
-        (field_module_name field ~in_op))
+      Buffer.add_char buf '\n')
     product.fields;
-  Buffer.add_string buf "  module Axis = struct\n";
-  Buffer.add_string buf "    type _ t = ..\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "    type _ t += %s : %s.t t\n"
-        (axis_ctor_name field.name)
-        (field_module_name field ~in_op))
-    product.fields;
-  Buffer.add_string
-    buf
-    "    type packed = Pack : 'a t -> packed\n\
-    \n\
-    \    let packed axis = Pack axis\n\
-    \n\
-    \    let all =\n\
-    \      [\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf buf "        Pack %s;\n" (axis_ctor_name field.name))
-    product.fields;
-  Buffer.add_string
-    buf
-    "      ]\n\
-    \n\
-    \    let name : type a. a t -> string = function\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "      | %s -> %S\n"
-        (axis_ctor_name field.name)
-        field.name)
-    product.fields;
-  Buffer.add_string buf "      | _ -> invalid_arg \"unknown axis\"\n";
-  Buffer.add_string
-    buf
-    "\n\
-    \    let pp ppf axis = Format.pp_print_string ppf (name axis)\n\
-    \n\
-    \    let proj : type a. a t -> product -> a = function\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "      | %s -> %s\n"
-        (axis_ctor_name field.name)
-        (proj_name field))
-    product.fields;
-  Buffer.add_string buf "      | _ -> invalid_arg \"unknown axis\"\n";
-  Buffer.add_string
-    buf
-    "\n\
-    \    let set : type a. a t -> a -> product -> product = function\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "      | %s -> %s\n"
-        (axis_ctor_name field.name)
-        (with_name field))
-    product.fields;
-  Buffer.add_string buf "      | _ -> invalid_arg \"unknown axis\"\n";
-  Buffer.add_string
-    buf
-    "\n\
-    \    let min_with : type a. a t -> a -> product = function\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "      | %s -> %s\n"
-        (axis_ctor_name field.name)
-        (min_with_name field))
-    product.fields;
-  Buffer.add_string buf "      | _ -> invalid_arg \"unknown axis\"\n";
-  Buffer.add_string
-    buf
-    "\n\
-    \    let max_with : type a. a t -> a -> product = function\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "      | %s -> %s\n"
-        (axis_ctor_name field.name)
-        (max_with_name field))
-    product.fields;
-  Buffer.add_string buf "      | _ -> invalid_arg \"unknown axis\"\n";
-  Buffer.add_string buf "  end\n\n";
   Buffer.add_string buf "  let name x =\n";
   Buffer.add_string buf "    let view = view x in\n";
   Buffer.add_string buf "    let b = Buffer.create 64 in\n";
@@ -539,17 +430,6 @@ let add_product_ml buf (product : product) module_name desc ~in_op =
   Buffer.add_string buf "    Buffer.contents b\n\n";
   Buffer.add_string buf "  let pp ppf x = Format.pp_print_string ppf (name x)\n";
   Buffer.add_string buf "  let show x = name x\n";
-  Buffer.add_string buf "  let of_name _ = None\n";
-  Buffer.add_string buf "  let legacy =\n";
-  Buffer.add_string buf "    make\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "      ~%s:%s.legacy\n"
-        field.name
-        (field_module_name field ~in_op))
-    product.fields;
   Buffer.add_string buf "end\n\n"
 
 let add_primitive_morph_sig buf (primitive : primitive_morph) =
@@ -561,17 +441,19 @@ let add_primitive_morph_sig buf (primitive : primitive_morph) =
     (module_name_of_expr core.source)
     (module_name_of_expr core.target)
 
-let lattice_module_sig_and_ml buf_mli buf_ml lattice =
-  match lattice with
-  | Base base ->
+let lattice_expr_module_sig_and_ml buf_mli buf_ml lattice expr =
+  match lattice, expr.opposite with
+  | Base base, false ->
     add_base_sig buf_mli base base.name;
+    add_base_ml buf_ml base base.name base.descriptor
+  | Base base, true ->
     add_base_sig buf_mli base (Name.op_module_name base.name);
-    add_base_ml buf_ml base base.name base.descriptor;
     add_base_ml buf_ml base (Name.op_module_name base.name) base.op_descriptor
-  | Product product ->
+  | Product product, false ->
     add_product_sig buf_mli product product.name ~in_op:false;
+    add_product_ml buf_ml product product.name product.descriptor ~in_op:false
+  | Product product, true ->
     add_product_sig buf_mli product (Name.op_module_name product.name) ~in_op:true;
-    add_product_ml buf_ml product product.name product.descriptor ~in_op:false;
     add_product_ml
       buf_ml
       product
@@ -1051,10 +933,10 @@ let render ~root_module:_ model =
   let ml = Buffer.create 16384 in
   let mli = Buffer.create 8192 in
   List.iter
-    (function
-      | Lattice lattice -> lattice_module_sig_and_ml mli ml lattice
-      | Morph _ -> ())
-    model.items;
+    (fun (expr : lattice_expr) ->
+      let lattice = String_map.find expr.name model.lattices in
+      lattice_expr_module_sig_and_ml mli ml lattice expr)
+    (emitted_module_exprs model);
   add_morphs_sig mli model;
   add_morphs_ml ml model;
   { ml = Buffer.contents ml; mli = Buffer.contents mli }

@@ -904,13 +904,8 @@ let emit_reference_defs buf model =
     Buffer.add_char buf '\n'
   in
   List.iter
-    (function
-      | Model.Lattice lattice ->
-        let name = Model.name_of_lattice lattice in
-        emit_expr name { name; opposite = false };
-        emit_expr (Name.op_module_name name) { name; opposite = true }
-      | Model.Morph _ -> ())
-    model.Model.items
+    (fun expr -> emit_expr (Model.module_name_of_expr expr) expr)
+    (Model.emitted_module_exprs model)
 
 let emit_test_runtime buf =
   Buffer.add_string
@@ -1015,9 +1010,8 @@ let check_repr ~name ~mask ~values ~of_int_exn =
       | None -> ()
     done)
 
-let check_lattice
+let check_base_lattice
     ~name
-    ~is_base
     ~values
     ~mask
     ~of_int_exn
@@ -1060,13 +1054,85 @@ let check_lattice
       ensure (Format.asprintf "%a" pp x = expected_name)
         "%s: pp mismatch for %d"
         name x;
-      if is_base
-      then ensure (of_name expected_name = Some x)
+      ensure (of_name expected_name = Some x)
         "%s: of_name mismatch for %S"
-        name expected_name
-      else ensure (of_name expected_name = None)
-        "%s: product of_name unexpectedly accepted %S"
         name expected_name);
+  iter2 values values
+    (fun x y ->
+      ensure (equal x y = (x = y))
+        "%s: equal mismatch for %d and %d"
+        name x y;
+      ensure (leq x y = ref_leq x y)
+        "%s: leq mismatch for %d and %d"
+        name x y;
+      ensure (join x y = ref_join x y)
+        "%s: join mismatch for %d and %d"
+        name x y;
+      ensure (meet x y = ref_meet x y)
+        "%s: meet mismatch for %d and %d"
+        name x y;
+      ensure (sub x y = ref_sub x y)
+        "%s: sub mismatch for %d and %d"
+        name x y;
+      ensure (imply x y = ref_imply x y)
+        "%s: imply mismatch for %d and %d"
+        name x y);
+  iter3 values values values
+    (fun x y z ->
+      ensure (join x (join y z) = join (join x y) z)
+        "%s: join associativity failed"
+        name;
+      ensure (meet x (meet y z) = meet (meet x y) z)
+        "%s: meet associativity failed"
+        name;
+      ensure ((leq (sub x y) z) = (leq x (join y z)))
+        "%s: subtraction residuation failed"
+        name;
+      ensure ((leq z (imply x y)) = (leq (meet z x) y))
+        "%s: implication residuation failed"
+        name)
+
+let check_product_lattice
+    ~name
+    ~values
+    ~mask
+    ~of_int_exn
+    ~bottom
+    ~top
+    ~leq
+    ~equal
+    ~join
+    ~meet
+    ~sub
+    ~imply
+    ~pp
+    ~show
+    ~name_fn
+    ~ref_bottom
+    ~ref_top
+    ~ref_leq
+    ~ref_join
+    ~ref_meet
+    ~ref_sub
+    ~ref_imply
+    ~ref_name
+  =
+  check_repr ~name ~mask ~values ~of_int_exn;
+  ensure (bottom = ref_bottom) "%s: bottom mismatch" name;
+  ensure (top = ref_top) "%s: top mismatch" name;
+  iter1 values
+    (fun x ->
+      let rendered = name_fn x in
+      let expected_name = ref_name x in
+      ensure (rendered = expected_name)
+        "%s: name mismatch for %d"
+        name x;
+      ensure (show x = expected_name)
+        "%s: show mismatch for %d"
+        name x;
+      ensure (Format.asprintf "%a" pp x = expected_name)
+        "%s: pp mismatch for %d"
+        name x);
   iter2 values values
     (fun x y ->
       ensure (equal x y = (x = y))
@@ -1113,81 +1179,125 @@ let check_morph ~name ~inputs ~expected ~apply =
 
 let emit_lattice_checks buf model =
   List.iter
-    (function
-      | Model.Lattice lattice ->
-        let name = Model.name_of_lattice lattice in
-        let emit_one module_name (expr : Model.lattice_expr) is_base =
-          let mask =
-            (match Model.String_map.find expr.Model.name model.Model.lattices with
-             | Model.Base base ->
-               if expr.opposite then base.op_descriptor.mask else base.descriptor.mask
-             | Model.Product product ->
-               if expr.opposite then product.op_descriptor.mask else product.descriptor.mask)
-          in
-          Printf.bprintf
-            buf
-            "let () =\n\
-             \  check_lattice\n\
-             \    ~name:%S\n\
-             \    ~is_base:%b\n\
-             \    ~values:%s\n\
-             \    ~mask:%d\n\
-             \    ~of_int_exn:%s.Repr.of_int_exn\n\
-             \    ~bottom:%s.bottom\n\
-             \    ~top:%s.top\n\
-             \    ~leq:%s.leq\n\
-             \    ~equal:%s.equal\n\
-             \    ~join:%s.join\n\
-             \    ~meet:%s.meet\n\
-             \    ~sub:%s.sub\n\
-             \    ~imply:%s.imply\n\
-             \    ~pp:%s.pp\n\
-             \    ~show:%s.show\n\
-             \    ~name_fn:%s.name\n\
-             \    ~of_name:%s.of_name\n\
-             \    ~legacy:%s.legacy\n\
-             \    ~ref_bottom:%s\n\
-             \    ~ref_top:%s\n\
-             \    ~ref_leq:%s\n\
-             \    ~ref_join:%s\n\
-             \    ~ref_meet:%s\n\
-             \    ~ref_sub:%s\n\
-             \    ~ref_imply:%s\n\
-             \    ~ref_name:%s\n\n"
-            module_name
-            is_base
-            (ref_values_var module_name)
-            mask
-            module_name
-            module_name
-            module_name
-            module_name
-            module_name
-            module_name
-            module_name
-            module_name
-            module_name
-            module_name
-            module_name
-            module_name
-            module_name
-            module_name
-            (ref_bottom_var module_name)
-            (ref_top_var module_name)
-            (ref_leq_fn module_name)
-            (ref_join_fn module_name)
-            (ref_meet_fn module_name)
-            (ref_sub_fn module_name)
-            (ref_imply_fn module_name)
-            (ref_name_fn module_name)
-        in
-        emit_one name { name; opposite = false } (match lattice with Model.Base _ -> true | Product _ -> false);
-        emit_one
-          (Name.op_module_name name)
-          { name; opposite = true }
-          (match lattice with Model.Base _ -> true | Product _ -> false)
-      | Model.Morph _ -> ())
-    model.Model.items
+    (fun (expr : Model.lattice_expr) ->
+      let module_name = Model.module_name_of_expr expr in
+      let lattice = Model.String_map.find expr.Model.name model.Model.lattices in
+      let is_base = match lattice with Model.Base _ -> true | Product _ -> false in
+      let mask =
+        match lattice with
+        | Model.Base base ->
+          if expr.opposite then base.op_descriptor.mask else base.descriptor.mask
+        | Model.Product product ->
+          if expr.opposite then product.op_descriptor.mask else product.descriptor.mask
+      in
+      if is_base
+      then
+        Printf.bprintf
+          buf
+          "let () =\n\
+           \  check_base_lattice\n\
+           \    ~name:%S\n\
+           \    ~values:%s\n\
+           \    ~mask:%d\n\
+           \    ~of_int_exn:%s.Repr.of_int_exn\n\
+           \    ~bottom:%s.bottom\n\
+           \    ~top:%s.top\n\
+           \    ~leq:%s.leq\n\
+           \    ~equal:%s.equal\n\
+           \    ~join:%s.join\n\
+           \    ~meet:%s.meet\n\
+           \    ~sub:%s.sub\n\
+           \    ~imply:%s.imply\n\
+           \    ~pp:%s.pp\n\
+           \    ~show:%s.show\n\
+           \    ~name_fn:%s.name\n\
+           \    ~of_name:%s.of_name\n\
+           \    ~legacy:%s.legacy\n\
+           \    ~ref_bottom:%s\n\
+           \    ~ref_top:%s\n\
+           \    ~ref_leq:%s\n\
+           \    ~ref_join:%s\n\
+           \    ~ref_meet:%s\n\
+           \    ~ref_sub:%s\n\
+           \    ~ref_imply:%s\n\
+           \    ~ref_name:%s\n\n"
+          module_name
+          (ref_values_var module_name)
+          mask
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          (ref_bottom_var module_name)
+          (ref_top_var module_name)
+          (ref_leq_fn module_name)
+          (ref_join_fn module_name)
+          (ref_meet_fn module_name)
+          (ref_sub_fn module_name)
+          (ref_imply_fn module_name)
+          (ref_name_fn module_name)
+      else
+        Printf.bprintf
+          buf
+          "let () =\n\
+           \  check_product_lattice\n\
+           \    ~name:%S\n\
+           \    ~values:%s\n\
+           \    ~mask:%d\n\
+           \    ~of_int_exn:%s.Repr.of_int_exn\n\
+           \    ~bottom:%s.bottom\n\
+           \    ~top:%s.top\n\
+           \    ~leq:%s.leq\n\
+           \    ~equal:%s.equal\n\
+           \    ~join:%s.join\n\
+           \    ~meet:%s.meet\n\
+           \    ~sub:%s.sub\n\
+           \    ~imply:%s.imply\n\
+           \    ~pp:%s.pp\n\
+           \    ~show:%s.show\n\
+           \    ~name_fn:%s.name\n\
+           \    ~ref_bottom:%s\n\
+           \    ~ref_top:%s\n\
+           \    ~ref_leq:%s\n\
+           \    ~ref_join:%s\n\
+           \    ~ref_meet:%s\n\
+           \    ~ref_sub:%s\n\
+           \    ~ref_imply:%s\n\
+           \    ~ref_name:%s\n\n"
+          module_name
+          (ref_values_var module_name)
+          mask
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          module_name
+          (ref_bottom_var module_name)
+          (ref_top_var module_name)
+          (ref_leq_fn module_name)
+          (ref_join_fn module_name)
+          (ref_meet_fn module_name)
+          (ref_sub_fn module_name)
+          (ref_imply_fn module_name)
+          (ref_name_fn module_name))
+    (Model.emitted_module_exprs model)
 
 let emit_product_checks buf model =
   let emit_one module_name (expr : Model.lattice_expr) (product : Model.product) =
@@ -1218,47 +1328,33 @@ let emit_product_checks buf model =
         let with_name = "with_" ^ field.name in
         let min_with_name = "min_with_" ^ field.name in
         let max_with_name = "max_with_" ^ field.name in
-        let bot_name = field.name ^ "_bot" in
-        let top_name = field.name ^ "_top" in
         Printf.bprintf buf "  iter2 %s %s (fun x value ->\n"
           (ref_values_var module_name)
           (ref_values_var field_module_name);
         Printf.bprintf
           buf
-          "    ensure (%s.%s x = %s.Axis.proj %s.Axis.%s x) %S;\n"
+          "    ensure (%s.%s (%s.%s value x) = value) %S;\n"
           module_name
           proj_name
           module_name
-          module_name
-          (String.capitalize_ascii field.name)
-          (module_name ^ ": axis proj mismatch on " ^ field.name);
-        Printf.bprintf
-          buf
-          "    ensure (%s.%s value x = %s.Axis.set %s.Axis.%s value x) %S;\n"
-          module_name
           with_name
-          module_name
-          module_name
-          (String.capitalize_ascii field.name)
-          (module_name ^ ": axis set mismatch on " ^ field.name);
+          (module_name ^ ": proj/with roundtrip mismatch on " ^ field.name);
         Printf.bprintf
           buf
-          "    ensure (%s.%s value = %s.Axis.min_with %s.Axis.%s value) %S;\n"
+          "    ensure (%s.%s (%s.%s value) = value) %S;\n"
+          module_name
+          proj_name
           module_name
           min_with_name
-          module_name
-          module_name
-          (String.capitalize_ascii field.name)
-          (module_name ^ ": axis min_with mismatch on " ^ field.name);
+          (module_name ^ ": proj/min_with mismatch on " ^ field.name);
         Printf.bprintf
           buf
-          "    ensure (%s.%s value = %s.Axis.max_with %s.Axis.%s value) %S;\n"
+          "    ensure (%s.%s (%s.%s value) = value) %S;\n"
+          module_name
+          proj_name
           module_name
           max_with_name
-          module_name
-          module_name
-          (String.capitalize_ascii field.name)
-          (module_name ^ ": axis max_with mismatch on " ^ field.name);
+          (module_name ^ ": proj/max_with mismatch on " ^ field.name);
         Printf.bprintf
           buf
           "    let expected = %s.of_view { (%s.view x) with %s = value } in\n"
@@ -1271,57 +1367,17 @@ let emit_product_checks buf model =
           module_name
           with_name
           (module_name ^ ": with mismatch on " ^ field.name);
-        Buffer.add_string buf "  );\n";
-        Printf.bprintf
-          buf
-          "  ensure (%s.%s = %s.%s %s.bottom) %S;\n"
-          module_name
-          bot_name
-          module_name
-          min_with_name
-          field_module_name
-          (module_name ^ ": bot mismatch on " ^ field.name);
-        Printf.bprintf
-          buf
-          "  ensure (%s.%s = %s.%s %s.top) %S;\n"
-          module_name
-          top_name
-          module_name
-          max_with_name
-          field_module_name
-          (module_name ^ ": top mismatch on " ^ field.name);
-        Printf.bprintf
-          buf
-          "  ensure (%s.Axis.name %s.Axis.%s = %S) %S;\n"
-          module_name
-          module_name
-          (String.capitalize_ascii field.name)
-          field.name
-          (module_name ^ ": axis name mismatch on " ^ field.name);
-        Printf.bprintf
-          buf
-          "  ensure (Format.asprintf \"%%a\" %s.Axis.pp %s.Axis.%s = %S) %S;\n"
-          module_name
-          module_name
-          (String.capitalize_ascii field.name)
-          field.name
-          (module_name ^ ": axis pp mismatch on " ^ field.name))
+        Buffer.add_string buf "  );\n")
       product.fields;
-    Printf.bprintf buf "  ensure (List.length %s.Axis.all = %d) %S\n\n"
-      module_name
-      (List.length product.fields)
-      (module_name ^ ": axis list length mismatch")
+    Buffer.add_string buf "  ()\n\n"
   in
   List.iter
-    (function
-      | Model.Lattice (Model.Product product) ->
-        emit_one product.name { name = product.name; opposite = false } product;
-        emit_one
-          (Name.op_module_name product.name)
-          { name = product.name; opposite = true }
-          product
-      | _ -> ())
-    model.Model.items
+    (fun (expr : Model.lattice_expr) ->
+      match Model.String_map.find expr.name model.Model.lattices with
+      | Model.Base _ -> ()
+      | Model.Product product ->
+        emit_one (Model.module_name_of_expr expr) expr product)
+    (Model.emitted_module_exprs model)
 
 let emit_morph_checks buf model =
   let resolve_semantics = make_semantics_resolver model in

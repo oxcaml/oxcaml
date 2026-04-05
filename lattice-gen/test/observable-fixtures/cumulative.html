@@ -272,78 +272,10 @@ Numbers = [
   let legacy = top
 end
 
-module Numbers_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
-
-  let z = 0
-  let s = 1
-
-  let name x =
-    if equal x z then &quot;Z&quot;
-    else if equal x s then &quot;S&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Z&quot; -&gt; Some z
-    | &quot;S&quot; -&gt; Some s
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = top
-end
-
 </pre>
 </div>
 <div class="lattice-generated-panel" data-panel="mli">
 <pre data-language="ocaml">module Numbers : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val z : t
-  val s : t
-end
-
-module Numbers_op : sig
   type t = int
 
   module Repr : sig
@@ -436,48 +368,6 @@ State = {
   let legacy = global
 end
 
-module Locality_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
-
-  let global = 0
-  let local = 1
-
-  let name x =
-    if equal x global then &quot;Global&quot;
-    else if equal x local then &quot;Local&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Global&quot; -&gt; Some global
-    | &quot;Local&quot; -&gt; Some local
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = global
-end
-
 module State = struct
   type t = int
 
@@ -527,43 +417,6 @@ module State = struct
   let with_locality x t = (t land lnot 1) lor ((x land 1) lsl 0)
   let min_with_locality x = with_locality x bottom
   let max_with_locality x = with_locality x top
-  let locality_bot = min_with_locality bottom
-  let locality_top = max_with_locality top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Locality : Locality.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Locality;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Locality -&gt; &quot;locality&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Locality -&gt; proj_locality
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Locality -&gt; with_locality
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Locality -&gt; min_with_locality
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Locality -&gt; max_with_locality
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
 
   let name x =
     let view = view x in
@@ -576,146 +429,12 @@ module State = struct
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~locality:Locality.legacy
-end
-
-module State_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
-
-  type view = {
-    locality : Locality_op.t;
-  }
-
-  type nonrec product = t
-
-  let of_view view =
-    let locality = (view.locality land 1) lsl 0 in
-    locality
-
-  let view t =
-    {
-      locality = (t lsr 0) land 1;
-    }
-
-  let make =
-    fun ~locality -&gt;
-    of_view {
-      locality;
-    }
-
-  let proj_locality t = (t lsr 0) land 1
-  let with_locality x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_locality x = with_locality x bottom
-  let max_with_locality x = with_locality x top
-  let locality_bot = min_with_locality bottom
-  let locality_top = max_with_locality top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Locality : Locality_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Locality;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Locality -&gt; &quot;locality&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Locality -&gt; proj_locality
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Locality -&gt; with_locality
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Locality -&gt; min_with_locality
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Locality -&gt; max_with_locality
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
-
-  let name x =
-    let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;State_op { &quot;;
-    Buffer.add_string b &quot;locality = &quot;;
-    Buffer.add_string b (Locality_op.show view.locality);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~locality:Locality_op.legacy
 end
 
 </pre>
 </div>
 <div class="lattice-generated-panel" data-panel="mli">
 <pre data-language="ocaml">module Locality : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val global : t
-  val local : t
-end
-
-module Locality_op : sig
   type t = int
 
   module Repr : sig
@@ -761,28 +480,12 @@ module State : sig
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
 
   type view = {
     locality : Locality.t;
   }
 
   type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Locality : Locality.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
 
   val of_view : view -&gt; t
   val view : t -&gt; view
@@ -793,64 +496,6 @@ module State : sig
   val with_locality : Locality.t -&gt; t -&gt; t
   val min_with_locality : Locality.t -&gt; t
   val max_with_locality : Locality.t -&gt; t
-  val locality_bot : t
-  val locality_top : t
-end
-
-module State_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-
-  type view = {
-    locality : Locality_op.t;
-  }
-
-  type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Locality : Locality_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
-
-  val of_view : view -&gt; t
-  val view : t -&gt; view
-  val make :
-    locality:Locality_op.t -&gt;
-    t
-  val proj_locality : t -&gt; Locality_op.t
-  val with_locality : Locality_op.t -&gt; t -&gt; t
-  val min_with_locality : Locality_op.t -&gt; t
-  val max_with_locality : Locality_op.t -&gt; t
-  val locality_bot : t
-  val locality_top : t
 end
 
 </pre>

@@ -619,6 +619,9 @@ let lattice_expr_equal (a : lattice_expr) (b : lattice_expr) =
 
 let flip_expr (expr : lattice_expr) = { expr with opposite = not expr.opposite }
 
+let effective_field_expr root_expr (field : field) =
+  if root_expr.opposite then flip_expr field.ty else field.ty
+
 let morph_core_of = function
   | Primitive primitive -> primitive.core
   | Bridge bridge -> bridge.core
@@ -627,6 +630,32 @@ let with_morph_core morph core =
   match morph with
   | Primitive _ -> Primitive { core }
   | Bridge bridge -> Bridge { bridge with core }
+
+let emitted_module_exprs (model : t) =
+  let seen = Hashtbl.create 32 in
+  let acc = ref [] in
+  let rec visit (expr : lattice_expr) =
+    if not (Hashtbl.mem seen expr)
+    then (
+      Hashtbl.add seen expr ();
+      (match String_map.find expr.name model.lattices with
+       | Base _ -> ()
+       | Product product ->
+         List.iter
+           (fun field -> visit (effective_field_expr expr field))
+           product.fields);
+      acc := expr :: !acc)
+  in
+  List.iter
+    (function
+      | Lattice lattice ->
+        visit { name = name_of_lattice lattice; opposite = false }
+      | Morph morph ->
+        let core = morph_core_of morph in
+        visit core.source;
+        visit core.target)
+    model.items;
+  List.rev !acc
 
 let value_index (lattice : finite_lattice) =
   let indices = Hashtbl.create (Array.length lattice.element_values) in

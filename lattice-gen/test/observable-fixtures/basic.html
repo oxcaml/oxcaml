@@ -272,78 +272,10 @@ Locality = [
   let legacy = global
 end
 
-module Locality_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let bottom = 1
-  let top = 0
-  let[@inline] leq x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] sub x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
-
-  let global = 0
-  let local = 1
-
-  let name x =
-    if equal x global then &quot;Global&quot;
-    else if equal x local then &quot;Local&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Global&quot; -&gt; Some global
-    | &quot;Local&quot; -&gt; Some local
-    | _ -&gt; None
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = global
-end
-
 </pre>
 </div>
 <div class="lattice-generated-panel" data-panel="mli">
 <pre data-language="ocaml">module Locality : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-  val global : t
-  val local : t
-end
-
-module Locality_op : sig
   type t = int
 
   module Repr : sig

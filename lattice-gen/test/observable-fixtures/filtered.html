@@ -427,57 +427,11 @@ module Pair = struct
   let with_left x t = (t land lnot 3) lor ((x land 3) lsl 0)
   let min_with_left x = with_left x bottom
   let max_with_left x = with_left x top
-  let left_bot = min_with_left bottom
-  let left_top = max_with_left top
 
   let proj_right t = (t lsr 2) land 3
   let with_right x t = (t land lnot 12) lor ((x land 3) lsl 2)
   let min_with_right x = with_right x bottom
   let max_with_right x = with_right x top
-  let right_bot = min_with_right bottom
-  let right_top = max_with_right top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Left : Axis.t t
-    type _ t += Right : Axis_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Left;
-        Pack Right;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Left -&gt; &quot;left&quot;
-      | Right -&gt; &quot;right&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Left -&gt; proj_left
-      | Right -&gt; proj_right
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Left -&gt; with_left
-      | Right -&gt; with_right
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Left -&gt; min_with_left
-      | Right -&gt; min_with_right
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Left -&gt; max_with_left
-      | Right -&gt; max_with_right
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
 
   let name x =
     let view = view x in
@@ -493,166 +447,6 @@ module Pair = struct
 
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~left:Axis.legacy
-      ~right:Axis_op.legacy
-end
-
-module Pair_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 10) lsr 1) in
-      x
-    let mask = 15
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
-  end
-
-  let[@inline] close_down_nat x =
-    let x = x lor ((x land 10) lsr 1) in
-    x
-  let[@inline] close_up_nat x =
-    let x = x lor ((x land 5) lsl 1) in
-    x
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 10) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 5) lsl 1) in
-    x
-  let bottom = 3
-  let top = 12
-  let[@inline] leq x y =
-    (((x land lnot y) land 12) = 0)
-    &amp;&amp; (((y land lnot x) land 3) = 0)
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y =
-    let o = x lor y in
-    let a = x land y in
-    (o land 12) lor (a land 3)
-  let[@inline] meet x y =
-    let o = x lor y in
-    let a = x land y in
-    (a land 12) lor (o land 3)
-  let[@inline] sub x y =
-    let zxy = x land lnot y in
-    let zyx = y land lnot x in
-    ((close_down_nat zxy) land 12)
-    lor ((lnot (close_up_dual zyx)) land 3)
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    let zyx = y land lnot x in
-    ((lnot (close_up_nat zxy)) land 12)
-    lor ((close_down_dual zyx) land 3)
-
-  type view = {
-    left : Axis_op.t;
-    right : Axis.t;
-  }
-
-  type nonrec product = t
-
-  let of_view view =
-    let left = (view.left land 3) lsl 0 in
-    let right = (view.right land 3) lsl 2 in
-    left lor right
-
-  let view t =
-    {
-      left = (t lsr 0) land 3;
-      right = (t lsr 2) land 3;
-    }
-
-  let make =
-    fun ~left -&gt;
-    fun ~right -&gt;
-    of_view {
-      left;
-      right;
-    }
-
-  let proj_left t = (t lsr 0) land 3
-  let with_left x t = (t land lnot 3) lor ((x land 3) lsl 0)
-  let min_with_left x = with_left x bottom
-  let max_with_left x = with_left x top
-  let left_bot = min_with_left bottom
-  let left_top = max_with_left top
-
-  let proj_right t = (t lsr 2) land 3
-  let with_right x t = (t land lnot 12) lor ((x land 3) lsl 2)
-  let min_with_right x = with_right x bottom
-  let max_with_right x = with_right x top
-  let right_bot = min_with_right bottom
-  let right_top = max_with_right top
-
-  module Axis = struct
-    type _ t = ..
-    type _ t += Left : Axis_op.t t
-    type _ t += Right : Axis.t t
-    type packed = Pack : &#39;a t -&gt; packed
-
-    let packed axis = Pack axis
-
-    let all =
-      [
-        Pack Left;
-        Pack Right;
-      ]
-
-    let name : type a. a t -&gt; string = function
-      | Left -&gt; &quot;left&quot;
-      | Right -&gt; &quot;right&quot;
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let pp ppf axis = Format.pp_print_string ppf (name axis)
-
-    let proj : type a. a t -&gt; product -&gt; a = function
-      | Left -&gt; proj_left
-      | Right -&gt; proj_right
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let set : type a. a t -&gt; a -&gt; product -&gt; product = function
-      | Left -&gt; with_left
-      | Right -&gt; with_right
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let min_with : type a. a t -&gt; a -&gt; product = function
-      | Left -&gt; min_with_left
-      | Right -&gt; min_with_right
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-
-    let max_with : type a. a t -&gt; a -&gt; product = function
-      | Left -&gt; max_with_left
-      | Right -&gt; max_with_right
-      | _ -&gt; invalid_arg &quot;unknown axis&quot;
-  end
-
-  let name x =
-    let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Pair_op { &quot;;
-    Buffer.add_string b &quot;left = &quot;;
-    Buffer.add_string b (Axis_op.show view.left);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;right = &quot;;
-    Buffer.add_string b (Axis.show view.right);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let pp ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let of_name _ = None
-  let legacy =
-    make
-      ~left:Axis_op.legacy
-      ~right:Axis.legacy
 end
 
 </pre>
@@ -732,8 +526,6 @@ module Pair : sig
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
   val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
 
   type view = {
     left : Axis.t;
@@ -741,21 +533,6 @@ module Pair : sig
   }
 
   type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Left : Axis.t t
-    type _ t += Right : Axis_op.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
 
   val of_view : view -&gt; t
   val view : t -&gt; view
@@ -767,79 +544,10 @@ module Pair : sig
   val with_left : Axis.t -&gt; t -&gt; t
   val min_with_left : Axis.t -&gt; t
   val max_with_left : Axis.t -&gt; t
-  val left_bot : t
-  val left_top : t
   val proj_right : t -&gt; Axis_op.t
   val with_right : Axis_op.t -&gt; t -&gt; t
   val min_with_right : Axis_op.t -&gt; t
   val max_with_right : Axis_op.t -&gt; t
-  val right_bot : t
-  val right_top : t
-end
-
-module Pair_op : sig
-  type t = int
-
-  module Repr : sig
-    type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
-  end
-
-  val bottom : t
-  val top : t
-  val leq : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val sub : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val pp : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
-
-  type view = {
-    left : Axis_op.t;
-    right : Axis.t;
-  }
-
-  type nonrec product = t
-
-  module Axis : sig
-    type _ t = ..
-    type _ t += Left : Axis_op.t t
-    type _ t += Right : Axis.t t
-    type packed = Pack : &#39;a t -&gt; packed
-    val packed : &#39;a t -&gt; packed
-    val all : packed list
-    val name : &#39;a t -&gt; string
-    val pp : Format.formatter -&gt; &#39;a t -&gt; unit
-    val proj : &#39;a t -&gt; product -&gt; &#39;a
-    val set : &#39;a t -&gt; &#39;a -&gt; product -&gt; product
-    val min_with : &#39;a t -&gt; &#39;a -&gt; product
-    val max_with : &#39;a t -&gt; &#39;a -&gt; product
-  end
-
-  val of_view : view -&gt; t
-  val view : t -&gt; view
-  val make :
-    left:Axis_op.t -&gt;
-    right:Axis.t -&gt;
-    t
-  val proj_left : t -&gt; Axis_op.t
-  val with_left : Axis_op.t -&gt; t -&gt; t
-  val min_with_left : Axis_op.t -&gt; t
-  val max_with_left : Axis_op.t -&gt; t
-  val left_bot : t
-  val left_top : t
-  val proj_right : t -&gt; Axis.t
-  val with_right : Axis.t -&gt; t -&gt; t
-  val min_with_right : Axis.t -&gt; t
-  val max_with_right : Axis.t -&gt; t
-  val right_bot : t
-  val right_top : t
 end
 
 </pre>
