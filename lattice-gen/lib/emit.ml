@@ -1,4 +1,5 @@
 open Model
+module Bitwise = Bitwise
 
 let bprintf = Printf.bprintf
 
@@ -9,133 +10,165 @@ type outputs =
 
 let dual_mask (desc : descriptor) = desc.mask land lnot desc.nat_mask
 
-let render_schedule_expr expr rounds direction =
+let add_indented_block buf indent text =
+  String.split_on_char '\n' text
+  |> List.iter (fun line -> bprintf buf "%s%s\n" indent line)
+
+let render_bitwise_function_ml ?(indent = "  ") ?(bindings = []) buf name args expr =
+  let avoid = args @ List.map fst bindings in
+  let cse_bindings, expr = Bitwise.cse ~avoid expr in
+  bprintf buf "%slet[@inline] %s %s =\n" indent name (String.concat " " args);
+  let binding_width = max 32 (72 - String.length indent - 4) in
+  List.iter
+    (fun (binding_name, binding_expr) ->
+      let rendered = Bitwise.render_pretty ~width:binding_width binding_expr in
+      match String.split_on_char '\n' rendered with
+      | [ line ] ->
+        bprintf
+          buf
+          "%s  let %s = %s in\n"
+          indent
+          binding_name
+          line
+      | _ ->
+        bprintf buf "%s  let %s =\n" indent binding_name;
+        add_indented_block buf (indent ^ "    ") rendered;
+        bprintf buf "%s  in\n" indent)
+    bindings;
+  List.iter
+    (fun (binding : Bitwise.binding) ->
+      let rendered = Bitwise.render_pretty ~width:binding_width binding.expr in
+      match String.split_on_char '\n' rendered with
+      | [ line ] ->
+        bprintf
+          buf
+          "%s  let %s = %s in\n"
+          indent
+          binding.name
+          line
+      | _ ->
+        bprintf buf "%s  let %s =\n" indent binding.name;
+        add_indented_block buf (indent ^ "    ") rendered;
+        bprintf buf "%s  in\n" indent)
+    cse_bindings;
+  add_indented_block
+    buf
+    (indent ^ "  ")
+    (Bitwise.render_pretty ~width:(max 32 (72 - String.length indent - 2)) expr)
+
+let build_schedule_expr expr rounds direction =
   List.fold_left
     (fun acc (round : round) ->
-      Printf.sprintf
-        "(%s lor ((%s land %d) %s %d))"
-        acc
-        acc
-        round.mask
-        (match direction with `Down -> "lsr" | `Up -> "lsl")
-        round.shift)
+      let shifted =
+        match direction with
+        | `Down -> Bitwise.shift_r (Bitwise.mask acc round.mask) round.shift
+        | `Up -> Bitwise.shift_l (Bitwise.mask acc round.mask) round.shift
+      in
+      Bitwise.or_ [ acc; shifted ])
     expr
     rounds
+
+let with_named_expr ~mask ~name ~expr ~needed =
+  if needed then [ (name, expr) ], Bitwise.var ~mask name else [], expr
+
+let close_down rounds expr =
+  if rounds = [] then expr else build_schedule_expr expr rounds `Down
+
+let close_up_complement ~mask rounds expr =
+  if rounds = []
+  then Bitwise.xor_mask expr mask
+  else Bitwise.xor_mask (build_schedule_expr expr rounds `Up) mask
 
 let add_specialized_ops_ml ?(indent = "  ") buf desc =
   let nat_mask = desc.nat_mask in
   let dual_mask = dual_mask desc in
+  let x = Bitwise.var ~mask:desc.mask "x" in
+  let y = Bitwise.var ~mask:desc.mask "y" in
+  let x_nat = Bitwise.mask x nat_mask in
+  let y_nat = Bitwise.mask y nat_mask in
+  let x_dual = Bitwise.mask x dual_mask in
+  let y_dual = Bitwise.mask y dual_mask in
+  let zxy_nat_expr = Bitwise.and_ [ x_nat; Bitwise.xor_mask y_nat nat_mask ] in
+  let zyx_dual_expr =
+    Bitwise.and_ [ y_dual; Bitwise.xor_mask x_dual dual_mask ]
+  in
+  bprintf buf "%slet min = %d\n" indent dual_mask;
+  bprintf buf "%slet max = %d\n" indent nat_mask;
   if nat_mask = desc.mask
-  then (
-    bprintf buf "%slet min = 0\n" indent;
-    bprintf buf "%slet max = %d\n" indent desc.mask;
-    bprintf buf "%slet[@inline] le x y = (x land y) = x\n" indent;
-    bprintf buf "%slet[@inline] equal (x : t) (y : t) = x = y\n" indent;
-    bprintf buf "%slet[@inline] join x y = x lor y\n" indent;
-    bprintf buf "%slet[@inline] meet x y = x land y\n" indent;
-    bprintf buf "%slet[@inline] subtract x y =\n" indent;
-    if desc.down_nat <> []
-    then (
-      bprintf buf "%s  let zxy = x land lnot y in\n" indent;
-      bprintf
-        buf
-        "%s  %s\n"
-        indent
-        (render_schedule_expr "zxy" desc.down_nat `Down))
-    else bprintf buf "%s  x land lnot y\n" indent;
-    bprintf buf "%slet[@inline] imply x y =\n" indent;
-    if desc.up_nat <> []
-    then (
-      bprintf buf "%s  let zxy = x land lnot y in\n" indent;
-      bprintf
-        buf
-        "%s  lnot (%s) land %d\n"
-        indent
-        (render_schedule_expr "zxy" desc.up_nat `Up)
-        desc.mask)
-    else bprintf buf "%s  lnot (x land lnot y) land %d\n" indent desc.mask)
+  then bprintf buf "%slet[@inline] le x y = (x land y) = x\n" indent
   else if nat_mask = 0
-  then (
-    bprintf buf "%slet min = %d\n" indent desc.mask;
-    bprintf buf "%slet max = 0\n" indent;
-    bprintf buf "%slet[@inline] le x y = (x land y) = y\n" indent;
-    bprintf buf "%slet[@inline] equal (x : t) (y : t) = x = y\n" indent;
-    bprintf buf "%slet[@inline] join x y = x land y\n" indent;
-    bprintf buf "%slet[@inline] meet x y = x lor y\n" indent;
-    bprintf buf "%slet[@inline] subtract x y =\n" indent;
-    if desc.up_dual <> []
-    then (
-      bprintf buf "%s  let zyx = y land lnot x in\n" indent;
-      bprintf
-        buf
-        "%s  lnot (%s) land %d\n"
-        indent
-        (render_schedule_expr "zyx" desc.up_dual `Up)
-        desc.mask)
-    else bprintf buf "%s  lnot (y land lnot x) land %d\n" indent desc.mask;
-    bprintf buf "%slet[@inline] imply x y =\n" indent;
-    if desc.down_dual <> []
-    then (
-      bprintf buf "%s  let zyx = y land lnot x in\n" indent;
-      bprintf
-        buf
-        "%s  %s\n"
-        indent
-        (render_schedule_expr "zyx" desc.down_dual `Down))
-    else bprintf buf "%s  y land lnot x\n" indent)
+  then bprintf buf "%slet[@inline] le x y = (x land y) = y\n" indent
   else (
-    bprintf buf "%slet min = %d\n" indent dual_mask;
-    bprintf buf "%slet max = %d\n" indent nat_mask;
     bprintf buf "%slet[@inline] le x y =\n" indent;
     bprintf buf "%s  (((x land lnot y) land %d) = 0)\n" indent nat_mask;
-    bprintf buf "%s  && (((y land lnot x) land %d) = 0)\n" indent dual_mask;
-    bprintf buf "%slet[@inline] equal (x : t) (y : t) = x = y\n" indent;
-    bprintf buf "%slet[@inline] join x y =\n" indent;
-    bprintf buf "%s  let o = x lor y in\n" indent;
-    bprintf buf "%s  let a = x land y in\n" indent;
-    bprintf buf "%s  (o land %d) lor (a land %d)\n" indent nat_mask dual_mask;
-    bprintf buf "%slet[@inline] meet x y =\n" indent;
-    bprintf buf "%s  let o = x lor y in\n" indent;
-    bprintf buf "%s  let a = x land y in\n" indent;
-    bprintf buf "%s  (a land %d) lor (o land %d)\n" indent nat_mask dual_mask;
-    bprintf buf "%slet[@inline] subtract x y =\n" indent;
-    bprintf buf "%s  let zxy = x land lnot y in\n" indent;
-    bprintf buf "%s  let zyx = y land lnot x in\n" indent;
-    bprintf
-      buf
-      "%s  ((%s) land %d)\n"
-      indent
-      (if desc.down_nat <> []
-       then render_schedule_expr "zxy" desc.down_nat `Down
-       else "zxy")
-      nat_mask;
-    bprintf
-      buf
-      "%s  lor ((%s) land %d)\n"
-      indent
-      (if desc.up_dual <> []
-       then "lnot (" ^ render_schedule_expr "zyx" desc.up_dual `Up ^ ")"
-       else "lnot zyx")
-      dual_mask;
-    bprintf buf "%slet[@inline] imply x y =\n" indent;
-    bprintf buf "%s  let zxy = x land lnot y in\n" indent;
-    bprintf buf "%s  let zyx = y land lnot x in\n" indent;
-    bprintf
-      buf
-      "%s  ((%s) land %d)\n"
-      indent
-      (if desc.up_nat <> []
-       then "lnot (" ^ render_schedule_expr "zxy" desc.up_nat `Up ^ ")"
-       else "lnot zxy")
-      nat_mask;
-    bprintf
-      buf
-      "%s  lor ((%s) land %d)\n"
-      indent
-      (if desc.down_dual <> []
-       then render_schedule_expr "zyx" desc.down_dual `Down
-       else "zyx")
-      dual_mask)
+    bprintf buf "%s  && (((y land lnot x) land %d) = 0)\n" indent dual_mask);
+  bprintf buf "%slet[@inline] equal (x : t) (y : t) = x = y\n" indent;
+  render_bitwise_function_ml
+    ~indent
+    buf
+    "join"
+    [ "x"; "y" ]
+    (Bitwise.or_
+       [ Bitwise.or_ [ x_nat; y_nat ];
+         Bitwise.and_ [ x_dual; y_dual ]
+       ]);
+  render_bitwise_function_ml
+    ~indent
+    buf
+    "meet"
+    [ "x"; "y" ]
+    (Bitwise.or_
+       [ Bitwise.and_ [ x_nat; y_nat ];
+         Bitwise.or_ [ x_dual; y_dual ]
+       ]);
+  let subtract_zxy_bindings, subtract_zxy =
+    with_named_expr
+      ~mask:nat_mask
+      ~name:"zxy"
+      ~expr:zxy_nat_expr
+      ~needed:(nat_mask <> 0 && desc.down_nat <> [])
+  in
+  let subtract_zyx_bindings, subtract_zyx =
+    with_named_expr
+      ~mask:dual_mask
+      ~name:"zyx"
+      ~expr:zyx_dual_expr
+      ~needed:(dual_mask <> 0 && desc.up_dual <> [])
+  in
+  let nat_sub = close_down desc.down_nat subtract_zxy in
+  let dual_sub =
+    close_up_complement ~mask:dual_mask desc.up_dual subtract_zyx
+  in
+  render_bitwise_function_ml
+    ~indent
+    ~bindings:(subtract_zxy_bindings @ subtract_zyx_bindings)
+    buf
+    "subtract"
+    [ "x"; "y" ]
+    (Bitwise.or_ [ nat_sub; dual_sub ]);
+  let imply_zxy_bindings, imply_zxy =
+    with_named_expr
+      ~mask:nat_mask
+      ~name:"zxy"
+      ~expr:zxy_nat_expr
+      ~needed:(nat_mask <> 0 && desc.up_nat <> [])
+  in
+  let imply_zyx_bindings, imply_zyx =
+    with_named_expr
+      ~mask:dual_mask
+      ~name:"zyx"
+      ~expr:zyx_dual_expr
+      ~needed:(dual_mask <> 0 && desc.down_dual <> [])
+  in
+  let nat_imply = close_up_complement ~mask:nat_mask desc.up_nat imply_zxy in
+  let dual_imply = close_down desc.down_dual imply_zyx in
+  render_bitwise_function_ml
+    ~indent
+    ~bindings:(imply_zxy_bindings @ imply_zyx_bindings)
+    buf
+    "imply"
+    [ "x"; "y" ]
+    (Bitwise.or_ [ nat_imply; dual_imply ])
 
 let field_module_name (field : field) ~in_op =
   let opposite = if in_op then not field.ty.opposite else field.ty.opposite in
@@ -151,69 +184,34 @@ let emitted_morph_name name = Name.escape_value_name name
 
 let view_ctor_name name = String.capitalize_ascii (Name.snake_case name)
 
-let render_mask_shift expr mask shift =
-  if shift = 0
-  then Printf.sprintf "(%s land %d)" expr mask
-  else Printf.sprintf "((%s land %d) lsl %d)" expr mask shift
+let lattice_module_type_text =
+  "module type Lattice = sig\n\
+  \  type t\n\
+  \  type view\n\
+  \n\
+  \  val view : t -> view\n\
+  \  val of_view : view -> t\n\
+  \n\
+  \  val le : t -> t -> bool\n\
+  \  val equal : t -> t -> bool\n\
+  \  val min : t\n\
+  \  val max : t\n\
+  \  val join : t -> t -> t\n\
+  \  val meet : t -> t -> t\n\
+  \  val subtract : t -> t -> t\n\
+  \  val imply : t -> t -> t\n\
+  \n\
+  \  val print : Format.formatter -> t -> unit\n\
+  \n\
+  \  module Repr : sig\n\
+  \    val to_int_unsafe : t -> int\n\
+  \    val from_int_unsafe : int -> t\n\
+  \  end\n\
+  end\n\n"
 
-let render_shift_mask expr shift mask =
-  if shift = 0
-  then Printf.sprintf "(%s land %d)" expr mask
-  else Printf.sprintf "((%s lsr %d) land %d)" expr shift mask
+let add_module_type_s buf = Buffer.add_string buf lattice_module_type_text
 
-let add_module_type_s buf =
-  Buffer.add_string
-    buf
-    "module type Lattice = sig\n\
-    \  type t\n\
-    \  type view\n\
-    \n\
-    \  val view : t -> view\n\
-    \  val of_view : view -> t\n\
-    \n\
-    \  val le : t -> t -> bool\n\
-    \  val equal : t -> t -> bool\n\
-    \  val min : t\n\
-    \  val max : t\n\
-    \  val join : t -> t -> t\n\
-    \  val meet : t -> t -> t\n\
-    \  val subtract : t -> t -> t\n\
-    \  val imply : t -> t -> t\n\
-    \n\
-    \  val print : Format.formatter -> t -> unit\n\
-    \n\
-    \  module Repr : sig\n\
-    \    val to_int_unsafe : t -> int\n\
-    \    val from_int_unsafe : int -> t\n\
-    \  end\n\
-    end\n\n"
-
-let add_module_type_s_ml buf =
-  Buffer.add_string
-    buf
-    "module type Lattice = sig\n\
-    \  type t\n\
-    \  type view\n\
-    \n\
-    \  val view : t -> view\n\
-    \  val of_view : view -> t\n\
-    \n\
-    \  val le : t -> t -> bool\n\
-    \  val equal : t -> t -> bool\n\
-    \  val min : t\n\
-    \  val max : t\n\
-    \  val join : t -> t -> t\n\
-    \  val meet : t -> t -> t\n\
-    \  val subtract : t -> t -> t\n\
-    \  val imply : t -> t -> t\n\
-    \n\
-    \  val print : Format.formatter -> t -> unit\n\
-    \n\
-    \  module Repr : sig\n\
-    \    val to_int_unsafe : t -> int\n\
-    \    val from_int_unsafe : int -> t\n\
-    \  end\n\
-    end\n\n"
+let add_module_type_s_ml buf = Buffer.add_string buf lattice_module_type_text
 
 let add_common_ml_items buf desc =
   Buffer.add_string buf "  type t = int\n\n";
@@ -376,7 +374,25 @@ let add_product_sig buf (product : product) module_name ~in_op =
     product.fields;
   Buffer.add_string buf "end\n\n"
 
-let add_product_ml buf (product : product) module_name desc ~in_op =
+let add_product_ml buf (product : product) module_name (desc : descriptor) ~in_op =
+  let t_expr = Bitwise.var ~mask:desc.mask "t" in
+  let make_field_expr (field : field) =
+    Bitwise.shift_l
+      (Bitwise.var ~mask:field.raw_mask (emitted_field_name field))
+      field.shift
+  in
+  let view_field_expr (field : field) =
+    Bitwise.mask (Bitwise.shift_r t_expr field.shift) field.raw_mask
+  in
+  let with_field_expr (field : field) =
+    Bitwise.or_
+      [ Bitwise.and_
+          [ t_expr;
+            Bitwise.const (desc.mask land lnot field.layout_mask)
+          ];
+        Bitwise.shift_l (Bitwise.var ~mask:field.raw_mask "x") field.shift
+      ]
+  in
   bprintf buf "module %s = struct\n" module_name;
   add_common_ml_items buf desc;
   Buffer.add_string buf "  type view = {\n";
@@ -396,21 +412,10 @@ let add_product_ml buf (product : product) module_name desc ~in_op =
       bprintf buf "      ~%s\n" (emitted_field_name field))
     product.fields;
   Buffer.add_string buf "    =\n";
-  List.iter
-    (fun (field : field) ->
-      let field_name = emitted_field_name field in
-      bprintf
-        buf
-        "    let %s = %s in\n"
-        field_name
-        (render_mask_shift field_name field.raw_mask field.shift))
-    product.fields;
   Buffer.add_string buf "    ";
-  List.iteri
-    (fun i (field : field) ->
-      if i > 0 then Buffer.add_string buf " lor ";
-      Buffer.add_string buf (emitted_field_name field))
-    product.fields;
+  Buffer.add_string
+    buf
+    (Bitwise.render (Bitwise.or_ (List.map make_field_expr product.fields)));
   Buffer.add_string buf "\n\n";
   Buffer.add_string buf "  let[@inline] of_view view =\n";
   Buffer.add_string buf "    make\n";
@@ -429,7 +434,7 @@ let add_product_ml buf (product : product) module_name desc ~in_op =
         buf
         "      %s = %s;\n"
         field_name
-        (render_shift_mask "t" field.shift field.raw_mask))
+        (Bitwise.render (view_field_expr field)))
     product.fields;
   Buffer.add_string buf "    }\n\n";
   List.iter
@@ -438,13 +443,12 @@ let add_product_ml buf (product : product) module_name desc ~in_op =
         buf
         "  let[@inline] %s t = %s\n"
         (proj_name field)
-        (render_shift_mask "t" field.shift field.raw_mask);
+        (Bitwise.render (view_field_expr field));
       bprintf
         buf
-        "  let[@inline] %s x t = (t land lnot %d) lor %s\n"
+        "  let[@inline] %s x t = %s\n"
         (with_name field)
-        field.layout_mask
-        (render_mask_shift "x" field.raw_mask field.shift);
+        (Bitwise.render (with_field_expr field));
       Buffer.add_char buf '\n')
     product.fields;
   Buffer.add_string buf "  let print ppf x =\n";
@@ -684,7 +688,7 @@ let synthesize_primitive_kernel model (primitive : primitive_morph) =
   then None
   else Some (normalize_kernel target_mask { const = !const; terms = List.rev !terms })
 
-let render_term ~source_mask (term : bit_term) =
+let bitwise_of_term ~source_mask (term : bit_term) =
   let dropped_low_bits shift =
     if shift <= 0 then 0 else (1 lsl shift) - 1
   in
@@ -696,39 +700,33 @@ let render_term ~source_mask (term : bit_term) =
       let required_mask = source_mask land lnot (dropped_low_bits shift) in
       term.mask = required_mask)
   in
+  let x = Bitwise.var ~mask:source_mask "x" in
   let atom =
     match term.negated, term.mask = source_mask with
-    | false, true -> "x"
-    | true, true when term.shift = 0 ->
-      Printf.sprintf "(x lxor %d)" source_mask
-    | false, false when mask_is_redundant_for_right_shift -> "x"
-    | false, false -> Printf.sprintf "(x land %d)" term.mask
-    | true, _ -> Printf.sprintf "((lnot x) land %d)" term.mask
+    | false, true -> x
+    | true, true -> Bitwise.xor_mask x source_mask
+    | false, false when mask_is_redundant_for_right_shift -> x
+    | false, false -> Bitwise.mask x term.mask
+    | true, _ -> Bitwise.mask (Bitwise.xor_mask x source_mask) term.mask
   in
   match term.shift with
   | 0 -> atom
-  | shift when shift > 0 -> Printf.sprintf "(%s lsl %d)" atom shift
-  | shift -> Printf.sprintf "(%s lsr %d)" atom (-shift)
+  | shift when shift > 0 -> Bitwise.shift_l atom shift
+  | shift -> Bitwise.shift_r atom (-shift)
 
-let render_kernel_expr ~source_mask (kernel : bit_kernel) =
-  let pieces =
-    (if kernel.const <> 0 then [ string_of_int kernel.const ] else [])
-    @ List.map (render_term ~source_mask) kernel.terms
-  in
-  match pieces with
-  | [] -> "0"
-  | [ piece ] -> piece
-  | piece :: rest ->
-    piece
-    ^ List.fold_left
-        (fun acc next -> acc ^ "\n      lor " ^ next)
-        ""
-        rest
+let bitwise_of_kernel ~source_mask (kernel : bit_kernel) =
+  Bitwise.or_
+    ((if kernel.const <> 0 then [ Bitwise.const kernel.const ] else [])
+     @ List.map (bitwise_of_term ~source_mask) kernel.terms)
 
 let add_kernel_ml ?(indent = "") buf model name source_expr kernel =
   let source_mask = mask_of_expr model source_expr in
-  bprintf buf "%slet %s x =\n" indent (emitted_morph_name name);
-  bprintf buf "%s  %s\n" indent (render_kernel_expr ~source_mask kernel)
+  render_bitwise_function_ml
+    ~indent
+    buf
+    (emitted_morph_name name)
+    [ "x" ]
+    (bitwise_of_kernel ~source_mask kernel)
 
 let lift_kernel_through_field
     ~(target_field : field)

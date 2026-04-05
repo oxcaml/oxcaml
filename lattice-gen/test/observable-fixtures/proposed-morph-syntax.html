@@ -432,12 +432,14 @@ module Locality = struct
   let max = 1
   let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
+  let[@inline] join x y =
+    x lor y
+  let[@inline] meet x y =
+    x land y
   let[@inline] subtract x y =
-    x land lnot y
+    x land (y lxor 1)
   let[@inline] imply x y =
-    lnot (x land lnot y) land 1
+    y lor (x lxor 1)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -479,14 +481,16 @@ module Regionality = struct
   let max = 3
   let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
+  let[@inline] join x y =
+    x lor y
+  let[@inline] meet x y =
+    x land y
   let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    (zxy lor ((zxy land 2) lsr 1))
+    let zxy = x land (y lxor 3) in
+    zxy lor ((zxy land 2) lsr 1)
   let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot ((zxy lor ((zxy land 1) lsl 1))) land 3
+    let zxy = x land (y lxor 3) in
+    (zxy lor ((zxy land 1) lsl 1)) lxor 3
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -529,12 +533,14 @@ module Uniqueness = struct
   let max = 0
   let[@inline] le x y = (x land y) = y
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
+  let[@inline] join x y =
+    x land y
+  let[@inline] meet x y =
+    x lor y
   let[@inline] subtract x y =
-    lnot (y land lnot x) land 1
+    x lor (y lxor 1)
   let[@inline] imply x y =
-    y land lnot x
+    y land (x lxor 1)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -574,12 +580,14 @@ module Linearity = struct
   let max = 1
   let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
+  let[@inline] join x y =
+    x lor y
+  let[@inline] meet x y =
+    x land y
   let[@inline] subtract x y =
-    x land lnot y
+    x land (y lxor 1)
   let[@inline] imply x y =
-    lnot (x land lnot y) land 1
+    y lor (x lxor 1)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -619,12 +627,14 @@ module Staticity = struct
   let max = 0
   let[@inline] le x y = (x land y) = y
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
+  let[@inline] join x y =
+    x land y
+  let[@inline] meet x y =
+    x lor y
   let[@inline] subtract x y =
-    lnot (y land lnot x) land 1
+    x lor (y lxor 1)
   let[@inline] imply x y =
-    y land lnot x
+    y land (x lxor 1)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -664,12 +674,14 @@ module Yielding = struct
   let max = 1
   let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
+  let[@inline] join x y =
+    x lor y
+  let[@inline] meet x y =
+    x land y
   let[@inline] subtract x y =
-    x land lnot y
+    x land (y lxor 1)
   let[@inline] imply x y =
-    lnot (x land lnot y) land 1
+    y lor (x lxor 1)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -704,12 +716,14 @@ module Monadic = struct
   let max = 0
   let[@inline] le x y = (x land y) = y
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
+  let[@inline] join x y =
+    x land y
+  let[@inline] meet x y =
+    x lor y
   let[@inline] subtract x y =
-    lnot (y land lnot x) land 3
+    x lor (y lxor 3)
   let[@inline] imply x y =
-    y land lnot x
+    y land (x lxor 3)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -725,9 +739,7 @@ module Monadic = struct
       ~uniqueness
       ~staticity
     =
-    let uniqueness = (uniqueness land 1) in
-    let staticity = ((staticity land 1) lsl 1) in
-    uniqueness lor staticity
+    uniqueness lor (staticity lsl 1)
 
   let[@inline] of_view view =
     make
@@ -736,15 +748,15 @@ module Monadic = struct
 
   let[@inline] view t =
     {
-      uniqueness = (t land 1);
-      staticity = ((t lsr 1) land 1);
+      uniqueness = t land 1;
+      staticity = t lsr 1;
     }
 
-  let[@inline] proj_uniqueness t = (t land 1)
-  let[@inline] with_uniqueness x t = (t land lnot 1) lor (x land 1)
+  let[@inline] proj_uniqueness t = t land 1
+  let[@inline] with_uniqueness x t = (t land 2) lor x
 
-  let[@inline] proj_staticity t = ((t lsr 1) land 1)
-  let[@inline] with_staticity x t = (t land lnot 2) lor ((x land 1) lsl 1)
+  let[@inline] proj_staticity t = t lsr 1
+  let[@inline] with_staticity x t = (t land 1) lor (x lsl 1)
 
   let print ppf x =
     let view = view x in
@@ -762,12 +774,14 @@ module Comonadic = struct
   let max = 3
   let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
+  let[@inline] join x y =
+    x lor y
+  let[@inline] meet x y =
+    x land y
   let[@inline] subtract x y =
-    x land lnot y
+    x land (y lxor 3)
   let[@inline] imply x y =
-    lnot (x land lnot y) land 3
+    y lor (x lxor 3)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -783,9 +797,7 @@ module Comonadic = struct
       ~linearity
       ~yielding
     =
-    let linearity = (linearity land 1) in
-    let yielding = ((yielding land 1) lsl 1) in
-    linearity lor yielding
+    linearity lor (yielding lsl 1)
 
   let[@inline] of_view view =
     make
@@ -794,15 +806,15 @@ module Comonadic = struct
 
   let[@inline] view t =
     {
-      linearity = (t land 1);
-      yielding = ((t lsr 1) land 1);
+      linearity = t land 1;
+      yielding = t lsr 1;
     }
 
-  let[@inline] proj_linearity t = (t land 1)
-  let[@inline] with_linearity x t = (t land lnot 1) lor (x land 1)
+  let[@inline] proj_linearity t = t land 1
+  let[@inline] with_linearity x t = (t land 2) lor x
 
-  let[@inline] proj_yielding t = ((t lsr 1) land 1)
-  let[@inline] with_yielding x t = (t land lnot 2) lor ((x land 1) lsl 1)
+  let[@inline] proj_yielding t = t lsr 1
+  let[@inline] with_yielding x t = (t land 1) lor (x lsl 1)
 
   let print ppf x =
     let view = view x in
@@ -820,12 +832,14 @@ module Comonadic_with_locality = struct
   let max = 7
   let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
+  let[@inline] join x y =
+    x lor y
+  let[@inline] meet x y =
+    x land y
   let[@inline] subtract x y =
-    x land lnot y
+    x land (y lxor 7)
   let[@inline] imply x y =
-    lnot (x land lnot y) land 7
+    y lor (x lxor 7)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -841,9 +855,7 @@ module Comonadic_with_locality = struct
       ~areality
       ~comonadic
     =
-    let areality = (areality land 1) in
-    let comonadic = ((comonadic land 3) lsl 1) in
-    areality lor comonadic
+    areality lor (comonadic lsl 1)
 
   let[@inline] of_view view =
     make
@@ -852,15 +864,15 @@ module Comonadic_with_locality = struct
 
   let[@inline] view t =
     {
-      areality = (t land 1);
-      comonadic = ((t lsr 1) land 3);
+      areality = t land 1;
+      comonadic = t lsr 1;
     }
 
-  let[@inline] proj_areality t = (t land 1)
-  let[@inline] with_areality x t = (t land lnot 1) lor (x land 1)
+  let[@inline] proj_areality t = t land 1
+  let[@inline] with_areality x t = (t land 6) lor x
 
-  let[@inline] proj_comonadic t = ((t lsr 1) land 3)
-  let[@inline] with_comonadic x t = (t land lnot 6) lor ((x land 3) lsl 1)
+  let[@inline] proj_comonadic t = t lsr 1
+  let[@inline] with_comonadic x t = (t land 1) lor (x lsl 1)
 
   let print ppf x =
     let view = view x in
@@ -878,14 +890,16 @@ module Comonadic_with_regionality = struct
   let max = 15
   let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
+  let[@inline] join x y =
+    x lor y
+  let[@inline] meet x y =
+    x land y
   let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    (zxy lor ((zxy land 2) lsr 1))
+    let zxy = x land (y lxor 15) in
+    zxy lor ((zxy land 2) lsr 1)
   let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot ((zxy lor ((zxy land 1) lsl 1))) land 15
+    let zxy = x land (y lxor 15) in
+    (zxy lor ((zxy land 1) lsl 1)) lxor 15
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -901,9 +915,7 @@ module Comonadic_with_regionality = struct
       ~areality
       ~comonadic
     =
-    let areality = (areality land 3) in
-    let comonadic = ((comonadic land 3) lsl 2) in
-    areality lor comonadic
+    areality lor (comonadic lsl 2)
 
   let[@inline] of_view view =
     make
@@ -912,15 +924,15 @@ module Comonadic_with_regionality = struct
 
   let[@inline] view t =
     {
-      areality = (t land 3);
-      comonadic = ((t lsr 2) land 3);
+      areality = t land 3;
+      comonadic = t lsr 2;
     }
 
-  let[@inline] proj_areality t = (t land 3)
-  let[@inline] with_areality x t = (t land lnot 3) lor (x land 3)
+  let[@inline] proj_areality t = t land 3
+  let[@inline] with_areality x t = (t land 12) lor x
 
-  let[@inline] proj_comonadic t = ((t lsr 2) land 3)
-  let[@inline] with_comonadic x t = (t land lnot 12) lor ((x land 3) lsl 2)
+  let[@inline] proj_comonadic t = t lsr 2
+  let[@inline] with_comonadic x t = (t land 3) lor (x lsl 2)
 
   let print ppf x =
     let view = view x in
@@ -941,23 +953,19 @@ module Value = struct
     &amp;&amp; (((y land lnot x) land 48) = 0)
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y =
-    let o = x lor y in
-    let a = x land y in
-    (o land 15) lor (a land 48)
+    let tmp1 = (x land 48) land (y land 48) in
+    (x land 15) lor (y land 15) lor tmp1
   let[@inline] meet x y =
-    let o = x lor y in
-    let a = x land y in
-    (a land 15) lor (o land 48)
+    let tmp1 = (x land 15) land (y land 15) in
+    tmp1 lor (x land 48) lor (y land 48)
   let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    let zyx = y land lnot x in
-    (((zxy lor ((zxy land 2) lsr 1))) land 15)
-    lor ((lnot ((zyx lor ((zyx land 1) lsl 1)))) land 48)
+    let zxy = (x land 15) land ((y land 15) lxor 15) in
+    let zyx = (y land 48) land ((x land 48) lxor 48) in
+    zxy lor ((zxy land 2) lsr 1) lor (zyx lxor 48)
   let[@inline] imply x y =
-    let zxy = x land lnot y in
-    let zyx = y land lnot x in
-    ((lnot ((zxy lor ((zxy land 1) lsl 1)))) land 15)
-    lor (((zyx lor ((zyx land 2) lsr 1))) land 48)
+    let zxy = (x land 15) land ((y land 15) lxor 15) in
+    let zyx = (y land 48) land ((x land 48) lxor 48) in
+    ((zxy lor ((zxy land 1) lsl 1)) lxor 15) lor zyx
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -973,9 +981,7 @@ module Value = struct
       ~comonadic
       ~monadic
     =
-    let comonadic = (comonadic land 15) in
-    let monadic = ((monadic land 3) lsl 4) in
-    comonadic lor monadic
+    comonadic lor (monadic lsl 4)
 
   let[@inline] of_view view =
     make
@@ -984,15 +990,15 @@ module Value = struct
 
   let[@inline] view t =
     {
-      comonadic = (t land 15);
-      monadic = ((t lsr 4) land 3);
+      comonadic = t land 15;
+      monadic = t lsr 4;
     }
 
-  let[@inline] proj_comonadic t = (t land 15)
-  let[@inline] with_comonadic x t = (t land lnot 15) lor (x land 15)
+  let[@inline] proj_comonadic t = t land 15
+  let[@inline] with_comonadic x t = (t land 48) lor x
 
-  let[@inline] proj_monadic t = ((t lsr 4) land 3)
-  let[@inline] with_monadic x t = (t land lnot 48) lor ((x land 3) lsl 4)
+  let[@inline] proj_monadic t = t lsr 4
+  let[@inline] with_monadic x t = (t land 15) lor (x lsl 4)
 
   let print ppf x =
     let view = view x in
@@ -1013,23 +1019,17 @@ module Alloc = struct
     &amp;&amp; (((y land lnot x) land 24) = 0)
   let[@inline] equal (x : t) (y : t) = x = y
   let[@inline] join x y =
-    let o = x lor y in
-    let a = x land y in
-    (o land 7) lor (a land 24)
+    let tmp1 = (x land 24) land (y land 24) in
+    (x land 7) lor (y land 7) lor tmp1
   let[@inline] meet x y =
-    let o = x lor y in
-    let a = x land y in
-    (a land 7) lor (o land 24)
+    let tmp1 = (x land 7) land (y land 7) in
+    tmp1 lor (x land 24) lor (y land 24)
   let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    let zyx = y land lnot x in
-    ((zxy) land 7)
-    lor ((lnot zyx) land 24)
+    let tmp1 = (x land 7) land ((y land 7) lxor 7) in
+    tmp1 lor (x land 24) lor ((y land 24) lxor 24)
   let[@inline] imply x y =
-    let zxy = x land lnot y in
-    let zyx = y land lnot x in
-    ((lnot zxy) land 7)
-    lor ((zyx) land 24)
+    let tmp1 = (y land 24) land ((x land 24) lxor 24) in
+    (y land 7) lor ((x land 7) lxor 7) lor tmp1
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -1045,9 +1045,7 @@ module Alloc = struct
       ~comonadic
       ~monadic
     =
-    let comonadic = (comonadic land 7) in
-    let monadic = ((monadic land 3) lsl 3) in
-    comonadic lor monadic
+    comonadic lor (monadic lsl 3)
 
   let[@inline] of_view view =
     make
@@ -1056,15 +1054,15 @@ module Alloc = struct
 
   let[@inline] view t =
     {
-      comonadic = (t land 7);
-      monadic = ((t lsr 3) land 3);
+      comonadic = t land 7;
+      monadic = t lsr 3;
     }
 
-  let[@inline] proj_comonadic t = (t land 7)
-  let[@inline] with_comonadic x t = (t land lnot 7) lor (x land 7)
+  let[@inline] proj_comonadic t = t land 7
+  let[@inline] with_comonadic x t = (t land 24) lor x
 
-  let[@inline] proj_monadic t = ((t lsr 3) land 3)
-  let[@inline] with_monadic x t = (t land lnot 24) lor ((x land 3) lsl 3)
+  let[@inline] proj_monadic t = t lsr 3
+  let[@inline] with_monadic x t = (t land 7) lor (x lsl 3)
 
   let print ppf x =
     let view = view x in
@@ -1091,12 +1089,14 @@ module Uniqueness_op = struct
   let max = 1
   let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
+  let[@inline] join x y =
+    x lor y
+  let[@inline] meet x y =
+    x land y
   let[@inline] subtract x y =
-    x land lnot y
+    x land (y lxor 1)
   let[@inline] imply x y =
-    lnot (x land lnot y) land 1
+    y lor (x lxor 1)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -1136,12 +1136,14 @@ module Staticity_op = struct
   let max = 1
   let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
+  let[@inline] join x y =
+    x lor y
+  let[@inline] meet x y =
+    x land y
   let[@inline] subtract x y =
-    x land lnot y
+    x land (y lxor 1)
   let[@inline] imply x y =
-    lnot (x land lnot y) land 1
+    y lor (x lxor 1)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -1174,12 +1176,14 @@ module Monadic_op = struct
   let max = 3
   let[@inline] le x y = (x land y) = x
   let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
+  let[@inline] join x y =
+    x lor y
+  let[@inline] meet x y =
+    x land y
   let[@inline] subtract x y =
-    x land lnot y
+    x land (y lxor 3)
   let[@inline] imply x y =
-    lnot (x land lnot y) land 3
+    y lor (x lxor 3)
 
   module Repr = struct
     let[@inline] to_int_unsafe x = x
@@ -1195,9 +1199,7 @@ module Monadic_op = struct
       ~uniqueness
       ~staticity
     =
-    let uniqueness = (uniqueness land 1) in
-    let staticity = ((staticity land 1) lsl 1) in
-    uniqueness lor staticity
+    uniqueness lor (staticity lsl 1)
 
   let[@inline] of_view view =
     make
@@ -1206,15 +1208,15 @@ module Monadic_op = struct
 
   let[@inline] view t =
     {
-      uniqueness = (t land 1);
-      staticity = ((t lsr 1) land 1);
+      uniqueness = t land 1;
+      staticity = t lsr 1;
     }
 
-  let[@inline] proj_uniqueness t = (t land 1)
-  let[@inline] with_uniqueness x t = (t land lnot 1) lor (x land 1)
+  let[@inline] proj_uniqueness t = t land 1
+  let[@inline] with_uniqueness x t = (t land 2) lor x
 
-  let[@inline] proj_staticity t = ((t lsr 1) land 1)
-  let[@inline] with_staticity x t = (t land lnot 2) lor ((x land 1) lsl 1)
+  let[@inline] proj_staticity t = t lsr 1
+  let[@inline] with_staticity x t = (t land 1) lor (x lsl 1)
 
   let print ppf x =
     let view = view x in
@@ -1227,86 +1229,73 @@ end
 
 module Morphs = struct
   (* Primitive morphs *)
-  let locality_as_regionality x =
-    x
-      lor (x lsl 1)
+  let[@inline] locality_as_regionality x =
+    x lor (x lsl 1)
 
-  let local_to_regional x =
-    x
-
-  let regional_to_local x =
-    (x land 1)
-
-  let regional_to_global x =
-    (x lsr 1)
-
-  let regional_r2g x =
-    (x lsr 1)
-      lor (x land 2)
-
-  let global_to_regional x =
-    1
-      lor (x lsl 1)
-
-  let linear_to_unique x =
+  let[@inline] local_to_regional x =
     x
 
-  let unique_to_linear x =
+  let[@inline] regional_to_local x =
+    x land 1
+
+  let[@inline] regional_to_global x =
+    x lsr 1
+
+  let[@inline] regional_r2g x =
+    (x lsr 1) lor (x land 2)
+
+  let[@inline] global_to_regional x =
+    1 lor (x lsl 1)
+
+  let[@inline] linear_to_unique x =
+    x
+
+  let[@inline] unique_to_linear x =
     x
 
 
   (* Product morphs *)
-  let comonadic_locality_as_regionality x =
-    (x land 1)
-      lor (x lsl 1)
+  let[@inline] comonadic_locality_as_regionality x =
+    (x land 1) lor (x lsl 1)
 
-  let comonadic_local_to_regional x =
-    (x land 1)
-      lor ((x land 6) lsl 1)
+  let[@inline] comonadic_local_to_regional x =
+    (x land 1) lor ((x land 6) lsl 1)
 
-  let comonadic_regional_to_local x =
-    ((x land 12) lsr 1)
-      lor (x land 1)
+  let[@inline] comonadic_regional_to_local x =
+    ((x land 12) lsr 1) lor (x land 1)
 
-  let comonadic_regional_to_global x =
-    (x lsr 1)
+  let[@inline] comonadic_regional_to_global x =
+    x lsr 1
 
-  let comonadic_r2g x =
-    ((x land 2) lsr 1)
-      lor (x land 14)
+  let[@inline] comonadic_r2g x =
+    ((x land 2) lsr 1) lor (x land 14)
 
-  let comonadic_to_monadic_min x =
-    (x land 1)
+  let[@inline] comonadic_to_monadic_min x =
+    x land 1
 
-  let comonadic_to_monadic_max x =
-    2
-      lor (x land 1)
+  let[@inline] comonadic_to_monadic_max x =
+    2 lor (x land 1)
 
-  let monadic_to_comonadic_min x =
-    (x land 1)
+  let[@inline] monadic_to_comonadic_min x =
+    x land 1
 
-  let monadic_to_comonadic_max x =
-    2
-      lor (x land 1)
+  let[@inline] monadic_to_comonadic_max x =
+    2 lor (x land 1)
 
-  let alloc_as_value x =
-    (x land 1)
-      lor (x lsl 1)
+  let[@inline] alloc_as_value x =
+    (x land 1) lor (x lsl 1)
 
-  let alloc_to_value_l2r x =
-    (x land 1)
-      lor ((x land 30) lsl 1)
+  let[@inline] alloc_to_value_l2r x =
+    (x land 1) lor ((x land 30) lsl 1)
 
-  let value_to_alloc_r2l x =
-    ((x land 60) lsr 1)
-      lor (x land 1)
+  let[@inline] value_to_alloc_r2l x =
+    ((x land 60) lsr 1) lor (x land 1)
 
-  let value_to_alloc_r2g x =
-    (x lsr 1)
+  let[@inline] value_to_alloc_r2g x =
+    x lsr 1
 
-  let value_r2g x =
-    ((x land 2) lsr 1)
-      lor (x land 62)
+  let[@inline] value_r2g x =
+    ((x land 2) lsr 1) lor (x land 62)
 
 end
 
