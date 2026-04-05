@@ -3,10 +3,11 @@
 open! Int_replace_polymorphic_compare
 open Format
 
-let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
+let operation ?(print_reg = Printreg.reg) ?(assign_symbol = ":=")
+    (op : Operation.t) arg ppf res =
   let reg = print_reg in
   let regs = Printreg.regs' ~print_reg in
-  if Array.length res > 0 then fprintf ppf "%a := " regs res;
+  if Array.length res > 0 then fprintf ppf "%a %s " regs res assign_symbol;
   match op with
   | Move -> regs ppf arg
   | Spill -> fprintf ppf "%a (spill)" regs arg

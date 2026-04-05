@@ -42,6 +42,27 @@ select_cmp:
   ret
 |}]
 
+(* CR ttebbi: We shouldn't materialize the bit, and ideally even share the
+   cmp instructions. *)
+let select_cmp_twice (x : int) (y: int) =
+  (Builtins.select (x < y) x y) + (Builtins.select (x < y) 10 20)
+[%%expect_asm X86_64{|
+select_cmp_twice:
+  movq  %rax, %rdi
+  cmpq  %rbx, %rdi
+  setl  %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rax
+  movl  $41, %esi
+  movl  $21, %edx
+  cmpq  $1, %rax
+  cmovne %rdx, %rsi
+  cmpq  $1, %rax
+  cmovne %rdi, %rbx
+  leaq  -1(%rbx,%rsi), %rax
+  ret
+|}]
+
 
 (* CR ttebbi: We could constant-fold this. *)
 let select_constant (x : int) = Builtins.select true x 55

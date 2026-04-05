@@ -263,3 +263,43 @@ M.f:
   vxorpd %xmm0, %xmm0, %xmm0
   ret
 |}]
+
+
+(* CR ttebbi: We should branch first and loop afterwards.*)
+let loop_invariant_code (should_call_f : bool) (f : unit -> unit) =
+  for _ = 0 to 9 do
+    if should_call_f then f ()
+  done
+[%%expect_asm X86_64{|
+loop_invariant_code:
+  subq  $24, %rsp
+  movq  %rax, (%rsp)
+  movq  %rbx, 8(%rsp)
+  movl  $1, %edi
+  cmpq  $1, %rax
+  je    .L118
+.L113:
+  movq  %rdi, 16(%rsp)
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  call  *%rdi
+.L130:
+  movq  (%rsp), %rax
+  movq  8(%rsp), %rbx
+  movq  16(%rsp), %rdi
+  cmpq  $19, %rdi
+  je    .L123
+  jmp   .L120
+.L118:
+  cmpq  $19, %rdi
+  je    .L123
+.L120:
+  addq  $2, %rdi
+  cmpq  $1, %rax
+  je    .L118
+  jmp   .L113
+.L123:
+  movl  $1, %eax
+  addq  $24, %rsp
+  ret
+|}]

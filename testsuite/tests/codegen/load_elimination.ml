@@ -33,6 +33,15 @@ mutable_load:
   ret
 |}]
 
+(* CR ttebbi: There is no need to load the stored value. *)
+let write_then_read r = r := 5; !r
+[%%expect_asm X86_64{|
+write_then_read:
+  movq  $11, (%rax)
+  movq  (%rax), %rax
+  ret
+|}]
+
 let mutable_load_branch r b =
   let x = !r in
   x + if b then !r else 7

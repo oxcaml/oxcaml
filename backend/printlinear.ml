@@ -43,12 +43,12 @@ let call_operation ?(print_reg = Printreg.reg) ppf op arg =
       (if enabled_at_init then "enabled_at_init " else "")
       name handler_code_sym regs arg
 
-let instr' ?(print_reg = Printreg.reg) ppf i =
+let instr' ?(print_reg = Printreg.reg) ?assign_symbol ppf i =
   let reg = print_reg in
   let regs = Printreg.regs' ~print_reg in
   let regsetaddr = Printreg.regsetaddr' ~print_reg in
   let test = Operation.format_test ~print_reg in
-  let operation = Printoperation.operation ~print_reg in
+  let operation = Printoperation.operation ~print_reg ?assign_symbol in
   (if !Oxcaml_flags.davail
    then
      let module RAS = Reg_availability_set in

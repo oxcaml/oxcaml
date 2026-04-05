@@ -356,6 +356,22 @@ string_get_float32_indexed_by_int64:
   ret
 |}]
 
+(* CR ttebbi: We convert the loaded char to int before comparing against a
+   constant, this could be a comparison against an untagged constant instead. *)
+let string_unsafe_get_and_use (t : string) : bool =
+    let first_char = String.unsafe_get t 0 in
+    first_char == 'A'
+[%%expect_asm X86_64{|
+string_unsafe_get_and_use:
+  movzbq (%rax), %rax
+  leaq  1(%rax,%rax), %rax
+  cmpq  $131, %rax
+  sete  %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
 let str_length (s : string) = String.length s
 [%%expect_asm X86_64{|
 str_length:
