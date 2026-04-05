@@ -230,19 +230,41 @@ Numbers = [
 <button type="button" class="lattice-generated-tab" data-panel="mli">.mli</button>
 </div>
 <div class="lattice-generated-panel" data-panel="ml">
-<pre data-language="ocaml">module Numbers = struct
-  type t = int
+<pre data-language="ocaml">module type Lattice = sig
+  type t
+  type view
 
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
+  val view : t -&gt; view
+  val of_view : view -&gt; t
+
+  val le : t -&gt; t -&gt; bool
+  val equal : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val join : t -&gt; t -&gt; t
+  val meet : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
+  val imply : t -&gt; t -&gt; t
+
+  val print : Format.formatter -&gt; t -&gt; unit
+
+  module Repr : sig
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
+end
 
-  let mask = 1
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
+(* Base Lattices *)
+
+module Numbers = struct
+  type view =
+    | Z
+    | S
+
+  let z = 0
+  let s = 1
+
+  type t = int
 
   let min = 0
   let max = 1
@@ -251,74 +273,74 @@ Numbers = [
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
   let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy
+    x land lnot y
   let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 1
+    lnot (x land lnot y) land 1
 
-  type view =
-    | Z
-    | S
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
 
-  let z = 0
-  let s = 1
+  let[@inline] view = function
+    | 0 -&gt; Z
+    | 1 -&gt; S
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
 
-  let name x =
-    if equal x z then &quot;Z&quot;
-    else if equal x s then &quot;S&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Z&quot; -&gt; Some z
-    | &quot;S&quot; -&gt; Some s
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = max
-
-  let view x =
-    if equal x z then Z
-    else if equal x s then S
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
+  let[@inline] of_view = function
     | Z -&gt; z
     | S -&gt; s
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;z&quot;
+      | 1 -&gt; &quot;s&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
 end
 
 </pre>
 </div>
 <div class="lattice-generated-panel" data-panel="mli">
-<pre data-language="ocaml">module Numbers : sig
+<pre data-language="ocaml">module type Lattice = sig
   type t
+  type view
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
+  val view : t -&gt; view
+  val of_view : view -&gt; t
 
-  val min : t
-  val max : t
   val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
   val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
+
   val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
+
+  module Repr : sig
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
+  end
+end
+
+(* Base Lattices *)
+
+module Numbers : sig
+  (* Order:
+     z &lt; s
+  *)
+
   type view =
     | Z
     | S
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val z : t
   val s : t
 end
@@ -348,33 +370,33 @@ State = {
 <button type="button" class="lattice-generated-tab" data-panel="mli">.mli</button>
 </div>
 <div class="lattice-generated-panel" data-panel="ml">
-<pre data-language="ocaml">module Locality = struct
-  type t = int
+<pre data-language="ocaml">module type Lattice = sig
+  type t
+  type view
 
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
+  val view : t -&gt; view
+  val of_view : view -&gt; t
+
+  val le : t -&gt; t -&gt; bool
+  val equal : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val join : t -&gt; t -&gt; t
+  val meet : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
+  val imply : t -&gt; t -&gt; t
+
+  val print : Format.formatter -&gt; t -&gt; unit
+
+  module Repr : sig
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
+end
 
-  let mask = 1
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
+(* Base Lattices *)
 
-  let min = 0
-  let max = 1
-  let[@inline] le x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 1
-
+module Locality = struct
   type view =
     | Global
     | Local
@@ -382,43 +404,7 @@ State = {
   let global = 0
   let local = 1
 
-  let name x =
-    if equal x global then &quot;Global&quot;
-    else if equal x local then &quot;Local&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Global&quot; -&gt; Some global
-    | &quot;Local&quot; -&gt; Some local
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = global
-
-  let view x =
-    if equal x global then Global
-    else if equal x local then Local
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | Global -&gt; global
-    | Local -&gt; local
-end
-
-module State = struct
   type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 1
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
 
   let min = 0
   let max = 1
@@ -427,122 +413,144 @@ module State = struct
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
   let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy
+    x land lnot y
   let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 1
+    lnot (x land lnot y) land 1
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
+
+  let[@inline] view = function
+    | 0 -&gt; Global
+    | 1 -&gt; Local
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+
+  let[@inline] of_view = function
+    | Global -&gt; global
+    | Local -&gt; local
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;global&quot;
+      | 1 -&gt; &quot;local&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+(* Product Lattices *)
+
+module State = struct
+  type t = int
+
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
+  let[@inline] subtract x y =
+    x land lnot y
+  let[@inline] imply x y =
+    lnot (x land lnot y) land 1
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
 
   type view = {
     locality : Locality.t;
   }
 
-  type nonrec product = t
-
-  let of_view view =
-    let locality = (view.locality land 1) lsl 0 in
+  let[@inline] make
+      ~locality
+    =
+    let locality = (locality land 1) in
     locality
 
-  let view t =
+  let[@inline] of_view view =
+    make
+      ~locality:view.locality
+
+  let[@inline] view t =
     {
-      locality = (t lsr 0) land 1;
+      locality = (t land 1);
     }
 
-  let make =
-    fun ~locality -&gt;
-    of_view {
-      locality;
-    }
+  let[@inline] proj_locality t = (t land 1)
+  let[@inline] with_locality x t = (t land lnot 1) lor (x land 1)
 
-  let proj_locality t = (t lsr 0) land 1
-  let with_locality x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_locality x = with_locality x min
-  let max_with_locality x = with_locality x max
-
-  let name x =
+  let print ppf x =
     let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;State { &quot;;
-    Buffer.add_string b &quot;locality = &quot;;
-    Buffer.add_string b (Locality.show view.locality);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
+    Format.fprintf
+      ppf
+      &quot;%a&quot;
+      Locality.print view.locality
 end
 
 </pre>
 </div>
 <div class="lattice-generated-panel" data-panel="mli">
-<pre data-language="ocaml">module Locality : sig
+<pre data-language="ocaml">module type Lattice = sig
   type t
+  type view
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
+  val view : t -&gt; view
+  val of_view : view -&gt; t
 
-  val min : t
-  val max : t
   val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
   val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
+
   val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
+
+  module Repr : sig
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
+  end
+end
+
+(* Base Lattices *)
+
+module Locality : sig
+  (* Order:
+     global &lt; local
+  *)
+
   type view =
     | Global
     | Local
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val global : t
   val local : t
 end
 
+(* Product Lattices *)
+
 module State : sig
-  type t
-
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-
   type view = {
     locality : Locality.t;
   }
 
-  type nonrec product = t
+  include Lattice with type view := view
 
-  val of_view : view -&gt; t
-  val view : t -&gt; view
   val make :
     locality:Locality.t -&gt;
     t
+
   val proj_locality : t -&gt; Locality.t
   val with_locality : Locality.t -&gt; t -&gt; t
-  val min_with_locality : Locality.t -&gt; t
-  val max_with_locality : Locality.t -&gt; t
 end
 
 </pre>

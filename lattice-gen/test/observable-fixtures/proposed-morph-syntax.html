@@ -392,19 +392,41 @@ value_r2g : Value -> Value = {
 <button type="button" class="lattice-generated-tab" data-panel="mli">.mli</button>
 </div>
 <div class="lattice-generated-panel" data-panel="ml">
-<pre data-language="ocaml">module Locality = struct
-  type t = int
+<pre data-language="ocaml">module type Lattice = sig
+  type t
+  type view
 
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
+  val view : t -&gt; view
+  val of_view : view -&gt; t
+
+  val le : t -&gt; t -&gt; bool
+  val equal : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val join : t -&gt; t -&gt; t
+  val meet : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
+  val imply : t -&gt; t -&gt; t
+
+  val print : Format.formatter -&gt; t -&gt; unit
+
+  module Repr : sig
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
+end
 
-  let mask = 1
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
+(* Base Lattices *)
+
+module Locality = struct
+  type view =
+    | Global
+    | Local
+
+  let global = 0
+  let local = 1
+
+  type t = int
 
   let min = 0
   let max = 1
@@ -413,80 +435,35 @@ value_r2g : Value -> Value = {
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
   let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy
+    x land lnot y
   let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 1
-
-  type view =
-    | Global
-    | Local
-
-  let global = 0
-  let local = 1
-
-  let name x =
-    if equal x global then &quot;Global&quot;
-    else if equal x local then &quot;Local&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Global&quot; -&gt; Some global
-    | &quot;Local&quot; -&gt; Some local
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = global
-
-  let view x =
-    if equal x global then Global
-    else if equal x local then Local
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | Global -&gt; global
-    | Local -&gt; local
-end
-
-module Regionality = struct
-  type t = int
+    lnot (x land lnot y) land 1
 
   module Repr = struct
-    type nonrec t = t
     let[@inline] to_int_unsafe x = x
     let[@inline] from_int_unsafe x = x
   end
 
-  let[@inline] close_repr x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let mask = 3
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-    x
+  let[@inline] view = function
+    | 0 -&gt; Global
+    | 1 -&gt; Local
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
 
-  let[@inline] close_down_nat x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_nat x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
-  let min = 0
-  let max = 3
-  let[@inline] le x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    close_down_nat zxy
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot (close_up_nat zxy) land 3
+  let[@inline] of_view = function
+    | Global -&gt; global
+    | Local -&gt; local
 
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;global&quot;
+      | 1 -&gt; &quot;local&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+module Regionality = struct
   type view =
     | Global
     | Regional
@@ -496,358 +473,7 @@ module Regionality = struct
   let regional = 1
   let local = 3
 
-  let name x =
-    if equal x global then &quot;Global&quot;
-    else if equal x regional then &quot;Regional&quot;
-    else if equal x local then &quot;Local&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Global&quot; -&gt; Some global
-    | &quot;Regional&quot; -&gt; Some regional
-    | &quot;Local&quot; -&gt; Some local
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = global
-
-  let view x =
-    if equal x global then Global
-    else if equal x regional then Regional
-    else if equal x local then Local
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | Global -&gt; global
-    | Regional -&gt; regional
-    | Local -&gt; local
-end
-
-module Uniqueness = struct
   type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 1
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
-
-  let min = 1
-  let max = 0
-  let[@inline] le x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] subtract x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
-
-  type view =
-    | Aliased
-    | Unique
-
-  let aliased = 0
-  let unique = 1
-
-  let name x =
-    if equal x aliased then &quot;Aliased&quot;
-    else if equal x unique then &quot;Unique&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Aliased&quot; -&gt; Some aliased
-    | &quot;Unique&quot; -&gt; Some unique
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = aliased
-
-  let view x =
-    if equal x aliased then Aliased
-    else if equal x unique then Unique
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | Aliased -&gt; aliased
-    | Unique -&gt; unique
-end
-
-module Linearity = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 1
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
-
-  let min = 0
-  let max = 1
-  let[@inline] le x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 1
-
-  type view =
-    | Many
-    | Once
-
-  let many = 0
-  let once = 1
-
-  let name x =
-    if equal x many then &quot;Many&quot;
-    else if equal x once then &quot;Once&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Many&quot; -&gt; Some many
-    | &quot;Once&quot; -&gt; Some once
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = many
-
-  let view x =
-    if equal x many then Many
-    else if equal x once then Once
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | Many -&gt; many
-    | Once -&gt; once
-end
-
-module Staticity = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 1
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
-
-  let min = 1
-  let max = 0
-  let[@inline] le x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] subtract x y =
-    let zyx = y land lnot x in
-    lnot zyx land 1
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
-
-  type view =
-    | Dynamic
-    | Static
-
-  let dynamic = 0
-  let static = 1
-
-  let name x =
-    if equal x dynamic then &quot;Dynamic&quot;
-    else if equal x static then &quot;Static&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Dynamic&quot; -&gt; Some dynamic
-    | &quot;Static&quot; -&gt; Some static
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = dynamic
-
-  let view x =
-    if equal x dynamic then Dynamic
-    else if equal x static then Static
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | Dynamic -&gt; dynamic
-    | Static -&gt; static
-end
-
-module Yielding = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 1
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
-
-  let min = 0
-  let max = 1
-  let[@inline] le x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 1
-
-  type view =
-    | Unyielding
-    | Yielding
-
-  let unyielding = 0
-  let yielding = 1
-
-  let name x =
-    if equal x unyielding then &quot;Unyielding&quot;
-    else if equal x yielding then &quot;Yielding&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Unyielding&quot; -&gt; Some unyielding
-    | &quot;Yielding&quot; -&gt; Some yielding
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = unyielding
-
-  let view x =
-    if equal x unyielding then Unyielding
-    else if equal x yielding then Yielding
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | Unyielding -&gt; unyielding
-    | Yielding -&gt; yielding
-end
-
-module Monadic = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 3
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
-
-  let min = 3
-  let max = 0
-  let[@inline] le x y = (x land y) = y
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x land y
-  let[@inline] meet x y = x lor y
-  let[@inline] subtract x y =
-    let zyx = y land lnot x in
-    lnot zyx land 3
-  let[@inline] imply x y =
-    let zyx = y land lnot x in
-    zyx
-
-  type view = {
-    uniqueness : Uniqueness.t;
-    staticity : Staticity.t;
-  }
-
-  type nonrec product = t
-
-  let of_view view =
-    let uniqueness = (view.uniqueness land 1) lsl 0 in
-    let staticity = (view.staticity land 1) lsl 1 in
-    uniqueness lor staticity
-
-  let view t =
-    {
-      uniqueness = (t lsr 0) land 1;
-      staticity = (t lsr 1) land 1;
-    }
-
-  let make =
-    fun ~uniqueness -&gt;
-    fun ~staticity -&gt;
-    of_view {
-      uniqueness;
-      staticity;
-    }
-
-  let proj_uniqueness t = (t lsr 0) land 1
-  let with_uniqueness x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_uniqueness x = with_uniqueness x min
-  let max_with_uniqueness x = with_uniqueness x max
-
-  let proj_staticity t = (t lsr 1) land 1
-  let with_staticity x t = (t land lnot 2) lor ((x land 1) lsl 1)
-  let min_with_staticity x = with_staticity x min
-  let max_with_staticity x = with_staticity x max
-
-  let name x =
-    let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Monadic { &quot;;
-    Buffer.add_string b &quot;uniqueness = &quot;;
-    Buffer.add_string b (Uniqueness.show view.uniqueness);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;staticity = &quot;;
-    Buffer.add_string b (Staticity.show view.staticity);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-end
-
-module Comonadic = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 3
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
 
   let min = 0
   let max = 3
@@ -857,76 +483,338 @@ module Comonadic = struct
   let[@inline] meet x y = x land y
   let[@inline] subtract x y =
     let zxy = x land lnot y in
-    zxy
+    (zxy lor ((zxy land 2) lsr 1))
   let[@inline] imply x y =
     let zxy = x land lnot y in
-    lnot zxy land 3
+    lnot ((zxy lor ((zxy land 1) lsl 1))) land 3
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
+
+  let[@inline] view = function
+    | 0 -&gt; Global
+    | 1 -&gt; Regional
+    | 3 -&gt; Local
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+
+  let[@inline] of_view = function
+    | Global -&gt; global
+    | Regional -&gt; regional
+    | Local -&gt; local
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;global&quot;
+      | 1 -&gt; &quot;regional&quot;
+      | 3 -&gt; &quot;local&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+module Uniqueness = struct
+  type view =
+    | Aliased
+    | Unique
+
+  let aliased = 0
+  let unique = 1
+
+  type t = int
+
+  let min = 1
+  let max = 0
+  let[@inline] le x y = (x land y) = y
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x land y
+  let[@inline] meet x y = x lor y
+  let[@inline] subtract x y =
+    lnot (y land lnot x) land 1
+  let[@inline] imply x y =
+    y land lnot x
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
+
+  let[@inline] view = function
+    | 0 -&gt; Aliased
+    | 1 -&gt; Unique
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+
+  let[@inline] of_view = function
+    | Aliased -&gt; aliased
+    | Unique -&gt; unique
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;aliased&quot;
+      | 1 -&gt; &quot;unique&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+module Linearity = struct
+  type view =
+    | Many
+    | Once
+
+  let many = 0
+  let once = 1
+
+  type t = int
+
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
+  let[@inline] subtract x y =
+    x land lnot y
+  let[@inline] imply x y =
+    lnot (x land lnot y) land 1
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
+
+  let[@inline] view = function
+    | 0 -&gt; Many
+    | 1 -&gt; Once
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+
+  let[@inline] of_view = function
+    | Many -&gt; many
+    | Once -&gt; once
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;many&quot;
+      | 1 -&gt; &quot;once&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+module Staticity = struct
+  type view =
+    | Dynamic
+    | Static
+
+  let dynamic = 0
+  let static = 1
+
+  type t = int
+
+  let min = 1
+  let max = 0
+  let[@inline] le x y = (x land y) = y
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x land y
+  let[@inline] meet x y = x lor y
+  let[@inline] subtract x y =
+    lnot (y land lnot x) land 1
+  let[@inline] imply x y =
+    y land lnot x
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
+
+  let[@inline] view = function
+    | 0 -&gt; Dynamic
+    | 1 -&gt; Static
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+
+  let[@inline] of_view = function
+    | Dynamic -&gt; dynamic
+    | Static -&gt; static
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;dynamic&quot;
+      | 1 -&gt; &quot;static&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+module Yielding = struct
+  type view =
+    | Unyielding
+    | Yielding
+
+  let unyielding = 0
+  let yielding = 1
+
+  type t = int
+
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
+  let[@inline] subtract x y =
+    x land lnot y
+  let[@inline] imply x y =
+    lnot (x land lnot y) land 1
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
+
+  let[@inline] view = function
+    | 0 -&gt; Unyielding
+    | 1 -&gt; Yielding
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+
+  let[@inline] of_view = function
+    | Unyielding -&gt; unyielding
+    | Yielding -&gt; yielding
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;unyielding&quot;
+      | 1 -&gt; &quot;yielding&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+(* Product Lattices *)
+
+module Monadic = struct
+  type t = int
+
+  let min = 3
+  let max = 0
+  let[@inline] le x y = (x land y) = y
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x land y
+  let[@inline] meet x y = x lor y
+  let[@inline] subtract x y =
+    lnot (y land lnot x) land 3
+  let[@inline] imply x y =
+    y land lnot x
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
+
+  type view = {
+    uniqueness : Uniqueness.t;
+    staticity : Staticity.t;
+  }
+
+  let[@inline] make
+      ~uniqueness
+      ~staticity
+    =
+    let uniqueness = (uniqueness land 1) in
+    let staticity = ((staticity land 1) lsl 1) in
+    uniqueness lor staticity
+
+  let[@inline] of_view view =
+    make
+      ~uniqueness:view.uniqueness
+      ~staticity:view.staticity
+
+  let[@inline] view t =
+    {
+      uniqueness = (t land 1);
+      staticity = ((t lsr 1) land 1);
+    }
+
+  let[@inline] proj_uniqueness t = (t land 1)
+  let[@inline] with_uniqueness x t = (t land lnot 1) lor (x land 1)
+
+  let[@inline] proj_staticity t = ((t lsr 1) land 1)
+  let[@inline] with_staticity x t = (t land lnot 2) lor ((x land 1) lsl 1)
+
+  let print ppf x =
+    let view = view x in
+    Format.fprintf
+      ppf
+      &quot;%a,%a&quot;
+      Uniqueness.print view.uniqueness
+      Staticity.print view.staticity
+end
+
+module Comonadic = struct
+  type t = int
+
+  let min = 0
+  let max = 3
+  let[@inline] le x y = (x land y) = x
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
+  let[@inline] subtract x y =
+    x land lnot y
+  let[@inline] imply x y =
+    lnot (x land lnot y) land 3
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
 
   type view = {
     linearity : Linearity.t;
     yielding : Yielding.t;
   }
 
-  type nonrec product = t
-
-  let of_view view =
-    let linearity = (view.linearity land 1) lsl 0 in
-    let yielding = (view.yielding land 1) lsl 1 in
+  let[@inline] make
+      ~linearity
+      ~yielding
+    =
+    let linearity = (linearity land 1) in
+    let yielding = ((yielding land 1) lsl 1) in
     linearity lor yielding
 
-  let view t =
+  let[@inline] of_view view =
+    make
+      ~linearity:view.linearity
+      ~yielding:view.yielding
+
+  let[@inline] view t =
     {
-      linearity = (t lsr 0) land 1;
-      yielding = (t lsr 1) land 1;
+      linearity = (t land 1);
+      yielding = ((t lsr 1) land 1);
     }
 
-  let make =
-    fun ~linearity -&gt;
-    fun ~yielding -&gt;
-    of_view {
-      linearity;
-      yielding;
-    }
+  let[@inline] proj_linearity t = (t land 1)
+  let[@inline] with_linearity x t = (t land lnot 1) lor (x land 1)
 
-  let proj_linearity t = (t lsr 0) land 1
-  let with_linearity x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_linearity x = with_linearity x min
-  let max_with_linearity x = with_linearity x max
+  let[@inline] proj_yielding t = ((t lsr 1) land 1)
+  let[@inline] with_yielding x t = (t land lnot 2) lor ((x land 1) lsl 1)
 
-  let proj_yielding t = (t lsr 1) land 1
-  let with_yielding x t = (t land lnot 2) lor ((x land 1) lsl 1)
-  let min_with_yielding x = with_yielding x min
-  let max_with_yielding x = with_yielding x max
-
-  let name x =
+  let print ppf x =
     let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Comonadic { &quot;;
-    Buffer.add_string b &quot;linearity = &quot;;
-    Buffer.add_string b (Linearity.show view.linearity);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;yielding = &quot;;
-    Buffer.add_string b (Yielding.show view.yielding);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
+    Format.fprintf
+      ppf
+      &quot;%a,%a&quot;
+      Linearity.print view.linearity
+      Yielding.print view.yielding
 end
 
 module Comonadic_with_locality = struct
   type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 7
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
 
   let min = 0
   let max = 7
@@ -935,88 +823,57 @@ module Comonadic_with_locality = struct
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
   let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy
+    x land lnot y
   let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 7
+    lnot (x land lnot y) land 7
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
 
   type view = {
     areality : Locality.t;
     comonadic : Comonadic.t;
   }
 
-  type nonrec product = t
-
-  let of_view view =
-    let areality = (view.areality land 1) lsl 0 in
-    let comonadic = (view.comonadic land 3) lsl 1 in
+  let[@inline] make
+      ~areality
+      ~comonadic
+    =
+    let areality = (areality land 1) in
+    let comonadic = ((comonadic land 3) lsl 1) in
     areality lor comonadic
 
-  let view t =
+  let[@inline] of_view view =
+    make
+      ~areality:view.areality
+      ~comonadic:view.comonadic
+
+  let[@inline] view t =
     {
-      areality = (t lsr 0) land 1;
-      comonadic = (t lsr 1) land 3;
+      areality = (t land 1);
+      comonadic = ((t lsr 1) land 3);
     }
 
-  let make =
-    fun ~areality -&gt;
-    fun ~comonadic -&gt;
-    of_view {
-      areality;
-      comonadic;
-    }
+  let[@inline] proj_areality t = (t land 1)
+  let[@inline] with_areality x t = (t land lnot 1) lor (x land 1)
 
-  let proj_areality t = (t lsr 0) land 1
-  let with_areality x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_areality x = with_areality x min
-  let max_with_areality x = with_areality x max
+  let[@inline] proj_comonadic t = ((t lsr 1) land 3)
+  let[@inline] with_comonadic x t = (t land lnot 6) lor ((x land 3) lsl 1)
 
-  let proj_comonadic t = (t lsr 1) land 3
-  let with_comonadic x t = (t land lnot 6) lor ((x land 3) lsl 1)
-  let min_with_comonadic x = with_comonadic x min
-  let max_with_comonadic x = with_comonadic x max
-
-  let name x =
+  let print ppf x =
     let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Comonadic_with_locality { &quot;;
-    Buffer.add_string b &quot;areality = &quot;;
-    Buffer.add_string b (Locality.show view.areality);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;comonadic = &quot;;
-    Buffer.add_string b (Comonadic.show view.comonadic);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
+    Format.fprintf
+      ppf
+      &quot;%a,%a&quot;
+      Locality.print view.areality
+      Comonadic.print view.comonadic
 end
 
 module Comonadic_with_regionality = struct
   type t = int
 
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let[@inline] close_repr x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let mask = 15
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-    x
-
-  let[@inline] close_down_nat x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_nat x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
   let min = 0
   let max = 15
   let[@inline] le x y = (x land y) = x
@@ -1025,93 +882,58 @@ module Comonadic_with_regionality = struct
   let[@inline] meet x y = x land y
   let[@inline] subtract x y =
     let zxy = x land lnot y in
-    close_down_nat zxy
+    (zxy lor ((zxy land 2) lsr 1))
   let[@inline] imply x y =
     let zxy = x land lnot y in
-    lnot (close_up_nat zxy) land 15
+    lnot ((zxy lor ((zxy land 1) lsl 1))) land 15
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
 
   type view = {
     areality : Regionality.t;
     comonadic : Comonadic.t;
   }
 
-  type nonrec product = t
-
-  let of_view view =
-    let areality = (view.areality land 3) lsl 0 in
-    let comonadic = (view.comonadic land 3) lsl 2 in
+  let[@inline] make
+      ~areality
+      ~comonadic
+    =
+    let areality = (areality land 3) in
+    let comonadic = ((comonadic land 3) lsl 2) in
     areality lor comonadic
 
-  let view t =
+  let[@inline] of_view view =
+    make
+      ~areality:view.areality
+      ~comonadic:view.comonadic
+
+  let[@inline] view t =
     {
-      areality = (t lsr 0) land 3;
-      comonadic = (t lsr 2) land 3;
+      areality = (t land 3);
+      comonadic = ((t lsr 2) land 3);
     }
 
-  let make =
-    fun ~areality -&gt;
-    fun ~comonadic -&gt;
-    of_view {
-      areality;
-      comonadic;
-    }
+  let[@inline] proj_areality t = (t land 3)
+  let[@inline] with_areality x t = (t land lnot 3) lor (x land 3)
 
-  let proj_areality t = (t lsr 0) land 3
-  let with_areality x t = (t land lnot 3) lor ((x land 3) lsl 0)
-  let min_with_areality x = with_areality x min
-  let max_with_areality x = with_areality x max
+  let[@inline] proj_comonadic t = ((t lsr 2) land 3)
+  let[@inline] with_comonadic x t = (t land lnot 12) lor ((x land 3) lsl 2)
 
-  let proj_comonadic t = (t lsr 2) land 3
-  let with_comonadic x t = (t land lnot 12) lor ((x land 3) lsl 2)
-  let min_with_comonadic x = with_comonadic x min
-  let max_with_comonadic x = with_comonadic x max
-
-  let name x =
+  let print ppf x =
     let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Comonadic_with_regionality { &quot;;
-    Buffer.add_string b &quot;areality = &quot;;
-    Buffer.add_string b (Regionality.show view.areality);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;comonadic = &quot;;
-    Buffer.add_string b (Comonadic.show view.comonadic);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
+    Format.fprintf
+      ppf
+      &quot;%a,%a&quot;
+      Regionality.print view.areality
+      Comonadic.print view.comonadic
 end
 
 module Value = struct
   type t = int
 
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let[@inline] close_repr x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let mask = 63
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-    x
-
-  let[@inline] close_down_nat x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_nat x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
   let min = 48
   let max = 15
   let[@inline] le x y =
@@ -1129,79 +951,60 @@ module Value = struct
   let[@inline] subtract x y =
     let zxy = x land lnot y in
     let zyx = y land lnot x in
-    ((close_down_nat zxy) land 15)
-    lor ((lnot (close_up_dual zyx)) land 48)
+    (((zxy lor ((zxy land 2) lsr 1))) land 15)
+    lor ((lnot ((zyx lor ((zyx land 1) lsl 1)))) land 48)
   let[@inline] imply x y =
     let zxy = x land lnot y in
     let zyx = y land lnot x in
-    ((lnot (close_up_nat zxy)) land 15)
-    lor ((close_down_dual zyx) land 48)
+    ((lnot ((zxy lor ((zxy land 1) lsl 1)))) land 15)
+    lor (((zyx lor ((zyx land 2) lsr 1))) land 48)
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
 
   type view = {
     comonadic : Comonadic_with_regionality.t;
     monadic : Monadic.t;
   }
 
-  type nonrec product = t
-
-  let of_view view =
-    let comonadic = (view.comonadic land 15) lsl 0 in
-    let monadic = (view.monadic land 3) lsl 4 in
+  let[@inline] make
+      ~comonadic
+      ~monadic
+    =
+    let comonadic = (comonadic land 15) in
+    let monadic = ((monadic land 3) lsl 4) in
     comonadic lor monadic
 
-  let view t =
+  let[@inline] of_view view =
+    make
+      ~comonadic:view.comonadic
+      ~monadic:view.monadic
+
+  let[@inline] view t =
     {
-      comonadic = (t lsr 0) land 15;
-      monadic = (t lsr 4) land 3;
+      comonadic = (t land 15);
+      monadic = ((t lsr 4) land 3);
     }
 
-  let make =
-    fun ~comonadic -&gt;
-    fun ~monadic -&gt;
-    of_view {
-      comonadic;
-      monadic;
-    }
+  let[@inline] proj_comonadic t = (t land 15)
+  let[@inline] with_comonadic x t = (t land lnot 15) lor (x land 15)
 
-  let proj_comonadic t = (t lsr 0) land 15
-  let with_comonadic x t = (t land lnot 15) lor ((x land 15) lsl 0)
-  let min_with_comonadic x = with_comonadic x min
-  let max_with_comonadic x = with_comonadic x max
+  let[@inline] proj_monadic t = ((t lsr 4) land 3)
+  let[@inline] with_monadic x t = (t land lnot 48) lor ((x land 3) lsl 4)
 
-  let proj_monadic t = (t lsr 4) land 3
-  let with_monadic x t = (t land lnot 48) lor ((x land 3) lsl 4)
-  let min_with_monadic x = with_monadic x min
-  let max_with_monadic x = with_monadic x max
-
-  let name x =
+  let print ppf x =
     let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Value { &quot;;
-    Buffer.add_string b &quot;comonadic = &quot;;
-    Buffer.add_string b (Comonadic_with_regionality.show view.comonadic);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;monadic = &quot;;
-    Buffer.add_string b (Monadic.show view.monadic);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
+    Format.fprintf
+      ppf
+      &quot;%a,%a&quot;
+      Comonadic_with_regionality.print view.comonadic
+      Monadic.print view.monadic
 end
 
 module Alloc = struct
   type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 31
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
 
   let min = 24
   let max = 7
@@ -1228,85 +1031,53 @@ module Alloc = struct
     ((lnot zxy) land 7)
     lor ((zyx) land 24)
 
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
+
   type view = {
     comonadic : Comonadic_with_locality.t;
     monadic : Monadic.t;
   }
 
-  type nonrec product = t
-
-  let of_view view =
-    let comonadic = (view.comonadic land 7) lsl 0 in
-    let monadic = (view.monadic land 3) lsl 3 in
+  let[@inline] make
+      ~comonadic
+      ~monadic
+    =
+    let comonadic = (comonadic land 7) in
+    let monadic = ((monadic land 3) lsl 3) in
     comonadic lor monadic
 
-  let view t =
+  let[@inline] of_view view =
+    make
+      ~comonadic:view.comonadic
+      ~monadic:view.monadic
+
+  let[@inline] view t =
     {
-      comonadic = (t lsr 0) land 7;
-      monadic = (t lsr 3) land 3;
+      comonadic = (t land 7);
+      monadic = ((t lsr 3) land 3);
     }
 
-  let make =
-    fun ~comonadic -&gt;
-    fun ~monadic -&gt;
-    of_view {
-      comonadic;
-      monadic;
-    }
+  let[@inline] proj_comonadic t = (t land 7)
+  let[@inline] with_comonadic x t = (t land lnot 7) lor (x land 7)
 
-  let proj_comonadic t = (t lsr 0) land 7
-  let with_comonadic x t = (t land lnot 7) lor ((x land 7) lsl 0)
-  let min_with_comonadic x = with_comonadic x min
-  let max_with_comonadic x = with_comonadic x max
+  let[@inline] proj_monadic t = ((t lsr 3) land 3)
+  let[@inline] with_monadic x t = (t land lnot 24) lor ((x land 3) lsl 3)
 
-  let proj_monadic t = (t lsr 3) land 3
-  let with_monadic x t = (t land lnot 24) lor ((x land 3) lsl 3)
-  let min_with_monadic x = with_monadic x min
-  let max_with_monadic x = with_monadic x max
-
-  let name x =
+  let print ppf x =
     let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Alloc { &quot;;
-    Buffer.add_string b &quot;comonadic = &quot;;
-    Buffer.add_string b (Comonadic_with_locality.show view.comonadic);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;monadic = &quot;;
-    Buffer.add_string b (Monadic.show view.monadic);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
+    Format.fprintf
+      ppf
+      &quot;%a,%a&quot;
+      Comonadic_with_locality.print view.comonadic
+      Monadic.print view.monadic
 end
 
+(* Opposite Lattices *)
+
 module Uniqueness_op = struct
-  type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 1
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
-
-  let min = 0
-  let max = 1
-  let[@inline] le x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 1
-
   type view =
     | Aliased
     | Unique
@@ -1314,43 +1085,7 @@ module Uniqueness_op = struct
   let aliased = 0
   let unique = 1
 
-  let name x =
-    if equal x aliased then &quot;Aliased&quot;
-    else if equal x unique then &quot;Unique&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Aliased&quot; -&gt; Some aliased
-    | &quot;Unique&quot; -&gt; Some unique
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = aliased
-
-  let view x =
-    if equal x aliased then Aliased
-    else if equal x unique then Unique
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | Aliased -&gt; aliased
-    | Unique -&gt; unique
-end
-
-module Staticity_op = struct
   type t = int
-
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let mask = 1
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
 
   let min = 0
   let max = 1
@@ -1359,12 +1094,35 @@ module Staticity_op = struct
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
   let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy
+    x land lnot y
   let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 1
+    lnot (x land lnot y) land 1
 
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
+
+  let[@inline] view = function
+    | 0 -&gt; Aliased
+    | 1 -&gt; Unique
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+
+  let[@inline] of_view = function
+    | Aliased -&gt; aliased
+    | Unique -&gt; unique
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;aliased&quot;
+      | 1 -&gt; &quot;unique&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+module Staticity_op = struct
   type view =
     | Dynamic
     | Static
@@ -1372,43 +1130,45 @@ module Staticity_op = struct
   let dynamic = 0
   let static = 1
 
-  let name x =
-    if equal x dynamic then &quot;Dynamic&quot;
-    else if equal x static then &quot;Static&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;Dynamic&quot; -&gt; Some dynamic
-    | &quot;Static&quot; -&gt; Some static
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = dynamic
-
-  let view x =
-    if equal x dynamic then Dynamic
-    else if equal x static then Static
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | Dynamic -&gt; dynamic
-    | Static -&gt; static
-end
-
-module Monadic_op = struct
   type t = int
 
+  let min = 0
+  let max = 1
+  let[@inline] le x y = (x land y) = x
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
+  let[@inline] subtract x y =
+    x land lnot y
+  let[@inline] imply x y =
+    lnot (x land lnot y) land 1
+
   module Repr = struct
-    type nonrec t = t
     let[@inline] to_int_unsafe x = x
     let[@inline] from_int_unsafe x = x
   end
 
-  let mask = 3
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    x
+  let[@inline] view = function
+    | 0 -&gt; Dynamic
+    | 1 -&gt; Static
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+
+  let[@inline] of_view = function
+    | Dynamic -&gt; dynamic
+    | Static -&gt; static
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;dynamic&quot;
+      | 1 -&gt; &quot;static&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+module Monadic_op = struct
+  type t = int
 
   let min = 0
   let max = 3
@@ -1417,756 +1177,462 @@ module Monadic_op = struct
   let[@inline] join x y = x lor y
   let[@inline] meet x y = x land y
   let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy
+    x land lnot y
   let[@inline] imply x y =
-    let zxy = x land lnot y in
-    lnot zxy land 3
+    lnot (x land lnot y) land 3
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
 
   type view = {
     uniqueness : Uniqueness_op.t;
     staticity : Staticity_op.t;
   }
 
-  type nonrec product = t
-
-  let of_view view =
-    let uniqueness = (view.uniqueness land 1) lsl 0 in
-    let staticity = (view.staticity land 1) lsl 1 in
+  let[@inline] make
+      ~uniqueness
+      ~staticity
+    =
+    let uniqueness = (uniqueness land 1) in
+    let staticity = ((staticity land 1) lsl 1) in
     uniqueness lor staticity
 
-  let view t =
+  let[@inline] of_view view =
+    make
+      ~uniqueness:view.uniqueness
+      ~staticity:view.staticity
+
+  let[@inline] view t =
     {
-      uniqueness = (t lsr 0) land 1;
-      staticity = (t lsr 1) land 1;
+      uniqueness = (t land 1);
+      staticity = ((t lsr 1) land 1);
     }
 
-  let make =
-    fun ~uniqueness -&gt;
-    fun ~staticity -&gt;
-    of_view {
-      uniqueness;
-      staticity;
-    }
+  let[@inline] proj_uniqueness t = (t land 1)
+  let[@inline] with_uniqueness x t = (t land lnot 1) lor (x land 1)
 
-  let proj_uniqueness t = (t lsr 0) land 1
-  let with_uniqueness x t = (t land lnot 1) lor ((x land 1) lsl 0)
-  let min_with_uniqueness x = with_uniqueness x min
-  let max_with_uniqueness x = with_uniqueness x max
+  let[@inline] proj_staticity t = ((t lsr 1) land 1)
+  let[@inline] with_staticity x t = (t land lnot 2) lor ((x land 1) lsl 1)
 
-  let proj_staticity t = (t lsr 1) land 1
-  let with_staticity x t = (t land lnot 2) lor ((x land 1) lsl 1)
-  let min_with_staticity x = with_staticity x min
-  let max_with_staticity x = with_staticity x max
-
-  let name x =
+  let print ppf x =
     let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Monadic_op { &quot;;
-    Buffer.add_string b &quot;uniqueness = &quot;;
-    Buffer.add_string b (Uniqueness_op.show view.uniqueness);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;staticity = &quot;;
-    Buffer.add_string b (Staticity_op.show view.staticity);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
+    Format.fprintf
+      ppf
+      &quot;%a,%a&quot;
+      Uniqueness_op.print view.uniqueness
+      Staticity_op.print view.staticity
 end
 
-let rec
-  alloc_as_value x =
-    (x land 1)
+module Morphs = struct
+  (* Primitive morphs *)
+  let locality_as_regionality x =
+    x
       lor (x lsl 1)
 
-and
-  alloc_to_value_l2r x =
+  let local_to_regional x =
+    x
+
+  let regional_to_local x =
     (x land 1)
-      lor ((x land 30) lsl 1)
 
-and
-  comonadic_local_to_regional x =
-    (x land 1)
-      lor ((x land 6) lsl 1)
-
-and
-  comonadic_locality_as_regionality x =
-    (x land 1)
-      lor (x lsl 1)
-
-and
-  comonadic_r2g x =
-    ((x land 2) lsr 1)
-      lor (x land 14)
-
-and
-  comonadic_regional_to_global x =
+  let regional_to_global x =
     (x lsr 1)
 
-and
-  comonadic_regional_to_local x =
-    ((x land 12) lsr 1)
-      lor (x land 1)
-
-and
-  comonadic_to_monadic_max x =
-    2
-      lor (x land 1)
-
-and
-  comonadic_to_monadic_min x =
-    (x land 1)
-
-and
-  global_to_regional x =
-    1
-      lor (x lsl 1)
-
-and
-  linear_to_unique x =
-    x
-
-and
-  local_to_regional x =
-    x
-
-and
-  locality_as_regionality x =
-    x
-      lor (x lsl 1)
-
-and
-  monadic_to_comonadic_max x =
-    2
-      lor (x land 1)
-
-and
-  monadic_to_comonadic_min x =
-    (x land 1)
-
-and
-  regional_r2g x =
+  let regional_r2g x =
     (x lsr 1)
       lor (x land 2)
 
-and
-  regional_to_global x =
-    (x lsr 1)
+  let global_to_regional x =
+    1
+      lor (x lsl 1)
 
-and
-  regional_to_local x =
-    (x land 1)
-
-and
-  unique_to_linear x =
+  let linear_to_unique x =
     x
 
-and
-  value_r2g x =
+  let unique_to_linear x =
+    x
+
+
+  (* Product morphs *)
+  let comonadic_locality_as_regionality x =
+    (x land 1)
+      lor (x lsl 1)
+
+  let comonadic_local_to_regional x =
+    (x land 1)
+      lor ((x land 6) lsl 1)
+
+  let comonadic_regional_to_local x =
+    ((x land 12) lsr 1)
+      lor (x land 1)
+
+  let comonadic_regional_to_global x =
+    (x lsr 1)
+
+  let comonadic_r2g x =
+    ((x land 2) lsr 1)
+      lor (x land 14)
+
+  let comonadic_to_monadic_min x =
+    (x land 1)
+
+  let comonadic_to_monadic_max x =
+    2
+      lor (x land 1)
+
+  let monadic_to_comonadic_min x =
+    (x land 1)
+
+  let monadic_to_comonadic_max x =
+    2
+      lor (x land 1)
+
+  let alloc_as_value x =
+    (x land 1)
+      lor (x lsl 1)
+
+  let alloc_to_value_l2r x =
+    (x land 1)
+      lor ((x land 30) lsl 1)
+
+  let value_to_alloc_r2l x =
+    ((x land 60) lsr 1)
+      lor (x land 1)
+
+  let value_to_alloc_r2g x =
+    (x lsr 1)
+
+  let value_r2g x =
     ((x land 2) lsr 1)
       lor (x land 62)
 
-and
-  value_to_alloc_r2g x =
-    (x lsr 1)
-
-and
-  value_to_alloc_r2l x =
-    ((x land 60) lsr 1)
-      lor (x land 1)
+end
 
 </pre>
 </div>
 <div class="lattice-generated-panel" data-panel="mli">
-<pre data-language="ocaml">module Locality : sig
+<pre data-language="ocaml">module type Lattice = sig
   type t
+  type view
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
+  val view : t -&gt; view
+  val of_view : view -&gt; t
 
-  val min : t
-  val max : t
   val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
   val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
+
   val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
+
+  module Repr : sig
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
+  end
+end
+
+(* Base Lattices *)
+
+module Locality : sig
+  (* Order:
+     global &lt; local
+  *)
+
   type view =
     | Global
     | Local
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val global : t
   val local : t
 end
 
 module Regionality : sig
-  type t
+  (* Order:
+     global &lt; regional &lt; local
+  *)
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
   type view =
     | Global
     | Regional
     | Local
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val global : t
   val regional : t
   val local : t
 end
 
 module Uniqueness : sig
-  type t
+  (* Order:
+     unique &lt; aliased
+  *)
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
   type view =
     | Aliased
     | Unique
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val aliased : t
   val unique : t
 end
 
 module Linearity : sig
-  type t
+  (* Order:
+     many &lt; once
+  *)
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
   type view =
     | Many
     | Once
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val many : t
   val once : t
 end
 
 module Staticity : sig
-  type t
+  (* Order:
+     static &lt; dynamic
+  *)
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
   type view =
     | Dynamic
     | Static
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val dynamic : t
   val static : t
 end
 
 module Yielding : sig
-  type t
+  (* Order:
+     unyielding &lt; yielding
+  *)
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
   type view =
     | Unyielding
     | Yielding
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val unyielding : t
   val yielding : t
 end
 
+(* Product Lattices *)
+
 module Monadic : sig
-  type t
-
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-
   type view = {
     uniqueness : Uniqueness.t;
     staticity : Staticity.t;
   }
 
-  type nonrec product = t
+  include Lattice with type view := view
 
-  val of_view : view -&gt; t
-  val view : t -&gt; view
   val make :
     uniqueness:Uniqueness.t -&gt;
     staticity:Staticity.t -&gt;
     t
+
   val proj_uniqueness : t -&gt; Uniqueness.t
   val with_uniqueness : Uniqueness.t -&gt; t -&gt; t
-  val min_with_uniqueness : Uniqueness.t -&gt; t
-  val max_with_uniqueness : Uniqueness.t -&gt; t
+
   val proj_staticity : t -&gt; Staticity.t
   val with_staticity : Staticity.t -&gt; t -&gt; t
-  val min_with_staticity : Staticity.t -&gt; t
-  val max_with_staticity : Staticity.t -&gt; t
 end
 
 module Comonadic : sig
-  type t
-
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-
   type view = {
     linearity : Linearity.t;
     yielding : Yielding.t;
   }
 
-  type nonrec product = t
+  include Lattice with type view := view
 
-  val of_view : view -&gt; t
-  val view : t -&gt; view
   val make :
     linearity:Linearity.t -&gt;
     yielding:Yielding.t -&gt;
     t
+
   val proj_linearity : t -&gt; Linearity.t
   val with_linearity : Linearity.t -&gt; t -&gt; t
-  val min_with_linearity : Linearity.t -&gt; t
-  val max_with_linearity : Linearity.t -&gt; t
+
   val proj_yielding : t -&gt; Yielding.t
   val with_yielding : Yielding.t -&gt; t -&gt; t
-  val min_with_yielding : Yielding.t -&gt; t
-  val max_with_yielding : Yielding.t -&gt; t
 end
 
 module Comonadic_with_locality : sig
-  type t
-
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-
   type view = {
     areality : Locality.t;
     comonadic : Comonadic.t;
   }
 
-  type nonrec product = t
+  include Lattice with type view := view
 
-  val of_view : view -&gt; t
-  val view : t -&gt; view
   val make :
     areality:Locality.t -&gt;
     comonadic:Comonadic.t -&gt;
     t
+
   val proj_areality : t -&gt; Locality.t
   val with_areality : Locality.t -&gt; t -&gt; t
-  val min_with_areality : Locality.t -&gt; t
-  val max_with_areality : Locality.t -&gt; t
+
   val proj_comonadic : t -&gt; Comonadic.t
   val with_comonadic : Comonadic.t -&gt; t -&gt; t
-  val min_with_comonadic : Comonadic.t -&gt; t
-  val max_with_comonadic : Comonadic.t -&gt; t
 end
 
 module Comonadic_with_regionality : sig
-  type t
-
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-
   type view = {
     areality : Regionality.t;
     comonadic : Comonadic.t;
   }
 
-  type nonrec product = t
+  include Lattice with type view := view
 
-  val of_view : view -&gt; t
-  val view : t -&gt; view
   val make :
     areality:Regionality.t -&gt;
     comonadic:Comonadic.t -&gt;
     t
+
   val proj_areality : t -&gt; Regionality.t
   val with_areality : Regionality.t -&gt; t -&gt; t
-  val min_with_areality : Regionality.t -&gt; t
-  val max_with_areality : Regionality.t -&gt; t
+
   val proj_comonadic : t -&gt; Comonadic.t
   val with_comonadic : Comonadic.t -&gt; t -&gt; t
-  val min_with_comonadic : Comonadic.t -&gt; t
-  val max_with_comonadic : Comonadic.t -&gt; t
 end
 
 module Value : sig
-  type t
-
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-
   type view = {
     comonadic : Comonadic_with_regionality.t;
     monadic : Monadic.t;
   }
 
-  type nonrec product = t
+  include Lattice with type view := view
 
-  val of_view : view -&gt; t
-  val view : t -&gt; view
   val make :
     comonadic:Comonadic_with_regionality.t -&gt;
     monadic:Monadic.t -&gt;
     t
+
   val proj_comonadic : t -&gt; Comonadic_with_regionality.t
   val with_comonadic : Comonadic_with_regionality.t -&gt; t -&gt; t
-  val min_with_comonadic : Comonadic_with_regionality.t -&gt; t
-  val max_with_comonadic : Comonadic_with_regionality.t -&gt; t
+
   val proj_monadic : t -&gt; Monadic.t
   val with_monadic : Monadic.t -&gt; t -&gt; t
-  val min_with_monadic : Monadic.t -&gt; t
-  val max_with_monadic : Monadic.t -&gt; t
 end
 
 module Alloc : sig
-  type t
-
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-
   type view = {
     comonadic : Comonadic_with_locality.t;
     monadic : Monadic.t;
   }
 
-  type nonrec product = t
+  include Lattice with type view := view
 
-  val of_view : view -&gt; t
-  val view : t -&gt; view
   val make :
     comonadic:Comonadic_with_locality.t -&gt;
     monadic:Monadic.t -&gt;
     t
+
   val proj_comonadic : t -&gt; Comonadic_with_locality.t
   val with_comonadic : Comonadic_with_locality.t -&gt; t -&gt; t
-  val min_with_comonadic : Comonadic_with_locality.t -&gt; t
-  val max_with_comonadic : Comonadic_with_locality.t -&gt; t
+
   val proj_monadic : t -&gt; Monadic.t
   val with_monadic : Monadic.t -&gt; t -&gt; t
-  val min_with_monadic : Monadic.t -&gt; t
-  val max_with_monadic : Monadic.t -&gt; t
 end
 
+(* Opposite Lattices *)
+
 module Uniqueness_op : sig
-  type t
+  (* Order:
+     aliased &lt; unique
+  *)
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
   type view =
     | Aliased
     | Unique
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val aliased : t
   val unique : t
 end
 
 module Staticity_op : sig
-  type t
+  (* Order:
+     dynamic &lt; static
+  *)
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
   type view =
     | Dynamic
     | Static
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val dynamic : t
   val static : t
 end
 
 module Monadic_op : sig
-  type t
-
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-
   type view = {
     uniqueness : Uniqueness_op.t;
     staticity : Staticity_op.t;
   }
 
-  type nonrec product = t
+  include Lattice with type view := view
 
-  val of_view : view -&gt; t
-  val view : t -&gt; view
   val make :
     uniqueness:Uniqueness_op.t -&gt;
     staticity:Staticity_op.t -&gt;
     t
+
   val proj_uniqueness : t -&gt; Uniqueness_op.t
   val with_uniqueness : Uniqueness_op.t -&gt; t -&gt; t
-  val min_with_uniqueness : Uniqueness_op.t -&gt; t
-  val max_with_uniqueness : Uniqueness_op.t -&gt; t
+
   val proj_staticity : t -&gt; Staticity_op.t
   val with_staticity : Staticity_op.t -&gt; t -&gt; t
-  val min_with_staticity : Staticity_op.t -&gt; t
-  val max_with_staticity : Staticity_op.t -&gt; t
 end
 
-val alloc_as_value : Alloc.t -&gt; Value.t
-val alloc_to_value_l2r : Alloc.t -&gt; Value.t
-val comonadic_local_to_regional : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
-val comonadic_locality_as_regionality : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
-val comonadic_r2g : Comonadic_with_regionality.t -&gt; Comonadic_with_regionality.t
-val comonadic_regional_to_global : Comonadic_with_regionality.t -&gt; Comonadic_with_locality.t
-val comonadic_regional_to_local : Comonadic_with_regionality.t -&gt; Comonadic_with_locality.t
-val comonadic_to_monadic_max : Comonadic.t -&gt; Monadic_op.t
-val comonadic_to_monadic_min : Comonadic.t -&gt; Monadic_op.t
-val global_to_regional : Locality.t -&gt; Regionality.t
-val linear_to_unique : Linearity.t -&gt; Uniqueness_op.t
-val local_to_regional : Locality.t -&gt; Regionality.t
-val locality_as_regionality : Locality.t -&gt; Regionality.t
-val monadic_to_comonadic_max : Monadic_op.t -&gt; Comonadic.t
-val monadic_to_comonadic_min : Monadic_op.t -&gt; Comonadic.t
-val regional_r2g : Regionality.t -&gt; Regionality.t
-val regional_to_global : Regionality.t -&gt; Locality.t
-val regional_to_local : Regionality.t -&gt; Locality.t
-val unique_to_linear : Uniqueness_op.t -&gt; Linearity.t
-val value_r2g : Value.t -&gt; Value.t
-val value_to_alloc_r2g : Value.t -&gt; Alloc.t
-val value_to_alloc_r2l : Value.t -&gt; Alloc.t
+module Morphs : sig
+  (* Primitive morphs *)
+  val locality_as_regionality : Locality.t -&gt; Regionality.t
+  val local_to_regional : Locality.t -&gt; Regionality.t
+  val regional_to_local : Regionality.t -&gt; Locality.t
+  val regional_to_global : Regionality.t -&gt; Locality.t
+  val regional_r2g : Regionality.t -&gt; Regionality.t
+  val global_to_regional : Locality.t -&gt; Regionality.t
+  val linear_to_unique : Linearity.t -&gt; Uniqueness_op.t
+  val unique_to_linear : Uniqueness_op.t -&gt; Linearity.t
+
+  (* Product morphs *)
+  val comonadic_locality_as_regionality : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
+  val comonadic_local_to_regional : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
+  val comonadic_regional_to_local : Comonadic_with_regionality.t -&gt; Comonadic_with_locality.t
+  val comonadic_regional_to_global : Comonadic_with_regionality.t -&gt; Comonadic_with_locality.t
+  val comonadic_r2g : Comonadic_with_regionality.t -&gt; Comonadic_with_regionality.t
+  val comonadic_to_monadic_min : Comonadic.t -&gt; Monadic_op.t
+  val comonadic_to_monadic_max : Comonadic.t -&gt; Monadic_op.t
+  val monadic_to_comonadic_min : Monadic_op.t -&gt; Comonadic.t
+  val monadic_to_comonadic_max : Monadic_op.t -&gt; Comonadic.t
+  val alloc_as_value : Alloc.t -&gt; Value.t
+  val alloc_to_value_l2r : Alloc.t -&gt; Value.t
+  val value_to_alloc_r2l : Value.t -&gt; Alloc.t
+  val value_to_alloc_r2g : Value.t -&gt; Alloc.t
+  val value_r2g : Value.t -&gt; Value.t
+end
+
 </pre>
 </div>
 </div>

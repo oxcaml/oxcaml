@@ -696,6 +696,10 @@ let render_block index attrs body =
 
 let ref_suffix module_name = String.lowercase_ascii module_name
 
+let emitted_field_name (field : Model.field) = Name.escape_value_name field.name
+
+let emitted_morph_name name = Name.escape_value_name name
+
 let ref_values_var module_name = "ref_values_" ^ ref_suffix module_name
 
 let test_values_var module_name = "test_values_" ^ ref_suffix module_name
@@ -760,7 +764,8 @@ let emit_reference_defs buf model =
          (Array.to_list
             (Array.mapi
                (fun i value ->
-                 string_of_int finite.element_values.(i), Printf.sprintf "%S" value)
+                 ( string_of_int finite.element_values.(i),
+                   Printf.sprintf "%S" (Name.snake_case value) ))
                finite.element_names))
          "invalid_arg \"unknown lattice element\"";
        Printf.bprintf buf "let %s = %d\n" (ref_bottom_var module_name) semantics.bottom;
@@ -833,11 +838,9 @@ let emit_reference_defs buf model =
        emit_int_array buf (ref_values_var module_name) semantics.values;
        Printf.bprintf buf "let %s x =\n" (ref_name_fn module_name);
        Printf.bprintf buf "  let b = Buffer.create 64 in\n";
-       Printf.bprintf buf "  Buffer.add_string b %S;\n" (module_name ^ " { ");
        List.iteri
          (fun i ((field : Model.field), _, child_module_name) ->
-           if i > 0 then Buffer.add_string buf "  Buffer.add_string b \"; \";\n";
-           Printf.bprintf buf "  Buffer.add_string b %S;\n" (field.name ^ " = ");
+           if i > 0 then Buffer.add_string buf "  Buffer.add_string b \",\";\n";
            Printf.bprintf
              buf
              "  Buffer.add_string b (%s ((x lsr %d) land %d));\n"
@@ -845,7 +848,6 @@ let emit_reference_defs buf model =
              field.shift
              field.raw_mask)
          effective_fields;
-       Buffer.add_string buf "  Buffer.add_string b \" }\";\n";
        Buffer.add_string buf "  Buffer.contents b\n";
        let render_pack_constant child_value_name =
          effective_fields
@@ -1011,10 +1013,6 @@ let check_base_lattice
     ~subtract
     ~imply
     ~print
-    ~show
-    ~name_fn
-    ~of_name
-    ~legacy
     ~ref_min
     ~ref_max
     ~ref_le
@@ -1027,30 +1025,16 @@ let check_base_lattice
   check_public_repr ~name ~valid_reprs ~to_int_unsafe ~from_int_unsafe;
   ensure (to_int_unsafe min = ref_min) "%s: min mismatch" name;
   ensure (to_int_unsafe max = ref_max) "%s: max mismatch" name;
-  ensure (array_mem values legacy) "%s: legacy is invalid" name;
   iter1 values
     (fun x ->
       let x_i = to_int_unsafe x in
-      let rendered = name_fn x in
       let expected_name = ref_name x_i in
       ensure (of_view (view x) = x)
         "%s: of_view/view mismatch for %d"
         name x_i;
-      ensure (rendered = expected_name)
-        "%s: name mismatch for %d"
-        name x_i;
-      ensure (show x = expected_name)
-        "%s: show mismatch for %d"
-        name x_i;
       ensure (Format.asprintf "%a" print x = expected_name)
         "%s: print mismatch for %d"
-        name x_i;
-      match of_name expected_name with
-      | Some y ->
-        ensure (equal y x)
-          "%s: of_name mismatch for %S"
-          name expected_name
-      | None -> fail "%s: of_name failed for %S" name expected_name);
+        name x_i);
   iter2 values values
     (fun x y ->
       let x_i = to_int_unsafe x in
@@ -1109,8 +1093,6 @@ let check_product_lattice
     ~subtract
     ~imply
     ~print
-    ~show
-    ~name_fn
     ~ref_min
     ~ref_max
     ~ref_le
@@ -1126,14 +1108,7 @@ let check_product_lattice
   iter1 values
     (fun x ->
       let x_i = to_int_unsafe x in
-      let rendered = name_fn x in
       let expected_name = ref_name x_i in
-      ensure (rendered = expected_name)
-        "%s: name mismatch for %d"
-        name x_i;
-      ensure (show x = expected_name)
-        "%s: show mismatch for %d"
-        name x_i;
       ensure (Format.asprintf "%a" print x = expected_name)
         "%s: print mismatch for %d"
         name x_i);
@@ -1214,10 +1189,6 @@ let emit_lattice_checks buf model =
            \    ~subtract:%s.subtract\n\
            \    ~imply:%s.imply\n\
            \    ~print:%s.print\n\
-           \    ~show:%s.show\n\
-           \    ~name_fn:%s.name\n\
-           \    ~of_name:%s.of_name\n\
-           \    ~legacy:%s.legacy\n\
            \    ~ref_min:%s\n\
            \    ~ref_max:%s\n\
            \    ~ref_le:%s\n\
@@ -1229,10 +1200,6 @@ let emit_lattice_checks buf model =
           module_name
           (test_values_var module_name)
           (ref_values_var module_name)
-          module_name
-          module_name
-          module_name
-          module_name
           module_name
           module_name
           module_name
@@ -1273,8 +1240,6 @@ let emit_lattice_checks buf model =
            \    ~subtract:%s.subtract\n\
            \    ~imply:%s.imply\n\
            \    ~print:%s.print\n\
-           \    ~show:%s.show\n\
-           \    ~name_fn:%s.name\n\
            \    ~ref_min:%s\n\
            \    ~ref_max:%s\n\
            \    ~ref_le:%s\n\
@@ -1286,8 +1251,6 @@ let emit_lattice_checks buf model =
           module_name
           (test_values_var module_name)
           (ref_values_var module_name)
-          module_name
-          module_name
           module_name
           module_name
           module_name
@@ -1320,7 +1283,8 @@ let emit_product_checks buf model =
     Printf.bprintf buf "    let rebuilt = %s.make\n" module_name;
     List.iter
       (fun (field : Model.field) ->
-        Printf.bprintf buf "      ~%s:view.%s\n" field.name field.name)
+        let field_name = emitted_field_name field in
+        Printf.bprintf buf "      ~%s:view.%s\n" field_name field_name)
       product.fields;
     Buffer.add_string buf "    in\n";
     Printf.bprintf
@@ -1334,10 +1298,9 @@ let emit_product_checks buf model =
           if expr.opposite then Model.flip_expr field.ty else field.ty
         in
         let field_module_name = Model.module_name_of_expr field_expr in
-        let proj_name = "proj_" ^ field.name in
-        let with_name = "with_" ^ field.name in
-        let min_with_name = "min_with_" ^ field.name in
-        let max_with_name = "max_with_" ^ field.name in
+        let field_name = emitted_field_name field in
+        let proj_name = "proj_" ^ field_name in
+        let with_name = "with_" ^ field_name in
         Printf.bprintf buf "  iter2 %s %s (fun x value ->\n"
           (test_values_var module_name)
           (test_values_var field_module_name);
@@ -1351,26 +1314,10 @@ let emit_product_checks buf model =
           (module_name ^ ": proj/with roundtrip mismatch on " ^ field.name);
         Printf.bprintf
           buf
-          "    ensure (%s.%s (%s.%s value) = value) %S;\n"
-          module_name
-          proj_name
-          module_name
-          min_with_name
-          (module_name ^ ": proj/min_with mismatch on " ^ field.name);
-        Printf.bprintf
-          buf
-          "    ensure (%s.%s (%s.%s value) = value) %S;\n"
-          module_name
-          proj_name
-          module_name
-          max_with_name
-          (module_name ^ ": proj/max_with mismatch on " ^ field.name);
-        Printf.bprintf
-          buf
           "    let expected = %s.of_view { (%s.view x) with %s = value } in\n"
           module_name
           module_name
-          field.name;
+          field_name;
         Printf.bprintf
           buf
           "    ensure (%s.%s value x = expected) %S\n"
@@ -1404,12 +1351,12 @@ let emit_morph_checks buf model =
       emit_int_array buf expected_var expected;
       Printf.bprintf
         buf
-        "let () = check_morph ~name:%S ~inputs:%s ~expected:%s ~to_int_unsafe:%s.Repr.to_int_unsafe ~apply:%s\n\n"
+        "let () = check_morph ~name:%S ~inputs:%s ~expected:%s ~to_int_unsafe:%s.Repr.to_int_unsafe ~apply:Morphs.%s\n\n"
         core.name
         (test_values_var source_module)
         expected_var
         target_module
-        core.name)
+        (emitted_morph_name core.name))
     model.Model.morphs
 
 let render_test_main model =

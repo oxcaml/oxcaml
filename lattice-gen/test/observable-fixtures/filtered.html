@@ -235,30 +235,44 @@ Pair = {
 <button type="button" class="lattice-generated-tab" data-panel="mli">.mli</button>
 </div>
 <div class="lattice-generated-panel" data-panel="ml">
-<pre data-language="ocaml">module Axis = struct
+<pre data-language="ocaml">module type Lattice = sig
+  type t
+  type view
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
+
+  val le : t -&gt; t -&gt; bool
+  val equal : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val join : t -&gt; t -&gt; t
+  val meet : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
+  val imply : t -&gt; t -&gt; t
+
+  val print : Format.formatter -&gt; t -&gt; unit
+
+  module Repr : sig
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
+  end
+end
+
+(* Base Lattices *)
+
+module Axis = struct
+  type view =
+    | A0
+    | A1
+    | A2
+
+  let a0 = 0
+  let a1 = 1
+  let a2 = 3
+
   type t = int
 
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let[@inline] close_repr x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let mask = 3
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-    x
-
-  let[@inline] close_down_nat x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_nat x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
   let min = 0
   let max = 3
   let[@inline] le x y = (x land y) = x
@@ -267,11 +281,41 @@ Pair = {
   let[@inline] meet x y = x land y
   let[@inline] subtract x y =
     let zxy = x land lnot y in
-    close_down_nat zxy
+    (zxy lor ((zxy land 2) lsr 1))
   let[@inline] imply x y =
     let zxy = x land lnot y in
-    lnot (close_up_nat zxy) land 3
+    lnot ((zxy lor ((zxy land 1) lsl 1))) land 3
 
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
+
+  let[@inline] view = function
+    | 0 -&gt; A0
+    | 1 -&gt; A1
+    | 3 -&gt; A2
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+
+  let[@inline] of_view = function
+    | A0 -&gt; a0
+    | A1 -&gt; a1
+    | A2 -&gt; a2
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;a0&quot;
+      | 1 -&gt; &quot;a1&quot;
+      | 3 -&gt; &quot;a2&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+(* Opposite Lattices *)
+
+module Axis_op = struct
   type view =
     | A0
     | A1
@@ -281,58 +325,8 @@ Pair = {
   let a1 = 1
   let a2 = 3
 
-  let name x =
-    if equal x a0 then &quot;A0&quot;
-    else if equal x a1 then &quot;A1&quot;
-    else if equal x a2 then &quot;A2&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;A0&quot; -&gt; Some a0
-    | &quot;A1&quot; -&gt; Some a1
-    | &quot;A2&quot; -&gt; Some a2
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = max
-
-  let view x =
-    if equal x a0 then A0
-    else if equal x a1 then A1
-    else if equal x a2 then A2
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | A0 -&gt; a0
-    | A1 -&gt; a1
-    | A2 -&gt; a2
-end
-
-module Axis_op = struct
   type t = int
 
-  module Repr = struct
-    type nonrec t = t
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let[@inline] close_repr x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let mask = 3
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-    x
-
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 2) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 1) lsl 1) in
-    x
   let min = 3
   let max = 0
   let[@inline] le x y = (x land y) = y
@@ -341,78 +335,43 @@ module Axis_op = struct
   let[@inline] meet x y = x lor y
   let[@inline] subtract x y =
     let zyx = y land lnot x in
-    lnot (close_up_dual zyx) land 3
+    lnot ((zyx lor ((zyx land 1) lsl 1))) land 3
   let[@inline] imply x y =
     let zyx = y land lnot x in
-    close_down_dual zyx
-
-  type view =
-    | A0
-    | A1
-    | A2
-
-  let a0 = 0
-  let a1 = 1
-  let a2 = 3
-
-  let name x =
-    if equal x a0 then &quot;A0&quot;
-    else if equal x a1 then &quot;A1&quot;
-    else if equal x a2 then &quot;A2&quot;
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_name = function
-    | &quot;A0&quot; -&gt; Some a0
-    | &quot;A1&quot; -&gt; Some a1
-    | &quot;A2&quot; -&gt; Some a2
-    | _ -&gt; None
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
-  let legacy = max
-
-  let view x =
-    if equal x a0 then A0
-    else if equal x a1 then A1
-    else if equal x a2 then A2
-    else invalid_arg &quot;unknown lattice element&quot;
-
-  let of_view = function
-    | A0 -&gt; a0
-    | A1 -&gt; a1
-    | A2 -&gt; a2
-end
-
-module Pair = struct
-  type t = int
+    (zyx lor ((zyx land 2) lsr 1))
 
   module Repr = struct
-    type nonrec t = t
     let[@inline] to_int_unsafe x = x
     let[@inline] from_int_unsafe x = x
   end
 
-  let[@inline] close_repr x =
-    let x = x lor ((x land 10) lsr 1) in
-    x
-  let mask = 15
-  let validate_repr_exn x =
-    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-    x
+  let[@inline] view = function
+    | 0 -&gt; A0
+    | 1 -&gt; A1
+    | 3 -&gt; A2
+    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
 
-  let[@inline] close_down_nat x =
-    let x = x lor ((x land 10) lsr 1) in
-    x
-  let[@inline] close_up_nat x =
-    let x = x lor ((x land 5) lsl 1) in
-    x
-  let[@inline] close_down_dual x =
-    let x = x lor ((x land 10) lsr 1) in
-    x
-  let[@inline] close_up_dual x =
-    let x = x lor ((x land 5) lsl 1) in
-    x
+  let[@inline] of_view = function
+    | A0 -&gt; a0
+    | A1 -&gt; a1
+    | A2 -&gt; a2
+
+  let print ppf x =
+    let s =
+      match x with
+      | 0 -&gt; &quot;a0&quot;
+      | 1 -&gt; &quot;a1&quot;
+      | 3 -&gt; &quot;a2&quot;
+      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    in
+    Format.pp_print_string ppf s
+end
+
+(* Product Lattices *)
+
+module Pair = struct
+  type t = int
+
   let min = 12
   let max = 3
   let[@inline] le x y =
@@ -430,179 +389,143 @@ module Pair = struct
   let[@inline] subtract x y =
     let zxy = x land lnot y in
     let zyx = y land lnot x in
-    ((close_down_nat zxy) land 3)
-    lor ((lnot (close_up_dual zyx)) land 12)
+    (((zxy lor ((zxy land 10) lsr 1))) land 3)
+    lor ((lnot ((zyx lor ((zyx land 5) lsl 1)))) land 12)
   let[@inline] imply x y =
     let zxy = x land lnot y in
     let zyx = y land lnot x in
-    ((lnot (close_up_nat zxy)) land 3)
-    lor ((close_down_dual zyx) land 12)
+    ((lnot ((zxy lor ((zxy land 5) lsl 1)))) land 3)
+    lor (((zyx lor ((zyx land 10) lsr 1))) land 12)
+
+  module Repr = struct
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
+  end
 
   type view = {
     left : Axis.t;
     right : Axis_op.t;
   }
 
-  type nonrec product = t
-
-  let of_view view =
-    let left = (view.left land 3) lsl 0 in
-    let right = (view.right land 3) lsl 2 in
+  let[@inline] make
+      ~left
+      ~right
+    =
+    let left = (left land 3) in
+    let right = ((right land 3) lsl 2) in
     left lor right
 
-  let view t =
+  let[@inline] of_view view =
+    make
+      ~left:view.left
+      ~right:view.right
+
+  let[@inline] view t =
     {
-      left = (t lsr 0) land 3;
-      right = (t lsr 2) land 3;
+      left = (t land 3);
+      right = ((t lsr 2) land 3);
     }
 
-  let make =
-    fun ~left -&gt;
-    fun ~right -&gt;
-    of_view {
-      left;
-      right;
-    }
+  let[@inline] proj_left t = (t land 3)
+  let[@inline] with_left x t = (t land lnot 3) lor (x land 3)
 
-  let proj_left t = (t lsr 0) land 3
-  let with_left x t = (t land lnot 3) lor ((x land 3) lsl 0)
-  let min_with_left x = with_left x min
-  let max_with_left x = with_left x max
+  let[@inline] proj_right t = ((t lsr 2) land 3)
+  let[@inline] with_right x t = (t land lnot 12) lor ((x land 3) lsl 2)
 
-  let proj_right t = (t lsr 2) land 3
-  let with_right x t = (t land lnot 12) lor ((x land 3) lsl 2)
-  let min_with_right x = with_right x min
-  let max_with_right x = with_right x max
-
-  let name x =
+  let print ppf x =
     let view = view x in
-    let b = Buffer.create 64 in
-    Buffer.add_string b &quot;Pair { &quot;;
-    Buffer.add_string b &quot;left = &quot;;
-    Buffer.add_string b (Axis.show view.left);
-    Buffer.add_string b &quot;; &quot;;
-    Buffer.add_string b &quot;right = &quot;;
-    Buffer.add_string b (Axis_op.show view.right);
-    Buffer.add_string b &quot; }&quot;;
-    Buffer.contents b
-
-  let print ppf x = Format.pp_print_string ppf (name x)
-  let show x = name x
+    Format.fprintf
+      ppf
+      &quot;%a,%a&quot;
+      Axis.print view.left
+      Axis_op.print view.right
 end
 
 </pre>
 </div>
 <div class="lattice-generated-panel" data-panel="mli">
-<pre data-language="ocaml">module Axis : sig
+<pre data-language="ocaml">module type Lattice = sig
   type t
+  type view
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
+  val view : t -&gt; view
+  val of_view : view -&gt; t
 
-  val min : t
-  val max : t
   val le : t -&gt; t -&gt; bool
   val equal : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
   val join : t -&gt; t -&gt; t
   val meet : t -&gt; t -&gt; t
   val subtract : t -&gt; t -&gt; t
   val imply : t -&gt; t -&gt; t
+
   val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
+
+  module Repr : sig
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
+  end
+end
+
+(* Base Lattices *)
+
+module Axis : sig
+  (* Order:
+     a0 &lt; a1 &lt; a2
+  *)
+
   type view =
     | A0
     | A1
     | A2
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val a0 : t
   val a1 : t
   val a2 : t
 end
+
+(* Opposite Lattices *)
 
 module Axis_op : sig
-  type t
+  (* Order:
+     a2 &lt; a1 &lt; a0
+  *)
 
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-  val of_name : string -&gt; t option
-  val legacy : t
   type view =
     | A0
     | A1
     | A2
 
-  val view : t -&gt; view
-  val of_view : view -&gt; t
+  include Lattice with type view := view
+
   val a0 : t
   val a1 : t
   val a2 : t
 end
 
+(* Product Lattices *)
+
 module Pair : sig
-  type t
-
-  module Repr : sig
-    type nonrec t = t
-    val to_int_unsafe : t -&gt; int
-    val from_int_unsafe : int -&gt; t
-  end
-
-  val min : t
-  val max : t
-  val le : t -&gt; t -&gt; bool
-  val equal : t -&gt; t -&gt; bool
-  val join : t -&gt; t -&gt; t
-  val meet : t -&gt; t -&gt; t
-  val subtract : t -&gt; t -&gt; t
-  val imply : t -&gt; t -&gt; t
-  val print : Format.formatter -&gt; t -&gt; unit
-  val show : t -&gt; string
-  val name : t -&gt; string
-
   type view = {
     left : Axis.t;
     right : Axis_op.t;
   }
 
-  type nonrec product = t
+  include Lattice with type view := view
 
-  val of_view : view -&gt; t
-  val view : t -&gt; view
   val make :
     left:Axis.t -&gt;
     right:Axis_op.t -&gt;
     t
+
   val proj_left : t -&gt; Axis.t
   val with_left : Axis.t -&gt; t -&gt; t
-  val min_with_left : Axis.t -&gt; t
-  val max_with_left : Axis.t -&gt; t
+
   val proj_right : t -&gt; Axis_op.t
   val with_right : Axis_op.t -&gt; t -&gt; t
-  val min_with_right : Axis_op.t -&gt; t
-  val max_with_right : Axis_op.t -&gt; t
 end
 
 </pre>

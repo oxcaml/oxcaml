@@ -519,23 +519,15 @@ let combine_repr_validators repr_validators =
 
 let reserved_base_names =
   String_set.of_list
-    [ "bottom";
-      "top";
-      "leq";
+    [ "min";
+      "max";
+      "le";
       "equal";
       "join";
       "meet";
-      "sub";
+      "subtract";
       "imply";
-      "name";
-      "of_name";
-      "pp";
-      "show";
-      "min";
-      "max";
-      "le";
-      "print";
-      "legacy"
+      "print"
     ]
 
 let reserved_product_names =
@@ -543,33 +535,25 @@ let reserved_product_names =
     [ "make";
       "view";
       "of_view";
-      "bottom";
-      "top";
-      "leq";
-      "equal";
-      "join";
-      "meet";
-      "sub";
-      "imply";
-      "pp";
-      "show";
       "min";
       "max";
       "le";
+      "equal";
+      "join";
+      "meet";
+      "subtract";
+      "imply";
       "print";
-      "legacy";
       "split";
       "merge";
-      "proj";
-      "min_with";
-      "max_with"
+      "proj"
     ]
 
 let check_generated_element_names base loc =
   let used = ref reserved_base_names in
   Array.iter
     (fun name ->
-      let value_name = Name.snake_case name in
+      let value_name = Name.snake_case_value_name name in
       check_value_name "value" value_name loc;
       ensure_unique_name used value_name loc "value")
     base.element_names
@@ -579,17 +563,14 @@ let check_product_field_names (fields : Ast.field list) =
   List.iter
     (fun (field : Ast.field) ->
       let name = located_txt field.Ast.name in
-      check_value_name "field" name (located_loc field.name);
+      let generated_name = Name.escape_value_name name in
+      check_value_name "field" generated_name (located_loc field.name);
       List.iter
         (fun generated ->
           ensure_unique_name used generated (located_loc field.name) "value")
-        [ name;
-          "with_" ^ name;
-          name ^ "_bot";
-          name ^ "_top";
-          "proj_" ^ name;
-          "min_with_" ^ name;
-          "max_with_" ^ name
+        [ generated_name;
+          "with_" ^ generated_name;
+          "proj_" ^ generated_name
         ])
     fields
 
@@ -740,8 +721,9 @@ let resolve ast =
     ensure_unique_name module_names (Name.op_module_name name) loc "module"
   in
   let register_morph_name name loc =
-    check_value_name "morphism" name loc;
-    ensure_unique_name morph_names name loc "morphism"
+    let generated_name = Name.escape_value_name name in
+    check_value_name "morphism" generated_name loc;
+    ensure_unique_name morph_names generated_name loc "morphism"
   in
   List.iter
     (function
@@ -847,7 +829,7 @@ let resolve ast =
           { name = located_txt name;
             element_names;
             element_values;
-            element_value_names = Array.map Name.snake_case element_names;
+            element_value_names = Array.map Name.snake_case_value_name element_names;
             repr_validator;
             descriptor;
             op_descriptor;

@@ -26,6 +26,61 @@ let is_lowercase = function
   | 'a' .. 'z' -> true
   | _ -> false
 
+let ocaml_keywords =
+  [ "and";
+    "as";
+    "assert";
+    "begin";
+    "class";
+    "constraint";
+    "do";
+    "done";
+    "downto";
+    "else";
+    "end";
+    "exception";
+    "external";
+    "false";
+    "for";
+    "fun";
+    "function";
+    "functor";
+    "if";
+    "in";
+    "include";
+    "inherit";
+    "initializer";
+    "lazy";
+    "let";
+    "match";
+    "method";
+    "module";
+    "mutable";
+    "new";
+    "nonrec";
+    "object";
+    "of";
+    "open";
+    "or";
+    "private";
+    "rec";
+    "sig";
+    "struct";
+    "then";
+    "to";
+    "true";
+    "try";
+    "type";
+    "val";
+    "virtual";
+    "when";
+    "while";
+    "with"
+  ]
+
+let escape_value_name name =
+  if List.mem name ocaml_keywords then name ^ "_" else name
+
 let snake_case name =
   let buf = Buffer.create (String.length name * 2) in
   let len = String.length name in
@@ -50,6 +105,8 @@ let snake_case name =
     else Buffer.add_char buf (Char.lowercase_ascii c)
   done;
   Buffer.contents buf
+
+let snake_case_value_name name = escape_value_name (snake_case name)
 
 let op_module_name name = name ^ "_op"
 

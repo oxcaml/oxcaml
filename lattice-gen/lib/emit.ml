@@ -9,53 +9,24 @@ type outputs =
 
 let dual_mask (desc : descriptor) = desc.mask land lnot desc.nat_mask
 
-let add_schedule_fn_ml ?(indent = "  ") buf name rounds direction =
-  if rounds = []
-  then false
-  else (
-    bprintf buf "%slet[@inline] %s x =\n" indent name;
-    List.iter
-      (fun (round : round) ->
-        bprintf
-          buf
-          "%s  let x = x lor ((x land %d) %s %d) in\n"
-          indent
-          round.mask
-          (match direction with `Down -> "lsr" | `Up -> "lsl")
-          round.shift)
-      rounds;
-    bprintf buf "%s  x\n" indent;
-    true)
-
-let add_repr_validator_ml ?(indent = "  ") buf repr_validator =
-  let has_close_repr =
-    add_schedule_fn_ml ~indent buf "close_repr" repr_validator.down `Down
-  in
-  bprintf buf "%slet mask = %d\n" indent repr_validator.mask;
-  bprintf buf "%slet validate_repr_exn x =\n" indent;
-  bprintf
-    buf
-    "%s  if x land lnot mask <> 0 then invalid_arg \"invalid representation\";\n"
-    indent;
-  if has_close_repr
-  then
-    bprintf
-      buf
-      "%s  if close_repr x <> x then invalid_arg \"invalid representation\";\n"
-      indent;
-  bprintf buf "%s  x\n" indent
+let render_schedule_expr expr rounds direction =
+  List.fold_left
+    (fun acc (round : round) ->
+      Printf.sprintf
+        "(%s lor ((%s land %d) %s %d))"
+        acc
+        acc
+        round.mask
+        (match direction with `Down -> "lsr" | `Up -> "lsl")
+        round.shift)
+    expr
+    rounds
 
 let add_specialized_ops_ml ?(indent = "  ") buf desc =
   let nat_mask = desc.nat_mask in
   let dual_mask = dual_mask desc in
   if nat_mask = desc.mask
   then (
-    let has_close_down_nat =
-      add_schedule_fn_ml ~indent buf "close_down_nat" desc.down_nat `Down
-    in
-    let has_close_up_nat =
-      add_schedule_fn_ml ~indent buf "close_up_nat" desc.up_nat `Up
-    in
     bprintf buf "%slet min = 0\n" indent;
     bprintf buf "%slet max = %d\n" indent desc.mask;
     bprintf buf "%slet[@inline] le x y = (x land y) = x\n" indent;
@@ -63,29 +34,28 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
     bprintf buf "%slet[@inline] join x y = x lor y\n" indent;
     bprintf buf "%slet[@inline] meet x y = x land y\n" indent;
     bprintf buf "%slet[@inline] subtract x y =\n" indent;
-    bprintf buf "%s  let zxy = x land lnot y in\n" indent;
-    bprintf
-      buf
-      "%s  %s\n"
-      indent
-      (if has_close_down_nat then "close_down_nat zxy" else "zxy");
+    if desc.down_nat <> []
+    then (
+      bprintf buf "%s  let zxy = x land lnot y in\n" indent;
+      bprintf
+        buf
+        "%s  %s\n"
+        indent
+        (render_schedule_expr "zxy" desc.down_nat `Down))
+    else bprintf buf "%s  x land lnot y\n" indent;
     bprintf buf "%slet[@inline] imply x y =\n" indent;
-    bprintf buf "%s  let zxy = x land lnot y in\n" indent;
-    bprintf
-      buf
-      "%s  %s\n"
-      indent
-      (if has_close_up_nat
-       then Printf.sprintf "lnot (close_up_nat zxy) land %d" desc.mask
-       else Printf.sprintf "lnot zxy land %d" desc.mask))
+    if desc.up_nat <> []
+    then (
+      bprintf buf "%s  let zxy = x land lnot y in\n" indent;
+      bprintf
+        buf
+        "%s  lnot (%s) land %d\n"
+        indent
+        (render_schedule_expr "zxy" desc.up_nat `Up)
+        desc.mask)
+    else bprintf buf "%s  lnot (x land lnot y) land %d\n" indent desc.mask)
   else if nat_mask = 0
   then (
-    let has_close_down_dual =
-      add_schedule_fn_ml ~indent buf "close_down_dual" desc.down_dual `Down
-    in
-    let has_close_up_dual =
-      add_schedule_fn_ml ~indent buf "close_up_dual" desc.up_dual `Up
-    in
     bprintf buf "%slet min = %d\n" indent desc.mask;
     bprintf buf "%slet max = 0\n" indent;
     bprintf buf "%slet[@inline] le x y = (x land y) = y\n" indent;
@@ -93,34 +63,27 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
     bprintf buf "%slet[@inline] join x y = x land y\n" indent;
     bprintf buf "%slet[@inline] meet x y = x lor y\n" indent;
     bprintf buf "%slet[@inline] subtract x y =\n" indent;
-    bprintf buf "%s  let zyx = y land lnot x in\n" indent;
-    bprintf
-      buf
-      "%s  %s\n"
-      indent
-      (if has_close_up_dual
-       then Printf.sprintf "lnot (close_up_dual zyx) land %d" desc.mask
-       else Printf.sprintf "lnot zyx land %d" desc.mask);
+    if desc.up_dual <> []
+    then (
+      bprintf buf "%s  let zyx = y land lnot x in\n" indent;
+      bprintf
+        buf
+        "%s  lnot (%s) land %d\n"
+        indent
+        (render_schedule_expr "zyx" desc.up_dual `Up)
+        desc.mask)
+    else bprintf buf "%s  lnot (y land lnot x) land %d\n" indent desc.mask;
     bprintf buf "%slet[@inline] imply x y =\n" indent;
-    bprintf buf "%s  let zyx = y land lnot x in\n" indent;
-    bprintf
-      buf
-      "%s  %s\n"
-      indent
-      (if has_close_down_dual then "close_down_dual zyx" else "zyx"))
+    if desc.down_dual <> []
+    then (
+      bprintf buf "%s  let zyx = y land lnot x in\n" indent;
+      bprintf
+        buf
+        "%s  %s\n"
+        indent
+        (render_schedule_expr "zyx" desc.down_dual `Down))
+    else bprintf buf "%s  y land lnot x\n" indent)
   else (
-    let has_close_down_nat =
-      add_schedule_fn_ml ~indent buf "close_down_nat" desc.down_nat `Down
-    in
-    let has_close_up_nat =
-      add_schedule_fn_ml ~indent buf "close_up_nat" desc.up_nat `Up
-    in
-    let has_close_down_dual =
-      add_schedule_fn_ml ~indent buf "close_down_dual" desc.down_dual `Down
-    in
-    let has_close_up_dual =
-      add_schedule_fn_ml ~indent buf "close_up_dual" desc.up_dual `Up
-    in
     bprintf buf "%slet min = %d\n" indent dual_mask;
     bprintf buf "%slet max = %d\n" indent nat_mask;
     bprintf buf "%slet[@inline] le x y =\n" indent;
@@ -142,13 +105,17 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
       buf
       "%s  ((%s) land %d)\n"
       indent
-      (if has_close_down_nat then "close_down_nat zxy" else "zxy")
+      (if desc.down_nat <> []
+       then render_schedule_expr "zxy" desc.down_nat `Down
+       else "zxy")
       nat_mask;
     bprintf
       buf
       "%s  lor ((%s) land %d)\n"
       indent
-      (if has_close_up_dual then "lnot (close_up_dual zyx)" else "lnot zyx")
+      (if desc.up_dual <> []
+       then "lnot (" ^ render_schedule_expr "zyx" desc.up_dual `Up ^ ")"
+       else "lnot zyx")
       dual_mask;
     bprintf buf "%slet[@inline] imply x y =\n" indent;
     bprintf buf "%s  let zxy = x land lnot y in\n" indent;
@@ -157,133 +124,167 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
       buf
       "%s  ((%s) land %d)\n"
       indent
-      (if has_close_up_nat then "lnot (close_up_nat zxy)" else "lnot zxy")
+      (if desc.up_nat <> []
+       then "lnot (" ^ render_schedule_expr "zxy" desc.up_nat `Up ^ ")"
+       else "lnot zxy")
       nat_mask;
     bprintf
       buf
       "%s  lor ((%s) land %d)\n"
       indent
-      (if has_close_down_dual then "close_down_dual zyx" else "zyx")
+      (if desc.down_dual <> []
+       then render_schedule_expr "zyx" desc.down_dual `Down
+       else "zyx")
       dual_mask)
 
 let field_module_name (field : field) ~in_op =
   let opposite = if in_op then not field.ty.opposite else field.ty.opposite in
   if opposite then Name.op_module_name field.ty.name else field.ty.name
 
-let proj_name (field : field) = "proj_" ^ field.name
+let emitted_field_name (field : field) = Name.escape_value_name field.name
 
-let with_name (field : field) = "with_" ^ field.name
+let proj_name (field : field) = "proj_" ^ emitted_field_name field
 
-let min_with_name (field : field) = "min_with_" ^ field.name
+let with_name (field : field) = "with_" ^ emitted_field_name field
 
-let max_with_name (field : field) = "max_with_" ^ field.name
+let emitted_morph_name name = Name.escape_value_name name
 
-let legacy_value_name name =
-  match name with
-  | "Locality" | "Regionality" -> "global"
-  | "Uniqueness" -> "aliased"
-  | "Linearity" -> "many"
-  | "Portability" -> "nonportable"
-  | "Contention" -> "uncontended"
-  | "Forkable" -> "forkable"
-  | "Yielding" -> "unyielding"
-  | "Statefulness" -> "stateful"
-  | "Visibility" -> "read_write"
-  | "Staticity" -> "dynamic"
-  | _ -> "max"
+let view_ctor_name name = String.capitalize_ascii (Name.snake_case name)
 
-let view_ctor_name value_name = String.capitalize_ascii value_name
+let render_mask_shift expr mask shift =
+  if shift = 0
+  then Printf.sprintf "(%s land %d)" expr mask
+  else Printf.sprintf "((%s land %d) lsl %d)" expr mask shift
 
-let add_common_sig_items_base buf =
+let render_shift_mask expr shift mask =
+  if shift = 0
+  then Printf.sprintf "(%s land %d)" expr mask
+  else Printf.sprintf "((%s lsr %d) land %d)" expr shift mask
+
+let add_module_type_s buf =
   Buffer.add_string
     buf
-    "  type t\n\
+    "module type Lattice = sig\n\
+    \  type t\n\
+    \  type view\n\
     \n\
-    \  module Repr : sig\n\
-    \    type nonrec t = t\n\
-    \    val to_int_unsafe : t -> int\n\
-    \    val from_int_unsafe : int -> t\n\
-    \  end\n\
+    \  val view : t -> view\n\
+    \  val of_view : view -> t\n\
     \n\
-    \  val min : t\n\
-    \  val max : t\n\
     \  val le : t -> t -> bool\n\
     \  val equal : t -> t -> bool\n\
+    \  val min : t\n\
+    \  val max : t\n\
     \  val join : t -> t -> t\n\
     \  val meet : t -> t -> t\n\
     \  val subtract : t -> t -> t\n\
     \  val imply : t -> t -> t\n\
+    \n\
     \  val print : Format.formatter -> t -> unit\n\
-    \  val show : t -> string\n\
-    \  val name : t -> string\n\
-    \  val of_name : string -> t option\n\
-    \  val legacy : t\n"
-
-let add_common_sig_items_product buf =
-  Buffer.add_string
-    buf
-    "  type t\n\
     \n\
     \  module Repr : sig\n\
-    \    type nonrec t = t\n\
     \    val to_int_unsafe : t -> int\n\
     \    val from_int_unsafe : int -> t\n\
     \  end\n\
+    end\n\n"
+
+let add_module_type_s_ml buf =
+  Buffer.add_string
+    buf
+    "module type Lattice = sig\n\
+    \  type t\n\
+    \  type view\n\
     \n\
-    \  val min : t\n\
-    \  val max : t\n\
+    \  val view : t -> view\n\
+    \  val of_view : view -> t\n\
+    \n\
     \  val le : t -> t -> bool\n\
     \  val equal : t -> t -> bool\n\
+    \  val min : t\n\
+    \  val max : t\n\
     \  val join : t -> t -> t\n\
     \  val meet : t -> t -> t\n\
     \  val subtract : t -> t -> t\n\
     \  val imply : t -> t -> t\n\
+    \n\
     \  val print : Format.formatter -> t -> unit\n\
-    \  val show : t -> string\n\
-    \  val name : t -> string\n"
+    \n\
+    \  module Repr : sig\n\
+    \    val to_int_unsafe : t -> int\n\
+    \    val from_int_unsafe : int -> t\n\
+    \  end\n\
+    end\n\n"
 
-let add_common_ml_items buf desc repr_validator =
+let add_common_ml_items buf desc =
   Buffer.add_string buf "  type t = int\n\n";
-  Buffer.add_string buf "  module Repr = struct\n";
-  Buffer.add_string buf "    type nonrec t = t\n";
+  add_specialized_ops_ml buf desc;
+  Buffer.add_string buf "\n  module Repr = struct\n";
   Buffer.add_string buf "    let[@inline] to_int_unsafe x = x\n";
   Buffer.add_string buf "    let[@inline] from_int_unsafe x = x\n";
-  Buffer.add_string buf "  end\n\n";
-  add_repr_validator_ml buf repr_validator;
-  Buffer.add_char buf '\n';
-  add_specialized_ops_ml buf desc;
-  Buffer.add_char buf '\n'
+  Buffer.add_string buf "  end\n\n"
 
-let add_name_functions_ml buf cases legacy =
-  Buffer.add_string buf "  let name x =\n";
-  List.iteri
-    (fun i (value_name, display_name) ->
-      if i = 0
-      then bprintf buf "    if equal x %s then %S\n" value_name display_name
-      else bprintf buf "    else if equal x %s then %S\n" value_name display_name)
-    cases;
-  Buffer.add_string buf "    else invalid_arg \"unknown lattice element\"\n\n";
-  Buffer.add_string buf "  let of_name = function\n";
+let cover_edges (finite : finite_lattice) =
+  let n = Array.length finite.element_names in
+  let edges = ref [] in
+  for i = 0 to n - 1 do
+    for j = 0 to n - 1 do
+      if i <> j && finite.leq.(i).(j)
+      then (
+        let covered = ref false in
+        for k = 0 to n - 1 do
+          if k <> i && k <> j && finite.leq.(i).(k) && finite.leq.(k).(j)
+          then covered := true
+        done;
+        if not !covered then edges := (i, j) :: !edges)
+    done
+  done;
+  List.rev !edges
+
+let maximal_chains (finite : finite_lattice) =
+  let covers = cover_edges finite in
+  let succs = Hashtbl.create 8 in
   List.iter
-    (fun (value_name, display_name) ->
-      bprintf buf "    | %S -> Some %s\n" display_name value_name)
-    cases;
-  Buffer.add_string buf "    | _ -> None\n\n";
-  Buffer.add_string buf "  let print ppf x = Format.pp_print_string ppf (name x)\n";
-  Buffer.add_string buf "  let show x = name x\n";
-  bprintf buf "  let legacy = %s\n" legacy
+    (fun (src, dst) ->
+      let prev = Option.value (Hashtbl.find_opt succs src) ~default:[] in
+      Hashtbl.replace succs src (dst :: prev))
+    covers;
+  let rec dfs node =
+    if node = finite.top
+    then [ [ node ] ]
+    else
+      Hashtbl.find_opt succs node
+      |> Option.value ~default:[]
+      |> List.sort_uniq Int.compare
+      |> List.concat_map (fun next ->
+           List.map (fun chain -> node :: chain) (dfs next))
+  in
+  dfs finite.bottom
 
-let add_base_sig buf (base : base) module_name =
+let add_base_order_comment buf (base : base) finite =
+  let chains =
+    maximal_chains finite
+    |> List.map (fun chain ->
+         String.concat
+           " < "
+           (List.map (fun index -> base.element_value_names.(index)) chain))
+  in
+  Buffer.add_string buf "  (* Order:\n";
+  List.iter (fun chain -> bprintf buf "     %s\n" chain) chains;
+  Buffer.add_string buf "  *)\n"
+
+let add_base_sig buf (base : base) module_name finite =
   bprintf buf "module %s : sig\n" module_name;
-  add_common_sig_items_base buf;
+  add_base_order_comment buf base finite;
+  Buffer.add_char buf '\n';
   Buffer.add_string buf "  type view =\n";
   Array.iter
-    (fun value_name ->
-      bprintf buf "    | %s\n" (view_ctor_name value_name))
-    base.element_value_names;
+    (fun name ->
+      bprintf buf "    | %s\n" (view_ctor_name name))
+    base.element_names;
   Buffer.add_char buf '\n';
-  Buffer.add_string buf "  val view : t -> view\n";
-  Buffer.add_string buf "  val of_view : view -> t\n";
+  Buffer.add_string
+    buf
+    "  include Lattice with type view := view\n\n";
   Array.iteri
     (fun i value_name ->
       bprintf buf "  val %s : t\n" value_name;
@@ -293,198 +294,197 @@ let add_base_sig buf (base : base) module_name =
 
 let add_base_ml buf (base : base) module_name desc =
   bprintf buf "module %s = struct\n" module_name;
-  add_common_ml_items buf desc base.repr_validator;
   Buffer.add_string buf "  type view =\n";
   Array.iter
-    (fun value_name ->
-      bprintf buf "    | %s\n" (view_ctor_name value_name))
-    base.element_value_names;
+    (fun name ->
+      bprintf buf "    | %s\n" (view_ctor_name name))
+    base.element_names;
   Buffer.add_char buf '\n';
   Array.iteri
     (fun i value_name ->
       bprintf buf "  let %s = %d\n" value_name base.element_values.(i))
     base.element_value_names;
-  if Array.length base.element_value_names > 0 then Buffer.add_char buf '\n';
-  let cases =
-    Array.to_list
-      (Array.mapi
-         (fun i value_name -> value_name, base.element_names.(i))
-         base.element_value_names)
-  in
-  add_name_functions_ml buf cases (legacy_value_name base.name);
-  Buffer.add_string buf "\n  let view x =\n";
+  if Array.length base.element_value_names > 0 then Buffer.add_string buf "\n";
+  add_common_ml_items buf desc;
+  Buffer.add_string buf "  let[@inline] view = function\n";
   Array.iteri
-    (fun i value_name ->
-      let ctor = view_ctor_name value_name in
-      if i = 0
-      then bprintf buf "    if equal x %s then %s\n" value_name ctor
-      else bprintf buf "    else if equal x %s then %s\n" value_name ctor)
-    base.element_value_names;
-  Buffer.add_string buf "    else invalid_arg \"unknown lattice element\"\n\n";
-  Buffer.add_string buf "  let of_view = function\n";
-  Array.iter
-    (fun value_name ->
+    (fun i name ->
+      let ctor = view_ctor_name name in
+      bprintf buf "    | %d -> %s\n" base.element_values.(i) ctor)
+    base.element_names;
+  Buffer.add_string buf "    | _ -> invalid_arg \"unknown lattice element\"\n\n";
+  Buffer.add_string buf "  let[@inline] of_view = function\n";
+  Array.iteri
+    (fun i name ->
       bprintf
         buf
         "    | %s -> %s\n"
-        (view_ctor_name value_name)
-        value_name)
+        (view_ctor_name name)
+        base.element_value_names.(i))
+    base.element_names;
+  Buffer.add_string buf "\n  let print ppf x =\n";
+  Buffer.add_string buf "    let s =\n";
+  Buffer.add_string buf "      match x with\n";
+  Array.iteri
+    (fun i _ ->
+      let display_name = base.element_value_names.(i) in
+      bprintf
+        buf
+        "      | %d -> %S\n"
+        base.element_values.(i)
+        display_name)
     base.element_value_names;
+  Buffer.add_string buf "      | _ -> invalid_arg \"unknown lattice element\"\n";
+  Buffer.add_string buf "    in\n";
+  Buffer.add_string buf "    Format.pp_print_string ppf s\n";
   Buffer.add_string buf "end\n\n"
 
 let add_product_sig buf (product : product) module_name ~in_op =
   bprintf buf "module %s : sig\n" module_name;
-  add_common_sig_items_product buf;
-  Buffer.add_string buf "\n  type view = {\n";
+  Buffer.add_string buf "  type view = {\n";
   List.iter
     (fun (field : field) ->
+      let field_name = emitted_field_name field in
       bprintf
         buf
         "    %s : %s.t;\n"
-        field.name
+        field_name
         (field_module_name field ~in_op))
     product.fields;
   Buffer.add_string buf "  }\n\n";
-  Buffer.add_string buf "  type nonrec product = t\n\n";
-  Buffer.add_string buf "  val of_view : view -> t\n";
-  Buffer.add_string buf "  val view : t -> view\n";
+  Buffer.add_string
+    buf
+    "  include Lattice with type view := view\n\n";
   Buffer.add_string buf "  val make :\n";
   List.iter
     (fun (field : field) ->
+      let field_name = emitted_field_name field in
       bprintf
         buf
         "    %s:%s.t ->\n"
-        field.name
+        field_name
         (field_module_name field ~in_op))
     product.fields;
-  Buffer.add_string buf "    t\n";
-  List.iter
-    (fun (field : field) ->
+  Buffer.add_string buf "    t\n\n";
+  let last_index = List.length product.fields - 1 in
+  List.iteri
+    (fun i (field : field) ->
       let field_mod = field_module_name field ~in_op in
       bprintf buf "  val %s : t -> %s.t\n" (proj_name field) field_mod;
       bprintf buf "  val %s : %s.t -> t -> t\n" (with_name field) field_mod;
-      bprintf buf "  val %s : %s.t -> t\n" (min_with_name field) field_mod;
-      bprintf buf "  val %s : %s.t -> t\n" (max_with_name field) field_mod)
+      if i <> last_index then Buffer.add_char buf '\n')
     product.fields;
   Buffer.add_string buf "end\n\n"
 
 let add_product_ml buf (product : product) module_name desc ~in_op =
   bprintf buf "module %s = struct\n" module_name;
-  add_common_ml_items buf desc product.repr_validator;
+  add_common_ml_items buf desc;
   Buffer.add_string buf "  type view = {\n";
   List.iter
     (fun (field : field) ->
+      let field_name = emitted_field_name field in
       bprintf
         buf
         "    %s : %s.t;\n"
-        field.name
+        field_name
         (field_module_name field ~in_op))
     product.fields;
   Buffer.add_string buf "  }\n\n";
-  Buffer.add_string buf "  type nonrec product = t\n\n";
-  Buffer.add_string buf "  let of_view view =\n";
+  Buffer.add_string buf "  let[@inline] make\n";
   List.iter
     (fun (field : field) ->
+      bprintf buf "      ~%s\n" (emitted_field_name field))
+    product.fields;
+  Buffer.add_string buf "    =\n";
+  List.iter
+    (fun (field : field) ->
+      let field_name = emitted_field_name field in
       bprintf
         buf
-        "    let %s = (view.%s land %d) lsl %d in\n"
-        field.name
-        field.name
-        field.raw_mask
-        field.shift)
+        "    let %s = %s in\n"
+        field_name
+        (render_mask_shift field_name field.raw_mask field.shift))
     product.fields;
   Buffer.add_string buf "    ";
   List.iteri
     (fun i (field : field) ->
       if i > 0 then Buffer.add_string buf " lor ";
-      Buffer.add_string buf field.name)
+      Buffer.add_string buf (emitted_field_name field))
     product.fields;
   Buffer.add_string buf "\n\n";
-  Buffer.add_string buf "  let view t =\n";
+  Buffer.add_string buf "  let[@inline] of_view view =\n";
+  Buffer.add_string buf "    make\n";
+  List.iter
+    (fun (field : field) ->
+      let field_name = emitted_field_name field in
+      bprintf buf "      ~%s:view.%s\n" field_name field_name)
+    product.fields;
+  Buffer.add_string buf "\n";
+  Buffer.add_string buf "  let[@inline] view t =\n";
   Buffer.add_string buf "    {\n";
   List.iter
     (fun (field : field) ->
+      let field_name = emitted_field_name field in
       bprintf
         buf
-        "      %s = (t lsr %d) land %d;\n"
-        field.name
-        field.shift
-        field.raw_mask)
-    product.fields;
-  Buffer.add_string buf "    }\n\n";
-  Buffer.add_string buf "  let make =\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf buf "    fun ~%s ->\n" field.name)
-    product.fields;
-  Buffer.add_string buf "    of_view {\n";
-  List.iter
-    (fun (field : field) -> bprintf buf "      %s;\n" field.name)
+        "      %s = %s;\n"
+        field_name
+        (render_shift_mask "t" field.shift field.raw_mask))
     product.fields;
   Buffer.add_string buf "    }\n\n";
   List.iter
     (fun (field : field) ->
       bprintf
         buf
-        "  let %s t = (t lsr %d) land %d\n"
+        "  let[@inline] %s t = %s\n"
         (proj_name field)
-        field.shift
-        field.raw_mask;
+        (render_shift_mask "t" field.shift field.raw_mask);
       bprintf
         buf
-        "  let %s x t = (t land lnot %d) lor ((x land %d) lsl %d)\n"
+        "  let[@inline] %s x t = (t land lnot %d) lor %s\n"
         (with_name field)
         field.layout_mask
-        field.raw_mask
-        field.shift;
-      bprintf
-        buf
-        "  let %s x = %s x min\n"
-        (min_with_name field)
-        (with_name field);
-      bprintf
-        buf
-        "  let %s x = %s x max\n"
-        (max_with_name field)
-        (with_name field);
+        (render_mask_shift "x" field.raw_mask field.shift);
       Buffer.add_char buf '\n')
     product.fields;
-  Buffer.add_string buf "  let name x =\n";
+  Buffer.add_string buf "  let print ppf x =\n";
   Buffer.add_string buf "    let view = view x in\n";
-  Buffer.add_string buf "    let b = Buffer.create 64 in\n";
-  bprintf buf "    Buffer.add_string b %S;\n" (module_name ^ " { ");
-  List.iteri
-    (fun i (field : field) ->
-      if i > 0 then Buffer.add_string buf "    Buffer.add_string b \"; \";\n";
-      bprintf buf "    Buffer.add_string b %S;\n" (field.name ^ " = ");
+  Buffer.add_string buf "    Format.fprintf\n";
+  Buffer.add_string buf "      ppf\n";
+  bprintf
+    buf
+    "      %S\n"
+    (String.concat "," (List.map (fun _ -> "%a") product.fields));
+  List.iter
+    (fun (field : field) ->
       bprintf
         buf
-        "    Buffer.add_string b (%s.show view.%s);\n"
+        "      %s.print view.%s\n"
         (field_module_name field ~in_op)
-        field.name)
+        (emitted_field_name field))
     product.fields;
-  Buffer.add_string buf "    Buffer.add_string b \" }\";\n";
-  Buffer.add_string buf "    Buffer.contents b\n\n";
-  Buffer.add_string buf "  let print ppf x = Format.pp_print_string ppf (name x)\n";
-  Buffer.add_string buf "  let show x = name x\n";
   Buffer.add_string buf "end\n\n"
 
 let add_primitive_morph_sig buf (primitive : primitive_morph) =
   let core = primitive.core in
   bprintf
     buf
-    "val %s : %s.t -> %s.t\n"
-    core.name
+    "  val %s : %s.t -> %s.t\n"
+    (emitted_morph_name core.name)
     (module_name_of_expr core.source)
     (module_name_of_expr core.target)
 
 let lattice_expr_module_sig_and_ml buf_mli buf_ml lattice expr =
   match lattice, expr.opposite with
   | Base base, false ->
-    add_base_sig buf_mli base base.name;
+    add_base_sig buf_mli base base.name base.logical;
     add_base_ml buf_ml base base.name base.descriptor
   | Base base, true ->
-    add_base_sig buf_mli base (Name.op_module_name base.name);
+    add_base_sig
+      buf_mli
+      base
+      (Name.op_module_name base.name)
+      (lattice_reverse base.logical);
     add_base_ml buf_ml base (Name.op_module_name base.name) base.op_descriptor
   | Product product, false ->
     add_product_sig buf_mli product product.name ~in_op:false;
@@ -501,6 +501,11 @@ let lattice_expr_module_sig_and_ml buf_mli buf_ml lattice expr =
 let source_element_name lattice_name index model =
   match String_map.find lattice_name model.lattices with
   | Base base -> base.element_value_names.(index)
+  | Product _ -> invalid_arg "primitive morph endpoints must be base lattices"
+
+let base_of_expr model (expr : lattice_expr) =
+  match String_map.find expr.name model.lattices with
+  | Base base -> base
   | Product _ -> invalid_arg "primitive morph endpoints must be base lattices"
 
 type bit_term =
@@ -720,10 +725,10 @@ let render_kernel_expr ~source_mask (kernel : bit_kernel) =
         ""
         rest
 
-let add_kernel_ml buf model name source_expr kernel =
+let add_kernel_ml ?(indent = "") buf model name source_expr kernel =
   let source_mask = mask_of_expr model source_expr in
-  bprintf buf "  %s x =\n" name;
-  bprintf buf "    %s\n" (render_kernel_expr ~source_mask kernel)
+  bprintf buf "%slet %s x =\n" indent (emitted_morph_name name);
+  bprintf buf "%s  %s\n" indent (render_kernel_expr ~source_mask kernel)
 
 let lift_kernel_through_field
     ~(target_field : field)
@@ -868,57 +873,58 @@ let build_morph_kernels model =
   String_map.iter (fun name _ -> ignore (resolve name)) model.morphs;
   kernels
 
-let add_primitive_morph_ml buf model kernels (primitive : primitive_morph) =
+let add_primitive_morph_ml ?(indent = "") buf model kernels (primitive : primitive_morph) =
   let core = primitive.core in
   match Hashtbl.find_opt kernels core.name with
-  | Some kernel -> add_kernel_ml buf model core.name core.source kernel
+  | Some kernel -> add_kernel_ml ~indent buf model core.name core.source kernel
   | None ->
-    let src_module = module_name_of_expr core.source in
+    let source_base = base_of_expr model core.source in
     let dst_module = module_name_of_expr core.target in
-    bprintf buf "  %s x =\n" core.name;
+    bprintf buf "%slet %s x =\n" indent (emitted_morph_name core.name);
+    bprintf buf "%s  match x with\n" indent;
     Array.iteri
       (fun i target ->
-        let src_name = source_element_name core.source.name i model in
         let dst_name = source_element_name core.target.name target model in
-        if i = 0
-        then
-          bprintf
-            buf
-            "    if %s.equal x %s.%s then %s.%s\n"
-            src_module
-            src_module
-            src_name
-            dst_module
-            dst_name
-        else
-          bprintf
-            buf
-            "    else if %s.equal x %s.%s then %s.%s\n"
-            src_module
-            src_module
-            src_name
-            dst_module
-            dst_name)
+        bprintf
+          buf
+          "%s  | %d -> %s.%s\n"
+          indent
+          source_base.element_values.(i)
+          dst_module
+          dst_name)
       core.map;
-    bprintf buf "    else invalid_arg %S\n" core.name
+    bprintf buf "%s  | _ -> invalid_arg %S\n" indent (emitted_morph_name core.name)
 
-let add_bridge_ml buf model kernels (bridge : product_bridge) =
+let add_bridge_ml ?(indent = "") buf model kernels (bridge : product_bridge) =
   let core = bridge.core in
   match Hashtbl.find_opt kernels core.name with
-  | Some kernel -> add_kernel_ml buf model core.name core.source kernel
+  | Some kernel -> add_kernel_ml ~indent buf model core.name core.source kernel
   | None ->
     let src_module = module_name_of_expr core.source in
     let dst_module = module_name_of_expr core.target in
-    bprintf buf "  %s x =\n" core.name;
-    bprintf buf "    %s.make\n" dst_module;
+    bprintf buf "%slet %s x =\n" indent (emitted_morph_name core.name);
+    bprintf buf "%s  %s.make\n" indent dst_module;
     List.iter
       (fun (assignment : bridge_assignment) ->
-        bprintf buf "      ~%s:(" assignment.target_field;
+        bprintf
+          buf
+          "%s    ~%s:("
+          indent
+          (Name.escape_value_name assignment.target_field);
         (match assignment.expr with
          | Source_field source_field ->
-           bprintf buf "%s.proj_%s x" src_module source_field
+           bprintf
+             buf
+             "%s.proj_%s x"
+             src_module
+             (Name.escape_value_name source_field)
          | Morph_apply { morph_name; source_field } ->
-           bprintf buf "%s (%s.proj_%s x)" morph_name src_module source_field
+           bprintf
+             buf
+             "%s (%s.proj_%s x)"
+             (emitted_morph_name morph_name)
+             src_module
+             (Name.escape_value_name source_field)
          | Min ->
            bprintf
              buf
@@ -932,45 +938,136 @@ let add_bridge_ml buf model kernels (bridge : product_bridge) =
         Buffer.add_string buf ")\n")
       bridge.assignments
 
+let add_morph_sig buf = function
+  | Primitive primitive -> add_primitive_morph_sig buf primitive
+  | Bridge bridge ->
+    let core = bridge.core in
+    bprintf
+      buf
+      "  val %s : %s.t -> %s.t\n"
+      (emitted_morph_name core.name)
+      (module_name_of_expr core.source)
+      (module_name_of_expr core.target)
+
+let morph_dependencies = function
+  | Primitive _ -> []
+  | Bridge bridge ->
+    List.filter_map
+      (fun (assignment : bridge_assignment) ->
+        match assignment.expr with
+        | Morph_apply { morph_name; _ } -> Some morph_name
+        | Source_field _ | Min | Max -> None)
+      bridge.assignments
+
+let ordered_morphs model =
+  let decl_order =
+    List.filter_map
+      (function Model.Morph morph -> Some morph | Lattice _ -> None)
+      model.items
+  in
+  let by_name =
+    List.to_seq decl_order
+    |> Seq.map (fun morph -> (morph_core_of morph).name, morph)
+    |> String_map.of_seq
+  in
+  let visiting = Hashtbl.create 16 in
+  let done_ = Hashtbl.create 16 in
+  let acc = ref [] in
+  let rec visit name =
+    if not (Hashtbl.mem done_ name)
+    then (
+      if Hashtbl.mem visiting name then invalid_arg ("cyclic morph definition involving " ^ name);
+      Hashtbl.add visiting name ();
+      let morph = String_map.find name by_name in
+      List.iter visit (morph_dependencies morph);
+      Hashtbl.remove visiting name;
+      Hashtbl.add done_ name ();
+      acc := morph :: !acc)
+  in
+  List.iter (fun morph -> visit (morph_core_of morph).name) decl_order;
+  List.rev !acc
+
+let split_morphs morphs =
+  List.partition
+    (function Primitive _ -> true | Bridge _ -> false)
+    morphs
+
+let add_module_section_comment buf title =
+  bprintf buf "(* %s *)\n\n" title
+
 let add_morphs_sig buf model =
-  String_map.iter
-    (fun _ morph ->
-      match morph with
-      | Primitive primitive -> add_primitive_morph_sig buf primitive
-      | Bridge bridge ->
-        let core = bridge.core in
-        bprintf
-          buf
-          "val %s : %s.t -> %s.t\n"
-          core.name
-          (module_name_of_expr core.source)
-          (module_name_of_expr core.target))
-    model.morphs
+  let morphs =
+    List.filter_map
+      (function Model.Morph morph -> Some morph | Lattice _ -> None)
+      model.items
+  in
+  if morphs <> []
+  then (
+    let primitive_morphs, bridge_morphs = split_morphs morphs in
+    Buffer.add_string buf "module Morphs : sig\n";
+    if primitive_morphs <> []
+    then (
+      Buffer.add_string buf "  (* Primitive morphs *)\n";
+      List.iter (add_morph_sig buf) primitive_morphs;
+      if bridge_morphs <> [] then Buffer.add_char buf '\n');
+    if bridge_morphs <> []
+    then (
+      Buffer.add_string buf "  (* Product morphs *)\n";
+      List.iter (add_morph_sig buf) bridge_morphs);
+    Buffer.add_string buf "end\n\n")
 
 let add_morphs_ml buf model =
-  let morphs = String_map.bindings model.morphs |> List.map snd in
+  let morphs = ordered_morphs model in
   let kernels = build_morph_kernels model in
-  match morphs with
-  | [] -> ()
-  | first :: rest ->
-    Buffer.add_string buf "let rec\n";
-    (match first with
-     | Primitive primitive -> add_primitive_morph_ml buf model kernels primitive
-     | Bridge bridge -> add_bridge_ml buf model kernels bridge);
-    List.iter
-      (fun morph ->
-        Buffer.add_string buf "\nand\n";
-        match morph with
-        | Primitive primitive -> add_primitive_morph_ml buf model kernels primitive
-        | Bridge bridge -> add_bridge_ml buf model kernels bridge)
-      rest;
-    Buffer.add_string buf "\n"
+  if morphs <> []
+  then (
+    let primitive_morphs, bridge_morphs = split_morphs morphs in
+    Buffer.add_string buf "module Morphs = struct\n";
+    if primitive_morphs <> []
+    then (
+      Buffer.add_string buf "  (* Primitive morphs *)\n";
+      List.iter
+        (fun primitive ->
+          add_primitive_morph_ml ~indent:"  " buf model kernels primitive;
+          Buffer.add_char buf '\n')
+        (List.map
+           (function Primitive primitive -> primitive | Bridge _ -> invalid_arg "impossible")
+           primitive_morphs);
+      if bridge_morphs <> [] then Buffer.add_char buf '\n');
+    if bridge_morphs <> []
+    then (
+      Buffer.add_string buf "  (* Product morphs *)\n";
+      List.iter
+        (fun bridge ->
+          add_bridge_ml ~indent:"  " buf model kernels bridge;
+          Buffer.add_char buf '\n')
+        (List.map
+           (function Bridge bridge -> bridge | Primitive _ -> invalid_arg "impossible")
+           bridge_morphs));
+    Buffer.add_string buf "end\n\n")
+
+let section_name_for_expr model (expr : lattice_expr) =
+  if expr.opposite
+  then "Opposite Lattices"
+  else
+    match String_map.find expr.name model.lattices with
+    | Base _ -> "Base Lattices"
+    | Product _ -> "Product Lattices"
 
 let render ~root_module:_ model =
   let ml = Buffer.create 16384 in
   let mli = Buffer.create 8192 in
+  add_module_type_s_ml ml;
+  add_module_type_s mli;
+  let current_section = ref None in
   List.iter
     (fun (expr : lattice_expr) ->
+      let section = section_name_for_expr model expr in
+      if !current_section <> Some section
+      then (
+        add_module_section_comment mli section;
+        add_module_section_comment ml section;
+        current_section := Some section);
       let lattice = String_map.find expr.name model.lattices in
       lattice_expr_module_sig_and_ml mli ml lattice expr)
     (emitted_module_exprs model);
