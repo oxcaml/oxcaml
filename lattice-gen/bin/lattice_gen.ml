@@ -1,7 +1,7 @@
 let usage_generation = "lattice_gen INPUT.lattice --ml OUTPUT.ml --mli OUTPUT.mli"
 
 let usage_observable =
-  "lattice_gen observable [--check|--update] PATH..."
+  "lattice_gen observable [--check|--update] [--test] PATH..."
 
 let run_generation args =
   let input_path = ref None in
@@ -39,10 +39,12 @@ let run_generation args =
 
 let run_observable args =
   let mode = ref Observable.Check in
+  let test = ref false in
   let paths = ref [] in
   let specs =
     [ "--check", Arg.Unit (fun () -> mode := Observable.Check), "check HTML snapshots";
-      "--update", Arg.Unit (fun () -> mode := Observable.Update), "rewrite HTML snapshots"
+      "--update", Arg.Unit (fun () -> mode := Observable.Update), "rewrite HTML snapshots";
+      "--test", Arg.Unit (fun () -> test := true), "compile and run lattice tests for each <lat> block"
     ]
   in
   let argv = Array.of_list ("lattice_gen observable" :: args) in
@@ -50,7 +52,7 @@ let run_observable args =
   Arg.parse_argv ~current argv specs (fun path -> paths := !paths @ [ path ]) usage_observable;
   match !paths with
   | [] -> raise (Arg.Bad "missing HTML path")
-  | paths -> Observable.process_paths ~mode:!mode paths
+  | paths -> Observable.process_paths ~mode:!mode ~test:!test paths
 
 let () =
   try

@@ -417,8 +417,18 @@ let add_product_ml buf (product : product) module_name desc ~in_op =
         "  let %s x = %s x top\n"
         (max_with_name field)
         (with_name field);
-      bprintf buf "  let %s = %s bottom\n" (bot_name field) (min_with_name field);
-      bprintf buf "  let %s = %s top\n\n" (top_name field) (max_with_name field))
+      bprintf
+        buf
+        "  let %s = %s %s.bottom\n"
+        (bot_name field)
+        (min_with_name field)
+        (field_module_name field ~in_op);
+      bprintf
+        buf
+        "  let %s = %s %s.top\n\n"
+        (top_name field)
+        (max_with_name field)
+        (field_module_name field ~in_op))
     product.fields;
   Buffer.add_string buf "  module Axis = struct\n";
   Buffer.add_string buf "    type _ t = ..\n";
@@ -638,8 +648,12 @@ let normalize_kernel target_mask (kernel : bit_kernel) =
   in
   { const = kernel.const land target_mask; terms }
 
-let find_field product field_name =
-  match List.find_opt (fun (field : field) -> String.equal field.name field_name) product.fields with
+let find_field (product : product) field_name =
+  match
+    List.find_opt
+      (fun (field : field) -> String.equal field.name field_name)
+      product.fields
+  with
   | Some field -> field
   | None -> invalid_arg ("unknown field " ^ field_name)
 

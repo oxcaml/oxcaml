@@ -90,6 +90,19 @@ type product =
     op_descriptor : descriptor
   }
 
+type product_field_info =
+  { field : field;
+    finite : finite_lattice;
+    stride : int
+  }
+
+type product_expr_info =
+  { product : product;
+    fields : product_field_info array;
+    positions : int String_map.t;
+    total : int
+  }
+
 type lattice =
   | Base of base
   | Product of product
@@ -1022,6 +1035,74 @@ let resolve ast =
       Hashtbl.add finite_cache expr finite;
       finite
   in
+  let product_info_of_expr (expr : lattice_expr) =
+    let product =
+      match String_map.find expr.name resolved_lattices with
+      | Product product -> product
+      | Base _ -> invalid_arg "expected product expression"
+    in
+    let effective_fields =
+      Array.of_list
+        (List.map
+           (fun (field : field) ->
+             let field_expr =
+               if expr.opposite then flip_expr field.ty else field.ty
+             in
+             field, finite_of_expr field_expr)
+           product.fields)
+    in
+    let arity = Array.length effective_fields in
+    let dims =
+      Array.map
+        (fun (_, (field_finite : finite_lattice)) ->
+          Array.length field_finite.element_names)
+        effective_fields
+    in
+    let total =
+      Array.fold_left
+        (fun acc dim ->
+          if dim = 0 then 0 else acc * dim)
+        1
+        dims
+    in
+    let strides = Array.make arity 1 in
+    for i = arity - 2 downto 0 do
+      strides.(i) <- strides.(i + 1) * dims.(i + 1)
+    done;
+    let fields =
+      Array.mapi
+        (fun i (field, finite) -> { field; finite; stride = strides.(i) })
+        effective_fields
+    in
+    let positions =
+      let positions = ref String_map.empty in
+      Array.iteri
+        (fun i (info : product_field_info) ->
+          positions := String_map.add info.field.name i !positions)
+        fields;
+      !positions
+    in
+    { product; fields; positions; total }
+  in
+  let product_decode_coord (info : product_expr_info) ordinal =
+    let arity = Array.length info.fields in
+    let coords = Array.make arity 0 in
+    let remainder = ref ordinal in
+    for i = arity - 1 downto 0 do
+      let dim = Array.length info.fields.(i).finite.element_names in
+      coords.(i) <- !remainder mod dim;
+      remainder := !remainder / dim
+    done;
+    coords
+  in
+  let product_encode_coord (info : product_expr_info) coord =
+    let ordinal = ref 0 in
+    Array.iteri
+      (fun i field_index ->
+        ordinal := !ordinal + (field_index * info.fields.(i).stride))
+      coord;
+    !ordinal
+  in
   let check_monotone
       morph_name
       loc
@@ -1240,166 +1321,74 @@ let resolve ast =
                   "missing assignment for target field %S"
                   target_field)
             target_fields;
-          let source_product =
-            match String_map.find source_expr.name resolved_lattices with
-            | Product product -> product
-            | Base _ -> assert false
-          in
-          let target_product =
-            match String_map.find target_expr.name resolved_lattices with
-            | Product product -> product
-            | Base _ -> assert false
-          in
-          let source_finite = finite_of_expr source_expr in
-          let target_finite = finite_of_expr target_expr in
-          let source_indices = value_index source_finite in
-          let target_indices = value_index target_finite in
-          let source_field_specs =
-            List.map
-              (fun (field : field) ->
-                let field_ty =
-                  if source_expr.opposite then flip_expr field.ty else field.ty
-                in
-                let field_finite = finite_of_expr field_ty in
-                (field.name, field, field_finite, value_index field_finite))
-              source_product.fields
-          in
-          let source_field_specs :
-              (string * field * finite_lattice * (int, int) Hashtbl.t) list
-            =
-            source_field_specs
-          in
-          let target_field_specs =
-            List.map
-              (fun (field : field) ->
-                let field_ty =
-                  if target_expr.opposite then flip_expr field.ty else field.ty
-                in
-                (field.name, field, finite_of_expr field_ty))
-              target_product.fields
-          in
-          let target_field_specs : (string * field * finite_lattice) list =
-            target_field_specs
-          in
-          let find_source_field_spec field_name =
-            match
-              List.find_opt
-                (fun (name, _, _, _) -> String.equal name field_name)
-                source_field_specs
-            with
-            | Some spec -> spec
+          let source_info = product_info_of_expr source_expr in
+          let target_info = product_info_of_expr target_expr in
+          let source_field_pos name =
+            match String_map.find_opt name source_info.positions with
+            | Some pos -> pos
             | None -> raise Not_found
           in
-          let assignment_map = Hashtbl.create (List.length resolved_assignments) in
-          List.iter
-            (fun assignment ->
-              Hashtbl.add assignment_map assignment.target_field assignment)
-            resolved_assignments;
-          let pack_source bounds =
-            let packed = ref 0 in
-            List.iter
-              (fun (_, (source_field : field), (source_field_finite : finite_lattice), _) ->
-                let field_index = Hashtbl.find bounds source_field.name in
-                let field_value = source_field_finite.element_values.(field_index) in
-                packed :=
-                  !packed
-                  lor ((field_value land source_field.raw_mask) lsl source_field.shift))
-              source_field_specs;
-            !packed
+          let assignment_by_target =
+            Array.init (Array.length target_info.fields) (fun i ->
+                let target_field_name = target_info.fields.(i).field.name in
+                match
+                  List.find_opt
+                    (fun assignment ->
+                      String.equal assignment.target_field target_field_name)
+                    resolved_assignments
+                with
+                | Some assignment -> assignment
+                | None -> assert false)
           in
           let map =
-            Array.init (Array.length source_finite.element_values) (fun source_index ->
-                let source_value = source_finite.element_values.(source_index) in
-                let packed = ref 0 in
-                List.iter
-                  (fun
-                    ( target_field_name,
-                      (target_field : field),
-                      (target_field_finite : finite_lattice) ) ->
-                    let assignment = Hashtbl.find assignment_map target_field_name in
-                    let field_value =
-                      match assignment.expr with
-                      | Source_field source_field_name ->
-                        let _, source_field, _, _ =
-                          find_source_field_spec source_field_name
-                        in
-                        (source_value lsr source_field.shift) land source_field.raw_mask
-                      | Morph_apply { morph_name; source_field } ->
-                        let referenced_core =
-                          morph_core_of (resolve_morph visiting morph_name)
-                        in
-                        let _, source_field, source_field_finite, source_value_index =
-                          find_source_field_spec source_field
-                        in
-                        let source_field_value =
-                          (source_value lsr source_field.shift) land source_field.raw_mask
-                        in
-                        let field_index =
-                          find_value_index
-                            source_field_finite
-                            source_value_index
-                            source_field_value
-                        in
-                        target_field_finite.element_values
-                          .(referenced_core.map.(field_index))
-                      | Min ->
-                        target_field_finite.element_values.(target_field_finite.bottom)
-                      | Max ->
-                        target_field_finite.element_values.(target_field_finite.top)
-                    in
-                    packed :=
-                      !packed
-                      lor ((field_value land target_field.raw_mask)
-                           lsl target_field.shift))
-                  target_field_specs;
-                find_value_index target_finite target_indices !packed)
+            Array.init source_info.total (fun source_index ->
+                let source_coord = product_decode_coord source_info source_index in
+                let target_coord = Array.make (Array.length target_info.fields) 0 in
+                Array.iteri
+                  (fun target_pos (target_spec : product_field_info) ->
+                    let assignment = assignment_by_target.(target_pos) in
+                    target_coord.(target_pos) <-
+                      (match assignment.expr with
+                       | Source_field source_field_name ->
+                         source_coord.(source_field_pos source_field_name)
+                       | Morph_apply { morph_name; source_field } ->
+                         let referenced_core =
+                           morph_core_of (resolve_morph visiting morph_name)
+                         in
+                         referenced_core.map
+                           .(source_coord.(source_field_pos source_field))
+                       | Min -> target_spec.finite.bottom
+                       | Max -> target_spec.finite.top))
+                  target_info.fields;
+                product_encode_coord target_info target_coord)
           in
-          check_monotone morph_name (located_loc name) source_finite target_finite map;
           let structural_adjoint kind =
             let compute_target_bound target_index =
-              let target_value = target_finite.element_values.(target_index) in
-              let bounds = Hashtbl.create (List.length source_field_specs) in
-              List.iter
-                (fun
-                  ( source_field_name,
-                    _,
-                    (source_field_finite : finite_lattice),
-                    _ ) ->
-                  Hashtbl.add
-                    bounds
-                    source_field_name
-                    (match kind with `Left -> source_field_finite.bottom | `Right -> source_field_finite.top))
-                source_field_specs;
+              let target_coord = product_decode_coord target_info target_index in
+              let bounds =
+                Array.init (Array.length source_info.fields) (fun i ->
+                    match kind with
+                    | `Left -> source_info.fields.(i).finite.bottom
+                    | `Right -> source_info.fields.(i).finite.top)
+              in
               let ok = ref true in
-              List.iter
-                (fun
-                  ( target_field_name,
-                    (_target_field : field),
-                    (target_field_finite : finite_lattice) ) ->
+              Array.iteri
+                (fun target_pos (target_spec : product_field_info) ->
                   if !ok
                   then (
-                    let assignment = Hashtbl.find assignment_map target_field_name in
-                    let target_field_value =
-                      (target_value lsr _target_field.shift) land _target_field.raw_mask
-                    in
-                    let target_field_index =
-                      find_value_index
-                        target_field_finite
-                        (value_index target_field_finite)
-                        target_field_value
-                    in
+                    let assignment = assignment_by_target.(target_pos) in
+                    let target_field_index = target_coord.(target_pos) in
                     match assignment.expr with
                     | Source_field source_field_name ->
-                      let _, _, source_field_finite, _ =
-                        find_source_field_spec source_field_name
-                      in
-                      let prev = Hashtbl.find bounds source_field_name in
+                      let source_pos = source_field_pos source_field_name in
+                      let source_field_finite = source_info.fields.(source_pos).finite in
+                      let prev = bounds.(source_pos) in
                       let next =
                         match kind with
                         | `Left -> source_field_finite.join.(prev).(target_field_index)
                         | `Right -> source_field_finite.meet.(prev).(target_field_index)
                       in
-                      Hashtbl.replace bounds source_field_name next
+                      bounds.(source_pos) <- next
                     | Morph_apply { morph_name; source_field } ->
                       let referenced_core =
                         morph_core_of (resolve_morph visiting morph_name)
@@ -1412,11 +1401,10 @@ let resolve ast =
                       (match adjoint with
                        | None -> ok := false
                        | Some adjoint ->
-                         let _, _, source_field_finite, _ =
-                           find_source_field_spec source_field
-                         in
+                         let source_pos = source_field_pos source_field in
+                         let source_field_finite = source_info.fields.(source_pos).finite in
                          let contribution = adjoint.(target_field_index) in
-                         let prev = Hashtbl.find bounds source_field in
+                         let prev = bounds.(source_pos) in
                          let next =
                            match kind with
                            | `Left ->
@@ -1424,23 +1412,21 @@ let resolve ast =
                            | `Right ->
                              source_field_finite.meet.(prev).(contribution)
                          in
-                         Hashtbl.replace bounds source_field next)
+                         bounds.(source_pos) <- next)
                     | Min ->
                       if kind = `Left
-                         && not target_field_finite.leq.(target_field_index).(target_field_finite.bottom)
+                         && target_field_index <> target_spec.finite.bottom
                       then ok := false
                     | Max ->
                       if kind = `Right
-                         && not target_field_finite.leq.(target_field_finite.top).(target_field_index)
+                         && target_field_index <> target_spec.finite.top
                       then ok := false))
-                target_field_specs;
+                target_info.fields;
               if !ok
-              then Some (find_value_index source_finite source_indices (pack_source bounds))
+              then Some (product_encode_coord source_info bounds)
               else None
             in
-            let adjoint =
-              Array.init (Array.length target_finite.element_values) compute_target_bound
-            in
+            let adjoint = Array.init target_info.total compute_target_bound in
             if Array.for_all Option.is_some adjoint
             then Some (Array.map Option.get adjoint)
             else None

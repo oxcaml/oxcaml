@@ -2,10 +2,11 @@
  (name test_semantics)
  (modules
   test_semantics
-  test_support
+ test_support
   test_negative_cases
   test_model_structure
   test_observable
+  test_compiler_fixture
   test_curated_fixtures)
  (libraries lattice_gen_lib unix)
  (deps
@@ -13,6 +14,7 @@
   chains.lattice
   diamond.lattice
   sampled_product.lattice
+  compiler_structure_html.lattice
   observable_input.html
   observable-fixtures/index.html
   observable-fixtures/basic.html

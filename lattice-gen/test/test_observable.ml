@@ -5,7 +5,7 @@ let run () =
       in
       let fixtures_dst = Filename.concat dir "observable-fixtures" in
       Test_support.copy_tree ~src:fixtures_src ~dst:fixtures_dst;
-      Observable.process_paths ~mode:Observable.Update [ fixtures_dst ];
+      Observable.process_paths ~mode:Observable.Update ~test:false [ fixtures_dst ];
       let basic = Test_support.read_file (Filename.concat fixtures_dst "basic.html") in
       Test_support.ensure
         (Test_support.contains basic "lattice-gen-output:start")
@@ -25,11 +25,15 @@ let run () =
       Test_support.ensure
         (Test_support.contains basic "module Locality = struct")
         "basic observable page missing generated module";
-      Observable.process_paths ~mode:Observable.Check [ fixtures_dst ];
+      Observable.process_paths ~mode:Observable.Check ~test:false [ fixtures_dst ];
+      Observable.process_paths
+        ~mode:Observable.Check
+        ~test:true
+        [ Filename.concat fixtures_dst "basic.html" ];
       let bad_input =
         Filename.concat (Filename.concat (Sys.getcwd ()) "test") "observable_input.html"
       in
-      match Observable.process_paths ~mode:Observable.Update [ bad_input ] with
+      match Observable.process_paths ~mode:Observable.Update ~test:true [ bad_input ] with
       | () -> Test_support.failf "expected observable rejection for <ocaml> block"
       | exception Observable.Error message ->
         Test_support.ensure

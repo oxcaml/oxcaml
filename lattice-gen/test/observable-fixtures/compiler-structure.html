@@ -1944,29 +1944,29 @@ module Monadic = struct
   let with_uniqueness x t = (t land lnot 1) lor ((x land 1) lsl 0)
   let min_with_uniqueness x = with_uniqueness x bottom
   let max_with_uniqueness x = with_uniqueness x top
-  let uniqueness_bot = min_with_uniqueness bottom
-  let uniqueness_top = max_with_uniqueness top
+  let uniqueness_bot = min_with_uniqueness Uniqueness.bottom
+  let uniqueness_top = max_with_uniqueness Uniqueness.top
 
   let proj_contention t = (t lsr 1) land 3
   let with_contention x t = (t land lnot 6) lor ((x land 3) lsl 1)
   let min_with_contention x = with_contention x bottom
   let max_with_contention x = with_contention x top
-  let contention_bot = min_with_contention bottom
-  let contention_top = max_with_contention top
+  let contention_bot = min_with_contention Contention.bottom
+  let contention_top = max_with_contention Contention.top
 
   let proj_visibility t = (t lsr 3) land 3
   let with_visibility x t = (t land lnot 24) lor ((x land 3) lsl 3)
   let min_with_visibility x = with_visibility x bottom
   let max_with_visibility x = with_visibility x top
-  let visibility_bot = min_with_visibility bottom
-  let visibility_top = max_with_visibility top
+  let visibility_bot = min_with_visibility Visibility.bottom
+  let visibility_top = max_with_visibility Visibility.top
 
   let proj_staticity t = (t lsr 5) land 1
   let with_staticity x t = (t land lnot 32) lor ((x land 1) lsl 5)
   let min_with_staticity x = with_staticity x bottom
   let max_with_staticity x = with_staticity x top
-  let staticity_bot = min_with_staticity bottom
-  let staticity_top = max_with_staticity top
+  let staticity_bot = min_with_staticity Staticity.bottom
+  let staticity_top = max_with_staticity Staticity.top
 
   module Axis = struct
     type _ t = ..
@@ -2127,29 +2127,29 @@ module Monadic_op = struct
   let with_uniqueness x t = (t land lnot 1) lor ((x land 1) lsl 0)
   let min_with_uniqueness x = with_uniqueness x bottom
   let max_with_uniqueness x = with_uniqueness x top
-  let uniqueness_bot = min_with_uniqueness bottom
-  let uniqueness_top = max_with_uniqueness top
+  let uniqueness_bot = min_with_uniqueness Uniqueness_op.bottom
+  let uniqueness_top = max_with_uniqueness Uniqueness_op.top
 
   let proj_contention t = (t lsr 1) land 3
   let with_contention x t = (t land lnot 6) lor ((x land 3) lsl 1)
   let min_with_contention x = with_contention x bottom
   let max_with_contention x = with_contention x top
-  let contention_bot = min_with_contention bottom
-  let contention_top = max_with_contention top
+  let contention_bot = min_with_contention Contention_op.bottom
+  let contention_top = max_with_contention Contention_op.top
 
   let proj_visibility t = (t lsr 3) land 3
   let with_visibility x t = (t land lnot 24) lor ((x land 3) lsl 3)
   let min_with_visibility x = with_visibility x bottom
   let max_with_visibility x = with_visibility x top
-  let visibility_bot = min_with_visibility bottom
-  let visibility_top = max_with_visibility top
+  let visibility_bot = min_with_visibility Visibility_op.bottom
+  let visibility_top = max_with_visibility Visibility_op.top
 
   let proj_staticity t = (t lsr 5) land 1
   let with_staticity x t = (t land lnot 32) lor ((x land 1) lsl 5)
   let min_with_staticity x = with_staticity x bottom
   let max_with_staticity x = with_staticity x top
-  let staticity_bot = min_with_staticity bottom
-  let staticity_top = max_with_staticity top
+  let staticity_bot = min_with_staticity Staticity_op.bottom
+  let staticity_top = max_with_staticity Staticity_op.top
 
   module Axis = struct
     type _ t = ..
@@ -2315,36 +2315,36 @@ module Comonadic = struct
   let with_linearity x t = (t land lnot 1) lor ((x land 1) lsl 0)
   let min_with_linearity x = with_linearity x bottom
   let max_with_linearity x = with_linearity x top
-  let linearity_bot = min_with_linearity bottom
-  let linearity_top = max_with_linearity top
+  let linearity_bot = min_with_linearity Linearity.bottom
+  let linearity_top = max_with_linearity Linearity.top
 
   let proj_portability t = (t lsr 1) land 3
   let with_portability x t = (t land lnot 6) lor ((x land 3) lsl 1)
   let min_with_portability x = with_portability x bottom
   let max_with_portability x = with_portability x top
-  let portability_bot = min_with_portability bottom
-  let portability_top = max_with_portability top
+  let portability_bot = min_with_portability Portability.bottom
+  let portability_top = max_with_portability Portability.top
 
   let proj_forkable t = (t lsr 3) land 1
   let with_forkable x t = (t land lnot 8) lor ((x land 1) lsl 3)
   let min_with_forkable x = with_forkable x bottom
   let max_with_forkable x = with_forkable x top
-  let forkable_bot = min_with_forkable bottom
-  let forkable_top = max_with_forkable top
+  let forkable_bot = min_with_forkable Forkable.bottom
+  let forkable_top = max_with_forkable Forkable.top
 
   let proj_yielding t = (t lsr 4) land 1
   let with_yielding x t = (t land lnot 16) lor ((x land 1) lsl 4)
   let min_with_yielding x = with_yielding x bottom
   let max_with_yielding x = with_yielding x top
-  let yielding_bot = min_with_yielding bottom
-  let yielding_top = max_with_yielding top
+  let yielding_bot = min_with_yielding Yielding.bottom
+  let yielding_top = max_with_yielding Yielding.top
 
   let proj_statefulness t = (t lsr 5) land 3
   let with_statefulness x t = (t land lnot 96) lor ((x land 3) lsl 5)
   let min_with_statefulness x = with_statefulness x bottom
   let max_with_statefulness x = with_statefulness x top
-  let statefulness_bot = min_with_statefulness bottom
-  let statefulness_top = max_with_statefulness top
+  let statefulness_bot = min_with_statefulness Statefulness.bottom
+  let statefulness_top = max_with_statefulness Statefulness.top
 
   module Axis = struct
     type _ t = ..
@@ -2521,36 +2521,36 @@ module Comonadic_op = struct
   let with_linearity x t = (t land lnot 1) lor ((x land 1) lsl 0)
   let min_with_linearity x = with_linearity x bottom
   let max_with_linearity x = with_linearity x top
-  let linearity_bot = min_with_linearity bottom
-  let linearity_top = max_with_linearity top
+  let linearity_bot = min_with_linearity Linearity_op.bottom
+  let linearity_top = max_with_linearity Linearity_op.top
 
   let proj_portability t = (t lsr 1) land 3
   let with_portability x t = (t land lnot 6) lor ((x land 3) lsl 1)
   let min_with_portability x = with_portability x bottom
   let max_with_portability x = with_portability x top
-  let portability_bot = min_with_portability bottom
-  let portability_top = max_with_portability top
+  let portability_bot = min_with_portability Portability_op.bottom
+  let portability_top = max_with_portability Portability_op.top
 
   let proj_forkable t = (t lsr 3) land 1
   let with_forkable x t = (t land lnot 8) lor ((x land 1) lsl 3)
   let min_with_forkable x = with_forkable x bottom
   let max_with_forkable x = with_forkable x top
-  let forkable_bot = min_with_forkable bottom
-  let forkable_top = max_with_forkable top
+  let forkable_bot = min_with_forkable Forkable_op.bottom
+  let forkable_top = max_with_forkable Forkable_op.top
 
   let proj_yielding t = (t lsr 4) land 1
   let with_yielding x t = (t land lnot 16) lor ((x land 1) lsl 4)
   let min_with_yielding x = with_yielding x bottom
   let max_with_yielding x = with_yielding x top
-  let yielding_bot = min_with_yielding bottom
-  let yielding_top = max_with_yielding top
+  let yielding_bot = min_with_yielding Yielding_op.bottom
+  let yielding_top = max_with_yielding Yielding_op.top
 
   let proj_statefulness t = (t lsr 5) land 3
   let with_statefulness x t = (t land lnot 96) lor ((x land 3) lsl 5)
   let min_with_statefulness x = with_statefulness x bottom
   let max_with_statefulness x = with_statefulness x top
-  let statefulness_bot = min_with_statefulness bottom
-  let statefulness_top = max_with_statefulness top
+  let statefulness_bot = min_with_statefulness Statefulness_op.bottom
+  let statefulness_top = max_with_statefulness Statefulness_op.top
 
   module Axis = struct
     type _ t = ..
@@ -2712,15 +2712,15 @@ module Comonadic_with_locality = struct
   let with_areality x t = (t land lnot 1) lor ((x land 1) lsl 0)
   let min_with_areality x = with_areality x bottom
   let max_with_areality x = with_areality x top
-  let areality_bot = min_with_areality bottom
-  let areality_top = max_with_areality top
+  let areality_bot = min_with_areality Locality.bottom
+  let areality_top = max_with_areality Locality.top
 
   let proj_comonadic t = (t lsr 1) land 127
   let with_comonadic x t = (t land lnot 254) lor ((x land 127) lsl 1)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic bottom
-  let comonadic_top = max_with_comonadic top
+  let comonadic_bot = min_with_comonadic Comonadic.bottom
+  let comonadic_top = max_with_comonadic Comonadic.top
 
   module Axis = struct
     type _ t = ..
@@ -2849,15 +2849,15 @@ module Comonadic_with_locality_op = struct
   let with_areality x t = (t land lnot 1) lor ((x land 1) lsl 0)
   let min_with_areality x = with_areality x bottom
   let max_with_areality x = with_areality x top
-  let areality_bot = min_with_areality bottom
-  let areality_top = max_with_areality top
+  let areality_bot = min_with_areality Locality_op.bottom
+  let areality_top = max_with_areality Locality_op.top
 
   let proj_comonadic t = (t lsr 1) land 127
   let with_comonadic x t = (t land lnot 254) lor ((x land 127) lsl 1)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic bottom
-  let comonadic_top = max_with_comonadic top
+  let comonadic_bot = min_with_comonadic Comonadic_op.bottom
+  let comonadic_top = max_with_comonadic Comonadic_op.top
 
   module Axis = struct
     type _ t = ..
@@ -2986,15 +2986,15 @@ module Comonadic_with_regionality = struct
   let with_areality x t = (t land lnot 3) lor ((x land 3) lsl 0)
   let min_with_areality x = with_areality x bottom
   let max_with_areality x = with_areality x top
-  let areality_bot = min_with_areality bottom
-  let areality_top = max_with_areality top
+  let areality_bot = min_with_areality Regionality.bottom
+  let areality_top = max_with_areality Regionality.top
 
   let proj_comonadic t = (t lsr 2) land 127
   let with_comonadic x t = (t land lnot 508) lor ((x land 127) lsl 2)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic bottom
-  let comonadic_top = max_with_comonadic top
+  let comonadic_bot = min_with_comonadic Comonadic.bottom
+  let comonadic_top = max_with_comonadic Comonadic.top
 
   module Axis = struct
     type _ t = ..
@@ -3123,15 +3123,15 @@ module Comonadic_with_regionality_op = struct
   let with_areality x t = (t land lnot 3) lor ((x land 3) lsl 0)
   let min_with_areality x = with_areality x bottom
   let max_with_areality x = with_areality x top
-  let areality_bot = min_with_areality bottom
-  let areality_top = max_with_areality top
+  let areality_bot = min_with_areality Regionality_op.bottom
+  let areality_top = max_with_areality Regionality_op.top
 
   let proj_comonadic t = (t lsr 2) land 127
   let with_comonadic x t = (t land lnot 508) lor ((x land 127) lsl 2)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic bottom
-  let comonadic_top = max_with_comonadic top
+  let comonadic_bot = min_with_comonadic Comonadic_op.bottom
+  let comonadic_top = max_with_comonadic Comonadic_op.top
 
   module Axis = struct
     type _ t = ..
@@ -3278,15 +3278,15 @@ module Value = struct
   let with_comonadic x t = (t land lnot 511) lor ((x land 511) lsl 0)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic bottom
-  let comonadic_top = max_with_comonadic top
+  let comonadic_bot = min_with_comonadic Comonadic_with_regionality.bottom
+  let comonadic_top = max_with_comonadic Comonadic_with_regionality.top
 
   let proj_monadic t = (t lsr 9) land 63
   let with_monadic x t = (t land lnot 32256) lor ((x land 63) lsl 9)
   let min_with_monadic x = with_monadic x bottom
   let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic bottom
-  let monadic_top = max_with_monadic top
+  let monadic_bot = min_with_monadic Monadic.bottom
+  let monadic_top = max_with_monadic Monadic.top
 
   module Axis = struct
     type _ t = ..
@@ -3433,15 +3433,15 @@ module Value_op = struct
   let with_comonadic x t = (t land lnot 511) lor ((x land 511) lsl 0)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic bottom
-  let comonadic_top = max_with_comonadic top
+  let comonadic_bot = min_with_comonadic Comonadic_with_regionality_op.bottom
+  let comonadic_top = max_with_comonadic Comonadic_with_regionality_op.top
 
   let proj_monadic t = (t lsr 9) land 63
   let with_monadic x t = (t land lnot 32256) lor ((x land 63) lsl 9)
   let min_with_monadic x = with_monadic x bottom
   let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic bottom
-  let monadic_top = max_with_monadic top
+  let monadic_bot = min_with_monadic Monadic_op.bottom
+  let monadic_top = max_with_monadic Monadic_op.top
 
   module Axis = struct
     type _ t = ..
@@ -3588,15 +3588,15 @@ module Alloc = struct
   let with_comonadic x t = (t land lnot 255) lor ((x land 255) lsl 0)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic bottom
-  let comonadic_top = max_with_comonadic top
+  let comonadic_bot = min_with_comonadic Comonadic_with_locality.bottom
+  let comonadic_top = max_with_comonadic Comonadic_with_locality.top
 
   let proj_monadic t = (t lsr 8) land 63
   let with_monadic x t = (t land lnot 16128) lor ((x land 63) lsl 8)
   let min_with_monadic x = with_monadic x bottom
   let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic bottom
-  let monadic_top = max_with_monadic top
+  let monadic_bot = min_with_monadic Monadic.bottom
+  let monadic_top = max_with_monadic Monadic.top
 
   module Axis = struct
     type _ t = ..
@@ -3743,15 +3743,15 @@ module Alloc_op = struct
   let with_comonadic x t = (t land lnot 255) lor ((x land 255) lsl 0)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic bottom
-  let comonadic_top = max_with_comonadic top
+  let comonadic_bot = min_with_comonadic Comonadic_with_locality_op.bottom
+  let comonadic_top = max_with_comonadic Comonadic_with_locality_op.top
 
   let proj_monadic t = (t lsr 8) land 63
   let with_monadic x t = (t land lnot 16128) lor ((x land 63) lsl 8)
   let min_with_monadic x = with_monadic x bottom
   let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic bottom
-  let monadic_top = max_with_monadic top
+  let monadic_bot = min_with_monadic Monadic_op.bottom
+  let monadic_top = max_with_monadic Monadic_op.top
 
   module Axis = struct
     type _ t = ..
@@ -3890,29 +3890,29 @@ module Scannable_axes = struct
   let with_externality x t = (t land lnot 3) lor ((x land 3) lsl 0)
   let min_with_externality x = with_externality x bottom
   let max_with_externality x = with_externality x top
-  let externality_bot = min_with_externality bottom
-  let externality_top = max_with_externality top
+  let externality_bot = min_with_externality Externality.bottom
+  let externality_top = max_with_externality Externality.top
 
   let proj_nullability t = (t lsr 2) land 1
   let with_nullability x t = (t land lnot 4) lor ((x land 1) lsl 2)
   let min_with_nullability x = with_nullability x bottom
   let max_with_nullability x = with_nullability x top
-  let nullability_bot = min_with_nullability bottom
-  let nullability_top = max_with_nullability top
+  let nullability_bot = min_with_nullability Nullability.bottom
+  let nullability_top = max_with_nullability Nullability.top
 
   let proj_separability t = (t lsr 3) land 3
   let with_separability x t = (t land lnot 24) lor ((x land 3) lsl 3)
   let min_with_separability x = with_separability x bottom
   let max_with_separability x = with_separability x top
-  let separability_bot = min_with_separability bottom
-  let separability_top = max_with_separability top
+  let separability_bot = min_with_separability Separability.bottom
+  let separability_top = max_with_separability Separability.top
 
   let proj_pointerness t = (t lsr 5) land 1
   let with_pointerness x t = (t land lnot 32) lor ((x land 1) lsl 5)
   let min_with_pointerness x = with_pointerness x bottom
   let max_with_pointerness x = with_pointerness x top
-  let pointerness_bot = min_with_pointerness bottom
-  let pointerness_top = max_with_pointerness top
+  let pointerness_bot = min_with_pointerness Pointerness.bottom
+  let pointerness_top = max_with_pointerness Pointerness.top
 
   module Axis = struct
     type _ t = ..
@@ -4073,29 +4073,29 @@ module Scannable_axes_op = struct
   let with_externality x t = (t land lnot 3) lor ((x land 3) lsl 0)
   let min_with_externality x = with_externality x bottom
   let max_with_externality x = with_externality x top
-  let externality_bot = min_with_externality bottom
-  let externality_top = max_with_externality top
+  let externality_bot = min_with_externality Externality_op.bottom
+  let externality_top = max_with_externality Externality_op.top
 
   let proj_nullability t = (t lsr 2) land 1
   let with_nullability x t = (t land lnot 4) lor ((x land 1) lsl 2)
   let min_with_nullability x = with_nullability x bottom
   let max_with_nullability x = with_nullability x top
-  let nullability_bot = min_with_nullability bottom
-  let nullability_top = max_with_nullability top
+  let nullability_bot = min_with_nullability Nullability_op.bottom
+  let nullability_top = max_with_nullability Nullability_op.top
 
   let proj_separability t = (t lsr 3) land 3
   let with_separability x t = (t land lnot 24) lor ((x land 3) lsl 3)
   let min_with_separability x = with_separability x bottom
   let max_with_separability x = with_separability x top
-  let separability_bot = min_with_separability bottom
-  let separability_top = max_with_separability top
+  let separability_bot = min_with_separability Separability_op.bottom
+  let separability_top = max_with_separability Separability_op.top
 
   let proj_pointerness t = (t lsr 5) land 1
   let with_pointerness x t = (t land lnot 32) lor ((x land 1) lsl 5)
   let min_with_pointerness x = with_pointerness x bottom
   let max_with_pointerness x = with_pointerness x top
-  let pointerness_bot = min_with_pointerness bottom
-  let pointerness_top = max_with_pointerness top
+  let pointerness_bot = min_with_pointerness Pointerness_op.bottom
+  let pointerness_top = max_with_pointerness Pointerness_op.top
 
   module Axis = struct
     type _ t = ..
@@ -4251,22 +4251,22 @@ module Kind_axes = struct
   let with_comonadic x t = (t land lnot 255) lor ((x land 255) lsl 0)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic bottom
-  let comonadic_top = max_with_comonadic top
+  let comonadic_bot = min_with_comonadic Comonadic_with_locality.bottom
+  let comonadic_top = max_with_comonadic Comonadic_with_locality.top
 
   let proj_monadic t = (t lsr 8) land 63
   let with_monadic x t = (t land lnot 16128) lor ((x land 63) lsl 8)
   let min_with_monadic x = with_monadic x bottom
   let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic bottom
-  let monadic_top = max_with_monadic top
+  let monadic_bot = min_with_monadic Monadic_op.bottom
+  let monadic_top = max_with_monadic Monadic_op.top
 
   let proj_scannable t = (t lsr 14) land 63
   let with_scannable x t = (t land lnot 1032192) lor ((x land 63) lsl 14)
   let min_with_scannable x = with_scannable x bottom
   let max_with_scannable x = with_scannable x top
-  let scannable_bot = min_with_scannable bottom
-  let scannable_top = max_with_scannable top
+  let scannable_bot = min_with_scannable Scannable_axes.bottom
+  let scannable_top = max_with_scannable Scannable_axes.top
 
   module Axis = struct
     type _ t = ..
@@ -4411,22 +4411,22 @@ module Kind_axes_op = struct
   let with_comonadic x t = (t land lnot 255) lor ((x land 255) lsl 0)
   let min_with_comonadic x = with_comonadic x bottom
   let max_with_comonadic x = with_comonadic x top
-  let comonadic_bot = min_with_comonadic bottom
-  let comonadic_top = max_with_comonadic top
+  let comonadic_bot = min_with_comonadic Comonadic_with_locality_op.bottom
+  let comonadic_top = max_with_comonadic Comonadic_with_locality_op.top
 
   let proj_monadic t = (t lsr 8) land 63
   let with_monadic x t = (t land lnot 16128) lor ((x land 63) lsl 8)
   let min_with_monadic x = with_monadic x bottom
   let max_with_monadic x = with_monadic x top
-  let monadic_bot = min_with_monadic bottom
-  let monadic_top = max_with_monadic top
+  let monadic_bot = min_with_monadic Monadic.bottom
+  let monadic_top = max_with_monadic Monadic.top
 
   let proj_scannable t = (t lsr 14) land 63
   let with_scannable x t = (t land lnot 1032192) lor ((x land 63) lsl 14)
   let min_with_scannable x = with_scannable x bottom
   let max_with_scannable x = with_scannable x top
-  let scannable_bot = min_with_scannable bottom
-  let scannable_top = max_with_scannable top
+  let scannable_bot = min_with_scannable Scannable_axes_op.bottom
+  let scannable_top = max_with_scannable Scannable_axes_op.top
 
   module Axis = struct
     type _ t = ..
