@@ -240,15 +240,18 @@ Pair = {
 
   module Repr = struct
     type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2) lsr 1) in
-      x
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let[@inline] close_repr x =
+    let x = x lor ((x land 2) lsr 1) in
+    x
+  let mask = 3
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let[@inline] close_down_nat x =
     let x = x lor ((x land 2) lsr 1) in
@@ -269,6 +272,11 @@ Pair = {
     let zxy = x land lnot y in
     lnot (close_up_nat zxy) land 3
 
+  type view =
+    | A0
+    | A1
+    | A2
+
   let a0 = 0
   let a1 = 1
   let a2 = 3
@@ -288,6 +296,17 @@ Pair = {
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = top
+
+  let view x =
+    if equal x a0 then A0
+    else if equal x a1 then A1
+    else if equal x a2 then A2
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | A0 -&gt; a0
+    | A1 -&gt; a1
+    | A2 -&gt; a2
 end
 
 module Axis_op = struct
@@ -295,15 +314,18 @@ module Axis_op = struct
 
   module Repr = struct
     type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2) lsr 1) in
-      x
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let[@inline] close_repr x =
+    let x = x lor ((x land 2) lsr 1) in
+    x
+  let mask = 3
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let[@inline] close_down_dual x =
     let x = x lor ((x land 2) lsr 1) in
@@ -324,6 +346,11 @@ module Axis_op = struct
     let zyx = y land lnot x in
     close_down_dual zyx
 
+  type view =
+    | A0
+    | A1
+    | A2
+
   let a0 = 0
   let a1 = 1
   let a2 = 3
@@ -343,6 +370,17 @@ module Axis_op = struct
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = top
+
+  let view x =
+    if equal x a0 then A0
+    else if equal x a1 then A1
+    else if equal x a2 then A2
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | A0 -&gt; a0
+    | A1 -&gt; a1
+    | A2 -&gt; a2
 end
 
 module Pair = struct
@@ -350,15 +388,18 @@ module Pair = struct
 
   module Repr = struct
     type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 10) lsr 1) in
-      x
-    let mask = 15
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let[@inline] close_repr x =
+    let x = x lor ((x land 10) lsr 1) in
+    x
+  let mask = 15
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let[@inline] close_down_nat x =
     let x = x lor ((x land 10) lsr 1) in
@@ -453,12 +494,12 @@ end
 </div>
 <div class="lattice-generated-panel" data-panel="mli">
 <pre data-language="ocaml">module Axis : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -474,18 +515,25 @@ end
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | A0
+    | A1
+    | A2
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val a0 : t
   val a1 : t
   val a2 : t
 end
 
 module Axis_op : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -501,18 +549,25 @@ module Axis_op : sig
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | A0
+    | A1
+    | A2
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val a0 : t
   val a1 : t
   val a2 : t
 end
 
 module Pair : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t

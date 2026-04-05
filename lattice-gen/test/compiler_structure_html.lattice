@@ -14,6 +14,54 @@ Nullability = [ Non_null < Maybe_null ]
 Separability = [ Non_float < Separable < Maybe_separable ]
 Pointerness = [ Non_pointer < Maybe_pointer ]
 
+Monadic = {
+  uniqueness : Uniqueness;
+  contention : Contention;
+  visibility : Visibility;
+  staticity : Staticity;
+}
+
+Comonadic = {
+  linearity : Linearity;
+  portability : Portability;
+  forkable : Forkable;
+  yielding : Yielding;
+  statefulness : Statefulness;
+}
+
+Comonadic_with_locality = {
+  areality : Locality;
+  comonadic : Comonadic;
+}
+
+Comonadic_with_regionality = {
+  areality : Regionality;
+  comonadic : Comonadic;
+}
+
+Value = {
+  comonadic : Comonadic_with_regionality;
+  monadic : Monadic;
+}
+
+Alloc = {
+  comonadic : Comonadic_with_locality;
+  monadic : Monadic;
+}
+
+Scannable_axes = {
+  externality : Externality;
+  nullability : Nullability;
+  separability : Separability;
+  pointerness : Pointerness;
+}
+
+Kind_axes = {
+  comonadic : Comonadic_with_locality;
+  monadic : Monadic^op;
+  scannable : Scannable_axes;
+}
+
 locality_as_regionality : Locality -> Regionality = [
   Global -> Global;
   Local -> Local;
@@ -82,54 +130,6 @@ visibility_to_statefulness : Visibility^op -> Statefulness = [
   Write -> Writing;
   Read_write -> Stateful;
 ]
-
-Monadic = {
-  uniqueness : Uniqueness;
-  contention : Contention;
-  visibility : Visibility;
-  staticity : Staticity;
-}
-
-Comonadic = {
-  linearity : Linearity;
-  portability : Portability;
-  forkable : Forkable;
-  yielding : Yielding;
-  statefulness : Statefulness;
-}
-
-Comonadic_with_locality = {
-  areality : Locality;
-  comonadic : Comonadic;
-}
-
-Comonadic_with_regionality = {
-  areality : Regionality;
-  comonadic : Comonadic;
-}
-
-Value = {
-  comonadic : Comonadic_with_regionality;
-  monadic : Monadic;
-}
-
-Alloc = {
-  comonadic : Comonadic_with_locality;
-  monadic : Monadic;
-}
-
-Scannable_axes = {
-  externality : Externality;
-  nullability : Nullability;
-  separability : Separability;
-  pointerness : Pointerness;
-}
-
-Kind_axes = {
-  comonadic : Comonadic_with_locality;
-  monadic : Monadic^op;
-  scannable : Scannable_axes;
-}
 
 comonadic_locality_as_regionality : Comonadic_with_locality -> Comonadic_with_regionality = {
   areality = locality_as_regionality(areality);

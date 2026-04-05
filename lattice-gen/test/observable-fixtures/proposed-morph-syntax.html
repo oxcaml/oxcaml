@@ -397,11 +397,14 @@ value_r2g : Value -> Value = {
 
   module Repr = struct
     type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 1
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 0
   let top = 1
@@ -415,6 +418,10 @@ value_r2g : Value -> Value = {
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot zxy land 1
+
+  type view =
+    | Global
+    | Local
 
   let global = 0
   let local = 1
@@ -432,6 +439,15 @@ value_r2g : Value -> Value = {
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = global
+
+  let view x =
+    if equal x global then Global
+    else if equal x local then Local
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | Global -&gt; global
+    | Local -&gt; local
 end
 
 module Regionality = struct
@@ -439,15 +455,18 @@ module Regionality = struct
 
   module Repr = struct
     type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2) lsr 1) in
-      x
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let[@inline] close_repr x =
+    let x = x lor ((x land 2) lsr 1) in
+    x
+  let mask = 3
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let[@inline] close_down_nat x =
     let x = x lor ((x land 2) lsr 1) in
@@ -468,6 +487,11 @@ module Regionality = struct
     let zxy = x land lnot y in
     lnot (close_up_nat zxy) land 3
 
+  type view =
+    | Global
+    | Regional
+    | Local
+
   let global = 0
   let regional = 1
   let local = 3
@@ -487,6 +511,17 @@ module Regionality = struct
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = global
+
+  let view x =
+    if equal x global then Global
+    else if equal x regional then Regional
+    else if equal x local then Local
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | Global -&gt; global
+    | Regional -&gt; regional
+    | Local -&gt; local
 end
 
 module Uniqueness = struct
@@ -494,11 +529,14 @@ module Uniqueness = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 1
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 1
   let top = 0
@@ -512,6 +550,10 @@ module Uniqueness = struct
   let[@inline] imply x y =
     let zyx = y land lnot x in
     zyx
+
+  type view =
+    | Aliased
+    | Unique
 
   let aliased = 0
   let unique = 1
@@ -529,6 +571,15 @@ module Uniqueness = struct
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = aliased
+
+  let view x =
+    if equal x aliased then Aliased
+    else if equal x unique then Unique
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | Aliased -&gt; aliased
+    | Unique -&gt; unique
 end
 
 module Linearity = struct
@@ -536,11 +587,14 @@ module Linearity = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 1
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 0
   let top = 1
@@ -554,6 +608,10 @@ module Linearity = struct
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot zxy land 1
+
+  type view =
+    | Many
+    | Once
 
   let many = 0
   let once = 1
@@ -571,6 +629,15 @@ module Linearity = struct
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = many
+
+  let view x =
+    if equal x many then Many
+    else if equal x once then Once
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | Many -&gt; many
+    | Once -&gt; once
 end
 
 module Staticity = struct
@@ -578,11 +645,14 @@ module Staticity = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 1
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 1
   let top = 0
@@ -596,6 +666,10 @@ module Staticity = struct
   let[@inline] imply x y =
     let zyx = y land lnot x in
     zyx
+
+  type view =
+    | Dynamic
+    | Static
 
   let dynamic = 0
   let static = 1
@@ -613,6 +687,15 @@ module Staticity = struct
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = dynamic
+
+  let view x =
+    if equal x dynamic then Dynamic
+    else if equal x static then Static
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | Dynamic -&gt; dynamic
+    | Static -&gt; static
 end
 
 module Yielding = struct
@@ -620,11 +703,14 @@ module Yielding = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 1
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 0
   let top = 1
@@ -638,6 +724,10 @@ module Yielding = struct
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot zxy land 1
+
+  type view =
+    | Unyielding
+    | Yielding
 
   let unyielding = 0
   let yielding = 1
@@ -655,6 +745,15 @@ module Yielding = struct
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = unyielding
+
+  let view x =
+    if equal x unyielding then Unyielding
+    else if equal x yielding then Yielding
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | Unyielding -&gt; unyielding
+    | Yielding -&gt; yielding
 end
 
 module Monadic = struct
@@ -662,11 +761,14 @@ module Monadic = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 3
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 3
   let top = 0
@@ -738,11 +840,14 @@ module Comonadic = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 3
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 0
   let top = 3
@@ -814,11 +919,14 @@ module Comonadic_with_locality = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 7
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 7
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 0
   let top = 7
@@ -890,15 +998,18 @@ module Comonadic_with_regionality = struct
 
   module Repr = struct
     type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2) lsr 1) in
-      x
-    let mask = 15
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let[@inline] close_repr x =
+    let x = x lor ((x land 2) lsr 1) in
+    x
+  let mask = 15
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let[@inline] close_down_nat x =
     let x = x lor ((x land 2) lsr 1) in
@@ -976,15 +1087,18 @@ module Value = struct
 
   module Repr = struct
     type nonrec t = t
-    let[@inline] close_repr x =
-      let x = x lor ((x land 2) lsr 1) in
-      x
-    let mask = 63
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let[@inline] close_repr x =
+    let x = x lor ((x land 2) lsr 1) in
+    x
+  let mask = 63
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    if close_repr x &lt;&gt; x then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let[@inline] close_down_nat x =
     let x = x lor ((x land 2) lsr 1) in
@@ -1080,11 +1194,14 @@ module Alloc = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 31
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 31
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 24
   let top = 7
@@ -1168,11 +1285,14 @@ module Uniqueness_op = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 1
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 0
   let top = 1
@@ -1186,6 +1306,10 @@ module Uniqueness_op = struct
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot zxy land 1
+
+  type view =
+    | Aliased
+    | Unique
 
   let aliased = 0
   let unique = 1
@@ -1203,6 +1327,15 @@ module Uniqueness_op = struct
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = aliased
+
+  let view x =
+    if equal x aliased then Aliased
+    else if equal x unique then Unique
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | Aliased -&gt; aliased
+    | Unique -&gt; unique
 end
 
 module Staticity_op = struct
@@ -1210,11 +1343,14 @@ module Staticity_op = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 1
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 0
   let top = 1
@@ -1228,6 +1364,10 @@ module Staticity_op = struct
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot zxy land 1
+
+  type view =
+    | Dynamic
+    | Static
 
   let dynamic = 0
   let static = 1
@@ -1245,6 +1385,15 @@ module Staticity_op = struct
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = dynamic
+
+  let view x =
+    if equal x dynamic then Dynamic
+    else if equal x static then Static
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | Dynamic -&gt; dynamic
+    | Static -&gt; static
 end
 
 module Monadic_op = struct
@@ -1252,11 +1401,14 @@ module Monadic_op = struct
 
   module Repr = struct
     type nonrec t = t
-    let mask = 3
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 3
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 0
   let top = 3
@@ -1428,12 +1580,12 @@ and
 </div>
 <div class="lattice-generated-panel" data-panel="mli">
 <pre data-language="ocaml">module Locality : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1449,17 +1601,23 @@ and
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | Global
+    | Local
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val global : t
   val local : t
 end
 
 module Regionality : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1475,18 +1633,25 @@ module Regionality : sig
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | Global
+    | Regional
+    | Local
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val global : t
   val regional : t
   val local : t
 end
 
 module Uniqueness : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1502,17 +1667,23 @@ module Uniqueness : sig
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | Aliased
+    | Unique
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val aliased : t
   val unique : t
 end
 
 module Linearity : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1528,17 +1699,23 @@ module Linearity : sig
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | Many
+    | Once
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val many : t
   val once : t
 end
 
 module Staticity : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1554,17 +1731,23 @@ module Staticity : sig
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | Dynamic
+    | Static
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val dynamic : t
   val static : t
 end
 
 module Yielding : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1580,17 +1763,23 @@ module Yielding : sig
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | Unyielding
+    | Yielding
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val unyielding : t
   val yielding : t
 end
 
 module Monadic : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1629,12 +1818,12 @@ module Monadic : sig
 end
 
 module Comonadic : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1673,12 +1862,12 @@ module Comonadic : sig
 end
 
 module Comonadic_with_locality : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1717,12 +1906,12 @@ module Comonadic_with_locality : sig
 end
 
 module Comonadic_with_regionality : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1761,12 +1950,12 @@ module Comonadic_with_regionality : sig
 end
 
 module Value : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1805,12 +1994,12 @@ module Value : sig
 end
 
 module Alloc : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1849,12 +2038,12 @@ module Alloc : sig
 end
 
 module Uniqueness_op : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1870,17 +2059,23 @@ module Uniqueness_op : sig
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | Aliased
+    | Unique
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val aliased : t
   val unique : t
 end
 
 module Staticity_op : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -1896,17 +2091,23 @@ module Staticity_op : sig
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | Dynamic
+    | Static
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val dynamic : t
   val static : t
 end
 
 module Monadic_op : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t

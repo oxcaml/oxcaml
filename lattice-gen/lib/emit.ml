@@ -27,12 +27,12 @@ let add_schedule_fn_ml ?(indent = "  ") buf name rounds direction =
     bprintf buf "%s  x\n" indent;
     true)
 
-let add_repr_validator_ml ?(indent = "    ") buf repr_validator =
+let add_repr_validator_ml ?(indent = "  ") buf repr_validator =
   let has_close_repr =
     add_schedule_fn_ml ~indent buf "close_repr" repr_validator.down `Down
   in
   bprintf buf "%slet mask = %d\n" indent repr_validator.mask;
-  bprintf buf "%slet of_int_exn x =\n" indent;
+  bprintf buf "%slet validate_repr_exn x =\n" indent;
   bprintf
     buf
     "%s  if x land lnot mask <> 0 then invalid_arg \"invalid representation\";\n"
@@ -192,15 +192,17 @@ let legacy_value_name name =
   | "Staticity" -> "dynamic"
   | _ -> "top"
 
+let view_ctor_name value_name = String.capitalize_ascii value_name
+
 let add_common_sig_items_base buf =
   Buffer.add_string
     buf
-    "  type t = int\n\
+    "  type t\n\
     \n\
     \  module Repr : sig\n\
     \    type nonrec t = t\n\
-    \    val mask : int\n\
-    \    val of_int_exn : int -> t\n\
+    \    val to_int_unsafe : t -> int\n\
+    \    val from_int_unsafe : int -> t\n\
     \  end\n\
     \n\
     \  val bottom : t\n\
@@ -220,12 +222,12 @@ let add_common_sig_items_base buf =
 let add_common_sig_items_product buf =
   Buffer.add_string
     buf
-    "  type t = int\n\
+    "  type t\n\
     \n\
     \  module Repr : sig\n\
     \    type nonrec t = t\n\
-    \    val mask : int\n\
-    \    val of_int_exn : int -> t\n\
+    \    val to_int_unsafe : t -> int\n\
+    \    val from_int_unsafe : int -> t\n\
     \  end\n\
     \n\
     \  val bottom : t\n\
@@ -244,8 +246,11 @@ let add_common_ml_items buf desc repr_validator =
   Buffer.add_string buf "  type t = int\n\n";
   Buffer.add_string buf "  module Repr = struct\n";
   Buffer.add_string buf "    type nonrec t = t\n";
-  add_repr_validator_ml buf repr_validator;
+  Buffer.add_string buf "    let[@inline] to_int_unsafe x = x\n";
+  Buffer.add_string buf "    let[@inline] from_int_unsafe x = x\n";
   Buffer.add_string buf "  end\n\n";
+  add_repr_validator_ml buf repr_validator;
+  Buffer.add_char buf '\n';
   add_specialized_ops_ml buf desc;
   Buffer.add_char buf '\n'
 
@@ -271,6 +276,14 @@ let add_name_functions_ml buf cases legacy =
 let add_base_sig buf (base : base) module_name =
   bprintf buf "module %s : sig\n" module_name;
   add_common_sig_items_base buf;
+  Buffer.add_string buf "  type view =\n";
+  Array.iter
+    (fun value_name ->
+      bprintf buf "    | %s\n" (view_ctor_name value_name))
+    base.element_value_names;
+  Buffer.add_char buf '\n';
+  Buffer.add_string buf "  val view : t -> view\n";
+  Buffer.add_string buf "  val of_view : view -> t\n";
   Array.iteri
     (fun i value_name ->
       bprintf buf "  val %s : t\n" value_name;
@@ -281,6 +294,12 @@ let add_base_sig buf (base : base) module_name =
 let add_base_ml buf (base : base) module_name desc =
   bprintf buf "module %s = struct\n" module_name;
   add_common_ml_items buf desc base.repr_validator;
+  Buffer.add_string buf "  type view =\n";
+  Array.iter
+    (fun value_name ->
+      bprintf buf "    | %s\n" (view_ctor_name value_name))
+    base.element_value_names;
+  Buffer.add_char buf '\n';
   Array.iteri
     (fun i value_name ->
       bprintf buf "  let %s = %d\n" value_name base.element_values.(i))
@@ -293,6 +312,24 @@ let add_base_ml buf (base : base) module_name desc =
          base.element_value_names)
   in
   add_name_functions_ml buf cases (legacy_value_name base.name);
+  Buffer.add_string buf "\n  let view x =\n";
+  Array.iteri
+    (fun i value_name ->
+      let ctor = view_ctor_name value_name in
+      if i = 0
+      then bprintf buf "    if equal x %s then %s\n" value_name ctor
+      else bprintf buf "    else if equal x %s then %s\n" value_name ctor)
+    base.element_value_names;
+  Buffer.add_string buf "    else invalid_arg \"unknown lattice element\"\n\n";
+  Buffer.add_string buf "  let of_view = function\n";
+  Array.iter
+    (fun value_name ->
+      bprintf
+        buf
+        "    | %s -> %s\n"
+        (view_ctor_name value_name)
+        value_name)
+    base.element_value_names;
   Buffer.add_string buf "end\n\n"
 
 let add_product_sig buf (product : product) module_name ~in_op =

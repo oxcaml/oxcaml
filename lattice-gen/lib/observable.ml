@@ -698,6 +698,8 @@ let ref_suffix module_name = String.lowercase_ascii module_name
 
 let ref_values_var module_name = "ref_values_" ^ ref_suffix module_name
 
+let test_values_var module_name = "test_values_" ^ ref_suffix module_name
+
 let ref_name_fn module_name = "ref_name_" ^ ref_suffix module_name
 
 let ref_bottom_var module_name = "ref_bottom_" ^ ref_suffix module_name
@@ -905,6 +907,16 @@ let emit_reference_defs buf model =
   in
   List.iter
     (fun expr -> emit_expr (Model.module_name_of_expr expr) expr)
+    (Model.emitted_module_exprs model);
+  List.iter
+    (fun expr ->
+      let module_name = Model.module_name_of_expr expr in
+      Printf.bprintf
+        buf
+        "let %s = Array.map %s.Repr.from_int_unsafe %s\n"
+        (test_values_var module_name)
+        module_name
+        (ref_values_var module_name))
     (Model.emitted_module_exprs model)
 
 let emit_test_runtime buf =
@@ -973,48 +985,23 @@ let array_mem xs x =
   Array.iter (fun y -> if y = x then found := true) xs;
   !found
 
-let check_repr ~name ~mask ~values ~of_int_exn =
-  ensure (mask >= 0) "%s: negative repr mask" name;
+let check_public_repr ~name ~valid_reprs ~to_int_unsafe ~from_int_unsafe =
   Array.iter
     (fun value ->
-      ensure (0 <= value && value <= mask)
-        "%s: valid value %d is outside repr mask %d"
-        name value mask;
-      ensure (of_int_exn value = value)
-        "%s: of_int_exn rejected valid repr %d"
+      ensure (to_int_unsafe (from_int_unsafe value) = value)
+        "%s: unsafe int roundtrip mismatch on valid repr %d"
         name value)
-    values;
-  if mask <= repr_exhaustive_threshold
-  then (
-    let valid = Array.make (mask + 1) false in
-    Array.iter (fun value -> valid.(value) <- true) values;
-    for i = 0 to mask do
-      match try Some (of_int_exn i) with Invalid_argument _ -> None with
-      | Some value ->
-        ensure valid.(value)
-          "%s: of_int_exn accepted invalid repr %d"
-          name i
-      | None ->
-        ensure (not valid.(i))
-          "%s: of_int_exn rejected valid repr %d"
-          name i
-    done)
-  else (
-    for _ = 1 to sample_count * 8 do
-      let i = Random.State.int rng (mask + 1) in
-      match try Some (of_int_exn i) with Invalid_argument _ -> None with
-      | Some value ->
-        ensure (value = i)
-          "%s: of_int_exn/to_int mismatch on sampled repr %d"
-          name i
-      | None -> ()
-    done)
+    valid_reprs;
+  ()
 
 let check_base_lattice
     ~name
     ~values
-    ~mask
-    ~of_int_exn
+    ~valid_reprs
+    ~to_int_unsafe
+    ~from_int_unsafe
+    ~view
+    ~of_view
     ~bottom
     ~top
     ~leq
@@ -1037,66 +1024,82 @@ let check_base_lattice
     ~ref_imply
     ~ref_name
   =
-  check_repr ~name ~mask ~values ~of_int_exn;
-  ensure (bottom = ref_bottom) "%s: bottom mismatch" name;
-  ensure (top = ref_top) "%s: top mismatch" name;
+  check_public_repr ~name ~valid_reprs ~to_int_unsafe ~from_int_unsafe;
+  ensure (to_int_unsafe bottom = ref_bottom) "%s: bottom mismatch" name;
+  ensure (to_int_unsafe top = ref_top) "%s: top mismatch" name;
   ensure (array_mem values legacy) "%s: legacy is invalid" name;
   iter1 values
     (fun x ->
+      let x_i = to_int_unsafe x in
       let rendered = name_fn x in
-      let expected_name = ref_name x in
+      let expected_name = ref_name x_i in
+      ensure (of_view (view x) = x)
+        "%s: of_view/view mismatch for %d"
+        name x_i;
       ensure (rendered = expected_name)
         "%s: name mismatch for %d"
-        name x;
+        name x_i;
       ensure (show x = expected_name)
         "%s: show mismatch for %d"
-        name x;
+        name x_i;
       ensure (Format.asprintf "%a" pp x = expected_name)
         "%s: pp mismatch for %d"
-        name x;
-      ensure (of_name expected_name = Some x)
-        "%s: of_name mismatch for %S"
-        name expected_name);
+        name x_i;
+      match of_name expected_name with
+      | Some y ->
+        ensure (equal y x)
+          "%s: of_name mismatch for %S"
+          name expected_name
+      | None -> fail "%s: of_name failed for %S" name expected_name);
   iter2 values values
     (fun x y ->
-      ensure (equal x y = (x = y))
+      let x_i = to_int_unsafe x in
+      let y_i = to_int_unsafe y in
+      ensure (equal x y = (x_i = y_i))
         "%s: equal mismatch for %d and %d"
-        name x y;
-      ensure (leq x y = ref_leq x y)
+        name x_i y_i;
+      ensure (leq x y = ref_leq x_i y_i)
         "%s: leq mismatch for %d and %d"
-        name x y;
-      ensure (join x y = ref_join x y)
+        name x_i y_i;
+      ensure (to_int_unsafe (join x y) = ref_join x_i y_i)
         "%s: join mismatch for %d and %d"
-        name x y;
-      ensure (meet x y = ref_meet x y)
+        name x_i y_i;
+      ensure (to_int_unsafe (meet x y) = ref_meet x_i y_i)
         "%s: meet mismatch for %d and %d"
-        name x y;
-      ensure (sub x y = ref_sub x y)
+        name x_i y_i;
+      ensure (to_int_unsafe (sub x y) = ref_sub x_i y_i)
         "%s: sub mismatch for %d and %d"
-        name x y;
-      ensure (imply x y = ref_imply x y)
+        name x_i y_i;
+      ensure (to_int_unsafe (imply x y) = ref_imply x_i y_i)
         "%s: imply mismatch for %d and %d"
-        name x y);
+        name x_i y_i);
   iter3 values values values
     (fun x y z ->
+      let join_yz = join y z in
+      let join_xy = join x y in
+      let meet_yz = meet y z in
+      let meet_xy = meet x y in
+      let sub_xy = sub x y in
+      let imply_xy = imply x y in
       ensure (join x (join y z) = join (join x y) z)
         "%s: join associativity failed"
         name;
       ensure (meet x (meet y z) = meet (meet x y) z)
         "%s: meet associativity failed"
         name;
-      ensure ((leq (sub x y) z) = (leq x (join y z)))
+      ensure ((leq sub_xy z) = (leq x join_yz))
         "%s: subtraction residuation failed"
         name;
-      ensure ((leq z (imply x y)) = (leq (meet z x) y))
+      ensure ((leq z imply_xy) = (leq (meet z x) y))
         "%s: implication residuation failed"
         name)
 
 let check_product_lattice
     ~name
     ~values
-    ~mask
-    ~of_int_exn
+    ~valid_reprs
+    ~to_int_unsafe
+    ~from_int_unsafe
     ~bottom
     ~top
     ~leq
@@ -1117,63 +1120,69 @@ let check_product_lattice
     ~ref_imply
     ~ref_name
   =
-  check_repr ~name ~mask ~values ~of_int_exn;
-  ensure (bottom = ref_bottom) "%s: bottom mismatch" name;
-  ensure (top = ref_top) "%s: top mismatch" name;
+  check_public_repr ~name ~valid_reprs ~to_int_unsafe ~from_int_unsafe;
+  ensure (to_int_unsafe bottom = ref_bottom) "%s: bottom mismatch" name;
+  ensure (to_int_unsafe top = ref_top) "%s: top mismatch" name;
   iter1 values
     (fun x ->
+      let x_i = to_int_unsafe x in
       let rendered = name_fn x in
-      let expected_name = ref_name x in
+      let expected_name = ref_name x_i in
       ensure (rendered = expected_name)
         "%s: name mismatch for %d"
-        name x;
+        name x_i;
       ensure (show x = expected_name)
         "%s: show mismatch for %d"
-        name x;
+        name x_i;
       ensure (Format.asprintf "%a" pp x = expected_name)
         "%s: pp mismatch for %d"
-        name x);
+        name x_i);
   iter2 values values
     (fun x y ->
-      ensure (equal x y = (x = y))
+      let x_i = to_int_unsafe x in
+      let y_i = to_int_unsafe y in
+      ensure (equal x y = (x_i = y_i))
         "%s: equal mismatch for %d and %d"
-        name x y;
-      ensure (leq x y = ref_leq x y)
+        name x_i y_i;
+      ensure (leq x y = ref_leq x_i y_i)
         "%s: leq mismatch for %d and %d"
-        name x y;
-      ensure (join x y = ref_join x y)
+        name x_i y_i;
+      ensure (to_int_unsafe (join x y) = ref_join x_i y_i)
         "%s: join mismatch for %d and %d"
-        name x y;
-      ensure (meet x y = ref_meet x y)
+        name x_i y_i;
+      ensure (to_int_unsafe (meet x y) = ref_meet x_i y_i)
         "%s: meet mismatch for %d and %d"
-        name x y;
-      ensure (sub x y = ref_sub x y)
+        name x_i y_i;
+      ensure (to_int_unsafe (sub x y) = ref_sub x_i y_i)
         "%s: sub mismatch for %d and %d"
-        name x y;
-      ensure (imply x y = ref_imply x y)
+        name x_i y_i;
+      ensure (to_int_unsafe (imply x y) = ref_imply x_i y_i)
         "%s: imply mismatch for %d and %d"
-        name x y);
+        name x_i y_i);
   iter3 values values values
     (fun x y z ->
+      let join_yz = join y z in
+      let sub_xy = sub x y in
+      let imply_xy = imply x y in
       ensure (join x (join y z) = join (join x y) z)
         "%s: join associativity failed"
         name;
       ensure (meet x (meet y z) = meet (meet x y) z)
         "%s: meet associativity failed"
         name;
-      ensure ((leq (sub x y) z) = (leq x (join y z)))
+      ensure ((leq sub_xy z) = (leq x join_yz))
         "%s: subtraction residuation failed"
         name;
-      ensure ((leq z (imply x y)) = (leq (meet z x) y))
+      ensure ((leq z imply_xy) = (leq (meet z x) y))
         "%s: implication residuation failed"
         name)
 
-let check_morph ~name ~inputs ~expected ~apply =
+let check_morph ~name ~inputs ~expected ~to_int_unsafe ~apply =
   Array.iteri
     (fun i x ->
-      ensure (apply x = expected.(i))
+      ensure (to_int_unsafe (apply x) = expected.(i))
         "%s: mismatch on input %d"
-        name x)
+        name i)
     inputs
 |}
 
@@ -1183,13 +1192,6 @@ let emit_lattice_checks buf model =
       let module_name = Model.module_name_of_expr expr in
       let lattice = Model.String_map.find expr.Model.name model.Model.lattices in
       let is_base = match lattice with Model.Base _ -> true | Product _ -> false in
-      let mask =
-        match lattice with
-        | Model.Base base ->
-          if expr.opposite then base.op_descriptor.mask else base.descriptor.mask
-        | Model.Product product ->
-          if expr.opposite then product.op_descriptor.mask else product.descriptor.mask
-      in
       if is_base
       then
         Printf.bprintf
@@ -1198,8 +1200,11 @@ let emit_lattice_checks buf model =
            \  check_base_lattice\n\
            \    ~name:%S\n\
            \    ~values:%s\n\
-           \    ~mask:%d\n\
-           \    ~of_int_exn:%s.Repr.of_int_exn\n\
+           \    ~valid_reprs:%s\n\
+           \    ~to_int_unsafe:%s.Repr.to_int_unsafe\n\
+           \    ~from_int_unsafe:%s.Repr.from_int_unsafe\n\
+           \    ~view:%s.view\n\
+           \    ~of_view:%s.of_view\n\
            \    ~bottom:%s.bottom\n\
            \    ~top:%s.top\n\
            \    ~leq:%s.leq\n\
@@ -1222,8 +1227,11 @@ let emit_lattice_checks buf model =
            \    ~ref_imply:%s\n\
            \    ~ref_name:%s\n\n"
           module_name
+          (test_values_var module_name)
           (ref_values_var module_name)
-          mask
+          module_name
+          module_name
+          module_name
           module_name
           module_name
           module_name
@@ -1253,8 +1261,9 @@ let emit_lattice_checks buf model =
            \  check_product_lattice\n\
            \    ~name:%S\n\
            \    ~values:%s\n\
-           \    ~mask:%d\n\
-           \    ~of_int_exn:%s.Repr.of_int_exn\n\
+           \    ~valid_reprs:%s\n\
+           \    ~to_int_unsafe:%s.Repr.to_int_unsafe\n\
+           \    ~from_int_unsafe:%s.Repr.from_int_unsafe\n\
            \    ~bottom:%s.bottom\n\
            \    ~top:%s.top\n\
            \    ~leq:%s.leq\n\
@@ -1275,8 +1284,9 @@ let emit_lattice_checks buf model =
            \    ~ref_imply:%s\n\
            \    ~ref_name:%s\n\n"
           module_name
+          (test_values_var module_name)
           (ref_values_var module_name)
-          mask
+          module_name
           module_name
           module_name
           module_name
@@ -1302,7 +1312,7 @@ let emit_lattice_checks buf model =
 let emit_product_checks buf model =
   let emit_one module_name (expr : Model.lattice_expr) (product : Model.product) =
     Printf.bprintf buf "let () =\n";
-    Printf.bprintf buf "  iter1 %s (fun x ->\n" (ref_values_var module_name);
+    Printf.bprintf buf "  iter1 %s (fun x ->\n" (test_values_var module_name);
     Printf.bprintf buf "    let view = %s.view x in\n" module_name;
     Printf.bprintf buf "    ensure (%s.of_view view = x) %S;\n"
       module_name
@@ -1329,8 +1339,8 @@ let emit_product_checks buf model =
         let min_with_name = "min_with_" ^ field.name in
         let max_with_name = "max_with_" ^ field.name in
         Printf.bprintf buf "  iter2 %s %s (fun x value ->\n"
-          (ref_values_var module_name)
-          (ref_values_var field_module_name);
+          (test_values_var module_name)
+          (test_values_var field_module_name);
         Printf.bprintf
           buf
           "    ensure (%s.%s (%s.%s value x) = value) %S;\n"
@@ -1385,6 +1395,7 @@ let emit_morph_checks buf model =
     (fun _ morph ->
       let core = Model.morph_core_of morph in
       let source_module = Model.module_name_of_expr core.source in
+      let target_module = Model.module_name_of_expr core.target in
       let target_semantics = resolve_semantics core.target in
       let expected =
         Array.map (fun index -> target_semantics.values.(index)) core.map
@@ -1393,10 +1404,11 @@ let emit_morph_checks buf model =
       emit_int_array buf expected_var expected;
       Printf.bprintf
         buf
-        "let () = check_morph ~name:%S ~inputs:%s ~expected:%s ~apply:%s\n\n"
+        "let () = check_morph ~name:%S ~inputs:%s ~expected:%s ~to_int_unsafe:%s.Repr.to_int_unsafe ~apply:%s\n\n"
         core.name
-        (ref_values_var source_module)
+        (test_values_var source_module)
         expected_var
+        target_module
         core.name)
     model.Model.morphs
 

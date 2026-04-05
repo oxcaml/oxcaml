@@ -235,11 +235,14 @@ Locality = [
 
   module Repr = struct
     type nonrec t = t
-    let mask = 1
-    let of_int_exn x =
-      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-      x
+    let[@inline] to_int_unsafe x = x
+    let[@inline] from_int_unsafe x = x
   end
+
+  let mask = 1
+  let validate_repr_exn x =
+    if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+    x
 
   let bottom = 0
   let top = 1
@@ -253,6 +256,10 @@ Locality = [
   let[@inline] imply x y =
     let zxy = x land lnot y in
     lnot zxy land 1
+
+  type view =
+    | Global
+    | Local
 
   let global = 0
   let local = 1
@@ -270,18 +277,27 @@ Locality = [
   let pp ppf x = Format.pp_print_string ppf (name x)
   let show x = name x
   let legacy = global
+
+  let view x =
+    if equal x global then Global
+    else if equal x local then Local
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_view = function
+    | Global -&gt; global
+    | Local -&gt; local
 end
 
 </pre>
 </div>
 <div class="lattice-generated-panel" data-panel="mli">
 <pre data-language="ocaml">module Locality : sig
-  type t = int
+  type t
 
   module Repr : sig
     type nonrec t = t
-    val mask : int
-    val of_int_exn : int -&gt; t
+    val to_int_unsafe : t -&gt; int
+    val from_int_unsafe : int -&gt; t
   end
 
   val bottom : t
@@ -297,6 +313,12 @@ end
   val name : t -&gt; string
   val of_name : string -&gt; t option
   val legacy : t
+  type view =
+    | Global
+    | Local
+
+  val view : t -&gt; view
+  val of_view : view -&gt; t
   val global : t
   val local : t
 end
