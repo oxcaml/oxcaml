@@ -10,24 +10,33 @@ type chain =
         loc : Location.t
       }
 
-type field_ty =
+type lattice_expr =
   { lattice : string Location.located;
     opposite : bool
   }
 
 type field =
   { name : string Location.located;
-    ty : field_ty
+    ty : lattice_expr
   }
 
-type mapping =
-  { small : string Location.located;
-    big : string Location.located
+type primitive_mapping =
+  { source : string Location.located;
+    target : string Location.located
   }
 
-type alias =
-  { slot : string Location.located;
-    name : string Location.located
+type bridge_expr =
+  | Source_field of string Location.located
+  | Morph_apply of
+      { morph : string Location.located;
+        field : string Location.located
+      }
+  | Min of Location.t
+  | Max of Location.t
+
+type bridge_assignment =
+  { target : string Location.located;
+    expr : bridge_expr
   }
 
 type decl =
@@ -39,11 +48,17 @@ type decl =
       { name : string Location.located;
         fields : field list
       }
-  | Embedding of
-      { small : string Location.located;
-        big : string Location.located;
-        mappings : mapping list;
-        aliases : alias list
+  | Primitive_morph of
+      { name : string Location.located;
+        source : lattice_expr;
+        target : lattice_expr;
+        mappings : primitive_mapping list
+      }
+  | Product_bridge of
+      { name : string Location.located;
+        source : lattice_expr;
+        target : lattice_expr;
+        assignments : bridge_assignment list
       }
 
 type file = decl list

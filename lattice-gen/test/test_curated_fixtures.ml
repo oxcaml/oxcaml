@@ -1,7 +1,6 @@
 let fixtures =
   [ "example.lattice";
     "compiler_structure.lattice";
-    "compiler_structure_kind_subbed.lattice";
     "chains.lattice";
     "diamond.lattice";
     "sampled_product.lattice"
@@ -11,43 +10,48 @@ let run () =
   List.iter
     (fun fixture ->
       let source = Test_support.load_fixture fixture in
+      Test_support.expect_generated_excludes
+        ~name:fixture
+        ~source
+        [ "Solver_runtime";
+          "Lattices_univ";
+          "Solver_support";
+          "type 'd t constraint 'd = 'l * 'r";
+          "include-solver"
+        ];
       if fixture = "compiler_structure.lattice"
-         || fixture = "compiler_structure_kind_subbed.lattice"
-      then
-        (Test_support.expect_generated_ml_excludes
-           ~name:fixture
-           ~source
-           [ "ignore (";
-             "lsr 0";
-             "let close_repr x = x";
-             "let close_down_nat x = x";
-             "let close_up_nat x = x";
-             "let close_down_dual x = x";
-             "let close_up_dual x = x";
-             "Format.pp_print_string ppf (show t)"
-           ];
-         Test_support.expect_generated_ml_contains
-           ~name:fixture
-           ~source
-           [ "module Lattices_const = struct";
-             "module Lattices_univ = struct";
-             "module Solver_support = Solver_runtime.Make (Lattices_univ)"
-           ];
-         Test_support.expect_generated_ml_suffix_excludes
-           ~name:fixture
-           ~source
-           ~after:"module Lattices_univ = struct"
-           [ " lsr ";
-             " lsl ";
-             " land lnot Layout.";
-             "raw_mask";
-             "layout_mask"
-           ];
-         Test_support.compile_generated_case
-           ~name:fixture
-           ~source)
-      else
-        Test_support.run_generated_case
+      then (
+        Test_support.expect_generated_ml_contains
           ~name:fixture
-          ~source)
-    fixtures
+          ~source
+          [ "module Value = struct";
+            "module Alloc = struct";
+            "module Kind_axes = struct";
+            "alloc_as_value x =";
+            "value_to_alloc_r2l x =";
+            "let rec"
+          ];
+        Test_support.expect_generated_mli_contains
+          ~name:fixture
+          ~source
+          [ "module Value : sig";
+            "module Alloc : sig";
+            "module Kind_axes : sig";
+            "module Axis : sig";
+            "val alloc_as_value : Alloc.t -> Value.t";
+            "val value_to_alloc_r2g : Value.t -> Alloc.t"
+          ]))
+    fixtures;
+  Test_support.compile_generated_case
+    ~name:"compiler-compile"
+    ~source:(Test_support.load_fixture "compiler_structure.lattice")
+    ~main:
+      {|
+let () =
+  let _ = Generated.Locality.global in
+  let _ = Generated.Value.bottom in
+  let _ = Generated.Kind_axes.bottom in
+  let _ = Generated.alloc_as_value Generated.Alloc.bottom in
+  let _ = Generated.value_to_alloc_r2l Generated.Value.bottom in
+  ()
+|}

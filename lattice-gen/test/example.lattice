@@ -6,22 +6,22 @@ Regionality = [
   Global < Regional < Local
 ]
 
-Locality <= Regionality via {
+locality_as_regionality : Locality -> Regionality = [
   Global -> Global;
   Local -> Local;
-} aliases {
-  embed = Locality_as_regionality;
-  left1 = Regional_to_local;
-  right1 = Regional_to_global;
-  left2 = Local_to_regional;
-  right2 = Global_to_regional;
-}
-
-Uniqueness = [
-  Unique < Aliased
 ]
 
 State = {
   loc : Regionality;
-  uniq : Uniqueness ^op;
+  fallback : Locality;
+}
+
+Projected_state = {
+  region : Regionality;
+  local : Locality;
+}
+
+state_to_projected : State -> Projected_state = {
+  region = loc;
+  local = fallback;
 }

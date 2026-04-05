@@ -1,5 +1,4 @@
-let usage_generation =
-  "lattice_gen INPUT.lattice --ml OUTPUT.ml --mli OUTPUT.mli [--test-ml OUTPUT_test.ml]"
+let usage_generation = "lattice_gen INPUT.lattice --ml OUTPUT.ml --mli OUTPUT.mli"
 
 let usage_observable =
   "lattice_gen observable [--check|--update] PATH..."
@@ -8,7 +7,6 @@ let run_generation args =
   let input_path = ref None in
   let ml_path = ref None in
   let mli_path = ref None in
-  let test_ml_path = ref None in
   let set_input path =
     match !input_path with
     | None -> input_path := Some path
@@ -16,10 +14,7 @@ let run_generation args =
   in
   let specs =
     [ "--ml", Arg.String (fun path -> ml_path := Some path), "output .ml path";
-      "--mli", Arg.String (fun path -> mli_path := Some path), "output .mli path";
-      "--test-ml",
-      Arg.String (fun path -> test_ml_path := Some path),
-      "optional output generated test .ml path"
+      "--mli", Arg.String (fun path -> mli_path := Some path), "output .mli path"
     ]
   in
   let argv = Array.of_list ("lattice_gen" :: args) in
@@ -40,12 +35,7 @@ let run_generation args =
     | Some path -> path
     | None -> raise (Arg.Bad "missing --mli output path")
   in
-  Generate.generate_to_files
-    ~input_path
-    ~ml_path
-    ~mli_path
-    ?test_ml_path:!test_ml_path
-    ()
+  Generate.generate_to_files ~input_path ~ml_path ~mli_path ()
 
 let run_observable args =
   let mode = ref Observable.Check in

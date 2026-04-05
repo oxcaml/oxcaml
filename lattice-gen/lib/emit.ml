@@ -4,8 +4,7 @@ let bprintf = Printf.bprintf
 
 type outputs =
   { ml : string;
-    mli : string;
-    test_ml : string
+    mli : string
   }
 
 let dual_mask (desc : descriptor) = desc.mask land lnot desc.nat_mask
@@ -32,6 +31,7 @@ let add_repr_validator_ml ?(indent = "    ") buf repr_validator =
   let has_close_repr =
     add_schedule_fn_ml ~indent buf "close_repr" repr_validator.down `Down
   in
+  bprintf buf "%slet mask = %d\n" indent repr_validator.mask;
   bprintf buf "%slet of_int_exn x =\n" indent;
   bprintf
     buf
@@ -167,18 +167,22 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
       dual_mask)
 
 let field_module_name (field : field) ~in_op =
-  Emit_common.field_module_name field ~in_op
+  let opposite = if in_op then not field.ty.opposite else field.ty.opposite in
+  if opposite then Name.op_module_name field.ty.name else field.ty.name
 
-let axis_ctor_name = Emit_common.axis_ctor_name
+let axis_ctor_name field_name = String.capitalize_ascii field_name
 
-let field_module_alias_name (field : field) = "Field_" ^ axis_ctor_name field.name
+let proj_name (field : field) = "proj_" ^ field.name
 
-let field_const_module_name (field : field) =
-  field_module_alias_name field ^ ".Const"
+let with_name (field : field) = "with_" ^ field.name
 
-let axis_module_name (axis : axis_object) ~in_op =
-  let opposite = if in_op then not axis.declared_opposite else axis.declared_opposite in
-  if opposite then Name.op_module_name axis.carrier_name else axis.carrier_name
+let bot_name (field : field) = field.name ^ "_bot"
+
+let top_name (field : field) = field.name ^ "_top"
+
+let min_with_name (field : field) = "min_with_" ^ field.name
+
+let max_with_name (field : field) = "max_with_" ^ field.name
 
 let legacy_value_name name =
   match name with
@@ -194,1104 +198,17 @@ let legacy_value_name name =
   | "Staticity" -> "dynamic"
   | _ -> "top"
 
-let solver_object_ctor_name_of_name name = Model.solver_object_ctor_name name
-
-let solver_objects_in_order model =
-  let add acc name =
-    let object_ = String_map.find name model.solver_objects in
-    acc @ [ object_ ]
-  in
-  List.fold_left
-    (fun acc ->
-      function
-      | Lattice lattice ->
-        let name = name_of_lattice lattice in
-        let acc = add acc name in
-        add acc (Name.op_module_name name)
-      | Embedding _ -> acc)
-    []
-    model.items
-
-let add_solver_items_sig buf =
+let add_common_sig_items buf =
   Buffer.add_string
     buf
-    "  type 'd t constraint 'd = 'l * 'r\n\
+    "  type t = int\n\
     \n\
-    \  type l = (Allowance.allowed * Allowance.disallowed) t\n\
-    \  type r = (Allowance.disallowed * Allowance.allowed) t\n\
-    \  type lr = (Allowance.allowed * Allowance.allowed) t\n\
+    \  module Repr : sig\n\
+    \    type nonrec t = t\n\
+    \    val mask : int\n\
+    \    val of_int_exn : int -> t\n\
+    \  end\n\
     \n\
-    \  type simple_error = {\n\
-    \    left : const;\n\
-    \    right : const;\n\
-    \  }\n\
-    \n\
-    \  type error = simple_error\n\
-    \n\
-    \  type equate_step =\n\
-    \    | Left_le_right\n\
-    \    | Right_le_left\n\
-    \n\
-    \  type equate_error = equate_step * error\n\
-    \n\
-    \  val min : lr\n\
-    \  val max : lr\n\
-    \  val legacy : lr\n\
-    \n\
-    \  val of_const : const -> ('l * 'r) t\n\
-    \  val to_const_exn : lr -> const\n\
-    \n\
-    \  val newvar : unit -> ('l * 'r) t\n\
-    \  val newvar_above : l -> ('l * 'r) t * bool\n\
-    \  val newvar_below : r -> ('l * 'r) t * bool\n\
-    \n\
-    \  val to_simple_error : error -> simple_error\n\
-    \  val print_error : Format.formatter -> error -> unit\n\
-    \  val print_equate_error : Format.formatter -> equate_error -> unit\n\
-    \n\
-    \  val submode : l -> r -> (unit, error) result\n\
-    \  val submode_exn : l -> r -> unit\n\
-    \  val equate : lr -> lr -> (unit, equate_error) result\n\
-    \  val equate_exn : lr -> lr -> unit\n\
-    \n\
-    \  val join : l list -> l\n\
-    \  val meet : r list -> r\n\
-    \n\
-    \  val print : ?verbose:bool -> Format_doc.formatter -> ('l * 'r) t -> unit\n\
-    \  val show : ?verbose:bool -> ('l * 'r) t -> string\n\
-    \n\
-    \  val zap_to_floor : l -> const\n\
-    \  val zap_to_ceil : r -> const\n"
-
-let add_product_solver_items_sig buf (product : product) ~in_op:_ =
-  Buffer.add_string
-    buf
-    "  type 'd t constraint 'd = 'l * 'r\n\
-    \n\
-    \  type l = (Allowance.allowed * Allowance.disallowed) t\n\
-    \  type r = (Allowance.disallowed * Allowance.allowed) t\n\
-    \  type lr = (Allowance.allowed * Allowance.allowed) t\n\
-    \n\
-    \  type 'a simple_axerror\n\
-    \n\
-    \  type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error\n\
-    \n\
-    \  type error = simple_error\n\
-    \n\
-    \  type equate_step =\n\
-    \    | Left_le_right\n\
-    \    | Right_le_left\n\
-    \n\
-    \  type equate_error = equate_step * error\n\
-    \n\
-    \  val min : lr\n\
-    \  val max : lr\n\
-    \  val legacy : lr\n\
-    \n\
-    \  val of_const : const -> ('l * 'r) t\n\
-    \  val to_const_exn : lr -> const\n\
-    \n\
-    \  val newvar : unit -> ('l * 'r) t\n\
-    \  val newvar_above : l -> ('l * 'r) t * bool\n\
-    \  val newvar_below : r -> ('l * 'r) t * bool\n\
-    \n\
-    \  val to_simple_error : error -> simple_error\n\
-    \  val print_error : Format.formatter -> error -> unit\n\
-    \  val print_equate_error : Format.formatter -> equate_error -> unit\n\
-    \n\
-    \  val submode : l -> r -> (unit, error) result\n\
-    \  val submode_exn : l -> r -> unit\n\
-    \  val equate : lr -> lr -> (unit, equate_error) result\n\
-    \  val equate_exn : lr -> lr -> unit\n\
-    \n\
-    \  val join : l list -> l\n\
-    \  val meet : r list -> r\n\
-    \n\
-    \  val print : ?verbose:bool -> Format_doc.formatter -> ('l * 'r) t -> unit\n\
-    \  val show : ?verbose:bool -> ('l * 'r) t -> string\n\
-    \n\
-    \  val zap_to_floor : l -> const\n\
-    \  val zap_to_ceil : r -> const\n\
-    \n\
-    \  type ('a, 'd) axis_mode constraint 'd = 'l * 'r\n\
-    \n\
-    \  val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) axis_mode\n\
-    \  val min_with : 'a Axis.t -> ('a, 'l * 'r) axis_mode -> ('l * Allowance.disallowed) t\n\
-    \  val max_with : 'a Axis.t -> ('a, 'l * 'r) axis_mode -> (Allowance.disallowed * 'r) t\n";
-  List.iter
-    (fun (field : field) ->
-      let field_module = field_module_alias_name field in
-      bprintf
-        buf
-        "  val proj_%s : ('l * 'r) t -> ('l * 'r) %s.t\n\
-        \  val min_with_%s : ('l * 'r) %s.t -> ('l * Allowance.disallowed) t\n\
-        \  val max_with_%s : ('l * 'r) %s.t -> (Allowance.disallowed * 'r) t\n"
-        field.name
-        field_module
-        field.name
-        field_module
-        field.name
-        field_module)
-    product.fields
-
-let add_base_sig buf (base : base) module_name ~include_solver =
-  let descriptor =
-    if module_name = base.name then base.descriptor else base.op_descriptor
-  in
-  ignore descriptor;
-  bprintf buf "module %s : sig\n" module_name;
-  Buffer.add_string buf "  module Const : sig\n";
-  if module_name = base.name
-  then Buffer.add_string buf "    type t = private int\n\n"
-  else bprintf buf "    type t = %s.Const.t\n\n" base.name;
-  Array.iteri
-    (fun i (_ : string) ->
-      bprintf buf "    val %s : t\n" base.element_value_names.(i))
-    base.element_names;
-  Buffer.add_string buf "\n";
-  Buffer.add_string
-    buf
-    "    val bottom : t\n\
-    \    val top : t\n\n\
-    \    val leq : t -> t -> bool\n\
-    \    val equal : t -> t -> bool\n\
-    \    val join : t -> t -> t\n\
-    \    val meet : t -> t -> t\n\
-    \    val sub : t -> t -> t\n\
-    \    val imply : t -> t -> t\n\n\
-    \    val name : t -> string\n\
-    \    val of_name : string -> t option\n\
-    \    val pp : Format.formatter -> t -> unit\n\
-    \    val show : t -> string\n\n";
-  Buffer.add_string
-    buf
-    "    module Repr : sig\n\
-    \      val bits : int\n\
-    \      val mask : int\n\
-    \      val to_int : t -> int\n\
-    \      val of_int_exn : int -> t\n\
-    \    end\n\
-    \n\
-    \    val min : t\n\
-    \    val max : t\n\
-    \    val le : t -> t -> bool\n\
-    \    val print : Format.formatter -> t -> unit\n\
-    \    val legacy : t\n\
-    \  end\n";
-  Buffer.add_string buf "  type const = Const.t\n\n";
-  if include_solver
-  then (
-    add_solver_items_sig buf;
-    Buffer.add_string buf "\n";
-    Array.iteri
-      (fun i (_ : string) ->
-        bprintf buf "  val %s : lr\n" base.element_value_names.(i))
-      base.element_names;
-    Buffer.add_string buf "\n");
-  Buffer.add_string buf "end\n\n"
-
-let add_product_view_sig buf (product : product) _module_name ~in_op:_ =
-  bprintf buf "    type view = {\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "      %s : %s.Const.t;\n"
-        field.name
-        (field_module_alias_name field))
-    product.fields;
-  Buffer.add_string buf "    }\n\n"
-
-let add_product_sig buf (product : product) module_name ~in_op ~include_solver =
-  bprintf buf "module %s : sig\n" module_name;
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "  module %s = %s\n"
-        (field_module_alias_name field)
-        (field_module_name field ~in_op))
-    product.fields;
-  if product.fields <> [] then Buffer.add_string buf "\n";
-  Buffer.add_string buf "  module Axis : sig\n";
-  Buffer.add_string buf "    type _ t =\n";
-  List.iter
-    (fun (axis : axis_object) ->
-      bprintf
-        buf
-        "      | %s : %s.Const.t t\n"
-        axis.ctor_name
-        ("Field_" ^ axis.ctor_name))
-    product.axes;
-  Buffer.add_string
-    buf
-    "\n\
-    \    type packed = P : 'a t -> packed\n\
-    \n\
-    \    val compare : 'a t -> 'b t -> ('a, 'b) Misc.comparison\n\
-    \n\
-    \    val all : packed list\n\
-    \    val print : Format.formatter -> 'a t -> unit\n\
-    \  end\n\n";
-  Buffer.add_string buf "  module Const : sig\n";
-  if not in_op
-  then Buffer.add_string buf "    type t = private int\n\n"
-  else bprintf buf "    type t = %s.Const.t\n\n" product.name;
-  add_product_view_sig buf product module_name ~in_op;
-  Buffer.add_string buf "    val make : ";
-  List.iteri
-    (fun i (field : field) ->
-      if i > 0 then Buffer.add_string buf " -> ";
-      bprintf
-        buf
-        "%s:%s.Const.t"
-        field.name
-        (field_module_alias_name field))
-    product.fields;
-  Buffer.add_string buf " -> t\n";
-  Buffer.add_string buf "    val view : t -> view\n";
-  Buffer.add_string buf "    val of_view : view -> t\n\n";
-  List.iter
-    (fun (field : field) ->
-      let field_module = field_module_alias_name field in
-      bprintf buf "    val %s : t -> %s.Const.t\n" field.name field_module;
-      bprintf buf "    val proj_%s : t -> %s.Const.t\n" field.name field_module;
-      bprintf buf "    val with_%s : %s.Const.t -> t -> t\n" field.name field_module;
-      bprintf buf "    val %s_bot : %s.Const.t -> t\n" field.name field_module;
-      bprintf buf "    val %s_top : %s.Const.t -> t\n" field.name field_module;
-      bprintf buf "    val min_with_%s : %s.Const.t -> t\n" field.name field_module;
-      bprintf buf "    val max_with_%s : %s.Const.t -> t\n" field.name field_module)
-    product.fields;
-  Buffer.add_string
-    buf
-    "\n    val bottom : t\n\
-    \    val top : t\n\n\
-    \    val leq : t -> t -> bool\n\
-    \    val equal : t -> t -> bool\n\
-    \    val join : t -> t -> t\n\
-    \    val meet : t -> t -> t\n\
-    \    val sub : t -> t -> t\n\
-    \    val imply : t -> t -> t\n\n\
-    \    val pp : Format.formatter -> t -> unit\n\
-    \    val show : t -> string\n\n\
-    \    module Layout : sig\n";
-  List.iter
-    (fun (field : field) ->
-      bprintf buf "      val %s_shift : int\n" field.name;
-      bprintf buf "      val %s_mask : int\n" field.name)
-    product.fields;
-  Buffer.add_string
-    buf
-    "    end\n\n\
-    \    module Repr : sig\n\
-    \      val bits : int\n\
-    \      val mask : int\n\
-    \      val to_int : t -> int\n\
-    \      val of_int_exn : int -> t\n\
-    \    end\n\
-    \n";
-  bprintf
-    buf
-    "    val min : t\n\
-    \    val max : t\n\
-    \    val le : t -> t -> bool\n\
-    \    val print : Format.formatter -> t -> unit\n\
-    \    val legacy : t\n\
-    \n\
-    \    val split : t -> view\n\
-    \    val merge : view -> t\n\
-    \n\
-    \    val proj : 'a Axis.t -> t -> 'a\n\
-    \    val min_with : 'a Axis.t -> 'a -> t\n\
-    \    val max_with : 'a Axis.t -> 'a -> t\n\
-    \  end\n";
-  Buffer.add_string buf "  type const = Const.t\n\n";
-  if include_solver
-  then (
-    add_product_solver_items_sig buf product ~in_op;
-    Buffer.add_string buf "\n");
-  Buffer.add_string buf "end\n\n"
-
-let add_embedding_sig buf (embedding : embedding) =
-  bprintf buf "module %s : sig\n" embedding.module_name;
-  bprintf
-    buf
-    "  val embed : %s.const -> %s.const\n"
-    embedding.small_name
-    embedding.big_name;
-  List.iteri
-    (fun i (morphism : morphism) ->
-      bprintf
-        buf
-        "  val left%d : %s.const -> %s.const\n"
-        (i + 1)
-        morphism.domain
-        morphism.codomain)
-    embedding.left_chain;
-  List.iteri
-    (fun i (morphism : morphism) ->
-      bprintf
-        buf
-        "  val right%d : %s.const -> %s.const\n"
-        (i + 1)
-        morphism.domain
-        morphism.codomain)
-    embedding.right_chain;
-  List.iter
-    (fun (alias_name, target) ->
-      let morphism =
-        if target = "embed"
-        then embedding.embed
-        else if String.length target >= 4 && String.sub target 0 4 = "left"
-      then List.nth embedding.left_chain (int_of_string (String.sub target 4 (String.length target - 4)) - 1)
-      else List.nth embedding.right_chain (int_of_string (String.sub target 5 (String.length target - 5)) - 1)
-      in
-      bprintf
-        buf
-        "  val %s : %s.const -> %s.const\n"
-        alias_name
-        morphism.domain
-        morphism.codomain)
-    embedding.aliases;
-  Buffer.add_string buf "end\n\n"
-
-let add_base_const_module_ml buf (base : base) module_name descriptor =
-  if module_name = base.name
-  then (
-    bprintf buf "  module %s = struct\n" module_name;
-    Buffer.add_string buf "    type t = int\n";
-    Array.iteri
-      (fun i (_ : string) ->
-        bprintf
-          buf
-          "    let %s = %d\n"
-          base.element_value_names.(i)
-          base.element_values.(i))
-      base.element_names;
-    add_specialized_ops_ml ~indent:"    " buf descriptor;
-    Buffer.add_string buf "    let name = function\n";
-    Array.iteri
-      (fun i elt ->
-        bprintf buf "      | %d -> %S\n" base.element_values.(i) elt)
-      base.element_names;
-    Buffer.add_string buf "      | _ -> invalid_arg \"invalid lattice element\"\n";
-    Buffer.add_string buf "    let of_name = function\n";
-    Array.iteri
-      (fun i elt ->
-        bprintf buf "      | %S -> Some %s\n" elt base.element_value_names.(i))
-      base.element_names;
-    Buffer.add_string buf "      | _ -> None\n";
-    Buffer.add_string buf "    let pp ppf = function\n";
-    Array.iteri
-      (fun i elt ->
-        bprintf
-          buf
-          "      | %d -> Format.pp_print_string ppf %S\n"
-          base.element_values.(i)
-          elt)
-      base.element_names;
-    Buffer.add_string
-      buf
-      "      | _ -> invalid_arg \"invalid lattice element\"\n\
-      \    let show t = Format.asprintf \"%a\" pp t\n\
-      \    module Repr = struct\n";
-    bprintf
-      buf
-      "      let bits = %d\n\
-      \      let mask = %d\n\
-      \      let to_int (x : t) = x\n"
-      descriptor.bits
-      descriptor.mask;
-    add_repr_validator_ml ~indent:"      " buf base.repr_validator;
-    bprintf
-      buf
-      "    end\n\
-      \n\
-      \    let min = bottom\n\
-      \    let max = top\n\
-      \    let le = leq\n\
-      \    let print = pp\n\
-      \    let legacy = %s\n\
-      \  end\n\n"
-      (legacy_value_name base.name))
-  else (
-    bprintf buf "  module %s = struct\n" module_name;
-    bprintf buf "    include Make_const_op (%s)\n" base.name;
-    Array.iteri
-      (fun i (_ : string) ->
-        bprintf
-          buf
-          "    let %s = %s.%s\n"
-          base.element_value_names.(i)
-          base.name
-          base.element_value_names.(i))
-      base.element_names;
-    bprintf buf "    let name = %s.name\n" base.name;
-    bprintf buf "    let of_name = %s.of_name\n" base.name;
-    Buffer.add_string buf "  end\n\n")
-
-let add_product_const_module_ml
-    buf
-    (product : product)
-    module_name
-    descriptor
-    ~in_op
-  =
-  bprintf buf "  module %s = struct\n" module_name;
-  List.iter
-    (fun (field : field) ->
-      bprintf
-        buf
-        "    module %s = %s\n"
-        (field_module_alias_name field)
-        (field_module_name field ~in_op))
-    product.fields;
-  if in_op
-  then (
-    bprintf buf "    include Make_const_op (%s)\n" product.name;
-    bprintf buf "    type view = %s.view = {\n" product.name;
-    List.iter
-      (fun (field : field) ->
-        bprintf
-          buf
-          "      %s : %s.t;\n"
-          field.name
-          (field_module_alias_name field))
-      product.fields;
-    Buffer.add_string buf "    }\n\n";
-    bprintf buf "    module Layout = %s.Layout\n" product.name;
-    bprintf buf "    module Axis = %s.Axis\n" product.name;
-    bprintf buf "    let make = %s.make\n" product.name;
-    bprintf buf "    let view = %s.view\n" product.name;
-    bprintf buf "    let of_view = %s.of_view\n" product.name;
-    List.iter
-      (fun (field : field) ->
-        bprintf buf "    let %s = %s.%s\n" field.name product.name field.name;
-        bprintf buf "    let proj_%s = %s.proj_%s\n" field.name product.name field.name;
-        bprintf buf "    let with_%s = %s.with_%s\n" field.name product.name field.name;
-        bprintf buf "    let %s_bot = %s.%s_bot\n" field.name product.name field.name;
-        bprintf buf "    let %s_top = %s.%s_top\n" field.name product.name field.name;
-        bprintf
-          buf
-          "    let min_with_%s = %s.min_with_%s\n"
-          field.name
-          product.name
-          field.name;
-        bprintf
-          buf
-          "    let max_with_%s = %s.max_with_%s\n"
-          field.name
-          product.name
-          field.name)
-      product.fields;
-    bprintf buf "    let split = %s.split\n" product.name;
-    bprintf buf "    let merge = %s.merge\n" product.name;
-    bprintf buf "    let proj = %s.proj\n" product.name;
-    bprintf buf "    let min_with = %s.min_with\n" product.name;
-    bprintf buf "    let max_with = %s.max_with\n" product.name;
-    Buffer.add_string buf "  end\n\n")
-  else (
-    Buffer.add_string buf "    type t = int\n";
-    Buffer.add_string buf "    type view = {\n";
-    List.iter
-      (fun (field : field) ->
-        bprintf
-          buf
-          "      %s : %s.t;\n"
-          field.name
-          (field_module_alias_name field))
-      product.fields;
-    Buffer.add_string buf "    }\n\n";
-    Buffer.add_string buf "    module Layout = struct\n";
-    List.iter
-      (fun (field : field) ->
-        bprintf buf "      let %s_shift = %d\n" field.name field.shift;
-        bprintf buf "      let %s_mask = %d\n" field.name field.layout_mask)
-      product.fields;
-    Buffer.add_string buf "    end\n";
-    Buffer.add_string buf "    let[@inline] make ";
-    List.iter (fun (field : field) -> bprintf buf "~%s " field.name) product.fields;
-    Buffer.add_string buf "=\n      ";
-    let parts =
-      List.map
-        (fun (field : field) ->
-          if field.shift = 0
-          then field.name
-          else Printf.sprintf "(%s lsl %d)" field.name field.shift)
-        product.fields
-    in
-    Buffer.add_string buf (String.concat " lor " parts);
-    Buffer.add_string buf "\n";
-    List.iter
-      (fun (field : field) ->
-        let field_module = field_module_alias_name field in
-        bprintf
-          buf
-          "    let[@inline] %s t = (%s land %d : %s.t)\n"
-          field.name
-          (if field.shift = 0
-           then "t"
-           else Printf.sprintf "(t lsr %d)" field.shift)
-          field.raw_mask
-          field_module;
-        bprintf buf "    let proj_%s = %s\n" field.name field.name;
-        bprintf
-          buf
-          "    let[@inline] with_%s value t = (t land lnot Layout.%s_mask) lor %s\n"
-          field.name
-          field.name
-          (if field.shift = 0
-           then "value"
-           else Printf.sprintf "(value lsl %d)" field.shift))
-      product.fields;
-    Buffer.add_string buf "    let[@inline] of_view view =\n";
-    Buffer.add_string buf "      make ";
-    List.iter
-      (fun (field : field) -> bprintf buf "~%s:view.%s " field.name field.name)
-      product.fields;
-    Buffer.add_string buf "\n";
-    Buffer.add_string buf "    let[@inline] view t =\n      {\n";
-    List.iter
-      (fun (field : field) -> bprintf buf "        %s = %s t;\n" field.name field.name)
-      product.fields;
-    Buffer.add_string buf "      }\n";
-    add_specialized_ops_ml ~indent:"    " buf descriptor;
-    List.iter
-      (fun (field : field) ->
-        bprintf
-          buf
-          "    let[@inline] %s_bot value = with_%s value bottom\n"
-          field.name
-          field.name;
-        bprintf
-          buf
-          "    let[@inline] %s_top value = with_%s value top\n"
-          field.name
-          field.name;
-        bprintf buf "    let min_with_%s = %s_bot\n" field.name field.name;
-        bprintf buf "    let max_with_%s = %s_top\n" field.name field.name)
-      product.fields;
-    Buffer.add_string buf "    let pp ppf t =\n";
-    if product.fields = []
-    then Buffer.add_string buf "      Format.pp_print_string ppf \"{}\"\n"
-    else (
-      Buffer.add_string buf "      let v = view t in\n";
-      Buffer.add_string buf "      Format.pp_print_string ppf \"{ \";\n";
-      List.iteri
-        (fun i field ->
-          let field : field = field in
-          if i > 0
-          then Buffer.add_string buf "      Format.pp_print_string ppf \"; \";\n";
-          bprintf
-            buf
-            "      Format.pp_print_string ppf %S;\n\
-            \      %s.pp ppf v.%s;\n"
-            (field.name ^ " = ")
-            (field_module_alias_name field)
-            field.name)
-        product.fields;
-      Buffer.add_string buf "      Format.pp_print_string ppf \" }\"\n");
-    Buffer.add_string
-      buf
-      "    let show t = Format.asprintf \"%a\" pp t\n\
-      \    module Repr = struct\n";
-    bprintf
-      buf
-      "      let bits = %d\n\
-      \      let mask = %d\n\
-      \      let to_int (x : t) = x\n"
-      descriptor.bits
-      descriptor.mask;
-    add_repr_validator_ml ~indent:"      " buf product.repr_validator;
-    Buffer.add_string
-      buf
-      "    end\n\
-      \n\
-      \    let min = bottom\n\
-      \    let max = top\n\
-      \    let le = leq\n\
-      \    let print = pp\n\
-      \n";
-    Buffer.add_string buf "    let split = view\n    let merge = of_view\n\n";
-    Buffer.add_string buf "    let legacy =\n      make ";
-    List.iter
-      (fun (field : field) ->
-        bprintf
-          buf
-          "~%s:%s.legacy "
-          field.name
-          (field_module_alias_name field))
-      product.fields;
-    Buffer.add_string buf "\n";
-    Buffer.add_string buf "    module Axis = struct\n";
-    Buffer.add_string buf "      type _ t =\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        bprintf
-          buf
-          "        | %s : %s.t t\n"
-          axis.ctor_name
-          (field_module_alias_name
-             (List.find (fun (field : field) -> field.name = axis.name) product.fields)))
-      product.axes;
-    Buffer.add_string buf "\n      type packed = P : 'a t -> packed\n\n";
-    Buffer.add_string
-      buf
-      "      let compare : type a b. a t -> b t -> (a, b) Misc.comparison =\n\
-      \        fun left right ->\n\
-      \          match left, right with\n";
-    List.iteri
-      (fun i (left_axis : axis_object) ->
-        bprintf
-          buf
-          "          | %s, %s -> Misc.Equal\n"
-          left_axis.ctor_name
-          left_axis.ctor_name;
-        List.iteri
-          (fun j (right_axis : axis_object) ->
-            if i <> j
-            then
-              bprintf
-                buf
-                "          | %s, %s -> Misc.%s\n"
-                left_axis.ctor_name
-                right_axis.ctor_name
-                (if i < j then "Less_than" else "Greater_than"))
-          product.axes)
-      product.axes;
-    Buffer.add_string buf "\n";
-    Buffer.add_string buf "      let all = [\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        bprintf buf "        P %s;\n" axis.ctor_name)
-      product.axes;
-    Buffer.add_string buf "      ]\n";
-    Buffer.add_string
-      buf
-      "      let print : type a. Format.formatter -> a t -> unit = fun ppf -> function\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        bprintf
-          buf
-          "        | %s -> Format.pp_print_string ppf %S\n"
-          axis.ctor_name
-          axis.name)
-      product.axes;
-    Buffer.add_string
-      buf
-      "      let proj : type a. a t -> int -> a = fun axis t ->\n\
-      \        match axis with\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        bprintf buf "        | %s -> %s t\n" axis.ctor_name axis.name)
-      product.axes;
-    Buffer.add_string
-      buf
-      "      let set : type a. a t -> a -> int -> int = fun axis value t ->\n\
-      \        match axis with\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        bprintf buf "        | %s -> with_%s value t\n" axis.ctor_name axis.name)
-      product.axes;
-    Buffer.add_string
-      buf
-      "      let min_with : type a. a t -> a -> int = fun axis value ->\n\
-      \        match axis with\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        bprintf buf "        | %s -> %s_bot value\n" axis.ctor_name axis.name)
-      product.axes;
-    Buffer.add_string
-      buf
-      "      let max_with : type a. a t -> a -> int = fun axis value ->\n\
-      \        match axis with\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        bprintf buf "        | %s -> %s_top value\n" axis.ctor_name axis.name)
-      product.axes;
-    Buffer.add_string
-      buf
-      "      let _ = set\n\
-      \    end\n\
-      \n\
-      \    let proj = Axis.proj\n\
-      \    let min_with = Axis.min_with\n\
-      \    let max_with = Axis.max_with\n\
-      \  end\n\n")
-
-let add_lattices_const_ml buf model =
-  let solver_objects = solver_objects_in_order model in
-  Buffer.add_string buf "module Lattices_const = struct\n  [@@@warning \"-32-37\"]\n";
-  List.iter
-    (function
-      | Lattice (Base base) ->
-        add_base_const_module_ml buf base base.name base.descriptor;
-        add_base_const_module_ml
-          buf
-          base
-          (Name.op_module_name base.name)
-          base.op_descriptor
-      | Lattice (Product product) ->
-        add_product_const_module_ml
-          buf
-          product
-          product.name
-          product.descriptor
-          ~in_op:false;
-        add_product_const_module_ml
-          buf
-          product
-          (Name.op_module_name product.name)
-          product.op_descriptor
-          ~in_op:true
-      | Embedding _ -> ())
-    model.items;
-  Buffer.add_string buf "  type _ obj =\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "    | %s : %s.t obj\n"
-        object_.object_ctor_name
-        object_.name)
-    solver_objects;
-  Buffer.add_string buf "\n";
-  Buffer.add_string buf "  let obj_index : type a. a obj -> int = function\n";
-  List.iteri
-    (fun i (object_ : solver_object) ->
-      bprintf buf "    | %s -> %d\n" object_.object_ctor_name i)
-    solver_objects;
-  Buffer.add_string buf "\n";
-  let emit_obj_dispatch fn =
-    let header =
-      match fn with
-      | "min" | "max" | "legacy" ->
-        Printf.sprintf "  let %s : type a. a obj -> a = function\n" fn
-      | "print" ->
-        "  let print : type a. a obj -> Format_doc.formatter -> a -> unit = fun obj ppf x ->\n      match obj with\n"
-      | "le" | "equal" ->
-        Printf.sprintf
-          "  let %s : type a. a obj -> a -> a -> bool = fun obj x y ->\n      match obj with\n"
-          fn
-      | "join" | "meet" | "sub" | "imply" ->
-        Printf.sprintf
-          "  let %s : type a. a obj -> a -> a -> a = fun obj x y ->\n      match obj with\n"
-          fn
-      | _ -> invalid_arg "emit_obj_dispatch"
-    in
-    Buffer.add_string buf header;
-    List.iter
-      (fun (object_ : solver_object) ->
-        let prefix = object_.name in
-        match fn with
-        | "min" ->
-          bprintf buf "    | %s -> %s.bottom\n" object_.object_ctor_name prefix
-        | "max" ->
-          bprintf buf "    | %s -> %s.top\n" object_.object_ctor_name prefix
-        | "legacy" ->
-          bprintf buf "    | %s -> %s.legacy\n" object_.object_ctor_name prefix
-        | "le" ->
-          bprintf buf "      | %s -> %s.leq x y\n" object_.object_ctor_name prefix
-        | "equal" ->
-          bprintf buf "      | %s -> %s.equal x y\n" object_.object_ctor_name prefix
-        | "join" ->
-          bprintf buf "      | %s -> %s.join x y\n" object_.object_ctor_name prefix
-        | "meet" ->
-          bprintf buf "      | %s -> %s.meet x y\n" object_.object_ctor_name prefix
-        | "sub" ->
-          bprintf buf "      | %s -> %s.sub x y\n" object_.object_ctor_name prefix
-        | "imply" ->
-          bprintf buf "      | %s -> %s.imply x y\n" object_.object_ctor_name prefix
-        | "print" ->
-          bprintf
-            buf
-            "      | %s -> Format_doc.pp_print_string ppf (%s.show x)\n"
-            object_.object_ctor_name
-            prefix
-        | _ -> ())
-      solver_objects;
-    Buffer.add_string buf "\n"
-  in
-  List.iter emit_obj_dispatch [ "min"; "max"; "legacy"; "le"; "equal"; "join"; "meet"; "sub"; "imply"; "print" ];
-  Buffer.add_string buf "  let _ = legacy, sub, imply\n\n";
-  Buffer.add_string
-    buf
-    "  let equal_obj : type a b. a obj -> b obj -> (a, b) Misc.eq option =\n\
-    \   fun obj1 obj2 ->\n\
-    \    match obj1, obj2 with\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "    | %s, %s -> Some Misc.Refl\n"
-        object_.object_ctor_name
-        object_.object_ctor_name)
-    solver_objects;
-  Buffer.add_string
-    buf
-    "    | _ -> None\n\
-    \n\
-    \  let compare_obj : type a b. a obj -> b obj -> (a, b) Misc.comparison =\n\
-    \   fun obj1 obj2 ->\n\
-    \    match equal_obj obj1 obj2 with\n\
-    \    | Some Misc.Refl -> Misc.Equal\n\
-    \    | None ->\n\
-    \      if obj_index obj1 < obj_index obj2 then Misc.Less_than else Misc.Greater_than\n\
-    \n\
-    \  let print_obj : type a. Format_doc.formatter -> a obj -> unit =\n\
-    \   fun ppf -> function\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      bprintf
-        buf
-        "    | %s -> Format_doc.fprintf ppf %S\n"
-        object_.object_ctor_name
-        object_.name)
-    solver_objects;
-  Buffer.add_string buf "\nend\n\n"
-
-let add_lattices_univ_ml buf model =
-  let solver_objects = solver_objects_in_order model in
-  Buffer.add_string
-    buf
-    "module Lattices_univ = struct\n\
-    \  [@@@warning \"-32-37\"]\n\
-    \  include Lattices_const\n\
-    \  open Allowance\n\
-    \  open Misc\n\
-    \  module Fmt = Format_doc\n\
-    \n\
-    \  type ('a, 'b, 'd) morph =\n\
-    \    | Id : ('a, 'a, 'l * 'r) morph\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      match object_.shape with
-      | Solver_base -> ()
-      | Solver_product axes ->
-        List.iter
-          (fun (axis : solver_axis) ->
-            bprintf
-              buf
-              "    | %s : (%s.t, %s.t, 'l * 'r) morph\n\
-              \    | %s : (%s.t, %s.t, 'l * disallowed) morph\n\
-              \    | %s : (%s.t, %s.t, disallowed * 'r) morph\n"
-              axis.proj_ctor_name
-              axis.carrier_object_name
-              object_.name
-              axis.min_with_ctor_name
-              axis.carrier_object_name
-              object_.name
-              axis.max_with_ctor_name
-              axis.carrier_object_name
-              object_.name)
-          axes)
-    solver_objects;
-  Buffer.add_string
-    buf
-    "    | Compose :\n\
-    \        ('b, 'c, 'l * 'r) morph * ('a, 'b, 'l * 'r) morph\n\
-    \        -> ('a, 'c, 'l * 'r) morph\n\
-    \    constraint 'd = _ * _\n\
-    \  [@@ocaml.warning \"-62\"]\n\
-    \n\
-    \  include Magic_allow_disallow (struct\n\
-    \    type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph constraint 'd = 'l * 'r\n\
-    \n\
-    \    let disallow_right : type a b l r.\n\
-    \        (a, b, l * r) sided -> (a, b, l * disallowed) sided = Obj.magic\n\
-    \    let disallow_left : type a b l r.\n\
-    \        (a, b, l * r) sided -> (a, b, disallowed * r) sided = Obj.magic\n\
-    \    let allow_right : type a b l r.\n\
-    \        (a, b, l * allowed) sided -> (a, b, l * r) sided = Obj.magic\n\
-    \    let allow_left : type a b l r.\n\
-    \        (a, b, allowed * r) sided -> (a, b, l * r) sided = Obj.magic\n\
-    \  end)\n\
-    \n\
-    \  let rec src : type a b l r. b obj -> (a, b, l * r) morph -> a obj =\n\
-    \   fun dst -> function\n\
-    \    | Id -> dst\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      match object_.shape with
-      | Solver_base -> ()
-      | Solver_product axes ->
-        List.iter
-          (fun (axis : solver_axis) ->
-            bprintf
-              buf
-              "    | %s -> %s\n\
-              \    | %s -> %s\n\
-              \    | %s -> %s\n"
-              axis.proj_ctor_name
-              (solver_object_ctor_name_of_name object_.name)
-              axis.min_with_ctor_name
-              (solver_object_ctor_name_of_name axis.carrier_object_name)
-              axis.max_with_ctor_name
-              (solver_object_ctor_name_of_name axis.carrier_object_name))
-          axes)
-    solver_objects;
-  Buffer.add_string
-    buf
-    "    | Compose (f, g) -> src (src dst f) g\n\
-    \n\
-    \  let id = Id\n\
-    \n\
-    \  let maybe_compose : type a b c l r.\n\
-    \      c obj -> (b, c, l * r) morph -> (a, b, l * r) morph -> (a, c, l * r) morph =\n\
-    \   fun _dst f g ->\n\
-    \    match f, g with\n\
-    \    | Id, g -> g\n\
-    \    | f, Id -> f\n\
-    \    | _ -> Compose (f, g)\n\
-    \n\
-    \  let compose = maybe_compose\n\
-    \n\
-    \  let rec left_adjoint : type a b l.\n\
-    \      b obj -> (a, b, l * allowed) morph -> (b, a, left_only) morph =\n\
-    \   fun dst -> function\n\
-    \    | Id -> Id\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      match object_.shape with
-      | Solver_base -> ()
-      | Solver_product axes ->
-        List.iter
-          (fun (axis : solver_axis) ->
-            bprintf
-              buf
-              "    | %s -> %s\n\
-              \    | %s -> %s\n"
-              axis.proj_ctor_name
-              axis.min_with_ctor_name
-              axis.max_with_ctor_name
-              axis.proj_ctor_name)
-          axes)
-    solver_objects;
-  Buffer.add_string
-    buf
-    "    | Compose (f, g) ->\n\
-    \      Compose (left_adjoint (src dst f) g, left_adjoint dst f)\n\
-    \n\
-    \  let rec right_adjoint : type a b r.\n\
-    \      b obj -> (a, b, allowed * r) morph -> (b, a, right_only) morph =\n\
-    \   fun dst -> function\n\
-    \    | Id -> Id\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      match object_.shape with
-      | Solver_base -> ()
-      | Solver_product axes ->
-        List.iter
-          (fun (axis : solver_axis) ->
-            bprintf
-              buf
-              "    | %s -> %s\n\
-              \    | %s -> %s\n"
-              axis.proj_ctor_name
-              axis.max_with_ctor_name
-              axis.min_with_ctor_name
-              axis.proj_ctor_name)
-          axes)
-    solver_objects;
-  Buffer.add_string
-    buf
-    "    | Compose (f, g) ->\n\
-    \      Compose (right_adjoint (src dst f) g, right_adjoint dst f)\n\
-    \n\
-    \  let rec apply : type a b l r. b obj -> (a, b, l * r) morph -> a -> b =\n\
-    \   fun dst morph x ->\n\
-    \    match morph with\n\
-    \    | Id -> x\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      match object_.shape with
-      | Solver_base -> ()
-      | Solver_product axes ->
-        List.iter
-          (fun (axis : solver_axis) ->
-            bprintf
-              buf
-              "    | %s -> %s.Axis.proj %s.Axis.%s x\n\
-              \    | %s -> %s.Axis.min_with %s.Axis.%s x\n\
-              \    | %s -> %s.Axis.max_with %s.Axis.%s x\n"
-              axis.proj_ctor_name
-              object_.name
-              object_.name
-              axis.axis.ctor_name
-              axis.min_with_ctor_name
-              object_.name
-              object_.name
-              axis.axis.ctor_name
-              axis.max_with_ctor_name
-              object_.name
-              object_.name
-              axis.axis.ctor_name)
-          axes)
-    solver_objects;
-  Buffer.add_string
-    buf
-    "    | Compose (f, g) -> apply dst f (apply (src dst f) g x)\n\
-    \n\
-    \  let rec morph_key : type a b l r. (a, b, l * r) morph -> string = function\n\
-    \    | Id -> \"Id\"\n";
-  List.iter
-    (fun (object_ : solver_object) ->
-      match object_.shape with
-      | Solver_base -> ()
-      | Solver_product axes ->
-        List.iter
-          (fun (axis : solver_axis) ->
-            bprintf
-              buf
-              "    | %s -> %S\n\
-              \    | %s -> %S\n\
-              \    | %s -> %S\n"
-              axis.proj_ctor_name
-              axis.proj_ctor_name
-              axis.min_with_ctor_name
-              axis.min_with_ctor_name
-              axis.max_with_ctor_name
-              axis.max_with_ctor_name)
-          axes)
-    solver_objects;
-  Buffer.add_string
-    buf
-    "    | Compose (f, g) -> \"Compose(\" ^ morph_key f ^ \",\" ^ morph_key g ^ \")\"\n\
-    \n\
-    \  let equal_morph : type a0 a1 b l0 r0 l1 r1.\n\
-    \      b obj ->\n\
-    \      (a0, b, l0 * r0) morph ->\n\
-    \      (a1, b, l1 * r1) morph ->\n\
-    \      (a0, a1) Misc.eq option =\n\
-    \   fun _dst m1 m2 ->\n\
-    \    if String.equal (morph_key m1) (morph_key m2)\n\
-    \    then Some (Obj.magic Misc.Refl)\n\
-    \    else None\n\
-    \n\
-    \  let compare_morph : type a0 a1 b l0 r0 l1 r1.\n\
-    \      b obj ->\n\
-    \      (a0, b, l0 * r0) morph ->\n\
-    \      (a1, b, l1 * r1) morph ->\n\
-    \      (a0, a1) Misc.comparison =\n\
-    \   fun _dst m1 m2 ->\n\
-    \    if String.equal (morph_key m1) (morph_key m2)\n\
-    \    then Obj.magic Equal\n\
-    \    else if String.compare (morph_key m1) (morph_key m2) < 0\n\
-    \    then Less_than\n\
-    \    else Greater_than\n\
-    \n\
-    \  let print_morph : type a b l r. b obj -> Fmt.formatter -> (a, b, l * r) morph -> unit =\n\
-    \   fun _dst ppf morph -> Fmt.fprintf ppf \"%s\" (morph_key morph)\n\
-    \n\
-    end\n\
-    \n\
-    module Solver_support = Solver_runtime.Make (Lattices_univ)\n\n"
-
-let add_const_op_functor_ml buf =
-  Buffer.add_string
-    buf
-    "module Make_const_op (Base : sig\n\
-    \  type t\n\
     \  val bottom : t\n\
     \  val top : t\n\
     \  val leq : t -> t -> bool\n\
@@ -1302,507 +219,474 @@ let add_const_op_functor_ml buf =
     \  val imply : t -> t -> t\n\
     \  val pp : Format.formatter -> t -> unit\n\
     \  val show : t -> string\n\
-    \  module Repr : sig\n\
-    \    val bits : int\n\
-    \    val mask : int\n\
-    \    val to_int : t -> int\n\
-    \    val of_int_exn : int -> t\n\
-    \  end\n\
-    \  val legacy : t\n\
-    \  end) = struct\n\
-    \  type t = Base.t\n\
-    \  let bottom = Base.top\n\
-    \  let top = Base.bottom\n\
-    \  let leq x y = Base.leq y x\n\
-    \  let equal = Base.equal\n\
-    \  let join = Base.meet\n\
-    \  let meet = Base.join\n\
-    \  let sub x y = Base.imply y x\n\
-    \  let imply x y = Base.sub y x\n\
-    \  let pp = Base.pp\n\
-    \  let show = Base.show\n\
-    \  module Repr = Base.Repr\n\
-    \  let min = bottom\n\
-    \  let max = top\n\
-    \  let le = leq\n\
-    \  let print = pp\n\
-    \  let legacy = Base.legacy\n\
-    end\n\n"
+    \  val name : t -> string\n\
+    \  val of_name : string -> t option\n\
+    \  val legacy : t\n"
 
-let add_solver_wrapper_functor_ml buf =
-  Buffer.add_string
-    buf
-    "module Make_solver_core\n\
-    \    (Const_desc : sig\n\
-    \      type t\n\
-    \      module Repr : sig\n\
-    \        val to_int : t -> int\n\
-    \      end\n\
-    \      val legacy : t\n\
-    \    end)\n\
-    \    (Obj_desc : sig\n\
-    \      val obj : int Solver_support.obj\n\
-    \    end) =\n\
-    struct\n\
-    \  include Solver_support.Positive_gen (Obj_desc)\n\
-    \n\
-    \  let of_const_value c = of_const (Const_desc.Repr.to_int c)\n\
-    \  let legacy = of_const_value Const_desc.legacy\n\
-    \  let show ?verbose t = Format_doc.asprintf \"%a\" (print ?verbose) t\n\
-    end\n\
-    \n\
-    module Make_solver_module\n\
-    \    (Const_desc : sig\n\
-    \      type t\n\
-    \      val pp : Format.formatter -> t -> unit\n\
-    \      module Repr : sig\n\
-    \        val to_int : t -> int\n\
-    \        val of_int_exn : int -> t\n\
-    \      end\n\
-    \      val legacy : t\n\
-    \    end)\n\
-    \    (Obj_desc : sig\n\
-    \      val obj : int Solver_support.obj\n\
-    \    end) =\n\
-    struct\n\
-    \  include Make_solver_core (struct\n\
-    \    type t = Const_desc.t\n\
-    \    module Repr = struct\n\
-    \      let to_int = Const_desc.Repr.to_int\n\
-    \    end\n\
-    \    let legacy = Const_desc.legacy\n\
-    \  end) (Obj_desc)\n\
-    \n\
-    \  type simple_error = {\n\
-    \    left : Const_desc.t;\n\
-    \    right : Const_desc.t;\n\
-    \  }\n\
-    \n\
-    \  type error = simple_error\n\
-    \n\
-    \  type equate_step =\n\
-    \    | Left_le_right\n\
-    \    | Right_le_left\n\
-    \n\
-    \  type equate_error = equate_step * error\n\
-    \n\
-    \  let error_of_raw ({ left; right; _ } : int Solver_support.Raw.error_raw) =\n\
-    \    {\n\
-    \      left = Const_desc.Repr.of_int_exn left;\n\
-    \      right = Const_desc.Repr.of_int_exn right;\n\
-    \    }\n\
-    \n\
-    \  let to_simple_error error = error\n\
-    \n\
-    \  let print_error ppf { left; right } =\n\
-    \    Format.fprintf ppf \"%a <= %a does not hold\" Const_desc.pp left Const_desc.pp right\n\
-    \n\
-    \  let print_equate_error ppf = function\n\
-    \    | Left_le_right, error ->\n\
-    \      Format.fprintf ppf \"Left_le_right: %a\" print_error error\n\
-    \    | Right_le_left, error ->\n\
-    \      Format.fprintf ppf \"Right_le_left: %a\" print_error error\n\
-    \n\
-    \  let submode a b = Result.map_error error_of_raw (submode_raw a b)\n\
-    \n\
-    \  let submode_exn a b =\n\
-    \    match submode a b with\n\
-    \    | Ok () -> ()\n\
-    \    | Error error -> invalid_arg (Format.asprintf \"%a\" print_error error)\n\
-    \n\
-    \  let equate a b =\n\
-    \    Result.map_error\n\
-    \      (fun (forward, error) ->\n\
-    \        ((if forward then Left_le_right else Right_le_left), error_of_raw error))\n\
-    \      (equate_raw a b)\n\
-    \n\
-    \  let equate_exn a b =\n\
-    \    match equate a b with\n\
-    \    | Ok () -> ()\n\
-    \    | Error error -> invalid_arg (Format.asprintf \"%a\" print_equate_error error)\n\
-    end\n\n"
+let add_common_ml_items buf desc repr_validator =
+  Buffer.add_string buf "  type t = int\n\n";
+  Buffer.add_string buf "  module Repr = struct\n";
+  Buffer.add_string buf "    type nonrec t = t\n";
+  add_repr_validator_ml buf repr_validator;
+  Buffer.add_string buf "  end\n\n";
+  add_specialized_ops_ml buf desc;
+  Buffer.add_char buf '\n'
 
-let add_base_ml buf (base : base) module_name _descriptor ~include_solver =
-  bprintf buf "module %s = struct\n" module_name;
-  bprintf buf "  module Const = Lattices_const.%s\n" module_name;
-  Buffer.add_string buf "  type const = Const.t\n";
-  if include_solver
-  then (
-    bprintf
-      buf
-      "\n\
-      \  include Make_solver_module (Const) (struct\n\
-      \    let obj = Lattices_univ.%s\n\
-      \  end)\n"
-      (solver_object_ctor_name_of_name module_name);
-    Array.iteri
-      (fun i (_ : string) ->
-        bprintf
-          buf
-          "  let %s = of_const_value Const.%s\n"
-          base.element_value_names.(i)
-          base.element_value_names.(i))
-      base.element_names);
+let add_name_functions_ml buf cases legacy =
+  Buffer.add_string buf "  let name x =\n";
+  List.iteri
+    (fun i (value_name, display_name) ->
+      if i = 0
+      then bprintf buf "    if equal x %s then %S\n" value_name display_name
+      else bprintf buf "    else if equal x %s then %S\n" value_name display_name)
+    cases;
+  Buffer.add_string buf "    else invalid_arg \"unknown lattice element\"\n\n";
+  Buffer.add_string buf "  let of_name = function\n";
+  List.iter
+    (fun (value_name, display_name) ->
+      bprintf buf "    | %S -> Some %s\n" display_name value_name)
+    cases;
+  Buffer.add_string buf "    | _ -> None\n\n";
+  Buffer.add_string buf "  let pp ppf x = Format.pp_print_string ppf (name x)\n";
+  Buffer.add_string buf "  let show x = name x\n";
+  bprintf buf "  let legacy = %s\n" legacy
+
+let add_base_sig buf (base : base) module_name =
+  bprintf buf "module %s : sig\n" module_name;
+  add_common_sig_items buf;
+  Array.iteri
+    (fun i value_name ->
+      bprintf buf "  val %s : t\n" value_name;
+      if i = Array.length base.element_value_names - 1 then ())
+    base.element_value_names;
   Buffer.add_string buf "end\n\n"
 
-let add_product_ml
-    buf
-    (product : product)
-    module_name
-    _descriptor
-    ~in_op
-    ~include_solver
-  =
+let add_base_ml buf (base : base) module_name desc =
   bprintf buf "module %s = struct\n" module_name;
+  add_common_ml_items buf desc base.repr_validator;
+  Array.iteri
+    (fun i value_name ->
+      bprintf buf "  let %s = %d\n" value_name base.element_values.(i))
+    base.element_value_names;
+  if Array.length base.element_value_names > 0 then Buffer.add_char buf '\n';
+  let cases =
+    Array.to_list
+      (Array.mapi
+         (fun i value_name -> value_name, base.element_names.(i))
+         base.element_value_names)
+  in
+  add_name_functions_ml buf cases (legacy_value_name base.name);
+  Buffer.add_string buf "end\n\n"
+
+let add_product_sig buf (product : product) module_name ~in_op =
+  bprintf buf "module %s : sig\n" module_name;
+  add_common_sig_items buf;
+  Buffer.add_string buf "\n  type view = {\n";
   List.iter
     (fun (field : field) ->
       bprintf
         buf
-        "  module %s = %s\n"
-        (field_module_alias_name field)
+        "    %s : %s.t;\n"
+        field.name
         (field_module_name field ~in_op))
     product.fields;
-  bprintf buf "  module Axis = Lattices_const.%s.Axis\n" module_name;
-  bprintf buf "  module Const = Lattices_const.%s\n" module_name;
-  Buffer.add_string buf "  type const = Const.t\n";
-  if include_solver
-  then (
-    bprintf
-      buf
-      "\n\
-      \  include Make_solver_core (Const) (struct\n\
-      \    let obj = Lattices_univ.%s\n\
-      \  end)\n\
-      \n"
-      (solver_object_ctor_name_of_name module_name);
-    Buffer.add_string
-      buf
-      "  type 'a simple_axerror = {\n\
-      \    left : 'a;\n\
-      \    right : 'a;\n\
-      \  }\n\
-      \n\
-      \  type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error\n\
-      \n\
-      \  type error = simple_error\n\
-      \n\
-      \  type equate_step =\n\
-      \    | Left_le_right\n\
-      \    | Right_le_left\n\
-      \n\
-      \  type equate_error = equate_step * error\n\
-      \n\
-      \  let error_of_raw ({ left; right; _ } : int Solver_support.Raw.error_raw) =\n\
-      \    let left = Const.Repr.of_int_exn left in\n\
-      \    let right = Const.Repr.of_int_exn right in\n\
-      \    let left_view = Const.view left in\n\
-      \    let right_view = Const.view right in\n";
-    List.iteri
-      (fun i (axis : axis_object) ->
-        let field =
-          List.find (fun (field : field) -> field.name = axis.name) product.fields
-        in
-        let field_module = field_module_alias_name field in
-        bprintf
-          buf
-          "  %sif not (%s.Const.le left_view.%s right_view.%s) then\n\
-          \    Error (Axis.%s, { left = left_view.%s; right = right_view.%s })\n"
-          (if i = 0 then "" else "else ")
-          field_module
-          field.name
-          field.name
-          axis.ctor_name
-          field.name
-          field.name)
-      product.axes;
-    Buffer.add_string
-      buf
-      "  else\n\
-      \    invalid_arg \"product error_of_raw: no failing axis\"\n\
-      \n\
-      \  let to_simple_error error = error\n\
-      \n\
-      \  let print_axerror pp ppf { left; right } =\n\
-      \    Format.fprintf ppf \"%a <= %a does not hold\" pp left pp right\n\
-      \n\
-      \  let print_error : Format.formatter -> error -> unit =\n\
-      \   fun ppf (Error (axis, error)) ->\n\
-      \    match axis, error with\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        let field =
-          List.find (fun (field : field) -> field.name = axis.name) product.fields
-        in
-        let field_module = field_module_alias_name field in
-        bprintf
-          buf
-          "    | Axis.%s, error ->\n\
-          \      Format.fprintf ppf \"%%a: %%a\"\n\
-          \        Axis.print\n\
-          \        Axis.%s\n\
-          \        (print_axerror %s.Const.pp)\n\
-          \        error\n"
-          axis.ctor_name
-          axis.ctor_name
-          field_module)
-      product.axes;
-    Buffer.add_string
-      buf
-      "\n\
-      \  let print_equate_error ppf = function\n\
-      \    | Left_le_right, error ->\n\
-      \      Format.fprintf ppf \"Left_le_right: %a\" print_error error\n\
-      \    | Right_le_left, error ->\n\
-      \      Format.fprintf ppf \"Right_le_left: %a\" print_error error\n\
-      \n\
-      \  let submode a b = Result.map_error error_of_raw (submode_raw a b)\n\
-      \n\
-      \  let submode_exn a b =\n\
-      \    match submode a b with\n\
-      \    | Ok () -> ()\n\
-      \    | Error error -> invalid_arg (Format.asprintf \"%a\" print_error error)\n\
-      \n\
-      \  let equate a b =\n\
-      \    Result.map_error\n\
-      \      (fun (forward, error) ->\n\
-      \        ((if forward then Left_le_right else Right_le_left), error_of_raw error))\n\
-      \      (equate_raw a b)\n\
-      \n\
-      \  let equate_exn a b =\n\
-      \    match equate a b with\n\
-      \    | Ok () -> ()\n\
-      \    | Error error -> invalid_arg (Format.asprintf \"%a\" print_equate_error error)\n\
-      \n\
-      \  type ('a, 'd) axis_mode = (int, 'd) Solver_support.Raw.mode constraint 'd = 'l * 'r\n\
-      \n\
-      \  let proj : type a l r. a Axis.t -> (l * r) t -> (a, l * r) axis_mode =\n\
-      \   fun axis m ->\n\
-      \    match axis with\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        bprintf
-          buf
-          "    | Axis.%s ->\n\
-          \      %s\n"
-          axis.ctor_name
-          (Printf.sprintf
-             "Solver_support.Raw.apply\n\
-             \        Lattices_univ.%s\n\
-             \        Lattices_univ.%s\n\
-             \        m"
-             (solver_object_ctor_name_of_name (axis_module_name axis ~in_op))
-             (solver_proj_ctor_name module_name axis)))
-      product.axes;
-    Buffer.add_string
-      buf
-      "  let min_with : type a l r. a Axis.t -> (a, l * r) axis_mode -> (l * Allowance.disallowed) t =\n\
-      \   fun axis m ->\n\
-      \    match axis with\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        bprintf
-          buf
-          "    | Axis.%s ->\n\
-          \      %s\n"
-          axis.ctor_name
-          (Printf.sprintf
-             "Solver_support.Raw.apply\n\
-             \        Lattices_univ.%s\n\
-             \        Lattices_univ.%s\n\
-             \        (Solver_support.Raw.disallow_right m)"
-             (solver_object_ctor_name_of_name module_name)
-             (solver_min_with_ctor_name module_name axis)))
-      product.axes;
-    Buffer.add_string
-      buf
-      "  let max_with : type a l r. a Axis.t -> (a, l * r) axis_mode -> (Allowance.disallowed * r) t =\n\
-      \   fun axis m ->\n\
-      \    match axis with\n";
-    List.iter
-      (fun (axis : axis_object) ->
-        bprintf
-          buf
-          "    | Axis.%s ->\n\
-          \      %s\n"
-          axis.ctor_name
-          (Printf.sprintf
-             "Solver_support.Raw.apply\n\
-             \        Lattices_univ.%s\n\
-             \        Lattices_univ.%s\n\
-             \        (Solver_support.Raw.disallow_left m)"
-             (solver_object_ctor_name_of_name module_name)
-             (solver_max_with_ctor_name module_name axis)))
-      product.axes;
-    List.iter
-      (fun (field : field) ->
-        let axis = axis_ctor_name field.name in
-        bprintf
-          buf
-          "  let proj_%s m = Obj.magic (proj Axis.%s m)\n\
-          \  let min_with_%s m = min_with Axis.%s (Obj.magic m)\n\
-          \  let max_with_%s m = max_with Axis.%s (Obj.magic m)\n"
-          field.name
-          axis
-          field.name
-          axis
-          field.name
-          axis)
-      product.fields;
-    Buffer.add_string buf "\n");
+  Buffer.add_string buf "  }\n\n";
+  Buffer.add_string buf "  type nonrec product = t\n\n";
+  Buffer.add_string buf "  module Axis : sig\n";
+  Buffer.add_string buf "    type _ t = ..\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "    type _ t += %s : %s.t t\n"
+        (axis_ctor_name field.name)
+        (field_module_name field ~in_op))
+    product.fields;
+  Buffer.add_string
+    buf
+    "    type packed = Pack : 'a t -> packed\n\
+    \    val packed : 'a t -> packed\n\
+    \    val all : packed list\n\
+    \    val name : 'a t -> string\n\
+    \    val pp : Format.formatter -> 'a t -> unit\n\
+    \    val proj : 'a t -> product -> 'a\n\
+    \    val set : 'a t -> 'a -> product -> product\n\
+    \    val min_with : 'a t -> 'a -> product\n\
+    \    val max_with : 'a t -> 'a -> product\n\
+    \  end\n\n";
+  Buffer.add_string buf "  val of_view : view -> t\n";
+  Buffer.add_string buf "  val view : t -> view\n";
+  Buffer.add_string buf "  val make :\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "    %s:%s.t ->\n"
+        field.name
+        (field_module_name field ~in_op))
+    product.fields;
+  Buffer.add_string buf "    t\n";
+  List.iter
+    (fun (field : field) ->
+      let field_mod = field_module_name field ~in_op in
+      bprintf buf "  val %s : t -> %s.t\n" (proj_name field) field_mod;
+      bprintf buf "  val %s : %s.t -> t -> t\n" (with_name field) field_mod;
+      bprintf buf "  val %s : %s.t -> t\n" (min_with_name field) field_mod;
+      bprintf buf "  val %s : %s.t -> t\n" (max_with_name field) field_mod;
+      bprintf buf "  val %s : t\n" (bot_name field);
+      bprintf buf "  val %s : t\n" (top_name field))
+    product.fields;
   Buffer.add_string buf "end\n\n"
 
-let find_base model name =
-  match String_map.find name model.lattices with
-  | Base base -> base
-  | Product _ -> invalid_arg "expected a base lattice"
+let add_product_ml buf (product : product) module_name desc ~in_op =
+  bprintf buf "module %s = struct\n" module_name;
+  add_common_ml_items buf desc product.repr_validator;
+  Buffer.add_string buf "  type view = {\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "    %s : %s.t;\n"
+        field.name
+        (field_module_name field ~in_op))
+    product.fields;
+  Buffer.add_string buf "  }\n\n";
+  Buffer.add_string buf "  type nonrec product = t\n\n";
+  Buffer.add_string buf "  let of_view view =\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "    let %s = (view.%s land %d) lsl %d in\n"
+        field.name
+        field.name
+        field.raw_mask
+        field.shift)
+    product.fields;
+  Buffer.add_string buf "    ";
+  List.iteri
+    (fun i (field : field) ->
+      if i > 0 then Buffer.add_string buf " lor ";
+      Buffer.add_string buf field.name)
+    product.fields;
+  Buffer.add_string buf "\n\n";
+  Buffer.add_string buf "  let view t =\n";
+  Buffer.add_string buf "    {\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      %s = (t lsr %d) land %d;\n"
+        field.name
+        field.shift
+        field.raw_mask)
+    product.fields;
+  Buffer.add_string buf "    }\n\n";
+  Buffer.add_string buf "  let make =\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf buf "    fun ~%s ->\n" field.name)
+    product.fields;
+  Buffer.add_string buf "    of_view {\n";
+  List.iter
+    (fun (field : field) -> bprintf buf "      %s;\n" field.name)
+    product.fields;
+  Buffer.add_string buf "    }\n\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "  let %s t = (t lsr %d) land %d\n"
+        (proj_name field)
+        field.shift
+        field.raw_mask;
+      bprintf
+        buf
+        "  let %s x t = (t land lnot %d) lor ((x land %d) lsl %d)\n"
+        (with_name field)
+        field.layout_mask
+        field.raw_mask
+        field.shift;
+      bprintf
+        buf
+        "  let %s x = %s x bottom\n"
+        (min_with_name field)
+        (with_name field);
+      bprintf
+        buf
+        "  let %s x = %s x top\n"
+        (max_with_name field)
+        (with_name field);
+      bprintf buf "  let %s = %s bottom\n" (bot_name field) (min_with_name field);
+      bprintf buf "  let %s = %s top\n\n" (top_name field) (max_with_name field))
+    product.fields;
+  Buffer.add_string buf "  module Axis = struct\n";
+  Buffer.add_string buf "    type _ t = ..\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "    type _ t += %s : %s.t t\n"
+        (axis_ctor_name field.name)
+        (field_module_name field ~in_op))
+    product.fields;
+  Buffer.add_string
+    buf
+    "    type packed = Pack : 'a t -> packed\n\
+    \n\
+    \    let packed axis = Pack axis\n\
+    \n\
+    \    let all =\n\
+    \      [\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf buf "        Pack %s;\n" (axis_ctor_name field.name))
+    product.fields;
+  Buffer.add_string
+    buf
+    "      ]\n\
+    \n\
+    \    let name : type a. a t -> string = function\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | %s -> %S\n"
+        (axis_ctor_name field.name)
+        field.name)
+    product.fields;
+  Buffer.add_string buf "      | _ -> invalid_arg \"unknown axis\"\n";
+  Buffer.add_string
+    buf
+    "\n\
+    \    let pp ppf axis = Format.pp_print_string ppf (name axis)\n\
+    \n\
+    \    let proj : type a. a t -> product -> a = function\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | %s -> %s\n"
+        (axis_ctor_name field.name)
+        (proj_name field))
+    product.fields;
+  Buffer.add_string buf "      | _ -> invalid_arg \"unknown axis\"\n";
+  Buffer.add_string
+    buf
+    "\n\
+    \    let set : type a. a t -> a -> product -> product = function\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | %s -> %s\n"
+        (axis_ctor_name field.name)
+        (with_name field))
+    product.fields;
+  Buffer.add_string buf "      | _ -> invalid_arg \"unknown axis\"\n";
+  Buffer.add_string
+    buf
+    "\n\
+    \    let min_with : type a. a t -> a -> product = function\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | %s -> %s\n"
+        (axis_ctor_name field.name)
+        (min_with_name field))
+    product.fields;
+  Buffer.add_string buf "      | _ -> invalid_arg \"unknown axis\"\n";
+  Buffer.add_string
+    buf
+    "\n\
+    \    let max_with : type a. a t -> a -> product = function\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      | %s -> %s\n"
+        (axis_ctor_name field.name)
+        (max_with_name field))
+    product.fields;
+  Buffer.add_string buf "      | _ -> invalid_arg \"unknown axis\"\n";
+  Buffer.add_string buf "  end\n\n";
+  Buffer.add_string buf "  let name x =\n";
+  Buffer.add_string buf "    let view = view x in\n";
+  Buffer.add_string buf "    let b = Buffer.create 64 in\n";
+  bprintf buf "    Buffer.add_string b %S;\n" (module_name ^ " { ");
+  List.iteri
+    (fun i (field : field) ->
+      if i > 0 then Buffer.add_string buf "    Buffer.add_string b \"; \";\n";
+      bprintf buf "    Buffer.add_string b %S;\n" (field.name ^ " = ");
+      bprintf
+        buf
+        "    Buffer.add_string b (%s.show view.%s);\n"
+        (field_module_name field ~in_op)
+        field.name)
+    product.fields;
+  Buffer.add_string buf "    Buffer.add_string b \" }\";\n";
+  Buffer.add_string buf "    Buffer.contents b\n\n";
+  Buffer.add_string buf "  let pp ppf x = Format.pp_print_string ppf (name x)\n";
+  Buffer.add_string buf "  let show x = name x\n";
+  Buffer.add_string buf "  let of_name _ = None\n";
+  Buffer.add_string buf "  let legacy =\n";
+  Buffer.add_string buf "    make\n";
+  List.iter
+    (fun (field : field) ->
+      bprintf
+        buf
+        "      ~%s:%s.legacy\n"
+        field.name
+        (field_module_name field ~in_op))
+    product.fields;
+  Buffer.add_string buf "end\n\n"
 
-let morphism_of_slot = Emit_common.morphism_of_slot
+let add_primitive_morph_sig buf (primitive : primitive_morph) =
+  let core = primitive.core in
+  bprintf
+    buf
+    "val %s : %s.t -> %s.t\n"
+    core.name
+    (module_name_of_expr core.source)
+    (module_name_of_expr core.target)
 
-let add_morphism_ml buf model name morphism =
-  let domain = find_base model morphism.domain in
-  let codomain = find_base model morphism.codomain in
-  bprintf buf "  let %s = function\n" name;
+let lattice_module_sig_and_ml buf_mli buf_ml lattice =
+  match lattice with
+  | Base base ->
+    add_base_sig buf_mli base base.name;
+    add_base_sig buf_mli base (Name.op_module_name base.name);
+    add_base_ml buf_ml base base.name base.descriptor;
+    add_base_ml buf_ml base (Name.op_module_name base.name) base.op_descriptor
+  | Product product ->
+    add_product_sig buf_mli product product.name ~in_op:false;
+    add_product_sig buf_mli product (Name.op_module_name product.name) ~in_op:true;
+    add_product_ml buf_ml product product.name product.descriptor ~in_op:false;
+    add_product_ml
+      buf_ml
+      product
+      (Name.op_module_name product.name)
+      product.op_descriptor
+      ~in_op:true
+
+let source_element_name lattice_name index model =
+  match String_map.find lattice_name model.lattices with
+  | Base base -> base.element_value_names.(index)
+  | Product _ -> invalid_arg "primitive morph endpoints must be base lattices"
+
+let product_field_module_name model (expr : lattice_expr) field_name =
+  match String_map.find expr.name model.lattices with
+  | Base _ -> invalid_arg "expected product lattice"
+  | Product product ->
+    let field =
+      match List.find_opt (fun (field : field) -> String.equal field.name field_name) product.fields with
+      | Some field -> field
+      | None -> invalid_arg "unknown bridge target field"
+    in
+    let effective_ty =
+      if expr.opposite then flip_expr field.ty else field.ty
+    in
+    module_name_of_expr effective_ty
+
+let add_primitive_morph_ml buf model (primitive : primitive_morph) =
+  let core = primitive.core in
+  let src_module = module_name_of_expr core.source in
+  let dst_module = module_name_of_expr core.target in
+  bprintf buf "  %s x =\n" core.name;
   Array.iteri
     (fun i target ->
-      bprintf
-        buf
-        "    | %d -> %s.Const.%s\n"
-        domain.element_values.(i)
-        codomain.name
-        codomain.element_value_names.(target))
-    morphism.map;
-  Buffer.add_string buf "    | _ -> invalid_arg \"invalid lattice element\"\n"
+      let src_name = source_element_name core.source.name i model in
+      let dst_name = source_element_name core.target.name target model in
+      if i = 0
+      then
+        bprintf
+          buf
+          "    if %s.equal x %s.%s then %s.%s\n"
+          src_module
+          src_module
+          src_name
+          dst_module
+          dst_name
+      else
+        bprintf
+          buf
+          "    else if %s.equal x %s.%s then %s.%s\n"
+          src_module
+          src_module
+          src_name
+          dst_module
+          dst_name)
+    core.map;
+  bprintf buf "    else invalid_arg %S\n" core.name
 
-let add_embedding_ml buf model (embedding : embedding) =
-  bprintf buf "module %s = struct\n" embedding.module_name;
-  add_morphism_ml buf model "embed" embedding.embed;
-  List.iteri
-    (fun i (morphism : morphism) ->
-      add_morphism_ml buf model ("left" ^ string_of_int (i + 1)) morphism)
-    embedding.left_chain;
-  List.iteri
-    (fun i (morphism : morphism) ->
-      add_morphism_ml buf model ("right" ^ string_of_int (i + 1)) morphism)
-    embedding.right_chain;
+let add_bridge_ml buf model (bridge : product_bridge) =
+  let core = bridge.core in
+  let src_module = module_name_of_expr core.source in
+  let dst_module = module_name_of_expr core.target in
+  bprintf buf "  %s x =\n" core.name;
+  bprintf buf "    %s.make\n" dst_module;
   List.iter
-    (fun (alias_name, slot) ->
-      bprintf buf "  let %s = %s\n" alias_name slot;
-      ignore (morphism_of_slot embedding slot))
-    embedding.aliases;
-  Buffer.add_string buf "end\n\n"
+    (fun (assignment : bridge_assignment) ->
+      bprintf buf "      ~%s:(" assignment.target_field;
+      (match assignment.expr with
+       | Source_field source_field ->
+         bprintf buf "%s.proj_%s x" src_module source_field
+       | Morph_apply { morph_name; source_field } ->
+         bprintf buf "%s (%s.proj_%s x)" morph_name src_module source_field
+       | Min ->
+         bprintf
+           buf
+           "%s.bottom"
+           (product_field_module_name model core.target assignment.target_field)
+       | Max ->
+         bprintf
+           buf
+           "%s.top"
+           (product_field_module_name model core.target assignment.target_field));
+      Buffer.add_string buf ")\n")
+    bridge.assignments
 
-type exported_alias = Emit_common.exported_alias =
-  { alias_name : string;
-    module_name : string;
-    morphism : morphism
-  }
+let add_morphs_sig buf model =
+  String_map.iter
+    (fun _ morph ->
+      match morph with
+      | Primitive primitive -> add_primitive_morph_sig buf primitive
+      | Bridge bridge ->
+        let core = bridge.core in
+        bprintf
+          buf
+          "val %s : %s.t -> %s.t\n"
+          core.name
+          (module_name_of_expr core.source)
+          (module_name_of_expr core.target))
+    model.morphs
 
-let collect_exported_aliases = Emit_common.collect_exported_aliases
+let add_morphs_ml buf model =
+  let morphs = String_map.bindings model.morphs |> List.map snd in
+  match morphs with
+  | [] -> ()
+  | first :: rest ->
+    Buffer.add_string buf "let rec\n";
+    (match first with
+     | Primitive primitive -> add_primitive_morph_ml buf model primitive
+     | Bridge bridge -> add_bridge_ml buf model bridge);
+    List.iter
+      (fun morph ->
+        Buffer.add_string buf "\nand\n";
+        match morph with
+        | Primitive primitive -> add_primitive_morph_ml buf model primitive
+        | Bridge bridge -> add_bridge_ml buf model bridge)
+      rest;
+    Buffer.add_string buf "\n"
 
-let add_exported_aliases_sig buf aliases =
-  List.iter
-    (fun alias ->
-      bprintf
-        buf
-        "val %s : %s.const -> %s.const\n"
-        alias.alias_name
-        alias.morphism.domain
-        alias.morphism.codomain)
-    aliases;
-  if aliases <> [] then Buffer.add_string buf "\n"
-
-let add_exported_aliases_ml buf aliases =
-  List.iter
-    (fun alias ->
-      bprintf
-        buf
-        "let %s = %s.%s\n"
-        alias.alias_name
-        alias.module_name
-        alias.alias_name)
-    aliases;
-  if aliases <> [] then Buffer.add_string buf "\n"
-
-let add_exported_aliases_top_sig buf model =
-  let aliases = collect_exported_aliases model in
-  add_exported_aliases_sig buf aliases
-
-let add_exported_aliases_top_ml buf model =
-  let aliases = collect_exported_aliases model in
-  add_exported_aliases_ml buf aliases
-
-let add_test_ml = Emit_test.add_test_ml
-
-let render ?(config = Render_config.default) ~root_module model =
-  let mli = Buffer.create 4096 in
-  let ml = Buffer.create 8192 in
-  let test_ml = Buffer.create 8192 in
-  add_test_ml test_ml model ~root_module;
-  add_const_op_functor_ml ml;
-  add_lattices_const_ml ml model;
-  if config.include_solver
-  then (
-    add_lattices_univ_ml ml model;
-    add_solver_wrapper_functor_ml ml);
+let render ~root_module:_ model =
+  let ml = Buffer.create 16384 in
+  let mli = Buffer.create 8192 in
   List.iter
     (function
-      | Lattice (Base base) ->
-        add_base_sig
-          mli
-          base
-          base.name
-          ~include_solver:config.include_solver;
-        add_base_sig
-          mli
-          base
-          (Name.op_module_name base.name)
-          ~include_solver:config.include_solver;
-        add_base_ml
-          ml
-          base
-          base.name
-          base.descriptor
-          ~include_solver:config.include_solver;
-        add_base_ml
-          ml
-          base
-          (Name.op_module_name base.name)
-          base.op_descriptor
-          ~include_solver:config.include_solver
-      | Lattice (Product product) ->
-        add_product_sig
-          mli
-          product
-          product.name
-          ~in_op:false
-          ~include_solver:config.include_solver;
-        add_product_sig
-          mli
-          product
-          (Name.op_module_name product.name)
-          ~in_op:true
-          ~include_solver:config.include_solver;
-        add_product_ml
-          ml
-          product
-          product.name
-          product.descriptor
-          ~in_op:false
-          ~include_solver:config.include_solver;
-        add_product_ml
-          ml
-          product
-          (Name.op_module_name product.name)
-          product.op_descriptor
-          ~in_op:true
-          ~include_solver:config.include_solver
-      | Embedding embedding ->
-        add_embedding_sig mli embedding;
-        add_embedding_ml ml model embedding)
+      | Lattice lattice -> lattice_module_sig_and_ml mli ml lattice
+      | Morph _ -> ())
     model.items;
-  add_exported_aliases_top_sig mli model;
-  add_exported_aliases_top_ml ml model;
-  { ml = Buffer.contents ml;
-    mli = Buffer.contents mli;
-    test_ml = Buffer.contents test_ml
-  }
+  add_morphs_sig mli model;
+  add_morphs_ml ml model;
+  { ml = Buffer.contents ml; mli = Buffer.contents mli }

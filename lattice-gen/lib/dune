@@ -7,4 +7,16 @@
 (library
  (name lattice_gen_lib)
  (wrapped false)
+ (modules
+  ast
+  emit
+  error
+  generate
+  lexer
+  location
+  model
+  name
+  observable
+  parse
+  parser)
  (libraries unix))

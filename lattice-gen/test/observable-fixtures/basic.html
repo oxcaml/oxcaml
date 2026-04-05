@@ -1,18 +1,331 @@
 <html>
-  <head><title>Basic Observable</title><link rel="stylesheet" href="lattice-observable.css" data-lattice-observable="css">
-<script src="lattice-observable.js" data-lattice-observable="js"></script>
-</head>
   <body>
+<!-- lattice-gen-scaffold:start -->
+
+<style>
+  lat {
+    --tok-comment: #64748b;
+    --tok-string: #0f766e;
+    --tok-number: #1d4ed8;
+    --tok-keyword: #7c3aed;
+    --tok-op: #b45309;
+    --tok-punct: #475569;
+    --tok-ctor: #be123c;
+    --tok-type: #0369a1;
+    --tok-ident: #0f172a;
+    display: block;
+    margin: 1.5rem 0;
+    padding: 1rem 1.1rem;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    border: 1px solid #dbe4f0;
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.98));
+    color: #0f172a;
+    font: 13px/1.6 Menlo, Monaco, Consolas, monospace;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    tab-size: 2;
+  }
+
+  .lattice-generated {
+    margin: 1.5rem 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+
+  .lattice-generated details {
+    margin: 0;
+  }
+
+  .lattice-generated summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.9rem 1rem;
+    font: 600 14px/1.2 ui-sans-serif, system-ui, sans-serif;
+    color: #0f172a;
+    background: linear-gradient(180deg, #f8fafc, #eef2ff);
+    border-bottom: 1px solid #dbe4f0;
+  }
+
+  .lattice-generated summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .lattice-generated-body {
+    padding: 0.9rem 1rem 1rem;
+  }
+
+  .lattice-generated-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .lattice-generated-tab {
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    background: #ffffff;
+    color: #334155;
+    font: 600 12px/1 ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .lattice-generated-tab.is-active {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #ffffff;
+  }
+
+  .lattice-generated-panel {
+    display: none;
+  }
+
+  .lattice-generated-panel.is-active {
+    display: block;
+  }
+
+  .lattice-generated pre {
+    --tok-comment: #94a3b8;
+    --tok-string: #86efac;
+    --tok-number: #93c5fd;
+    --tok-keyword: #c4b5fd;
+    --tok-op: #fbbf24;
+    --tok-punct: #cbd5e1;
+    --tok-ctor: #fda4af;
+    --tok-type: #67e8f9;
+    --tok-ident: #e2e8f0;
+    margin: 0;
+    padding: 1rem;
+    overflow-x: auto;
+    border-radius: 12px;
+    background: #0f172a;
+    color: #e2e8f0;
+    font: 12px/1.5 Menlo, Monaco, Consolas, monospace;
+  }
+
+  .tok-comment { color: var(--tok-comment); }
+  .tok-string { color: var(--tok-string); }
+  .tok-number { color: var(--tok-number); }
+  .tok-keyword { color: var(--tok-keyword); font-weight: 600; }
+  .tok-op { color: var(--tok-op); }
+  .tok-punct { color: var(--tok-punct); }
+  .tok-ctor { color: var(--tok-ctor); }
+  .tok-type { color: var(--tok-type); }
+  .tok-ident { color: var(--tok-ident); }
+</style>
+<script>
+  (() => {
+    const escapeHtml = text =>
+      text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const span = (cls, text) =>
+      '<span class="' + cls + '">' + escapeHtml(text) + '</span>';
+
+    const ocamlKeywords = new Set([
+      'and', 'as', 'begin', 'class', 'constraint', 'do', 'done', 'downto',
+      'else', 'end', 'exception', 'external', 'false', 'for', 'fun',
+      'function', 'functor', 'if', 'in', 'include', 'inherit', 'initializer',
+      'lazy', 'let', 'match', 'method', 'module', 'mutable', 'new', 'nonrec',
+      'object', 'of', 'open', 'or', 'private', 'rec', 'sig', 'struct', 'then',
+      'to', 'true', 'try', 'type', 'val', 'virtual', 'when', 'while', 'with'
+    ]);
+
+    const latticeKeywords = new Set(['id', 'max', 'min', 'op', 'via']);
+
+    const tokenRe =
+      /(\(\*[\s\S]*?\*\)|"(?:\\.|[^"\\])*"|\b\d+\b|\b[A-Z][A-Za-z0-9_']*\b|\b[a-z_][A-Za-z0-9_'-]*\b|->|<=|>=|<>|&&|\|\||[<>=|^:+\-*/]+|[][(){};,])/g;
+
+    const highlight = (text, language) => {
+      let out = '';
+      let last = 0;
+      text.replace(tokenRe, (token, _m, offset) => {
+        out += escapeHtml(text.slice(last, offset));
+        let cls;
+        if (token.startsWith('(*')) cls = 'tok-comment';
+        else if (token.startsWith('"')) cls = 'tok-string';
+        else if (/^\d+$/.test(token)) cls = 'tok-number';
+        else if (
+          /^[<>=|^:+\-*/]+$/.test(token) ||
+          /^(->|<=|>=|<>|&&|\|\|)$/.test(token)
+        ) cls = 'tok-op';
+        else if (/^[\[\](){};,]$/.test(token)) cls = 'tok-punct';
+        else if (/^[A-Z]/.test(token)) cls = language === 'lattice' ? 'tok-ident' : 'tok-ctor';
+        else if (language === 'ocaml' && ocamlKeywords.has(token)) cls = 'tok-keyword';
+        else if (language === 'lattice' && latticeKeywords.has(token)) cls = 'tok-keyword';
+        else cls = language === 'ocaml' ? 'tok-ident' : 'tok-type';
+        out += span(cls, token);
+        last = offset + token.length;
+        return token;
+      });
+      out += escapeHtml(text.slice(last));
+      return out;
+    };
+
+    const highlightLatBlocks = () => {
+      for (const block of document.querySelectorAll('lat')) {
+        const text = block.textContent.replace(/^\n+|\n+\s*$/g, '');
+        block.innerHTML = highlight(text, 'lattice');
+      }
+    };
+
+    const highlightGeneratedBlocks = () => {
+      for (const pre of document.querySelectorAll('.lattice-generated pre[data-language]')) {
+        pre.innerHTML = highlight(pre.textContent, pre.dataset.language);
+      }
+    };
+
+    const init = () => {
+      highlightLatBlocks();
+      highlightGeneratedBlocks();
+      const blocks = document.querySelectorAll('.lattice-generated');
+      for (const block of blocks) {
+        const tabs = block.querySelectorAll('.lattice-generated-tab');
+        const panels = block.querySelectorAll('.lattice-generated-panel');
+        const activate = kind => {
+          for (const tab of tabs) {
+            tab.classList.toggle('is-active', tab.dataset.panel === kind);
+          }
+          for (const panel of panels) {
+            panel.classList.toggle('is-active', panel.dataset.panel === kind);
+          }
+        };
+        for (const tab of tabs) {
+          tab.addEventListener('click', () => activate(tab.dataset.panel));
+        }
+        activate('ml');
+      }
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init, { once: true });
+    } else {
+      init();
+    }
+  })();
+</script>
+
+<!-- lattice-gen-scaffold:end -->
+
     <lat root-module="Demo">
 Locality = [
   Global < Local
 ]
-    </lat><out>
-<div class="lattice-observable lat-observable" data-default-tab="ml">
-<div class="lattice-observable__header"><span class="lattice-observable__title">Demo</span><span class="lattice-observable__meta">generated lattice library</span></div>
-<div class="lattice-observable__tabs"><button class="lattice-observable__tab is-active" data-lattice-tab="ml">Demo.ml</button><button class="lattice-observable__tab" data-lattice-tab="mli">Demo.mli</button><button class="lattice-observable__tab" data-lattice-tab="test">Demo_test.ml</button></div>
-<pre class="lattice-observable__panel is-active" data-lattice-panel="ml">module Make_const_op (Base : sig
-  type t
+    </lat>
+<!-- lattice-gen-output:start 1 -->
+<div class="lattice-generated">
+<details open>
+<summary>Generated 1</summary>
+<div class="lattice-generated-body">
+<div class="lattice-generated-tabs">
+<button type="button" class="lattice-generated-tab" data-panel="ml">.ml</button>
+<button type="button" class="lattice-generated-tab" data-panel="mli">.mli</button>
+</div>
+<div class="lattice-generated-panel" data-panel="ml">
+<pre data-language="ocaml">module Locality = struct
+  type t = int
+
+  module Repr = struct
+    type nonrec t = t
+    let mask = 1
+    let of_int_exn x =
+      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+      x
+  end
+
+  let bottom = 0
+  let top = 1
+  let[@inline] leq x y = (x land y) = x
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x lor y
+  let[@inline] meet x y = x land y
+  let[@inline] sub x y =
+    let zxy = x land lnot y in
+    zxy
+  let[@inline] imply x y =
+    let zxy = x land lnot y in
+    lnot zxy land 1
+
+  let global = 0
+  let local = 1
+
+  let name x =
+    if equal x global then &quot;Global&quot;
+    else if equal x local then &quot;Local&quot;
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_name = function
+    | &quot;Global&quot; -&gt; Some global
+    | &quot;Local&quot; -&gt; Some local
+    | _ -&gt; None
+
+  let pp ppf x = Format.pp_print_string ppf (name x)
+  let show x = name x
+  let legacy = global
+end
+
+module Locality_op = struct
+  type t = int
+
+  module Repr = struct
+    type nonrec t = t
+    let mask = 1
+    let of_int_exn x =
+      if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
+      x
+  end
+
+  let bottom = 1
+  let top = 0
+  let[@inline] leq x y = (x land y) = y
+  let[@inline] equal (x : t) (y : t) = x = y
+  let[@inline] join x y = x land y
+  let[@inline] meet x y = x lor y
+  let[@inline] sub x y =
+    let zyx = y land lnot x in
+    lnot zyx land 1
+  let[@inline] imply x y =
+    let zyx = y land lnot x in
+    zyx
+
+  let global = 0
+  let local = 1
+
+  let name x =
+    if equal x global then &quot;Global&quot;
+    else if equal x local then &quot;Local&quot;
+    else invalid_arg &quot;unknown lattice element&quot;
+
+  let of_name = function
+    | &quot;Global&quot; -&gt; Some global
+    | &quot;Local&quot; -&gt; Some local
+    | _ -&gt; None
+
+  let pp ppf x = Format.pp_print_string ppf (name x)
+  let show x = name x
+  let legacy = global
+end
+
+</pre>
+</div>
+<div class="lattice-generated-panel" data-panel="mli">
+<pre data-language="ocaml">module Locality : sig
+  type t = int
+
+  module Repr : sig
+    type nonrec t = t
+    val mask : int
+    val of_int_exn : int -&gt; t
+  end
+
   val bottom : t
   val top : t
   val leq : t -&gt; t -&gt; bool
@@ -23,1177 +336,44 @@ Locality = [
   val imply : t -&gt; t -&gt; t
   val pp : Format.formatter -&gt; t -&gt; unit
   val show : t -&gt; string
-  module Repr : sig
-    val bits : int
-    val mask : int
-    val to_int : t -&gt; int
-    val of_int_exn : int -&gt; t
-  end
+  val name : t -&gt; string
+  val of_name : string -&gt; t option
   val legacy : t
-  end) = struct
-  type t = Base.t
-  let bottom = Base.top
-  let top = Base.bottom
-  let leq x y = Base.leq y x
-  let equal = Base.equal
-  let join = Base.meet
-  let meet = Base.join
-  let sub x y = Base.imply y x
-  let imply x y = Base.sub y x
-  let pp = Base.pp
-  let show = Base.show
-  module Repr = Base.Repr
-  let min = bottom
-  let max = top
-  let le = leq
-  let print = pp
-  let legacy = Base.legacy
-end
-
-module Lattices_const = struct
-  [@@@warning &quot;-32-37&quot;]
-  module Locality = struct
-    type t = int
-    let global = 0
-    let local = 1
-    let bottom = 0
-    let top = 1
-    let[@inline] leq x y = (x land y) = x
-    let[@inline] equal (x : t) (y : t) = x = y
-    let[@inline] join x y = x lor y
-    let[@inline] meet x y = x land y
-    let[@inline] sub x y =
-      let zxy = x land lnot y in
-      zxy
-    let[@inline] imply x y =
-      let zxy = x land lnot y in
-      lnot zxy land 1
-    let name = function
-      | 0 -&gt; &quot;Global&quot;
-      | 1 -&gt; &quot;Local&quot;
-      | _ -&gt; invalid_arg &quot;invalid lattice element&quot;
-    let of_name = function
-      | &quot;Global&quot; -&gt; Some global
-      | &quot;Local&quot; -&gt; Some local
-      | _ -&gt; None
-    let pp ppf = function
-      | 0 -&gt; Format.pp_print_string ppf &quot;Global&quot;
-      | 1 -&gt; Format.pp_print_string ppf &quot;Local&quot;
-      | _ -&gt; invalid_arg &quot;invalid lattice element&quot;
-    let show t = Format.asprintf &quot;%a&quot; pp t
-    module Repr = struct
-      let bits = 1
-      let mask = 1
-      let to_int (x : t) = x
-      let of_int_exn x =
-        if x land lnot mask &lt;&gt; 0 then invalid_arg &quot;invalid representation&quot;;
-        x
-    end
-
-    let min = bottom
-    let max = top
-    let le = leq
-    let print = pp
-    let legacy = global
-  end
-
-  module Locality_op = struct
-    include Make_const_op (Locality)
-    let global = Locality.global
-    let local = Locality.local
-    let name = Locality.name
-    let of_name = Locality.of_name
-  end
-
-  type _ obj =
-    | Obj_Locality : Locality.t obj
-    | Obj_Locality_op : Locality_op.t obj
-
-  let obj_index : type a. a obj -&gt; int = function
-    | Obj_Locality -&gt; 0
-    | Obj_Locality_op -&gt; 1
-
-  let min : type a. a obj -&gt; a = function
-    | Obj_Locality -&gt; Locality.bottom
-    | Obj_Locality_op -&gt; Locality_op.bottom
-
-  let max : type a. a obj -&gt; a = function
-    | Obj_Locality -&gt; Locality.top
-    | Obj_Locality_op -&gt; Locality_op.top
-
-  let legacy : type a. a obj -&gt; a = function
-    | Obj_Locality -&gt; Locality.legacy
-    | Obj_Locality_op -&gt; Locality_op.legacy
-
-  let le : type a. a obj -&gt; a -&gt; a -&gt; bool = fun obj x y -&gt;
-      match obj with
-      | Obj_Locality -&gt; Locality.leq x y
-      | Obj_Locality_op -&gt; Locality_op.leq x y
-
-  let equal : type a. a obj -&gt; a -&gt; a -&gt; bool = fun obj x y -&gt;
-      match obj with
-      | Obj_Locality -&gt; Locality.equal x y
-      | Obj_Locality_op -&gt; Locality_op.equal x y
-
-  let join : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
-      match obj with
-      | Obj_Locality -&gt; Locality.join x y
-      | Obj_Locality_op -&gt; Locality_op.join x y
-
-  let meet : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
-      match obj with
-      | Obj_Locality -&gt; Locality.meet x y
-      | Obj_Locality_op -&gt; Locality_op.meet x y
-
-  let sub : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
-      match obj with
-      | Obj_Locality -&gt; Locality.sub x y
-      | Obj_Locality_op -&gt; Locality_op.sub x y
-
-  let imply : type a. a obj -&gt; a -&gt; a -&gt; a = fun obj x y -&gt;
-      match obj with
-      | Obj_Locality -&gt; Locality.imply x y
-      | Obj_Locality_op -&gt; Locality_op.imply x y
-
-  let print : type a. a obj -&gt; Format_doc.formatter -&gt; a -&gt; unit = fun obj ppf x -&gt;
-      match obj with
-      | Obj_Locality -&gt; Format_doc.pp_print_string ppf (Locality.show x)
-      | Obj_Locality_op -&gt; Format_doc.pp_print_string ppf (Locality_op.show x)
-
-  let _ = legacy, sub, imply
-
-  let equal_obj : type a b. a obj -&gt; b obj -&gt; (a, b) Misc.eq option =
-   fun obj1 obj2 -&gt;
-    match obj1, obj2 with
-    | Obj_Locality, Obj_Locality -&gt; Some Misc.Refl
-    | Obj_Locality_op, Obj_Locality_op -&gt; Some Misc.Refl
-    | _ -&gt; None
-
-  let compare_obj : type a b. a obj -&gt; b obj -&gt; (a, b) Misc.comparison =
-   fun obj1 obj2 -&gt;
-    match equal_obj obj1 obj2 with
-    | Some Misc.Refl -&gt; Misc.Equal
-    | None -&gt;
-      if obj_index obj1 &lt; obj_index obj2 then Misc.Less_than else Misc.Greater_than
-
-  let print_obj : type a. Format_doc.formatter -&gt; a obj -&gt; unit =
-   fun ppf -&gt; function
-    | Obj_Locality -&gt; Format_doc.fprintf ppf &quot;Locality&quot;
-    | Obj_Locality_op -&gt; Format_doc.fprintf ppf &quot;Locality_op&quot;
-
-end
-
-module Lattices_univ = struct
-  [@@@warning &quot;-32-37&quot;]
-  include Lattices_const
-  open Allowance
-  open Misc
-  module Fmt = Format_doc
-
-  type (&#39;a, &#39;b, &#39;d) morph =
-    | Id : (&#39;a, &#39;a, &#39;l * &#39;r) morph
-    | Compose :
-        (&#39;b, &#39;c, &#39;l * &#39;r) morph * (&#39;a, &#39;b, &#39;l * &#39;r) morph
-        -&gt; (&#39;a, &#39;c, &#39;l * &#39;r) morph
-    constraint &#39;d = _ * _
-  [@@ocaml.warning &quot;-62&quot;]
-
-  include Magic_allow_disallow (struct
-    type (&#39;a, &#39;b, &#39;d) sided = (&#39;a, &#39;b, &#39;d) morph constraint &#39;d = &#39;l * &#39;r
-
-    let disallow_right : type a b l r.
-        (a, b, l * r) sided -&gt; (a, b, l * disallowed) sided = Obj.magic
-    let disallow_left : type a b l r.
-        (a, b, l * r) sided -&gt; (a, b, disallowed * r) sided = Obj.magic
-    let allow_right : type a b l r.
-        (a, b, l * allowed) sided -&gt; (a, b, l * r) sided = Obj.magic
-    let allow_left : type a b l r.
-        (a, b, allowed * r) sided -&gt; (a, b, l * r) sided = Obj.magic
-  end)
-
-  let rec src : type a b l r. b obj -&gt; (a, b, l * r) morph -&gt; a obj =
-   fun dst -&gt; function
-    | Id -&gt; dst
-    | Compose (f, g) -&gt; src (src dst f) g
-
-  let id = Id
-
-  let maybe_compose : type a b c l r.
-      c obj -&gt; (b, c, l * r) morph -&gt; (a, b, l * r) morph -&gt; (a, c, l * r) morph =
-   fun _dst f g -&gt;
-    match f, g with
-    | Id, g -&gt; g
-    | f, Id -&gt; f
-    | _ -&gt; Compose (f, g)
-
-  let compose = maybe_compose
-
-  let rec left_adjoint : type a b l.
-      b obj -&gt; (a, b, l * allowed) morph -&gt; (b, a, left_only) morph =
-   fun dst -&gt; function
-    | Id -&gt; Id
-    | Compose (f, g) -&gt;
-      Compose (left_adjoint (src dst f) g, left_adjoint dst f)
-
-  let rec right_adjoint : type a b r.
-      b obj -&gt; (a, b, allowed * r) morph -&gt; (b, a, right_only) morph =
-   fun dst -&gt; function
-    | Id -&gt; Id
-    | Compose (f, g) -&gt;
-      Compose (right_adjoint (src dst f) g, right_adjoint dst f)
-
-  let rec apply : type a b l r. b obj -&gt; (a, b, l * r) morph -&gt; a -&gt; b =
-   fun dst morph x -&gt;
-    match morph with
-    | Id -&gt; x
-    | Compose (f, g) -&gt; apply dst f (apply (src dst f) g x)
-
-  let rec morph_key : type a b l r. (a, b, l * r) morph -&gt; string = function
-    | Id -&gt; &quot;Id&quot;
-    | Compose (f, g) -&gt; &quot;Compose(&quot; ^ morph_key f ^ &quot;,&quot; ^ morph_key g ^ &quot;)&quot;
-
-  let equal_morph : type a0 a1 b l0 r0 l1 r1.
-      b obj -&gt;
-      (a0, b, l0 * r0) morph -&gt;
-      (a1, b, l1 * r1) morph -&gt;
-      (a0, a1) Misc.eq option =
-   fun _dst m1 m2 -&gt;
-    if String.equal (morph_key m1) (morph_key m2)
-    then Some (Obj.magic Misc.Refl)
-    else None
-
-  let compare_morph : type a0 a1 b l0 r0 l1 r1.
-      b obj -&gt;
-      (a0, b, l0 * r0) morph -&gt;
-      (a1, b, l1 * r1) morph -&gt;
-      (a0, a1) Misc.comparison =
-   fun _dst m1 m2 -&gt;
-    if String.equal (morph_key m1) (morph_key m2)
-    then Obj.magic Equal
-    else if String.compare (morph_key m1) (morph_key m2) &lt; 0
-    then Less_than
-    else Greater_than
-
-  let print_morph : type a b l r. b obj -&gt; Fmt.formatter -&gt; (a, b, l * r) morph -&gt; unit =
-   fun _dst ppf morph -&gt; Fmt.fprintf ppf &quot;%s&quot; (morph_key morph)
-
-end
-
-module Solver_support = Solver_runtime.Make (Lattices_univ)
-
-module Make_solver_core
-    (Const_desc : sig
-      type t
-      module Repr : sig
-        val to_int : t -&gt; int
-      end
-      val legacy : t
-    end)
-    (Obj_desc : sig
-      val obj : int Solver_support.obj
-    end) =
-struct
-  include Solver_support.Positive_gen (Obj_desc)
-
-  let of_const_value c = of_const (Const_desc.Repr.to_int c)
-  let legacy = of_const_value Const_desc.legacy
-  let show ?verbose t = Format_doc.asprintf &quot;%a&quot; (print ?verbose) t
-end
-
-module Make_solver_module
-    (Const_desc : sig
-      type t
-      val pp : Format.formatter -&gt; t -&gt; unit
-      module Repr : sig
-        val to_int : t -&gt; int
-        val of_int_exn : int -&gt; t
-      end
-      val legacy : t
-    end)
-    (Obj_desc : sig
-      val obj : int Solver_support.obj
-    end) =
-struct
-  include Make_solver_core (struct
-    type t = Const_desc.t
-    module Repr = struct
-      let to_int = Const_desc.Repr.to_int
-    end
-    let legacy = Const_desc.legacy
-  end) (Obj_desc)
-
-  type simple_error = {
-    left : Const_desc.t;
-    right : Const_desc.t;
-  }
-
-  type error = simple_error
-
-  type equate_step =
-    | Left_le_right
-    | Right_le_left
-
-  type equate_error = equate_step * error
-
-  let error_of_raw ({ left; right; _ } : int Solver_support.Raw.error_raw) =
-    {
-      left = Const_desc.Repr.of_int_exn left;
-      right = Const_desc.Repr.of_int_exn right;
-    }
-
-  let to_simple_error error = error
-
-  let print_error ppf { left; right } =
-    Format.fprintf ppf &quot;%a &lt;= %a does not hold&quot; Const_desc.pp left Const_desc.pp right
-
-  let print_equate_error ppf = function
-    | Left_le_right, error -&gt;
-      Format.fprintf ppf &quot;Left_le_right: %a&quot; print_error error
-    | Right_le_left, error -&gt;
-      Format.fprintf ppf &quot;Right_le_left: %a&quot; print_error error
-
-  let submode a b = Result.map_error error_of_raw (submode_raw a b)
-
-  let submode_exn a b =
-    match submode a b with
-    | Ok () -&gt; ()
-    | Error error -&gt; invalid_arg (Format.asprintf &quot;%a&quot; print_error error)
-
-  let equate a b =
-    Result.map_error
-      (fun (forward, error) -&gt;
-        ((if forward then Left_le_right else Right_le_left), error_of_raw error))
-      (equate_raw a b)
-
-  let equate_exn a b =
-    match equate a b with
-    | Ok () -&gt; ()
-    | Error error -&gt; invalid_arg (Format.asprintf &quot;%a&quot; print_equate_error error)
-end
-
-module Locality = struct
-  module Const = Lattices_const.Locality
-  type const = Const.t
-
-  include Make_solver_module (Const) (struct
-    let obj = Lattices_univ.Obj_Locality
-  end)
-  let global = of_const_value Const.global
-  let local = of_const_value Const.local
-end
-
-module Locality_op = struct
-  module Const = Lattices_const.Locality_op
-  type const = Const.t
-
-  include Make_solver_module (Const) (struct
-    let obj = Lattices_univ.Obj_Locality_op
-  end)
-  let global = of_const_value Const.global
-  let local = of_const_value Const.local
-end
-
-</pre><pre class="lattice-observable__panel" data-lattice-panel="mli">module Locality : sig
-  module Const : sig
-    type t = private int
-
-    val global : t
-    val local : t
-
-    val bottom : t
-    val top : t
-
-    val leq : t -&gt; t -&gt; bool
-    val equal : t -&gt; t -&gt; bool
-    val join : t -&gt; t -&gt; t
-    val meet : t -&gt; t -&gt; t
-    val sub : t -&gt; t -&gt; t
-    val imply : t -&gt; t -&gt; t
-
-    val name : t -&gt; string
-    val of_name : string -&gt; t option
-    val pp : Format.formatter -&gt; t -&gt; unit
-    val show : t -&gt; string
-
-    module Repr : sig
-      val bits : int
-      val mask : int
-      val to_int : t -&gt; int
-      val of_int_exn : int -&gt; t
-    end
-
-    val min : t
-    val max : t
-    val le : t -&gt; t -&gt; bool
-    val print : Format.formatter -&gt; t -&gt; unit
-    val legacy : t
-  end
-  type const = Const.t
-
-  type &#39;d t constraint &#39;d = &#39;l * &#39;r
-
-  type l = (Allowance.allowed * Allowance.disallowed) t
-  type r = (Allowance.disallowed * Allowance.allowed) t
-  type lr = (Allowance.allowed * Allowance.allowed) t
-
-  type simple_error = {
-    left : const;
-    right : const;
-  }
-
-  type error = simple_error
-
-  type equate_step =
-    | Left_le_right
-    | Right_le_left
-
-  type equate_error = equate_step * error
-
-  val min : lr
-  val max : lr
-  val legacy : lr
-
-  val of_const : const -&gt; (&#39;l * &#39;r) t
-  val to_const_exn : lr -&gt; const
-
-  val newvar : unit -&gt; (&#39;l * &#39;r) t
-  val newvar_above : l -&gt; (&#39;l * &#39;r) t * bool
-  val newvar_below : r -&gt; (&#39;l * &#39;r) t * bool
-
-  val to_simple_error : error -&gt; simple_error
-  val print_error : Format.formatter -&gt; error -&gt; unit
-  val print_equate_error : Format.formatter -&gt; equate_error -&gt; unit
-
-  val submode : l -&gt; r -&gt; (unit, error) result
-  val submode_exn : l -&gt; r -&gt; unit
-  val equate : lr -&gt; lr -&gt; (unit, equate_error) result
-  val equate_exn : lr -&gt; lr -&gt; unit
-
-  val join : l list -&gt; l
-  val meet : r list -&gt; r
-
-  val print : ?verbose:bool -&gt; Format_doc.formatter -&gt; (&#39;l * &#39;r) t -&gt; unit
-  val show : ?verbose:bool -&gt; (&#39;l * &#39;r) t -&gt; string
-
-  val zap_to_floor : l -&gt; const
-  val zap_to_ceil : r -&gt; const
-
-  val global : lr
-  val local : lr
-
+  val global : t
+  val local : t
 end
 
 module Locality_op : sig
-  module Const : sig
-    type t = Locality.Const.t
+  type t = int
 
-    val global : t
-    val local : t
-
-    val bottom : t
-    val top : t
-
-    val leq : t -&gt; t -&gt; bool
-    val equal : t -&gt; t -&gt; bool
-    val join : t -&gt; t -&gt; t
-    val meet : t -&gt; t -&gt; t
-    val sub : t -&gt; t -&gt; t
-    val imply : t -&gt; t -&gt; t
-
-    val name : t -&gt; string
-    val of_name : string -&gt; t option
-    val pp : Format.formatter -&gt; t -&gt; unit
-    val show : t -&gt; string
-
-    module Repr : sig
-      val bits : int
-      val mask : int
-      val to_int : t -&gt; int
-      val of_int_exn : int -&gt; t
-    end
-
-    val min : t
-    val max : t
-    val le : t -&gt; t -&gt; bool
-    val print : Format.formatter -&gt; t -&gt; unit
-    val legacy : t
+  module Repr : sig
+    type nonrec t = t
+    val mask : int
+    val of_int_exn : int -&gt; t
   end
-  type const = Const.t
 
-  type &#39;d t constraint &#39;d = &#39;l * &#39;r
-
-  type l = (Allowance.allowed * Allowance.disallowed) t
-  type r = (Allowance.disallowed * Allowance.allowed) t
-  type lr = (Allowance.allowed * Allowance.allowed) t
-
-  type simple_error = {
-    left : const;
-    right : const;
-  }
-
-  type error = simple_error
-
-  type equate_step =
-    | Left_le_right
-    | Right_le_left
-
-  type equate_error = equate_step * error
-
-  val min : lr
-  val max : lr
-  val legacy : lr
-
-  val of_const : const -&gt; (&#39;l * &#39;r) t
-  val to_const_exn : lr -&gt; const
-
-  val newvar : unit -&gt; (&#39;l * &#39;r) t
-  val newvar_above : l -&gt; (&#39;l * &#39;r) t * bool
-  val newvar_below : r -&gt; (&#39;l * &#39;r) t * bool
-
-  val to_simple_error : error -&gt; simple_error
-  val print_error : Format.formatter -&gt; error -&gt; unit
-  val print_equate_error : Format.formatter -&gt; equate_error -&gt; unit
-
-  val submode : l -&gt; r -&gt; (unit, error) result
-  val submode_exn : l -&gt; r -&gt; unit
-  val equate : lr -&gt; lr -&gt; (unit, equate_error) result
-  val equate_exn : lr -&gt; lr -&gt; unit
-
-  val join : l list -&gt; l
-  val meet : r list -&gt; r
-
-  val print : ?verbose:bool -&gt; Format_doc.formatter -&gt; (&#39;l * &#39;r) t -&gt; unit
-  val show : ?verbose:bool -&gt; (&#39;l * &#39;r) t -&gt; string
-
-  val zap_to_floor : l -&gt; const
-  val zap_to_ceil : r -&gt; const
-
-  val global : lr
-  val local : lr
-
+  val bottom : t
+  val top : t
+  val leq : t -&gt; t -&gt; bool
+  val equal : t -&gt; t -&gt; bool
+  val join : t -&gt; t -&gt; t
+  val meet : t -&gt; t -&gt; t
+  val sub : t -&gt; t -&gt; t
+  val imply : t -&gt; t -&gt; t
+  val pp : Format.formatter -&gt; t -&gt; unit
+  val show : t -&gt; string
+  val name : t -&gt; string
+  val of_name : string -&gt; t option
+  val legacy : t
+  val global : t
+  val local : t
 end
-
-</pre><pre class="lattice-observable__panel" data-lattice-panel="test">open Demo
-
-[@@@warning &quot;-32&quot;]
-
-let exhaustive_threshold = 256
-
-let repr_exhaustive_threshold = 4096
-
-let sample_count = 200
-
-let rng = Random.State.make [| 0x51ed; 0x1234; 0x2026 |]
-
-let fail fmt = Printf.ksprintf failwith fmt
-
-let ensure cond fmt =
-  Printf.ksprintf (fun message -&gt; if not cond then fail &quot;%s&quot; message) fmt
-
-let safe_product limit a b =
-  if a = 0 || b = 0
-  then 0
-  else if a &gt; limit / b
-  then limit + 1
-  else a * b
-
-let should_exhaust sizes =
-  List.fold_left (safe_product exhaustive_threshold) 1 sizes
-  &lt;= exhaustive_threshold
-
-let iter1 xs f =
-  let xs = Array.of_list xs in
-  let nx = Array.length xs in
-  if should_exhaust [ nx ]
-  then
-    for i = 0 to nx - 1 do
-      f xs.(i)
-    done
-  else
-    for _ = 1 to sample_count do
-      f xs.(Random.State.int rng nx)
-    done
-
-let iter2 xs ys f =
-  let xs = Array.of_list xs in
-  let ys = Array.of_list ys in
-  let nx = Array.length xs in
-  let ny = Array.length ys in
-  if should_exhaust [ nx; ny ]
-  then (
-    for i = 0 to nx - 1 do
-      for j = 0 to ny - 1 do
-        f xs.(i) ys.(j)
-      done
-    done)
-  else
-    for _ = 1 to sample_count do
-      f
-        xs.(Random.State.int rng nx)
-        ys.(Random.State.int rng ny)
-    done
-
-let iter3 xs ys zs f =
-  let xs = Array.of_list xs in
-  let ys = Array.of_list ys in
-  let zs = Array.of_list zs in
-  let nx = Array.length xs in
-  let ny = Array.length ys in
-  let nz = Array.length zs in
-  if should_exhaust [ nx; ny; nz ]
-  then (
-    for i = 0 to nx - 1 do
-      for j = 0 to ny - 1 do
-        for k = 0 to nz - 1 do
-          f xs.(i) ys.(j) zs.(k)
-        done
-      done
-    done)
-  else
-    for _ = 1 to sample_count do
-      f
-        xs.(Random.State.int rng nx)
-        ys.(Random.State.int rng ny)
-        zs.(Random.State.int rng nz)
-    done
-
-let values_of_repr mask of_int_exn =
-  if mask &lt;= repr_exhaustive_threshold
-  then (
-    let acc = ref [] in
-    for i = 0 to mask do
-      try acc := of_int_exn i :: !acc with
-      | Invalid_argument _ -&gt; ()
-    done;
-    List.rev !acc)
-  else (
-    let acc = ref [] in
-    let target = max exhaustive_threshold sample_count in
-    let try_add i =
-      try
-        let value = of_int_exn i in
-        if not (List.exists (( = ) value) !acc) then acc := value :: !acc
-      with
-      | Invalid_argument _ -&gt; ()
-    in
-    List.iter try_add [ 0; mask; mask land lnot 1; mask lsr 1; 1 ];
-    let attempts = ref 0 in
-    while List.length !acc &lt; target &amp;&amp; !attempts &lt; target * 32 do
-      incr attempts;
-      try_add (Random.State.int rng (mask + 1))
-    done;
-    List.rev !acc)
-
-let check_repr ~name ~values ~mask ~to_int ~of_int_exn ~show =
-  ensure (values &lt;&gt; []) &quot;%s: no values enumerated&quot; name;
-  let valid = Array.make (mask + 1) false in
-  List.iter
-    (fun value -&gt;
-      let i = to_int value in
-      ensure (0 &lt;= i &amp;&amp; i &lt;= mask)
-        &quot;%s: representation %d for %s is outside mask %d&quot;
-        name i (show value) mask;
-      ensure (not valid.(i))
-        &quot;%s: duplicate representation %d&quot;
-        name i;
-      valid.(i) &lt;- true;
-      ensure (of_int_exn i = value)
-        &quot;%s: of_int_exn/to_int roundtrip failed for %s&quot;
-        name (show value))
-    values;
-  if mask &lt;= repr_exhaustive_threshold
-  then
-    for i = 0 to mask do
-      match try Some (of_int_exn i) with Invalid_argument _ -&gt; None with
-      | Some value -&gt;
-        ensure valid.(i)
-          &quot;%s: of_int_exn accepted invalid representation %d (%s)&quot;
-          name i (show value);
-        ensure (to_int value = i)
-          &quot;%s: to_int/of_int_exn roundtrip failed for %d&quot;
-          name i
-      | None -&gt;
-        ensure (not valid.(i))
-          &quot;%s: of_int_exn rejected valid representation %d&quot;
-          name i
-    done
-  else
-    for _ = 1 to sample_count * 4 do
-      let i = Random.State.int rng (mask + 1) in
-      match try Some (of_int_exn i) with Invalid_argument _ -&gt; None with
-      | Some value -&gt;
-        ensure (to_int value = i)
-          &quot;%s: sampled to_int/of_int_exn roundtrip failed for %d&quot;
-          name i
-      | None -&gt; ()
-    done
-
-let check_name_roundtrip ~name ~values ~to_name ~of_name ~show =
-  iter1 values
-    (fun value -&gt;
-      let text = to_name value in
-      match of_name text with
-      | Some value&#39; -&gt;
-        ensure (value = value&#39;)
-          &quot;%s: name/of_name roundtrip failed for %s&quot;
-          name (show value)
-      | None -&gt;
-        fail &quot;%s: of_name rejected %S&quot; name text)
-
-let check_valid ~name ~to_int ~of_int_exn ~show value =
-  let i = to_int value in
-  match try Some (of_int_exn i) with Invalid_argument _ -&gt; None with
-  | Some value&#39; -&gt;
-    ensure (value&#39; = value)
-      &quot;%s: invalid result representation %d for %s&quot;
-      name i (show value)
-  | None -&gt;
-    fail &quot;%s: invalid result representation %d for %s&quot; name i (show value)
-
-let check_lattice
-    ~name
-    ~values
-    ~bottom
-    ~top
-    ~leq
-    ~join
-    ~meet
-    ~sub
-    ~imply
-    ~to_int
-    ~of_int_exn
-    ~show
-  =
-  check_valid ~name ~to_int ~of_int_exn ~show bottom;
-  check_valid ~name ~to_int ~of_int_exn ~show top;
-  iter1 values
-    (fun value -&gt;
-      ensure (leq value value)
-        &quot;%s: reflexivity failed for %s&quot;
-        name (show value);
-      ensure (leq bottom value)
-        &quot;%s: bottom is not &lt;= %s&quot;
-        name (show value);
-      ensure (leq value top)
-        &quot;%s: %s is not &lt;= top&quot;
-        name (show value));
-  iter2 values values
-    (fun x y -&gt;
-      let join_xy = join x y in
-      let join_yx = join y x in
-      let meet_xy = meet x y in
-      let meet_yx = meet y x in
-      let sub_xy = sub x y in
-      let imply_xy = imply x y in
-      check_valid ~name ~to_int ~of_int_exn ~show join_xy;
-      check_valid ~name ~to_int ~of_int_exn ~show join_yx;
-      check_valid ~name ~to_int ~of_int_exn ~show meet_xy;
-      check_valid ~name ~to_int ~of_int_exn ~show meet_yx;
-      check_valid ~name ~to_int ~of_int_exn ~show sub_xy;
-      check_valid ~name ~to_int ~of_int_exn ~show imply_xy;
-      ensure (join_xy = join_yx)
-        &quot;%s: join commutativity failed for %s and %s&quot;
-        name (show x) (show y);
-      ensure (meet_xy = meet_yx)
-        &quot;%s: meet commutativity failed for %s and %s&quot;
-        name (show x) (show y);
-      ensure (join x x = x)
-        &quot;%s: join idempotence failed for %s&quot;
-        name (show x);
-      ensure (meet x x = x)
-        &quot;%s: meet idempotence failed for %s&quot;
-        name (show x);
-      ensure ((leq x y) = (join x y = y))
-        &quot;%s: join/order mismatch for %s and %s&quot;
-        name (show x) (show y);
-      ensure ((leq x y) = (meet x y = x))
-        &quot;%s: meet/order mismatch for %s and %s&quot;
-        name (show x) (show y);
-      ensure (meet x (join x y) = x)
-        &quot;%s: absorption failed for meet/join on %s and %s&quot;
-        name (show x) (show y);
-      ensure (join x (meet x y) = x)
-        &quot;%s: absorption failed for join/meet on %s and %s&quot;
-        name (show x) (show y));
-  iter3 values values values
-    (fun x y z -&gt;
-      let join_yz = join y z in
-      let join_xy = join x y in
-      let meet_yz = meet y z in
-      let meet_xy = meet x y in
-      let sub_xy = sub x y in
-      let imply_xy = imply x y in
-      check_valid ~name ~to_int ~of_int_exn ~show join_yz;
-      check_valid ~name ~to_int ~of_int_exn ~show join_xy;
-      check_valid ~name ~to_int ~of_int_exn ~show meet_yz;
-      check_valid ~name ~to_int ~of_int_exn ~show meet_xy;
-      check_valid ~name ~to_int ~of_int_exn ~show sub_xy;
-      check_valid ~name ~to_int ~of_int_exn ~show imply_xy;
-      ensure (join x join_yz = join join_xy z)
-        &quot;%s: join associativity failed&quot;
-        name;
-      ensure (meet x meet_yz = meet meet_xy z)
-        &quot;%s: meet associativity failed&quot;
-        name;
-      ensure ((leq sub_xy z) = (leq x join_yz))
-        &quot;%s: subtraction residuation failed&quot;
-        name;
-      ensure ((leq z imply_xy) = (leq (meet z x) y))
-        &quot;%s: implication residuation failed&quot;
-        name)
-
-let check_duality
-    ~name
-    ~values
-    ~bottom
-    ~top
-    ~join
-    ~meet
-    ~sub
-    ~imply
-    ~op_bottom
-    ~op_top
-    ~op_join
-    ~op_meet
-    ~op_sub
-    ~op_imply
-    ~show
-  =
-  ensure (bottom = op_top)
-    &quot;%s: bottom/top duality failed&quot;
-    name;
-  ensure (top = op_bottom)
-    &quot;%s: top/bottom duality failed&quot;
-    name;
-  iter2 values values
-    (fun x y -&gt;
-      ensure (join x y = op_meet x y)
-        &quot;%s: join/meet duality failed for %s and %s&quot;
-        name (show x) (show y);
-      ensure (meet x y = op_join x y)
-        &quot;%s: meet/join duality failed for %s and %s&quot;
-        name (show x) (show y);
-      ensure (sub x y = op_imply y x)
-        &quot;%s: sub/imply duality failed for %s and %s&quot;
-        name (show x) (show y);
-      ensure (imply x y = op_sub y x)
-        &quot;%s: imply/sub duality failed for %s and %s&quot;
-        name (show x) (show y))
-
-let check_reference_equivalence
-    ~name
-    ~values
-    ~bottom
-    ~top
-    ~leq
-    ~join
-    ~meet
-    ~sub
-    ~imply
-    ~ref_bottom
-    ~ref_top
-    ~ref_leq
-    ~ref_join
-    ~ref_meet
-    ~ref_sub
-    ~ref_imply
-    ~to_int
-    ~of_int_exn
-    ~show
-  =
-  check_valid ~name ~to_int ~of_int_exn ~show ref_bottom;
-  check_valid ~name ~to_int ~of_int_exn ~show ref_top;
-  ensure (bottom = ref_bottom)
-    &quot;%s: bottom/reference mismatch&quot;
-    name;
-  ensure (top = ref_top)
-    &quot;%s: top/reference mismatch&quot;
-    name;
-  iter2 values values
-    (fun x y -&gt;
-      let ref_join_xy = ref_join x y in
-      let ref_meet_xy = ref_meet x y in
-      let ref_sub_xy = ref_sub x y in
-      let ref_imply_xy = ref_imply x y in
-      check_valid ~name ~to_int ~of_int_exn ~show ref_join_xy;
-      check_valid ~name ~to_int ~of_int_exn ~show ref_meet_xy;
-      check_valid ~name ~to_int ~of_int_exn ~show ref_sub_xy;
-      check_valid ~name ~to_int ~of_int_exn ~show ref_imply_xy;
-      ensure (leq x y = ref_leq x y)
-        &quot;%s: leq/reference mismatch for %s and %s&quot;
-        name (show x) (show y);
-      ensure (join x y = ref_join_xy)
-        &quot;%s: join/reference mismatch for %s and %s&quot;
-        name (show x) (show y);
-      ensure (meet x y = ref_meet_xy)
-        &quot;%s: meet/reference mismatch for %s and %s&quot;
-        name (show x) (show y);
-      ensure (sub x y = ref_sub_xy)
-        &quot;%s: sub/reference mismatch for %s and %s&quot;
-        name (show x) (show y);
-      ensure (imply x y = ref_imply_xy)
-        &quot;%s: imply/reference mismatch for %s and %s&quot;
-        name (show x) (show y))
-
-let check_adjunction
-    ~name
-    ~a_values
-    ~b_values
-    ~leq_a
-    ~leq_b
-    ~f
-    ~g
-    ~show_f
-    ~show_g
-    ~f_to_int
-    ~f_of_int_exn
-    ~g_to_int
-    ~g_of_int_exn
-  =
-  iter2 a_values b_values
-    (fun a b -&gt;
-      let fa = f a in
-      let gb = g b in
-      check_valid ~name ~to_int:f_to_int ~of_int_exn:f_of_int_exn ~show:show_f fa;
-      check_valid ~name ~to_int:g_to_int ~of_int_exn:g_of_int_exn ~show:show_g gb;
-      ensure ((leq_b fa b) = (leq_a a gb))
-        &quot;%s: adjunction failed&quot;
-        name)
-
-let check_function_equality
-    ~name
-    ~values
-    ~f
-    ~g
-    ~to_int
-    ~of_int_exn
-    ~show
-  =
-  iter1 values
-    (fun value -&gt;
-      let fv = f value in
-      let gv = g value in
-      check_valid ~name ~to_int ~of_int_exn ~show fv;
-      check_valid ~name ~to_int ~of_int_exn ~show gv;
-      ensure (fv = gv)
-        &quot;%s: extensional equality failed&quot;
-        name)
-
-let check_solver
-    ~name
-    ~values
-    ~bottom
-    ~top
-    ~leq
-    ~equal
-    ~solver_min
-    ~solver_max
-    ~of_const
-    ~to_const_exn
-    ~floor_of_above
-    ~ceil_of_below
-    ~submode_const
-    ~equate_const
-    ~fresh_floor
-    ~fresh_ceil
-    ~show
-  =
-  ensure (to_const_exn solver_min = bottom)
-    &quot;%s: solver min mismatch&quot;
-    name;
-  ensure (to_const_exn solver_max = top)
-    &quot;%s: solver max mismatch&quot;
-    name;
-  ensure (fresh_floor () = bottom)
-    &quot;%s: fresh solver var floor mismatch&quot;
-    name;
-  ensure (fresh_ceil () = top)
-    &quot;%s: fresh solver var ceil mismatch&quot;
-    name;
-  iter1 values
-    (fun value -&gt;
-      ensure (to_const_exn (of_const value) = value)
-        &quot;%s: solver const roundtrip failed for %s&quot;
-        name (show value);
-      ensure (floor_of_above value = value)
-        &quot;%s: newvar_above floor mismatch for %s&quot;
-        name (show value);
-      ensure (ceil_of_below value = value)
-        &quot;%s: newvar_below ceil mismatch for %s&quot;
-        name (show value));
-  iter2 values values
-    (fun x y -&gt;
-      ensure
-        ((Result.is_ok (submode_const x y)) = leq x y)
-        &quot;%s: solver submode mismatch for %s and %s&quot;
-        name (show x) (show y);
-      ensure
-        ((Result.is_ok (equate_const x y)) = equal x y)
-        &quot;%s: solver equate mismatch for %s and %s&quot;
-        name (show x) (show y))
-
-let check_solver_projection
-    ~name
-    ~product_values
-    ~field_values
-    ~product_of_const
-    ~field_of_const
-    ~field_to_const
-    ~proj
-    ~min_with_floor
-    ~max_with_ceil
-    ~newvar
-    ~equate_const
-    ~zap_to_floor
-    ~zap_to_ceil
-    ~field
-    ~field_bot
-    ~field_top
-    ~product_show
-    ~field_show
-  =
-  iter1 product_values
-    (fun product -&gt;
-      ensure
-        (field_to_const (proj (product_of_const product)) = field product)
-        &quot;%s: solver projection mismatch for %s&quot;
-        name (product_show product));
-  iter1 field_values
-    (fun field_value -&gt;
-      ensure
-        (min_with_floor (field_of_const field_value) = field_bot field_value)
-        &quot;%s: solver min_with mismatch for %s&quot;
-        name (field_show field_value);
-      ensure
-        (max_with_ceil (field_of_const field_value) = field_top field_value)
-        &quot;%s: solver max_with mismatch for %s&quot;
-        name (field_show field_value);
-      let v = newvar () in
-      let projected = proj v in
-      ensure (Result.is_ok (equate_const projected field_value))
-        &quot;%s: solver projected equate failed for %s&quot;
-        name (field_show field_value);
-      ensure
-        (field (zap_to_floor v) = field_value)
-        &quot;%s: solver projection sharing floor mismatch for %s&quot;
-        name (field_show field_value);
-      ensure
-        (field (zap_to_ceil v) = field_value)
-        &quot;%s: solver projection sharing ceil mismatch for %s&quot;
-        name (field_show field_value))
-
-let check_product_roundtrip ~name ~values ~view ~of_view ~to_int ~of_int_exn ~show =
-  iter1 values
-    (fun value -&gt;
-      let rebuilt = of_view (view value) in
-      check_valid ~name ~to_int ~of_int_exn ~show rebuilt;
-      ensure (rebuilt = value)
-        &quot;%s: view/of_view roundtrip failed&quot;
-        name)
-
-let check_field_projection
-    ~name
-    ~product_values
-    ~field_values
-    ~product_leq
-    ~field_leq
-    ~field
-    ~with_field
-    ~field_bot
-    ~field_top
-    ~product_to_int
-    ~product_of_int_exn
-    ~product_show
-    ~field_to_int
-    ~field_of_int_exn
-    ~field_show
-  =
-  iter1 product_values
-    (fun product -&gt;
-      let field_product = field product in
-      let rebuilt = with_field field_product product in
-      check_valid
-        ~name
-        ~to_int:field_to_int
-        ~of_int_exn:field_of_int_exn
-        ~show:field_show
-        field_product;
-      check_valid
-        ~name
-        ~to_int:product_to_int
-        ~of_int_exn:product_of_int_exn
-        ~show:product_show
-        rebuilt;
-      ensure (rebuilt = product)
-        &quot;%s: with_field/field roundtrip failed&quot;
-        name);
-  iter2 field_values product_values
-    (fun field_value product -&gt;
-      let updated = with_field field_value product in
-      let projected = field updated in
-      let lower = field_bot field_value in
-      let upper = field_top field_value in
-      check_valid
-        ~name
-        ~to_int:product_to_int
-        ~of_int_exn:product_of_int_exn
-        ~show:product_show
-        updated;
-      check_valid
-        ~name
-        ~to_int:field_to_int
-        ~of_int_exn:field_of_int_exn
-        ~show:field_show
-        projected;
-      check_valid
-        ~name
-        ~to_int:product_to_int
-        ~of_int_exn:product_of_int_exn
-        ~show:product_show
-        lower;
-      check_valid
-        ~name
-        ~to_int:product_to_int
-        ~of_int_exn:product_of_int_exn
-        ~show:product_show
-        upper;
-      ensure (projected = field_value)
-        &quot;%s: field/with_field coherence failed&quot;
-        name;
-      ensure
-        ((product_leq lower product)
-         = field_leq field_value (field product))
-        &quot;%s: lower adjunction failed&quot;
-        name;
-      ensure
-        ((product_leq product upper)
-         = field_leq (field product) field_value)
-        &quot;%s: upper adjunction failed&quot;
-        name)
-
-let values_locality = values_of_repr Locality.Const.Repr.mask Locality.Const.Repr.of_int_exn
-let values_locality_op = values_locality
-
-let () =
-  check_repr ~name:&quot;Locality&quot; ~values:values_locality ~mask:Locality.Const.Repr.mask ~to_int:Locality.Const.Repr.to_int ~of_int_exn:Locality.Const.Repr.of_int_exn ~show:Locality.Const.show;
-  check_name_roundtrip ~name:&quot;Locality&quot; ~values:values_locality ~to_name:Locality.Const.name ~of_name:Locality.Const.of_name ~show:Locality.Const.show;
-  check_lattice ~name:&quot;Locality&quot; ~values:values_locality ~bottom:Locality.Const.bottom ~top:Locality.Const.top ~leq:Locality.Const.leq ~join:Locality.Const.join ~meet:Locality.Const.meet ~sub:Locality.Const.sub ~imply:Locality.Const.imply ~to_int:Locality.Const.Repr.to_int ~of_int_exn:Locality.Const.Repr.of_int_exn ~show:Locality.Const.show;
-  check_lattice ~name:&quot;Locality_op&quot; ~values:values_locality_op ~bottom:Locality_op.Const.bottom ~top:Locality_op.Const.top ~leq:Locality_op.Const.leq ~join:Locality_op.Const.join ~meet:Locality_op.Const.meet ~sub:Locality_op.Const.sub ~imply:Locality_op.Const.imply ~to_int:Locality_op.Const.Repr.to_int ~of_int_exn:Locality_op.Const.Repr.of_int_exn ~show:Locality_op.Const.show;
-  check_duality ~name:&quot;Locality&quot; ~values:values_locality ~bottom:Locality.Const.bottom ~top:Locality.Const.top ~join:Locality.Const.join ~meet:Locality.Const.meet ~sub:Locality.Const.sub ~imply:Locality.Const.imply ~op_bottom:Locality_op.Const.bottom ~op_top:Locality_op.Const.top ~op_join:Locality_op.Const.join ~op_meet:Locality_op.Const.meet ~op_sub:Locality_op.Const.sub ~op_imply:Locality_op.Const.imply ~show:Locality.Const.show;
-  check_solver ~name:&quot;Locality&quot; ~values:values_locality ~bottom:Locality.Const.bottom ~top:Locality.Const.top ~leq:Locality.Const.leq ~equal:Locality.Const.equal ~solver_min:Locality.min ~solver_max:Locality.max ~of_const:Locality.of_const ~to_const_exn:Locality.to_const_exn ~floor_of_above:(fun value -&gt; let v, _ = Locality.newvar_above (Locality.of_const value) in Locality.zap_to_floor v) ~ceil_of_below:(fun value -&gt; let v, _ = Locality.newvar_below (Locality.of_const value) in Locality.zap_to_ceil v) ~submode_const:(fun x y -&gt; Locality.submode (Locality.of_const x) (Locality.of_const y)) ~equate_const:(fun x y -&gt; Locality.equate (Locality.of_const x) (Locality.of_const y)) ~fresh_floor:(fun () -&gt; let v = Locality.newvar () in Locality.zap_to_floor v) ~fresh_ceil:(fun () -&gt; let v = Locality.newvar () in Locality.zap_to_ceil v) ~show:Locality.Const.show;
-  check_solver ~name:&quot;Locality_op&quot; ~values:values_locality_op ~bottom:Locality_op.Const.bottom ~top:Locality_op.Const.top ~leq:Locality_op.Const.leq ~equal:Locality_op.Const.equal ~solver_min:Locality_op.min ~solver_max:Locality_op.max ~of_const:Locality_op.of_const ~to_const_exn:Locality_op.to_const_exn ~floor_of_above:(fun value -&gt; let v, _ = Locality_op.newvar_above (Locality_op.of_const value) in Locality_op.zap_to_floor v) ~ceil_of_below:(fun value -&gt; let v, _ = Locality_op.newvar_below (Locality_op.of_const value) in Locality_op.zap_to_ceil v) ~submode_const:(fun x y -&gt; Locality_op.submode (Locality_op.of_const x) (Locality_op.of_const y)) ~equate_const:(fun x y -&gt; Locality_op.equate (Locality_op.of_const x) (Locality_op.of_const y)) ~fresh_floor:(fun () -&gt; let v = Locality_op.newvar () in Locality_op.zap_to_floor v) ~fresh_ceil:(fun () -&gt; let v = Locality_op.newvar () in Locality_op.zap_to_ceil v) ~show:Locality_op.Const.show;
-  ()
 
 </pre>
 </div>
-</out>
-    <ocaml>
-let () = print_endline (Demo.Locality.show Demo.Locality.local)
-    </ocaml><ocaml-out>
-<div class="lattice-observable lattice-observable--ok">
-<div class="lattice-observable__header"><span class="lattice-observable__title">OCaml stdout</span></div>
-<pre class="lattice-observable__panel is-active">Local</pre>
 </div>
-</ocaml-out>
+</details>
+</div>
+<!-- lattice-gen-output:end 1 -->
   </body>
 </html>

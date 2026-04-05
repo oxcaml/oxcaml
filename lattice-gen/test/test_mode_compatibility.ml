@@ -1,6 +1,6 @@
 let run () =
   let source =
-    Test_support.load_fixture "compiler_structure_kind_subbed.lattice"
+    Test_support.load_fixture "compiler_structure.lattice"
   in
   let compatibility_source =
     Test_support.load_fixture "mode_compatibility_source.ml"

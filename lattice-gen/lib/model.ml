@@ -1,6 +1,16 @@
 module String_map = Map.Make (String)
 module String_set = Set.Make (String)
 
+let no_loc =
+  let pos =
+    { Lexing.pos_fname = "";
+      pos_lnum = 1;
+      pos_bol = 0;
+      pos_cnum = 0
+    }
+  in
+  Location.make pos pos
+
 type round =
   { shift : int;
     mask : int
@@ -23,11 +33,17 @@ type repr_validator =
 
 type finite_lattice =
   { element_names : string array;
+    element_values : int array;
     leq : bool array array;
     join : int array array;
     meet : int array array;
     bottom : int;
     top : int
+  }
+
+type lattice_expr =
+  { name : string;
+    opposite : bool
   }
 
 type base =
@@ -43,8 +59,7 @@ type base =
 
 type field =
   { name : string;
-    lattice_name : string;
-    declared_opposite : bool;
+    ty : lattice_expr;
     shift : int;
     raw_mask : int;
     layout_mask : int
@@ -66,18 +81,6 @@ type axis_object =
     max_with_name : string
   }
 
-type solver_orientation =
-  | Positive
-  | Negative
-
-type solver_axis =
-  { axis : axis_object;
-    carrier_object_name : string;
-    proj_ctor_name : string;
-    min_with_ctor_name : string;
-    max_with_ctor_name : string
-  }
-
 type product =
   { name : string;
     fields : field list;
@@ -91,57 +94,52 @@ type lattice =
   | Base of base
   | Product of product
 
-type morphism =
-  { domain : string;
-    codomain : string;
-    map : int array
+type morph_core =
+  { name : string;
+    source : lattice_expr;
+    target : lattice_expr;
+    map : int array;
+    left_adjoint : int array option;
+    right_adjoint : int array option;
+    left_name : string option;
+    right_name : string option
   }
 
-type embedding =
-  { module_name : string;
-    small_name : string;
-    big_name : string;
-    embed : morphism;
-    left_chain : morphism list;
-    right_chain : morphism list;
-    aliases : (string * string) list
+type primitive_morph =
+  { core : morph_core
   }
+
+type bridge_expr =
+  | Source_field of string
+  | Morph_apply of
+      { morph_name : string;
+        source_field : string
+      }
+  | Min
+  | Max
+
+type bridge_assignment =
+  { target_field : string;
+    expr : bridge_expr
+  }
+
+type product_bridge =
+  { core : morph_core;
+    assignments : bridge_assignment list
+  }
+
+type morph =
+  | Primitive of primitive_morph
+  | Bridge of product_bridge
 
 type item =
   | Lattice of lattice
-  | Embedding of embedding
-
-type object_shape =
-  | Base_object
-  | Product_object of axis_object list
-
-type lattice_object =
-  { name : string;
-    opposite_name : string;
-    shape : object_shape;
-    repr_validator : repr_validator;
-    descriptor : descriptor;
-    op_descriptor : descriptor
-  }
-
-type solver_object_shape =
-  | Solver_base
-  | Solver_product of solver_axis list
-
-type solver_object =
-  { name : string;
-    object_ctor_name : string;
-    orientation : solver_orientation;
-    shape : solver_object_shape;
-    repr_validator : repr_validator;
-    descriptor : descriptor
-  }
+  | Morph of morph
 
 type t =
   { items : item list;
     lattices : lattice String_map.t;
-    objects : lattice_object String_map.t;
-    solver_objects : solver_object String_map.t
+    morphs : morph String_map.t
   }
 
 let opp_descriptor (desc : descriptor) =
@@ -155,6 +153,10 @@ let opp_descriptor (desc : descriptor) =
     up_dual = desc.up_nat
   }
 
+let located_txt (x : string Location.located) = x.txt
+
+let located_loc (x : 'a Location.located) = x.loc
+
 let check_module_name name loc =
   if not (Name.is_module_name name)
   then Error.failf loc "invalid OCaml module name %S" name
@@ -162,58 +164,6 @@ let check_module_name name loc =
 let check_value_name kind name loc =
   if not (Name.is_value_name name)
   then Error.failf loc "invalid OCaml %s name %S" kind name
-
-let reserved_base_names =
-  String_set.of_list
-    [ "bottom";
-      "top";
-      "leq";
-      "equal";
-      "join";
-      "meet";
-      "sub";
-      "imply";
-      "name";
-      "of_name";
-      "pp";
-      "show"
-    ]
-
-let reserved_product_names =
-  String_set.of_list
-    [ "make";
-      "view";
-      "of_view";
-      "bottom";
-      "top";
-      "leq";
-      "equal";
-      "join";
-      "meet";
-      "sub";
-      "imply";
-      "pp";
-      "show"
-    ]
-
-let located_txt (x : string Location.located) = x.txt
-
-let located_loc (x : 'a Location.located) = x.loc
-
-let parse_alias_slot alias =
-  let s = located_txt alias.Ast.slot in
-  let len = String.length s in
-  if s = "embed"
-  then `Embed
-  else if len >= 5 && String.sub s 0 4 = "left"
-  then (
-    try `Left (int_of_string (String.sub s 4 (len - 4))) with
-    | Failure _ -> Error.failf (located_loc alias.slot) "invalid alias slot %S" s)
-  else if len >= 6 && String.sub s 0 5 = "right"
-  then (
-    try `Right (int_of_string (String.sub s 5 (len - 5))) with
-    | Failure _ -> Error.failf (located_loc alias.slot) "invalid alias slot %S" s)
-  else Error.failf (located_loc alias.slot) "invalid alias slot %S" s
 
 let ensure_unique_name used name loc kind =
   if String_set.mem name !used
@@ -231,6 +181,7 @@ let lattice_reverse (lattice : finite_lattice) =
     done
   done;
   { element_names = lattice.element_names;
+    element_values = lattice.element_values;
     leq;
     join = lattice.meet;
     meet = lattice.join;
@@ -335,7 +286,14 @@ let make_finite_lattice ~loc element_names edges =
   let join = compute_binary_op `Join leq n loc in
   let meet = compute_binary_op `Meet leq n loc in
   check_distributive join meet n loc;
-  { element_names; leq; join; meet; bottom; top }
+  { element_names;
+    element_values = Array.init n Fun.id;
+    leq;
+    join;
+    meet;
+    bottom;
+    top
+  }
 
 let join_irreducibles (lattice : finite_lattice) =
   let n = Array.length lattice.element_names in
@@ -471,59 +429,6 @@ let build_base_descriptor decl_direction logical loc =
   in
   element_values, repr_validator, descriptor, op_descriptor
 
-let descriptor_of_lattice = function
-  | Base base -> base.descriptor, base.op_descriptor
-  | Product product -> product.descriptor, product.op_descriptor
-
-let repr_validator_of_lattice = function
-  | Base base -> base.repr_validator
-  | Product product -> product.repr_validator
-
-let check_generated_element_names base loc =
-  let used = ref reserved_base_names in
-  Array.iter
-    (fun name ->
-      let value_name = Name.snake_case name in
-      check_value_name "value" value_name loc;
-      ensure_unique_name used value_name loc "value")
-    base.element_names
-
-let check_product_field_names (fields : Ast.field list) loc =
-  let used = ref reserved_product_names in
-  List.iter
-    (fun (field : Ast.field) ->
-      let name = located_txt field.Ast.name in
-      check_value_name "field" name (located_loc field.name);
-      List.iter
-        (fun generated ->
-          ensure_unique_name used generated (located_loc field.name) "value")
-        [ name;
-          "with_" ^ name;
-          name ^ "_bot";
-          name ^ "_top";
-          "proj_" ^ name;
-          "min_with_" ^ name;
-          "max_with_" ^ name
-        ])
-    fields;
-  ignore loc
-
-let axis_object_of_field (field : field) =
-  { name = field.name;
-    ctor_name = String.capitalize_ascii field.name;
-    carrier_name = field.lattice_name;
-    declared_opposite = field.declared_opposite;
-    shift = field.shift;
-    raw_mask = field.raw_mask;
-    layout_mask = field.layout_mask;
-    proj_name = "proj_" ^ field.name;
-    with_name = "with_" ^ field.name;
-    bot_name = field.name ^ "_bot";
-    top_name = field.name ^ "_top";
-    min_with_name = "min_with_" ^ field.name;
-    max_with_name = "max_with_" ^ field.name
-  }
-
 let shift_round amount (round : round) =
   { round with mask = round.mask lsl amount }
 
@@ -599,141 +504,171 @@ let combine_repr_validators repr_validators =
   in
   { combined with down = merge_rounds combined.down }
 
-let name_of_lattice = function Base base -> base.name | Product product -> product.name
+let reserved_base_names =
+  String_set.of_list
+    [ "bottom";
+      "top";
+      "leq";
+      "equal";
+      "join";
+      "meet";
+      "sub";
+      "imply";
+      "name";
+      "of_name";
+      "pp";
+      "show";
+      "min";
+      "max";
+      "le";
+      "print";
+      "legacy"
+    ]
 
-let solver_object_ctor_name name = "Obj_" ^ name
+let reserved_product_names =
+  String_set.of_list
+    [ "make";
+      "view";
+      "of_view";
+      "bottom";
+      "top";
+      "leq";
+      "equal";
+      "join";
+      "meet";
+      "sub";
+      "imply";
+      "pp";
+      "show";
+      "min";
+      "max";
+      "le";
+      "print";
+      "legacy";
+      "split";
+      "merge";
+      "proj";
+      "min_with";
+      "max_with"
+    ]
 
-let solver_proj_ctor_name product_name axis =
-  "Proj_" ^ product_name ^ "_" ^ axis.ctor_name
+let check_generated_element_names base loc =
+  let used = ref reserved_base_names in
+  Array.iter
+    (fun name ->
+      let value_name = Name.snake_case name in
+      check_value_name "value" value_name loc;
+      ensure_unique_name used value_name loc "value")
+    base.element_names
 
-let solver_min_with_ctor_name product_name axis =
-  "Min_with_" ^ product_name ^ "_" ^ axis.ctor_name
+let check_product_field_names (fields : Ast.field list) =
+  let used = ref reserved_product_names in
+  List.iter
+    (fun (field : Ast.field) ->
+      let name = located_txt field.Ast.name in
+      check_value_name "field" name (located_loc field.name);
+      List.iter
+        (fun generated ->
+          ensure_unique_name used generated (located_loc field.name) "value")
+        [ name;
+          "with_" ^ name;
+          name ^ "_bot";
+          name ^ "_top";
+          "proj_" ^ name;
+          "min_with_" ^ name;
+          "max_with_" ^ name
+        ])
+    fields
 
-let solver_max_with_ctor_name product_name axis =
-  "Max_with_" ^ product_name ^ "_" ^ axis.ctor_name
-
-let solver_axis_carrier_name (axis : axis_object) ~in_op =
-  let opposite = if in_op then not axis.declared_opposite else axis.declared_opposite in
-  if opposite then Name.op_module_name axis.carrier_name else axis.carrier_name
-
-let object_of_lattice = function
-  | Base base ->
-    { name = base.name;
-      opposite_name = Name.op_module_name base.name;
-      shape = Base_object;
-      repr_validator = base.repr_validator;
-      descriptor = base.descriptor;
-      op_descriptor = base.op_descriptor
-    }
-  | Product product ->
-    { name = product.name;
-      opposite_name = Name.op_module_name product.name;
-      shape = Product_object product.axes;
-      repr_validator = product.repr_validator;
-      descriptor = product.descriptor;
-      op_descriptor = product.op_descriptor
-    }
-
-let solver_axis_of_axis product_name axis ~in_op =
-  let module_name =
-    if in_op then Name.op_module_name product_name else product_name
-  in
-  { axis;
-    carrier_object_name = solver_axis_carrier_name axis ~in_op;
-    proj_ctor_name = solver_proj_ctor_name module_name axis;
-    min_with_ctor_name = solver_min_with_ctor_name module_name axis;
-    max_with_ctor_name = solver_max_with_ctor_name module_name axis
+let axis_object_of_field (field : field) =
+  { name = field.name;
+    ctor_name = String.capitalize_ascii field.name;
+    carrier_name = field.ty.name;
+    declared_opposite = field.ty.opposite;
+    shift = field.shift;
+    raw_mask = field.raw_mask;
+    layout_mask = field.layout_mask;
+    proj_name = "proj_" ^ field.name;
+    with_name = "with_" ^ field.name;
+    bot_name = field.name ^ "_bot";
+    top_name = field.name ^ "_top";
+    min_with_name = "min_with_" ^ field.name;
+    max_with_name = "max_with_" ^ field.name
   }
 
-let solver_objects_of_lattice = function
-  | Base base ->
-    [ { name = base.name;
-        object_ctor_name = solver_object_ctor_name base.name;
-        orientation = Positive;
-        shape = Solver_base;
-        repr_validator = base.repr_validator;
-        descriptor = base.descriptor
-      };
-      { name = Name.op_module_name base.name;
-        object_ctor_name = solver_object_ctor_name (Name.op_module_name base.name);
-        orientation = Positive;
-        shape = Solver_base;
-        repr_validator = base.repr_validator;
-        descriptor = base.op_descriptor
-      } ]
-  | Product product ->
-    [ { name = product.name;
-        object_ctor_name = solver_object_ctor_name product.name;
-        orientation = Positive;
-        shape =
-          Solver_product
-            (List.map
-               (fun axis -> solver_axis_of_axis product.name axis ~in_op:false)
-               product.axes);
-        repr_validator = product.repr_validator;
-        descriptor = product.descriptor
-      };
-      { name = Name.op_module_name product.name;
-        object_ctor_name = solver_object_ctor_name (Name.op_module_name product.name);
-        orientation = Positive;
-        shape =
-          Solver_product
-            (List.map
-               (fun axis -> solver_axis_of_axis product.name axis ~in_op:true)
-               product.axes);
-        repr_validator = product.repr_validator;
-        descriptor = product.op_descriptor
-      } ]
+let name_of_lattice = function Base base -> base.name | Product product -> product.name
 
-let finite_of_lattice = function
-  | Base base -> base.logical
-  | Product _ -> invalid_arg "products are not enumerated in v1"
+let module_name_of_expr (expr : lattice_expr) =
+  if expr.opposite then Name.op_module_name expr.name else expr.name
 
-let build_aliases aliases function_names =
-  let used = ref function_names in
-  List.map
-    (fun alias ->
-      let slot =
-        match parse_alias_slot alias with
-        | `Embed -> "embed"
-        | `Left n -> "left" ^ string_of_int n
-        | `Right n -> "right" ^ string_of_int n
-      in
-      if not (String_set.mem slot function_names)
-      then Error.failf (located_loc alias.slot) "alias slot %S refers to a missing function" slot;
-      let alias_name = Name.snake_case (located_txt alias.name) in
-      check_value_name "alias" alias_name (located_loc alias.name);
-      ensure_unique_name used alias_name (located_loc alias.name) "embedding function";
-      alias_name, slot)
-    aliases
+let lattice_expr_equal (a : lattice_expr) (b : lattice_expr) =
+  a.name = b.name && Bool.equal a.opposite b.opposite
+
+let flip_expr (expr : lattice_expr) = { expr with opposite = not expr.opposite }
+
+let morph_core_of = function
+  | Primitive primitive -> primitive.core
+  | Bridge bridge -> bridge.core
+
+let with_morph_core morph core =
+  match morph with
+  | Primitive _ -> Primitive { core }
+  | Bridge bridge -> Bridge { bridge with core }
+
+let value_index (lattice : finite_lattice) =
+  let indices = Hashtbl.create (Array.length lattice.element_values) in
+  Array.iteri (fun i value -> Hashtbl.replace indices value i) lattice.element_values;
+  indices
+
+let find_value_index (lattice : finite_lattice) indices value =
+  match Hashtbl.find_opt indices value with
+  | Some index -> index
+  | None ->
+    invalid_arg
+      (Printf.sprintf
+         "unknown element value %d for finite lattice of size %d"
+         value
+         (Array.length lattice.element_values))
 
 let greatest_under (lattice : finite_lattice) predicate =
   let n = Array.length lattice.element_names in
-  let candidates = List.filter predicate (List.init n Fun.id) in
-  match
-    List.filter
-      (fun x ->
-        List.for_all
-          (fun other -> lattice.leq.(other).(x))
-          candidates)
-      candidates
-  with
-  | [ x ] -> Some x
-  | _ -> None
+  let best = ref None in
+  for x = 0 to n - 1 do
+    if predicate x
+    then
+      match !best with
+      | None -> best := Some x
+      | Some current when lattice.leq.(current).(x) -> best := Some x
+      | Some _ -> ()
+  done;
+  match !best with
+  | None -> None
+  | Some best ->
+    let ok = ref true in
+    for x = 0 to n - 1 do
+      if predicate x && not lattice.leq.(x).(best) then ok := false
+    done;
+    if !ok then Some best else None
 
 let least_over (lattice : finite_lattice) predicate =
   let n = Array.length lattice.element_names in
-  let candidates = List.filter predicate (List.init n Fun.id) in
-  match
-    List.filter
-      (fun x ->
-        List.for_all
-          (fun other -> lattice.leq.(x).(other))
-          candidates)
-      candidates
-  with
-  | [ x ] -> Some x
-  | _ -> None
+  let best = ref None in
+  for x = 0 to n - 1 do
+    if predicate x
+    then
+      match !best with
+      | None -> best := Some x
+      | Some current when lattice.leq.(x).(current) -> best := Some x
+      | Some _ -> ()
+  done;
+  match !best with
+  | None -> None
+  | Some best ->
+    let ok = ref true in
+    for x = 0 to n - 1 do
+      if predicate x && not lattice.leq.(best).(x) then ok := false
+    done;
+    if !ok then Some best else None
 
 let left_adjoint (dom : finite_lattice) (cod : finite_lattice) map =
   Array.init (Array.length cod.element_names) (fun y ->
@@ -747,59 +682,70 @@ let right_adjoint (dom : finite_lattice) (cod : finite_lattice) map =
       | Some x -> x
       | None -> raise Not_found)
 
-let morphism_equal a b =
-  a.domain = b.domain
-  && a.codomain = b.codomain
-  && Array.length a.map = Array.length b.map
-  && Array.for_all2 Int.equal a.map b.map
-
-let rec build_left_chain lattices seen current acc =
-  let dom = finite_of_lattice (String_map.find current.domain lattices) in
-  let cod = finite_of_lattice (String_map.find current.codomain lattices) in
-  match
-    try Some (left_adjoint dom cod current.map) with
-    | Not_found -> None
-  with
-  | None -> List.rev acc
-  | Some map ->
-    let morphism = { domain = current.codomain; codomain = current.domain; map } in
-    if List.exists (morphism_equal morphism) seen
-    then List.rev acc
-    else build_left_chain lattices (morphism :: seen) morphism (morphism :: acc)
-
-let rec build_right_chain lattices seen current acc =
-  let dom = finite_of_lattice (String_map.find current.domain lattices) in
-  let cod = finite_of_lattice (String_map.find current.codomain lattices) in
-  match
-    try Some (right_adjoint dom cod current.map) with
-    | Not_found -> None
-  with
-  | None -> List.rev acc
-  | Some map ->
-    let morphism = { domain = current.codomain; codomain = current.domain; map } in
-    if List.exists (morphism_equal morphism) seen
-    then List.rev acc
-    else build_right_chain lattices (morphism :: seen) morphism (morphism :: acc)
+let int_array_equal a b =
+  Array.length a = Array.length b && Array.for_all2 Int.equal a b
 
 let resolve ast =
-  let global_modules = ref String_set.empty in
-  let lattices = ref String_map.empty in
-  let items = ref [] in
-  let register_module name loc =
-    check_module_name name loc;
-    ensure_unique_name global_modules name loc "module"
-  in
+  let lattice_decls = Hashtbl.create 16 in
+  let morph_decls = Hashtbl.create 16 in
+  let lattice_order = ref [] in
+  let morph_order = ref [] in
+  let module_names = ref String_set.empty in
+  let morph_names = ref String_set.empty in
   let register_lattice_name name loc =
-    register_module name loc;
-    register_module (Name.op_module_name name) loc
+    check_module_name name loc;
+    ensure_unique_name module_names name loc "module";
+    ensure_unique_name module_names (Name.op_module_name name) loc "module"
+  in
+  let register_morph_name name loc =
+    check_value_name "morphism" name loc;
+    ensure_unique_name morph_names name loc "morphism"
   in
   List.iter
     (function
-      | Ast.Base { name; clauses } ->
+      | Ast.Base { name; _ } as decl ->
         let lattice_name = located_txt name in
-        if String_map.mem lattice_name !lattices
+        if Hashtbl.mem lattice_decls lattice_name
         then Error.failf (located_loc name) "duplicate lattice name %S" lattice_name;
         register_lattice_name lattice_name (located_loc name);
+        Hashtbl.add lattice_decls lattice_name decl;
+        lattice_order := !lattice_order @ [ lattice_name ]
+      | Ast.Product { name; _ } as decl ->
+        let lattice_name = located_txt name in
+        if Hashtbl.mem lattice_decls lattice_name
+        then Error.failf (located_loc name) "duplicate lattice name %S" lattice_name;
+        register_lattice_name lattice_name (located_loc name);
+        Hashtbl.add lattice_decls lattice_name decl;
+        lattice_order := !lattice_order @ [ lattice_name ]
+      | Ast.Primitive_morph { name; _ } as decl ->
+        let morph_name = located_txt name in
+        if Hashtbl.mem morph_decls morph_name
+        then Error.failf (located_loc name) "duplicate morph name %S" morph_name;
+        register_morph_name morph_name (located_loc name);
+        Hashtbl.add morph_decls morph_name decl;
+        morph_order := !morph_order @ [ morph_name ]
+      | Ast.Product_bridge { name; _ } as decl ->
+        let morph_name = located_txt name in
+        if Hashtbl.mem morph_decls morph_name
+        then Error.failf (located_loc name) "duplicate morph name %S" morph_name;
+        register_morph_name morph_name (located_loc name);
+        Hashtbl.add morph_decls morph_name decl;
+        morph_order := !morph_order @ [ morph_name ])
+    ast;
+  let parse_expr (expr : Ast.lattice_expr) =
+    { name = located_txt expr.lattice; opposite = expr.opposite }
+  in
+  let resolved_lattices = ref String_map.empty in
+  let rec resolve_lattice visiting name =
+    match String_map.find_opt name !resolved_lattices with
+    | Some lattice -> lattice
+    | None ->
+      if String_set.mem name visiting
+      then Error.failf no_loc "cyclic product definition involving %S" name;
+      let visiting = String_set.add name visiting in
+      match Hashtbl.find_opt lattice_decls name with
+      | None -> Error.failf no_loc "unknown lattice %S" name
+      | Some (Ast.Base { name; clauses }) ->
         let element_order = ref [] in
         let element_index = Hashtbl.create 16 in
         let logical_direction = ref None in
@@ -849,15 +795,14 @@ let resolve ast =
           | Ast.Singleton elt :: _ -> Location.merge (located_loc name) (located_loc elt)
           | Ast.Chain chain :: _ -> Location.merge (located_loc name) chain.loc
         in
-        let logical =
-          make_finite_lattice ~loc element_names (List.rev !edges)
-        in
+        let logical = make_finite_lattice ~loc element_names (List.rev !edges) in
         let direction = Option.value !logical_direction ~default:Ast.Lt in
         let element_values, repr_validator, descriptor, op_descriptor =
           build_base_descriptor direction logical (located_loc name)
         in
+        let logical = { logical with element_values } in
         let base =
-          { name = lattice_name;
+          { name = located_txt name;
             element_names;
             element_values;
             element_value_names = Array.map Name.snake_case element_names;
@@ -868,45 +813,43 @@ let resolve ast =
           }
         in
         check_generated_element_names base (located_loc name);
-        lattices := String_map.add lattice_name (Base base) !lattices;
-        items := !items @ [ Lattice (Base base) ]
-      | Ast.Product { name; fields } ->
-        let lattice_name = located_txt name in
-        if String_map.mem lattice_name !lattices
-        then Error.failf (located_loc name) "duplicate lattice name %S" lattice_name;
-        register_lattice_name lattice_name (located_loc name);
+        let lattice = Base base in
+        resolved_lattices := String_map.add base.name lattice !resolved_lattices;
+        lattice
+      | Some (Ast.Product { name; fields }) ->
         if fields = []
         then Error.failf (located_loc name) "products must have at least one field";
-        check_product_field_names fields (located_loc name);
+        check_product_field_names fields;
         let offset = ref 0 in
         let shifted_descs = ref [] in
         let shifted_repr_validators = ref [] in
         let resolved_fields =
           List.map
             (fun (field : Ast.field) ->
+              let ty = parse_expr field.ty in
               let referenced =
-                match String_map.find_opt (located_txt field.ty.lattice) !lattices with
-                | Some lattice -> lattice
-                | None ->
-                  Error.failf (located_loc field.ty.lattice)
-                    "unknown lattice %S"
-                    (located_txt field.ty.lattice)
+                resolve_lattice visiting ty.name
               in
-              let repr_validator = repr_validator_of_lattice referenced in
-              let descriptor, op_descriptor = descriptor_of_lattice referenced in
-              let chosen = if field.ty.opposite then op_descriptor else descriptor in
+              let repr_validator =
+                match referenced with
+                | Base base -> base.repr_validator
+                | Product product -> product.repr_validator
+              in
+              let descriptor, op_descriptor =
+                match referenced with
+                | Base base -> base.descriptor, base.op_descriptor
+                | Product product -> product.descriptor, product.op_descriptor
+              in
+              let chosen = if ty.opposite then op_descriptor else descriptor in
               let shift = !offset in
               let shifted = shift_descriptor shift chosen in
-              let shifted_repr_validator =
-                shift_repr_validator shift repr_validator
-              in
+              let shifted_repr_validator = shift_repr_validator shift repr_validator in
               offset := !offset + chosen.bits;
               shifted_descs := !shifted_descs @ [ shifted ];
               shifted_repr_validators :=
                 !shifted_repr_validators @ [ shifted_repr_validator ];
               { name = located_txt field.name;
-                lattice_name = name_of_lattice referenced;
-                declared_opposite = field.ty.opposite;
+                ty;
                 shift;
                 raw_mask = chosen.mask;
                 layout_mask = chosen.mask lsl shift
@@ -917,7 +860,7 @@ let resolve ast =
         let descriptor = combine_descriptors !shifted_descs in
         let op_descriptor = opp_descriptor descriptor in
         let product =
-          { name = lattice_name;
+          { name = located_txt name;
             fields = resolved_fields;
             axes = List.map axis_object_of_field resolved_fields;
             repr_validator;
@@ -925,137 +868,633 @@ let resolve ast =
             op_descriptor
           }
         in
-        lattices := String_map.add lattice_name (Product product) !lattices;
-        items := !items @ [ Lattice (Product product) ]
-      | Ast.Embedding { small; big; mappings; aliases } ->
-        let small_name = located_txt small in
-        let big_name = located_txt big in
-        let module_name = Name.embedding_module_name small_name big_name in
-        register_module module_name (Location.merge (located_loc small) (located_loc big));
-        let small_lattice =
-          match String_map.find_opt small_name !lattices with
-          | Some (Base base) -> base
-          | Some _ ->
-            Error.failf (located_loc small)
-              "embeddings are only supported between base lattices in v1"
-          | None -> Error.failf (located_loc small) "unknown lattice %S" small_name
-        in
-        let big_lattice =
-          match String_map.find_opt big_name !lattices with
-          | Some (Base base) -> base
-          | Some _ ->
-            Error.failf (located_loc big)
-              "embeddings are only supported between base lattices in v1"
-          | None -> Error.failf (located_loc big) "unknown lattice %S" big_name
-        in
-        let small_index = Hashtbl.create 16 in
-        Array.iteri
-          (fun i name -> Hashtbl.add small_index name i)
-          small_lattice.element_names;
-        let big_index = Hashtbl.create 16 in
-        Array.iteri
-          (fun i name -> Hashtbl.add big_index name i)
-          big_lattice.element_names;
-        let map = Array.make (Array.length small_lattice.element_names) (-1) in
-        List.iter
-          (fun (mapping : Ast.mapping) ->
-            let source =
-              match Hashtbl.find_opt small_index (located_txt mapping.small) with
-              | Some i -> i
-              | None ->
-                Error.failf (located_loc mapping.small)
-                  "unknown element %S in %S"
-                  (located_txt mapping.small)
-                  small_name
-            in
-            let target =
-              match Hashtbl.find_opt big_index (located_txt mapping.big) with
-              | Some i -> i
-              | None ->
-                Error.failf (located_loc mapping.big)
-                  "unknown element %S in %S"
-                  (located_txt mapping.big)
-                  big_name
-            in
-            if map.(source) <> -1
-            then
-              Error.failf (located_loc mapping.small)
-                "duplicate mapping for element %S"
-                (located_txt mapping.small);
-            map.(source) <- target)
-          mappings;
-        Array.iteri
-          (fun _i target ->
-            if target = -1
-            then
-              Error.failf (located_loc small)
-                "embedding must map every element of %S"
-                small_name)
-          map;
-        let seen = Hashtbl.create 16 in
-        Array.iter
-          (fun target ->
-            if Hashtbl.mem seen target
-            then Error.failf (located_loc small) "embedding must be injective";
-            Hashtbl.add seen target ())
-          map;
-        let n_small = Array.length small_lattice.element_names in
-        for a = 0 to n_small - 1 do
-          for b = 0 to n_small - 1 do
-            if small_lattice.logical.leq.(a).(b)
-               && not big_lattice.logical.leq.(map.(a)).(map.(b))
-            then Error.failf (located_loc small) "embedding must be monotone";
-            if big_lattice.logical.leq.(map.(a)).(map.(b))
-               && not small_lattice.logical.leq.(a).(b)
-            then Error.failf (located_loc small) "embedding must be order-reflecting"
-          done
-        done;
-        let embed = { domain = small_name; codomain = big_name; map } in
-        let left_chain = build_left_chain !lattices [ embed ] embed [] in
-        let right_chain = build_right_chain !lattices [ embed ] embed [] in
-        let function_names =
-          let names = ref String_set.empty in
-          ensure_unique_name names "embed" (located_loc small) "embedding function";
-          List.iteri
-            (fun i _ ->
-              ensure_unique_name names ("left" ^ string_of_int (i + 1)) (located_loc small) "embedding function")
-            left_chain;
-          List.iteri
-            (fun i _ ->
-              ensure_unique_name names ("right" ^ string_of_int (i + 1)) (located_loc small) "embedding function")
-            right_chain;
-          !names
-        in
-        let aliases = build_aliases aliases function_names in
-        let embedding =
-          { module_name;
-            small_name;
-            big_name;
-            embed;
-            left_chain;
-            right_chain;
-            aliases
-          }
-        in
-        items := !items @ [ Embedding embedding ])
-    ast;
-  let objects =
-    String_map.fold
-      (fun _ lattice acc ->
-        let object_ = object_of_lattice lattice in
-        String_map.add object_.name object_ acc)
-      !lattices
-      String_map.empty
+        let lattice = Product product in
+        resolved_lattices := String_map.add product.name lattice !resolved_lattices;
+        lattice
+      | Some _ -> assert false
   in
-  let solver_objects =
-    String_map.fold
-      (fun _ lattice acc ->
-        List.fold_left
-          (fun acc (object_ : solver_object) ->
-            String_map.add object_.name object_ acc)
-          acc
-          (solver_objects_of_lattice lattice))
-      !lattices
-      String_map.empty
+  List.iter (fun name -> ignore (resolve_lattice String_set.empty name)) !lattice_order;
+  let resolved_lattices = !resolved_lattices in
+  let find_base_expr (expr : lattice_expr) loc =
+    match String_map.find expr.name resolved_lattices with
+    | Base base -> base
+    | Product _ ->
+      Error.failf loc "primitive morph endpoints must be base lattices, got %S" expr.name
   in
-  { items = !items; lattices = !lattices; objects; solver_objects }
+  let product_fields_for_expr (expr : lattice_expr) =
+    match String_map.find expr.name resolved_lattices with
+    | Base _ -> None
+    | Product product ->
+      Some
+        (List.map
+           (fun (field : field) ->
+             (field.name, if expr.opposite then flip_expr field.ty else field.ty))
+           product.fields)
+  in
+  let find_field_type (fields : (string * lattice_expr) list) field_name =
+    match List.find_opt (fun (name, _) -> String.equal name field_name) fields with
+    | Some (_, ty) -> ty
+    | None -> raise Not_found
+  in
+  let finite_cache = Hashtbl.create 32 in
+  let rec finite_of_expr (expr : lattice_expr) =
+    match Hashtbl.find_opt finite_cache expr with
+    | Some finite -> finite
+    | None ->
+      let finite =
+        match String_map.find expr.name resolved_lattices with
+        | Base base ->
+          if expr.opposite then lattice_reverse base.logical else base.logical
+        | Product product ->
+          let effective_fields : (field * finite_lattice) array =
+            Array.of_list
+              (List.map
+                 (fun (field : field) ->
+                   let field_expr =
+                     if expr.opposite then flip_expr field.ty else field.ty
+                   in
+                   field, finite_of_expr field_expr)
+                 product.fields)
+          in
+          let arity = Array.length effective_fields in
+          let dims =
+            Array.map
+              (fun (_, (field_finite : finite_lattice)) ->
+                Array.length field_finite.element_names)
+              effective_fields
+          in
+          let total =
+            Array.fold_left
+              (fun acc dim ->
+                if dim = 0 then 0 else acc * dim)
+              1
+              dims
+          in
+          let decode ordinal =
+            let coords = Array.make arity 0 in
+            let remainder = ref ordinal in
+            for i = arity - 1 downto 0 do
+              let dim = dims.(i) in
+              coords.(i) <- !remainder mod dim;
+              remainder := !remainder / dim
+            done;
+            coords
+          in
+          let coords = Array.init total decode in
+          let pack coord =
+            Array.fold_left
+              (fun acc i ->
+                let field, (field_finite : finite_lattice) = effective_fields.(i) in
+                let value = field_finite.element_values.(coord.(i)) in
+                acc lor ((value land field.raw_mask) lsl field.shift))
+              0
+              (Array.init arity Fun.id)
+          in
+          let element_values = Array.map pack coords in
+          let element_names =
+            Array.map
+              (fun coord ->
+                let pieces =
+                  Array.to_list
+                    (Array.mapi
+                       (fun i field_index ->
+                         let field, (field_finite : finite_lattice) = effective_fields.(i) in
+                         field.name ^ "=" ^ field_finite.element_names.(field_index))
+                       coord)
+                in
+                "{ " ^ String.concat "; " pieces ^ " }")
+              coords
+          in
+          let indices = Hashtbl.create total in
+          Array.iteri (fun i value -> Hashtbl.add indices value i) element_values;
+          let finite_stub : finite_lattice =
+            { element_names;
+              element_values;
+              leq = [||];
+              join = [||];
+              meet = [||];
+              bottom = 0;
+              top = 0
+            }
+          in
+          let pointwise make =
+            Array.init total (fun left ->
+                Array.init total (fun right ->
+                    let coord = Array.make arity 0 in
+                    for i = 0 to arity - 1 do
+                      let _, (field_finite : finite_lattice) = effective_fields.(i) in
+                      coord.(i) <- make field_finite coords.(left).(i) coords.(right).(i)
+                    done;
+                    find_value_index finite_stub indices (pack coord)))
+          in
+          let leq =
+            Array.init total (fun left ->
+                Array.init total (fun right ->
+                    let ok = ref true in
+                    for i = 0 to arity - 1 do
+                      let _, (field_finite : finite_lattice) = effective_fields.(i) in
+                      ok :=
+                        !ok
+                        && field_finite.leq.(coords.(left).(i)).(coords.(right).(i))
+                    done;
+                    !ok))
+          in
+          let join =
+            pointwise (fun field_finite left right -> field_finite.join.(left).(right))
+          in
+          let meet =
+            pointwise (fun field_finite left right -> field_finite.meet.(left).(right))
+          in
+          let bottom_coord =
+            Array.init arity (fun i ->
+                let _, (field_finite : finite_lattice) = effective_fields.(i) in
+                field_finite.bottom)
+          in
+          let top_coord =
+            Array.init arity (fun i ->
+                let _, (field_finite : finite_lattice) = effective_fields.(i) in
+                field_finite.top)
+          in
+          let bottom = find_value_index finite_stub indices (pack bottom_coord) in
+          let top = find_value_index finite_stub indices (pack top_coord) in
+          { element_names; element_values; leq; join; meet; bottom; top }
+      in
+      Hashtbl.add finite_cache expr finite;
+      finite
+  in
+  let check_monotone
+      morph_name
+      loc
+      (source_finite : finite_lattice)
+      (target_finite : finite_lattice)
+      map
+    =
+    let n = Array.length source_finite.element_names in
+    for i = 0 to n - 1 do
+      for j = 0 to n - 1 do
+        if source_finite.leq.(i).(j)
+           && not target_finite.leq.(map.(i)).(map.(j))
+        then Error.failf loc "morphism %S is not monotone" morph_name
+      done
+    done
+  in
+  let with_adjoint_metadata core =
+    let source_finite = finite_of_expr core.source in
+    let target_finite = finite_of_expr core.target in
+    let left_adjoint =
+      try Some (left_adjoint source_finite target_finite core.map) with
+      | Not_found -> None
+    in
+    let right_adjoint =
+      try Some (right_adjoint source_finite target_finite core.map) with
+      | Not_found -> None
+    in
+    { core with left_adjoint; right_adjoint }
+  in
+  let resolved_morphs = ref String_map.empty in
+  let rec resolve_morph visiting morph_name =
+    match String_map.find_opt morph_name !resolved_morphs with
+    | Some morph -> morph
+    | None ->
+      if String_set.mem morph_name visiting
+      then Error.failf no_loc "cyclic morph definition involving %S" morph_name;
+      let visiting = String_set.add morph_name visiting in
+      let resolved =
+        match Hashtbl.find morph_decls morph_name with
+        | Ast.Primitive_morph { name; source; target; mappings } ->
+          let source_expr = parse_expr source in
+          let target_expr = parse_expr target in
+          let source_base = find_base_expr source_expr (located_loc source.lattice) in
+          let target_base = find_base_expr target_expr (located_loc target.lattice) in
+          let source_index = Hashtbl.create 16 in
+          Array.iteri (fun i elt -> Hashtbl.add source_index elt i) source_base.element_names;
+          let target_index = Hashtbl.create 16 in
+          Array.iteri (fun i elt -> Hashtbl.add target_index elt i) target_base.element_names;
+          let map = Array.make (Array.length source_base.element_names) (-1) in
+          List.iter
+            (fun (mapping : Ast.primitive_mapping) ->
+              let src_name = located_txt mapping.source in
+              let dst_name = located_txt mapping.target in
+              let src =
+                match Hashtbl.find_opt source_index src_name with
+                | Some i -> i
+                | None ->
+                  Error.failf
+                    (located_loc mapping.source)
+                    "unknown element %S in %S"
+                    src_name
+                    source_base.name
+              in
+              let dst =
+                match Hashtbl.find_opt target_index dst_name with
+                | Some i -> i
+                | None ->
+                  Error.failf
+                    (located_loc mapping.target)
+                    "unknown element %S in %S"
+                    dst_name
+                    target_base.name
+              in
+              if map.(src) <> -1
+              then
+                Error.failf
+                  (located_loc mapping.source)
+                  "duplicate mapping for element %S"
+                  src_name;
+              map.(src) <- dst)
+            mappings;
+          Array.iteri
+            (fun _ target ->
+              if target = -1
+              then
+                Error.failf
+                  (located_loc name)
+                  "morphism must map every element of %S"
+                  source_base.name)
+            map;
+          let source_finite = finite_of_expr source_expr in
+          let target_finite = finite_of_expr target_expr in
+          check_monotone morph_name (located_loc name) source_finite target_finite map;
+          Primitive
+            { core =
+                with_adjoint_metadata
+                  { name = morph_name;
+                    source = source_expr;
+                    target = target_expr;
+                    map;
+                    left_adjoint = None;
+                    right_adjoint = None;
+                    left_name = None;
+                    right_name = None
+                  }
+            }
+        | Ast.Product_bridge { name; source; target; assignments } ->
+          let source_expr = parse_expr source in
+          let target_expr = parse_expr target in
+          let source_fields =
+            match product_fields_for_expr source_expr with
+            | Some fields -> fields
+            | None ->
+              Error.failf
+                (located_loc source.lattice)
+                "product bridge source must be a product, got %S"
+                source_expr.name
+          in
+          let target_fields =
+            match product_fields_for_expr target_expr with
+            | Some fields -> fields
+            | None ->
+              Error.failf
+                (located_loc target.lattice)
+                "product bridge target must be a product, got %S"
+                target_expr.name
+          in
+          let seen_targets = Hashtbl.create 16 in
+          let resolved_assignments =
+            List.map
+              (fun (assignment : Ast.bridge_assignment) ->
+                let target_field = located_txt assignment.target in
+                if Hashtbl.mem seen_targets target_field
+                then
+                  Error.failf
+                    (located_loc assignment.target)
+                    "duplicate assignment for target field %S"
+                    target_field;
+                Hashtbl.add seen_targets target_field ();
+                let target_ty =
+                  match find_field_type target_fields target_field with
+                  | ty -> ty
+                  | exception Not_found ->
+                    Error.failf
+                      (located_loc assignment.target)
+                      "unknown target field %S"
+                      target_field
+                in
+                let expr =
+                  match assignment.expr with
+                  | Ast.Source_field field ->
+                    let source_field = located_txt field in
+                    let source_ty =
+                      match find_field_type source_fields source_field with
+                      | ty -> ty
+                      | exception Not_found ->
+                        Error.failf
+                          (located_loc field)
+                          "unknown source field %S"
+                          source_field
+                    in
+                    if not (lattice_expr_equal source_ty target_ty)
+                    then
+                      Error.failf
+                        (located_loc assignment.target)
+                        "field %S expects %s but source field %S has %s"
+                        target_field
+                        (module_name_of_expr target_ty)
+                        source_field
+                        (module_name_of_expr source_ty);
+                    Source_field source_field
+                  | Ast.Morph_apply { morph; field } ->
+                    let referenced = resolve_morph visiting (located_txt morph) in
+                    let referenced_core = morph_core_of referenced in
+                    let source_field = located_txt field in
+                    let source_ty =
+                      match find_field_type source_fields source_field with
+                      | ty -> ty
+                      | exception Not_found ->
+                        Error.failf
+                          (located_loc field)
+                          "unknown source field %S"
+                          source_field
+                    in
+                    if not (lattice_expr_equal referenced_core.source source_ty)
+                    then
+                      Error.failf
+                        (located_loc morph)
+                        "morphism %S expects %s but source field %S has %s"
+                        referenced_core.name
+                        (module_name_of_expr referenced_core.source)
+                        source_field
+                        (module_name_of_expr source_ty);
+                    if not (lattice_expr_equal referenced_core.target target_ty)
+                    then
+                      Error.failf
+                        (located_loc morph)
+                        "morphism %S returns %s but target field %S expects %s"
+                        referenced_core.name
+                        (module_name_of_expr referenced_core.target)
+                        target_field
+                        (module_name_of_expr target_ty);
+                    Morph_apply { morph_name = referenced_core.name; source_field }
+                  | Ast.Min _ -> Min
+                  | Ast.Max _ -> Max
+                in
+                { target_field; expr })
+              assignments
+          in
+          List.iter
+            (fun (target_field, _) ->
+              if not (Hashtbl.mem seen_targets target_field)
+              then
+                Error.failf
+                  (located_loc name)
+                  "missing assignment for target field %S"
+                  target_field)
+            target_fields;
+          let source_product =
+            match String_map.find source_expr.name resolved_lattices with
+            | Product product -> product
+            | Base _ -> assert false
+          in
+          let target_product =
+            match String_map.find target_expr.name resolved_lattices with
+            | Product product -> product
+            | Base _ -> assert false
+          in
+          let source_finite = finite_of_expr source_expr in
+          let target_finite = finite_of_expr target_expr in
+          let source_indices = value_index source_finite in
+          let target_indices = value_index target_finite in
+          let source_field_specs =
+            List.map
+              (fun (field : field) ->
+                let field_ty =
+                  if source_expr.opposite then flip_expr field.ty else field.ty
+                in
+                let field_finite = finite_of_expr field_ty in
+                (field.name, field, field_finite, value_index field_finite))
+              source_product.fields
+          in
+          let source_field_specs :
+              (string * field * finite_lattice * (int, int) Hashtbl.t) list
+            =
+            source_field_specs
+          in
+          let target_field_specs =
+            List.map
+              (fun (field : field) ->
+                let field_ty =
+                  if target_expr.opposite then flip_expr field.ty else field.ty
+                in
+                (field.name, field, finite_of_expr field_ty))
+              target_product.fields
+          in
+          let target_field_specs : (string * field * finite_lattice) list =
+            target_field_specs
+          in
+          let find_source_field_spec field_name =
+            match
+              List.find_opt
+                (fun (name, _, _, _) -> String.equal name field_name)
+                source_field_specs
+            with
+            | Some spec -> spec
+            | None -> raise Not_found
+          in
+          let assignment_map = Hashtbl.create (List.length resolved_assignments) in
+          List.iter
+            (fun assignment ->
+              Hashtbl.add assignment_map assignment.target_field assignment)
+            resolved_assignments;
+          let pack_source bounds =
+            let packed = ref 0 in
+            List.iter
+              (fun (_, (source_field : field), (source_field_finite : finite_lattice), _) ->
+                let field_index = Hashtbl.find bounds source_field.name in
+                let field_value = source_field_finite.element_values.(field_index) in
+                packed :=
+                  !packed
+                  lor ((field_value land source_field.raw_mask) lsl source_field.shift))
+              source_field_specs;
+            !packed
+          in
+          let map =
+            Array.init (Array.length source_finite.element_values) (fun source_index ->
+                let source_value = source_finite.element_values.(source_index) in
+                let packed = ref 0 in
+                List.iter
+                  (fun
+                    ( target_field_name,
+                      (target_field : field),
+                      (target_field_finite : finite_lattice) ) ->
+                    let assignment = Hashtbl.find assignment_map target_field_name in
+                    let field_value =
+                      match assignment.expr with
+                      | Source_field source_field_name ->
+                        let _, source_field, _, _ =
+                          find_source_field_spec source_field_name
+                        in
+                        (source_value lsr source_field.shift) land source_field.raw_mask
+                      | Morph_apply { morph_name; source_field } ->
+                        let referenced_core =
+                          morph_core_of (resolve_morph visiting morph_name)
+                        in
+                        let _, source_field, source_field_finite, source_value_index =
+                          find_source_field_spec source_field
+                        in
+                        let source_field_value =
+                          (source_value lsr source_field.shift) land source_field.raw_mask
+                        in
+                        let field_index =
+                          find_value_index
+                            source_field_finite
+                            source_value_index
+                            source_field_value
+                        in
+                        target_field_finite.element_values
+                          .(referenced_core.map.(field_index))
+                      | Min ->
+                        target_field_finite.element_values.(target_field_finite.bottom)
+                      | Max ->
+                        target_field_finite.element_values.(target_field_finite.top)
+                    in
+                    packed :=
+                      !packed
+                      lor ((field_value land target_field.raw_mask)
+                           lsl target_field.shift))
+                  target_field_specs;
+                find_value_index target_finite target_indices !packed)
+          in
+          check_monotone morph_name (located_loc name) source_finite target_finite map;
+          let structural_adjoint kind =
+            let compute_target_bound target_index =
+              let target_value = target_finite.element_values.(target_index) in
+              let bounds = Hashtbl.create (List.length source_field_specs) in
+              List.iter
+                (fun
+                  ( source_field_name,
+                    _,
+                    (source_field_finite : finite_lattice),
+                    _ ) ->
+                  Hashtbl.add
+                    bounds
+                    source_field_name
+                    (match kind with `Left -> source_field_finite.bottom | `Right -> source_field_finite.top))
+                source_field_specs;
+              let ok = ref true in
+              List.iter
+                (fun
+                  ( target_field_name,
+                    (_target_field : field),
+                    (target_field_finite : finite_lattice) ) ->
+                  if !ok
+                  then (
+                    let assignment = Hashtbl.find assignment_map target_field_name in
+                    let target_field_value =
+                      (target_value lsr _target_field.shift) land _target_field.raw_mask
+                    in
+                    let target_field_index =
+                      find_value_index
+                        target_field_finite
+                        (value_index target_field_finite)
+                        target_field_value
+                    in
+                    match assignment.expr with
+                    | Source_field source_field_name ->
+                      let _, _, source_field_finite, _ =
+                        find_source_field_spec source_field_name
+                      in
+                      let prev = Hashtbl.find bounds source_field_name in
+                      let next =
+                        match kind with
+                        | `Left -> source_field_finite.join.(prev).(target_field_index)
+                        | `Right -> source_field_finite.meet.(prev).(target_field_index)
+                      in
+                      Hashtbl.replace bounds source_field_name next
+                    | Morph_apply { morph_name; source_field } ->
+                      let referenced_core =
+                        morph_core_of (resolve_morph visiting morph_name)
+                      in
+                      let adjoint =
+                        match kind with
+                        | `Left -> referenced_core.left_adjoint
+                        | `Right -> referenced_core.right_adjoint
+                      in
+                      (match adjoint with
+                       | None -> ok := false
+                       | Some adjoint ->
+                         let _, _, source_field_finite, _ =
+                           find_source_field_spec source_field
+                         in
+                         let contribution = adjoint.(target_field_index) in
+                         let prev = Hashtbl.find bounds source_field in
+                         let next =
+                           match kind with
+                           | `Left ->
+                             source_field_finite.join.(prev).(contribution)
+                           | `Right ->
+                             source_field_finite.meet.(prev).(contribution)
+                         in
+                         Hashtbl.replace bounds source_field next)
+                    | Min ->
+                      if kind = `Left
+                         && not target_field_finite.leq.(target_field_index).(target_field_finite.bottom)
+                      then ok := false
+                    | Max ->
+                      if kind = `Right
+                         && not target_field_finite.leq.(target_field_finite.top).(target_field_index)
+                      then ok := false))
+                target_field_specs;
+              if !ok
+              then Some (find_value_index source_finite source_indices (pack_source bounds))
+              else None
+            in
+            let adjoint =
+              Array.init (Array.length target_finite.element_values) compute_target_bound
+            in
+            if Array.for_all Option.is_some adjoint
+            then Some (Array.map Option.get adjoint)
+            else None
+          in
+          let left_adjoint = structural_adjoint `Left in
+          let right_adjoint = structural_adjoint `Right in
+          Bridge
+            { core =
+                { name = morph_name;
+                  source = source_expr;
+                  target = target_expr;
+                  map;
+                  left_adjoint;
+                  right_adjoint;
+                  left_name = None;
+                  right_name = None
+                };
+              assignments = resolved_assignments
+            }
+        | Ast.Base _ | Ast.Product _ -> assert false
+      in
+      resolved_morphs := String_map.add morph_name resolved !resolved_morphs;
+      resolved
+  in
+  List.iter
+    (fun morph_name -> ignore (resolve_morph String_set.empty morph_name))
+    !morph_order;
+  let find_matching_morph source target map =
+    String_map.to_seq !resolved_morphs
+    |> Seq.find_map (fun (name, morph) ->
+         let core = morph_core_of morph in
+         if lattice_expr_equal core.source source
+            && lattice_expr_equal core.target target
+            && int_array_equal core.map map
+         then Some name
+         else None)
+  in
+  let resolved_morphs =
+    String_map.mapi
+      (fun _ morph ->
+        let core = morph_core_of morph in
+        let left_name =
+          Option.bind core.left_adjoint (fun map ->
+              find_matching_morph core.target core.source map)
+        in
+        let right_name =
+          Option.bind core.right_adjoint (fun map ->
+              find_matching_morph core.target core.source map)
+        in
+        with_morph_core morph { core with left_name; right_name })
+      !resolved_morphs
+  in
+  let items =
+    List.map (fun name -> Lattice (String_map.find name resolved_lattices)) !lattice_order
+    @ List.map (fun name -> Morph (String_map.find name resolved_morphs)) !morph_order
+  in
+  { items; lattices = resolved_lattices; morphs = resolved_morphs }

@@ -10,79 +10,63 @@ L = [
 ]
 |};
   Test_support.expect_error
-    ~name:"cycle"
-    ~needle:"cycle"
+    ~name:"non-monotone"
+    ~needle:"not monotone"
     ~source:
       {|
-L = [
-  A < B;
-  B < A
+A = [ Lo < Hi ]
+B = [ Red < Blue ]
+bad : A -> B = [
+  Lo -> Blue;
+  Hi -> Red;
 ]
 |};
   Test_support.expect_error
-    ~name:"missing-extreme"
-    ~needle:"missing a unique bottom"
+    ~name:"unknown-bridge-field"
+    ~needle:"unknown source field"
     ~source:
       {|
-L = [
-  A;
-  B
-]
-|};
-  Test_support.expect_error
-    ~name:"not-lattice"
-    ~needle:"join"
-    ~source:
-      {|
-L = [
-  Bot < A < U < Top;
-  Bot < A < V < Top;
-  Bot < B < U;
-  Bot < B < V
-]
-|};
-  Test_support.expect_error
-    ~name:"nondistributive"
-    ~needle:"not distributive"
-    ~source:
-      {|
-L = [
-  Bot < A < Top;
-  Bot < B < Top;
-  Bot < C < Top
-]
-|};
-  Test_support.expect_error
-    ~name:"bad-field"
-    ~needle:"unknown lattice"
-    ~source:
-      {|
-A = [ X < Y ]
-B = { bad : Missing }
-|};
-  Test_support.expect_error
-    ~name:"bad-embedding"
-    ~needle:"injective"
-    ~source:
-      {|
-S = [ A < B ]
-T = [ X < Y < Z ]
-S <= T via {
-  A -> X;
-  B -> X;
+A = [ Lo < Hi ]
+P = { x : A }
+Q = { y : A }
+bad : P -> Q = {
+  y = z;
 }
 |};
   Test_support.expect_error
-    ~name:"bad-alias"
-    ~needle:"missing function"
+    ~name:"duplicate-target-field"
+    ~needle:"duplicate assignment"
     ~source:
       {|
-S = [ A < B ]
-T = [ X < Y < Z ]
-S <= T via {
-  A -> X;
-  B -> Z;
-} aliases {
-  left9 = Nope;
+A = [ Lo < Hi ]
+P = { x : A }
+Q = { y : A }
+bad : P -> Q = {
+  y = x;
+  y = min;
+}
+|};
+  Test_support.expect_error
+    ~name:"missing-target-field"
+    ~needle:"missing assignment"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+P = { x : A }
+Q = { y : A; z : A }
+bad : P -> Q = {
+  y = x;
+}
+|};
+  Test_support.expect_error
+    ~name:"product-op-mismatch"
+    ~needle:"expects A but source field"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+P = { x : A }
+Q = { y : A }
+bad : P^op -> Q = {
+  y = x;
 }
 |}

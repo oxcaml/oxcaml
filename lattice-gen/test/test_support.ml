@@ -15,8 +15,7 @@ let failf fmt = Printf.ksprintf failwith fmt
 let ensure cond fmt =
   Printf.ksprintf (fun message -> if not cond then failwith message) fmt
 
-let read_file path =
-  In_channel.with_open_bin path In_channel.input_all
+let read_file path = In_channel.with_open_bin path In_channel.input_all
 
 let write_file path contents =
   let oc = open_out path in
@@ -24,114 +23,26 @@ let write_file path contents =
     ~finally:(fun () -> close_out oc)
     (fun () -> output_string oc contents)
 
-let write_solver_runtime path =
-  write_file path Solver_runtime_source.contents
-
 let ensure_dir_exists path =
   if Sys.file_exists path
-  then (
-    if not (Sys.is_directory path) then failf "%s exists and is not a directory" path)
+  then ensure (Sys.is_directory path) "%s exists and is not a directory" path
   else Unix.mkdir path 0o755
 
 let remove_dir path =
   ignore (Sys.command ("rm -rf " ^ Filename.quote path))
 
-let remove_dir_if_empty path =
-  if Sys.file_exists path && Sys.is_directory path && Array.length (Sys.readdir path) = 0
-  then Unix.rmdir path
-
-let keep_temp_dirs () =
-  match Sys.getenv_opt "LATTICE_GEN_KEEP_TEMP_DIRS" with
-  | Some ("1" | "true" | "yes") -> true
-  | _ -> false
-
-let prune_stale_temp_dirs base =
-  let now = Unix.time () in
-  if Sys.file_exists base && Sys.is_directory base
-  then
-    Sys.readdir base
-    |> Array.to_list
-    |> List.iter (fun entry ->
-         let path = Filename.concat base entry in
-         if Sys.is_directory path
-         then
-           match Unix.stat path with
-           | stats when now -. stats.Unix.st_mtime > 3600.0 -> remove_dir path
-           | _ -> ())
-
-let rec copy_tree ~src ~dst =
-  if Sys.is_directory src
-  then (
-    ensure_dir_exists dst;
-    Sys.readdir src
-    |> Array.to_list
-    |> List.iter (fun entry ->
-         copy_tree
-           ~src:(Filename.concat src entry)
-           ~dst:(Filename.concat dst entry)))
-  else write_file dst (read_file src)
-
-let command_output ~cwd command =
-  let ic =
-    Unix.open_process_in
-      (Printf.sprintf "cd %s && %s" (Filename.quote cwd) command)
-  in
-  Fun.protect
-    ~finally:(fun () -> ignore (Unix.close_process_in ic))
-    (fun () -> input_line ic |> String.trim)
-
-let repo_root () = command_output ~cwd:(Sys.getcwd ()) "git rev-parse --show-toplevel"
-
-let command_lines ~cwd command =
-  let ic =
-    Unix.open_process_in
-      (Printf.sprintf "cd %s && %s" (Filename.quote cwd) command)
-  in
-  let rec loop acc =
-    match input_line ic with
-    | line -> loop (line :: acc)
-    | exception End_of_file -> List.rev acc
-  in
-  Fun.protect
-    ~finally:(fun () -> ignore (Unix.close_process_in ic))
-    (fun () -> loop [])
-
-let compiler_root () =
-  let roots =
-    command_lines ~cwd:(Sys.getcwd ()) "git worktree list --porcelain"
-    |> List.filter_map (fun line ->
-         if String.length line > 9 && String.sub line 0 9 = "worktree "
-         then Some (String.sub line 9 (String.length line - 9))
-         else None)
-  in
-  let is_configured root =
-    Sys.file_exists (Filename.concat root "typing/solver_intf.mli")
-    && Sys.file_exists (Filename.concat root "dune.runtime_selection")
-    && Sys.file_exists (Filename.concat root "duneconf/dirs-to-ignore.inc")
-    && Sys.file_exists (Filename.concat root "duneconf/ox-extra.inc")
-  in
-  match List.find_opt is_configured roots with
-  | Some root -> root
-  | None -> failf "could not find configured compiler worktree from %s" (repo_root ())
-
 let with_temp_dir prefix f =
-  let base = Filename.concat (compiler_root ()) "lattice-gen-test-build" in
-  if not (Sys.file_exists base) then Unix.mkdir base 0o755;
-  prune_stale_temp_dirs base;
+  let base = Filename.concat (Filename.get_temp_dir_name ()) "lattice-gen-tests" in
+  ensure_dir_exists base;
   let dir = Filename.temp_file ~temp_dir:base prefix "" in
   Sys.remove dir;
   Unix.mkdir dir 0o755;
   match f dir with
   | result ->
     remove_dir dir;
-    remove_dir_if_empty base;
     result
   | exception exn ->
-    if keep_temp_dirs ()
-    then prerr_endline ("preserving failing temp dir: " ^ dir)
-    else (
-      remove_dir dir;
-      remove_dir_if_empty base);
+    remove_dir dir;
     raise exn
 
 let run_command ~cwd command =
@@ -164,164 +75,80 @@ let expect_error ~name ~source ~needle =
   with
   | Error.Error _ as exn ->
     let message = Error.describe_exn exn in
-    if not (contains message needle)
-    then failf "unexpected error for %s: %s" name message
+    ensure (contains message needle) "unexpected error for %s: %s" name message
 
 let resolve_model ~name ~source =
   let ast = Parse.from_string ~input_name:(name ^ ".lattice") source in
   Model.resolve ast
 
-let load_fixture name = read_file name
+let load_fixture name =
+  if Sys.file_exists name
+  then read_file name
+  else read_file (Filename.concat (Filename.concat (Sys.getcwd ()) "test") name)
 
-let expect_generated_ml_excludes ~name ~source needles =
-  let outputs =
-    Generate.render_string ~root_module:"Generated" ~input_name:name source
-  in
+let render ~name ~source =
+  Generate.render_string ~root_module:"Generated" ~input_name:name source
+
+let expect_generated_ml_contains ~name ~source needles =
+  let outputs = render ~name ~source in
   List.iter
     (fun needle ->
-      ensure (not (contains outputs.ml needle))
+      ensure
+        (contains outputs.ml needle)
+        "generated .ml for %s is missing %S"
+        name
+        needle)
+    needles
+
+let expect_generated_mli_contains ~name ~source needles =
+  let outputs = render ~name ~source in
+  List.iter
+    (fun needle ->
+      ensure
+        (contains outputs.mli needle)
+        "generated .mli for %s is missing %S"
+        name
+        needle)
+    needles
+
+let expect_generated_excludes ~name ~source needles =
+  let outputs = render ~name ~source in
+  List.iter
+    (fun needle ->
+      ensure
+        (not (contains outputs.ml needle) && not (contains outputs.mli needle))
         "generated output for %s unexpectedly contains %S"
         name
         needle)
     needles
 
-let expect_generated_ml_contains ~name ~source needles =
-  let outputs =
-    Generate.render_string ~root_module:"Generated" ~input_name:name source
-  in
-  List.iter
-    (fun needle ->
-      ensure (contains outputs.ml needle)
-        "generated output for %s is missing %S"
-        name
-        needle)
-    needles
-
-let expect_generated_ml_suffix_excludes ~name ~source ~after needles =
-  let outputs =
-    Generate.render_string ~root_module:"Generated" ~input_name:name source
-  in
-  let ml = outputs.ml in
-  let marker_len = String.length after in
-  let rec find_from i =
-    if i + marker_len > String.length ml
-    then failf "generated output for %s is missing marker %S" name after
-    else if String.sub ml i marker_len = after
-    then String.sub ml i (String.length ml - i)
-    else find_from (i + 1)
-  in
-  let suffix = find_from 0 in
-  List.iter
-    (fun needle ->
-      ensure (not (contains suffix needle))
-        "generated output for %s unexpectedly contains %S after %S"
-        name
-        needle
-        after)
-    needles
-
-let generate_case_files ~dir ~source =
-  let input_path = Filename.concat dir "input.lattice" in
-  let ml_path = Filename.concat dir "generated.ml" in
-  let mli_path = Filename.concat dir "generated.mli" in
-  let test_ml_path = Filename.concat dir "generated_test.ml" in
-  let dune_path = Filename.concat dir "dune" in
-  write_file input_path source;
-  Generate.generate_to_files
-    ~input_path
-    ~ml_path
-    ~mli_path
-    ~test_ml_path
-    ();
-  write_solver_runtime (Filename.concat dir "solver_runtime.ml");
-  write_file
-    dune_path
-    {|(executable
- (name generated_test)
- (modules generated solver_runtime generated_test)
- (libraries ocamlcommon))
-|};
-  ml_path, mli_path, test_ml_path
-
-let compile_and_run_generated_test ~dir =
-  let root = compiler_root () in
-  let rel_dir = Filename.concat "lattice-gen-test-build" (Filename.basename dir) in
-  run_command
-    ~cwd:root
-    (Printf.sprintf
-       "RUNTIME_DIR=runtime4 dune build --display=short %s/generated_test.exe"
-       rel_dir);
-  run_command
-    ~cwd:root
-    (Printf.sprintf
-       "RUNTIME_DIR=runtime4 dune exec --display=short ./%s/generated_test.exe"
-       rel_dir)
-
-let compile_generated_case ~name ~source =
-  with_temp_dir ("lattice-gen-" ^ name ^ "-") (fun dir ->
-    try
-      ignore (generate_case_files ~dir ~source);
-      let root = compiler_root () in
-      let rel_dir =
-        Filename.concat "lattice-gen-test-build" (Filename.basename dir)
-      in
-      run_command
-        ~cwd:root
-        (Printf.sprintf
-           "RUNTIME_DIR=runtime4 dune build --display=short %s/generated_test.exe"
-           rel_dir)
-    with
-    | exn ->
-      failf
-        "generated compile case %s failed\nsource:\n%s\nerror: %s"
-        name
-        source
-        (Printexc.to_string exn))
-
-let compile_generated_case_with_module ~name ~source ~module_name ~module_source =
-  with_temp_dir ("lattice-gen-" ^ name ^ "-") (fun dir ->
-    try
-      ignore (generate_case_files ~dir ~source);
-      write_file (Filename.concat dir (module_name ^ ".ml")) module_source;
+let compile_generated_case ~name:_ ~source ~main =
+  with_temp_dir "compile-" (fun dir ->
+      let input_path = Filename.concat dir "generated.lattice" in
+      let ml_path = Filename.concat dir "generated.ml" in
+      let mli_path = Filename.concat dir "generated.mli" in
+      let main_path = Filename.concat dir "main.ml" in
+      let dune_path = Filename.concat dir "dune" in
+      let dune_project_path = Filename.concat dir "dune-project" in
+      write_file input_path source;
+      Generate.generate_to_files ~input_path ~ml_path ~mli_path ();
+      write_file main_path main;
+      write_file dune_project_path "(lang dune 3.10)\n";
       write_file
-        (Filename.concat dir "dune")
-        (Printf.sprintf
-           {|(executable
- (name %s)
- (modules generated solver_runtime %s)
- (flags (:standard -w -53))
- (libraries ocamlcommon))
-|}
-           module_name
-           module_name);
-      let root = compiler_root () in
-      let rel_dir =
-        Filename.concat "lattice-gen-test-build" (Filename.basename dir)
-      in
-      run_command
-        ~cwd:root
-        (Printf.sprintf
-           "RUNTIME_DIR=runtime4 dune build --display=short %s/%s.exe"
-           rel_dir
-           module_name)
-    with
-    | exn ->
-      failf
-        "generated compile case %s with extra module %s failed\nsource:\n%s\nerror: %s"
-        name
-        module_name
-        source
-        (Printexc.to_string exn))
+        dune_path
+        {|(executable
+ (name main)
+ (modules generated main))|};
+      run_command ~cwd:dir "dune build main.exe")
 
-let run_generated_case ~name ~source =
-  with_temp_dir ("lattice-gen-" ^ name ^ "-") (fun dir ->
-    try
-      ignore (generate_case_files ~dir ~source);
-      compile_and_run_generated_test ~dir
-    with
-    | exn ->
-      failf
-        "generated case %s failed\nsource:\n%s\nerror: %s"
-        name
-        source
-        (Printexc.to_string exn))
+let rec copy_tree ~src ~dst =
+  if Sys.is_directory src
+  then (
+    ensure_dir_exists dst;
+    Sys.readdir src
+    |> Array.to_list
+    |> List.iter (fun entry ->
+         copy_tree
+           ~src:(Filename.concat src entry)
+           ~dst:(Filename.concat dst entry)))
+  else write_file dst (read_file src)

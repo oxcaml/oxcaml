@@ -31,27 +31,130 @@
         padding-left: 1.25rem;
       }
     </style>
-  <link rel="stylesheet" href="lattice-observable.css" data-lattice-observable="css">
-<script src="lattice-observable.js" data-lattice-observable="js"></script>
-</head>
+  </head>
   <body>
+<!-- lattice-gen-scaffold:start -->
+
+<style>
+  .lattice-generated {
+    margin: 1.5rem 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+
+  .lattice-generated details {
+    margin: 0;
+  }
+
+  .lattice-generated summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.9rem 1rem;
+    font: 600 14px/1.2 ui-sans-serif, system-ui, sans-serif;
+    color: #0f172a;
+    background: linear-gradient(180deg, #f8fafc, #eef2ff);
+    border-bottom: 1px solid #dbe4f0;
+  }
+
+  .lattice-generated summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .lattice-generated-body {
+    padding: 0.9rem 1rem 1rem;
+  }
+
+  .lattice-generated-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .lattice-generated-tab {
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    background: #ffffff;
+    color: #334155;
+    font: 600 12px/1 ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .lattice-generated-tab.is-active {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #ffffff;
+  }
+
+  .lattice-generated-panel {
+    display: none;
+  }
+
+  .lattice-generated-panel.is-active {
+    display: block;
+  }
+
+  .lattice-generated pre {
+    margin: 0;
+    padding: 1rem;
+    overflow-x: auto;
+    border-radius: 12px;
+    background: #0f172a;
+    color: #e2e8f0;
+    font: 12px/1.5 Menlo, Monaco, Consolas, monospace;
+  }
+</style>
+<script>
+  (() => {
+    const init = () => {
+      const blocks = document.querySelectorAll('.lattice-generated');
+      for (const block of blocks) {
+        const tabs = block.querySelectorAll('.lattice-generated-tab');
+        const panels = block.querySelectorAll('.lattice-generated-panel');
+        const activate = kind => {
+          for (const tab of tabs) {
+            tab.classList.toggle('is-active', tab.dataset.panel === kind);
+          }
+          for (const panel of panels) {
+            panel.classList.toggle('is-active', panel.dataset.panel === kind);
+          }
+        };
+        for (const tab of tabs) {
+          tab.addEventListener('click', () => activate(tab.dataset.panel));
+        }
+        activate('ml');
+      }
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init, { once: true });
+    } else {
+      init();
+    }
+  })();
+</script>
+
+<!-- lattice-gen-scaffold:end -->
+
     <h1>Observable Fixture Pages</h1>
     <p>
       These pages are source fixtures for
       <code>lattice_gen observable</code>. After running
       <code>observable --update</code>, each page gets generated
-      <code>&lt;out&gt;</code> and <code>&lt;ocaml-out&gt;</code> blocks.
+      snapshot blocks for the rendered <code>.ml</code> and <code>.mli</code>.
     </p>
 
     <div class="card">
       <h2>Fixtures</h2>
       <ul>
-        <li><a href="basic.html">basic.html</a> - single <code>&lt;lat&gt;</code> plus one <code>&lt;ocaml&gt;</code></li>
-        <li><a href="multi-lat.html">multi-lat.html</a> - multiple lattices, default root-module naming, cumulative OCaml state</li>
-        <li><a href="filtered.html">filtered.html</a> - <code>include-solver="false"</code></li>
-        <li><a href="cumulative.html">cumulative.html</a> - later OCaml blocks can see earlier OCaml bindings and lattices</li>
-        <li><a href="compiler-structure.html">compiler-structure.html</a> - compiler-shaped nested products using the existing structure fixture</li>
-        <li><a href="proposed-morph-syntax.html">proposed-morph-syntax.html</a> - design sketch for named primitive morph declarations</li>
+        <li><a href="basic.html">basic.html</a> - single <code>&lt;lat&gt;</code> block</li>
+        <li><a href="multi-lat.html">multi-lat.html</a> - multiple lattices in one page</li>
+        <li><a href="filtered.html">filtered.html</a> - product-focused fixture</li>
+        <li><a href="cumulative.html">cumulative.html</a> - two independent generated modules</li>
+        <li><a href="compiler-structure.html">compiler-structure.html</a> - compiler-shaped nested products and bridges</li>
+        <li><a href="proposed-morph-syntax.html">proposed-morph-syntax.html</a> - runnable syntax sketch for named morphs</li>
       </ul>
     </div>
 

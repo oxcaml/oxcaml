@@ -15,7 +15,8 @@ rule token = parse
   | "]" { RBRACKET }
   | "{" { LBRACE }
   | "}" { RBRACE }
-  | "<=" { LEQ }
+  | "(" { LPAREN }
+  | ")" { RPAREN }
   | "->" { ARROW }
   | "<" { LT }
   | ">" { GT }
@@ -23,8 +24,6 @@ rule token = parse
   | ":" { COLON }
   | ";" { SEMI }
   | "^" { CARET }
-  | "via" { VIA }
-  | "aliases" { ALIASES }
   | ident as text { IDENT (Location.locate lexbuf text) }
   | eof { EOF }
   | _ as ch { Error.failf (Location.of_lexbuf lexbuf) "unexpected character '%c'" ch }

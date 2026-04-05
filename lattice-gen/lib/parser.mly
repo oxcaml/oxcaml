@@ -6,14 +6,14 @@ let merge_names
     (rest : string Location.located list)
   =
   match List.rev rest with
-  | [] -> first.loc
-  | last :: _ -> Location.merge first.loc last.loc
+  | [] -> first.Location.loc
+  | last :: _ -> Location.merge first.Location.loc last.Location.loc
 %}
 
 %token <string Location.located> IDENT
 %token LBRACKET RBRACKET LBRACE RBRACE
-%token EQ LT GT LEQ ARROW CARET COLON SEMI
-%token VIA ALIASES
+%token LPAREN RPAREN
+%token EQ LT GT ARROW CARET COLON SEMI
 %token EOF
 
 %start <Ast.file> file
@@ -32,12 +32,10 @@ decl:
       { Base { name; clauses } }
   | name = IDENT EQ LBRACE fields = field_list RBRACE
       { Product { name; fields } }
-  | small = IDENT LEQ big = IDENT VIA LBRACE mappings = mapping_list RBRACE aliases = aliases_opt
-      { Embedding { small; big; mappings; aliases } }
-
-aliases_opt:
-  | { [] }
-  | ALIASES LBRACE aliases = alias_list RBRACE { aliases }
+  | name = IDENT COLON source = lattice_expr ARROW target = lattice_expr EQ LBRACKET mappings = mapping_list RBRACKET
+      { Primitive_morph { name; source; target; mappings } }
+  | name = IDENT COLON source = lattice_expr ARROW target = lattice_expr EQ LBRACE assignments = bridge_assignment_list RBRACE
+      { Product_bridge { name; source; target; assignments } }
 
 clause_list:
   | { [] }
@@ -59,21 +57,21 @@ field_tail_list:
 
 mapping_list:
   | { [] }
-  | first = mapping rest = mapping_tail_list { first :: rest }
+  | first = primitive_mapping rest = mapping_tail_list { first :: rest }
 
 mapping_tail_list:
   | { [] }
   | SEMI { [] }
-  | SEMI next = mapping rest = mapping_tail_list { next :: rest }
+  | SEMI next = primitive_mapping rest = mapping_tail_list { next :: rest }
 
-alias_list:
+bridge_assignment_list:
   | { [] }
-  | first = alias_decl rest = alias_tail_list { first :: rest }
+  | first = bridge_assignment rest = bridge_assignment_tail_list { first :: rest }
 
-alias_tail_list:
+bridge_assignment_tail_list:
   | { [] }
   | SEMI { [] }
-  | SEMI next = alias_decl rest = alias_tail_list { next :: rest }
+  | SEMI next = bridge_assignment rest = bridge_assignment_tail_list { next :: rest }
 
 clause:
   | name = IDENT { Singleton name }
@@ -90,22 +88,38 @@ gt_tail:
   | name = IDENT { [name] }
   | name = IDENT GT rest = gt_tail { name :: rest }
 
+lattice_expr:
+  | lattice = IDENT opposite = field_opposite
+      { { lattice; opposite } }
+
 field:
-  | name = IDENT COLON lattice = IDENT opposite = field_opposite
-      { { name; ty = { lattice; opposite } } }
+  | name = IDENT COLON ty = lattice_expr
+      { { name; ty } }
 
 field_opposite:
   | { false }
   | CARET kw = IDENT
       {
         let kw : string Location.located = kw in
-        if kw.txt <> "op"
-        then Error.failf kw.loc "expected \"op\" after '^'";
+        if kw.Location.txt <> "op"
+        then Error.failf kw.Location.loc "expected \"op\" after '^'";
         true
       }
 
-mapping:
-  | small = IDENT ARROW big = IDENT { { small; big } }
+primitive_mapping:
+  | source = IDENT ARROW target = IDENT { { source; target } }
 
-alias_decl:
-  | slot = IDENT EQ name = IDENT { { slot; name } }
+bridge_assignment:
+  | target = IDENT EQ expr = bridge_expr { { target; expr } }
+
+bridge_expr:
+  | field = IDENT
+      {
+        if field.Location.txt = "min"
+        then Min field.Location.loc
+        else if field.Location.txt = "max"
+        then Max field.Location.loc
+        else Source_field field
+      }
+  | morph = IDENT LPAREN field = IDENT RPAREN
+      { Morph_apply { morph; field } }

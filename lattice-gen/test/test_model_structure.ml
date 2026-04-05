@@ -4,111 +4,153 @@ let run () =
       ~name:"model-structure"
       ~source:
         {|
-Locality = [
-  Global < Local
+A = [ Lo < Hi ]
+B = [ Red < Blue ]
+
+f : A -> B = [
+  Lo -> Red;
+  Hi -> Blue;
 ]
 
-Linearity = [
-  Many < Once
+g : B -> A = [
+  Red -> Lo;
+  Blue -> Hi;
 ]
 
-Alloc = {
-  areality : Locality;
-  linearity : Linearity ^op;
+P = {
+  src : A;
+  dst : B;
+}
+
+Q = {
+  left : A;
+  right : B;
+}
+
+R = {
+  first : A;
+  second : B;
+}
+
+Mix = {
+  x : A;
+  y : B^op;
+}
+
+Qop = {
+  left : A;
+  right : B^op;
+}
+
+id_p : P -> P = {
+  src = src;
+  dst = dst;
+}
+
+rename : P -> Q = {
+  left = src;
+  right = dst;
+}
+
+unrename : Q -> P = {
+  src = left;
+  dst = right;
+}
+
+rename_undeclared : P -> R = {
+  first = src;
+  second = dst;
+}
+
+mix_to_qop : Mix -> Qop = {
+  left = x;
+  right = y;
+}
+
+filled_q : P -> Q = {
+  left = src;
+  right = max;
 }
 |}
   in
   let product =
-    match Model.String_map.find "Alloc" model.lattices with
+    match Model.String_map.find "P" model.lattices with
     | Model.Product product -> product
     | Model.Base _ -> failwith "expected product lattice"
   in
   Test_support.ensure
-    (List.length product.fields = 2)
-    "expected two fields in product";
+    (List.map (fun (field : Model.field) -> field.name) product.fields = [ "src"; "dst" ])
+    "unexpected product fields";
   Test_support.ensure
-    (List.length product.axes = 2)
-    "expected two derived axes in product";
-  let axis_names = List.map (fun (axis : Model.axis_object) -> axis.name) product.axes in
+    (List.map (fun (axis : Model.axis_object) -> axis.name) product.axes = [ "src"; "dst" ])
+    "unexpected derived axes";
+  let f =
+    match Model.String_map.find "f" model.morphs with
+    | Model.Primitive primitive -> primitive
+    | Model.Bridge _ -> failwith "expected primitive morph"
+  in
+  let f_core = f.core in
   Test_support.ensure
-    (axis_names = [ "areality"; "linearity" ])
-    "unexpected axis names";
-  let axis_ctors =
-    List.map (fun (axis : Model.axis_object) -> axis.ctor_name) product.axes
+    (Option.equal String.equal f_core.left_name (Some "g"))
+    "expected left adjoint of f to match g";
+  Test_support.ensure
+    (Option.equal String.equal f_core.right_name (Some "g"))
+    "expected right adjoint of f to match g";
+  let id_p =
+    match Model.String_map.find "id_p" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected product bridge"
   in
   Test_support.ensure
-    (axis_ctors = [ "Areality"; "Linearity" ])
-    "unexpected axis constructor names";
-  let linearity_axis =
-    List.find (fun (axis : Model.axis_object) -> axis.name = "linearity") product.axes
+    (Option.equal String.equal id_p.core.left_name (Some "id_p"))
+    "expected identity bridge to be its own left adjoint";
+  Test_support.ensure
+    (Option.equal String.equal id_p.core.right_name (Some "id_p"))
+    "expected identity bridge to be its own right adjoint";
+  let rename =
+    match Model.String_map.find "rename" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected product bridge"
   in
-  Test_support.ensure linearity_axis.declared_opposite "expected ^op to be preserved on axis";
   Test_support.ensure
-    (linearity_axis.proj_name = "proj_linearity")
-    "unexpected proj name";
+    (Option.equal String.equal rename.core.left_name (Some "unrename"))
+    "expected rename bridge left adjoint to match unrename";
   Test_support.ensure
-    (linearity_axis.min_with_name = "min_with_linearity")
-    "unexpected min_with name";
+    (Option.equal String.equal rename.core.right_name (Some "unrename"))
+    "expected rename bridge right adjoint to match unrename";
+  let rename_undeclared =
+    match Model.String_map.find "rename_undeclared" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected product bridge"
+  in
   Test_support.ensure
-    (linearity_axis.max_with_name = "max_with_linearity")
-    "unexpected max_with name";
-  let object_ = Model.String_map.find "Alloc" model.objects in
+    (Option.is_some rename_undeclared.core.left_adjoint)
+    "expected rename_undeclared to have a left adjoint";
   Test_support.ensure
-    (object_.opposite_name = "Alloc_op")
-    "unexpected opposite object name";
-  let solver_object = Model.String_map.find "Alloc" model.solver_objects in
-  let solver_object_op = Model.String_map.find "Alloc_op" model.solver_objects in
+    (Option.is_some rename_undeclared.core.right_adjoint)
+    "expected rename_undeclared to have a right adjoint";
   Test_support.ensure
-    (solver_object.object_ctor_name = "Obj_Alloc")
-    "unexpected solver object constructor name";
+    (Option.is_none rename_undeclared.core.left_name)
+    "expected rename_undeclared left adjoint name to stay hidden";
   Test_support.ensure
-    (match solver_object.orientation with
-     | Model.Positive -> true
-     | Model.Negative -> false)
-    "expected positive solver orientation for base product";
+    (Option.is_none rename_undeclared.core.right_name)
+    "expected rename_undeclared right adjoint name to stay hidden";
+  let mix_to_qop =
+    match Model.String_map.find "mix_to_qop" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected product bridge"
+  in
   Test_support.ensure
-    (match solver_object_op.orientation with
-     | Model.Positive -> true
-     | Model.Negative -> false)
-    "expected positive solver orientation for opposite product";
-  match object_.shape with
-  | Model.Base_object -> failwith "expected product object"
-  | Model.Product_object axes ->
-    Test_support.ensure
-      (List.map (fun (axis : Model.axis_object) -> axis.name) axes = axis_names)
-      "object axes do not match product axes"
-  ;
-  match solver_object.shape with
-  | Model.Solver_base -> failwith "expected packed product solver object"
-  | Model.Solver_product axes ->
-    Test_support.ensure
-      (List.length axes = 2)
-      "expected packed solver axes";
-    let line_axis =
-      List.find
-        (fun (axis : Model.solver_axis) -> axis.axis.name = "linearity")
-        axes
-    in
-    Test_support.ensure
-      (line_axis.carrier_object_name = "Linearity_op")
-      "unexpected solver carrier object for declared ^op field";
-    Test_support.ensure
-      (line_axis.proj_ctor_name = "Proj_Alloc_Linearity")
-      "unexpected solver proj constructor name";
-    Test_support.ensure
-      (line_axis.min_with_ctor_name = "Min_with_Alloc_Linearity")
-      "unexpected solver min_with constructor name";
-    Test_support.ensure
-      (line_axis.max_with_ctor_name = "Max_with_Alloc_Linearity")
-      "unexpected solver max_with constructor name";
-    match solver_object_op.shape with
-    | Model.Solver_base -> failwith "expected packed opposite solver object"
-    | Model.Solver_product axes_op ->
-      let line_axis_op =
-        List.find
-          (fun (axis : Model.solver_axis) -> axis.axis.name = "linearity")
-          axes_op
-      in
-      Test_support.ensure
-        (line_axis_op.carrier_object_name = "Linearity")
-        "unexpected opposite solver carrier object for ^op field"
+    (Array.length mix_to_qop.core.map = 4)
+    "unexpected mixed-polarity product size";
+  let filled_q =
+    match Model.String_map.find "filled_q" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected product bridge"
+  in
+  Test_support.ensure
+    (List.length filled_q.assignments = 2)
+    "unexpected assignment count in filled bridge";
+  Test_support.ensure
+    (Array.for_all (fun target -> target = 1 || target = 3) filled_q.core.map)
+    "expected max-filled bridge to pin the right field to top"
