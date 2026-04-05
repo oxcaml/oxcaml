@@ -2910,9 +2910,6 @@ let add_types_to_env ~shapes decls env =
       add_type ~check:true ~shape id decl env)
     decls shapes env
 
-
-(* UPDATE TYPE UPSTAEM *)
-
 (* Translate a set of type declarations, mutually recursive or not *)
 let transl_type_decl env rec_flag sdecl_list =
   List.iter check_redefined_unit sdecl_list;
@@ -4571,8 +4568,6 @@ let variance_error ~loc ~v1 ~v2 =
   function
   | Variance_variable_error { error; variable; context } ->
       Out_type.prepare_for_printing [ variable ];
-      (* CR rtjoa: need this? *)
-      (* Printtyp.Naming_context.reset (); *)
       let intro = variance_context context in
       Location.errorf ~loc "%a%t" pp_doc intro
         (variance_variable_error ~v1 ~v2 variable error)
@@ -4665,8 +4660,6 @@ let report_error ~loc = function
       let reaching_path = Reaching_path.simplify reaching_path in
       Out_type.prepare_for_printing [used_as; defined_as];
       Reaching_path.add_to_preparation reaching_path;
-      (* CR rtjoa: need this? *)
-      (* Printtyp.Naming_context.reset (); *)
       Location.errorf ~loc
         "This recursive type is not regular.@ \
          @[<v>The type constructor %a is defined as@;<1 2>type %a@ \
@@ -4783,7 +4776,7 @@ let report_error ~loc = function
       Location.errorf ~loc
         "Don't know how to unbox this type.@ \
          Only %a, %a, %a, %a, vector primitives, and@ \
-                   the corresponding unboxed types can be marked unboxed."
+         the corresponding unboxed types can be marked unboxed."
         Style.inline_code "float"
         Style.inline_code "int32"
         Style.inline_code "int64"
@@ -4949,8 +4942,9 @@ let report_error ~loc = function
          which does not have a free row type variable.@]"
         (Style.as_inline_code Printtyp.type_expr) ty
   | Local_not_enabled ->
-      Location.errorf ~loc "The local extension is disabled@ \
-                            To enable it, pass the '-extension local' flag"
+      Location.errorf ~loc
+        "The local extension is disabled@ \
+         To enable it, pass the '-extension local' flag"
   | Unexpected_layout_any_in_primitive name ->
       Location.errorf ~loc
         "The primitive %a doesn't work well with type variables of@ \
@@ -5025,7 +5019,6 @@ let report_error ~loc = function
   | Layout_poly_unsupported ->
     Location.errorf ~loc
       "Layout polymorphism is unsupported in this context."
-
 
 let () =
   Location.register_error_of_exn
