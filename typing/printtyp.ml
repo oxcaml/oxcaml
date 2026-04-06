@@ -1420,13 +1420,14 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
 (* CR layouts v2.8: This should use the annotation in the jkind, if there
    is one. But first that annotation needs to be in Typedtree, not in
    Parsetree. Internal ticket 4435. *)
-let out_jkind_option_of_jkind ~ignore_null env jkind =
+let out_jkind_option_of_jkind ~ignore_null ~in_layout_poly env jkind =
   let desc = Jkind.get jkind in
   let elide =
-    Jkind.is_value_for_printing ~ignore_null env jkind (* C2.1 *)
-    || (match desc.base with
-        | Layout (Sort (Var _, _)) -> not !Clflags.verbose_types (* X1 *)
-        | _ -> false)
+    not in_layout_poly
+    && (Jkind.is_value_for_printing ~ignore_null env jkind (* C2.1 *)
+        || (match desc.base with
+          | Layout (Sort (Var _, _)) -> not !Clflags.verbose_types (* X1 *)
+          | _ -> false))
   in
   if elide then None else Some (out_jkind_of_desc env desc)
 
@@ -1664,7 +1665,7 @@ let rec tree_of_modal_typexp mode modal ty =
         (* Make the names delayed, so that the real type is
            printed once when used as proxy *)
         List.iter add_delayed tyl;
-        let tl = tree_of_qtvs tyl in
+        let tl = tree_of_qtvs ~in_layout_poly:false tyl in
         let tr = Otyp_poly (tl, tree_of_typexp mode alloc_mode ty) in
         (* Forget names when we leave scope *)
         Names.remove_names tyl;
@@ -1748,16 +1749,19 @@ and tree_of_typexp mode alloc_mode ty =
   tree_of_modal_typexp mode (Other alloc_mode) ty
 
 (* qtvs = quantified type variables *)
-(* this silently drops any arguments that are not generic Tvar or Tunivar *)
-and tree_of_qtvs qtvs =
+(* this silently drops any arguments that are not generic Tvar or Tunivar, *)
+(* unless we're printing a layout-polymorphic value description *)
+and tree_of_qtvs ~in_layout_poly qtvs =
   let tree_of_qtv v : (string * out_jkind option) option =
-    (* CR layouts: We ignore nullability here to avoid needlessly printing
-       ['a : value_or_null] when it's not relevant (most cases).
+    (* CR layouts: We possibly ignore nullability here to avoid needlessly
+       printing ['a : value_or_null] when it's not relevant (most cases);
+       a notable exception is "val poly_".
        Unfortunately, this makes error messages really confusing, because
        we don't consider jkind annotations. *)
     let tree jkind =
       Some (Names.name_of_type Names.new_name v,
-            out_jkind_option_of_jkind ~ignore_null:true !printing_env jkind)
+            out_jkind_option_of_jkind ~ignore_null:true ~in_layout_poly
+              !printing_env jkind)
     in
     match v.desc with
     | Tvar { jkind } when v.level = generic_level -> tree jkind
@@ -1981,20 +1985,21 @@ let zap_qtvs_if_boring qtvs =
 (* get the free variables with their jkinds; do this *after* converting the
    type itself, so that the type names are available.
    This implements Case (C3) from Note [When to print jkind annotations]. *)
-let extract_qtvs tyl =
+let extract_qtvs ~in_layout_poly tyl =
   let fvs = Ctype.free_non_row_variables_of_list tyl in
   (* The [Ctype.free*variables] family of functions returns the free
      variables in reverse order they were encountered in the list of types.
   *)
   let fvs = List.rev fvs in
   let tfvs = List.map Transient_expr.repr fvs in
-  let vars_jkinds = tree_of_qtvs tfvs in
+  let vars_jkinds = tree_of_qtvs ~in_layout_poly tfvs in
   zap_qtvs_if_boring vars_jkinds
 
 let param_jkind ty =
   match get_desc ty with
   | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
-     out_jkind_option_of_jkind ~ignore_null:false !printing_env jkind
+      out_jkind_option_of_jkind ~ignore_null:false ~in_layout_poly:false
+        !printing_env jkind
   | _ -> None (* this is (C2.2) from Note [When to print jkind annotations] *)
 
 let tree_of_label l =
@@ -2028,7 +2033,9 @@ let tree_of_constructor_args_and_ret_type args ret_type =
   | Some res ->
       let out_ret = tree_of_typexp Type res in
       let out_args = tree_of_constructor_arguments args in
-      let qtvs = extract_qtvs (res :: tys_of_constr_args args) in
+      let qtvs =
+        extract_qtvs ~in_layout_poly:false (res :: tys_of_constr_args args)
+      in
       (out_args, Some (qtvs, out_ret))
 
 let tree_of_single_constructor cd =
@@ -2406,12 +2413,13 @@ let tree_of_value_description id decl =
       Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         decl.val_modalities
   in
+  let in_layout_poly = not (List.is_empty (Lpoly.get_exn decl.val_lpoly)) in
   let qsvs, qtvs =
     (* Important: process the fvs *after* the type; tree_of_type_scheme
        resets the naming context. Both must be inside print_with_genvars
        so that sort poly var names are registered when jkinds are printed. *)
     Jkind_types.Sort.print_with_genvars (Lpoly.get_exn decl.val_lpoly)
-      (fun names -> names, extract_qtvs [decl.val_type])
+      (fun names -> names, extract_qtvs ~in_layout_poly [decl.val_type])
   in
   let apparent_arity =
     let rec count n typ =
@@ -2480,7 +2488,7 @@ let tree_of_method mode (lab, priv, virt, ty) =
   let (ty, tyl) = method_type priv ty in
   let tty = tree_of_typexp mode ty in
   let tyl = List.map Transient_expr.repr tyl in
-  let qtvs = tree_of_qtvs tyl in
+  let qtvs = tree_of_qtvs ~in_layout_poly:false tyl in
   let qtvs = zap_qtvs_if_boring qtvs in
   Names.remove_names tyl;
   let priv = priv <> Mpublic in

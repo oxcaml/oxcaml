@@ -20,6 +20,8 @@ open Mode
 
 type jkind_initialization_choice = Sort | Any
 
+type valdecl_lpoly_flag = Lpoly | Lmono
+
 module TyVarEnv : sig
   (* this is just the subset of [TyVarEnv] that is needed outside
      of [Typetexp]. See the ml file for more. *)
@@ -130,7 +132,7 @@ val transl_simple_type_delayed
            Returns the type, an instance of the corresponding type_expr, and a
            function that binds the type variable. *)
 val transl_type_scheme:
-        Env.t -> Parsetree.core_type ->
+        Env.t -> Parsetree.core_type -> valdecl_lpoly_flag ->
         Jkind_types.Sort.var list * Typedtree.core_type
 val transl_type_param:
   Env.t -> Path.t -> jkind_lr -> Parsetree.core_type -> Typedtree.core_type
@@ -195,6 +197,7 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+  | Val_poly_and_layout
 
 exception Error of Location.t * Env.t * error
 

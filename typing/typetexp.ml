@@ -55,6 +55,14 @@ type cannot_quantify_reason =
   | Univar
   | Scope_escape
 
+type valdecl_lpoly_flag =
+  | Lpoly
+  | Lmono
+
+let is_poly_valdecl = function
+  | Lpoly -> true
+  | Lmono -> false
+
 (* a description of the jkind on an explicitly quantified universal
    variable, containing whether the jkind was a default
    (e.g. [let f : 'a. 'a -> 'a = ...]) or explicit
@@ -105,6 +113,7 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+  | Val_poly_and_layout
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -1637,7 +1646,41 @@ let transl_type_scheme_lmono env styp =
   | _ ->
     transl_type_scheme_mono env styp
 
-let transl_type_scheme_lpoly env attrs loc vars inner_type =
+let transl_type_scheme_poly_val env styp =
+  let vars, styp =
+    match styp.ptyp_desc with
+    | Ptyp_poly (vars, styp) -> vars, styp
+    | _ -> [], styp
+  in
+  let cty =
+    with_local_level begin fun () ->
+      TyVarEnv.reset ();
+      List.iter
+        (fun (name_loc, jkind_opt) ->
+           let name = name_loc.txt in
+           if Option.is_some jkind_opt then
+             let jkind =
+               jkind_of_annotation env
+                 (Type_variable ("'" ^ name)) [] (Option.get jkind_opt)
+             in
+             let var = newvar ~name jkind in
+             TyVarEnv.add name var jkind (Env.stage env))
+        vars;
+      transl_simple_type ~new_var_jkind:Sort env ~closed:false
+        Alloc.Const.legacy styp
+    end
+    ~post:generalize_ctyp
+  in
+  let ty = cty.ctyp_type in
+  let ety = Subst.type_expr Subst.identity ty in
+  let sort_vars = generalize_layout_variables ety in
+  let vars_names_loc =
+    List.map (fun v -> mknoloc (Jkind_types.Sort.Var.name v)) sort_vars
+  in
+  let ctyp = { cty with ctyp_desc = Ttyp_newlayout (vars_names_loc, cty) } in
+  sort_vars, ctyp
+
+let transl_type_scheme_newlayout env attrs loc vars inner_type =
   (* Use [with_local_level] just for scoping *)
   with_local_level begin fun () ->
     let env', ident_var_pairs =
@@ -1693,15 +1736,19 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
     ident_var_pairs |> List.map snd |> List.rev, ctyp
   end
 
-let transl_type_scheme env styp =
+let transl_type_scheme env styp valdecl_flag =
+  let is_val_poly = is_poly_valdecl valdecl_flag in
   match styp.ptyp_desc with
   | Ptyp_newlayout (vars, st) ->
     Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
       Language_extension.Alpha;
-    transl_type_scheme_lpoly env styp.ptyp_attributes
+    if is_val_poly then
+      raise (Error (styp.ptyp_loc, env, Val_poly_and_layout));
+    transl_type_scheme_newlayout env styp.ptyp_attributes
       styp.ptyp_loc vars st
   | _ ->
-    [], transl_type_scheme_lmono env styp
+    if is_val_poly then transl_type_scheme_poly_val env styp
+    else [], transl_type_scheme_lmono env styp
 
 (* Error report *)
 
@@ -1913,6 +1960,12 @@ let report_error_doc env ppf =
   | Lpoly_unsupported ->
       fprintf ppf
         "@[Layout polymorphism is not supported in this context@]"
+  | Val_poly_and_layout ->
+      fprintf ppf
+        "@[The %a keyword is not support inside layout-polymorphic@ \
+         value descriptions introduced using %a.@]"
+        Style.inline_code "layout_"
+        Style.inline_code "val poly_"
 
 let () =
   Location.register_error_of_exn

@@ -550,6 +550,10 @@ val default_to_value : 'd Types.jkind -> unit
    these three functions to default to void - it's the most efficient thing
    when we have a choice. *)
 
+(** Generate a fresh sort variable when the type has no kind constraint. *)
+val default_to_fresh_layout :
+  'd Types.jkind -> Sort.var list * sort Layout.t Types.jkind_base
+
 (** Generalize the sorts in a jkind when in sort generalization context. Only
     has an effect when called within {!Sort.generalize_with}. *)
 val generalize : current_level:int -> 'd Types.jkind -> unit

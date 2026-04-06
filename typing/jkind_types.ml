@@ -714,6 +714,33 @@ module Sort = struct
         (* path compression *)
         result)
 
+  let rec default_to_fresh_layouts_and_get : var list -> t -> var list * t =
+   fun vars -> function
+    | Base b -> vars, Base b
+    | Product ts ->
+      let vars, ts =
+        List.fold_left_map default_to_fresh_layouts_and_get vars ts
+      in
+      vars, Product ts
+    | Univar uv -> vars, Univar uv
+    | Var r -> (
+      match r.contents with
+      | None when is_genvar r -> vars, Var r
+      | None ->
+        let v = new_genvar () in
+        let v' = of_var v in
+        r.level <- v.level;
+        r.contents <- Some v';
+        v :: vars, v'
+      | Some s ->
+        let vars, result = default_to_fresh_layouts_and_get vars s in
+        set r (Some result);
+        (* path compression *)
+        vars, result)
+
+  let default_to_fresh_layouts_and_get : t -> var list * t =
+   fun t -> default_to_fresh_layouts_and_get [] t
+
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_value_and_get s
 

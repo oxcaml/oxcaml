@@ -1706,10 +1706,11 @@ module type S_poly = sig
   val poly_ g : 'a 'b. 'a -> 'b -> 'a
 end
 [%%expect{|
-Line 2, characters 2-28:
-2 |   val poly_ f : 'a. 'a -> 'a
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "val poly_" annotation is not yet implemented.
+module type S_poly =
+  sig
+    val f : layout_ l. ('a : l). 'a -> 'a
+    val g : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
+  end
 |}]
 
 let poly_ f : 'a. 'a -> 'a = fun x -> x
