@@ -77,7 +77,10 @@ let bar (c @ local) =
   let _ = use_unique (id c) in
   ()
 [%%expect{|
-val bar : 'a @ local unique -> unit = <fun>
+Line 2, characters 25-26:
+2 |   let _ = use_unique (id c) in
+                             ^
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let bar (x @ aliased) =
@@ -123,37 +126,29 @@ Error: This value is "dynamic"
 (* mode polymorphism allows us to combine take combine the bounds of two
 functions via joins *)
 let f (x : string) = x
-let g (x : string @ local) = x
+let g (x : string @ portable) = x
 let which = function
   | false -> f
   | true -> g
 [%%expect{|
 val f : string -> string = <fun>
-val g : string @ local -> string @ local = <fun>
-val which : bool -> string @ local -> string @ local = <fun>
+val g : string @ portable -> string = <fun>
+val which : bool -> string @ portable -> string = <fun>
 |}]
 
-(* The least upper bound between local and global is local *)
-let foo (x @ global) =
+(* The least upper bound between portable and nonportable is nonportable *)
+let foo (x @ portable) =
   let f = which true in
-  let y @ global = "global" in
-  use_global (f y) (* y is weakened to local before it's applied to f *)
+  use_portable (f x) (* x is weakened to nonportable before it's applied to f *)
 [%%expect{|
-Line 4, characters 13-18:
-4 |   use_global (f y) (* y is weakened to local before it's applied to f *)
-                 ^^^^^
-Error: This value is "local" but is expected to be "global".
+val foo : string @ portable -> unit = <fun>
 |}]
 
-let foo (x @ global) =
+let foo (x @ portable) =
   let f = which false in
-  let y @ global = "global" in
-  use_global (f y) (* y is weakened to local before it's applied to f *)
+  use_global (f x) (* x is weakened to nonportable before it's applied to f *)
 [%%expect{|
-Line 4, characters 13-18:
-4 |   use_global (f y) (* y is weakened to local before it's applied to f *)
-                 ^^^^^
-Error: This value is "local" but is expected to be "global".
+val foo : string @ portable -> unit = <fun>
 |}]
 
 (* mode variables used at some mode imposes a bound on them *)
@@ -250,9 +245,70 @@ val foo : int @ portable -> int -> unit = <fun>
 
 (* LOCAL AND MODE POLYMORPHISM *)
 
-(* local values stay local through id - can't return without exclave_ *)
-let foo (local_ x) =
+(* When translating a function, the compiler must decide where to allocate the return
+  value. If we allow the return value to be polymorphic, we must either forego all
+  optimisations and default to heap allocations in all cases, or we limit polymorphism
+  over return values.
+
+  If we don't, we might encounter a soundness issue, where a return value is used as
+  [global] but the compiler chose to allocate it on the stack.
+
+  The following tests show the limits of polymorphism over locality
+*)
+
+(* identity forces the return value to be global *)
+let id x = x
+
+(* but we can still annotate the function to (always) return a local value *)
+let id_local (x @ local) = x
+let id_exclave x = exclave_ x
+[%%expect{|
+val id : 'a -> 'a = <fun>
+val id_local : 'a @ local -> 'a @ local = <fun>
+val id_exclave : 'a -> 'a @ local = <fun>
+|}]
+
+(* Functions impose a default global bound over return values. As a result, [id]
+  only accepts global values  *)
+let foo () =
+  let x @ local = "hello" in
   let y = id x in
+  use_global y
+[%%expect{|
+Line 3, characters 13-14:
+3 |   let y = id x in
+                 ^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+(* When defined locally, [id] can be made to default to local values instead *)
+let foo () =
+  let id x = x in
+  let x @ local = "local" in
+  let y @ global = "global" in
+  let _ = id x in
+  let z = id y in
+  use_global z (* ought to fail since id defaults to local and weakens to y *)
+[%%expect{|
+Line 7, characters 13-14:
+7 |   use_global z (* ought to fail since id defaults to local and weakens to y *)
+                 ^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+(* if return values are only used as global it allocates on the heap *)
+let foo () =
+  let id x = x in
+  let y @ global = "global" in
+  let z = id y in
+  use_global z (* succeeds *)
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+
+(* local values stay local through id_local - can't return without exclave_ *)
+let foo (local_ x) =
+  let y = id_local x in
   y
 [%%expect{|
 Line 3, characters 2-3:
@@ -266,29 +322,17 @@ Error: This value is "local"
 
 (* with exclave_ it works *)
 let foo (local_ x) = exclave_
-  let y = id x in
+  let y = id_local x in
   y
 [%%expect{|
-val foo : 'a @ local portable -> 'a @ local = <fun>
-|}]
-
-(* local input stays local through id *)
-let foo () =
-  let x @ local = "hello" in
-  let y = id x in
-  use_global y
-[%%expect{|
-Line 4, characters 13-14:
-4 |   use_global y
-                 ^
-Error: This value is "local" but is expected to be "global".
+val foo : 'a @ local -> 'a @ local = <fun>
 |}]
 
 (* MULTIPLE MODE AXES *)
 
 (* Bounds can be imposed on multiple axes *)
-let foo (x @ global portable) =
-  use_global (id x);
+let foo (x @ uncontended portable) =
+  use_uncontended (id x);
   use_portable (id x)
 [%%expect{|
 val foo : 'a @ portable -> unit = <fun>
