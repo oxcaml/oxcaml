@@ -262,7 +262,8 @@ end = struct
      we started processing the current type. See Note [Global type variables].
   *)
   let type_variables =
-    ref (TyVarMap.empty : (type_expr * bool ref * jkind_lr * Env.stage) TyVarMap.t)
+    ref (TyVarMap.empty :
+           (type_expr * bool ref * jkind_lr * Env.stage) TyVarMap.t)
 
   (* These are variables that have been used in the currently-being-checked
      type, possibly including the variables in [type_variables].
@@ -1294,7 +1295,7 @@ and transl_type_repr env ~policy ~row_context mode loc vars st =
       end in
       (sort_vars, new_univars, cty)
     end
-      ~post:(fun (_, _, cty) -> generalize_ctyp cty)
+    ~post:(fun (_, _, cty) -> generalize_ctyp cty)
   in
   let ty = cty.ctyp_type in
   let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
@@ -1356,8 +1357,8 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
             in
             let t = newvar jkind in
             (* Use the whole location, which is used by [Type_mismatch]. *)
-            TyVarEnv.remember_used
-              ~check:alias_loc ~rigid alias t styp_loc (Env.stage env);
+            TyVarEnv.remember_used ~check:alias_loc ~rigid
+              alias t styp_loc (Env.stage env);
             let ty = transl_type env ~policy ~row_context mode styp in
             begin try unify_var env t ty.ctyp_type with Unify err ->
               let err = Errortrace.swap_unification_error err in
@@ -1828,8 +1829,7 @@ let report_error_doc loc env = function
         "The %s extension is disabled@ \
          To enable it, pass the '-extension %s' flag@]" ext ext
   | Polymorphic_optional_param ->
-    Location.errorf ~loc
-      "@[Optional parameters cannot be polymorphic@]"
+      Location.errorf ~loc "@[Optional parameters cannot be polymorphic@]"
   | Non_value {vloc; typ; err} ->
     let s =
       match vloc with
