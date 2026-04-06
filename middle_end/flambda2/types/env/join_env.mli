@@ -63,6 +63,21 @@ module Analysis : sig
 
   val simple_refined_at_join :
     'a t -> Typing_env.t -> Simple.t -> 'a simple_refined_at_join
+
+  module Simples_at_join : sig
+    type 'a t
+
+    type definition_at_use = At_normal_mode of Simple.t [@@unboxed]
+
+    val fold_definitions_at_uses :
+      ('a -> definition_at_use -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  end
+
+  val fold_variables_created_at_join :
+    f:(Name.t -> 'a Simples_at_join.t -> Flambda_kind.t -> 'b -> 'b) ->
+    'a t ->
+    init:'b ->
+    'b
 end
 
 val cut_and_n_way_join_with_analysis :

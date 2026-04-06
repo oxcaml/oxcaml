@@ -11,8 +11,8 @@ let code loopify(never) size(30) newer_version_of(f_0)
      where k3 =
        let prim_1 = %int_comp.gt (bit, bit') in
        cont k2 (prim_1))
-    where k2 (naked_immediate : imm) =
-      (switch naked_immediate
+    where k2 (join_param : imm) =
+      (switch join_param
          | 0 -> k (0)
          | 1 -> k2
          where k2 =
