@@ -3116,7 +3116,6 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         Ctype.with_local_level_generalize_structure_if_principal
           (fun () -> Typecore.type_exp env sexp
             ~mode:(Value.disallow_left mode))
-          ~before_generalize:Typecore.generalize_structure_exp
       in
       let mty =
         match get_desc (Ctype.expand_head env exp.exp_type) with

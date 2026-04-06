@@ -687,7 +687,6 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
              Ctype.with_local_level_generalize_structure_if_principal
                (fun () -> Typetexp.transl_simple_type ~new_var_jkind:Any val_env
                             ~closed:false Alloc.Const.legacy styp)
-               ~before_generalize:(fun cty -> Ctype.generalize_structure cty.ctyp_type)
            in
            begin
              match
@@ -734,7 +733,6 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
            end;
            let definition =
              Ctype.with_local_level_generalize_structure_if_principal
-               ~before_generalize:Typecore.generalize_structure_exp
                (fun () -> Typecore.type_exp val_env sdefinition)
            in
            begin
@@ -1245,10 +1243,6 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
         Ctype.with_local_level_generalize_structure_if_principal
           (fun () ->
             Typecore.type_class_arg_pattern cl_num val_env met_env l spat)
-          ~before_generalize: begin fun (pat, _, _, _) ->
-            let gen {pat_type = ty} = Ctype.generalize_structure ty in
-            iter_pattern gen pat
-          end
       in
       let pv =
         List.map
@@ -1310,8 +1304,6 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       let cl =
         Ctype.with_local_level_generalize_structure_if_principal
           (fun () -> class_expr cl_num val_env met_env virt self_scope scl')
-          ~before_generalize:
-            (fun cl -> Ctype.generalize_class_type_structure cl.cl_type)
       in
       let rec nonopt_labels ls ty_fun =
         match ty_fun with
@@ -1655,7 +1647,6 @@ let initial_env define_class approx
   let constr_type =
     Ctype.with_local_level_generalize_structure_if_principal
       (fun () -> approx cl.pci_expr)
-      ~before_generalize:Ctype.generalize_structure
   in
   let dummy_cty = Cty_signature (Ctype.new_class_signature ()) in
   let dummy_class =
