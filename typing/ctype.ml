@@ -3184,32 +3184,7 @@ let unification_jkind_check uenv ty jkind =
     | Perform_checks -> constrain_type_jkind_exn (get_env uenv) Unify ty jkind
     | Delay_checks r -> r := (ty,jkind) :: !r
 
-let check_and_update_generalized_ty_jkind ?name ~loc env ty =
-  let immediacy_check jkind =
-    let is_immediate jkind =
-      (* Just check externality and layout, because that's what actually matters
-         for upstream code. We check both for a known value and something that
-         might turn out later to be value. This is the conservative choice. *)
-      let context = mk_jkind_context_check_principal env in
-      let ext = Jkind.get_externality_upper_bound ~context env jkind in
-      Jkind_axis.Externality.le ext External64 &&
-      match Jkind.get_layout env jkind with
-      | Some (Base (Value, _)) | None -> true
-      | _ -> false
-    in
-    if Language_extension.erasable_extensions_only ()
-      && is_immediate jkind && not (Jkind.History.has_warned jkind)
-    then
-      let id =
-        match name with
-        | Some id -> Ident.name id
-        | None -> "<unknown>"
-      in
-      Location.prerr_warning loc (Warnings.Incompatible_with_upstream
-        (Warnings.Immediate_erasure id));
-      Jkind.History.with_warning jkind
-    else jkind
-  in
+let check_and_update_generalized_ty_jkind ?name ~loc ty =
   let generalization_check level jkind =
     if level = generic_level then
       Jkind.History.(update_reason jkind (Generalized (name, loc)))
@@ -3220,12 +3195,10 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
     if try_mark_node mark ty then begin
       begin match get_desc ty with
       | Tvar ({ jkind; _ } as r) ->
-        let new_jkind = immediacy_check jkind in
-        let new_jkind = generalization_check level new_jkind in
+        let new_jkind = generalization_check level jkind in
         set_type_desc ty (Tvar {r with jkind = new_jkind})
       | Tunivar ({ jkind; _ } as r) ->
-        let new_jkind = immediacy_check jkind in
-        let new_jkind = generalization_check level new_jkind in
+        let new_jkind = generalization_check level jkind in
         set_type_desc ty (Tunivar {r with jkind = new_jkind})
       | _ -> ()
       end;
