@@ -131,8 +131,6 @@ let () =
   assert (Yep_first "a" = Yep_first "a");
   assert (Nope_last <> Yep_first "a");
   assert (compare Nope_last Nope_last = 0);
-  (* CR or-null: if source constructor order should matter for custom
-     [@@or_null], consider enforcing that at type declaration time. *)
   assert (compare Nope_last (Yep_first "a") < 0);
   assert (compare (Yep_first "a") Nope_last > 0)
 ;;
