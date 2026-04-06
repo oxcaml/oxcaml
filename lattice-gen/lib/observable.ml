@@ -665,9 +665,13 @@ let extract_lat_blocks source =
   loop 0 1 []
 
 let render_block index attrs body =
-  let outputs =
-    Generate.render_string ?root_module:attrs.root_module ~input_name:"observable" body
+  let model, outputs =
+    Generate.resolve_and_render_string
+      ?root_module:attrs.root_module
+      ~input_name:"observable"
+      body
   in
+  Generate.report_warnings model;
   Printf.sprintf
     "%s\n\
      <div class=\"lattice-generated\">\n\
@@ -1374,10 +1378,8 @@ let run_block_tests path (block : lat_block) =
   let input_name =
     Printf.sprintf "%s#lat%d" (Filename.basename path) block.index
   in
-  let ast = Parse.from_string ~input_name block.body in
-  let model = Model.resolve ast in
-  let outputs =
-    Generate.render_string
+  let model, outputs =
+    Generate.resolve_and_render_string
       ?root_module:block.attrs.root_module
       ~input_name
       block.body
@@ -1394,9 +1396,9 @@ let run_block_tests path (block : lat_block) =
       run_command ~cwd:dir "./main.exe")
 
 let test_lattice_source ?root_module ~input_name source =
-  let ast = Parse.from_string ~input_name source in
-  let model = Model.resolve ast in
-  let outputs = Generate.render_string ?root_module ~input_name source in
+  let model, outputs =
+    Generate.resolve_and_render_string ?root_module ~input_name source
+  in
   with_temp_dir "observable-source-test-" (fun dir ->
       write_file (Filename.concat dir "generated.ml") outputs.ml;
       write_file (Filename.concat dir "generated.mli") outputs.mli;

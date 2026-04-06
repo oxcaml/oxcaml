@@ -151,10 +151,20 @@ type item =
   | Lattice of lattice
   | Morph of morph
 
+type morph_step =
+  | Declared_morph of string
+  | Adjoint_chain_step of Ast.adjoint_chain
+
+type warning =
+  { loc : Location.t;
+    message : string
+  }
+
 type t =
   { items : item list;
     lattices : lattice String_map.t;
-    morphs : morph String_map.t
+    morphs : morph String_map.t;
+    warnings : warning list
   }
 
 let opp_descriptor (desc : descriptor) =
@@ -614,6 +624,41 @@ let with_morph_core morph core =
   | Primitive _ -> Primitive { core }
   | Bridge bridge -> Bridge { bridge with core }
 
+let int_array_equal a b =
+  Array.length a = Array.length b && Array.for_all2 Int.equal a b
+
+let rec bridge_expr_equal left right =
+  match left, right with
+  | Source_field left, Source_field right -> String.equal left right
+  | Morph_apply left, Morph_apply right ->
+    String.equal left.morph_name right.morph_name
+    && String.equal left.source_field right.source_field
+  | Min, Min | Max, Max -> true
+  | Join (left_l, left_r), Join (right_l, right_r)
+  | Meet (left_l, left_r), Meet (right_l, right_r) ->
+    bridge_expr_equal left_l right_l && bridge_expr_equal left_r right_r
+  | ( Source_field _ | Morph_apply _ | Min | Max | Join _ | Meet _ ),
+    _
+    -> false
+
+let bridge_assignment_equal left right =
+  String.equal left.target_field right.target_field
+  && bridge_expr_equal left.expr right.expr
+
+let morph_equal left right =
+  let left_core = morph_core_of left in
+  let right_core = morph_core_of right in
+  lattice_expr_equal left_core.source right_core.source
+  && lattice_expr_equal left_core.target right_core.target
+  && int_array_equal left_core.map right_core.map
+  &&
+  match left, right with
+  | Primitive _, Primitive _ -> true
+  | Bridge left, Bridge right ->
+    List.length left.assignments = List.length right.assignments
+    && List.for_all2 bridge_assignment_equal left.assignments right.assignments
+  | Primitive _, Bridge _ | Bridge _, Primitive _ -> false
+
 let emitted_module_exprs (model : t) =
   let seen = Hashtbl.create 32 in
   let acc = ref [] in
@@ -707,15 +752,12 @@ let right_adjoint (dom : finite_lattice) (cod : finite_lattice) map =
       | Some x -> x
       | None -> raise Not_found)
 
-let int_array_equal a b =
-  Array.length a = Array.length b && Array.for_all2 Int.equal a b
-
 let resolve ast =
   let lattice_decls = Hashtbl.create 16 in
   let morph_decls = Hashtbl.create 16 in
   let lattice_order = ref [] in
-  let morph_order = ref [] in
-  let adjoint_chains = ref [] in
+  let morph_steps = ref [] in
+  let declared_chains = ref [] in
   let module_names = ref String_set.empty in
   let morph_names = ref String_set.empty in
   let register_lattice_name name loc =
@@ -727,6 +769,10 @@ let resolve ast =
     let generated_name = Name.escape_value_name name in
     check_value_name "morphism" generated_name loc;
     ensure_unique_name morph_names generated_name loc "morphism"
+  in
+  let validate_chain_morph_name name loc =
+    let generated_name = Name.escape_value_name name in
+    check_value_name "morphism" generated_name loc
   in
   List.iter
     (function
@@ -750,16 +796,21 @@ let resolve ast =
         then Error.failf (located_loc name) "duplicate morph name %S" morph_name;
         register_morph_name morph_name (located_loc name);
         Hashtbl.add morph_decls morph_name decl;
-        morph_order := !morph_order @ [ morph_name ]
+        morph_steps := !morph_steps @ [ Declared_morph morph_name ]
       | Ast.Product_bridge { name; _ } as decl ->
         let morph_name = located_txt name in
         if Hashtbl.mem morph_decls morph_name
         then Error.failf (located_loc name) "duplicate morph name %S" morph_name;
         register_morph_name morph_name (located_loc name);
         Hashtbl.add morph_decls morph_name decl;
-        morph_order := !morph_order @ [ morph_name ]
+        morph_steps := !morph_steps @ [ Declared_morph morph_name ]
       | Ast.Adjoint_chain chain ->
-        adjoint_chains := !adjoint_chains @ [ chain ])
+        List.iter
+          (fun name ->
+            validate_chain_morph_name (located_txt name) (located_loc name))
+          chain.names;
+        declared_chains := !declared_chains @ [ chain ];
+        morph_steps := !morph_steps @ [ Adjoint_chain_step chain ])
     ast;
   let parse_expr (expr : Ast.lattice_expr) =
     { name = located_txt expr.lattice; opposite = expr.opposite }
@@ -1149,397 +1200,15 @@ let resolve ast =
     { core with left_adjoint; right_adjoint }
   in
   let resolved_morphs = ref String_map.empty in
-  let rec resolve_morph visiting morph_name =
-    match String_map.find_opt morph_name !resolved_morphs with
-    | Some morph -> morph
-    | None ->
-      if String_set.mem morph_name visiting
-      then Error.failf no_loc "cyclic morph definition involving %S" morph_name;
-      let visiting = String_set.add morph_name visiting in
-      let resolved =
-        match Hashtbl.find morph_decls morph_name with
-        | Ast.Primitive_morph { name; source; target; mappings } ->
-          let source_expr = parse_expr source in
-          let target_expr = parse_expr target in
-          let source_base = find_base_expr source_expr (located_loc source.lattice) in
-          let target_base = find_base_expr target_expr (located_loc target.lattice) in
-          let source_index = Hashtbl.create 16 in
-          Array.iteri (fun i elt -> Hashtbl.add source_index elt i) source_base.element_names;
-          let target_index = Hashtbl.create 16 in
-          Array.iteri (fun i elt -> Hashtbl.add target_index elt i) target_base.element_names;
-          let map = Array.make (Array.length source_base.element_names) (-1) in
-          List.iter
-            (fun (mapping : Ast.primitive_mapping) ->
-              let src_name = located_txt mapping.source in
-              let dst_name = located_txt mapping.target in
-              let src =
-                match Hashtbl.find_opt source_index src_name with
-                | Some i -> i
-                | None ->
-                  Error.failf
-                    (located_loc mapping.source)
-                    "unknown element %S in %S"
-                    src_name
-                    source_base.name
-              in
-              let dst =
-                match Hashtbl.find_opt target_index dst_name with
-                | Some i -> i
-                | None ->
-                  Error.failf
-                    (located_loc mapping.target)
-                    "unknown element %S in %S"
-                    dst_name
-                    target_base.name
-              in
-              if map.(src) <> -1
-              then
-                Error.failf
-                  (located_loc mapping.source)
-                  "duplicate mapping for element %S"
-                  src_name;
-              map.(src) <- dst)
-            mappings;
-          Array.iteri
-            (fun _ target ->
-              if target = -1
-              then
-                Error.failf
-                  (located_loc name)
-                  "morphism must map every element of %S"
-                  source_base.name)
-            map;
-          let source_finite = finite_of_expr source_expr in
-          let target_finite = finite_of_expr target_expr in
-          check_monotone morph_name (located_loc name) source_finite target_finite map;
-          Primitive
-            { core =
-                with_adjoint_metadata
-                  { name = morph_name;
-                    source = source_expr;
-                    target = target_expr;
-                    map;
-                    left_adjoint = None;
-                    right_adjoint = None;
-                    left_name = None;
-                    right_name = None
-                  }
-            }
-        | Ast.Product_bridge { name; source; target; assignments } ->
-          let source_expr = parse_expr source in
-          let target_expr = parse_expr target in
-          let source_fields =
-            match product_fields_for_expr source_expr with
-            | Some fields -> fields
-            | None ->
-              Error.failf
-                (located_loc source.lattice)
-                "product bridge source must be a product, got %S"
-                source_expr.name
-          in
-          let target_fields =
-            match product_fields_for_expr target_expr with
-            | Some fields -> fields
-            | None ->
-              Error.failf
-                (located_loc target.lattice)
-                "product bridge target must be a product, got %S"
-                target_expr.name
-          in
-          let seen_targets = Hashtbl.create 16 in
-          let rec resolve_bridge_expr
-              (target_field : string)
-              (target_ty : lattice_expr)
-              (expr : Ast.bridge_expr)
-            =
-            match expr with
-            | Ast.Source_field field ->
-              let source_field = located_txt field in
-              let source_ty =
-                match find_field_type source_fields source_field with
-                | ty -> ty
-                | exception Not_found ->
-                  Error.failf
-                    (located_loc field)
-                    "unknown source field %S"
-                    source_field
-              in
-              if not (lattice_expr_equal source_ty target_ty)
-              then
-                Error.failf
-                  (located_loc field)
-                  "field %S expects %s but source field %S has %s"
-                  target_field
-                  (module_name_of_expr target_ty)
-                  source_field
-                  (module_name_of_expr source_ty);
-              Source_field source_field
-            | Ast.Morph_apply { morph; field } ->
-              let referenced = resolve_morph visiting (located_txt morph) in
-              let referenced_core = morph_core_of referenced in
-              let source_field = located_txt field in
-              let source_ty =
-                match find_field_type source_fields source_field with
-                | ty -> ty
-                | exception Not_found ->
-                  Error.failf
-                    (located_loc field)
-                    "unknown source field %S"
-                    source_field
-              in
-              if not (lattice_expr_equal referenced_core.source source_ty)
-              then
-                Error.failf
-                  (located_loc morph)
-                  "morphism %S expects %s but source field %S has %s"
-                  referenced_core.name
-                  (module_name_of_expr referenced_core.source)
-                  source_field
-                  (module_name_of_expr source_ty);
-              if not (lattice_expr_equal referenced_core.target target_ty)
-              then
-                Error.failf
-                  (located_loc morph)
-                  "morphism %S returns %s but target field %S expects %s"
-                  referenced_core.name
-                  (module_name_of_expr referenced_core.target)
-                  target_field
-                  (module_name_of_expr target_ty);
-              Morph_apply { morph_name = referenced_core.name; source_field }
-            | Ast.Min _ -> Min
-            | Ast.Max _ -> Max
-            | Ast.Join { left; right; _ } ->
-              Join
-                ( resolve_bridge_expr target_field target_ty left,
-                  resolve_bridge_expr target_field target_ty right )
-            | Ast.Meet { left; right; _ } ->
-              Meet
-                ( resolve_bridge_expr target_field target_ty left,
-                  resolve_bridge_expr target_field target_ty right )
-          in
-          let resolved_assignments =
-            List.map
-              (fun (assignment : Ast.bridge_assignment) ->
-                let target_field = located_txt assignment.target in
-                if Hashtbl.mem seen_targets target_field
-                then
-                  Error.failf
-                    (located_loc assignment.target)
-                    "duplicate assignment for target field %S"
-                    target_field;
-                Hashtbl.add seen_targets target_field ();
-                let target_ty =
-                  match find_field_type target_fields target_field with
-                  | ty -> ty
-                  | exception Not_found ->
-                    Error.failf
-                      (located_loc assignment.target)
-                      "unknown target field %S"
-                      target_field
-                in
-                let expr =
-                  resolve_bridge_expr target_field target_ty assignment.expr
-                in
-                { target_field; expr })
-              assignments
-          in
-          List.iter
-            (fun (target_field, _) ->
-              if not (Hashtbl.mem seen_targets target_field)
-              then
-                Error.failf
-                  (located_loc name)
-                  "missing assignment for target field %S"
-                  target_field)
-            target_fields;
-          let source_info = product_info_of_expr source_expr in
-          let target_info = product_info_of_expr target_expr in
-          let source_field_pos name =
-            match String_map.find_opt name source_info.positions with
-            | Some pos -> pos
-            | None -> raise Not_found
-          in
-          let rec eval_bridge_expr
-              (source_coord : int array)
-              (target_finite : finite_lattice)
-              (expr : bridge_expr)
-            =
-            match expr with
-            | Source_field source_field_name ->
-              source_coord.(source_field_pos source_field_name)
-            | Morph_apply { morph_name; source_field } ->
-              let referenced_core =
-                morph_core_of (resolve_morph visiting morph_name)
-              in
-              referenced_core.map
-                .(source_coord.(source_field_pos source_field))
-            | Min -> target_finite.bottom
-            | Max -> target_finite.top
-            | Join (left, right) ->
-              target_finite.join
-                .(eval_bridge_expr source_coord target_finite left)
-                .(eval_bridge_expr source_coord target_finite right)
-            | Meet (left, right) ->
-              target_finite.meet
-                .(eval_bridge_expr source_coord target_finite left)
-                .(eval_bridge_expr source_coord target_finite right)
-          in
-          let assignment_by_target =
-            Array.init (Array.length target_info.fields) (fun i ->
-                let target_field_name = target_info.fields.(i).field.name in
-                match
-                  List.find_opt
-                    (fun assignment ->
-                      String.equal assignment.target_field target_field_name)
-                    resolved_assignments
-                with
-                | Some assignment -> assignment
-                | None -> assert false)
-          in
-          let rec check_bridge_expr_monotone = function
-            | Source_field _ | Min | Max -> ()
-            | Morph_apply { morph_name; _ } ->
-              ignore (resolve_morph visiting morph_name)
-            | Join (left, right) | Meet (left, right) ->
-              check_bridge_expr_monotone left;
-              check_bridge_expr_monotone right
-          in
-          let map =
-            Array.init source_info.total (fun source_index ->
-                let source_coord = product_decode_coord source_info source_index in
-                let target_coord = Array.make (Array.length target_info.fields) 0 in
-                Array.iteri
-                  (fun target_pos (target_spec : product_field_info) ->
-                    let assignment = assignment_by_target.(target_pos) in
-                    target_coord.(target_pos) <-
-                      eval_bridge_expr source_coord target_spec.finite assignment.expr)
-                  target_info.fields;
-                product_encode_coord target_info target_coord)
-          in
-          List.iter
-            (fun assignment -> check_bridge_expr_monotone assignment.expr)
-            resolved_assignments;
-          let core_without_adjoint_metadata =
-            { name = morph_name;
-              source = source_expr;
-              target = target_expr;
-              map;
-              left_adjoint = None;
-              right_adjoint = None;
-              left_name = None;
-              right_name = None
-            }
-          in
-          let core =
-            let neutral_bounds kind =
-              Array.init (Array.length source_info.fields) (fun i ->
-                  match kind with
-                  | `Left -> source_info.fields.(i).finite.bottom
-                  | `Right -> source_info.fields.(i).finite.top)
-            in
-            let merge_bounds kind left right =
-              Array.mapi
-                (fun i left_index ->
-                  let source_field_finite = source_info.fields.(i).finite in
-                  let right_index = right.(i) in
-                  match kind with
-                  | `Left -> source_field_finite.join.(left_index).(right_index)
-                  | `Right -> source_field_finite.meet.(left_index).(right_index))
-                left
-            in
-            let singleton_bounds kind source_pos contribution =
-              let bounds = neutral_bounds kind in
-              bounds.(source_pos) <- contribution;
-              bounds
-            in
-            let rec bridge_expr_adjoint kind target_finite target_index expr =
-              match expr with
-              | Source_field source_field_name ->
-                let source_pos = source_field_pos source_field_name in
-                Some (singleton_bounds kind source_pos target_index)
-              | Morph_apply { morph_name; source_field } ->
-                let referenced_core = morph_core_of (resolve_morph visiting morph_name) in
-                let adjoint =
-                  match kind with
-                  | `Left -> referenced_core.left_adjoint
-                  | `Right -> referenced_core.right_adjoint
-                in
-                Option.map
-                  (fun adjoint ->
-                    let source_pos = source_field_pos source_field in
-                    singleton_bounds kind source_pos adjoint.(target_index))
-                  adjoint
-              | Min ->
-                if kind = `Left && target_index <> target_finite.bottom
-                then None
-                else Some (neutral_bounds kind)
-              | Max ->
-                if kind = `Right && target_index <> target_finite.top
-                then None
-                else Some (neutral_bounds kind)
-              | Join (left, right) ->
-                (match kind with
-                 | `Left -> None
-                 | `Right ->
-                   Option.bind
-                     (bridge_expr_adjoint kind target_finite target_index left)
-                     (fun left_bounds ->
-                       Option.map
-                         (merge_bounds kind left_bounds)
-                         (bridge_expr_adjoint kind target_finite target_index right)))
-              | Meet (left, right) ->
-                (match kind with
-                 | `Left ->
-                   Option.bind
-                     (bridge_expr_adjoint kind target_finite target_index left)
-                     (fun left_bounds ->
-                       Option.map
-                         (merge_bounds kind left_bounds)
-                         (bridge_expr_adjoint kind target_finite target_index right))
-                 | `Right -> None)
-            in
-            let structural_adjoint kind =
-              let compute_target_bound target_index =
-                let target_coord = product_decode_coord target_info target_index in
-                let initial = neutral_bounds kind in
-                let rec loop target_pos bounds =
-                  if target_pos = Array.length target_info.fields
-                  then Some (product_encode_coord source_info bounds)
-                  else
-                    let target_spec = target_info.fields.(target_pos) in
-                    let assignment = assignment_by_target.(target_pos) in
-                    let target_field_index = target_coord.(target_pos) in
-                    Option.bind
-                      (bridge_expr_adjoint
-                         kind
-                         target_spec.finite
-                         target_field_index
-                         assignment.expr)
-                      (fun field_bounds -> loop (target_pos + 1) (merge_bounds kind bounds field_bounds))
-                in
-                loop 0 initial
-              in
-              let adjoint = Array.init target_info.total compute_target_bound in
-              if Array.for_all Option.is_some adjoint
-              then Some (Array.map Option.get adjoint)
-              else None
-            in
-            { core_without_adjoint_metadata with
-              left_adjoint = structural_adjoint `Left;
-              right_adjoint = structural_adjoint `Right
-            }
-          in
-          Bridge { core; assignments = resolved_assignments }
-        | Ast.Base _ | Ast.Product _ | Ast.Adjoint_chain _ -> assert false
-      in
-      resolved_morphs := String_map.add morph_name resolved !resolved_morphs;
-      resolved
+  let resolved_morph_order = ref [] in
+  let register_resolved_morph morph =
+    let name = (morph_core_of morph).name in
+    if not (String_map.mem name !resolved_morphs)
+    then resolved_morph_order := !resolved_morph_order @ [ name ];
+    resolved_morphs := String_map.add name morph !resolved_morphs
   in
-  List.iter
-    (fun morph_name -> ignore (resolve_morph String_set.empty morph_name))
-    !morph_order;
-  let find_matching_morph source target map =
-    String_map.to_seq !resolved_morphs
+  let find_matching_morph resolved source target map =
+    String_map.to_seq resolved
     |> Seq.find_map (fun (name, morph) ->
          let core = morph_core_of morph in
          if lattice_expr_equal core.source source
@@ -1548,96 +1217,962 @@ let resolve ast =
          then Some name
          else None)
   in
-  let resolved_morphs =
+  let rebuild_adjoint_names resolved =
     String_map.mapi
       (fun _ morph ->
         let core = morph_core_of morph in
         let left_name =
           Option.bind core.left_adjoint (fun map ->
-              find_matching_morph core.target core.source map)
+              find_matching_morph resolved core.target core.source map)
         in
         let right_name =
           Option.bind core.right_adjoint (fun map ->
-              find_matching_morph core.target core.source map)
+              find_matching_morph resolved core.target core.source map)
         in
         with_morph_core morph { core with left_name; right_name })
-      !resolved_morphs
+      resolved
+  in
+  let morph_decl_loc name =
+    match Hashtbl.find_opt morph_decls name with
+    | Some (Ast.Primitive_morph { name; _ })
+    | Some (Ast.Product_bridge { name; _ }) -> located_loc name
+    | Some (Ast.Base _ | Ast.Product _ | Ast.Adjoint_chain _) | None -> no_loc
+  in
+  let chain_names (chain : Ast.adjoint_chain) = List.map located_txt chain.names in
+  let render_chain names = String.concat " -| " names in
+  let list_lex_compare left right =
+    let rec loop left right =
+      match left, right with
+      | [], [] -> 0
+      | [], _ -> -1
+      | _, [] -> 1
+      | left :: left_rest, right :: right_rest ->
+        let cmp = String.compare left right in
+        if cmp <> 0 then cmp else loop left_rest right_rest
+    in
+    loop left right
+  in
+  let mk_bridge_expr op left right =
+    match op with
+    | `Join -> Join (left, right)
+    | `Meet -> Meet (left, right)
+  in
+  let combine_bridge_expr kind exprs =
+    match exprs with
+    | [] -> if kind = `Left then Min else Max
+    | expr :: rest ->
+      List.fold_left
+        (fun acc expr ->
+          mk_bridge_expr
+            (match kind with `Left -> `Join | `Right -> `Meet)
+            acc
+            expr)
+        expr
+        rest
+  in
+  let rec resolve_morph visiting morph_name =
+    match String_map.find_opt morph_name !resolved_morphs with
+    | Some morph -> morph
+    | None ->
+      if String_set.mem morph_name visiting
+      then Error.failf no_loc "cyclic morph definition involving %S" morph_name;
+      let visiting = String_set.add morph_name visiting in
+      let resolved =
+        match Hashtbl.find_opt morph_decls morph_name with
+        | None -> Error.failf no_loc "unknown morph %S" morph_name
+        | Some decl ->
+          (match decl with
+           | Ast.Primitive_morph { name; source; target; mappings } ->
+             let source_expr = parse_expr source in
+             let target_expr = parse_expr target in
+             let source_base =
+               find_base_expr source_expr (located_loc source.lattice)
+             in
+             let target_base =
+               find_base_expr target_expr (located_loc target.lattice)
+             in
+             let source_index = Hashtbl.create 16 in
+             Array.iteri
+               (fun i elt -> Hashtbl.add source_index elt i)
+               source_base.element_names;
+             let target_index = Hashtbl.create 16 in
+             Array.iteri
+               (fun i elt -> Hashtbl.add target_index elt i)
+               target_base.element_names;
+             let map = Array.make (Array.length source_base.element_names) (-1) in
+             List.iter
+               (fun (mapping : Ast.primitive_mapping) ->
+                 let src_name = located_txt mapping.source in
+                 let dst_name = located_txt mapping.target in
+                 let src =
+                   match Hashtbl.find_opt source_index src_name with
+                   | Some i -> i
+                   | None ->
+                     Error.failf
+                       (located_loc mapping.source)
+                       "unknown element %S in %S"
+                       src_name
+                       source_base.name
+                 in
+                 let dst =
+                   match Hashtbl.find_opt target_index dst_name with
+                   | Some i -> i
+                   | None ->
+                     Error.failf
+                       (located_loc mapping.target)
+                       "unknown element %S in %S"
+                       dst_name
+                       target_base.name
+                 in
+                 if map.(src) <> -1
+                 then
+                   Error.failf
+                     (located_loc mapping.source)
+                     "duplicate mapping for element %S"
+                     src_name;
+                 map.(src) <- dst)
+               mappings;
+             Array.iteri
+               (fun _ target ->
+                 if target = -1
+                 then
+                   Error.failf
+                     (located_loc name)
+                     "morphism must map every element of %S"
+                     source_base.name)
+               map;
+             let source_finite = finite_of_expr source_expr in
+             let target_finite = finite_of_expr target_expr in
+             check_monotone
+               morph_name
+               (located_loc name)
+               source_finite
+               target_finite
+               map;
+             Primitive
+               { core =
+                   with_adjoint_metadata
+                     { name = morph_name;
+                       source = source_expr;
+                       target = target_expr;
+                       map;
+                       left_adjoint = None;
+                       right_adjoint = None;
+                       left_name = None;
+                       right_name = None
+                     }
+               }
+           | Ast.Product_bridge { name; source; target; assignments } ->
+             let source_expr = parse_expr source in
+             let target_expr = parse_expr target in
+             let source_fields =
+               match product_fields_for_expr source_expr with
+               | Some fields -> fields
+               | None ->
+                 Error.failf
+                   (located_loc source.lattice)
+                   "product bridge source must be a product, got %S"
+                   source_expr.name
+             in
+             let target_fields =
+               match product_fields_for_expr target_expr with
+               | Some fields -> fields
+               | None ->
+                 Error.failf
+                   (located_loc target.lattice)
+                   "product bridge target must be a product, got %S"
+                   target_expr.name
+             in
+             let seen_targets = Hashtbl.create 16 in
+             let rec resolve_bridge_expr
+                 (target_field : string)
+                 (target_ty : lattice_expr)
+                 (expr : Ast.bridge_expr)
+               =
+               match expr with
+               | Ast.Source_field field ->
+                 let source_field = located_txt field in
+                 let source_ty =
+                   match find_field_type source_fields source_field with
+                   | ty -> ty
+                   | exception Not_found ->
+                     Error.failf
+                       (located_loc field)
+                       "unknown source field %S"
+                       source_field
+                 in
+                 if not (lattice_expr_equal source_ty target_ty)
+                 then
+                   Error.failf
+                     (located_loc field)
+                     "field %S expects %s but source field %S has %s"
+                     target_field
+                     (module_name_of_expr target_ty)
+                     source_field
+                     (module_name_of_expr source_ty);
+                 Source_field source_field
+               | Ast.Morph_apply { morph; field } ->
+                 let referenced = resolve_morph visiting (located_txt morph) in
+                 let referenced_core = morph_core_of referenced in
+                 let source_field = located_txt field in
+                 let source_ty =
+                   match find_field_type source_fields source_field with
+                   | ty -> ty
+                   | exception Not_found ->
+                     Error.failf
+                       (located_loc field)
+                       "unknown source field %S"
+                       source_field
+                 in
+                 if not (lattice_expr_equal referenced_core.source source_ty)
+                 then
+                   Error.failf
+                     (located_loc morph)
+                     "morphism %S expects %s but source field %S has %s"
+                     referenced_core.name
+                     (module_name_of_expr referenced_core.source)
+                     source_field
+                     (module_name_of_expr source_ty);
+                 if not (lattice_expr_equal referenced_core.target target_ty)
+                 then
+                   Error.failf
+                     (located_loc morph)
+                     "morphism %S returns %s but target field %S expects %s"
+                     referenced_core.name
+                     (module_name_of_expr referenced_core.target)
+                     target_field
+                     (module_name_of_expr target_ty);
+                 Morph_apply
+                   { morph_name = referenced_core.name;
+                     source_field
+                   }
+               | Ast.Min _ -> Min
+               | Ast.Max _ -> Max
+               | Ast.Join { left; right; _ } ->
+                 Join
+                   ( resolve_bridge_expr target_field target_ty left,
+                     resolve_bridge_expr target_field target_ty right )
+               | Ast.Meet { left; right; _ } ->
+                 Meet
+                   ( resolve_bridge_expr target_field target_ty left,
+                     resolve_bridge_expr target_field target_ty right )
+             in
+             let resolved_assignments =
+               List.map
+                 (fun (assignment : Ast.bridge_assignment) ->
+                   let target_field = located_txt assignment.target in
+                   if Hashtbl.mem seen_targets target_field
+                   then
+                     Error.failf
+                       (located_loc assignment.target)
+                       "duplicate assignment for target field %S"
+                       target_field;
+                   Hashtbl.add seen_targets target_field ();
+                   let target_ty =
+                     match find_field_type target_fields target_field with
+                     | ty -> ty
+                     | exception Not_found ->
+                       Error.failf
+                         (located_loc assignment.target)
+                         "unknown target field %S"
+                         target_field
+                   in
+                   let expr =
+                     resolve_bridge_expr target_field target_ty assignment.expr
+                   in
+                   { target_field; expr })
+                 assignments
+             in
+             List.iter
+               (fun (target_field, _) ->
+                 if not (Hashtbl.mem seen_targets target_field)
+                 then
+                   Error.failf
+                     (located_loc name)
+                     "missing assignment for target field %S"
+                     target_field)
+               target_fields;
+             build_bridge_from_assignments
+               visiting
+               ~name:morph_name
+               ~source_expr
+               ~target_expr
+               ~assignments:resolved_assignments
+           | Ast.Base _ | Ast.Product _ | Ast.Adjoint_chain _ -> assert false)
+      in
+      register_resolved_morph resolved;
+      resolved
+  and build_bridge_from_assignments
+      visiting
+      ~name
+      ~source_expr
+      ~target_expr
+      ~assignments
+    =
+    let target_fields =
+      match product_fields_for_expr target_expr with
+      | Some fields -> fields
+      | None -> invalid_arg "product bridge target must be a product"
+    in
+    List.iter
+      (fun (target_field, _) ->
+        if
+          not
+            (List.exists
+               (fun assignment ->
+                 String.equal assignment.target_field target_field)
+               assignments)
+        then invalid_arg ("missing assignment for target field " ^ target_field))
+      target_fields;
+    let source_info = product_info_of_expr source_expr in
+    let target_info = product_info_of_expr target_expr in
+    let source_field_pos name =
+      match String_map.find_opt name source_info.positions with
+      | Some pos -> pos
+      | None -> raise Not_found
+    in
+    let rec eval_bridge_expr
+        (source_coord : int array)
+        (target_finite : finite_lattice)
+        (expr : bridge_expr)
+      =
+      match expr with
+      | Source_field source_field_name ->
+        source_coord.(source_field_pos source_field_name)
+      | Morph_apply { morph_name; source_field } ->
+        let referenced_core = morph_core_of (resolve_morph visiting morph_name) in
+        referenced_core.map.(source_coord.(source_field_pos source_field))
+      | Min -> target_finite.bottom
+      | Max -> target_finite.top
+      | Join (left, right) ->
+        target_finite.join
+          .(eval_bridge_expr source_coord target_finite left)
+          .(eval_bridge_expr source_coord target_finite right)
+      | Meet (left, right) ->
+        target_finite.meet
+          .(eval_bridge_expr source_coord target_finite left)
+          .(eval_bridge_expr source_coord target_finite right)
+    in
+    let assignment_by_target =
+      Array.init (Array.length target_info.fields) (fun i ->
+          let target_field_name = target_info.fields.(i).field.name in
+          match
+            List.find_opt
+              (fun assignment ->
+                String.equal assignment.target_field target_field_name)
+              assignments
+          with
+          | Some assignment -> assignment
+          | None -> assert false)
+    in
+    let rec check_bridge_expr_monotone = function
+      | Source_field _ | Min | Max -> ()
+      | Morph_apply { morph_name; _ } ->
+        ignore (resolve_morph visiting morph_name)
+      | Join (left, right) | Meet (left, right) ->
+        check_bridge_expr_monotone left;
+        check_bridge_expr_monotone right
+    in
+    let map =
+      Array.init source_info.total (fun source_index ->
+          let source_coord = product_decode_coord source_info source_index in
+          let target_coord = Array.make (Array.length target_info.fields) 0 in
+          Array.iteri
+            (fun target_pos (target_spec : product_field_info) ->
+              let assignment = assignment_by_target.(target_pos) in
+              target_coord.(target_pos) <-
+                eval_bridge_expr source_coord target_spec.finite assignment.expr)
+            target_info.fields;
+          product_encode_coord target_info target_coord)
+    in
+    List.iter (fun assignment -> check_bridge_expr_monotone assignment.expr) assignments;
+    let core_without_adjoint_metadata =
+      { name;
+        source = source_expr;
+        target = target_expr;
+        map;
+        left_adjoint = None;
+        right_adjoint = None;
+        left_name = None;
+        right_name = None
+      }
+    in
+    let core =
+      let neutral_bounds kind =
+        Array.init (Array.length source_info.fields) (fun i ->
+            match kind with
+            | `Left -> source_info.fields.(i).finite.bottom
+            | `Right -> source_info.fields.(i).finite.top)
+      in
+      let merge_bounds kind left right =
+        Array.mapi
+          (fun i left_index ->
+            let source_field_finite = source_info.fields.(i).finite in
+            let right_index = right.(i) in
+            match kind with
+            | `Left -> source_field_finite.join.(left_index).(right_index)
+            | `Right -> source_field_finite.meet.(left_index).(right_index))
+          left
+      in
+      let singleton_bounds kind source_pos contribution =
+        let bounds = neutral_bounds kind in
+        bounds.(source_pos) <- contribution;
+        bounds
+      in
+      let rec bridge_expr_adjoint kind target_finite target_index expr =
+        match expr with
+        | Source_field source_field_name ->
+          let source_pos = source_field_pos source_field_name in
+          Some (singleton_bounds kind source_pos target_index)
+        | Morph_apply { morph_name; source_field } ->
+          let referenced_core = morph_core_of (resolve_morph visiting morph_name) in
+          let adjoint =
+            match kind with
+            | `Left -> referenced_core.left_adjoint
+            | `Right -> referenced_core.right_adjoint
+          in
+          Option.map
+            (fun adjoint ->
+              let source_pos = source_field_pos source_field in
+              singleton_bounds kind source_pos adjoint.(target_index))
+            adjoint
+        | Min ->
+          if kind = `Left && target_index <> target_finite.bottom
+          then None
+          else Some (neutral_bounds kind)
+        | Max ->
+          if kind = `Right && target_index <> target_finite.top
+          then None
+          else Some (neutral_bounds kind)
+        | Join (left, right) ->
+          (match kind with
+           | `Left -> None
+           | `Right ->
+             Option.bind
+               (bridge_expr_adjoint kind target_finite target_index left)
+               (fun left_bounds ->
+                 Option.map
+                   (merge_bounds kind left_bounds)
+                   (bridge_expr_adjoint kind target_finite target_index right)))
+        | Meet (left, right) ->
+          (match kind with
+           | `Left ->
+             Option.bind
+               (bridge_expr_adjoint kind target_finite target_index left)
+               (fun left_bounds ->
+                 Option.map
+                   (merge_bounds kind left_bounds)
+                   (bridge_expr_adjoint kind target_finite target_index right))
+           | `Right -> None)
+      in
+      let structural_adjoint kind =
+        let compute_target_bound target_index =
+          let target_coord = product_decode_coord target_info target_index in
+          let initial = neutral_bounds kind in
+          let rec loop target_pos bounds =
+            if target_pos = Array.length target_info.fields
+            then Some (product_encode_coord source_info bounds)
+            else
+              let target_spec = target_info.fields.(target_pos) in
+              let assignment = assignment_by_target.(target_pos) in
+              let target_field_index = target_coord.(target_pos) in
+              Option.bind
+                (bridge_expr_adjoint
+                   kind
+                   target_spec.finite
+                   target_field_index
+                   assignment.expr)
+                (fun field_bounds ->
+                  loop (target_pos + 1) (merge_bounds kind bounds field_bounds))
+          in
+          loop 0 initial
+        in
+        let adjoint = Array.init target_info.total compute_target_bound in
+        if Array.for_all Option.is_some adjoint
+        then Some (Array.map Option.get adjoint)
+        else None
+      in
+      { core_without_adjoint_metadata with
+        left_adjoint = structural_adjoint `Left;
+        right_adjoint = structural_adjoint `Right
+      }
+    in
+    Bridge { core; assignments }
+  and synthesize_bridge_adjoint visiting ~name ~loc bridge kind =
+    let known_core = bridge.core in
+    let source_expr = known_core.target in
+    let target_expr = known_core.source in
+    let source_info = product_info_of_expr known_core.source in
+    let source_field_pos name =
+      match String_map.find_opt name source_info.positions with
+      | Some pos -> pos
+      | None -> raise Not_found
+    in
+    let empty_contrib () =
+      Array.init (Array.length source_info.fields) (fun _ -> [])
+    in
+    let merge_contrib left right =
+      Array.mapi (fun i xs -> xs @ right.(i)) left
+    in
+    let singleton_contrib source_pos expr =
+      let contrib = empty_contrib () in
+      contrib.(source_pos) <- [ expr ];
+      contrib
+    in
+    let rec symbolic_adjoint target_field_name = function
+      | Source_field source_field_name ->
+        let source_pos = source_field_pos source_field_name in
+        Some (singleton_contrib source_pos (Source_field target_field_name))
+      | Morph_apply { morph_name; source_field } ->
+        let referenced = resolve_morph visiting morph_name in
+        let referenced_core = morph_core_of referenced in
+        let source_pos = source_field_pos source_field in
+        let adjoint_map =
+          match kind with
+          | `Left -> referenced_core.left_adjoint
+          | `Right -> referenced_core.right_adjoint
+        in
+        let adjoint_name =
+          Option.bind adjoint_map (fun map ->
+              find_matching_morph
+                !resolved_morphs
+                referenced_core.target
+                referenced_core.source
+                map)
+        in
+        Option.map
+          (fun adjoint_name ->
+            singleton_contrib
+              source_pos
+              (Morph_apply
+                 { morph_name = adjoint_name;
+                   source_field = target_field_name
+                 }))
+          adjoint_name
+      | Min ->
+        if kind = `Left then None else Some (empty_contrib ())
+      | Max ->
+        if kind = `Right then None else Some (empty_contrib ())
+      | Join (left, right) ->
+        (match kind with
+         | `Left -> None
+         | `Right ->
+           Option.bind (symbolic_adjoint target_field_name left) (fun left ->
+               Option.map
+                 (merge_contrib left)
+                 (symbolic_adjoint target_field_name right)))
+      | Meet (left, right) ->
+        (match kind with
+         | `Left ->
+           Option.bind (symbolic_adjoint target_field_name left) (fun left ->
+               Option.map
+                 (merge_contrib left)
+                 (symbolic_adjoint target_field_name right))
+         | `Right -> None)
+    in
+    let contributions = empty_contrib () in
+    let ok =
+      List.for_all
+        (fun (assignment : bridge_assignment) ->
+          match symbolic_adjoint assignment.target_field assignment.expr with
+          | None -> false
+          | Some contrib ->
+            Array.iteri
+              (fun i xs -> contributions.(i) <- contributions.(i) @ xs)
+              contrib;
+            true)
+        bridge.assignments
+    in
+    if not ok
+    then
+      Error.failf
+        loc
+        "cannot synthesize %s adjoint %S of bridge morph %S"
+        (match kind with `Left -> "left" | `Right -> "right")
+        name
+        known_core.name;
+    let inferred_assignments =
+      Array.to_list
+        (Array.mapi
+           (fun i (source_field : product_field_info) ->
+             { target_field = source_field.field.name;
+               expr = combine_bridge_expr kind contributions.(i)
+             })
+           source_info.fields)
+    in
+    let inferred =
+      build_bridge_from_assignments
+        visiting
+        ~name
+        ~source_expr
+        ~target_expr
+        ~assignments:inferred_assignments
+    in
+    let expected =
+      match kind with
+      | `Left -> known_core.left_adjoint
+      | `Right -> known_core.right_adjoint
+    in
+    (match expected with
+     | Some expected when int_array_equal (morph_core_of inferred).map expected -> ()
+     | _ ->
+       Error.failf loc "internal adjoint synthesis mismatch for %S" name);
+    inferred
+  and synthesize_named_adjoint visiting ~name ~loc ~known ~kind =
+    let known_core = morph_core_of known in
+    let adjoint_map =
+      match kind with
+      | `Left -> known_core.left_adjoint
+      | `Right -> known_core.right_adjoint
+    in
+    match adjoint_map with
+    | None ->
+      Error.failf
+        loc
+        "morphism %S has no %s adjoint (required to infer %S)"
+        known_core.name
+        (match kind with `Left -> "left" | `Right -> "right")
+        name
+    | Some map ->
+      (match known with
+       | Primitive _ ->
+         Primitive
+           { core =
+               with_adjoint_metadata
+                 { name;
+                   source = known_core.target;
+                   target = known_core.source;
+                   map;
+                   left_adjoint = None;
+                   right_adjoint = None;
+                   left_name = None;
+                   right_name = None
+                 }
+           }
+       | Bridge bridge ->
+         synthesize_bridge_adjoint visiting ~name ~loc bridge kind)
+  in
+  let ensure_chain_slot name loc expected =
+    let resolved =
+      match String_map.find_opt name !resolved_morphs with
+      | Some morph -> morph
+      | None ->
+        (match Hashtbl.find_opt morph_decls name with
+         | Some _ -> resolve_morph String_set.empty name
+         | None ->
+           register_resolved_morph expected;
+           expected)
+    in
+    if not (morph_equal resolved expected)
+    then
+      Error.failf
+        loc
+        "morphism %S does not match its inferred adjoint in chain"
+        name;
+    resolved
+  in
+  let check_chain_pair left_name right_name left right =
+    let left_core = morph_core_of left in
+    let right_core = morph_core_of right in
+    if not (lattice_expr_equal left_core.target right_core.source)
+       || not (lattice_expr_equal left_core.source right_core.target)
+    then
+      Error.failf
+        (Location.merge (located_loc left_name) (located_loc right_name))
+        "adjoint chain type mismatch between %S : %s -> %s and %S : %s -> %s"
+        left_core.name
+        (module_name_of_expr left_core.source)
+        (module_name_of_expr left_core.target)
+        right_core.name
+        (module_name_of_expr right_core.source)
+        (module_name_of_expr right_core.target);
+    (match left_core.right_adjoint with
+     | None ->
+       Error.failf
+         (located_loc left_name)
+         "morphism %S has no right adjoint (required to match %S in adjoint chain)"
+         left_core.name
+         right_core.name
+     | Some right_adjoint ->
+       if not (int_array_equal right_adjoint right_core.map)
+       then
+         Error.failf
+           (Location.merge (located_loc left_name) (located_loc right_name))
+           "morphism %S is not left adjoint to %S"
+           left_core.name
+           right_core.name);
+    (match right_core.left_adjoint with
+     | None ->
+       Error.failf
+         (located_loc right_name)
+         "morphism %S has no left adjoint (required to match %S in adjoint chain)"
+         right_core.name
+         left_core.name
+     | Some left_adjoint ->
+       if not (int_array_equal left_adjoint left_core.map)
+       then
+         Error.failf
+           (Location.merge (located_loc left_name) (located_loc right_name))
+           "morphism %S is not right adjoint to %S"
+           right_core.name
+           left_core.name)
+  in
+  let process_chain (chain : Ast.adjoint_chain) =
+    let names = Array.of_list chain.names in
+    let n = Array.length names in
+    let slots =
+      Array.init n (fun i ->
+          let name = located_txt names.(i) in
+          match String_map.find_opt name !resolved_morphs with
+          | Some morph -> Some morph
+          | None ->
+            (match Hashtbl.find_opt morph_decls name with
+             | Some _ -> Some (resolve_morph String_set.empty name)
+             | None -> None))
+    in
+    if Array.for_all Option.is_none slots
+    then
+      Error.failf
+        chain.loc
+        "adjoint chain must contain at least one declared or inferred morph anchor";
+    let changed = ref true in
+    while !changed do
+      changed := false;
+      for i = 0 to n - 2 do
+        match slots.(i), slots.(i + 1) with
+        | Some left, None ->
+          let name = located_txt names.(i + 1) in
+          let inferred =
+            synthesize_named_adjoint
+              String_set.empty
+              ~name
+              ~loc:(located_loc names.(i + 1))
+              ~known:left
+              ~kind:`Right
+          in
+          let resolved =
+            ensure_chain_slot name (located_loc names.(i + 1)) inferred
+          in
+          if Option.is_none slots.(i + 1) then changed := true;
+          slots.(i + 1) <- Some resolved
+        | Some left, Some right ->
+          check_chain_pair names.(i) names.(i + 1) left right
+        | None, _ -> ()
+      done;
+      for i = n - 1 downto 1 do
+        match slots.(i - 1), slots.(i) with
+        | None, Some right ->
+          let name = located_txt names.(i - 1) in
+          let inferred =
+            synthesize_named_adjoint
+              String_set.empty
+              ~name
+              ~loc:(located_loc names.(i - 1))
+              ~known:right
+              ~kind:`Left
+          in
+          let resolved =
+            ensure_chain_slot name (located_loc names.(i - 1)) inferred
+          in
+          if Option.is_none slots.(i - 1) then changed := true;
+          slots.(i - 1) <- Some resolved
+        | Some left, Some right ->
+          check_chain_pair names.(i - 1) names.(i) left right
+        | _, None -> ()
+      done
+    done;
+    Array.iteri
+      (fun i slot ->
+        if Option.is_none slot
+        then
+          Error.failf
+            (located_loc names.(i))
+            "could not infer morph %S from adjoint chain"
+            (located_txt names.(i)))
+      slots;
+    for i = 0 to n - 2 do
+      check_chain_pair
+        names.(i)
+        names.(i + 1)
+        (Option.get slots.(i))
+        (Option.get slots.(i + 1))
+    done
+  in
+  List.iter
+    (function
+      | Declared_morph morph_name -> ignore (resolve_morph String_set.empty morph_name)
+      | Adjoint_chain_step chain -> process_chain chain)
+    !morph_steps;
+  let resolved_morphs = rebuild_adjoint_names !resolved_morphs in
+  let declared_chain_names = List.map chain_names !declared_chains in
+  let declared_chain_name_set =
+    List.fold_left
+      (fun acc names ->
+        List.fold_left
+          (fun acc name -> String_set.add name acc)
+          acc
+          names)
+      String_set.empty
+      declared_chain_names
+  in
+  let declared_chain_edges =
+    List.fold_left
+      (fun acc names ->
+        let rec add acc = function
+          | left :: ((right :: _) as rest) ->
+            add (String_set.add (left ^ "\000" ^ right) acc) rest
+          | _ -> acc
+        in
+        add acc names)
+      String_set.empty
+      declared_chain_names
+  in
+  let warnings = ref [] in
+  let add_warning loc fmt =
+    Printf.ksprintf
+      (fun message -> warnings := !warnings @ [ { loc; message } ])
+      fmt
+  in
+  let edge_declared left right =
+    String_set.mem (left ^ "\000" ^ right) declared_chain_edges
+  in
+  let core_of_name name =
+    morph_core_of (String_map.find name resolved_morphs)
+  in
+  let rec valid_named_chain = function
+    | [] | [ _ ] -> true
+    | left :: ((right :: _) as rest) ->
+      Option.equal String.equal (core_of_name left).right_name (Some right)
+      && valid_named_chain rest
   in
   List.iter
     (fun (chain : Ast.adjoint_chain) ->
-      let rec check_pairs = function
-        | [] | [ _ ] -> ()
-        | left_name :: ((right_name :: _) as rest) ->
-          let left_morph_name = located_txt left_name in
-          let right_morph_name = located_txt right_name in
-          let left =
-            match String_map.find_opt left_morph_name resolved_morphs with
-            | Some morph -> morph
-            | None ->
-              Error.failf
-                (located_loc left_name)
-                "unknown morph %S in adjoint chain"
-                left_morph_name
+      match chain_names chain with
+      | [] | [ _ ] -> ()
+      | names ->
+        let names_set =
+          List.fold_left
+            (fun acc name -> String_set.add name acc)
+            String_set.empty
+            names
+        in
+        let first_core = core_of_name (List.hd names) in
+        let last_core = core_of_name (List.hd (List.rev names)) in
+        let left_extension =
+          match first_core.left_name with
+          | Some name
+            when not (String_set.mem name names_set)
+                 && not (edge_declared name first_core.name) -> Some name
+          | _ -> None
+        in
+        let right_extension =
+          match last_core.right_name with
+          | Some name
+            when not (String_set.mem name names_set)
+                 && not (edge_declared last_core.name name) -> Some name
+          | _ -> None
+        in
+        match left_extension, right_extension with
+        | None, None -> ()
+        | left_extension, right_extension ->
+          let extended =
+            (match left_extension with Some name -> [ name ] | None -> [])
+            @ names
+            @ (match right_extension with Some name -> [ name ] | None -> [])
           in
-          let right =
-            match String_map.find_opt right_morph_name resolved_morphs with
-            | Some morph -> morph
-            | None ->
-              Error.failf
-                (located_loc right_name)
-                "unknown morph %S in adjoint chain"
-                right_morph_name
-          in
-          let left_core = morph_core_of left in
-          let right_core = morph_core_of right in
-          if not (lattice_expr_equal left_core.target right_core.source)
-             || not (lattice_expr_equal left_core.source right_core.target)
-          then
-            Error.failf
-              (Location.merge (located_loc left_name) (located_loc right_name))
-              "adjoint chain type mismatch between %S : %s -> %s and %S : %s -> %s"
-              left_core.name
-              (module_name_of_expr left_core.source)
-              (module_name_of_expr left_core.target)
-              right_core.name
-              (module_name_of_expr right_core.source)
-              (module_name_of_expr right_core.target);
-          (match left_core.right_adjoint with
-           | None ->
-             Error.failf
-               (located_loc left_name)
-               "morphism %S has no right adjoint (required to match %S in adjoint chain)"
-               left_core.name
-               right_core.name
-           | Some right_adjoint ->
-             if not (int_array_equal right_adjoint right_core.map)
-             then
-               Error.failf
-                 (Location.merge (located_loc left_name) (located_loc right_name))
-                 "morphism %S is not left adjoint to %S"
-                 left_core.name
-                 right_core.name);
-          (match right_core.left_adjoint with
-           | None ->
-             Error.failf
-               (located_loc right_name)
-               "morphism %S has no left adjoint (required to match %S in adjoint chain)"
-               right_core.name
-               left_core.name
-           | Some left_adjoint ->
-             if not (int_array_equal left_adjoint left_core.map)
-             then
-               Error.failf
-                 (Location.merge (located_loc left_name) (located_loc right_name))
-                 "morphism %S is not right adjoint to %S"
-                 right_core.name
-                 left_core.name);
-          check_pairs rest
+          add_warning
+            chain.loc
+            "adjoint chain can be extended: %s"
+            (render_chain extended))
+    !declared_chains;
+  let canonicalize_chain names =
+    match names with
+    | [ left; right ] when valid_named_chain [ right; left ] ->
+      if String.compare left right <= 0 then [ left; right ] else [ right; left ]
+    | _ ->
+      let reversed = List.rev names in
+      if valid_named_chain reversed && list_lex_compare reversed names < 0
+      then reversed
+      else names
+  in
+  let warned_missing = Hashtbl.create 16 in
+  String_map.iter
+    (fun name _ ->
+      if not (String_set.mem name declared_chain_name_set)
+      then (
+        let touched_declared = ref false in
+        let chain = ref [ name ] in
+        let visited = ref (String_set.singleton name) in
+        let rec extend_left current =
+          match (core_of_name current).left_name with
+          | Some prev when String_set.mem prev !visited -> ()
+          | Some prev when String_set.mem prev declared_chain_name_set ->
+            touched_declared := true
+          | Some prev ->
+            visited := String_set.add prev !visited;
+            chain := prev :: !chain;
+            extend_left prev
+          | None -> ()
+        in
+        let rec extend_right current =
+          match (core_of_name current).right_name with
+          | Some next when String_set.mem next !visited -> ()
+          | Some next when String_set.mem next declared_chain_name_set ->
+            touched_declared := true
+          | Some next ->
+            visited := String_set.add next !visited;
+            chain := !chain @ [ next ];
+            extend_right next
+          | None -> ()
+        in
+        extend_left name;
+        extend_right name;
+        let chain = canonicalize_chain !chain in
+        if not !touched_declared && List.length chain >= 2
+        then (
+          let key = render_chain chain in
+          if not (Hashtbl.mem warned_missing key)
+          then (
+            Hashtbl.add warned_missing key ();
+            add_warning
+              (morph_decl_loc name)
+              "morphism %S could be added to an adjoint chain: %s"
+              name
+              key))))
+    resolved_morphs;
+  String_map.iter
+    (fun name morph ->
+      let core = morph_core_of morph in
+      let missing_left =
+        Option.is_some core.left_adjoint && Option.is_none core.left_name
       in
-      check_pairs chain.names)
-    !adjoint_chains;
+      let missing_right =
+        Option.is_some core.right_adjoint && Option.is_none core.right_name
+      in
+      if missing_left || missing_right
+      then
+        let which, referent =
+          match missing_left, missing_right with
+          | true, true -> "left and right adjoints", "them"
+          | true, false -> "left adjoint", "it"
+          | false, true -> "right adjoint", "it"
+          | false, false -> assert false
+        in
+        add_warning
+          (morph_decl_loc name)
+          "morphism %S has unnamed %s; add an adjoint chain to synthesize %s"
+          name
+          which
+          referent)
+    resolved_morphs;
   let items =
     List.map (fun name -> Lattice (String_map.find name resolved_lattices)) !lattice_order
-    @ List.map (fun name -> Morph (String_map.find name resolved_morphs)) !morph_order
+    @ List.map
+        (fun name -> Morph (String_map.find name resolved_morphs))
+        !resolved_morph_order
   in
-  { items; lattices = resolved_lattices; morphs = resolved_morphs }
+  { items;
+    lattices = resolved_lattices;
+    morphs = resolved_morphs;
+    warnings = !warnings
+  }

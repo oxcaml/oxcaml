@@ -87,4 +87,49 @@ kinds_unique_implies_uncontended2 : K2 -> K2 = {
       "~contention:(C2_op.join (M2_op.proj_contention x) (unique_cap2 (M2_op.proj_uniqueness x)))";
       "let kinds_unique_implies_uncontended2 x =";
       "~monadic:(unique_implies_uncontended2 (K2.proj_monadic x))"
-    ]
+    ];
+  Test_support.expect_generated_ml_contains
+    ~name:"adjoint-inference.lattice"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+B = [ Red < Green < Blue ]
+
+f : A -> B = [
+  Lo -> Red;
+  Hi -> Blue;
+]
+
+f -| g
+
+P = {
+  x : B;
+}
+
+Q = {
+  y : A;
+}
+
+use_g : P -> Q = {
+  y = g(x);
+}
+|}
+    [ "let[@inline] f x =";
+      "let[@inline] g x = x lsr 1";
+      "let[@inline] use_g x = x lsr 1"
+    ];
+  Test_support.expect_generated_mli_contains
+    ~name:"adjoint-inference.lattice"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+B = [ Red < Green < Blue ]
+
+f : A -> B = [
+  Lo -> Red;
+  Hi -> Blue;
+]
+
+f -| g
+|}
+    [ "val g : B.t -> A.t" ]

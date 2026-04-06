@@ -84,16 +84,12 @@ bad : P -> Q = {
 }
 |};
   Test_support.expect_error
-    ~name:"adjoint_chain_unknown"
-    ~needle:"unknown morph"
+    ~name:"adjoint_chain_no_anchor"
+    ~needle:"anchor"
     ~source:
       {|
 A = [ Lo < Hi ]
 B = [ Red < Blue ]
-f : A -> B = [
-  Lo -> Red;
-  Hi -> Blue;
-]
 f -| g
 |};
   Test_support.expect_error
@@ -169,4 +165,21 @@ left_only : Single -> Pair = {
   right = min;
 }
 join_pair -| left_only
+|};
+  Test_support.expect_error
+    ~name:"adjoint_chain_conflicting_declared"
+    ~needle:"is not left adjoint to"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+B = [ Red < Blue ]
+f : A -> B = [
+  Lo -> Red;
+  Hi -> Blue;
+]
+g : B -> A = [
+  Red -> Hi;
+  Blue -> Hi;
+]
+f -| g
 |}

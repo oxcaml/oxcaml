@@ -67,28 +67,6 @@ local_to_regional : Locality -> Regionality = [
   Local -> Regional;
 ]
 
-regional_to_local : Regionality -> Locality = [
-  Global -> Global;
-  Regional -> Local;
-  Local -> Local;
-]
-
-locality_as_regionality : Locality -> Regionality = [
-  Global -> Global;
-  Local -> Local;
-]
-
-regional_to_global : Regionality -> Locality = [
-  Global -> Global;
-  Regional -> Global;
-  Local -> Local;
-]
-
-global_to_regional : Locality -> Regionality = [
-  Global -> Regional;
-  Local -> Local;
-]
-
 local_to_regional
   -| regional_to_local
   -| locality_as_regionality
@@ -106,10 +84,7 @@ linear_to_unique : Linearity -> Uniqueness^op = [
   Once -> Unique;
 ]
 
-unique_to_linear : Uniqueness^op -> Linearity = [
-  Aliased -> Many;
-  Unique -> Once;
-]
+linear_to_unique -| unique_to_linear
 
 portable_to_contended : Portability -> Contention^op = [
   Portable -> Contended;
@@ -117,11 +92,7 @@ portable_to_contended : Portability -> Contention^op = [
   Nonportable -> Uncontended;
 ]
 
-contended_to_portable : Contention^op -> Portability = [
-  Contended -> Portable;
-  Shared -> Shareable;
-  Uncontended -> Nonportable;
-]
+portable_to_contended -| contended_to_portable
 
 statefulness_to_visibility : Statefulness -> Visibility^op = [
   Stateless -> Immutable;
@@ -130,41 +101,10 @@ statefulness_to_visibility : Statefulness -> Visibility^op = [
   Stateful -> Read_write;
 ]
 
-visibility_to_statefulness : Visibility^op -> Statefulness = [
-  Immutable -> Stateless;
-  Read -> Reading;
-  Write -> Writing;
-  Read_write -> Stateful;
-]
-
-linear_to_unique -| unique_to_linear
-
-portable_to_contended -| contended_to_portable
-
 statefulness_to_visibility -| visibility_to_statefulness
 
 comonadic_local_to_regional : Comonadic_with_locality -> Comonadic_with_regionality = {
   areality = local_to_regional(areality);
-  comonadic = comonadic;
-}
-
-comonadic_regional_to_local : Comonadic_with_regionality -> Comonadic_with_locality = {
-  areality = regional_to_local(areality);
-  comonadic = comonadic;
-}
-
-comonadic_locality_as_regionality : Comonadic_with_locality -> Comonadic_with_regionality = {
-  areality = locality_as_regionality(areality);
-  comonadic = comonadic;
-}
-
-comonadic_regional_to_global : Comonadic_with_regionality -> Comonadic_with_locality = {
-  areality = regional_to_global(areality);
-  comonadic = comonadic;
-}
-
-comonadic_global_to_regional : Comonadic_with_locality -> Comonadic_with_regionality = {
-  areality = global_to_regional(areality);
   comonadic = comonadic;
 }
 
@@ -186,12 +126,7 @@ comonadic_to_monadic_min : Comonadic -> Monadic^op = {
   staticity = min;
 }
 
-comonadic_to_monadic_max : Comonadic -> Monadic^op = {
-  uniqueness = linear_to_unique(linearity);
-  contention = portable_to_contended(portability);
-  visibility = statefulness_to_visibility(statefulness);
-  staticity = max;
-}
+comonadic_to_monadic_min -| monadic_to_comonadic_max
 
 monadic_to_comonadic_min : Monadic^op -> Comonadic = {
   linearity = unique_to_linear(uniqueness);
@@ -201,35 +136,10 @@ monadic_to_comonadic_min : Monadic^op -> Comonadic = {
   yielding = min;
 }
 
-monadic_to_comonadic_max : Monadic^op -> Comonadic = {
-  linearity = unique_to_linear(uniqueness);
-  portability = contended_to_portable(contention);
-  statefulness = visibility_to_statefulness(visibility);
-  forkable = max;
-  yielding = max;
-}
-
-comonadic_to_monadic_min -| monadic_to_comonadic_max
-
 monadic_to_comonadic_min -| comonadic_to_monadic_max
 
 alloc_to_value_l2r : Alloc -> Value = {
   comonadic = comonadic_local_to_regional(comonadic);
-  monadic = monadic;
-}
-
-value_to_alloc_r2l : Value -> Alloc = {
-  comonadic = comonadic_regional_to_local(comonadic);
-  monadic = monadic;
-}
-
-alloc_as_value : Alloc -> Value = {
-  comonadic = comonadic_locality_as_regionality(comonadic);
-  monadic = monadic;
-}
-
-value_to_alloc_r2g : Value -> Alloc = {
-  comonadic = comonadic_regional_to_global(comonadic);
   monadic = monadic;
 }
 

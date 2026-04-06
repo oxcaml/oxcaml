@@ -12,11 +12,6 @@ f : A -> B = [
   Hi -> Blue;
 ]
 
-g : B -> A = [
-  Red -> Lo;
-  Blue -> Hi;
-]
-
 P = {
   src : A;
   dst : B;
@@ -60,6 +55,67 @@ unrename : Q -> P = {
 rename_undeclared : P -> R = {
   first = src;
   second = dst;
+}
+
+C = [ Down < Up ]
+
+D = [ Left < Right ]
+
+u : C -> D = [
+  Down -> Left;
+  Up -> Right;
+]
+
+v : D -> C = [
+  Left -> Down;
+  Right -> Up;
+]
+
+id_q : Q -> Q = {
+  left = left;
+  right = right;
+}
+
+Small = [ Low < High ]
+
+Tall = [ Low < Mid < High ]
+
+s_to_mid : Small -> Tall = [
+  Low -> Low;
+  High -> Mid;
+]
+
+mid_to_s : Tall -> Small = [
+  Low -> Low;
+  Mid -> High;
+  High -> High;
+]
+
+small_as_tall : Small -> Tall = [
+  Low -> Low;
+  High -> High;
+]
+
+f -| g -| h
+id_p ⊣ id_p
+rename -| unrename
+rename_undeclared -| unrename_inferred
+s_to_mid -| mid_to_s
+
+Q2 = {
+  lifted : A;
+}
+
+QB = {
+  lifted_b : B;
+}
+
+use_g : P -> Q2 = {
+  lifted = g(dst);
+}
+
+use_h : P -> QB = {
+  lifted_b = h(src);
 }
 
 mix_to_qop : Mix -> Qop = {
@@ -107,10 +163,6 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   uniqueness = uniqueness;
   contention = join(contention, unique_cap2(uniqueness));
 }
-
-f -| g -| f
-id_p ⊣ id_p
-rename -| unrename
 |}
   in
   let product =
@@ -136,6 +188,28 @@ rename -| unrename
   Test_support.ensure
     (Option.equal String.equal f_core.right_name (Some "g"))
     "expected right adjoint of f to match g";
+  let g =
+    match Model.String_map.find "g" model.morphs with
+    | Model.Primitive primitive -> primitive
+    | Model.Bridge _ -> failwith "expected primitive morph"
+  in
+  Test_support.ensure
+    (Option.equal String.equal g.core.left_name (Some "f"))
+    "expected inferred g left adjoint to match f";
+  Test_support.ensure
+    (Option.is_some g.core.right_name)
+    "expected inferred g to expose a named right adjoint";
+  let h =
+    match Model.String_map.find "h" model.morphs with
+    | Model.Primitive primitive -> primitive
+    | Model.Bridge _ -> failwith "expected primitive morph"
+  in
+  Test_support.ensure
+    (Option.equal String.equal h.core.left_name (Some "g"))
+    "expected inferred h left adjoint to match g";
+  Test_support.ensure
+    (Array.to_list h.core.map = Array.to_list f_core.map)
+    "expected inferred h to match the second right-adjoint step from f";
   let id_p =
     match Model.String_map.find "id_p" model.morphs with
     | Model.Bridge bridge -> bridge
@@ -170,11 +244,44 @@ rename -| unrename
     (Option.is_some rename_undeclared.core.right_adjoint)
     "expected rename_undeclared to have a right adjoint";
   Test_support.ensure
-    (Option.is_none rename_undeclared.core.left_name)
-    "expected rename_undeclared left adjoint name to stay hidden";
+    (Option.equal String.equal rename_undeclared.core.right_name
+       (Some "unrename_inferred"))
+    "expected rename_undeclared right adjoint name to be inferred";
   Test_support.ensure
-    (Option.is_none rename_undeclared.core.right_name)
-    "expected rename_undeclared right adjoint name to stay hidden";
+    (Option.is_some rename_undeclared.core.left_name)
+    "expected rename_undeclared left adjoint name to be discoverable";
+  Test_support.ensure
+    (Option.is_some rename_undeclared.core.right_name)
+    "expected rename_undeclared right adjoint name to be visible";
+  let unrename_inferred =
+    match Model.String_map.find "unrename_inferred" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected inferred bridge morph"
+  in
+  Test_support.ensure
+    (Array.to_list unrename_inferred.core.map
+     = Array.to_list (Option.get rename_undeclared.core.right_adjoint))
+    "expected inferred bridge morph to match rename_undeclared right adjoint";
+  Test_support.ensure
+    (Option.equal String.equal unrename_inferred.core.left_name
+       (Some "rename_undeclared"))
+    "expected inferred bridge left adjoint name to point back to rename_undeclared";
+  let use_g =
+    match Model.String_map.find "use_g" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected product bridge"
+  in
+  Test_support.ensure
+    (Array.length use_g.core.map = 4)
+    "expected later bridge using inferred g to resolve";
+  let use_h =
+    match Model.String_map.find "use_h" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected product bridge"
+  in
+  Test_support.ensure
+    (Array.length use_h.core.map = 4)
+    "expected later bridge using inferred h to resolve";
   let mix_to_qop =
     match Model.String_map.find "mix_to_qop" model.morphs with
     | Model.Bridge bridge -> bridge
@@ -232,4 +339,37 @@ rename -| unrename
     "expected unique_implies_uncontended2 to lack a left adjoint";
   Test_support.ensure
     (Option.is_some unique_implies_uncontended2.core.right_adjoint)
-    "expected unique_implies_uncontended2 to have a right adjoint"
+    "expected unique_implies_uncontended2 to have a right adjoint";
+  let warning_messages =
+    List.map (fun (warning : Model.warning) -> warning.message) model.warnings
+  in
+  Test_support.ensure
+    (List.exists
+       (fun message ->
+         String.equal
+           message
+           {|morphism "u" could be added to an adjoint chain: u -| v|})
+       warning_messages)
+    "expected a warning for the missing standalone adjoint chain";
+  Test_support.ensure
+    (List.exists
+       (fun message ->
+         String.equal
+           message
+           {|adjoint chain can be extended: s_to_mid -| mid_to_s -| small_as_tall|})
+       warning_messages)
+    "expected a warning for the extendable adjoint chain";
+  Test_support.ensure
+    (List.exists
+       (fun message ->
+         String.equal
+           message
+           {|morphism "unique_implies_uncontended2" has unnamed right adjoint; add an adjoint chain to synthesize it|})
+       warning_messages)
+    "expected a warning for an unnamed adjoint";
+  Test_support.ensure
+    (not
+       (List.exists
+          (fun message -> Test_support.contains message "id_q")
+          warning_messages))
+    "did not expect a warning for the self-adjoint singleton morph"
