@@ -40,7 +40,6 @@
    }{
      all_modules = "lib.cmx main.cmx";
      compile_only = "false";
-     ocamlopt_byte_exit_status = "2";
      flags = "-a";
      ocamlopt.byte;
   }{
@@ -55,5 +54,8 @@
 
 (* Make sure ocamlc and ocamlopt print badly ordered dependencies only once.
    See issue #12074. We test with ocamlc.byte only. *)
+
+(* CR sspies: We have not pulled in the dependecy check changes from upstream
+   yet for native compilation, so for the time being, our errors differ here. *)
 
 let value = ()
