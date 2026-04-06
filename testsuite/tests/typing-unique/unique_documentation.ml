@@ -308,14 +308,14 @@ let check_tuple x y z =
     | p, q, r -> free p
   in m, y, y
 [%%expect{|
-val check_tuple : t @ unique -> 'a -> 'b -> unit * 'a * 'a = <fun>
+val check_tuple : t @ unique -> 'a -> ('b -> unit * 'a * 'a) = <fun>
 |}]
 
 let okay x y z =
   match x, y, z with
   | p, q, r -> free x.field1; free p.field2
 [%%expect{|
-val okay : t @ unique -> 'a -> 'b -> unit = <fun>
+val okay : t @ unique -> 'a -> ('b -> unit) = <fun>
 |}]
 
 let bad x y z =

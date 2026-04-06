@@ -65,9 +65,9 @@ let () =
   let y = fst ~label1:x ~label2:() in
   use_global y
 [%%expect{|
-Line 4, characters 13-14:
-4 |   use_global y
-                 ^
+Line 3, characters 22-23:
+3 |   let y = fst ~label1:x ~label2:() in
+                          ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -149,9 +149,9 @@ let () =
   let y = foo x in
   use_global y
 [%%expect{|
-Line 4, characters 13-14:
-4 |   use_global y
-                 ^
+Line 3, characters 14-15:
+3 |   let y = foo x in
+                  ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -172,9 +172,9 @@ let () =
   let y = foo x in
   use_global y
 [%%expect{|
-Line 4, characters 13-14:
-4 |   use_global y
-                 ^
+Line 3, characters 14-15:
+3 |   let y = foo x in
+                  ^
 Error: This value is "local" but is expected to be "global".
 |}]
 

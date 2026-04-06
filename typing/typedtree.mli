@@ -126,6 +126,11 @@ val create_alloc_mode_r : Mode.Locality.r -> alloc_mode_r
 
 val alloc_mode_r_legacy : alloc_mode_r
 
+val alloc_mode_r_iter :
+  alloc_mode_r
+  -> f:(Mode.Locality.r -> unit)
+  -> unit
+
 type alloc_mode_l
 
 val alloc_mode_l_iter :

@@ -437,7 +437,7 @@ let curry =
   foo ~a:3 ~c:4
 [%%expect{|
 val curry :
-  b:'_weak3 @ unique -> d:'_weak4 @ unique -> int * '_weak3 * int * '_weak4 =
+  b:'_weak3 @ unique -> (d:'_weak4 @ unique -> int * '_weak3 * int * '_weak4) =
   <fun>
 |}]
 

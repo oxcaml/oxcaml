@@ -47,12 +47,11 @@ let foo =
   let clocal @ local = "local" in
   let foo = fst cglobal in
   let bar = fst clocal in
-  use_global foo;
-  use_global bar
+  ()
 [%%expect{|
-Line 7, characters 13-16:
-7 |   use_global bar
-                 ^^^
+Line 5, characters 16-22:
+5 |   let bar = fst clocal in
+                    ^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -92,25 +91,28 @@ let many_arguments x y z s t = y
 val many_arguments : 'a -> 'b -> 'c -> 'd -> 'e -> 'b = <fun>
 |}]
 
-let foo =
-  let x @ local = "local" in
-  let y @ global = "global" in
+let foo (x @ portable) (y @ uncontended) =
   let y = many_arguments x y () () () in
-  use_global y
+  use_uncontended y
 [%%expect{|
-val foo : unit = ()
+val foo : 'a @ portable -> 'b -> unit = <fun>
 |}]
 
-let foo =
-  let x @ local = "local" in
-  let y @ global = "global" in
+let foo (x @ portable) (y @ uncontended) =
   let f = many_arguments x y in
-  use_global f
+  use_portable f
 [%%expect{|
-Line 5, characters 13-14:
-5 |   use_global f
-                 ^
-Error: This value is "local" but is expected to be "global".
+val foo : 'a @ portable -> 'b @ portable -> unit = <fun>
+|}]
+
+let foo (x @ portable) (y @ nonportable) =
+  let f = many_arguments x y in
+  use_portable f
+[%%expect{|
+Line 3, characters 15-16:
+3 |   use_portable f
+                   ^
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let foo =

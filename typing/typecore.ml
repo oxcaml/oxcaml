@@ -277,6 +277,7 @@ type error =
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Param_mode_mismatch of Alloc.equate_error
   | Uncurried_function_escapes_comonadic of Alloc.Comonadic.error
+  | Uncurried_function_escapes_locality
   | Function_returns_local
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
@@ -484,15 +485,12 @@ let check_tail_call_local_returning loc env ap_mode {region_mode; _} =
     (* This application will be performed after the current region is closed; if
        ap_mode is local, the application allocates in the outer
        region, and thus [region_mode] needs to be marked local as well*)
-      Typedtree.alloc_mode_l_iter
-      ~f:(fun mode ->
-        match
-          Regionality.submode ~pp:(loc, Expression)
-            (locality_as_regionality mode) region_mode
-        with
-        | Ok () -> ()
-        | Error _ -> raise (Error (loc, env, Tail_call_local_returning))
-      ) ap_mode
+      match
+        Regionality.submode ~pp:(loc, Expression)
+          (locality_as_regionality ap_mode) region_mode
+      with
+      | Ok () -> ()
+      | Error _ -> raise (Error (loc, env, Tail_call_local_returning))
     end
   | None -> ()
 
@@ -756,6 +754,15 @@ let newvar_above_if_modepoly level m =
   then fst (Locality.newvar_above level m)
   else m
 
+let newvar_equate_if_modepoly level m =
+  if Language_extension.(is_at_least_mode_poly Beta)
+  then begin
+    let mode = Locality.newvar level in
+    Locality.equate_exn mode m;
+    mode
+  end
+  else m
+
 let create_allocation_mode_r mode =
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode = newvar_below_if_modepoly 0 locality_mode in
@@ -763,7 +770,7 @@ let create_allocation_mode_r mode =
   alloc_mode
 
 let create_allocation_mode_l :
-    Alloc.lr -> alloc_mode_l = fun mode ->
+    type r. (allowed * r) Alloc.t -> alloc_mode_l = fun mode ->
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode = newvar_above_if_modepoly 0 locality_mode in
   Typedtree.create_alloc_mode_l (Locality.disallow_right alloc_mode)
@@ -5728,7 +5735,7 @@ type type_function_result_param =
 type fun_alloc_mode =
   { alloc_mode_r: alloc_mode_r;
     alloc_mode_l: alloc_mode_l;
-    fun_closure_mode: Mode.Alloc.Comonadic.lr;
+    fun_closure_mode: Mode.Alloc.Comonadic.lr
   }
 
 (* The result of calling [type_function]. For the outer call to
@@ -6596,8 +6603,9 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
-      let ap_mode = create_allocation_mode_l mode_ret in
+      let ap_mode_alloc = create_allocation_mode_l mode_ret in
       let mode_ret = Alloc.disallow_right mode_ret in
+      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
@@ -6616,7 +6624,7 @@ and type_expect_
       in
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
       let exp = rue {
-        exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode,
+        exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode_alloc,
                               zero_alloc);
         exp_loc = loc; exp_extra;
         exp_type = ty_ret;
@@ -8490,7 +8498,7 @@ and type_function
                 | None ->
                   assert(is_final_val_param);
                   Final_arg
-                | Some { fun_closure_mode; alloc_mode_l } ->
+                | Some { fun_closure_mode; alloc_mode_l; alloc_mode_r } ->
                   assert(not is_final_val_param);
                   (* Handle mode crossing of [arg_mode]. Note that [close_over]
                      uses the [arg_mode.comonadic] as a left mode, and
@@ -8516,21 +8524,28 @@ and type_function
                   begin match
                     Alloc.Comonadic.submode arg_mode fun_closure_mode
                   with
-                    | Ok () -> ()
+                    | Ok () -> Typedtree.alloc_mode_r_iter
+                      ~f:(fun mode ->
+                        Locality.submode_exn
+                        (Alloc.Comonadic.proj Areality arg_mode) mode)
+                      alloc_mode_r
                     | Error e ->
                       raise (Error(loc_fun, env,
                         Uncurried_function_escapes_comonadic e))
                   end;
-                  begin match
-                    Alloc.Comonadic.submode
-                      (Alloc.Comonadic.disallow_right closure_mode)
-                      fun_closure_mode
-                  with
+                  Typedtree.alloc_mode_r_iter alloc_mode_r
+                    ~f:(fun mode ->
+                    match
+                      Locality.submode
+                        (Alloc.Comonadic.proj Areality
+                           closure_mode)
+                        mode
+                    with
                     | Ok () -> ()
-                    | Error e ->
+                    | Error _ ->
                       raise (Error(loc_fun, env,
-                        Uncurried_function_escapes_comonadic e))
-                  end;
+                        Uncurried_function_escapes_locality))
+                  );
                   More_args { partial_mode = alloc_mode_l }
               in
               pat, params_suffix, body, ret_info, newtypes, contains_gadt, curry
@@ -8609,20 +8624,25 @@ and type_function
             };
         }
       in
+      let locality_mode = Alloc.proj_comonadic Areality ret_mode in
+      let ret_alloc_mode = newvar_equate_if_modepoly 0 locality_mode in
+      let ret_alloc_mode = Typedtree.create_alloc_mode_l
+        (Locality.disallow_right ret_alloc_mode)
+      in
       let ret_info =
         match ret_info with
         | Some _ as x -> x
         | None ->
-          let ret_mode = create_allocation_mode_l ret_mode in
           let ret_mode =
-            {ret_mode_annots with mode_modes = ret_mode }
+            {ret_mode_annots with mode_modes = ret_alloc_mode }
           in
           Some { ret_sort ; ret_mode }
       in
       let fun_alloc_mode =
         { fun_closure_mode = closure_mode;
           alloc_mode_l = alloc_mode.alloc_mode_l;
-          alloc_mode_r = alloc_mode.alloc_mode_r }
+          alloc_mode_r = alloc_mode.alloc_mode_r
+        }
       in
       { function_ = exp_type, param :: params, body;
         newtypes = []; params_contain_gadt = contains_gadt;
@@ -10327,15 +10347,17 @@ and type_function_cases_expect
         fc_arg_sort = arg_sort;
       }
     in
+    let ret_alloc_mode = create_allocation_mode_l ret_mode in
     let fun_alloc_mode =
       { fun_closure_mode = closure_mode;
         alloc_mode_l = alloc_mode.alloc_mode_l;
-        alloc_mode_r = alloc_mode.alloc_mode_r }
+        alloc_mode_r = alloc_mode.alloc_mode_r
+      }
     in
     cases, ty_fun, fun_alloc_mode,
       { ret_sort;
         ret_mode =
-          {mode_modes = create_allocation_mode_l ret_mode; mode_desc = []} }
+          {mode_modes = ret_alloc_mode; mode_desc = []} }
   end
 
 (* Typing of let bindings *)
@@ -12362,6 +12384,11 @@ let report_error ~loc env =
               but expected to be %a."
             (Style.as_inline_code (Alloc.Const.print_axis (Comonadic ax))) left
             (Style.as_inline_code (Alloc.Const.print_axis (Comonadic ax))) right
+    end
+  | Uncurried_function_escapes_locality -> begin
+      Location.errorf ~loc
+            "This function or one of its parameters escape their region@ \
+            when it is partially applied."
     end
   | Bad_tail_annotation err ->
       Location.errorf ~loc

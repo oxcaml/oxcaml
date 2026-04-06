@@ -395,7 +395,7 @@ module type Solver_mono = sig
   val iter_covariant :
     'a obj ->
     ('a, allowed * 'r) mode ->
-    (int -> ('a, allowed * disallowed) mode -> unit) ->
+    (id:int -> level:int -> ('a, allowed * disallowed) mode -> unit) ->
     unit
 
   (** Applies an iterator over every reachable contravariant (right-) constraint
@@ -406,7 +406,7 @@ module type Solver_mono = sig
   val iter_contravariant :
     'a obj ->
     ('a, 'l * allowed) mode ->
-    (int -> ('a, disallowed * allowed) mode -> unit) ->
+    (id:int -> level:int -> ('a, disallowed * allowed) mode -> unit) ->
     unit
 
   (** Apply a monotone morphism explained by an optional hint *)

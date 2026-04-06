@@ -732,7 +732,7 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it escapes the borrow region at line 4, characters 10-50.
   Hint: This is a partial application
-        Adding 1 more argument may make the value non-local
+        Adding 1 more argument will make the value non-local
 |}]
 
 let rec foo x =

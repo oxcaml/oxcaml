@@ -29,9 +29,9 @@ type 'a myref = { mutable i : 'a; }
 val alloc : 'a -> 'a myref = <fun>
 |}]
 
-let store_any x y = x.i <- y
+let store_local (x @ local) y = x.i <- y
 [%%expect{|
-val store_any : 'a myref -> 'a -> unit = <fun>
+val store_local : 'a myref @ local -> 'a -> unit = <fun>
 |}]
 
 let store_global (x @ global) y = x.i <- y
@@ -42,8 +42,8 @@ val store_global : 'a myref -> 'a -> unit = <fun>
 let () =
   let (x @ local) = { i = "local" } in
   let (x' @ global) = { i = "global" } in
-  store_any x "test";
-  store_any x' "test";
+  store_local x "test";
+  store_local x' "test";
   store_global x "should fail"
 [%%expect{|
 Line 6, characters 15-16:

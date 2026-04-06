@@ -20,7 +20,7 @@ let foo r x = r.i <- x
 [%%expect{|
 (let
   (foo/288 =
-     (function {nlocal = 1} r/290[L] x/291 : int
+     (function {nlocal = 0} r/290[L] x/291 : int
        (setfield_ptr(maybe-stack) 0 r/290 x/291)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/288))
 val foo : 'a myref -> 'a -> unit = <fun>
@@ -41,7 +41,7 @@ let foo (r @ global) x = r.i <- x
 [%%expect{|
 (let
   (foo/295 =
-     (function {nlocal = 1} r/296 x/297 : int (setfield_ptr 0 r/296 x/297)))
+     (function {nlocal = 0} r/296 x/297 : int (setfield_ptr 0 r/296 x/297)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/295))
 val foo : 'a myref -> 'a -> unit = <fun>
 |}]
@@ -53,7 +53,7 @@ let foo () =
 [%%expect{|
 (let
   (foo/298 =
-     (function {nlocal = 1} param/304[L][value<int>] : local
+     (function {nlocal = 1} param/304[L][value<int>]
        (let
          (r/299 = (makemutable 0 (*) "bar")
           store/300 =
@@ -76,7 +76,7 @@ Line 2, characters 6-7:
 Warning 26 [unused-var]: unused variable r.
 (let
   (foo/306 =
-     (function {nlocal = 1} param/311[L][value<int>] : local
+     (function {nlocal = 1} param/311[L][value<int>]
        (region
          (let (r/307 =mut "bar")
            (function {nlocal = 1} r/310[L] : int
@@ -93,7 +93,7 @@ let foo () =
 [%%expect{|
 (let
   (foo/313 =
-     (function {nlocal = 1} param/319[L][value<int>] : local
+     (function {nlocal = 1} param/319[L][value<int>]
        (let
          (r/314 = (makemutable 0 (*) "bar")
           store/315 =
@@ -114,23 +114,18 @@ val foo : unit -> unit -> unit = <fun>
 
   The following tests assert the locality of returned functions *)
 
-(* CR ageorges: the following two functions return local functions.
-  This will cause a crash if applied as global, (see [foo] below),
-  and is unsound *)
-
 let fst x = fun y -> x
 [%%expect{|
 (let
   (fst/321 =
-     (function {nlocal = 1} x/322? : local
-       (function {nlocal = 1} y/323[L]? : local x/322)))
+     (function {nlocal = 0} x/322? (function {nlocal = 1} y/323[L]? x/322)))
   (apply (field_imm 1 (global Toploop!)) "fst" fst/321))
 val fst : 'a -> 'b -> 'a = <fun>
 |}]
 
 let fst' x y = x
 [%%expect{|
-(let (fst'/324 = (function {nlocal = 1} x/326[L]? y/327[L]? : local x/326))
+(let (fst'/324 = (function {nlocal = 1} x/326[L]? y/327[L]? x/326))
   (apply (field_imm 1 (global Toploop!)) "fst'" fst'/324))
 val fst' : 'a -> 'b -> 'a = <fun>
 |}]
