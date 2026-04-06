@@ -29,9 +29,9 @@ val prod : 'a -> 'b -> 'a * 'b = <fun>
 |}]
 
 (* With exclave_ the tuple is local *)
-let prod_local x y = exclave_ (x, y)
+let prod_local (x @ local) (y @ local) = exclave_ (x, y)
 [%%expect{|
-val prod_local : 'a -> 'b -> 'a * 'b @ local = <fun>
+val prod_local : 'a @ local -> 'b @ local -> 'a * 'b @ local = <fun>
 |}]
 
 (* [prod] is polymorphic on the other axes *)

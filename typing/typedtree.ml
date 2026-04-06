@@ -149,6 +149,8 @@ let create_alloc_mode_r m = m
 
 let alloc_mode_r_legacy = Mode.Locality.disallow_left Mode.Locality.legacy
 
+let alloc_mode_r_iter alloc_mode ~f = f alloc_mode
+
 type alloc_mode_l = Mode.Locality.l
 
 let alloc_mode_l_iter alloc_mode ~f = f (Locality.disallow_right alloc_mode)
