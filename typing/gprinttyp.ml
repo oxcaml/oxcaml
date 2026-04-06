@@ -369,6 +369,7 @@ module Pp = struct
     | Some Types.Rigid -> fprintf ppf "rigid"
     | Some Types.Univar _t -> fprintf ppf "univar"
     | Some Types.Reified _p -> fprintf ppf "reified"
+    | Some Types.Fixed_existential -> fprintf ppf "existential"
 
   let field_kind ppf v =
     match Types.field_kind_repr v with
@@ -417,9 +418,10 @@ module Pp = struct
     fprintf ppf "cluster_%d" !cluster_counter
 
   let exponent_of_label ppf = function
-    | Asttypes.Nolabel -> ()
-    | Asttypes.Labelled s -> fprintf ppf "<SUP>%s</SUP>" s
-    | Asttypes.Optional s -> fprintf ppf "<SUP>?%s</SUP>" s
+    | Types.Nolabel -> ()
+    | Types.Labelled s -> fprintf ppf "<SUP>%s</SUP>" s
+    | Types.Optional s -> fprintf ppf "<SUP>?%s</SUP>" s
+    | Types.Position s -> fprintf ppf "<SUP>@%s</SUP>" s
 
   let pretty_var ppf name =
     let name = Option.value ~default:"_" name in
@@ -674,11 +676,13 @@ module Digraph = struct
     let edge = edge params id in
     let std_edge = edge std in
     match desc with
-    | Types.Tvar name -> mk "%a" Pp.pretty_var name
-    | Types.Tarrow(l,t1,t2,_) ->
+    | Types.Tvar { name; _ } -> mk "%a" Pp.pretty_var name
+    | Types.Tarrow ((l,_,_),t1,t2,_) ->
        mk "→%a" Pp.exponent_of_label l |> numbered [t1; t2]
     | Types.Ttuple tl ->
         mk "*" |> labeled_edges params id tl
+    | Types.Tunboxed_tuple tl ->
+        mk "#*" |> labeled_edges params id tl
     | Types.Tconstr (p,tl,abbrevs) ->
         let constr = mk "%a" pp_path p |> numbered tl in
         if not params.follow_expansions then
@@ -713,6 +717,8 @@ module Digraph = struct
           dg.elts dg.graph empty_subgraph
           ~color ~id ~desc
     | Types.Tnil -> mk "[Nil]"
+    | Types.Tquote t -> mk "[Quote]" |> std_edge t
+    | Types.Tsplice t -> mk "[Splice]" |> std_edge t
     | Types.Tlink t -> add_tynode Decoration.(make [Style Dash]) |> std_edge t
     | Types.Tsubst (t, o) ->
         let dg = add_tynode (labelr "[Subst]") |> std_edge t in
@@ -720,11 +726,13 @@ module Digraph = struct
         | None -> dg
         | Some row -> edge (labelr "parent polyvar") row dg
         end
-    | Types.Tunivar name ->
+    | Types.Tunivar { name; _ } ->
         mk "%a<SUP>∀</SUP>" Pp.pretty_var name
     | Types.Tpoly (t, tl) ->
         let dg = mk "∀" |> std_edge t in
         List.fold_left (poly_edge ~color params id) dg tl
+    | Types.Trepr (t, _sort_vars) ->
+        mk "[Repr]" |> std_edge t
     | Types.Tvariant row ->
         let Row {fields; more; name; fixed; closed} = Types.row_repr row in
         let closed = if closed then "<SUP>closed</SUP>" else "" in
@@ -751,6 +759,8 @@ module Digraph = struct
           pp_path pack_path
           Pp.(list ~sep:semi pp_cstrs) pack_cstrs
         |> numbered types
+    | Types.Tof_kind _ ->
+        mk "[Kind]"
   and variant params id0 (elts,main,fields) (name,rf)  =
     let id = Index.subnode ~name id0 in
     let fnode = Node id in
@@ -812,7 +822,7 @@ module Digraph = struct
               elts main fields
               ~id:id_next ~desc ~color
         end
-    | Types.Tvar name ->
+    | Types.Tvar { name; _ } ->
         let dg  = mk {elts; graph= fields } "%a" Pp.pretty_var name in
         let {elts; graph=fields} =
           add (labelr "row variable") (Edge(prev_id,id)) dg
