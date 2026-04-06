@@ -1629,7 +1629,7 @@ and tree_of_typobject_repr fi =
   { fields; open_row }
 
 and tree_of_typobject mode fi nm =
-  begin match nm with
+  match nm with
   | None ->
       let { fields; open_row } = tree_of_typobject_repr fi in
       let fields =
@@ -1643,9 +1643,7 @@ and tree_of_typobject mode fi nm =
       let (p', s) = best_type_path p in
       assert (s = Id);
       Otyp_class (tree_of_path (Some Type) p', args)
-  | _ ->
-      fatal_error "Out_type.tree_of_typobject"
-  end
+  | _ -> fatal_error "Out_type.tree_of_typobject"
 
 and tree_of_typfields rest = function
   | [] ->
@@ -1672,22 +1670,8 @@ let tree_of_typexp mode ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
   wrap_mutation (fun () -> tree_of_typexp mode Alloc.Const.legacy ty)
 
-(* and tree_of_package mode {pack_path; pack_cstrs} =
- *   { opack_path = tree_of_path (Some Module_type) pack_path;
- *     opack_cstrs =
- *       List.map
- *         (fun (li, ty) -> (String.concat "." li, tree_of_typexp mode Alloc.Const.legacy ty))
- *         pack_cstrs } *)
-
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
-
-(* Only used for printing a single modality in error message *)
-(* let modality ?(id = fun _ppf -> ()) ax ppf modality =
- *   if Mode.Modality.Per_axis.is_id ax modality then id ppf
- *   else
- *     Fmt.asprintf "%a" (Mode.Modality.Per_axis.print ax) modality
- *     |> !Oprint.out_modality ppf *)
 
 let prepared_type_expr ppf ty = typexp Type ppf ty
 
@@ -1698,50 +1682,8 @@ let type_expr_with_reserved_names ppf ty =
   Aliases.mark_loops ty;
   prepared_type_expr ppf ty
 
-
 let prepared_type_scheme ppf ty = typexp Type_scheme ppf ty
 
-(* <<<<<<< oxcaml
- * let type_scheme ppf ty =
- *   prepare_for_printing [ty];
- *   prepared_type_scheme ppf ty
- *
- * let type_path ppf p =
- *   let (p', s) = best_type_path p in
- *   let p'' = if (s = Id) then p' else p in
- *   let t = tree_of_path (Some Type) p'' in
- *   !Oprint.out_ident ppf t
- *
- * let tree_of_type_scheme ty =
- *   prepare_for_printing [ty];
- *   tree_of_typexp Type_scheme ty
- *
- * let () =
- *   Env.print_type_expr := type_expr;
- *   Jkind.set_outcometrees_of_types (fun tys ->
- *     prepare_for_printing tys;
- *     List.map (tree_of_typexp Type) tys);
- *   Jkind.set_outcometree_of_modalities tree_of_modalities;
- *   Jkind.set_print_type_expr type_expr;
- *   Jkind.set_raw_type_expr (compat raw_type_expr)
- *
- * ||||||| upstream-base
- * let type_scheme ppf ty =
- *   prepare_for_printing [ty];
- *   prepared_type_scheme ppf ty
- *
- * let type_path ppf p =
- *   let (p', s) = best_type_path p in
- *   let p'' = if (s = Id) then p' else p in
- *   let t = tree_of_best_type_path p p'' in
- *   !Oprint.out_ident ppf t
- *
- * let tree_of_type_scheme ty =
- *   prepare_for_printing [ty];
- *   tree_of_typexp Type_scheme ty
- *
- * =======
- * >>>>>>> upstream-incoming *)
 (* Print one type declaration *)
 
 let tree_of_constraints params =
@@ -2031,20 +1973,20 @@ let tree_of_type_decl id decl =
         Some (out_jkind_of_desc (Jkind.get decl.type_jkind))
     | _ -> None (* other cases have no jkind annotation *)
   in
-  let attrs =
+  let otype_attributes =
     if unsafe_mode_crossing
     then [{ oattr_name = "unsafe_allow_any_mode_crossing" }]
     else []
   in
-    { otype_name = name;
-      otype_params = args;
-      otype_type = ty;
-      otype_private = priv;
-      otype_jkind;
-      otype_unboxed = unboxed;
-      otype_or_null_reexport = or_null_reexport;
-      otype_cstrs = constraints;
-      otype_attributes = attrs }
+  { otype_name = name;
+    otype_params = args;
+    otype_type = ty;
+    otype_private = priv;
+    otype_jkind;
+    otype_unboxed = unboxed;
+    otype_or_null_reexport = or_null_reexport;
+    otype_cstrs = constraints;
+    otype_attributes }
 
 let add_type_decl_to_preparation id decl =
    ignore @@ prepare_decl id decl
@@ -2744,16 +2686,6 @@ let trees_of_type_expansion =
 let pp_type ppf t =
   Style.as_inline_code !Oprint.out_type ppf t
 
-(* let quoted_ident ppf t =
- *   Style.as_inline_code !Oprint.out_ident ppf t *)
-
-(* let type_expansion ppf = function
- *   | Same t -> pp_type ppf t
- *   | Diff(t,t') ->
- *       fprintf ppf "@[<2>%a@ =@ %a@]"
- *         pp_type t
- *         pp_type t' *)
-
 let pp_type_expansion ppf = function
   | Same t -> pp_type ppf t
   | Diff(t,t') ->
@@ -2782,7 +2714,6 @@ let prepare_expansion Errortrace.{ty; expanded} =
   Errortrace.{ty; expanded}
 
 (* Adapt functions to exposed interface *)
-(* <<<<<<< oxcaml *)
 let abbreviate ~abbrev f =
   f ?abbrev:(if abbrev then Some (Abbrev.abbrev ()) else None)
 
@@ -2792,45 +2723,14 @@ let tree_of_module ident ?(ellipsis = false) =
 let tree_of_signature sg = tree_of_signature sg
 let tree_of_modtype ?(abbrev = false) ty =
   abbreviate ~abbrev tree_of_modtype ty
-(* let type_expansion mode ppf ty_exp =
- *   type_expansion ppf (trees_of_type_expansion mode ty_exp) *)
-(* ||||||| upstream-base *)
-(* let tree_of_path = tree_of_path None *)
-(* let tree_of_modtype = tree_of_modtype ~ellipsis:false *)
-(* let type_expansion mode ppf ty_exp =
- *   type_expansion ppf (trees_of_type_expansion mode ty_exp) *)
-(* ======= *)
 let namespaced_tree_of_path n = tree_of_path (Some n)
 let tree_of_path p = tree_of_path None p
-(* let tree_of_modtype ?abbrev = tree_of_modtype ~ellipsis:false *)
-(* >>>>>>> upstream-incoming *)
 let tree_of_type_declaration ident td rs =
   with_hidden_items [{hide=true; ident}]
     (fun () -> tree_of_type_declaration ident td rs)
 let tree_of_modtype_declaration ?(abbrev = false) id md =
   abbreviate ~abbrev tree_of_modtype_declaration id md
 
-(* <<<<<<< oxcaml
- *
- * (** Compatibility module for Format printers *)
- * module Compat = struct
- *   let longident = Fmt.compat longident
- *   let path = Fmt.compat path
- *   let type_expr = Fmt.compat type_expr
- *   let shared_type_scheme = Fmt.compat shared_type_scheme
- *   let signature = Fmt.compat signature
- *   let class_type = Fmt.compat class_type
- *   let modtype = Fmt.compat modtype
- *   let string_of_label (lbl : Asttypes.arg_label) =
- *     let lbl : Types.arg_label = match lbl with
- *       | Nolabel -> Nolabel
- *       | Labelled s -> Labelled s
- *       | Optional s -> Optional s
- *     in
- *     string_of_label lbl
- * end
- * ||||||| upstream-base
- * ======= *)
 let best_type_path p =
   if !printing_env == Env.empty
   then (p, Id)
