@@ -25,10 +25,18 @@ type primitive_mapping =
     target : string Location.located
   }
 
+type morph_expr =
+  | Morph_name of string Location.located
+  | Compose of
+      { left : morph_expr;
+        right : morph_expr;
+        loc : Location.t
+      }
+
 type bridge_expr =
   | Source_field of string Location.located
   | Morph_apply of
-      { morph : string Location.located;
+      { morph : morph_expr;
         field : string Location.located
       }
   | Min of Location.t
@@ -74,6 +82,12 @@ type decl =
         source : lattice_expr;
         target : lattice_expr;
         assignments : bridge_assignment list
+      }
+  | Morph_expr of
+      { name : string Location.located;
+        source : lattice_expr;
+        target : lattice_expr;
+        expr : morph_expr
       }
   | Adjoint_chain of adjoint_chain
 

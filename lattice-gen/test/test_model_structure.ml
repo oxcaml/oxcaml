@@ -12,6 +12,16 @@ f : A -> B = [
   Hi -> Blue;
 ]
 
+E = [ Cold < Warm < Hot ]
+
+g_to_e : B -> E = [
+  Red -> Cold;
+  Blue -> Hot;
+]
+
+fg_compose : A -> E = compose(g_to_e, f)
+fg_compose_unicode : A -> E = g_to_e ∘ f
+
 P = {
   src : A;
   dst : B;
@@ -110,12 +120,20 @@ QB = {
   lifted_b : B;
 }
 
+QE = {
+  lifted_e : E;
+}
+
 use_g : P -> Q2 = {
   lifted = g(dst);
 }
 
 use_h : P -> QB = {
   lifted_b = h(src);
+}
+
+use_compose : P -> QE = {
+  lifted_e = (g_to_e ∘ f)(src);
 }
 
 mix_to_qop : Mix -> Qop = {
@@ -179,7 +197,7 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let f =
     match Model.String_map.find "f" model.morphs with
     | Model.Primitive primitive -> primitive
-    | Model.Bridge _ -> failwith "expected primitive morph"
+    | Model.Bridge _ | Model.Composed _ -> failwith "expected primitive morph"
   in
   let f_core = f.core in
   Test_support.ensure
@@ -191,7 +209,7 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let g =
     match Model.String_map.find "g" model.morphs with
     | Model.Primitive primitive -> primitive
-    | Model.Bridge _ -> failwith "expected primitive morph"
+    | Model.Bridge _ | Model.Composed _ -> failwith "expected primitive morph"
   in
   Test_support.ensure
     (Option.equal String.equal g.core.left_name (Some "f"))
@@ -202,7 +220,7 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let h =
     match Model.String_map.find "h" model.morphs with
     | Model.Primitive primitive -> primitive
-    | Model.Bridge _ -> failwith "expected primitive morph"
+    | Model.Bridge _ | Model.Composed _ -> failwith "expected primitive morph"
   in
   Test_support.ensure
     (Option.equal String.equal h.core.left_name (Some "g"))
@@ -210,10 +228,27 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   Test_support.ensure
     (Array.to_list h.core.map = Array.to_list f_core.map)
     "expected inferred h to match the second right-adjoint step from f";
+  let fg_compose =
+    match Model.String_map.find "fg_compose" model.morphs with
+    | Model.Composed composed -> composed
+    | Model.Primitive _ | Model.Bridge _ -> failwith "expected composed morph"
+  in
+  let fg_compose_unicode =
+    match Model.String_map.find "fg_compose_unicode" model.morphs with
+    | Model.Composed composed -> composed
+    | Model.Primitive _ | Model.Bridge _ -> failwith "expected composed morph"
+  in
+  Test_support.ensure
+    (Array.to_list fg_compose.core.map = [ 0; 2 ])
+    "expected composed morph to compose maps extensionally";
+  Test_support.ensure
+    (Array.to_list fg_compose_unicode.core.map
+     = Array.to_list fg_compose.core.map)
+    "expected Unicode compose syntax to match compose(...)";
   let id_p =
     match Model.String_map.find "id_p" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected product bridge"
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
   in
   Test_support.ensure
     (Option.equal String.equal id_p.core.left_name (Some "id_p"))
@@ -224,7 +259,7 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let rename =
     match Model.String_map.find "rename" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected product bridge"
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
   in
   Test_support.ensure
     (Option.equal String.equal rename.core.left_name (Some "unrename"))
@@ -235,7 +270,7 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let rename_undeclared =
     match Model.String_map.find "rename_undeclared" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected product bridge"
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
   in
   Test_support.ensure
     (Option.is_some rename_undeclared.core.left_adjoint)
@@ -256,7 +291,8 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let unrename_inferred =
     match Model.String_map.find "unrename_inferred" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected inferred bridge morph"
+    | Model.Primitive _ | Model.Composed _ ->
+      failwith "expected inferred bridge morph"
   in
   Test_support.ensure
     (Array.to_list unrename_inferred.core.map
@@ -269,7 +305,7 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let use_g =
     match Model.String_map.find "use_g" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected product bridge"
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
   in
   Test_support.ensure
     (Array.length use_g.core.map = 4)
@@ -277,15 +313,23 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let use_h =
     match Model.String_map.find "use_h" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected product bridge"
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
   in
   Test_support.ensure
     (Array.length use_h.core.map = 4)
     "expected later bridge using inferred h to resolve";
+  let use_compose =
+    match Model.String_map.find "use_compose" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
+  in
+  Test_support.ensure
+    (Array.length use_compose.core.map = 4)
+    "expected bridge using composed morph syntax to resolve";
   let mix_to_qop =
     match Model.String_map.find "mix_to_qop" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected product bridge"
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
   in
   Test_support.ensure
     (Array.length mix_to_qop.core.map = 4)
@@ -293,7 +337,7 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let filled_q =
     match Model.String_map.find "filled_q" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected product bridge"
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
   in
   Test_support.ensure
     (List.length filled_q.assignments = 2)
@@ -304,7 +348,7 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let join_pair =
     match Model.String_map.find "join_pair" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected product bridge"
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
   in
   Test_support.ensure
     (Array.to_list join_pair.core.map = [ 0; 1; 1; 1 ])
@@ -318,7 +362,7 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let meet_pair =
     match Model.String_map.find "meet_pair" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected product bridge"
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
   in
   Test_support.ensure
     (Array.to_list meet_pair.core.map = [ 0; 0; 0; 1 ])
@@ -332,7 +376,7 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   let unique_implies_uncontended2 =
     match Model.String_map.find "unique_implies_uncontended2" model.morphs with
     | Model.Bridge bridge -> bridge
-    | Model.Primitive _ -> failwith "expected product bridge"
+    | Model.Primitive _ | Model.Composed _ -> failwith "expected product bridge"
   in
   Test_support.ensure
     (Option.is_none unique_implies_uncontended2.core.left_adjoint)
@@ -367,6 +411,12 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
            {|morphism "unique_implies_uncontended2" has unnamed right adjoint; add an adjoint chain to synthesize it|})
        warning_messages)
     "expected a warning for an unnamed adjoint";
+  Test_support.ensure
+    (not
+       (List.exists
+          (fun message -> Test_support.contains message "fg_compose")
+          warning_messages))
+    "did not expect a warning for composed morphs";
   Test_support.ensure
     (not
        (List.exists

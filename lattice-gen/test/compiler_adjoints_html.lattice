@@ -73,11 +73,8 @@ local_to_regional
   -| regional_to_global
   -| global_to_regional
 
-regional_r2g : Regionality -> Regionality = [
-  Global -> Global;
-  Regional -> Global;
-  Local -> Local;
-]
+regional_r2g : Regionality -> Regionality =
+  locality_as_regionality ∘ regional_to_global
 
 linear_to_unique : Linearity -> Uniqueness^op = [
   Many -> Aliased;
@@ -114,10 +111,8 @@ comonadic_local_to_regional
   -| comonadic_regional_to_global
   -| comonadic_global_to_regional
 
-comonadic_r2g : Comonadic_with_regionality -> Comonadic_with_regionality = {
-  areality = regional_r2g(areality);
-  comonadic = comonadic;
-}
+comonadic_r2g : Comonadic_with_regionality -> Comonadic_with_regionality =
+  comonadic_locality_as_regionality ∘ comonadic_regional_to_global
 
 comonadic_to_monadic_min : Comonadic -> Monadic^op = {
   uniqueness = linear_to_unique(linearity);
@@ -147,8 +142,6 @@ alloc_to_value_l2r
   -| value_to_alloc_r2l
   -| alloc_as_value
   -| value_to_alloc_r2g
+  -| alloc_to_value_g2r
 
-value_r2g : Value -> Value = {
-  comonadic = comonadic_r2g(comonadic);
-  monadic = monadic;
-}
+value_r2g : Value -> Value = alloc_as_value ∘ value_to_alloc_r2g

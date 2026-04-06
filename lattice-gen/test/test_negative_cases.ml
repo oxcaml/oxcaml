@@ -182,4 +182,25 @@ g : B -> A = [
   Blue -> Hi;
 ]
 f -| g
+|};
+  Test_support.expect_error
+    ~name:"compose_type_mismatch"
+    ~needle:"cannot compose"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+B = [ Red < Blue ]
+C = [ Cold < Hot ]
+
+f : A -> B = [
+  Lo -> Red;
+  Hi -> Blue;
+]
+
+g : C -> A = [
+  Cold -> Lo;
+  Hot -> Hi;
+]
+
+bad : A -> A = g ∘ f
 |}

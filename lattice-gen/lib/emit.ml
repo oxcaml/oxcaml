@@ -784,6 +784,12 @@ let lift_kernel_through_field
           referenced.terms
     }
 
+let rec morph_expr_apply_ml arg = function
+  | Morph_name morph_name ->
+    Printf.sprintf "%s (%s)" (emitted_morph_name morph_name) arg
+  | Compose (left, right) ->
+    morph_expr_apply_ml (morph_expr_apply_ml arg right) left
+
 let rec add_bridge_expr_ml buf src_module target_ty = function
   | Source_field source_field ->
     bprintf
@@ -791,13 +797,16 @@ let rec add_bridge_expr_ml buf src_module target_ty = function
       "%s.proj_%s x"
       src_module
       (Name.escape_value_name source_field)
-  | Morph_apply { morph_name; source_field } ->
+  | Morph_apply { morph; source_field } ->
     bprintf
       buf
-      "%s (%s.proj_%s x)"
-      (emitted_morph_name morph_name)
-      src_module
-      (Name.escape_value_name source_field)
+      "%s"
+      (morph_expr_apply_ml
+         (Printf.sprintf
+            "%s.proj_%s x"
+            src_module
+            (Name.escape_value_name source_field))
+         morph)
   | Min -> bprintf buf "%s.min" (module_name_of_expr target_ty)
   | Max -> bprintf buf "%s.max" (module_name_of_expr target_ty)
   | Join (left, right) ->
@@ -841,7 +850,7 @@ let kernel_of_bridge_assignment
                  shift = target_field.shift - source_field.shift
                } ]
          })
-  | Morph_apply { morph_name; source_field } ->
+  | Morph_apply { morph = Morph_name morph_name; source_field } ->
     let source_product =
       match String_map.find source_expr.name model.lattices with
       | Product product -> product
@@ -856,6 +865,8 @@ let kernel_of_bridge_assignment
             ~target_field
             ~source_field
             ~referenced))
+  | Morph_apply { morph = Compose _; _ } ->
+    None
   | Min ->
     Some
       { const = (bottom_value_of_expr model target_ty land target_field.raw_mask) lsl target_field.shift;
@@ -916,6 +927,7 @@ let build_morph_kernels model =
                         })
                       { const = 0; terms = [] }
                       partials))
+          | Composed _ -> None
         in
         Hashtbl.remove visiting morph_name;
         Option.iter (fun kernel -> Hashtbl.add kernels morph_name kernel) result;
@@ -976,6 +988,15 @@ let add_bridge_ml ?(indent = "") buf model kernels (bridge : product_bridge) =
         Buffer.add_string buf ")\n")
       bridge.assignments
 
+let add_composed_ml ?(indent = "") buf (composed : composed_morph) =
+  let core = composed.core in
+  bprintf
+    buf
+    "%slet %s x = %s\n"
+    indent
+    (emitted_morph_name core.name)
+    (morph_expr_apply_ml "x" composed.expr)
+
 let add_morph_sig buf = function
   | Primitive primitive -> add_primitive_morph_sig buf primitive
   | Bridge bridge ->
@@ -986,9 +1007,22 @@ let add_morph_sig buf = function
       (emitted_morph_name core.name)
       (module_name_of_expr core.source)
       (module_name_of_expr core.target)
+  | Composed composed ->
+    let core = composed.core in
+    bprintf
+      buf
+      "  val %s : %s.t -> %s.t\n"
+      (emitted_morph_name core.name)
+      (module_name_of_expr core.source)
+      (module_name_of_expr core.target)
+
+let rec morph_names_of_morph_expr = function
+  | Morph_name morph_name -> [ morph_name ]
+  | Compose (left, right) ->
+    morph_names_of_morph_expr left @ morph_names_of_morph_expr right
 
 let rec morph_names_of_bridge_expr = function
-  | Morph_apply { morph_name; _ } -> [ morph_name ]
+  | Morph_apply { morph; _ } -> morph_names_of_morph_expr morph
   | Source_field _ | Min | Max -> []
   | Join (left, right) | Meet (left, right) ->
     morph_names_of_bridge_expr left @ morph_names_of_bridge_expr right
@@ -1000,6 +1034,7 @@ let morph_dependencies = function
       (fun (assignment : bridge_assignment) ->
         morph_names_of_bridge_expr assignment.expr)
       bridge.assignments
+  | Composed composed -> morph_names_of_morph_expr composed.expr
 
 let ordered_morphs model =
   let decl_order =
@@ -1031,7 +1066,7 @@ let ordered_morphs model =
 
 let split_morphs morphs =
   List.partition
-    (function Primitive _ -> true | Bridge _ -> false)
+    (function Primitive _ -> true | Bridge _ | Composed _ -> false)
     morphs
 
 let add_module_section_comment buf title =
@@ -1045,17 +1080,17 @@ let add_morphs_sig buf model =
   in
   if morphs <> []
   then (
-    let primitive_morphs, bridge_morphs = split_morphs morphs in
+    let primitive_morphs, derived_morphs = split_morphs morphs in
     Buffer.add_string buf "module Morphs : sig\n";
     if primitive_morphs <> []
     then (
       Buffer.add_string buf "  (* Primitive morphs *)\n";
       List.iter (add_morph_sig buf) primitive_morphs;
-      if bridge_morphs <> [] then Buffer.add_char buf '\n');
-    if bridge_morphs <> []
+      if derived_morphs <> [] then Buffer.add_char buf '\n');
+    if derived_morphs <> []
     then (
-      Buffer.add_string buf "  (* Product morphs *)\n";
-      List.iter (add_morph_sig buf) bridge_morphs);
+      Buffer.add_string buf "  (* Derived morphs *)\n";
+      List.iter (add_morph_sig buf) derived_morphs);
     Buffer.add_string buf "end\n\n")
 
 let add_morphs_ml buf model =
@@ -1063,7 +1098,7 @@ let add_morphs_ml buf model =
   let kernels = build_morph_kernels model in
   if morphs <> []
   then (
-    let primitive_morphs, bridge_morphs = split_morphs morphs in
+    let primitive_morphs, derived_morphs = split_morphs morphs in
     Buffer.add_string buf "module Morphs = struct\n";
     if primitive_morphs <> []
     then (
@@ -1073,19 +1108,22 @@ let add_morphs_ml buf model =
           add_primitive_morph_ml ~indent:"  " buf model kernels primitive;
           Buffer.add_char buf '\n')
         (List.map
-           (function Primitive primitive -> primitive | Bridge _ -> invalid_arg "impossible")
+           (function
+             | Primitive primitive -> primitive
+             | Bridge _ | Composed _ -> invalid_arg "impossible")
            primitive_morphs);
-      if bridge_morphs <> [] then Buffer.add_char buf '\n');
-    if bridge_morphs <> []
+      if derived_morphs <> [] then Buffer.add_char buf '\n');
+    if derived_morphs <> []
     then (
-      Buffer.add_string buf "  (* Product morphs *)\n";
+      Buffer.add_string buf "  (* Derived morphs *)\n";
       List.iter
-        (fun bridge ->
-          add_bridge_ml ~indent:"  " buf model kernels bridge;
+        (fun morph ->
+          (match morph with
+           | Bridge bridge -> add_bridge_ml ~indent:"  " buf model kernels bridge
+           | Composed composed -> add_composed_ml ~indent:"  " buf composed
+           | Primitive _ -> invalid_arg "impossible");
           Buffer.add_char buf '\n')
-        (List.map
-           (function Bridge bridge -> bridge | Primitive _ -> invalid_arg "impossible")
-           bridge_morphs));
+        derived_morphs);
     Buffer.add_string buf "end\n\n")
 
 let section_name_for_expr model (expr : lattice_expr) =

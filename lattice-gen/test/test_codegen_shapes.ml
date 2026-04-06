@@ -132,4 +132,68 @@ f : A -> B = [
 
 f -| g
 |}
-    [ "val g : B.t -> A.t" ]
+    [ "val g : B.t -> A.t" ];
+  Test_support.expect_generated_ml_contains
+    ~name:"compose.lattice"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+B = [ Red < Blue ]
+C = [ Cold < Warm < Hot ]
+
+f : A -> B = [
+  Lo -> Red;
+  Hi -> Blue;
+]
+
+g : B -> C = [
+  Red -> Cold;
+  Blue -> Hot;
+]
+
+h : A -> C = compose(g, f)
+h2 : A -> C = g ∘ f
+
+P = {
+  x : A;
+}
+
+Q = {
+  y : C;
+  z : C;
+}
+
+use_compose : P -> Q = {
+  y = (compose(g, f))(x);
+  z = (g ∘ f)(x);
+}
+|}
+    [ "let h x = g (f (x))";
+      "let h2 x = g (f (x))";
+      "~y:(g (f (P.proj_x x)))";
+      "~z:(g (f (P.proj_x x)))"
+    ];
+  Test_support.expect_generated_mli_contains
+    ~name:"compose.lattice"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+B = [ Red < Blue ]
+C = [ Cold < Warm < Hot ]
+
+f : A -> B = [
+  Lo -> Red;
+  Hi -> Blue;
+]
+
+g : B -> C = [
+  Red -> Cold;
+  Blue -> Hot;
+]
+
+h : A -> C = compose(g, f)
+h2 : A -> C = g ∘ f
+|}
+    [ "val h : A.t -> C.t";
+      "val h2 : A.t -> C.t"
+    ]

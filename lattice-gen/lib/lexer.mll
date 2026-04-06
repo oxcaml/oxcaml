@@ -21,6 +21,7 @@ rule token = parse
   | "->" { ARROW }
   | "-|" { ADJOINT }
   | "⊣" { ADJOINT }
+  | "∘" { COMPOSE }
   | "<" { LT }
   | ">" { GT }
   | "=" { EQ }

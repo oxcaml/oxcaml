@@ -297,11 +297,6 @@ Kind_axes = {
   scannable : Scannable_axes;
 }
 
-locality_as_regionality : Locality -> Regionality = [
-  Global -> Global;
-  Local -> Local;
-]
-
 local_to_regional : Locality -> Regionality = [
   Global -> Global;
   Local -> Regional;
@@ -313,13 +308,12 @@ regional_to_local : Regionality -> Locality = [
   Local -> Local;
 ]
 
-regional_to_global : Regionality -> Locality = [
+locality_as_regionality : Locality -> Regionality = [
   Global -> Global;
-  Regional -> Global;
   Local -> Local;
 ]
 
-regional_r2g : Regionality -> Regionality = [
+regional_to_global : Regionality -> Locality = [
   Global -> Global;
   Regional -> Global;
   Local -> Local;
@@ -329,6 +323,15 @@ global_to_regional : Locality -> Regionality = [
   Global -> Regional;
   Local -> Local;
 ]
+
+local_to_regional
+  -| regional_to_local
+  -| locality_as_regionality
+  -| regional_to_global
+  -| global_to_regional
+
+regional_r2g : Regionality -> Regionality =
+  locality_as_regionality ∘ regional_to_global
 
 linear_to_unique : Linearity -> Uniqueness^op = [
   Many -> Aliased;
@@ -366,10 +369,11 @@ visibility_to_statefulness : Visibility^op -> Statefulness = [
   Read_write -> Stateful;
 ]
 
-comonadic_locality_as_regionality : Comonadic_with_locality -> Comonadic_with_regionality = {
-  areality = locality_as_regionality(areality);
-  comonadic = comonadic;
-}
+linear_to_unique -| unique_to_linear
+
+portable_to_contended -| contended_to_portable
+
+statefulness_to_visibility -| visibility_to_statefulness
 
 comonadic_local_to_regional : Comonadic_with_locality -> Comonadic_with_regionality = {
   areality = local_to_regional(areality);
@@ -381,15 +385,29 @@ comonadic_regional_to_local : Comonadic_with_regionality -> Comonadic_with_local
   comonadic = comonadic;
 }
 
+comonadic_locality_as_regionality : Comonadic_with_locality -> Comonadic_with_regionality = {
+  areality = locality_as_regionality(areality);
+  comonadic = comonadic;
+}
+
 comonadic_regional_to_global : Comonadic_with_regionality -> Comonadic_with_locality = {
   areality = regional_to_global(areality);
   comonadic = comonadic;
 }
 
-comonadic_r2g : Comonadic_with_regionality -> Comonadic_with_regionality = {
-  areality = regional_r2g(areality);
+comonadic_global_to_regional : Comonadic_with_locality -> Comonadic_with_regionality = {
+  areality = global_to_regional(areality);
   comonadic = comonadic;
 }
+
+comonadic_local_to_regional
+  -| comonadic_regional_to_local
+  -| comonadic_locality_as_regionality
+  -| comonadic_regional_to_global
+  -| comonadic_global_to_regional
+
+comonadic_r2g : Comonadic_with_regionality -> Comonadic_with_regionality =
+  comonadic_locality_as_regionality ∘ comonadic_regional_to_global
 
 comonadic_to_monadic_min : Comonadic -> Monadic^op = {
   uniqueness = linear_to_unique(linearity);
@@ -421,10 +439,9 @@ monadic_to_comonadic_max : Monadic^op -> Comonadic = {
   yielding = max;
 }
 
-alloc_as_value : Alloc -> Value = {
-  comonadic = comonadic_locality_as_regionality(comonadic);
-  monadic = monadic;
-}
+comonadic_to_monadic_min -| monadic_to_comonadic_max
+
+monadic_to_comonadic_min -| comonadic_to_monadic_max
 
 alloc_to_value_l2r : Alloc -> Value = {
   comonadic = comonadic_local_to_regional(comonadic);
@@ -436,41 +453,28 @@ value_to_alloc_r2l : Value -> Alloc = {
   monadic = monadic;
 }
 
+alloc_as_value : Alloc -> Value = {
+  comonadic = comonadic_locality_as_regionality(comonadic);
+  monadic = monadic;
+}
+
 value_to_alloc_r2g : Value -> Alloc = {
   comonadic = comonadic_regional_to_global(comonadic);
   monadic = monadic;
 }
 
-value_r2g : Value -> Value = {
-  comonadic = comonadic_r2g(comonadic);
+alloc_to_value_g2r : Alloc -> Value = {
+  comonadic = comonadic_global_to_regional(comonadic);
   monadic = monadic;
 }
-
-local_to_regional
-  -| regional_to_local
-  -| locality_as_regionality
-  -| regional_to_global
-  -| global_to_regional
-
-linear_to_unique -| unique_to_linear
-
-portable_to_contended -| contended_to_portable
-
-statefulness_to_visibility -| visibility_to_statefulness
-
-comonadic_local_to_regional
-  -| comonadic_regional_to_local
-  -| comonadic_locality_as_regionality
-  -| comonadic_regional_to_global
-
-comonadic_to_monadic_min -| monadic_to_comonadic_max
-
-monadic_to_comonadic_min -| comonadic_to_monadic_max
 
 alloc_to_value_l2r
   -| value_to_alloc_r2l
   -| alloc_as_value
   -| value_to_alloc_r2g
+  -| alloc_to_value_g2r
+
+value_r2g : Value -> Value = alloc_as_value ∘ value_to_alloc_r2g
     </lat>
 <!-- lattice-gen-output:start 1 -->
 <div class="lattice-generated">
@@ -2042,15 +2046,13 @@ end
 
 module Morphs = struct
   (* Primitive morphs *)
-  let[@inline] locality_as_regionality x = x lor (x lsl 1)
-
   let[@inline] local_to_regional x = x
 
   let[@inline] regional_to_local x = x land 0b1
 
-  let[@inline] regional_to_global x = x lsr 1
+  let[@inline] locality_as_regionality x = x lor (x lsl 1)
 
-  let[@inline] regional_r2g x = (x lsr 1) lor (x land 0b10)
+  let[@inline] regional_to_global x = x lsr 1
 
   let[@inline] global_to_regional x = 0b1 lor (x lsl 1)
 
@@ -2067,8 +2069,8 @@ module Morphs = struct
   let[@inline] visibility_to_statefulness x = x
 
 
-  (* Product morphs *)
-  let[@inline] comonadic_locality_as_regionality x = (x lsl 1) lor (x land 0b1)
+  (* Derived morphs *)
+  let regional_r2g x = locality_as_regionality (regional_to_global (x))
 
   let[@inline] comonadic_local_to_regional x =
     ((x land 0b11111110) lsl 1) lor (x land 0b1)
@@ -2076,9 +2078,13 @@ module Morphs = struct
   let[@inline] comonadic_regional_to_local x =
     ((x land 0b111111100) lsr 1) lor (x land 0b1)
 
+  let[@inline] comonadic_locality_as_regionality x = (x lsl 1) lor (x land 0b1)
+
   let[@inline] comonadic_regional_to_global x = x lsr 1
 
-  let[@inline] comonadic_r2g x = ((x land 0b10) lsr 1) lor (x land 0b111111110)
+  let[@inline] comonadic_global_to_regional x = 0b1 lor (x lsl 1)
+
+  let comonadic_r2g x = comonadic_locality_as_regionality (comonadic_regional_to_global (x))
 
   let[@inline] comonadic_to_monadic_min x =
     ((x land 0b1100000) lsr 2) lor (x land 0b111)
@@ -2092,18 +2098,19 @@ module Morphs = struct
   let[@inline] monadic_to_comonadic_max x =
     0b11000 lor ((x land 0b11000) lsl 2) lor (x land 0b111)
 
-  let[@inline] alloc_as_value x = (x lsl 1) lor (x land 0b1)
-
   let[@inline] alloc_to_value_l2r x =
     ((x land 0b11111111111110) lsl 1) lor (x land 0b1)
 
   let[@inline] value_to_alloc_r2l x =
     ((x land 0b111111111111100) lsr 1) lor (x land 0b1)
 
+  let[@inline] alloc_as_value x = (x lsl 1) lor (x land 0b1)
+
   let[@inline] value_to_alloc_r2g x = x lsr 1
 
-  let[@inline] value_r2g x =
-    ((x land 0b10) lsr 1) lor (x land 0b111111111111110)
+  let[@inline] alloc_to_value_g2r x = 0b1 lor (x lsl 1)
+
+  let value_r2g x = alloc_as_value (value_to_alloc_r2g (x))
 
 end
 
@@ -2686,11 +2693,10 @@ end
 
 module Morphs : sig
   (* Primitive morphs *)
-  val locality_as_regionality : Locality.t -&gt; Regionality.t
   val local_to_regional : Locality.t -&gt; Regionality.t
   val regional_to_local : Regionality.t -&gt; Locality.t
+  val locality_as_regionality : Locality.t -&gt; Regionality.t
   val regional_to_global : Regionality.t -&gt; Locality.t
-  val regional_r2g : Regionality.t -&gt; Regionality.t
   val global_to_regional : Locality.t -&gt; Regionality.t
   val linear_to_unique : Linearity.t -&gt; Uniqueness_op.t
   val unique_to_linear : Uniqueness_op.t -&gt; Linearity.t
@@ -2699,20 +2705,23 @@ module Morphs : sig
   val statefulness_to_visibility : Statefulness.t -&gt; Visibility_op.t
   val visibility_to_statefulness : Visibility_op.t -&gt; Statefulness.t
 
-  (* Product morphs *)
-  val comonadic_locality_as_regionality : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
+  (* Derived morphs *)
+  val regional_r2g : Regionality.t -&gt; Regionality.t
   val comonadic_local_to_regional : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
   val comonadic_regional_to_local : Comonadic_with_regionality.t -&gt; Comonadic_with_locality.t
+  val comonadic_locality_as_regionality : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
   val comonadic_regional_to_global : Comonadic_with_regionality.t -&gt; Comonadic_with_locality.t
+  val comonadic_global_to_regional : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
   val comonadic_r2g : Comonadic_with_regionality.t -&gt; Comonadic_with_regionality.t
   val comonadic_to_monadic_min : Comonadic.t -&gt; Monadic_op.t
   val comonadic_to_monadic_max : Comonadic.t -&gt; Monadic_op.t
   val monadic_to_comonadic_min : Monadic_op.t -&gt; Comonadic.t
   val monadic_to_comonadic_max : Monadic_op.t -&gt; Comonadic.t
-  val alloc_as_value : Alloc.t -&gt; Value.t
   val alloc_to_value_l2r : Alloc.t -&gt; Value.t
   val value_to_alloc_r2l : Value.t -&gt; Alloc.t
+  val alloc_as_value : Alloc.t -&gt; Value.t
   val value_to_alloc_r2g : Value.t -&gt; Alloc.t
+  val alloc_to_value_g2r : Alloc.t -&gt; Value.t
   val value_r2g : Value.t -&gt; Value.t
 end
 

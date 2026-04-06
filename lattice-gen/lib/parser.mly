@@ -9,17 +9,22 @@ let merge_names
   | [] -> first.Location.loc
   | last :: _ -> Location.merge first.Location.loc last.Location.loc
 
-let bridge_expr_loc = function
+let rec bridge_expr_loc = function
   | Source_field field -> field.Location.loc
-  | Morph_apply { morph; field } -> Location.merge morph.Location.loc field.Location.loc
+  | Morph_apply { morph; field } ->
+    Location.merge (morph_expr_loc morph) field.Location.loc
   | Min loc | Max loc -> loc
   | Join { loc; _ } | Meet { loc; _ } -> loc
+
+and morph_expr_loc = function
+  | Morph_name name -> name.Location.loc
+  | Compose { loc; _ } -> loc
 %}
 
 %token <string Location.located> IDENT
 %token LBRACKET RBRACKET LBRACE RBRACE
 %token LPAREN RPAREN COMMA
-%token EQ LT GT ARROW CARET COLON SEMI ADJOINT
+%token EQ LT GT ARROW CARET COLON SEMI ADJOINT COMPOSE
 %token EOF
 
 %start <Ast.file> file
@@ -42,6 +47,8 @@ decl:
       { Primitive_morph { name; source; target; mappings } }
   | name = IDENT COLON source = lattice_expr ARROW target = lattice_expr EQ LBRACE assignments = bridge_assignment_list RBRACE
       { Product_bridge { name; source; target; assignments } }
+  | name = IDENT COLON source = lattice_expr ARROW target = lattice_expr EQ expr = morph_expr
+      { Morph_expr { name; source; target; expr } }
   | first = IDENT ADJOINT second = IDENT rest = adjoint_chain_tail
       {
         let names = first :: second :: rest in
@@ -136,6 +143,10 @@ bridge_expr:
             "unknown bridge expression operator %S (expected join or meet)"
             kw.Location.txt
       }
+  | morph = IDENT LPAREN field = IDENT RPAREN
+      { Morph_apply { morph = Morph_name morph; field } }
+  | LPAREN morph = morph_expr RPAREN LPAREN field = IDENT RPAREN
+      { Morph_apply { morph; field } }
   | field = IDENT
       {
         if field.Location.txt = "min"
@@ -144,8 +155,28 @@ bridge_expr:
         then Max field.Location.loc
         else Source_field field
       }
-  | morph = IDENT LPAREN field = IDENT RPAREN
-      { Morph_apply { morph; field } }
+
+morph_expr:
+  | left = morph_expr COMPOSE right = morph_atom
+      { Compose { left; right; loc = Location.merge (morph_expr_loc left) (morph_expr_loc right) } }
+  | atom = morph_atom
+      { atom }
+
+morph_atom:
+  | name = IDENT
+      { Morph_name name }
+  | kw = IDENT LPAREN left = morph_expr COMMA right = morph_expr RPAREN
+      {
+        if kw.Location.txt = "compose"
+        then Compose { left; right; loc = Location.merge kw.Location.loc (morph_expr_loc right) }
+        else
+          Error.failf
+            kw.Location.loc
+            "unknown morph expression operator %S (expected compose)"
+            kw.Location.txt
+      }
+  | LPAREN expr = morph_expr RPAREN
+      { expr }
 
 adjoint_chain_tail:
   | { [] }

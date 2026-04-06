@@ -291,6 +291,9 @@ local_to_regional
   -| regional_to_global
   -| global_to_regional
 
+regional_r2g : Regionality -> Regionality =
+  locality_as_regionality ∘ regional_to_global
+
 linear_to_unique : Linearity -> Uniqueness^op = [
   Many -> Aliased;
   Once -> Unique;
@@ -315,12 +318,6 @@ statefulness_to_visibility : Statefulness -> Visibility^op = [
 
 statefulness_to_visibility -| visibility_to_statefulness
 
-regional_r2g : Regionality -> Regionality = [
-  Global -> Global;
-  Regional -> Global;
-  Local -> Local;
-]
-
 comonadic_local_to_regional : Comonadic_with_locality -> Comonadic_with_regionality = {
   areality = local_to_regional(areality);
   comonadic = comonadic;
@@ -330,11 +327,10 @@ comonadic_local_to_regional
   -| comonadic_regional_to_local
   -| comonadic_locality_as_regionality
   -| comonadic_regional_to_global
+  -| comonadic_global_to_regional
 
-comonadic_r2g : Comonadic_with_regionality -> Comonadic_with_regionality = {
-  areality = regional_r2g(areality);
-  comonadic = comonadic;
-}
+comonadic_r2g : Comonadic_with_regionality -> Comonadic_with_regionality =
+  comonadic_locality_as_regionality ∘ comonadic_regional_to_global
 
 comonadic_to_monadic_min : Comonadic -> Monadic^op = {
   uniqueness = linear_to_unique(linearity);
@@ -364,11 +360,9 @@ alloc_to_value_l2r
   -| value_to_alloc_r2l
   -| alloc_as_value
   -| value_to_alloc_r2g
+  -| alloc_to_value_g2r
 
-value_r2g : Value -> Value = {
-  comonadic = comonadic_r2g(comonadic);
-  monadic = monadic;
-}
+value_r2g : Value -> Value = alloc_as_value ∘ value_to_alloc_r2g
     </lat>
 <!-- lattice-gen-output:start 1 -->
 <div class="lattice-generated">
@@ -1962,10 +1956,10 @@ module Morphs = struct
 
   let[@inline] visibility_to_statefulness x = x
 
-  let[@inline] regional_r2g x = (x lsr 1) lor (x land 0b10)
 
+  (* Derived morphs *)
+  let regional_r2g x = locality_as_regionality (regional_to_global (x))
 
-  (* Product morphs *)
   let[@inline] comonadic_local_to_regional x =
     ((x land 0b11111110) lsl 1) lor (x land 0b1)
 
@@ -1976,7 +1970,9 @@ module Morphs = struct
 
   let[@inline] comonadic_regional_to_global x = x lsr 1
 
-  let[@inline] comonadic_r2g x = ((x land 0b10) lsr 1) lor (x land 0b111111110)
+  let[@inline] comonadic_global_to_regional x = 0b1 lor (x lsl 1)
+
+  let comonadic_r2g x = comonadic_locality_as_regionality (comonadic_regional_to_global (x))
 
   let[@inline] comonadic_to_monadic_min x =
     ((x land 0b1100000) lsr 2) lor (x land 0b111)
@@ -2000,8 +1996,9 @@ module Morphs = struct
 
   let[@inline] value_to_alloc_r2g x = x lsr 1
 
-  let[@inline] value_r2g x =
-    ((x land 0b10) lsr 1) lor (x land 0b111111111111110)
+  let[@inline] alloc_to_value_g2r x = 0b1 lor (x lsl 1)
+
+  let value_r2g x = alloc_as_value (value_to_alloc_r2g (x))
 
 end
 
@@ -2595,13 +2592,14 @@ module Morphs : sig
   val contended_to_portable : Contention_op.t -&gt; Portability.t
   val statefulness_to_visibility : Statefulness.t -&gt; Visibility_op.t
   val visibility_to_statefulness : Visibility_op.t -&gt; Statefulness.t
-  val regional_r2g : Regionality.t -&gt; Regionality.t
 
-  (* Product morphs *)
+  (* Derived morphs *)
+  val regional_r2g : Regionality.t -&gt; Regionality.t
   val comonadic_local_to_regional : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
   val comonadic_regional_to_local : Comonadic_with_regionality.t -&gt; Comonadic_with_locality.t
   val comonadic_locality_as_regionality : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
   val comonadic_regional_to_global : Comonadic_with_regionality.t -&gt; Comonadic_with_locality.t
+  val comonadic_global_to_regional : Comonadic_with_locality.t -&gt; Comonadic_with_regionality.t
   val comonadic_r2g : Comonadic_with_regionality.t -&gt; Comonadic_with_regionality.t
   val comonadic_to_monadic_min : Comonadic.t -&gt; Monadic_op.t
   val monadic_to_comonadic_max : Monadic_op.t -&gt; Comonadic.t
@@ -2611,6 +2609,7 @@ module Morphs : sig
   val value_to_alloc_r2l : Value.t -&gt; Alloc.t
   val alloc_as_value : Alloc.t -&gt; Value.t
   val value_to_alloc_r2g : Value.t -&gt; Alloc.t
+  val alloc_to_value_g2r : Alloc.t -&gt; Value.t
   val value_r2g : Value.t -&gt; Value.t
 end
 
