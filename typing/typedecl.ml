@@ -3989,8 +3989,11 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         md_mode, modalities, Valmi_sig_value raw_modalities
   in
+  let lpoly_flag =
+    if valdecl.pval_poly then Typetexp.Lpoly else Typetexp.Lmono
+  in
   let lpoly, cty =
-    Typetexp.transl_type_scheme env valdecl.pval_poly valdecl.pval_type
+    Typetexp.transl_type_scheme env valdecl.pval_type lpoly_flag
   in
   let sort =
     match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with

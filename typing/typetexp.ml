@@ -55,6 +55,14 @@ type cannot_quantify_reason =
   | Univar
   | Scope_escape
 
+type valdecl_lpoly_flag =
+  | Lpoly
+  | Lmono
+
+let is_poly_valdecl = function
+  | Lpoly -> true
+  | Lmono -> false
+
 (* a description of the jkind on an explicitly quantified universal
    variable, containing whether the jkind was a default
    (e.g. [let f : 'a. 'a -> 'a = ...]) or explicit
@@ -1728,17 +1736,18 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
     ident_var_pairs |> List.map snd |> List.rev, ctyp
   end
 
-let transl_type_scheme env poly_valdecl styp =
+let transl_type_scheme env styp valdecl_flag =
+  let is_val_poly = is_poly_valdecl valdecl_flag in
   match styp.ptyp_desc with
   | Ptyp_newlayout (vars, st) ->
     Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
       Language_extension.Alpha;
-    if poly_valdecl then
+    if is_val_poly then
       raise (Error (styp.ptyp_loc, env, Val_poly_and_layout));
     transl_type_scheme_newlayout env styp.ptyp_attributes
       styp.ptyp_loc vars st
   | _ ->
-    if poly_valdecl then transl_type_scheme_poly_val env styp
+    if is_val_poly then transl_type_scheme_poly_val env styp
     else [], transl_type_scheme_lmono env styp
 
 (* Error report *)
