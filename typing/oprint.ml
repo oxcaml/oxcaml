@@ -596,23 +596,24 @@ and print_typargs ppf =
       pp_close_box ppf ();
       pp_print_space ppf ()
 and print_out_label ppf
-    { olab_name; olab_mut; olab_atomic; olab_type; olab_modalities } =
+    { olab_name; olab_mut; olab_type; olab_modalities } =
   (* See the notes [NON-LEGACY MODES] *)
-  let mut =
+  let mut, atomic =
     match olab_mut with
-    | Mutable -> "mutable "
-    | Immutable -> ""
+    | Om_immutable -> "", Nonatomic
+    | Om_mutable (None, atomic) -> "mutable ", atomic
+    | Om_mutable (Some s, atomic) -> "mutable(" ^ s ^ ") ", atomic
   in
   let print_atomic ppf = function
-    | Asttypes.Nonatomic -> ()
-    | Asttypes.Atomic -> fprintf ppf " [@@atomic]"
+    | Nonatomic -> ()
+    | Atomic -> fprintf ppf " [@@atomic]"
   in
   fprintf ppf "@[<2>%s%a :@ %a%a%a@];"
     mut
     print_lident olab_name
     print_out_type olab_type
     print_out_modalities olab_modalities
-    print_atomic olab_atomic
+    print_atomic atomic
 
 and print_out_jkind_const ppf ojkind =
   let rec pp_element ~nested ppf (ojkind : Outcometree.out_jkind_const) =
