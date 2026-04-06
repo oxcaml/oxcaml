@@ -42,12 +42,9 @@ val with_local_level_generalize:
     before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
 val with_local_level_generalize_if:
         bool -> before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
-val with_local_level_generalize_structure:
-    before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
-val with_local_level_generalize_structure_if:
-    before_generalize:('a -> unit) -> bool -> (unit -> 'a) -> 'a
-val with_local_level_generalize_structure_if_principal:
-    before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
+val with_local_level_generalize_structure: (unit -> 'a) -> 'a
+val with_local_level_generalize_structure_if: bool -> (unit -> 'a) -> 'a
+val with_local_level_generalize_structure_if_principal: (unit -> 'a) -> 'a
 val with_local_level_generalize_for_class:
     before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
 
