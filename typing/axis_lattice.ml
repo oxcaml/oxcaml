@@ -146,12 +146,13 @@ let set_axis (v : t) ~axis:i ~level:lev : t =
   let off = offsets.(i) in
   let cleared = v land lnot axis_mask.(i) in
   match axis_shapes.(i) with
-  | Chain2 -> cleared lor ((lev land 1) lsl off)
+  (* No range checks here; callers keep [lev] in range for the axis. *)
+  | Chain2 -> cleared lor (lev lsl off)
   | Chain3 ->
-    let lo = (lev lor (lev lsr 1)) land 1 in
-    let hi = (lev lsr 1) land 1 in
+    let lo = lev lor (lev lsr 1) in
+    let hi = lev lsr 1 in
     cleared lor (lo lsl off) lor (hi lsl (off + 1))
-  | Diamond4 -> cleared lor ((lev land 0b11) lsl off)
+  | Diamond4 -> cleared lor (lev lsl off)
 
 let decode (v : t) : int array =
   Array.init num_axes (fun i -> get_axis v ~axis:i)
@@ -179,11 +180,18 @@ let to_string = pp
     Diamond axes intentionally keep 10 unchanged. *)
 
 let chain3_hi_mask =
-  hi_mask.(0)
-  lor hi_mask.(3)
-  lor hi_mask.(4)
-  lor hi_mask.(10)
-  lor hi_mask.(12)
+  let rec loop acc i =
+    if i = num_axes
+    then acc
+    else
+      let acc =
+        match axis_shapes.(i) with
+        | Chain3 -> acc lor hi_mask.(i)
+        | Chain2 | Diamond4 -> acc
+      in
+      loop acc (i + 1)
+  in
+  loop 0 0
 
 let co_sub (a : t) (b : t) : t =
   let r = a land lnot b in
