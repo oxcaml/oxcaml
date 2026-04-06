@@ -211,6 +211,7 @@ Caml_inline void domain_set_handled(dom_internal *d)
 Caml_inline void domain_set_pending(dom_internal *d)
 { atomic_store_release(&d->pending, 1); }
 
+uintnat caml_tick_use_usleep = 0;
 static struct {
   /* This mutex protects mutation of `thread_id` and `running` */
   caml_plat_mutex mutex;
@@ -2061,10 +2062,6 @@ void caml_handle_gc_interrupt(void)
    [false] argument. In this case, all tick requests will be ignored.
  */
 
-/* Debug knob: set OCAML_TICK_USE_USLEEP=1 to fall back to usleep instead of
-   epoll, for performance comparison. */
-static bool tick_thread_use_usleep = false;
-
 #ifdef HAS_INTERRUPTIBLE_TICK
 
 /* Interruptible wait helpers for the tick thread.
@@ -2261,8 +2258,6 @@ static void caml_do_tick_all_domains(void)
 static void* caml_tick(void *arg)
 {
   (void)arg;
-  char *env = getenv("OCAML_TICK_USE_USLEEP");
-  tick_thread_use_usleep = (env != NULL && env[0] == '1');
   while (!atomic_load_acquire(&tick_thread.stop)) {
     /* We re-calculate the interval each iteration of the loop so that the
        per-domain tick interval can be changed. We use the (quite loose)
@@ -2272,7 +2267,7 @@ static void* caml_tick(void *arg)
     uintnat interval = caml_effective_tick_interval_usec();
 
 #ifdef HAS_INTERRUPTIBLE_TICK
-    if (tick_thread_use_usleep) {
+    if (caml_tick_use_usleep) {
       if (interval > 0) {
         usleep(interval);
         caml_do_tick_all_domains();
