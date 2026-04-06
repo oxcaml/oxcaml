@@ -244,6 +244,12 @@ let add_module_type_s buf = Buffer.add_string buf lattice_module_type_text
 
 let add_module_type_s_ml buf = Buffer.add_string buf lattice_module_type_text
 
+let add_common_prelude_ml buf =
+  Buffer.add_string
+    buf
+    "let[@cold] raise_unknown_lattice_element () =\n\
+\  invalid_arg \"unknown lattice element\"\n\n"
+
 let add_common_ml_items buf desc =
   Buffer.add_string buf "  type t = int\n\n";
   add_specialized_ops_ml buf desc;
@@ -341,7 +347,7 @@ let add_base_ml buf (base : base) module_name desc =
       let ctor = view_ctor_name name in
       bprintf buf "    | %d -> %s\n" base.element_values.(i) ctor)
     base.element_names;
-  Buffer.add_string buf "    | _ -> invalid_arg \"unknown lattice element\"\n\n";
+  Buffer.add_string buf "    | _ -> raise_unknown_lattice_element ()\n\n";
   Buffer.add_string buf "  let[@inline] of_view = function\n";
   Array.iteri
     (fun i name ->
@@ -363,7 +369,7 @@ let add_base_ml buf (base : base) module_name desc =
         base.element_values.(i)
         display_name)
     base.element_value_names;
-  Buffer.add_string buf "      | _ -> invalid_arg \"unknown lattice element\"\n";
+  Buffer.add_string buf "      | _ -> raise_unknown_lattice_element ()\n";
   Buffer.add_string buf "    in\n";
   Buffer.add_string buf "    Format.pp_print_string ppf s\n";
   Buffer.add_string buf "end\n\n"
@@ -1094,6 +1100,7 @@ let render ~root_module:_ model =
   let ml = Buffer.create 16384 in
   let mli = Buffer.create 8192 in
   add_module_type_s_ml ml;
+  add_common_prelude_ml ml;
   add_module_type_s mli;
   let current_section = ref None in
   List.iter

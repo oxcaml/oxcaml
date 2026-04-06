@@ -107,6 +107,10 @@ unique_implies_uncontended2 : M2^op -> M2^op = {
   uniqueness = uniqueness;
   contention = join(contention, unique_cap2(uniqueness));
 }
+
+f -| g -| f
+id_p ⊣ id_p
+rename -| unrename
 |}
   in
   let product =

@@ -19,7 +19,7 @@ let bridge_expr_loc = function
 %token <string Location.located> IDENT
 %token LBRACKET RBRACKET LBRACE RBRACE
 %token LPAREN RPAREN COMMA
-%token EQ LT GT ARROW CARET COLON SEMI
+%token EQ LT GT ARROW CARET COLON SEMI ADJOINT
 %token EOF
 
 %start <Ast.file> file
@@ -42,6 +42,11 @@ decl:
       { Primitive_morph { name; source; target; mappings } }
   | name = IDENT COLON source = lattice_expr ARROW target = lattice_expr EQ LBRACE assignments = bridge_assignment_list RBRACE
       { Product_bridge { name; source; target; assignments } }
+  | first = IDENT ADJOINT second = IDENT rest = adjoint_chain_tail
+      {
+        let names = first :: second :: rest in
+        Adjoint_chain { names; loc = merge_names first (second :: rest) }
+      }
 
 clause_list:
   | { [] }
@@ -141,3 +146,7 @@ bridge_expr:
       }
   | morph = IDENT LPAREN field = IDENT RPAREN
       { Morph_apply { morph; field } }
+
+adjoint_chain_tail:
+  | { [] }
+  | ADJOINT next = IDENT rest = adjoint_chain_tail { next :: rest }

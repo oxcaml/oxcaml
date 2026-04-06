@@ -49,6 +49,11 @@ type bridge_assignment =
     expr : bridge_expr
   }
 
+type adjoint_chain =
+  { names : string Location.located list;
+    loc : Location.t
+  }
+
 type decl =
   | Base of
       { name : string Location.located;
@@ -70,5 +75,6 @@ type decl =
         target : lattice_expr;
         assignments : bridge_assignment list
       }
+  | Adjoint_chain of adjoint_chain
 
 type file = decl list

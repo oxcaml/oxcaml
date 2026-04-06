@@ -19,6 +19,8 @@ rule token = parse
   | ")" { RPAREN }
   | "," { COMMA }
   | "->" { ARROW }
+  | "-|" { ADJOINT }
+  | "⊣" { ADJOINT }
   | "<" { LT }
   | ">" { GT }
   | "=" { EQ }

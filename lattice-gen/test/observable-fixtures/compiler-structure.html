@@ -445,6 +445,25 @@ value_r2g : Value -> Value = {
   comonadic = comonadic_r2g(comonadic);
   monadic = monadic;
 }
+
+local_to_regional -| regional_to_local -|
+locality_as_regionality -| regional_to_global -| global_to_regional
+
+linear_to_unique -| unique_to_linear
+
+portable_to_contended -| contended_to_portable
+
+statefulness_to_visibility -| visibility_to_statefulness
+
+comonadic_local_to_regional -| comonadic_regional_to_local -|
+comonadic_locality_as_regionality -| comonadic_regional_to_global
+
+comonadic_to_monadic_min -| monadic_to_comonadic_max
+
+monadic_to_comonadic_min -| comonadic_to_monadic_max
+
+alloc_to_value_l2r -| value_to_alloc_r2l -|
+alloc_as_value -| value_to_alloc_r2g
     </lat>
 <!-- lattice-gen-output:start 1 -->
 <div class="lattice-generated">
@@ -480,6 +499,9 @@ value_r2g : Value -> Value = {
   end
 end
 
+let[@cold] raise_unknown_lattice_element () =
+  invalid_arg &quot;unknown lattice element&quot;
+
 (* Base Lattices *)
 
 module Locality = struct
@@ -509,7 +531,7 @@ module Locality = struct
   let[@inline] view = function
     | 0 -&gt; Global
     | 1 -&gt; Local
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Global -&gt; global
@@ -520,7 +542,7 @@ module Locality = struct
       match x with
       | 0 -&gt; &quot;global&quot;
       | 1 -&gt; &quot;local&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -559,7 +581,7 @@ module Regionality = struct
     | 0 -&gt; Global
     | 1 -&gt; Regional
     | 3 -&gt; Local
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Global -&gt; global
@@ -572,7 +594,7 @@ module Regionality = struct
       | 0 -&gt; &quot;global&quot;
       | 1 -&gt; &quot;regional&quot;
       | 3 -&gt; &quot;local&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -604,7 +626,7 @@ module Uniqueness = struct
   let[@inline] view = function
     | 0 -&gt; Aliased
     | 1 -&gt; Unique
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Aliased -&gt; aliased
@@ -615,7 +637,7 @@ module Uniqueness = struct
       match x with
       | 0 -&gt; &quot;aliased&quot;
       | 1 -&gt; &quot;unique&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -647,7 +669,7 @@ module Linearity = struct
   let[@inline] view = function
     | 0 -&gt; Many
     | 1 -&gt; Once
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Many -&gt; many
@@ -658,7 +680,7 @@ module Linearity = struct
       match x with
       | 0 -&gt; &quot;many&quot;
       | 1 -&gt; &quot;once&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -697,7 +719,7 @@ module Portability = struct
     | 0 -&gt; Portable
     | 1 -&gt; Shareable
     | 3 -&gt; Nonportable
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Portable -&gt; portable
@@ -710,7 +732,7 @@ module Portability = struct
       | 0 -&gt; &quot;portable&quot;
       | 1 -&gt; &quot;shareable&quot;
       | 3 -&gt; &quot;nonportable&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -749,7 +771,7 @@ module Contention = struct
     | 0 -&gt; Contended
     | 1 -&gt; Shared
     | 3 -&gt; Uncontended
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Contended -&gt; contended
@@ -762,7 +784,7 @@ module Contention = struct
       | 0 -&gt; &quot;contended&quot;
       | 1 -&gt; &quot;shared&quot;
       | 3 -&gt; &quot;uncontended&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -794,7 +816,7 @@ module Forkable = struct
   let[@inline] view = function
     | 0 -&gt; Forkable
     | 1 -&gt; Unforkable
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Forkable -&gt; forkable
@@ -805,7 +827,7 @@ module Forkable = struct
       match x with
       | 0 -&gt; &quot;forkable&quot;
       | 1 -&gt; &quot;unforkable&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -837,7 +859,7 @@ module Yielding = struct
   let[@inline] view = function
     | 0 -&gt; Unyielding
     | 1 -&gt; Yielding
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Unyielding -&gt; unyielding
@@ -848,7 +870,7 @@ module Yielding = struct
       match x with
       | 0 -&gt; &quot;unyielding&quot;
       | 1 -&gt; &quot;yielding&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -880,7 +902,7 @@ module Staticity = struct
   let[@inline] view = function
     | 0 -&gt; Dynamic
     | 1 -&gt; Static
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Dynamic -&gt; dynamic
@@ -891,7 +913,7 @@ module Staticity = struct
       match x with
       | 0 -&gt; &quot;dynamic&quot;
       | 1 -&gt; &quot;static&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -929,7 +951,7 @@ module Statefulness = struct
     | 2 -&gt; Writing
     | 3 -&gt; Stateful
     | 1 -&gt; Reading
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Stateless -&gt; stateless
@@ -944,7 +966,7 @@ module Statefulness = struct
       | 2 -&gt; &quot;writing&quot;
       | 3 -&gt; &quot;stateful&quot;
       | 1 -&gt; &quot;reading&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -982,7 +1004,7 @@ module Visibility = struct
     | 1 -&gt; Read
     | 3 -&gt; Read_write
     | 2 -&gt; Write
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Immutable -&gt; immutable
@@ -997,7 +1019,7 @@ module Visibility = struct
       | 1 -&gt; &quot;read&quot;
       | 3 -&gt; &quot;read_write&quot;
       | 2 -&gt; &quot;write&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -1036,7 +1058,7 @@ module Externality = struct
     | 0 -&gt; External_
     | 1 -&gt; External64
     | 3 -&gt; Internal
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | External_ -&gt; external_
@@ -1049,7 +1071,7 @@ module Externality = struct
       | 0 -&gt; &quot;external_&quot;
       | 1 -&gt; &quot;external64&quot;
       | 3 -&gt; &quot;internal&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -1081,7 +1103,7 @@ module Nullability = struct
   let[@inline] view = function
     | 0 -&gt; Non_null
     | 1 -&gt; Maybe_null
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Non_null -&gt; non_null
@@ -1092,7 +1114,7 @@ module Nullability = struct
       match x with
       | 0 -&gt; &quot;non_null&quot;
       | 1 -&gt; &quot;maybe_null&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -1131,7 +1153,7 @@ module Separability = struct
     | 0 -&gt; Non_float
     | 1 -&gt; Separable
     | 3 -&gt; Maybe_separable
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Non_float -&gt; non_float
@@ -1144,7 +1166,7 @@ module Separability = struct
       | 0 -&gt; &quot;non_float&quot;
       | 1 -&gt; &quot;separable&quot;
       | 3 -&gt; &quot;maybe_separable&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -1176,7 +1198,7 @@ module Pointerness = struct
   let[@inline] view = function
     | 0 -&gt; Non_pointer
     | 1 -&gt; Maybe_pointer
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Non_pointer -&gt; non_pointer
@@ -1187,7 +1209,7 @@ module Pointerness = struct
       match x with
       | 0 -&gt; &quot;non_pointer&quot;
       | 1 -&gt; &quot;maybe_pointer&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -1705,7 +1727,7 @@ module Uniqueness_op = struct
   let[@inline] view = function
     | 0 -&gt; Aliased
     | 1 -&gt; Unique
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Aliased -&gt; aliased
@@ -1716,7 +1738,7 @@ module Uniqueness_op = struct
       match x with
       | 0 -&gt; &quot;aliased&quot;
       | 1 -&gt; &quot;unique&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -1755,7 +1777,7 @@ module Contention_op = struct
     | 0 -&gt; Contended
     | 1 -&gt; Shared
     | 3 -&gt; Uncontended
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Contended -&gt; contended
@@ -1768,7 +1790,7 @@ module Contention_op = struct
       | 0 -&gt; &quot;contended&quot;
       | 1 -&gt; &quot;shared&quot;
       | 3 -&gt; &quot;uncontended&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -1806,7 +1828,7 @@ module Visibility_op = struct
     | 1 -&gt; Read
     | 3 -&gt; Read_write
     | 2 -&gt; Write
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Immutable -&gt; immutable
@@ -1821,7 +1843,7 @@ module Visibility_op = struct
       | 1 -&gt; &quot;read&quot;
       | 3 -&gt; &quot;read_write&quot;
       | 2 -&gt; &quot;write&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end
@@ -1853,7 +1875,7 @@ module Staticity_op = struct
   let[@inline] view = function
     | 0 -&gt; Dynamic
     | 1 -&gt; Static
-    | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+    | _ -&gt; raise_unknown_lattice_element ()
 
   let[@inline] of_view = function
     | Dynamic -&gt; dynamic
@@ -1864,7 +1886,7 @@ module Staticity_op = struct
       match x with
       | 0 -&gt; &quot;dynamic&quot;
       | 1 -&gt; &quot;static&quot;
-      | _ -&gt; invalid_arg &quot;unknown lattice element&quot;
+      | _ -&gt; raise_unknown_lattice_element ()
     in
     Format.pp_print_string ppf s
 end

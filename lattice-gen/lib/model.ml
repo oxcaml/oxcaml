@@ -715,6 +715,7 @@ let resolve ast =
   let morph_decls = Hashtbl.create 16 in
   let lattice_order = ref [] in
   let morph_order = ref [] in
+  let adjoint_chains = ref [] in
   let module_names = ref String_set.empty in
   let morph_names = ref String_set.empty in
   let register_lattice_name name loc =
@@ -756,7 +757,9 @@ let resolve ast =
         then Error.failf (located_loc name) "duplicate morph name %S" morph_name;
         register_morph_name morph_name (located_loc name);
         Hashtbl.add morph_decls morph_name decl;
-        morph_order := !morph_order @ [ morph_name ])
+        morph_order := !morph_order @ [ morph_name ]
+      | Ast.Adjoint_chain chain ->
+        adjoint_chains := !adjoint_chains @ [ chain ])
     ast;
   let parse_expr (expr : Ast.lattice_expr) =
     { name = located_txt expr.lattice; opposite = expr.opposite }
@@ -1393,6 +1396,14 @@ let resolve ast =
                 | Some assignment -> assignment
                 | None -> assert false)
           in
+          let rec check_bridge_expr_monotone = function
+            | Source_field _ | Min | Max -> ()
+            | Morph_apply { morph_name; _ } ->
+              ignore (resolve_morph visiting morph_name)
+            | Join (left, right) | Meet (left, right) ->
+              check_bridge_expr_monotone left;
+              check_bridge_expr_monotone right
+          in
           let map =
             Array.init source_info.total (fun source_index ->
                 let source_coord = product_decode_coord source_info source_index in
@@ -1405,9 +1416,9 @@ let resolve ast =
                   target_info.fields;
                 product_encode_coord target_info target_coord)
           in
-          let source_finite = finite_of_expr source_expr in
-          let target_finite = finite_of_expr target_expr in
-          check_monotone morph_name (located_loc name) source_finite target_finite map;
+          List.iter
+            (fun assignment -> check_bridge_expr_monotone assignment.expr)
+            resolved_assignments;
           let core_without_adjoint_metadata =
             { name = morph_name;
               source = source_expr;
@@ -1519,7 +1530,7 @@ let resolve ast =
             }
           in
           Bridge { core; assignments = resolved_assignments }
-        | Ast.Base _ | Ast.Product _ -> assert false
+        | Ast.Base _ | Ast.Product _ | Ast.Adjoint_chain _ -> assert false
       in
       resolved_morphs := String_map.add morph_name resolved !resolved_morphs;
       resolved
@@ -1552,6 +1563,79 @@ let resolve ast =
         with_morph_core morph { core with left_name; right_name })
       !resolved_morphs
   in
+  List.iter
+    (fun (chain : Ast.adjoint_chain) ->
+      let rec check_pairs = function
+        | [] | [ _ ] -> ()
+        | left_name :: ((right_name :: _) as rest) ->
+          let left_morph_name = located_txt left_name in
+          let right_morph_name = located_txt right_name in
+          let left =
+            match String_map.find_opt left_morph_name resolved_morphs with
+            | Some morph -> morph
+            | None ->
+              Error.failf
+                (located_loc left_name)
+                "unknown morph %S in adjoint chain"
+                left_morph_name
+          in
+          let right =
+            match String_map.find_opt right_morph_name resolved_morphs with
+            | Some morph -> morph
+            | None ->
+              Error.failf
+                (located_loc right_name)
+                "unknown morph %S in adjoint chain"
+                right_morph_name
+          in
+          let left_core = morph_core_of left in
+          let right_core = morph_core_of right in
+          if not (lattice_expr_equal left_core.target right_core.source)
+             || not (lattice_expr_equal left_core.source right_core.target)
+          then
+            Error.failf
+              (Location.merge (located_loc left_name) (located_loc right_name))
+              "adjoint chain type mismatch between %S : %s -> %s and %S : %s -> %s"
+              left_core.name
+              (module_name_of_expr left_core.source)
+              (module_name_of_expr left_core.target)
+              right_core.name
+              (module_name_of_expr right_core.source)
+              (module_name_of_expr right_core.target);
+          (match left_core.right_adjoint with
+           | None ->
+             Error.failf
+               (located_loc left_name)
+               "morphism %S has no right adjoint (required to match %S in adjoint chain)"
+               left_core.name
+               right_core.name
+           | Some right_adjoint ->
+             if not (int_array_equal right_adjoint right_core.map)
+             then
+               Error.failf
+                 (Location.merge (located_loc left_name) (located_loc right_name))
+                 "morphism %S is not left adjoint to %S"
+                 left_core.name
+                 right_core.name);
+          (match right_core.left_adjoint with
+           | None ->
+             Error.failf
+               (located_loc right_name)
+               "morphism %S has no left adjoint (required to match %S in adjoint chain)"
+               right_core.name
+               left_core.name
+           | Some left_adjoint ->
+             if not (int_array_equal left_adjoint left_core.map)
+             then
+               Error.failf
+                 (Location.merge (located_loc left_name) (located_loc right_name))
+                 "morphism %S is not right adjoint to %S"
+                 right_core.name
+                 left_core.name);
+          check_pairs rest
+      in
+      check_pairs chain.names)
+    !adjoint_chains;
   let items =
     List.map (fun name -> Lattice (String_map.find name resolved_lattices)) !lattice_order
     @ List.map (fun name -> Morph (String_map.find name resolved_morphs)) !morph_order

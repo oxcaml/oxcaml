@@ -210,3 +210,22 @@ value_r2g : Value -> Value = {
   comonadic = comonadic_r2g(comonadic);
   monadic = monadic;
 }
+
+local_to_regional -| regional_to_local -|
+locality_as_regionality -| regional_to_global -| global_to_regional
+
+linear_to_unique -| unique_to_linear
+
+portable_to_contended -| contended_to_portable
+
+statefulness_to_visibility -| visibility_to_statefulness
+
+comonadic_local_to_regional -| comonadic_regional_to_local -|
+comonadic_locality_as_regionality -| comonadic_regional_to_global
+
+comonadic_to_monadic_min -| monadic_to_comonadic_max
+
+monadic_to_comonadic_min -| comonadic_to_monadic_max
+
+alloc_to_value_l2r -| value_to_alloc_r2l -|
+alloc_as_value -| value_to_alloc_r2g
