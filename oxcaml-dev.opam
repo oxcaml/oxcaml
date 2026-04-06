@@ -22,7 +22,7 @@ depends: [
   # This should match dune-project; the effective version will usually be higher
   "dune" {>= "3.13.0"}
   "menhir" {= "20231231"}
-  "ocamlformat" {>= "0.28.0" & < "0.29.0"}
+  "ocamlformat" {= "0.29.1"}
 
   "merlin"
   "ocaml-lsp-server"

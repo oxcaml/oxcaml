@@ -56,8 +56,8 @@ In the event that one needs to rebase a patch over formatting changes, here is a
 Assuming a specific formatting commit:
 ```shell
 # main formatting commit for flambda2/ in the repository
-format_commit=first-ocamlformat.0.28.1
-previous_commit=last-ocamlformat.0.24.1 # or $format_commit~1
+format_commit=first-ocamlformat.0.29.0
+previous_commit=last-ocamlformat.0.28.1 # or $format_commit~1
 ```
 
 Rebase as usual until its parent:
