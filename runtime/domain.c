@@ -2100,11 +2100,13 @@ static int tick_thread_open_fds(void)
   struct epoll_event ev;
   ev.events = EPOLLIN;
   ev.data.fd = timer_fd;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, timer_fd, &ev) == -1)
+  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, timer_fd, &ev) == -1) {
     goto fail;
+  }
   ev.data.fd = event_fd;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event_fd, &ev) == -1)
+  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event_fd, &ev) == -1) {
     goto fail;
+  }
 
   tick_thread.epoll_fd = epoll_fd;
   tick_thread.timer_fd = timer_fd;
@@ -2151,7 +2153,9 @@ static bool tick_thread_wait(void)
 
   struct epoll_event events[2];
   int n = epoll_wait(tick_thread.epoll_fd, events, 2, -1);
-  if (n <= 0) return true;
+  if (n <= 0) {
+    caml_plat_fatal_error("tick_thread_wait", errno);
+  }
 
   bool timer_fired = false;
   for (int i = 0; i < n; i++) {
