@@ -46,11 +46,11 @@ let tail_operator = function
   | _ -> false
 
 let expr_tail_positions = function
-  | Texp_apply (callee, args, _, _, _) when tail_operator callee -> begin
-    match List.last args with
+  | Texp_apply (callee, args, _, _, _) when tail_operator callee ->
+    begin match List.last args with
     | None | Some (_, Omitted _) -> []
     | Some (_, Arg (expr, _)) -> [ Expression expr ]
-  end
+    end
   | Texp_instvar _
   | Texp_setinstvar _
   | Texp_override _

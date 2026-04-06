@@ -77,12 +77,12 @@ let signature_of_env ?(ignore_extensions = true) env =
     (* Trec_not == bluff, FIXME *)
     | Env_type (_, i, t) -> Some (Sig_type (i, t, Trec_not, Exported))
     (* Texp_first == bluff, FIXME *)
-    | Env_extension (_, i, e) -> begin
-      match e.ext_type_path with
+    | Env_extension (_, i, e) ->
+      begin match e.ext_type_path with
       | Path.Pident id when Ident.name id = "exn" ->
         Some (Sig_typext (i, e, Text_exception, Exported))
       | _ -> Some (Sig_typext (i, e, Text_first, Exported))
-    end
+      end
     | Env_module (_, i, pr, m, _, _) ->
       Some (Sig_module (i, pr, m, Trec_not, Exported))
     | Env_modtype (_, i, m) -> Some (Sig_modtype (i, m, Exported))

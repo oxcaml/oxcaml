@@ -535,8 +535,8 @@ let json_of_response (type a) (query : a t) (response : a) : json =
     `List
       (List.map locations ~f:(fun (name, loc) ->
            with_location loc [ ("content", `String name) ]))
-  | Document _, resp -> begin
-    match resp with
+  | Document _, resp ->
+    begin match resp with
     | `No_documentation -> `String "No documentation available"
     | `Invalid_context -> `String "Not a valid identifier"
     | `Builtin s ->
@@ -547,7 +547,7 @@ let json_of_response (type a) (query : a t) (response : a) : json =
     | `Not_in_env str -> `String (Printf.sprintf "Not in environment '%s'" str)
     | `File_not_found msg -> `String msg
     | `Found doc -> `String doc
-  end
+    end
   | Syntax_document _, resp -> (
     match resp with
     | `Found { name; description; documentation; level } ->
@@ -581,11 +581,11 @@ let json_of_response (type a) (query : a t) (response : a) : json =
   | Locate_type _, resp -> json_of_locate resp
   | Locate_types _, resp -> json_of_locate_types resp
   | Locate _, resp -> json_of_locate resp
-  | Jump _, resp -> begin
-    match resp with
+  | Jump _, resp ->
+    begin match resp with
     | `Error str -> `String str
     | `Found pos -> `Assoc [ ("pos", Lexing.json_of_position pos) ]
-  end
+    end
   | Phrase _, pos -> `Assoc [ ("pos", Lexing.json_of_position pos) ]
   | Case_analysis _, ({ Location.loc_start; loc_end; _ }, str) ->
     let assoc =

@@ -135,8 +135,8 @@ let run ?(limit = 100) ~env ~query ~modules () =
   let init = compute_values query env None [] in
   modules
   |> List.fold_left ~init ~f:(fun acc name ->
-         let lident = Longident.Lident name in
-         values_from_module query env lident acc)
+      let lident = Longident.Lident name in
+      values_from_module query env lident acc)
   |> List.sort ~cmp:compare_result
   |> List.take_n limit
 

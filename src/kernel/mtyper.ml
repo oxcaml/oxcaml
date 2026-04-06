@@ -218,7 +218,7 @@ let type_interface config caught (parsetree : Parsetree.signature) =
     match cached_value with
     | Some
         (Interface_items
-          { items; psig_modalities; sig_modalities = _; sig_sloc = _ })
+           { items; psig_modalities; sig_modalities = _; sig_sloc = _ })
     (* only use the cached items if they were typed using the same modalities on the sig *)
       when List.equal
              ~eq:(fun

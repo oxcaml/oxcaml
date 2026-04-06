@@ -11,24 +11,24 @@ let set_fname ~file (loc : Location.t) =
 
 let decl_of_path_or_lid env namespace path lid =
   match (namespace : Shape.Sig_component_kind.t) with
-  | Constructor -> begin
-    match Env.find_constructor_by_name lid env with
+  | Constructor ->
+    begin match Env.find_constructor_by_name lid env with
     | exception Not_found -> None
     | { cstr_uid; cstr_loc; _ } ->
       Some { Env_lookup.uid = cstr_uid; loc = cstr_loc; namespace }
-  end
-  | Label -> begin
-    match Env.find_label_by_name Legacy lid env with
+    end
+  | Label ->
+    begin match Env.find_label_by_name Legacy lid env with
     | exception Not_found -> None
     | { lbl_uid; lbl_loc; _ } ->
       Some { Env_lookup.uid = lbl_uid; loc = lbl_loc; namespace }
-  end
-  | Unboxed_label -> begin
-    match Env.find_label_by_name Unboxed_product lid env with
+    end
+  | Unboxed_label ->
+    begin match Env.find_label_by_name Unboxed_product lid env with
     | exception Not_found -> None
     | { lbl_uid; lbl_loc; _ } ->
       Some { Env_lookup.uid = lbl_uid; loc = lbl_loc; namespace }
-  end
+    end
   | _ -> Env_lookup.by_path path namespace env
 
 let should_ignore_lid (lid : Longident.t Location.loc) =
@@ -51,14 +51,13 @@ let iterator ~current_buffer_path ~index ~reduce_for_uid =
       (Fun.flip (Format_doc.compat Path.print) path);
     let lid = { lid with loc = set_fname ~file:current_buffer_path lid.loc } in
     let index_decl () =
-      begin
-        match decl_of_path_or_lid env namespace path lid.txt with
-        | (exception _) | None ->
-          log ~title:"index_buffer" "Declaration not found"
-        | Some decl ->
-          log ~title:"index_buffer" "Found declaration: %a" Logger.fmt
-            (Fun.flip Location.print_loc decl.loc);
-          add decl.uid lid
+      begin match decl_of_path_or_lid env namespace path lid.txt with
+      | (exception _) | None ->
+        log ~title:"index_buffer" "Declaration not found"
+      | Some decl ->
+        log ~title:"index_buffer" "Found declaration: %a" Logger.fmt
+          (Fun.flip Location.print_loc decl.loc);
+        add decl.uid lid
       end
     in
     if not (should_ignore_lid lid) then
@@ -68,24 +67,23 @@ let iterator ~current_buffer_path ~index ~reduce_for_uid =
         log ~title:"index_buffer" "Shape of path: %a" Logger.fmt
           (Fun.flip Shape.print path_shape);
         let result = reduce_for_uid env path_shape in
-        begin
-          match Locate.uid_of_result ~traverse_aliases:false result with
-          | Some uid, false ->
-            log ~title:"index_buffer" "Found %a (%a) wiht uid %a" Logger.fmt
-              (Fun.flip Pprintast.longident lid.txt)
-              Logger.fmt
-              (Fun.flip Location.print_loc lid.loc)
-              Logger.fmt
-              (Fun.flip Shape.Uid.print uid);
-            add uid lid
-          | Some uid, true ->
-            log ~title:"index_buffer" "Shape is approximative, found uid: %a"
-              Logger.fmt
-              (Fun.flip Shape.Uid.print uid);
-            index_decl ()
-          | None, _ ->
-            log ~title:"index_buffer" "Reduction failed: missing uid";
-            index_decl ()
+        begin match Locate.uid_of_result ~traverse_aliases:false result with
+        | Some uid, false ->
+          log ~title:"index_buffer" "Found %a (%a) wiht uid %a" Logger.fmt
+            (Fun.flip Pprintast.longident lid.txt)
+            Logger.fmt
+            (Fun.flip Location.print_loc lid.loc)
+            Logger.fmt
+            (Fun.flip Shape.Uid.print uid);
+          add uid lid
+        | Some uid, true ->
+          log ~title:"index_buffer" "Shape is approximative, found uid: %a"
+            Logger.fmt
+            (Fun.flip Shape.Uid.print uid);
+          index_decl ()
+        | None, _ ->
+          log ~title:"index_buffer" "Reduction failed: missing uid";
+          index_decl ()
         end
   in
   Ast_iterators.iterator_on_usages ~include_hidden:true ~f

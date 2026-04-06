@@ -6,13 +6,13 @@ let create_position pos_cnum =
 let create_tree intervals =
   intervals
   |> List.map (fun ((low, high), payload) ->
-         let loc =
-           { Location.loc_start = create_position low;
-             loc_end = create_position high;
-             loc_ghost = false
-           }
-         in
-         Result.get_ok (Overrides_interval_tree.Interval.create ~loc ~payload))
+      let loc =
+        { Location.loc_start = create_position low;
+          loc_end = create_position high;
+          loc_ghost = false
+        }
+      in
+      Result.get_ok (Overrides_interval_tree.Interval.create ~loc ~payload))
   |> Overrides_interval_tree.of_alist
 
 let test_of_alist_exn =

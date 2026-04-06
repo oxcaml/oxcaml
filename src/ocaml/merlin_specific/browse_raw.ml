@@ -785,11 +785,11 @@ let of_node node =
     | Core_type { ctyp_desc } -> of_core_type_desc ctyp_desc
     | Package_type { pack_fields } ->
       list_fold (fun (_, ct) -> of_core_type ct) pack_fields
-    | Row_field rf -> begin
-      match rf.rf_desc with
+    | Row_field rf ->
+      begin match rf.rf_desc with
       | Ttag (_, _, cts) -> list_fold of_core_type cts
       | Tinherit ct -> of_core_type ct
-    end
+      end
     | Value_description { val_desc; val_modal_info } ->
       of_core_type val_desc ** of_value_description_modal_info val_modal_info
     | Type_declaration

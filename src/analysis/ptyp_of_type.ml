@@ -182,7 +182,7 @@ and modes mode =
 and const_modalities ~mut modality =
   Printtyp.tree_of_modalities mut modality
   |> List.map ~f:(fun modality ->
-         Location.mknoloc (Parsetree.Modality modality))
+      Location.mknoloc (Parsetree.Modality modality))
 
 and value_description id
     { val_type; val_kind = _; val_loc; val_attributes; val_modalities; _ } =

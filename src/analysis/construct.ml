@@ -122,12 +122,12 @@ module Util = struct
               See c-simple, test 6.2b for an example *)
           Btype.backtrack snap;
           Some params
-        | None -> begin
-          match type_expr.desc with
+        | None ->
+          begin match type_expr.desc with
           | Tarrow ((arg_label, _, _), _, te, _) ->
             check_type te (arg_label :: params)
           | _ -> None
-        end
+          end
       in
       (* TODO we should probably sort the results better *)
       match (is_in_stdlib path, check_type value_description.val_type []) with
@@ -362,17 +362,17 @@ module Gen = struct
           (make_param (Labelled s) (Pat.var (Location.mknoloc s)), s)
         | Optional s ->
           (make_param (Optional s) (Pat.var (Location.mknoloc s)), s)
-        | Nolabel -> begin
-          match get_desc ty with
-          | Tpoly (poly, []) -> begin
-            match get_desc poly with
+        | Nolabel ->
+          begin match get_desc ty with
+          | Tpoly (poly, []) ->
+            begin match get_desc poly with
             | Tconstr (path, _, _) ->
               let name = uniq_name env (Path.last path) in
               (make_param Nolabel (Pat.var (Location.mknoloc name)), name)
             | _ -> (make_param Nolabel (Pat.any ()), "_")
-          end
+            end
           | _ -> (make_param Nolabel (Pat.any ()), "_")
-        end
+          end
     in
 
     let constructor env type_expr path constrs =
@@ -446,9 +446,9 @@ module Gen = struct
       | row_descrs ->
         List.map row_descrs ~f:(fun (lbl, row_field) ->
             (match row_field_repr row_field with
-            | Reither (false, [ ty ], _) | Rpresent (Some ty) ->
-              List.map ~f:(fun s -> Some s) (exp_or_hole env ty)
-            | _ -> [ None ])
+              | Reither (false, [ ty ], _) | Rpresent (Some ty) ->
+                List.map ~f:(fun s -> Some s) (exp_or_hole env ty)
+              | _ -> [ None ])
             |> List.map ~f:(fun e -> Ast_helper.Exp.variant lbl e))
         |> List.flatten |> List.rev
     in
@@ -475,10 +475,10 @@ module Gen = struct
       let lbl_lids, lbl_exprs = List.split labels in
       Util.combinations lbl_exprs
       |> List.map ~f:(fun lbl_exprs ->
-             let labels =
-               List.map2 lbl_lids lbl_exprs ~f:(fun lid exp -> (lid, exp))
-             in
-             Ast_helper.Exp.record labels None)
+          let labels =
+            List.map2 lbl_lids lbl_exprs ~f:(fun lid exp -> (lid, exp))
+          in
+          Ast_helper.Exp.record labels None)
     in
 
     (* Given a typed hole, there is two possible forms of constructions:
@@ -499,8 +499,8 @@ module Gen = struct
           (* Special case for lazy *)
           let exps = exp_or_hole env texp in
           List.map exps ~f:Ast_helper.Exp.lazy_
-        | Tconstr (path, _params, _) -> begin
-          try
+        | Tconstr (path, _params, _) ->
+          begin try
             (* If this is a "basic" type we propose a default value *)
             [ Hashtbl.find Util.predef_types path ]
           with Not_found -> (
@@ -511,7 +511,7 @@ module Gen = struct
             | Type_record_unboxed_product (labels, _, _) ->
               record env rtyp path labels Unboxed_product
             | Type_abstract _ | Type_open -> [])
-        end
+          end
         | Tarrow _ ->
           let rec left_types acc env ty =
             match get_desc ty with
@@ -584,7 +584,7 @@ module Gen = struct
           with Typemod.Error _ ->
             let name = Ident.name (Path.head path) in
             raise (Modtype_not_found (Modtype, name))
-        end
+          end
         | Tobject (fields, _) ->
           let rec aux acc fields =
             match get_desc fields with
@@ -595,9 +595,9 @@ module Gen = struct
               let exprs =
                 exp_or_hole env type_expr
                 |> List.map ~f:(fun expr ->
-                       let open Ast_helper in
-                       Cf.method_ (Location.mknoloc name) Asttypes.Public
-                       @@ Ast_helper.Cf.concrete Asttypes.Fresh expr)
+                    let open Ast_helper in
+                    Cf.method_ (Location.mknoloc name) Asttypes.Public
+                    @@ Ast_helper.Cf.concrete Asttypes.Fresh expr)
               in
               aux (exprs :: acc) fields
             | _ ->

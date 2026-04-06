@@ -912,13 +912,15 @@ let ocaml_flags =
         \        <num>             a single warning number\n\
         \        <num1>..<num2>    a range of consecutive warning numbers\n\
         \        <letter>          a predefined set\n\
-        \     default setting is %S" Warnings.defaults_w );
+        \     default setting is %S"
+        Warnings.defaults_w );
     ( "-warn-error",
       ocaml_warnings_spec ~error:true,
       Printf.sprintf
         "<list> Enable or disable error status for warnings according\n\
         \     to <list>.  See option -w for the syntax of <list>.\n\
-        \     Default setting is %S" Warnings.defaults_warn_error );
+        \     Default setting is %S"
+        Warnings.defaults_warn_error );
     ( "-alert",
       ocaml_alert_spec,
       Printf.sprintf
@@ -1177,11 +1179,10 @@ let unitname t =
   | None ->
     let basename = Misc.unitname t.query.filename in
     (* CR: get rid of wrapping_prefix. it is only here for legacy reasons at the moment *)
-    begin
-      match t.merlin.wrapping_prefix with
-      | Some prefix -> Misc.unitname (prefix ^ basename)
-      | None ->
-        String.Map.find_opt basename t.merlin.unit_name_for
-        |> Option.map ~f:Misc.unitname
-        |> Option.value ~default:basename
+    begin match t.merlin.wrapping_prefix with
+    | Some prefix -> Misc.unitname (prefix ^ basename)
+    | None ->
+      String.Map.find_opt basename t.merlin.unit_name_for
+      |> Option.map ~f:Misc.unitname
+      |> Option.value ~default:basename
     end

@@ -265,7 +265,7 @@ let lookup_related_uids_in_indexes ~(config : Mconfig.t) uid =
   in
   Uid_map.find_opt uid related_uids
   |> Option.value_map ~default:[] ~f:(fun x ->
-         x |> Union_find.get |> Uid_set.to_list)
+      x |> Union_find.get |> Uid_set.to_list)
 
 let find_linked_uids ~config ~scope ~name uid =
   let title = "find_linked_uids" in
@@ -398,13 +398,13 @@ let locs_of ~config ~env ~typer_result ~pos ~scope path =
                   | Some path ->
                     let file = Filename.concat path loc.loc_start.pos_fname in
                     Some (set_fname ~file loc)
-                  | None -> begin
-                    match Locate.find_source ~config loc fname with
+                  | None ->
+                    begin match Locate.find_source ~config loc fname with
                     | `Found (file, _) -> Some (set_fname ~file loc)
                     | `File_not_found msg ->
                       log ~title:"occurrences" "%s" msg;
                       None
-                  end
+                    end
               in
               Option.map loc ~f:(fun loc : Query_protocol.occurrence ->
                   { loc; is_stale = Staleness.is_stale staleness })))

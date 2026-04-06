@@ -664,18 +664,18 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
       List.find_opt modifiers ~f:(fun (modifier : _ Location.loc) ->
           Loc_comparison_result.is_inside (compare_cursor_to_loc modifier.loc))
       |> Option.bind ~f:(fun (modifier : _ Location.loc) ->
-             match modifier.txt with
-             | "non_pointer" ->
-               (Some
-                  { name = "Kind Modifier";
-                    description =
-                      "Modifies a value kind abbreviation to indicate that its \
-                       representation is never a pointer.";
-                    documentation = syntax_doc_url Oxcaml "kinds/syntax/";
-                    level = Advanced
-                  }
-                 : syntax_info)
-             | _ -> None))
+          match modifier.txt with
+          | "non_pointer" ->
+            (Some
+               { name = "Kind Modifier";
+                 description =
+                   "Modifies a value kind abbreviation to indicate that its \
+                    representation is never a pointer.";
+                 documentation = syntax_doc_url Oxcaml "kinds/syntax/";
+                 level = Advanced
+               }
+              : syntax_info)
+          | _ -> None))
   | Jkind_annotation { pjka_desc = Pjk_mod _; _ } :: _ ->
     Some
       { name = "`mod` keyword (in a kind)";
@@ -745,7 +745,8 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
              match extra with
              | Typedtree.Texp_stack -> true
              | _ -> false)
-         && (* In this case, [exp_loc] differs from the location returned by
+         &&
+         (* In this case, [exp_loc] differs from the location returned by
                [Browse_raw.node_merlin_loc] (which is whats used to determine [nodes]).
                The [Browse_raw.node_merlin_loc] one includes the stack_, whereas [exp_loc]
                doesn't. Since we already know that the cursor is in the
@@ -832,7 +833,7 @@ let get_syntax_doc cursor_loc node : syntax_info =
     :: ( _,
          Module_type_constraint
            (Tmodtype_explicit
-             ({ mty_desc = Tmty_with (_, [ (_, _, Twith_modtype _) ]); _ }, _))
+              ({ mty_desc = Tmty_with (_, [ (_, _, Twith_modtype _) ]); _ }, _))
        )
     :: _ ->
     Some

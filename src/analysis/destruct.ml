@@ -99,8 +99,8 @@ let rec gen_patterns ?(recurse = true) env type_expr =
       List.combine (List.map ~f:fst lst) (Patterns.omega_list lst)
     in
     [ Tast_helper.Pat.tuple env type_expr patterns ]
-  | Tconstr (path, _params, _) -> begin
-    match Env.find_type_descrs path env with
+  | Tconstr (path, _params, _) ->
+    begin match Env.find_type_descrs path env with
     | Type_record (labels, _, _) ->
       let lst =
         List.map labels ~f:(fun lbl_descr ->
@@ -163,7 +163,7 @@ let rec gen_patterns ?(recurse = true) env type_expr =
       else
         raise
           (Not_allowed (sprintf "non-destructible type: %s" (Path.last path)))
-  end
+    end
   | Tvariant row_desc ->
     List.filter_map (row_fields row_desc) ~f:(fun (lbl, row_field) ->
         match (lbl, row_field_repr row_field) with
@@ -200,18 +200,18 @@ let rec needs_parentheses = function
   | t :: ts -> (
     match t with
     | Structure _ | Structure_item _ | Value_binding _ -> false
-    | Expression e -> begin
-      match e.Typedtree.exp_desc with
+    | Expression e ->
+      begin match e.Typedtree.exp_desc with
       | Texp_for _ | Texp_while _ -> false
       | Texp_let _
       (* We are after the "in" keyword, we need to look at the parent of the
          binding. *)
       | Texp_function { body = Tfunction_body _; _ }
       (* The assumption here is that we're not in a [function ... | ...]
-          situation but either in [fun param] or [let name param]. *) ->
-        needs_parentheses ts
+          situation but either in [fun param] or [let name param]. *)
+        -> needs_parentheses ts
       | _ -> true
-    end
+      end
     | _ -> needs_parentheses ts)
 
 let rec get_match = function
@@ -276,15 +276,15 @@ let collect_every_pattern_for_expression parent =
                 in
                 if Typedtree.exists_general_pattern ill_typed_pred p then
                   raise Ill_typed
-                else begin
-                  match Typedtree.classify_pattern p with
+                else
+                  begin match Typedtree.classify_pattern p with
                   | Value -> (p : Typedtree.pattern) :: acc
-                  | Computation -> begin
-                    match Typedtree.split_pattern p with
+                  | Computation ->
+                    begin match Typedtree.split_pattern p with
                     | Some p, _ -> (p : Typedtree.pattern) :: acc
                     | None, _ -> acc
+                    end
                   end
-                end
               | _ -> acc)
             env node acc
         | _ -> acc)
@@ -316,10 +316,9 @@ let rec get_every_pattern loc = function
         { exp_desc = Typedtree.Texp_ident { path = Path.Pident id; _ }; _ }
       when Ident.name id = "*type-error*" -> raise Ill_typed
     | Expression { exp_desc = Typedtree.Texp_function { params; _ }; _ } ->
-    begin
       (* So we need to deal with the case where we're either in the body of a
          function, or in a function parameter. *)
-      match
+      begin match
         List.find_some
           ~f:(fun param ->
             Location_aux.included ~into:param.Typedtree.fp_loc loc)
@@ -331,7 +330,7 @@ let rec get_every_pattern loc = function
       | None ->
         (* In function body *)
         collect_every_pattern_for_expression parent
-    end
+      end
     | Expression _ ->
       (* We are on the right node *)
       collect_every_pattern_for_expression parent
@@ -514,17 +513,16 @@ let rec qualify_constructors ~unmangling_tables f pat =
             | Some cstr_des -> cstr_des.Types.cstr_name
             | None -> name
           in
-          begin
-            match Types.get_desc pat.pat_type with
-            | Types.Tconstr (path, _, _) ->
-              let path = f pat.pat_env path in
-              let env_check = Env.find_constructor_by_name in
-              let txt =
-                Misc_utils.Path.to_shortest_lid ~env:pat.pat_env ~name
-                  ~env_check path
-              in
-              { lid with Asttypes.txt }
-            | _ -> lid
+          begin match Types.get_desc pat.pat_type with
+          | Types.Tconstr (path, _, _) ->
+            let path = f pat.pat_env path in
+            let env_check = Env.find_constructor_by_name in
+            let txt =
+              Misc_utils.Path.to_shortest_lid ~env:pat.pat_env ~name ~env_check
+                path
+            in
+            { lid with Asttypes.txt }
+          | _ -> lid
           end
         | _ -> lid (* already qualified *)
       in
@@ -797,17 +795,16 @@ let refine_complete_match (type a) parents (patt : a Typedtree.general_pattern)
     if not (destructible patt) then raise Nothing_to_do
     else
       let ty = patt.Typedtree.pat_type in
-      begin
-        match gen_patterns patt.Typedtree.pat_env ty with
-        | [] -> assert false
-        | [ more_precise_pattern ] ->
-          (* If only one pattern is generated, then we're only refining the
+      begin match gen_patterns patt.Typedtree.pat_env ty with
+      | [] -> assert false
+      | [ more_precise_pattern ] ->
+        (* If only one pattern is generated, then we're only refining the
              current pattern, not generating new branches. *)
-          refine_current_pattern parents patt config source more_precise_pattern
-        | sub_patterns ->
-          (* If more than one pattern is generated, then we're generating new
+        refine_current_pattern parents patt config source more_precise_pattern
+      | sub_patterns ->
+        (* If more than one pattern is generated, then we're generating new
              branches. *)
-          refine_and_generate_branches patt config source patterns sub_patterns
+        refine_and_generate_branches patt config source patterns sub_patterns
       end
 
 let destruct_pattern (type a) (patt : a Typedtree.general_pattern) config source

@@ -29,7 +29,7 @@ jobs:
           - os: ubuntu-latest
             flambda-backend-config: --enable-middle-end=flambda2 --disable-naked-pointers
             name: flambda2
-            ocaml-compiler: 5.2.x
+            ocaml-compiler: 5.4.0
 
     env:
       MERLIN_TESTS: all
@@ -93,7 +93,7 @@ jobs:
       run: |
         opam depext conf-jq --yes # opam depext bug
         opam pin menhirLib 20231231 --no-action
-        opam install --yes ppx_string ppx_compare ocamlformat.0.26.2
+        opam install --yes ppx_string ppx_compare ocamlformat.0.29.0
         opam install . --deps-only --with-test --yes
 
     - name: Check formatting

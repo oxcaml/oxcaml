@@ -60,12 +60,12 @@ let raw_info_printer : raw_info -> _ = function
       (Out_sig_item
          (Printtyp.tree_of_type_declaration id tdecl Types.Trec_first))
   | `Type_scheme te -> `Print (Out_type (Printtyp.tree_of_type_scheme te))
-  | `Variant (label, arg) -> begin
-    match arg with
+  | `Variant (label, arg) ->
+    begin match arg with
     | None -> `String label
     | Some te ->
       `Concat (label ^ " of ", Out_type (Printtyp.tree_of_type_scheme te))
-  end
+    end
 
 (* List methods of an object.
    Code taken from [uTop](https://github.com/diml/utop
@@ -80,12 +80,12 @@ let rec methods_of_type env ?(acc = []) type_expr =
     methods_of_type env ~acc type_expr
   | Tfield (name, _, ty, rest) ->
     methods_of_type env ~acc:((name, ty) :: acc) rest
-  | Tconstr (path, _, _) -> begin
-    match lookup_env Env.find_type path env with
+  | Tconstr (path, _, _) ->
+    begin match lookup_env Env.find_type path env with
     | None | Some { type_manifest = None; _ } -> acc
     | Some { type_manifest = Some type_expr; _ } ->
       methods_of_type env ~acc type_expr
-  end
+    end
   | _ -> acc
 
 let classify_node = function
@@ -189,8 +189,8 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
               commu_ok ))
       in
       (`Label, `Type_scheme (Btype.newgenty desc))
-    | `Mod m -> begin
-      try
+    | `Mod m ->
+      begin try
         if not exact then raise Exit;
         let verbosity =
           Mconfig.Verbosity.to_int !Type_utils.verbosity ~for_smart:1
@@ -199,7 +199,7 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
           raise Exit;
         (`Module, `Modtype m)
       with Exit -> (`Module, `None)
-    end
+      end
     | `ModType m ->
       if exact then
         (`Modtype, `Modtype_declaration (ident, (*verbose_sig env*) m))
@@ -238,11 +238,10 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
           | `Type -> Type
           | _ -> assert false
         in
-        begin
-          match get_doc (`Completion_entry (namespace, p, loc)) with
-          | `Found str -> `String str
-          | _ -> `None
-          | exception _ -> `None
+        begin match get_doc (`Completion_entry (namespace, p, loc)) with
+        | `Found str -> `String str
+        | _ -> `None
+        | exception _ -> `None
         end
       | _, _ -> `None)
   in
@@ -301,14 +300,13 @@ let fold_sumtype_constructors ~env ~init ~f t =
   match t.desc with
   | Tconstr (path, _, _) ->
     log ~title:"fold_sumtype_constructors" "node type: %s" (Path.name path);
-    begin
-      match Env.find_type_descrs path env with
-      | exception Not_found -> init
-      | Type_record _
-      | Type_record_unboxed_product _
-      | Type_abstract _
-      | Type_open -> init
-      | Type_variant (constrs, _, _) -> List.fold_right constrs ~init ~f
+    begin match Env.find_type_descrs path env with
+    | exception Not_found -> init
+    | Type_record _
+    | Type_record_unboxed_product _
+    | Type_abstract _
+    | Type_open -> init
+    | Type_variant (constrs, _, _) -> List.fold_right constrs ~init ~f
     end
   | _ -> init
 
@@ -444,12 +442,11 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
         let in_scope_candidates =
           Env.fold_constructors consider_constr prefix_path env []
         in
-        begin
-          match (prefix_path, target_type) with
-          | Some _, _ | _, None -> in_scope_candidates
-          | None, Some ty ->
-            fold_sumtype_constructors ~env ~init:in_scope_candidates
-              ~f:consider_constr ty
+        begin match (prefix_path, target_type) with
+        | Some _, _ | _, None -> in_scope_candidates
+        | None, Some ty ->
+          fold_sumtype_constructors ~env ~init:in_scope_candidates
+            ~f:consider_constr ty
         end
       | `Types ->
         Env.fold_types
@@ -542,7 +539,10 @@ let complete_methods ~env ~prefix obj =
   in
   let methods = List.filter ~f:has_prefix (methods_of_type env t) in
   List.map methods ~f:(fun (name, ty) ->
-      let info = `None (* TODO: get documentation. *) in
+      let info =
+        `None
+        (* TODO: get documentation. *)
+      in
       { name;
         kind = `MethodCall;
         desc = `Type_scheme ty;
@@ -713,8 +713,8 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
       let snap = Btype.snapshot () in
       let is_label =
         match lbl.Types.lbl_all with
-        | [||] -> begin
-          match
+        | [||] ->
+          begin match
             let ty =
               match parent with
               | `Expression e -> e.Typedtree.exp_type
@@ -723,8 +723,8 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
             let decl = Ctype.extract_concrete_typedecl env ty in
             (ty, decl)
           with
-          | ty, Typedecl (p, _, decl) -> begin
-            try
+          | ty, Typedecl (p, _, decl) ->
+            begin try
               let lbls = Datarepr.labels_of_type p decl in
               let labels =
                 List.map lbls ~f:(fun (_, lbl) ->
@@ -732,8 +732,7 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
                       let _, lbl_arg, lbl_res =
                         Ctype.instance_label ~fixed:false lbl
                       in
-                      begin
-                        try Ctype.unify_var env ty lbl_res with _ -> ()
+                      begin try Ctype.unify_var env ty lbl_res with _ -> ()
                       end;
                       (* FIXME: the two subst can lose some sharing between types *)
                       let lbl_res = Subst.type_expr Subst.identity lbl_res in
@@ -746,9 +745,9 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
               match decl.Types.type_kind with
               | Types.Type_record (lbls, _, _) -> Declaration (ty, lbls)
               | _ -> Maybe)
-          end
+            end
           | _ | (exception _) -> Maybe
-        end
+          end
         | lbls -> Description (Array.to_list lbls)
       in
       let result =

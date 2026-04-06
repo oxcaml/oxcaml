@@ -85,11 +85,10 @@ let from_nodes ~path =
       with Jkind.Error.User_error _ -> None)
     | Class_field
         { cf_desc = Tcf_method (_, _, Tcfk_concrete (_, { exp_type })) } ->
-    begin
-      match Types.get_desc exp_type with
+      begin match Types.get_desc exp_type with
       | Tarrow (_, _, t, _) -> ret (Type (env, t))
       | _ -> None
-    end
+      end
     | Class_field
         { cf_desc = Tcf_val (_, _, _, Tcfk_concrete (_, { exp_type = t }), _) }
       -> ret (Type (env, t))

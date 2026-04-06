@@ -68,14 +68,13 @@ let rec summarize ~include_types node =
   match node.t_node with
   | Value_binding vb ->
     let deprecated = Type_utils.is_deprecated vb.vb_attributes in
-    begin
-      match id_of_patt vb.vb_pat with
-      | None -> None
-      | Some ident ->
-        let typ =
-          outline_type ~include_types ~env:node.t_env vb.vb_pat.pat_type
-        in
-        Some (mk ~location ~deprecated `Value typ ident)
+    begin match id_of_patt vb.vb_pat with
+    | None -> None
+    | Some ident ->
+      let typ =
+        outline_type ~include_types ~env:node.t_env vb.vb_pat.pat_type
+      in
+      Some (mk ~location ~deprecated `Value typ ident)
     end
   | Value_description vd ->
     let deprecated = Type_utils.is_deprecated vd.val_attributes in
@@ -83,21 +82,19 @@ let rec summarize ~include_types node =
     Some (mk ~location ~deprecated `Value typ vd.val_id)
   | Module_declaration md ->
     let children = get_mod_children ~include_types node in
-    begin
-      match md.md_id with
-      | None -> None
-      | Some id ->
-        let deprecated = Type_utils.is_deprecated md.md_attributes in
-        Some (mk ~children ~location ~deprecated `Module None id)
+    begin match md.md_id with
+    | None -> None
+    | Some id ->
+      let deprecated = Type_utils.is_deprecated md.md_attributes in
+      Some (mk ~children ~location ~deprecated `Module None id)
     end
   | Module_binding mb ->
     let children = get_mod_children ~include_types node in
-    begin
-      match mb.mb_id with
-      | None -> None
-      | Some id ->
-        let deprecated = Type_utils.is_deprecated mb.mb_attributes in
-        Some (mk ~children ~location ~deprecated `Module None id)
+    begin match mb.mb_id with
+    | None -> None
+    | Some id ->
+      let deprecated = Type_utils.is_deprecated mb.mb_attributes in
+      Some (mk ~children ~location ~deprecated `Module None id)
     end
   | Module_type_declaration mtd ->
     let children = get_mod_children ~include_types node in
@@ -155,8 +152,8 @@ and get_class_elements node =
   | Class_structure _ ->
     List.filter_map (Lazy.force node.t_children) ~f:(fun child ->
         match child.t_node with
-        | Class_field cf -> begin
-          match get_class_field_desc_infos cf.cf_desc with
+        | Class_field cf ->
+          begin match get_class_field_desc_infos cf.cf_desc with
           | Some (str_loc, outline_kind) ->
             let deprecated = Type_utils.is_deprecated cf.cf_attributes in
             Some
@@ -168,7 +165,7 @@ and get_class_elements node =
                 deprecated
               }
           | None -> None
-        end
+          end
         | _ -> None)
   | _ -> []
 
