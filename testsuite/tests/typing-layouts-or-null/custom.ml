@@ -267,6 +267,24 @@ type ('a : value_or_null) widened_nullable : value_or_null =
 type ('a : value_or_null mod non_null) widened_nullable = A | B of 'a [@@or_null]
 |}]
 
+type ('a : immediate) widened_immediate : value_or_null =
+  | A
+  | B of 'a
+[@@or_null]
+
+[%%expect{|
+type ('a : immediate) widened_immediate = A | B of 'a [@@or_null]
+|}]
+
+type ('a : immediate_or_null) widened_immediate_or_null : value_or_null =
+  | A
+  | B of 'a
+[@@or_null]
+
+[%%expect{|
+type ('a : immediate) widened_immediate_or_null = A | B of 'a [@@or_null]
+|}]
+
 type ('a : value) wrong_result_kind : value =
   | A
   | B of 'a
