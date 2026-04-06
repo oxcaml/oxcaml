@@ -71,6 +71,42 @@ filled_q : P -> Q = {
   left = src;
   right = max;
 }
+
+Pair = {
+  left : A;
+  right : A;
+}
+
+Single = {
+  value : A;
+}
+
+join_pair : Pair -> Single = {
+  value = join(left, right);
+}
+
+meet_pair : Pair -> Single = {
+  value = meet(left, right);
+}
+
+U2 = [ Aliased > Unique ]
+
+C2 = [ Contended > Shared > Uncontended ]
+
+M2 = {
+  uniqueness : U2;
+  contention : C2;
+}
+
+unique_cap2 : U2^op -> C2^op = [
+  Aliased -> Contended;
+  Unique -> Uncontended;
+]
+
+unique_implies_uncontended2 : M2^op -> M2^op = {
+  uniqueness = uniqueness;
+  contention = join(contention, unique_cap2(uniqueness));
+}
 |}
   in
   let product =
@@ -153,4 +189,43 @@ filled_q : P -> Q = {
     "unexpected assignment count in filled bridge";
   Test_support.ensure
     (Array.for_all (fun target -> target = 1 || target = 3) filled_q.core.map)
-    "expected max-filled bridge to pin the right field to top"
+    "expected max-filled bridge to pin the right field to top";
+  let join_pair =
+    match Model.String_map.find "join_pair" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected product bridge"
+  in
+  Test_support.ensure
+    (Array.to_list join_pair.core.map = [ 0; 1; 1; 1 ])
+    "unexpected join bridge semantics";
+  Test_support.ensure
+    (Option.is_none join_pair.core.left_adjoint)
+    "expected join bridge to lack a left adjoint";
+  Test_support.ensure
+    (Option.is_some join_pair.core.right_adjoint)
+    "expected join bridge to have a right adjoint";
+  let meet_pair =
+    match Model.String_map.find "meet_pair" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected product bridge"
+  in
+  Test_support.ensure
+    (Array.to_list meet_pair.core.map = [ 0; 0; 0; 1 ])
+    "unexpected meet bridge semantics";
+  Test_support.ensure
+    (Option.is_some meet_pair.core.left_adjoint)
+    "expected meet bridge to have a left adjoint";
+  Test_support.ensure
+    (Option.is_none meet_pair.core.right_adjoint)
+    "expected meet bridge to lack a right adjoint";
+  let unique_implies_uncontended2 =
+    match Model.String_map.find "unique_implies_uncontended2" model.morphs with
+    | Model.Bridge bridge -> bridge
+    | Model.Primitive _ -> failwith "expected product bridge"
+  in
+  Test_support.ensure
+    (Option.is_none unique_implies_uncontended2.core.left_adjoint)
+    "expected unique_implies_uncontended2 to lack a left adjoint";
+  Test_support.ensure
+    (Option.is_some unique_implies_uncontended2.core.right_adjoint)
+    "expected unique_implies_uncontended2 to have a right adjoint"

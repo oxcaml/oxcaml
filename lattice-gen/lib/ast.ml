@@ -33,6 +33,16 @@ type bridge_expr =
       }
   | Min of Location.t
   | Max of Location.t
+  | Join of
+      { left : bridge_expr;
+        right : bridge_expr;
+        loc : Location.t
+      }
+  | Meet of
+      { left : bridge_expr;
+        right : bridge_expr;
+        loc : Location.t
+      }
 
 type bridge_assignment =
   { target : string Location.located;

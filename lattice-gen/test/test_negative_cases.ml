@@ -69,4 +69,17 @@ Q = { y : A }
 bad : P^op -> Q = {
   y = x;
 }
+|};
+  Test_support.expect_error
+    ~name:"join-type-mismatch"
+    ~needle:"field \"z\" expects A but source field \"y\" has B"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+B = [ Red < Blue ]
+P = { x : A; y : B }
+Q = { z : A }
+bad : P -> Q = {
+  z = join(x, y);
+}
 |}

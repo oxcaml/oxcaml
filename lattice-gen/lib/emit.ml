@@ -9,6 +9,7 @@ type outputs =
   }
 
 let dual_mask (desc : descriptor) = desc.mask land lnot desc.nat_mask
+let bits_literal = Bitwise.bits_literal
 
 let add_indented_block buf indent text =
   String.split_on_char '\n' text
@@ -104,20 +105,34 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
   let y_nat = Bitwise.mask y nat_mask in
   let x_dual = Bitwise.mask x dual_mask in
   let y_dual = Bitwise.mask y dual_mask in
-  let zxy_nat_expr = Bitwise.and_ [ x_nat; Bitwise.xor_mask y_nat nat_mask ] in
-  let zyx_dual_expr =
-    Bitwise.and_ [ y_dual; Bitwise.xor_mask x_dual dual_mask ]
+  let use_shared_diff = nat_mask <> 0 && dual_mask <> 0 in
+  let diff_expr = Bitwise.xor_ x y in
+  let diff_bindings, diff =
+    with_named_expr ~mask:desc.mask ~name:"d" ~expr:diff_expr ~needed:use_shared_diff
   in
-  bprintf buf "%slet min = %d\n" indent dual_mask;
-  bprintf buf "%slet max = %d\n" indent nat_mask;
+  let zxy_nat_expr =
+    if use_shared_diff
+    then Bitwise.and_ [ Bitwise.mask diff nat_mask; x_nat ]
+    else Bitwise.and_ [ x_nat; Bitwise.xor_mask y_nat nat_mask ]
+  in
+  let zyx_dual_expr =
+    if use_shared_diff
+    then Bitwise.and_ [ Bitwise.mask diff dual_mask; y_dual ]
+    else Bitwise.and_ [ y_dual; Bitwise.xor_mask x_dual dual_mask ]
+  in
+  bprintf buf "%slet min = %s\n" indent (bits_literal dual_mask);
+  bprintf buf "%slet max = %s\n" indent (bits_literal nat_mask);
   if nat_mask = desc.mask
   then bprintf buf "%slet[@inline] le x y = (x land y) = x\n" indent
   else if nat_mask = 0
   then bprintf buf "%slet[@inline] le x y = (x land y) = y\n" indent
-  else (
-    bprintf buf "%slet[@inline] le x y =\n" indent;
-    bprintf buf "%s  (((x land lnot y) land %d) = 0)\n" indent nat_mask;
-    bprintf buf "%s  && (((y land lnot x) land %d) = 0)\n" indent dual_mask);
+  else
+    bprintf
+      buf
+      "%slet[@inline] le x y = ((x lxor y) land ((x land %s) lor (y land %s))) = 0\n"
+      indent
+      (bits_literal nat_mask)
+      (bits_literal dual_mask);
   bprintf buf "%slet[@inline] equal (x : t) (y : t) = x = y\n" indent;
   render_bitwise_function_ml
     ~indent
@@ -157,7 +172,7 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
   in
   render_bitwise_function_ml
     ~indent
-    ~bindings:(subtract_zxy_bindings @ subtract_zyx_bindings)
+    ~bindings:(diff_bindings @ subtract_zxy_bindings @ subtract_zyx_bindings)
     buf
     "subtract"
     [ "x"; "y" ]
@@ -180,7 +195,7 @@ let add_specialized_ops_ml ?(indent = "  ") buf desc =
   let dual_imply = close_down desc.down_dual imply_zyx in
   render_bitwise_function_ml
     ~indent
-    ~bindings:(imply_zxy_bindings @ imply_zyx_bindings)
+    ~bindings:(diff_bindings @ imply_zxy_bindings @ imply_zyx_bindings)
     buf
     "imply"
     [ "x"; "y" ]
@@ -763,19 +778,34 @@ let lift_kernel_through_field
           referenced.terms
     }
 
-let product_field_module_name model (expr : lattice_expr) field_name =
-  match String_map.find expr.name model.lattices with
-  | Base _ -> invalid_arg "expected product lattice"
-  | Product product ->
-    let field =
-      match List.find_opt (fun (field : field) -> String.equal field.name field_name) product.fields with
-      | Some field -> field
-      | None -> invalid_arg "unknown bridge target field"
-    in
-    let effective_ty =
-      if expr.opposite then flip_expr field.ty else field.ty
-    in
-    module_name_of_expr effective_ty
+let rec add_bridge_expr_ml buf src_module target_ty = function
+  | Source_field source_field ->
+    bprintf
+      buf
+      "%s.proj_%s x"
+      src_module
+      (Name.escape_value_name source_field)
+  | Morph_apply { morph_name; source_field } ->
+    bprintf
+      buf
+      "%s (%s.proj_%s x)"
+      (emitted_morph_name morph_name)
+      src_module
+      (Name.escape_value_name source_field)
+  | Min -> bprintf buf "%s.min" (module_name_of_expr target_ty)
+  | Max -> bprintf buf "%s.max" (module_name_of_expr target_ty)
+  | Join (left, right) ->
+    bprintf buf "%s.join (" (module_name_of_expr target_ty);
+    add_bridge_expr_ml buf src_module target_ty left;
+    bprintf buf ") (";
+    add_bridge_expr_ml buf src_module target_ty right;
+    Buffer.add_char buf ')'
+  | Meet (left, right) ->
+    bprintf buf "%s.meet (" (module_name_of_expr target_ty);
+    add_bridge_expr_ml buf src_module target_ty left;
+    bprintf buf ") (";
+    add_bridge_expr_ml buf src_module target_ty right;
+    Buffer.add_char buf ')'
 
 let kernel_of_bridge_assignment
     model
@@ -830,6 +860,7 @@ let kernel_of_bridge_assignment
       { const = (top_value_of_expr model target_ty land target_field.raw_mask) lsl target_field.shift;
         terms = []
       }
+  | Join _ | Meet _ -> None
 
 let build_morph_kernels model =
   let kernels = Hashtbl.create (String_map.cardinal model.morphs) in
@@ -920,35 +951,22 @@ let add_bridge_ml ?(indent = "") buf model kernels (bridge : product_bridge) =
     bprintf buf "%s  %s.make\n" indent dst_module;
     List.iter
       (fun (assignment : bridge_assignment) ->
+        let target_ty =
+          let target_product =
+            match String_map.find core.target.name model.lattices with
+            | Product product -> product
+            | Base _ -> invalid_arg "expected bridge target product"
+          in
+          effective_field_type
+            core.target
+            (find_field target_product assignment.target_field)
+        in
         bprintf
           buf
           "%s    ~%s:("
           indent
           (Name.escape_value_name assignment.target_field);
-        (match assignment.expr with
-         | Source_field source_field ->
-           bprintf
-             buf
-             "%s.proj_%s x"
-             src_module
-             (Name.escape_value_name source_field)
-         | Morph_apply { morph_name; source_field } ->
-           bprintf
-             buf
-             "%s (%s.proj_%s x)"
-             (emitted_morph_name morph_name)
-             src_module
-             (Name.escape_value_name source_field)
-         | Min ->
-           bprintf
-             buf
-             "%s.min"
-             (product_field_module_name model core.target assignment.target_field)
-         | Max ->
-           bprintf
-             buf
-             "%s.max"
-             (product_field_module_name model core.target assignment.target_field));
+        add_bridge_expr_ml buf src_module target_ty assignment.expr;
         Buffer.add_string buf ")\n")
       bridge.assignments
 
@@ -963,14 +981,18 @@ let add_morph_sig buf = function
       (module_name_of_expr core.source)
       (module_name_of_expr core.target)
 
+let rec morph_names_of_bridge_expr = function
+  | Morph_apply { morph_name; _ } -> [ morph_name ]
+  | Source_field _ | Min | Max -> []
+  | Join (left, right) | Meet (left, right) ->
+    morph_names_of_bridge_expr left @ morph_names_of_bridge_expr right
+
 let morph_dependencies = function
   | Primitive _ -> []
   | Bridge bridge ->
-    List.filter_map
+    List.concat_map
       (fun (assignment : bridge_assignment) ->
-        match assignment.expr with
-        | Morph_apply { morph_name; _ } -> Some morph_name
-        | Source_field _ | Min | Max -> None)
+        morph_names_of_bridge_expr assignment.expr)
       bridge.assignments
 
 let ordered_morphs model =

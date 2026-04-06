@@ -8,11 +8,17 @@ let merge_names
   match List.rev rest with
   | [] -> first.Location.loc
   | last :: _ -> Location.merge first.Location.loc last.Location.loc
+
+let bridge_expr_loc = function
+  | Source_field field -> field.Location.loc
+  | Morph_apply { morph; field } -> Location.merge morph.Location.loc field.Location.loc
+  | Min loc | Max loc -> loc
+  | Join { loc; _ } | Meet { loc; _ } -> loc
 %}
 
 %token <string Location.located> IDENT
 %token LBRACKET RBRACKET LBRACE RBRACE
-%token LPAREN RPAREN
+%token LPAREN RPAREN COMMA
 %token EQ LT GT ARROW CARET COLON SEMI
 %token EOF
 
@@ -113,6 +119,18 @@ bridge_assignment:
   | target = IDENT EQ expr = bridge_expr { { target; expr } }
 
 bridge_expr:
+  | kw = IDENT LPAREN left = bridge_expr COMMA right = bridge_expr RPAREN
+      {
+        if kw.Location.txt = "join"
+        then Join { left; right; loc = Location.merge kw.Location.loc (bridge_expr_loc right) }
+        else if kw.Location.txt = "meet"
+        then Meet { left; right; loc = Location.merge kw.Location.loc (bridge_expr_loc right) }
+        else
+          Error.failf
+            kw.Location.loc
+            "unknown bridge expression operator %S (expected join or meet)"
+            kw.Location.txt
+      }
   | field = IDENT
       {
         if field.Location.txt = "min"

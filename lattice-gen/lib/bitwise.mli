@@ -7,11 +7,17 @@ type binding =
     expr : t
   }
 
+val bits_literal : int -> string
+
 val var : mask:int -> var -> t
 
 val const : int -> t
 
 val mask : t -> int -> t
+
+val simplify : t -> int -> t
+
+val xor_ : t -> t -> t
 
 val xor_mask : t -> int -> t
 
