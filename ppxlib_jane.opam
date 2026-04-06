@@ -6,6 +6,7 @@ bug-reports: "https://github.com/janestreet/ppxlib_jane/issues"
 dev-repo: "git+https://github.com/janestreet/ppxlib_jane.git"
 doc: "https://ocaml.janestreet.com/ocaml-core/latest/doc/ppxlib_jane/index.html"
 license: "MIT"
+x-maintenance-intent: ["(latest)"]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]

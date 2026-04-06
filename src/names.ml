@@ -18,6 +18,7 @@ module Language_feature_name = struct
     | Ptyp_quote _ -> "quoted type"
     | Ptyp_splice _ -> "spliced type"
     | Ptyp_of_kind _ -> "type of a fixed kind"
+    | Ptyp_repr _ -> "kind-polymorphic type"
     | Ptyp_extension _ -> "extension point as a type"
   ;;
 
@@ -37,6 +38,8 @@ module Language_feature_name = struct
     | Pexp_apply _ -> "application expression"
     | Pexp_match _ -> "match expression"
     | Pexp_try _ -> "try-with expression"
+    | Pexp_unboxed_unit -> "unboxed unit expression"
+    | Pexp_unboxed_bool _ -> "unboxed bool expression"
     | Pexp_tuple _ -> "tuple expression"
     | Pexp_unboxed_tuple _ -> "unboxed tuple expression"
     | Pexp_construct _ -> "variant constructor expression"
@@ -81,6 +84,7 @@ module Language_feature_name = struct
     | Pexp_quote _ -> "quoted expression"
     | Pexp_splice _ -> "spliced expression"
     | Pexp_hole -> "hole"
+    | Pexp_borrow _ -> "borrowing expression"
   ;;
 
   let of_pattern_desc : Shim.Pattern_desc.t -> string = function
@@ -97,6 +101,8 @@ module Language_feature_name = struct
        | Pconst_float _ -> "floating point literal pattern"
        | Pconst_unboxed_float _ -> "unboxed floating point literal pattern")
     | Ppat_interval _ -> "character interval '..' pattern"
+    | Ppat_unboxed_unit -> "unboxed unit pattern"
+    | Ppat_unboxed_bool _ -> "unboxed bool pattern"
     | Ppat_tuple _ -> "tuple pattern"
     | Ppat_unboxed_tuple _ -> "unboxed tuple pattern"
     | Ppat_construct _ -> "variant constructor pattern"
@@ -134,7 +140,7 @@ module Language_feature_name = struct
     | Psig_class_type _ -> "class type declaration"
     | Psig_attribute _ -> "module-level attribute (in a sig)"
     | Psig_extension _ -> "extension point as a signature item"
-    | Psig_kind_abbrev _ -> "kind abbrevation declaration"
+    | Psig_jkind _ -> "kind declaration"
   ;;
 
   let of_structure_item_desc : Shim.Structure_item_desc.t -> string = function
@@ -151,7 +157,7 @@ module Language_feature_name = struct
     | Pstr_class_type _ -> "class type definition"
     | Pstr_attribute _ -> "module-level attribute (in a struct)"
     | Pstr_extension _ -> "extension point as a structure item"
-    | Pstr_kind_abbrev _ -> "kind abbreviation definition"
+    | Pstr_jkind _ -> "kind definition"
     | Pstr_eval _ -> "top-level expression"
     | Pstr_primitive _ -> "primitive 'external' binding"
   ;;
@@ -196,6 +202,7 @@ module Constructor_name = struct
     | Ptyp_quote _ -> "Ptyp_quote"
     | Ptyp_splice _ -> "Ptyp_splice"
     | Ptyp_of_kind _ -> "Ptyp_of_kind"
+    | Ptyp_repr _ -> "Ptyp_repr"
     | Ptyp_extension _ -> "Ptyp_extension"
   ;;
 
@@ -207,6 +214,8 @@ module Constructor_name = struct
     | Pexp_apply _ -> "Pexp_apply"
     | Pexp_match _ -> "Pexp_match"
     | Pexp_try _ -> "Pexp_try"
+    | Pexp_unboxed_unit -> "Pexp_unboxed_unit"
+    | Pexp_unboxed_bool _ -> "Pexp_unboxed_bool"
     | Pexp_tuple _ -> "Pexp_tuple"
     | Pexp_unboxed_tuple _ -> "Pexp_unboxed_tuple"
     | Pexp_construct _ -> "Pexp_construct"
@@ -246,6 +255,7 @@ module Constructor_name = struct
     | Pexp_quote _ -> "Pexp_quote"
     | Pexp_splice _ -> "Pexp_splice"
     | Pexp_hole -> "Pexp_hole"
+    | Pexp_borrow _ -> "Pexp_borrow"
   ;;
 
   let of_pattern_desc : Shim.Pattern_desc.t -> string = function
@@ -254,6 +264,8 @@ module Constructor_name = struct
     | Ppat_alias _ -> "Ppat_alias"
     | Ppat_constant _ -> "Ppat_constant"
     | Ppat_interval _ -> "Ppat_interval"
+    | Ppat_unboxed_unit -> "Ppat_unboxed_unit"
+    | Ppat_unboxed_bool _ -> "Ppat_unboxed_bool"
     | Ppat_tuple _ -> "Ppat_tuple"
     | Ppat_unboxed_tuple _ -> "Ppat_unboxed_tuple"
     | Ppat_construct _ -> "Ppat_construct"
@@ -288,7 +300,7 @@ module Constructor_name = struct
     | Psig_class_type _ -> "Psig_class_type"
     | Psig_attribute _ -> "Psig_attribute"
     | Psig_extension _ -> "Psig_extension"
-    | Psig_kind_abbrev _ -> "Psig_kind_abbrev"
+    | Psig_jkind _ -> "Psig_jkind"
   ;;
 
   let of_structure_item_desc : Shim.Structure_item_desc.t -> string = function
@@ -305,7 +317,7 @@ module Constructor_name = struct
     | Pstr_class_type _ -> "Pstr_class_type"
     | Pstr_attribute _ -> "Pstr_attribute"
     | Pstr_extension _ -> "Pstr_extension"
-    | Pstr_kind_abbrev _ -> "Pstr_kind_abbrev"
+    | Pstr_jkind _ -> "Pstr_jkind"
     | Pstr_eval _ -> "Pstr_eval"
     | Pstr_primitive _ -> "Pstr_primitive"
   ;;

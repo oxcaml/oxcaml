@@ -81,7 +81,8 @@ module Value_description = struct
   let extract_modalities vd = vd.pval_modalities, { vd with pval_modalities = [] }
 
   let create ~loc ~name ~type_ ~modalities ~prim =
-    { pval_loc = loc
+    { pval_poly = false
+    ; pval_loc = loc
     ; pval_modalities = modalities
     ; pval_name = name
     ; pval_type = type_
@@ -108,7 +109,8 @@ module Value_binding = struct
   let extract_modes vb = vb.pvb_modes, { vb with pvb_modes = [] }
 
   let create ~loc ~pat ~expr ~modes =
-    { pvb_pat = pat
+    { pvb_is_poly = false
+    ; pvb_pat = pat
     ; pvb_expr = expr
     ; pvb_modes = modes
     ; pvb_attributes = []
@@ -202,6 +204,7 @@ module Core_type_desc = struct
     | Ptyp_quote of core_type
     | Ptyp_splice of core_type
     | Ptyp_of_kind of jkind_annotation
+    | Ptyp_repr of string loc list * core_type
     | Ptyp_extension of extension
 
   let of_parsetree x = x
@@ -215,6 +218,8 @@ module Pattern_desc = struct
     | Ppat_alias of pattern * string loc
     | Ppat_constant of constant
     | Ppat_interval of constant * constant
+    | Ppat_unboxed_unit
+    | Ppat_unboxed_bool of bool
     | Ppat_tuple of (string option * pattern) list * closed_flag
     | Ppat_unboxed_tuple of (string option * pattern) list * closed_flag
     | Ppat_construct of
@@ -248,6 +253,8 @@ module Expression_desc = struct
     | Pexp_apply of expression * (arg_label * expression) list
     | Pexp_match of expression * case list
     | Pexp_try of expression * case list
+    | Pexp_unboxed_unit
+    | Pexp_unboxed_bool of bool
     | Pexp_tuple of (string option * expression) list
     | Pexp_unboxed_tuple of (string option * expression) list
     | Pexp_construct of Longident.t loc * expression option
@@ -288,6 +295,7 @@ module Expression_desc = struct
     | Pexp_quote of expression
     | Pexp_splice of expression
     | Pexp_hole
+    | Pexp_borrow of expression
 
   (* The ignored [loc] argument is used in shim_upstream.ml. *)
   let of_parsetree x ~loc:_ = x
@@ -350,7 +358,7 @@ module Signature_item_desc = struct
     | Psig_class_type of class_type_declaration list
     | Psig_attribute of attribute
     | Psig_extension of extension * attributes
-    | Psig_kind_abbrev of string loc * jkind_annotation
+    | Psig_jkind of jkind_declaration
 
   let of_parsetree x = x
   let to_parsetree x = x
@@ -358,15 +366,22 @@ end
 
 type nonrec jkind_annotation_desc = jkind_annotation_desc =
   | Pjk_default
-  | Pjk_abbreviation of string
+  | Pjk_abbreviation of Longident.t loc
   | Pjk_mod of jkind_annotation * Modes.t
   | Pjk_with of jkind_annotation * core_type * Modality.t loc list
   | Pjk_kind_of of core_type
   | Pjk_product of jkind_annotation list
 
 type nonrec jkind_annotation = jkind_annotation =
-  { pjkind_loc : Location.t
-  ; pjkind_desc : jkind_annotation_desc
+  { pjka_loc : Location.t
+  ; pjka_desc : jkind_annotation_desc
+  }
+
+type nonrec jkind_declaration = jkind_declaration =
+  { pjkind_name : string loc
+  ; pjkind_manifest : jkind_annotation option
+  ; pjkind_attributes : attributes
+  ; pjkind_loc : Location.t
   }
 
 module Type_declaration = struct
@@ -441,7 +456,7 @@ module Structure_item_desc = struct
     | Pstr_include of include_declaration
     | Pstr_attribute of attribute
     | Pstr_extension of extension * attributes
-    | Pstr_kind_abbrev of string loc * jkind_annotation
+    | Pstr_jkind of jkind_declaration
 
   let of_parsetree x = x
   let to_parsetree x = x
