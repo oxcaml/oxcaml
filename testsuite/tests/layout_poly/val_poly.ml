@@ -92,7 +92,7 @@ Line 2, characters 45-47:
 Error: Tuple element types must have layout value.
        The layout of "'a" is the abstract kind x
          because of the annotation on the universal variable 'a.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must overlap with value maybe_separable
          because it's the type of a tuple element.
 |}]
 

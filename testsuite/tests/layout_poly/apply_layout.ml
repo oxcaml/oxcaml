@@ -209,7 +209,7 @@ Error: This expression has type "float#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's the type of a tuple element.
 |}]
 

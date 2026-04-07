@@ -680,8 +680,8 @@ let remove_mode_and_jkind_variables ty =
     if TypeSet.mem ty !visited then () else begin
       visited := TypeSet.add ty !visited;
       match get_desc ty with
-      | Tvar { jkind } -> Jkind.default_to_value jkind
-      | Tunivar { jkind } -> Jkind.default_to_value jkind
+      | Tvar { jkind } -> Jkind.default_to_scannable jkind
+      | Tunivar { jkind } -> Jkind.default_to_scannable jkind
       | Tarrow ((_,marg,mret),targ,tret,_) ->
          let _ = Alloc.zap_to_legacy marg in
          let _ = Alloc.zap_to_legacy mret in
@@ -3202,7 +3202,7 @@ let check_type_nullability env ty null =
 
 let check_type_separability env ty sep =
   let upper_bound =
-    Jkind.set_separability_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) sep
+    Jkind.set_root_separability (Jkind.Builtin.any ~why:Dummy_jkind) sep
   in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true
