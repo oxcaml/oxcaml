@@ -739,9 +739,9 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     ~le_monde_exterieur ~all_constants ~my_depth : rev_code =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
-  (* Note: this significately degrades the analysis on zero_alloc code. However,
-     it is highly unclear what should be done for zero_alloc code, so we simply
-     mark the code as escaping. *)
+  (* Note: this significantly degrades the analysis on code being checked by the
+     zero alloc checker. However, it is highly unclear what should be done for
+     such code, so we simply mark the code as escaping. *)
   let is_opaque = Code_metadata.is_opaque code_metadata in
   let check_zero_alloc =
     match Code.zero_alloc_attribute code with
