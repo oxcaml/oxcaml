@@ -101,9 +101,20 @@ let record_new_alias r (i : Cfg.basic Cfg.instruction) =
   Stamp_tbl.replace r.new_aliases i.res.(0).Reg.stamp
     i.arg.(0).Reg.stamp
 
+let basic_desc_match r (old_d : Cfg.basic)
+    (new_d : Cfg.basic) =
+  match old_d, new_d with
+  | Pushtrap { lbl_handler = old_l },
+    Pushtrap { lbl_handler = new_l } ->
+    labels_match r old_l new_l
+  | Poptrap { lbl_handler = old_l },
+    Poptrap { lbl_handler = new_l } ->
+    labels_match r old_l new_l
+  | _ -> Cfg.equal_basic old_d new_d
+
 let basic_match r (old_i : Cfg.basic Cfg.instruction)
     (new_i : Cfg.basic Cfg.instruction) =
-  Cfg.equal_basic old_i.desc new_i.desc
+  basic_desc_match r old_i.desc new_i.desc
   && regs_match r old_i.arg new_i.arg
   && regs_match r old_i.res new_i.res
 

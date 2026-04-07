@@ -501,3 +501,10 @@ let insert_op_debug env sub_cfg op dbg rs rd :
   if !Clflags.llvm_backend
   then Use_default
   else insert_op_debug' env sub_cfg op dbg rs rd
+
+let pseudoregs_for_operation op rs rd :
+    Cfg_selectgen_target_intf.pseudoregs_for_operation_result =
+  try
+    let rsrc, rdst = pseudoregs_for_operation op rs rd in
+    Constrained (rsrc, rdst)
+  with Use_default_exn -> Use_default_regs

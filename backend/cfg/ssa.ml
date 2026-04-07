@@ -51,6 +51,7 @@ type instruction =
   | Op of
       { id : InstructionId.t;
         op : Operation.t;
+        typ : Cmm.machtype;
         args : instruction array
       }
   | Block_param of
@@ -132,7 +133,7 @@ type t =
 
 let rec print_instruction ppf (i : instruction) =
   match i with
-  | Op { id; op; args } ->
+  | Op { id; op; args; _ } ->
     Format.fprintf ppf "v%d = %a(%a)"
       (InstructionId.hash id) Operation.dump op print_args
       args
