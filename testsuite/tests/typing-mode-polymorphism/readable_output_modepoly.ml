@@ -1,5 +1,5 @@
 (* TEST
- flags += "-dlambda -dno-unique-ids";
+ flags += "-dlambda -dno-unique-ids -extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -11,11 +11,11 @@ let[@tail_mod_cons] rec map f = function
 [%%expect{|
 (letrec
   (map
-     (function {nlocal = 0} f
-       param[value<
-              (consts (0))
-               (non_consts ([0: ?,
-                             value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
+     (function {nlocal = 1} f[L]
+       param[L][value<
+                 (consts (0))
+                  (non_consts ([0: ?,
+                                value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
        tail_mod_cons
        : (consts (0))
           (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
@@ -32,11 +32,11 @@ let[@tail_mod_cons] rec map f = function
            (seq (apply map_dps block 1 f (field_imm 1 param)) block))
          0))
     map_dps
-      (function {nlocal = 0} dst offset[value<int>] f
-        param[value<
-               (consts (0))
-                (non_consts ([0: ?,
-                              value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
+      (function {nlocal = 1} dst offset[value<int>] f[L]
+        param[L][value<
+                  (consts (0))
+                   (non_consts ([0: ?,
+                                 value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
         tail_mod_cons
         : (consts (0))
            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
@@ -74,8 +74,8 @@ let[@tail_mod_cons] rec rec_map f = function
 [%%expect{|
 (letrec
   (rec_map
-     (function {nlocal = 0} f
-       param[value<(consts (0)) (non_consts ([0: ?]))>] tail_mod_cons
+     (function {nlocal = 1} f[L]
+       param[L][value<(consts (0)) (non_consts ([0: ?]))>] tail_mod_cons
        : (consts (0)) (non_consts ([0: ?]))
        (if param
          (let (*match* =a? (field_imm 0 param))
@@ -92,8 +92,8 @@ let[@tail_mod_cons] rec rec_map f = function
                  block))))
          0))
     rec_map_dps
-      (function {nlocal = 0} dst offset[value<int>] f
-        param[value<(consts (0)) (non_consts ([0: ?]))>] tail_mod_cons
+      (function {nlocal = 1} dst offset[value<int>] f[L]
+        param[L][value<(consts (0)) (non_consts ([0: ?]))>] tail_mod_cons
         : (consts (0)) (non_consts ([0: ?]))
         (if param
           (let
@@ -221,11 +221,11 @@ let[@tail_mod_cons] rec effects f = function
 [%%expect{|
 (letrec
   (effects
-     (function {nlocal = 0} f
-       param[value<
-              (consts (0))
-               (non_consts ([0: ?,
-                             value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
+     (function {nlocal = 1} f[L]
+       param[L][value<
+                 (consts (0))
+                  (non_consts ([0: ?,
+                                value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
        tail_mod_cons
        : (consts (0))
           (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
@@ -250,11 +250,11 @@ let[@tail_mod_cons] rec effects f = function
                (seq (apply effects_dps block 1 f (field_imm 1 param)) block))))
          0))
     effects_dps
-      (function {nlocal = 0} dst offset[value<int>] f
-        param[value<
-               (consts (0))
-                (non_consts ([0: ?,
-                              value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
+      (function {nlocal = 1} dst offset[value<int>] f[L]
+        param[L][value<
+                  (consts (0))
+                   (non_consts ([0: ?,
+                                 value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
         tail_mod_cons
         : (consts (0))
            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
@@ -299,10 +299,11 @@ let[@tail_mod_cons] rec map_stutter f xs =
 [%%expect{|
 (letrec
   (map_stutter
-     (function {nlocal = 0} f
-       xs[value<
-           (consts (0))
-            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
+     (function {nlocal = 1} f[L]
+       xs[L][value<
+              (consts (0))
+               (non_consts ([0: ?,
+                             value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
        tail_mod_cons
        : (consts (0))
           (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
@@ -325,11 +326,11 @@ let[@tail_mod_cons] rec map_stutter f xs =
              (seq (apply map_stutter_dps block 1 f (field_imm 1 xs)) block))
            0)))
     map_stutter_dps
-      (function {nlocal = 0} dst offset[value<int>] f
-        xs[value<
-            (consts (0))
-             (non_consts ([0: ?,
-                           value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
+      (function {nlocal = 1} dst offset[value<int>] f[L]
+        xs[L][value<
+               (consts (0))
+                (non_consts ([0: ?,
+                              value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
         tail_mod_cons
         : (consts (0))
            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
@@ -380,8 +381,9 @@ let[@tail_mod_cons] rec smap_stutter f xs n =
 type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
 (letrec
   (smap_stutter
-     (function {nlocal = 0} f xs[value<(consts ()) (non_consts ([0: *, *]))>]
-       n[value<int>] tail_mod_cons
+     (function {nlocal = 1} f[L]
+       xs[L][value<(consts ()) (non_consts ([0: *, *]))>] n[L][value<int>]
+       tail_mod_cons
        : (consts (0))
           (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
        (if (%eq n 0) 0
@@ -407,8 +409,8 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
                  (%int_sub n 1))
                block)))))
     smap_stutter_dps
-      (function {nlocal = 0} dst offset[value<int>] f
-        xs[value<(consts ()) (non_consts ([0: *, *]))>] n[value<int>]
+      (function {nlocal = 1} dst offset[value<int>] f[L]
+        xs[L][value<(consts ()) (non_consts ([0: *, *]))>] n[L][value<int>]
         tail_mod_cons
         : (consts (0))
            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))

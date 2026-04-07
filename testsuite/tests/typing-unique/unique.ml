@@ -357,7 +357,7 @@ val inf6 : 'a @ unique -> 'a = <fun>
 
 let unique_default_args ?(unique_ x = 1.0) () = x
 [%%expect{|
-val unique_default_args : ?x:float @ unique -> unit -> float = <fun>
+val unique_default_args : ?x:float @ unique -> (unit -> float) = <fun>
 |}]
 
 (* Unique Local *)
@@ -437,7 +437,7 @@ let curry =
   foo ~a:3 ~c:4
 [%%expect{|
 val curry :
-  b:'_weak3 @ unique -> d:'_weak4 @ unique -> int * '_weak3 * int * '_weak4 =
+  b:'_weak3 @ unique -> (d:'_weak4 @ unique -> int * '_weak3 * int * '_weak4) =
   <fun>
 |}]
 
@@ -496,7 +496,7 @@ type box = { x : int; }
 
 let curry (unique_ b1 : box) (unique_ b2 : box) = ()
 [%%expect{|
-val curry : box @ unique -> box @ unique -> unit = <fun>
+val curry : box @ unique -> (box @ unique -> unit) = <fun>
 |}]
 
 let curry : unique_ box -> unique_ box -> unit = fun b1 b2 -> ()
@@ -506,20 +506,12 @@ val curry : box @ unique -> box @ unique -> unit = <fun>
 
 let curry : unique_ box -> (unique_ box -> unit) = fun b1 b2 -> ()
 [%%expect{|
-Line 1, characters 51-66:
-1 | let curry : unique_ box -> (unique_ box -> unit) = fun b1 b2 -> ()
-                                                       ^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "once",
-       but expected to be "many".
+val curry : box @ unique -> (box @ unique -> unit) = <fun>
 |}]
 
 let curry : unique_ box -> (unique_ box -> unit) = fun b1 -> function | b2 -> ()
 [%%expect{|
-Line 1, characters 51-80:
-1 | let curry : unique_ box -> (unique_ box -> unit) = fun b1 -> function | b2 -> ()
-                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "once",
-       but expected to be "many".
+val curry : box @ unique -> (box @ unique -> unit) = <fun>
 |}]
 
 (* For nested functions, inner functions are not constrained *)

@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension mode_polymorphism_alpha";
   expect;
 *)
 
@@ -19,7 +20,8 @@ val local_aliased_use : 'a @ local -> unit = <fun>
 
 let unique_aliased_use (local_ unique_ x) (local_ y) = ()
 [%%expect{|
-val unique_aliased_use : 'a @ local unique -> 'b @ local -> unit = <fun>
+val unique_aliased_use : 'a @ local unique -> ('b @ local -> unit) @ local =
+  <fun>
 |}]
 
 let aliased_unique_use (local_ x) (local_ unique_ y) = ()

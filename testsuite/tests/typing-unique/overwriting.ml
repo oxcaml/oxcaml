@@ -35,14 +35,14 @@ Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Asser
 (*************************************)
 (* Checking uniqueness of overwrites *)
 
-let id = function x -> x
+let use_aliased (x @ aliased) = x
 
 let overwrite_shared (r : record_update) =
-  let r = id r in
+  let r = use_aliased r in
   let x = overwrite_ r with { x = "foo" } in
   x.x
 [%%expect{|
-val id : 'a -> 'a = <fun>
+val use_aliased : 'a -> 'a = <fun>
 Line 5, characters 21-22:
 5 |   let x = overwrite_ r with { x = "foo" } in
                          ^

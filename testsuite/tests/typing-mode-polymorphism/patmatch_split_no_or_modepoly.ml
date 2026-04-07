@@ -1,5 +1,5 @@
 (* TEST
- flags += "-nostdlib -nopervasives -dlambda";
+ flags += "-nostdlib -nopervasives -dlambda -extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -16,8 +16,9 @@ let last_is_anys = function
 [%%expect{|
 (let
   (last_is_anys/14 =
-     (function {nlocal = 0}
-       param/16[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+     (function {nlocal = 1}
+       param/16[L][value<
+                    (consts ()) (non_consts ([0: value<int>, value<int>]))>]
        : int
        (catch
          (if (field_imm 0 param/16) (if (field_imm 1 param/16) (exit 1) 1)
@@ -35,8 +36,9 @@ let last_is_vars = function
 [%%expect{|
 (let
   (last_is_vars/21 =
-     (function {nlocal = 0}
-       param/25[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+     (function {nlocal = 1}
+       param/25[L][value<
+                    (consts ()) (non_consts ([0: value<int>, value<int>]))>]
        : int
        (catch
          (if (field_imm 0 param/25) (if (field_imm 1 param/25) (exit 3) 1)
@@ -79,9 +81,9 @@ let f = function
    B/30 =? (apply (field_imm 0 (global Toploop!)) "B/30")
    A/29 =? (apply (field_imm 0 (global Toploop!)) "A/29")
    f/32 =
-     (function {nlocal = 0}
-       param/34[value<
-                 (consts ()) (non_consts ([0: *, value<int>, value<int>]))>]
+     (function {nlocal = 1}
+       param/34[L][value<
+                    (consts ()) (non_consts ([0: *, value<int>, value<int>]))>]
        : int
        (let (*match*/35 =a? (field_imm 0 param/34))
          (catch

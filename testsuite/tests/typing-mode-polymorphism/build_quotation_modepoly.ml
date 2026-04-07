@@ -1,5 +1,5 @@
 (* TEST
- flags += "-extension runtime_metaprogramming -extension comprehensions";
+ flags += "-extension runtime_metaprogramming -extension comprehensions -extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -185,20 +185,21 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ fun x y -> x ]>;;
 [%%expect {|
-- : <[$('a) -> $('b) -> $('a)]> expr = <[fun x y -> x]>
+- : <[$('a) -> ($('b) -> $('a)) @ local]> expr = <[fun x y -> x]>
 |}];;
 
 <[ fun f x y -> f ~a:y ~b:x ]>;;
 [%%expect {|
-- : <[(a:$('a) -> b:$('b) -> $('c)) -> $('b) -> $('a) -> $('c)]> expr =
-<[fun f x y -> f ~a:y ~b:x]>
+- : <[(a:$('a) -> b:$('b) -> $('c)) -> ($('b) -> $('a) -> $('c)) @ local]>
+    expr
+= <[fun f x y -> f ~a:y ~b:x]>
 |}];;
 
 <[ fun f x y -> f ?a:y ?b:x ]>;;
 [%%expect {|
 - : <[
-     (?a:$('a) -> ?b:$('b) -> $('c)) -> $('b) option -> $('a) option -> $('c)
-     ]>
+     (?a:$('a) -> ?b:$('b) -> $('c)) ->
+     ($('b) option -> $('a) option -> $('c)) @ local]>
     expr
 = <[fun f x y -> f ?a:y ?b:x]>
 |}];;
@@ -264,7 +265,7 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ fun f x d -> match f x with | res -> res | exception e -> d ]>;;
 [%%expect {|
-- : <[($('a) -> $('b)) -> $('a) -> $('b) -> $('b)]> expr =
+- : <[($('a) -> $('b)) -> ($('a) -> $('b) -> $('b)) @ local]> expr =
 <[fun f x d -> match f x with | res -> res | (exception e) -> d]>
 |}];;
 
@@ -280,7 +281,7 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ fun x d -> match x with | Some y -> y | None -> d ]>;;
 [%%expect {|
-- : <[$('a) option -> $('a) -> $('a)]> expr =
+- : <[$('a) option -> ($('a) -> $('a)) @ local]> expr =
 <[fun x d -> match x with | Some (y) -> y | None -> d]>
 |}];;
 
@@ -292,13 +293,15 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ fun (type a) (f : a -> a) (x : a) -> f (f x) ]>;;
 [%%expect {|
-- : <[($('a) -> $('a)) -> $('a) -> $('a)]> expr =
+- : <[($('a) -> $('a)) -> ($('a) -> $('a)) @ local]> expr =
 <[fun (type a) (f : a -> a) (x : a) -> f (f x)]>
 |}];;
 
 <[ fun x (type a) (f : a -> a * a) (g : int -> a) -> f (g x) ]>;;
 [%%expect {|
-- : <[int -> ($('a) -> $('a) * $('a)) -> (int -> $('a)) -> $('a) * $('a)]>
+- : <[
+     int ->
+     (($('a) -> $('a) * $('a)) -> (int -> $('a)) -> $('a) * $('a)) @ local]>
     expr
 = <[fun x (type a) (f : a -> a * a) (g : int -> a) -> f (g x)]>
 |}];;
@@ -433,7 +436,7 @@ Here is an example of a case that is not matched:
 
 <[ fun (f: int -> int) (x: int) -> f x ]>;;
 [%%expect {|
-- : <[(int -> int) -> int -> int]> expr =
+- : <[(int -> int) -> (int -> int) @ local]> expr =
 <[fun (f : int -> int) (x : int) -> f x]>
 |}];;
 
@@ -719,7 +722,7 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 
 <[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
 [%%expect {|
-- : <[(module Hashtbl.S) -> int -> unit]> expr =
+- : <[(module Hashtbl.S) -> (int -> unit) @ local]> expr =
 <[fun (module M : Stdlib.Hashtbl.S) x -> M.clear (M.create x)]>
 |}];;
 
@@ -917,7 +920,7 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[
      (x:$('a) -> ?y:$('b) -> $('c) -> unit) ->
-     $('a) -> $('d) -> $('c) -> unit]>
+     ($('a) -> $('d) -> $('c) -> unit) @ local]>
     expr
 = <[fun (f : x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x:x ?y:None z]>
 |}];;
@@ -966,13 +969,13 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 
 <[ fun x -> function None -> 0 | Some x -> x ]>
 [%%expect {|
-- : <[$('a) -> int option -> int]> expr =
+- : <[$('a) -> (int option -> int) @ local]> expr =
 <[fun x -> function | None -> 0 | Some (x__1) -> x__1]>
 |}];;
 
 <[ fun f x -> (f [@inlined]) x [@nontail] ]>
 [%%expect {|
-- : <[($('a) -> $('b)) -> $('a) -> $('b)]> expr =
+- : <[($('a) -> $('b)) -> ($('a) -> $('b)) @ local]> expr =
 <[fun f x -> ((f [@inlined]) x [@nontail])]>
 |}];;
 
@@ -1073,7 +1076,8 @@ Error: Identifier "x" is used at line 1, characters 43-44,
 (* Bug 9: Fun with function cases must have balanced format boxes *)
 <[ fun x -> function | 0 -> x | n -> n + x ]>;;
 [%%expect {|
-- : <[int -> int -> int]> expr = <[fun x -> function | 0 -> x | n -> n + x]>
+- : <[int -> (int -> int) @ local]> expr =
+<[fun x -> function | 0 -> x | n -> n + x]>
 |}];;
 
 (* Bug 10: Src_pos must not print as "." *)
@@ -1103,7 +1107,7 @@ Error: Identifier "x" is used at line 1, characters 43-44,
 (* Bug 2.2: Match/try in case RHS must be parenthesized *)
 <[ fun x y -> match x with | true -> (match y with | 0 -> "a" | _ -> "b") | false -> "c" ]>;;
 [%%expect {|
-- : <[bool -> int -> string]> expr =
+- : <[bool -> (int -> string) @ local]> expr =
 <[
   fun x y ->
     match x with | true -> (match y with | 0 -> "a" | _ -> "b") | false ->
