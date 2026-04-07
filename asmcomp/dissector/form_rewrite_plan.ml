@@ -110,9 +110,11 @@ end
 
 (* Rewritten relocation entries for a single .rela.text* section *)
 module Rewritten_rela_section = struct
+  open Rela.X86_64
+
   type t =
     { section_offset : int64; (* Original file offset of this section *)
-      entries : Rela.rela_entry list
+      entries : rela_entry list
     }
 
   let section_offset t = t.section_offset
@@ -274,8 +276,10 @@ let build_symbol_rewrite_map ~igot_and_iplt ~relocations =
    PC32 to IGOT entry *)
 let rewrite_rela_section ~rela_body ~symtab_body ~strtab_body ~symbol_to_index
     ~plt_rewrite_map ~got_rewrite_map =
+  let open Rela.X86_64 in
+  let open Reloc_type in
   let entries = ref [] in
-  Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
+  iter_rela_entries ~rela_body ~f:(fun entry ->
       let new_entry =
         (* Look up the original symbol name for this relocation *)
         let sym_name_opt =
@@ -286,28 +290,23 @@ let rewrite_rela_section ~rela_body ~symtab_body ~strtab_body ~symbol_to_index
         | Some sym_name -> (
           (* Check if this relocation type/symbol should be rewritten *)
           let rewrite_to =
-            if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-            then String.Tbl.find_opt plt_rewrite_map sym_name
-            else if
-              Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
-            then String.Tbl.find_opt got_rewrite_map sym_name
-            else None
+            match entry.r_type with
+            | R_X86_64_PLT32 -> String.Tbl.find_opt plt_rewrite_map sym_name
+            | R_X86_64_REX_GOTPCRELX ->
+              String.Tbl.find_opt got_rewrite_map sym_name
+            | R_X86_64_64 | R_X86_64_PC32 -> None
           in
           match rewrite_to with
           | Some new_sym_name -> (
             match String.Tbl.find_opt symbol_to_index new_sym_name with
             | Some idx ->
               log_verbose "  rewrite reloc at 0x%Lx: %s %s -> PC32 to %s"
-                entry.r_offset
-                (Rela.Reloc_type.name entry.r_type)
-                sym_name new_sym_name;
-              { entry with r_sym = idx; r_type = Rela.Reloc_type.pc32 }
+                entry.r_offset (name entry.r_type) sym_name new_sym_name;
+              { entry with r_sym = idx; r_type = R_X86_64_PC32 }
             | None ->
               log_verbose
                 "  rewrite reloc at 0x%Lx: %s -> %s NOT FOUND in symtab"
-                entry.r_offset
-                (Rela.Reloc_type.name entry.r_type)
-                new_sym_name;
+                entry.r_offset (name entry.r_type) new_sym_name;
               entry)
           | None -> entry)
       in

@@ -28,7 +28,8 @@
 (** ELF relocation section parsing.
 
     This module provides support for reading RELA (relocations with addends)
-    sections from ELF files. *)
+    sections from ELF files. Relocation type numbers are architecture-specific;
+    use the [X86_64] submodule for x86-64 relocations. *)
 
 (** {1 Section Indices} *)
 
@@ -62,74 +63,6 @@ module Section_index : sig
       meaning it requires the SHT_SYMTAB_SHNDX extended section index table. *)
 end
 
-(** {1 x86-64 Relocation Types} *)
-
-(** Abstract type representing an x86-64 relocation type. *)
-module Reloc_type : sig
-  type t
-
-  val equal : t -> t -> bool
-  (** Test equality of relocation types. *)
-
-  val to_int64 : t -> int64
-  (** Convert to the raw ELF relocation type value. *)
-
-  val of_int64 : int64 -> t
-  (** Create from a raw ELF relocation type value. *)
-
-  val plt32 : t
-  (** R_X86_64_PLT32 relocation type. *)
-
-  val rex_gotpcrelx : t
-  (** R_X86_64_REX_GOTPCRELX relocation type. *)
-
-  val r64 : t
-  (** R_X86_64_64 relocation type (64-bit absolute). *)
-
-  val pc32 : t
-  (** R_X86_64_PC32 relocation type (32-bit PC-relative). *)
-
-  val name : t -> string
-  (** [name t] returns a human-readable name for the relocation type.
-      Known types are returned as short names like "PLT32",
-      unknown types are returned as "type=N". *)
-end
-
-(** {1 RELA Entry Parsing} *)
-
-(** A parsed RELA entry. *)
-type rela_entry =
-  { r_offset : int64;
-    (** Offset within the section being relocated. *)
-    r_sym : int;
-    (** Symbol table index. *)
-    r_type : Reloc_type.t;
-    (** Relocation type. *)
-    r_addend : int64
-    (** Addend for the relocation. *)
-  }
-
-(** [iter_rela_entries ~rela_body ~f] iterates over all RELA entries in
-    the given section body, calling [f] for each entry. *)
-val iter_rela_entries : rela_body:Owee_buf.t -> f:(rela_entry -> unit) -> unit
-
-(** {1 Symbol Name Lookup} *)
-
-(** [read_symbol_name ~symtab_body ~strtab_body ~sym_index] reads the name
-    of the symbol at the given index from the symbol table.
-
-    Returns [None] if the index is out of bounds or the name cannot be read. *)
-val read_symbol_name :
-  symtab_body:Owee_buf.t -> strtab_body:Owee_buf.t -> sym_index:int -> string option
-
-(** [read_symbol_shndx ~symtab_body ~sym_index] reads the section header index
-    (st_shndx) of the symbol at the given index.
-
-    Returns [None] if the index is out of bounds.
-    Use [Section_index.is_undef] to check for undefined symbols. *)
-val read_symbol_shndx :
-  symtab_body:Owee_buf.t -> sym_index:int -> Section_index.t option
-
 (** {1 Entry Sizes} *)
 
 val rela_entry_size : int
@@ -138,11 +71,70 @@ val rela_entry_size : int
 val sym_entry_size : int
 (** Size of an Elf64_Sym entry in bytes (24). *)
 
-(** {1 Writing RELA Entries} *)
+(** {1 x86-64 Relocations} *)
 
-(** [write_rela_entry ~cursor entry] writes a RELA entry at the current
-    cursor position and advances the cursor by [rela_entry_size] bytes. *)
-val write_rela_entry : cursor:Owee_buf.cursor -> rela_entry -> unit
+module X86_64 : sig
+  (** x86-64 relocation types (ELF ABI, psABI Table 4.9).
+
+      Constructors are named after the ELF symbol. *)
+  module Reloc_type : sig
+    type t =
+      | R_X86_64_64
+      | R_X86_64_PC32
+      | R_X86_64_PLT32
+      | R_X86_64_REX_GOTPCRELX
+
+    val to_int : t -> int
+    (** Map a relocation type to its ELF integer value. *)
+
+    val of_int : int -> t
+    (** Parse an ELF integer value; raises [Failure] for unrecognised types. *)
+
+    val equal : t -> t -> bool
+    val name : t -> string
+  end
+
+  (** A parsed RELA entry. *)
+  type rela_entry =
+    { r_offset : int64;
+      (** Offset within the section being relocated. *)
+      r_sym : int;
+      (** Symbol table index. *)
+      r_type : Reloc_type.t;
+      (** Relocation type. *)
+      r_addend : int64
+      (** Addend for the relocation. *)
+    }
+
+  (** [iter_rela_entries ~rela_body ~f] iterates over all RELA entries in
+      the given section body, calling [f] for each entry. *)
+  val iter_rela_entries :
+    rela_body:Owee_buf.t -> f:(rela_entry -> unit) -> unit
+
+  (** [write_rela_entry ~cursor entry] writes a RELA entry at the current
+      cursor position and advances the cursor by [rela_entry_size] bytes. *)
+  val write_rela_entry : cursor:Owee_buf.cursor -> rela_entry -> unit
+end
+
+(** {1 Symbol Name Lookup} *)
+
+(** [read_symbol_name ~symtab_body ~strtab_body ~sym_index] reads the name
+    of the symbol at the given index from the symbol table.
+
+    Returns [None] if the index is out of bounds or the name cannot be read. *)
+val read_symbol_name :
+  symtab_body:Owee_buf.t ->
+  strtab_body:Owee_buf.t ->
+  sym_index:int ->
+  string option
+
+(** [read_symbol_shndx ~symtab_body ~sym_index] reads the section header index
+    (st_shndx) of the symbol at the given index.
+
+    Returns [None] if the index is out of bounds.
+    Use [Section_index.is_undef] to check for undefined symbols. *)
+val read_symbol_shndx :
+  symtab_body:Owee_buf.t -> sym_index:int -> Section_index.t option
 
 (** {1 Symbol Table Writing} *)
 

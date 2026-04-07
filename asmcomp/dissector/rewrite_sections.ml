@@ -33,6 +33,7 @@ module Strtab = Compiler_owee.Owee_elf_string_table
 module Buf = Compiler_owee.Owee_buf
 module String = Misc.Stdlib.String
 module FRP = Form_rewrite_plan
+open Rela.X86_64
 
 (* Safe conversion from int64 to int with bounds checking. Fatal error if the
    value doesn't fit in an int (would happen on 32-bit platforms for values >
@@ -80,7 +81,7 @@ let write_rela ~cursor ~symbol_to_index ~r_offset ~symbol ~r_type ~r_addend =
   let r_sym =
     String.Tbl.find_opt symbol_to_index symbol |> Option.value ~default:0
   in
-  Rela.write_rela_entry ~cursor
+  write_rela_entry ~cursor
     { r_offset = Int64.of_int r_offset; r_sym; r_type; r_addend }
 
 let execute_plan unix ~input_file ~output_file ~header ~sections
@@ -126,7 +127,7 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
     (fun r ->
       write_rela ~cursor ~symbol_to_index:(FRP.symbol_to_index plan)
         ~r_offset:(Igot.Relocation.offset r) ~symbol:(Igot.Relocation.symbol r)
-        ~r_type:Rela.Reloc_type.r64 ~r_addend:(Igot.Relocation.addend r))
+        ~r_type:Reloc_type.R_X86_64_64 ~r_addend:(Igot.Relocation.addend r))
     (Igot.relocations igot);
   Buf.Write.fixed_bytes
     (Buf.cursor output_buf ~at:(int64_to_int (SL.offset iplt_layout)))
@@ -139,7 +140,7 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
     (fun r ->
       write_rela ~cursor ~symbol_to_index:(FRP.symbol_to_index plan)
         ~r_offset:(Iplt.Relocation.offset r) ~symbol:(Iplt.Relocation.symbol r)
-        ~r_type:Rela.Reloc_type.pc32 ~r_addend:(Iplt.Relocation.addend r))
+        ~r_type:Reloc_type.R_X86_64_PC32 ~r_addend:(Iplt.Relocation.addend r))
     (Iplt.relocations iplt);
   let cursor =
     Buf.cursor output_buf ~at:(int64_to_int (SL.offset symtab_layout))
@@ -235,7 +236,7 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
                (FRP.Rewritten_rela_section.section_offset rewritten_section))
       in
       List.iter
-        (fun e -> Rela.write_rela_entry ~cursor e)
+        (fun e -> write_rela_entry ~cursor e)
         (FRP.Rewritten_rela_section.entries rewritten_section))
     (FRP.rewritten_rela_sections plan);
   Buf.Write.fixed_bytes
