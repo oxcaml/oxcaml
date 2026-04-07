@@ -18,6 +18,8 @@ open! Rev_expr
 open! Traverse_acc.Env
 module Acc = Traverse_acc
 module Dot = Dot_printer
+module K = Flambda_kind
+module KS = Flambda_kind.With_subkind
 
 type denv = Acc.Env.t
 
@@ -41,18 +43,16 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
       (fun i kind ->
         Variable.create
           (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
-          (Flambda_kind.With_subkind.kind kind))
+          (KS.kind kind))
       (Flambda_arity.unarized_components (Code.result_arity code))
   in
-  let exn = Variable.create "function_exn" Flambda_kind.value in
-  let my_closure = Variable.create "my_closure" Flambda_kind.value in
+  let exn = Variable.create "function_exn" K.value in
+  let my_closure = Variable.create "my_closure" K.value in
   let arity = Code.params_arity code in
   let params =
     List.mapi
       (fun i kind ->
-        Variable.create
-          (Printf.sprintf "function_param_%i" i)
-          (Flambda_kind.With_subkind.kind kind))
+        Variable.create (Printf.sprintf "function_param_%i" i) (KS.kind kind))
       (Flambda_arity.unarize arity)
   in
   let has_unsafe_result_type =
@@ -116,7 +116,7 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
   in
   Function_slot.Lmap.iter
     (fun function_slot name ->
-      Acc.kind name Flambda_kind.value acc;
+      Acc.kind name K.value acc;
       let code_id =
         (Function_slot.Map.find function_slot funs
           : Function_declarations.code_id_in_function_declaration)
@@ -159,7 +159,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let _tag, block_shape = Flambda_primitive.Block_kind.to_shape block_kind in
     List.iteri
       (fun i field ->
-        let kind = Flambda_kind.Block_shape.element_kind block_shape i in
+        let kind = K.Block_shape.element_kind block_shape i in
         let from = Acc.simple_to_node acc ~denv field in
         default_bp (fun base ->
             Acc.add_constructor_dep acc ~base (Field.block i kind) ~from))
@@ -272,9 +272,8 @@ let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
       let name = Name.symbol symbol in
       let[@inline always] block_field_kind i =
         match[@ocaml.warning "-4"] static_const with
-        | Block (_, _, shape, _) ->
-          Flambda_kind.Scannable_block_shape.element_kind shape i
-        | Immutable_value_array _ -> Flambda_kind.value
+        | Block (_, _, shape, _) -> K.Scannable_block_shape.element_kind shape i
+        | Immutable_value_array _ -> K.value
         | _ ->
           Misc.fatal_errorf
             "Unexpected static const %a in [block_field_kind] for symbol %a"
@@ -328,11 +327,11 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         then (
           let callee = Acc.simple_to_node acc ~denv (Option.get callee) in
           let callee_if_any_source =
-            Variable.create "callee_if_any_source" Flambda_kind.value
+            Variable.create "callee_if_any_source" K.value
           in
           let widget_if_any_source =
             Code_id_or_name.var
-              (Variable.create "widget_if_any_source" Flambda_kind.rec_info)
+              (Variable.create "widget_if_any_source" K.rec_info)
           in
           Acc.add_alias_if_any_source_dep acc ~if_any_source:callee ~from:callee
             ~to_:(Code_id_or_name.var callee_if_any_source);
@@ -770,10 +769,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
           (Code_metadata.result_arity code_metadata)
     };
   Acc.continuation_info acc exn_continuation
-    { is_exn_handler = true;
-      params = [exn];
-      arity = [Flambda_kind.With_subkind.any_value]
-    };
+    { is_exn_handler = true; params = [exn]; arity = [KS.any_value] };
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
   let should_preserve_direct_calls =
@@ -793,14 +789,12 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     }
   in
   Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind bp acc) params;
-  Acc.kind (Name.var my_closure) Flambda_kind.value acc;
+  Acc.kind (Name.var my_closure) K.value acc;
+  Option.iter (fun region -> Acc.kind (Name.var region) K.region acc) my_region;
   Option.iter
-    (fun region -> Acc.kind (Name.var region) Flambda_kind.region acc)
-    my_region;
-  Option.iter
-    (fun region -> Acc.kind (Name.var region) Flambda_kind.region acc)
+    (fun region -> Acc.kind (Name.var region) K.region acc)
     my_ghost_region;
-  Acc.kind (Name.var my_depth) Flambda_kind.rec_info acc;
+  Acc.kind (Name.var my_depth) K.rec_info acc;
   if is_opaque
   then (
     List.iter
@@ -860,7 +854,7 @@ and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
 type result =
   { holed : Rev_expr.t;
     deps : Global_flow_graph.graph;
-    kinds : Flambda_kind.t Name.Map.t;
+    kinds : K.t Name.Map.t;
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t
@@ -882,11 +876,9 @@ let run (unit : Flambda_unit.t) =
   Acc.add_any_source acc (Code_id_or_name.symbol all_constants);
   let create_holed () =
     let dummy_toplevel_return =
-      Variable.create "dummy_toplevel_return" Flambda_kind.value
+      Variable.create "dummy_toplevel_return" K.value
     in
-    let dummy_toplevel_exn =
-      Variable.create "dummy_toplevel_exn" Flambda_kind.value
-    in
+    let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
     Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
     Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
     let return_continuation = Flambda_unit.return_continuation unit in
@@ -899,12 +891,12 @@ let run (unit : Flambda_unit.t) =
     Acc.continuation_info acc return_continuation
       { is_exn_handler = false;
         params = [dummy_toplevel_return];
-        arity = [Flambda_kind.With_subkind.any_value]
+        arity = [KS.any_value]
       };
     Acc.continuation_info acc exn_continuation
       { is_exn_handler = true;
         params = [dummy_toplevel_exn];
-        arity = [Flambda_kind.With_subkind.any_value]
+        arity = [KS.any_value]
       };
     Acc.fixed_arity_continuation acc return_continuation;
     Acc.fixed_arity_continuation acc exn_continuation;
