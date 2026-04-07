@@ -14,9 +14,9 @@
 let neg x = -x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  movl  $2, %eax
-  subq  %rbx, %rax
+  movl  $2, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -368,8 +368,9 @@ let collatz n =
 ;;
 [%%expect_asm X86_64{|
 collatz:
+  movl  $1, %edi
   movq  %rax, %rbx
-  movl  $1, %eax
+  movq  %rdi, %rax
   cmpq  $3, %rbx
   jg    .L1
 .L0:

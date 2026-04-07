@@ -97,6 +97,8 @@ select_utils.mli
 selectgen.ml
 selectgen.mli
 selection.mli
+ssa/**/*.ml
+ssa/**/*.mli
 stack_check.mli
 stack_class.mli
 stack_class_utils.ml

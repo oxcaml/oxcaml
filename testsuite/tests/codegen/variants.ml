@@ -192,30 +192,30 @@ let unnecessary_match = function
 [%%expect_asm X86_64{|
 unnecessary_match:
   sarq  $1, %rax
-  leaq  .L125(%rip), %rdx
+  leaq  .L135(%rip), %rdx
   movslq (%rdx,%rax,4), %rax
   addq  %rax, %rdx
   jmp   *%rdx
 .L0:
-  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
+  movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
 .L1:
-  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
+  movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $3, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
 .L2:
-  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
+  movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $5, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
 .L3:
-  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
+  movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $7, %eax
   movq  (%rbx), %rdi
