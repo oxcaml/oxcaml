@@ -433,8 +433,8 @@ int_safe_get:
   jae   .L0
   movq  -4(%rax,%rbx,4), %rax
   ret
-.L0:
-  movq  camlTOP38__block1142@GOTPCREL(%rip), %rax
+.L115:
+  movq  camlTOP39__block1174@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -457,8 +457,8 @@ ref_safe_set:
   movl  $1, %eax
   addq  $8, %rsp
   ret
-.L0:
-  movq  camlTOP39__block1184@GOTPCREL(%rip), %rax
+.L116:
+  movq  camlTOP40__block1216@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -498,7 +498,7 @@ poly_safe_get:
   ret
 .L2:
   subq  $8, %rsp
-  movq  camlTOP40__block1227@GOTPCREL(%rip), %rax
+  movq  camlTOP41__block1259@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -531,7 +531,7 @@ poly_safe_set:
   ret
 .L1:
   subq  $8, %rsp
-  movq  camlTOP41__block1282@GOTPCREL(%rip), %rax
+  movq  camlTOP42__block1314@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -551,8 +551,8 @@ int64_safe_get:
   jae   .L0
   movq  -4(%rax,%rbx,4), %rax
   ret
-.L0:
-  movq  camlTOP42__block1339@GOTPCREL(%rip), %rax
+.L116:
+  movq  camlTOP43__block1371@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -570,8 +570,8 @@ float_safe_get:
   jae   .L0
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
-.L0:
-  movq  camlTOP43__block1380@GOTPCREL(%rip), %rax
+.L115:
+  movq  camlTOP44__block1412@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -589,8 +589,8 @@ float_safe_get_plain:
   jae   .L0
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
-.L0:
-  movq  camlTOP44__block1421@GOTPCREL(%rip), %rax
+.L115:
+  movq  camlTOP45__block1453@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -613,8 +613,8 @@ int32_safe_get:
   jae   .L0
   movslq -2(%rax,%rbx,2), %rax
   ret
-.L0:
-  movq  camlTOP45__block1466@GOTPCREL(%rip), %rax
+.L120:
+  movq  camlTOP46__block1498@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
