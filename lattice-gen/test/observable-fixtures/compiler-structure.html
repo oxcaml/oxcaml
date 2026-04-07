@@ -513,6 +513,31 @@ end
 let[@cold] raise_unknown_lattice_element () =
   invalid_arg &quot;unknown lattice element&quot;
 
+module type Opposable = sig
+  type t
+
+  val le : t -&gt; t -&gt; bool
+  val min : t
+  val max : t
+  val join : t -&gt; t -&gt; t
+  val meet : t -&gt; t -&gt; t
+  val subtract : t -&gt; t -&gt; t
+  val imply : t -&gt; t -&gt; t
+end
+
+module Opposite (L : Opposable) = struct
+  let min = L.max
+  let max = L.min
+
+  let[@inline] le x y = L.le y x
+
+  let join = L.meet
+  let meet = L.join
+
+  let subtract x y = L.imply y x
+  let imply x y = L.subtract y x
+end
+
 (* Base Lattices *)
 
 module Locality = struct
@@ -1712,268 +1737,33 @@ end
 (* Opposite Lattices *)
 
 module Uniqueness_op = struct
-  type view =
-    | Aliased
-    | Unique
+  include Uniqueness
 
-  let aliased = 0
-  let unique = 1
-
-  type t = int
-
-  let min = 0
-  let max = 0b1
-  let[@inline] le x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] subtract x y = x land lnot y
-  let[@inline] imply x y = (x lxor 0b1) lor y
-
-  module Repr = struct
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let[@inline] view = function
-    | 0 -&gt; Aliased
-    | 1 -&gt; Unique
-    | _ -&gt; raise_unknown_lattice_element ()
-
-  let[@inline] of_view = function
-    | Aliased -&gt; aliased
-    | Unique -&gt; unique
-
-  let print ppf x =
-    let s =
-      match x with
-      | 0 -&gt; &quot;aliased&quot;
-      | 1 -&gt; &quot;unique&quot;
-      | _ -&gt; raise_unknown_lattice_element ()
-    in
-    Format.pp_print_string ppf s
+  include Opposite (Uniqueness)
 end
 
 module Contention_op = struct
-  type view =
-    | Contended
-    | Shared
-    | Uncontended
+  include Contention
 
-  let contended = 0
-  let shared = 1
-  let uncontended = 3
-
-  type t = int
-
-  let min = 0
-  let max = 0b11
-  let[@inline] le x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy lor ((zxy land 0b10) lsr 1)
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    (zxy lor ((zxy land 0b1) lsl 1)) lxor 0b11
-
-  module Repr = struct
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let[@inline] view = function
-    | 0 -&gt; Contended
-    | 1 -&gt; Shared
-    | 3 -&gt; Uncontended
-    | _ -&gt; raise_unknown_lattice_element ()
-
-  let[@inline] of_view = function
-    | Contended -&gt; contended
-    | Shared -&gt; shared
-    | Uncontended -&gt; uncontended
-
-  let print ppf x =
-    let s =
-      match x with
-      | 0 -&gt; &quot;contended&quot;
-      | 1 -&gt; &quot;shared&quot;
-      | 3 -&gt; &quot;uncontended&quot;
-      | _ -&gt; raise_unknown_lattice_element ()
-    in
-    Format.pp_print_string ppf s
+  include Opposite (Contention)
 end
 
 module Visibility_op = struct
-  type view =
-    | Immutable
-    | Read
-    | Read_write
-    | Write
+  include Visibility
 
-  let immutable = 0
-  let read = 1
-  let read_write = 3
-  let write = 2
-
-  type t = int
-
-  let min = 0
-  let max = 0b11
-  let[@inline] le x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] subtract x y = x land lnot y
-  let[@inline] imply x y = (x lxor 0b11) lor y
-
-  module Repr = struct
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let[@inline] view = function
-    | 0 -&gt; Immutable
-    | 1 -&gt; Read
-    | 3 -&gt; Read_write
-    | 2 -&gt; Write
-    | _ -&gt; raise_unknown_lattice_element ()
-
-  let[@inline] of_view = function
-    | Immutable -&gt; immutable
-    | Read -&gt; read
-    | Read_write -&gt; read_write
-    | Write -&gt; write
-
-  let print ppf x =
-    let s =
-      match x with
-      | 0 -&gt; &quot;immutable&quot;
-      | 1 -&gt; &quot;read&quot;
-      | 3 -&gt; &quot;read_write&quot;
-      | 2 -&gt; &quot;write&quot;
-      | _ -&gt; raise_unknown_lattice_element ()
-    in
-    Format.pp_print_string ppf s
+  include Opposite (Visibility)
 end
 
 module Staticity_op = struct
-  type view =
-    | Dynamic
-    | Static
+  include Staticity
 
-  let dynamic = 0
-  let static = 1
-
-  type t = int
-
-  let min = 0
-  let max = 0b1
-  let[@inline] le x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] subtract x y = x land lnot y
-  let[@inline] imply x y = (x lxor 0b1) lor y
-
-  module Repr = struct
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  let[@inline] view = function
-    | 0 -&gt; Dynamic
-    | 1 -&gt; Static
-    | _ -&gt; raise_unknown_lattice_element ()
-
-  let[@inline] of_view = function
-    | Dynamic -&gt; dynamic
-    | Static -&gt; static
-
-  let print ppf x =
-    let s =
-      match x with
-      | 0 -&gt; &quot;dynamic&quot;
-      | 1 -&gt; &quot;static&quot;
-      | _ -&gt; raise_unknown_lattice_element ()
-    in
-    Format.pp_print_string ppf s
+  include Opposite (Staticity)
 end
 
 module Monadic_op = struct
-  type t = int
+  include Monadic
 
-  let min = 0
-  let max = 0b111111
-  let[@inline] le x y = (x land y) = x
-  let[@inline] equal (x : t) (y : t) = x = y
-  let[@inline] join x y = x lor y
-  let[@inline] meet x y = x land y
-  let[@inline] subtract x y =
-    let zxy = x land lnot y in
-    zxy lor ((zxy land 0b100) lsr 1)
-  let[@inline] imply x y =
-    let zxy = x land lnot y in
-    (zxy lor ((zxy land 0b10) lsl 1)) lxor 0b111111
-
-  module Repr = struct
-    let[@inline] to_int_unsafe x = x
-    let[@inline] from_int_unsafe x = x
-  end
-
-  type view = {
-    uniqueness : Uniqueness_op.t;
-    contention : Contention_op.t;
-    visibility : Visibility_op.t;
-    staticity : Staticity_op.t;
-  }
-
-  let[@inline] make
-      ~uniqueness
-      ~contention
-      ~visibility
-      ~staticity
-    =
-    uniqueness lor (contention lsl 1) lor (visibility lsl 3) lor (staticity lsl 5)
-
-  let[@inline] of_view view =
-    make
-      ~uniqueness:view.uniqueness
-      ~contention:view.contention
-      ~visibility:view.visibility
-      ~staticity:view.staticity
-
-  let[@inline] view t =
-    {
-      uniqueness = t land 0b1;
-      contention = (t land 0b110) lsr 1;
-      visibility = (t land 0b11000) lsr 3;
-      staticity = t lsr 5;
-    }
-
-  let[@inline] proj_uniqueness t = t land 0b1
-  let[@inline] with_uniqueness x t = x lor (t land 0b111110)
-
-  let[@inline] proj_contention t = (t land 0b110) lsr 1
-  let[@inline] with_contention x t = (x lsl 1) lor (t land 0b111001)
-
-  let[@inline] proj_visibility t = (t land 0b11000) lsr 3
-  let[@inline] with_visibility x t = (x lsl 3) lor (t land 0b100111)
-
-  let[@inline] proj_staticity t = t lsr 5
-  let[@inline] with_staticity x t = (x lsl 5) lor (t land 0b11111)
-
-  let print ppf x =
-    let view = view x in
-    Format.fprintf
-      ppf
-      &quot;%a,%a,%a,%a&quot;
-      Uniqueness_op.print view.uniqueness
-      Contention_op.print view.contention
-      Visibility_op.print view.visibility
-      Staticity_op.print view.staticity
+  include Opposite (Monadic)
 end
 
 (* Product Lattices *)
@@ -2572,11 +2362,13 @@ module Uniqueness_op : sig
      aliased &lt; unique
   *)
 
+  type t = Uniqueness.t
+
   type view =
     | Aliased
     | Unique
 
-  include Lattice with type view := view
+  include Lattice with type t := t and type view := view
 
   val aliased : t
   val unique : t
@@ -2587,12 +2379,14 @@ module Contention_op : sig
      contended &lt; shared &lt; uncontended
   *)
 
+  type t = Contention.t
+
   type view =
     | Contended
     | Shared
     | Uncontended
 
-  include Lattice with type view := view
+  include Lattice with type t := t and type view := view
 
   val contended : t
   val shared : t
@@ -2605,13 +2399,15 @@ module Visibility_op : sig
      immutable &lt; write &lt; read_write
   *)
 
+  type t = Visibility.t
+
   type view =
     | Immutable
     | Read
     | Read_write
     | Write
 
-  include Lattice with type view := view
+  include Lattice with type t := t and type view := view
 
   val immutable : t
   val read : t
@@ -2624,17 +2420,21 @@ module Staticity_op : sig
      dynamic &lt; static
   *)
 
+  type t = Staticity.t
+
   type view =
     | Dynamic
     | Static
 
-  include Lattice with type view := view
+  include Lattice with type t := t and type view := view
 
   val dynamic : t
   val static : t
 end
 
 module Monadic_op : sig
+  type t = Monadic.t
+
   type view = {
     uniqueness : Uniqueness_op.t;
     contention : Contention_op.t;
@@ -2642,7 +2442,7 @@ module Monadic_op : sig
     staticity : Staticity_op.t;
   }
 
-  include Lattice with type view := view
+  include Lattice with type t := t and type view := view
 
   val make :
     uniqueness:Uniqueness_op.t -&gt;

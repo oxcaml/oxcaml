@@ -240,6 +240,31 @@ let lattice_module_type_text =
   \  end\n\
   end\n\n"
 
+let opposable_module_type_text =
+  "module type Opposable = sig\n\
+  \  type t\n\
+  \n\
+  \  val le : t -> t -> bool\n\
+  \  val min : t\n\
+  \  val max : t\n\
+  \  val join : t -> t -> t\n\
+  \  val meet : t -> t -> t\n\
+  \  val subtract : t -> t -> t\n\
+  \  val imply : t -> t -> t\n\
+  end\n\n\
+   module Opposite (L : Opposable) = struct\n\
+  \  let min = L.max\n\
+  \  let max = L.min\n\
+  \n\
+  \  let[@inline] le x y = L.le y x\n\
+  \n\
+  \  let join = L.meet\n\
+  \  let meet = L.join\n\
+  \n\
+  \  let subtract x y = L.imply y x\n\
+  \  let imply x y = L.subtract y x\n\
+  end\n\n"
+
 let add_module_type_s buf = Buffer.add_string buf lattice_module_type_text
 
 let add_module_type_s_ml buf = Buffer.add_string buf lattice_module_type_text
@@ -248,7 +273,8 @@ let add_common_prelude_ml buf =
   Buffer.add_string
     buf
     "let[@cold] raise_unknown_lattice_element () =\n\
-\  invalid_arg \"unknown lattice element\"\n\n"
+\  invalid_arg \"unknown lattice element\"\n\n";
+  Buffer.add_string buf opposable_module_type_text
 
 let add_common_ml_items buf desc =
   Buffer.add_string buf "  type t = int\n\n";
@@ -307,19 +333,32 @@ let add_base_order_comment buf (base : base) finite =
   List.iter (fun chain -> bprintf buf "     %s\n" chain) chains;
   Buffer.add_string buf "  *)\n"
 
-let add_base_sig buf (base : base) module_name finite =
+let add_base_sig ?manifest_t ?manifest_view buf (base : base) module_name finite =
   bprintf buf "module %s : sig\n" module_name;
   add_base_order_comment buf base finite;
   Buffer.add_char buf '\n';
-  Buffer.add_string buf "  type view =\n";
-  Array.iter
-    (fun name ->
-      bprintf buf "    | %s\n" (view_ctor_name name))
-    base.element_names;
-  Buffer.add_char buf '\n';
-  Buffer.add_string
-    buf
-    "  include Lattice with type view := view\n\n";
+  Option.iter
+    (fun manifest_t -> bprintf buf "  type t = %s.t\n\n" manifest_t)
+    manifest_t;
+  (match manifest_view with
+   | Some manifest_view ->
+     bprintf buf "  type view = %s.view\n\n" manifest_view
+   | None ->
+     Buffer.add_string buf "  type view =\n";
+     Array.iter
+       (fun name ->
+         bprintf buf "    | %s\n" (view_ctor_name name))
+       base.element_names;
+     Buffer.add_char buf '\n');
+  (match manifest_t with
+   | None ->
+     Buffer.add_string
+       buf
+       "  include Lattice with type view := view\n\n"
+   | Some _ ->
+     Buffer.add_string
+       buf
+       "  include Lattice with type t := t and type view := view\n\n");
   Array.iteri
     (fun i value_name ->
       bprintf buf "  val %s : t\n" value_name;
@@ -374,22 +413,35 @@ let add_base_ml buf (base : base) module_name desc =
   Buffer.add_string buf "    Format.pp_print_string ppf s\n";
   Buffer.add_string buf "end\n\n"
 
-let add_product_sig buf (product : product) module_name ~in_op =
+let add_product_sig ?manifest_t ?manifest_view buf (product : product) module_name ~in_op =
   bprintf buf "module %s : sig\n" module_name;
-  Buffer.add_string buf "  type view = {\n";
-  List.iter
-    (fun (field : field) ->
-      let field_name = emitted_field_name field in
-      bprintf
-        buf
-        "    %s : %s.t;\n"
-        field_name
-        (field_module_name field ~in_op))
-    product.fields;
-  Buffer.add_string buf "  }\n\n";
-  Buffer.add_string
-    buf
-    "  include Lattice with type view := view\n\n";
+  Option.iter
+    (fun manifest_t -> bprintf buf "  type t = %s.t\n\n" manifest_t)
+    manifest_t;
+  (match manifest_view with
+   | Some manifest_view ->
+     bprintf buf "  type view = %s.view\n\n" manifest_view
+   | None ->
+     Buffer.add_string buf "  type view = {\n";
+     List.iter
+       (fun (field : field) ->
+         let field_name = emitted_field_name field in
+         bprintf
+           buf
+           "    %s : %s.t;\n"
+           field_name
+           (field_module_name field ~in_op))
+       product.fields;
+     Buffer.add_string buf "  }\n\n");
+  (match manifest_t with
+   | None ->
+     Buffer.add_string
+       buf
+       "  include Lattice with type view := view\n\n"
+   | Some _ ->
+     Buffer.add_string
+       buf
+       "  include Lattice with type t := t and type view := view\n\n");
   Buffer.add_string buf "  val make :\n";
   List.iter
     (fun (field : field) ->
@@ -506,6 +558,12 @@ let add_product_ml buf (product : product) module_name (desc : descriptor) ~in_o
     product.fields;
   Buffer.add_string buf "end\n\n"
 
+let add_opposite_ml buf module_name source_module_name =
+  bprintf buf "module %s = struct\n" module_name;
+  bprintf buf "  include %s\n\n" source_module_name;
+  bprintf buf "  include Opposite (%s)\n" source_module_name;
+  Buffer.add_string buf "end\n\n"
+
 let add_primitive_morph_sig buf (primitive : primitive_morph) =
   let core = primitive.core in
   bprintf
@@ -522,22 +580,25 @@ let lattice_expr_module_sig_and_ml buf_mli buf_ml lattice expr =
     add_base_ml buf_ml base base.name base.descriptor
   | Base base, true ->
     add_base_sig
+      ~manifest_t:base.name
+      ~manifest_view:base.name
       buf_mli
       base
       (Name.op_module_name base.name)
       (lattice_reverse base.logical);
-    add_base_ml buf_ml base (Name.op_module_name base.name) base.op_descriptor
+    add_opposite_ml buf_ml (Name.op_module_name base.name) base.name
   | Product product, false ->
     add_product_sig buf_mli product product.name ~in_op:false;
     add_product_ml buf_ml product product.name product.descriptor ~in_op:false
   | Product product, true ->
-    add_product_sig buf_mli product (Name.op_module_name product.name) ~in_op:true;
-    add_product_ml
-      buf_ml
+    add_product_sig
+      ~manifest_t:product.name
+      ~manifest_view:product.name
+      buf_mli
       product
       (Name.op_module_name product.name)
-      product.op_descriptor
-      ~in_op:true
+      ~in_op:true;
+    add_opposite_ml buf_ml (Name.op_module_name product.name) product.name
 
 let source_element_name lattice_name index model =
   match String_map.find lattice_name model.lattices with

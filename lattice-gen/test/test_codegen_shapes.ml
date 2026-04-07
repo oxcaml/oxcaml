@@ -196,4 +196,74 @@ h2 : A -> C = g ∘ f
 |}
     [ "val h : A.t -> C.t";
       "val h2 : A.t -> C.t"
-    ]
+    ];
+  Test_support.expect_generated_ml_contains
+    ~name:"opposite-wrapper.lattice"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+
+P = {
+  x : A^op;
+  y : A;
+}
+
+Q = {
+  p : P^op;
+  a : A;
+}
+|}
+    [ "module A_op = struct\n  include A\n\n  include Opposite (A)\nend";
+      "module P_op = struct\n  include P\n\n  include Opposite (P)\nend"
+    ];
+  Test_support.expect_generated_mli_contains
+    ~name:"opposite-wrapper.lattice"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+
+P = {
+  x : A^op;
+  y : A;
+}
+
+Q = {
+  p : P^op;
+  a : A;
+}
+|}
+    [ "module A_op : sig\n  (* Order:\n     hi < lo\n  *)\n\n  type t = A.t";
+      "module P_op : sig\n  type t = P.t";
+      "type view = A.view";
+      "type view = P.view";
+      "val proj_x : t -> A.t";
+      "val proj_y : t -> A_op.t"
+    ];
+  Test_support.compile_generated_case
+    ~name:"opposite-wrapper.lattice"
+    ~source:
+      {|
+A = [ Lo < Hi ]
+
+P = {
+  x : A^op;
+  y : A;
+}
+
+Q = {
+  p : P^op;
+  a : A;
+}
+|}
+    ~main:
+      {|
+let () =
+  let p = Generated.P.make ~x:Generated.A_op.hi ~y:Generated.A.lo in
+  let (_ : Generated.A.t) = Generated.P_op.proj_x p in
+  let (_ : Generated.A_op.t) = Generated.P_op.proj_y p in
+  let (_ : Generated.P.t) = Generated.P_op.with_x Generated.A.lo p in
+  let _q =
+    Generated.Q.make ~p:(Generated.P_op.with_x Generated.A.lo p) ~a:Generated.A.hi
+  in
+  ()
+|}
