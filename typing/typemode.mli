@@ -73,7 +73,9 @@ val transl_with_bound_modifiers :
   Mode.Modality.Const.t * Jkind_axis.Externality.t option
 
 (** Interpret a mod-bounds. *)
-val transl_mod_bounds : Parsetree.modes -> Jkind.Mod_bounds.t
+val transl_mod_bounds :
+  Parsetree.modes ->
+  Jkind.Mod_bounds.t * Jkind_axis.Separability.t Location.loc option
 
 (** Translate an algebraic representation of mod bounds into user syntax. If
     [verbose] is true, redundant annotations are included. *)

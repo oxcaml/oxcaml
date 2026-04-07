@@ -42,14 +42,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type t : immutable_data end
+         sig type t : immutable_data non_pointer end
        is not included in
          sig type t : immediate end
        Type declarations do not match:
-         type t : immutable_data
+         type t : immutable_data non_pointer
        is not included in
          type t : immediate
-       The kind of the first is immutable_data
+       The kind of the first is immutable_data non_pointer
          because of the definition of t at line 4, characters 2-32.
        But the kind of the first must be a subkind of immediate
          because of the definition of t at line 2, characters 2-20.
@@ -343,9 +343,9 @@ Error: Signature mismatch:
          type 'a t = 'a
        is not included in
          type 'a t : immutable_data with 'a
-       The kind of the first is value
+       The layout of the first is value
          because of the definition of t at line 2, characters 2-36.
-       But the kind of the first must be a subkind of immutable_data with 'a
+       But the layout of the first must be a sublayout of value non_float
          because of the definition of t at line 2, characters 2-36.
 |}]
 

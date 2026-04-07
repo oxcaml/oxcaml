@@ -114,7 +114,7 @@ Error: Signature mismatch:
          type t = int
        is not included in
          type t : bits64
-       The layout of the first is value
+       The layout of the first is immediate
          because it is the primitive type int.
        But the layout of the first must be a sublayout of bits64
          because of the definition of t at line 3, characters 2-12.
@@ -139,7 +139,7 @@ Error: Signature mismatch:
          type t
        The layout of the first is bits64
          because of the definition of t at line 2, characters 2-17.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a value layout
          because of the definition of t at line 3, characters 2-12.
 |}]
 
@@ -621,7 +621,7 @@ Error: Signature mismatch:
          type t
        The layout of the first is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a value layout
          because of the definition of t at line 5, characters 2-14.
 |}]
 
@@ -644,7 +644,7 @@ Error: Signature mismatch:
          type t
        The layout of the first is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a value layout
          because of the definition of t at line 5, characters 2-14.
 |}]
 

@@ -123,7 +123,7 @@ type t12 : bits64
 
 [%%expect{|
 type t1 : any
-type t2 : any mod separable
+type t2 : any separable
 type t3 : value_or_null
 type t4
 type t5 : void
@@ -911,7 +911,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : ('a : value_or_null mod separable). 'a iarray -> 'a iarray = <fun>
+val f : ('a : value_or_null separable). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)
@@ -1490,7 +1490,7 @@ Error: This expression has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because of the annotation on the wildcard _ at line 1, characters 22-33.
          need a value
 |}]

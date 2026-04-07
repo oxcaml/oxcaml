@@ -152,8 +152,7 @@ Error: This expression has type "<[#($('a) * $('b) * $('c))]> expr"
        but an expression was expected of type "'d expr"
        The layout of <[#($('a) * $('b) * $('c))]> is any & any & any
          because it is an unboxed tuple.
-       But the layout of <[#($('a) * $('b) * $('c))]> must be a sublayout of
-           value
+       But the layout of <[#($('a) * $('b) * $('c))]> must be a value layout
          because of the definition of eval at line 7, characters 2-38.
 |}]
 
