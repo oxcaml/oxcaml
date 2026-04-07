@@ -35,8 +35,6 @@ let apply_cont_deps denv acc apply_cont =
         ~from:(Acc.simple_to_node acc ~denv dep))
     params args
 
-let reaper_test_opaque = Sys.getenv_opt "REAPEROPAQUE" <> None
-
 let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   let return =
     List.mapi
@@ -269,11 +267,6 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
           ~from:(Code_id_or_name.name denv.all_constants);
         Acc.add_constructor_dep acc ~base Field.get_tag
           ~from:(Code_id_or_name.name denv.all_constants))
-  | Unary (Opaque_identity { middle_end_only = true; _ }, arg)
-    when reaper_test_opaque ->
-    (* XXX TO REMOVE !!! *)
-    let from = Acc.simple_to_node acc ~denv arg in
-    default_bp (fun to_ -> Acc.add_alias acc ~to_ ~from)
   | Unary (Project_function_slot { move_from = _; move_to }, block) ->
     let block = Acc.simple_to_node acc ~denv block in
     default_bp (fun to_ ->
@@ -284,9 +277,10 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         Acc.add_accessor_dep acc ~to_ (Field.value_slot value_slot) ~base:block)
   | Unary (Block_load { kind; mut; field }, block) -> (
     (* Loads from mutable blocks are also tracked here. This is ok because
-       stores automatically escape the block. CR ncourant: think about whether
-       we can make stores only escape the corresponding fields of the block
-       instead of the whole block. *)
+       stores automatically cause the block to escape. *)
+    (* CR ncourant: think about whether we can make stores only cause the
+       corresponding fields of the block to escape instead of the whole block.
+    *)
     let kind = Flambda_primitive.Block_access_kind.element_kind_for_load kind in
     let block = Acc.simple_to_node acc ~denv block in
     default_bp (fun to_ ->
