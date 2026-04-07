@@ -178,7 +178,7 @@ Line 2, characters 11-13:
 Error: The type "r" has no unboxed version.
 Hint: Float records don't get unboxed versions.
 |}]
-type r = { f : float ; f2 : float# }
+type r = { f : float ; f2 : float# } [@@flatten_floats]
 type bad = r#
 [%%expect{|
 type r = { f : float; f2 : float#; }

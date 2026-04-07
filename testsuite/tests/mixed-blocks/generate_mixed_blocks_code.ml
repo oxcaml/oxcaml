@@ -378,9 +378,10 @@ module Mixed_record = struct
 
   let type_decl t =
     sprintf
-      "type %s = { %s }"
+      "type %s = { %s }%s"
       (type_ t)
       (fields_to_type_decl t.fields)
+      (if is_all_floats t then " [@@flatten_floats]" else "")
   ;;
 
   let record_value_of_fields fields =

@@ -200,6 +200,8 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
+  | Missing_flatten_floats
+  | Misplaced_flatten_floats
 
 exception Error of Location.t * error
 

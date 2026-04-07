@@ -30,9 +30,10 @@ type t_void_at_border_of_prefix_and_suffix = {
 
 type t_void_in_all_float_mixed_record = { x : t_void; y : float#; z : float }
 [%%expect {|
-type t_void_in_all_float_mixed_record = {
-  x : t_void;
-  y : float#;
-  z : float;
-}
+Line 1, characters 0-77:
+1 | type t_void_in_all_float_mixed_record = { x : t_void; y : float#; z : float }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This record type mixes boxed and unboxed float fields,
+       which causes the flat float record optimization.
+       You must annotate it with "[@@flatten_floats]".
 |}]
