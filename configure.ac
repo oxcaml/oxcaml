@@ -159,7 +159,7 @@ AC_ARG_ENABLE([runtime5],
   [AS_HELP_STRING([--enable-runtime5],
     [Use the OCaml 5 runtime])],
   [],
-  [enable_runtime5=no])
+  [enable_runtime5=yes])
 
 AC_ARG_ENABLE([coverage],
   [AS_HELP_STRING([--enable-coverage],
