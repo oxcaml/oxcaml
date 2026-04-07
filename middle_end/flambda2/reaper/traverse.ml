@@ -145,16 +145,7 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
         names_and_function_slots)
     names_and_function_slots
 
-let rec traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
-  match Expr.descr expr with
-  | Let let_expr -> traverse_let denv acc let_expr
-  | Let_cont let_cont -> traverse_let_cont denv acc let_cont
-  | Apply apply -> traverse_apply denv acc apply
-  | Apply_cont apply_cont -> traverse_apply_cont denv acc apply_cont
-  | Switch switch -> traverse_switch denv acc switch
-  | Invalid { message } -> traverse_invalid denv acc ~message
-
-and traverse_let denv acc let_expr : rev_expr =
+let rec traverse_let denv acc let_expr : rev_expr =
   let bound_pattern, body =
     Let.pattern_match let_expr ~f:(fun bound_pattern ~body ->
         bound_pattern, body)
@@ -856,6 +847,15 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     }
   in
   { params_and_body; code_metadata; free_names_of_params_and_body }
+
+and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
+  match Expr.descr expr with
+  | Let let_expr -> traverse_let denv acc let_expr
+  | Let_cont let_cont -> traverse_let_cont denv acc let_cont
+  | Apply apply -> traverse_apply denv acc apply
+  | Apply_cont apply_cont -> traverse_apply_cont denv acc apply_cont
+  | Switch switch -> traverse_switch denv acc switch
+  | Invalid { message } -> traverse_invalid denv acc ~message
 
 type result =
   { holed : Rev_expr.t;
