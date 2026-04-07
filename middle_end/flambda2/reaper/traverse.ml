@@ -220,7 +220,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
           ~to_);
     default acc
 
-and traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
+let traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
     set_of_closures =
   let names_and_function_slots =
     let bound_vars =
@@ -245,7 +245,7 @@ and traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
   in
   record_set_of_closures_deps denv names_and_function_slots set_of_closures acc
 
-and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
+let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
   let bound_static =
     match bound_pattern with
     | Static b -> b
