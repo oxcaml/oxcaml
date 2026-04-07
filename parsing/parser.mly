@@ -4062,8 +4062,14 @@ type_parameters:
       { ps }
 ;
 
-jkind_desc:
-    jkind_annotation MOD mkrhs(LIDENT)+ { (* LIDENTs here are for modes *)
+(* This grammar is parameterized by itself so that we can sometimes include with
+   kinds and sometimes not. It would be nice if the typechecker could be solely
+   responsible for ruling out with kinds in positions where they may not appear,
+   but in practice they create problems for parsing around "with kind_"
+   constraints, as both use the word "with". *)
+jkind_desc_gen(self):
+    jkind_annotation_gen(self) MOD mkrhs(LIDENT)+ {
+      (* LIDENTs here are for modes *)
       let modes =
         List.map
           (fun {txt; loc} -> {txt = Mode txt; loc})
@@ -4071,36 +4077,57 @@ jkind_desc:
       in
       Pjk_mod ($1, modes)
     }
-  | jkind_annotation WITH core_type optional_atat_modalities_expr {
-      Pjk_with ($1, $3, $4)
-    }
   | mkrhs(type_longident) mkrhs(LIDENT)* {
       Pjk_abbreviation ($1, $2)
     }
-  | KIND_OF ty=core_type {
+  | KIND_OF ty=core_type %prec below_LBRACKETAT {
       Pjk_kind_of ty
     }
   | UNDERSCORE {
       Pjk_default
     }
-  | reverse_product_jkind %prec below_AMPERSAND {
+  | reverse_product_jkind_gen(self) %prec below_AMPERSAND {
       Pjk_product (List.rev $1)
     }
-  | LPAREN jkind_desc RPAREN {
+  | LPAREN self RPAREN {
       $2
     }
 ;
 
-reverse_product_jkind :
-  | jkind1 = jkind_annotation AMPERSAND jkind2 = jkind_annotation %prec prec_unboxed_product_kind
-      { [jkind2; jkind1] }
-  | jkinds = reverse_product_jkind
+reverse_product_jkind_gen(self):
+  | jkind1 = jkind_annotation_gen(self)
     AMPERSAND
-    jkind = jkind_annotation %prec prec_unboxed_product_kind
+    jkind2 = jkind_annotation_gen(self) %prec prec_unboxed_product_kind
+      { [jkind2; jkind1] }
+  | jkinds = reverse_product_jkind_gen(self)
+    AMPERSAND
+    jkind = jkind_annotation_gen(self) %prec prec_unboxed_product_kind
     { jkind :: jkinds }
+;
+
+jkind_annotation_gen(self) :
+  self { { pjka_loc = make_loc $sloc; pjka_desc = $1 } }
+;
+(* Full jkind grammar - including with kinds *)
+jkind_desc:
+    jkind_annotation_gen(jkind_desc)
+    WITH core_type optional_atat_modalities_expr {
+      Pjk_with ($1, $3, $4)
+    }
+  | jkind_desc_gen(jkind_desc) { $1 }
+;
 
 jkind_annotation: (* : jkind_annotation *)
   jkind_desc { { pjka_loc = make_loc $sloc; pjka_desc = $1 } }
+;
+
+(* jkind grammar without WITH - used in [with_constraint] *)
+jkind_desc_no_with_kinds:
+  jkind_desc_gen(jkind_desc_no_with_kinds) { $1 }
+;
+
+jkind_annotation_no_with_kinds:
+  jkind_desc_no_with_kinds { { pjka_loc = make_loc $sloc; pjka_desc = $1 } }
 ;
 
 jkind_constraint:
@@ -4386,6 +4413,22 @@ with_constraint:
       { Pwith_modtype (l, rhs) }
   | MODULE TYPE l=mkrhs(mty_longident) COLONEQUAL rhs=module_type
       { Pwith_modtypesubst (l, rhs) }
+  | KIND lid=mkrhs(label_longident) EQUAL
+    jka=jkind_annotation_no_with_kinds
+      { Pwith_jkind
+          (lid,
+           { pjkind_name = loc_last lid;
+             pjkind_manifest = Some jka;
+             pjkind_attributes = [];
+             pjkind_loc = make_loc $sloc }) }
+  | KIND lid=mkrhs(label_longident) COLONEQUAL
+    jka=jkind_annotation_no_with_kinds
+      { Pwith_jkindsubst
+          (lid,
+           { pjkind_name = loc_last lid;
+             pjkind_manifest = Some jka;
+             pjkind_attributes = [];
+             pjkind_loc = make_loc $sloc }) }
 ;
 with_type_binder:
     EQUAL          { Public }

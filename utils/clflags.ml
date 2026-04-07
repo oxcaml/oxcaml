@@ -114,6 +114,8 @@ and uses_metaprogramming = ref false    (* -uses-metaprogramming *)
 and custom_runtime = ref false          (* -custom *)
 and no_check_prims = ref false          (* -no-check-prims *)
 and bytecode_compatible_32 = ref false  (* -compat-32 *)
+and thunkify_cu_init = ref false
+  (* -thunkify-compilation-unit-initialization *)
 and output_c_object = ref false         (* -output-obj *)
 and output_complete_object = ref false  (* -output-complete-obj *)
 and output_complete_executable = ref false  (* -output-complete-exe *)

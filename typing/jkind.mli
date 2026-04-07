@@ -478,9 +478,9 @@ val for_unboxed_record :
     [decl_params] is the parameters in the head of the type declaration.
     [type_apply] should be [Ctype.apply] partially applied to an [env].
 
-    [free_vars] is a function that, given a list of [Types.type_expr]s that are
-    used in the boxed variant, returns all type variables that are free within
-    the [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good
+    [get_free_vars] is a function that, given a list of [Types.type_expr]s that
+    are used in the boxed variant, returns all type variables that are free
+    within the [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good
     candidate for implementing this function. *)
 val for_boxed_variant :
   loc:Location.t ->
@@ -490,7 +490,7 @@ val for_boxed_variant :
     Types.type_expr ->
     Types.type_expr list ->
     Types.type_expr) ->
-  free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
+  get_free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
   Types.constructor_declaration list ->
   Types.jkind_l
 

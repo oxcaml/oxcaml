@@ -271,6 +271,12 @@ let[@inline] decr_degree graph reg =
   let deg = degree graph reg in
   if deg <> Degree.infinite then Reg.Tbl.replace graph.degree reg (pred deg)
 
+let[@inline] get_max_degree graph =
+  Reg.Tbl.fold
+    (fun _reg degree acc ->
+      if degree = Degree.infinite then acc else Int.max acc degree)
+    graph.degree 0
+
 let[@inline] init_register graph reg =
   Reg.Tbl.replace graph.adj_list reg [];
   Reg.Tbl.replace graph.degree reg 0

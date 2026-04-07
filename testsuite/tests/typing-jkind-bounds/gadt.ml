@@ -827,3 +827,31 @@ Error: The kind of type "t" is immutable_data with (type : value) t/2
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
+
+(*********************************************************)
+(* Unboxed GADT aliases should stay in declaration-parameter space. *)
+
+type ('a, 'b) unboxed_alias_t : immediate with 'a @@ contended portable
+[%%expect {|
+type ('a, 'b) unboxed_alias_t : immediate with 'a @@ portable contended
+|}]
+
+type 'a unboxed_alias_x =
+  X : ('a, 'b) unboxed_alias_t -> 'a unboxed_alias_x
+[@@unboxed]
+[%%expect {|
+type 'a unboxed_alias_x = X : ('a, 'b) unboxed_alias_t -> 'a unboxed_alias_x [@@unboxed]
+|}]
+
+type 'a unboxed_alias_y
+  : immediate with 'a @@ contended portable = 'a unboxed_alias_x
+[%%expect {|
+type 'a unboxed_alias_y = 'a unboxed_alias_x
+|}]
+
+type 'a unboxed_alias_z
+  : immutable_data with 'a @@ contended portable =
+  'a unboxed_alias_x list
+[%%expect {|
+type 'a unboxed_alias_z = 'a unboxed_alias_x list
+|}]

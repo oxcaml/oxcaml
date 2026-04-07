@@ -76,3 +76,9 @@ module Spilling_heuristics : sig
 
   val value : t Lazy.t
 end
+
+module Interf_threshold : sig
+  type t = int option
+
+  val value : t Lazy.t
+end

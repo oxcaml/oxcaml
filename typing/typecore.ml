@@ -1166,7 +1166,7 @@ let mode_mutate_mutable mut_name =
   let mode =
     { Value.Const.max with
       visibility = Write;
-      contention = Uncontended }
+      contention = Corrupted }
     |> Value.of_const ~hint_monadic:(Mutable_write mut_name)
   in
   mode_default mode
@@ -1192,6 +1192,13 @@ let mode_quoted : expected_mode = mode_default mode_in_quotes
 (** The left-mode of the result of an expression that was quoted.
     Note: we must have that [mode_quoted <= mode_splice] for soundness. *)
 and mode_splice : Value.l = Value.disallow_right mode_in_quotes
+
+(** Lower bound for the mode of a quoted expression that
+    might have side-effects. *)
+let mode_computation_quoted : Value.l =
+  let open Mode_hint in
+  { Value.Const.min with linearity = Once }
+  |> Value.of_const ~hint_comonadic:Quoted_computation
 
 (** The [expected_mode] of a quoted expression value when it is spliced. *)
 let mode_spliced =
@@ -4791,6 +4798,100 @@ and is_nonexpansive_arg = function
 
 let maybe_expansive e = not (is_nonexpansive e)
 
+(** Syntactic computation check for quoted expressions.
+    Potentially expensive or side-effectful computations should return [true],
+    and only syntactic values should return [false]. **)
+let rec maybe_computation exp =
+  match exp.exp_desc with
+  (* Return [false] for syntactic values *)
+  | Texp_ident _ ->
+    false
+  | Texp_constant _ ->
+    false
+  | Texp_function _ ->
+    false
+  | Texp_unboxed_unit ->
+    false
+  | Texp_unboxed_bool _ ->
+    false
+  | Texp_tuple (exps, _) ->
+    List.exists (fun (_, exp) -> maybe_computation exp) exps
+  | Texp_unboxed_tuple exps ->
+    List.exists (fun (_, exp, _) -> maybe_computation exp) exps
+  | Texp_construct (_, _, exps, _) ->
+    List.exists maybe_computation exps
+  | Texp_variant (_, Some (exp, _)) ->
+    maybe_computation exp
+  | Texp_variant (_, None) ->
+    false
+  | Texp_record { fields; extended_expression = None; _ } ->
+    Array.exists
+      (function
+      | (_, Overridden (_, exp)) -> maybe_computation exp
+      | (_, Kept _) -> false)
+      fields
+  | Texp_record { extended_expression = Some _; _ } ->
+    true
+  | Texp_record_unboxed_product { fields; extended_expression = None; _ } ->
+    Array.exists
+      (function
+      | (_, Overridden (_, exp)) -> maybe_computation exp
+      | (_, Kept _) -> false)
+      fields
+  | Texp_record_unboxed_product { extended_expression = Some _; _ } ->
+    true
+  | Texp_field (exp, _, _, _, _, _) ->
+    maybe_computation exp
+  | Texp_unboxed_field (exp, _, _, _, _) ->
+    maybe_computation exp
+  | Texp_array (_, _, exps, _) ->
+    List.exists maybe_computation exps
+  | Texp_hole _ ->
+    false
+  | Texp_quotation exp ->
+    (* Approximate quote values as quotes of values.
+       Note that splices are always considered computations. *)
+    maybe_computation exp
+  (* it is always safe to approximate [maybe_computation] as [true]. *)
+  | Texp_let _
+  | Texp_letmutable _
+  | Texp_apply _
+  | Texp_match _
+  | Texp_try _
+  | Texp_atomic_loc _
+  | Texp_setfield _
+  | Texp_idx _
+  | Texp_list_comprehension _
+  | Texp_array_comprehension _
+  | Texp_ifthenelse _
+  | Texp_sequence _
+  | Texp_while _
+  | Texp_for _
+  | Texp_send _
+  | Texp_new _
+  | Texp_instvar _
+  | Texp_mutvar _
+  | Texp_setinstvar _
+  | Texp_setmutvar _
+  | Texp_override _
+  | Texp_letmodule _
+  | Texp_letexception _
+  | Texp_assert _
+  | Texp_lazy _
+  | Texp_object _
+  | Texp_pack _
+  | Texp_letop _
+  | Texp_unreachable
+  | Texp_extension_constructor _
+  | Texp_open _
+  | Texp_probe _
+  | Texp_probe_is_enabled _
+  | Texp_exclave _
+  | Texp_src_pos
+  | Texp_overwrite _
+  | Texp_antiquotation _
+    -> true
+
 let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
   List.map
@@ -7832,6 +7933,8 @@ and type_expect_
       with_explanation (fun () ->
         unify_exp_types loc env expr_ty (generic_instance ty_expected));
       let arg = type_expect new_env mode_quoted exp (mk_expected ty) in
+      if maybe_computation arg then
+        submode ~loc ~env ~reason:Other mode_computation_quoted expected_mode;
       re {
         exp_desc = Texp_quotation arg;
         exp_loc = loc; exp_extra = [];

@@ -1768,7 +1768,9 @@ module For_jit = struct
       | _ -> label, None
 
     let string_to_target name : Binary_emitter_intf.target =
-      Binary_emitter_intf.Symbol (Asm_symbol.create_global name)
+      Binary_emitter_intf.Symbol
+        (Asm_symbol.create_without_encoding
+           ~visibility:Asm_symbol.Global name)
 
     let target_symbol (r : Reloc.t) : Binary_emitter_intf.target =
       let label =
@@ -1824,6 +1826,11 @@ module For_jit = struct
       | Binary_emitter_intf.Symbol sym -> Asm_symbol.print ppf sym
       | Binary_emitter_intf.Label lbl -> Asm_label.print ppf lbl
 
+    let jit_debug =
+      match Sys.getenv_opt "OCAML_JIT_DEBUG" with
+      | Some ("true" | "1") -> true
+      | _ -> false
+
     let compute_value (r : Reloc.t) ~place_address ~lookup_target
         ~read_instruction:_ =
       let label, addend =
@@ -1833,22 +1840,58 @@ module For_jit = struct
         | Kind.DIR64 (label, addend) ->
           label, addend
       in
-      let sym, _ = parse_label label in
+      let sym, suffix = parse_label label in
       let target = string_to_target sym in
+      if jit_debug then
+        Printf.eprintf
+          "x86 compute_value: label=%s sym=%s suffix=%s \
+           kind=%s place=0x%Lx addend=%Ld\n%!"
+          label sym
+          (match suffix with None -> "<none>" | Some s -> s)
+          (match r.Reloc.kind with
+          | Kind.REL32 _ -> "REL32"
+          | Kind.DIR32 _ -> "DIR32"
+          | Kind.DIR64 _ -> "DIR64")
+          place_address addend;
       match lookup_target target with
       | None ->
+        if jit_debug then
+          Printf.eprintf
+            "x86 compute_value: lookup FAILED for %s\n%!" sym;
         Error (Format.asprintf "Symbol not found: %a" print_target target)
       | Some target_addr ->
+        if jit_debug then
+          Printf.eprintf
+            "x86 compute_value: lookup OK for %s -> 0x%Lx\n%!"
+            sym target_addr;
         let target_addr = Int64.add target_addr addend in
+        let check_range ~value ~min_value ~max_value ~compare =
+          if compare value min_value < 0 || compare value max_value > 0
+          then
+            Error
+              (Format.asprintf
+                 "Computed value 0x%Lx for relocation at address 0x%Lx \
+                  doesn't fit; permissible range is (0x%Lx, 0x%Lx)"
+                 value place_address min_value max_value)
+          else Ok value
+        in
         (match r.Reloc.kind with
         | Kind.REL32 _ ->
           (* Relative: compute offset from place to target *)
           let rel_size = 4L in
           (* REL32 is 4 bytes *)
           let src_addr = Int64.add place_address rel_size in
-          Ok (Int64.sub target_addr src_addr)
-        | Kind.DIR32 _ | Kind.DIR64 _ ->
-          (* Absolute: just use the target address *)
+          let value = Int64.sub target_addr src_addr in
+          check_range ~value
+            ~min_value:(Int64.of_int32 Int32.min_int)
+            ~max_value:(Int64.of_int32 Int32.max_int)
+            ~compare:Int64.compare
+        | Kind.DIR32 _ ->
+          check_range ~value:target_addr
+            ~min_value:0L ~max_value:0xffff_ffffL
+            ~compare:Int64.unsigned_compare
+        | Kind.DIR64 _ ->
+          (* Absolute 64-bit: no range check needed *)
           Ok target_addr)
   end
 

@@ -434,13 +434,6 @@ let raise ~loc err = raise (Error.User_error (loc, err))
 module Mod_bounds = struct
   include Jkind0.Mod_bounds
 
-  let meet t1 t2 =
-    let crossing = Crossing.meet (crossing t1) (crossing t2) in
-    let externality = Externality.meet (externality t1) (externality t2) in
-    let nullability = Nullability.meet (nullability t1) (nullability t2) in
-    let separability = Separability.meet (separability t1) (separability t2) in
-    create crossing ~externality ~nullability ~separability
-
   let less_or_equal t1 t2 =
     let[@inline] modal_less_or_equal ax : Sub_result.t =
       let a = t1 |> crossing |> (Crossing.proj [@inlined hint]) ax in
@@ -1118,9 +1111,12 @@ module Base_and_axes = struct
                     };
                   skippable_axes = relevant_axes_when_seen
                 }
+          (* CR metaprogramming jbachurski: Since quotes/splices inherit
+             (quoted/spliced) with-bounds from their operand, they do not
+             belong in the next case. What is the right behaviour here? *)
+          | Tquote _ | Tsplice _ | Tquote_eval _ -> Skip
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tunivar _ | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _
-          | Tof_kind _ ->
+          | Tunivar _ | Tpackage _ | Tof_kind _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We

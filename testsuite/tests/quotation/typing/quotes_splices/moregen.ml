@@ -46,44 +46,48 @@ module M2 = struct
 end
 
 [%%expect{|
-module M2 : sig val f : 'a expr -> <[$('a) * $('a)]> expr end
+module M2 : sig val f : 'a expr -> <[$('a) * $('a)]> expr @ once end
 |}]
 
 (*  Checking [M2'] does not rely on any quote-splice inverses:
     'a will be unified with <[int]> when checking the function parameter side,
     skipping any nontrivial reasoning.  *)
 module M2' : sig
-  val f : <[ int ]> expr -> <[ int * int ]> expr
+  val f : <[ int ]> expr -> <[ int * int ]> expr @ once
 end = M2
 
 [%%expect{|
-module M2' : sig val f : <[int]> expr -> <[int * int]> expr end
+module M2' : sig val f : <[int]> expr -> <[int * int]> expr @ once end
 |}]
 
 (*  [M3] is trickier, leading to the case $'a < t *)
 
 module M3 = struct
-  let f = let (x : <[ 'a -> unit ]> expr) = <[ fun _ -> () ]> in <[ ($x, $x) ]>
+  let f () =
+    let (x : <[ 'a -> unit ]> expr) = <[ fun _ -> () ]> in
+    <[ ($x, $x) ]>
 end
 
 [%%expect{|
-module M3 : sig val f : <[($('a) -> unit) * ($('a) -> unit)]> expr end
+module M3 :
+  sig val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once end
 |}]
 
 (*   $('a) = int  <=>  'a = <[int]> *)
 module M3' : sig
-  val f : <[ (int -> unit) * (int -> unit) ]> expr
+  val f : unit -> <[ (int -> unit) * (int -> unit) ]> expr @ once
 end = M3
 
 [%%expect{|
-module M3' : sig val f : <[(int -> unit) * (int -> unit)]> expr end
+module M3' :
+  sig val f : unit -> <[(int -> unit) * (int -> unit)]> expr @ once end
 |}]
 
 (*   [M3''] is a simple failure to check the error message when we end up with
      contradicting quoted unificands *)
 (*   string = $('a) = int  <=>  <[string]> = 'a = <[int]>  <=>  string = int (error!) *)
 module M3'' : sig
-  val f : <[ (string -> unit) * (int -> unit) ]> expr
+  val f : unit -> <[ (string -> unit) * (int -> unit) ]> expr @ once
 end = M3
 
 [%%expect{|
@@ -92,16 +96,20 @@ Line 3, characters 6-8:
           ^^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : <[($('a) -> unit) * ($('a) -> unit)]> expr end
+         sig
+           val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once
+         end
        is not included in
-         sig val f : <[(string -> unit) * (int -> unit)]> expr end
+         sig
+           val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
+         end
        Values do not match:
-         val f : <[($('a) -> unit) * ($('a) -> unit)]> expr
+         val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once
        is not included in
-         val f : <[(string -> unit) * (int -> unit)]> expr
-       The type "<[(string -> unit) * (string -> unit)]> expr"
+         val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
+       The type "unit -> <[(string -> unit) * (string -> unit)]> expr @ once"
        is not compatible with the type
-         "<[(string -> unit) * (int -> unit)]> expr"
+         "unit -> <[(string -> unit) * (int -> unit)]> expr @ once"
        Type "(string -> unit) * (string -> unit)" is not compatible with type
          "(string -> unit) * (int -> unit)"
        Type "string" is not compatible with type "int"
@@ -112,7 +120,7 @@ Error: Signature mismatch:
 module M4 : sig
   val x : <[ 'a * 'a ]> expr
 end = struct
-  let x = <[ let y = Obj.magic () in (y, y) ]>
+  let x = Obj.magic_many <[ let y = Obj.magic () in (y, y) ]>
 end
 
 [%%expect{|

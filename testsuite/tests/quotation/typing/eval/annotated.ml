@@ -9,13 +9,13 @@
 
 (* [eval] stub *)
 open (struct
-  let eval = Obj.magic
+  let eval x = x |> Obj.magic_many |> Obj.magic
 end : sig
-  val eval : 'a expr -> 'a eval
+  val eval : 'a expr @ once -> 'a eval
 end)
 type nonrec 'a eval' = 'a eval
 [%%expect {|
-val eval : 'a expr -> 'a eval = <fun>
+val eval : 'a expr @ once -> 'a eval = <fun>
 type nonrec 'a eval' = 'a eval
 |}]
 #mark_toplevel_in_quotations

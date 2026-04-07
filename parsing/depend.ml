@@ -454,9 +454,11 @@ and add_modtype bv mty =
           | Pwith_type (_, td) -> add_type_declaration bv td
           | Pwith_module (_, lid) -> add_module_path bv lid
           | Pwith_modtype (_, mty) -> add_modtype bv mty
+          | Pwith_jkind (_, jd) -> add_jkind_declaration bv jd
           | Pwith_typesubst (_, td) -> add_type_declaration bv td
           | Pwith_modsubst (_, lid) -> add_module_path bv lid
           | Pwith_modtypesubst (_, mty) -> add_modtype bv mty
+          | Pwith_jkindsubst (_, jd) -> add_jkind_declaration bv jd
         )
         cstrl
   | Pmty_typeof m -> add_module_expr bv m

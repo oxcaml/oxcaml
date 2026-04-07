@@ -1368,7 +1368,8 @@ let rec check_constraints_rec env loc visited ty =
       let ty = Ctype.instance_poly tl ty in
       check_constraints_rec env loc visited ty
   | _ ->
-      Btype.iter_type_expr (check_constraints_rec env loc visited) ty
+      Ctype.iter_type_expr_with_stages
+        (fun env -> check_constraints_rec env loc visited) env ty
   end
 
 let check_constraints_labels env visited l pl =
@@ -2171,7 +2172,7 @@ let rec update_decl_jkind env dpath decl =
           ~loc
           ~decl_params:decl.type_params
           ~type_apply:(Ctype.apply env)
-          ~free_vars:(Ctype.free_variable_set_of_list env)
+          ~get_free_vars:(Ctype.free_variable_set_of_list env)
           cstrs
       in
       List.rev cstrs, rep, jkind
@@ -2482,7 +2483,7 @@ let check_unboxed_paths decls ~unboxed_version_banned =
      if they go through an object or polymorphic variant type *)
 
 let check_well_founded ~abs_env env loc path to_check visited ty0 =
-  let rec check parents trace ty =
+  let rec check parents trace env ty =
     if TypeSet.mem ty parents then begin
       (*Format.eprintf "@[%a@]@." Printtyp.raw_type_expr ty;*)
       let err =
@@ -2526,19 +2527,20 @@ let check_well_founded ~abs_env env loc path to_check visited ty0 =
     match get_desc ty with
     | Tconstr(p, tyl, _) ->
         let to_check = to_check p in
-        if to_check then List.iter (check_subtype parents trace ty) tyl;
+        if to_check then List.iter (check_subtype parents trace ty env) tyl;
         begin match Ctype.try_expand_once_opt env ty with
-        | ty' -> check parents (Expands_to (ty, ty') :: trace) ty'
+        | ty' -> check parents (Expands_to (ty, ty') :: trace) env ty'
         | exception Ctype.Cannot_expand ->
-            if not to_check then List.iter (check_subtype parents trace ty) tyl
+            if not to_check then
+              List.iter (check_subtype parents trace ty env) tyl
         end
     | _ ->
-        Btype.iter_type_expr (check_subtype parents trace ty) ty
-  and check_subtype parents trace outer_ty inner_ty =
-      check parents (Contains (outer_ty, inner_ty) :: trace) inner_ty
+        Ctype.iter_type_expr_with_stages (check_subtype parents trace ty) env ty
+  and check_subtype parents trace outer_ty env inner_ty =
+      check parents (Contains (outer_ty, inner_ty) :: trace) env inner_ty
   in
   let snap = Btype.snapshot () in
-  try Ctype.wrap_trace_gadt_instances env (check TypeSet.empty []) ty0
+  try Ctype.wrap_trace_gadt_instances env (check TypeSet.empty [] env) ty0
   with Ctype.Escape _ ->
     (* Will be detected by check_regularity *)
     Btype.backtrack snap
@@ -2774,7 +2776,7 @@ let check_regularity ~abs_env env loc path decl to_check =
 
   let visited = ref TypeSet.empty in
 
-  let rec check_regular cpath args prev_exp trace ty =
+  let rec check_regular cpath args prev_exp trace env ty =
     if not (TypeSet.mem ty !visited) then begin
       visited := TypeSet.add ty !visited;
       match get_desc ty with
@@ -2808,20 +2810,20 @@ let check_regularity ~abs_env env loc path decl to_check =
               end;
               check_regular path' args
                 (path' :: prev_exp) (Expands_to (ty,body) :: trace)
-                body
+                env body
             with Not_found -> ()
           end;
-          List.iter (check_subtype cpath args prev_exp trace ty) args'
+          List.iter (check_subtype cpath args prev_exp trace ty env) args'
       | Tpoly (ty, tl) ->
           let ty = Ctype.instance_poly ~keep_names:true tl ty in
-          check_regular cpath args prev_exp trace ty
+          check_regular cpath args prev_exp trace env ty
       | _ ->
-          Btype.iter_type_expr
-            (check_subtype cpath args prev_exp trace ty) ty
+          Ctype.iter_type_expr_with_stages
+            (check_subtype cpath args prev_exp trace ty) env ty
     end
-    and check_subtype cpath args prev_exp trace outer_ty inner_ty =
+    and check_subtype cpath args prev_exp trace outer_ty env inner_ty =
       let trace = Contains (outer_ty, inner_ty) :: trace in
-      check_regular cpath args prev_exp trace inner_ty
+      check_regular cpath args prev_exp trace env inner_ty
   in
 
   Option.iter
@@ -2829,8 +2831,8 @@ let check_regularity ~abs_env env loc path decl to_check =
       let (args, body) =
         Ctype.instance_parameterized_type
           ~keep_names:true decl.type_params body in
-      List.iter (check_regular path args [] []) args;
-      check_regular path args [] [] body)
+      List.iter (check_regular path args [] [] env) args;
+      check_regular path args [] [] env body)
     decl.type_manifest
 
 let check_abbrev_regularity ~abs_env env id_loc_list to_check tdecl =
@@ -4590,6 +4592,35 @@ let transl_jkind_decl env
 let transl_jkind_decl env pjkind =
   Builtin_attributes.warning_scope pjkind.pjkind_attributes
     (fun () -> transl_jkind_decl env pjkind)
+
+let transl_jkind_constraint id env orig_decl new_decl =
+  (* This can be much simpler than [transl_with_constraint] because the
+     considerations that require us to re-check the declaration in the inner
+     environment (e.g., [constraint]s) do not occur for lr-jkinds. *)
+  Env.mark_jkind_used orig_decl.jkind_uid;
+  let jkind_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
+  let context = Jkind.History.Jkind_declaration (Pident id) in
+  let jka =
+    match new_decl.pjkind_manifest with
+    | None -> Misc.fatal_error "Typedecl.transl_jkind_constraint : no manifest"
+    | Some jka -> jka
+  in
+  let jkind_manifest = Some (Jkind.Const.of_annotation env ~context jka) in
+  let jkind_jkind =
+    { jkind_manifest;
+      jkind_attributes = new_decl.pjkind_attributes;
+      jkind_uid;
+      jkind_loc = new_decl.pjkind_loc }
+  in
+  let decl =
+    { jkind_id = id;
+      jkind_name = new_decl.pjkind_name;
+      jkind_jkind;
+      jkind_attributes = new_decl.pjkind_attributes;
+      jkind_annotation = Some jka;
+      jkind_loc = new_decl.pjkind_loc }
+  in
+  decl
 
 (**** Error report ****)
 

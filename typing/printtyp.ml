@@ -866,9 +866,12 @@ let same_printing_env env =
   && Compilation_unit.Name.Set.equal !printing_pers used_pers
 
 let set_printing_env env =
-  printing_env := env;
+  (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
+     errors track their stage, as we should usually print at stage 0.
+     See ticket 6726. *)
+  printing_env := Env.enter_future env;
   if !Clflags.real_paths ||
-     !printing_env == Env.empty ||
+     env == Env.empty ||
      same_printing_env env then
     ()
   else begin
@@ -1473,7 +1476,8 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
       match modes.visibility, modes.contention with
       | Immutable, Contended
       | Read, Shared
-      | (Read_write | Write), Uncontended -> None
+      | Write, Corrupted
+      | Read_write, Uncontended -> None
       | _, _ -> Some modes.contention
     in
 
@@ -1482,7 +1486,8 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
       match modes.statefulness, modes.portability with
       | Stateless, Portable
       | Reading, Shareable
-      | (Stateful | Writing), Nonportable -> None
+      | Writing, Corruptible
+      | Stateful, Nonportable -> None
       | _, _ -> Some modes.portability
     in
 

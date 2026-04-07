@@ -15,6 +15,8 @@
 
 (* Environment handling *)
 
+module StdlibMap = Map
+
 open Cmi_format
 open Misc
 open Asttypes
@@ -135,6 +137,27 @@ let used_labels : label_usage usage_tbl ref =
 (** Map indexed by the name of module components. *)
 module NameMap = String.Map
 
+(** Runtime metaprogramming stage. Computed as the difference between the
+    number of surrounding quotes minus the number of surrounding splices. *)
+type stage = int
+
+(** Occurence of a path at a specific stage.
+    Used for local constraints, as they are only valid at a fixed stage. *)
+module StagedPath = struct
+  type t = { stage : stage; path : Path.t }
+
+  module T = struct
+    type nonrec t = t
+    let compare { stage; path } { stage = stage'; path = path' } =
+      match Int.compare stage stage' with
+      | 0 -> Path.compare path path'
+      | x -> x
+  end
+
+  module Map = StdlibMap.Make(T)
+end
+
+
 type value_unbound_reason =
   | Val_unbound_instance_variable
   | Val_unbound_self
@@ -180,7 +203,7 @@ type summary =
   | Env_cltype of summary * Ident.t * class_type_declaration
   | Env_open of summary * Path.t
   | Env_functor_arg of summary * Ident.t
-  | Env_constraints of summary * type_declaration Path.Map.t
+  | Env_constraints of summary * type_declaration StagedPath.Map.t
   | Env_copy_types of summary
   | Env_persistent of summary * Ident.t
   | Env_value_unbound of summary * string * value_unbound_reason
@@ -637,7 +660,6 @@ type type_descr_kind =
 type type_descriptions = type_descr_kind
 
 let in_signature_flag = 0x01
-type stage = int
 
 type t = {
   values: (lock_or_stage, value_entry, value_data) IdTbl.t;
@@ -653,7 +675,7 @@ type t = {
   functor_args: unit Ident.tbl;
   jkinds : (empty, jkind_data, jkind_data) IdTbl.t;
   summary: summary;
-  local_constraints: type_declaration Path.Map.t;
+  local_constraints: type_declaration StagedPath.Map.t;
   implicit_jkinds: jkind_lr loc String.Map.t;
   flags: int;
   stage: stage;
@@ -956,7 +978,7 @@ let empty = {
   types = IdTbl.empty;
   modules = IdTbl.empty; modtypes = IdTbl.empty;
   classes = IdTbl.empty; cltypes = IdTbl.empty;
-  summary = Env_empty; local_constraints = Path.Map.empty;
+  summary = Env_empty; local_constraints = StagedPath.Map.empty;
   implicit_jkinds = String.Map.empty;
   flags = 0;
   functor_args = Ident.empty;
@@ -964,6 +986,8 @@ let empty = {
   stage = 0;
   toplevel_scope = Ident.lowest_scope
  }
+
+let path_at_current_stage env path = { StagedPath.stage = env.stage; path }
 
 let in_signature b env =
   let flags =
@@ -975,7 +999,7 @@ let in_signature b env =
 let is_in_signature env = env.flags land in_signature_flag <> 0
 
 let has_local_constraints env =
-  not (Path.Map.is_empty env.local_constraints)
+  not (StagedPath.Map.is_empty env.local_constraints)
 
 let is_ext cda =
   match cda.cda_description with
@@ -1511,7 +1535,9 @@ let step_find_unboxed_version decl =
         | _ -> Lacks_unboxed_version
 
 let rec find_type_data path env seen =
-  match Path.Map.find path env.local_constraints with
+  match
+    StagedPath.Map.find (path_at_current_stage env path) env.local_constraints
+  with
   | decl ->
     {
       tda_declaration = decl;
@@ -2922,9 +2948,10 @@ let add_module_lazy ~update_summary id presence mty ?mode env =
 let add_module ?arg ?shape id presence mty ?mode env =
   add_module_declaration ~check:false ?arg ?shape id presence (md mty) ?mode env
 
-let add_local_constraint path info env =
+let add_local_constraint ~stage path info env =
   { env with
-    local_constraints = Path.Map.add path info env.local_constraints }
+    local_constraints =
+      StagedPath.Map.add { stage; path } info env.local_constraints }
 
 let add_implicit_jkind ~loc name jkind env =
   match String.Map.find_opt name env.implicit_jkinds with
@@ -3040,6 +3067,10 @@ let enter_splice ~loc env =
   if env.stage = 0 then
     raise (Error (Toplevel_splice loc));
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
+
+let enter_future env =
+  (* Reuse a very large number *)
+  { env with stage = Ident.highest_scope }
 
 let mark_toplevel_in_quotations ~scope env =
   { env with toplevel_scope = scope }
@@ -4829,7 +4860,7 @@ let filter_non_loaded_persistent f env =
 (* Return the environment summary *)
 
 let summary env =
-  if Path.Map.is_empty env.local_constraints then env.summary
+  if StagedPath.Map.is_empty env.local_constraints then env.summary
   else Env_constraints (env.summary, env.local_constraints)
 
 let last_env = s_ref empty

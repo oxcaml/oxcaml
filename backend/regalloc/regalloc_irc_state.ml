@@ -206,6 +206,9 @@ let[@inline] degree state reg = Regalloc_interf_graph.degree state.graph reg
 let[@inline] set_degree state reg degree =
   Regalloc_interf_graph.set_degree state.graph reg degree
 
+let[@inline] get_max_degree state =
+  Regalloc_interf_graph.get_max_degree state.graph
+
 let[@inline] is_precolored state reg =
   RegWorkList.equal (reg_work_list state reg) RegWorkList.Precolored
 

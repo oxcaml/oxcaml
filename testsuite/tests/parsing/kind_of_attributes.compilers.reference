@@ -1,0 +1,86 @@
+[
+  structure_item (kind_of_attributes.ml[8,127+0]..[8,127+31])
+    Pstr_modtype "K" (kind_of_attributes.ml[8,127+12]..[8,127+13])
+      module_type (kind_of_attributes.ml[8,127+16]..[8,127+31])
+        Pmty_signature
+        [
+          signature_item (kind_of_attributes.ml[8,127+20]..[8,127+27])
+            Psig_kind
+            jkind_declaration "k" (kind_of_attributes.ml[8,127+26]..[8,127+27]) (kind_of_attributes.ml[8,127+20]..[8,127+27])
+              pjkind_manifest =
+                None
+        ]
+  structure_item (kind_of_attributes.ml[16,482+0]..[16,482+55])
+    Pstr_module
+    "_" (kind_of_attributes.ml[16,482+7]..[16,482+8])
+      module_expr (kind_of_attributes.ml[16,482+11]..[16,482+55])
+        Pmod_constraint
+        module_expr (kind_of_attributes.ml[16,482+12]..[16,482+15])
+          Pmod_ident "Int" (kind_of_attributes.ml[16,482+12]..[16,482+15])
+        module_type (kind_of_attributes.ml[16,482+18]..[16,482+54])
+          Pmty_with
+          module_type (kind_of_attributes.ml[16,482+18]..[16,482+19])
+            Pmty_ident "K" (kind_of_attributes.ml[16,482+18]..[16,482+19])
+          [
+            Pwith_jkind "k" (kind_of_attributes.ml[16,482+31]..[16,482+32])
+              jkind_declaration "k" (kind_of_attributes.ml[16,482+31]..[16,482+32]) (kind_of_attributes.ml[16,482+25]..[16,482+54])
+                pjkind_manifest =
+                  Some
+                    jkind (kind_of_attributes.ml[16,482+35]..[16,482+54])
+                    Pjk_kind_of
+                      core_type (kind_of_attributes.ml[16,482+44]..[16,482+47])
+                        attribute "foo"
+                          []
+                        Ptyp_constr "int" (kind_of_attributes.ml[16,482+44]..[16,482+47])
+                        []
+          ]
+  structure_item (kind_of_attributes.ml[18,539+0]..[18,539+57])
+    Pstr_module
+    "_" (kind_of_attributes.ml[18,539+7]..[18,539+8])
+      module_expr (kind_of_attributes.ml[18,539+11]..[18,539+57])
+        Pmod_constraint
+        module_expr (kind_of_attributes.ml[18,539+12]..[18,539+15])
+          Pmod_ident "Int" (kind_of_attributes.ml[18,539+12]..[18,539+15])
+        module_type (kind_of_attributes.ml[18,539+19]..[18,539+48])
+          attribute "foo"
+            []
+          Pmty_with
+          module_type (kind_of_attributes.ml[18,539+19]..[18,539+20])
+            Pmty_ident "K" (kind_of_attributes.ml[18,539+19]..[18,539+20])
+          [
+            Pwith_jkind "k" (kind_of_attributes.ml[18,539+32]..[18,539+33])
+              jkind_declaration "k" (kind_of_attributes.ml[18,539+32]..[18,539+33]) (kind_of_attributes.ml[18,539+26]..[18,539+48])
+                pjkind_manifest =
+                  Some
+                    jkind (kind_of_attributes.ml[18,539+36]..[18,539+48])
+                    Pjk_kind_of
+                      core_type (kind_of_attributes.ml[18,539+45]..[18,539+48])
+                        Ptyp_constr "int" (kind_of_attributes.ml[18,539+45]..[18,539+48])
+                        []
+          ]
+  structure_item (kind_of_attributes.ml[20,598+0]..[20,598+57])
+    Pstr_module
+    "_" (kind_of_attributes.ml[20,598+7]..[20,598+8])
+      module_expr (kind_of_attributes.ml[20,598+12]..[20,598+49])
+        attribute "foo"
+          []
+        Pmod_constraint
+        module_expr (kind_of_attributes.ml[20,598+13]..[20,598+16])
+          Pmod_ident "Int" (kind_of_attributes.ml[20,598+13]..[20,598+16])
+        module_type (kind_of_attributes.ml[20,598+19]..[20,598+48])
+          Pmty_with
+          module_type (kind_of_attributes.ml[20,598+19]..[20,598+20])
+            Pmty_ident "K" (kind_of_attributes.ml[20,598+19]..[20,598+20])
+          [
+            Pwith_jkind "k" (kind_of_attributes.ml[20,598+32]..[20,598+33])
+              jkind_declaration "k" (kind_of_attributes.ml[20,598+32]..[20,598+33]) (kind_of_attributes.ml[20,598+26]..[20,598+48])
+                pjkind_manifest =
+                  Some
+                    jkind (kind_of_attributes.ml[20,598+36]..[20,598+48])
+                    Pjk_kind_of
+                      core_type (kind_of_attributes.ml[20,598+45]..[20,598+48])
+                        Ptyp_constr "int" (kind_of_attributes.ml[20,598+45]..[20,598+48])
+                        []
+          ]
+]
+
