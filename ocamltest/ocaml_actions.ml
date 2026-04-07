@@ -917,6 +917,7 @@ let run_expect_once input_file principal log env ~backend =
     command;
     expect_flags;
     Ocaml_flags.toplevel_default_flags;
+    backend_flags env backend;
     Ocaml_flags.stdlib;
     directory_flags env;
     Ocaml_flags.include_toplevel_directory;

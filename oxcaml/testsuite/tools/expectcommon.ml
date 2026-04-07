@@ -22,14 +22,14 @@ type string_constant =
   ; tag : string
   }
 
-type expectation_filter = Principal | X86_64
+type expectation_filter = Principal | X86_64 | Raw | Simplify | Reaper
 
-type expectation_kind = Expect_toplevel | Expect_asm
+type expectation_kind = Expect_toplevel | Expect_asm | Expect_fexpr
 
 type expectation =
   { extid_loc       : Location.t (* Location of "expect" in "[%%expect ...]" *)
   ; payload_loc     : Location.t (* Location of the whole payload *)
-  ; expected_output : (expectation_filter option * string_constant) list
+  ; expected_output : (expectation_filter list * string_constant) list
   ; kind            : expectation_kind
   }
 
@@ -50,16 +50,23 @@ type correction =
 let filter_of_string = function
   | "Principal" -> Some Principal
   | "X86_64" -> Some X86_64
+  | "Raw" -> Some Raw
+  | "Simplify" -> Some Simplify
+  | "Reaper" -> Some Reaper
   | _ -> None
 
 let string_of_filter = function
   | Principal -> "Principal"
   | X86_64 -> "X86_64"
+  | Raw -> "Raw"
+  | Simplify -> "Simplify"
+  | Reaper -> "Reaper"
 
 let match_expect_extension (ext : Parsetree.extension) =
   let match_ext_name = function
     | "expect" | "ocaml.expect" -> Some Expect_toplevel
     | "expect_asm" | "ocaml.expect_asm" -> Some Expect_asm
+    | "expect_fexpr" | "ocaml.expect_fexpr" -> Some Expect_fexpr
     | _ -> None
   in
   match ext with
@@ -81,38 +88,65 @@ let match_expect_extension (ext : Parsetree.extension) =
         { str; tag }
       | _ -> invalid_payload ~loc:e.pexp_loc ()
     in
-    (* Parse a single element: either {|...|} or Filter{|...|} *)
-    let parse_element (e : Parsetree.expression) =
+    let ident (e : Parsetree.expression) =
       match e.pexp_desc with
-      | Pexp_constant (Pconst_string _) ->
-        (* Bare string constant - no filter *)
-        (None, string_constant e)
-      | Pexp_construct ({ txt = Lident name; }, Some arg) -> (
-        (* Filter{|content|} - filter with string content *)
-        match filter_of_string name with
-        | Some filter -> (Some filter, string_constant arg)
-        | None ->
-          invalid_payload
-            ~msg:(Printf.sprintf "unexpected filter \"%s\"" name)
-            ~loc:e.pexp_loc
-            ())
-      | _ ->
-        invalid_payload
-        ~loc:e.pexp_loc
-        ~msg:("expected {|...|} or Filter{|...|}")
-        ()
+      | Pexp_construct ({ txt = Lident txt; }, None) -> txt
+      | Pexp_ident {txt = Lident txt; } -> txt
+      | _ -> invalid_payload ~loc:e.pexp_loc ()
+    in
+    (* Parse elements: filters followed by {|...|} *)
+    let parse_element (e : Parsetree.expression) =
+      let filters, txt =
+        match e.pexp_desc with
+        | Pexp_constant (Pconst_string _) ->
+            (* Bare string constant - no filter *)
+            ([], string_constant e)
+        | Pexp_construct ({txt = Lident filter; }, Some txt) ->
+            ([filter], string_constant txt)
+        | Pexp_apply (e, args) -> (
+        (* filter1 ... filterN {|content|} - filters with string content *)
+            match List.rev args with
+            | [] -> invalid_payload
+                      ~loc:e.pexp_loc
+                      ~msg:"expected filter* {|...|}" ()
+            | (_, txt)::filters ->
+                ident e :: (List.rev_map ~f:(fun (_, e) -> ident e) filters),
+                string_constant txt)
+        | _ ->
+            invalid_payload
+              ~loc:e.pexp_loc
+              ~msg:("expected {|...|} or Filter{|...|}")
+              ()
+      in
+      let filters =
+        List.map ~f:(fun f ->
+            match filter_of_string f with
+            | None ->
+                invalid_payload
+                  ~msg:(Printf.sprintf "unexpected filter \"%s\"" f)
+                  ~loc:e.pexp_loc
+                  ()
+            | Some f -> f
+          )
+          filters
+      in
+      (filters, txt)
     in
     let is_arch_filter = function
       | X86_64 -> true
-      | Principal -> false
+      | Principal | Raw | Simplify | Reaper -> false
+    in
+    let is_pass_filter = function
+      | Raw | Simplify | Reaper -> true
+      | Principal | X86_64 -> false
     in
     let validate_expect_toplevel entries =
       (* Valid formats:
          - [{|...|}] (one untagged)
          - [{|...|}, Principal{|...|}] (non-principal + principal)*)
       match entries with
-      | [(None, _)] -> entries
-      | [(None, _); (Some Principal, _)]-> entries
+      | [([], _)] -> entries
+      | [([], _); ([Principal], _)]-> entries
       | _ ->
         let msg = "expected [%%expect {|...|}] or \
                    [%%expect {|...|}, Principal{|...|}]"
@@ -123,13 +157,24 @@ let match_expect_extension (ext : Parsetree.extension) =
       (* All entries must have architecture tags *)
       if List.for_all ~f:(fun (f, _) ->
         match f with
-        | Some filter -> is_arch_filter filter
-        | None -> false
+        | [ filter ] -> is_arch_filter filter
+        | [] | _::_::_ -> false
       ) entries
       then entries
       else
         invalid_payload
           ~msg:"expected [%%expect_asm Arch1{|...|}, Arch2{|...|}, ...]"
+          ()
+    in
+    let validate_expect_fexpr entries =
+      (* All entries must have pass tags *)
+      if List.for_all ~f:(fun (f, _) ->
+          List.for_all ~f:is_pass_filter f
+      ) entries
+      then entries
+      else
+        invalid_payload
+          ~msg:"expected [%%expect_fexpr Pass1{|...|}, Pass2{|...|}, ...]"
           ()
     in
     let expectation =
@@ -148,6 +193,7 @@ let match_expect_extension (ext : Parsetree.extension) =
           match kind with
           | Expect_toplevel -> validate_expect_toplevel expected_output
           | Expect_asm -> validate_expect_asm expected_output
+          | Expect_fexpr -> validate_expect_fexpr expected_output
         in
         { extid_loc
         ; payload_loc = e.pexp_loc
@@ -160,10 +206,10 @@ let match_expect_extension (ext : Parsetree.extension) =
         | Expect_toplevel ->
           { extid_loc
           ; payload_loc = { extid_loc with loc_start = extid_loc.loc_end }
-          ; expected_output = [(None, { tag = ""; str = "" })]
+          ; expected_output = [([], { tag = ""; str = "" })]
           ; kind
           }
-        | Expect_asm -> invalid_payload ())
+        | Expect_asm | Expect_fexpr -> invalid_payload ())
       | _ -> invalid_payload ()
     in
     Some expectation
@@ -270,23 +316,27 @@ let eval_expectation expectation ~output =
   let to_update = match expectation.kind with
   | Expect_toplevel ->
     (match expectation.expected_output with
-      | [(None, expected)] -> [(None, expected)]
-      | [(None, if_not_principal); (Some Principal, if_principal)] ->
+      | [([], expected)] -> [([], expected)]
+      | [([], if_not_principal); ([Principal], if_principal)] ->
         if !Clflags.principal
-        then [(Some Principal, if_principal)]
-        else [(None, if_not_principal)]
+        then [([Principal], if_principal)]
+        else [([], if_not_principal)]
       | _ -> Misc.fatal_error "impossible: already validated")
   | Expect_asm ->
     List.filter
-      ~f:(fun (f, _) -> f = current_arch_filter ())
+      ~f:(fun (f, _) ->
+          match current_arch_filter () with
+          | None -> false
+          | Some arch -> List.mem ~set:f arch)
       expectation.expected_output
+  | Expect_fexpr -> expectation.expected_output
   in
   match to_update with
-  | [(filter, s)] when s.str <> output ->
+  | [(filters, s)] when s.str <> output ->
     let s = { s with str = output } in
     Some { expectation with expected_output =
       List.map
-        ~f:(fun (f, e) -> (f, if f = filter then s else e))
+        ~f:(fun (f, e) -> (f, if List.equal ~eq:(=) f filters then s else e))
         expectation.expected_output
     }
   | _ :: _ :: _ ->
@@ -317,7 +367,7 @@ function
   | (Ptop_dir _  | Ptop_def []) :: l -> min_line_number l
   | Ptop_def (st :: _) :: _ -> Some st.pstr_loc.loc_start.pos_lnum
 
-let eval_expect_file _fname ~file_contents ~execute_phrase =
+let eval_expect_file fname ~file_contents ~execute_phrase =
   Warnings.reset_fatal ();
   let chunks, trailing_code =
     parse_contents ~fname:"" file_contents |> split_chunks
@@ -351,11 +401,12 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
             (Printexc.raw_backtrace_to_string bt)
         end;
         Btype.backtrack snap;
-        false
+        false, None
     in
-    let _ : bool =
-      List.fold_left phrases ~init:true ~f:(fun acc phrase ->
-        acc && exec_one phrase)
+    let (_, last_unit : bool * Compilation_unit.t option) =
+      List.fold_left phrases ~init:(true, None) ~f:(fun (acc, _) phrase ->
+          let success, unit = exec_one phrase in
+          acc && success, unit)
     in
     Format.pp_print_flush ppf ();
     let len = Buffer.length buf in
@@ -364,17 +415,60 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
       Buffer.add_char buf '\n';
     let s = Buffer.contents buf in
     Buffer.clear buf;
-    (Misc.delete_eol_spaces s, !last_asm)
+    (Misc.delete_eol_spaces s, !last_asm, last_unit)
+  in
+  let fexpr_outputs unit filters =
+    let read_dump_file pass =
+      let file =
+        let fname =
+          match unit with
+          | Some unit ->
+              (* CR keryan: works only as long as we keep generating a
+                 capitalized filename, and with the -S flag *)
+              Compilation_unit.(name unit |> Name.to_string) ^ "."
+          | None -> Filename.chop_extension fname
+        in
+        fname ^ pass ^ ".fl"
+      in
+      if Sys.file_exists file then
+        let ic = open_in_bin file in
+        try In_channel.input_all ic with
+        | _ -> close_in ic; "Unexpected error"
+      else Printf.sprintf "Error: No fexpr file '%s' found" file
+    in
+    List.map filters ~f:(function
+        | Raw -> read_dump_file "raw"
+        | Simplify -> read_dump_file "simplify"
+        | Reaper -> read_dump_file "reaper"
+        | Principal | X86_64 -> "")
+    |> String.concat ~sep:"\n"
+    |> (^) "\n"
   in
   let corrected_expectations =
     capture_everything buf ppf ~f:(fun () ->
       List.concat_map chunks ~f:(fun chunk ->
-        let (toplevel_output, asm_output) = exec_phrases chunk.phrases in
+            let has_fexpr =
+              List.exists ~f:(fun exp ->
+                  match exp.kind with
+                  | Expect_fexpr -> true | _ -> false)
+                chunk.expectations
+            in
+            let keep_asm = !Clflags.keep_asm_file in
+            if has_fexpr then Clflags.keep_asm_file := true;
+        let (toplevel_output, asm_output, last_unit) =
+          exec_phrases chunk.phrases
+        in
+        Clflags.keep_asm_file := keep_asm;
         List.filter_map chunk.expectations ~f:(fun expectation ->
           let output = match expectation.kind with
             | Expect_toplevel -> toplevel_output
             | Expect_asm -> Option.value asm_output
                               ~default:"\nNo assembly: compilation failed\n"
+            | Expect_fexpr ->
+                let filters =
+                  List.concat_map ~f:fst expectation.expected_output
+                in
+                fexpr_outputs last_unit filters
           in
           eval_expectation expectation ~output)))
   in
@@ -383,7 +477,7 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
     | None -> ""
     | Some phrases ->
       capture_everything buf ppf
-        ~f:(fun () -> fst (exec_phrases phrases))
+        ~f:(fun () -> let (r, _, _) = exec_phrases phrases in r)
   in
   { corrected_expectations; trailing_output }
 
@@ -395,7 +489,7 @@ let output_corrected oc ~file_contents correction =
     Printf.fprintf oc "{%s|%s|%s}" tag str tag
   in
   let output_entry oc (filter, str_const) =
-    Option.iter (fun f -> output_string oc (string_of_filter f)) filter;
+    List.iter ~f:(fun f -> output_string oc (string_of_filter f)) filter;
     output_body oc str_const
   in
   let ofs =
@@ -443,7 +537,8 @@ module type Toplevel = sig
   val initialize_toplevel_env : unit -> unit
   val load_file : Format.formatter -> string -> bool
   val execute_phrase :
-    bool -> Format.formatter -> Parsetree.toplevel_phrase -> bool
+    bool -> Format.formatter -> Parsetree.toplevel_phrase ->
+    bool * Compilation_unit.t option
 end
 
 let is_object_file ~object_extensions fname =
