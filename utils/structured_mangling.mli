@@ -30,9 +30,9 @@
 
 (** Structured name mangling for OxCaml symbols.
 
-    This module implements a mangling scheme that encodes OxCaml identifiers into
-    a restricted character set (ASCII alphanumeric and underscore) suitable for
-    use in linker symbols. The scheme preserves the lexical structure of the
+    This module implements a mangling scheme that encodes OxCaml identifiers
+    into a restricted character set (ASCII alphanumeric and underscore) suitable
+    for use in linker symbols. The scheme preserves the lexical structure of the
     source program by encoding each scope (compilation unit, module, function,
     etc.) as a tagged path item.
 
