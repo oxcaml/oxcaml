@@ -191,7 +191,25 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
           (string_of_origin origin);
         []))
   in
-  let result = List.concat_map (analyze_one ~indent:"") files in
+  let result =
+    let files_since_last_gc = ref 0 in
+    List.concat_map
+      (fun file ->
+        let r = analyze_one ~indent:"" file in
+        incr files_since_last_gc;
+        if !files_since_last_gc >= 5
+        then begin
+          (* Owee_buf.map_binary mmaps files into bigarrays whose mapped
+             regions are only released by GC finalization. The GC doesn't
+             see the mmap'd memory (it's off-heap), so without periodic
+             collection we can accumulate many simultaneously mapped
+             files. *)
+          Gc.full_major ();
+          files_since_last_gc := 0
+        end;
+        r)
+      files
+  in
   Option.iter close_out out_channel;
   (* Log summary if -ddissector is enabled *)
   if !Clflags.ddissector
