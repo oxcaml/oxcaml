@@ -799,14 +799,10 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   then (
     List.iter2
       (fun param arg ->
-        Acc.add_alias acc
-          ~to_:(Code_id_or_name.var (Bound_parameter.var param))
-          ~from:(Code_id_or_name.var arg))
+        Acc.add_alias_vars acc ~to_:(Bound_parameter.var param) ~from:arg)
       (Bound_parameters.to_list params)
       code_dep.params;
-    Acc.add_alias acc
-      ~to_:(Code_id_or_name.var my_closure)
-      ~from:(Code_id_or_name.var code_dep.my_closure))
+    Acc.add_alias_vars acc ~to_:my_closure ~from:code_dep.my_closure)
   else (
     List.iter
       (fun arg -> Acc.add_cond_any_usage acc ~denv (Simple.var arg))

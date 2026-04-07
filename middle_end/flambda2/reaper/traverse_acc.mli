@@ -90,6 +90,8 @@ val code_deps : t -> code_dep Code_id.Map.t
 (* Directly adding edges to the graph *)
 val add_alias : t -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
 
+val add_alias_vars : t -> to_:Variable.t -> from:Variable.t -> unit
+
 val add_use_dep : t -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
 
 val add_accessor_dep :

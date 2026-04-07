@@ -142,6 +142,9 @@ let find_code t code_id = Code_id.Map.find code_id t.code
 
 let add_alias t ~to_ ~from = Graph.add_alias t.deps ~to_ ~from
 
+let add_alias_vars t ~to_ ~from =
+  add_alias t ~to_:(Code_id_or_name.var to_) ~from:(Code_id_or_name.var from)
+
 let add_use_dep t ~to_ ~from = Graph.add_use_dep t.deps ~to_ ~from
 
 let add_accessor_dep t ~to_ relation ~base =
