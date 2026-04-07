@@ -306,6 +306,21 @@ let size_vec128 = 16
 let size_vec256 = 32
 let size_vec512 = 64
 
+let specific_op_result_type
+    (op : specific_operation) : Cmm.machtype =
+  match op with
+  | Ifloatarithmem (Float64, _, _) -> Cmm.typ_float
+  | Ifloatarithmem (Float32, _, _) -> Cmm.typ_float32
+  | Ipackf32 -> Cmm.typ_float
+  | Ilea _ | Istore_int _ | Ioffset_loc _ | Ibswap _
+  | Isextend32 | Izextend32 | Irdtsc | Irdpmc
+  | Ilfence | Isfence | Imfence | Icldemote _
+  | Iprefetch _ | Illvm_intrinsic _ ->
+    Cmm.typ_int
+  | Isimd _ | Isimd_mem _ ->
+    (* CR: should inspect the SIMD op for the exact type *)
+    Cmm.typ_vec128
+
 let allow_unaligned_access = true
 
 (* Whether Ocaml provides shift operations where the shift amount is interpreted
