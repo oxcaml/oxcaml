@@ -1102,6 +1102,7 @@ module Jkind0 = struct
       create crossing ~externality:(Axis_lattice.externality x)
         ~nullability:(Axis_lattice.nullability x)
         ~separability:(Axis_lattice.separability x)
+
     let meet t1 t2 =
       let crossing = Crossing.meet (crossing t1) (crossing t2) in
       let externality = Externality.meet (externality t1) (externality t2) in
@@ -1110,6 +1111,7 @@ module Jkind0 = struct
         Separability.meet (separability t1) (separability t2)
       in
       create crossing ~externality ~nullability ~separability
+
     (* Returns the set of axes that is relevant under a given modality. For
        example, under the [global] modality, the areality axis is *not*
        relevant. *)
