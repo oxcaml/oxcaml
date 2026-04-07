@@ -333,6 +333,15 @@ in
   in
   add_type ~check:true id decl env
 
+(* nroberts: The below [update_type] is deleted upstream in
+   https://github.com/ocaml/ocaml/pull/12180 to stop ocamlc from looping on some
+   type constraints. Our internal version records jkind constraints, and so we
+   cannot delete it. We haven't separately implemented a fix for ocamlc looping,
+   so we probably have the same issue described in that PR, but users haven't
+   reported it.
+   rtjoa: It was re-added upsteram in
+   https://github.com/ocaml/ocaml/pull/13510
+*)
 (* [update_type] performs step 3 of the process described in the comment in
    [enter_type]: We unify the manifest of each type with the definition of that
    variable in [temp_env], which contains any requirements on the type implied
@@ -351,36 +360,38 @@ in
    that...  These circular types are ruled out just after [update_type] in
    [transl_type_decl], and then we perform the delayed checks.
 *)
+
+(* Update a temporary definition to share recursion *)
 let update_type temp_env env id loc =
+  let unify_manifest env type_manifest path type_params =
+    match type_manifest with
+    | Some ty ->
+      (* Since this function is called after generalizing declarations, ty is at
+         the generic level. Since we need to keep possible sharings in recursive
+         type definitions, unify without instantiating, but generalize again
+         after unification. *)
+      let delayed_jkind_checks, _ =
+        Ctype.with_local_level_generalize (fun () ->
+            try
+              let new_ty = Ctype.newconstr path type_params in
+              Ctype.unify_delaying_jkind_checks env new_ty ty, new_ty
+            with Ctype.Unify err ->
+              raise (Error(loc, Type_clash (env, err))))
+          ~before_generalize:(fun (_, new_ty) -> Ctype.generalize new_ty)
+      in
+      delayed_jkind_checks
+    | None -> Misc.fatal_error "Typedecl.update_type"
+  in
   let path = Path.Pident id in
   let decl = Env.find_type path temp_env in
-  (* Since this function is called after generalizing declarations,
-     ty is at the generic level.  Since we need to keep possible
-     sharings in recursive type definitions, unify without instantiating,
-     but generalize again after unification. *)
-  Ctype.with_local_level_generalize begin fun () ->
-    try
-      let checks =
-        match decl.type_manifest with
-        | Some ty ->
-          Ctype.unify_delaying_jkind_checks
-            env (Ctype.newconstr path decl.type_params) ty
-        | None -> Misc.fatal_error "Typedecl.update_type"
-      in
-      match decl.type_unboxed_version with
-      | None ->
-        checks
-      | Some { type_manifest = Some ty; type_params; _ } ->
-        let checks_from_unboxed_version =
-          Ctype.unify_delaying_jkind_checks env
-            (Ctype.newconstr (Path.unboxed_version path) type_params) ty
-        in
-        checks @ checks_from_unboxed_version
-      | Some { type_manifest = None; _ } ->
-        Misc.fatal_error "Typedecl.update_type"
-    with Ctype.Unify err ->
-      raise (Error(loc, Type_clash (env, err)))
-  end
+  let checks = unify_manifest env decl.type_manifest path decl.type_params in
+  match decl.type_unboxed_version with
+  | None -> checks
+  | Some { type_manifest; type_params; _ } ->
+    let checks_from_unboxed_version =
+      unify_manifest env type_manifest (Path.unboxed_version path) type_params
+    in
+    checks @ checks_from_unboxed_version
 
 (* Determine if a type's values are represented by floats at run-time. *)
 (* CR layouts v2.5: Should we check for unboxed float here? Is a record with all
@@ -593,7 +604,11 @@ let make_constructor
          then widen so as to not introduce any new constraints *)
       (* narrow and widen are now invoked through with_local_scope *)
       TyVarEnv.with_local_scope begin fun () ->
-      let closed = svars <> [] in
+      let closed =
+        match svars with
+        | [] -> false
+        | _ -> true
+      in
       let targs, tret_type, args, ret_type, univars =
         Ctype.with_local_level_generalize_if closed begin fun () ->
           TyVarEnv.reset ();
@@ -630,6 +645,14 @@ let make_constructor
           end;
           (targs, tret_type, args, ret_type, univar_list)
         end
+        ~before_generalize: begin fun (_, _, args, ret_type, univars) ->
+          Btype.iter_type_expr_cstr_args Ctype.generalize args;
+          Ctype.generalize ret_type;
+          let _vars = TyVarEnv.instance_poly_univars env loc univars in
+          let set_level t = Ctype.enforce_current_level env t in
+          Btype.iter_type_expr_cstr_args set_level args;
+          set_level ret_type;
+        end
       in
       if closed then begin
         ignore (TyVarEnv.instance_poly_univars env loc univars);
@@ -639,25 +662,6 @@ let make_constructor
       end;
       tvars, targs, Some tret_type, args, Some ret_type
       end
-
-let shape_map_labels =
-  List.fold_left (fun map { ld_id; ld_uid; _} ->
-    Shape.Map.add_label map ld_id ld_uid)
-    Shape.Map.empty
-
-let shape_map_cstrs =
-  List.fold_left (fun map { cd_id; cd_uid; cd_args; _ } ->
-    let cstr_shape_map =
-      let label_decls =
-        match cd_args with
-        | Cstr_tuple _ -> []
-        | Cstr_record ldecls -> ldecls
-      in
-      shape_map_labels label_decls
-    in
-    Shape.Map.add_constr map cd_id
-      @@ Shape.str ~uid:cd_uid cstr_shape_map)
-    (Shape.Map.empty)
 
 let verify_unboxed_attr unboxed_attr sdecl =
   begin match unboxed_attr with
@@ -845,6 +849,7 @@ let shape_extension_constructor ext =
 
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
+  Ctype.with_local_level begin fun () ->
   TyVarEnv.reset();
   let path = Path.Pident id in
   let tparams = make_params env path sdecl.ptype_params in
@@ -869,14 +874,15 @@ let transl_declaration env sdecl (id, uid) =
   verify_unboxed_attr unboxed_attr sdecl;
   let transl_type sty =
     let cty =
-      (* generalize_structure is necessary so that copying during instantiation
-         traverses inside of any type constructors in the [with]-bound. It's
-         also necessary because the variables here are at generic level, and so
-         any containers of them should be, too! *)
-      Ctype.with_local_level_generalize_structure begin fun () ->
+      Ctype.with_local_level begin fun () ->
         Typetexp.transl_simple_type env ~new_var_jkind:Any
           ~closed:true Mode.Alloc.Const.legacy sty
       end
+      (* This call to [generalize_structure] is necessary so that copying
+         during instantiation traverses inside of any type constructors in the
+         [with]-bound. It's also necessary because the variables here are at
+         generic level, and so any containers of them should be, too! *)
+      ~post:(fun cty -> Ctype.generalize_structure cty.ctyp_type)
     in
     cty.ctyp_type  (* CR layouts v2.8: Do this more efficiently. Or probably
                       add with-kinds to Typedtree. Internal ticekt 4435. *)
@@ -957,8 +963,8 @@ let transl_declaration env sdecl (id, uid) =
           let tcstr =
             { cd_id = name;
               cd_name = scstr.pcd_name;
-              cd_vars = tvars;
               cd_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+              cd_vars = tvars;
               cd_args = targs;
               cd_res = tret_type;
               cd_loc = scstr.pcd_loc;
@@ -1118,6 +1124,10 @@ let transl_declaration env sdecl (id, uid) =
       in
       set_private_row env sdecl.ptype_loc p decl
     end;
+    (* CR sspies: We used to compute shapes here, which were then added to
+       various typing environments. The computation of the shapes has moved
+       further down in the translation, so they are currently not added to the
+       intermediate environments. Find out whether that is an issue. *)
     let decl =
       {
         typ_id = id;
@@ -1133,15 +1143,8 @@ let transl_declaration env sdecl (id, uid) =
         typ_jkind_annotation = jkind_annotation
       }
     in
-    let typ_shape =
-      let uid = decl.typ_type.type_uid in
-      match decl.typ_kind with
-      | Ttype_variant cstrs -> Shape.str ~uid (shape_map_cstrs cstrs)
-      | Ttype_record labels | Ttype_record_unboxed_product labels ->
-        Shape.str ~uid (shape_map_labels labels)
-      | Ttype_abstract | Ttype_open -> Shape.leaf uid
-    in
-    decl, typ_shape
+    decl
+  end
 
 (* Note [Typechecking unboxed versions of types]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1310,6 +1313,17 @@ let remove_unboxed_versions decls =
         (id, { d with type_unboxed_version = None })
       | false, true -> Misc.fatal_error "Typedecl.remove_unboxed_versions")
     Path.Set.empty decls
+
+(* Generalize a type declaration *)
+
+let rec generalize_decl decl =
+  Option.iter generalize_decl (decl.type_unboxed_version);
+  List.iter Ctype.generalize decl.type_params;
+  Btype.iter_type_expr_kind Ctype.generalize decl.type_kind;
+  begin match decl.type_manifest with
+  | None    -> ()
+  | Some ty -> Ctype.generalize ty
+  end
 
 (* Check that all constraints are enforced *)
 
@@ -1818,20 +1832,6 @@ let update_constructor_representation
       if is_extension_constructor then
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Constructor_mixed shape
-
-
-let add_types_to_env ~shapes decls env =
-  match shapes with
-  | None ->
-    List.fold_right
-      (fun (id, decl) env ->
-        add_type ~check:true id decl env)
-      decls env
-  | Some shapes ->
-    List.fold_right2
-    (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
-    decls shapes env
 
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
@@ -2790,7 +2790,6 @@ let check_redefined_unit (td: Parsetree.type_declaration) =
   | _ ->
       ()
 
-
 (* Note [Quality of jkinds during inference]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2898,6 +2897,19 @@ let normalize_decl_jkinds env decls =
     env
     decls
 
+let add_types_to_env ~shapes decls env =
+  match shapes with
+  | None ->
+    List.fold_right
+      (fun (id, decl) env ->
+        add_type ~check:true id decl env)
+      decls env
+  | Some shapes ->
+    List.fold_right2
+    (fun (id, decl) shape env ->
+      add_type ~check:true ~shape id decl env)
+    decls shapes env
+
 (* Translate a set of type declarations, mutually recursive or not *)
 let transl_type_decl env rec_flag sdecl_list =
   List.iter check_redefined_unit sdecl_list;
@@ -2931,7 +2943,7 @@ let transl_type_decl env rec_flag sdecl_list =
      expand to a generic type variable. After that, we check the coherence of
      the translated declarations in the resulting new environment. *)
   let tdecls, decls, temp_env, new_env =
-    Ctype.with_local_level_generalize begin fun () ->
+    Ctype.with_local_level_iter ~post:generalize_decl begin fun () ->
       (* Enter types. *)
       let temp_env =
         List.fold_left2 (enter_type rec_flag) env sdecl_list ids_list in
@@ -2971,20 +2983,18 @@ let transl_type_decl env rec_flag sdecl_list =
          enviroment. *)
       let tdecls =
         List.map2 transl_declaration sdecl_list (List.map ids_slots ids_list) in
-      let decls = List.map (fun (d, _shape) -> (d.typ_id, d.typ_type)) tdecls in
+      let decls = List.map (fun d -> (d.typ_id, d.typ_type)) tdecls in
       let decls = derive_unboxed_versions decls env in
       let tdecls =
         List.map2
-          (fun (tdecl, shape) (_, decl) ->
-            { tdecl with typ_type = decl }, shape)
-          tdecls decls
+          (fun tdecl (_, decl) -> { tdecl with typ_type = decl }) tdecls decls
       in
       current_slot := None;
       (* Check for duplicates *)
       check_duplicates sdecl_list;
       (* Build the final env. *)
       let new_env = add_types_to_env ~shapes:None decls env in
-      (tdecls, decls, temp_env, new_env)
+      ((tdecls, decls, temp_env, new_env), List.map snd decls)
     end
   in
   (* Check for ill-formed abbrevs *)
@@ -3019,9 +3029,8 @@ let transl_type_decl env rec_flag sdecl_list =
       (Path.Pident id)
       decl to_check)
     decls;
-  List.iter (fun (tdecl, _shape) ->
-    check_abbrev_regularity ~abs_env new_env id_loc_list to_check tdecl)
-    tdecls;
+  List.iter
+    (check_abbrev_regularity ~abs_env new_env id_loc_list to_check) tdecls;
   List.iter (fun (id, decl) ->
     check_unboxed_recursion_decl ~abs_env new_env (List.assoc id id_loc_list)
       (Path.Pident id)
@@ -3079,7 +3088,7 @@ let transl_type_decl env rec_flag sdecl_list =
      check_constraints will succeed via mutation, be backtracked, and then
      perhaps a sort variable gets defaulted to value. Bad bad.) *)
   List.iter2
-    (fun sdecl (tdecl, _shape) ->
+    (fun sdecl tdecl ->
       let decl = tdecl.typ_type in
        match Ctype.closed_type_decl decl with
          Some ty -> raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
@@ -3128,7 +3137,7 @@ let transl_type_decl env rec_flag sdecl_list =
   (* Keep original declaration *)
   let final_decls =
     List.map2
-      (fun (tdecl, _shape) (_id2, decl) ->
+      (fun tdecl (_id2, decl) ->
         { tdecl with typ_type = decl }
       ) tdecls decls
   in
@@ -3362,6 +3371,15 @@ let transl_type_extension extend env loc styext =
       in
       (ttype_params, type_params, constructors)
     end
+    ~before_generalize: begin fun (_, type_params, constructors) ->
+      (* Generalize types *)
+      List.iter Ctype.generalize type_params;
+      List.iter
+        (fun (ext, _shape) ->
+          Btype.iter_type_expr_cstr_args Ctype.generalize ext.ext_type.ext_args;
+          Option.iter Ctype.generalize ext.ext_type.ext_ret_type)
+        constructors;
+    end
   in
   (* Check that all type variables are closed *)
   List.iter
@@ -3416,6 +3434,10 @@ let transl_exception env sext =
         TyVarEnv.reset();
         transl_extension_constructor ~scope env
           Predef.path_exn [] [] Asttypes.Public sext)
+      ~before_generalize: begin fun (ext, _shape) ->
+        Btype.iter_type_expr_cstr_args Ctype.generalize ext.ext_type.ext_args;
+        Option.iter Ctype.generalize ext.ext_type.ext_ret_type;
+      end
   in
   (* Check that all type variables are closed *)
   begin match Ctype.closed_extension_constructor ext.ext_type with
@@ -4056,7 +4078,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       let cty =
         transl_simple_type ~new_var_jkind:Any env ~closed:no_row Mode.Alloc.Const.legacy sty
       in
-      cty, cty.ctyp_type
+        cty, cty.ctyp_type
   in
   (* In the second part, we check the consistency between the two
      declarations and compute a "merged" declaration; we now need to
@@ -4149,7 +4171,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_loc = loc;
       type_attributes = sdecl.ptype_attributes;
       type_unboxed_default;
-      type_uid;
+      type_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
       type_unboxed_version;
     }
   in
@@ -4231,6 +4253,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     typ_jkind_annotation = Jkind.get_annotation type_jkind;
   }
   end
+  ~before_generalize:(fun ttyp -> generalize_decl ttyp.typ_type)
 
 (* A simplified version of [transl_with_constraint], for the case of packages.
    Package constraints are much simpler than normal with type constraints (e.g.,
@@ -4260,7 +4283,7 @@ let transl_package_constraint ~loc ty =
 
 let abstract_type_decl ~injective ~jkind ~params =
   let arity = List.length params in
-  Ctype.with_local_level_generalize begin fun () ->
+  Ctype.with_local_level_generalize ~before_generalize:generalize_decl begin fun () ->
     let params = List.map Ctype.newvar params in
     { type_params = params;
       type_arity = arity;
@@ -4489,11 +4512,22 @@ let variance (p,n,i) =
 let variance_context =
   let open Typedecl_variance in
   function
-  | Type_declaration { id; decl; unboxed_version = _ } ->
+  | Type_declaration { id ; decl ; unboxed_version } ->
+      let pre, post =
+        if unboxed_version then
+          (* Unexpected; errors in the unboxed version should have also
+            been present and reported first for the boxed version. *)
+          "In the unboxed version of the definition",
+        "@ Please report this error to the Jane Street compilers team."
+        else
+          "In the definition", ""
+      in
       Out_type.add_type_declaration_to_preparation id decl;
-      Format_doc.doc_printf "In the definition@\n  @[%a@]@\n"
+      Format_doc.doc_printf "%s@\n  @[%a@]@\n%s"
+        pre
         (Style.as_inline_code @@ Out_type.prepared_type_declaration id)
         decl
+        post
   | Gadt_constructor c ->
       Out_type.add_constructor_to_preparation c;
       doc_printf "In the GADT constructor@\n  @[%a@]@\n"
@@ -4504,6 +4538,7 @@ let variance_context =
       doc_printf "In the extension constructor@\n  @[%a@]@\n"
         (Out_type.prepared_extension_constructor id)
         e
+
 
 let variance_variable_error ~v1 ~v2 variable error ppf =
   let open Typedecl_variance in
@@ -4555,9 +4590,9 @@ let report_error ~loc = function
        -- maximum is %i non-constant constructors@]"
       (Config.max_tag + 1)
   | Duplicate_label s ->
-      Location.errorf ~loc "Two labels are named %a" Style.inline_code s
+      Location.errorf "Two labels are named %a" Style.inline_code s
   | Unboxed_mutable_label ->
-      Location.errorf ~loc "Unboxed record labels cannot be mutable"
+      Location.errorf "Unboxed record labels cannot be mutable"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->
@@ -4579,7 +4614,8 @@ let report_error ~loc = function
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->
       Out_type.reset ();
       Reaching_path.add_to_preparation reaching_path;
-      Location.errorf ~loc "@[<v>The definition of %a is recursive without boxing%a@]"
+      Location.errorf ~loc
+        "<v>The definition of %a is recursive without boxing%a"
         Style.inline_code s
         Reaching_path.pp_colon reaching_path
   | Definition_mismatch (ty, env, err) ->
@@ -4747,8 +4783,8 @@ let report_error ~loc = function
         Style.inline_code "nativeint"
   | Cannot_unbox_or_untag_type Untagged ->
       Location.errorf ~loc
-        "Don't know how to untag this type. Only %a, %a, %a,@ \
-         and other immediate types can be untagged."
+        "Don't know how to untag this type. Only %a, %a, %a, \
+         and@ other immediate types can be untagged."
         Style.inline_code "int8"
         Style.inline_code "int16"
         Style.inline_code "int"
@@ -4800,7 +4836,7 @@ let report_error ~loc = function
           made representable by %a)"
         Style.inline_code "[@layout_poly]"
     in
-    Location.errorf ~loc "@[%s must have a representable layout%t.@ %a@]" s
+    Location.errorf ~loc "%s must have a representable layout%t.@ %a" s
       extra
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
@@ -4809,9 +4845,8 @@ let report_error ~loc = function
     Location.errorf ~loc "Records must contain at least one runtime value."
   | Non_representable_in_module (err, ty) ->
     let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
-    Location.errorf ~loc
-      "The type of a module-level value must have a@ \
-       representable layout.@ %a"
+    Location.errorf ~loc "The type of a module-level value must have a@ \
+                          representable layout.@ %a"
       (Jkind.Violation.report_with_offender ~offender
          ~level:(Ctype.get_current_level ()))
       err
@@ -4851,21 +4886,22 @@ let report_error ~loc = function
             (Mixed_product_kind.to_plural_string mixed_product_kind)
             max_value_prefix_len value_prefix_len
       | Insufficient_level { required_layouts_level; mixed_product_kind } -> (
-        let hint ppf =
-          fprintf ppf "You must enable -extension %s to use this feature."
-            (Language_extension.to_command_line_string Layouts
-               required_layouts_level)
+        let hint =
+          [Location.msg
+             "You must enable -extension %s to use this feature."
+             (Language_extension.to_command_line_string Layouts
+                required_layouts_level)]
         in
         match Language_extension.is_enabled Layouts with
         | false ->
           Location.errorf ~loc
-            "@[<v>The appropriate layouts extension is not enabled.@;%t@]" hint
+            "@[<v>The appropriate layouts extension is not enabled.@]"
+            ~sub:hint
         | true ->
           Location.errorf ~loc
-            "@[<v>The enabled layouts extension does not allow for mixed %s.@;\
-             %t@]"
+            "@[<v>The enabled layouts extension does not allow for mixed %s.@]"
             (Mixed_product_kind.to_plural_string mixed_product_kind)
-            hint)
+            ~sub:hint)
     end
   | Bad_unboxed_attribute msg ->
       Location.errorf ~loc "This type cannot be unboxed because@ %s." msg
@@ -4935,7 +4971,7 @@ let report_error ~loc = function
       "In signatures, zero_alloc is only supported on function declarations.\
        @ Found no arrows in this declaration's type.\
        @ Hint: You can write %a to specify the arity\
-       @ of an alias (for n > 0)."
+       @ of an alias (for n > 0).@]"
       Style.inline_code "[@zero_alloc arity n]"
   | Zero_alloc_attr_bad_user_arity ->
     Location.errorf ~loc
@@ -4968,15 +5004,12 @@ let report_error ~loc = function
         Style.inline_code name
   | Constructor_submode_failed e ->
       let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
-      let sub = [
-        Location.msg
-          "@[@{<hint>Hint@}: all argument types must \
-           mode-cross for rebinding to succeed.@]"
-      ] in
-      Location.errorf ~sub ~loc "This constructor is at mode %a, \
-        but expected to be at mode %a."
+      Location.errorf ~loc "This constructor is at mode %a, \
+        but expected to be at mode %a.@]"
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
+        ~sub:[Location.msg "@[<hv>@[@{<hint>Hint@}: all argument types must \
+                            mode-cross for rebinding to succeed."]
   | Atomic_field_in_mixed_block ->
     Location.errorf ~loc
       "Atomic record fields are not permitted in mixed blocks."

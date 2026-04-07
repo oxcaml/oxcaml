@@ -27,9 +27,6 @@ val strings_of_paths: namespace -> Path.t list -> string list
 (** Print a list of paths, using the same naming context to
     avoid name collisions *)
 
-val rewrite_double_underscore_longidents: Env.t -> Longident.t -> Longident.t
-
-
 (** [printed_signature sourcefile ppf sg] print the signature [sg] of
         [sourcefile] with potential warnings for name collisions *)
 val printed_signature: string -> Format.formatter -> signature -> unit
@@ -57,6 +54,10 @@ module type Printers := sig
         multiple types to use common names for type variables, see
         {!Out_type.prepare_for_printing} and {!Out_type.prepared_type_expr}. *)
     val type_expr: type_expr printer
+
+    (** Prints a modality. If it is the identity modality, prints [id], which
+        defaults to nothing. *)
+    val modality : ?id:unit printer -> 'a Mode.Modality.Axis.t -> 'a printer
 
     val type_scheme: type_expr printer
 
@@ -98,10 +99,6 @@ module type Printers := sig
     val modtype: module_type printer
     val signature: signature printer
     val class_type: class_type printer
-
-    (** Prints a modality. If it is the identity modality, prints [id], which
-        defaults to nothing. *)
-    val modality : ?id:unit printer -> 'a Mode.Modality.Axis.t -> 'a printer
   end
 
 module Doc : Printers with type 'a printer := 'a Format_doc.printer

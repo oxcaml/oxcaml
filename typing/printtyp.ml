@@ -13,92 +13,29 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Longident
-open Types
 open Out_type
-
 module Fmt = Format_doc
-
-let doc_longident = Pprintast.Doc.longident
-let () = Mode.print_longident := doc_longident
-
-let find_double_underscore s =
-  let len = String.length s in
-  let rec loop i =
-    if i + 1 >= len then
-      None
-    else if s.[i] = '_' && s.[i + 1] = '_' then
-      Some i
-    else
-      loop (i + 1)
-  in
-  loop 0
-
-let expand_longident_head name =
-  match find_double_underscore name with
-  | None -> None
-  | Some i ->
-      Some
-        (Ldot
-           ( Location.mknoloc (Lident (String.sub name 0 i)),
-             Location.mknoloc
-               (Unit_info.modulize
-                  (String.sub name (i + 2) (String.length name - i - 2))) ))
-
-let rec module_path_is_an_alias_of env path ~alias_of =
-  match Env.find_module path env with
-  | { md_type = Mty_alias path'; _ } ->
-      Path.same path' alias_of
-      || module_path_is_an_alias_of env path' ~alias_of
-  | _ -> false
-  | exception Not_found -> false
-
-let rec rewrite_double_underscore_longidents env (l : Longident.t) =
-  match l with
-  | Ldot (l, s) ->
-      Ldot (Location.map (rewrite_double_underscore_longidents env) l, s)
-  | Lapply (a, b) ->
-      Lapply
-        ( Location.map (rewrite_double_underscore_longidents env) a,
-          Location.map (rewrite_double_underscore_longidents env) b )
-  | Lident name ->
-      begin
-        match expand_longident_head name with
-        | None -> l
-        | Some l' ->
-            begin
-              match
-                (Env.find_module_by_name_lazy l env,
-                 Env.find_module_by_name_lazy l' env)
-              with
-              | exception Not_found -> l
-              | (p, _), (p', _) ->
-                  if module_path_is_an_alias_of env p' ~alias_of:p then l'
-                  else l
-            end
-      end
 
 let namespaced_ident namespace  id =
   Out_name.print (ident_name (Some namespace) id)
 
-let doc_modality ?(id = fun _ppf () -> ()) ax ppf modality =
-  if Mode.Modality.Per_axis.is_id ax modality then id ppf ()
-  else
-    Fmt.asprintf "%a" (Mode.Modality.Per_axis.print ax) modality
-    |> !Oprint.out_modality ppf
-
 module Doc = struct
   let wrap_printing_env = wrap_printing_env
 
-  let longident = doc_longident
+  let longident = Pprintast.Doc.longident
 
   let ident ppf id = Fmt.pp_print_string ppf
       (Out_name.print (ident_name None id))
 
-
-
   let typexp mode ppf ty =
     !Oprint.out_type ppf (tree_of_typexp mode ty)
+
+  let modality ?(id = fun _ppf () -> ()) ax ppf modality =
+    if Mode.Modality.Per_axis.is_id ax modality then
+      id ppf ()
+    else
+      Fmt.asprintf "%a" (Mode.Modality.Per_axis.print ax) modality
+      |> !Oprint.out_modality ppf
 
   let type_expansion k ppf e =
     pp_type_expansion ppf (trees_of_type_expansion k e)
@@ -121,10 +58,9 @@ module Doc = struct
     prepared_type_scheme ppf ty
 
   let path ppf p =
-    !Oprint.out_ident ppf (tree_of_path ~disambiguation:false p)
+    !Oprint.out_ident ppf (tree_of_path p)
 
   let () = Env.print_path := path
-  let () = Jkind.set_printtyp_path path
 
   let type_path ppf p = !Oprint.out_ident ppf (tree_of_type_path p)
 
@@ -152,7 +88,8 @@ module Doc = struct
     prepared_constructor ppf c
 
   let constructor_arguments ppf a =
-    !Oprint.out_constr_args ppf (tree_of_constructor_arguments a)
+    let tys = tree_of_constructor_arguments a in
+    !Oprint.out_constr_args ppf tys
 
   let label ppf l =
     prepare_for_printing [l.Types.ld_type];
@@ -178,21 +115,20 @@ module Doc = struct
       ocstr_return_type = ret;
     }
 
+  (* Print a signature body (used by -i when compiling a .ml) *)
+
   let print_signature ppf tree =
     Fmt.fprintf ppf "@[<v>%a@]" !Oprint.out_signature tree
 
   let signature ppf sg =
     Fmt.fprintf ppf "%a" print_signature (tree_of_signature sg)
 
-  let modality = doc_modality
 end
 open Doc
 let string_of_path p = Fmt.asprintf "%a" path p
 
 let strings_of_paths namespace p =
-  Ident_names.reset ();
-  let tree_of_path = namespaced_tree_of_path namespace in
-  let trees = List.map tree_of_path p in
+  let trees = List.map (namespaced_tree_of_path namespace) p in
   List.map (Fmt.asprintf "%a" !Oprint.out_ident) trees
 
 let wrap_printing_env = wrap_printing_env
@@ -201,6 +137,10 @@ let longident = Fmt.compat longident
 let path = Fmt.compat path
 let type_path = Fmt.compat type_path
 let type_expr = Fmt.compat type_expr
+
+let modality ?id ax =
+  Fmt.compat (modality ?id:(Option.map Fmt.deprecated id) ax)
+
 let type_scheme = Fmt.compat type_scheme
 let shared_type_scheme = Fmt.compat shared_type_scheme
 
@@ -221,28 +161,19 @@ let class_declaration = Fmt.compat1 class_declaration
 let class_type = Fmt.compat class_type
 let cltype_declaration = Fmt.compat1 cltype_declaration
 
-let modality ?(id = fun _ppf () -> ()) ax ppf modality =
-  if Mode.Modality.Per_axis.is_id ax modality then id ppf ()
-  else
-    Format.fprintf ppf "%a"
-      (Fmt.compat !Oprint.out_modality)
-      (Format.asprintf "%a"
-         (Fmt.compat (Mode.Modality.Per_axis.print ax))
-         modality)
-
+(* Print a signature body (used by -i when compiling a .ml) *)
 let printed_signature sourcefile ppf sg =
+  (* we are tracking any collision event for warning 63 *)
   Ident_conflicts.reset ();
-  Ident_names.reset ();
   let t = tree_of_signature sg in
   if Warnings.(is_active @@ Erroneous_printed_signature "") then
-    begin
-      match Ident_conflicts.err_msg () with
-      | None -> ()
-      | Some msg ->
-          let conflicts = Fmt.asprintf "%a" Fmt.pp_doc msg in
-          Location.prerr_warning (Location.in_file sourcefile)
-            (Warnings.Erroneous_printed_signature conflicts);
-          Warnings.check_fatal ()
+    begin match Ident_conflicts.err_msg () with
+    | None -> ()
+    | Some msg ->
+        let conflicts = Fmt.asprintf "%a" Fmt.pp_doc msg in
+        Location.prerr_warning (Location.in_file sourcefile)
+          (Warnings.Erroneous_printed_signature conflicts);
+        Warnings.check_fatal ()
     end;
   Fmt.compat print_signature ppf t
 
@@ -250,3 +181,6 @@ let string_of_label : Types.arg_label -> string = function
   | Nolabel -> ""
   | Labelled s | Position s -> s
   | Optional s -> "?" ^ s
+
+let () = Jkind.set_printtyp_path Doc.path
+let () = Mode.print_longident := Doc.longident

@@ -53,16 +53,16 @@ let scrape_ty env ty =
   in
   match get_desc ty with
   | Tconstr _ ->
-      let ty = Ctype.expand_head_opt env ty in
-      begin match get_desc ty with
+      let ty' = Ctype.expand_head_opt env ty in
+      begin match get_desc ty' with
       | Tconstr (p, _, _) ->
           begin match find_unboxed_type (Env.find_type p env) with
-          | Some _ -> Some (Ctype.get_unboxed_type_approximation env ty).ty
-          | None -> Some ty
-          | exception Not_found -> None
+          | Some _ -> Some (Ctype.get_unboxed_type_approximation env ty').ty
+          | None -> Some ty'
+          | exception Not_found -> None (* missing cmi file *)
           end
       | _ ->
-          Some ty
+          Some ty'
       end
   | _ -> Some ty
 
@@ -139,11 +139,11 @@ type 'a classification =
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
    See comment on [classification] above to understand [classify_product]. *)
 let classify ~classify_product env ty sort : _ classification =
-  match (sort : Jkind.Sort.Const.t) with
-  | Base Value -> begin
   match scrape_ty env ty with
   | None -> Any
   | Some ty ->
+  match (sort : Jkind.Sort.Const.t) with
+  | Base Value -> begin
   if Ctype.is_always_gc_ignorable env ty
   then
     if Ctype.check_type_nullability env ty Non_null
@@ -155,21 +155,42 @@ let classify ~classify_product env ty sort : _ classification =
       begin match Predef.find_type_constr p with
       | Some `Float -> Float
       | Some `Lazy_t -> Lazy
-      | Some (`Int | `Char | `Int8 | `Int16) -> Immediate
+      | Some (`Int | `Char | `Int8 | `Int16) ->
+        (* This should be unreachable anyway because we check
+           [is_always_gc_ignorable] above *)
+        Immediate
       | Some (`String | `Bytes
-             | `Int32 | `Int64 | `Nativeint | `Float32
+             | `Int32 | `Int64 | `Nativeint
              | `Extension_constructor | `Continuation
              | `Array | `Floatarray | `Iarray
              | `Atomic_loc
-             | `Int8x16 | `Int16x8 | `Int32x4 | `Int64x2
-             | `Float16x8 | `Float32x4 | `Float64x2
-             | `Int8x32 | `Int16x16 | `Int32x8 | `Int64x4
-             | `Float16x16 | `Float32x8 | `Float64x4
-             | `Int8x64 | `Int16x32 | `Int32x16 | `Int64x8
-             | `Float16x32 | `Float32x16 | `Float64x8)
+             | `Float32
+             | `Int8x16
+             | `Int16x8
+             | `Int32x4
+             | `Int64x2
+             | `Float16x8
+             | `Float32x4
+             | `Float64x2
+             | `Int8x32
+             | `Int16x16
+             | `Int32x8
+             | `Int64x4
+             | `Float16x16
+             | `Float32x8
+             | `Float64x4
+             | `Int8x64
+             | `Int16x32
+             | `Int32x16
+             | `Int64x8
+             | `Float16x32
+             | `Float32x16
+             | `Float64x8
+             )
         -> Addr
-      | Some (`Lexing_position | `Code | `Idx_imm | `Idx_mut)
-      | Some #Predef.data_type_constr | None ->
+      | Some (`Lexing_position | `Code)
+      | Some (#Predef.data_type_constr | #Predef.abstract_non_value_type_constr)
+      | None ->
         try
           match (Env.find_type p env).type_kind with
           | Type_abstract _ ->
@@ -303,8 +324,8 @@ let array_kind_of_elt ~elt_sort env loc ty =
 
 let array_type_kind ~elt_sort ~elt_ty env loc ty =
   match scrape_poly env ty with
-  | Some (Tconstr(p, [elt_ty], _))
-    when Path.same p Predef.path_array || Path.same p Predef.path_iarray ->
+  | Some (Tconstr(p, [elt_ty], _)) when Path.same p Predef.path_array
+                              || Path.same p Predef.path_iarray ->
       array_kind_of_elt ~elt_sort env loc elt_ty
   | Some (Tconstr(p, [], _)) when Path.same p Predef.path_floatarray ->
       Pfloatarray
@@ -527,11 +548,9 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     || depth >= 2
     || num_nodes_visited >= 30
   in
-  let scty =
-    match scrape_ty env ty with
-    | Some scty -> scty
-    | None -> raise Missing_cmi_fallback
-  in
+  match scrape_ty env ty with
+  | None -> num_nodes_visited, non_nullable Pgenval
+  | Some scty ->
   begin
     (* CR layouts: We want to avoid correcting levels twice, and scrape_ty will
        correct levels for us.  But it may be the case that we could do the
@@ -555,8 +574,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     | Ok _ -> ()
     | Error _ ->
       match
-        Ctype.check_type_jkind env
-          ty (Jkind.Builtin.value_or_null ~why:V1_safety_check)
+        Ctype.(check_type_jkind env ty
+                 (Jkind.Builtin.value_or_null ~why:V1_safety_check))
       with
       | Ok _ -> ()
       | Error violation ->

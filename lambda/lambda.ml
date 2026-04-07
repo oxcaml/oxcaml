@@ -1760,7 +1760,7 @@ let transl_module_representation repr =
       (fun sort ->
          sort
          |> Jkind.Sort.default_for_transl_and_get
-         |> Data_types.mixed_block_element_of_const_sort)
+         |> Types.mixed_block_element_of_const_sort)
       repr
   in
   let is_value (elt : Types.mixed_block_element) =

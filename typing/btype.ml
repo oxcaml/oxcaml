@@ -191,6 +191,26 @@ let type_origin decl =
 
 let dummy_method = "*dummy method*"
 
+                  (********************************)
+                  (*  Utilities for poly types    *)
+                  (********************************)
+
+let tpoly_is_mono ty =
+  match get_desc ty with
+  | Tpoly(_, []) -> true
+  | Tpoly(_, _ :: _) -> false
+  | _ -> assert false
+
+let tpoly_get_poly ty =
+  match get_desc ty with
+  | Tpoly(ty, vars) -> (ty, vars)
+  | _ -> assert false
+
+let tpoly_get_mono ty =
+  match get_desc ty with
+  | Tpoly(ty, []) -> ty
+  | _ -> assert false
+
 (**** Representative of a type ****)
 
 let merge_fixed_explanation fixed1 fixed2 =
@@ -842,32 +862,7 @@ let instance_variable_type label sign =
   match Vars.find label sign.csig_vars with
   | (_, _, ty) -> ty
   | exception Not_found -> assert false
-
-                  (********************************)
-                  (*  Utilities for poly types    *)
-                  (********************************)
-
-let tpoly_is_mono ty =
-  match get_desc ty with
-  | Tpoly(_, []) -> true
-  | Tpoly(_, _ :: _) -> false
-  | _ -> assert false
-
-let tpoly_get_poly ty =
-  match get_desc ty with
-  | Tpoly(ty, vars) -> (ty, vars)
-  | _ -> assert false
-
-let tpoly_get_mono ty =
-  match get_desc ty with
-  | Tpoly(ty, []) -> ty
-  | _ -> assert false
-
-                  (**********)
-                  (*  Misc  *)
-                  (**********)
-
-
+!
                   (************)
                   (*  Jkinds  *)
                   (************)

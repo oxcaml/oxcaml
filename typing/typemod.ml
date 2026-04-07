@@ -807,6 +807,7 @@ module Merge = struct
           {Signature_group.ghosts; replace_by})
 
   let return = return_payload ~late_typedtree:()
+
   let split_row_id s ghosts =
     let srow = s ^ "#row" in
     let rec split before = function
@@ -3317,8 +3318,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       | { loc = app_loc; attributes = app_attributes;
           arg = Some { shape = arg_shape; path = arg_path; arg } } ->
       let coercion =
-        try Includemod.modtypes ~loc:arg.mod_loc ~mark:true env
-              arg.mod_type mty_param
+        try Includemod.modtypes
+              ~loc:arg.mod_loc ~mark:true env arg.mod_type mty_param
               ~modes:(Specific (arg.mod_mode, mm_param))
         with Includemod.Error _ -> apply_error ()
       in
@@ -3349,8 +3350,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                     raise (Error(app_loc, env, error))
             in
             begin match
-              Includemod.modtypes ~loc:app_loc ~mark:false env
-                mty_res nondep_mty
+              Includemod.modtypes
+                ~loc:app_loc ~mark:false env mty_res nondep_mty
                 ~modes:(Specific ((mm_res, None), mm_res))
             with
             | Tcoerce_none -> ()
@@ -3895,9 +3896,11 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         raise (Error_forward (Builtin_attributes.error_of_extension ext))
     | Pstr_attribute x ->
         Builtin_attributes.parse_standard_implementation_attributes x;
-        if Option.is_some toplevel
-        || not (Warnings.is_active (Misplaced_attribute "")) then
-          Builtin_attributes.mark_alert_used x;
+        (* CR rtjoa for dkalinichenko: saw this in your version but looks like
+           it's deleted upstream, leaving this here in case it affects tests *)
+        (* if Option.is_some toplevel
+         * || not (Warnings.is_active (Misplaced_attribute "")) then
+         *   Builtin_attributes.mark_alert_used x; *)
         Tstr_attribute x, [], shape_map, env
     | Pstr_kind_abbrev _ ->
         Misc.fatal_error "kind_abbrev not supported!"
@@ -4774,15 +4777,22 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This is an alias for module %a, which is missing"
         (Style.as_inline_code path) p
+  | Cannot_alias p ->
+      Location.errorf ~loc
+        "Functor arguments, such as %a, cannot be aliased"
+        (Style.as_inline_code path) p
   | Cannot_scrape_package_type p ->
       Location.errorf ~loc
         "The type of this packed module refers to %a, which is missing"
         (Style.as_inline_code path) p
   | Badly_formed_signature (context, err) ->
-      Location.errorf ~loc "@[In %s:@ %a@]"
-        context
-        (Format_doc.deprecated Location.print_report)
-        (Typedecl.report_error ~loc:Location.none err)
+     let report = Typedecl.report_error ~loc err in
+     let txt =
+       Format_doc.doc_printf "In %s:@ %a"
+         context
+         Format_doc.pp_doc report.main.txt
+     in
+     { report with main = { report.main with txt} }
   | Cannot_hide_id Illegal_shadowing
       { shadowed_item_kind; shadowed_item_id; shadowed_item_loc;
         shadower_id; user_id; user_kind; user_loc } ->
@@ -4892,10 +4902,6 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
-  | Cannot_alias p ->
-      Location.errorf ~loc
-        "Functor arguments, such as %a, cannot be aliased"
-        (Style.as_inline_code path) p
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env

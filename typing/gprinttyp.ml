@@ -368,8 +368,8 @@ module Pp = struct
     | Some Types.Fixed_private -> fprintf ppf "private"
     | Some Types.Rigid -> fprintf ppf "rigid"
     | Some Types.Univar _t -> fprintf ppf "univar"
-    | Some Types.Fixed_existential -> fprintf ppf "existential"
     | Some Types.Reified _p -> fprintf ppf "reified"
+    | Some Types.Fixed_existential -> fprintf ppf "existential"
 
   let field_kind ppf v =
     match Types.field_kind_repr v with
@@ -677,7 +677,7 @@ module Digraph = struct
     let std_edge = edge std in
     match desc with
     | Types.Tvar { name; _ } -> mk "%a" Pp.pretty_var name
-    | Types.Tarrow ((l, _, _), t1, t2, _) ->
+    | Types.Tarrow ((l,_,_),t1,t2,_) ->
        mk "→%a" Pp.exponent_of_label l |> numbered [t1; t2]
     | Types.Ttuple tl ->
         mk "*" |> labeled_edges params id tl

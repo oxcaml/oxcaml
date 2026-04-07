@@ -749,13 +749,13 @@ end = struct
   module Set = Set.Make (struct
     type t = tags
 
-    let compare t1 t2 = Data_types.compare_tag t1.tag t2.tag
+    let compare t1 t2 = Types.compare_tag t1.tag t2.tag
   end)
 
   module Map = Map.Make (struct
     type t = tags
 
-    let compare t1 t2 = Data_types.compare_tag t1.tag t2.tag
+    let compare t1 t2 = Types.compare_tag t1.tag t2.tag
   end)
 
   let print ppf { name_for_error; _ } =
@@ -2344,19 +2344,6 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     check_uniqueness_comprehensions ~borrows
   in
   let check_uniqueness_binding_op = check_uniqueness_binding_op ~borrows in
-  (* CR dkalinichenko: i'm not sure this is sound at all. figure out
-     uniqueness and effects. *)
-  let check_uniqueness_aliased_eff_cases ienv eff_cases =
-    match eff_cases with
-    | [] -> UF.unused
-    | _ ->
-      let paths = Paths.fresh () in
-      let uf_aliased =
-        Paths.mark_aliased (Occurrence.mk loc) Aliased.Forced paths
-      in
-      let uf_cases = check_uniqueness_cases ienv (Match_single paths) eff_cases in
-      UF.seq uf_aliased uf_cases
-  in
   function
   | Texp_ident _ as exp_desc ->
     let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
@@ -2429,17 +2416,23 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_match (arg, _, cases, eff_cases, _) ->
     let value, uf_arg = check_uniqueness_exp_for_match ienv arg in
     let uf_cases = check_uniqueness_comp_cases ienv value cases in
-    let uf_eff_cases = check_uniqueness_aliased_eff_cases ienv eff_cases in
-    (* CR dkalinichenko: is this the right code? *)
-    UF.seq uf_arg (UF.choose uf_cases uf_eff_cases)
+    let uf_eff_cases = check_uniqueness_cases ienv value eff_cases in
+    (* CR rtjoa for zqian: uncertain whether this is sound *)
+    (* Effects can be run multiple times - for uniqueness, this is equivalent to
+       twice - and can also be run when the non-effect case is run. *)
+    let uf_all_cases = UF.seqs [uf_eff_cases; uf_eff_cases; uf_cases] in
+    UF.seq uf_arg uf_all_cases
   | Texp_try (body, cases, eff_cases) ->
     let uf_body = check_uniqueness_exp ~overwrite:None ienv body in
-    let uf_cases =
-      check_uniqueness_cases ienv (Match_single (Paths.fresh ())) cases
-    in
-    let uf_eff_cases = check_uniqueness_aliased_eff_cases ienv eff_cases in
-    (* CR dkalinichenko: is this the right code? *)
-    UF.seq uf_body (UF.choose uf_cases uf_eff_cases)
+    let value = Match_single (Paths.fresh ()) in
+    let uf_cases = check_uniqueness_cases ienv value cases in
+    let uf_eff_cases = check_uniqueness_cases ienv value eff_cases in
+    (* CR rtjoa for zqian: uncertain whether this is sound *)
+    (* Effects can be run multiple times - for uniqueness, this is equivalent to
+       twice - and can also be run when the non-effect case is run. *)
+    let uf_all_cases = UF.seqs [uf_eff_cases; uf_eff_cases; uf_cases] in
+    (* we don't know how much of e will be run; safe to assume all of them *)
+    UF.seq uf_body uf_all_cases
   | Texp_unboxed_unit -> UF.unused
   | Texp_unboxed_bool _ -> UF.unused
   | Texp_tuple (es, _) ->

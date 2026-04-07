@@ -318,8 +318,8 @@ let extension_constructor sub x =
 
 let pat_extra sub = function
   | Tpat_unpack as d -> d
-  | Tpat_type (path, lid) -> Tpat_type (path, map_loc_lid sub lid)
-  | Tpat_open (path, lid, env) ->
+  | Tpat_type (path,lid) -> Tpat_type (path, map_loc_lid sub lid)
+  | Tpat_open (path,lid,env) ->
       Tpat_open (path, map_loc_lid sub lid, sub.env sub env)
   | Tpat_constraint (ct, ma) ->
     Tpat_constraint (sub.typ sub ct, sub.modes sub ma)
@@ -362,7 +362,8 @@ let pat
     | Tpat_record_unboxed_product (l, closed) ->
         Tpat_record_unboxed_product
           (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, closed)
-    | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
+    | Tpat_array (am, arg_sort, l) ->
+        Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
     | Tpat_alias (p, id, s, uid, sort, m, ty) ->
         Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
@@ -536,9 +537,7 @@ let expr sub x =
         Texp_apply (
           sub.expr sub exp,
           List.map
-            (tuple2 id
-               (Typedtree.map_apply_arg
-                  (fun (exp, sort) -> (sub.expr sub exp, sort))))
+            (tuple2 id (Typedtree.map_apply_arg (tuple2 (sub.expr sub) id)))
             list,
           pos, am, za
         )
@@ -564,7 +563,8 @@ let expr sub x =
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
     | Texp_construct (lid, cd, args, am) ->
-        Texp_construct (map_loc_lid sub lid, cd, List.map (sub.expr sub) args, am)
+        Texp_construct
+          (map_loc_lid sub lid, cd, List.map (sub.expr sub) args, am)
     | Texp_variant (l, expo) ->
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
     | Texp_record { fields; representation; extended_expression; alloc_mode } ->
@@ -812,7 +812,7 @@ let module_type sub x =
     | Tmty_typeof mexpr ->
         Tmty_typeof (sub.module_expr sub mexpr)
     | Tmty_strengthen (mtype, p, lid) ->
-        Tmty_strengthen (sub.module_type sub mtype, p, lid)
+        Tmty_strengthen (sub.module_type sub mtype, p, map_loc_lid sub lid)
   in
   let mty_attributes = sub.attributes sub x.mty_attributes in
   {x with mty_loc; mty_desc; mty_env; mty_attributes}
@@ -859,6 +859,13 @@ let module_coercion sub = function
 let module_expr sub x =
   let mod_loc = sub.location sub x.mod_loc in
   let mod_env = sub.env sub x.mod_env in
+  let mod_mode =
+    match x.mod_mode with
+    | _, None -> x.mod_mode
+    | mode, Some (locks, txt, loc) ->
+      let { txt; loc } = map_loc_lid sub { txt; loc } in
+      mode, Some (locks, txt, loc)
+  in
   let mod_desc =
     match x.mod_desc with
     | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc_lid sub lid)
@@ -891,7 +898,7 @@ let module_expr sub x =
           )
   in
   let mod_attributes = sub.attributes sub x.mod_attributes in
-  {x with mod_loc; mod_desc; mod_env; mod_attributes}
+  {x with mod_loc; mod_desc; mod_mode; mod_env; mod_attributes}
 
 let module_binding sub x =
   let mb_loc = sub.location sub x.mb_loc in
@@ -927,9 +934,7 @@ let class_expr sub x =
         Tcl_apply (
           sub.class_expr sub cl,
           List.map
-            (tuple2 id
-               (Typedtree.map_apply_arg
-                  (fun (exp, sort) -> (sub.expr sub exp, sort))))
+            (tuple2 id (Typedtree.map_apply_arg (tuple2 (sub.expr sub) id)))
             args
         )
     | Tcl_let (rec_flag, value_bindings, ivars, cl) ->

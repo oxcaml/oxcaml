@@ -664,8 +664,7 @@ let set_args q r = match q with
 | {pat_desc = Tpat_array (am, arg_sort, omegas)} ->
     let args,rest = read_args omegas r in
     make_pat
-      (Tpat_array (am, arg_sort, args)) q.pat_type q.pat_env ::
-    rest
+      (Tpat_array (am, arg_sort, args)) q.pat_type q.pat_env :: rest
 | {pat_desc=Tpat_constant _|Tpat_any|Tpat_unboxed_unit|Tpat_unboxed_bool _} ->
     q::r (* case any is used in matching.ml *)
 | {pat_desc = (Tpat_var _ | Tpat_alias _ | Tpat_or _); _} ->
@@ -1104,7 +1103,7 @@ let build_other ext env =
           | _ ->
               build_other_constrs env d
           end
-      | Unboxed_bool b -> 
+      | Unboxed_bool b ->
         make_pat (Tpat_unboxed_bool (not b)) d.pat_type Env.empty
       | Variant { cstr_row; type_row } ->
           let tags =
@@ -1479,7 +1478,8 @@ let print_pat pat =
         Printf.sprintf "(%s)" (String.concat "," (List.map string_of_pat list))
       | Tpat_variant (_, _, _) -> "variant"
       | Tpat_record (_, _) -> "record"
-      | Tpat_array _ -> "array"
+      | Tpat_array (Mutable, _) -> "array"
+      | Tpat_array (Immutable, _) -> "immutable array"
   in
   Printf.fprintf stderr "PAT[%s]\n%!" (string_of_pat pat)
 *)

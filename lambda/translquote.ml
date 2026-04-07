@@ -2680,8 +2680,8 @@ let type_for_annotation ~env ~loc typ =
           Ttyp_constr
             (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
         | Tobject (fields, _) ->
-          let Out_type.{ fields; open_row } =
-            Out_type.tree_of_typobject_repr fields
+          let Printtyp.{ fields; open_row } =
+            Printtyp.tree_of_typobject_repr fields
           in
           let fields =
             List.map
@@ -2694,10 +2694,10 @@ let type_for_annotation ~env ~loc typ =
           in
           Ttyp_object (fields, if open_row then Open else Closed)
         | Tvariant row ->
-          let Out_type.
+          let Printtyp.
                 { fields; name = _; closed; present = _; all_present = _; tags }
               =
-            Out_type.tree_of_typvariant_repr row
+            Printtyp.tree_of_typvariant_repr row
           in
           let fields =
             List.map

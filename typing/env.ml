@@ -1081,11 +1081,11 @@ let rec address_head = function
   | Alocal id -> AHlocal id
   | Adot (a, _, _) -> address_head a
 
-(* The name of the compilation unit currently compiled.
-   "" if outside a compilation unit. *)
+(* The name of the compilation unit currently compiled. *)
 module Current_unit : sig
   val get : unit -> Unit_info.t option
-  val set : Unit_info.t option -> unit
+  val set : Unit_info.t -> unit
+  val unset : unit -> unit
 
   module Name : sig
     val get : unit -> string
@@ -1098,8 +1098,10 @@ end = struct
     ref None
   let get () =
     !current_unit
-  let set unit_info =
-    current_unit := unit_info
+  let set cu =
+    current_unit := Some cu
+  let unset () =
+    current_unit := None
 
   module Name = struct
     let get () =
@@ -1296,7 +1298,7 @@ let reset_declaration_caches () =
   ()
 
 let reset_cache ~preserve_persistent_env =
-  Current_unit.set None;
+  Current_unit.unset ();
   if not preserve_persistent_env then
     Persistent_env.clear !persistent_env;
   reset_declaration_caches ();
@@ -3256,7 +3258,7 @@ let mark_label_used usage uid =
   | exception Not_found -> ()
 
 let mark_constructor_description_used usage env cstr =
-  let ty_path = Data_types.cstr_res_type_path cstr in
+  let ty_path = cstr_res_type_path cstr in
   mark_type_path_used env ty_path;
   match Types.Uid.Tbl.find !used_constructors cstr.cstr_uid with
   | mark -> mark usage
@@ -3764,7 +3766,7 @@ let rec lookup_module_components ~errors ~use ~loc lid env =
       Papply (f_path, arg), fcomp_res_mode_with_locks, comps
 
 and lookup_structure_components ~errors ~use ?(reason = Project) l env =
-  let { txt = lid; loc } = l in
+  let { txt=lid; loc } = l in
   let path, mode_with_locks, comps =
     lookup_module_components ~errors ~use ~loc lid env
   in
@@ -3814,9 +3816,9 @@ and lookup_apply ~errors ~use ~loc lid0 env =
     lookup_module_components ~errors ~use ~loc f0_lid env
   in
   let check_one_apply ~errors ~loc ~f_lid ~f_comp ~arg_path ~arg_mty env =
-    let { txt = f_lid; loc = f_lid_loc } = f_lid in
     let f_comp, param_mty =
-      get_functor_components ~errors ~loc:f_lid_loc f_lid env f_comp
+      let { txt = f_lid; loc } = f_lid in
+      get_functor_components ~errors ~loc f_lid env f_comp
     in
     check_functor_appl
       ~errors ~loc ~lid_whole_app:lid0
@@ -3957,9 +3959,9 @@ let lookup_all_dot_labels ~record_form ~errors ~use ~loc usage l s env =
 
 let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
   match l with
-  | { txt = Longident.Lident "*predef*"; _ } ->
+  | { txt=Longident.Lident "*predef*"; _ } ->
       (* Hack to support compilation of default arguments *)
-      let { txt = s; loc } = s in
+      let { txt=s; loc } = s in
       lookup_all_ident_constructors
         ~errors ~use ~loc usage s (Lazy.force initial)
   | _ ->
@@ -4040,10 +4042,9 @@ let open_signature_by_path path env0 =
   let comps = find_structure_components path env0 in
   add_components None path env0 comps locks_empty
 
-let open_signature ~errors ~loc slot lid env0 =
+let open_signature ~errors slot lid env0 =
   let (root, mode_with_locks, comps) =
-    lookup_structure_components ~errors ~use:true ~reason:Open
-      (Location.mkloc lid loc) env0
+    lookup_structure_components ~errors ~use:true ~reason:Open lid env0
   in
   let _, locks = mode_with_locks in
   root, mode_with_locks, add_components slot root env0 comps locks
@@ -4089,7 +4090,7 @@ let remove_last_open root env0 =
 (* Open a signature from a file *)
 
 let open_pers_signature name env =
-  open_signature ~errors:false ~loc:Location.none None (Lident name) env
+  open_signature ~errors:false None (Location.mknoloc (Lident name)) env
 
 let open_signature
     ~used_slot
@@ -4137,10 +4138,9 @@ let open_signature
       end;
       used := true
     in
-    open_signature ~errors:true ~loc:lid.loc (Some slot) lid.txt env
+    open_signature ~errors:true (Some slot) lid env
   end
-  else open_signature ~errors:true ~loc:lid.loc None lid.txt env
-
+  else open_signature ~errors:true None lid env
 
 (* General forms of the lookup functions *)
 
@@ -4220,9 +4220,8 @@ let lid_without_hash = function
       | None -> None
       end
   | Ldot(l, s) -> begin
-      (* CR dkalinichenko: do we need to also update the location? *)
       match string_without_hash s.txt with
-      | Some s' -> Some (Ldot(l, { s with txt = s' }))
+      | Some txt -> Some (Ldot(l, { s with txt }))
       | None -> None
       end
   | Lapply _ -> None
@@ -4901,48 +4900,48 @@ let report_lookup_error_doc loc env = function
        quoted_constr lid
        (spellcheck extract_constructors env lid)
   | Unbound_label (lid, record_form, usage) ->
-      let P record_form = record_form in
-      let label_of_other_form = match record_form with
-        | Legacy ->
-          (match find_label_by_name Unboxed_product lid env with
-          | _ -> Some "an unboxed record"
-          | exception Not_found -> None)
-        | Unboxed_product ->
-          (match find_label_by_name Legacy lid env with
-          | _ -> Some "a boxed record"
-          | exception Not_found -> None)
-      in
-      let sub = match label_of_other_form with
-        | Some other_form ->
-          let hint_msg = match record_form, usage with
-            | Unboxed_product, _ ->
-              Format_doc.asprintf
-                "There is %s field with this name.@ \
-                 Note that float- and [@@unboxed]- records don't get unboxed \
-                 versions." other_form
-            | Legacy, Projection ->
-              let print_projection ppf (op, lid) =
-                fprintf ppf "%s%a" op Pprintast.Doc.longident lid
-              in
-              Format_doc.asprintf
-                "There is %s field with this name.@ \
-                 To project an unboxed record field, use %a instead of %a."
-                other_form
+     let P record_form = record_form in
+     let label_of_other_form = match record_form with
+       | Legacy ->
+         (match find_label_by_name Unboxed_product lid env with
+         | _ -> Some "an unboxed record"
+         | exception Not_found -> None)
+       | Unboxed_product ->
+         (match find_label_by_name Legacy lid env with
+         | _ -> Some "a boxed record"
+         | exception Not_found -> None)
+     in
+     let sub =
+       match label_of_other_form with
+       | Some other_form ->
+         [ Location.msg
+             "@{<hint>Hint@}: There is %s field with this name." other_form ]
+         @
+         (match record_form, usage with
+          | Unboxed_product, _ ->
+            (* If an unboxed field isn't in scope but a boxed field is, then the
+               boxed field must come from a record that didn't get an unboxed
+               version. *)
+            [ Location.msg
+                "Note that float- and [@@unboxed]- records don't get \
+                  unboxed versions." ]
+          | Legacy, Projection ->
+            let print_projection ppf (op, lid) =
+              fprintf ppf "%s%a" op quoted_longident lid
+            in
+            [ Location.msg
+                "To project an unboxed record field, use %a instead of %a."
                 (Style.as_inline_code print_projection) (".#", lid)
-                (Style.as_inline_code print_projection) (".", lid)
-            | _ ->
-              Format_doc.asprintf
-                "There is %s field with this name." other_form
-          in
-          [Location.msg "@{<hint>Hint@}: @[%s@]" hint_msg]
-        | None -> []
-      in
-      Location.aligned_error_hint ~loc
-        "@{<ralign>Unbound %s field @}%a"
-        (record_form_to_string record_form)
-        quoted_longident lid
-        (spellcheck (extract_labels record_form) env lid)
-        ~sub
+                (Style.as_inline_code print_projection) (".", lid) ]
+          | _ -> [])
+       | None -> []
+     in
+     Location.aligned_error_hint ~loc
+       "@{<ralign>Unbound %s field @}%a"
+       (record_form_to_string record_form)
+       quoted_longident lid
+       (spellcheck (extract_labels record_form) env lid)
+       ~sub
   | Unbound_class lid -> begin
       let main ppf =
         fprintf ppf "@{<ralign>Unbound class @}%a" quoted_longident lid
@@ -4982,14 +4981,14 @@ let report_lookup_error_doc loc env = function
        "@{<ralign>Unbound class type @}%a" quoted_longident lid
       (spellcheck extract_cltypes env lid)
   | Unbound_settable_variable s ->
-      Location.aligned_error_hint ~loc
-        "@{<ralign>Unbound instance variable or mutable variable @}%a"
-        Style.inline_code s
-        (spellcheck_name extract_settable_variables env s)
+        Location.aligned_error_hint ~loc
+          "@{<ralign>Unbound instance variable or mutable variable @}%a"
+          Style.inline_code s
+          (spellcheck_name extract_settable_variables env s)
   | Not_a_settable_variable s ->
      Location.aligned_error_hint ~loc
-        "@{<ralign>The value @}%a \
-         is not an instance variable or mutable variable"
+        "@{<ralign>The value @}%a is not an instance variable or mutable \
+         variable"
         Style.inline_code s
         (spellcheck_name extract_settable_variables env s)
   | Masked_instance_variable lid ->
@@ -5058,12 +5057,12 @@ let report_lookup_error_doc loc env = function
        (Style.as_inline_code pp_path) p
   | Functor_used_as_structure (lid, reason) ->
      Location.errorf ~loc
-       "@[The module %a is a functor, it cannot %a@]"
+       "The module %a is a functor, it cannot %a"
        quoted_longident lid
        print_structure_components_reason reason
   | Abstract_used_as_structure (lid, p, reason) ->
      Location.errorf ~loc
-       "@[The module %a is of abstract type %a, it cannot %a@]"
+       "The module %a is of abstract type %a, it cannot %a"
        quoted_longident lid
        (Style.as_inline_code pp_path) p
        print_structure_components_reason reason
@@ -5083,48 +5082,49 @@ let report_lookup_error_doc loc env = function
         (Style.as_inline_code pp_path) p cause
   | Local_value_used_in_exclave (item, lid) ->
       Location.errorf ~loc
-        "@[%a local, so it cannot be used \
-         inside an exclave_@]"
+        "%a local, so it cannot be used inside an exclave_"
         print_lock_item (item, lid)
   | Non_value_used_in_object (lid, typ, err) ->
       Location.errorf ~loc
-        "@[%a must have a type of layout value because it is \
-         captured by an object.@ %a@]"
+        "%a must have a type of layout value because it is captured by an \
+         object.@ %a"
         quoted_longident lid
         (fun v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
            ~level:Btype.generic_level v)
         err
   | No_unboxed_version (lid, decl) ->
-      let sub = match decl.type_kind with
-      | Type_record (_, Record_unboxed, _) ->
+      let sub =
+        match decl.type_kind with
+        | Type_record (_, Record_unboxed, _) ->
           [Location.msg
-            "@{<hint>Hint@}: \
-             [@@unboxed] records don't get unboxed versions."]
-      | Type_record (_, (Record_float | Record_ufloat | Record_mixed _), _) ->
+             "@{<hint>Hint@}: [@@unboxed] records don't get unboxed \
+              versions."]
+        | Type_record (_, (Record_float | Record_ufloat |
+                           Record_mixed _), _) ->
           [Location.msg
             "@{<hint>Hint@}: Float records don't get unboxed versions."]
-      | Type_record_unboxed_product _ ->
+        | Type_record_unboxed_product _ ->
           [Location.msg
             "@{<hint>Hint@}: It is already an unboxed record."]
-      | _ -> []
+        | _ -> []
       in
       Location.errorf ~loc ~sub
-        "@[The type %a has no unboxed version.@]"
+        "The type %a has no unboxed version."
         quoted_longident lid
   | Error_from_persistent_env err ->
       Location.error_of_printer_file Persistent_env.report_error_doc err
   | Mutable_value_used_in_closure ctx ->
       Location.errorf ~loc
-        "@[Mutable variable cannot be used inside %t.@]"
+        "Mutable variable cannot be used inside %t."
         ((Mode.print_pinpoint ctx |> Option.get)
           ~definite:false ~capitalize:false)
   | Incompatible_stage (lid, usage_loc, usage_stage, intro_loc, intro_stage) ->
       Location.errorf ~loc
-        "@[Identifier %a is used at %a,@ \
+        "Identifier %a is used at %a,@ \
          %a;@ \
          it is introduced at %a,@ \
-         %a.@]"
+         %a."
         quoted_longident lid
         (Location.Doc.loc ~capitalize_first:false) usage_loc
         print_stage usage_stage
@@ -5132,10 +5132,10 @@ let report_lookup_error_doc loc env = function
         print_stage intro_stage
   | Unbound_in_stage (context, lid, usage_loc, usage_stage, avail_stage) ->
       Location.errorf ~loc
-        "@[%a %a used at %a@ \
+        "%a %a used at %a@ \
          cannot be used in this context;@ \
          %a is not defined %a.@]\
-         @.@[@{<hint>Hint@}: %a %a is defined %a.@]"
+         @.@[@{<hint>Hint@}: %a %a is defined %a."
         print_unbound_in_quotation context
         quoted_longident lid
         (Location.Doc.loc ~capitalize_first:false) usage_loc
@@ -5163,22 +5163,21 @@ let report_error_doc = function
   | Illegal_value_name(loc, name) ->
       Location.errorf ~loc "%a is not a valid value identifier."
        Style.inline_code name
+  | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t err
   | Implicit_jkind_already_defined { name; defined_at; loc } ->
       Location.errorf ~loc
-        "@[<hov>The implicit kind for %a is already defined at %a.@]"
+        "<hov>The implicit kind for %a is already defined at %a."
         Style.inline_code name
         (Location.Doc.loc ~capitalize_first:false) defined_at
-  | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t err
   | Incomplete_instantiation { unset_param } ->
       Location.errorf ~loc:Location.none
-        "@[<hov>Not enough instance arguments: the parameter@ %a@ is \
-                   required.@]"
+        "<hov>Not enough instance arguments: the parameter@ %a@ is required."
         Global_module.Parameter_name.print unset_param
   | Toplevel_splice loc ->
       Location.errorf ~loc
-        "@[<hov>Splices ($) are not allowed in the initial stage,@ \
+        "<hov>Splices ($) are not allowed in the initial stage,@ \
          as encountered at %a.@,\
-         Did you forget to insert a quotation?@]"
+         Did you forget to insert a quotation?"
         (Location.Doc.loc ~capitalize_first:false) loc
   | Unsupported_inside_quotation (loc, context) ->
       Location.errorf ~loc
@@ -5190,7 +5189,8 @@ let report_error_doc = function
 let () =
   Location.register_error_of_exn
     (function
-      | Error err -> Some (report_error_doc err)
+      | Error err ->
+          Some (report_error_doc err)
       | _ ->
           None
     )

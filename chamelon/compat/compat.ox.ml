@@ -28,7 +28,6 @@
 open Typedtree
 open Types
 open Mode
-open Data_types
 
 let dummy_jkind = Jkind.Builtin.value ~why:(Unknown "dummy_layout")
 

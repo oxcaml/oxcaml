@@ -71,8 +71,12 @@ module Context = struct
   let alt_pp ppf cxt =
     if cxt = [] then () else
     if List.for_all (function Module _ -> true | _ -> false) cxt then
-      Fmt.fprintf ppf ",@ in module %a"
-        (Style.as_inline_code Printtyp.path) (path_of_context cxt)
+      Fmt.fprintf ppf ",@ in module %t"
+        (fun ppf -> Fmt.deprecated_printer (fun fmt ->
+          Format.fprintf fmt "%a"
+            (Fmt.compat (Style.as_inline_code Printtyp.path))
+            (path_of_context cxt)
+        ) ppf)
     else
       Fmt.fprintf ppf ",@ @[<hv 2>at position@ %a@]"
         (Style.as_inline_code context) cxt
@@ -80,8 +84,12 @@ module Context = struct
   let pp ppf cxt =
     if cxt = [] then () else
     if List.for_all (function Module _ -> true | _ -> false) cxt then
-      Fmt.fprintf ppf "In module %a:@ "
-        (Style.as_inline_code Printtyp.path) (path_of_context cxt)
+      Fmt.fprintf ppf "In module %t:@ "
+        (fun ppf -> Fmt.deprecated_printer (fun fmt ->
+          Format.fprintf fmt "%a"
+            (Fmt.compat (Style.as_inline_code Printtyp.path))
+            (path_of_context cxt)
+        ) ppf)
     else
       Fmt.fprintf ppf "@[<hv 2>At position@ %a@]@ "
         (Style.as_inline_code context) cxt

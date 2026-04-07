@@ -17,8 +17,8 @@
 
 open Asttypes
 open Types
-open Mode
 open Data_types
+open Mode
 
 type constant =
     Const_int of int
@@ -192,7 +192,7 @@ and 'k pattern_desc =
       (string option * value general_pattern * Jkind.sort) list ->
       value pattern_desc
   | Tpat_construct :
-      Longident.t loc * Data_types.constructor_description *
+      Longident.t loc * constructor_description *
         value general_pattern list *
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
           option ->
@@ -267,11 +267,11 @@ and expression_desc =
       expression * (arg_label * apply_arg) list * apply_position *
         Mode.Locality.l * Zero_alloc.assume option
   | Texp_match of
-      expression * Jkind.sort * computation case list * value case list *
-        partial
+      expression * Jkind.sort * computation case list * value case list
+      * partial
+  | Texp_try of expression * value case list * value case list
   | Texp_unboxed_unit
   | Texp_unboxed_bool of bool
-  | Texp_try of expression * value case list * value case list
   | Texp_tuple of (string option * expression) list * alloc_mode
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
@@ -285,8 +285,7 @@ and expression_desc =
     }
   | Texp_record_unboxed_product of {
       fields :
-        ( Data_types.unboxed_label_description *
-          record_label_definition ) array;
+        ( unboxed_label_description * record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
@@ -371,7 +370,7 @@ and meth =
   | Tmeth_ancestor of Ident.t * Path.t
 
 and block_access =
-  | Baccess_field of Longident.t loc * Data_types.label_description
+  | Baccess_field of Longident.t loc * label_description
   | Baccess_array of {
       mut: mutable_flag;
       index_kind: index_kind;
@@ -383,8 +382,7 @@ and block_access =
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
-  | Uaccess_unboxed_field of Longident.t loc *
-      Data_types.unboxed_label_description
+  | Uaccess_unboxed_field of Longident.t loc * unboxed_label_description
 
 and comprehension =
   {
@@ -1101,7 +1099,7 @@ let shallow_iter_pattern_desc
   | Tpat_lazy p -> f.f p
   | Tpat_any
   | Tpat_var _
-  | Tpat_constant _ 
+  | Tpat_constant _
   | Tpat_unboxed_unit
   | Tpat_unboxed_bool _ -> ()
   | Tpat_value p -> f.f p
@@ -1391,6 +1389,10 @@ let split_pattern pat =
   in
   split_pattern pat
 
+let map_apply_arg f = function
+  | Arg arg -> Arg (f arg)
+  | Omitted _ as arg -> arg
+
 let loc_of_decl ~uid =
   let of_option { txt; loc } =
     match txt with
@@ -1440,12 +1442,14 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_apply (exp, list, _, _, _) ->
       let acc = fold_antiquote_exp f acc exp in
       fold_antiquote_args f acc list
-  | Texp_match (exp, _, cases, _, _) ->
+  | Texp_match (exp, _, cases, eff_cases, _) ->
       let acc = fold_antiquote_exp f acc exp in
-      fold_antiquote_cases f acc cases
-  | Texp_try (exp, cases, _) ->
+      let acc = fold_antiquote_cases f acc cases in
+      fold_antiquote_cases f acc eff_cases
+  | Texp_try (exp, cases, eff_cases) ->
       let acc = fold_antiquote_exp f acc exp in
-      fold_antiquote_cases f acc cases
+      let acc = fold_antiquote_cases f acc cases in
+      fold_antiquote_cases f acc eff_cases
   | Texp_tuple (list, _) ->
       List.fold_left (fun acc (_, e) -> fold_antiquote_exp f acc e) acc list
   | Texp_unboxed_tuple list ->
@@ -1596,7 +1600,3 @@ and fold_antiquote_comprehension_clauses f acc ccs =
 
 and fold_antiquote_binding_op f acc op =
   fold_antiquote_exp f acc op.bop_exp
-
-let map_apply_arg f = function
-  | Arg arg -> Arg (f arg)
-  | Omitted _ as arg -> arg

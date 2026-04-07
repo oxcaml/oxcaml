@@ -23,9 +23,6 @@ type abstract_type_constr = [
   | `String
   | `Bytes
   | `Float
-  | `Float32
-  | `Int8
-  | `Int16
   | `Continuation
   | `Array
   | `Nativeint
@@ -38,6 +35,11 @@ type abstract_type_constr = [
   | `Atomic_loc
   | `Lexing_position
   | `Code
+  | `Float32
+  | `Int8
+  | `Int16
+]
+type abstract_non_value_type_constr = [
   | `Idx_imm
   | `Idx_mut
   | `Int8x16
@@ -73,6 +75,7 @@ type data_type_constr = [
 ]
 type type_constr = [
   | abstract_type_constr
+  | abstract_non_value_type_constr
   | data_type_constr
 ]
 

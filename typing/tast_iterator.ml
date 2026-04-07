@@ -188,7 +188,8 @@ let value_description sub x =
    | Valmi_sig_value moda -> sub.modalities sub moda
    | Valmi_str_primitive modes -> sub.modes sub modes)
 
-let label_decl sub ({ld_loc; ld_name; ld_type; ld_attributes; ld_modalities; _} as ld) =
+let label_decl sub
+    ({ld_loc; ld_name; ld_type; ld_attributes; ld_modalities} as ld) =
   sub.item_declaration sub (Label ld);
   sub.location sub ld_loc;
   sub.attributes sub ld_attributes;
@@ -407,8 +408,8 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       List.iter (sub.case sub) effs
   | Texp_unboxed_unit -> ()
   | Texp_unboxed_bool _ -> ()
-  | Texp_tuple (list, _) -> List.iter (fun (_, e) -> sub.expr sub e) list
-  | Texp_unboxed_tuple list -> List.iter (fun (_, e, _) -> sub.expr sub e) list
+  | Texp_tuple (list, _) -> List.iter (fun (_,e) -> sub.expr sub e) list
+  | Texp_unboxed_tuple list -> List.iter (fun (_,e,_) -> sub.expr sub e) list
   | Texp_construct (lid, _, args, _) ->
       iter_loc_lid sub lid;
       List.iter (sub.expr sub) args
@@ -455,7 +456,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
             sub.expr sub exp)
         comp_clauses
   | Texp_atomic_loc (exp, _, lid, _, _) ->
-      iter_loc sub lid;
+      iter_loc_lid sub lid;
       sub.expr sub exp
   | Texp_ifthenelse (exp1, exp2, expo) ->
       sub.expr sub exp1;
@@ -586,7 +587,9 @@ let module_type sub {mty_loc; mty_desc; mty_env; mty_attributes; _} =
       List.iter (fun (_, lid, e) ->
         iter_loc_lid sub lid; sub.with_constraint sub e) list
   | Tmty_typeof mexpr -> sub.module_expr sub mexpr
-  | Tmty_strengthen (mtype, _, _) -> sub.module_type sub mtype
+  | Tmty_strengthen (mtype, _, lid) ->
+    sub.module_type sub mtype;
+    iter_loc_lid sub lid
 
 let with_constraint sub = function
   | Twith_type      decl -> sub.type_declaration sub decl
@@ -624,9 +627,13 @@ let module_coercion sub = function
       sub.location sub pc_loc;
       sub.env sub pc_env
 
-let module_expr sub {mod_loc; mod_desc; mod_env; mod_attributes; _} =
+let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =
   sub.location sub mod_loc;
   sub.attributes sub mod_attributes;
+  begin match mod_mode with
+  | _, None -> ()
+  | _, Some (_, txt, loc) -> iter_loc_lid sub {txt; loc}
+  end;
   sub.env sub mod_env;
   match mod_desc with
   | Tmod_ident (_, lid) -> iter_loc_lid sub lid
@@ -822,7 +829,6 @@ let modalities sub x =
 
 let modes sub x =
   List.iter (iter_loc sub) x.mode_desc
-
 
 let item_declaration _sub _ = ()
 

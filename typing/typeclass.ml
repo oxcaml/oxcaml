@@ -1223,8 +1223,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       in
       let param_name = "*opt*" ^ param_suffix in
       let smatch =
-        Exp.match_ ~loc
-          (Exp.ident ~loc (mknoloc (Longident.Lident param_name)))
+        Exp.match_ ~loc (Exp.ident ~loc (mknoloc (Longident.Lident param_name)))
           scases
       in
       let sfun =
@@ -1460,6 +1459,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
              let ty =
                Ctype.with_local_level_generalize
                  (fun () -> Ctype.instance vd.val_type)
+                 ~before_generalize:Ctype.generalize
              in
              let expr =
                {exp_desc =
@@ -2035,6 +2035,9 @@ let type_classes define_class approx kind env cls =
       List.iter (collapse_conj_class_params env) res;
       res, env
     end
+    (* CR rtjoa: there was no ~post here before - do we need to generalize? with
+       local level generalize for class differs from the normal one *)
+    ~before_generalize:(fun _ -> ())
   in
   let res = List.rev_map (final_decl env define_class) res in
   let decls = List.fold_right extract_type_decls res [] in

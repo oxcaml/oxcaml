@@ -268,8 +268,10 @@ let print_out_value ppf tree =
         in
         fprintf ppf "@[<1>(%a)@]" (print_tree_list print_elem ",") tree_list
     | Oval_unboxed_tuple tree_list ->
-        fprintf ppf "@[<1>#(%a)@]" (print_labeled_tree_list print_tree_1 ",")
-          tree_list
+        let print_elem ppf (lbl, item) =
+          print_label ppf lbl; print_tree_1 ppf item
+        in
+        fprintf ppf "@[<1>#(%a)@]" (print_tree_list print_elem ",") tree_list
     | Oval_floatarray arr ->
        fprintf ppf "@[<2>[|%a|]@]"
          (pp_print_seq ~pp_sep:semicolon pp_print_float)
@@ -296,17 +298,6 @@ let print_out_value ppf tree =
           print_list false ppf tree_list
     in
     cautious (print_list true) ppf tree_list
-  and print_labeled_tree_list print_item sep ppf labeled_tree_list =
-    let rec print_list first ppf =
-      function
-        [] -> ()
-      | (label, tree) :: labeled_tree_list ->
-          if not first then fprintf ppf "%s@ " sep;
-          print_label ppf label;
-          print_item ppf tree;
-          print_list false ppf labeled_tree_list
-    in
-    cautious (print_list true) ppf labeled_tree_list
   in
   cautious print_tree_1 ppf tree
 
@@ -346,6 +337,12 @@ let print_out_modes ppf l =
   | [] -> ()
   | _ -> pp_print_string ppf " @ ");
   pp_print_list ~pp_sep:pp_print_space print_out_mode ppf l
+
+(* Labeled tuples with the first element labeled sometimes require parens. *)
+let is_initially_labeled_tuple ty =
+  match ty with
+  | Otyp_tuple ((Some _, _) :: _) -> true
+  | _ -> false
 
 let print_out_modality = pp_print_string
 
@@ -406,7 +403,14 @@ let rec print_out_type_0 ppf =
    - Or, there is at least one mode to print.
  *)
 and print_out_type_mode ~arg mode ppf ty =
+  let parens =
+    is_initially_labeled_tuple ty && arg
+  in
+  if parens then
+    pp_print_char ppf '(';
   print_out_type_2 ~arg ppf ty;
+  if parens then
+    pp_print_char ppf ')';
   print_out_modes ppf mode
 
 and print_out_type_1 ppf =
@@ -441,6 +445,8 @@ and print_out_ret ppf =
 and print_out_type_2 ~arg ppf =
   function
     Otyp_tuple tyl ->
+      (* Tuples require parens in argument function argument position (~arg)
+         when the first element has a label. *)
       let parens =
         match tyl with
         | (Some _, _) :: _ -> arg
@@ -590,23 +596,24 @@ and print_typargs ppf =
       pp_close_box ppf ();
       pp_print_space ppf ()
 and print_out_label ppf
-    { olab_name; olab_mut; olab_atomic; olab_type; olab_modalities } =
+    { olab_name; olab_mut; olab_type; olab_modalities } =
   (* See the notes [NON-LEGACY MODES] *)
-  let mut =
+  let mut, atomic =
     match olab_mut with
-    | Mutable -> "mutable "
-    | Immutable -> ""
+    | Om_immutable -> "", Nonatomic
+    | Om_mutable (None, atomic) -> "mutable ", atomic
+    | Om_mutable (Some s, atomic) -> "mutable(" ^ s ^ ") ", atomic
   in
   let print_atomic ppf = function
-    | Asttypes.Nonatomic -> ()
-    | Asttypes.Atomic -> fprintf ppf " [@@atomic]"
+    | Nonatomic -> ()
+    | Atomic -> fprintf ppf " [@@atomic]"
   in
   fprintf ppf "@[<2>%s%a :@ %a%a%a@];"
     mut
     print_lident olab_name
     print_out_type olab_type
     print_out_modalities olab_modalities
-    print_atomic olab_atomic
+    print_atomic atomic
 
 and print_out_jkind_const ppf ojkind =
   let rec pp_element ~nested ppf (ojkind : Outcometree.out_jkind_const) =
@@ -833,7 +840,7 @@ let constructor_of_extension_constructor
 
 let rec print_out_module_type ppf = function
   | Omty_functor (param, res, mres) ->
-      fprintf ppf "@[<2>functor %a@]" print_out_functor (param, res, mres)
+      fprintf ppf "@[<2>%a@]" print_out_functor (param, res, mres)
   | _ as mty -> print_simple_out_module_type ppf mty
 
 and print_out_module_type_with_modes ppf (mty, mm) =
@@ -856,7 +863,7 @@ and print_out_functor ppf (param, res, mres) =
         print_simple_out_module_type_with_modes (mty, mm)
         print_out_module_type_with_modes (res, mres)
   | _ ->
-      fprintf ppf "@[%a%a"
+      fprintf ppf "@[<2>functor@ %a%a"
         print_out_functor_parameter param
         print_out_functor_return_with_modes (res, mres)
 
