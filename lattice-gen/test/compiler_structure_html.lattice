@@ -90,10 +90,10 @@ global_to_regional : Locality -> Regionality = [
 ]
 
 local_to_regional
-  -| regional_to_local
-  -| locality_as_regionality
-  -| regional_to_global
-  -| global_to_regional
+  ⊣ regional_to_local
+  ⊣ locality_as_regionality
+  ⊣ regional_to_global
+  ⊣ global_to_regional
 
 regional_r2g : Regionality -> Regionality =
   locality_as_regionality ∘ regional_to_global
@@ -134,11 +134,11 @@ visibility_to_statefulness : Visibility^op -> Statefulness = [
   Read_write -> Stateful;
 ]
 
-linear_to_unique -| unique_to_linear
+linear_to_unique ⊣ unique_to_linear
 
-portable_to_contended -| contended_to_portable
+portable_to_contended ⊣ contended_to_portable
 
-statefulness_to_visibility -| visibility_to_statefulness
+statefulness_to_visibility ⊣ visibility_to_statefulness
 
 comonadic_local_to_regional : Comonadic_with_locality -> Comonadic_with_regionality = {
   areality = local_to_regional(areality);
@@ -166,10 +166,10 @@ comonadic_global_to_regional : Comonadic_with_locality -> Comonadic_with_regiona
 }
 
 comonadic_local_to_regional
-  -| comonadic_regional_to_local
-  -| comonadic_locality_as_regionality
-  -| comonadic_regional_to_global
-  -| comonadic_global_to_regional
+  ⊣ comonadic_regional_to_local
+  ⊣ comonadic_locality_as_regionality
+  ⊣ comonadic_regional_to_global
+  ⊣ comonadic_global_to_regional
 
 comonadic_r2g : Comonadic_with_regionality -> Comonadic_with_regionality =
   comonadic_locality_as_regionality ∘ comonadic_regional_to_global
@@ -204,9 +204,9 @@ monadic_to_comonadic_max : Monadic^op -> Comonadic = {
   yielding = max;
 }
 
-comonadic_to_monadic_min -| monadic_to_comonadic_max
+comonadic_to_monadic_min ⊣ monadic_to_comonadic_max
 
-monadic_to_comonadic_min -| comonadic_to_monadic_max
+monadic_to_comonadic_min ⊣ comonadic_to_monadic_max
 
 alloc_to_value_l2r : Alloc -> Value = {
   comonadic = comonadic_local_to_regional(comonadic);
@@ -234,9 +234,9 @@ alloc_to_value_g2r : Alloc -> Value = {
 }
 
 alloc_to_value_l2r
-  -| value_to_alloc_r2l
-  -| alloc_as_value
-  -| value_to_alloc_r2g
-  -| alloc_to_value_g2r
+  ⊣ value_to_alloc_r2l
+  ⊣ alloc_as_value
+  ⊣ value_to_alloc_r2g
+  ⊣ alloc_to_value_g2r
 
 value_r2g : Value -> Value = alloc_as_value ∘ value_to_alloc_r2g
