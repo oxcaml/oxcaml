@@ -1556,7 +1556,8 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1137, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 

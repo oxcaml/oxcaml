@@ -2266,7 +2266,7 @@ let module_declaration_address env id presence md =
       let open Subst.Lazy in
       match md.md_type with
       | Mty_alias path -> Lazy_backtrack.create (ModAlias {env; path})
-      | _ -> assert false
+      | _ -> Misc.fatal_error "Env.module_declaration_address"
     end
   | Mp_present ->
       Lazy_backtrack.create_forced (Alocal id)
