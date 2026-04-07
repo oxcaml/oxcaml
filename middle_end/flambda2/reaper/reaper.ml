@@ -34,12 +34,12 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   in
   let solved_dep =
     Profile.record_call ~accumulate:true "solver" (fun () ->
-        Dep_solver.fixpoint deps)
+        Analysis.fixpoint deps)
   in
   let () =
     if Flambda_features.debug_reaper "print-solved"
     then (
-      Format.printf "RESULT@ %a@." Dep_solver.pp_result solved_dep;
+      Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result solved_dep;
       Dot_printer.print_solved_dep solved_dep deps)
   in
   let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }
@@ -57,7 +57,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   in
   let final_typing_env =
     Option.map
-      (Dep_solver.rewrite_typing_env solved_dep
+      (Types_rewriter.rewrite_typing_env solved_dep
          ~unit_symbol:(Flambda_unit.module_symbol unit))
       final_typing_env
   in

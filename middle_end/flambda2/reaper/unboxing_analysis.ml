@@ -62,30 +62,91 @@
    Likewise, for values whose representation is changed, we compute for each
    field the variables needed to represent it at the point of the allocation. *)
 
+module PTA = Points_to_analysis
 open Global_flow_graph.Relations
+open! PTA.Relations
 open! Datalog_helpers.Syntax
 open Datalog_helpers
-open! Points_to_analysis.Relations
-open Points_to_analysis
 
-type 'a unboxed_fields =
-  | Not_unboxed of 'a
-  | Unboxed of 'a unboxed_fields Field.Map.t
+module Unboxed_fields = struct
+  type 'a t = 'a u Field.Map.t
 
-let rec pp_unboxed_elt pp_unboxed ppf = function
-  | Not_unboxed x -> pp_unboxed ppf x
-  | Unboxed fields -> Field.Map.print (pp_unboxed_elt pp_unboxed) ppf fields
+  and 'a u =
+    | Not_unboxed of 'a
+    | Unboxed of 'a t
 
-let print_unboxed_fields = pp_unboxed_elt
+  let rec print_u pp_elem ppf = function
+    | Not_unboxed x -> pp_elem ppf x
+    | Unboxed fields -> print pp_elem ppf fields
 
-let rec fold_unboxed_with_kind (f : Flambda_kind.t -> 'a -> 'b -> 'b)
-    (fields : 'a unboxed_fields Field.Map.t) acc =
-  Field.Map.fold
-    (fun field elt acc ->
-      match elt with
-      | Not_unboxed elt -> f (Field.kind field) elt acc
-      | Unboxed fields -> fold_unboxed_with_kind f fields acc)
-    fields acc
+  and print pp_elem ppf fields = Field.Map.print (print_u pp_elem) ppf fields
+
+  let rec fold_with_kind (f : Flambda_kind.t -> 'a -> 'b -> 'b) (fields : 'a t)
+      acc =
+    Field.Map.fold
+      (fun field elt acc ->
+        match elt with
+        | Not_unboxed elt -> f (Field.kind field) elt acc
+        | Unboxed fields -> fold_with_kind f fields acc)
+      fields acc
+
+  let rec mapi_u (not_unboxed : 'a -> 'b -> 'c) (unboxed : Field.t -> 'a -> 'a)
+      (acc : 'a) (uf : 'b u) : 'c u =
+    match uf with
+    | Not_unboxed x -> Not_unboxed (not_unboxed acc x)
+    | Unboxed f -> Unboxed (mapi not_unboxed unboxed acc f)
+
+  and mapi not_unboxed unboxed acc f =
+    Field.Map.mapi
+      (fun field uf -> mapi_u not_unboxed unboxed (unboxed field acc) uf)
+      f
+
+  let map f uf = mapi (fun () x -> f x) (fun _ () -> ()) () uf
+
+  let map_u f uf =
+    match uf with
+    | Not_unboxed x -> Not_unboxed (f x)
+    | Unboxed fields -> Unboxed (map f fields)
+
+  (* This is not symmetrical!! [fields1] must define a subset of [fields2], but
+     does not have to define all of them. *)
+  let rec fold2_subset_u f fields1 fields2 acc =
+    match fields1, fields2 with
+    | Not_unboxed x1, Not_unboxed x2 -> f x1 x2 acc
+    | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ ->
+      Misc.fatal_errorf "[fold2_unboxed_subset]"
+    | Unboxed fields1, Unboxed fields2 -> fold2_subset f fields1 fields2 acc
+
+  and fold2_subset f fields1 fields2 acc =
+    Field.Map.fold
+      (fun field f1 acc ->
+        match Field.Map.find field fields2 with
+        | exception Not_found ->
+          Misc.fatal_errorf "@[<v 2>@[%a@]:@ @[%a@]@]@." Format.pp_print_text
+            "Expected a subset of unboxed fields, but the following field is \
+             not in the superset"
+            Field.print field
+        | f2 -> fold2_subset_u f f1 f2 acc)
+      fields1 acc
+
+  let rec fold2_subset_with_kind f fields1 fields2 acc =
+    Field.Map.fold
+      (fun field f1 acc ->
+        match Field.Map.find field fields2 with
+        | exception Not_found ->
+          Misc.fatal_errorf "@[<v 2>@[%a@]:@ @[%a@]@]@." Format.pp_print_text
+            "Expected a subset of unboxed fields, but the following field is \
+             not in the superset"
+            Field.print field
+        | f2 -> (
+          match f1, f2 with
+          | Not_unboxed x1, Not_unboxed x2 -> f (Field.kind field) x1 x2 acc
+          | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ ->
+            Misc.fatal_errorf "[fold2_unboxed_subset]"
+          | Unboxed fields1, Unboxed fields2 ->
+            fold2_subset_with_kind f fields1 fields2 acc))
+      fields1 acc
+end
 
 (* CR-someday ncourant: track fields that are known to be constant, here and in
    changed_representation, to avoid having them be represented. This is a bit
@@ -95,67 +156,52 @@ let rec fold_unboxed_with_kind (f : Flambda_kind.t -> 'a -> 'b -> 'b)
    of the constant but only that it is one (an alias to all_constants)
 
    - For symbols, this could break dominator scoping. *)
-type unboxed = Variable.t unboxed_fields Field.Map.t
+type unboxed = Variable.t Unboxed_fields.t
 
 type changed_representation =
   (* CR ncourant: this is currently never produced, because we need to rewrite
      the value_kinds to account for changed representations before enabling
      this *)
   | Block_representation of
-      (int * Flambda_primitive.Block_access_kind.t) unboxed_fields Field.Map.t
-      * int
+      (int * Flambda_primitive.Block_access_kind.t) Unboxed_fields.t * int
   | Closure_representation of
-      Value_slot.t unboxed_fields Field.Map.t
+      Value_slot.t Unboxed_fields.t
       * Function_slot.t Function_slot.Map.t (* old -> new *)
       * Function_slot.t (* OLD current function slot *)
 
 let pp_changed_representation ff = function
   | Block_representation (fields, size) ->
     Format.fprintf ff "(fields %a) (size %d)"
-      (Field.Map.print
-         (pp_unboxed_elt (fun ff (field, _) -> Format.pp_print_int ff field)))
+      (Unboxed_fields.print (fun ff (field, _) -> Format.pp_print_int ff field))
       fields size
   | Closure_representation (fields, function_slots, fs) ->
     Format.fprintf ff "(fields %a) (function_slots %a) (current %a)"
-      (Field.Map.print (pp_unboxed_elt Value_slot.print))
+      (Unboxed_fields.print Value_slot.print)
       fields
       (Function_slot.Map.print Function_slot.print)
       function_slots Function_slot.print fs
 
-module Relations = struct
-  let cannot_change_witness_calling_convention =
-    rel1 "cannot_change_witness_calling_convention" Cols.[n]
+let cannot_change_witness_calling_convention =
+  rel1 "cannot_change_witness_calling_convention" Cols.[n]
 
-  let cannot_change_calling_convention =
-    rel1 "cannot_change_calling_convention" Cols.[n]
+let cannot_change_calling_convention =
+  rel1 "cannot_change_calling_convention" Cols.[n]
 
-  let cannot_change_representation0 =
-    rel1 "cannot_change_representation0" Cols.[n]
+let cannot_change_representation0 = rel1 "cannot_change_representation0" Cols.[n]
 
-  let cannot_change_representation1 =
-    rel1 "cannot_change_representation1" Cols.[n]
+let cannot_change_representation1 = rel1 "cannot_change_representation1" Cols.[n]
 
-  let cannot_change_representation = rel1 "cannot_change_representation" Cols.[n]
+let cannot_change_representation = rel1 "cannot_change_representation" Cols.[n]
 
-  let cannot_unbox0_tbl = Datalog.create_relation ~name:"cannot_unbox0" Cols.[n]
+let cannot_unbox0_tbl = Datalog.create_relation ~name:"cannot_unbox0" Cols.[n]
 
-  let cannot_unbox0 x = cannot_unbox0_tbl % [x]
+let cannot_unbox0 x = cannot_unbox0_tbl % [x]
 
-  let cannot_unbox = rel1 "cannot_unbox" Cols.[n]
+let cannot_unbox = rel1 "cannot_unbox" Cols.[n]
 
-  let to_unbox = rel1 "to_unbox" Cols.[n]
+let to_unbox = rel1 "to_unbox" Cols.[n]
 
-  let to_change_representation = rel1 "to_change_representation" Cols.[n]
-
-  let multiple_allocation_points = rel1 "multiple_allocations_points" Cols.[n]
-
-  let dominated_by_allocation_point =
-    rel2 "dominated_by_allocation_point" Cols.[n; n]
-
-  let allocation_point_dominator = rel2 "allocation_point_dominator" Cols.[n; n]
-end
-
-open Relations
+let to_change_representation = rel1 "to_change_representation" Cols.[n]
 
 let datalog_rules =
   saturate_in_order
@@ -440,51 +486,7 @@ let datalog_rules =
        [has_usage x; ~~(cannot_unbox x)] ==> to_unbox x);
       (let$ [x] = ["x"] in
        [has_usage x; ~~(cannot_change_representation x); ~~(to_unbox x)]
-       ==> to_change_representation x);
-      (let$ [x] = ["x"] in
-       [any_source x] ==> multiple_allocation_points x);
-      (let$ [x; y; z] = ["x"; "y"; "z"] in
-       [ sources x y;
-         has_source y;
-         sources x z;
-         has_source z;
-         distinct Cols.n y z ]
-       ==> multiple_allocation_points x);
-      (* [allocation_point_dominator x y] is the same as
-         [dominated_by_allocation_point y x], which is that [y] is the
-         allocation point dominator of [x]. *)
-      (let$ [x; y] = ["x"; "y"] in
-       [sources x y; has_source y; ~~(multiple_allocation_points x)]
-       ==> and_
-             [allocation_point_dominator x y; dominated_by_allocation_point y x])
-    ]
-
-(* XXX to move to points_to_analysis *)
-let get_allocation_point =
-  let dom =
-    query
-      (let^$ [x], [y] = ["x"], ["y"] in
-       [allocation_point_dominator x y] =>? [y])
-  in
-  fun db x ->
-    Cursor.fold_with_parameters dom [x] db ~init:None ~f:(fun [y] acc ->
-        assert (Option.is_none acc);
-        Some y)
-
-let rec mapi_unboxed_fields (not_unboxed : 'a -> 'b -> 'c)
-    (unboxed : Field.t -> 'a -> 'a) (acc : 'a) (uf : 'b unboxed_fields) :
-    'c unboxed_fields =
-  match uf with
-  | Not_unboxed x -> Not_unboxed (not_unboxed acc x)
-  | Unboxed f ->
-    Unboxed
-      (Field.Map.mapi
-         (fun field uf ->
-           mapi_unboxed_fields not_unboxed unboxed (unboxed field acc) uf)
-         f)
-
-let map_unboxed_fields f uf =
-  mapi_unboxed_fields (fun () x -> f x) (fun _ () -> ()) () uf
+       ==> to_change_representation x) ]
 
 type result =
   { db : Datalog.database;
@@ -494,34 +496,6 @@ type result =
   }
 
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
-
-type single_field_source =
-  | No_source
-  | One of Code_id_or_name.t
-  | Many
-
-let get_single_field_source =
-  let q_any_source =
-    let^? [block; field], [source] = ["block"; "field"], ["source"] in
-    [constructor ~base:block field ~from:source; any_source source]
-  in
-  let q_source =
-    query
-      (let^$ [block; field], [field_source; source] =
-         ["block"; "field"], ["field_source"; "source"]
-       in
-       [ constructor ~base:block field ~from:field_source;
-         sources field_source source;
-         has_source source ]
-       =>? [source])
-  in
-  fun db block field ->
-    if q_any_source [block; field] db
-    then Many
-    else
-      Cursor.fold_with_parameters q_source [block; field] db ~init:No_source
-        ~f:(fun [source] acc ->
-          match acc with No_source -> One source | One _ | Many -> Many)
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
     name_prefix =
@@ -533,7 +507,7 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
           Field.print field
       | Call_witness _ -> None
       | Block _ | Value_slot _ | Is_int | Get_tag -> (
-        let field_source = get_single_field_source db unboxed_block field in
+        let field_source = PTA.get_single_field_source db unboxed_block field in
         match field_source with
         | No_source -> None
         | One _ | Many -> (
@@ -542,9 +516,9 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
               Field.print_for_variable_name field
           in
           let[@local] default () =
-            Some (Not_unboxed (mk (Field.kind field) new_name))
+            Some (Unboxed_fields.Not_unboxed (mk (Field.kind field) new_name))
           in
-          match field_use with
+          match (field_use : PTA.field_usage) with
           | Used_as_top -> default ()
           | Used_as_vars flow_to ->
             if Code_id_or_name.Map.is_empty flow_to
@@ -568,13 +542,12 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
               in
               let unboxed_fields =
                 mk_unboxed_fields ~has_to_be_unboxed ~mk db new_unboxed_block
-                  (get_fields db
-                     (get_all_usages ~follow_known_arity_calls:true db flow_to))
+                  (PTA.get_fields db
+                     (PTA.get_all_usages ~follow_known_arity_calls:true db
+                        flow_to))
                   new_name
               in
-              if false && Field.Map.is_empty unboxed_fields
-              then None
-              else Some (Unboxed unboxed_fields)
+              Some (Unboxed_fields.Unboxed unboxed_fields)
             else if
               Code_id_or_name.Map.exists
                 (fun k () -> has_to_be_unboxed k)
@@ -604,3 +577,173 @@ let query_dominated_by =
   query
     (let^$ [x], [y] = ["x"], ["y"] in
      [dominated_by_allocation_point x y] =>? [y])
+
+let perform_analysis db ~stats =
+  let db =
+    Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
+        (* We need to do this after [field_of_constructor_is_used] is computed,
+           so that we prevent unboxing based on the number of fields actually
+           used. *)
+        let db =
+          let max_unbox_size = Flambda_features.reaper_max_unbox_size () in
+          (* CR-someday ncourant: it is unfortunate we need to go through the
+             raw table API here *)
+          Datalog.set_table cannot_unbox0_tbl
+            (Code_id_or_name.Map.filter_map
+               (fun _block fields ->
+                 let num_used_fields =
+                   Field.Map.fold
+                     (fun field () acc ->
+                       if
+                         Field.is_real_field field
+                         && not (Field.is_function_slot field)
+                       then acc + 1
+                       else acc)
+                     fields 0
+                 in
+                 if num_used_fields > max_unbox_size then Some () else None)
+               (Datalog.get_table field_of_constructor_is_used_tbl db))
+            db
+        in
+        List.fold_left
+          (fun db rule -> Datalog.Schedule.run ~stats rule db)
+          db datalog_rules)
+  in
+  let name_of_node =
+    if Flambda_features.debug_reaper "nostamps"
+    then
+      fun node ->
+        Code_id_or_name.pattern_match node ~code_id:Code_id.name
+          ~symbol:Symbol.linkage_name_as_string ~var:Variable.name
+    else
+      fun node ->
+        Flambda_colours.without_colours ~f:(fun () ->
+            Format.asprintf "%a" Code_id_or_name.print node)
+  in
+  let has_to_be_unboxed code_or_name = has_to_be_unboxed [code_or_name] db in
+  let unboxed, changed_representation =
+    Profile.record_call ~accumulate:true "compute_unboxing_variables" (fun () ->
+        let unboxed =
+          Datalog.Cursor.fold query_to_unbox db ~init:Code_id_or_name.Map.empty
+            ~f:(fun [code_or_name; to_patch] unboxed ->
+              (* CR-someday ncourant: produce ghost makeblocks/set of closures
+                 for debugging *)
+              let new_name =
+                Format.asprintf "%s_into_%s"
+                  (name_of_node code_or_name)
+                  (name_of_node to_patch)
+              in
+              let fields =
+                mk_unboxed_fields ~has_to_be_unboxed
+                  ~mk:(fun kind name -> Variable.create name kind)
+                  db code_or_name
+                  (PTA.get_fields db
+                     (PTA.get_all_usages ~follow_known_arity_calls:true db
+                        (Code_id_or_name.Map.singleton to_patch ())))
+                  new_name
+              in
+              Code_id_or_name.Map.add to_patch fields unboxed)
+        in
+        if Flambda_features.debug_reaper "unbox"
+        then
+          Format.printf "TO UNBOX: %a@."
+            (Code_id_or_name.Map.print (Unboxed_fields.print Variable.print))
+            unboxed;
+        let changed_representation = ref Code_id_or_name.Map.empty in
+        Datalog.Cursor.iter query_to_change_representation db
+          ~f:(fun [code_id_or_name] ->
+            (* This can happen because we change the representation of each
+               function slot of a set of closures at the same time. *)
+            if Code_id_or_name.Map.mem code_id_or_name !changed_representation
+            then ()
+            else
+              let add_to_s repr alloc_point =
+                Datalog.Cursor.iter_with_parameters query_dominated_by
+                  [alloc_point] db ~f:(fun [c] ->
+                    changed_representation
+                      := Code_id_or_name.Map.add c (repr, alloc_point)
+                           !changed_representation)
+              in
+              match PTA.get_set_of_closures_def db code_id_or_name with
+              | Not_a_set_of_closures ->
+                let r = ref ~-1 in
+                let mk _kind _name =
+                  (* XXX fixme, disabled for now *)
+                  (* TODO depending on the kind, use two counters; then produce a
+               mixed block; map_unboxed_fields should help with that *)
+                  incr r;
+                  ( !r,
+                    Flambda_primitive.(
+                      Block_access_kind.Values
+                        { tag = Unknown;
+                          size = Unknown;
+                          field_kind = Block_access_field_kind.Any_value
+                        }) )
+                in
+                let uses =
+                  PTA.get_all_usages ~follow_known_arity_calls:false db
+                    (Code_id_or_name.Map.singleton code_id_or_name ())
+                in
+                let repr =
+                  mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name
+                    (PTA.get_fields db uses) ""
+                in
+                add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
+              | Set_of_closures l ->
+                let mk kind name =
+                  Value_slot.create
+                    (Compilation_unit.get_current_exn ())
+                    ~name ~is_always_immediate:false kind
+                in
+                let fields =
+                  PTA.get_fields_usage_of_constructors db
+                    (List.fold_left
+                       (fun acc (_, x) -> Code_id_or_name.Map.add x () acc)
+                       Code_id_or_name.Map.empty l)
+                in
+                let repr =
+                  mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name
+                    fields "unboxed"
+                in
+                let fss =
+                  List.fold_left
+                    (fun acc (fs, _) ->
+                      Function_slot.Map.add fs
+                        (Function_slot.create
+                           (Compilation_unit.get_current_exn ())
+                           ~name:(Function_slot.name fs)
+                           ~is_always_immediate:false Flambda_kind.value)
+                        acc)
+                    Function_slot.Map.empty l
+                in
+                List.iter
+                  (fun (fs, f) ->
+                    add_to_s (Closure_representation (repr, fss, fs)) f)
+                  l);
+        if Flambda_features.debug_reaper "unbox"
+        then
+          Format.eprintf "@.TO_CHG: %a@."
+            (Code_id_or_name.Map.print (fun ff (repr, alloc_point) ->
+                 Format.fprintf ff "[from %a]%a" Code_id_or_name.print
+                   alloc_point pp_changed_representation repr))
+            !changed_representation;
+        unboxed, !changed_representation)
+  in
+  if
+    Flambda_features.reaper_unbox ()
+    && Flambda_features.reaper_change_calling_conventions ()
+  then { db; unboxed_fields = unboxed; changed_representation }
+  else
+    { db;
+      unboxed_fields = Code_id_or_name.Map.empty;
+      changed_representation = Code_id_or_name.Map.empty
+    }
+
+let cannot_change_calling_convention_query =
+  let^? [x], [] = ["x"], [] in
+  [cannot_change_calling_convention x]
+
+let cannot_change_calling_convention uses v =
+  (not (Flambda_features.reaper_change_calling_conventions ()))
+  || (not (Compilation_unit.is_current (Code_id.get_compilation_unit v)))
+  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
