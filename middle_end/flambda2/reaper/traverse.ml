@@ -795,8 +795,19 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     (fun region -> Acc.kind (Name.var region) K.region acc)
     my_ghost_region;
   Acc.kind (Name.var my_depth) K.rec_info acc;
-  if is_opaque
+  if not is_opaque
   then (
+    List.iter2
+      (fun param arg ->
+        Acc.add_alias acc
+          ~to_:(Code_id_or_name.var (Bound_parameter.var param))
+          ~from:(Code_id_or_name.var arg))
+      (Bound_parameters.to_list params)
+      code_dep.params;
+    Acc.add_alias acc
+      ~to_:(Code_id_or_name.var my_closure)
+      ~from:(Code_id_or_name.var code_dep.my_closure))
+  else (
     List.iter
       (fun arg -> Acc.add_cond_any_usage acc ~denv (Simple.var arg))
       code_dep.params;
@@ -813,21 +824,8 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     any_source my_depth;
     Option.iter any_source my_region;
     Option.iter any_source my_ghost_region;
-    List.iter any_source (code_dep.exn :: code_dep.return))
-  else
-    List.iter2
-      (fun param arg ->
-        Acc.add_alias acc
-          ~to_:(Code_id_or_name.var (Bound_parameter.var param))
-          ~from:(Code_id_or_name.var arg))
-      (Bound_parameters.to_list params)
-      code_dep.params;
-  if is_opaque
-  then Acc.add_cond_any_usage acc ~denv (Simple.var code_dep.my_closure)
-  else
-    Acc.add_alias acc
-      ~to_:(Code_id_or_name.var my_closure)
-      ~from:(Code_id_or_name.var code_dep.my_closure);
+    List.iter any_source (code_dep.exn :: code_dep.return);
+    Acc.add_cond_any_usage acc ~denv (Simple.var code_dep.my_closure));
   let body = traverse denv acc body in
   let params_and_body =
     { return_continuation;
