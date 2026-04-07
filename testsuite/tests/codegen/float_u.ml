@@ -11,6 +11,7 @@
  flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -158,18 +159,13 @@ min:
 .L126:
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jnp   .L130
-  vmovsd (%rsp), %xmm0
-  addq  $24, %rsp
-  ret
-.L130:
-  vmovsd 8(%rsp), %xmm0
-  addq  $24, %rsp
-  ret
+  jp    .L138
+  jmp   .L136
 .L134:
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
   jnp   .L138
+.L136:
   vmovsd 8(%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -202,18 +198,13 @@ max:
 .L126:
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jnp   .L130
-  vmovsd 8(%rsp), %xmm0
-  addq  $24, %rsp
-  ret
-.L130:
-  vmovsd (%rsp), %xmm0
-  addq  $24, %rsp
-  ret
+  jp    .L138
+  jmp   .L136
 .L134:
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
   jnp   .L138
+.L136:
   vmovsd (%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -246,18 +237,13 @@ min_num:
 .L126:
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jnp   .L130
-  vmovsd (%rsp), %xmm0
-  addq  $24, %rsp
-  ret
-.L130:
-  vmovsd 8(%rsp), %xmm0
-  addq  $24, %rsp
-  ret
+  jp    .L138
+  jmp   .L136
 .L134:
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
   jnp   .L138
+.L136:
   vmovsd 8(%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -290,18 +276,13 @@ max_num:
 .L126:
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jnp   .L130
-  vmovsd 8(%rsp), %xmm0
-  addq  $24, %rsp
-  ret
-.L130:
-  vmovsd (%rsp), %xmm0
-  addq  $24, %rsp
-  ret
+  jp    .L138
+  jmp   .L136
 .L134:
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
   jnp   .L138
+.L136:
   vmovsd (%rsp), %xmm0
   addq  $24, %rsp
   ret

@@ -729,6 +729,9 @@ module Bytes = struct
 end
 
 module String = struct
+  external unsafe_get : (string[@local_opt]) -> int -> char
+    @@ portable = "%string_unsafe_get"
+
   external unsafe_get_int32_ne : (string[@local_opt]) -> int -> int32#
     @@ portable = "%caml_string_get32u#" [@@warning "-187"]
 
@@ -924,7 +927,14 @@ external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 
 external opaque : 'a -> 'a = "%opaque"
 
-external obj_is_int : 'a -> bool = "%obj_is_int"
+module Obj = struct
+
+  type t
+
+  external repr : 'a -> t @@ portable = "%obj_magic"
+  external is_int : t @ contended -> bool @@ portable = "%obj_is_int"
+  external magic : 'a -> 'b @@ portable = "%obj_magic"
+end
 
 external get_header : 'a -> nativeint = "%get_header"
   [@@warning "-187"]

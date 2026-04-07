@@ -11,6 +11,7 @@
  flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -170,8 +171,6 @@ noop_loop:
   incq  %rax
   cmpq  %rbx, %rax
   jle   .L110
-  movl  $1, %eax
-  ret
 .L119:
   movl  $1, %eax
   ret
@@ -261,5 +260,41 @@ M.f:
   ret
 .L132:
   vxorpd %xmm0, %xmm0, %xmm0
+  ret
+|}]
+
+
+(* CR ttebbi: We should branch first and loop afterwards.*)
+let loop_invariant_code (should_call_f : bool) (f : unit -> unit) =
+  for _ = 0 to 9 do
+    if should_call_f then f ()
+  done
+[%%expect_asm X86_64{|
+loop_invariant_code:
+  subq  $24, %rsp
+  movq  %rax, (%rsp)
+  movq  %rbx, 8(%rsp)
+  xorl  %edi, %edi
+  cmpq  $1, %rax
+  je    .L118
+  jmp   .L113
+.L109:
+  cmpq  $1, %rax
+  je    .L118
+.L113:
+  movq  %rdi, 16(%rsp)
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  call  *%rdi
+.L130:
+  movq  (%rsp), %rax
+  movq  8(%rsp), %rbx
+  movq  16(%rsp), %rdi
+.L118:
+  incq  %rdi
+  cmpq  $9, %rdi
+  jle   .L109
+  movl  $1, %eax
+  addq  $24, %rsp
   ret
 |}]

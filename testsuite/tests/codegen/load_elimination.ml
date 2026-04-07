@@ -5,6 +5,7 @@
  flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -30,6 +31,15 @@ let mutable_load r = !r + !r
 mutable_load:
   movq  (%rax), %rax
   leaq  -1(%rax,%rax), %rax
+  ret
+|}]
+
+(* CR ttebbi: There is no need to load the stored value. *)
+let write_then_read r = r := 5; !r
+[%%expect_asm X86_64{|
+write_then_read:
+  movq  $11, (%rax)
+  movq  (%rax), %rax
   ret
 |}]
 

@@ -11,6 +11,7 @@
  flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -353,6 +354,22 @@ string_get_float32_indexed_by_int64:
   salq  $1, %rbx
   sarq  $1, %rbx
   vmovss (%rax,%rbx), %xmm0
+  ret
+|}]
+
+(* CR ttebbi: We convert the loaded char to int before comparing against a
+   constant, this could be a comparison against an untagged constant instead. *)
+let string_unsafe_get_and_use (t : string) : bool =
+    let first_char = String.unsafe_get t 0 in
+    first_char == 'A'
+[%%expect_asm X86_64{|
+string_unsafe_get_and_use:
+  movzbq (%rax), %rax
+  leaq  1(%rax,%rax), %rax
+  cmpq  $131, %rax
+  sete  %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]
 
