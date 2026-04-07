@@ -514,16 +514,21 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   fd_cmm
   ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
   ++ (fun (fd_cmm : Cmm.fundecl) ->
-  (if !Oxcaml_flags.use_ssa
-   then
+  (let cfg_old =
+     Cfg_selection.emit_fundecl ~future_funcnames:funcnames
+       fd_cmm
+   in
+   if !Oxcaml_flags.use_ssa
+   then (
      let ssa = Ssa_selection.emit_fundecl fd_cmm in
      if !Oxcaml_flags.dump_cfg
      then
        Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa.print
          ssa;
-     Ssa_lowering.convert ssa
-   else
-     Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm)
+     let cfg_new = Ssa_lowering.convert ssa in
+     Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name
+       ~old_cfg:cfg_old ~new_cfg:cfg_new ppf_dump);
+   cfg_old)
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->

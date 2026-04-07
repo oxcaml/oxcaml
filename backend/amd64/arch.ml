@@ -312,10 +312,11 @@ let specific_op_result_type
   | Ifloatarithmem (Float64, _, _) -> Cmm.typ_float
   | Ifloatarithmem (Float32, _, _) -> Cmm.typ_float32
   | Ipackf32 -> Cmm.typ_float
-  | Ilea _ | Istore_int _ | Ioffset_loc _ | Ibswap _
-  | Isextend32 | Izextend32 | Irdtsc | Irdpmc
-  | Ilfence | Isfence | Imfence | Icldemote _
-  | Iprefetch _ | Illvm_intrinsic _ ->
+  | Istore_int _ | Ioffset_loc _ | Ilfence | Isfence
+  | Imfence | Icldemote _ | Iprefetch _ ->
+    Cmm.typ_void
+  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Irdtsc
+  | Irdpmc | Illvm_intrinsic _ ->
     Cmm.typ_int
   | Isimd _ | Isimd_mem _ ->
     (* CR: should inspect the SIMD op for the exact type *)

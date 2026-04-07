@@ -691,6 +691,7 @@
   ssa
   ssa_of_cmm
   cfg_of_ssa
+  cfg_compare
   ;; backend/debug/
   available_ranges_vars
   compute_ranges
