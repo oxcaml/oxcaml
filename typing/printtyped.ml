@@ -651,6 +651,9 @@ and expression i ppf x =
   end;
   match x.exp_desc with
   | Texp_ident { path; _ } -> line i ppf "Texp_ident %a\n" fmt_path path;
+  | Texp_apply_layout (exp, args) ->
+      line i ppf "Texp_apply_layout (%d args)\n" (List.length args);
+      expression (i+1) ppf exp;
   | Texp_instvar (_, li,_) -> line i ppf "Texp_instvar %a\n" fmt_path li;
   | Texp_mutvar id -> line i ppf "Texp_mutvar %a\n" fmt_ident id.txt;
   | Texp_constant (c) -> line i ppf "Texp_constant %a\n" fmt_constant c;

@@ -659,6 +659,8 @@ module Jkind0 : sig
     val map_type_expr :
       (type_expr -> type_expr) -> ('l * 'r) jkind -> ('l * 'r) jkind
 
+    val instance : jkind_lr -> jkind_lr
+
     val has_with_bounds : jkind_l -> bool
 
     module Builtin : sig

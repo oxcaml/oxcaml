@@ -162,22 +162,22 @@ Error: Signature mismatch:
        which is not supported yet.
 |}]
 
-(* Layout-polymorphic values cannot be used in expression position:
-   instantiation is not yet supported *)
+(* a [let poly_] binding of a tuple. The middle-end won't support this in the
+   foreseeable future *)
 module _ : sig
   val foo : layout_ x. ('a : x). 'a -> 'a
   val bar : layout_ p q. ('a : p) ('b : q). 'a -> 'b -> 'a
 end = struct
-  let foo, bar =
+  let poly_ foo, bar =
     let poly_ foo x = x in
     let poly_ bar x _y = x in
     (foo, bar)
 end
 [%%expect{|
-Line 8, characters 5-8:
-8 |     (foo, bar)
-         ^^^
-Error: Instantiation of layout-polymorphic values is not yet supported.
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [<genvar>])
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* CR-someday zqian: Mixing poly_ and non-poly_ in let ... and ... is a type
@@ -353,20 +353,68 @@ Error: Signature mismatch:
        Hint: Did you forget to provide "()" as argument?
 |}]
 
-(* CR-soon zqian: once we support instantiation, we should observe that foo is
-   polymorphic on two types sharing the same polymorphic layout. *)
+(* We observe that foo is polymorphic on two types sharing the same polymorphic
+   layout *)
+module M : sig
+  val foo : int
+end = struct
+  let poly_ foo x y =
+    let id z = z in
+    let _ = id x in
+    let _ = id y in
+    ()
+end
+[%%expect{|
+Lines 3-9, characters 6-3:
+3 | ......struct
+4 |   let poly_ foo x y =
+5 |     let id z = z in
+6 |     let _ = id x in
+7 |     let _ = id y in
+8 |     ()
+9 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val foo : layout_ l. ('a : l) ('b : l). 'a -> 'b -> unit end
+       is not included in
+         sig val foo : int end
+       Values do not match:
+         val foo : layout_ l. ('a : l) ('b : l). 'a -> 'b -> unit
+       is not included in
+         val foo : int
+       The type "'a -> 'b -> unit" is not compatible with the type "int"
+|}]
+
+(* We observe that foo is polymorphic on two types NOT sharing the same polymorphic
+   layout. *)
 module M : sig
   val foo : int
 end = struct
   let poly_ foo x y =
     let poly_ id z = z in
-    id x, id y
+    let _ = id x in
+    let _ = id y in
+    ()
 end
 [%%expect{|
-Line 6, characters 4-6:
-6 |     id x, id y
-        ^^
-Error: Instantiation of layout-polymorphic values is not yet supported.
+Lines 3-9, characters 6-3:
+3 | ......struct
+4 |   let poly_ foo x y =
+5 |     let poly_ id z = z in
+6 |     let _ = id x in
+7 |     let _ = id y in
+8 |     ()
+9 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end
+       is not included in
+         sig val foo : int end
+       Values do not match:
+         val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit
+       is not included in
+         val foo : int
+       The type "'a -> 'b -> unit" is not compatible with the type "int"
 |}]
 
 (* [rec] prevents layout polymorphism, even for fake recursion (no
@@ -381,7 +429,7 @@ Line 4, characters 16-17:
 4 |   let rec poly_ f x = x
                     ^
 Warning 218: "poly_" has no effect in recursive bindings, which do not support layout polymorphism. Consider using a regular "let rec" instead.
-Uncaught exception: File "lambda/translcore.ml", line 2031, characters 19-25: Assertion failed
+Uncaught exception: File "lambda/translcore.ml", line 2040, characters 19-25: Assertion failed
 
 |}]
 
@@ -395,7 +443,7 @@ end
 Line 4, characters 20-49:
 4 |   let rec poly_ f : layout_ l. ('a : l). 'a -> 'a = fun x -> x
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
 (* CR-soon zqian: should be layout poly, once we support instantiation. *)
@@ -408,7 +456,7 @@ end
 Line 4, characters 20-49:
 4 |   let rec poly_ f : layout_ l. ('a : l). 'a -> 'a = fun x -> f x
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
 (* CR-soon zqian: should be layout poly, once we support instantiation. *)
@@ -423,7 +471,7 @@ end
 Line 5, characters 20-49:
 5 |   let rec poly_ g : layout_ l. ('a : l). 'a -> 'a = fun x -> h x
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
 (* either all poly, or none poly. *)

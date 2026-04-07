@@ -317,7 +317,7 @@ let _ = (fun (x : layout_ a. ('t : a). 't) -> x)
 Line 1, characters 18-41:
 1 | let _ = (fun (x : layout_ a. ('t : a). 't) -> x)
                       ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
 let f : layout_ a. ('t : a). 't -> 't = fun x -> x
@@ -325,7 +325,7 @@ let f : layout_ a. ('t : a). 't -> 't = fun x -> x
 Line 1, characters 8-37:
 1 | let f : layout_ a. ('t : a). 't -> 't = fun x -> x
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
 (* layout_ in a record field type is not yet supported *)
@@ -334,17 +334,18 @@ type t = { id : layout_ k. ('a : k). 'a -> 'a }
 Line 1, characters 16-45:
 1 | type t = { id : layout_ k. ('a : k). 'a -> 'a }
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
+(* CR-soon zqian: should work once layout instantiation is handled by slambda *)
 module F (M : sig val f : layout_ x. ('a : x). 'a -> 'a end) = struct
   let () = let _ = M.f in ()
 end
 [%%expect{|
-Line 2, characters 19-22:
-2 |   let () = let _ = M.f in ()
-                       ^^^
-Error: Instantiation of layout-polymorphic values is not yet supported.
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [value])
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* You can add additional constraint on the modal bounds, which doesn't affect

@@ -3664,6 +3664,10 @@ and quote_expression_desc ~scopes ~transl stage e =
     match e.exp_desc with
     | Texp_ident { path; kind; _ } ->
       quote_value_ident_path_as_exp loc env path kind
+    | Texp_apply_layout _ ->
+      Misc.fatal_error
+        "Translquote: translation of layout-polymorphic instantiation is not \
+         yet supported"
     | Texp_constant const ->
       let const = quote_constant loc const in
       Exp_desc.constant loc const

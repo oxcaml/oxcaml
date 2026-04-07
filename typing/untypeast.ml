@@ -526,6 +526,7 @@ let expression sub exp =
   let desc =
     match exp.exp_desc with
       Texp_ident { lid; _ } -> Pexp_ident (map_loc sub lid)
+    | Texp_apply_layout (exp, _) -> (sub.expr sub exp).pexp_desc
     | Texp_constant cst -> Pexp_constant (constant cst)
     | Texp_let (rec_flag, list, exp) ->
         Pexp_let (Immutable, rec_flag,
