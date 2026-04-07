@@ -56,7 +56,8 @@ val initialize_toplevel_env : unit -> unit
         (* Initialize the typing environment for the toplevel *)
 val print_exception_outcome : formatter -> exn -> unit
         (* Print an exception resulting from the evaluation of user code. *)
-val execute_phrase : bool -> formatter -> Parsetree.toplevel_phrase -> bool
+val execute_phrase : bool -> formatter -> Parsetree.toplevel_phrase
+  -> bool * Compilation_unit.t option
         (* Execute the given toplevel phrase. Return [true] if the
            phrase executed with no errors and [false] otherwise.
            First bool says whether the values and types of the results

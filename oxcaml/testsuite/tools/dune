@@ -1,7 +1,7 @@
 (library
  (name expectcommon)
  (modes byte native)
- (libraries ocamlcommon)
+ (libraries ocamlcommon ocamlopttoplevel)
  (modules expectcommon))
 
 (executable
