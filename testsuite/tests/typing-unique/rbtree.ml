@@ -470,10 +470,23 @@ type ('k, 'v) tree =
       value : 'v @@ many aliased; right : ('k, 'v) tree;
     }
   | Leaf
-val fold : ('a -> 'b -> 'c -> 'c) -> 'c -> ('a, 'b) tree -> 'c = <fun>
+val fold :
+  ('a @ [< 'n @@ past > 'mm4 @@ many | aliased] ->
+   ('b @ [< 'p @@ past > 'mm3 @@ many | aliased] ->
+    ('c @ [> 'mm1 | 'mm2 | 'mm0] -> 'c @ [< 'q & 'mm0 & global]) @ [> 'p | 'm]) @ [< 'm @@ past > 'n | 'o]) @ [< 'o @@ past & 'mm6 @@ past & global many > aliased] ->
+  ('c @ [< 'mm7 & 'mm2 & global > 'q] ->
+   (('a, 'b) tree @ [< 'mm3 & 'mm4] -> 'c @ [< 'mm1 & global > 'mm7]) @ [< global > close('mm2) | close('mm7) | 'mm5 | nonportable]) @ [< 'mm5 @@ past & global > 'mm6 | nonportable] =
+  <fun>
 val work :
-  insert:(int -> bool -> 'a -> 'a) ->
-  fold:(('b -> bool -> int -> int) -> int -> 'a -> 'c) -> empty:'a -> 'c =
+  insert:(int @ [< 'n @@ past > aliased] ->
+          (bool @ [< 'p @@ past] ->
+           ('a @ [> 'mm1 | 'mm0] -> 'a @ [< 'q & 'mm0 & global]) @ [> 'p | 'm]) @ [< 'm @@ past > 'n | 'o]) @ [< 'o @@ past & 'mm2 @@ past & global many] ->
+  (fold:(('b @ [< 'mm3 @@ past & global] ->
+          (bool @ [< 'mm4 @@ past & global] ->
+           (int @ [< 'mm5 & global] -> int @ [< global > 'mm5]) @ [< global > 'mm4]) @ [< global > 'mm3]) @ [< 'mm7 @@ past] ->
+         (int @ [< 'mm9 @@ past] ->
+          ('a @ [> 'mm11 | 'q] -> 'c @ [< 'mm10 & global]) @ [> 'mm9 | 'mm6]) @ [< 'mm6 @@ past > 'mm7 | 'mm8]) @ [< 'mm8 @@ past & 'mm12 @@ past & global] ->
+   (empty:'a @ [< 'mm11 & 'mm1 & global] -> 'c @ [< global > 'mm10]) @ [< global > 'mm12]) @ [< global > 'mm2] =
   <fun>
 Line 85, characters 16-71:
 85 |                 balance_right (Node { t with right = ins k v t.right }) [@nontail]

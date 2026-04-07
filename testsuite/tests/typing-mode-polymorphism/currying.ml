@@ -3,23 +3,17 @@
  expect;
 *)
 
-(*
- * This file tests that mode polymorphism works, without printing mode variables.
- * The modes printed are not always representative of the underlying modes: they have
- * been zapped in order to be printed
-*)
-
 let use_uncontended (x @ uncontended) = ()
 let use_portable (x @ portable) = ()
 let use_unique (x @ unique) = ()
 let use_static (x @ static) = ()
 let use_global (x @ global) = ()
 [%%expect{|
-val use_uncontended : 'a -> unit = <fun>
-val use_portable : 'a @ portable -> unit = <fun>
-val use_unique : 'a @ unique -> unit = <fun>
-val use_static : 'a -> unit = <fun>
-val use_global : 'a -> unit = <fun>
+val use_uncontended : 'a @ [< uncontended] -> unit @ [< global] = <fun>
+val use_portable : 'a @ [< portable] -> unit @ [< global] = <fun>
+val use_unique : 'a @ [< unique] -> unit @ [< global] = <fun>
+val use_static : 'a @ 'm -> unit @ [< global] = <fun>
+val use_global : 'a @ [< global] -> unit @ [< global] = <fun>
 |}]
 
 (* [fst] is the K-combinator and displays an interesting bi-directional dependency
@@ -36,7 +30,9 @@ val use_global : 'a -> unit = <fun>
 
 let fst x y = x
 [%%expect{|
-val fst : 'a -> 'b -> 'a = <fun>
+val fst :
+  'a @ [< 'm & global] ->
+  ('b @ 'n -> 'a @ [< global > 'm]) @ [< global > close('m)] = <fun>
 |}]
 
 (* n-ary functions will impose locality bounds on arguments, since the middle end
@@ -58,14 +54,17 @@ Error: This value is "local" but is expected to be "global".
 let bar (once_ x) =
   fst x
 [%%expect{|
-val bar : 'a @ once -> 'b -> 'a @ once = <fun>
+val bar :
+  'a @ [< 'm & global > once] ->
+  ('b @ 'n -> 'a @ [< global > 'm | once]) @ [< global > close('m) | once] =
+  <fun>
 |}]
 
 let bar (unique_ x) =
   let x = fst x () in
   use_unique x
 [%%expect{|
-val bar : 'a @ unique -> unit = <fun>
+val bar : 'a @ [< global unique] -> unit @ [< global] = <fun>
 |}]
 
 (* The returned closure is nonportable *)
@@ -88,21 +87,33 @@ Error: The value "bar1" is "nonportable"
 
 let many_arguments x y z s t = y
 [%%expect{|
-val many_arguments : 'a -> 'b -> 'c -> 'd -> 'e -> 'b = <fun>
+val many_arguments :
+  'a @ [< 'm @@ past & global] ->
+  ('b @ [< 'n & global] ->
+   ('c @ [< 'o @@ past & global] ->
+    ('d @ [< 'p @@ past & global] ->
+     ('e @ 'q -> 'b @ [< global > 'n]) @ [< global > 'p]) @ [< global > 'o]) @ [< global > close('n)]) @ [< global > 'm] =
+  <fun>
 |}]
 
 let foo (x @ portable) (y @ uncontended) =
   let y = many_arguments x y () () () in
   use_uncontended y
 [%%expect{|
-val foo : 'a @ portable -> 'b -> unit = <fun>
+val foo :
+  'a @ [< 'm @@ past & global portable] ->
+  ('b @ [< global uncontended] -> unit @ [< global]) @ [< global > 'm] =
+  <fun>
 |}]
 
 let foo (x @ portable) (y @ uncontended) =
   let f = many_arguments x y in
   use_portable f
 [%%expect{|
-val foo : 'a @ portable -> 'b @ portable -> unit = <fun>
+val foo :
+  'a @ [< 'm @@ past & global portable] ->
+  ('b @ [< global portable uncontended] -> unit @ [< global]) @ [< global > 'm] =
+  <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -129,7 +140,9 @@ val foo : unit = ()
 
 let fst x = fun y -> x
 [%%expect{|
-val fst : 'a -> 'b -> 'a = <fun>
+val fst :
+  'a @ [< 'm & global] ->
+  ('b @ 'n -> 'a @ [< global > 'm]) @ [< global > close('m)] = <fun>
 |}]
 
 (* x is < global as before *)
@@ -164,7 +177,7 @@ let bar (x @ unique) =
   let x = fst x in
   use_unique x
 [%%expect{|
-val bar : 'a @ unique -> unit = <fun>
+val bar : 'a @ [< global unique] -> unit @ [< global] = <fun>
 |}]
 
 let bar (x @ unique) =
@@ -189,7 +202,7 @@ let var (x @ portable) =
   let x = fst x () in
   use_portable x
 [%%expect{|
-val var : 'a @ portable -> unit = <fun>
+val var : 'a @ [< global portable] -> unit @ [< global] = <fun>
 |}]
 let var (x @ nonportable) =
   let x = fst x () in
@@ -206,7 +219,7 @@ let var (x @ uncontended) =
   let x = fst x () in
   use_uncontended x
 [%%expect{|
-val var : 'a -> unit = <fun>
+val var : 'a @ [< global uncontended] -> unit @ [< global] = <fun>
 |}]
 let var (x @ contended) =
   let x = fst x () in
@@ -238,13 +251,17 @@ Error: The value "bar1" is "nonportable"
 (* deeply nested closures should still propagate modes *)
 let nest x = fun () -> fun () -> fun () -> x
 [%%expect{|
-val nest : 'a -> unit -> unit -> unit -> 'a = <fun>
+val nest :
+  'a @ [< 'm & global] ->
+  (unit @ 'p ->
+   (unit @ 'o -> (unit @ 'n -> 'a @ [< global > 'm]) @ [< global > close('m)]) @ [< global > close('m)]) @ [< global > close('m)] =
+  <fun>
 |}]
 
 let foo (x @ portable) =
   use_portable (nest x () () ())
 [%%expect{|
-val foo : 'a @ portable -> unit = <fun>
+val foo : 'a @ [< global portable] -> unit @ [< global] = <fun>
 |}]
 
 let foo (x @ nonportable) =

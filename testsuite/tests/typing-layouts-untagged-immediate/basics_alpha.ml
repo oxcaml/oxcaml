@@ -25,12 +25,15 @@ let f1_3 (x : int#) = x;;
 [%%expect{|
 type t_untagged_immediate : untagged_immediate
 type ('a : untagged_immediate) t_untagged_immediate_id = 'a
-val f1_1 : t_untagged_immediate -> t_untagged_immediate = <fun>
+val f1_1 :
+  t_untagged_immediate @ [< 'm & global] ->
+  t_untagged_immediate @ [< global > 'm] = <fun>
 val f1_2 :
   ('a : untagged_immediate).
-    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+    'a t_untagged_immediate_id @ [< 'm & global] ->
+    'a t_untagged_immediate_id @ [< global > 'm] =
   <fun>
-val f1_3 : int# -> int# = <fun>
+val f1_3 : int# @ 'm -> int# @ [< global] = <fun>
 |}];;
 
 (*****************************************)
@@ -47,12 +50,15 @@ let f2_3 (x : int#) =
   let y = x in
   y;;
 [%%expect{|
-val f2_1 : t_untagged_immediate -> t_untagged_immediate = <fun>
+val f2_1 :
+  t_untagged_immediate @ [< 'm & global] ->
+  t_untagged_immediate @ [< global > 'm] = <fun>
 val f2_2 :
   ('a : untagged_immediate).
-    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+    'a t_untagged_immediate_id @ [< 'm & global] ->
+    'a t_untagged_immediate_id @ [< global > 'm] =
   <fun>
-val f2_3 : int# -> int# = <fun>
+val f2_3 : int# @ 'm -> int# @ [< global] = <fun>
 |}];;
 
 (**************************************)
@@ -242,7 +248,9 @@ module type S6_1 = sig val x : t_untagged_immediate end
 let f6 (m : (module S6_1)) = let module M6 = (val m) in M6.x;;
 [%%expect{|
 module type S6_1 = sig val x : t_untagged_immediate end
-val f6 : (module S6_1) -> t_untagged_immediate = <fun>
+val f6 :
+  (module S6_1) @ [< global many uncontended] ->
+  t_untagged_immediate @ [< global > aliased nonportable] = <fun>
 |}];;
 
 module type S6_2 = sig val x : 'a t_untagged_immediate_id end
@@ -333,11 +341,14 @@ let make_intu () : int# = assert false
 
 let id_value x = x;;
 [%%expect{|
-val make_t_untagged_immediate : unit -> t_untagged_immediate = <fun>
+val make_t_untagged_immediate :
+  unit @ 'm -> t_untagged_immediate @ [< global] = <fun>
 val make_t_untagged_immediate_id :
-  ('a : untagged_immediate). unit -> 'a t_untagged_immediate_id = <fun>
-val make_intu : unit -> int# = <fun>
-val id_value : 'a -> 'a = <fun>
+  ('a : untagged_immediate).
+    unit @ 'm -> 'a t_untagged_immediate_id @ [< global] =
+  <fun>
+val make_intu : unit @ 'm -> int# @ [< global] = <fun>
+val id_value : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 |}];;
 
 let x8_1 = id_value (make_t_untagged_immediate ());;
@@ -392,13 +403,19 @@ let f9_3 () = twice f1_3 (make_intu ());;
 [%%expect{|
 val twice :
   ('a : untagged_immediate).
-    ('a t_untagged_immediate_id -> 'a t_untagged_immediate_id) ->
-    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+    ('a t_untagged_immediate_id @ [> 'o | 'n] ->
+     'a t_untagged_immediate_id @ [< 'm & 'n & global]) @ [< 'p @@ past & global many] ->
+    ('a t_untagged_immediate_id @ [< 'o] ->
+     'a t_untagged_immediate_id @ [< global > 'm]) @ [< global > 'p] =
   <fun>
-val f9_1 : unit -> t_untagged_immediate t_untagged_immediate_id = <fun>
-val f9_2 : ('a : untagged_immediate). unit -> 'a t_untagged_immediate_id =
+val f9_1 :
+  unit @ 'm -> t_untagged_immediate t_untagged_immediate_id @ [< global] =
   <fun>
-val f9_3 : unit -> int# t_untagged_immediate_id = <fun>
+val f9_2 :
+  ('a : untagged_immediate).
+    unit @ 'm -> 'a t_untagged_immediate_id @ [< global] =
+  <fun>
+val f9_3 : unit @ 'm -> int# t_untagged_immediate_id @ [< global] = <fun>
 |}];;
 
 (**************************************************)
@@ -640,13 +657,20 @@ class ['a] c12_12 = object
 end;;
 [%%expect{|
 type t12_8 = < f : t_untagged_immediate -> t_untagged_immediate >
-val f12_9 : t12_8 -> t_untagged_immediate -> t_untagged_immediate = <fun>
+val f12_9 :
+  t12_8 @ [< 'n @@ past & global uncontended] ->
+  (t_untagged_immediate @ [< global many uncontended > 'm] ->
+   t_untagged_immediate @ [< global > aliased nonportable]) @ [< 'm @@ past & global > 'n | nonportable] =
+  <fun>
 val f12_10 :
-  < baz : t_untagged_immediate ->
-          t_untagged_immediate ->
-          t_untagged_immediate -> t_untagged_immediate;
-    .. > ->
-  t_untagged_immediate -> t_untagged_immediate = <fun>
+  < baz : t_untagged_immediate @ [< 'n @@ past > 'mm1 | aliased] ->
+          (t_untagged_immediate @ [< 'o @@ past > 'mm0 | aliased] ->
+           (t_untagged_immediate @ [> 'q | aliased] ->
+            t_untagged_immediate @ [< 'p & global]) @ [> 'o | 'm | nonportable]) @ [< 'm @@ past > 'n | nonportable];
+    .. > @ [< 'mm2 @@ past & global uncontended] ->
+  (t_untagged_immediate @ [< 'q & 'mm0 & 'mm1 & many] ->
+   t_untagged_immediate @ [< global > 'p]) @ [< global > 'mm2 | nonportable] =
+  <fun>
 class ['a] c12_11 : object method x : t_untagged_immediate -> 'a end
 class ['a] c12_12 : object method x : 'a -> t_untagged_immediate end
 |}];;

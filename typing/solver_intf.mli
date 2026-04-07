@@ -475,6 +475,52 @@ module type Solver_mono = sig
     val apply :
       'b obj -> ('a, 'b, 'l * 'r) morph -> ('a, 'l * 'r) t -> ('b, 'l * 'r) t
   end
+
+  (** The exposed description of modes *)
+  module Desc : sig
+    module Var : sig
+      type 'a t
+
+      type ('b, 'd) t_with_morph =
+        | Amorphvar : 'a t * ('a, 'b, 'd) morph -> ('b, 'd) t_with_morph
+
+      module Head : sig
+        type 'a t =
+          { desc_id : int;
+            desc_upper : 'a;
+            desc_lower : 'a;
+            desc_vlower : ('a, left_only) t_with_morph list;
+            desc_level : int
+          }
+
+        val equal : 'a t -> 'b t -> bool
+
+        val hash : 'a t -> int
+      end
+
+      val force : 'a obj -> 'a t -> 'a Head.t
+    end
+
+    type ('b, 'd) morphvar =
+      | Amorphvar : 'a Var.Head.t * ('a, 'b, 'd) morph -> ('b, 'd) morphvar
+
+    type ('a, 'd) t =
+      | Amode : 'a -> ('a, 'l * 'r) t
+      | Amodevar : ('a, 'd) morphvar -> ('a, 'd) t
+      | Amodejoin :
+          'a * ('a, 'l * disallowed) morphvar list
+          -> ('a, 'l * disallowed) t
+      | Amodemeet :
+          'a * ('a, disallowed * 'r) morphvar list
+          -> ('a, disallowed * 'r) t
+
+    val equal : 'a obj -> ('a, 'l * 'r) t -> ('a, 'l * 'r) t -> bool
+
+    val print : 'a obj -> Fmt.formatter -> ('a, 'l * 'r) t -> unit
+  end
+
+  (** Returns the description of a mode. *)
+  val desc : 'a obj -> ('a, 'd) mode -> ('a, 'd) Desc.t
 end
 
 (** Hint module to be provided by the user of the solver. *)

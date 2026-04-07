@@ -42,7 +42,8 @@ let overwrite_shared (r : record_update) =
   let x = overwrite_ r with { x = "foo" } in
   x.x
 [%%expect{|
-val use_aliased : 'a -> 'a = <fun>
+val use_aliased :
+  'a @ [< 'm & global > aliased] -> 'a @ [< global > 'm | aliased] = <fun>
 Line 5, characters 21-22:
 5 |   let x = overwrite_ r with { x = "foo" } in
                          ^
@@ -764,7 +765,7 @@ let guards_good = function
   end
   | OptionB _ -> false
 [%%expect{|
-val is_option_a : options -> bool = <fun>
+val is_option_a : options @ 'n -> bool @ 'm = <fun>
 Line 8, characters 30-59:
 8 |     | Some s when is_option_a (overwrite_ v with OptionA s) -> true
                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -844,7 +845,8 @@ let mutable_field_aliased r =
 [%%expect{|
 type 'a mutable_record = { mutable m : 'a; }
 val mutable_field_aliased :
-  options mutable_record @ unique -> options mutable_record * options = <fun>
+  options mutable_record @ [< 'm & global unique uncontended] ->
+  options mutable_record * options @ [< global > 'm | aliased] = <fun>
 |}]
 
 let mutable_field_aliased r =

@@ -6,8 +6,10 @@
 (* Subtyping is "syntactic" *)
 fun (x : < x : int >) y z -> (y :> 'a), (x :> 'a), (z :> 'a);;
 [%%expect{|
-- : < x : int > ->
-    (< x : int > -> < x : int > -> < x : int > * < x : int > * < x : int >) @ local
+- : < x : int > @ [< 'm . aliased & global] ->
+    (< x : int > @ [< 'n & global] ->
+     (< x : int > @ [< 'o & global] ->
+      < x : int > * < x : int > * < x : int > @ [< global > 'o | 'n | 'm @@ global many]) @ [> close('n) | local]) @ [> close('m) @@ many | local]
 = <fun>
 |}];;
 (* - : (< x : int > as 'a) -> 'a -> 'a * 'a = <fun> *)
@@ -37,8 +39,8 @@ Lines 3-5, characters 4-3:
 4 |   inherit ['a] c ()
 5 | end..
 Error: Some type variables are unbound in this type:
-         class d : unit -> object method f : 'a -> unit end
-       The method "f" has type "'a -> unit" where "'a" is unbound
+         class d : unit -> object method f : 'a @ 'm -> unit @ [< global] end
+       The method "f" has type "'a @ 'm -> unit @ [< global]" where "'a" is unbound
 |}];;
 
 (* Create instance #c *)
@@ -50,7 +52,11 @@ end;;
 [%%expect{|
 class virtual c : unit -> object  end
 and ['a] d :
-  unit -> object constraint 'a = < x : int; .. > method f : 'a -> int end
+  unit ->
+  object
+    constraint 'a = < x : int; .. >
+    method f : 'a @ [< uncontended] -> int @ [< global]
+  end
 |}];;
 (* class virtual c : unit -> object  end *)
 (* and ['a] d : *)
@@ -154,7 +160,9 @@ class ['a, 'b] c :
   object
     constraint 'a = int -> 'c
     constraint 'b = 'a * < x : 'b > * 'c * 'd
-    method f : 'a -> 'b -> unit
+    method f :
+      'a @ [< 'm @@ past & 'm @@ past & 'm @@ past & global] ->
+      ('b @ 'n -> unit @ [< global]) @ [< global > 'm | 'm | 'm]
   end
 |}];;
 class ['a, 'b] d () = object
@@ -166,7 +174,9 @@ class ['a, 'b] d :
   object
     constraint 'a = int -> 'd
     constraint 'b = 'a * (< x : 'b > as 'c) * 'd * 'e
-    method f : (int -> 'd) -> (int -> 'd) * 'c * 'd * 'e -> unit
+    method f :
+      (int -> 'd) @ [< 'm @@ past & 'm @@ past & 'm @@ past & global] ->
+      ((int -> 'd) * 'c * 'd * 'e @ 'n -> unit @ [< global]) @ [< global > 'm | 'm | 'm]
   end
 |}];;
 
@@ -266,11 +276,15 @@ type 'a u = 'a
 |}];;
 fun (x : t) (y : 'a u) -> x = y;;
 [%%expect{|
-- : t -> (t u -> bool) @ local = <fun>
+- : t @ [< 'm @@ past & global uncontended] ->
+    (t u @ [< global many uncontended] -> bool @ [< global]) @ [> 'm | local nonportable]
+= <fun>
 |}];;
 fun (x : t) (y : 'a u) -> y = x;;
 [%%expect{|
-- : t -> (t u -> bool) @ local = <fun>
+- : t @ [< 'm @@ past & global uncontended] ->
+    (t u @ [< global many uncontended] -> bool @ [< global]) @ [> 'm | local nonportable]
+= <fun>
 |}];;
 (* - : t -> t u -> bool = <fun> *)
 
@@ -383,11 +397,11 @@ module M' : sig class ['a] c : unit -> object method f : 'a -> unit end end
 |}];;
 fun x -> (x :> 'a #M.c);;
 [%%expect{|
-- : ('a #M.c as 'b) -> 'b = <fun>
+- : ('a #M.c as 'b) @ [< 'm & global] -> 'b = <fun>
 |}];;
 fun x -> (x :> 'a #M'.c);;
 [%%expect{|
-- : ('a #M'.c as 'b) -> 'b = <fun>
+- : ('a #M'.c as 'b) @ [< 'm & global] -> 'b = <fun>
 |}];;
 class ['a] c (x : 'b #c) = object end;;
 [%%expect{|
@@ -707,14 +721,17 @@ Lines 1-3, characters 12-3:
 3 | end......
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : (#c as 'a) -> 'a end
+         sig val f : (#c as 'a) @ [< 'm . aliased] -> 'a end
        is not included in
          sig val f : #c -> #c end
        Values do not match:
-         val f : (#c as 'a) -> 'a
+         val f : (#c as 'a) @ [< 'm . aliased] -> 'a
        is not included in
          val f : #c -> #c
-       The type "(#c as 'a) -> 'a" is not compatible with the type "#c -> #c"
+       The type
+         "(#c as 'a) @ [< 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased] ->
+         'a"
+       is not compatible with the type "#c -> #c"
        Type "#c as 'a" = "< m : 'a; .. >" is not compatible with type
          "#c as 'b" = "< m : 'b; .. >"
        Type "'a" is not compatible with type "'b"
@@ -731,7 +748,8 @@ Error: Multiple definition of the type name "t".
 
 fun x -> (x :> < m : 'a -> 'a > as 'a);;
 [%%expect{|
-- : < m : (< m : 'a -> 'a > as 'a) -> 'a; .. > -> 'a = <fun>
+- : < m : (< m : 'a -> 'a > as 'a) -> 'a; .. > @ [< 'm & global] -> 'a =
+<fun>
 |}];;
 
 fun x -> (x : int -> bool :> 'a -> 'a);;
@@ -752,11 +770,14 @@ Error: Type "int -> bool" is not a subtype of "int -> int"
 |}];;
 fun x -> (x : < > :> < .. >);;
 [%%expect{|
-- : <  > -> <  > = <fun>
+- : <  > @ [< 'm . aliased & global] -> <  > @ [< global > 'm @@ global many]
+= <fun>
 |}];;
 fun x -> (x : < .. > :> < >);;
 [%%expect{|
-- : < .. > -> <  > = <fun>
+- : < .. > @ [< 'm . aliased & global] ->
+    <  > @ [< global > 'm @@ global many]
+= <fun>
 |}];;
 
 let x = ref [];;
@@ -824,7 +845,7 @@ type 'a t = < x : 'a >
 |}];;
 fun (x : 'a t as 'a) -> ();;
 [%%expect{|
-- : ('a t as 'a) -> unit = <fun>
+- : ('a t as 'a) @ [< global] -> unit @ [< global] = <fun>
 |}];;
 fun (x : 'a t) -> (x : 'a); ();;
 [%%expect{|
@@ -833,7 +854,7 @@ Line 1, characters 18-26:
                       ^^^^^^^^
 Warning 10 [non-unit-statement]: this expression should have type unit.
 
-- : ('a t as 'a) t -> unit = <fun>
+- : ('a t as 'a) t @ [< global] -> unit @ [< global] = <fun>
 |}];;
 fun ((x : 'a) | (x : 'a t)) -> ();;
 [%%expect{|
@@ -842,7 +863,7 @@ Line 1, characters 17-18:
                      ^
 Warning 12 [redundant-subpat]: this sub-pattern is unused.
 
-- : ('a t as 'a) -> unit = <fun>
+- : ('a t as 'a) @ [< global] -> unit @ [< global] = <fun>
 |}];;
 
 class ['a] c () = object
@@ -852,7 +873,12 @@ end;;
 [%%expect{|
 class ['a] c :
   unit ->
-  object constraint 'a = (< .. > as 'b) -> unit method m : 'b -> unit end
+  object
+    constraint 'a =
+      (< .. > as 'b) @ [< global many uncontended > aliased nonportable]as 'n ->
+      unit @ [< global many uncontended > aliased nonportable]as 'm
+    method m : 'b @ 'n -> unit @ 'm
+  end
 |}];;
 class ['a] c () = object
   constraint 'a = unit -> < .. >
@@ -861,7 +887,7 @@ end;;
 [%%expect{|
 class ['a] c :
   unit ->
-  object constraint 'a = unit -> (< .. > as 'b) method m : 'a -> 'b end
+  object constraint 'a = unit -> (< .. > as 'b) method m : 'a @ 'm -> 'b end
 |}];;
 
 class c () = object (self)
@@ -1148,7 +1174,7 @@ Error: The class type
 let is_empty (x : < >) = ()
 class c = object (self) method private foo = is_empty self end;;
 [%%expect {|
-val is_empty : <  > -> unit = <fun>
+val is_empty : <  > @ 'm -> unit @ [< global] = <fun>
 Line 2, characters 54-58:
 2 | class c = object (self) method private foo = is_empty self end;;
                                                           ^^^^
@@ -1162,7 +1188,7 @@ let has_foo (x : < foo : 'a; .. >) = ()
 
 class c = object (self) method private foo = 5 initializer has_foo self end;;
 [%%expect {|
-val has_foo : < foo : 'a; .. > -> unit = <fun>
+val has_foo : < foo : 'a; .. > @ 'm -> unit @ [< global] = <fun>
 Line 3, characters 10-75:
 3 | class c = object (self) method private foo = 5 initializer has_foo self end;;
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1233,7 +1259,7 @@ Error: This expression has no method "foo"
 let has_foo (x : < foo : int; ..>) = ()
 class c = object(self) initializer has_foo self end;;
 [%%expect {|
-val has_foo : < foo : int; .. > -> unit = <fun>
+val has_foo : < foo : int; .. > @ 'm -> unit @ [< global] = <fun>
 Line 2, characters 10-51:
 2 | class c = object(self) initializer has_foo self end;;
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1392,7 +1418,7 @@ class foo =
   end
 let _ = (new foo)#f true
 [%%expect {|
-class foo : object method f : bool -> bool end
+class foo : object method f : bool @ 'm -> bool @ [< global] end
 - : bool = true
 |}];;
 

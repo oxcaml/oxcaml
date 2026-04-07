@@ -19,14 +19,15 @@ let aliased_use (x @ aliased global) = x
 [%%expect{|
 (let (aliased_use/290 = (function {nlocal = 0} x/292? x/292))
   (apply (field_imm 1 (global Toploop!)) "aliased_use" aliased_use/290))
-val aliased_use : 'a -> 'a = <fun>
+val aliased_use :
+  'a @ [< 'm & global > aliased] -> 'a @ [< global > 'm | aliased] = <fun>
 |}]
 
 let unique_use (x @ unique global) = x
 [%%expect{|
 (let (unique_use/293 = (function {nlocal = 0} x/295? x/295))
   (apply (field_imm 1 (global Toploop!)) "unique_use" unique_use/293))
-val unique_use : 'a @ unique -> 'a = <fun>
+val unique_use : 'a @ [< 'm & global unique] -> 'a @ [< global > 'm] = <fun>
 |}]
 
 (* This output is fine with overwriting: The [r.y] is not pushed down. *)
@@ -49,7 +50,9 @@ let proj_aliased r =
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/300
            y/299))))
   (apply (field_imm 1 (global Toploop!)) "proj_aliased" proj_aliased/296))
-val proj_aliased : record -> record * string = <fun>
+val proj_aliased :
+  record @ [< 'm & global] -> record * string @ [< global > 'm | aliased] =
+  <fun>
 |}]
 
 let proj_unique r =
@@ -71,7 +74,9 @@ let proj_unique r =
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/305
            y/304))))
   (apply (field_imm 1 (global Toploop!)) "proj_unique" proj_unique/301))
-val proj_unique : record @ unique -> record * string = <fun>
+val proj_unique :
+  record @ [< 'm & global unique] ->
+  record * string @ [< global > 'm | aliased] = <fun>
 |}]
 
 (* This output would be unsound if [aliased_use] was able to overwrite [r]
@@ -95,7 +100,9 @@ let match_aliased r =
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/310
            (field_imm 1 r/308)))))
   (apply (field_imm 1 (global Toploop!)) "match_aliased" match_aliased/306))
-val match_aliased : record -> record * string = <fun>
+val match_aliased :
+  record @ [< 'm & global] -> record * string @ [< global > 'm | aliased] =
+  <fun>
 |}]
 
 (* This is sound since we bind [y] before the [unique_use] *)
@@ -119,7 +126,9 @@ let match_unique r =
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/316
            y/315))))
   (apply (field_imm 1 (global Toploop!)) "match_unique" match_unique/312))
-val match_unique : record @ unique -> record * string = <fun>
+val match_unique :
+  record @ [< 'm & global unique] ->
+  record * string @ [< global > 'm | aliased] = <fun>
 |}]
 
 (* Similarly, this would be unsound since Lambda performs a mini ANF pass. *)
@@ -146,7 +155,9 @@ let match_mini_anf_aliased r =
            (field_imm 1 r/320)))))
   (apply (field_imm 1 (global Toploop!)) "match_mini_anf_aliased"
     match_mini_anf_aliased/318))
-val match_mini_anf_aliased : record -> record * string = <fun>
+val match_mini_anf_aliased :
+  record @ [< 'm & global] -> record * string @ [< global > 'm | aliased] =
+  <fun>
 |}]
 
 (* This is sound since we bind [y] before the [unique_use] *)
@@ -174,7 +185,9 @@ let match_mini_anf_unique r =
            y/332))))
   (apply (field_imm 1 (global Toploop!)) "match_mini_anf_unique"
     match_mini_anf_unique/328))
-val match_mini_anf_unique : record @ unique -> record * string = <fun>
+val match_mini_anf_unique :
+  record @ [< 'm & global unique] ->
+  record * string @ [< global > 'm | aliased] = <fun>
 |}]
 
 let match_anf_aliased r =
@@ -206,7 +219,9 @@ let match_anf_aliased r =
              y/341)))))
   (apply (field_imm 1 (global Toploop!)) "match_anf_aliased"
     match_anf_aliased/338))
-val match_anf_aliased : record -> record * string = <fun>
+val match_anf_aliased :
+  record @ [< 'm & global] -> record * string @ [< global > 'm | aliased] =
+  <fun>
 |}]
 
 (* This is sound since we bind [y] using [field_mut] *)
@@ -240,7 +255,9 @@ let match_anf_unique r =
              y/353)))))
   (apply (field_imm 1 (global Toploop!)) "match_anf_unique"
     match_anf_unique/350))
-val match_anf_unique : record @ unique -> record * string = <fun>
+val match_anf_unique :
+  record @ [< 'm & global unique] ->
+  record * string @ [< global > 'm | aliased] = <fun>
 |}]
 
 type tree =
@@ -387,7 +404,7 @@ let swap_inner (t : tree) =
            (exit 19))
         with (19) t/370)))
   (apply (field_imm 1 (global Toploop!)) "swap_inner" swap_inner/368))
-val swap_inner : tree -> tree = <fun>
+val swap_inner : tree @ [< global] -> tree @ [< global > aliased] = <fun>
 |}]
 
 (* CR uniqueness: Update this test once overwriting is fully implemented.
@@ -437,7 +454,9 @@ let match_guard r =
              (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*)
                r/461 y/390))))))
   (apply (field_imm 1 (global Toploop!)) "match_guard" match_guard/386))
-val match_guard : record @ unique -> record * string = <fun>
+val match_guard :
+  record @ [< 'm & global unique] ->
+  record * string @ [< global > 'm | aliased] = <fun>
 |}]
 
 let match_guard_unique (unique_ r) =

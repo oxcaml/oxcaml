@@ -1,0 +1,677 @@
+(* TEST
+ flags = "-extension unique -extension mode_polymorphism_alpha";
+ expect;
+*)
+
+(*
+ * This file tests printing of poymorphic mode variables
+*)
+
+
+let id x = x
+[%%expect{|
+val id : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
+|}]
+
+let foo x = 42
+[%%expect{|
+val foo : 'a @ 'm -> int @ [< global] = <fun>
+|}]
+
+(* CR ageorges: Is there a way to explain the following? id is instantiated, but foo is
+  generalized with more bounds that necessary? *)
+let foo x = id x
+[%%expect{|
+val foo : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
+|}]
+
+let foo f x = f x
+[%%expect{|
+val foo :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [< global > 'o] = <fun>
+|}, Principal{|
+val foo :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [< global > 'o] = <fun>
+|}]
+
+let foo =
+  let id x = x in
+  fun x -> id x
+[%%expect{|
+val foo : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
+|}]
+
+(* CR ageorges: make the printer aware of mode crossing/jkinds *)
+let foo a b = a + b
+[%%expect{|
+val foo : int @ 'n -> (int @ 'm -> int @ [< global]) @ [< global] = <fun>
+|}, Principal{|
+val foo :
+  int @ [< 'm @@ past & global] ->
+  (int @ 'n -> int @ [< global]) @ [< global > 'm] = <fun>
+|}]
+
+
+(* records *)
+
+type ('a,'b) mytypemod = { x : 'a; y : 'b @@ portable }
+
+let foo t = t.x
+[%%expect{|
+type ('a, 'b) mytypemod = { x : 'a; y : 'b @@ portable; }
+val foo : ('a, 'b) mytypemod @ [< 'm & global] -> 'a @ [< global > 'm] =
+  <fun>
+|}]
+
+let foo t = t.y
+[%%expect{|
+val foo :
+  ('a, 'b) mytypemod @ [< 'm & global] -> 'b @ [< global > 'm @@ portable] =
+  <fun>
+|}]
+
+let foo x z = x.y
+[%%expect{|
+val foo :
+  ('a, 'b) mytypemod @ [< 'm & global] ->
+  ('c @ 'n -> 'b @ [< global > 'm @@ portable]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+
+let x =
+  let foo x = x in
+  let _ @ contended = foo (ref 42 : _ @ contended ) in
+  let _ @ uncontended = foo  (ref 41 : _ @ uncontended) in
+  foo
+[%%expect{|
+val x : '_weak1 -> '_weak1 @ [< global > aliased nonportable] = <fun>
+|}]
+
+type ('a,'b) mytype = { x : 'a; y : 'b }
+[%%expect{|
+type ('a, 'b) mytype = { x : 'a; y : 'b; }
+|}]
+
+let foo x y = { x; y }
+[%%expect{|
+val foo :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> ('a, 'b) mytype @ [< global > 'n | 'm]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+let foo x = fun y -> { x; y }
+[%%expect{|
+val foo :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> ('a, 'b) mytype @ [< global > 'n | 'm]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+let foo x = { x; y = 42 }
+[%%expect{|
+val foo : 'a @ [< 'm & global] -> ('a, int) mytype @ [< global > 'm] = <fun>
+|}]
+
+let foo r = { r with y = 42 }
+[%%expect{|
+val foo :
+  ('a, 'b) mytype @ [< global many uncontended] ->
+  ('a, int) mytype @ [< global > aliased nonportable] = <fun>
+|}]
+
+type 'a myref = { mutable x : 'a }
+[%%expect{|
+type 'a myref = { mutable x : 'a; }
+|}]
+
+let create a = { x = a }
+[%%expect{|
+val create :
+  'a @ [< global many > 'm] ->
+  'a myref @ [< 'm @@ past & global > nonportable] = <fun>
+|}]
+
+let read r = r.x
+[%%expect{|
+val read :
+  'a myref @ [< 'm & shared] -> 'a @ [< global > 'm @@ global many | aliased] =
+  <fun>
+|}]
+
+let store r = fun a -> r.x <- a
+[%%expect{|
+val store :
+  'a myref @ [< 'n @@ past & global uncontended] ->
+  ('a @ [< global many uncontended > 'm] -> unit @ [< global]) @ [< 'm @@ past & global > 'n | nonportable] =
+  <fun>
+|}]
+
+(* products *)
+
+let dupl x = (x, x)
+[%%expect{|
+val dupl : 'a @ [< 'm & global many] -> 'a * 'a @ [< global > 'm | aliased] =
+  <fun>
+|}]
+
+let prod x y = (x, y)
+[%%expect{|
+val prod :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [< global > 'n | 'm]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+let prod_eta x = fun y -> (x, y)
+[%%expect{|
+val prod_eta :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [< global > 'n | 'm]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+let fst (a, _) = a
+let snd (_, b) = b
+[%%expect{|
+val fst : 'a * 'b @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
+val snd : 'a * 'b @ [< 'm & global] -> 'b @ [< global > 'm] = <fun>
+|}]
+
+let foo x = fun y ->
+  let x' = fst (x,y) in
+  let y' = snd (x,y) in
+  (x', y')
+[%%expect{|
+val foo :
+  'a @ [< 'm & global many] ->
+  ('b @ [< 'n & global many] -> 'a * 'b @ [< global > 'n | 'm | aliased]) @ [< global > close('m) | nonportable] =
+  <fun>
+|}]
+
+(* currying *)
+
+let foo x y = x
+[%%expect{|
+val foo :
+  'a @ [< 'm & global] ->
+  ('b @ 'n -> 'a @ [< global > 'm]) @ [< global > close('m)] = <fun>
+|}]
+
+let foo x y = y
+[%%expect{|
+val foo :
+  'a @ [< 'm @@ past & global] ->
+  ('b @ [< 'n & global] -> 'b @ [< global > 'n]) @ [< global > 'm] = <fun>
+|}]
+
+let foo x y = id x
+[%%expect{|
+val foo :
+  'a @ [< 'm & global] ->
+  ('b @ 'n -> 'a @ [< global > 'm]) @ [< global > close('m)] = <fun>
+|}]
+
+let foo f = fun x -> fun y -> f x y
+[%%expect{|
+val foo :
+  ('a @ [< 'm @@ past > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> 'm | 'n]) @ [< 'mm1 @@ past & 'n @@ past & 'mm0 @@ past & global] ->
+  ('a @ [< 'q & global] ->
+   ('b @ [< 'p] -> 'c @ [< global > 'o]) @ [< global > close('q) | 'mm1]) @ [< global > 'mm0] =
+  <fun>
+|}]
+
+let fst x = fun y -> x
+[%%expect{|
+val fst :
+  'a @ [< 'm & global] ->
+  ('b @ 'n -> 'a @ [< global > 'm]) @ [< global > close('m)] = <fun>
+|}]
+let snd x = fun y -> y
+[%%expect{|
+val snd :
+  'a @ 'n -> ('b @ [< 'm & global] -> 'b @ [< global > 'm]) @ [< global] =
+  <fun>
+|}]
+
+let foo x y = ref x
+[%%expect{|
+val foo :
+  'a @ [< global many uncontended > 'm] ->
+  ('b @ 'n -> 'a ref @ [< global > aliased nonportable]) @ [< 'm @@ past & global > nonportable] =
+  <fun>
+|}]
+
+let foo (x @ aliased) y = ref x
+[%%expect{|
+val foo :
+  'a @ [< global many uncontended > 'm | aliased] ->
+  ('b @ 'n -> 'a ref @ [< global > aliased nonportable]) @ [< 'm @@ past & global > nonportable] =
+  <fun>
+|}]
+
+let foo (x @ contended) y = x
+[%%expect{|
+val foo :
+  'a @ [< 'm & global > contended] ->
+  ('b @ 'n -> 'a @ [< global > 'm | contended]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+let foo x y z = 42
+[%%expect{|
+val foo :
+  'a @ [< 'm @@ past & global] ->
+  ('b @ [< 'n @@ past & global] ->
+   ('c @ 'o -> int @ [< global]) @ [< global > 'n]) @ [< global > 'm] =
+  <fun>
+|}]
+
+let foo x y = (x, y)
+[%%expect{|
+val foo :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [< global > 'n | 'm]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+let foo x y z = (y,z)
+[%%expect{|
+val foo :
+  'a @ [< 'm @@ past & global] ->
+  ('b @ [< 'n & global] ->
+   ('c @ [< 'o & global] -> 'b * 'c @ [< global > 'o | 'n]) @ [< global > close('n)]) @ [< global > 'm] =
+  <fun>
+|}]
+
+(* annotations *)
+
+(* CR ageorges: if a mode variable is fully determined (its bounds are equal) consider
+  printing it as a constant rather than variable *)
+let legacy_id (x @ global many aliased nonportable uncontended forkable unyielding stateful read_write dynamic) = x
+[%%expect{|
+val legacy_id :
+  'a @ [< global many uncontended > aliased nonportable] ->
+  'a @ [< global > aliased nonportable] = <fun>
+|}]
+
+let foo (local_ x) = x
+[%%expect{|
+val foo : 'a @ [< 'm > local] -> 'a @ [> 'm | local] = <fun>
+|}]
+
+let foo x = exclave_ x
+[%%expect{|
+val foo : 'a @ [< 'm] -> 'a @ [> 'm | local] = <fun>
+|}]
+
+let foo (x @ portable) = x
+[%%expect{|
+val foo : 'a @ [< 'm & global portable] -> 'a @ [< global > 'm] = <fun>
+|}]
+
+let foo : (unit -> unit) @ portable = fun () -> ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+
+let foo (unique_ y) (z @ portable) = z
+[%%expect{|
+val foo :
+  'a @ [< 'm @@ past & global unique] ->
+  ('b @ [< 'n & global portable] -> 'b @ [< global > 'n]) @ [< global > 'm] =
+  <fun>
+|}]
+
+let foo (local_ x) (unique_ y) (z @ portable) = exclave_ (x, y, z)
+[%%expect{|
+val foo :
+  'a @ [< 'm > local] ->
+  ('b @ [< 'n & unique] ->
+   ('c @ [< 'o & portable] -> 'a * 'b * 'c @ [> 'o | 'n | 'm | local]) @ [> close('n) | local]) @ [> close('m) | local] =
+  <fun>
+|}]
+
+(* if a type is annotated, mode crossing has an effect on the bounds of mode variable *)
+
+type intref = { mutable v : int }
+
+let foo (x : intref) (f : intref @ local -> int) = f x
+[%%expect{|
+type intref = { mutable v : int; }
+val foo :
+  intref @ [< 'm @@ past & global uncontended] ->
+  ((intref @ local -> int) @ 'n -> int @ [< global]) @ [< global > 'm | nonportable] =
+  <fun>
+|}]
+
+(* CR ageorges: ideally we want to apply mode crossing reguardless of principality *)
+let foo (f : int -> int) x y = f
+[%%expect{|
+val foo :
+  (int -> int) @ [< 'o . aliased contended & 'm @@ past & global] ->
+  ('a @ [< 'n @@ past & global] ->
+   ('b @ 'p -> (int -> int) @ [< global > 'o]) @ [< global > 'n]) @ [< global > 'm] =
+  <fun>
+|}, Principal{|
+val foo :
+  (int -> int) @ [< 'm . aliased contended & global] ->
+  ('a @ [< 'n @@ past & global] ->
+   ('b @ 'o -> (int -> int) @ [< global > 'm]) @ [< global > 'n]) @ [< global > close('m) @@ many portable] =
+  <fun>
+|}]
+
+let foo (f : intref @ local -> int) (x : intref) (y : intref) = f x
+[%%expect{|
+val foo :
+  (intref @ local -> int) @ [< 'm @@ past & global] ->
+  (intref @ [< 'n @@ past & global uncontended] ->
+   (intref @ 'o -> int @ [< global]) @ [< global > 'n @@ many portable | nonportable]) @ [< global > 'm] =
+  <fun>
+|}, Principal{|
+val foo :
+  (intref @ local -> int) @ [< 'm @@ past & global] ->
+  (intref @ [< 'n @@ past & global uncontended] ->
+   (intref @ 'o -> int @ [< global]) @ [< global > 'n | nonportable]) @ [< global > 'm] =
+  <fun>
+|}]
+
+(* aliases of non-polymorphic functions *)
+
+let map = List.map
+[%%expect{|
+val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
+|}]
+
+let map f l = List.map f l
+[%%expect{|
+val map :
+  ('a @ [< 'm @@ past > aliased nonportable] ->
+   'b @ [< global many uncontended]) @ [< 'n @@ past & global many > 'o | 'm] ->
+  ('a list @ [< global many uncontended] ->
+   'b list @ [< 'o @@ past & global > aliased nonportable]) @ [< global > 'n] =
+  <fun>
+|}, Principal{|
+val map :
+  ('a @ [< 'm @@ past > aliased nonportable] ->
+   'b @ [< global many uncontended]) @ [< 'n @@ past & global many > 'o | 'm] ->
+  ('a list @ [< global many uncontended] ->
+   'b list @ [< 'o @@ past & global > aliased nonportable]) @ [< global > 'n] =
+  <fun>
+|}]
+
+let map_eta f = fun l -> List.map f l
+[%%expect{|
+val map_eta :
+  ('a @ [< 'm @@ past > aliased nonportable] ->
+   'b @ [< global many uncontended]) @ [< 'n @@ past & global many > 'o | 'm] ->
+  ('a list @ [< global many uncontended] ->
+   'b list @ [< 'o @@ past & global > aliased nonportable]) @ [< global > 'n] =
+  <fun>
+|}]
+
+(* modules *)
+
+ module Counter : sig
+  type t
+
+  val incr : t -> t
+
+  val to_int : t -> int
+end = struct
+  type t = int
+
+  let incr n = n + 1
+
+  let to_int = fun n -> n
+ end
+ [%%expect{|
+module Counter : sig type t val incr : t -> t val to_int : t -> int end
+|}]
+
+let incr n = Counter.incr n
+[%%expect{|
+val incr :
+  Counter.t @ [< global many uncontended] ->
+  Counter.t @ [< global > aliased nonportable] = <fun>
+|}]
+
+let incr = Counter.incr
+[%%expect{|
+val incr : Counter.t -> Counter.t = <fun>
+|}]
+
+let incr n = n + 1
+[%%expect{|
+val incr : int @ 'm -> int @ [< global] = <fun>
+|}]
+
+let id x = x
+[%%expect{|
+val id : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
+|}]
+
+module Foo : sig
+  type t
+
+  val id_portable : t @ portable -> t @ portable
+
+  val id_nonportable : t -> t
+
+  val bar : t @ portable -> t
+end = struct
+  type t = unit -> unit
+
+  let id_portable = id
+
+  let id_nonportable = id
+
+  let bar = id
+end
+[%%expect{|
+module Foo :
+  sig
+    type t
+    val id_portable : t @ portable -> t @ portable
+    val id_nonportable : t -> t
+    val bar : t @ portable -> t
+  end
+|}]
+
+(* CR ageorges: remove duplicates in [< 'm & 'm] and [> 'm | 'm] *)
+module Foo : sig
+  type t
+
+  val illegal : t -> t @ portable
+end = struct
+  type t = unit -> unit
+
+  let illegal = id
+end
+[%%expect{|
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type t = unit -> unit
+7 |
+8 |   let illegal = id
+9 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type t = unit -> unit
+           val illegal : 'a @ [< 'm & global] -> 'a @ [< global > 'm]
+         end
+       is not included in
+         sig type t val illegal : t -> t @ portable end
+       Values do not match:
+         val illegal : 'a @ [< 'm & global] -> 'a @ [< global > 'm]
+       is not included in
+         val illegal : t -> t @ portable
+       The type
+         "t @ [< 'm & 'm & 'm & 'm & global > nonportable] ->
+         t @ [< global > 'm | 'm | 'm | 'm | nonportable]"
+       is not compatible with the type "t -> t @ portable"
+|}]
+
+(* variant types *)
+
+type 'a option' = None' | Some' of 'a
+
+let wrap x = Some' x
+[%%expect{|
+type 'a option' = None' | Some' of 'a
+val wrap : 'a @ [< 'm & global] -> 'a option' @ [< global > 'm] = <fun>
+|}]
+
+let unwrap_or default = function
+  | None' -> default
+  | Some' x -> x
+[%%expect{|
+val unwrap_or :
+  'a @ [< 'm & global] ->
+  ('a option' @ [< 'n] -> 'a @ [> 'n | 'm]) @ [< global > close('m)] = <fun>
+|}]
+
+type ('a, 'b) either = Left of 'a | Right of 'b
+
+let map_left f = function
+  | Left x -> Left (f x)
+  | Right y -> Right y
+[%%expect{|
+type ('a, 'b) either = Left of 'a | Right of 'b
+val map_left :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  (('a, 'c) either @ [< 'p & 'n & global] -> ('b, 'c) either @ [> 'p | 'm]) @ [< global > 'o] =
+  <fun>
+|}]
+
+(* recursive functions *)
+
+let rec length = function
+  | [] -> 0
+  | _ :: tl -> 1 + length tl
+[%%expect{|
+val length : 'a list @ 'n -> int @ 'm = <fun>
+|}]
+
+let rec map f = function
+  | [] -> []
+  | x :: xs -> f x :: map f xs
+[%%expect{|
+val map :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global many > aliased] ->
+  ('a list @ [< 'n] -> 'b list @ [< global > 'm]) @ [< global > 'o | nonportable] =
+  <fun>
+|}]
+
+(* if/then/else *)
+
+let choose b x y = if b then x else y
+[%%expect{|
+val choose :
+  bool @ [< 'm @@ past & global] ->
+  ('a @ [< 'n & global] ->
+   ('a @ [< 'o & global] -> 'a @ [< global > 'o | 'n]) @ [< global > close('n)]) @ [< global > 'm] =
+  <fun>
+|}]
+
+(* nested closures *)
+
+let nest x = fun () -> fun () -> fun () -> x
+[%%expect{|
+val nest :
+  'a @ [< 'm & global] ->
+  (unit @ 'p ->
+   (unit @ 'o -> (unit @ 'n -> 'a @ [< global > 'm]) @ [< global > close('m)]) @ [< global > close('m)]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+(* sequencing: using x then returning it *)
+
+let use_and_return x = ignore x; x
+[%%expect{|
+val use_and_return :
+  'a @ [< 'm & global many uncontended] -> 'a @ [< global > 'm | aliased] =
+  <fun>
+|}]
+
+(* multiple distinct mode variables *)
+
+let swap (a, b) = (b, a)
+[%%expect{|
+val swap : 'a * 'b @ [< 'm & global] -> 'b * 'a @ [< global > 'm] = <fun>
+|}]
+
+let both_id x y = (x, y)
+[%%expect{|
+val both_id :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [< global > 'n | 'm]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+(* let bindings preserving modes *)
+
+let let_chain x =
+  let a = x in
+  let b = a in
+  let c = b in
+  c
+[%%expect{|
+val let_chain : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
+|}]
+
+(* mode polymorphism with option type *)
+
+let map_option f = function
+  | None -> None
+  | Some x -> Some (f x)
+[%%expect{|
+val map_option :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  ('a option @ [< 'n] -> 'b option @ [> 'm]) @ [< global > 'o] = <fun>
+|}]
+
+(* Currying over three arguments *)
+
+let triple x y z = (x, y, z)
+[%%expect{|
+val triple :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] ->
+   ('c @ [< 'o & global] -> 'a * 'b * 'c @ [< global > 'o | 'n | 'm]) @ [< global > close('n)]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+let flip f (x, y) = f (y, x)
+[%%expect{|
+val flip :
+  ('a * 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  ('b * 'a @ [< 'n & global] -> 'c @ [< global > 'm]) @ [< global > 'o] =
+  <fun>
+|}]
+
+let flip f x y = f y x
+[%%expect{|
+val flip :
+  ('a @ [< 'm @@ past > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> 'm | 'n]) @ [< 'n @@ past & 'mm0 @@ past & global] ->
+  ('b @ [< 'p & global] ->
+   ('a @ [< 'q] -> 'c @ [< global > 'o]) @ [< global > close('p)]) @ [< global > 'mm0] =
+  <fun>
+|}]
+
+
+let flip f = fun x -> fun y -> f y x
+[%%expect{|
+val flip :
+  ('a @ [< 'm @@ past > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> 'm | 'n]) @ [< 'mm1 @@ past & 'n @@ past & 'mm0 @@ past & global] ->
+  ('b @ [< 'p & global] ->
+   ('a @ [< 'q] -> 'c @ [< global > 'o]) @ [< global > close('p) | 'mm1]) @ [< global > 'mm0] =
+  <fun>
+|}]

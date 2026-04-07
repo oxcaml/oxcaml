@@ -25,10 +25,10 @@ let f (type (a : immediate) (b : immediate)) (x : a) = x;;
 let f (type (a : immediate) (b : immediate) c) (x : a) = x;;
 
 [%%expect{|
-val f : ('a : immediate). 'a -> 'a = <fun>
-val f : ('a : immediate). 'a -> 'a = <fun>
-val f : ('a : immediate). 'a -> 'a = <fun>
-val f : ('a : immediate). 'a -> 'a = <fun>
+val f : ('a : immediate). 'a @ 'm -> 'a @ [< global] = <fun>
+val f : ('a : immediate). 'a @ 'm -> 'a @ [< global] = <fun>
+val f : ('a : immediate). 'a @ 'm -> 'a @ [< global] = <fun>
+val f : ('a : immediate). 'a @ 'm -> 'a @ [< global] = <fun>
 |}]
 
 let f y (type a : immediate) (x : a) = x;;
@@ -36,9 +36,21 @@ let f y (type (a : immediate)) (x : a) = x;;
 let f y (type (a : immediate) (b : immediate)) (x : a) = x;;
 
 [%%expect{|
-val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
-val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
-val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
+val f :
+  'b ('a : immediate).
+    'b @ [< 'm @@ past & global] ->
+    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm] =
+  <fun>
+val f :
+  'b ('a : immediate).
+    'b @ [< 'm @@ past & global] ->
+    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm] =
+  <fun>
+val f :
+  'b ('a : immediate).
+    'b @ [< 'm @@ past & global] ->
+    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm] =
+  <fun>
 |}]
 
 let f y (type a : immediate) = y;;
@@ -47,10 +59,10 @@ let f y (type (a : immediate) (b : immediate)) = y;;
 let f y (type (a : immediate) (b : immediate) c) = y;;
 
 [%%expect{|
-val f : 'a -> 'a = <fun>
-val f : 'a -> 'a = <fun>
-val f : 'a -> 'a = <fun>
-val f : 'a -> 'a = <fun>
+val f : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
+val f : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
+val f : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
+val f : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 |}]
 
 (* Just newtypes, no value parameters *)
@@ -184,7 +196,9 @@ let f xs = match xs with
 
 [%%expect{|
 type t = #(int * float#)
-val f : #('a * float#) -> #('a * float#) = <fun>
+val f :
+  #('a * float#) @ [< 'm . aliased contended & 'm & global] ->
+  #('a * float#) @ [< global > 'm | 'm] = <fun>
 |}]
 
 module M = struct
@@ -196,7 +210,7 @@ let x () = #( M.Null, M.This "hi" )
 module M :
   sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
   stateless
-val x : unit -> #('a M.t * string M.t) = <fun>
+val x : unit @ 'm -> #('a M.t * string M.t) @ [< global] = <fun>
 |}]
 
 external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
@@ -230,19 +244,19 @@ let f4 p =
   | T2 (type (a : value) (b : value)) (_ : a * b) -> ()
 [%%expect{|
 type packed1 = T1 : ('a : float64). 'a -> packed1
-val f1 : packed1 -> unit = <fun>
-val f1_no_parens : packed1 -> unit = <fun>
+val f1 : packed1 @ 'm -> unit @ [< global] = <fun>
+val f1_no_parens : packed1 @ 'm -> unit @ [< global] = <fun>
 type packed2 = T2 : 'a * 'b -> packed2
-val f2 : packed2 -> unit = <fun>
-val f3 : packed2 -> unit = <fun>
-val f4 : packed2 -> unit = <fun>
+val f2 : packed2 @ 'm -> unit @ [< global] = <fun>
+val f3 : packed2 @ 'm -> unit @ [< global] = <fun>
+val f4 : packed2 @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (* This needs to be printed with a space after "float#" because of how
    identifiers ending in "#" are parsed. *)
 let f () = fun () : float# -> #0.
 [%%expect{|
-val f : unit -> unit -> float# = <fun>
+val f : unit @ 'n -> (unit @ 'm -> float# @ [< global]) @ [< global] = <fun>
 |}]
 
 (******************)
@@ -437,7 +451,7 @@ let g () = exclave_ local_
   local_ (() : @ unique once);;
 
 [%%expect{|
-val g : unit -> unit @ local once = <fun>
+val g : unit @ 'm -> unit @ [> local once] = <fun>
 |}]
 
 (* type declarations *)
@@ -537,28 +551,32 @@ let f ~(x1 @ many)
 
 [%%expect{|
 val f :
-  x1:'b ->
-  x2:string @ local ->
-  x3:(string -> string) @ local ->
-  x4:('a. 'a -> 'a) @ local ->
-  x9:('a. 'a) @ local ->
-  x5:'c @ local ->
-  x6:bool @ local ->
-  x7:bool @ local ->
-  x8:unit @ local ->
-  string ->
-  'd @ local ->
-  'b * string * (string -> string) * ('e -> 'e) * 'c * string * string *
-  int array * string * (int -> (int -> int) @ local) *
-  (int -> (int -> int) @ local) @ local contended = <fun>
+  x1:'b @ [< 'm & global many] ->
+  (x2:string @ [< 'n @@ past > local] ->
+   (x3:(string -> string) @ [< 'mm6 . aliased contended & 'o @@ past > local] ->
+    (x4:('a. 'a -> 'a) @ [< 'mm5 . aliased contended & 'p @@ past > local] ->
+     (x9:('a. 'a) @ [< 'q @@ past > local] ->
+      (x5:'c @ [< 'mm0 > local] ->
+       (x6:bool @ [< 'mm1 @@ past & many > local] ->
+        (x7:bool @ [< 'mm2 @@ past & many > local] ->
+         (x8:unit @ [< 'mm3 @@ past > local] ->
+          (string @ [< 'mm4 @@ past & global] ->
+           ('d @ [> local] ->
+            'b * string * (string -> string) * ('e -> 'e) * 'c * string *
+            string * int array * string *
+            (int @ [< 'mm7 @@ past] ->
+             (int @ 'mm8 -> int @ [< global]) @ [> 'mm7 | local]) *
+            (int @ [< 'mm9 @@ past] ->
+             (int @ 'mm10 -> int @ [< global]) @ [> 'mm9 | local]) @ [> 'mm0 | 'mm5 | 'mm6 | 'm | local contended]) @ [> 'mm4 | local]) @ [> 'mm3 | local]) @ [> 'mm2 | local]) @ [> 'mm1 | local]) @ [> close('mm0) | local]) @ [> 'q | local]) @ [> 'p | local]) @ [> 'o | local]) @ [> 'n | local]) @ [< global > close('m)] =
+  <fun>
 |}]
 
 let f1 (_ @ local) = ()
 let f2 () = let x @ local = [1; 2; 3] in f1 x [@nontail]
 
 [%%expect{|
-val f1 : 'a @ local -> unit = <fun>
-val f2 : unit -> unit = <fun>
+val f1 : 'a @ [> local] -> unit @ [< global] = <fun>
+val f2 : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 module type S = sig @@ portable contended
@@ -635,7 +653,12 @@ Error: This value is "local"
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
 
 [%%expect{|
-val f2 : float @ local -> (float -> float) @ once -> t2 @ local once = <fun>
+val f2 :
+  float @ [< 'm @@ past > local] ->
+  ((float @ [> aliased nonportable] ->
+    float @ [< global many uncontended > 'n]) @ [< 'o @@ past > once] ->
+   t2 @ [< 'n @@ past > 'o | local once nonportable]) @ [> 'm | local] =
+  <fun>
 |}]
 
 
@@ -800,7 +823,7 @@ let foo () =
   let module (F @ portable) () = struct end in
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (**********)
@@ -825,7 +848,7 @@ let f a =
 
 [%%expect{|
 type t = { a : int; }
-val f : int -> int = <fun>
+val f : int @ 'm -> int @ [< global] = <fun>
 |}]
 
 let apply ~(f @ local) x = f x [@nontail]
@@ -833,9 +856,11 @@ let double1 y = apply ~f:(stack_ fun x -> x + y) y [@nontail]
 let double2 y = apply ~f:(stack_ function x -> x + y) y [@nontail]
 
 [%%expect{|
-val apply : f:('a -> 'b) @ local -> 'a -> 'b = <fun>
-val double1 : int -> int = <fun>
-val double2 : int -> int = <fun>
+val apply :
+  f:('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past > local] ->
+  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [> 'o | local] = <fun>
+val double1 : int @ [< many] -> int @ [< global] = <fun>
+val double2 : int @ [< many] -> int @ [< global] = <fun>
 |}]
 
 let make_tuple x y z = stack_ (x, y), z
@@ -926,7 +951,10 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : ('a : value_or_null mod separable). 'a iarray -> 'a iarray = <fun>
+val f :
+  ('a : value_or_null mod separable).
+    'a iarray @ [< 'm & global many] -> 'a iarray @ [< global > 'm | aliased] =
+  <fun>
 |}]
 
 (******************)
@@ -944,7 +972,7 @@ let (x : ((x:int * y:int) [@test.attr])) = (~x:1, ~y:2)
 [%%expect{|
 val z : int = 4
 val punned : int = 5
-val x_must_be_even : 'a -> 'b = <fun>
+val x_must_be_even : 'a @ 'm -> 'b @ [< global] = <fun>
 exception Odd
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
@@ -994,13 +1022,17 @@ let f = fun (~foo, ~bar:bar) -> foo * 10 + bar
 let f ((~(x:int),y) : (x:int * int)) : int = x + y
 
 [%%expect{|
-val foo : 'a -> (unit -> 'b) -> (unit -> 'b) -> 'b = <fun>
+val foo :
+  'a @ [< 'm @@ past & global] ->
+  ((unit @ 'o -> 'b @ [< 'n & global]) @ [< 'p @@ past & global] ->
+   ((unit @ 'mm0 -> 'b @ [< 'q & global]) @ 'mm1 -> 'b @ [< global > 'q | 'n]) @ [< global > 'p]) @ [< global > 'm] =
+  <fun>
 val x : int @@ stateless = 1
 val y : int = 2
 val x : int @@ stateless = 1
 val y : int = 2
-val f : (foo:int * bar:int) -> int = <fun>
-val f : (x:int * int) -> int = <fun>
+val f : (foo:int * bar:int) @ 'm -> int @ [< global] = <fun>
+val f : (x:int * int) @ 'm -> int @ [< global] = <fun>
 |}]
 
 type xy = (x:int * y:int)
@@ -1064,14 +1096,38 @@ let test_char s f =
   Format.printf "%s: %C\n" s (Char_u.to_char f); Format.print_flush ()
 
 [%%expect{|
-val test_float : string -> Float_u.t -> unit = <fun>
-val test_int8 : string -> int8# -> unit = <fun>
-val test_int16 : string -> int16# -> unit = <fun>
-val test_int32 : string -> Int32_u.t -> unit = <fun>
-val test_int64 : string -> Int64_u.t -> unit = <fun>
-val test_int : string -> int# -> unit = <fun>
-val test_nativeint : string -> Nativeint_u.t -> unit = <fun>
-val test_char : string -> char# -> unit = <fun>
+val test_float :
+  string @ [< global many uncontended > 'm] ->
+  (Float_u.t @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
+  <fun>
+val test_int8 :
+  string @ [< global many uncontended > 'm] ->
+  (int8# @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
+  <fun>
+val test_int16 :
+  string @ [< global many uncontended > 'm] ->
+  (int16# @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
+  <fun>
+val test_int32 :
+  string @ [< global many uncontended > 'm] ->
+  (Int32_u.t @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
+  <fun>
+val test_int64 :
+  string @ [< global many uncontended > 'm] ->
+  (Int64_u.t @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
+  <fun>
+val test_int :
+  string @ [< global many uncontended > 'm] ->
+  (int# @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
+  <fun>
+val test_nativeint :
+  string @ [< global many uncontended > 'm] ->
+  (Nativeint_u.t @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
+  <fun>
+val test_char :
+  string @ [< global many uncontended > 'm] ->
+  (char# @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
+  <fun>
 |}]
 
 (* Expressions *)
@@ -1190,9 +1246,10 @@ let f x =
 ;;
 
 [%%expect{|
-val f : float# -> [> `Five | `Four | `Other ] = <fun>
+val f : float# @ 'm -> [> `Five | `Four | `Other ] @ [< global] = <fun>
 val x : unit = ()
-val f : float# -> float# = <fun>
+val f : float# @ [< 'm & global many] -> float# @ [< global > 'm | aliased] =
+  <fun>
 |}]
 ;;
 test_float "result" (f #7.);;
@@ -1223,10 +1280,11 @@ let f x =
 [%%expect{|
 result: 7.000000
 - : unit = ()
-val f : float# -> float# = <fun>
+val f : float# @ [< 'm & global many] -> float# @ [< global > 'm | aliased] =
+  <fun>
 larger match result: 3.000000
 - : unit = ()
-val f : int64# -> [> `Five | `Four | `Other ] = <fun>
+val f : int64# @ 'm -> [> `Five | `Four | `Other ] @ [< global] = <fun>
 |}]
 
 let x =
@@ -1245,7 +1303,8 @@ test_int64 "result" (f #7L);;
 
 [%%expect{|
 val x : unit = ()
-val f : int64# -> int64# = <fun>
+val f : int64# @ [< 'm & global many] -> int64# @ [< global > 'm | aliased] =
+  <fun>
 result: 7
 - : unit = ()
 |}]
@@ -1273,9 +1332,11 @@ let inc r = #{ r with i = r.#i + 1 }
 [%%expect{|
 type 'a boxed_with_idx = { data : 'a; i : int; }
 type 'a with_idx = 'a boxed_with_idx# = #{ data : 'a; i : int; }
-val idx : 'a with_idx -> int = <fun>
+val idx : 'a with_idx @ 'm -> int @ [< global] = <fun>
 val payload : string = "payload"
-val inc : 'a with_idx -> 'a with_idx = <fun>
+val inc :
+  'a with_idx @ [< global many uncontended] ->
+  'a with_idx @ [< global > aliased nonportable] = <fun>
 |}]
 
 (*****************)
@@ -1286,8 +1347,8 @@ let idx_r () = (.foo)
 let idx_r_r () = (.foo.#foo)
 [%%expect{|
 type 'a r = { foo : 'a; }
-val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
-val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
+val idx_r : unit @ 'm -> ('a r, 'a) idx_imm @ [< global] = <fun>
+val idx_r_r : unit @ 'm -> ('a r# r, 'a) idx_imm @ [< global] = <fun>
 |}]
 
 module Borrow = struct
@@ -1388,7 +1449,7 @@ let f (_ : 'a. 'a -> 'a) = ()
 
 [%%expect{|
 type t = ('a. 'a -> 'a) -> int
-val f : ('a. 'a -> 'a) -> unit = <fun>
+val f : ('a. 'a -> 'a) @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (************************)
@@ -1439,11 +1500,11 @@ type t4 = int8#
 type t5 = int16
 type t6 = int16#
 val x : float32 = 3.1400001s
-val x : unit -> float32# = <fun>
+val x : unit @ 'm -> float32# @ [< global] = <fun>
 val y : int8 = 42s
-val y : unit -> int8# = <fun>
+val y : unit @ 'm -> int8# @ [< global] = <fun>
 val z : int16 = 42S
-val z : unit -> int16# = <fun>
+val z : unit @ 'm -> int16# @ [< global] = <fun>
 |}]
 
 (********)
@@ -1572,7 +1633,10 @@ Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Asser
 let f ~(x : [%call_pos]) () = x;;
 
 [%%expect{|
-val f : x:[%call_pos] -> unit -> lexing_position = <fun>
+val f :
+  x:[%call_pos] ->
+  (unit @ 'n -> lexing_position @ [< global > 'm]) @ [< global > close('m)] =
+  <fun>
 |}]
 
 type t = x:[%call_pos] -> int
@@ -1584,7 +1648,10 @@ type t = x:[%call_pos] -> int
 let f g here = g ~(here : [%call_pos])
 
 [%%expect{|
-val f : (here:[%call_pos] -> 'a) -> lexing_position -> 'a = <fun>
+val f :
+  (here:[%call_pos] -> 'a @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  (lexing_position @ [< 'n] -> 'a @ [< global > 'm]) @ [< global > 'o] =
+  <fun>
 |}]
 
 (***************)
@@ -1655,7 +1722,7 @@ type ('a, _ : any) t
 let f #() = #()
 
 [%%expect{|
-val f : unit# -> unit# = <fun>
+val f : unit# @ 'm -> unit# @ [< global] = <fun>
 |}]
 
 (*************************)
@@ -1664,7 +1731,7 @@ val f : unit# -> unit# = <fun>
 let f = function #false -> #true | #true -> #false
 
 [%%expect{|
-val f : bool# -> bool# = <fun>
+val f : bool# @ 'n -> bool# @ 'm = <fun>
 |}]
 
 (***********************)
@@ -1672,7 +1739,8 @@ val f : bool# -> bool# = <fun>
 
 let f (_ : (repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) = ()
 [%%expect{|
-val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
+val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) @ 'm -> unit @ [< global] =
+  <fun>
 |}]
 
 (*****************)

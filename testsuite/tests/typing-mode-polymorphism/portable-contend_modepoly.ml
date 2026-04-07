@@ -39,7 +39,8 @@ Error: This value is "contended"
 
 let foo (r @ contended) = {r with a = best_bytes ()}
 [%%expect{|
-val foo : r @ contended -> r @ contended = <fun>
+val foo : r @ [< global > contended] -> r @ [< global > aliased contended] =
+  <fun>
 |}]
 
 let foo (r @ contended) = {r with b = best_bytes ()}
@@ -66,29 +67,35 @@ Error: This value is "shared"
 (* reading mutable field from shared record is fine *)
 let foo (r @ shared) = r.a
 [%%expect{|
-val foo : r @ shared -> bytes @ shared = <fun>
+val foo : r @ [< shared > shared] -> bytes @ [< global > aliased shared] =
+  <fun>
 |}]
 
 let foo (r @ shared) = {r with b = best_bytes ()}
 [%%expect{|
-val foo : r @ shared -> r @ shared = <fun>
+val foo : r @ [< shared > shared] -> r @ [< global > aliased shared] = <fun>
 |}]
 
 (* reading immutable field from contended record is fine *)
 let foo (r @ contended) = r.b
 [%%expect{|
-val foo : r @ contended -> bytes @ contended = <fun>
+val foo :
+  r @ [< 'm & global > contended] ->
+  bytes @ [< global > 'm @@ many portable | contended] = <fun>
 |}]
 
 (* reading immutable field from shared record is fine *)
 let foo (r @ shared) = r.b
 [%%expect{|
-val foo : r @ shared -> bytes @ shared = <fun>
+val foo :
+  r @ [< 'm & global shared > shared] ->
+  bytes @ [< global > 'm @@ many portable | shared] = <fun>
 |}]
 
 let foo (r @ shared) = {r with a = best_bytes ()}
 [%%expect{|
-val foo : r @ shared -> r @ shared = <fun>
+val foo : r @ [< global shared > shared] -> r @ [< global > aliased shared] =
+  <fun>
 |}]
 
 (* Force top level to be uncontended and nonportable *)
@@ -112,7 +119,7 @@ let x @ portable = fun a -> a
 
 let y @ portable = x
 [%%expect{|
-val x : 'a -> 'a = <fun>
+val x : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 Line 3, characters 19-20:
 3 | let y @ portable = x
                        ^
@@ -176,7 +183,7 @@ let foo () =
     let _ @ portable = bar in
     ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 
@@ -235,7 +242,9 @@ let foo (r @ shared) =
     | [| x; y |] -> ()
     | _ -> ()
 [%%expect{|
-val foo : ('a : value_or_null mod separable). 'a array @ shared -> unit =
+val foo :
+  ('a : value_or_null mod separable).
+    'a array @ [< shared > shared] -> unit @ [< global] =
   <fun>
 |}]
 
@@ -284,7 +293,7 @@ let foo () =
     let _ @ portable = bar in
     ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 let foo () =
@@ -293,7 +302,7 @@ let foo () =
     let _ @ portable = bar in
     ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (* Closing over nonportable forces nonportable. *)
@@ -363,14 +372,17 @@ let foo (x : int @ nonportable) (y : int @ contended) =
     let _ @ shared = y in
     ()
 [%%expect{|
-val foo : int -> int @ contended -> unit = <fun>
+val foo :
+  int @ [< 'm @@ past & global > nonportable] ->
+  (int @ [> contended] -> unit @ [< global]) @ [< global > 'm | nonportable] =
+  <fun>
 |}]
 
 let foo (x : int @ shared) =
     let _ @ uncontended = x in
     ()
 [%%expect{|
-val foo : int @ shared -> unit = <fun>
+val foo : int @ [< shared > shared] -> unit @ [< global] = <fun>
 |}]
 
 (* TESTING immutable array *)
@@ -379,7 +391,9 @@ module Iarray = Stdlib_stable.Iarray
 let foo (r : int iarray @ contended) = Iarray.get r 42
 [%%expect{|
 module Iarray = Stdlib_stable.Iarray
-val foo : int iarray @ contended -> int = <fun>
+val foo :
+  int iarray @ [< global > contended] ->
+  int @ [< global > aliased nonportable] = <fun>
 |}]
 
 let foo (r @ contended) = Iarray.get r 42
