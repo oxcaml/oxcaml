@@ -860,63 +860,61 @@ type result =
     code_deps : Traverse_acc.code_dep Code_id.Map.t
   }
 
+let create_symbol_and_add_any_source acc name =
+  let cu = Compilation_unit.get_current_exn () in
+  let sym = Symbol.create cu (Linkage_name.of_string name) in
+  Acc.add_any_source acc (Code_id_or_name.symbol sym);
+  sym
+
+let run0 unit acc ~all_constants () =
+  let le_monde_exterieur =
+    create_symbol_and_add_any_source acc "le_monde_extérieur"
+  in
+  let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
+  let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
+  Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
+  Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
+  let return_continuation = Flambda_unit.return_continuation unit in
+  let exn_continuation = Flambda_unit.exn_continuation unit in
+  let conts =
+    Continuation.Map.of_list
+      [ return_continuation, Normal [dummy_toplevel_return];
+        exn_continuation, Normal [dummy_toplevel_exn] ]
+  in
+  Acc.continuation_info acc return_continuation
+    { is_exn_handler = false;
+      params = [dummy_toplevel_return];
+      arity = [KS.any_value]
+    };
+  Acc.continuation_info acc exn_continuation
+    { is_exn_handler = true;
+      params = [dummy_toplevel_exn];
+      arity = [KS.any_value]
+    };
+  Acc.fixed_arity_continuation acc return_continuation;
+  Acc.fixed_arity_continuation acc exn_continuation;
+  let should_preserve_direct_calls =
+    match Flambda_features.reaper_preserve_direct_calls () with
+    | Never | Zero_alloc -> No
+    | Always -> Yes
+    | Auto -> Auto
+  in
+  traverse
+    { parent = Hole;
+      conts;
+      should_preserve_direct_calls;
+      current_code_id = None;
+      le_monde_exterieur = Name.symbol le_monde_exterieur;
+      all_constants = Name.symbol all_constants
+    }
+    acc (Flambda_unit.body unit)
+
 let run (unit : Flambda_unit.t) =
   let acc = Acc.create () in
-  let le_monde_exterieur =
-    Symbol.create
-      (Compilation_unit.get_current_exn ())
-      (Linkage_name.of_string "le_monde_extérieur")
+  let all_constants = create_symbol_and_add_any_source acc "all_constants" in
+  let holed =
+    Profile.record_call ~accumulate:false "down" (run0 unit acc ~all_constants)
   in
-  Acc.add_any_source acc (Code_id_or_name.symbol le_monde_exterieur);
-  let all_constants =
-    Symbol.create
-      (Compilation_unit.get_current_exn ())
-      (Linkage_name.of_string "all_constants")
-  in
-  Acc.add_any_source acc (Code_id_or_name.symbol all_constants);
-  let create_holed () =
-    let dummy_toplevel_return =
-      Variable.create "dummy_toplevel_return" K.value
-    in
-    let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
-    Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
-    Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
-    let return_continuation = Flambda_unit.return_continuation unit in
-    let exn_continuation = Flambda_unit.exn_continuation unit in
-    let conts =
-      Continuation.Map.of_list
-        [ return_continuation, Normal [dummy_toplevel_return];
-          exn_continuation, Normal [dummy_toplevel_exn] ]
-    in
-    Acc.continuation_info acc return_continuation
-      { is_exn_handler = false;
-        params = [dummy_toplevel_return];
-        arity = [KS.any_value]
-      };
-    Acc.continuation_info acc exn_continuation
-      { is_exn_handler = true;
-        params = [dummy_toplevel_exn];
-        arity = [KS.any_value]
-      };
-    Acc.fixed_arity_continuation acc return_continuation;
-    Acc.fixed_arity_continuation acc exn_continuation;
-    let should_preserve_direct_calls =
-      match Flambda_features.reaper_preserve_direct_calls () with
-      | Never | Zero_alloc -> No
-      | Always -> Yes
-      | Auto -> Auto
-    in
-    traverse
-      { parent = Hole;
-        conts;
-        should_preserve_direct_calls;
-        current_code_id = None;
-        le_monde_exterieur = Name.symbol le_monde_exterieur;
-        all_constants = Name.symbol all_constants
-      }
-      acc (Flambda_unit.body unit)
-  in
-  let holed = Profile.record_call ~accumulate:false "down" create_holed in
   let deps = Acc.deps ~all_constants:(Name.symbol all_constants) acc in
   let kinds = Acc.kinds acc in
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
