@@ -2689,68 +2689,16 @@ let fundecl fundecl =
 
 (* Emission of data *)
 
-(* CR sspies: Share the [emit_item] code with the Arm backend in emitaux. *)
-let emit_item : Cmm.data_item -> unit = function
-  | Cdefine_symbol s -> (
-    let sym =
-      S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
-    in
-    match s.sym_global with
-    | Local -> D.define_label (L.create_string_unchecked Data (S.encode sym))
-    | Global ->
-      global_maybe_protected sym;
-      add_def_symbol s.sym_name;
-      (* Following the same convention as for function symbols above, we emit
-         both a label and a linker symbol for [sym]. *)
-      D.define_joint_label_and_symbol ~section:Data sym)
-  | Cint8 n -> D.int8 (Numbers.Int8.of_int_exn n)
-  | Cint16 n -> D.int16 (Numbers.Int16.of_int_exn n)
-  | Cint32 n -> D.int32 (Numbers.Int64.to_int32_exn (Int64.of_nativeint n))
-  (* CR mshinwell: Add [Targetint.of_nativeint] *)
-  | Cint n -> D.targetint (Targetint.of_int64 (Int64.of_nativeint n))
-  | Csingle f -> D.float32 f
-  | Cdouble f -> D.float64 f
-  (* SIMD vectors respect little-endian byte order *)
-  | Cvec128 { word0; word1 } ->
-    (* Least significant *)
-    D.float64_from_bits word0;
-    D.float64_from_bits word1
-  | Cvec256 { word0; word1; word2; word3 } ->
-    (* Least significant *)
-    D.float64_from_bits word0;
-    D.float64_from_bits word1;
-    D.float64_from_bits word2;
-    D.float64_from_bits word3
-  | Cvec512 { word0; word1; word2; word3; word4; word5; word6; word7 } ->
-    (* Least significant *)
-    D.float64_from_bits word0;
-    D.float64_from_bits word1;
-    D.float64_from_bits word2;
-    D.float64_from_bits word3;
-    D.float64_from_bits word4;
-    D.float64_from_bits word5;
-    D.float64_from_bits word6;
-    D.float64_from_bits word7
-  | Csymbol_address s -> (
-    add_used_symbol s.sym_name;
-    match emit_cmm_symbol s with
-    | `Symbol s -> D.symbol s
-    | `Label l -> D.label l)
-  | Csymbol_offset (s, o) -> (
-    add_used_symbol s.sym_name;
-    match emit_cmm_symbol s with
-    | `Symbol s ->
-      D.symbol_plus_offset s ~offset_in_bytes:(Targetint.of_int_exn o)
-    | `Label l ->
-      D.label_plus_offset l ~offset_in_bytes:(Targetint.of_int_exn o))
-  | Cstring s -> D.string s
-  | Cskip n -> D.space ~bytes:n
-  | Calign n -> D.align ~fill:Zero ~bytes:n
+let emit_data_item_actions : Emitaux.emit_data_item_actions =
+  { global_maybe_protected;
+    symbol_defined = add_def_symbol;
+    symbol_used = add_used_symbol
+  }
 
 let data l =
   D.data ();
   D.align ~fill:Zero ~bytes:8;
-  List.iter emit_item l
+  List.iter (Emitaux.emit_data_item emit_data_item_actions) l
 
 (* Beginning / end of an assembly file *)
 
