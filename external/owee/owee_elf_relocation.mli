@@ -28,8 +28,9 @@
 (** ELF relocation section parsing.
 
     This module provides support for reading RELA (relocations with addends)
-    sections from ELF files. Relocation type numbers are architecture-specific;
-    use the [X86_64] submodule for x86-64 relocations. *)
+    sections from ELF files. Relocation type numbers are architecture-specific
+    and overlap numerically between architectures; use the [X86_64] or
+    [Aarch64] submodule for the target architecture. *)
 
 (** {1 Section Indices} *)
 
@@ -76,13 +77,64 @@ val sym_entry_size : int
 module X86_64 : sig
   (** x86-64 relocation types (ELF ABI, psABI Table 4.9).
 
-      Constructors are named after the ELF symbol. *)
+      Constructors are named after the ELF symbol.
+      Incompatible with [Aarch64.Reloc_type.t]. *)
   module Reloc_type : sig
     type t =
       | R_X86_64_64
       | R_X86_64_PC32
       | R_X86_64_PLT32
       | R_X86_64_REX_GOTPCRELX
+
+    val to_int : t -> int
+    (** Map a relocation type to its ELF integer value. *)
+
+    val of_int : int -> t
+    (** Parse an ELF integer value; raises [Failure] for unrecognised types. *)
+
+    val equal : t -> t -> bool
+    val name : t -> string
+  end
+
+  (** A parsed RELA entry. *)
+  type rela_entry =
+    { r_offset : int64;
+      (** Offset within the section being relocated. *)
+      r_sym : int;
+      (** Symbol table index. *)
+      r_type : Reloc_type.t;
+      (** Relocation type. *)
+      r_addend : int64
+      (** Addend for the relocation. *)
+    }
+
+  (** [iter_rela_entries ~rela_body ~f] iterates over all RELA entries in
+      the given section body, calling [f] for each entry. *)
+  val iter_rela_entries :
+    rela_body:Owee_buf.t -> f:(rela_entry -> unit) -> unit
+
+  (** [write_rela_entry ~cursor entry] writes a RELA entry at the current
+      cursor position and advances the cursor by [rela_entry_size] bytes. *)
+  val write_rela_entry : cursor:Owee_buf.cursor -> rela_entry -> unit
+end
+
+(** {1 AArch64 Relocations} *)
+
+module Aarch64 : sig
+  (** AArch64 relocation types (ELF ABI, IHI0056).
+
+      Constructors are named after the ELF symbol.
+      Incompatible with [X86_64.Reloc_type.t]. *)
+  module Reloc_type : sig
+    type t =
+      | R_AARCH64_ABS64
+      | R_AARCH64_ADR_PREL_PG_HI21
+      | R_AARCH64_ADD_ABS_LO12_NC
+      | R_AARCH64_JUMP26
+      | R_AARCH64_CALL26
+      | R_AARCH64_LDST64_ABS_LO12_NC
+      | R_AARCH64_ADR_GOT_PAGE
+      | R_AARCH64_LD64_GOT_LO12_NC
 
     val to_int : t -> int
     (** Map a relocation type to its ELF integer value. *)
