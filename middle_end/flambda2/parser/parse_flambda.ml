@@ -156,4 +156,4 @@ let parse filename =
       Env.set_unit_name (Some unit_info);
       let flambda = Fexpr_to_flambda.conv comp_unit fexpr in
       Env.set_unit_name old_unit_info;
-      flambda)
+      flambda.unit)

@@ -150,11 +150,11 @@ let add_accessor_dep t ~to_ relation ~base =
 let add_constructor_dep t ~base relation ~from =
   Graph.add_constructor_dep t.deps ~base relation ~from
 
-let add_coaccessor_dep t ~to_ relation ~base =
-  Graph.add_coaccessor_dep t.deps ~to_ relation ~base
+let add_argument_dep t ~from relation ~base =
+  Graph.add_argument_dep t.deps ~from relation ~base
 
-let add_coconstructor_dep t ~base relation ~from =
-  Graph.add_coconstructor_dep t.deps ~base relation ~from
+let add_parameter_dep t ~base relation ~to_ =
+  Graph.add_parameter_dep t.deps ~base relation ~to_
 
 let add_propagate_dep t ~if_used ~to_ ~from =
   Graph.add_propagate_dep t.deps ~if_used ~to_ ~from
@@ -163,6 +163,8 @@ let add_alias_if_any_source_dep t ~if_any_source ~to_ ~from =
   Graph.add_alias_if_any_source_dep t.deps ~if_any_source ~to_ ~from
 
 let add_any_source t x = Graph.add_any_source t.deps x
+
+let add_zero_alloc_source t x = Graph.add_zero_alloc_source t.deps x
 
 let add_any_usage t x = Graph.add_any_usage t.deps x
 
@@ -245,7 +247,7 @@ let add_set_of_closures_dep let_bound_name_of_the_closure closure_code_id
                     ╚═══╝               ╚═══╝
 
    For indirect calls, we have a series of call witnesses for each
-   complex parameter, each with coconstructors for each part of the
+   complex parameter, each with parameter relations for each part of the
    complex parameter, the code_id, and returning a value with the next call
    witness.
 *)
@@ -261,15 +263,16 @@ let create_known_arity_call_witness t code_id ~params ~returns ~exn =
   let witness = Code_id_or_name.var witness in
   List.iteri
     (fun i v ->
-      add_coconstructor_dep t ~base:witness (Cofield.param i)
-        ~from:(Code_id_or_name.var v))
+      add_parameter_dep t ~base:witness (Cofield.param i)
+        ~to_:(Code_id_or_name.var v))
     params;
   List.iteri
     (fun i v ->
-      add_constructor_dep t ~base:witness (Field.apply (Normal i))
+      add_constructor_dep t ~base:witness
+        (Field.normal_return_of_call i)
         ~from:(Code_id_or_name.var v))
     returns;
-  add_constructor_dep t ~base:witness (Field.apply Exn)
+  add_constructor_dep t ~base:witness Field.exn_return_of_call
     ~from:(Code_id_or_name.var exn);
   add_constructor_dep t ~base:witness Field.code_id_of_call_witness
     ~from:(Code_id_or_name.code_id code_id);
@@ -282,15 +285,16 @@ let make_known_arity_apply_widget t ~(denv : Env.t) ~params ~returns ~exn =
   in
   List.iteri
     (fun i v ->
-      add_coaccessor_dep t ~base:witness (Cofield.param i)
-        ~to_:(simple_to_node t ~all_constants:denv.all_constants v))
+      add_argument_dep t ~base:witness (Cofield.param i)
+        ~from:(simple_to_node t ~all_constants:denv.all_constants v))
     params;
   List.iteri
     (fun i v ->
-      add_accessor_dep t ~base:witness (Field.apply (Normal i))
+      add_accessor_dep t ~base:witness
+        (Field.normal_return_of_call i)
         ~to_:(Code_id_or_name.var v))
     returns;
-  add_accessor_dep t ~base:witness (Field.apply Exn)
+  add_accessor_dep t ~base:witness Field.exn_return_of_call
     ~to_:(Code_id_or_name.var exn);
   let called =
     Code_id_or_name.var (Variable.create "called" Flambda_kind.rec_info)
@@ -316,17 +320,18 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
     let witness = Code_id_or_name.var witness in
     List.iteri
       (fun i v ->
-        add_constructor_dep t ~base:witness (Field.apply (Normal i))
+        add_constructor_dep t ~base:witness
+          (Field.normal_return_of_call i)
           ~from:(Code_id_or_name.var v))
       returns;
-    add_constructor_dep t ~base:witness (Field.apply Exn)
+    add_constructor_dep t ~base:witness Field.exn_return_of_call
       ~from:(Code_id_or_name.var exn);
     add_constructor_dep t ~base:witness Field.code_id_of_call_witness
       ~from:(Code_id_or_name.code_id code_id);
     let untuple_var =
       Code_id_or_name.var (Variable.create "untuple_var" Flambda_kind.value)
     in
-    add_coconstructor_dep t ~base:witness (Cofield.param 0) ~from:untuple_var;
+    add_parameter_dep t ~base:witness (Cofield.param 0) ~to_:untuple_var;
     (* CR ncourant: this should be changed if we ever allow non-value tuples *)
     List.iteri
       (fun i v ->
@@ -342,30 +347,32 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
       | (first, witness) :: rest -> (
         List.iteri
           (fun i arg ->
-            add_coconstructor_dep t ~from:(Code_id_or_name.var arg)
-              (Cofield.param i) ~base:witness)
+            add_parameter_dep t ~to_:(Code_id_or_name.var arg) (Cofield.param i)
+              ~base:witness)
           first;
         add_constructor_dep t ~base:witness Field.code_id_of_call_witness
           ~from:(Code_id_or_name.code_id code_id);
         match rest with
         | [] ->
-          add_constructor_dep t ~base:witness (Field.apply Exn)
+          add_constructor_dep t ~base:witness Field.exn_return_of_call
             ~from:(Code_id_or_name.var exn);
           List.iteri
             (fun i return_arg ->
               add_constructor_dep t
                 ~from:(Code_id_or_name.var return_arg)
-                (Field.apply (Normal i)) ~base:witness)
+                (Field.normal_return_of_call i)
+                ~base:witness)
             returns
         | (_, next_witness) :: _ ->
           let v =
             Code_id_or_name.var
               (Variable.create "partial_apply" Flambda_kind.value)
           in
-          add_constructor_dep t ~from:v (Field.apply (Normal 0)) ~base:witness;
+          add_constructor_dep t ~from:v
+            (Field.normal_return_of_call 0)
+            ~base:witness;
           add_constructor_dep t ~from:next_witness
-            (Field.code_of_closure Unknown_arity_code_pointer)
-            ~base:v;
+            Field.unknown_arity_call_witness ~base:v;
           add_deps rest)
     in
     let params = Flambda_arity.group_by_parameter arity params in
@@ -394,17 +401,18 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
     | (first, witness) :: rest -> (
       List.iteri
         (fun i v ->
-          add_coaccessor_dep t ~base:witness (Cofield.param i)
-            ~to_:(simple_to_node t ~all_constants:denv.all_constants v))
+          add_argument_dep t ~base:witness (Cofield.param i)
+            ~from:(simple_to_node t ~all_constants:denv.all_constants v))
         first;
-      add_accessor_dep t ~base:witness (Field.apply Exn)
+      add_accessor_dep t ~base:witness Field.exn_return_of_call
         ~to_:(Code_id_or_name.var exn);
       add_accessor_dep t ~base:witness Field.code_id_of_call_witness ~to_:called;
       match rest with
       | [] ->
         List.iteri
           (fun i v ->
-            add_accessor_dep t ~base:witness (Field.apply (Normal i))
+            add_accessor_dep t ~base:witness
+              (Field.normal_return_of_call i)
               ~to_:(Code_id_or_name.var v))
           returns
       | (_, next_witness) :: _ ->
@@ -412,9 +420,8 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
           Code_id_or_name.var
             (Variable.create "partial_apply" Flambda_kind.value)
         in
-        add_accessor_dep t ~base:witness (Field.apply (Normal 0)) ~to_:v;
-        add_accessor_dep t ~base:v
-          (Field.code_of_closure Unknown_arity_code_pointer)
+        add_accessor_dep t ~base:witness (Field.normal_return_of_call 0) ~to_:v;
+        add_accessor_dep t ~base:v Field.unknown_arity_call_witness
           ~to_:next_witness;
         add_deps rest)
   in
@@ -460,11 +467,9 @@ let record_set_of_closure_deps t =
                Flambda_kind.value)
         in
         add_any_source t witness;
-        add_constructor_dep t ~from:witness
-          (Field.code_of_closure Known_arity_code_pointer)
+        add_constructor_dep t ~from:witness Field.known_arity_call_witness
           ~base:(Code_id_or_name.name name);
-        add_constructor_dep t ~from:witness
-          (Field.code_of_closure Unknown_arity_code_pointer)
+        add_constructor_dep t ~from:witness Field.unknown_arity_call_witness
           ~base:(Code_id_or_name.name name);
         add_constructor_dep t ~base:witness Field.code_id_of_call_witness
           ~from:(Code_id_or_name.name name)
@@ -474,11 +479,11 @@ let record_set_of_closure_deps t =
           ~from:(Code_id_or_name.name name)
           ~if_used:(Code_id_or_name.code_id code_id);
         add_constructor_dep t ~from:code_dep.known_arity_call_witness
-          (Field.code_of_closure Known_arity_code_pointer)
+          Field.known_arity_call_witness
           ~base:(Code_id_or_name.name name);
         add_constructor_dep t
           ~from:(List.hd code_dep.unknown_arity_call_witnesses)
-          (Field.code_of_closure Unknown_arity_code_pointer)
+          Field.unknown_arity_call_witness
           ~base:(Code_id_or_name.name name))
     t.set_of_closures_dep
 

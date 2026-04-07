@@ -6,7 +6,11 @@
  ocamlopt.opt;
 
  only-default-codegen;
- flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
 *)
 
@@ -14,8 +18,8 @@ open Intrinsics
 
 
 (* CR ttebbi: What could have been a nice dense loop got
-   interrupted by the loop exit path. In addition, we could
-   consider loop rotation to remove the unconditional jump. *)
+   interrupted by the loop exit path. In addition, we should do
+   loop rotation to remove the unconditional jump. *)
 let loop_code_layout n =
   let[@cold] cold () = () in
   let sum = ref 0 in
@@ -48,6 +52,38 @@ loop_code_layout.cold:
   ret
 |}]
 
+let for_loop_layout n f =
+  for i = 0 to n do
+    f()
+  done
+[%%expect_asm X86_64{|
+for_loop_layout:
+  cmpq  $1, %rax
+  jl    .L120
+  subq  $24, %rsp
+  movq  %rbx, (%rsp)
+  sarq  $1, %rax
+  movq  %rax, 8(%rsp)
+  xorl  %eax, %eax
+.L109:
+  movq  %rax, 16(%rsp)
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  call  *%rdi
+.L124:
+  movq  16(%rsp), %rax
+  incq  %rax
+  movq  (%rsp), %rbx
+  movq  8(%rsp), %rdi
+  cmpq  %rdi, %rax
+  jle   .L109
+  movl  $1, %eax
+  addq  $24, %rsp
+  ret
+.L120:
+  movl  $1, %eax
+  ret
+|}]
 
 (* CR ttebbi: loop peeling could avoid repeating List.hd *)
 let loop_with_non_dominating_load x l =
@@ -98,47 +134,45 @@ f:
 .L107:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
-  movq  camlTOP4__do_work_9_13_code@GOTPCREL(%rip), %rdi
+  movq  camlTOP5__do_work_11_15_code@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rbx)
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
   movq  %rax, 16(%rbx)
   movl  $1, %eax
   addq  $8, %rsp
-  jmp   camlTOP4__do_work_9_13_code@PLT
+  jmp   camlTOP5__do_work_11_15_code@PLT
 
 f.do_work:
   movq  16(%rbx), %rax
   leaq  -1(%rax,%rax), %rax
-  movl  $3, %edi
+  movl  $1, %edi
 .L120:
   movq  16(%rbx), %rsi
   leaq  -1(%rax,%rsi), %rax
-  cmpq  $201, %rdi
-  je    .L127
-  addq  $2, %rdi
-  jmp   .L120
-.L127:
+  incq  %rdi
+  cmpq  $100, %rdi
+  jle   .L120
   ret
 |}]
 
 
-(* CR ttebbi: noop loop could be eliminated *)
+(* CR ttebbi: noop loop could be eliminated
+   https://github.com/oxcaml/oxcaml/issues/4752 *)
 let noop_loop lo hi = for i = lo to hi do () done
 [%%expect_asm X86_64{|
 noop_loop:
   cmpq  %rbx, %rax
-  jg    .L117
-  cmpq  %rbx, %rax
-  je    .L113
+  jg    .L119
+  sarq  $1, %rax
+  sarq  $1, %rbx
 .L110:
-  addq  $2, %rax
+  incq  %rax
   cmpq  %rbx, %rax
-  jne   .L110
-.L113:
+  jle   .L110
   movl  $1, %eax
   ret
-.L117:
+.L119:
   movl  $1, %eax
   ret
 |}]
@@ -159,19 +193,19 @@ let f n =
 f:
   movq  %rax, %rbx
   cmpq  $1, %rbx
-  jl    .L119
+  jl    .L121
+  sarq  $1, %rbx
   movl  $1, %eax
-  movl  $1, %edi
-.L108:
-  leaq  (%rdi,%rdi,2), %rsi
-  leaq  -3(%rax,%rsi), %rax
+  xorl  %edi, %edi
+.L109:
+  movq  %rdi, %rsi
+  imulq $6, %rsi
+  addq  %rsi, %rax
+  incq  %rdi
   cmpq  %rbx, %rdi
-  je    .L115
-  addq  $2, %rdi
-  jmp   .L108
-.L115:
+  jle   .L109
   ret
-.L119:
+.L121:
   movl  $1, %eax
   ret
 |}]
@@ -209,22 +243,23 @@ M.f:
   leaq  (%rdx,%rdi), %rax
   leaq  -1(%rax,%rax), %rax
   cmpq  $1, %rax
-  jl    .L129
+  jl    .L132
+  sarq  $1, %rax
   vxorpd %xmm0, %xmm0, %xmm0
-  movl  $1, %edi
-.L115:
-  leaq  -2(%rdi,%rdi,2), %rsi
+  xorl  %edi, %edi
+.L116:
+  movq  %rdi, %rsi
+  imulq $6, %rsi
+  incq  %rsi
   vmovsd -4(%rbx,%rsi,4), %xmm1
   vmulsd 4(%rbx,%rsi,4), %xmm1, %xmm1
   vmulsd 12(%rbx,%rsi,4), %xmm1, %xmm1
   vaddsd %xmm1, %xmm0, %xmm0
+  incq  %rdi
   cmpq  %rax, %rdi
-  je    .L125
-  addq  $2, %rdi
-  jmp   .L115
-.L125:
+  jle   .L116
   ret
-.L129:
+.L132:
   vxorpd %xmm0, %xmm0, %xmm0
   ret
 |}]

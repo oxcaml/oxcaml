@@ -30,6 +30,8 @@ module Location : sig
 
   val print : Cmm.machtype_component -> Format.formatter -> t -> unit
 
+  val compare : t -> t -> int
+
   val equal : t -> t -> bool
 
   module Set : Set.S with type elt = t
@@ -107,6 +109,25 @@ end = struct
       | Outgoing { index } -> Reg.Outgoing (word_index_to_byte_offset index)
       | Domainstate { index } ->
         Reg.Domainstate (word_index_to_byte_offset index)
+
+    let compare (t1 : t) (t2 : t) : int =
+      match t1, t2 with
+      | ( Local { index = i1; stack_class = c1 },
+          Local { index = i2; stack_class = c2 } ) ->
+        let c = Int.compare i1 i2 in
+        if c <> 0
+        then c
+        else Int.compare (Stack_class.hash c1) (Stack_class.hash c2)
+      | Incoming { index = i1 }, Incoming { index = i2 } -> Int.compare i1 i2
+      | Outgoing { index = i1 }, Outgoing { index = i2 } -> Int.compare i1 i2
+      | Domainstate { index = i1 }, Domainstate { index = i2 } ->
+        Int.compare i1 i2
+      | Local _, (Incoming _ | Outgoing _ | Domainstate _) -> -1
+      | (Incoming _ | Outgoing _ | Domainstate _), Local _ -> 1
+      | Incoming _, (Outgoing _ | Domainstate _) -> -1
+      | (Outgoing _ | Domainstate _), Incoming _ -> 1
+      | Outgoing _, Domainstate _ -> -1
+      | Domainstate _, Outgoing _ -> 1
   end
 
   type t =
@@ -137,8 +158,11 @@ end = struct
     Printreg.loc ~unknown:(fun _ -> assert false) ppf (to_loc_lossy t) typ
 
   let compare (t1 : t) (t2 : t) : int =
-    (* CR-someday azewierzejew: Implement proper comparison. *)
-    Stdlib.compare t1 t2
+    match t1, t2 with
+    | Reg r1, Reg r2 -> Regs.Phys_reg.compare r1 r2
+    | Stack s1, Stack s2 -> Stack.compare s1 s2
+    | Reg _, Stack _ -> -1
+    | Stack _, Reg _ -> 1
 
   let equal (t1 : t) (t2 : t) : bool = compare t1 t2 = 0
 
@@ -185,8 +209,12 @@ end = struct
     | Named _ -> Reg.Unknown
 
   let compare (t1 : t) (t2 : t) =
-    (* CR-someday azewierzejew: Implement proper comparison. *)
-    Stdlib.compare t1 t2
+    match t1, t2 with
+    | Preassigned { location = l1 }, Preassigned { location = l2 } ->
+      Location.compare l1 l2
+    | Named { stamp = s1 }, Named { stamp = s2 } -> Reg.Stamp.compare s1 s2
+    | Preassigned _, Named _ -> -1
+    | Named _, Preassigned _ -> 1
 end
 
 module Register : sig
@@ -500,15 +528,13 @@ end = struct
            allocation): %a."
           InstructionId.format id InstructionId.format old_successor_id
           InstructionId.format successor_id;
-      (* CR-someday azewierzejew: Avoid using polymrphic compare. *)
       (match instr.desc, old_instr.desc with
       | Op (Name_for_debugger _), Op (Name_for_debugger _) ->
         (* IRC uses `Reg.interf` to represent the adjacency lists for the
            interference graph, which can lead to cycles. *)
         ()
       | _ ->
-        (* CR-soon xclerc for xclerc: avoid polymorphic equality. *)
-        if Stdlib.compare instr.desc old_instr.desc <> 0
+        if not (Cfg.equal_basic instr.desc old_instr.desc)
         then
           Regalloc_utils.fatal "The desc of instruction with id %a changed"
             InstructionId.format id);
@@ -579,29 +605,22 @@ end = struct
     | Switch labels1, Switch labels2 ->
       Array.iter2 (fun l1 l2 -> compare_label l1 l2) labels1 labels2
     | Return, Return -> ()
-    | Raise rk1, Raise rk2
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare rk1 rk2 = 0 ->
-      ()
+    | Raise rk1, Raise rk2 when Lambda.equal_raise_kind rk1 rk2 -> ()
     | Tailcall_self { destination = l1 }, Tailcall_self { destination = l2 } ->
       compare_label l1 l2
     | Tailcall_func call1, Tailcall_func call2
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
+      when Cfg.equal_func_call_operation call1 call2 ->
       ()
     | Call_no_return call1, Call_no_return call2
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
+      when Cfg.equal_external_call_operation call1 call2 ->
       ()
     | ( Call { op = call1; label_after = l1 },
         Call { op = call2; label_after = l2 } )
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
+      when Cfg.equal_func_call_operation call1 call2 ->
       compare_label l1 l2
     | ( Prim { op = prim1; label_after = l1 },
         Prim { op = prim2; label_after = l2 } )
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare prim1 prim2 = 0 ->
+      when Cfg.equal_prim_call_operation prim1 prim2 ->
       compare_label l1 l2
     | ( Invalid { message = m1; label_after = None; _ },
         Invalid { message = m2; label_after = None; _ } )

@@ -207,7 +207,7 @@ module type Axis = sig
 
   (** Compare two axes in implication order. If A implies B, then A is before B.
   *)
-  val compare : 'a t -> 'b t -> int
+  val compare : 'a t -> 'b t -> ('a, 'b) Misc.comparison
 
   type packed = P : 'a t -> packed
 
@@ -379,6 +379,7 @@ module type S = sig
       type t =
         | Portable
         | Shareable
+        | Corruptible
         | Nonportable
 
       include Const with type t := t
@@ -407,6 +408,7 @@ module type S = sig
     module Const : sig
       type t =
         | Uncontended
+        | Corrupted
         | Shared
         | Contended
 
@@ -452,7 +454,8 @@ module type S = sig
     module Const : sig
       type t =
         | Stateless
-        | Observing
+        | Writing
+        | Reading
         | Stateful
 
       include Const with type t := t
@@ -462,7 +465,9 @@ module type S = sig
 
     val stateless : lr
 
-    val observing : lr
+    val writing : lr
+
+    val reading : lr
 
     val stateful : lr
   end
@@ -472,6 +477,7 @@ module type S = sig
       type t =
         | Read_write
         | Read
+        | Write
         | Immutable
 
       include Const with type t := t
@@ -482,6 +488,8 @@ module type S = sig
     val immutable : lr
 
     val read : lr
+
+    val write : lr
 
     val read_write : lr
   end
@@ -530,7 +538,7 @@ module type S = sig
 
     val print : Fmt.formatter -> ('p, 'r) t -> unit
 
-    val eq : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
+    val equal : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
   end
 
   module type Mode := sig
@@ -580,8 +588,8 @@ module type S = sig
       (** Represents a mode axis in this product whose constant is ['a], and
           whose allowance is ['d1] given the product's allowance ['d0]. *)
       type 'a t =
-        | Monadic : 'a Monadic.Axis.t -> 'a t
         | Comonadic : 'a Comonadic.Axis.t -> 'a t
+        | Monadic : 'a Monadic.Axis.t -> 'a t
 
       include Axis with type 'a t := 'a t
     end

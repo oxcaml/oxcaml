@@ -113,14 +113,6 @@ let fmt_private_flag f x =
   | Public -> fprintf f "Public"
   | Private -> fprintf f "Private"
 
-let fmt_index_kind f = function
-  | Index_int -> fprintf f "Index_int"
-  | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
-  | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
-  | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
-  | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
-  | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
-
 let line i f s (*...*) =
   fprintf f "%s" (String.make ((2*i) mod 72) ' ');
   fprintf f s (*...*)
@@ -247,6 +239,10 @@ let rec core_type i ppf x =
   | Ptyp_repr (lvars, ct) ->
       line i ppf "Ptyp_repr\n";
       list i reprvar ppf lvars;
+      core_type i ppf ct
+  | Ptyp_newlayout (lvars, ct) ->
+      line i ppf "Ptyp_newlayout\n";
+      list i string_loc ppf lvars;
       core_type i ppf ct
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
@@ -510,10 +506,6 @@ and expression i ppf x =
 and block_access i ppf = function
   | Baccess_field lid ->
       line i ppf "Baccess_field %a\n" fmt_longident_loc lid
-  | Baccess_array (mut, index_kind, index) ->
-      line i ppf "Baccess_array %a %a\n"
-        fmt_mutable_flag mut fmt_index_kind index_kind;
-      expression i ppf index
   | Baccess_block (mut, idx) ->
       line i ppf "Baccess_block %a\n"
         fmt_mutable_flag mut;
@@ -1024,6 +1016,9 @@ and with_constraint i ppf x =
       line i ppf "Pwith_module %a = %a\n"
         fmt_longident_loc lid1
         fmt_longident_loc lid2;
+  | Pwith_jkind (lid, jd) ->
+      line i ppf "Pwith_jkind %a\n" fmt_longident_loc lid;
+      jkind_declaration (i+1) ppf jd;
   | Pwith_modsubst (lid1, lid2) ->
       line i ppf "Pwith_modsubst %a = %a\n"
         fmt_longident_loc lid1
@@ -1036,6 +1031,9 @@ and with_constraint i ppf x =
      line i ppf "Pwith_modtypesubst %a\n"
         fmt_longident_loc lid1;
       module_type (i+1) ppf mty
+  | Pwith_jkindsubst (lid, jd) ->
+      line i ppf "Pwith_jkindsubst %a\n" fmt_longident_loc lid;
+      jkind_declaration (i+1) ppf jd;
 
 and module_expr i ppf x =
   line i ppf "module_expr %a\n" fmt_location x.pmod_loc;

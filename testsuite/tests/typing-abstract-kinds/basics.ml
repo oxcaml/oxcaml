@@ -2,7 +2,8 @@
    expect;
 *)
 
-(* Basic tests for abstract kinds. No with-kind substutitions yet. *)
+(* Basic tests for abstract kinds. [with kind_] substitutions are tested in
+   [with_constraints.ml]. *)
 
 (****************************************************)
 (* Test: Abstract kinds allowed in sigs and structs *)
@@ -404,88 +405,6 @@ Error: Signature mismatch:
        Their definitions are not equal.
 |}]
 
-(***************************)
-(* Test: Recursive modules *)
-
-(* Kind declarations are banned in recursive module signatures, in
-   the first version. We plan to support this soon. Internal ticket 5793. *)
-module rec M : sig
-  kind_ k
-end = struct
-  kind_ k
-end
-[%%expect{|
-Line 2, characters 2-9:
-2 |   kind_ k
-      ^^^^^^^
-Error: Kind declarations are not yet supported in recursive module signatures
-|}]
-
-(* They are fine in the structure though. *)
-module rec M : sig
-  type t : value
-end = struct
-  kind_ k = value
-  type t : k
-end
-[%%expect{|
-module rec M : sig type t end
-|}]
-
-(* You can't hide one in a nested module or functor *)
-module rec M : sig
-  module N : sig
-    kind_ k
-  end
-end = struct
-  module N = struct
-    kind_ k
-  end
-end
-[%%expect{|
-Line 3, characters 4-11:
-3 |     kind_ k
-        ^^^^^^^
-Error: Kind declarations are not yet supported in recursive module signatures
-|}]
-
-module rec M : sig
-  module F (Arg : sig end) : sig
-    kind_ k
-  end
-end = struct
-  module F (Arg : sig end) = struct
-    kind_ k
-  end
-end
-[%%expect{|
-Line 3, characters 4-11:
-3 |     kind_ k
-        ^^^^^^^
-Error: Kind declarations are not yet supported in recursive module signatures
-|}]
-
-(* Kind declarations that come from signatures which are defined before the
-   recursive group are fine, since they can't be use to introduce recursive
-   kinds. *)
-module K : sig
-  kind_ k
-end = struct
-  kind_ k
-end
-
-module rec M : sig
-  module M1 = K
-  module M2 : module type of K
-end = struct
-  module M1 = K
-  module M2 = K
-end
-[%%expect{|
-module K : sig kind_ k end
-module rec M : sig module M1 = K module M2 : sig kind_ k end end
-|}]
-
 module M : sig
   kind_ k = value
 end = struct
@@ -528,6 +447,275 @@ Error: Signature mismatch:
        is not included in
          kind_ k = any
        The the first is abstract, but the second is not.
+|}]
+
+(*********************************)
+(* Test: Recursive module basics *)
+
+(* Kind declarations are supported in recursive module signatures. *)
+module rec M : sig
+  kind_ k
+end = struct
+  kind_ k
+end
+[%%expect{|
+module rec M : sig kind_ k end
+|}]
+
+(* And in recursive structures. *)
+module rec M : sig
+  type t : value
+end = struct
+  kind_ k = value
+  type t : k
+end
+[%%expect{|
+module rec M : sig type t end
+|}]
+
+(* Kind declarations also work in nested modules and functors *)
+module rec M : sig
+  module N : sig
+    kind_ k
+  end
+end = struct
+  module N = struct
+    kind_ k
+  end
+end
+[%%expect{|
+module rec M : sig module N : sig kind_ k end end
+|}]
+
+module rec M : sig
+  module F (Arg : sig end) : sig
+    kind_ k
+  end
+end = struct
+  module F (Arg : sig end) = struct
+    kind_ k
+  end
+end
+[%%expect{|
+module rec M : sig module F : functor (Arg : sig end) -> sig kind_ k end end
+|}]
+
+(* Kind alias is preserved in a recursive module. *)
+module rec M : sig
+  kind_ k = value
+end = struct
+  kind_ k = value
+end
+[%%expect{|
+module rec M : sig kind_ k = value end
+|}]
+
+(* Limitation: kind declaration manifests are erased during recursive module
+   type approximation, so you can't depend on the RHS of a kind alias within a
+   recursive group. *)
+module rec M : sig
+  kind_ k = value
+  type s : k
+end = struct
+  kind_ k = value
+  type s = int
+end
+and N : sig
+  type ('a : value) t
+  type r = M.s t
+end = struct
+  type 'a t = 'a list
+  type r = M.s t
+end
+[%%expect{|
+Line 10, characters 11-14:
+10 |   type r = M.s t
+                ^^^
+Error: This type "M.s" should be an instance of type "('a : value)"
+       The kind of M.s is M.k
+         because of the annotation on the declaration of the type s.
+       But the kind of M.s must be a subkind of value
+         because of the definition of t at line 9, characters 2-21.
+|}]
+
+(*********************************)
+(* Test: Recursive module cycles *)
+
+(* A kind alias that refers to a kind from the same recursive module is
+   rejected because it would form a cycle. *)
+module rec M : sig
+  kind_ k = M.k
+end = struct
+  kind_ k = M.k
+end
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module rec M : sig
+2 |   kind_ k = M.k
+3 | end = struct
+4 |   kind_ k = M.k
+5 | end
+Error: The kind "M.k" is cyclic:
+         "M.k" = "M.k"
+|}]
+
+(* Cross-module kind cycle: M.k -> N.j -> M.k *)
+module rec M : sig
+  kind_ k = N.j
+end = struct
+  kind_ k = N.j
+end
+and N : sig
+  kind_ j = M.k
+end = struct
+  kind_ j = M.k
+end
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module rec M : sig
+2 |   kind_ k = N.j
+3 | end = struct
+4 |   kind_ k = N.j
+5 | end
+Error: The kind "M.k" is cyclic:
+         "M.k" = "N.j",
+         "N.j" = "M.k"
+|}]
+
+(* Kind cycle with mod bounds *)
+module rec M : sig
+  kind_ k = M.k mod global
+end = struct
+  kind_ k = M.k mod global
+end
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module rec M : sig
+2 |   kind_ k = M.k mod global
+3 | end = struct
+4 |   kind_ k = M.k mod global
+5 | end
+Error: The kind "M.k" is cyclic:
+         "M.k" = "M.k mod global",
+         "M.k mod global" contains "M.k"
+|}]
+
+(* A kind alias to a kind defined outside the recursive group is fine. *)
+module K : sig
+  kind_ j
+end = struct
+  kind_ j
+end
+
+module rec M : sig
+  kind_ k = K.j
+end = struct
+  kind_ k = K.j
+end
+[%%expect{|
+module K : sig kind_ j end
+module rec M : sig kind_ k = K.j end
+|}]
+
+(* A kind alias to a non-cyclic kind within the same recursive group
+   is fine. *)
+module rec M : sig
+  kind_ k = value
+end = struct
+  kind_ k = value
+end
+and N : sig
+  kind_ j = M.k
+end = struct
+  kind_ j = M.k
+end
+[%%expect{|
+module rec M : sig kind_ k = value end
+and N : sig kind_ j = M.k end
+|}]
+
+(* A longer kind cycle. *)
+module rec A : sig
+  kind_ ka = D.kd
+end = struct
+  kind_ ka = D.kd
+end
+and B : sig
+  kind_ kb = A.ka mod global
+end = struct
+  kind_ kb = A.ka mod global
+end
+and C : sig
+  kind_ kc = B.kb
+end = struct
+  kind_ kc = B.kb
+end
+and D : sig
+  kind_ kd = C.kc mod contended many
+end = struct
+  kind_ kd = C.kc mod contended many
+end
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module rec A : sig
+2 |   kind_ ka = D.kd
+3 | end = struct
+4 |   kind_ ka = D.kd
+5 | end
+Error: The kind "A.ka" is cyclic:
+         "A.ka" = "D.kd",
+         "D.kd" = "C.kc mod many contended",
+         "C.kc mod many contended" contains "C.kc",
+         "C.kc" = "B.kb",
+         "B.kb" = "A.ka mod global",
+         "A.ka mod global" contains "A.ka"
+|}]
+
+(* Kind cycle through a functor application *)
+module F (X : sig kind_ k end) : sig
+  kind_ fk = X.k
+end = struct
+  kind_ fk = X.k
+end
+
+module rec A : sig
+  kind_ k = F(A).fk mod portable
+end = struct
+  kind_ k = F(A).fk mod portable
+end
+[%%expect{|
+module F : functor (X : sig kind_ k end) -> sig kind_ fk = X.k end
+Lines 7-11, characters 0-3:
+ 7 | module rec A : sig
+ 8 |   kind_ k = F(A).fk mod portable
+ 9 | end = struct
+10 |   kind_ k = F(A).fk mod portable
+11 | end
+Error: The kind "A.k" is cyclic:
+         "A.k" = "F(A).fk mod portable",
+         "F(A).fk mod portable" contains "F(A).fk",
+         "F(A).fk" = "A.k"
+|}]
+
+(* Kind declarations that come from signatures which are defined before the
+   recursive group are fine, since they can't be use to introduce recursive
+   kinds. *)
+module K : sig
+  kind_ k
+end = struct
+  kind_ k
+end
+
+module rec M : sig
+  module M1 = K
+  module M2 : module type of K
+end = struct
+  module M1 = K
+  module M2 = K
+end
+[%%expect{|
+module K : sig kind_ k end
+module rec M : sig module M1 = K module M2 : sig kind_ k end end
 |}]
 
 (***********************)
@@ -677,8 +865,8 @@ type q = t2 t1'
 |}]
 
 
-(***************************)
-(* Test: Nondep error case *)
+(****************************)
+(* Test: Nondep error cases *)
 
 (* We can't always round up jkinds with abstract bases, so we may need to error
    because of a type that can't be erased in the with bounds. *)
@@ -698,6 +886,75 @@ Error: This functor has type
        "functor (X : sig type t end) -> sig kind_ k type t : k with X.t end"
        The parameter cannot be eliminated in the result type.
        Please bind the argument to a module identifier.
+|}]
+
+(* Appears in signature (similar to tests in [generalized-open/gpr1506.ml]) *)
+include struct
+  open struct
+    kind_ k
+    type t : k
+  end
+  type s = t
+end
+[%%expect{|
+Lines 2-5, characters 2-5:
+2 | ..open struct
+3 |     kind_ k
+4 |     type t : k
+5 |   end
+Error: The kind "k" introduced by this open appears in the signature.
+Line 6, characters 2-12:
+6 |   type s = t
+      ^^^^^^^^^^
+  The type "s" has no valid kind if "k" is hidden.
+|}]
+
+include struct
+  open struct
+    kind_ k
+  end
+  kind_ k' = k
+end
+[%%expect{|
+Lines 2-4, characters 2-5:
+2 | ..open struct
+3 |     kind_ k
+4 |   end
+Error: The kind "k" introduced by this open appears in the signature.
+Line 5, characters 2-14:
+5 |   kind_ k' = k
+      ^^^^^^^^^^^^
+  The kind "k'" has no valid definition if "k" is hidden.
+|}]
+
+(* Illegal shadowing (similar to first test in [typing-sigsubst/sigsubst.ml]) *)
+module type S1 = sig
+  kind_ k
+  type t1 : k
+end
+module type S2 = sig
+  kind_ k
+  type t2 : k
+end
+module type Combined = sig
+  include S1
+  include S2
+end
+[%%expect{|
+module type S1 = sig kind_ k type t1 : k end
+module type S2 = sig kind_ k type t2 : k end
+Line 11, characters 2-12:
+11 |   include S2
+       ^^^^^^^^^^
+Error: Illegal shadowing of included kind "k/2" by "k/1".
+Line 10, characters 2-12:
+10 |   include S1
+       ^^^^^^^^^^
+  Kind "k/2" came from this include.
+Line 3, characters 2-13:
+3 |   type t1 : k
+      ^^^^^^^^^^^
+  The type "t1" has no valid kind if "k/2" is shadowed.
 |}]
 
 
@@ -827,7 +1084,7 @@ end
 Line 3, characters 2-9:
 3 |   kind_ k
       ^^^^^^^
-Error: Multiple definition of the jkind name "k".
+Error: Multiple definition of the kind name "k".
        Names must be unique in a given structure or signature.
 |}]
 
@@ -840,7 +1097,7 @@ end
 Line 3, characters 2-9:
 3 |   kind_ k
       ^^^^^^^
-Error: Multiple definition of the jkind name "k".
+Error: Multiple definition of the kind name "k".
        Names must be unique in a given structure or signature.
 |}]
 
@@ -856,7 +1113,7 @@ module M : sig kind_ k end
 Line 4, characters 2-11:
 4 |   include M
       ^^^^^^^^^
-Error: Multiple definition of the jkind name "k".
+Error: Multiple definition of the kind name "k".
        Names must be unique in a given structure or signature.
 |}]
 
@@ -871,7 +1128,7 @@ module type S = sig kind_ k end
 Line 4, characters 2-11:
 4 |   include S
       ^^^^^^^^^
-Error: Multiple definition of the jkind name "k".
+Error: Multiple definition of the kind name "k".
        Names must be unique in a given structure or signature.
 |}]
 
@@ -889,7 +1146,7 @@ module F : functor (X : sig kind_ k end) -> sig kind_ k = X.k end
 Line 6, characters 2-19:
 6 |   include functor F
       ^^^^^^^^^^^^^^^^^
-Error: Multiple definition of the jkind name "k".
+Error: Multiple definition of the kind name "k".
        Names must be unique in a given structure or signature.
 |}]
 
@@ -1224,4 +1481,282 @@ end = struct
 end
 [%%expect{|
 module M : sig kind_ k type ('a : k) t end
+|}]
+
+(*********************************************************)
+(* Test: Hidden recursive-module cycles through abstraction *)
+
+(* This cycle is hidden by an abstract recursive signature. *)
+module rec Hidden_a : sig
+  kind_ ka = Hidden_b.kb
+end = struct
+  kind_ ka = Hidden_b.kb
+end
+and Hidden_b : sig
+  kind_ kb
+end = struct
+  kind_ kb = Hidden_a.ka
+end
+[%%expect{|
+module rec Hidden_a : sig kind_ ka = Hidden_b.kb end
+and Hidden_b : sig kind_ kb end
+|}]
+
+(* This cycle is rejected when both aliases carry the same bound. *)
+module rec Hidden_bounds_a : sig
+  kind_ ka = Hidden_bounds_b.kb mod global
+end = struct
+  kind_ ka = Hidden_bounds_b.kb mod global
+end
+and Hidden_bounds_b : sig
+  kind_ kb = Hidden_bounds_a.ka mod global
+end = struct
+  kind_ kb = Hidden_bounds_a.ka mod global
+end
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module rec Hidden_bounds_a : sig
+2 |   kind_ ka = Hidden_bounds_b.kb mod global
+3 | end = struct
+4 |   kind_ ka = Hidden_bounds_b.kb mod global
+5 | end
+Error: The kind "Hidden_bounds_a.ka" is cyclic:
+         "Hidden_bounds_a.ka" = "Hidden_bounds_b.kb mod global",
+         "Hidden_bounds_b.kb mod global" contains "Hidden_bounds_b.kb",
+         "Hidden_bounds_b.kb" = "Hidden_bounds_a.ka mod global",
+         "Hidden_bounds_a.ka mod global" contains "Hidden_bounds_a.ka"
+|}]
+
+module rec Hidden_nested : sig
+  module A : sig
+    kind_ k
+  end
+  kind_ k = A.k
+end = struct
+  module A = struct
+    kind_ k = Hidden_nested.k
+  end
+  kind_ k = A.k
+end
+[%%expect{|
+module rec Hidden_nested : sig module A : sig kind_ k end kind_ k = A.k end
+|}]
+
+(* This self alias is hidden by an abstract recursive signature. *)
+module rec Hidden_self : sig
+  kind_ k
+end = struct
+  kind_ k = Hidden_self.k
+end
+[%%expect{|
+module rec Hidden_self : sig kind_ k end
+|}]
+
+module rec Hidden_local_mty_a : sig
+  module type T = sig
+    kind_ k
+  end
+  module X : T
+  kind_ ka = X.k
+end = struct
+  module type T = sig
+    kind_ k
+  end
+  module X = struct
+    kind_ k = Hidden_local_mty_b.kb
+  end
+  kind_ ka = X.k
+end
+and Hidden_local_mty_b : sig
+  kind_ kb = Hidden_local_mty_a.ka
+end = struct
+  kind_ kb = Hidden_local_mty_a.ka
+end
+[%%expect{|
+module rec Hidden_local_mty_a :
+  sig module type T = sig kind_ k end module X : T kind_ ka = X.k end
+and Hidden_local_mty_b : sig kind_ kb = Hidden_local_mty_a.ka end
+|}]
+
+(* This cycle is rejected when the local module type exposes the alias. *)
+module rec Visible_local_mty_a : sig
+  module type T = sig
+    kind_ k = Visible_local_mty_b.kb
+  end
+  module X : T
+  kind_ ka = X.k
+end = struct
+  module type T = sig
+    kind_ k = Visible_local_mty_b.kb
+  end
+  module X = struct
+    kind_ k = Visible_local_mty_b.kb
+  end
+  kind_ ka = X.k
+end
+and Visible_local_mty_b : sig
+  kind_ kb = Visible_local_mty_a.ka
+end = struct
+  kind_ kb = Visible_local_mty_a.ka
+end
+[%%expect{|
+Lines 1-15, characters 0-3:
+ 1 | module rec Visible_local_mty_a : sig
+ 2 |   module type T = sig
+ 3 |     kind_ k = Visible_local_mty_b.kb
+ 4 |   end
+ 5 |   module X : T
+...
+12 |     kind_ k = Visible_local_mty_b.kb
+13 |   end
+14 |   kind_ ka = X.k
+15 | end
+Error: The kind "Visible_local_mty_a.X.k" is cyclic:
+         "Visible_local_mty_a.X.k" = "Visible_local_mty_b.kb",
+         "Visible_local_mty_b.kb" = "Visible_local_mty_a.ka",
+         "Visible_local_mty_a.ka" = "Visible_local_mty_a.X.k"
+|}]
+
+(************************************************************)
+(* Test: Asymmetric GADT refinement of abstract-kind equalities *)
+(* Upshot: GADT pattern matching refines the kinds of abstract types,
+   but it does currently *not* refine the kind variables. 
+   Doing so in the future would be safe, but we would have to be 
+   very careful in combination with the above hidden recursive cycles:
+   if GADT matching refined kind variables, we could expose the 
+   hidden cycles, and the typechecker could then go into an infinite
+   loop if it is not carefully rewritten to handle cycles.
+   This is probably doable (after all, it works for rectypes),
+   but not worth the effort right now. *)
+
+(* Set up two abstract kinds with equal concrete definitions. *)
+type ('a : any, 'b : any) branch_eq = Refl : ('x : any). ('x, 'x) branch_eq
+module type Branch_empty = sig end
+
+module Branch_kinds : sig
+  kind_ k1
+  kind_ k2
+  type t1 : k1
+  type t2 : k2
+  val eq12 : (t1, t2) branch_eq
+end = struct
+  kind_ k1 = float64
+  kind_ k2 = float64
+  type t1 = float#
+  type t2 = float#
+  let eq12 = Refl
+end
+[%%expect{|
+type ('a : any, 'b : any) branch_eq = Refl : ('x : any). ('x, 'x) branch_eq
+module type Branch_empty = sig end
+module Branch_kinds :
+  sig
+    kind_ k1
+    kind_ k2
+    type t1 : k1
+    type t2 : k2
+    val eq12 : (t1, t2) branch_eq
+  end
+|}]
+
+type ('a : Branch_kinds.k1) branch_needs_k1
+type ('a : Branch_kinds.k2) branch_needs_k2
+[%%expect{|
+type ('a : Branch_kinds.k1) branch_needs_k1
+type ('a : Branch_kinds.k2) branch_needs_k2
+|}]
+
+(* Without a match, t2 does not satisfy k1. *)
+let _ =
+  (module struct
+    type bad = Branch_kinds.t2 branch_needs_k1
+  end : Branch_empty)
+[%%expect{|
+Line 3, characters 15-30:
+3 |     type bad = Branch_kinds.t2 branch_needs_k1
+                   ^^^^^^^^^^^^^^^
+Error: This type "Branch_kinds.t2" should be an instance of type
+         "('a : Branch_kinds.k1)"
+       The kind of Branch_kinds.t2 is Branch_kinds.k2
+         because of the definition of t2 at line 8, characters 2-14.
+       But the kind of Branch_kinds.t2 must be a subkind of Branch_kinds.k1
+         because of the definition of branch_needs_k1 at line 1, characters 0-43.
+|}]
+
+(* Inside the match, t2 satisfies k1 but t1 still does not satisfy k2. *)
+let _ =
+  match Branch_kinds.eq12 with
+  | Refl ->
+    (module struct
+      type now_ok_1 = Branch_kinds.t2 branch_needs_k1
+      type now_ok_2 = Branch_kinds.t2 branch_needs_k2
+      type still_bad = Branch_kinds.t1 branch_needs_k2
+    end : Branch_empty)
+[%%expect{|
+Line 7, characters 23-38:
+7 |       type still_bad = Branch_kinds.t1 branch_needs_k2
+                           ^^^^^^^^^^^^^^^
+Error: This type "Branch_kinds.t1" should be an instance of type
+         "('a : Branch_kinds.k2)"
+       The kind of Branch_kinds.t1 is Branch_kinds.k1
+         because of the definition of t1 at line 7, characters 2-14.
+       But the kind of Branch_kinds.t1 must be a subkind of Branch_kinds.k2
+         because of the definition of branch_needs_k2 at line 2, characters 0-43.
+|}]
+
+module Branch_kinds_extra : sig
+  kind_ k1
+  kind_ k2
+  type t1 : k1
+  type t1' : k1
+  type t2 : k2
+  type t2' : k2
+  val eq12 : (t1, t2) branch_eq
+end = struct
+  kind_ k1 = float64
+  kind_ k2 = float64
+  type t1 = float#
+  type t1' = float#
+  type t2 = float#
+  type t2' = float#
+  let eq12 = Refl
+end
+[%%expect{|
+module Branch_kinds_extra :
+  sig
+    kind_ k1
+    kind_ k2
+    type t1 : k1
+    type t1' : k1
+    type t2 : k2
+    type t2' : k2
+    val eq12 : (t1, t2) branch_eq
+  end
+|}]
+
+(* Add more types at the same abstract kinds. *)
+type ('a : Branch_kinds_extra.k1) branch_needs_k1_extra
+[%%expect{|
+type ('a : Branch_kinds_extra.k1) branch_needs_k1_extra
+|}]
+
+(* The refinement does *not* apply to a different type at k2. *)
+let _ =
+  match Branch_kinds_extra.eq12 with
+  | Refl ->
+    (module struct
+      type test_t2 = Branch_kinds_extra.t2 branch_needs_k1_extra
+      type test_t2' = Branch_kinds_extra.t2' branch_needs_k1_extra
+    end : Branch_empty)
+[%%expect{|
+Line 6, characters 22-44:
+6 |       type test_t2' = Branch_kinds_extra.t2' branch_needs_k1_extra
+                          ^^^^^^^^^^^^^^^^^^^^^^
+Error: This type "Branch_kinds_extra.t2'" should be an instance of type
+         "('a : Branch_kinds_extra.k1)"
+       The kind of Branch_kinds_extra.t2' is Branch_kinds_extra.k2
+         because of the definition of t2' at line 7, characters 2-15.
+       But the kind of Branch_kinds_extra.t2' must be a subkind of
+           Branch_kinds_extra.k1
+         because of the definition of branch_needs_k1_extra at line 1, characters 0-55.
 |}]

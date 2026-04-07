@@ -16,7 +16,12 @@
 open Misc
 open Asttypes
 
-module SL = Slambda0
+type error =
+  | Slambda_unsupported of string
+
+exception Error of Location.t option * error
+
+let error ?loc err = raise (Error (loc, err))
 
 type constant = Typedtree.constant
 
@@ -114,6 +119,10 @@ let eq_locality_mode a b =
   | Alloc_heap, Alloc_local -> false
   | Alloc_local, Alloc_heap -> false
 
+type staticity =
+  | Static
+  | Dynamic
+
 type initialization_or_assignment =
   | Assignment of modify_mode
   | Heap_initialization
@@ -141,7 +150,7 @@ type primitive =
   | Pbytes_of_string
   | Pignore
     (* Globals *)
-  | Pgetglobal of Compilation_unit.t
+  | Pgetglobal of Compilation_unit.t * staticity
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
@@ -588,6 +597,13 @@ and raise_kind =
   | Raise_reraise
   | Raise_notrace
 
+let equal_raise_kind left right =
+  match left, right with
+  | Raise_regular, Raise_regular
+  | Raise_reraise, Raise_reraise
+  | Raise_notrace, Raise_notrace -> true
+  | (Raise_regular | Raise_reraise | Raise_notrace), _ -> false
+
 let generic_value =
   { raw_kind = Pgenval;
     nullable = Nullable;
@@ -687,7 +703,9 @@ let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
       Array.for_all
         (function
           | Value _ -> true
-          | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
+          (* CR layout poly: This function probably shouldn't exist at all
+             and we should merge mixed_block_shape and block_shape. *)
+          | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
           | _ -> false)
         shape
     in
@@ -951,9 +969,42 @@ type lambda =
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
   | Lexclave of lambda
-  | Lsplice of lambda_splice
+  | Lsplice of scoped_location * slambda
 
-and slambda = lambda SL.t0
+and slambda =
+  | SLlayout of layout
+  | SLglobal of Compilation_unit.t
+  | SLvar of Slambdaident.t
+  | SLmissing
+  | SLrecord of slambda list
+  | SLfield of slambda * int
+  | SLhalves of slambda_halves
+  | SLproj_comptime of slambda
+  | SLproj_runtime of slambda
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
+
+and slambda_halves =
+  { sval_comptime: slambda;
+    sval_runtime: lambda
+  }
+
+and slambda_function =
+  { sfun_params: Slambdaident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Slambdaident.t;
+    slet_value: slambda;
+    slet_body: slambda
+  }
 
 and rec_binding = {
   id : Ident.t;
@@ -1019,7 +1070,79 @@ and lambda_event_kind =
   | Lev_function
   | Lev_pseudo
 
-and lambda_splice = { splice_loc : scoped_location; slambda : slambda }
+let rec try_to_find_location lam =
+  (* This is very much best-effort and may overshoot, but will still likely be
+     better than nothing. *)
+  match lam with
+  | Lprim (_, _, loc)
+  | Lfunction { loc; _ }
+  | Lletrec ({ def = { loc; _ }; _ } :: _, _)
+  | Lapply { ap_loc = loc; _ }
+  | Lfor { for_loc = loc; _ }
+  | Lswitch (_, _, loc, _)
+  | Lstringswitch (_, _, _, loc, _)
+  | Lsend (_, _, _, _, _, _, loc, _)
+  | Levent (_, { lev_loc = loc; _ })
+  | Lsplice (loc, _) ->
+    loc
+  | Llet (_, _, _, _, lam, _)
+  | Lmutlet (_, _, _, lam, _)
+  | Lifthenelse (lam, _, _, _)
+  | Lstaticcatch (lam, _, _, _, _)
+  | Lstaticraise (_, lam :: _)
+  | Lwhile { wh_cond = lam; _ }
+  | Lsequence (lam, _)
+  | Lassign (_, lam)
+  | Lifused (_, lam)
+  | Lregion (lam, _)
+  | Lexclave lam
+  | Ltrywith (lam, _, _, _, _) ->
+    try_to_find_location lam
+  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
+    Debuginfo.Scoped_location.Loc_unknown
+
+let try_to_find_debuginfo lam =
+  Debuginfo.from_location (try_to_find_location lam)
+
+let fatal_error_unevaluated_splice_var ident =
+  Misc.fatal_errorf_doc
+    "Splice variable %a should have been evaluated"
+    Ident.doc_print ident
+
+let fatal_error_invalid_constructor lambda =
+  let loc =
+    Debuginfo.Scoped_location.to_location (try_to_find_location lambda)
+  in
+  let name = match lambda with
+    | Lvar _ -> "Lvar"
+    | Lmutvar _ -> "Lmutvar"
+    | Lconst _ -> "Lconst"
+    | Lapply _ -> "Lapply"
+    | Lfunction _ -> "Lfunction"
+    | Llet _ -> "Llet"
+    | Lmutlet _ -> "Lmutlet"
+    | Lletrec _ -> "Lletrec"
+    | Lprim _ -> "Lprim"
+    | Lswitch _ -> "Lswitch"
+    | Lstringswitch _ -> "Lstringswitch"
+    | Lstaticraise _ -> "Lstaticraise"
+    | Lstaticcatch _ -> "Lstaticcatch"
+    | Ltrywith _ -> "Ltrywith"
+    | Lifthenelse _ -> "Lifthenelse"
+    | Lsequence _ -> "Lsequence"
+    | Lwhile _ -> "Lwhile"
+    | Lfor _ -> "Lfor"
+    | Lassign _ -> "Lassign"
+    | Lsend _ -> "Lsend"
+    | Levent _ -> "Levent"
+    | Lifused _ -> "Lifused"
+    | Lregion _ -> "Lregion"
+    | Lexclave _ -> "Lexclave"
+    | Lsplice _ -> "Lsplice"
+  in
+  Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
+    name Location.print_loc loc
+
 
 type runtime_param =
   | Rp_argument_block of Global_module.t
@@ -1408,11 +1531,10 @@ let make_key e =
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
-    | Levent _
-    (* CR layout poly: Anything calling this should probably be moved to after
-       slambda eval, we could possibly also make slambda keys. *)
-    | Lsplice _ ->
+    | Levent _ ->
         raise Not_simple
+    | Lsplice _ ->
+        fatal_error_invalid_constructor e
 
   and tr_recs env es = List.map (tr_rec env) es
 
@@ -1602,8 +1724,7 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice { slambda = (SL.Quote e); _ } ->
-      free_variables e
+  | Lsplice _ as l -> fatal_error_invalid_constructor l
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -1720,7 +1841,7 @@ let transl_module_representation repr =
 (* Translate an access path *)
 
 let rec transl_address loc = function
-  | Env.Aunit cu -> Lprim(Pgetglobal cu, [], loc)
+  | Env.Aunit cu -> Lprim(Pgetglobal (cu, Dynamic), [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
@@ -1773,7 +1894,7 @@ let block_of_module_representation ~loc = function
              layout poly usecases, however it should be easy to move this assert
              to after slambdaeval (or maybe during?). *)
           | Splice_variable _ ->
-            Misc.fatal_error "Layout poly doesn't support mixed modules yet")
+            error ~loc (Slambda_unsupported "mixed modules"))
         0 shape
     in
     Typedecl.assert_mixed_product_support loc Module
@@ -1944,8 +2065,7 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
-    | Lsplice { splice_loc; slambda = (SL.Quote e) } ->
-        Lsplice { splice_loc; slambda = (SL.Quote (subst s l e)) }
+    | Lsplice _ -> fatal_error_invalid_constructor lam
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -2591,6 +2711,8 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
     layout_unboxed_product (List.map layout_of_const_sort sorts)
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
+  | Genvar _ ->
+    Misc.fatal_error "layout_of_const_sort: unexpected genvar"
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
@@ -2615,6 +2737,8 @@ let extern_repr_involves_unboxed_products extern_repr =
     false
   | Same_as_ocaml_repr (Univar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"
+  | Same_as_ocaml_repr (Genvar _) ->
+    Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected genvar"
 
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
@@ -3057,10 +3181,7 @@ let may_allocate_in_region lam =
         rather, it's in the parent region *)
       ()
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
-    (* CR layout poly: Pessimistically return true, this really should only get
-       called after slambda eval but translcore does some early simplification.
-       We should fix that at some point. *)
-    | Lsplice _ -> raise Exit
+    | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
     | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
@@ -3088,40 +3209,6 @@ let simple_prim_on_values ~name ~arity ~alloc =
         (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.value))
     ~native_repr_res:(Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.value)
     ~is_layout_poly:false
-
-let rec try_to_find_location lam =
-  (* This is very much best-effort and may overshoot, but will still likely be
-     better than nothing. *)
-  match lam with
-  | Lprim (_, _, loc)
-  | Lfunction { loc; _ }
-  | Lletrec ({ def = { loc; _ }; _ } :: _, _)
-  | Lapply { ap_loc = loc; _ }
-  | Lfor { for_loc = loc; _ }
-  | Lswitch (_, _, loc, _)
-  | Lstringswitch (_, _, _, loc, _)
-  | Lsend (_, _, _, _, _, _, loc, _)
-  | Levent (_, { lev_loc = loc; _ })
-  | Lsplice { splice_loc = loc; _ }->
-    loc
-  | Llet (_, _, _, _, lam, _)
-  | Lmutlet (_, _, _, lam, _)
-  | Lifthenelse (lam, _, _, _)
-  | Lstaticcatch (lam, _, _, _, _)
-  | Lstaticraise (_, lam :: _)
-  | Lwhile { wh_cond = lam; _ }
-  | Lsequence (lam, _)
-  | Lassign (_, lam)
-  | Lifused (_, lam)
-  | Lregion (lam, _)
-  | Lexclave lam
-  | Ltrywith (lam, _, _, _, _) ->
-    try_to_find_location lam
-  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
-    Debuginfo.Scoped_location.Loc_unknown
-
-let try_to_find_debuginfo lam =
-  Debuginfo.from_location (try_to_find_location lam)
 
 (* The "count_initializers_*" functions count the number of individual
    components in an initializer for the corresponding array kind _after_
@@ -3231,3 +3318,16 @@ let icmp cmp size x y ~loc = binary (Icmp (size, cmp)) x y ~loc
 let phys_equal x y ~loc = Lprim (Pphys_equal Eq, [x;y], loc)
 
 let static_cast ~src ~dst arg ~loc = unary (Static_cast {src; dst}) arg ~loc
+
+let report_error ppf = function
+  | Slambda_unsupported where ->
+    Format_doc.fprintf ppf
+      "Static computation and layout polymorphism are not yet supported in %s."
+      where
+
+let () =
+  Location.register_error_of_exn (function
+    | Error (Some loc, err) ->
+      Some (Location.error_of_printer ~loc report_error err)
+    | Error (None, err) -> Some (Location.error_of_printer report_error err)
+    | _ -> None)

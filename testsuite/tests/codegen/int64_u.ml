@@ -1,13 +1,16 @@
 (* TEST
  readonly_files = "intrinsics.ml";
- flags = " -extension-universe upstream_compatible";
  setup-ocamlopt.opt-build-env;
  all_modules = "intrinsics.ml";
  compile_only = "true";
  ocamlopt.opt;
 
  only-default-codegen;
- flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
 *)
 
@@ -15,6 +18,7 @@ open Intrinsics
 
 (* Codegen tests for Int64_u operations *)
 
+(* CR ttebbi: This should use the neg instruction. *)
 let neg x = Int64_u.neg x
 [%%expect_asm X86_64{|
 neg:
@@ -317,29 +321,26 @@ lognot:
   ret
 |}]
 
-let shift_left x y = Int64_u.shift_left x y
+let shift_left x y = Int64_u.shift_left x (Int64_u.to_int y)
 [%%expect_asm X86_64{|
 shift_left:
   movq  %rbx, %rcx
-  sarq  $1, %rcx
   salq  %cl, %rax
   ret
 |}]
 
-let shift_right x y = Int64_u.shift_right x y
+let shift_right x y = Int64_u.shift_right x (Int64_u.to_int y)
 [%%expect_asm X86_64{|
 shift_right:
   movq  %rbx, %rcx
-  sarq  $1, %rcx
   sarq  %cl, %rax
   ret
 |}]
 
-let shift_right_logical x y = Int64_u.shift_right_logical x y
+let shift_right_logical x y = Int64_u.shift_right_logical x (Int64_u.to_int y)
 [%%expect_asm X86_64{|
 shift_right_logical:
   movq  %rbx, %rcx
-  sarq  $1, %rcx
   shrq  %cl, %rax
   ret
 |}]
@@ -361,13 +362,13 @@ to_int:
 let unsigned_to_int x = Int64_u.unsigned_to_int x
 [%%expect_asm X86_64{|
 unsigned_to_int:
-  subq  $8, %rsp
   movq  %rax, %rbx
   cmpq  $0, %rbx
   jl    .L112
   movabsq $4611686018427387903, %rax
   cmpq  %rax, %rbx
   jg    .L109
+  subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L115
@@ -380,11 +381,9 @@ unsigned_to_int:
   ret
 .L109:
   movl  $1, %eax
-  addq  $8, %rsp
   ret
 .L112:
   movl  $1, %eax
-  addq  $8, %rsp
   ret
 |}]
 
@@ -513,6 +512,7 @@ float_of_bits:
   ret
 |}]
 
+(* CR ttebbi: Subtraction should be done on byte registers. *)
 let compare x y = Int64_u.compare x y
 [%%expect_asm X86_64{|
 compare:
@@ -520,7 +520,6 @@ compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
@@ -539,7 +538,6 @@ unsigned_compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
@@ -565,7 +563,6 @@ equal_using_compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
@@ -627,5 +624,22 @@ let of_int64 x = Int64_u.of_int64 x
 [%%expect_asm X86_64{|
 of_int64:
   movq  8(%rax), %rax
+  ret
+|}]
+
+let bswap64 x = Int64_u.bswap x
+[%%expect_asm X86_64{|
+bswap64:
+  bswap %rax
+  ret
+|}]
+
+let bytes_get_int64_bswap (buf : bytes) (i : int) =
+  Int64_u.bswap (Bytes.unsafe_get_int64_ne buf i)
+[%%expect_asm X86_64{|
+bytes_get_int64_bswap:
+  sarq  $1, %rbx
+  movq  (%rax,%rbx), %rax
+  bswap %rax
   ret
 |}]

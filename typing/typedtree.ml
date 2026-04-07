@@ -197,6 +197,14 @@ and 'k pattern_desc =
       mode: Mode.Value.l;
       type_expr: Types.type_expr;
     } -> value pattern_desc
+  | Tpat_fun_layout : {
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.Value.l;
+      lpoly: Lpoly.t;
+    } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
   | Tpat_unboxed_bool : bool -> value pattern_desc
@@ -267,8 +275,12 @@ and arg_label = Types.arg_label =
 
 and expression_desc =
     Texp_ident of
-      Path.t * Longident.t loc * Types.value_description * ident_kind *
-        unique_use * Mode.Value.l
+      { path : Path.t;
+        lid : Longident.t loc;
+        desc : Types.value_description;
+        kind : ident_kind;
+        unique_use : unique_use;
+        mode : Mode.Value.l }
   | Texp_constant of constant
   | Texp_let of rec_flag * value_binding list * expression
   | Texp_letmutable of value_binding * expression
@@ -397,7 +409,6 @@ and expression_desc =
   | Texp_hole of unique_use
   | Texp_quotation of expression
   | Texp_antiquotation of expression
-  | Texp_eval of core_type * Jkind.sort
 
 and ident_kind =
   | Id_value
@@ -411,14 +422,6 @@ and meth =
 and block_access =
   | Baccess_field of
       Longident.t loc * Types.label_description * Types.record_representation
-  | Baccess_array of {
-      mut: mutable_flag;
-      index_kind: index_kind;
-      index: expression;
-      base_ty: Types.type_expr;
-      elt_ty: Types.type_expr;
-      elt_sort: Jkind.Sort.t
-    }
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
@@ -822,9 +825,11 @@ and with_constraint =
     Twith_type of type_declaration
   | Twith_module of Path.t * Longident.t loc
   | Twith_modtype of module_type
+  | Twith_jkind of jkind_declaration
   | Twith_typesubst of type_declaration
   | Twith_modsubst of Path.t * Longident.t loc
   | Twith_modtypesubst of module_type
+  | Twith_jkindsubst of jkind_declaration
 
 
 and core_type =
@@ -854,6 +859,7 @@ and core_type_desc =
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
+  | Ttyp_newlayout of string loc list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
 
@@ -1105,6 +1111,7 @@ let function_arity params body =
 let rec classify_pattern_desc : type k . k pattern_desc -> k pattern_category =
   function
   | Tpat_alias _ -> Value
+  | Tpat_fun_layout _ -> Value
   | Tpat_unboxed_unit -> Value
   | Tpat_unboxed_bool _ -> Value
   | Tpat_tuple _ -> Value
@@ -1139,6 +1146,7 @@ let shallow_iter_pattern_desc
   : type k . pattern_action -> k pattern_desc -> unit
   = fun f -> function
   | Tpat_alias { pattern = p; _ } -> f.f p
+  | Tpat_fun_layout _ -> ()
   | Tpat_tuple patl -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_unboxed_tuple patl -> List.iter (fun (_, p, _) -> f.f p) patl
   | Tpat_construct(_, _, _, patl, _) -> List.iter (fun (_, p) -> f.f p) patl
@@ -1186,6 +1194,7 @@ let shallow_map_pattern_desc
   | Tpat_variant (x1, Some p1, x2) ->
       Tpat_variant (x1, Some (f.f p1), x2)
   | Tpat_var _
+  | Tpat_fun_layout _
   | Tpat_constant _
   | Tpat_unboxed_unit
   | Tpat_unboxed_bool _
@@ -1238,6 +1247,8 @@ let rec iter_bound_idents
   match pat.pat_desc with
   | Tpat_var { id; name = s; uid; sort; _ } ->
       f (id, s, pat.pat_type, sort, uid)
+  | Tpat_fun_layout { id; name = s; uid; sort; _ } ->
+      f (id, s, pat.pat_type, sort, uid)
   | Tpat_alias { pattern = p; id; name = s; uid; sort; type_expr = ty; _ } ->
       iter_bound_idents f p;
       f (id, s, ty, sort, uid)
@@ -1274,6 +1285,8 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
       (* [Tpat_var] and [Tpat_alias] are the only cases that directly
          bind an ident *)
       | Tpat_var { id; name = s; uid; sort; mode } ->
+          f id s pat.pat_type uid mode (of_sort sort)
+      | Tpat_fun_layout { id; name = s; uid; sort; mode; _ } ->
           f id s pat.pat_type uid mode (of_sort sort)
       | Tpat_alias { pattern = p; id; name = s; uid; sort; mode;
                      type_expr = ty } ->
@@ -1462,8 +1475,8 @@ let nominal_exp_doc lid t =
   let rec nominal_exp_doc doc exp =
     match exp.exp_desc with
     | _ when exp.exp_attributes <> [] -> None
-    | Texp_ident (_,l,_,_,_,_) ->
-        Some (longident l doc)
+    | Texp_ident { lid; _ } ->
+        Some (longident lid doc)
     | Texp_instvar (_,_,s) ->
         Some (string s.Location.txt doc)
     | Texp_constant _ -> assert false
@@ -1626,7 +1639,6 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_quotation exp ->
       fold_antiquote_exp (fold_antiquote_exp f) acc exp
   | Texp_antiquotation exp -> f acc exp
-  | Texp_eval _ -> acc
 
 and fold_antiquote_exp_opt f acc = function
   | None -> acc

@@ -159,7 +159,12 @@ let merge_cmxa0 ~archives =
       lib_imports_cmi = cmis;
       lib_imports_cmx = cmxs;
       lib_quoted_globals = quoted_globals;
-      lib_generic_fns = Generic_fns.Tbl.entries genfns
+      lib_generic_fns = Generic_fns.Tbl.entries genfns;
+      lib_requires_metaprogramming =
+        List.exists
+          (fun (cmxa : Cmx_format.library_infos) ->
+            cmxa.lib_requires_metaprogramming)
+          cmxa_list
     }
   in
   magic, cmxa

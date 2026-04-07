@@ -59,10 +59,10 @@ let mkTarrow (label, t1, t2, comm) =
 
 type texp_ident_identifier = ident_kind * unique_use
 
-let mkTexp_ident ?id:(ident_kind, uu = Id_value, aliased_many_use)
-    (path, longident, vd) =
-  Texp_ident
-    (path, longident, vd, ident_kind, uu, Mode.Value.(disallow_right legacy))
+let mkTexp_ident ?id:(kind, unique_use = Id_value, aliased_many_use)
+    (path, lid, desc) =
+  let mode = Mode.Value.(disallow_right legacy) in
+  Texp_ident { path; lid; desc; kind; unique_use; mode }
 
 type nonrec apply_arg = apply_arg
 
@@ -286,8 +286,8 @@ let untype_label = function
 
 let view_texp (e : expression_desc) =
   match e with
-  | Texp_ident (path, longident, vd, ident_kind, uu, _mode) ->
-    Texp_ident (path, longident, vd, (ident_kind, uu))
+  | Texp_ident { path; lid; desc; kind; unique_use; _ } ->
+    Texp_ident (path, lid, desc, (kind, unique_use))
   | Texp_apply (exp, args, pos, mode, za) ->
     let args = List.map (fun (label, x) -> untype_label label, x) args in
     Texp_apply (exp, args, (pos, mode, za))
@@ -558,7 +558,8 @@ let mk_value_description ~val_type ~val_kind ~val_attributes =
     val_modalities = Mode.Modality.(Const.id |> of_const);
     val_attributes;
     val_uid = Uid.internal_not_actually_unique;
-    val_zero_alloc = Zero_alloc.default
+    val_zero_alloc = Zero_alloc.default;
+    val_lpoly = Lpoly.determined []
   }
 
 let mkTtyp_any = Ttyp_var (None, None)

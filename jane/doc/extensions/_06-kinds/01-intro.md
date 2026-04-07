@@ -2,7 +2,6 @@
 layout: documentation-page
 collectionName: Kinds
 title: Intro
-slug: intro
 ---
 
 # The kind system
@@ -42,7 +41,7 @@ less precise kind is expected.
 This page describes the kind system at a high level, and contains complete
 details for the non-modal bounds. It does not exhaustively describe the possible
 layouts (which are documented on the [unboxed types
-page](../../unboxed-types/01-intro)) or the modal axes (which are documented on the
+page](../../unboxed-types/intro)) or the modal axes (which are documented on the
 [modes page](../../modes/intro)), but does explain how those components appear in
 kinds, including how the modal bounds are affected by the with-bounds.
 
@@ -84,7 +83,7 @@ floating point numbers that are passed in SIMD registers), `bits64`
 and `bits32` (for types represented by unboxed/untagged integers) and product
 layouts like `float64 & bits32` (an unboxed pair that is passed in two
 registers). More detail on layouts and the unboxed types language feature can be
-found [here](../../unboxed-types/01-intro).
+found [here](../../unboxed-types/intro).
 
 Modal bounds all correspond to modal axes, which are described in more detail in
 the [modes documentation](../../modes/intro). The logic for which types can
@@ -130,7 +129,7 @@ Adding bounds to a kind always makes the kind more specific, or lower. That is,
 for any kind `k`, `k mod <bounds> <= k`.
 
 Along the future modal axes, a _lower_ mode leads to a lower kind. So `stateless
-< observing` leads to `value mod stateless <= value mod observing`, and bounding
+< reading` leads to `value mod stateless <= value mod reading`, and bounding
 by the maximum mode has no effect. However, along the past modal axes, a
 _higher_ mode leads to a lower kind. So `shared < contended` leads to `value mod
 contended <= value mod shared` and it's bounding by the minimum mode that has no

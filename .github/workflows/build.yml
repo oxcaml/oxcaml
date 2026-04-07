@@ -87,7 +87,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml'
+            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml'
 
           - name: runtime4 (aarch64-darwin)
             config: --disable-runtime5 --disable-warn-error
@@ -159,6 +159,13 @@ jobs:
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             check_arch: true
 
+          - name: runtime5 x86-peephole (x86_64-linux)
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,w=-46,x86-peephole-optimize=1'
+            ocamlparam: '_,w=-46,x86-peephole-optimize=1'
+            check_arch: true
+
           - name: runtime4 address-sanitizer (x86_64-linux)
             config: --disable-runtime5 --enable-address-sanitizer
             os: warp-ubuntu-latest-x64-8x
@@ -195,11 +202,30 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             cc: musl-gcc
 
+          # Here and below, we put 'reaper=1,_' instead of '_,reaper=1', as
+          # some tests rely on explicitely controlling whether the reaper is
+          # enabled.
           - name: runtime5 reaper
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,reaper=1'
-            ocamlparam: '_,reaper=1'
+            build_ocamlparam: 'reaper=1,_'
+            ocamlparam: 'reaper=1,_'
+
+          - name: runtime5 reaper with local value slots
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: 'reaper=1,reaper-local-fields=1,_'
+            ocamlparam: 'reaper=1,reaper-local-fields=1,_'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml'
+
+          # Same as for the reaper, some tests rely on being able to enable or disable
+          # lifting and specialization
+          - name: runtime5 match-in-match
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: 'flambda2-expert-cont-lifting-budget=1000,flambda2-expert-cont-spec-budget=100,_'
+            ocamlparam: 'flambda2-expert-cont-lifting-budget=1000,flambda2-expert-cont-spec-budget=100,_'
+            disable_testcases: 'testsuite/tests/flambda2/n_way_join_preserves_null.ml'
 
     env:
       J: "8"
@@ -224,6 +250,10 @@ jobs:
           shasum --check <(echo "44a07e9f18033cff7840dbb112fff2862c0fb8fc  $filename")
           tar -xzf "$filename" -C musl-kernel --strip-components=1
           echo "C_INCLUDE_PATH=$PWD/musl-kernel/x86/include" >> "$GITHUB_ENV"
+
+      - name: Install gdb (Linux)
+        if: runner.os == 'Linux' && contains(matrix.config, '--enable-runtime5') && matrix.cc != 'musl-gcc'
+        run: sudo apt-get update && sudo apt-get install gdb
 
       - name: Install autoconf and bash and parallel (macOS)
         if: runner.os == 'macOS'
@@ -521,7 +551,7 @@ jobs:
 
           git add raw-data/
           git commit -m "Add metrics for commit ${COMMIT_HASH}"
-          git push
+          git push || (git pull --rebase && git push)
 
       - name: Upload core dumps
         uses: actions/upload-artifact@v4

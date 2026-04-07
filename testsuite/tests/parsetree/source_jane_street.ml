@@ -108,21 +108,6 @@ type t = ..
 type t += K : ('a : float64). 'a ignore -> t
 |}]
 
-(* CR layouts v2.8: re-enable this. Internal ticket 5118. *)
-(*
-module M : sig
-  kind_abbrev_ k = immediate
-end = struct
-  kind_abbrev_ k = immediate
-end
-
-[%%expect{|
->> Fatal error: kind_abbrev not supported!
-Uncaught exception: Misc.Fatal_error
-
-|}]
-*)
-
 type t1 : any
 type t2 : any mod separable
 type t3 : value_or_null
@@ -429,21 +414,14 @@ Error: This expression has type "int" but an expression was expected of type
 
 (* expressions *)
 let g () = exclave_ local_
-  let f = (() : _ @ unique once) in
-  let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-  local_ (() : _ @ unique once);;
+  let _f = (() : _ @ unique once) in
+  let _f = (() : @ unique once) in
+  let _f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
+  let _f x y @ local unique = exclave_ local_ (x + y : @ once unique) in
+  local_ (() : _ @ unique once);
+  local_ (() : @ unique once);;
 
 [%%expect{|
-Line 2, characters 6-7:
-2 |   let f = (() : _ @ unique once) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
-Line 3, characters 6-7:
-3 |   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
 val g : unit -> unit @ local once = <fun>
 |}]
 
@@ -1291,59 +1269,10 @@ val inc : 'a with_idx -> 'a with_idx = <fun>
 type 'a r = { foo : 'a }
 let idx_r () = (.foo)
 let idx_r_r () = (.foo.#foo)
-let idx_array x = (.(x))
-let idx_array_L x = (.L(x))
-let idx_array_l x = (.l(x))
-let idx_array_S x = (.S(x))
-let idx_array_s x = (.s(x))
-let idx_array_n x = (.n(x))
-let idx_iarray x = (.:(x))
-let idx_iarray_L x = (.:L(x))
-let idx_iarray_l x = (.:l(x))
-let idx_iarray_S x = (.:S(x))
-let idx_iarray_s x = (.:s(x))
-let idx_iarray_n x = (.:n(x))
-let idx_imm x = (.idx_imm(x))
-let idx_mut x = (.idx_mut(x))
 [%%expect{|
 type 'a r = { foo : 'a; }
 val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
 val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
-val idx_array :
-  ('a : value_or_null mod non_float). int -> ('a array, 'a) idx_mut = <fun>
-val idx_array_L :
-  ('a : value_or_null mod non_float). int64# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_l :
-  ('a : value_or_null mod non_float). int32# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_S :
-  ('a : value_or_null mod non_float). int16# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_s :
-  ('a : value_or_null mod non_float). int8# -> ('a array, 'a) idx_mut = <fun>
-val idx_array_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_iarray :
-  ('a : value_or_null mod non_float). int -> ('a iarray, 'a) idx_imm = <fun>
-val idx_iarray_L :
-  ('a : value_or_null mod non_float). int64# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_l :
-  ('a : value_or_null mod non_float). int32# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_S :
-  ('a : value_or_null mod non_float). int16# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_s :
-  ('a : value_or_null mod non_float). int8# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
-val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
 |}]
 
 module Borrow = struct
@@ -1368,8 +1297,8 @@ Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 
-(***************)
-(* Modal kinds *)
+(*************************************)
+(* Modal kinds and kind declarations *)
 
 (* supported *)
 type 'a list : immutable_data with 'a
@@ -1415,6 +1344,15 @@ module M :
     kind_ data = value mod many
     kind_ abstract
   end @@ stateless
+|}]
+
+module type S = sig kind_ k end
+module type S1 = S with kind_ k = value mod portable
+module type S2 = S with kind_ k := value mod global
+[%%expect{|
+module type S = sig kind_ k end
+module type S1 = sig kind_ k = value mod portable end
+module type S2 = sig end
 |}]
 
 (* not yet supported *)
@@ -1618,7 +1556,7 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1137, characters 2-8: Assertion failed
 
 |}]
 
@@ -1736,18 +1674,31 @@ val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
 
 let poly_ id : 'a. 'a -> 'a = fun x -> x
 [%%expect{|
-Line 1, characters 0-40:
+Line 1, characters 10-12:
 1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+              ^^
+Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+>> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+let poly_ id = fun x -> x
+[%%expect{|
+>> Fatal error: layout: unexpected genvar
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 [%%expect{|
-Line 1, characters 0-54:
+Line 1, characters 10-15:
 1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+              ^^^^^
+Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+>> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 module type S_poly = sig
@@ -1764,20 +1715,28 @@ Error: The "val poly_" annotation is not yet implemented.
 let poly_ f : 'a. 'a -> 'a = fun x -> x
 and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 [%%expect{|
-Line 1, characters 0-39:
+Line 2, characters 10-11:
+2 | and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+              ^
+Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+
+Line 1, characters 10-11:
 1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+              ^
+Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+>> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* Mixed poly and non-poly in mutually recursive bindings *)
 let poly_ f : 'a. 'a -> 'a = fun x -> x
 and g = fun x -> x
 [%%expect{|
-Line 1, characters 0-39:
-1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+Line 2, characters 0-18:
+2 | and g = fun x -> x
+    ^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 |}]
 
 let h = fun x -> x
@@ -1786,7 +1745,7 @@ and poly_ k : 'a. 'a -> 'a = fun x -> x
 Line 2, characters 0-39:
 2 | and poly_ k : 'a. 'a -> 'a = fun x -> x
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 |}]
 
 let m = fun x -> x
@@ -1796,5 +1755,12 @@ and p = fun x -> x
 Line 2, characters 0-39:
 2 | and poly_ n : 'a. 'a -> 'a = fun x -> x
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
+|}]
+
+module type S = sig
+  val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
+end
+[%%expect{|
+module type S = sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
 |}]

@@ -1,5 +1,4 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  include systhreads;
  hassysthreads;
  runtime5;

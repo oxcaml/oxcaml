@@ -176,6 +176,11 @@ val fold_blocks : t -> f:(Label.t -> basic_block -> 'a -> 'a) -> init:'a -> 'a
 val fold_body_instructions :
   t -> f:('a -> basic instruction -> 'a) -> init:'a -> 'a
 
+(* CR-soon xclerc for xclerc: [register_predecessors_for_all_blocks] only adds
+   blocks to the predecessor sets, and does not clear the sets beforehand. This
+   looks like a mistake; at the very least a named boolean parameter should be
+   added so that the caller has to explicitly decide whether or not to clear the
+   sets before registration . *)
 val register_predecessors_for_all_blocks : t -> unit
 
 (** Printing *)
@@ -261,5 +266,18 @@ val make_empty_block : ?label:Label.t -> terminator instruction -> basic_block
 (** "Contains calls" in the traditional sense as used in upstream [Selectgen].
 *)
 val basic_block_contains_calls : basic_block -> bool
+
+val equal_func_call_operation :
+  func_call_operation -> func_call_operation -> bool
+
+val equal_external_call_operation :
+  external_call_operation -> external_call_operation -> bool
+
+val equal_prim_call_operation :
+  prim_call_operation -> prim_call_operation -> bool
+
+val equal_basic : basic -> basic -> bool
+
+val equal_terminator : terminator -> terminator -> bool
 
 val invalid_stack_offset : int

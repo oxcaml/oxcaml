@@ -15,12 +15,11 @@ let parse_flambda filename =
     let comp_unit = Unit_info.modname unit_info in
     Env.set_unit_name (Some unit_info);
     let fl2 = Fexpr_to_flambda.conv comp_unit unit in
-    check_invariants fl2;
-    (* CR gbury/lmaurer/bclement: add a proper traversal to compute the actual
-       code_slot_offsets here (as well as free_names) *)
+    check_invariants fl2.unit;
     Flambda2.flambda_to_flambda ~ppf_dump:Format.std_formatter
       ~prefixname:(Filename.chop_extension filename)
-      ~machine_width:Sixty_four fl2
+      ~machine_width:Sixty_four ~code_slot_offsets:fl2.code_slot_offsets
+      fl2.unit
   | Error e ->
     Test_utils.dump_error e;
     exit 1
@@ -28,6 +27,9 @@ let parse_flambda filename =
 module Options = Oxcaml_args.Make_optcomp_options (Oxcaml_args.Default.Optmain)
 
 let _ =
+  (* Setting [Clflags.native_code := true] is how we tell the option parsing
+     machinery that we are going to use flambda2. *)
+  Clflags.native_code := true;
   let file_action = ref (fun () -> Misc.fatal_error "Missing a flambda file") in
   let defer_file file =
     let ext = Filename.extension file in
@@ -41,4 +43,5 @@ let _ =
   Clflags.add_arguments __LOC__ (Arch.command_line_options @ Options.list);
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Compenv.parse_arguments (ref Sys.argv) defer_file "fexprc";
+  Compmisc.read_clflags_from_env ();
   !file_action ()

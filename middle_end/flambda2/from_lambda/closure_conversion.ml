@@ -368,12 +368,13 @@ module Inlining = struct
       assert false
     | Some (Closure_approximation { code; _ }) ->
       let metadata = Code_or_metadata.code_metadata code in
-      let fun_params_length =
-        Code_metadata.params_arity metadata |> Flambda_arity.num_params
-      in
+      (* CR-someday mshinwell/bclement: we should handle tupled functions
+         correctly here rather than bailing out. (Tupled functions have detupled
+         params in the code metadata but the apply has a single tuple
+         argument) *)
       if
         (not (Code_or_metadata.code_present code))
-        || fun_params_length > List.length (Apply_expr.args apply)
+        || Code_metadata.is_tupled metadata
       then (
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
@@ -381,6 +382,21 @@ module Inlining = struct
           ~are_rebuilding_terms Definition_says_not_to_inline;
         Not_inlinable)
       else
+        (* These calculations are all in terms of non-unarized parameters. *)
+        let params_length_from_code_metadata =
+          Code_metadata.params_arity metadata |> Flambda_arity.num_params
+        in
+        let params_length_from_args =
+          Flambda_arity.num_params (Apply_expr.args_arity apply)
+        in
+        if params_length_from_code_metadata <> params_length_from_args
+        then
+          Misc.fatal_errorf
+            "Closure_conversion: inlinable function has %d (complex) params \
+             but application has %d (complex) args, despite earlier \
+             determination this was an exact application:@ %a"
+            params_length_from_code_metadata params_length_from_args
+            Apply_expr.print apply;
         let code = Code_or_metadata.get_code code in
         let inlined_call = Apply_expr.inlined apply in
         let decision, res =
@@ -611,6 +627,7 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
           return_transformer = None
         } ])
   | Univar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Univar"
+  | Genvar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Genvar"
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
 
 let unarize_extern_repr ~machine_width alloc_mode
@@ -627,6 +644,8 @@ let unarize_extern_repr ~machine_width alloc_mode
     [{ kind; arg_transformer = None; return_transformer = None }]
   | Same_as_ocaml_repr (Univar _) ->
     Misc.fatal_error "unarize_extern_repr: unexpected univar"
+  | Same_as_ocaml_repr (Genvar _) ->
+    Misc.fatal_error "unarize_extern_repr: unexpected genvar"
   | Same_as_ocaml_repr (Product sorts) ->
     List.concat_map unarize_const_sort_for_extern_repr sorts
   | Unboxed_float Boxed_float64 ->
@@ -1165,7 +1184,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     in
     close_c_call acc env ~loc ~let_bound_ids_with_kinds prim ~args
       exn_continuation dbg ~current_region ~current_ghost_region k
-  | Pgetglobal cu, [] ->
+  | Pgetglobal (cu, _), [] ->
     if Compilation_unit.equal cu (Env.current_unit env)
     then
       Misc.fatal_errorf_doc "Pgetglobal %a in the same unit"

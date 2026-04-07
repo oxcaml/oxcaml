@@ -46,8 +46,20 @@ let _ =
  include systhreads;
  hassysthreads;
  {
-   bytecode;
+   runtime4;
+   reference = "${test_source_directory}/uncaught_exception_handler.r4.reference";
+   {
+     bytecode;
+   }{
+     native;
+   }
  }{
-   native;
+   runtime5;
+   reference = "${test_source_directory}/uncaught_exception_handler.r5.reference";
+   {
+     bytecode;
+   }{
+     native;
+   }
  }
 *)

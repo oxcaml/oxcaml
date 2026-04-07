@@ -1,6 +1,5 @@
 (* TEST
  include unix;
- flags = "-alert -unsafe_multidomain";
  modules = "callbackprim.c";
  libunix;
  {

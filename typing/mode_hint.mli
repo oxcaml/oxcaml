@@ -33,6 +33,7 @@ type pinpoint_desc =
   | Functor  (** A functor definition *)
   | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
+  | Quote  (** A quoted expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
   | Class  (** A class declaration *)
@@ -60,6 +61,7 @@ type legacy =
   | Compilation_unit
   | Toplevel
   | Class
+  | Quoted
 
 (* CR-soon zqian: add loop and function body to [region_desc] *)
 type region_desc = Borrow
@@ -82,6 +84,7 @@ type 'd const =
   | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
   | Lazy_allocated_on_heap : (disallowed * 'r) pos const
   | Legacy : legacy -> ('l * 'r) const
+  | Toplevel_expression : (disallowed * 'r) pos const
   | Tailcall_function : (disallowed * 'r) pos const
   | Tailcall_argument : (disallowed * 'r) pos const
   | Mutable_read : mutable_part -> (disallowed * 'r) neg const
@@ -97,6 +100,8 @@ type 'd const =
           INVARIANT: The [pinpoint] cannot be [Unknown]. *)
   | Borrowed : Location.t * ('l * 'r, 'd) polarity -> 'd const
   | Escape_region : region -> (disallowed * 'r) const
+  | Quoted_computation : ('l * disallowed) pos const
+  | Spliced : ('l * 'r, 'd) polarity -> 'd const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 

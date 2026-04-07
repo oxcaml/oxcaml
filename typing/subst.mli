@@ -135,6 +135,9 @@ module Unsafe: sig
     Path.t -> params:type_expr list -> body:type_expr -> t -> t
   val add_module_path: Path.t -> Path.t -> t -> t
 
+  val add_jkind_path: Path.t -> Path.t -> t -> t
+  val add_jkind : Path.t -> jkind_const_desc_lr -> t -> t
+
   type error =
     | Fcm_type_substituted_away of Path.t * Types.module_type
 

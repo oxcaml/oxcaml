@@ -4,8 +4,6 @@
  native;
 *)
 
-[@@@alert "-do_not_spawn_domains"]
-
 external caml_callback : ('a -> 'b) -> 'a -> 'b = "caml_callback"
 
 let callback_minor () = caml_callback Gc.minor ()

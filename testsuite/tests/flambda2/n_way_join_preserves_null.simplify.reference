@@ -1,0 +1,27 @@
+let code f_0 deleted in
+let code loopify(never) size(30) newer_version_of(f_0)
+      f_0_1 (bit : imm tagged, bit' : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %int_comp.lt (bit', 0) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k2 (0i)
+     where k3 =
+       let prim_1 = %int_comp.gt (bit, bit') in
+       cont k2 (prim_1))
+    where k2 (join_param : imm) =
+      (switch join_param
+         | 0 -> k (0)
+         | 1 -> k2
+         where k2 =
+           let prim = %phys_ne (bit, 0) in
+           let noteq = %tag_imm (prim) in
+           cont k (noteq))
+in
+let $camlN_way_join_preserves_null__f_1 = closure f_0_1 @f in
+let $camlN_way_join_preserves_null =
+  Block 0 ($camlN_way_join_preserves_null__f_1)
+in
+cont done ($camlN_way_join_preserves_null)

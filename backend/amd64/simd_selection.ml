@@ -1165,14 +1165,30 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
   Array.iteri
     (fun i ({ loc; _ } : Simd.arg) -> maybe_pin arg_regs i loc)
     simd.args;
-  (match simd.res with
-  | Res_none -> ()
-  | First_arg ->
-    assert (not (Reg.is_preassigned arg_regs.(0)));
-    arg_regs.(0) <- res_regs.(0)
+  match simd.res with
+  | Res_none -> arg_regs, res_regs
+  | Arg rr ->
+    let res_regs = ref res_regs in
+    Array.fold_left
+      (fun r a ->
+        let len = Simd.loc_reg_count simd.args.(a).loc in
+        let a = Simd.unarized_reg_index simd.args a in
+        (* CR-someday mslater: we should require binding all overwritten args *)
+        (if r = Array.length !res_regs
+         then
+           let fresh = Reg.createv_with_typs (Array.sub arg_regs a len) in
+           res_regs := Array.append !res_regs fresh);
+        for idx = 0 to len - 1 do
+          assert (not (Reg.is_preassigned arg_regs.(a + idx)));
+          arg_regs.(a + idx) <- !res_regs.(r + idx)
+        done;
+        r + len)
+      0 rr
+    |> ignore;
+    arg_regs, !res_regs
   | Res rr ->
-    Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr);
-  arg_regs, res_regs
+    Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr;
+    arg_regs, res_regs
 
 let pseudoregs_for_operation (simd : Simd.operation) arg res =
   let arg_regs = Array.copy arg in

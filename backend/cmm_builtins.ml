@@ -1263,6 +1263,22 @@ let builtin_even_if_not_annotated = function
     true
   | _ -> false
 
+(* These builtins are lowered to Cmm operations guaranteed to produce
+   sign-extended 32-bit results. This means the caller can skip redundant sign
+   extensions. *)
+let builtin_sign_extends = function
+  | "caml_native_pointer_load_signed_int32"
+  | "caml_native_pointer_load_unboxed_int32"
+  | "caml_ext_pointer_load_signed_int32" | "caml_ext_pointer_load_unboxed_int32"
+  | "caml_int32_shift_right_by_int32_unboxed" | "caml_csel_int32_unboxed" ->
+    true
+  | _ -> false
+
+type t =
+  { extcall : expression;
+    builtin_sign_extends : bool
+  }
+
 let extcall ~dbg ~returns ~alloc ~is_c_builtin ~effects ~coeffects ~ty_args name
     typ_res args =
   if not returns
@@ -1287,9 +1303,10 @@ let extcall ~dbg ~returns ~alloc ~is_c_builtin ~effects ~coeffects ~ty_args name
   if is_c_builtin || builtin_even_if_not_annotated name
   then
     match transl_builtin name args dbg typ_res with
-    | Some op -> op
-    | None -> default
-  else default
+    | Some op ->
+      { extcall = op; builtin_sign_extends = builtin_sign_extends name }
+    | None -> { extcall = default; builtin_sign_extends = false }
+  else { extcall = default; builtin_sign_extends = false }
 
 let report_error ppf = function
   | Bad_immediate msg -> Format_doc.pp_print_string ppf msg

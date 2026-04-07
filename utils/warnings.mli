@@ -40,11 +40,11 @@ type constructor_usage_warning =
   | Only_exported_private
 
 type upstream_compat_warning =
-  | Immediate_erasure of string
   | Non_value_sort of string
   | Unboxed_attribute of string
   | Immediate_void_variant
   | Separability_check
+  | Unpacked_attribute
 
 type name_out_of_scope_warning =
   | Name of string
@@ -154,6 +154,8 @@ type t =
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
+  | Useless_lpoly                           (* 217 *)
+  | Lpoly_in_letrec                         (* 218 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

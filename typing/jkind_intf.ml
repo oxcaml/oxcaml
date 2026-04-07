@@ -54,6 +54,12 @@ module type Sort = sig
       | Base of base
       | Product of t list
       | Univar of univar
+      | Genvar of var
+          (** A layout variable bound by a surrounding [val_lpoly]. It's a
+              "fake" constant that will be instantiated to real layout constant
+              by slambda. The [var] is used only for physical identity; its
+              contents are not consumed and its level must be
+              [Ident.highest_scope]. *)
 
     val equal : t -> t -> bool
 
@@ -187,7 +193,7 @@ module type Sort = sig
   val bits64 : t
 
   (** Create a new sort variable that can be unified. *)
-  val new_var : level:int -> t
+  val new_var : level:int -> var
 
   val of_base : base -> t
 
@@ -217,6 +223,54 @@ module type Sort = sig
   type change
 
   val undo_change : change -> unit
+
+  (** Create a fresh polymorphic sort variable (level = [Ident.highest_scope]).
+  *)
+  val new_genvar : unit -> var
+
+  (** Returns [true] iff the variable was created by {!new_genvar}. *)
+  val is_genvar : var -> bool
+
+  (** Get the concrete content of a variable. The returned sort must be
+      representable (including rigid sorts). *)
+  val get_representable_var : var -> t option
+
+  (** [subst s t] applies the variable substitution [s] to [t], replacing each
+      [Var v] where [(v, t')] is in [subst] with [t']. *)
+  val subst : (var * t) list -> t -> t
+
+  (** [instance_with ~level vars f] creates a fresh sort var at [level] for each
+      var in [vars], calls [f] with {!instance} configured to replace each var
+      with its fresh copy, and returns the fresh vars together with the result
+      of [f]. Raises if any var in [vars] is not a generic variable (see
+      {!is_genvar}). *)
+  val instance_with : level:int -> var list -> (unit -> 'a) -> var list * 'a
+
+  (** Apply instantiation to every [Var] node in a sort. Generic variables (see
+      {!is_genvar}) are replaced by fresh vars registered via {!instance_with};
+      non-generic variables are left unchanged. Must be called within the
+      dynamic extent of {!instance_with}. *)
+  val instance : t -> t
+
+  (** Returns a human-readable name for a generic variable. Must be called
+      within the dynamic extent of {!print_with_genvars}. *)
+  val to_string_genvar : var -> string
+
+  (** [print_with_genvars vars f] assigns a fresh name to each var in [vars],
+      calls [f] with those names, and returns the result. Within the call to
+      [f], {!to_string_genvar} will return the assigned name for each var. *)
+  val print_with_genvars : var list -> (string list -> 'a) -> 'a
+
+  (** [generalize_with f] runs [f] with sort generalization enabled (for let
+      poly_ support). Returns the result of [f] and the list of sort variables
+      lifted to generic during [f]. *)
+  val generalize_with : (unit -> 'a) -> 'a * var list
+
+  (** Generalize sort variables when in sort generalization context. Sets the
+      level of sort variables to Ident.highest_scope and accumulates them. This
+      should be called from Ctype.generalize. Only has an effect when called
+      within {!generalize_with}. *)
+  val generalize : current_level:int -> t -> unit
 
   module Debug_printers : sig
     val base : Format.formatter -> base -> unit
@@ -312,6 +366,7 @@ module History = struct
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
+    | Idx_base
 
   type value_creation_reason =
     | Class_let_binding
@@ -340,17 +395,13 @@ module History = struct
     | Univar
     | Default_type_jkind
     | Existential_type_variable
-    | Idx_base
     | List_comprehension_iterator_element
     | Lazy_expression
     | Class_type_argument
     | Class_term_argument
     | Debug_printer_argument
     | Array_type_kind
-    | Quotation_result
-    | Antiquotation_result
-    | Tquote
-    | Tsplice
+    | Quoted_expression
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =
@@ -382,6 +433,8 @@ module History = struct
           arity : int
         }
     | Overapproximation_of_with_bounds
+    | Inside_quote
+    | Evaluated_quote
     | Old_style_unboxed_type
 
   type product_creation_reason =

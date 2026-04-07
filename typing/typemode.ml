@@ -77,9 +77,11 @@ module Mode_axis_pair = struct
     | "once" -> comonadic Linearity Once
     | "many" -> comonadic Linearity Many
     | "nonportable" -> comonadic Portability Nonportable
+    | "corruptible" -> comonadic Portability Corruptible
     | "shareable" -> comonadic Portability Shareable
     | "portable" -> comonadic Portability Portable
     | "contended" -> monadic Contention Contended
+    | "corrupted" -> monadic Contention Corrupted
     | "shared" -> monadic Contention Shared
     | "uncontended" -> monadic Contention Uncontended
     | "unforkable" -> comonadic Forkable Unforkable
@@ -87,10 +89,12 @@ module Mode_axis_pair = struct
     | "yielding" -> comonadic Yielding Yielding
     | "unyielding" -> comonadic Yielding Unyielding
     | "stateless" -> comonadic Statefulness Stateless
-    | "observing" -> comonadic Statefulness Observing
+    | "reading" -> comonadic Statefulness Reading
+    | "writing" -> comonadic Statefulness Writing
     | "stateful" -> comonadic Statefulness Stateful
     | "immutable" -> monadic Visibility Immutable
     | "read" -> monadic Visibility Read
+    | "write" -> monadic Visibility Write
     | "read_write" -> monadic Visibility Read_write
     | "static" -> monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
@@ -231,6 +235,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       match a with
       | Immutable -> Contended
       | Read -> Shared
+      | Write -> Corrupted
       | Read_write -> Uncontended
     in
     [Atom (Monadic Contention, Join_const b)]
@@ -238,7 +243,8 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
     let b : Portability.Const.t =
       match a with
       | Stateless -> Portable
-      | Observing -> Shareable
+      | Reading -> Shareable
+      | Writing -> Corruptible
       | Stateful -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_const b)]
@@ -384,6 +390,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     | (Some _ as c), _ | c, None -> c
     | None, Some Visibility.Const.Immutable -> Some Contention.Const.Contended
     | None, Some Visibility.Const.Read -> Some Contention.Const.Shared
+    | None, Some Visibility.Const.Write -> Some Contention.Const.Corrupted
     | None, Some Visibility.Const.Read_write ->
       Some Contention.Const.Uncontended
   in
@@ -392,8 +399,9 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     match annots.portability, annots.statefulness with
     | (Some _ as p), _ | p, None -> p
     | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
-    | None, Some Statefulness.Const.Observing ->
-      Some Portability.Const.Shareable
+    | None, Some Statefulness.Const.Reading -> Some Portability.Const.Shareable
+    | None, Some Statefulness.Const.Writing ->
+      Some Portability.Const.Corruptible
     | None, Some Statefulness.Const.Stateful ->
       Some Portability.Const.Nonportable
   in
@@ -605,7 +613,7 @@ let sort_dedup_modalities ~warn l =
       =
     let (P ax0) = Axis.to_value (P ax0) in
     let (P ax1) = Axis.to_value (P ax1) in
-    Mode.Value.Axis.compare ax0 ax1
+    Misc.comparison_result (Mode.Value.Axis.compare ax0 ax1)
   in
   let dedup ~on_dup =
     let rec loop x = function
@@ -678,6 +686,27 @@ let sort_dedup_modalities modalities =
   |> sort_dedup_modalities ~warn:false
 
 let untransl_modalities t = List.map untransl_modality t.moda_desc
+
+let transl_with_bound_modifiers annots =
+  let modal_annots, externality =
+    List.fold_left
+      (fun (modal_annots, externality)
+           ({ txt = Parsetree.Modality modality; loc } as annot) ->
+        match Modifier_axis_pair.of_string modality with
+        | P (Modal _, _) -> annot :: modal_annots, externality
+        | P (Nonmodal Externality, (value : Externality.t)) ->
+          modal_annots, Some value
+        | P (Nonmodal (Nullability | Separability), _) ->
+          raise (Error (loc, Unrecognized_modifier (Modality, modality)))
+        | exception Not_found ->
+          raise (Error (loc, Unrecognized_modifier (Modality, modality))))
+      ([], None) annots
+  in
+  let modality =
+    (transl_modalities ~maturity:Stable Immutable (List.rev modal_annots))
+      .moda_modalities
+  in
+  modality, externality
 
 let transl_alloc_mode annots =
   let { mode_modes = opt_modes; mode_desc = annots } =

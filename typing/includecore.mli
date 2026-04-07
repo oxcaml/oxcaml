@@ -32,6 +32,19 @@ type primitive_mismatch =
   | Argument_repr of int
   | Layout_poly_attr
 
+type layout_poly_coercion =
+  | Extra_lhs of { extra: int }
+  (** [first] has [extra] more layout parameters than [second]. *)
+  | Extra_rhs of { extra: int }
+  (** [second] has [extra] more layout parameters than [first]. *)
+  | Instantiate_lhs_to_rhs of { index_lhs: int; index_rhs: int }
+  (** The sort poly var at position [index_lhs] in [first] is instantiated with
+      the sort poly var at position [index_rhs] in [second] (not position
+      [index_lhs] as expected). *)
+  | Instantiate_lhs of { index_lhs: int; arg: Jkind_types.Sort.t option }
+  (** The sort poly var at position [index_lhs] in [first] is instantiated with
+      [arg], which is not any sort poly var of [second]. *)
+
 type value_mismatch =
   | Primitive_mismatch of primitive_mismatch
   | Not_a_primitive
@@ -39,6 +52,7 @@ type value_mismatch =
   | Zero_alloc of Zero_alloc.error
   | Modality of Mode.Modality.error
   | Mode of Mode.Value.error
+  | Layout_poly_coercion of layout_poly_coercion
 
 exception Dont_match of value_mismatch
 

@@ -1,5 +1,9 @@
 (* TEST
  flags += " -O3";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  only-default-codegen;
  expect.opt;
 *)
@@ -45,32 +49,29 @@ arr_sum:
   salq  $8, %rdi
   shrq  $17, %rdi
   orq   $1, %rdi
-  movq  %rdi, %rsi
-  addq  $-2, %rsi
+  leaq  -2(%rdi), %rsi
   cmpq  $1, %rsi
-  jl    .L135
+  jl    .L137
+  sarq  $1, %rsi
   movl  $1, %eax
-  movl  $1, %edx
-  cmpq  %rdi, %rdx
-  jae   .L131
-.L118:
-  movq  -4(%rbx,%rdx,4), %rcx
+  xorl  %edx, %edx
+.L114:
+  leaq  1(%rdx,%rdx), %rcx
+  cmpq  %rdi, %rcx
+  jae   .L133
+  movq  -4(%rbx,%rcx,4), %rcx
   leaq  -1(%rax,%rcx), %rax
+  incq  %rdx
   cmpq  %rsi, %rdx
-  je    .L125
-  addq  $2, %rdx
-  cmpq  %rdi, %rdx
-  jae   .L131
-  jmp   .L118
-.L125:
+  jle   .L114
   ret
-.L131:
-  movq  camlTOP2__block95@GOTPCREL(%rip), %rax
+.L133:
+  movq  camlTOP2__block101@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L135:
+.L137:
   movl  $1, %eax
   ret
 |}]

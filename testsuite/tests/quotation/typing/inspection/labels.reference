@@ -23,7 +23,7 @@ Stdlib.ignore
 Stdlib.ignore
   ((fun x -> x)
      (function | (Labels_types.Foo : Labels_types.vrt) -> 0 |
-              (Labels_types.Bar : Labels_types.vrt) -> 1)
+        (Labels_types.Bar : Labels_types.vrt) -> 1)
   : Labels_types.vrt -> int)
 
 Stdlib.ignore

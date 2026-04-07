@@ -320,6 +320,11 @@ let foo7' = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
 val foo7' : <[$('_a) -> $('_a)]> expr = <[fun (y : _) -> y]>
 |}];;
 
+let foo7'' () = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
+[%%expect {|
+val foo7'' : unit -> <[$('a) -> $('a)]> expr = <fun>
+|}];;
+
 let foo8 (type a) (type b) x = <[fun ((p, q) : $a * $b) -> ($x, (p, q))]> <["foo"]>;;
 [%%expect {|
 Line 1, characters 31-73:
@@ -372,6 +377,35 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
        it is introduced at line 1, characters 0-13, outside any quotations.
 |}];;
 
+type 'a t_param_well_staged = A of 'a expr
+[%%expect {|
+type 'a t_param_well_staged = A of 'a expr
+|}];;
+
+type 'a t_param_ill_staged = A of <['a]> expr
+[%%expect {|
+Line 1, characters 36-38:
+1 | type 'a t_param_ill_staged = A of <['a]> expr
+                                        ^^
+Error: Type variable "'a" is used inside a quotation (<[ ... ]>),
+       it already occurs outside any quotations.
+       Hint: Consider using "$'a".
+|}];;
+
+type _ t_param_well_staged_gadt =
+  | A : 'a expr -> <[$('a) * $('a)]> t_param_well_staged_gadt
+[%%expect {|
+type _ t_param_well_staged_gadt =
+    A : 'a expr -> <[$('a) * $('a)]> t_param_well_staged_gadt
+|}];;
+
+type _ t_param_re_staged_gadt =
+  | B : <['b]> expr -> <['b * 'b]> t_param_re_staged_gadt
+[%%expect {|
+type _ t_param_re_staged_gadt =
+    B : 'b expr -> <[$('b) * $('b)]> t_param_re_staged_gadt
+|}];;
+
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
 [%%expect {|
 - : <[$('a) -> $('b) -> $('a) * $('b)]> expr =
@@ -422,7 +456,7 @@ Error: This expression has type "<[int -> int]>"
 
 let mk_pair x = <[$x, $x]>;;
 [%%expect {|
-val mk_pair : 'a expr -> <[$('a) * $('a)]> expr = <fun>
+val mk_pair : 'a expr -> <[$('a) * $('a)]> expr @ once = <fun>
 |}];;
 
 mk_pair <[123]>;;
@@ -447,12 +481,13 @@ mk_pair <[Some 123]>;;
 
 mk_pair <[fun () -> 42]>;;
 [%%expect {|
-- : <[unit -> int * unit -> int]> expr = <[((fun () -> 42), (fun () -> 42))]>
+- : <[(unit -> int) * (unit -> int)]> expr =
+<[((fun () -> 42), (fun () -> 42))]>
 |}];;
 
 mk_pair <[fun x -> x]>;;
 [%%expect {|
-- : <['_weak1 -> '_weak1 * '_weak1 -> '_weak1]> expr =
+- : <[('_weak1 -> '_weak1) * ('_weak1 -> '_weak1)]> expr =
 <[((fun x -> x), (fun x -> x))]>
 |}];;
 
@@ -478,150 +513,46 @@ Error: Type variable "'a" is used outside any quotations,
        Hint: Consider using "<['a]>".
 |}];;
 
+(* Eta expansion of quotes/splices *)
+
 let eta (type a) (x : a expr) : a expr = <[ $x ]>
 [%%expect {|
-val eta : 'a expr -> 'a expr = <fun>
+val eta : 'a expr -> 'a expr @ once = <fun>
 |}]
 
-(* Inclusion checks *)
-
-(*  [M1] and [M2] pass solely due to stage normalisation
-    (moving all type variables to occur at stage offset zero) *)
-
-module M1 : sig
-  val foo : 'a -> <[$('a) -> int]> expr
-end = struct
-  let foo (x: 'a) = <[fun (y : $'a) -> 1]>;;
-end
-
-[%%expect{|
-module M1 : sig val foo : 'a -> <[$('a) -> int]> expr end
+let eta1 (type a) = <[ fun (x : $a expr) : $a expr -> <[ $x ]> ]>
+[%%expect {|
+val eta1 : <[$('a) expr -> $('a) expr @ once]> expr =
+  <[fun (x : _ expr) -> (<[$x]> : _ expr)]>
 |}]
 
-module M1' : sig
-  val foo : <['a]> expr -> <['a -> int]> expr
-end = struct
-  let foo (x: 'a expr) = <[fun (y : $'a) -> 1]>;;
-end
-
-[%%expect{|
-module M1' : sig val foo : 'a expr -> <[$('a) -> int]> expr end
+let eta1' = <[ fun (type a) (x : a) : a -> $(<[ x ]>) ]>
+[%%expect {|
+val eta1' : <[$('a) -> $('a)]> expr = <[fun (type a) (x : a) -> (x : a)]>
 |}]
 
-module M1'' : sig
-  val foo : 'a expr -> <[$('a) -> int]> expr
-end = struct
-  let foo (x: <['a]> expr) = <[fun (y : 'a) -> 1]>;;
-end
+(* Applicative *)
 
-[%%expect{|
-module M1'' : sig val foo : 'a expr -> <[$('a) -> int]> expr end
+let app (type a b) (f : <[$a -> $b]> expr) (x : a expr) =
+  <[ $f $x ]>
+[%%expect {|
+val app : <[$('a) -> $('b)]> expr -> 'a expr -> 'b expr @ once = <fun>
 |}]
 
-(*  Simple functions with a type variable under a quote-splice *)
-module M2 = struct
-  let f (x : <[ 'a ]> expr) = <[ ($x, $x) ]>
-end
-
-[%%expect{|
-module M2 : sig val f : 'a expr -> <[$('a) * $('a)]> expr end
+let both (type a b) (p : a expr * b expr) : <[$a * $b]> expr =
+  let (x, y) = p in <[ $x, $y ]>
+[%%expect {|
+val both : 'a expr * 'b expr -> <[$('a) * $('b)]> expr @ once = <fun>
 |}]
 
-(*  Checking [M2'] does not rely on any quote-splice inverses:
-    'a will be unified with <[int]> when checking the function parameter side,
-    skipping any nontrivial reasoning.  *)
-module M2' : sig
-  val f : <[ int ]> expr -> <[ int * int ]> expr
-end = M2
+(* Non-value-kinded expressions *)
 
-[%%expect{|
-module M2' : sig val f : <[int]> expr -> <[int * int]> expr end
+let x = <[ #42L ]>
+[%%expect {|
+val x : <[int64#]> expr = <[#42L]>
 |}]
 
-(*  [M3] is trickier, leading to the case $'a < t *)
-
-module M3 = struct
-  let f = let (x : <[ 'a -> unit ]> expr) = <[ fun _ -> () ]> in <[ ($x, $x) ]>
-end
-
-[%%expect{|
-module M3 : sig val f : <[($('a) -> unit) * ($('a) -> unit)]> expr end
-|}]
-
-(*   $('a) = int  <=>  'a = <[int]> *)
-module M3' : sig
-  val f : <[ (int -> unit) * (int -> unit) ]> expr
-end = M3
-
-[%%expect{|
-module M3' : sig val f : <[(int -> unit) * (int -> unit)]> expr end
-|}]
-
-(*   [M3''] is a simple failure to check the error message when we end up with
-     contradicting quoted unificands *)
-(*   string = $('a) = int  <=>  <[string]> = 'a = <[int]>  <=>  string = int (error!) *)
-module M3'' : sig
-  val f : <[ (string -> unit) * (int -> unit) ]> expr
-end = M3
-
-[%%expect{|
-Line 3, characters 6-8:
-3 | end = M3
-          ^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val f : <[($('a) -> unit) * ($('a) -> unit)]> expr end
-       is not included in
-         sig val f : <[(string -> unit) * (int -> unit)]> expr end
-       Values do not match:
-         val f : <[($('a) -> unit) * ($('a) -> unit)]> expr
-       is not included in
-         val f : <[(string -> unit) * (int -> unit)]> expr
-       The type "<[(string -> unit) * (string -> unit)]> expr"
-       is not compatible with the type
-         "<[(string -> unit) * (int -> unit)]> expr"
-       Type "string" = "string" is not compatible with type "int"
-|}]
-
-(*  [M4] is analogous to [M3], but featuring an uninhabited type *)
-
-module M4 : sig
-  val x : <[ 'a * 'a ]> expr
-end = struct
-  let x = <[ let y = Obj.magic () in (y, y) ]>
-end
-
-[%%expect{|
-module M4 : sig val x : <[$('a) * $('a)]> expr end
-|}]
-
-module M4' : sig
-  val x : <[ int * int ]> expr
-end = M4
-
-[%%expect{|
-module M4' : sig val x : <[int * int]> expr end
-|}]
-
-(* Analogously to [M3''], [M4''] checks we detect any failing unifications *)
-module M4'' : sig
-  val x : <[ int * string ]> expr
-end = M4
-
-[%%expect{|
-Line 3, characters 6-8:
-3 | end = M4
-          ^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val x : <[$('a) * $('a)]> expr end
-       is not included in
-         sig val x : <[int * string]> expr end
-       Values do not match:
-         val x : <[$('a) * $('a)]> expr
-       is not included in
-         val x : <[int * string]> expr
-       The type "<[int * int]> expr" is not compatible with the type
-         "<[int * string]> expr"
-       Type "int" = "int" is not compatible with type "string"
+let x = <[ #("abc", #42L) ]>
+[%%expect {|
+val x : <[#(string * int64#)]> expr = <[#("abc", #42L)]>
 |}]

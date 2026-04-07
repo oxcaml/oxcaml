@@ -72,6 +72,13 @@ val newgenstub: scope:int -> jkind_lr -> type_expr
         (* Return a fresh generic node, to be instantiated
            by [Transient_expr.set_stub_desc] *)
 
+val new_quote_ty: type_expr -> type_expr
+        (* Quote a type expression *)
+val new_splice_ty: type_expr -> type_expr
+        (* Splice a type expression *)
+val new_quote_eval_ty: type_expr -> type_expr
+        (* Quote-eval a type expression *)
+
 (**** Types ****)
 
 val is_Tvar: type_expr -> bool
@@ -167,6 +174,7 @@ type 'a type_iterators =
     it_class_declaration: 'a type_iterators -> class_declaration -> unit;
     it_class_type_declaration:
         'a type_iterators -> class_type_declaration -> unit;
+    it_jkind_declaration: 'a type_iterators -> jkind_declaration -> unit;
     it_functor_param: 'a type_iterators -> functor_parameter -> unit;
     it_module_type: 'a type_iterators -> module_type -> unit;
     it_class_type: 'a type_iterators -> class_type -> unit;
@@ -373,6 +381,7 @@ module Jkind0 : sig
 
     val equal : t -> t -> bool
     val join : t -> t -> t
+    val meet : t -> t -> t
 
     val relevant_axes_of_modality :
       relevant_for_shallow:[ `Irrelevant | `Relevant ] ->
@@ -690,9 +699,22 @@ module Jkind0 : sig
     val for_non_float : why:Jkind_intf.History.value_creation_reason -> 'd jkind
 
     val for_boxed_record : label_declaration list -> jkind_l
+
     val for_boxed_record_with_updates :
       (label_declaration * type_expr * Jkind_types.Sort.Const.t option) list ->
       jkind_l
+
+    (* Shared type-level implementation of Steps B1-B4 from
+       Note [With-bounds for GADTs].  Callers choose the projection target via
+       [projected_params]: declaration parameters for boxed GADTs, or the
+       already-instantiated head arguments for unboxed GADTs. *)
+    val gadt_payload_subst :
+      projected_params:Types.type_expr list ->
+      res_args:Types.type_expr list ->
+      payload_tys:Types.type_expr list ->
+      get_free_vars:(Types.type_expr list -> TypeSet.t) ->
+      (Types.type_expr * Types.type_expr) list
+
     val for_boxed_variant :
       loc:Location.t ->
       decl_params:Types.type_expr list ->
@@ -701,7 +723,7 @@ module Jkind0 : sig
         Types.type_expr ->
         Types.type_expr list ->
         Types.type_expr) ->
-      free_vars:(Types.type_expr list -> TypeSet.t) ->
+      get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       Types.constructor_declaration list ->
       Types.jkind_l
 
@@ -709,6 +731,9 @@ module Jkind0 : sig
 
     (** The jkind of a float. *)
     val for_float : Ident.t -> jkind_l
+
+    (** The jkind of a quoted expression, [_ expr]. *)
+    val for_expr : Types.jkind_l
 
     (** The jkind for [array] type arguments. *)
     val for_array_argument : jkind_lr

@@ -304,7 +304,7 @@ Error: This value is "immutable"
          which is expected to be "stateless"
          because it is contained (via constructor "StatefulFun") in the value at line 3, characters 10-51
          which is expected to be "stateless".
-       However, the highlighted expression is expected to be "read_write"
+       However, the highlighted expression is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
 |}]
 
@@ -316,9 +316,9 @@ let (foo @ stateless) () =
 Line 4, characters 23-24:
 4 |     raise (StatefulFun g)
                            ^
-Error: This value is "stateful"
+Error: This value is "writing"
          because it contains a usage (of the value "x" at line 3, characters 15-16)
-         which is expected to be "read_write"
+         which is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
        However, the highlighted expression is expected to be "stateless"
          because it is contained (via constructor "StatefulFun") in the value at line 4, characters 10-25
@@ -353,7 +353,7 @@ Line 3, characters 24-25:
 Error: This value is "immutable"
          because it is used inside the function at lines 1-4, characters 22-13
          which is expected to be "stateless".
-       However, the highlighted expression is expected to be "read_write"
+       However, the highlighted expression is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
 |}]
 
@@ -367,7 +367,7 @@ Line 3, characters 24-25:
                             ^
 Error: This value is "immutable"
          because it is contained (via constructor "ImmutableRef") (with some modality) in the value at line 3, characters 6-20.
-       However, the highlighted expression is expected to be "read_write"
+       However, the highlighted expression is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
 |}]
 
@@ -501,8 +501,8 @@ Error: Signature mismatch:
          val wrap : unit -> exn (* in a structure at nonportable *)
        is not included in
          val wrap : unit -> exn @@ portable (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
+       The first is "nonportable"
          because it contains a usage (of the constructor "R" at line 9, characters 16-17)
          which is expected to be "uncontended".
-       However, the right-hand side is "portable".
+       However, the second is "portable".
 |}]

@@ -127,6 +127,7 @@ let rec add_type bv ty =
   | Ptyp_splice t -> add_type bv t
   | Ptyp_of_kind jkind -> add_jkind bv jkind
   | Ptyp_repr(_, t) -> add_type bv t
+  | Ptyp_newlayout(_, t) -> add_type bv t
   | Ptyp_extension e -> handle_extension e
 
 and add_type_labeled_tuple bv tl =
@@ -182,7 +183,8 @@ let add_type_declaration bv td =
       List.iter (fun pld -> add_type bv pld.pld_type) lbls
   | Ptype_open -> () in
   add_tkind td.ptype_kind;
-  List.iter (fun (ty, _) -> add_type bv ty) td.ptype_params
+  List.iter (fun (ty, _) -> add_type bv ty) td.ptype_params;
+  add_opt add_jkind bv td.ptype_jkind_annotation
 
 let add_extension_constructor bv ext =
   match ext.pext_kind with
@@ -371,8 +373,6 @@ and add_labeled_tuple_expr bv el = List.iter (add_expr bv) (List.map snd el)
 
 and add_block_access bv = function
   | Baccess_field fld -> add bv fld
-  | Baccess_array (_, _, index) ->
-    add_expr bv index
   | Baccess_block (_, idx) ->
     add_expr bv idx
 
@@ -454,9 +454,11 @@ and add_modtype bv mty =
           | Pwith_type (_, td) -> add_type_declaration bv td
           | Pwith_module (_, lid) -> add_module_path bv lid
           | Pwith_modtype (_, mty) -> add_modtype bv mty
+          | Pwith_jkind (_, jd) -> add_jkind_declaration bv jd
           | Pwith_typesubst (_, td) -> add_type_declaration bv td
           | Pwith_modsubst (_, lid) -> add_module_path bv lid
           | Pwith_modtypesubst (_, mty) -> add_modtype bv mty
+          | Pwith_jkindsubst (_, jd) -> add_jkind_declaration bv jd
         )
         cstrl
   | Pmty_typeof m -> add_module_expr bv m
