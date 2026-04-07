@@ -504,7 +504,7 @@ CAMLexport value caml_copy_int64(int64_t i)
                                                                         \
   CAMLprim int64_t caml_int64_##name##_native
 
-#define CAMLprim_int64_3(name)                                          \
+#define CAMLprim_uint64_2(name)                                         \
   CAMLprim uint64_t caml_int64_##name##_native(uint64_t, uint64_t);     \
                                                                         \
   CAMLprim value caml_int64_##name(value v1, value v2)                  \
@@ -534,7 +534,7 @@ CAMLprim_int64_2(div)(int64_t dividend, int64_t divisor)
   return dividend / divisor;
 }
 
-CAMLprim_int64_3(unsigned_div)(uint64_t dividend, uint64_t divisor)
+CAMLprim_uint64_2(unsigned_div)(uint64_t dividend, uint64_t divisor)
 {
   if (divisor == 0) caml_raise_zero_divide();
   return dividend / divisor;
@@ -549,7 +549,7 @@ CAMLprim_int64_2(mod)(int64_t dividend, int64_t divisor)
   return dividend % divisor;
 }
 
-CAMLprim_int64_3(unsigned_mod)(uint64_t dividend, uint64_t divisor)
+CAMLprim_uint64_2(unsigned_mod)(uint64_t dividend, uint64_t divisor)
 {
   if (divisor == 0) caml_raise_zero_divide();
   return dividend % divisor;
