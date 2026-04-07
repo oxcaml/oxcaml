@@ -22,8 +22,8 @@
    0. Areality (Regionality): Global -> Regional -> Local
    1. Uniqueness (monadic): Aliased -> Unique
    2. Linearity: Many -> Once
-   3. Contention (monadic): Contended -> Shared -> Uncontended
-   4. Portability: Portable -> Shareable -> Nonportable
+   3. Contention (monadic): Contended -> Corrupted / Shared -> Uncontended
+   4. Portability: Portable -> Shareable / Corruptible -> Nonportable
    5. Forkable: Forkable -> Unforkable
    6. Yielding: Unyielding -> Yielding
    7. Statefulness: Stateless -> Writing / Reading -> Stateful
@@ -69,8 +69,8 @@ let axis_shapes =
       | Modal (Comonadic Areality) -> Chain3
       | Modal (Monadic Uniqueness) -> Chain2
       | Modal (Comonadic Linearity) -> Chain2
-      | Modal (Monadic Contention) -> Chain3
-      | Modal (Comonadic Portability) -> Chain3
+      | Modal (Monadic Contention) -> Diamond4
+      | Modal (Comonadic Portability) -> Diamond4
       | Modal (Comonadic Forkable) -> Chain2
       | Modal (Comonadic Yielding) -> Chain2
       | Modal (Comonadic Statefulness) -> Diamond4
@@ -264,13 +264,15 @@ module Levels = struct
     match x with
     | Mode.Portability.Const.Portable -> 0
     | Mode.Portability.Const.Shareable -> 1
-    | Mode.Portability.Const.Nonportable -> 2
+    | Mode.Portability.Const.Corruptible -> 2
+    | Mode.Portability.Const.Nonportable -> 3
 
   let level_of_contention_monadic (x : Mode.Contention.Const.t) : int =
     match x with
     | Mode.Contention.Const.Contended -> 0
-    | Mode.Contention.Const.Shared -> 1
-    | Mode.Contention.Const.Uncontended -> 2
+    | Mode.Contention.Const.Corrupted -> 1
+    | Mode.Contention.Const.Shared -> 2
+    | Mode.Contention.Const.Uncontended -> 3
 
   let level_of_forkable (x : Mode.Forkable.Const.t) : int =
     match x with
@@ -327,13 +329,15 @@ module Levels = struct
   let portability_of_level = function
     | 0 -> Mode.Portability.Const.Portable
     | 1 -> Mode.Portability.Const.Shareable
-    | 2 -> Mode.Portability.Const.Nonportable
+    | 2 -> Mode.Portability.Const.Corruptible
+    | 3 -> Mode.Portability.Const.Nonportable
     | _ -> invalid_arg "Axis_lattice.portability_of_level"
 
   let contention_of_level_monadic = function
     | 0 -> Mode.Contention.Const.Contended
-    | 1 -> Mode.Contention.Const.Shared
-    | 2 -> Mode.Contention.Const.Uncontended
+    | 1 -> Mode.Contention.Const.Corrupted
+    | 2 -> Mode.Contention.Const.Shared
+    | 3 -> Mode.Contention.Const.Uncontended
     | _ -> invalid_arg "Axis_lattice.contention_of_level_monadic"
 
   let forkable_of_level = function

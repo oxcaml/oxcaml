@@ -273,6 +273,7 @@ let () =
     portability
     [ Mode.Portability.Const.Portable;
       Mode.Portability.Const.Shareable;
+      Mode.Portability.Const.Corruptible;
       Mode.Portability.Const.Nonportable ];
   check_axis
     (module Opposite (Mode.Contention.Const))
@@ -280,6 +281,7 @@ let () =
     (fun sample contention -> { sample with contention })
     contention
     [ Mode.Contention.Const.Uncontended;
+      Mode.Contention.Const.Corrupted;
       Mode.Contention.Const.Shared;
       Mode.Contention.Const.Contended ];
   check_axis
