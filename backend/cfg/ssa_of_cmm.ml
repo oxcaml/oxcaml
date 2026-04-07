@@ -57,11 +57,11 @@ type builder =
     mutable body : Ssa.body_instruction list
   }
 
-let make_op op args : Ssa.instruction =
-  Op { id = Ssa.InstructionId.create (); op; args }
+let make_op ~typ op args : Ssa.instruction =
+  Op { id = Ssa.InstructionId.create (); op; typ; args }
 
-let add_op b op args : Ssa.instruction =
-  let i = make_op op args in
+let add_op b ~typ op args : Ssa.instruction =
+  let i = make_op ~typ op args in
   b.body <- Instr i :: b.body;
   i
 
@@ -402,7 +402,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   let emit_branch b (test : Operation.test) rarg ~true_label
       ~false_label : Ssa.terminator =
-    let make_cond op a = add_op b op a in
+    let make_cond op a = add_op b ~typ:Cmm.typ_int op a in
     match test with
     | Itruetest ->
       Branch
@@ -467,7 +467,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Misc.fatal_errorf "Ssa_of_cmm: unbound var %a" V.print v
 
   let env_add v instrs env =
-    { env with vars = V.Map.add (VP.var v) instrs env.vars }
+    { env with
+      vars = V.Map.add (VP.var v) instrs env.vars
+    }
 
   let compute_join_types r1 r2 =
     assert (Array.length r1 = Array.length r2);
@@ -478,37 +480,37 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match exp with
     | Cconst_int (n, _) ->
       let i =
-        add_op b (Const_int (Nativeint.of_int n)) [||]
+        add_op b ~typ:Cmm.typ_int (Const_int (Nativeint.of_int n)) [||]
       in
       Ok [| i |]
     | Cconst_natint (n, _) ->
-      let i = add_op b (Const_int n) [||] in
+      let i = add_op b ~typ:Cmm.typ_int (Const_int n) [||] in
       Ok [| i |]
     | Cconst_float32 (n, _) ->
       let i =
-        add_op b
+        add_op b ~typ:Cmm.typ_float32
           (Const_float32 (Int32.bits_of_float n))
           [||]
       in
       Ok [| i |]
     | Cconst_float (n, _) ->
       let i =
-        add_op b
+        add_op b ~typ:Cmm.typ_float
           (Const_float (Int64.bits_of_float n))
           [||]
       in
       Ok [| i |]
     | Cconst_vec128 (bits, _) ->
-      let i = add_op b (Const_vec128 bits) [||] in
+      let i = add_op b ~typ:Cmm.typ_vec128 (Const_vec128 bits) [||] in
       Ok [| i |]
     | Cconst_vec256 (bits, _) ->
-      let i = add_op b (Const_vec256 bits) [||] in
+      let i = add_op b ~typ:Cmm.typ_vec256 (Const_vec256 bits) [||] in
       Ok [| i |]
     | Cconst_vec512 (bits, _) ->
-      let i = add_op b (Const_vec512 bits) [||] in
+      let i = add_op b ~typ:Cmm.typ_vec512 (Const_vec512 bits) [||] in
       Ok [| i |]
     | Cconst_symbol (sym, _) ->
-      let i = add_op b (Const_symbol sym) [||] in
+      let i = add_op b ~typ:Cmm.typ_int (Const_symbol sym) [||] in
       Ok [| i |]
     | Cvar v -> Ok (env_find v env)
     | Clet (v, e1, e2) ->
@@ -524,7 +526,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_tuple env b args with
       | Never_returns -> Never_returns
       | Ok rs ->
-        let i = add_op b Opaque rs in
+        let i = add_op b ~typ:Cmm.typ_val Opaque rs in
         Ok [| i |])
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) ->
       let* loc_exp = emit_expr env b arg in
@@ -670,6 +672,22 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         "Ssa_of_cmm: unexpected terminator (%a)"
         (Cfg.dump_terminator ~sep:"") term
 
+  and chunk_of_machtype (ty : Cmm.machtype) :
+      Cmm.memory_chunk =
+    match ty with
+    | [| Float |] -> Double
+    | [| Float32 |] -> Single { reg = Float32 }
+    | [| Vec128 |] -> Onetwentyeight_unaligned
+    | [| Vec256 |] -> Twofiftysix_unaligned
+    | [| Vec512 |] -> Fivetwelve_unaligned
+    | _ -> Word_val
+
+  and chunk_of_instruction (r : Ssa.instruction) :
+      Cmm.memory_chunk =
+    match r with
+    | Op { typ; _ } -> chunk_of_machtype typ
+    | Block_param _ | Proj _ -> Word_val
+
   and emit_alloc env b (cmm_args : Cmm.expression list)
       (ph : Cmm.alloc_dbginfo_item) mode dbg :
       or_never_returns =
@@ -684,7 +702,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           mode
         }
     in
-    let addr = add_op b alloc_op [||] in
+    let addr = add_op b ~typ:Cmm.typ_val alloc_op [||] in
     let byte_offset = ref (-Arch.size_int) in
     let ok = ref true in
     List.iter
@@ -699,28 +717,45 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             Target.select_store ~is_assign:false
               addressing_mode arg
           in
-          (match store_result with
+          match store_result with
           | Rewritten (op, Cmm.Ctuple []) ->
-            ignore (add_op b op [| addr |])
+            ignore (add_op b ~typ:Cmm.typ_void op [| addr |]);
+            byte_offset :=
+              !byte_offset + Arch.size_int
           | Rewritten (op, new_arg) -> (
             match emit_expr env b new_arg with
             | Never_returns -> ok := false
             | Ok field ->
               ignore
-                (add_op b op
-                   (Array.append field [| addr |])))
+                (add_op b ~typ:Cmm.typ_void op
+                   (Array.append field [| addr |]));
+              byte_offset :=
+                !byte_offset + Arch.size_int)
           | Use_default | Maybe_out_of_range -> (
             match emit_expr env b arg with
             | Never_returns -> ok := false
             | Ok field ->
-              let chunk : Cmm.memory_chunk =
-                Word_val
-              in
-              ignore
-                (add_op b
-                   (Store (chunk, addressing_mode, false))
-                   (Array.append field [| addr |]))));
-          byte_offset := !byte_offset + Arch.size_int))
+              Array.iter
+                (fun (r : Ssa.instruction) ->
+                  let chunk = chunk_of_instruction r in
+                  ignore
+                    (add_op b ~typ:Cmm.typ_void
+                       (Store
+                          ( chunk,
+                            Arch.offset_addressing
+                              Arch.identity_addressing
+                              !byte_offset,
+                            false ))
+                       [| r; addr |]);
+                  byte_offset :=
+                    !byte_offset
+                    + Select_utils.size_component
+                        (match chunk with
+                        | Cmm.Double -> Cmm.Float
+                        | Cmm.Single { reg = Float32 } ->
+                          Cmm.Float32
+                        | _ -> Cmm.Val))
+                field)))
       cmm_args;
     if not !ok then Never_returns else Ok [| addr |]
 
@@ -741,7 +776,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         emit_expr_op_cont env b new_op arg_instrs
           label_after dbg
       | Basic (Op basic_op) ->
-        let i = add_op b basic_op arg_instrs in
+        let i = add_op b ~typ:ty basic_op arg_instrs in
         if Array.length ty = 0
         then Ok [||]
         else Ok [| i |]
@@ -766,15 +801,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       emit_block b term;
       let b_then =
         fork then_label
-          (Merge
-             { predecessors = [pred_label] })
+          (Merge { predecessors = [pred_label] })
           [||]
       in
       let r_then = emit_expr env b_then eif in
       let b_else =
         fork else_label
-          (Merge
-             { predecessors = [pred_label] })
+          (Merge { predecessors = [pred_label] })
           [||]
       in
       let r_else = emit_expr env b_else eelse in
@@ -848,11 +881,22 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let pred_label = b.current_label in
     let b_body =
       fork body_label
-        (Merge
-           { predecessors = [pred_label] })
+        (Merge { predecessors = [pred_label] })
         [||]
     in
-    let r_body = emit_expr env b_body catch_body in
+    let body_env =
+      match rec_flag with
+      | Cmm.Exn_handler -> (
+        match handlers_info with
+        | [(nfail, _, _, _)] ->
+          { env with
+            trap_stack =
+              Operation.Specific_trap (nfail, env.trap_stack)
+          }
+        | _ -> env)
+      | Cmm.Normal | Cmm.Recursive -> env
+    in
+    let r_body = emit_expr body_env b_body catch_body in
     emit_block b
       (Always { goto = body_label; args = [||] });
     let handler_results =
@@ -963,6 +1007,26 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Never_returns)
     | Return_lbl ->
       let* src = emit_tuple env b args in
+      List.iter
+        (fun (trap : Cmm.trap_action) ->
+          match trap with
+          | Push handler_id ->
+            let h =
+              Static_label.Map.find handler_id
+                env.static_exceptions
+            in
+            add_body b
+              (Pushtrap
+                 { lbl_handler = h.handler_label })
+          | Pop handler_id ->
+            let h =
+              Static_label.Map.find handler_id
+                env.static_exceptions
+            in
+            add_body b
+              (Poptrap
+                 { lbl_handler = h.handler_label }))
+        traps;
       emit_block b (Return src);
       Never_returns
 
@@ -1134,7 +1198,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (Merge { predecessors = [pred_label] })
         [||]
     in
-    emit_tail env b_body catch_body;
+    let body_env =
+      match rec_flag with
+      | Cmm.Exn_handler -> (
+        match handlers_info with
+        | [(nfail, _, _, _)] ->
+          { env with
+            trap_stack =
+              Operation.Specific_trap (nfail, env.trap_stack)
+          }
+        | _ -> env)
+      | Cmm.Normal | Cmm.Recursive -> env
+    in
+    emit_tail body_env b_body catch_body;
     emit_block b
       (Always { goto = body_label; args = [||] });
     let handler_builders =

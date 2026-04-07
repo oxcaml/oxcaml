@@ -42,75 +42,14 @@ let rec get_regs env (i : Ssa.instruction) : Reg.t array =
     let src_regs = get_regs env src in
     [| src_regs.(index) |]
 
-let operation_result_type (op : Operation.t) : Cmm.machtype =
-  match op with
-  | Move | Spill | Reload | Opaque -> Cmm.typ_val
-  | Const_int _ | Const_symbol _ | Stackoffset _
-  | Intop _ | Intop_imm _ | Intop_atomic _
-  | Probe_is_enabled _ | Begin_region | End_region
-  | Dls_get | Tls_get | Domain_index ->
-    Cmm.typ_int
-  | Const_float _ -> Cmm.typ_float
-  | Const_float32 _ -> Cmm.typ_float32
-  | Const_vec128 _ -> Cmm.typ_vec128
-  | Const_vec256 _ -> Cmm.typ_vec256
-  | Const_vec512 _ -> Cmm.typ_vec512
-  | Int128op _ -> Cmm.typ_int128
-  | Floatop (Float64, _) -> Cmm.typ_float
-  | Floatop (Float32, _) -> Cmm.typ_float32
-  | Reinterpret_cast cast -> (
-    match cast with
-    | Float_of_int64 | Float_of_float32 -> Cmm.typ_float
-    | Int64_of_float | Int32_of_float32 | Int_of_value ->
-      Cmm.typ_int
-    | Float32_of_int32 | Float32_of_float ->
-      Cmm.typ_float32
-    | Value_of_int -> Cmm.typ_val
-    | V128_of_vec _ -> Cmm.typ_vec128
-    | V256_of_vec _ -> Cmm.typ_vec256
-    | V512_of_vec _ -> Cmm.typ_vec512)
-  | Static_cast cast -> (
-    match cast with
-    | Float_of_int Float64 | Float_of_float32 ->
-      Cmm.typ_float
-    | Float_of_int Float32 | Float32_of_float ->
-      Cmm.typ_float32
-    | Int_of_float _ -> Cmm.typ_int
-    | V128_of_scalar _ | Scalar_of_v128 _ ->
-      Cmm.typ_vec128
-    | V256_of_scalar _ | Scalar_of_v256 _ ->
-      Cmm.typ_vec256
-    | V512_of_scalar _ | Scalar_of_v512 _ ->
-      Cmm.typ_vec512)
-  | Load { memory_chunk; _ } -> (
-    match memory_chunk with
-    | Word_val -> Cmm.typ_val
-    | Single { reg = Float64 } | Double -> Cmm.typ_float
-    | Single { reg = Float32 } -> Cmm.typ_float32
-    | Onetwentyeight_aligned | Onetwentyeight_unaligned ->
-      Cmm.typ_vec128
-    | Twofiftysix_aligned | Twofiftysix_unaligned ->
-      Cmm.typ_vec256
-    | Fivetwelve_aligned | Fivetwelve_unaligned ->
-      Cmm.typ_vec512
-    | _ -> Cmm.typ_int)
-  | Store _ -> Cmm.typ_void
-  | Alloc _ -> Cmm.typ_val
-  | Poll -> Cmm.typ_void
-  | Pause -> Cmm.typ_void
-  | Specific op -> Arch.specific_op_result_type op
-  | Csel _ | Name_for_debugger _ | Dummy_use ->
-    Cmm.typ_val
-
 let rec allocate_regs env (i : Ssa.instruction) =
   match i with
-  | Op { id; op; args } ->
+  | Op { id; typ; args; _ } ->
     if not (Ssa.InstructionId.Tbl.mem env.op_regs id)
     then (
       Array.iter (allocate_regs env) args;
-      let ty = operation_result_type op in
       Ssa.InstructionId.Tbl.replace env.op_regs id
-        (Reg.createv ty))
+        (Reg.createv typ))
   | Block_param _ -> ()
   | Proj { src; _ } -> allocate_regs env src
 
@@ -210,24 +149,17 @@ let branch_cond_id (block : Ssa.basic_block) :
     Some id
   | _ -> None
 
-let default_emit_op body op dbg arg res =
-  DLL.add_end body
-    (make_cfg_instr (Cfg.Op op) arg res dbg)
-
 module Make (Target : Cfg_selectgen_target_intf.S) = struct
-  let dummy_env =
-    Select_utils.env_create ~tailrec_label:Label.entry_label
-
   let emit_op body op dbg rs rd =
-    let sub = Sub_cfg.make_empty () in
-    match Target.insert_op_debug dummy_env sub op dbg rs rd
-    with
-    | Regs _rd ->
-      Sub_cfg.iter_basic_blocks sub
-        ~f:(fun (block : Cfg.basic_block) ->
-          DLL.iter block.body ~f:(fun instr ->
-              DLL.add_end body instr))
-    | Use_default -> default_emit_op body op dbg rs rd
+    match Target.pseudoregs_for_operation op rs rd with
+    | Constrained (rsrc, rdst) ->
+      emit_moves body ~src:rs ~dst:rsrc;
+      DLL.add_end body
+        (make_cfg_instr (Cfg.Op op) rsrc rdst dbg);
+      emit_moves body ~src:rdst ~dst:rd
+    | Use_default_regs ->
+      DLL.add_end body
+        (make_cfg_instr (Cfg.Op op) rs rd dbg)
 
   let convert_block (renv : reg_env) (ssa : Ssa.t)
     (block : Ssa.basic_block) : Cfg.basic_block =
@@ -265,7 +197,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   Array.iter
     (fun (bi : Ssa.body_instruction) ->
       match bi with
-      | Instr (Op { id; op; args } as i) ->
+      | Instr (Op { id; op; args; _ } as i) ->
         let is_branch_cond =
           match skip_id with
           | Some sid -> Ssa.InstructionId.equal id sid
@@ -685,5 +617,8 @@ let convert (ssa : Ssa.t) : Cfg_with_layout.t =
     ssa.blocks;
   Select_utils.Stack_offset_and_exn.update_cfg cfg;
   Cfg.register_predecessors_for_all_blocks cfg;
-  Cfg_with_layout.create cfg ~layout
+  let cfg_with_layout =
+    Cfg_with_layout.create cfg ~layout
+  in
+  Cfg_simplify.run cfg_with_layout
 end
