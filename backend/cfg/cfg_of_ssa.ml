@@ -352,15 +352,47 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Debuginfo.none,
         true )
     | Tailcall_self { destination; args } ->
-      let arg = concat_map_regs (get_regs renv) args in
+      let virt_args =
+        concat_map_regs (get_regs renv) args
+      in
+      let loc_arg =
+        Proc.loc_parameters (Reg.typv virt_args)
+      in
+      emit_moves body ~src:virt_args ~dst:loc_arg;
       ( make_cfg_instr
           (Cfg.Tailcall_self { destination })
-          arg [||] Debuginfo.none,
+          loc_arg [||] Debuginfo.none,
         false )
     | Tailcall_func (call_op, args) ->
-      let arg = concat_map_regs (get_regs renv) args in
-      ( make_cfg_instr (Cfg.Tailcall_func call_op) arg [||]
-          Debuginfo.none,
+      let virt_args =
+        concat_map_regs (get_regs renv) args
+      in
+      let rarg, loc_arg =
+        match call_op with
+        | Indirect _ ->
+          let rarg =
+            Array.sub virt_args 1
+              (Array.length virt_args - 1)
+          in
+          let loc, _ofs =
+            Proc.loc_arguments (Reg.typv rarg)
+          in
+          rarg, loc
+        | Direct _ ->
+          let loc, _ofs =
+            Proc.loc_arguments (Reg.typv virt_args)
+          in
+          virt_args, loc
+      in
+      emit_moves body ~src:rarg ~dst:loc_arg;
+      let call_arg =
+        match call_op with
+        | Indirect _ ->
+          Array.append [| virt_args.(0) |] loc_arg
+        | Direct _ -> loc_arg
+      in
+      ( make_cfg_instr (Cfg.Tailcall_func call_op)
+          call_arg [||] Debuginfo.none,
         false )
     | Call { op = call_op; args; continuation;
              exn_continuation = _ } ->

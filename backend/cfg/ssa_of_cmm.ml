@@ -521,7 +521,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cop (Craise k, args, _dbg) ->
       emit_expr_raise env b k args
     | Cop (Copaque, args, _dbg) -> (
-      match emit_tuple_exprs env b args with
+      match emit_tuple env b args with
       | Never_returns -> Never_returns
       | Ok rs ->
         let i = add_op b Opaque rs in
@@ -561,29 +561,39 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Never_returns
 
   and emit_tuple env b exp_list : or_never_returns =
-    let rec loop acc = function
-      | [] -> Ok (Array.concat (List.rev acc))
-      | e :: rest ->
-        let* r = emit_expr env b e in
-        loop (r :: acc) rest
+    (* Right-to-left evaluation, matching the old pipeline *)
+    let rec loop = function
+      | [] -> Ok [||]
+      | exp :: rest ->
+        match loop rest with
+        | Never_returns -> Never_returns
+        | Ok rest_regs -> (
+          match emit_expr env b exp with
+          | Never_returns -> Never_returns
+          | Ok exp_regs ->
+            Ok (Array.append exp_regs rest_regs))
     in
-    loop [] exp_list
-
-  and emit_tuple_exprs env b exp_list : or_never_returns =
-    emit_tuple env b exp_list
+    loop exp_list
 
   and emit_expr_raise env b k args =
     let* r = emit_tuple env b args in
     emit_block b (Raise (k, r));
     Never_returns
 
-  and emit_expr_op env b op args dbg : or_never_returns =
-    let ty = Select_utils.oper_result_type op in
-    let label_after = Cmm.new_label () in
-    let new_op, new_args =
-      select_operation op args dbg ~label_after
+  and emit_expr_op_cont env b
+      (new_op : Cfg.basic_or_terminator)
+      arg_instrs _label_after _dbg : or_never_returns =
+    let ty =
+      match new_op with
+      | Terminator
+          (Prim { op = External { ty_res; _ }; _ }) ->
+        ty_res
+      | _ ->
+        (* For most ops, the result type comes from
+           the Cmm op, but we already evaluated args.
+           Use typ_val as fallback for terminators. *)
+        Cmm.typ_val
     in
-    let* arg_instrs = emit_tuple env b new_args in
     match new_op with
     | Terminator (Call { op = call_op; label_after }) ->
       let pred_label = b.current_label in
@@ -596,11 +606,22 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
              continuation = cont_label;
              exn_continuation = exn_cont
            });
+      let call_ty =
+        match new_op with
+        | Terminator (Call _) ->
+          Select_utils.oper_result_type
+            (Capply
+               { result_type = Cmm.typ_val;
+                 region = Rc_normal;
+                 callees = None
+               })
+        | _ -> ty
+      in
       start_block b cont_label
         (CallContinuation
            { predecessor = pred_label })
-        ty;
-      Ok (block_params cont_label ty)
+        call_ty;
+      Ok (block_params cont_label call_ty)
     | Terminator
         (Prim
           { op = External ({ ty_res; _ } as ext_call);
@@ -621,7 +642,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
            { predecessor = pred_label })
         ty_res;
       Ok (block_params cont_label ty_res)
-    | Terminator (Prim { op = Probe _ as probe_op; label_after })
+    | Terminator
+        (Prim { op = Probe _ as probe_op; label_after })
       ->
       let pred_label = b.current_label in
       let cont_label = label_after in
@@ -637,57 +659,96 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
            { predecessor = pred_label })
         ty;
       Ok (block_params cont_label ty)
-    | Terminator (Call_no_return _ext_call) ->
+    | Terminator (Call_no_return _) ->
       emit_block b Never;
       Never_returns
-    | Basic (Op (Alloc { bytes = _; mode; dbginfo = [ph] }))
-      ->
-      let* field_instrs = emit_tuple env b new_args in
-      let n_fields = Array.length field_instrs in
-      let alloc_words = n_fields in
-      let bytes = alloc_words * Arch.size_addr in
-      let alloc_op =
-        Operation.Alloc
-          { bytes;
-            dbginfo =
-              [{ ph with alloc_words; alloc_dbg = dbg }];
-            mode
-          }
-      in
-      let addr = add_op b alloc_op [||] in
-      let byte_offset = ref (-Arch.size_int) in
-      Array.iter
-        (fun field ->
-          let addressing_mode =
-            Arch.offset_addressing
-              Arch.identity_addressing !byte_offset
-          in
-          let chunk : Cmm.memory_chunk =
-            match field with
-            | Ssa.Op { op = Const_int _ | Const_symbol _; _ }
-              ->
-              Word_int
-            | _ -> Word_val
-          in
-          ignore
-            (add_op b
-               (Store (chunk, addressing_mode, false))
-               [| field; addr |]);
-          byte_offset := !byte_offset + Arch.size_int)
-        field_instrs;
-      Ok [| addr |]
-    | Basic (Op op) ->
-      let i = add_op b op arg_instrs in
-      if Array.length ty = 0
-      then Ok [||]
-      else Ok [| i |]
-    | Basic basic ->
-      Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)"
-        Cfg.dump_basic basic
+    | Basic _ ->
+      Misc.fatal_errorf
+        "Ssa_of_cmm.emit_expr_op_cont: unexpected basic"
     | Terminator term ->
       Misc.fatal_errorf
         "Ssa_of_cmm: unexpected terminator (%a)"
         (Cfg.dump_terminator ~sep:"") term
+
+  and emit_alloc env b (cmm_args : Cmm.expression list)
+      (ph : Cmm.alloc_dbginfo_item) mode dbg :
+      or_never_returns =
+    let n_fields = List.length cmm_args in
+    let alloc_words = n_fields in
+    let bytes = alloc_words * Arch.size_addr in
+    let alloc_op =
+      Operation.Alloc
+        { bytes;
+          dbginfo =
+            [{ ph with alloc_words; alloc_dbg = dbg }];
+          mode
+        }
+    in
+    let addr = add_op b alloc_op [||] in
+    let byte_offset = ref (-Arch.size_int) in
+    let ok = ref true in
+    List.iter
+      (fun (arg : Cmm.expression) ->
+        if !ok
+        then (
+          let addressing_mode =
+            Arch.offset_addressing
+              Arch.identity_addressing !byte_offset
+          in
+          let store_result =
+            Target.select_store ~is_assign:false
+              addressing_mode arg
+          in
+          (match store_result with
+          | Rewritten (op, Cmm.Ctuple []) ->
+            ignore (add_op b op [| addr |])
+          | Rewritten (op, new_arg) -> (
+            match emit_expr env b new_arg with
+            | Never_returns -> ok := false
+            | Ok field ->
+              ignore
+                (add_op b op
+                   (Array.append field [| addr |])))
+          | Use_default | Maybe_out_of_range -> (
+            match emit_expr env b arg with
+            | Never_returns -> ok := false
+            | Ok field ->
+              let chunk : Cmm.memory_chunk =
+                Word_val
+              in
+              ignore
+                (add_op b
+                   (Store (chunk, addressing_mode, false))
+                   (Array.append field [| addr |]))));
+          byte_offset := !byte_offset + Arch.size_int))
+      cmm_args;
+    if not !ok then Never_returns else Ok [| addr |]
+
+  and emit_expr_op env b op args dbg : or_never_returns =
+    let ty = Select_utils.oper_result_type op in
+    let label_after = Cmm.new_label () in
+    let new_op, new_args =
+      select_operation op args dbg ~label_after
+    in
+    match new_op with
+    | Basic (Op (Alloc { bytes = _; mode; dbginfo = [ph] }))
+      ->
+      emit_alloc env b new_args ph mode dbg
+    | _ ->
+      let* arg_instrs = emit_tuple env b new_args in
+      (match new_op with
+      | Terminator _ ->
+        emit_expr_op_cont env b new_op arg_instrs
+          label_after dbg
+      | Basic (Op basic_op) ->
+        let i = add_op b basic_op arg_instrs in
+        if Array.length ty = 0
+        then Ok [||]
+        else Ok [| i |]
+      | Basic basic ->
+        Misc.fatal_errorf
+          "Ssa_of_cmm: unexpected basic (%a)"
+          Cfg.dump_basic basic)
 
   and emit_expr_ifthenelse env b econd eif eelse :
       or_never_returns =
@@ -906,10 +967,221 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Never_returns
 
   and emit_tail env b (exp : Cmm.expression) : unit =
-    match emit_expr env b exp with
+    match exp with
+    | Clet (v, e1, e2) -> (
+      match emit_expr env b e1 with
+      | Never_returns -> ()
+      | Ok r1 -> emit_tail (env_add v r1 env) b e2)
+    | Cphantom_let (_, _, body) -> emit_tail env b body
+    | Csequence (e1, e2) -> (
+      match emit_expr env b e1 with
+      | Never_returns -> ()
+      | Ok _ -> emit_tail env b e2)
+    | Cop
+        ( (Capply { result_type = _; region = Rc_normal; _ }
+          as op),
+          args,
+          dbg ) ->
+      emit_tail_apply env b op args dbg
+    | Cifthenelse (econd, _, eif, _, eelse, _) ->
+      emit_tail_ifthenelse env b econd eif eelse
+    | Cswitch (esel, index, ecases, _) ->
+      emit_tail_switch env b esel index ecases
+    | Ccatch (_, [], e1) -> emit_tail env b e1
+    | Ccatch (rec_flag, handlers, body) ->
+      emit_tail_catch env b rec_flag handlers body
+    | _ -> (
+      match emit_expr env b exp with
+      | Never_returns -> ()
+      | Ok r -> emit_block b (Return r))
+
+  and trap_stack_is_empty env =
+    match env.trap_stack with
+    | Operation.Uncaught -> true
+    | Specific_trap _ -> false
+
+  and emit_tail_apply env b op args dbg =
+    let label_after = Cmm.new_label () in
+    let new_op, new_args =
+      select_operation op args dbg ~label_after
+    in
+    match emit_tuple env b new_args with
     | Never_returns -> ()
-    | Ok r ->
-      emit_block b (Return r)
+    | Ok arg_instrs -> (
+      match new_op with
+      | Terminator (Call { op = Indirect callees; _ })
+        when trap_stack_is_empty env ->
+        emit_block b
+          (Tailcall_func (Indirect callees, arg_instrs))
+      | Terminator (Call { op = Direct func; _ })
+        when String.equal func.sym_name
+               !Select_utils.current_function_name
+             && trap_stack_is_empty env ->
+        emit_block b
+          (Tailcall_self
+             { destination = env.tailrec_label;
+               args = arg_instrs
+             })
+      | Terminator (Call { op = Direct func; _ })
+        when trap_stack_is_empty env ->
+        emit_block b
+          (Tailcall_func (Direct func, arg_instrs))
+      | _ ->
+        (* Fall back to call + return *)
+        let r =
+          emit_expr_op_cont env b new_op arg_instrs
+            label_after dbg
+        in
+        (match r with
+        | Never_returns -> ()
+        | Ok r -> emit_block b (Return r)))
+
+  and emit_tail_ifthenelse env b econd eif eelse =
+    let cond, earg = select_condition econd in
+    match emit_expr env b earg with
+    | Never_returns -> ()
+    | Ok rarg ->
+      let then_label = Cmm.new_label () in
+      let else_label = Cmm.new_label () in
+      let pred_label = b.current_label in
+      let term =
+        emit_branch b cond rarg ~true_label:then_label
+          ~false_label:else_label
+      in
+      emit_block b term;
+      let b_then =
+        fork then_label
+          (Merge { predecessors = [pred_label] })
+          [||]
+      in
+      emit_tail env b_then eif;
+      let b_else =
+        fork else_label
+          (Merge { predecessors = [pred_label] })
+          [||]
+      in
+      emit_tail env b_else eelse;
+      merge_into b b_then;
+      merge_into b b_else
+
+  and emit_tail_switch env b esel index ecases =
+    match emit_expr env b esel with
+    | Never_returns -> ()
+    | Ok rsel ->
+      let pred_label = b.current_label in
+      let case_builders =
+        Array.map
+          (fun (case_expr, _dbg) ->
+            let case_label = Cmm.new_label () in
+            let b_case =
+              fork case_label
+                (Merge
+                   { predecessors = [pred_label] })
+                [||]
+            in
+            emit_tail env b_case case_expr;
+            case_label, b_case)
+          ecases
+      in
+      let labels =
+        Array.map
+          (fun idx ->
+            let label, _ = case_builders.(idx) in
+            label)
+          index
+      in
+      ignore rsel;
+      emit_block b (Switch labels);
+      Array.iter
+        (fun (_, b_case) -> merge_into b b_case)
+        case_builders
+
+  and emit_tail_catch env b rec_flag handlers
+      catch_body =
+    let handlers_info =
+      List.map
+        (fun (handler : Cmm.static_handler) ->
+          let nfail = handler.label in
+          let ids = handler.params in
+          let handler_body = handler.body in
+          let handler_label = Cmm.new_label () in
+          let types =
+            List.map (fun (_id, ty) -> ty) ids
+            |> Array.concat
+          in
+          let traps_ref = ref Unreachable in
+          let handler_info =
+            { handler_label; handler_types = types;
+              traps_ref }
+          in
+          nfail, ids, handler_body, handler_info)
+        handlers
+    in
+    let env =
+      List.fold_left
+        (fun env (nfail, _ids, _body, info) ->
+          { env with
+            static_exceptions =
+              Static_label.Map.add nfail info
+                env.static_exceptions
+          })
+        env handlers_info
+    in
+    let body_label = Cmm.new_label () in
+    let pred_label = b.current_label in
+    let b_body =
+      fork body_label
+        (Merge { predecessors = [pred_label] })
+        [||]
+    in
+    emit_tail env b_body catch_body;
+    emit_block b
+      (Always { goto = body_label; args = [||] });
+    let handler_builders =
+      List.map
+        (fun (_, ids, handler_body, info) ->
+          let trap_stack =
+            match !(info.traps_ref) with
+            | Unreachable -> env.trap_stack
+            | Reachable ts -> ts
+          in
+          let handler_env =
+            { env with trap_stack }
+          in
+          let param_idx = ref 0 in
+          let handler_env =
+            List.fold_left
+              (fun env (id, ty) ->
+                let n = Array.length ty in
+                let proj_instrs =
+                  Array.init n (fun i ->
+                    (Ssa.Block_param
+                       { block = info.handler_label;
+                         index = !param_idx + i
+                       }
+                      : Ssa.instruction))
+                in
+                param_idx := !param_idx + n;
+                env_add id proj_instrs env)
+              handler_env ids
+          in
+          let block_desc : Ssa.block_desc =
+            match rec_flag with
+            | Cmm.Exn_handler ->
+              TrapHandler { predecessors = [] }
+            | Cmm.Normal | Cmm.Recursive ->
+              Merge { predecessors = [] }
+          in
+          let b_handler =
+            fork info.handler_label block_desc
+              info.handler_types
+          in
+          emit_tail handler_env b_handler handler_body;
+          b_handler)
+        handlers_info
+    in
+    merge_into b b_body;
+    List.iter (merge_into b) handler_builders
 
   and join_branches b r1 b1 r2 b2 : or_never_returns =
     match r1, r2 with
