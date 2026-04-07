@@ -55,14 +55,6 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
         Variable.create (Printf.sprintf "function_param_%i" i) (KS.kind kind))
       (Flambda_arity.unarize arity)
   in
-  let has_unsafe_result_type =
-    false
-    &&
-    match Code.result_types code with
-    | Unknown -> false
-    | Bottom -> false
-    | Ok _ -> true
-  in
   let never_delete =
     match Code.zero_alloc_attribute code with
     | Default_zero_alloc ->
@@ -92,7 +84,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     }
   in
   Acc.add_any_source acc (Code_id_or_name.code_id code_id);
-  if has_unsafe_result_type || never_delete
+  if never_delete
   then (
     List.iter
       (fun var -> Acc.add_any_usage acc (Code_id_or_name.var var))
