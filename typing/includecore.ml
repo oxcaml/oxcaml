@@ -1227,8 +1227,9 @@ module Variant_diffing = struct
           Array.map (Option.map fst) cstr_shapes1 |> Array.to_list,
           Array.map (Option.map fst) cstr_shapes2 |> Array.to_list
       | _, _ ->
-          (* The match is doomed, but let [compare] go through first since that
-             catches more basic errors *)
+          (* Only need to compare shapes in the boxed-versus-boxed case. In
+             other cases, either the comparison is doomed anyway due to
+             different representations or the shapes aren't relevant. *)
           List.map (fun _ -> None) cstrs1,
           List.map (fun _ -> None) cstrs2
     in
