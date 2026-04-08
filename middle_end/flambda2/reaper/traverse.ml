@@ -143,7 +143,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     (Bound_var.name (Bound_pattern.must_be_singleton bound_pattern))
     (Flambda_primitive.result_kind' prim)
     acc;
-  match[@ocaml.warning "-4"] prim with
+  match prim with
   | Variadic (Make_block (block_kind, _mutability, _), fields) ->
     let _tag, block_shape = Flambda_primitive.Block_kind.to_shape block_kind in
     List.iteri
@@ -192,7 +192,20 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
         Acc.add_accessor_dep acc ~to_ Field.get_tag ~base:name)
-  | prim ->
+  | Nullary _
+  | Unary
+      ( ( Duplicate_block _ | Duplicate_array _
+        | Is_int { variant_only = false }
+        | Is_null | Array_length _ | Bigarray_length _ | String_length _
+        | Int_as_pointer _ | Opaque_identity _ | Int_arith _ | Float_arith _
+        | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+        | Reinterpret_boxed_vector | Unbox_number _ | Box_number _
+        | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
+        | End_region _ | End_try_region _ | Obj_dup | Get_header | Peek _
+        | Make_lazy _ ),
+        _ )
+  | Binary _ | Ternary _ | Quaternary _
+  | Variadic ((Begin_region _ | Begin_try_region _ | Make_array _), _) ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with
       | Arbitrary_effects, _, _, _ ->
@@ -201,7 +214,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
           ~f:(fun () bound_to ->
             Acc.add_cond_any_usage acc ~denv (Simple.name bound_to))
           ~init:()
-      | _ -> ()
+      | (No_effects | Only_generative_effects _), _, _, _ -> ()
     in
     default_bp (fun to_ ->
         Acc.add_use_dep acc
@@ -260,15 +273,23 @@ let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
     ~block_like:(fun () symbol static_const ->
       let name = Name.symbol symbol in
       let[@inline always] block_field_kind i =
-        match[@ocaml.warning "-4"] static_const with
+        match static_const with
         | Block (_, _, shape, _) -> K.Scannable_block_shape.element_kind shape i
         | Immutable_value_array _ -> K.value
-        | _ ->
+        | Set_of_closures _ | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _
+        | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _
+        | Boxed_vec512 _ | Immutable_float_block _ | Immutable_float_array _
+        | Immutable_float32_array _ | Immutable_int_array _
+        | Immutable_int8_array _ | Immutable_int16_array _
+        | Immutable_int32_array _ | Immutable_int64_array _
+        | Immutable_nativeint_array _ | Immutable_vec128_array _
+        | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
+        | Mutable_string _ | Immutable_string _ ->
           Misc.fatal_errorf
             "Unexpected static const %a in [block_field_kind] for symbol %a"
             Static_const.print static_const Symbol.print symbol
       in
-      match[@ocaml.warning "-4"] static_const with
+      match static_const with
       | Block (_, _, _, fields) | Immutable_value_array fields ->
         List.iteri
           (fun i (field : Simple.With_debuginfo.t) ->
@@ -293,7 +314,15 @@ let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
           "Unexpected [Set_of_closures] in block_like static const traversal \
            for symbol %a"
           Symbol.print symbol
-      | _ ->
+      | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
+      | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+      | Immutable_float_block _ | Immutable_float_array _
+      | Immutable_float32_array _ | Immutable_int_array _
+      | Immutable_int8_array _ | Immutable_int16_array _
+      | Immutable_int32_array _ | Immutable_int64_array _
+      | Immutable_nativeint_array _ | Immutable_vec128_array _
+      | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
+      | Mutable_string _ | Immutable_string _ ->
         Acc.add_alias acc
           ~to_:(Code_id_or_name.name name)
           ~from:(Code_id_or_name.name denv.all_constants))
