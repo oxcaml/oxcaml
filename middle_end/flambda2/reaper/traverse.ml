@@ -598,7 +598,7 @@ and traverse_let_cont_non_recursive denv acc cont ~body handler =
          possible source. This makes sure that we do not unbox the exception
          parameter of exception handlers, which is incorrect when used in
          functions (for instance, if they raise async exceptions), and would
-         also probably put incorrect backtrace information. *)
+         also probably yield incorrect backtrace information. *)
       Acc.add_any_source acc (Code_id_or_name.var (List.hd params));
       (* It is also assumed to have any possible use, to make sure it is never
          deleted, as the runtime can look at it. *)
