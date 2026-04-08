@@ -374,9 +374,10 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       | No ->
         if is_external
         then
-          (* External call. We always want to escape everything here, as we will
-             not be able to recover the code_id from the sources of the closure,
-             and the call is very likely to indeed be a call to that code_id. *)
+          (* External call. We always want to mark everything as escaping here,
+             as we will not be able to recover the code_id from the sources of
+             the closure, and the call is indeed very likely to be a call to
+             that code_id. *)
           add_apply acc ~only_if_closure_any_source:false))
   | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
@@ -653,6 +654,7 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
         Continuation.Map.add cont (Normal params) conts)
       handlers denv.conts
   in
+  (* Record kinds of bound parameters *)
   Bound_parameters.iter
     (fun bp -> Acc.bound_parameter_kind bp acc)
     invariant_params;
