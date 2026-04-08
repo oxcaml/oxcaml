@@ -130,6 +130,7 @@ type t =
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
   (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Toplevel_splice_in_type_checking        (* 182 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
   | Overridden_kind_modifier of string      (* 185 *)
@@ -234,6 +235,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Toplevel_splice_in_type_checking -> 182
   | Redundant_kind_modifier _ -> 183
   | Ignored_kind_modifier _ -> 184
   | Overridden_kind_modifier _ -> 185
@@ -1290,6 +1292,10 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
+  | Toplevel_splice_in_type_checking ->
+      "An ill-staged splice was encountered during type-checking. \
+       This state is recoverable, but might result in unexpected bugs. \
+       Please report this error to the Jane Street OCaml Language team."
   | Redundant_kind_modifier abbrev ->
       "This kind modifier is already implied by the kind \"" ^ abbrev ^ "\"."
   | Ignored_kind_modifier (abbrev, modifiers) ->
