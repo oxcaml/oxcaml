@@ -42,6 +42,7 @@
 (executable
  (name topstart)
  (modes native)
+ (flags (:standard -linkall))
  (libraries ocamlopttoplevel)
  (modules topstart))
 

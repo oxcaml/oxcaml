@@ -55,7 +55,7 @@ struct caml_ephe_info {
   uintnat round;
   struct {
     value* todop;
-    uintnat round;;
+    uintnat round;
   } cursor;
 };
 

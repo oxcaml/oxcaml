@@ -6,8 +6,8 @@ let empty_record loc = H.Exp.record ~loc [] None
 let empty_apply loc f =
   H.Exp.apply ~loc f []
 
-let foo_exp = H.Exp.constant (Pconst_char 'a') (* irrelevant what this
-                                                   expression actually is *)
+let foo_exp = H.Exp.constant (H.Const.char 'a') (* irrelevant what this
+                                                    expression actually is *)
 let var ~loc name = H.Pat.var { txt = name; loc }
 
 let mutable_let_rec loc =
@@ -36,7 +36,7 @@ let missing_rhs loc =
 
 let empty_let loc = H.Str.value ~loc Asttypes.Nonrecursive []
 let empty_type loc = H.Str.type_ ~loc Asttypes.Nonrecursive []
-let empty_poly_binder loc = H.Typ.(poly ~loc [] (any ~loc ()))
+let empty_poly_binder loc = H.Typ.(poly ~loc [] (any ~loc None))
 let functor_id loc = Location.mkloc (Longident.(
   Lapply (Location.mknoloc (Lident "F"),  Location.mknoloc (Lident "X")))) loc
 let complex_record loc =
