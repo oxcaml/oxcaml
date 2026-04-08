@@ -981,17 +981,20 @@ let rec low_bits ~bits ~dbg x =
       let low_bits = Nativeint.pred (Nativeint.shift_left 1n bits) in
       Nativeint.equal low_bits (Nativeint.logand mask low_bits)
     in
-    (* Ignore sign and zero extensions which do not affect the low bits *)
     map_tail
       (function
         | Cop
             ( (Casr | Clsr),
               [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
               _ )
-          when 0 <= right && right <= left && left <= unused_bits ->
-          (* these sign-extensions can be replaced with a left shift since we
-             don't care about the high bits that it changed *)
-          low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
+          when 0 <= left && 0 <= right && max left right <= unused_bits ->
+          (* Replacing a first left then right shift pattern with a single shift
+             leaves the highest `max left right` bits in a different state. It
+             doesn't matter if we use a logical or arithmetic right shift in the
+             end because the topmost bits are wrong anyway. *)
+          if left >= right
+          then low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
+          else low_bits ~bits ~dbg (asr_const x (right - left) dbg)
         | x -> (
           match get_const_bitmask x with
           | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->

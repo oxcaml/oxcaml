@@ -14,7 +14,7 @@ let $camlTests14__first_const = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let prim = %num_conv.[`tagged_imm`].[`imm`] (n) in
+   let prim = %num_conv.[`tagged_imm`].[`nativeint`] (n) in
    let prim_1 = %string_load.[`8`] (s, prim) in
    let Pstringrefu = %tag_imm (prim_1) in
    cont k1 (Pstringrefu)
@@ -96,21 +96,21 @@ let code gadt_match_3 deleted in
 let code loopify(never) size(5) newer_version_of(set_0)
       set_0_1 (t : val)
         my_closure _region _ghost_region my_depth
-        -> k * k1
+        -> k1 * k2
         : imm tagged =
   let Psetfield = %block_set.`imm`.[`0`] (t, 42) in
-  cont k (0)
+  cont k1 (0)
 in
 let $camlTests14__set_4 = closure set_0_1 @set in
 let code loopify(never) size(7) newer_version_of(nth_char_1)
       nth_char_1_1 (s : val, n : imm tagged)
         my_closure _region _ghost_region my_depth
-        -> k * k1
+        -> k1 * k2
         : imm tagged =
-  let prim = %num_conv.[`tagged_imm`].[`imm`] (n) in
+  let prim = %num_conv.[`tagged_imm`].[`nativeint`] (n) in
   let prim_1 = %string_load.[`8`] (s, prim) in
   let Pstringrefu = %tag_imm (prim_1) in
-  cont k (Pstringrefu)
+  cont k1 (Pstringrefu)
 in
 let $camlTests14__nth_char_5 = closure nth_char_1_1 @nth_char in
 let code loopify(never) size(1) newer_version_of(needs_try_region_2)

@@ -709,6 +709,36 @@ module Bytes = struct
     @@ portable = "%caml_bytes_set32u#_indexed_by_int64#"
     [@@warning "-187"]
 
+  external unsafe_get_int64_ne_indexed_by_int32 :
+    (bytes[@local_opt]) -> int32# -> int64#
+    @@ portable = "%caml_bytes_get64u#_indexed_by_int32#"
+    [@@warning "-187"]
+
+  external unsafe_set_int64_ne_indexed_by_int32 :
+    (bytes[@local_opt]) -> int32# -> int64# -> unit
+    @@ portable = "%caml_bytes_set64u#_indexed_by_int32#"
+    [@@warning "-187"]
+
+  external unsafe_get_int64_ne_indexed_by_int16 :
+    (bytes[@local_opt]) -> int16# -> int64#
+    @@ portable = "%caml_bytes_get64u#_indexed_by_int16#"
+    [@@warning "-187"]
+
+  external unsafe_set_int64_ne_indexed_by_int16 :
+    (bytes[@local_opt]) -> int16# -> int64# -> unit
+    @@ portable = "%caml_bytes_set64u#_indexed_by_int16#"
+    [@@warning "-187"]
+
+  external unsafe_get_int64_ne_indexed_by_int8 :
+    (bytes[@local_opt]) -> int8# -> int64#
+    @@ portable = "%caml_bytes_get64u#_indexed_by_int8#"
+    [@@warning "-187"]
+
+  external unsafe_set_int64_ne_indexed_by_int8 :
+    (bytes[@local_opt]) -> int8# -> int64# -> unit
+    @@ portable = "%caml_bytes_set64u#_indexed_by_int8#"
+    [@@warning "-187"]
+
   external unsafe_get_float32_ne : (bytes[@local_opt]) -> int -> float32#
     @@ portable = "%caml_bytes_getf32u#" [@@warning "-187"]
 

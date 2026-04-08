@@ -27,16 +27,12 @@ bytes_get_uint8:
   ret
 |}]
 
-(* CR ttebbi: The sal/sar pair to truncate the tagged int
-   to 8/16 bits is inefficient. A simple sarq $1 + movb/movw
-   would suffice since the store instruction itself truncates. *)
 let bytes_set_uint8 (buf : bytes) (i : int) (v : int) =
   Bytes.unsafe_set buf i v
 [%%expect_asm X86_64{|
 bytes_set_uint8:
   sarq  $1, %rbx
-  salq  $55, %rdi
-  sarq  $56, %rdi
+  sarq  $1, %rdi
   movb  %dil, (%rax,%rbx)
   movl  $1, %eax
   ret
@@ -68,8 +64,7 @@ let bytes_set_uint16 (buf : bytes) (i : int) (v : int) =
 [%%expect_asm X86_64{|
 bytes_set_uint16:
   sarq  $1, %rbx
-  salq  $47, %rdi
-  sarq  $48, %rdi
+  sarq  $1, %rdi
   movw  %di, (%rax,%rbx)
   movl  $1, %eax
   ret
@@ -197,16 +192,16 @@ bytes_safe_get_int32:
   movzbq (%rax,%rdi), %rsi
   subq  %rsi, %rdi
   addq  $-3, %rdi
+  sarq  $1, %rbx
   movq  %rdi, %rsi
   sarq  $63, %rsi
   xorq  $-1, %rsi
   andq  %rdi, %rsi
-  sarq  $1, %rbx
   cmpq  %rsi, %rbx
-  jae   .L124
+  jae   .L123
   movslq (%rax,%rbx), %rax
   ret
-.L124:
+.L123:
   movq  camlTOP18__block602@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -214,15 +209,11 @@ bytes_safe_get_int32:
   jmp   *%r11
 |}]
 
-(* CR ttebbi: No need to clear the topmost bit, since out-of-bounds is
-   undefined already. *)
 let bytes_get_int64_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) =
   Bytes.unsafe_get_int64_ne_indexed_by_int64 buf i
 [%%expect_asm X86_64{|
 bytes_get_int64_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   movq  (%rax,%rbx), %rax
   ret
 |}]
@@ -232,8 +223,6 @@ let bytes_set_int64_indexed_by_int64
   Bytes.unsafe_set_int64_ne_indexed_by_int64 buf i v
 [%%expect_asm X86_64{|
 bytes_set_int64_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   movq  %rdi, (%rax,%rbx)
   movl  $1, %eax
   ret
@@ -244,23 +233,17 @@ let bytes_get_int8_indexed_by_int64
   Bytes.unsafe_get_int8_indexed_by_int64 buf i
 [%%expect_asm X86_64{|
 bytes_get_int8_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   movsbq (%rax,%rbx), %rax
   leaq  1(%rax,%rax), %rax
   ret
 |}]
 
-(* CR ttebbi: Both index and value are needlessly sign-extended. *)
 let bytes_set_int8_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) (v : int) =
   Bytes.unsafe_set_int8_indexed_by_int64 buf i v
 [%%expect_asm X86_64{|
 bytes_set_int8_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
-  salq  $55, %rdi
-  sarq  $56, %rdi
+  sarq  $1, %rdi
   movb  %dil, (%rax,%rbx)
   movl  $1, %eax
   ret
@@ -271,8 +254,6 @@ let bytes_get_int32_indexed_by_int64
   Bytes.unsafe_get_int32_ne_indexed_by_int64 buf i
 [%%expect_asm X86_64{|
 bytes_get_int32_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   movslq (%rax,%rbx), %rax
   ret
 |}]
@@ -282,8 +263,6 @@ let bytes_set_int32_indexed_by_int64
   Bytes.unsafe_set_int32_ne_indexed_by_int64 buf i v
 [%%expect_asm X86_64{|
 bytes_set_int32_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   movl  %edi, (%rax,%rbx)
   movl  $1, %eax
   ret
@@ -294,8 +273,6 @@ let bytes_get_float32_indexed_by_int64
   Bytes.unsafe_get_float32_ne_indexed_by_int64 buf i
 [%%expect_asm X86_64{|
 bytes_get_float32_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   vmovss (%rax,%rbx), %xmm0
   ret
 |}]
@@ -305,9 +282,64 @@ let bytes_set_float32_indexed_by_int64
   Bytes.unsafe_set_float32_ne_indexed_by_int64 buf i v
 [%%expect_asm X86_64{|
 bytes_set_float32_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   vmovss %xmm0, (%rax,%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
+let bytes_get_int64_indexed_by_int32
+    (buf : bytes) (i : Int32_u.t) =
+  Bytes.unsafe_get_int64_ne_indexed_by_int32 buf i
+[%%expect_asm X86_64{|
+bytes_get_int64_indexed_by_int32:
+  movq  (%rax,%rbx), %rax
+  ret
+|}]
+
+let bytes_set_int64_indexed_by_int32
+    (buf : bytes) (i : Int32_u.t) (v : Int64_u.t) =
+  Bytes.unsafe_set_int64_ne_indexed_by_int32 buf i v
+[%%expect_asm X86_64{|
+bytes_set_int64_indexed_by_int32:
+  movq  %rdi, (%rax,%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
+let bytes_get_int64_indexed_by_int16
+    (buf : bytes) (i : int16#) =
+  Bytes.unsafe_get_int64_ne_indexed_by_int16 buf i
+[%%expect_asm X86_64{|
+bytes_get_int64_indexed_by_int16:
+  movq  (%rax,%rbx), %rax
+  ret
+|}]
+
+let bytes_set_int64_indexed_by_int16
+    (buf : bytes) (i : int16#) (v : Int64_u.t) =
+  Bytes.unsafe_set_int64_ne_indexed_by_int16 buf i v
+[%%expect_asm X86_64{|
+bytes_set_int64_indexed_by_int16:
+  movq  %rdi, (%rax,%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
+let bytes_get_int64_indexed_by_int8
+    (buf : bytes) (i : int8#) =
+  Bytes.unsafe_get_int64_ne_indexed_by_int8 buf i
+[%%expect_asm X86_64{|
+bytes_get_int64_indexed_by_int8:
+  movq  (%rax,%rbx), %rax
+  ret
+|}]
+
+let bytes_set_int64_indexed_by_int8
+    (buf : bytes) (i : int8#) (v : Int64_u.t) =
+  Bytes.unsafe_set_int64_ne_indexed_by_int8 buf i v
+[%%expect_asm X86_64{|
+bytes_set_int64_indexed_by_int8:
+  movq  %rdi, (%rax,%rbx)
   movl  $1, %eax
   ret
 |}]
@@ -317,8 +349,6 @@ let string_get_int8_indexed_by_int64
   String.unsafe_get_int8_indexed_by_int64 s i
 [%%expect_asm X86_64{|
 string_get_int8_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   movsbq (%rax,%rbx), %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -329,8 +359,6 @@ let string_get_int32_indexed_by_int64
   String.unsafe_get_int32_ne_indexed_by_int64 s i
 [%%expect_asm X86_64{|
 string_get_int32_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   movslq (%rax,%rbx), %rax
   ret
 |}]
@@ -340,8 +368,6 @@ let string_get_int64_indexed_by_int64
   String.unsafe_get_int64_ne_indexed_by_int64 s i
 [%%expect_asm X86_64{|
 string_get_int64_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   movq  (%rax,%rbx), %rax
   ret
 |}]
@@ -351,8 +377,6 @@ let string_get_float32_indexed_by_int64
   String.unsafe_get_float32_ne_indexed_by_int64 s i
 [%%expect_asm X86_64{|
 string_get_float32_indexed_by_int64:
-  salq  $1, %rbx
-  sarq  $1, %rbx
   vmovss (%rax,%rbx), %xmm0
   ret
 |}]
