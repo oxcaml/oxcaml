@@ -584,7 +584,7 @@ and traverse_let_cont denv acc (let_cont : Let_cont.t) : rev_expr =
 
 and traverse_let_cont_non_recursive denv acc cont ~body handler =
   let cont_handler = Non_recursive_let_cont_handler.handler handler in
-  let traverse handler acc =
+  let traverse_handler handler acc =
     let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
     let params = Bound_parameters.vars handler.bound_parameters in
     Acc.continuation_info acc cont ~params
@@ -626,7 +626,7 @@ and traverse_let_cont_non_recursive denv acc cont ~body handler =
       le_monde_exterieur = denv.le_monde_exterieur;
       all_constants = denv.all_constants
     }
-    acc cont_handler traverse
+    acc cont_handler traverse_handler
 
 and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
   let invariant_params_vars = Bound_parameters.vars invariant_params in
