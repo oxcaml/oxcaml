@@ -759,7 +759,11 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     | Assume _ -> false
     | Check _ -> true
   in
-  let code_dep = Acc.find_code acc code_id in
+  let code_dep =
+    match Acc.find_code acc code_id with
+    | Some code_dep -> code_dep
+    | None -> Misc.fatal_errorf "No code dep found for %a" Code_id.print code_id
+  in
   Acc.add_code_id_my_closure acc code_id my_closure;
   let maybe_opaque var = if is_opaque then Variable.rename var else var in
   let return = List.map maybe_opaque code_dep.return in

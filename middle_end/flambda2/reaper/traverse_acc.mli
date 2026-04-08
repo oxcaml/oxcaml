@@ -89,7 +89,7 @@ val get_continuation_info : t -> continuation_info Continuation.Map.t
 (* Code *)
 val add_code : t -> Code_id.t -> code_dep -> unit
 
-val find_code : t -> Code_id.t -> code_dep
+val find_code : t -> Code_id.t -> code_dep option
 
 val code_deps : t -> code_dep Code_id.Map.t
 

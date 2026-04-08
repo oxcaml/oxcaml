@@ -138,7 +138,7 @@ let alias_kind t name simple =
 
 let add_code t code_id dep = t.code <- Code_id.Map.add code_id dep t.code
 
-let find_code t code_id = Code_id.Map.find code_id t.code
+let find_code t code_id = Code_id.Map.find_opt code_id t.code
 
 let add_alias t ~to_ ~from = Graph.add_alias t.deps ~to_ ~from
 
@@ -456,7 +456,7 @@ let record_set_of_closure_deps t =
          conflicts in code that will be rewritten for unbox-fv-closures
          anyway. *)
       match find_code t code_id with
-      | exception Not_found ->
+      | None ->
         assert (
           not
             (Compilation_unit.is_current (Code_id.get_compilation_unit code_id)));
@@ -477,7 +477,7 @@ let record_set_of_closure_deps t =
           ~base:(Code_id_or_name.name name);
         add_constructor_dep t ~base:witness Field.code_id_of_call_witness
           ~from:(Code_id_or_name.name name)
-      | code_dep ->
+      | Some code_dep ->
         add_propagate_dep t
           ~to_:(Code_id_or_name.var code_dep.my_closure)
           ~from:(Code_id_or_name.name name)
