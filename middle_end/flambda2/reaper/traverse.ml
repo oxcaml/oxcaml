@@ -255,7 +255,7 @@ let traverse_static_set_of_closures denv acc ~closure_symbols set_of_closures =
 
 let traverse_block_like_static_const denv acc symbol
     (static_const : Static_const.t) =
-  let name = Name.symbol symbol in
+  let name = Name.symbol symbol |> Code_id_or_name.name in
   match static_const with
   | Block (_, _, _, fields) | Immutable_value_array fields ->
     List.iteri
@@ -264,17 +264,11 @@ let traverse_block_like_static_const denv acc symbol
         let from =
           Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field)
         in
-        Acc.add_constructor_dep acc
-          ~base:(Code_id_or_name.name name)
-          (Field.block i kind) ~from)
+        Acc.add_constructor_dep acc ~base:name (Field.block i kind) ~from)
       fields;
-    Acc.add_constructor_dep acc
-      ~base:(Code_id_or_name.name name)
-      Field.is_int
+    Acc.add_constructor_dep acc ~base:name Field.is_int
       ~from:(Code_id_or_name.name denv.all_constants);
-    Acc.add_constructor_dep acc
-      ~base:(Code_id_or_name.name name)
-      Field.get_tag
+    Acc.add_constructor_dep acc ~base:name Field.get_tag
       ~from:(Code_id_or_name.name denv.all_constants)
   | Set_of_closures _ ->
     Misc.fatal_errorf
@@ -289,9 +283,7 @@ let traverse_block_like_static_const denv acc symbol
   | Immutable_nativeint_array _ | Immutable_vec128_array _
   | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
   | Mutable_string _ | Immutable_string _ ->
-    Acc.add_alias acc
-      ~to_:(Code_id_or_name.name name)
-      ~from:(Code_id_or_name.name denv.all_constants)
+    Acc.add_alias acc ~to_:name ~from:(Code_id_or_name.name denv.all_constants)
 
 let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
   let bound_static =
