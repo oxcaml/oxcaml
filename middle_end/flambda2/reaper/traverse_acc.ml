@@ -426,6 +426,7 @@ let record_set_of_closure_deps t =
            closure_code_id = code_id;
            only_full_applications = _
          } ->
+      let name = Code_id_or_name.name name in
       (* CR ncourant: use only_full_applications; not done here to avoid
          conflicts in code that will be rewritten for unbox-fv-closures
          anyway. *)
@@ -446,23 +447,21 @@ let record_set_of_closure_deps t =
         in
         add_any_source t witness;
         add_constructor_dep t ~from:witness Field.known_arity_call_witness
-          ~base:(Code_id_or_name.name name);
+          ~base:name;
         add_constructor_dep t ~from:witness Field.unknown_arity_call_witness
-          ~base:(Code_id_or_name.name name);
+          ~base:name;
         add_constructor_dep t ~base:witness Field.code_id_of_call_witness
-          ~from:(Code_id_or_name.name name)
+          ~from:name
       | Some code_dep ->
         add_propagate_dep t
           ~to_:(Code_id_or_name.var code_dep.my_closure)
-          ~from:(Code_id_or_name.name name)
+          ~from:name
           ~if_used:(Code_id_or_name.code_id code_id);
         add_constructor_dep t ~from:code_dep.known_arity_call_witness
-          Field.known_arity_call_witness
-          ~base:(Code_id_or_name.name name);
+          Field.known_arity_call_witness ~base:name;
         add_constructor_dep t
           ~from:(List.hd code_dep.unknown_arity_call_witnesses)
-          Field.unknown_arity_call_witness
-          ~base:(Code_id_or_name.name name))
+          Field.unknown_arity_call_witness ~base:name)
     t.set_of_closures_dep
 
 let deps t ~all_constants =
