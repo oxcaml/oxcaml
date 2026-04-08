@@ -65,6 +65,11 @@ let remove_new eqs r =
           partners eqs.old_to_new
     }
 
+let remove_pair eqs ~old_r ~new_r =
+  { old_to_new = remove_from_map new_r old_r eqs.old_to_new;
+    new_to_old = remove_from_map old_r new_r eqs.new_to_old
+  }
+
 (* Old move: dst <- src. Replace dst with src on the
    old side of all pairs containing dst. *)
 let subst_old_move eqs ~src ~dst =
@@ -113,7 +118,7 @@ let fold_left2_arr f init a b =
 
 let is_move (i : Cfg.basic Cfg.instruction) =
   match i.desc with
-  | Op Move ->
+  | Op (Move | Opaque) ->
     Array.length i.arg = 1
     && Array.length i.res = 1
     && i.arg.(0).Reg.loc = Reg.Unknown
@@ -129,7 +134,9 @@ let basic_desc_match label_map (old_d : Cfg.basic)
     Poptrap { lbl_handler = nl } -> (
     match Label.Tbl.find_opt label_map nl with
     | Some mapped -> Label.equal mapped ol
-    | None -> false)
+    | None ->
+      Label.Tbl.replace label_map nl ol;
+      true)
   | _ -> Cfg.equal_basic old_d new_d
 
 let terminator_structure_match label_map
@@ -150,6 +157,15 @@ let terminator_structure_match label_map
   | Truth_test ot, Truth_test nt ->
     map_label ot.ifso nt.ifso
     && map_label ot.ifnot nt.ifnot
+  (* Truth_test ≈ Int_test with Cne/Ceq 0 *)
+  | ( Int_test { lt; eq; gt; imm = Some 0; _ },
+      Truth_test { ifso; ifnot } )
+    when Label.equal lt gt ->
+    map_label lt ifso && map_label eq ifnot
+  | ( Truth_test { ifso; ifnot },
+      Int_test { lt; eq; gt; imm = Some 0; _ } )
+    when Label.equal lt gt ->
+    map_label ifso lt && map_label ifnot eq
   | Int_test ot, Int_test nt ->
     map_label ot.lt nt.lt
     && map_label ot.eq nt.eq
@@ -178,8 +194,10 @@ let terminator_structure_match label_map
   | Prim op, Prim np ->
     Cfg.equal_prim_call_operation op.op np.op
     && map_label op.label_after np.label_after
-  | Invalid oi, Invalid ni ->
-    String.equal oi.message ni.message
+  | Invalid _, Invalid _ ->
+    (* Invalid blocks are unreachable; don't compare
+       args or messages *)
+    true
   | ( ( Never | Always _ | Parity_test _
       | Truth_test _ | Int_test _ | Float_test _
       | Switch _ | Return | Raise _
@@ -197,6 +215,10 @@ let terminator_structure_match label_map
 let process_backward ~ppf_check label_map eqs
     ~(old_block : Cfg.basic_block)
     ~(new_block : Cfg.basic_block) =
+  (* Skip unreachable blocks *)
+  match old_block.terminator.desc, new_block.terminator.desc with
+  | Invalid _, Invalid _ -> eqs
+  | _ ->
   let report fmt =
     match ppf_check with
     | None -> Format.ifprintf Format.std_formatter fmt
@@ -205,15 +227,7 @@ let process_backward ~ppf_check label_map eqs
   let ol = old_block.start in
   let nl = new_block.start in
   let add_reg_pairs eqs old_regs new_regs =
-    if Array.length old_regs
-       <> Array.length new_regs
-    then (
-      report
-        "Reg count mismatch at old=%a new=%a@."
-        Label.format ol Label.format nl;
-      eqs)
-    else
-      fold_left2_arr
+    fold_left2_arr
         (fun eqs old_r new_r ->
           if old_r.Reg.loc <> Reg.Unknown
              && new_r.Reg.loc <> Reg.Unknown
@@ -228,14 +242,19 @@ let process_backward ~ppf_check label_map eqs
           else add_pair eqs ~old_r ~new_r)
         eqs old_regs new_regs
   in
-  let check_results eqs
+  (* After removing matched output pairs (old_res[i],
+     new_res[i]), check that no equations remain for
+     those output registers. If they do, it means some
+     use requires the output to equal a register that
+     the instruction doesn't produce. *)
+  let check_residual_outputs eqs
       (old_i : Cfg.basic Cfg.instruction)
       (new_i : Cfg.basic Cfg.instruction) =
     match ppf_check with
     | None -> ()
     | Some _ ->
-      Array.iteri
-        (fun i old_r ->
+      Array.iter
+        (fun old_r ->
           match
             Reg.Map.find_opt old_r eqs.old_to_new
           with
@@ -243,19 +262,23 @@ let process_backward ~ppf_check label_map eqs
           | Some new_rs ->
             Reg.Set.iter
               (fun new_r ->
-                if i < Array.length new_i.res
-                   && not
-                        (Reg.same new_r new_i.res.(i))
-                then
-                  report
-                    "Result mismatch at old=%a \
-                     new=%a: old_res[%d] paired with \
-                     wrong new reg@."
-                    Label.format ol Label.format nl i)
+                report
+                  "Residual output equation at \
+                   old=%a(id:%a) new=%a(id:%a): \
+                   %a still paired with %a \
+                   after removing matched outputs \
+                   (%a)@."
+                  Label.format ol
+                  InstructionId.print old_i.id
+                  Label.format nl
+                  InstructionId.print new_i.id
+                  Printreg.reg old_r
+                  Printreg.reg new_r
+                  Cfg.dump_basic old_i.desc)
               new_rs)
         old_i.res;
-      Array.iteri
-        (fun i new_r ->
+      Array.iter
+        (fun new_r ->
           match
             Reg.Map.find_opt new_r eqs.new_to_old
           with
@@ -263,15 +286,19 @@ let process_backward ~ppf_check label_map eqs
           | Some old_rs ->
             Reg.Set.iter
               (fun old_r ->
-                if i < Array.length old_i.res
-                   && not
-                        (Reg.same old_r old_i.res.(i))
-                then
-                  report
-                    "Result mismatch at old=%a \
-                     new=%a: new_res[%d] paired with \
-                     wrong old reg@."
-                    Label.format ol Label.format nl i)
+                report
+                  "Residual output equation at \
+                   old=%a(id:%a) new=%a(id:%a): \
+                   %a still paired with %a \
+                   after removing matched outputs \
+                   (%a)@."
+                  Label.format ol
+                  InstructionId.print old_i.id
+                  Label.format nl
+                  InstructionId.print new_i.id
+                  Printreg.reg new_r
+                  Printreg.reg old_r
+                  Cfg.dump_basic new_i.desc)
               old_rs)
         new_i.res
   in
@@ -284,7 +311,30 @@ let process_backward ~ppf_check label_map eqs
   let eqs =
     Array.fold_left remove_new eqs new_t.res
   in
-  let eqs = add_reg_pairs eqs old_t.arg new_t.arg in
+  let eqs =
+    match old_t.desc with
+    | Invalid _ ->
+      (* Invalid blocks are unreachable; skip arg
+         comparison *)
+      eqs
+    | _ ->
+      if Array.length old_t.arg
+         <> Array.length new_t.arg
+      then (
+        report
+          "Reg count mismatch at old=%a(id:%a) \
+           new=%a(id:%a): %d vs %d regs in \
+           terminator %a vs %a@."
+          Label.format ol InstructionId.print
+          old_t.id Label.format nl
+          InstructionId.print new_t.id
+          (Array.length old_t.arg)
+          (Array.length new_t.arg)
+          (Cfg.dump_terminator ~sep:"") old_t.desc
+          (Cfg.dump_terminator ~sep:"") new_t.desc;
+        eqs)
+      else add_reg_pairs eqs old_t.arg new_t.arg
+  in
   (* Process body backwards *)
   let old_rev = List.rev (DLL.to_list old_block.body) in
   let new_rev = List.rev (DLL.to_list new_block.body) in
@@ -311,14 +361,32 @@ let process_backward ~ppf_check label_map eqs
               ni.desc)
       then (
         report
-          "Instruction mismatch at old=%a new=%a: \
-           %a vs %a@."
-          Label.format ol Label.format nl
+          "Instruction mismatch at old=%a(id:%a) \
+           new=%a(id:%a): %a vs %a@."
+          Label.format ol InstructionId.print oi.id
+          Label.format nl InstructionId.print ni.id
           Cfg.dump_basic oi.desc Cfg.dump_basic
           ni.desc;
         eqs)
       else (
-        check_results eqs oi ni;
+        (* Remove matched output pairs *)
+        let eqs =
+          let n =
+            min (Array.length oi.res)
+              (Array.length ni.res)
+          in
+          let eqs = ref eqs in
+          for i = 0 to n - 1 do
+            eqs :=
+              remove_pair !eqs ~old_r:oi.res.(i)
+                ~new_r:ni.res.(i)
+          done;
+          !eqs
+        in
+        (* Check no residual equations remain on
+           output registers *)
+        check_residual_outputs eqs oi ni;
+        (* Remove any remaining output equations *)
         let eqs =
           Array.fold_left remove_old eqs oi.res
         in
@@ -326,7 +394,23 @@ let process_backward ~ppf_check label_map eqs
           Array.fold_left remove_new eqs ni.res
         in
         let eqs =
-          add_reg_pairs eqs oi.arg ni.arg
+          if Array.length oi.arg
+             <> Array.length ni.arg
+          then (
+            report
+              "Reg count mismatch at \
+               old=%a(id:%a) new=%a(id:%a): \
+               %d vs %d regs in %a@."
+              Label.format ol
+              InstructionId.print oi.id
+              Label.format nl
+              InstructionId.print ni.id
+              (Array.length oi.arg)
+              (Array.length ni.arg)
+              Cfg.dump_basic oi.desc;
+            eqs)
+          else
+            add_reg_pairs eqs oi.arg ni.arg
         in
         loop eqs old_rest new_rest)
     | _ :: _, [] | [], _ :: _ ->
@@ -340,7 +424,8 @@ let process_backward ~ppf_check label_map eqs
 
 (* === Entry point === *)
 
-let compare ~fun_name ~old_cfg ~new_cfg ppf =
+let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg
+    ppf =
   let old_cfg_t = Cfg_with_layout.cfg old_cfg in
   let new_cfg_t = Cfg_with_layout.cfg new_cfg in
   let mismatches = Buffer.create 256 in
@@ -364,10 +449,19 @@ let compare ~fun_name ~old_cfg ~new_cfg ppf =
     if not (Label.Set.mem ol !visited)
     then (
       visited := Label.Set.add ol !visited;
+      let ob = Cfg.get_block old_cfg_t ol in
+      let nb = Cfg.get_block new_cfg_t nl in
+      match ob, nb with
+      | None, _ | _, None ->
+        Format.fprintf ppf_m
+          "Missing block: old=%a(%s) new=%a(%s)@."
+          Label.format ol
+          (if ob = None then "missing" else "ok")
+          Label.format nl
+          (if nb = None then "missing" else "ok")
+      | Some ob, Some nb ->
       Label.Tbl.replace block_pairs ol nl;
       Label.Tbl.replace preds ol [];
-      let ob = Cfg.get_block_exn old_cfg_t ol in
-      let nb = Cfg.get_block_exn new_cfg_t nl in
       if not
            (Bool.equal ob.is_trap_handler
               nb.is_trap_handler)
@@ -400,8 +494,15 @@ let compare ~fun_name ~old_cfg ~new_cfg ppf =
               ob.terminator.desc nb.terminator.desc)
       then
         Format.fprintf ppf_m
-          "Terminator mismatch at old=%a new=%a@."
-          Label.format ol Label.format nl;
+          "Terminator mismatch at old=%a(id:%a) \
+           new=%a(id:%a): %a vs %a@."
+          Label.format ol InstructionId.print
+          ob.terminator.id Label.format nl
+          InstructionId.print nb.terminator.id
+          (Cfg.dump_terminator ~sep:"")
+          ob.terminator.desc
+          (Cfg.dump_terminator ~sep:"")
+          nb.terminator.desc;
       (* Enqueue successor pairs *)
       Label.Set.iter
         (fun ns ->
@@ -464,15 +565,31 @@ let compare ~fun_name ~old_cfg ~new_cfg ppf =
         (Label.Tbl.find preds ol)
   done;
   (* Phase 3: Verification pass *)
+  let entry_start_eqs = ref empty_eqs in
   Label.Tbl.iter
     (fun ol nl ->
       let ob = Cfg.get_block_exn old_cfg_t ol in
       let nb = Cfg.get_block_exn new_cfg_t nl in
       let eqs = Label.Tbl.find block_eqs ol in
-      ignore
-        (process_backward ~ppf_check:(Some ppf_m)
-           label_map eqs ~old_block:ob ~new_block:nb))
+      let start_eqs =
+        process_backward ~ppf_check:(Some ppf_m)
+          label_map eqs ~old_block:ob ~new_block:nb
+      in
+      if Label.equal ol old_entry
+      then entry_start_eqs := start_eqs)
     block_pairs;
+  if not (eqs_equal !entry_start_eqs empty_eqs)
+  then (
+    Format.fprintf ppf_m
+      "Undischarged equations at entry:@.";
+    Reg.Map.iter
+      (fun old_r new_rs ->
+        Reg.Set.iter
+          (fun new_r ->
+            Format.fprintf ppf_m "  %a -> %a@."
+              Printreg.reg old_r Printreg.reg new_r)
+          new_rs)
+      (!entry_start_eqs).old_to_new);
   (* Check block counts *)
   let old_count = Label.Tbl.length old_cfg_t.blocks in
   let new_count = Label.Tbl.length new_cfg_t.blocks in
@@ -489,6 +606,10 @@ let compare ~fun_name ~old_cfg ~new_cfg ppf =
     Format.fprintf ppf
       "*** CFG comparison MISMATCH for %s:@.%s@."
       fun_name msg;
+    Format.fprintf ppf "*** CMM:@.%a@."
+      Printcmm.fundecl fd_cmm;
+    Format.fprintf ppf "*** SSA:@.%a@."
+      Ssa.print ssa;
     Format.fprintf ppf "*** Old CFG:@.%a@."
       (Cfg_with_layout.dump ~msg:"") old_cfg;
     Format.fprintf ppf

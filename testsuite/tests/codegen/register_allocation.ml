@@ -36,7 +36,13 @@ spill_cold_path:
   movq  %rax, (%rsp)
   movl  $1, %eax
   call  camlTOP2__cold_1_3_code@PLT
+<<<<<<< HEAD
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+.L119:
+=======
+.L127:
+>>>>>>> de3d4ac415 (working prototype)
   movq  (%rsp), %rax
 .L1:
   addq  $4, %rax
@@ -107,11 +113,23 @@ f:
   subq  $24, %rsp
   movq  %rax, (%rsp)
   call  camlTOP7__g_11_13_code@PLT
+<<<<<<< HEAD
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+.L108:
+=======
+.L112:
+>>>>>>> de3d4ac415 (working prototype)
   movq  %rax, 8(%rsp)
   movq  (%rsp), %rax
   call  camlTOP7__g_11_13_code@PLT
+<<<<<<< HEAD
 .L1:
+||||||| parent of de3d4ac415 (working prototype)
+.L109:
+=======
+.L113:
+>>>>>>> de3d4ac415 (working prototype)
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
   addq  $24, %rsp
@@ -143,7 +161,13 @@ loop_readonly_use_spilled_var:
   ret
 .L1:
   call  camlTOP8__g_15_18_code@PLT
+<<<<<<< HEAD
 .L2:
+||||||| parent of de3d4ac415 (working prototype)
+.L117:
+=======
+.L124:
+>>>>>>> de3d4ac415 (working prototype)
   movq  (%rsp), %rbx
   cmpq  $1, %rax
   jge   .L1
@@ -179,7 +203,13 @@ spill_unspill_loop_movement:
 .L0:
   movq  %rdi, 16(%rsp)
   call  camlTOP9__f_20_23_code@PLT
+<<<<<<< HEAD
 .L1:
+||||||| parent of de3d4ac415 (working prototype)
+.L145:
+=======
+.L164:
+>>>>>>> de3d4ac415 (working prototype)
   movq  %rax, %rsi
   movq  16(%rsp), %rdi
   movq  %rdi, %rdx
@@ -191,7 +221,13 @@ spill_unspill_loop_movement:
   movq  %rsi, 32(%rsp)
   movq  %rdi, 16(%rsp)
   call  camlTOP9__f_20_23_code@PLT
+<<<<<<< HEAD
 .L2:
+||||||| parent of de3d4ac415 (working prototype)
+.L146:
+=======
+.L165:
+>>>>>>> de3d4ac415 (working prototype)
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   movq  16(%rsp), %rdi
@@ -249,7 +285,7 @@ spill_xmm_on_caml_modify:
   movq  %rax, %r12
   vmovsd (%r12), %xmm0
   vmovsd %xmm0, (%rsp)
-  vmovsd .L109(%rip), %xmm0
+  vmovsd .L116(%rip), %xmm0
   vmovsd (%rsp), %xmm1
   vaddsd %xmm0, %xmm1, %xmm0
   vmovsd %xmm0, 8(%rsp)
@@ -291,7 +327,13 @@ unnecessary_moves:
   movq  (%rbx), %rdi
   movq  %r8, %rax
   call  *%rdi
+<<<<<<< HEAD
 .L1:
+||||||| parent of de3d4ac415 (working prototype)
+.L117:
+=======
+.L125:
+>>>>>>> de3d4ac415 (working prototype)
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
@@ -315,7 +357,13 @@ spill_one_or_two:
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
+<<<<<<< HEAD
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+.L107:
+=======
+.L111:
+>>>>>>> de3d4ac415 (working prototype)
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
@@ -357,8 +405,16 @@ double_loop_no_definition_at_beginning:
   subq  $40, %rbx
   movq  %rbx, 64(%r14)
   cmpq  80(%r14), %rbx
-  jl    <hidden GC jump pad>
+<<<<<<< HEAD
+  jl    .L156
 .L1:
+||||||| parent of de3d4ac415 (working prototype)
+  jl    .L156
+.L157:
+=======
+  jl    .L182
+.L183:
+>>>>>>> de3d4ac415 (working prototype)
   addq  72(%r14), %rbx
   addq  $8, %rbx
   movq  $5111, -8(%rbx)
@@ -378,7 +434,13 @@ double_loop_no_definition_at_beginning:
   movq  (%rdx), %rax
   movq  %rdx, 56(%rsp)
   call  camlTOP15__f_33_37_code@PLT
+<<<<<<< HEAD
 .L3:
+||||||| parent of de3d4ac415 (working prototype)
+.L158:
+=======
+.L184:
+>>>>>>> de3d4ac415 (working prototype)
   movq  56(%rsp), %rdx
   movq  8(%rdx), %rdx
   movq  24(%rsp), %rax
@@ -407,12 +469,24 @@ double_loop_no_definition_at_beginning.f:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rax
+<<<<<<< HEAD
   jae   .L0
+||||||| parent of de3d4ac415 (working prototype)
+  jae   .L177
+=======
+  jae   .L203
+>>>>>>> de3d4ac415 (working prototype)
   movq  16(%rbx), %rbx
   movq  %rbx, -4(%rsi,%rax,4)
   movl  $1, %eax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+.L177:
+=======
+.L203:
+>>>>>>> de3d4ac415 (working prototype)
   movq  camlTOP15__block741@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -453,8 +527,16 @@ spilled_phi_merge:
   movq  (%rbx), %rdi
   movq  48(%rsp), %rbx
   call  *%rdi
+<<<<<<< HEAD
 .L0:
   movq  (%rsp), %rax
+||||||| parent of de3d4ac415 (working prototype)
+.L120:
+  movq  (%rsp), %rsi
+=======
+.L129:
+  movq  (%rsp), %rsi
+>>>>>>> de3d4ac415 (working prototype)
   movq  8(%rsp), %rbp
   movq  16(%rsp), %rbx
   movq  24(%rsp), %rdi
@@ -501,35 +583,83 @@ spill_slot_lifetime:
   subq  $56, %rsp
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
+<<<<<<< HEAD
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+.L127:
+=======
+.L144:
+>>>>>>> de3d4ac415 (working prototype)
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
+<<<<<<< HEAD
 .L1:
+||||||| parent of de3d4ac415 (working prototype)
+.L128:
+=======
+.L145:
+>>>>>>> de3d4ac415 (working prototype)
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
+<<<<<<< HEAD
 .L2:
+||||||| parent of de3d4ac415 (working prototype)
+.L129:
+=======
+.L146:
+>>>>>>> de3d4ac415 (working prototype)
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
+<<<<<<< HEAD
 .L3:
+||||||| parent of de3d4ac415 (working prototype)
+.L130:
+=======
+.L147:
+>>>>>>> de3d4ac415 (working prototype)
   vmovsd %xmm0, 24(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
+<<<<<<< HEAD
 .L4:
+||||||| parent of de3d4ac415 (working prototype)
+.L131:
+=======
+.L148:
+>>>>>>> de3d4ac415 (working prototype)
   vmovsd %xmm0, 32(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
+<<<<<<< HEAD
 .L5:
+||||||| parent of de3d4ac415 (working prototype)
+.L132:
+=======
+.L149:
+>>>>>>> de3d4ac415 (working prototype)
   vmovsd %xmm0, 40(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
+<<<<<<< HEAD
 .L6:
+||||||| parent of de3d4ac415 (working prototype)
+.L133:
+=======
+.L150:
+>>>>>>> de3d4ac415 (working prototype)
   vmovsd %xmm0, 48(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
+<<<<<<< HEAD
 .L7:
+||||||| parent of de3d4ac415 (working prototype)
+.L134:
+=======
+.L151:
+>>>>>>> de3d4ac415 (working prototype)
   vxorpd %xmm1, %xmm1, %xmm1
   vmovsd (%rsp), %xmm2
   vaddsd %xmm2, %xmm1, %xmm1
@@ -550,7 +680,7 @@ spill_slot_lifetime:
   ret
 
 spill_slot_lifetime.get_one:
-  vmovsd .L138(%rip), %xmm0
+  vmovsd .L156(%rip), %xmm0
   ret
 |}]
 

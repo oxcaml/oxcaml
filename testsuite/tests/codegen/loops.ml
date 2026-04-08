@@ -40,7 +40,13 @@ loop_code_layout:
   movq  %rbx, (%rsp)
   movl  $1, %eax
   call  camlTOP2__cold_1_4_code@PLT
+<<<<<<< HEAD
 .L1:
+||||||| parent of de3d4ac415 (working prototype)
+.L118:
+=======
+.L126:
+>>>>>>> de3d4ac415 (working prototype)
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
@@ -71,7 +77,13 @@ for_loop_layout:
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
+<<<<<<< HEAD
 .L1:
+||||||| parent of de3d4ac415 (working prototype)
+.L124:
+=======
+.L135:
+>>>>>>> de3d4ac415 (working prototype)
   movq  16(%rsp), %rax
   incq  %rax
   movq  (%rsp), %rbx
@@ -131,8 +143,16 @@ f:
   subq  $8, %rsp
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+  jb    .L105
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+  jb    .L105
+.L107:
+=======
+  jb    .L108
+.L110:
+>>>>>>> de3d4ac415 (working prototype)
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
   movq  camlTOP5__do_work_11_15_code@GOTPCREL(%rip), %rdi
@@ -148,12 +168,24 @@ f.do_work:
   movq  16(%rbx), %rax
   leaq  -1(%rax,%rax), %rax
   movl  $1, %edi
+<<<<<<< HEAD
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+.L120:
+=======
+.L123:
+>>>>>>> de3d4ac415 (working prototype)
   movq  16(%rbx), %rsi
   leaq  -1(%rax,%rsi), %rax
   incq  %rdi
   cmpq  $100, %rdi
+<<<<<<< HEAD
   jle   .L0
+||||||| parent of de3d4ac415 (working prototype)
+  jle   .L120
+=======
+  jle   .L123
+>>>>>>> de3d4ac415 (working prototype)
   ret
 |}]
 

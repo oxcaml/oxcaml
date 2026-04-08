@@ -28,7 +28,7 @@ let rec get_regs env (i : Ssa.instruction) : Reg.t array =
     with Not_found ->
       Misc.fatal_errorf "Cfg_of_ssa: no regs for Op %d"
         (Ssa.InstructionId.hash id))
-  | Block_param { block; index } -> (
+  | Block_param { block; index; _ } -> (
     try
       let regs =
         Label.Tbl.find env.block_params_regs block
@@ -98,23 +98,33 @@ let emit_moves body ~src ~dst =
     src dst
 
 let reconstruct_test renv (cond : Ssa.instruction)
-    ~true_label ~false_label : Cfg.terminator * Reg.t array =
+    ~true_label ~false_label :
+    Cfg.terminator * Reg.t array =
   match cond with
+  (* Truth test wrapper: Cne 0 folds to Truth_test *)
+  | Op { op = Intop_imm (Icomp Cne, 0); args; _ } ->
+    let arg = concat_map_regs (get_regs renv) args in
+    ( Cfg.Truth_test
+        { ifso = true_label; ifnot = false_label },
+      arg )
   | Op { op = Intop (Icomp cmp); args; _ } ->
     let arg = concat_map_regs (get_regs renv) args in
     ( Select_utils.terminator_of_test (Iinttest cmp)
-        ~label_true:true_label ~label_false:false_label,
+        ~label_true:true_label
+        ~label_false:false_label,
       arg )
   | Op { op = Intop_imm (Icomp cmp, n); args; _ } ->
     let arg = concat_map_regs (get_regs renv) args in
     ( Select_utils.terminator_of_test
-        (Iinttest_imm (cmp, n)) ~label_true:true_label
+        (Iinttest_imm (cmp, n))
+        ~label_true:true_label
         ~label_false:false_label,
       arg )
   | Op { op = Floatop (w, Icompf cmp); args; _ } ->
     let arg = concat_map_regs (get_regs renv) args in
     ( Select_utils.terminator_of_test
-        (Ifloattest (w, cmp)) ~label_true:true_label
+        (Ifloattest (w, cmp))
+        ~label_true:true_label
         ~label_false:false_label,
       arg )
   | Op { op = Intop_imm (Iand, 1); args; _ } ->
@@ -128,6 +138,13 @@ let reconstruct_test renv (cond : Ssa.instruction)
         { ifso = true_label; ifnot = false_label },
       arg )
 
+(* Always fold a comparison that flows directly into
+   the Branch condition. For Itruetest/Ifalsetest,
+   the condition is a raw value (not a comparison Op),
+   so it won't match and falls to Truth_test. For
+   cases where Cmm-to-SSA bound a comparison in a
+   Clet, ssa_of_cmm should add an extra truth-test
+   layer so the folding produces the right result. *)
 let branch_cond_id (block : Ssa.basic_block) :
     Ssa.InstructionId.t option =
   match block.terminator with
@@ -150,9 +167,18 @@ let branch_cond_id (block : Ssa.basic_block) :
   | _ -> None
 
 module Make (Target : Cfg_selectgen_target_intf.S) = struct
+  let pad_to a target_len filler =
+    let n = Array.length a in
+    if n >= target_len then a
+    else
+      Array.init target_len (fun i ->
+        if i < n then a.(i) else filler.(i))
+
   let emit_op body op dbg rs rd =
     match Target.pseudoregs_for_operation op rs rd with
     | Constrained (rsrc, rdst) ->
+      let rs = pad_to rs (Array.length rsrc) rsrc in
+      let rd = pad_to rd (Array.length rdst) rdst in
       emit_moves body ~src:rs ~dst:rsrc;
       DLL.add_end body
         (make_cfg_instr (Cfg.Op op) rsrc rdst dbg);
@@ -190,9 +216,15 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
              [||] [||] Debuginfo.none)
     | None -> ())
   | TrapHandler _ ->
+    (* Only move the exn bucket into the first param,
+       matching cfg_selectgen setup_catch_handler.
+       Extra handler params (e.g. from reraise with
+       extra state) are kept alive across the try body
+       by the register allocator. *)
     let virt_res = get_block_params_regs renv block in
     let exn_bucket = [| Proc.loc_exn_bucket |] in
-    emit_moves body ~src:exn_bucket ~dst:virt_res
+    let first_param = [| virt_res.(0) |] in
+    emit_moves body ~src:exn_bucket ~dst:first_param
   | Merge _ | FunctionStart -> ());
   Array.iter
     (fun (bi : Ssa.body_instruction) ->
@@ -246,7 +278,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let src_regs =
         concat_map_regs (get_regs renv) args
       in
-      emit_moves body ~src:src_regs ~dst:dst_regs;
+      (* Use intermediate registers to handle cases
+         where src and dst overlap (e.g. loop-carried
+         phi nodes), matching cfg_selectgen. *)
+      let tmp_regs = Reg.createv_with_typs src_regs in
+      emit_moves body ~src:src_regs ~dst:tmp_regs;
+      emit_moves body ~src:tmp_regs ~dst:dst_regs;
       ( make_cfg_instr (Cfg.Always goto) [||] [||]
           Debuginfo.none,
         false )
@@ -263,8 +300,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Misc.fatal_error
           "Cfg_of_ssa: multi-condition Branch not yet \
            supported")
-    | Switch labels ->
-      ( make_cfg_instr (Cfg.Switch labels) [||] [||]
+    | Switch (labels, args) ->
+      let arg =
+        concat_map_regs (get_regs renv) args
+      in
+      ( make_cfg_instr (Cfg.Switch labels) arg [||]
           Debuginfo.none,
         false )
     | Return args ->
@@ -276,10 +316,43 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       ( make_cfg_instr Cfg.Return loc_res [||]
           Debuginfo.none,
         false )
-    | Raise (k, args) ->
-      let exn_val = concat_map_regs (get_regs renv) args in
+    | Raise (k, args, handler_label) ->
+      let exn_val =
+        concat_map_regs (get_regs renv) args
+      in
       let exn_bucket = [| Proc.loc_exn_bucket |] in
-      emit_moves body ~src:exn_val ~dst:exn_bucket;
+      (* Move exn value to exn bucket, and extra
+         args (from reraise) to the handler's extra
+         param registers, matching cfg_selectgen
+         emit_expr_raise. *)
+      let extra_dst =
+        match handler_label with
+        | Some hl -> (
+          match Label.Tbl.find_opt ssa.blocks hl
+          with
+          | Some handler_block ->
+            let handler_regs =
+              get_block_params_regs renv
+                handler_block
+            in
+            (* Skip the first param (exn bucket) *)
+            if Array.length handler_regs > 1
+            then
+              Array.sub handler_regs 1
+                (Array.length handler_regs - 1)
+            else [||]
+          | None -> [||])
+        | None -> [||]
+      in
+      let dst =
+        Array.append exn_bucket extra_dst
+      in
+      let src =
+        if Array.length exn_val > Array.length dst
+        then Array.sub exn_val 0 (Array.length dst)
+        else exn_val
+      in
+      emit_moves body ~src ~dst;
       ( make_cfg_instr (Cfg.Raise k) exn_bucket [||]
           Debuginfo.none,
         true )
@@ -451,13 +524,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let is_trap_handler =
     match block.desc with TrapHandler _ -> true | _ -> false
   in
-  let exn =
-    match block.terminator with
-    | Call { exn_continuation; _ }
-    | Prim { exn_continuation; _ } ->
-      exn_continuation
-    | _ -> None
-  in
+  let exn = None in
   { Cfg.start = block.label;
     body;
     terminator;

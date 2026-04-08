@@ -85,6 +85,13 @@ to_float:
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+  jb    .L105
+.L107:
+=======
+  jb    .L108
+.L110:
+>>>>>>> de3d4ac415 (working prototype)
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vcvtss2sd %xmm0, %xmm0, %xmm0
