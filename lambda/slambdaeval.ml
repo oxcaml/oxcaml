@@ -291,6 +291,10 @@ and eval_lam_shallow env lam =
   | Lsplice (_loc, slam) ->
     let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
     halves.slv_runtime
+  | Ltemplate _ | Linstantiate _ ->
+    (* These constructors only exist in tlambda, fracturing has removed them
+       (and replaced them with SLtemplate and SLinstantiate). *)
+    Lambda.fatal_error_invalid_constructor lam
   | Lvar _ | Lmutvar _
   | Lstaticraise (_, _)
   | Lsequence (_, _)
@@ -325,6 +329,9 @@ and eval_structured_const env const =
       Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
     in
     if new_consts == old_consts then const else Const_block (n, new_consts)
+  | Const_layout old_layout ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then const else Const_layout new_layout
   | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
   | Const_null ->
     const

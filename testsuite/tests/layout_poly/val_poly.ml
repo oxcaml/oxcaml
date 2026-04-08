@@ -343,8 +343,7 @@ module F (M : sig val f : layout_ x. ('a : x). 'a -> 'a end  @ static) = struct
   let () = let _ = M.f in ()
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]

@@ -42,7 +42,12 @@ let create_dynamic sval_runtime =
     so does nothing. *)
 let fracture_const lambda = function
   | Const_layout layout ->
-    SLhalves { sval_comptime = SLlayout layout; sval_runtime = lambda }
+    SLhalves
+      { sval_comptime = SLlayout layout;
+        sval_runtime =
+          Lprim
+            (Punbox_unit, [lambda_unit], Debuginfo.Scoped_location.Loc_unknown)
+      }
   | _ -> SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
 
 let rec fracture_lam lambda : slambda =
@@ -331,7 +336,8 @@ let rec fracture_lam lambda : slambda =
        slambda) and Lsplice only exists in slambda. *)
     fatal_error_invalid_constructor lambda
   | Ltemplate
-      ({ kind; params; return; body; attr; loc; mode; ret_mode }, free_vars) ->
+      ({ kind = _; params; return; body; attr; loc; mode; ret_mode }, free_vars)
+    ->
     let free_vars = Ident.Map.to_list free_vars in
     let free_vars_shape =
       List.map
@@ -369,8 +375,16 @@ let rec fracture_lam lambda : slambda =
           SLhalves
             { sval_comptime = body_c;
               sval_runtime =
-                lfunction ~kind ~params:(closure_param :: params) ~return ~body
-                  ~attr ~loc ~mode ~ret_mode
+                lfunction
+                  ~kind:
+                    (Curried
+                       { nlocal =
+                           (match mode with
+                           | Alloc_heap -> 0
+                           | Alloc_local -> 1)
+                       })
+                  ~params:[closure_param] ~return ~body ~attr ~loc ~mode
+                  ~ret_mode
             })
     in
     let free_vars_shape =
@@ -397,6 +411,8 @@ let rec fracture_lam lambda : slambda =
   | Linstantiate ({ ap_func; ap_args; ap_loc } as app) ->
     slet_local "fun" ap_func (fun fun_c fun_r ->
         slet_local_list "arg" ap_args (fun args_c args_r ->
+            (* Currently all instantiation args are erased kinds. *)
+            ignore args_r;
             let app_id = Slambdaident.create_local "app" in
             let app_var = SLvar app_id in
             SLlet
@@ -411,7 +427,7 @@ let rec fracture_lam lambda : slambda =
                         Lapply
                           { app with
                             ap_func = Lsplice (ap_loc, app_var);
-                            ap_args = fun_r :: args_r
+                            ap_args = [fun_r]
                           }
                     }
               }))

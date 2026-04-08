@@ -196,9 +196,8 @@ Line 2, characters 12-13:
 2 |   let poly_ f = 42
                 ^
 Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
 
+module M : sig val f : int end
 |}]
 
 (* layout-polymorphic id is not included in regular id,
@@ -517,7 +516,6 @@ Line 2, characters 12-13:
 2 |   let poly_ f = x
                 ^
 Warning 26 [unused-var]: unused variable f.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
 
+val f : 'a @ local -> unit = <fun>
 |}]
