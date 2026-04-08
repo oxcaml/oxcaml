@@ -210,22 +210,12 @@ let extract unix ~filename =
 
 let extract_from_linked_partitions unix linked_partitions =
   let acc =
-    let files_since_last_gc = ref 0 in
     List.fold_left
       (fun acc linked ->
-        let acc =
-          extract_into_accumulator unix
-            ~filename:(Partition.Linked.linked_object linked)
-            acc
-        in
-        incr files_since_last_gc;
-        if !files_since_last_gc >= 5
-        then begin
-          (* See comment in Measure_object_files.measure_files *)
-          Gc.full_major ();
-          files_since_last_gc := 0
-        end;
-        acc)
+        extract_into_accumulator unix
+          ~filename:(Partition.Linked.linked_object linked)
+          acc)
       empty_accumulator linked_partitions
   in
+  Gc.compact ();
   finalize acc
