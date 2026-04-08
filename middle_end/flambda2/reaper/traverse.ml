@@ -315,6 +315,13 @@ let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
     ~block_like:(fun () symbol static_const ->
       traverse_block_like_static_const denv acc symbol static_const)
 
+let must_have_callee apply =
+  match Apply.callee apply with
+  | Some callee -> callee
+  | None ->
+    Misc.fatal_errorf "Callee is unexpectedly [None] in [Apply]:@ %a"
+      Apply.print apply
+
 let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id; _ } -> (
@@ -331,7 +338,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       let callee, call_widget =
         if only_if_closure_any_source
         then (
-          let callee = Acc.simple_to_node acc ~denv (Option.get callee) in
+          let callee = Acc.simple_to_node acc ~denv (must_have_callee apply) in
           let callee_if_any_source =
             Variable.create "callee_if_any_source" K.value
           in
@@ -384,9 +391,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
         ~returns:return_args ~exn:exn_arg
     in
-    let closure =
-      Acc.simple_to_node acc ~denv (Option.get (Apply.callee apply))
-    in
+    let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
     Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
       ~base:closure
   | Function { function_call = Indirect_unknown_arity; _ } ->
@@ -395,9 +400,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         ~arity:(Apply.args_arity apply) ~params:(Apply.args apply)
         ~returns:return_args ~exn:exn_arg
     in
-    let closure =
-      Acc.simple_to_node acc ~denv (Option.get (Apply.callee apply))
-    in
+    let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
     Acc.add_accessor_dep acc ~to_:call_widget Field.unknown_arity_call_witness
       ~base:closure
   | Method _ | C_call _ | Effect _ -> default_acc acc
