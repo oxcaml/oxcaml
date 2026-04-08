@@ -18,8 +18,8 @@ one_or_two_element_list:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L110
-.L112:
+  jb    .L115
+.L117:
   leaq  8(%r15), %rdi
   movq  $2048, -8(%rdi)
   movq  %rbx, (%rdi)
@@ -32,8 +32,8 @@ one_or_two_element_list:
 .L106:
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L113
-.L115:
+  jb    .L118
+.L120:
   leaq  8(%r15), %rax
   movq  $2048, -8(%rax)
   movq  %rbx, (%rax)
@@ -57,23 +57,23 @@ spill_slot_lifetime:
   subq  $24, %rsp
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L112:
+.L118:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L113:
+.L119:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L114:
+.L120:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L115:
+.L121:
   subq  $40, %r15
   cmpq  (%r14), %r15
-  jb    .L116
-.L118:
+  jb    .L122
+.L124:
   leaq  8(%r15), %rax
   movq  $4350, -8(%rax)
   vmovsd (%rsp), %xmm1
@@ -87,6 +87,6 @@ spill_slot_lifetime:
   ret
 
 spill_slot_lifetime.get_one:
-  vmovsd .L122(%rip), %xmm0
+  vmovsd .L129(%rip), %xmm0
   ret
 |}]

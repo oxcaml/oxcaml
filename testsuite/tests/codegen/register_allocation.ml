@@ -36,7 +36,7 @@ spill_cold_path:
   movq  %rax, (%rsp)
   movl  $1, %eax
   call  camlTOP2__cold_1_3_code@PLT
-.L119:
+.L127:
   movq  (%rsp), %rax
 .L113:
   addq  $4, %rax
@@ -107,11 +107,11 @@ f:
   subq  $24, %rsp
   movq  %rax, (%rsp)
   call  camlTOP7__g_11_13_code@PLT
-.L108:
+.L112:
   movq  %rax, 8(%rsp)
   movq  (%rsp), %rax
   call  camlTOP7__g_11_13_code@PLT
-.L109:
+.L113:
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
   addq  $24, %rsp
@@ -144,7 +144,7 @@ loop_readonly_use_spilled_var:
   ret
 .L111:
   call  camlTOP8__g_15_18_code@PLT
-.L117:
+.L124:
   movq  (%rsp), %rbx
   cmpq  $1, %rax
   jge   .L111
@@ -180,7 +180,7 @@ spill_unspill_loop_movement:
 .L112:
   movq  %rdi, 16(%rsp)
   call  camlTOP9__f_20_23_code@PLT
-.L145:
+.L164:
   movq  %rax, %rsi
   movq  16(%rsp), %rdi
   movq  %rdi, %rdx
@@ -192,7 +192,7 @@ spill_unspill_loop_movement:
   movq  %rsi, 32(%rsp)
   movq  %rdi, 16(%rsp)
   call  camlTOP9__f_20_23_code@PLT
-.L146:
+.L165:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   movq  16(%rsp), %rdi
@@ -250,7 +250,7 @@ spill_xmm_on_caml_modify:
   movq  %rax, %r12
   vmovsd (%r12), %xmm0
   vmovsd %xmm0, (%rsp)
-  vmovsd .L109(%rip), %xmm0
+  vmovsd .L116(%rip), %xmm0
   vmovsd (%rsp), %xmm1
   vaddsd %xmm0, %xmm1, %xmm0
   vmovsd %xmm0, 8(%rsp)
@@ -292,7 +292,7 @@ unnecessary_moves:
   movq  (%rbx), %rdi
   movq  %r8, %rax
   call  *%rdi
-.L117:
+.L125:
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
@@ -316,7 +316,7 @@ spill_one_or_two:
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
-.L107:
+.L111:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
@@ -359,8 +359,8 @@ double_loop_no_definition_at_beginning:
   subq  $40, %rbx
   movq  %rbx, 64(%r14)
   cmpq  80(%r14), %rbx
-  jl    .L156
-.L157:
+  jl    .L182
+.L183:
   addq  72(%r14), %rbx
   addq  $8, %rbx
   movq  $5111, -8(%rbx)
@@ -379,7 +379,7 @@ double_loop_no_definition_at_beginning:
   movq  %rdx, 56(%rsp)
   movq  (%rdx), %rax
   call  camlTOP15__f_33_37_code@PLT
-.L158:
+.L184:
   movq  56(%rsp), %rdx
   movq  8(%rdx), %rdx
   movq  24(%rsp), %rax
@@ -408,12 +408,12 @@ double_loop_no_definition_at_beginning.f:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rax
-  jae   .L177
+  jae   .L203
   movq  16(%rbx), %rbx
   movq  %rbx, -4(%rsi,%rax,4)
   movl  $1, %eax
   ret
-.L177:
+.L203:
   movq  camlTOP15__block741@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -454,7 +454,7 @@ spilled_phi_merge:
   movq  (%rbx), %rdi
   movq  48(%rsp), %rbx
   call  *%rdi
-.L120:
+.L129:
   movq  (%rsp), %rsi
   movq  8(%rsp), %rbp
   movq  16(%rsp), %rbx
@@ -502,35 +502,35 @@ spill_slot_lifetime:
   subq  $56, %rsp
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L127:
+.L144:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L128:
+.L145:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L129:
+.L146:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L130:
+.L147:
   vmovsd %xmm0, 24(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L131:
+.L148:
   vmovsd %xmm0, 32(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L132:
+.L149:
   vmovsd %xmm0, 40(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L133:
+.L150:
   vmovsd %xmm0, 48(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L134:
+.L151:
   vxorpd %xmm1, %xmm1, %xmm1
   vmovsd (%rsp), %xmm2
   vaddsd %xmm2, %xmm1, %xmm1
@@ -551,7 +551,7 @@ spill_slot_lifetime:
   ret
 
 spill_slot_lifetime.get_one:
-  vmovsd .L138(%rip), %xmm0
+  vmovsd .L156(%rip), %xmm0
   ret
 |}]
 

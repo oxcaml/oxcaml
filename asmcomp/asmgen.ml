@@ -521,13 +521,39 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
    if !Oxcaml_flags.use_ssa
    then (
      let ssa = Ssa_selection.emit_fundecl fd_cmm in
+     (try Ssa.validate ssa
+      with exn ->
+        let bt = Printexc.get_raw_backtrace () in
+        Format.fprintf ppf_dump
+          "*** SSA validation error for %s: %s@.\
+           *** CMM:@.%a@.\
+           *** SSA:@.%a@."
+          fd_cmm.fun_name.sym_name
+          (Printexc.to_string exn)
+          Printcmm.fundecl fd_cmm
+          Ssa.print ssa;
+        Printexc.raise_with_backtrace exn bt);
      if !Oxcaml_flags.dump_cfg
      then
-       Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa.print
-         ssa;
-     let cfg_new = Ssa_lowering.convert ssa in
-     Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name
-       ~old_cfg:cfg_old ~new_cfg:cfg_new ppf_dump);
+       Format.fprintf ppf_dump "*** SSA@.@.%a"
+         Ssa.print ssa;
+     (try
+        let cfg_new = Ssa_lowering.convert ssa in
+        Cfg_compare.compare
+          ~fun_name:fd_cmm.fun_name.sym_name
+          ~fd_cmm ~ssa ~old_cfg:cfg_old
+          ~new_cfg:cfg_new ppf_dump
+      with exn ->
+        let bt = Printexc.get_raw_backtrace () in
+        Format.fprintf ppf_dump
+          "*** SSA pipeline error for %s: %s@.\
+           *** CMM:@.%a@.\
+           *** SSA:@.%a@."
+          fd_cmm.fun_name.sym_name
+          (Printexc.to_string exn)
+          Printcmm.fundecl fd_cmm
+          Ssa.print ssa;
+        Printexc.raise_with_backtrace exn bt));
    cfg_old)
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)

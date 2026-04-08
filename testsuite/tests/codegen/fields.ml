@@ -92,8 +92,8 @@ header:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
@@ -138,8 +138,8 @@ make_ref:
   movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    .L106
+.L108:
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)
   movq  %rbx, (%rax)

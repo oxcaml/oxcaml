@@ -130,8 +130,8 @@ poly_unsafe_get:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L112
-.L114:
+  jb    .L119
+.L121:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd -4(%rdi,%rbx,4), %xmm0
@@ -434,7 +434,7 @@ int_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L115:
-  movq  camlTOP39__block1174@GOTPCREL(%rip), %rax
+  movq  camlTOP38__block1142@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -458,7 +458,7 @@ ref_safe_set:
   addq  $8, %rsp
   ret
 .L116:
-  movq  camlTOP40__block1216@GOTPCREL(%rip), %rax
+  movq  camlTOP39__block1184@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -485,8 +485,8 @@ poly_safe_get:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L126
-.L128:
+  jb    .L140
+.L142:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd -4(%rdi,%rbx,4), %xmm0
@@ -498,7 +498,7 @@ poly_safe_get:
   ret
 .L123:
   subq  $8, %rsp
-  movq  camlTOP41__block1259@GOTPCREL(%rip), %rax
+  movq  camlTOP40__block1227@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -531,7 +531,7 @@ poly_safe_set:
   ret
 .L124:
   subq  $8, %rsp
-  movq  camlTOP42__block1314@GOTPCREL(%rip), %rax
+  movq  camlTOP41__block1282@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -552,7 +552,7 @@ int64_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L116:
-  movq  camlTOP43__block1371@GOTPCREL(%rip), %rax
+  movq  camlTOP42__block1339@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -571,7 +571,7 @@ float_safe_get:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L115:
-  movq  camlTOP44__block1412@GOTPCREL(%rip), %rax
+  movq  camlTOP43__block1380@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -590,7 +590,7 @@ float_safe_get_plain:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L115:
-  movq  camlTOP45__block1453@GOTPCREL(%rip), %rax
+  movq  camlTOP44__block1421@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -614,7 +614,7 @@ int32_safe_get:
   movslq -2(%rax,%rbx,2), %rax
   ret
 .L120:
-  movq  camlTOP46__block1498@GOTPCREL(%rip), %rax
+  movq  camlTOP45__block1466@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11

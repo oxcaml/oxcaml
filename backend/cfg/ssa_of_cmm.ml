@@ -97,10 +97,11 @@ let fork label desc params =
 let merge_into parent sub =
   parent.blocks <- sub.blocks @ parent.blocks
 
-let block_params label types =
+let block_params label (types : Cmm.machtype) =
   Array.mapi
-    (fun i _ ->
-      (Ssa.Block_param { block = label; index = i }
+    (fun i typ ->
+      (Ssa.Block_param
+         { block = label; index = i; typ }
         : Ssa.instruction))
     types
 
@@ -403,15 +404,36 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let emit_branch b (test : Operation.test) rarg ~true_label
       ~false_label : Ssa.terminator =
     let make_cond op a = add_op b ~typ:Cmm.typ_int op a in
+    (* For Itruetest/Ifalsetest: if the condition is
+       already a comparison Op, wrap it in an extra
+       truth-test comparison so cfg_of_ssa's fold
+       produces Truth_test (not Int_test/etc).
+       Otherwise put the raw value — cfg_of_ssa won't
+       match it and uses Truth_test directly. *)
+    let is_comparison (v : Ssa.instruction) =
+      match v with
+      | Op { op = Intop (Icomp _)
+                | Intop_imm (Icomp _, _)
+                | Floatop (_, Icompf _)
+                | Intop_imm (Iand, 1); _ } -> true
+      | _ -> false
+    in
+    let wrap_truth_test v =
+      if is_comparison v
+      then make_cond (Intop_imm (Icomp Cne, 0)) [| v |]
+      else v
+    in
     match test with
     | Itruetest ->
+      let c = wrap_truth_test rarg.(0) in
       Branch
-        { conditions = [| rarg.(0), true_label |];
+        { conditions = [| c, true_label |];
           else_goto = false_label
         }
     | Ifalsetest ->
+      let c = wrap_truth_test rarg.(0) in
       Branch
-        { conditions = [| rarg.(0), false_label |];
+        { conditions = [| c, false_label |];
           else_goto = true_label
         }
     | Iinttest cmp ->
@@ -562,27 +584,83 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       emit_block b Never;
       Never_returns
 
+  (* Replicates emit_parts/emit_parts_list from
+     cfg_selectgen exactly. Pre-evaluates complex
+     args R-to-L, binding results to fresh vars in
+     the env. Returns simplified CMM expressions
+     (Cvar for pre-evaluated, original for deferred)
+     and the updated env. *)
+  and emit_parts env b ~effects_after exp =
+    if may_defer ~effects_after exp
+    then Some (exp, env)
+    else
+      match emit_expr env b exp with
+      | Never_returns -> None
+      | Ok r ->
+        if Array.length r = 0
+        then Some (Cmm.Ctuple [], env)
+        else
+          let id = V.create_local "bind" in
+          Some
+            ( Cmm.Cvar id,
+              { env with
+                vars =
+                  V.Map.add id r env.vars
+              } )
+
+  and emit_parts_list env b exp_list =
+    let module EC =
+      Select_utils.Effect_and_coeffect
+    in
+    let exp_list_right_to_left, _ =
+      List.fold_left
+        (fun (acc, effects_after) exp ->
+          let exp_effect = effects_of exp in
+          ( (exp, effects_after) :: acc,
+            EC.join exp_effect effects_after ))
+        ([], EC.none) exp_list
+    in
+    List.fold_left
+      (fun acc (exp, effects_after) ->
+        match acc with
+        | None -> None
+        | Some (result, env) -> (
+          match
+            emit_parts env b ~effects_after exp
+          with
+          | None -> None
+          | Some (exp_result, env) ->
+            Some (exp_result :: result, env)))
+      (Some ([], env))
+      exp_list_right_to_left
+
   and emit_tuple env b exp_list : or_never_returns =
-    (* Right-to-left evaluation, matching the old pipeline *)
+    (* Simple right-to-left evaluation, matching
+       emit_tuple_not_flattened in cfg_selectgen.
+       Note: emit_parts_list is NOT used here — it is
+       only used in emit_alloc and emit_expr_exit. *)
     let rec loop = function
       | [] -> Ok [||]
-      | exp :: rest ->
+      | exp :: rest -> (
         match loop rest with
         | Never_returns -> Never_returns
         | Ok rest_regs -> (
           match emit_expr env b exp with
           | Never_returns -> Never_returns
           | Ok exp_regs ->
-            Ok (Array.append exp_regs rest_regs))
+            Ok (Array.append exp_regs rest_regs)))
     in
     loop exp_list
 
   and emit_expr_raise env b k args =
     let* r = emit_tuple env b args in
-    emit_block b (Raise (k, r));
+    let handler_label =
+      current_exn_continuation env
+    in
+    emit_block b (Raise (k, r, handler_label));
     Never_returns
 
-  and emit_expr_op_cont env b
+  and emit_expr_op_cont env b ~ty
       (new_op : Cfg.basic_or_terminator)
       arg_instrs _label_after _dbg : or_never_returns =
     let ty =
@@ -590,11 +668,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Terminator
           (Prim { op = External { ty_res; _ }; _ }) ->
         ty_res
-      | _ ->
-        (* For most ops, the result type comes from
-           the Cmm op, but we already evaluated args.
-           Use typ_val as fallback for terminators. *)
-        Cmm.typ_val
+      | _ -> ty
     in
     match new_op with
     | Terminator (Call { op = call_op; label_after }) ->
@@ -608,17 +682,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
              continuation = cont_label;
              exn_continuation = exn_cont
            });
-      let call_ty =
-        match new_op with
-        | Terminator (Call _) ->
-          Select_utils.oper_result_type
-            (Capply
-               { result_type = Cmm.typ_val;
-                 region = Rc_normal;
-                 callees = None
-               })
-        | _ -> ty
-      in
+      let call_ty = ty in
       start_block b cont_label
         (CallContinuation
            { predecessor = pred_label })
@@ -682,36 +746,212 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | [| Vec512 |] -> Fivetwelve_unaligned
     | _ -> Word_val
 
-  and chunk_of_instruction (r : Ssa.instruction) :
+  and chunk_of_component
+      (c : Cmm.machtype_component) :
       Cmm.memory_chunk =
-    match r with
-    | Op { typ; _ } -> chunk_of_machtype typ
-    | Block_param _ | Proj _ -> Word_val
+    match c with
+    | Float -> Double
+    | Float32 -> Single { reg = Float32 }
+    | Vec128 -> Onetwentyeight_unaligned
+    | Vec256 -> Twofiftysix_unaligned
+    | Vec512 -> Fivetwelve_unaligned
+    | Val | Int | Addr | Valx2 -> Word_val
 
-  and emit_alloc env b (cmm_args : Cmm.expression list)
-      (ph : Cmm.alloc_dbginfo_item) mode dbg :
-      or_never_returns =
-    let n_fields = List.length cmm_args in
-    let alloc_words = n_fields in
-    let bytes = alloc_words * Arch.size_addr in
-    let alloc_op =
-      Operation.Alloc
-        { bytes;
-          dbginfo =
-            [{ ph with alloc_words; alloc_dbg = dbg }];
-          mode
-        }
+  and typ_of_instruction
+      (r : Ssa.instruction) :
+      Cmm.machtype_component =
+    match r with
+    | Op { typ; _ } ->
+      assert (Array.length typ = 1);
+      typ.(0)
+    | Block_param { typ; _ } -> typ
+    | Proj { index; src } -> (
+      match src with
+      | Op { typ; _ } -> typ.(index)
+      | _ ->
+        Misc.fatal_error
+          "typ_of_instruction: Proj of non-Op")
+
+  (* Copied from cfg_selectgen effects_of0/effects_of.
+     Used to decide what needs pre-evaluation before
+     an allocation, matching emit_parts_list. *)
+  and effects_of0 (exp : Cmm.expression) =
+    let module EC = Select_utils.Effect_and_coeffect in
+    match exp with
+    | Cconst_int _ | Cconst_natint _
+    | Cconst_float32 _ | Cconst_float _
+    | Cconst_symbol _ | Cconst_vec128 _
+    | Cconst_vec256 _ | Cconst_vec512 _
+    | Cvar _ ->
+      EC.none
+    | Ctuple el -> EC.join_list_map el effects_of
+    | Clet (_, arg, body) ->
+      EC.join (effects_of arg) (effects_of body)
+    | Cphantom_let (_, _, body) -> effects_of body
+    | Csequence (e1, e2) ->
+      EC.join (effects_of e1) (effects_of e2)
+    | Cifthenelse
+        (cond, _, ifso, _, ifnot, _) ->
+      EC.join (effects_of cond)
+        (EC.join (effects_of ifso)
+           (effects_of ifnot))
+    | Cop (op, args, _) ->
+      let from_op =
+        match op with
+        | Cextcall { effects = e; coeffects = ce } ->
+          EC.create
+            (Select_utils.select_effects e)
+            (Select_utils.select_coeffects ce)
+        | Capply _ | Cprobe _ | Copaque | Cpoll
+        | Cpause ->
+          EC.arbitrary
+        | Calloc (Heap, _) -> EC.none
+        | Calloc (Local, _) ->
+          EC.coeffect_only Arbitrary
+        | Cstore _ -> EC.effect_only Arbitrary
+        | Cbeginregion | Cendregion -> EC.arbitrary
+        | Cprefetch _ -> EC.arbitrary
+        | Catomic _ -> EC.arbitrary
+        | Craise _ -> EC.effect_only Raise
+        | Cload { mutability = Immutable } -> EC.none
+        | Cload { mutability = Mutable }
+        | Cdls_get | Ctls_get | Cdomain_index ->
+          EC.coeffect_only Read_mutable
+        | Cprobe_is_enabled _ ->
+          EC.coeffect_only Arbitrary
+        | Ctuple_field _ | Caddi | Csubi | Cmuli
+        | Cmulhi _ | Cdivi | Cmodi | Caddi128
+        | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor
+        | Cbswap _ | Ccsel _ | Cclz _ | Cctz _
+        | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _
+        | Caddv | Cadda | Cnegf _ | Cabsf _
+        | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
+        | Cpackf32 | Creinterpret_cast _
+        | Cstatic_cast _ | Ccmpf _ ->
+          EC.none
+      in
+      EC.join from_op
+        (EC.join_list_map args effects_of)
+    | Cswitch _ | Ccatch _ | Cexit _
+    | Cinvalid _ ->
+      EC.arbitrary
+
+  and effects_of (expr : Cmm.expression) =
+    match Target.effects_of expr with
+    | Effects_of_all_expressions exprs ->
+      Select_utils.Effect_and_coeffect.join_list_map
+        exprs effects_of
+    | Use_default -> effects_of0 expr
+
+  (* Copied from cfg_selectgen is_simple_expr0/
+     is_simple_expr. Used together with effects_of
+     to replicate the emit_parts_list logic. *)
+  and is_simple_expr0 (exp : Cmm.expression) =
+    match exp with
+    | Cconst_int _ | Cconst_natint _
+    | Cconst_float32 _ | Cconst_float _
+    | Cconst_symbol _ | Cconst_vec128 _
+    | Cconst_vec256 _ | Cconst_vec512 _
+    | Cvar _ ->
+      true
+    | Ctuple el -> List.for_all is_simple_expr el
+    | Clet (_, arg, body) ->
+      is_simple_expr arg && is_simple_expr body
+    | Cphantom_let (_, _, body) ->
+      is_simple_expr body
+    | Csequence (e1, e2) ->
+      is_simple_expr e1 && is_simple_expr e2
+    | Cop (op, args, _) -> (
+      match op with
+      | Cextcall
+          { effects = No_effects;
+            coeffects = No_coeffects
+          } ->
+        List.for_all is_simple_expr args
+      | Capply _ | Cextcall _ | Calloc _
+      | Cstore _ | Craise _ | Catomic _
+      | Cprobe _ | Cprobe_is_enabled _ | Copaque
+      | Cpoll | Cpause ->
+        false
+      | Cprefetch _ | Cbeginregion | Cendregion ->
+        false
+      | Cload _ | Caddi | Csubi | Cmuli
+      | Cmulhi _ | Cdivi | Cmodi | Caddi128
+      | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor
+      | Clsl | Clsr | Casr | Ccmpi _ | Caddv
+      | Cadda | Cnegf _ | Cclz _ | Cctz _
+      | Cpopcnt | Cbswap _ | Ccsel _ | Cabsf _
+      | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
+      | Cpackf32 | Creinterpret_cast _
+      | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
+      | Cdls_get | Ctls_get | Cdomain_index ->
+        List.for_all is_simple_expr args)
+    | Cifthenelse _ | Cswitch _ | Ccatch _
+    | Cexit _ | Cinvalid _ ->
+      false
+
+  and is_simple_expr (expr : Cmm.expression) =
+    match Target.is_simple_expr expr with
+    | Simple_if_all_expressions_are exprs ->
+      List.for_all is_simple_expr exprs
+    | Use_default -> is_simple_expr0 expr
+
+  (* Replicates emit_parts from cfg_selectgen:
+     an expression may be deferred if its effects
+     allow it AND it is structurally simple. *)
+  and may_defer ~effects_after exp =
+    let module EC =
+      Select_utils.Effect_and_coeffect
     in
-    let addr = add_op b ~typ:Cmm.typ_val alloc_op [||] in
+    let ec = effects_of exp in
+    let may_defer_evaluation =
+      match EC.effect_ ec with
+      | Arbitrary | Raise ->
+        EC.pure_and_copure effects_after
+      | None -> (
+        match EC.coeffect ec with
+        | None -> true
+        | Read_mutable -> (
+          match EC.effect_ effects_after with
+          | None | Raise -> true
+          | Arbitrary -> false)
+        | Arbitrary -> (
+          match EC.effect_ effects_after with
+          | None -> true
+          | Arbitrary | Raise -> false))
+    in
+    may_defer_evaluation && is_simple_expr exp
+
+  (* emit_stores: matches cfg_selectgen emit_stores.
+     Args are already simplified by emit_parts_list,
+     so complex subexprs are Cvar lookups. *)
+  and emit_stores env b cmm_args addr =
     let byte_offset = ref (-Arch.size_int) in
     let ok = ref true in
+    let store_one_reg (r : Ssa.instruction)
+        (typ : Cmm.machtype_component) =
+      let chunk = chunk_of_component typ in
+      ignore
+        (add_op b ~typ:Cmm.typ_void
+           (Store
+              ( chunk,
+                Arch.offset_addressing
+                  Arch.identity_addressing
+                  !byte_offset,
+                false ))
+           [| r; addr |]);
+      byte_offset :=
+        !byte_offset
+        + Select_utils.size_component typ
+    in
     List.iter
       (fun (arg : Cmm.expression) ->
         if !ok
         then (
           let addressing_mode =
             Arch.offset_addressing
-              Arch.identity_addressing !byte_offset
+              Arch.identity_addressing
+              !byte_offset
           in
           let store_result =
             Target.select_store ~is_assign:false
@@ -719,7 +959,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           in
           match store_result with
           | Rewritten (op, Cmm.Ctuple []) ->
-            ignore (add_op b ~typ:Cmm.typ_void op [| addr |]);
+            ignore
+              (add_op b ~typ:Cmm.typ_void op
+                 [| addr |]);
             byte_offset :=
               !byte_offset + Arch.size_int
           | Rewritten (op, new_arg) -> (
@@ -737,53 +979,74 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             | Ok field ->
               Array.iter
                 (fun (r : Ssa.instruction) ->
-                  let chunk = chunk_of_instruction r in
-                  ignore
-                    (add_op b ~typ:Cmm.typ_void
-                       (Store
-                          ( chunk,
-                            Arch.offset_addressing
-                              Arch.identity_addressing
-                              !byte_offset,
-                            false ))
-                       [| r; addr |]);
-                  byte_offset :=
-                    !byte_offset
-                    + Select_utils.size_component
-                        (match chunk with
-                        | Cmm.Double -> Cmm.Float
-                        | Cmm.Single { reg = Float32 } ->
-                          Cmm.Float32
-                        | _ -> Cmm.Val))
+                  store_one_reg r
+                    (typ_of_instruction r))
                 field)))
       cmm_args;
-    if not !ok then Never_returns else Ok [| addr |]
+    !ok
+
+  and emit_alloc env b (cmm_args : Cmm.expression list)
+      (ph : Cmm.alloc_dbginfo_item) mode dbg :
+      or_never_returns =
+    let n_args = List.length cmm_args in
+    let alloc_words = n_args in
+    let bytes = alloc_words * Arch.size_addr in
+    let alloc_op =
+      Operation.Alloc
+        { bytes;
+          dbginfo =
+            [{ ph with alloc_words;
+                       alloc_dbg = dbg
+             }];
+          mode
+        }
+    in
+    let addr =
+      add_op b ~typ:Cmm.typ_val alloc_op [||]
+    in
+    if emit_stores env b cmm_args addr
+    then Ok [| addr |]
+    else Never_returns
 
   and emit_expr_op env b op args dbg : or_never_returns =
-    let ty = Select_utils.oper_result_type op in
-    let label_after = Cmm.new_label () in
-    let new_op, new_args =
-      select_operation op args dbg ~label_after
-    in
-    match new_op with
-    | Basic (Op (Alloc { bytes = _; mode; dbginfo = [ph] }))
-      ->
-      emit_alloc env b new_args ph mode dbg
-    | _ ->
-      let* arg_instrs = emit_tuple env b new_args in
+    (* Matching cfg_selectgen emit_expr_op:
+       emit_parts_list first, then select_operation
+       on the simplified args. *)
+    match emit_parts_list env b args with
+    | None -> Never_returns
+    | Some (simple_args, env) ->
+      let ty = Select_utils.oper_result_type op in
+      let label_after = Cmm.new_label () in
+      let new_op, new_args =
+        select_operation op simple_args dbg
+          ~label_after
+      in
       (match new_op with
-      | Terminator _ ->
-        emit_expr_op_cont env b new_op arg_instrs
-          label_after dbg
-      | Basic (Op basic_op) ->
-        let i = add_op b ~typ:ty basic_op arg_instrs in
-        if Array.length ty = 0
-        then Ok [||]
-        else Ok [| i |]
-      | Basic basic ->
-        Misc.fatal_errorf
-          "Ssa_of_cmm: unexpected basic (%a)"
-          Cfg.dump_basic basic)
+      | Basic
+          (Op
+            (Alloc
+              { bytes = _; mode; dbginfo = [ph] }))
+        ->
+        emit_alloc env b new_args ph mode dbg
+      | _ ->
+        let* arg_instrs =
+          emit_tuple env b new_args
+        in
+        (match new_op with
+        | Terminator _ ->
+          emit_expr_op_cont env b ~ty new_op
+            arg_instrs label_after dbg
+        | Basic (Op basic_op) ->
+          let i =
+            add_op b ~typ:ty basic_op arg_instrs
+          in
+          if Array.length ty = 0
+          then Ok [||]
+          else Ok [| i |]
+        | Basic basic ->
+          Misc.fatal_errorf
+            "Ssa_of_cmm: unexpected basic (%a)"
+            Cfg.dump_basic basic))
 
   and emit_expr_ifthenelse env b econd eif eelse :
       or_never_returns =
@@ -840,8 +1103,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             label)
           index
       in
-      ignore rsel;
-      emit_block b (Switch labels);
+      emit_block b (Switch (labels, rsel));
       join_array b case_results
 
   and emit_expr_catch env b rec_flag handlers catch_body :
@@ -884,19 +1146,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (Merge { predecessors = [pred_label] })
         [||]
     in
-    let body_env =
-      match rec_flag with
-      | Cmm.Exn_handler -> (
-        match handlers_info with
-        | [(nfail, _, _, _)] ->
-          { env with
-            trap_stack =
-              Operation.Specific_trap (nfail, env.trap_stack)
-          }
-        | _ -> env)
-      | Cmm.Normal | Cmm.Recursive -> env
-    in
-    let r_body = emit_expr body_env b_body catch_body in
+    (* Note: unlike the earlier version, we do NOT
+       push the trap onto body_env for Exn_handler.
+       The CMM exit<push(N)> trap actions handle the
+       push explicitly, matching cfg_selectgen. *)
+    let r_body = emit_expr env b_body catch_body in
     emit_block b
       (Always { goto = body_label; args = [||] });
     let handler_results =
@@ -919,7 +1173,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                   Array.init n (fun i ->
                     (Ssa.Block_param
                        { block = info.handler_label;
-                         index = !param_idx + i
+                         index = !param_idx + i;
+                         typ = ty.(i)
                        }
                       : Ssa.instruction))
                 in
@@ -954,7 +1209,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       or_never_returns =
     match lbl with
     | Lbl nfail -> (
-      let* src = emit_tuple env b args in
+      (* Matching cfg_selectgen emit_expr_exit:
+         emit_parts_list first, then emit_tuple
+         on the simplified args. *)
+      let src_result =
+        match emit_parts_list env b args with
+        | None -> Never_returns
+        | Some (simple_args, env) ->
+          emit_tuple env b simple_args
+      in
+      let* src = src_result in
       let handler =
         try
           Static_label.Map.find nfail
@@ -1057,48 +1321,107 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | _ -> (
       match emit_expr env b exp with
       | Never_returns -> ()
-      | Ok r -> emit_block b (Return r))
+      | Ok r ->
+        emit_pop_all_traps env b;
+        emit_block b (Return r))
 
   and trap_stack_is_empty env =
     match env.trap_stack with
     | Operation.Uncaught -> true
     | Specific_trap _ -> false
 
+  and emit_pop_all_traps env b =
+    let rec pop = function
+      | Operation.Uncaught -> ()
+      | Operation.Specific_trap (lbl, rest) ->
+        let handler =
+          try
+            Static_label.Map.find lbl
+              env.static_exceptions
+          with Not_found ->
+            Misc.fatal_errorf
+              "emit_pop_all_traps: unbound %a"
+              Static_label.format lbl
+        in
+        add_body b
+          (Poptrap
+             { lbl_handler =
+                 handler.handler_label
+             });
+        pop rest
+    in
+    pop env.trap_stack
+
   and emit_tail_apply env b op args dbg =
+    (* Matching cfg_selectgen emit_tail_apply:
+       emit_parts_list first, then select_operation
+       on simplified args. *)
+    match emit_parts_list env b args with
+    | None -> ()
+    | Some (simple_args, env) ->
     let label_after = Cmm.new_label () in
     let new_op, new_args =
-      select_operation op args dbg ~label_after
+      select_operation op simple_args dbg ~label_after
     in
     match emit_tuple env b new_args with
     | Never_returns -> ()
     | Ok arg_instrs -> (
+      (* Check if a tail call is possible: trap stack
+         must be empty and args must fit in registers
+         (no stack args), matching cfg_selectgen. *)
+      let can_tailcall =
+        if not (trap_stack_is_empty env)
+        then false
+        else
+          let arg_types =
+            Array.map
+              (fun (i : Ssa.instruction) ->
+                match i with
+                | Op { typ; _ } ->
+                  if Array.length typ = 1
+                  then typ.(0)
+                  else Cmm.Val
+                | Block_param { typ; _ } -> typ
+                | Proj _ -> Cmm.Val)
+              arg_instrs
+          in
+          let _, stack_ofs =
+            Proc.loc_arguments arg_types
+          in
+          stack_ofs = 0
+      in
       match new_op with
       | Terminator (Call { op = Indirect callees; _ })
-        when trap_stack_is_empty env ->
+        when can_tailcall ->
         emit_block b
           (Tailcall_func (Indirect callees, arg_instrs))
       | Terminator (Call { op = Direct func; _ })
         when String.equal func.sym_name
                !Select_utils.current_function_name
-             && trap_stack_is_empty env ->
+             && can_tailcall ->
         emit_block b
           (Tailcall_self
              { destination = env.tailrec_label;
                args = arg_instrs
              })
       | Terminator (Call { op = Direct func; _ })
-        when trap_stack_is_empty env ->
+        when can_tailcall ->
         emit_block b
           (Tailcall_func (Direct func, arg_instrs))
       | _ ->
         (* Fall back to call + return *)
+        let ty =
+          Select_utils.oper_result_type op
+        in
         let r =
-          emit_expr_op_cont env b new_op arg_instrs
-            label_after dbg
+          emit_expr_op_cont env b ~ty new_op
+            arg_instrs label_after dbg
         in
         (match r with
         | Never_returns -> ()
-        | Ok r -> emit_block b (Return r)))
+        | Ok r ->
+          emit_pop_all_traps env b;
+          emit_block b (Return r)))
 
   and emit_tail_ifthenelse env b econd eif eelse =
     let cond, earg = select_condition econd in
@@ -1154,8 +1477,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             label)
           index
       in
-      ignore rsel;
-      emit_block b (Switch labels);
+      emit_block b (Switch (labels, rsel));
       Array.iter
         (fun (_, b_case) -> merge_into b b_case)
         case_builders
@@ -1198,19 +1520,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (Merge { predecessors = [pred_label] })
         [||]
     in
-    let body_env =
-      match rec_flag with
-      | Cmm.Exn_handler -> (
-        match handlers_info with
-        | [(nfail, _, _, _)] ->
-          { env with
-            trap_stack =
-              Operation.Specific_trap (nfail, env.trap_stack)
-          }
-        | _ -> env)
-      | Cmm.Normal | Cmm.Recursive -> env
-    in
-    emit_tail body_env b_body catch_body;
+    emit_tail env b_body catch_body;
     emit_block b
       (Always { goto = body_label; args = [||] });
     let handler_builders =
@@ -1233,7 +1543,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                   Array.init n (fun i ->
                     (Ssa.Block_param
                        { block = info.handler_label;
-                         index = !param_idx + i
+                         index = !param_idx + i;
+                         typ = ty.(i)
                        }
                       : Ssa.instruction))
                 in
@@ -1270,6 +1581,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       merge_into b b1;
       b.current_label <- b1.current_label;
       b.current_desc <- b1.current_desc;
+      b.current_params <- b1.current_params;
       b.body <- b1.body;
       Ok r
     | Never_returns, Ok r ->
@@ -1277,6 +1589,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       merge_into b b2;
       b.current_label <- b2.current_label;
       b.current_desc <- b2.current_desc;
+      b.current_params <- b2.current_params;
       b.body <- b2.body;
       Ok r
     | Ok r1_instrs, Ok r2_instrs ->
@@ -1353,12 +1666,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let fun_arg_types =
       List.map snd f.fun_args |> Array.concat
     in
-    let tailrec_label = Cmm.new_label () in
     let env =
       { vars = V.Map.empty;
         static_exceptions = Static_label.Map.empty;
         trap_stack = Operation.Uncaught;
-        tailrec_label
+        tailrec_label = entry_label
       }
     in
     let env, _offset =
@@ -1369,7 +1681,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             Array.init n (fun i ->
               (Ssa.Block_param
                  { block = entry_label;
-                   index = offset + i
+                   index = offset + i;
+                   typ = ty.(i)
                  }
                 : Ssa.instruction))
           in

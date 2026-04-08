@@ -40,7 +40,7 @@ loop_code_layout:
   movq  %rbx, (%rsp)
   movl  $1, %eax
   call  camlTOP2__cold_1_4_code@PLT
-.L118:
+.L126:
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
@@ -71,7 +71,7 @@ for_loop_layout:
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
-.L124:
+.L135:
   movq  16(%rsp), %rax
   incq  %rax
   movq  (%rsp), %rbx
@@ -131,8 +131,8 @@ f:
   subq  $8, %rsp
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
   movq  camlTOP5__do_work_11_15_code@GOTPCREL(%rip), %rdi
@@ -148,12 +148,12 @@ f.do_work:
   movq  16(%rbx), %rax
   leaq  -1(%rax,%rax), %rax
   movl  $1, %edi
-.L120:
+.L123:
   movq  16(%rbx), %rsi
   leaq  -1(%rax,%rsi), %rax
   incq  %rdi
   cmpq  $100, %rdi
-  jle   .L120
+  jle   .L123
   ret
 |}]
 

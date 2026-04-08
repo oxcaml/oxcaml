@@ -56,7 +56,8 @@ type instruction =
       }
   | Block_param of
       { block : Label.t;
-        index : int
+        index : int;
+        typ : Cmm.machtype_component
       }
   | Proj of
       { index : int;
@@ -80,9 +81,12 @@ type terminator =
       { conditions : (instruction * Label.t) array;
         else_goto : Label.t
       }
-  | Switch of Label.t array
+  | Switch of Label.t array * instruction array
   | Return of instruction array
-  | Raise of Lambda.raise_kind * instruction array
+  | Raise of
+      Lambda.raise_kind
+      * instruction array
+      * Label.t option (* exn handler label *)
   | Tailcall_self of
       { destination : Label.t;
         args : instruction array
@@ -137,7 +141,7 @@ let rec print_instruction ppf (i : instruction) =
     Format.fprintf ppf "v%d = %a(%a)"
       (InstructionId.hash id) Operation.dump op print_args
       args
-  | Block_param { block; index } ->
+  | Block_param { block; index; _ } ->
     Format.fprintf ppf "%a.%d" Label.format block index
   | Proj { index; src } ->
     Format.fprintf ppf "proj(%d, %a)" index print_instr_ref
@@ -147,7 +151,7 @@ and print_instr_ref ppf (i : instruction) =
   match i with
   | Op { id; _ } ->
     Format.fprintf ppf "v%d" (InstructionId.hash id)
-  | Block_param { block; index } ->
+  | Block_param { block; index; _ } ->
     Format.fprintf ppf "%a.%d" Label.format block index
   | Proj { index; src } ->
     Format.fprintf ppf "proj(%d, %a)" index print_instr_ref
@@ -197,15 +201,16 @@ let print_terminator ppf (t : terminator) =
       conditions;
     Format.fprintf ppf "else goto %a" Label.format
       else_goto
-  | Switch labels ->
-    Format.fprintf ppf "switch [%a]"
+  | Switch (labels, arg) ->
+    Format.fprintf ppf "switch(%a) [%a]"
+      print_instr_array arg
       (Format.pp_print_array ~pp_sep:(fun ppf () ->
            Format.fprintf ppf ", ")
          Label.format)
       labels
   | Return args ->
     Format.fprintf ppf "return(%a)" print_instr_array args
-  | Raise (_, args) ->
+  | Raise (_, args, _) ->
     Format.fprintf ppf "raise(%a)" print_instr_array args
   | Tailcall_self { destination; args } ->
     Format.fprintf ppf "tailcall_self %a(%a)"
@@ -282,3 +287,209 @@ let print ppf (t : t) =
     (fun _label block -> print_block ppf block)
     t.blocks;
   Format.fprintf ppf "@."
+
+(* === SSA invariant validation === *)
+
+let validate (t : t) =
+  let error fmt =
+    Format.kasprintf
+      (fun s ->
+        Misc.fatal_errorf "SSA validation (%s): %s"
+          t.fun_name s)
+      fmt
+  in
+  (* Check entry block exists *)
+  if not (Label.Tbl.mem t.blocks t.entry_label)
+  then
+    error "entry block %a not found"
+      Label.format t.entry_label;
+  (* Compute actual predecessors from terminators *)
+  let actual_preds = Label.Tbl.create 16 in
+  Label.Tbl.iter
+    (fun _ bl ->
+      Label.Tbl.replace actual_preds bl.label [])
+    t.blocks;
+  let add_pred ~src ~dst =
+    match Label.Tbl.find_opt actual_preds dst with
+    | Some ps ->
+      Label.Tbl.replace actual_preds dst (src :: ps)
+    | None ->
+      error "block %a references non-existent \
+             successor %a"
+        Label.format src Label.format dst
+  in
+  let successor_labels label (term : terminator) =
+    match term with
+    | Never -> ()
+    | Always { goto; _ } -> add_pred ~src:label ~dst:goto
+    | Branch { conditions; else_goto } ->
+      Array.iter
+        (fun (_, lbl) -> add_pred ~src:label ~dst:lbl)
+        conditions;
+      add_pred ~src:label ~dst:else_goto
+    | Switch (labels, _) ->
+      Array.iter
+        (fun lbl -> add_pred ~src:label ~dst:lbl)
+        labels
+    | Return _ | Raise _ | Tailcall_func _ -> ()
+    | Tailcall_self { destination; _ } ->
+      add_pred ~src:label ~dst:destination
+    | Call { continuation; exn_continuation; _ }
+    | Prim { continuation; exn_continuation; _ } ->
+      add_pred ~src:label ~dst:continuation;
+      (match exn_continuation with
+      | Some l -> add_pred ~src:label ~dst:l
+      | None -> ())
+  in
+  Label.Tbl.iter
+    (fun label (bl : basic_block) ->
+      successor_labels label bl.terminator)
+    t.blocks;
+  (* Collect all defined Op ids and check uniqueness *)
+  let defined_ops = InstructionId.Tbl.create 64 in
+  Label.Tbl.iter
+    (fun label (bl : basic_block) ->
+      Array.iter
+        (fun (bi : body_instruction) ->
+          match bi with
+          | Instr (Op { id; _ }) ->
+            if InstructionId.Tbl.mem defined_ops id
+            then
+              error "block %a: duplicate Op id v%d"
+                Label.format label
+                (InstructionId.hash id);
+            InstructionId.Tbl.replace defined_ops id ()
+          | Instr (Block_param _ | Proj _)
+          | Pushtrap _ | Poptrap _ | Stack_check _
+          | Debuginfo _ -> ())
+        bl.body)
+    t.blocks;
+  (* Validate each block *)
+  Label.Tbl.iter
+    (fun label (bl : basic_block) ->
+      (* BlockParam types match block params *)
+      let check_instr_ref (i : instruction) =
+        match i with
+        | Block_param { block; index; typ } ->
+          (match Label.Tbl.find_opt t.blocks block
+           with
+          | None ->
+            error "block %a: BlockParam references \
+                   non-existent block %a"
+              Label.format label Label.format block
+          | Some target ->
+            if index < 0
+               || index >= Array.length target.params
+            then
+              error "block %a: BlockParam index %d \
+                     out of range for block %a \
+                     (params length %d)"
+                Label.format label index
+                Label.format block
+                (Array.length target.params);
+            let expected = target.params.(index) in
+            if not
+                 (Cmm.equal_machtype_component
+                    expected typ)
+            then
+              error "block %a: BlockParam %a.%d has \
+                     type %a but block params say %a"
+                Label.format label Label.format block
+                index Printcmm.machtype_component typ
+                Printcmm.machtype_component expected)
+        | Op _ | Proj _ -> ()
+      in
+      let rec check_instruction (i : instruction) =
+        check_instr_ref i;
+        match i with
+        | Op { id; args; _ } ->
+          if not
+               (InstructionId.Tbl.mem defined_ops id)
+          then
+            error "block %a: Op v%d referenced but \
+                   not defined in any block body"
+              Label.format label
+              (InstructionId.hash id);
+          Array.iter check_instruction args
+        | Proj { src; _ } ->
+          (match src with
+           | Op _ -> ()
+           | Block_param _ | Proj _ ->
+             error "block %a: Proj source must be \
+                    an Op"
+               Label.format label);
+          check_instruction src
+        | Block_param _ -> ()
+      in
+      (* Check body instructions *)
+      Array.iter
+        (fun (bi : body_instruction) ->
+          match bi with
+          | Instr i -> check_instruction i
+          | Pushtrap _ | Poptrap _ | Stack_check _
+          | Debuginfo _ -> ())
+        bl.body;
+      (* Check terminator instruction refs *)
+      let check_term_args args =
+        Array.iter check_instruction args
+      in
+      (match bl.terminator with
+      | Never -> ()
+      | Always { goto; args } ->
+        check_term_args args;
+        (* Goto args count must match target params *)
+        (match Label.Tbl.find_opt t.blocks goto with
+        | None -> () (* already reported above *)
+        | Some target ->
+          if Array.length args
+             <> Array.length target.params
+          then
+            error "block %a: goto %a has %d args \
+                   but target has %d params"
+              Label.format label Label.format goto
+              (Array.length args)
+              (Array.length target.params))
+      | Branch { conditions; else_goto } ->
+        Array.iter
+          (fun (cond, lbl) ->
+            check_instruction cond;
+            (match Label.Tbl.find_opt t.blocks lbl
+             with
+            | None -> ()
+            | Some target ->
+              if Array.length target.params > 0
+              then
+                error "block %a: Branch target %a \
+                       has block parameters"
+                  Label.format label Label.format
+                  lbl))
+          conditions;
+        (match Label.Tbl.find_opt t.blocks else_goto
+         with
+        | None -> ()
+        | Some target ->
+          if Array.length target.params > 0
+          then
+            error "block %a: Branch else target %a \
+                   has block parameters"
+              Label.format label Label.format
+              else_goto)
+      | Switch (_, args) -> check_term_args args
+      | Return args -> check_term_args args
+      | Raise (_, args, _) -> check_term_args args
+      | Tailcall_self { args; _ } ->
+        check_term_args args
+      | Tailcall_func (_, args) ->
+        check_term_args args
+      | Call { args; _ } -> check_term_args args
+      | Prim { args; _ } -> check_term_args args);
+      (* Check entry block is FunctionStart *)
+      if Label.equal label t.entry_label
+      then
+        match bl.desc with
+        | FunctionStart -> ()
+        | Merge _ | CallContinuation _
+        | TrapHandler _ ->
+          error "entry block %a is not FunctionStart"
+            Label.format label)
+    t.blocks
