@@ -431,7 +431,7 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
   cond_alias t ~denv ~from:apply ~to_:(List.hd witnesses);
   apply
 
-let record_set_of_closures_dep t
+let record_set_of_closures_deps_one_closure t
     { let_bound_name_of_the_closure = name;
       closure_code_id = code_id;
       only_full_applications = _
@@ -470,7 +470,7 @@ let record_set_of_closures_dep t
       Field.unknown_arity_call_witness ~base:name
 
 let record_set_of_closures_deps t =
-  List.iter (record_set_of_closures_dep t) t.set_of_closures_deps
+  List.iter (record_set_of_closures_deps_one_closure t) t.set_of_closures_deps
 
 let deps t ~all_constants =
   List.iter
