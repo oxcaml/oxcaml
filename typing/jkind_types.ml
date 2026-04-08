@@ -383,29 +383,42 @@ module Sort = struct
     | Ccontents t_op -> v.contents <- t_op
     | Clevel level -> v.level <- level
 
-  let rec t_iter ~f = function
-    | Var v -> f v
+  let rec update_level level = function
+    | Var v -> update_level_var level v
     | Base _ | Univar _ -> ()
-    | Product ts -> List.iter (fun t -> t_iter ~f t) ts
+    | Product ts -> List.iter (update_level level) ts
 
-  let update_level u v =
-    let new_level = min v.level u.level in
-    if v.level <> new_level
-    then (
-      log_change (v, Clevel v.level);
-      v.level <- new_level);
-    if u.level <> new_level
-    then (
-      log_change (u, Clevel u.level);
-      u.level <- new_level)
+  and update_level_var level u =
+    match u.contents with
+    | Some t -> update_level level t
+    | None ->
+      let new_level = min level u.level in
+      if u.level <> new_level
+      then (
+        log_change (u, Clevel u.level);
+        u.level <- new_level)
+
+  let[@inline] set_without_level : var -> t option -> unit =
+   fun v t_op ->
+    log_change (v, Ccontents v.contents);
+    v.contents <- t_op
 
   let[@inline] set : var -> t option -> unit =
    fun v t_op ->
-    log_change (v, Ccontents v.contents);
-    v.contents <- t_op;
-    match t_op with
-    | None -> ()
-    | Some t -> t_iter ~f:(fun u -> update_level u v) t
+    assert (Option.is_none v.contents);
+    (* [t_op] is always [Some _]. Takes [option] only for performance. *)
+    let t = Option.get t_op in
+    (* [v.level] is meaningful and should affect all variables in [t]. *)
+    update_level v.level t;
+    set_without_level v t_op
+  (* [v.contents] is set, which renders [v.level] meaningless, so we don't
+       need to update that. *)
+
+  let[@inline] set_to_compress : var -> t option -> unit =
+   fun v t_op ->
+    assert (Option.is_some v.contents);
+    (* [v.contents] is [Some _], hence [v.level] safe to ignore *)
+    set_without_level v t_op
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save
@@ -618,7 +631,7 @@ module Sort = struct
       | None -> t
       | Some s ->
         let result = get s in
-        if result != s then set r (Some result);
+        if result != s then set_to_compress r (Some result);
         (* path compression *)
         result)
 
@@ -716,7 +729,7 @@ module Sort = struct
       Static.Const.scannable
     | Some s ->
       let result = default_to_scannable_and_get s in
-      set r (Static.T_option.of_const result);
+      set_to_compress r (Static.T_option.of_const result);
       (* path compression *)
       result
 

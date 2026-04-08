@@ -155,7 +155,7 @@ end = struct
 end
 [%%expect{|
 >> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, value])
+(layout args: [value, <genvar>])
 Uncaught exception: Misc.Fatal_error
 
 |}]
