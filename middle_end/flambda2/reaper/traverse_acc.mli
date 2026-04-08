@@ -13,8 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Accumulator used during the downward traversal of the Flambda2 term to build
-    the global flow graph for the reaper. *)
+(** Accumulator used during the downward traversal of the Flambda 2 term to
+    build the global flow graph for the reaper. *)
 
 module Graph = Global_flow_graph
 
@@ -24,9 +24,20 @@ type continuation_info =
     arity : Flambda_kind.With_subkind.t list
   }
 
+(** Environment threaded through the downward traversal of a function body.
+    Tracks the context needed to register dependencies at each expression. *)
 module Env : sig
+  (** [Normal params] carries the dummy variables representing a continuation's
+      parameters. *)
   type cont_kind = Normal of Variable.t list
 
+  (** Controls whether the reaper preserves direct function calls even when the
+      closure might be dead.
+
+      - [Yes]: always preserve direct calls.
+      - [No]: allow removal of direct calls if the closure is dead.
+      - [Auto]: preserve only if the closure is independently marked as
+        [any_source]. *)
   type should_preserve_direct_calls =
     | Yes
     | No
@@ -43,20 +54,34 @@ module Env : sig
     all_constants:Name.t ->
     t
 
+  (** The reversed expression context above the current point in the traversal.
+  *)
   val parent : t -> Rev_expr.rev_expr_holed
 
+  (** Map from continuations in scope to their parameter variables. *)
   val conts : t -> cont_kind Continuation.Map.t
 
+  (** The code id of the function currently being traversed, or [None] at the
+      top level. *)
   val current_code_id : t -> Code_id.t option
 
+  (** Whether direct calls in the current function should be preserved by the
+      reaper. Set per function body based on the [reaper_preserve_direct_calls]
+      flag and whether zero-alloc checking is active. *)
   val should_preserve_direct_calls : t -> should_preserve_direct_calls
 
+  (** A distinguished [any_source] symbol representing the external world.
+      Dependencies on this node model side effects. *)
   val le_monde_exterieur : t -> Name.t
 
+  (** A distinguished [any_source] symbol to which all compile-time constants
+      are mapped. *)
   val all_constants : t -> Name.t
 
+  (** Return a copy of the environment with a new parent context. *)
   val with_parent : t -> Rev_expr.rev_expr_holed -> t
 
+  (** Return a copy of the environment with a new continuation map. *)
   val with_conts : t -> cont_kind Continuation.Map.t -> t
 end
 
