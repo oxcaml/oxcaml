@@ -76,7 +76,13 @@ val fixed_arity_continuation : t -> Continuation.t -> unit
 val fixed_arity_continuations : t -> Continuation.Set.t
 
 (* Continuation information map. *)
-val continuation_info : t -> Continuation.t -> continuation_info -> unit
+val continuation_info :
+  t ->
+  Continuation.t ->
+  params:Variable.t list ->
+  arity:Flambda_kind.With_subkind.t list ->
+  is_exn_handler:bool ->
+  unit
 
 val get_continuation_info : t -> continuation_info Continuation.Map.t
 
@@ -89,6 +95,8 @@ val code_deps : t -> code_dep Code_id.Map.t
 
 (* Directly adding edges to the graph *)
 val add_alias : t -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
+
+val add_alias_vars : t -> to_:Variable.t -> from:Variable.t -> unit
 
 val add_use_dep : t -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
 
