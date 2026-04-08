@@ -49,7 +49,7 @@ module Float_u : sig
     ('a : float64 mod global) ('b : float64 mod global).
     'a -> 'b -> ('a, 'b) pair
 end = struct
-  type ('a : float64, 'b : float64) pair = { fst : 'a; snd : 'b }
+  type ('a : float64, 'b : float64) pair = { fst : 'a; snd : 'b } [@@floatu_record]
   let mk_pair fst snd = { fst; snd }
 end
 
@@ -63,7 +63,7 @@ module Float_u :
   end
 |}]
 
-type float_u_record = { x : float#; y : float# }
+type float_u_record = { x : float#; y : float# } [@@floatu_record]
 
 [%%expect{|
 type float_u_record = { x : float#; y : float#; }

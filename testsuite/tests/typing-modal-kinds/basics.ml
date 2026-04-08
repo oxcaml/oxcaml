@@ -100,7 +100,7 @@ module Int64_u :
   end
 |}]
 
-type float_u_record = { x : float#; y : float# }
+type float_u_record = { x : float#; y : float# } [@@floatu_record]
 
 [%%expect{|
 type float_u_record = { x : float#; y : float#; }

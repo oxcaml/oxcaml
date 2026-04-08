@@ -111,7 +111,7 @@ let[@inline never] consumer x y = Float_u.(x + y)
 type t8 = { a : float#;
             mutable b : float#;
             c : float#;
-            mutable d : float# }
+            mutable d : float# } [@@floatu_record]
 
 let print_record_and_allocs s r =
   let allocs = get_exact_allocations () in

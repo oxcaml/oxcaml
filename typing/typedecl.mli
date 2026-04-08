@@ -202,6 +202,7 @@ type error =
   | Non_value_atomic_field
   | Missing_flatten_floats
   | Misplaced_flatten_floats
+  | Missing_floatu_record
 
 exception Error of Location.t * error
 

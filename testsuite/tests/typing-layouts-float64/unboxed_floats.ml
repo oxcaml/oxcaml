@@ -355,7 +355,7 @@ let _ =
 (* Test 8: basic float# records *)
 
 (* Copy of test 3, but the float args are in a record *)
-type manyargs = { x1 : float#; x3 : float#; x5 : float#; x7: float#; x9: float# }
+type manyargs = { x1 : float#; x3 : float#; x5 : float#; x7: float#; x9: float# } [@@floatu_record]
 
 (* Get some float# args by pattern matching and others by projection *)
 let[@inline_never] f8 x0 x2 x4 x6 x8 steps ({ x1; x5; _ } as fargs) () =
@@ -406,7 +406,7 @@ let _ = test8 ()
 type t9 = { a : float#;
             mutable b : float#;
             c : float#;
-            mutable d : float# }
+            mutable d : float# } [@@floatu_record]
 
 (* Construction *)
 let t9_1 = { a = #3.14;
@@ -491,7 +491,7 @@ let _ =
 
 type ex = Ex : 'a -> ex
 
-type t11_u = { xu : float#; yu : float# }
+type t11_u = { xu : float#; yu : float# } [@@floatu_record]
 type t11_b = { xb : float; yb : float }
 
 let ru = { xu = #3.14; yu = #42.0 }

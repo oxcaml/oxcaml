@@ -560,7 +560,12 @@ type t_u = #{ u : float# }
 type t = { b : float# }
 [%%expect{|
 type t_u = #{ u : float#; }
-type t = { b : float#; }
+Line 2, characters 0-23:
+2 | type t = { b : float# }
+    ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This record type contains only unboxed float fields,
+       which gives it an unboxed float record representation.
+       You must annotate it with "[@@floatu_record]".
 |}]
 
 let f () : t_u = { b = #1.0 }
@@ -574,11 +579,11 @@ Error: This boxed record expression should be unboxed instead,
 
 let f () : t = #{ u = #2.0 }
 [%%expect{|
-Line 1, characters 15-28:
+Line 1, characters 11-12:
 1 | let f () : t = #{ u = #2.0 }
-                   ^^^^^^^^^^^^^
-Error: This unboxed record expression should be boxed instead,
-       the expected type is "t"
+               ^
+Error: The type constructor "t" expects 3 argument(s),
+       but is here applied to 0 argument(s)
 |}]
 
 let ({ b } : t_u) = assert false
@@ -592,11 +597,11 @@ Error: This boxed record pattern should be unboxed instead,
 
 let (#{ u } : t) = assert false
 [%%expect{|
-Line 1, characters 5-11:
+Line 1, characters 14-15:
 1 | let (#{ u } : t) = assert false
-         ^^^^^^
-Error: This unboxed record pattern should be boxed instead,
-       the expected type is "t"
+                  ^
+Error: The type constructor "t" expects 3 argument(s),
+       but is here applied to 0 argument(s)
 |}]
 
 let bad_get (t_u : t_u) = t_u.u
@@ -610,11 +615,11 @@ Error: This expression has type "t_u",
 
 let bad_get (t : t) = t.#b
 [%%expect{|
-Line 1, characters 22-23:
+Line 1, characters 17-18:
 1 | let bad_get (t : t) = t.#b
-                          ^
-Error: This expression has type "t",
-       which is a boxed record rather than an unboxed one.
+                     ^
+Error: The type constructor "t" expects 3 argument(s),
+       but is here applied to 0 argument(s)
 |}]
 
 let _ = #{ b = #5.0 }
@@ -623,8 +628,6 @@ Line 1, characters 11-12:
 1 | let _ = #{ b = #5.0 }
                ^
 Error: Unbound unboxed record field "b"
-Hint: There is a boxed record field with this name.
-      Note that float- and [@@unboxed]- records don't get unboxed versions.
 |}]
 
 let _ = { u = #5.0 }
@@ -652,8 +655,6 @@ Line 1, characters 19-20:
 1 | let bad_get t = t.#b
                        ^
 Error: Unbound unboxed record field "b"
-Hint: There is a boxed record field with this name.
-      Note that float- and [@@unboxed]- records don't get unboxed versions.
 |}]
 
 (*****************************************************************************)

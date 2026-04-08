@@ -953,8 +953,21 @@ module Type_naming = struct
               )
             | _ -> false
           in
+          let needs_floatu_record =
+            match ty_structure with
+            | Record (ts, Boxed) ->
+              List.for_all ts ~f:(fun t ->
+                  Type_structure.layout t = Float64
+                  && Type_structure.scrape t <> Float
+              )
+            | _ -> false
+          in
           let attr =
-            if needs_flatten_floats then " [@@flatten_floats]" else ""
+            if needs_flatten_floats
+            then " [@@flatten_floats]"
+            else if needs_floatu_record
+            then " [@@floatu_record]"
+            else ""
           in
           ( id,
             sprintf "type %s = %s%s (* %s *)" type_name type_definition attr
