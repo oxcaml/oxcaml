@@ -541,6 +541,7 @@
   linkenv
   optlink
   ;; asmcomp/dissector/
+  dissector_gc
   dissector_log
   build_igot_and_iplt
   build_linker_args

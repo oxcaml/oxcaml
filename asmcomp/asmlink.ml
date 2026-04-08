@@ -329,7 +329,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
     then Filename.temp_file (Filename.basename output_name) ".tmp"
     else output_name
   in
-  if dissector_enabled then Gc.compact ();
+  if dissector_enabled then Dissector_gc.compact_phase "link";
   let exitcode =
     Profile.record_call "link_object" (fun () ->
         Ccomp.call_linker mode link_output_name files c_lib)

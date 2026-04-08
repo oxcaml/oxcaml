@@ -194,7 +194,7 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
   let result =
     List.concat_map (fun file -> analyze_one ~indent:"" file) files
   in
-  Gc.compact ();
+  Dissector_gc.compact_phase "measure";
   Option.iter close_out out_channel;
   (* Log summary if -ddissector is enabled *)
   if !Clflags.ddissector
