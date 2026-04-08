@@ -62,11 +62,11 @@ type t
 val create : unit -> t
 
 (* Functions about variable kinds *)
-val kind : Name.t -> Flambda_kind.t -> t -> unit
+val kind : t -> Name.t -> Flambda_kind.t -> unit
 
-val bound_parameter_kind : Bound_parameter.t -> t -> unit
+val bound_parameter_kind : t -> Bound_parameter.t -> unit
 
-val alias_kind : Name.t -> Simple.t -> t -> unit
+val alias_kind : t -> Name.t -> Simple.t -> unit
 
 val kinds : t -> Flambda_kind.t Name.Map.t
 
@@ -87,7 +87,7 @@ val continuation_info :
 val get_continuation_info : t -> continuation_info Continuation.Map.t
 
 (* Code *)
-val add_code : Code_id.t -> code_dep -> t -> unit
+val add_code : t -> Code_id.t -> code_dep -> unit
 
 val find_code : t -> Code_id.t -> code_dep
 
@@ -142,7 +142,7 @@ val add_cond_any_usage : t -> denv:Env.t -> Simple.t -> unit
 
 val add_cond_any_source : t -> denv:Env.t -> Code_id_or_name.t -> unit
 
-val add_apply : apply_dep -> t -> unit
+val add_apply : t -> apply_dep -> unit
 
 val create_known_arity_call_witness :
   t ->
@@ -180,6 +180,6 @@ val make_unknown_arity_apply_widget :
   Code_id_or_name.t
 
 val add_set_of_closures_dep :
-  Name.t -> Code_id.t -> only_full_applications:bool -> t -> unit
+  t -> Name.t -> Code_id.t -> only_full_applications:bool -> unit
 
 val deps : t -> all_constants:Name.t -> Graph.graph

@@ -88,9 +88,9 @@ let create () =
 
 let kinds t = t.kinds
 
-let kind name k t = t.kinds <- Name.Map.add name k t.kinds
+let kind t name k = t.kinds <- Name.Map.add name k t.kinds
 
-let bound_parameter_kind (bp : Bound_parameter.t) t =
+let bound_parameter_kind t (bp : Bound_parameter.t) =
   let kind = Flambda_kind.With_subkind.kind (Bound_parameter.kind bp) in
   let name = Name.var (Bound_parameter.var bp) in
   t.kinds <- Name.Map.add name kind t.kinds
@@ -108,7 +108,7 @@ let simple_to_node t ~all_constants simple =
       then Graph.add_any_source t.deps (Code_id_or_name.symbol s);
       Code_id_or_name.symbol s)
 
-let alias_kind name simple t =
+let alias_kind t name simple =
   let kind =
     Simple.pattern_match simple
       ~name:(fun name ~coercion:_ ->
@@ -136,7 +136,7 @@ let alias_kind name simple t =
   in
   t.kinds <- Name.Map.add name kind t.kinds
 
-let add_code code_id dep t = t.code <- Code_id.Map.add code_id dep t.code
+let add_code t code_id dep = t.code <- Code_id.Map.add code_id dep t.code
 
 let find_code t code_id = Code_id.Map.find code_id t.code
 
@@ -209,10 +209,10 @@ let continuation_info t k ~params ~arity ~is_exn_handler =
 
 let get_continuation_info t = t.continuation_info
 
-let add_apply apply t = t.apply_deps <- apply :: t.apply_deps
+let add_apply t apply = t.apply_deps <- apply :: t.apply_deps
 
-let add_set_of_closures_dep let_bound_name_of_the_closure closure_code_id
-    ~only_full_applications t =
+let add_set_of_closures_dep t let_bound_name_of_the_closure closure_code_id
+    ~only_full_applications =
   t.set_of_closures_dep
     <- { let_bound_name_of_the_closure;
          closure_code_id;

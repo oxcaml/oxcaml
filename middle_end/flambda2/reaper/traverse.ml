@@ -96,7 +96,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
         Acc.add_any_source acc param)
       params);
   if never_delete then Acc.add_any_usage acc (Code_id_or_name.code_id code_id);
-  Acc.add_code code_id code_dep acc
+  Acc.add_code acc code_id code_dep
 
 let record_set_of_closures_deps denv names_and_function_slots set_of_closures
     acc : unit =
@@ -108,7 +108,7 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
   in
   Function_slot.Lmap.iter
     (fun function_slot name ->
-      Acc.kind name K.value acc;
+      Acc.kind acc name K.value;
       let code_id =
         (Function_slot.Map.find function_slot funs
           : Function_declarations.code_id_in_function_declaration)
@@ -116,7 +116,7 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
       match code_id with
       | Deleted _ -> ()
       | Code_id { code_id; only_full_applications } ->
-        Acc.add_set_of_closures_dep name code_id ~only_full_applications acc)
+        Acc.add_set_of_closures_dep acc name code_id ~only_full_applications)
     names_and_function_slots;
   Function_slot.Lmap.iter
     (fun _function_slot function_slot_name ->
@@ -139,10 +139,9 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
 
 let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     ~(default_bp : (Code_id_or_name.t -> unit) -> unit) =
-  Acc.kind
+  Acc.kind acc
     (Bound_var.name (Bound_pattern.must_be_singleton bound_pattern))
-    (Flambda_primitive.result_kind' prim)
-    acc;
+    (Flambda_primitive.result_kind' prim);
   match prim with
   | Variadic (Make_block (block_kind, _mutability, _), fields) ->
     let _tag, block_shape = Flambda_primitive.Block_kind.to_shape block_kind in
@@ -380,7 +379,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
             apply_call_witness = call_widget
           }
         in
-        Acc.add_apply apply_dep acc
+        Acc.add_apply acc apply_dep
     in
     match callee with
     | None -> add_apply acc ~only_if_closure_any_source:false
@@ -522,9 +521,9 @@ let rec traverse_let denv acc let_expr : rev_expr =
   | Prim (prim, _dbg) ->
     traverse_prim denv acc ~bound_pattern prim ~default ~default_bp
   | Simple s ->
-    Acc.alias_kind
+    Acc.alias_kind acc
       (Name.var (Bound_var.var (Bound_pattern.must_be_singleton bound_pattern)))
-      s acc;
+      s;
     default_bp (fun to_ ->
         Acc.add_alias acc ~to_ ~from:(Acc.simple_to_node acc ~denv s))
   | Rec_info _ -> default acc);
@@ -671,11 +670,11 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
       handlers denv.conts
   in
   Bound_parameters.iter
-    (fun bp -> Acc.bound_parameter_kind bp acc)
+    (fun bp -> Acc.bound_parameter_kind acc bp)
     invariant_params;
   Continuation.Lmap.iter
     (fun _ (_, bp, _) ->
-      Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind bp acc) bp)
+      Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind acc bp) bp)
     handlers;
   let handlers =
     Continuation.Lmap.map
@@ -716,7 +715,7 @@ and traverse_cont_handler : type a.
   Continuation_handler.pattern_match cont_handler
     ~f:(fun bound_parameters ~handler ->
       Bound_parameters.iter
-        (fun bp -> Acc.bound_parameter_kind bp acc)
+        (fun bp -> Acc.bound_parameter_kind acc bp)
         bound_parameters;
       let expr = traverse denv acc handler in
       let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
@@ -794,13 +793,13 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
       all_constants
     }
   in
-  Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind bp acc) params;
-  Acc.kind (Name.var my_closure) K.value acc;
-  Option.iter (fun region -> Acc.kind (Name.var region) K.region acc) my_region;
+  Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind acc bp) params;
+  Acc.kind acc (Name.var my_closure) K.value;
+  Option.iter (fun region -> Acc.kind acc (Name.var region) K.region) my_region;
   Option.iter
-    (fun region -> Acc.kind (Name.var region) K.region acc)
+    (fun region -> Acc.kind acc (Name.var region) K.region)
     my_ghost_region;
-  Acc.kind (Name.var my_depth) K.rec_info acc;
+  Acc.kind acc (Name.var my_depth) K.rec_info;
   if not is_opaque
   then (
     List.iter2
