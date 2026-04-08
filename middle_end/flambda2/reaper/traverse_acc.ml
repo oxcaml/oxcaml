@@ -434,9 +434,9 @@ let record_set_of_closure_deps t =
         assert (
           not
             (Compilation_unit.is_current (Code_id.get_compilation_unit code_id)));
-        (* The code comes from another compilation unit; so we don't know what
-           happens once it is applied. As such, it must escape the whole
-           block. *)
+        (* The code comes from another compilation unit, so we don't know what
+           happens once it is applied. As such, it must cause the whole block to
+           escape. *)
         let witness =
           Code_id_or_name.var
             (Variable.create
