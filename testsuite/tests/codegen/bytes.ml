@@ -286,6 +286,63 @@ bytes_set_float32_indexed_by_int64:
   ret
 |}]
 
+let bytes_get_int64_indexed_by_int32
+    (buf : bytes) (i : Int32_u.t) =
+  Bytes.unsafe_get_int64_ne_indexed_by_int32 buf i
+[%%expect_asm X86_64{|
+bytes_get_int64_indexed_by_int32:
+  movq  (%rax,%rbx), %rax
+  ret
+|}]
+
+let bytes_set_int64_indexed_by_int32
+    (buf : bytes) (i : Int32_u.t) (v : Int64_u.t) =
+  Bytes.unsafe_set_int64_ne_indexed_by_int32 buf i v
+[%%expect_asm X86_64{|
+bytes_set_int64_indexed_by_int32:
+  movq  %rdi, (%rax,%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
+let bytes_get_int64_indexed_by_int16
+    (buf : bytes) (i : int16#) =
+  Bytes.unsafe_get_int64_ne_indexed_by_int16 buf i
+[%%expect_asm X86_64{|
+bytes_get_int64_indexed_by_int16:
+  movq  (%rax,%rbx), %rax
+  ret
+|}]
+
+let bytes_set_int64_indexed_by_int16
+    (buf : bytes) (i : int16#) (v : Int64_u.t) =
+  Bytes.unsafe_set_int64_ne_indexed_by_int16 buf i v
+[%%expect_asm X86_64{|
+bytes_set_int64_indexed_by_int16:
+  movq  %rdi, (%rax,%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
+let bytes_get_int64_indexed_by_int8
+    (buf : bytes) (i : int8#) =
+  Bytes.unsafe_get_int64_ne_indexed_by_int8 buf i
+[%%expect_asm X86_64{|
+bytes_get_int64_indexed_by_int8:
+  movq  (%rax,%rbx), %rax
+  ret
+|}]
+
+let bytes_set_int64_indexed_by_int8
+    (buf : bytes) (i : int8#) (v : Int64_u.t) =
+  Bytes.unsafe_set_int64_ne_indexed_by_int8 buf i v
+[%%expect_asm X86_64{|
+bytes_set_int64_indexed_by_int8:
+  movq  %rdi, (%rax,%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
 let string_get_int8_indexed_by_int64
     (s : string) (i : Int64_u.t) =
   String.unsafe_get_int8_indexed_by_int64 s i
