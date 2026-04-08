@@ -139,13 +139,10 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
 
 let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     ~(default_bp : (Code_id_or_name.t -> unit) -> unit) =
-  let () =
-    let kind = Flambda_primitive.result_kind' prim in
-    let name =
-      Name.var (Bound_var.var (Bound_pattern.must_be_singleton bound_pattern))
-    in
-    Acc.kind name kind acc
-  in
+  Acc.kind
+    (Bound_var.name (Bound_pattern.must_be_singleton bound_pattern))
+    (Flambda_primitive.result_kind' prim)
+    acc;
   match[@ocaml.warning "-4"] prim with
   | Variadic (Make_block (block_kind, _mutability, _), fields) ->
     let _tag, block_shape = Flambda_primitive.Block_kind.to_shape block_kind in
