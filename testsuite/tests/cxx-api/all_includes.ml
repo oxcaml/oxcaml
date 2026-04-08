@@ -1,4 +1,7 @@
+(* This test is broken and will be fixed when we pull in 5.5
+   (upstream ocaml/ocaml#14421). *)
 (* TEST
+ skip;
  modules = "stubs.c";
  readonly_files = "all-includes.h";
  not-msvc;

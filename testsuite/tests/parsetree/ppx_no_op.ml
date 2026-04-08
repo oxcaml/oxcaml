@@ -11,8 +11,8 @@ let () =
          match pstr_desc with
          | Pstr_extension (({ txt = "expect"; loc }, _payload), attrs) ->
            { item with pstr_desc =
-                         Pstr_eval (Ast_helper.Exp.mk ~loc
-                            (Pexp_constant (Pconst_char 'X')), attrs) }
+                       Pstr_eval (Ast_helper.Exp.mk ~loc
+                          (Pexp_constant (Ast_helper.Const.char 'X')), attrs) }
          | _ -> Ast_mapper.default_mapper.structure_item mapper item
        in
        { Ast_mapper.default_mapper with structure_item })
