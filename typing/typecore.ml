@@ -300,6 +300,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Let_poly_not_yet_implemented
+  | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
 
 and invalid_layout_poly_inst_context =
@@ -3120,18 +3121,23 @@ and type_pat_aux
             let kind = Val_mut (m0, sort) in
             mode, kind
       in
-      let lpoly =
-        if (penv : Pattern_env.t).is_lpoly
-        then Lpoly.pending ~loc
-        else Lpoly.determined []
-      in
-      let id, uid =
-        enter_variable ~lpoly tps loc name mode ~kind ty sp.ppat_attributes sort
-      in
       let pat_desc =
-        if (penv : Pattern_env.t).is_lpoly
-        then Tpat_fun_layout { id; name; uid; sort; mode = alloc_mode; lpoly }
-        else Tpat_var { id; name; uid; sort; mode = alloc_mode }
+        match (penv : Pattern_env.t).env_alloc_mode with
+        | Some env_alloc_mode ->
+          let lpoly = Lpoly.pending ~loc in
+          let id, uid =
+            enter_variable ~lpoly tps loc name mode ~kind ty
+              sp.ppat_attributes sort
+          in
+          Tpat_fun_layout { id; name; uid; sort;
+                            mode = alloc_mode; lpoly; env_alloc_mode }
+        | None ->
+          let lpoly = Lpoly.determined [] in
+          let id, uid =
+            enter_variable ~lpoly tps loc name mode ~kind ty
+              sp.ppat_attributes sort
+          in
+          Tpat_var { id; name; uid; sort; mode = alloc_mode }
       in
       rvp {
         pat_desc;
@@ -3561,13 +3567,14 @@ let type_pattern
 
 let type_pattern_list
     category no_existentials env mutable_flag spatl expected_tys expected_sorts
-    allow_modules ~is_lpoly
+    allow_modules
   =
   let tps = create_type_pat_state allow_modules in
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
-      ~is_lpoly ~equations_scope ~allow_recursive_equations:false in
-  let type_pat (attrs, pat_mode, exp_mode, pat) ty sort =
+      ~equations_scope ~allow_recursive_equations:false in
+  let type_pat (attrs, pat_mode, env_alloc_mode, exp_mode, pat) ty sort =
+    Pattern_env.set_env_alloc_mode new_penv env_alloc_mode;
     Builtin_attributes.warning_scope ~ppwarning:false attrs
       (fun () ->
          exp_mode,
@@ -4899,6 +4906,29 @@ let rec maybe_computation exp =
   | Texp_apply_layout _
     -> true
 
+(* Returns true if, for every [Texp_ident x] occurring in the expression,
+   the comonadic axes of the expression are weaker (higher) than [x].
+   Conservative: may return false when the condition holds. *)
+let rec is_syntactic_value (exp : expression) =
+  match exp.exp_desc with
+  | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit | Texp_unboxed_bool _
+  | Texp_function _ -> true
+  | Texp_construct (_, _, args, _) ->
+    List.for_all is_syntactic_value args
+  | Texp_variant (_, None) -> true
+  | Texp_variant (_, Some (e, _)) -> is_syntactic_value e
+  | Texp_tuple (args, _) ->
+    List.for_all (fun (_, e) -> is_syntactic_value e) args
+  | Texp_unboxed_tuple args ->
+    List.for_all (fun (_, e, _) -> is_syntactic_value e) args
+  | Texp_record { fields; extended_expression = None; _ } ->
+    Array.for_all (fun (_, def) ->
+      match def with
+      | Kept _ -> assert false
+      | Overridden (_, e) -> is_syntactic_value e) fields
+  | Texp_apply_layout (e, _) | Texp_exclave e -> is_syntactic_value e
+  | _ -> false
+
 let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
   List.map
@@ -5905,7 +5935,7 @@ let vb_pat_constraint
   in
   vb.pvb_attributes, spat
 
-let pat_modes ~force_toplevel rec_mode_var (attrs, spat) =
+let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
   let pat_mode, exp_mode =
     if force_toplevel
     then simple_pat_mode Value.legacy, mode_legacy
@@ -5924,7 +5954,24 @@ let pat_modes ~force_toplevel rec_mode_var (attrs, spat) =
     | Some mode ->
         simple_pat_mode mode, mode_default mode
   in
-  attrs, pat_mode, exp_mode, spat
+  let env_alloc_mode, exp_mode =
+    if is_lpoly then
+      (* Since we require [is_syntactic_value] for the RHS of [let poly_], we
+         can conservatively use the RHS's comonadic mode as the captured
+         environment's mode. *)
+      let env_alloc_mode, env_mode =
+        register_allocation ~loc:spat.ppat_loc
+          ~desc:Lpoly_captured_environment exp_mode
+      in
+      let exp_mode =
+        (* [env_mode] guaranteed to be lower than [exp_mode], but prioritize
+           [exp_mode] for mode error hints. *)
+        Mode.Value.meet (List.map as_single_mode [exp_mode; env_mode])
+      in
+      Some env_alloc_mode, mode_default exp_mode
+    else None, exp_mode
+  in
+  attrs, pat_mode, env_alloc_mode, exp_mode, spat
 
 let add_zero_alloc_attribute expr attributes =
   let open Builtin_attributes in
@@ -10371,8 +10418,10 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     | Nonrecursive -> None
   in
   let spatl = List.map vb_pat_constraint spat_sexp_list in
-  let spatl = List.map (pat_modes ~force_toplevel rec_mode_var) spatl in
-  let attrs_list = List.map (fun (attrs, _, _, _) -> attrs) spatl in
+  let spatl =
+    List.map (pat_modes ~force_toplevel rec_mode_var ~is_lpoly) spatl
+  in
+  let attrs_list = List.map (fun (attrs, _, _, _, _) -> attrs) spatl in
   let is_recursive = (rec_flag = Recursive) in
 
   let (pat_list, exp_list, new_env, mvs, sorts, _pvs) =
@@ -10387,7 +10436,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           let (pat_list, _new_env, _force, pvs, _mvs as res) =
             with_local_level_if is_recursive (fun () ->
               type_pattern_list Value existential_context env mutable_flag spatl
-                nvs sorts allow_modules ~is_lpoly
+                nvs sorts allow_modules
             ) ~post:(fun (_, _, _, pvs, _) ->
                        iter_pattern_variables_type generalize pvs)
           in
@@ -10513,7 +10562,12 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
             )
         )
         mode_pat_typ_list
-        (List.map2 (fun (attrs, _, _, _) (e, _) -> attrs, e) spatl exp_list);
+        (List.map2 (fun (attrs, _, _, _, _) (e, _) -> attrs, e) spatl exp_list);
+      if is_lpoly then
+        List.iter2 (fun { pvb_loc; _ } (exp, _) ->
+          if not (is_syntactic_value exp) then
+            raise (Error (pvb_loc, env, Let_poly_not_syntactic_value))
+        ) spat_sexp_list exp_list;
       (mode_pat_typ_list, exp_list, new_env, mvs, sorts,
        List.map (fun pv -> { pv with pv_type = instance pv.pv_type}) pvs)
     end
@@ -12486,6 +12540,10 @@ let report_error ~loc env =
   | Let_poly_not_yet_implemented ->
       Location.errorf ~loc
         "The %a annotation is not yet implemented."
+        Style.inline_code "let poly_"
+  | Let_poly_not_syntactic_value ->
+      Location.errorf ~loc
+        "The right-hand side of a %a binding must be a syntactic value."
         Style.inline_code "let poly_"
   | Layout_poly_inst_not_yet_supported ctx ->
       let ctx_str = match ctx with

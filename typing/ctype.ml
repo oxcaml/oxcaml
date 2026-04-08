@@ -301,27 +301,29 @@ module Pattern_env : sig
     { mutable env : Env.t;
       equations_scope : int;
       allow_recursive_equations : bool;
-      is_lpoly : bool; }
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+      mutable env_alloc_mode : Mode.Alloc.r option; }
+  val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
     -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
+  val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
 end = struct
   type t =
     { mutable env : Env.t;
       equations_scope : int;
       allow_recursive_equations : bool;
-      is_lpoly : bool; }
-  let make ?(is_lpoly=false) env ~equations_scope ~allow_recursive_equations =
+      mutable env_alloc_mode : Mode.Alloc.r option; }
+  let make ?env_alloc_mode env ~equations_scope ~allow_recursive_equations =
     { env;
       equations_scope;
       allow_recursive_equations;
-      is_lpoly; }
+      env_alloc_mode; }
   let copy ?equations_scope penv =
     let equations_scope =
       match equations_scope with None -> penv.equations_scope | Some s -> s in
     { penv with equations_scope }
   let set_env penv env = penv.env <- env
+  let set_env_alloc_mode penv m = penv.env_alloc_mode <- m
 end
 
 (**** unification mode ****)
