@@ -420,7 +420,7 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
   cond_alias t ~denv ~from:apply ~to_:(List.hd witnesses);
   apply
 
-let record_set_of_closure_deps t =
+let record_set_of_closures_deps t =
   List.iter
     (fun { let_bound_name_of_the_closure = name;
            closure_code_id = code_id;
@@ -498,7 +498,7 @@ let deps t ~all_constants =
             ~from:(simple_to_node t ~all_constants closure)
             ~if_used:(Code_id_or_name.code_id code_id)))
     t.apply_deps;
-  record_set_of_closure_deps t;
+  record_set_of_closures_deps t;
   t.deps
 
 let simple_to_node t ~denv s =
