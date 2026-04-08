@@ -159,3 +159,11 @@ val emit_elf_note :
   typ:int32 ->
   emit_desc:(unit -> unit) ->
   unit
+
+type emit_data_item_actions =
+  { global_maybe_protected : Asm_targets.Asm_symbol.t -> unit;
+    symbol_defined : string -> unit;
+    symbol_used : string -> unit
+  }
+
+val emit_data_item : emit_data_item_actions -> Cmm.data_item -> unit
