@@ -152,7 +152,7 @@ val test_direct : int64 = 2L
 let test_via_index =
   (* Check that the same works when accessing through a block index *)
   let idx = ((.snd) : (('a : bits64) t, 'a) idx_mut) |> Sys.opaque_identity in
-  Idx_mut.unsafe_get test_block idx |> box_int64
+  Idx_mut.get test_block idx |> box_int64
 [%%expect {|
 val test_via_index : int64 = 2L
 |}]
@@ -168,8 +168,8 @@ val test_set_direct : int64 = 42L
 let test_set_via_index =
   let t = make_test_block () in
   let idx = ((.snd) : (('a : bits64) t, 'a) idx_mut) |> Sys.opaque_identity in
-  Idx_mut.unsafe_set t idx #42L;
-  Idx_mut.unsafe_get t idx |> box_int64
+  Idx_mut.set t idx #42L;
+  Idx_mut.get t idx |> box_int64
 [%%expect {|
 val test_set_via_index : int64 = 42L
 |}]
@@ -208,7 +208,7 @@ let test_nested_via_index =
     ((.snd.#snd) : (int64# t# t, int64#) idx_mut)
     |> Sys.opaque_identity
   in
-  Idx_mut.unsafe_get test_nested_block idx |> box_int64
+  Idx_mut.get test_nested_block idx |> box_int64
 [%%expect{|
 val test_nested_via_index : int64 = 4L
 |}]

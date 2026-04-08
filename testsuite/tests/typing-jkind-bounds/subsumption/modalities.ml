@@ -737,7 +737,7 @@ Error: The kind of type "not_always_portable" is
            immediate with 'a t & void mod everything with 'a t
          because it is an unboxed record.
        But the kind of type "not_always_portable" must be a subkind of
-           value_or_null mod portable & void mod portable
+           any mod portable & any mod portable
          because of the annotation on the declaration of the type not_always_portable.
 |}]
 
