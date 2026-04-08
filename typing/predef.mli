@@ -208,6 +208,11 @@ val option_argument_jkind : jkind_lr
 (* The jkind used for list argument types *)
 val list_argument_jkind : jkind_lr
 
+(* Cycle breaker: [Ikind] installs this callback at startup so [Predef] can
+   compute [type_ikind] without directly depending on [Ikind]. *)
+val set_ikind_of_jkind :
+  (params:type_expr list -> jkind_l -> type_ikind) -> unit
+
 (* To build the initial environment. Since there is a nasty mutual
    recursion between predef and env, we break it by parameterizing
    over Env.t, Env.add_type and Env.add_extension. *)

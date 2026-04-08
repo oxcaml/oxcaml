@@ -1602,6 +1602,9 @@ and find_type_unboxed_version path env seen =
       type_arity = decl.type_arity;
       type_kind = decl.type_kind;
       type_jkind = jkind;
+      type_ikind =
+        Types.ikinds_todo
+          (Format_doc.asprintf "env unboxed alias path=%a" Path.print path);
       type_private = decl.type_private;
       type_manifest = Some man;
       type_variance = decl.type_variance;
@@ -3264,7 +3267,7 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
   let with_imports cmi = { cmi with cmi_crcs = imports } in
   save_signature_with_transform with_imports ~alerts sg modname cu cmi
 
-(* Make the initial environment, without language extensions *)
+(* Make the initial environment. *)
 let initial () =
   let add_type_and_remember_decl (type_ident : Ident.t) decl env =
     match !Clflags.shape_format with

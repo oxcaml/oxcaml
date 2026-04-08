@@ -117,6 +117,16 @@ val module_declaration: scoping -> t -> module_declaration -> module_declaration
      apply (compose s1 s2) x = apply s2 (apply s1 x) **)
 val compose: t -> t -> t
 
+module Ikind_substitution : sig
+  type lookup_result =
+    | Lookup_identity
+    | Lookup_path of Path.t
+    | Lookup_type_fun of type_expr list * type_expr
+
+  val substitute_decl_ikind_with_lookup :
+    (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref
+end
+
 module Unsafe: sig
 
   type t = unsafe subst

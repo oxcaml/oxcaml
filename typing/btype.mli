@@ -381,6 +381,8 @@ module Jkind0 : sig
 
     val equal : t -> t -> bool
     val join : t -> t -> t
+    val to_axis_lattice : t -> Axis_lattice.t
+    val of_axis_lattice : Axis_lattice.t -> t
     val meet : t -> t -> t
 
     val relevant_axes_of_modality :

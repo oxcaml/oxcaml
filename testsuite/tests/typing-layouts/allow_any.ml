@@ -539,3 +539,25 @@ let f (type a b) (eq : ((a, b) M7.t, (a, b) M9.t) eq) = match eq with Refl -> ()
 [%%expect{|
 val f : (('a, 'b) M7.t, ('a, 'b) M9.t) eq -> unit = <fun>
 |}]
+
+module M : sig 
+  type t : immutable_data
+end = struct
+  type q : immutable_data = { bar : int ref }
+  [@@unsafe_allow_any_mode_crossing]
+  type t : immutable_data = q
+end
+[%%expect{|
+module M : sig type t : immutable_data end
+|}]
+
+module M : sig 
+  type t : immutable_data
+end = struct
+  type q : immutable_data = { bar : int ref }
+  [@@unsafe_allow_any_mode_crossing]
+  type t : immutable_data = q list
+end
+[%%expect{|
+module M : sig type t : immutable_data end
+|}]
