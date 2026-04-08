@@ -8,7 +8,9 @@ module List = ListLabels
 let instr_prefix : type a. Format.formatter -> a Cfg.instruction -> unit =
  fun fmt instr ->
   Format.fprintf fmt "%t%a%t " Cfg_colours.instr_id InstructionId.format_padded
-    instr.id Cfg_colours.pop
+    instr.id Cfg_colours.pop;
+  if Array.length instr.res > 0
+  then Format.fprintf fmt "%a := " Printreg.regs instr.res
 
 let instr_suffix : type a.
     Format.formatter ->
@@ -16,9 +18,7 @@ let instr_suffix : type a.
     unit =
  fun fmt (instr, liveness) ->
   if Array.length instr.arg > 0
-  then Format.fprintf fmt " arg:[|%a|]" Printreg.regs instr.arg;
-  if Array.length instr.res > 0
-  then Format.fprintf fmt " res:[|%a|]" Printreg.regs instr.res;
+  then Format.fprintf fmt " %a" Printreg.regs instr.arg;
   match liveness with
   | None -> ()
   | Some liveness -> (
@@ -69,7 +69,7 @@ let block :
         Cfg.dump_basic instr.desc Cfg_colours.pop instr_suffix (instr, liveness));
   Format.fprintf fmt "%a%t%a%t%a\n\n" instr_prefix block.terminator
     Cfg_colours.terminator
-    (Cfg.dump_terminator ~sep:", ")
+    (Cfg.dump_terminator ~sep:"\n         ")
     block.terminator.desc Cfg_colours.pop instr_suffix
     (block.terminator, liveness)
 

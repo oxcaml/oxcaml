@@ -25,7 +25,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* CR mshinwell: share some of this with Flambda_colours *)
+(* CR-someday mshinwell/xclerc: share some of this with Flambda_colours *)
 
 (* Whether to output an up arrow on push and a down arrow on pop. Handy for
    hunting down mismatched pushes and pops. *)
