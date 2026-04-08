@@ -395,12 +395,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (fun var ->
             let layout = Jkind.Sort.var_default_to_scannable_and_get var in
             let layout = Typeopt.layout_of_sort e.exp_loc layout in
-            Lconst (Const_layout layout)
-            )
+            Lconst (Const_layout layout))
           args;
         ap_result_layout = Lambda.layout_function;
         ap_region_close = Rc_normal;
-        ap_mode = alloc_heap;
+        ap_mode = alloc_local;
         ap_loc = (of_location ~scopes e.exp_loc);
         ap_tailcall = Default_tailcall;
         ap_inlined = Default_inlined;

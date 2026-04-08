@@ -1441,7 +1441,7 @@ let rec lam ppf = function
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lsplice (_, slambda) ->
-      fprintf ppf "$(%a)" slam slambda
+      fprintf ppf "$%a" slam slambda
 
 and slam ppf = function
   | SLlayout l -> fprintf ppf "⟪%a⟫" layout l
@@ -1457,12 +1457,12 @@ and slam ppf = function
   | SLfield (container, field) ->
     fprintf ppf "%a.%i" slam container field
   | SLhalves { sval_comptime; sval_runtime } ->
-    fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]"
+    fprintf ppf "@[<hv>@[<2>{ c =@ %a@]@,@[<2>; r =@ ⟪%a⟫@] }@]"
       slam sval_comptime lam sval_runtime
   | SLproj_comptime value -> fprintf ppf "%a.c" slam value
-  | SLtemplate func -> fprintf ppf "(template %a)" slambda_function func
+  | SLtemplate func -> slambda_function ppf func
   | SLinstantiate apply -> fprintf ppf "(%a)" slambda_apply apply
-  | SLlet _ as slet ->
+  | SLlet { slet_body = SLlet _ } as slet ->
     let rec letbody ~sp = function
     | SLlet { slet_name; slet_value; slet_body} ->
         if sp then fprintf ppf "@ ";
@@ -1473,12 +1473,15 @@ and slam ppf = function
     fprintf ppf "@[<2>(let@ @[<hv 1>(";
     let expr = letbody ~sp:false slet in
     fprintf ppf ")@]@ %a)@]" slam expr
+  | SLlet { slet_name; slet_value; slet_body } ->
+    fprintf ppf "@[<2>(@[<2>let (%a =@ %a)@]@ %a)@]"
+      Slambdaident.print slet_name slam slet_value slam slet_body
 
 and slambda_function ppf { sfun_params; sfun_body } =
   let print_params ppf =
     Array.iter (fun id -> fprintf ppf "%a@ " Slambdaident.print id) sfun_params
   in
-  fprintf ppf "@[<2>@[<2>%t->@]@ %a@]" print_params slam sfun_body
+  fprintf ppf "@[<2>(template @[<2>%t->@]@ %a)@]" print_params slam sfun_body
 
 and slambda_apply ppf { sapp_func; sapp_args } =
   let print_args ppf =
