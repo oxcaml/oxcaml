@@ -155,7 +155,7 @@ val create_known_arity_call_witness :
 val make_known_arity_apply_widget :
   t ->
   denv:Env.t ->
-  params:Simple.t list ->
+  Apply_expr.t ->
   returns:Variable.t list ->
   exn:Variable.t ->
   Code_id_or_name.t
@@ -173,8 +173,7 @@ val create_unknown_arity_call_witnesses :
 val make_unknown_arity_apply_widget :
   t ->
   denv:Env.t ->
-  arity:[`Complex] Flambda_arity.t ->
-  params:Simple.t list ->
+  Apply_expr.t ->
   returns:Variable.t list ->
   exn:Variable.t ->
   Code_id_or_name.t

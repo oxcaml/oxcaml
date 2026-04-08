@@ -270,7 +270,8 @@ let create_known_arity_call_witness t code_id ~params ~returns ~exn =
     ~from:(Code_id_or_name.code_id code_id);
   witness
 
-let make_known_arity_apply_widget t ~(denv : Env.t) ~params ~returns ~exn =
+let make_known_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
+  let args = Apply_expr.args apply in
   let witness =
     Code_id_or_name.var (Variable.create "known_arity_apply" K.rec_info)
   in
@@ -278,7 +279,7 @@ let make_known_arity_apply_widget t ~(denv : Env.t) ~params ~returns ~exn =
     (fun i v ->
       add_argument_dep t ~base:witness (Cofield.param i)
         ~from:(simple_to_node t ~all_constants:denv.all_constants v))
-    params;
+    args;
   List.iteri
     (fun i v ->
       add_accessor_dep t ~base:witness
@@ -327,7 +328,9 @@ let create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params
     ~returns ~exn =
   let rec add_deps params_and_witnesses =
     match params_and_witnesses with
-    | [] -> Misc.fatal_error "add_deps: no params"
+    | [] ->
+      Misc.fatal_errorf "add_deps: no params for code ID %a" Code_id.print
+        code_id
     | (first, witness) :: rest -> (
       List.iteri
         (fun i arg ->
@@ -379,13 +382,16 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
     create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params
       ~returns ~exn
 
-let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
-    ~exn =
+let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
+  let arity = Apply_expr.args_arity apply in
   let called = Code_id_or_name.var (Variable.create "called" K.rec_info) in
   add_any_usage t called;
-  let rec add_deps params_and_witnesses =
-    match params_and_witnesses with
-    | [] -> Misc.fatal_error "add_deps: no params"
+  let rec add_deps args_and_witnesses =
+    match args_and_witnesses with
+    | [] ->
+      Misc.fatal_errorf
+        "make_unknown_arity_apply_widget: no args for application %a"
+        Apply_expr.print apply
     | (first, witness) :: rest -> (
       List.iteri
         (fun i v ->
@@ -410,7 +416,7 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
           ~to_:next_witness;
         add_deps rest)
   in
-  let params = Flambda_arity.group_by_parameter arity params in
+  let args = Flambda_arity.group_by_parameter arity (Apply_expr.args apply) in
   let witnesses =
     List.mapi
       (fun i _ ->
@@ -418,9 +424,9 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
           (Variable.create
              (Format.asprintf "unknown_arity_apply_%d" i)
              K.rec_info))
-      params
+      args
   in
-  add_deps (List.combine params witnesses);
+  add_deps (List.combine args witnesses);
   let apply = Code_id_or_name.var (Variable.create "apply" K.rec_info) in
   cond_alias t ~denv ~from:apply ~to_:(List.hd witnesses);
   apply

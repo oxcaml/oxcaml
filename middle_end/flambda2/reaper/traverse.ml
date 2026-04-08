@@ -339,8 +339,8 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
   | Function { function_call = Direct code_id; _ } -> (
     (* CR ncourant: think about cross-module propagation *)
     let call_widget =
-      Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
-        ~returns:return_args ~exn:exn_arg
+      Acc.make_known_arity_apply_widget acc ~denv apply ~returns:return_args
+        ~exn:exn_arg
     in
     let callee = Apply.callee apply in
     let is_external =
@@ -400,17 +400,16 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
           add_apply acc ~only_if_closure_any_source:false))
   | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
-      Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
-        ~returns:return_args ~exn:exn_arg
+      Acc.make_known_arity_apply_widget acc ~denv apply ~returns:return_args
+        ~exn:exn_arg
     in
     let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
     Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
       ~base:closure
   | Function { function_call = Indirect_unknown_arity; _ } ->
     let call_widget =
-      Acc.make_unknown_arity_apply_widget acc ~denv
-        ~arity:(Apply.args_arity apply) ~params:(Apply.args apply)
-        ~returns:return_args ~exn:exn_arg
+      Acc.make_unknown_arity_apply_widget acc ~denv apply ~returns:return_args
+        ~exn:exn_arg
     in
     let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
     Acc.add_accessor_dep acc ~to_:call_widget Field.unknown_arity_call_witness
