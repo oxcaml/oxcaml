@@ -498,7 +498,17 @@ let deps t ~all_constants =
            apply_closure;
            apply_call_witness
          } ->
-      let code_dep = find_code t apply_code_id in
+      let code_dep =
+        match Code_id.Map.find_opt apply_code_id t.code with
+        | Some code_dep -> code_dep
+        | None ->
+          Misc.fatal_errorf
+            "No code found for %a in apply dep (from %a); external code ids \
+             should not appear here"
+            Code_id.print apply_code_id
+            (Format.pp_print_option Code_id.print)
+            function_containing_apply_expr
+      in
       add_alias t ~from:code_dep.known_arity_call_witness
         ~to_:apply_call_witness;
       match apply_closure with
