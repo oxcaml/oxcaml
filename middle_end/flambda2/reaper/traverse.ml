@@ -192,7 +192,9 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
         Acc.add_accessor_dep acc ~to_ Field.get_tag ~base:name)
-  | Nullary _
+  | Nullary
+      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
+      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax )
   | Unary
       ( ( Duplicate_block _ | Duplicate_array _
         | Is_int { variant_only = false }
@@ -204,7 +206,26 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         | End_region _ | End_try_region _ | Obj_dup | Get_header | Peek _
         | Make_lazy _ ),
         _ )
-  | Binary _ | Ternary _ | Quaternary _
+  | Binary
+      ( ( Block_set _ | Array_load _ | String_or_bigstring_load _
+        | Bigarray_load _ | Phys_equal _ | Int_arith _ | Int_shift _
+        | Int_comp _ | Float_arith _ | Float_comp _ | Bigarray_get_alignment _
+        | Atomic_load_field _ | Poke _ | Read_offset _ ),
+        _,
+        _ )
+  | Ternary
+      ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
+        | Atomic_field_int_arith _ | Atomic_set_field _
+        | Atomic_exchange_field _ | Write_offset _ ),
+        _,
+        _,
+        _ )
+  | Quaternary
+      ( (Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _),
+        _,
+        _,
+        _,
+        _ )
   | Variadic ((Begin_region _ | Begin_try_region _ | Make_array _), _) ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with
