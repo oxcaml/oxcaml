@@ -247,6 +247,52 @@ let traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
   in
   record_set_of_closures_deps denv names_and_function_slots set_of_closures acc
 
+let traverse_static_set_of_closures denv acc ~closure_symbols set_of_closures =
+  let names_and_function_slots =
+    Function_slot.Lmap.map Name.symbol closure_symbols
+  in
+  record_set_of_closures_deps denv names_and_function_slots set_of_closures acc
+
+let traverse_block_like_static_const denv acc symbol
+    (static_const : Static_const.t) =
+  let name = Name.symbol symbol in
+  match static_const with
+  | Block (_, _, _, fields) | Immutable_value_array fields ->
+    List.iteri
+      (fun i (field : Simple.With_debuginfo.t) ->
+        let kind = Static_const.block_field_kind static_const i in
+        let from =
+          Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field)
+        in
+        Acc.add_constructor_dep acc
+          ~base:(Code_id_or_name.name name)
+          (Field.block i kind) ~from)
+      fields;
+    Acc.add_constructor_dep acc
+      ~base:(Code_id_or_name.name name)
+      Field.is_int
+      ~from:(Code_id_or_name.name denv.all_constants);
+    Acc.add_constructor_dep acc
+      ~base:(Code_id_or_name.name name)
+      Field.get_tag
+      ~from:(Code_id_or_name.name denv.all_constants)
+  | Set_of_closures _ ->
+    Misc.fatal_errorf
+      "Unexpected [Set_of_closures] in block_like static const traversal for \
+       symbol %a"
+      Symbol.print symbol
+  | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
+  | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+  | Immutable_float_block _ | Immutable_float_array _
+  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
+  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
+  | Immutable_nativeint_array _ | Immutable_vec128_array _
+  | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
+  | Mutable_string _ | Immutable_string _ ->
+    Acc.add_alias acc
+      ~to_:(Code_id_or_name.name name)
+      ~from:(Code_id_or_name.name denv.all_constants)
+
 let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
   let bound_static =
     match bound_pattern with
@@ -265,50 +311,9 @@ let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
     ~code:(fun () _code_id _code -> ())
     ~deleted_code:(fun () _ -> ())
     ~set_of_closures:(fun () ~closure_symbols set_of_closures ->
-      let names_and_function_slots =
-        Function_slot.Lmap.map Name.symbol closure_symbols
-      in
-      record_set_of_closures_deps denv names_and_function_slots set_of_closures
-        acc)
+      traverse_static_set_of_closures denv acc ~closure_symbols set_of_closures)
     ~block_like:(fun () symbol static_const ->
-      let name = Name.symbol symbol in
-      match static_const with
-      | Block (_, _, _, fields) | Immutable_value_array fields ->
-        List.iteri
-          (fun i (field : Simple.With_debuginfo.t) ->
-            let kind = Static_const.block_field_kind static_const i in
-            let from =
-              Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field)
-            in
-            Acc.add_constructor_dep acc
-              ~base:(Code_id_or_name.name name)
-              (Field.block i kind) ~from)
-          fields;
-        Acc.add_constructor_dep acc
-          ~base:(Code_id_or_name.name name)
-          Field.is_int
-          ~from:(Code_id_or_name.name denv.all_constants);
-        Acc.add_constructor_dep acc
-          ~base:(Code_id_or_name.name name)
-          Field.get_tag
-          ~from:(Code_id_or_name.name denv.all_constants)
-      | Set_of_closures _ ->
-        Misc.fatal_errorf
-          "Unexpected [Set_of_closures] in block_like static const traversal \
-           for symbol %a"
-          Symbol.print symbol
-      | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
-      | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-      | Immutable_float_block _ | Immutable_float_array _
-      | Immutable_float32_array _ | Immutable_int_array _
-      | Immutable_int8_array _ | Immutable_int16_array _
-      | Immutable_int32_array _ | Immutable_int64_array _
-      | Immutable_nativeint_array _ | Immutable_vec128_array _
-      | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
-      | Mutable_string _ | Immutable_string _ ->
-        Acc.add_alias acc
-          ~to_:(Code_id_or_name.name name)
-          ~from:(Code_id_or_name.name denv.all_constants))
+      traverse_block_like_static_const denv acc symbol static_const)
 
 let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
   match Apply.call_kind apply with
