@@ -338,7 +338,7 @@ Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
 (* CR-soon zqian: should work once layout instantiation is handled by slambda *)
-module F (M : sig val f : layout_ x. ('a : x). 'a -> 'a end) = struct
+module F (M : sig val f : layout_ x. ('a : x). 'a -> 'a end  @ static) = struct
   let () = let _ = M.f in ()
 end
 [%%expect{|

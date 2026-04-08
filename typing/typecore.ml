@@ -8305,9 +8305,18 @@ and type_ident env ?(recarg=Rejected) lid =
        end;
        [], ty, Id_prim (Option.map Locality.disallow_right mode, sort)
     | _ ->
+       let lvars = Lpoly.get_exn desc.val_lpoly in
+       begin match lvars with
+       | [] -> ()
+       | _ :: _ ->
+          Staticity.submode_err
+            (lid.loc, Ident {category = Value; lid = lid.txt})
+            (Value.proj_monadic Staticity actual_mode)
+            (Staticity.of_const ~hint:Lpoly_inst Static)
+       end;
        let layout_args, val_type =
          Jkind_types.Sort.instance_with ~level:(get_current_level ())
-           (Lpoly.get_exn desc.val_lpoly)
+           lvars
            (fun () -> instance desc.val_type)
        in
        layout_args, val_type, Id_value
