@@ -68,7 +68,7 @@ type closure_dep =
 type t =
   { mutable code : code_dep Code_id.Map.t;
     mutable apply_deps : apply_dep list;
-    mutable set_of_closures_dep : closure_dep list;
+    mutable set_of_closures_deps : closure_dep list;
     deps : Graph.graph;
     mutable kinds : K.t Name.Map.t;
     mutable fixed_arity_conts : Continuation.Set.t;
@@ -80,7 +80,7 @@ let code_deps t = t.code
 let create () =
   { code = Code_id.Map.empty;
     apply_deps = [];
-    set_of_closures_dep = [];
+    set_of_closures_deps = [];
     deps = Graph.create ();
     kinds = Name.Map.empty;
     fixed_arity_conts = Continuation.Set.empty;
@@ -201,12 +201,12 @@ let add_apply t apply = t.apply_deps <- apply :: t.apply_deps
 
 let add_set_of_closures_dep t let_bound_name_of_the_closure closure_code_id
     ~only_full_applications =
-  t.set_of_closures_dep
+  t.set_of_closures_deps
     <- { let_bound_name_of_the_closure;
          closure_code_id;
          only_full_applications
        }
-       :: t.set_of_closures_dep
+       :: t.set_of_closures_deps
 
 (*= Encoding of sets of closures and apply
 
@@ -459,7 +459,7 @@ let record_set_of_closures_dep t
       Field.unknown_arity_call_witness ~base:name
 
 let record_set_of_closures_deps t =
-  List.iter (record_set_of_closures_dep t) t.set_of_closures_dep
+  List.iter (record_set_of_closures_dep t) t.set_of_closures_deps
 
 let deps t ~all_constants =
   List.iter
