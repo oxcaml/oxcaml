@@ -447,27 +447,15 @@ let traverse_apply denv acc apply : rev_expr =
     | C_call _ -> ()
     | Effect (Perform { eff }) -> Acc.add_cond_any_usage acc ~denv eff
     | Effect (Reperform { eff; cont; last_fiber }) ->
-      Acc.add_cond_any_usage acc ~denv eff;
-      Acc.add_cond_any_usage acc ~denv cont;
-      Acc.add_cond_any_usage acc ~denv last_fiber
+      List.iter (Acc.add_cond_any_usage acc ~denv) [eff; cont; last_fiber]
     | Effect (With_stack { valuec; exnc; effc; f; arg }) ->
-      Acc.add_cond_any_usage acc ~denv valuec;
-      Acc.add_cond_any_usage acc ~denv exnc;
-      Acc.add_cond_any_usage acc ~denv effc;
-      Acc.add_cond_any_usage acc ~denv f;
-      Acc.add_cond_any_usage acc ~denv arg
+      List.iter (Acc.add_cond_any_usage acc ~denv) [valuec; exnc; effc; f; arg]
     | Effect (With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }) ->
-      Acc.add_cond_any_usage acc ~denv valuec;
-      Acc.add_cond_any_usage acc ~denv exnc;
-      Acc.add_cond_any_usage acc ~denv effc;
-      Acc.add_cond_any_usage acc ~denv dyn;
-      Acc.add_cond_any_usage acc ~denv bind;
-      Acc.add_cond_any_usage acc ~denv f;
-      Acc.add_cond_any_usage acc ~denv arg
+      List.iter
+        (Acc.add_cond_any_usage acc ~denv)
+        [valuec; exnc; effc; dyn; bind; f; arg]
     | Effect (Resume { cont; f; arg }) ->
-      Acc.add_cond_any_usage acc ~denv cont;
-      Acc.add_cond_any_usage acc ~denv f;
-      Acc.add_cond_any_usage acc ~denv arg
+      List.iter (Acc.add_cond_any_usage acc ~denv) [cont; f; arg]
   in
   traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc;
   let expr = Apply apply in
