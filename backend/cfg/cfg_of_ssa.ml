@@ -41,6 +41,10 @@ let rec get_regs env (i : Ssa.instruction) : Reg.t array =
   | Proj { index; src } ->
     let src_regs = get_regs env src in
     [| src_regs.(index) |]
+  | Pushtrap _ | Poptrap _ | Stack_check _
+  | Debuginfo _ ->
+    Misc.fatal_error
+      "Cfg_of_ssa.get_regs: unexpected instruction"
 
 let rec allocate_regs env (i : Ssa.instruction) =
   match i with
@@ -52,6 +56,8 @@ let rec allocate_regs env (i : Ssa.instruction) =
         (Reg.createv typ))
   | Block_param _ -> ()
   | Proj { src; _ } -> allocate_regs env src
+  | Pushtrap _ | Poptrap _ | Stack_check _
+  | Debuginfo _ -> ()
 
 let allocate_block_params_regs env
     (block : Ssa.basic_block) =
@@ -68,9 +74,9 @@ let get_block_params_regs env (block : Ssa.basic_block) =
       "Cfg_of_ssa: no regs for block params of %a"
       Label.format block.label
 
-let allocate_body_regs env (bi : Ssa.body_instruction) =
-  match bi with
-  | Instr i -> allocate_regs env i
+let allocate_body_regs env (i : Ssa.instruction) =
+  match i with
+  | Op _ | Block_param _ | Proj _ -> allocate_regs env i
   | Pushtrap _ | Poptrap _ | Stack_check _ | Debuginfo _ ->
     ()
 
@@ -227,9 +233,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     emit_moves body ~src:exn_bucket ~dst:first_param
   | Merge _ | FunctionStart -> ());
   Array.iter
-    (fun (bi : Ssa.body_instruction) ->
-      match bi with
-      | Instr (Op { id; op; args; _ } as i) ->
+    (fun (i : Ssa.instruction) ->
+      match i with
+      | Op { id; op; args; _ } ->
         let is_branch_cond =
           match skip_id with
           | Some sid -> Ssa.InstructionId.equal id sid
@@ -242,7 +248,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           in
           let res = get_regs renv i in
           emit_op body op Debuginfo.none arg res)
-      | Instr (Block_param _ | Proj _) -> ()
+      | Block_param _ | Proj _ -> ()
       | Pushtrap { lbl_handler } ->
         DLL.add_end body
           (make_cfg_instr (Cfg.Pushtrap { lbl_handler })

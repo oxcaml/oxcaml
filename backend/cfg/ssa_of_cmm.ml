@@ -5,16 +5,6 @@ open! Int_replace_polymorphic_compare
 module V = Backend_var
 module VP = Backend_var.With_provenance
 
-let rec combine_traps trap_stack = function
-  | [] -> trap_stack
-  | Cmm.Push t :: l ->
-    combine_traps (Operation.Specific_trap (t, trap_stack)) l
-  | Cmm.Pop _ :: l -> (
-    match (trap_stack : Operation.trap_stack) with
-    | Uncaught ->
-      Misc.fatal_error "Trying to pop a trap from an empty stack"
-    | Specific_trap (_, ts) -> combine_traps ts l)
-
 type or_never_returns =
   | Ok of Ssa.instruction array
   | Never_returns
@@ -24,12 +14,8 @@ let ( let* ) x f = match x with Never_returns -> Never_returns | Ok x -> f x
 type static_handler =
   { handler_label : Label.t;
     handler_types : Cmm.machtype;
-    traps_ref : trap_stack_info ref
+    traps_ref : Select_utils.trap_stack_info ref
   }
-
-and trap_stack_info =
-  | Unreachable
-  | Reachable of Operation.trap_stack
 
 type env =
   { vars : Ssa.instruction array V.Map.t;
@@ -54,19 +40,18 @@ type builder =
     mutable current_label : Label.t;
     mutable current_desc : Ssa.block_desc;
     mutable current_params : Cmm.machtype;
-    mutable body : Ssa.body_instruction list
+    mutable body : Ssa.instruction list
   }
 
-let make_op ~typ op args : Ssa.instruction =
-  Op { id = Ssa.InstructionId.create (); op; typ; args }
-
 let add_op b ~typ op args : Ssa.instruction =
-  let i = make_op ~typ op args in
-  b.body <- Instr i :: b.body;
+  let i : Ssa.instruction =
+    Op { id = Ssa.InstructionId.create (); op; typ; args }
+  in
+  b.body <- i :: b.body;
   i
 
-let add_body b (bi : Ssa.body_instruction) =
-  b.body <- bi :: b.body
+let add_body b (i : Ssa.instruction) =
+  b.body <- i :: b.body
 
 let emit_block b term =
   let block =
@@ -493,10 +478,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       vars = V.Map.add (VP.var v) instrs env.vars
     }
 
-  let compute_join_types r1 r2 =
-    assert (Array.length r1 = Array.length r2);
-    [||]
-
   let rec emit_expr env b (exp : Cmm.expression) :
       or_never_returns =
     match exp with
@@ -636,9 +617,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   and emit_tuple env b exp_list : or_never_returns =
     (* Simple right-to-left evaluation, matching
-       emit_tuple_not_flattened in cfg_selectgen.
-       Note: emit_parts_list is NOT used here — it is
-       only used in emit_alloc and emit_expr_exit. *)
+       emit_tuple_not_flattened in cfg_selectgen. *)
     let rec loop = function
       | [] -> Ok [||]
       | exp :: rest -> (
@@ -682,12 +661,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
              continuation = cont_label;
              exn_continuation = exn_cont
            });
-      let call_ty = ty in
       start_block b cont_label
         (CallContinuation
            { predecessor = pred_label })
-        call_ty;
-      Ok (block_params cont_label call_ty)
+        ty;
+      Ok (block_params cont_label ty)
     | Terminator
         (Prim
           { op = External ({ ty_res; _ } as ext_call);
@@ -736,16 +714,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         "Ssa_of_cmm: unexpected terminator (%a)"
         (Cfg.dump_terminator ~sep:"") term
 
-  and chunk_of_machtype (ty : Cmm.machtype) :
-      Cmm.memory_chunk =
-    match ty with
-    | [| Float |] -> Double
-    | [| Float32 |] -> Single { reg = Float32 }
-    | [| Vec128 |] -> Onetwentyeight_unaligned
-    | [| Vec256 |] -> Twofiftysix_unaligned
-    | [| Vec512 |] -> Fivetwelve_unaligned
-    | _ -> Word_val
-
   and chunk_of_component
       (c : Cmm.machtype_component) :
       Cmm.memory_chunk =
@@ -771,6 +739,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | _ ->
         Misc.fatal_error
           "typ_of_instruction: Proj of non-Op")
+    | Pushtrap _ | Poptrap _ | Stack_check _
+    | Debuginfo _ ->
+      Misc.fatal_error
+        "typ_of_instruction: not a value instruction"
 
   (* Copied from cfg_selectgen effects_of0/effects_of.
      Used to decide what needs pre-evaluation before
@@ -1119,7 +1091,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             List.map (fun (_id, ty) -> ty) ids
             |> Array.concat
           in
-          let traps_ref = ref Unreachable in
+          let traps_ref = ref Select_utils.Unreachable in
           let handler_info =
             { handler_label; handler_types = types; traps_ref }
           in
@@ -1146,10 +1118,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (Merge { predecessors = [pred_label] })
         [||]
     in
-    (* Note: unlike the earlier version, we do NOT
-       push the trap onto body_env for Exn_handler.
-       The CMM exit<push(N)> trap actions handle the
-       push explicitly, matching cfg_selectgen. *)
     let r_body = emit_expr env b_body catch_body in
     emit_block b
       (Always { goto = body_label; args = [||] });
@@ -1158,8 +1126,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (fun (_, ids, handler_body, info) ->
           let trap_stack =
             match !(info.traps_ref) with
-            | Unreachable -> env.trap_stack
-            | Reachable ts -> ts
+            | Select_utils.Unreachable ->
+              env.trap_stack
+            | Select_utils.Reachable ts -> ts
           in
           let handler_env =
             { env with trap_stack }
@@ -1205,6 +1174,33 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     join_array b all_results
 
+  and find_handler env handler_id =
+    try
+      Static_label.Map.find handler_id
+        env.static_exceptions
+    with Not_found ->
+      Misc.fatal_errorf
+        "Ssa_of_cmm: unbound trap handler %a"
+        Static_label.format handler_id
+
+  and emit_trap_actions env b traps =
+    List.iter
+      (fun (trap : Cmm.trap_action) ->
+        let h =
+          match trap with
+          | Push handler_id ->
+            find_handler env handler_id
+          | Pop handler_id ->
+            find_handler env handler_id
+        in
+        add_body b
+          (match trap with
+          | Push _ ->
+            Pushtrap { lbl_handler = h.handler_label }
+          | Pop _ ->
+            Poptrap { lbl_handler = h.handler_label }))
+      traps
+
   and emit_expr_exit env b (lbl : Cmm.exit_label) args traps :
       or_never_returns =
     match lbl with
@@ -1219,78 +1215,23 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           emit_tuple env b simple_args
       in
       let* src = src_result in
-      let handler =
-        try
-          Static_label.Map.find nfail
-            env.static_exceptions
-        with Not_found ->
-          Misc.fatal_errorf
-            "Ssa_of_cmm: unbound label %a"
-            Static_label.format nfail
-      in
-      List.iter
-        (fun (trap : Cmm.trap_action) ->
-          match trap with
-          | Push handler_id -> (
-            let h =
-              try
-                Static_label.Map.find handler_id
-                  env.static_exceptions
-              with Not_found ->
-                Misc.fatal_errorf
-                  "Ssa_of_cmm: unbound trap handler %a"
-                  Static_label.format handler_id
-            in
-            add_body b
-              (Pushtrap
-                 { lbl_handler = h.handler_label }))
-          | Pop handler_id -> (
-            let h =
-              try
-                Static_label.Map.find handler_id
-                  env.static_exceptions
-              with Not_found ->
-                Misc.fatal_errorf
-                  "Ssa_of_cmm: unbound trap handler %a"
-                  Static_label.format handler_id
-            in
-            add_body b
-              (Poptrap
-                 { lbl_handler = h.handler_label })))
-        traps;
-      let new_trap_stack =
-        combine_traps env.trap_stack traps
-      in
-      (match !(handler.traps_ref) with
-      | Unreachable ->
-        handler.traps_ref := Reachable new_trap_stack
-      | Reachable _ -> ());
+      let handler = find_handler env nfail in
+      emit_trap_actions env b traps;
+      Select_utils.set_traps nfail
+        handler.traps_ref env.trap_stack traps;
       emit_block b
         (Always
            { goto = handler.handler_label; args = src });
       Never_returns)
     | Return_lbl ->
-      let* src = emit_tuple env b args in
-      List.iter
-        (fun (trap : Cmm.trap_action) ->
-          match trap with
-          | Push handler_id ->
-            let h =
-              Static_label.Map.find handler_id
-                env.static_exceptions
-            in
-            add_body b
-              (Pushtrap
-                 { lbl_handler = h.handler_label })
-          | Pop handler_id ->
-            let h =
-              Static_label.Map.find handler_id
-                env.static_exceptions
-            in
-            add_body b
-              (Poptrap
-                 { lbl_handler = h.handler_label }))
-        traps;
+      let src_result =
+        match emit_parts_list env b args with
+        | None -> Never_returns
+        | Some (simple_args, env) ->
+          emit_tuple env b simple_args
+      in
+      let* src = src_result in
+      emit_trap_actions env b traps;
       emit_block b (Return src);
       Never_returns
 
@@ -1334,15 +1275,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let rec pop = function
       | Operation.Uncaught -> ()
       | Operation.Specific_trap (lbl, rest) ->
-        let handler =
-          try
-            Static_label.Map.find lbl
-              env.static_exceptions
-          with Not_found ->
-            Misc.fatal_errorf
-              "emit_pop_all_traps: unbound %a"
-              Static_label.format lbl
-        in
+        let handler = find_handler env lbl in
         add_body b
           (Poptrap
              { lbl_handler =
@@ -1374,15 +1307,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         then false
         else
           let arg_types =
-            Array.map
-              (fun (i : Ssa.instruction) ->
-                match i with
-                | Op { typ; _ } ->
-                  if Array.length typ = 1
-                  then typ.(0)
-                  else Cmm.Val
-                | Block_param { typ; _ } -> typ
-                | Proj _ -> Cmm.Val)
+            Array.map typ_of_instruction
               arg_instrs
           in
           let _, stack_ofs =
@@ -1495,7 +1420,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             List.map (fun (_id, ty) -> ty) ids
             |> Array.concat
           in
-          let traps_ref = ref Unreachable in
+          let traps_ref = ref Select_utils.Unreachable in
           let handler_info =
             { handler_label; handler_types = types;
               traps_ref }
@@ -1528,8 +1453,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (fun (_, ids, handler_body, info) ->
           let trap_stack =
             match !(info.traps_ref) with
-            | Unreachable -> env.trap_stack
-            | Reachable ts -> ts
+            | Select_utils.Unreachable ->
+              env.trap_stack
+            | Select_utils.Reachable ts -> ts
           in
           let handler_env =
             { env with trap_stack }
@@ -1597,7 +1523,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let n = Array.length r1_instrs in
       assert (n = Array.length r2_instrs);
       let join_types =
-        Array.init n (fun _i -> Cmm.Val)
+        Array.map typ_of_instruction r1_instrs
       in
       emit_block b1
         (Always { goto = join_label; args = r1_instrs });
@@ -1611,7 +1537,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       start_block b join_label
         (Merge { predecessors = preds })
         join_types;
-      if n = 0
+      if Array.length join_types = 0
       then Ok [||]
       else Ok (block_params join_label join_types)
 
@@ -1636,10 +1562,21 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (fun (_, _, sub) -> merge_into b sub)
         results;
       Never_returns
-    | Some n ->
+    | Some _ ->
       let join_label = Cmm.new_label () in
       let join_types =
-        Array.init n (fun _i -> Cmm.Val)
+        let first_ok =
+          Array.to_seq results
+          |> Seq.filter_map (fun (_, r, _) ->
+               match r with
+               | Ok instrs -> Some instrs
+               | Never_returns -> None)
+          |> Seq.uncons
+        in
+        match first_ok with
+        | Some (instrs, _) ->
+          Array.map typ_of_instruction instrs
+        | None -> [||]
       in
       let preds = ref [] in
       Array.iter
@@ -1657,7 +1594,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (Merge
            { predecessors = List.rev !preds })
         join_types;
-      if n = 0
+      if Array.length join_types = 0
       then Ok [||]
       else Ok (block_params join_label join_types)
 

@@ -63,9 +63,6 @@ type instruction =
       { index : int;
         src : instruction
       }
-
-type body_instruction =
-  | Instr of instruction
   | Pushtrap of { lbl_handler : Label.t }
   | Poptrap of { lbl_handler : Label.t }
   | Stack_check of { max_frame_size_bytes : int }
@@ -117,7 +114,7 @@ type basic_block =
   { label : Label.t;
     desc : block_desc;
     params : Cmm.machtype;
-    body : body_instruction array;
+    body : instruction array;
     terminator : terminator
   }
 
@@ -146,27 +143,6 @@ let rec print_instruction ppf (i : instruction) =
   | Proj { index; src } ->
     Format.fprintf ppf "proj(%d, %a)" index print_instr_ref
       src
-
-and print_instr_ref ppf (i : instruction) =
-  match i with
-  | Op { id; _ } ->
-    Format.fprintf ppf "v%d" (InstructionId.hash id)
-  | Block_param { block; index; _ } ->
-    Format.fprintf ppf "%a.%d" Label.format block index
-  | Proj { index; src } ->
-    Format.fprintf ppf "proj(%d, %a)" index print_instr_ref
-      src
-
-and print_args ppf args =
-  Array.iteri
-    (fun i arg ->
-      if i > 0 then Format.fprintf ppf ", ";
-      print_instr_ref ppf arg)
-    args
-
-let print_body_instruction ppf (bi : body_instruction) =
-  match bi with
-  | Instr i -> print_instruction ppf i
   | Pushtrap { lbl_handler } ->
     Format.fprintf ppf "pushtrap %a" Label.format
       lbl_handler
@@ -177,8 +153,28 @@ let print_body_instruction ppf (bi : body_instruction) =
     Format.fprintf ppf "stack_check %d"
       max_frame_size_bytes
   | Debuginfo dbg ->
-    Format.fprintf ppf "debuginfo %a" Debuginfo.print_compact
-      dbg
+    Format.fprintf ppf "debuginfo %a"
+      Debuginfo.print_compact dbg
+
+and print_instr_ref ppf (i : instruction) =
+  match i with
+  | Op { id; _ } ->
+    Format.fprintf ppf "v%d" (InstructionId.hash id)
+  | Block_param { block; index; _ } ->
+    Format.fprintf ppf "%a.%d" Label.format block index
+  | Proj { index; src } ->
+    Format.fprintf ppf "proj(%d, %a)" index print_instr_ref
+      src
+  | Pushtrap _ | Poptrap _ | Stack_check _
+  | Debuginfo _ ->
+    print_instruction ppf i
+
+and print_args ppf args =
+  Array.iteri
+    (fun i arg ->
+      if i > 0 then Format.fprintf ppf ", ";
+      print_instr_ref ppf arg)
+    args
 
 let print_instr_array ppf arr =
   Array.iteri
@@ -273,7 +269,7 @@ let print_block ppf (block : basic_block) =
     Printcmm.machtype block.params;
   Array.iter
     (fun bi ->
-      Format.fprintf ppf "  %a@." print_body_instruction bi)
+      Format.fprintf ppf "  %a@." print_instruction bi)
     block.body;
   Format.fprintf ppf "  %a@." print_terminator
     block.terminator
@@ -345,151 +341,285 @@ let validate (t : t) =
     (fun label (bl : basic_block) ->
       successor_labels label bl.terminator)
     t.blocks;
-  (* Collect all defined Op ids and check uniqueness *)
-  let defined_ops = InstructionId.Tbl.create 64 in
-  Label.Tbl.iter
-    (fun label (bl : basic_block) ->
+  (* Compute successor labels for RPO/dominator
+     computation *)
+  let get_successors (term : terminator) =
+    match term with
+    | Never -> []
+    | Always { goto; _ } -> [goto]
+    | Branch { conditions; else_goto } ->
+      let succs = ref [else_goto] in
       Array.iter
-        (fun (bi : body_instruction) ->
-          match bi with
-          | Instr (Op { id; _ }) ->
-            if InstructionId.Tbl.mem defined_ops id
-            then
-              error "block %a: duplicate Op id v%d"
-                Label.format label
-                (InstructionId.hash id);
-            InstructionId.Tbl.replace defined_ops id ()
-          | Instr (Block_param _ | Proj _)
-          | Pushtrap _ | Poptrap _ | Stack_check _
-          | Debuginfo _ -> ())
-        bl.body)
-    t.blocks;
-  (* Validate each block *)
-  Label.Tbl.iter
-    (fun label (bl : basic_block) ->
-      (* BlockParam types match block params *)
-      let check_instr_ref (i : instruction) =
-        match i with
-        | Block_param { block; index; typ } ->
-          (match Label.Tbl.find_opt t.blocks block
-           with
-          | None ->
-            error "block %a: BlockParam references \
-                   non-existent block %a"
-              Label.format label Label.format block
-          | Some target ->
-            if index < 0
-               || index >= Array.length target.params
-            then
-              error "block %a: BlockParam index %d \
-                     out of range for block %a \
-                     (params length %d)"
-                Label.format label index
-                Label.format block
-                (Array.length target.params);
-            let expected = target.params.(index) in
+        (fun (_, lbl) -> succs := lbl :: !succs)
+        conditions;
+      !succs
+    | Switch (labels, _) -> Array.to_list labels
+    | Return _ | Raise _ | Tailcall_func _ -> []
+    | Tailcall_self { destination; _ } ->
+      [destination]
+    | Call { continuation; exn_continuation; _ }
+    | Prim { continuation; exn_continuation; _ } ->
+      continuation
+      :: (match exn_continuation with
+         | Some l -> [l]
+         | None -> [])
+  in
+  (* Compute reverse postorder via DFS *)
+  let rpo =
+    let visited = Label.Tbl.create 16 in
+    let order = ref [] in
+    let rec dfs label =
+      if not (Label.Tbl.mem visited label)
+      then (
+        Label.Tbl.replace visited label ();
+        let bl = Label.Tbl.find t.blocks label in
+        List.iter dfs
+          (get_successors bl.terminator);
+        order := label :: !order)
+    in
+    dfs t.entry_label;
+    !order
+  in
+  (* Compute immediate dominators
+     (Cooper-Harvey-Kennedy algorithm) *)
+  let rpo_index = Label.Tbl.create 16 in
+  List.iteri
+    (fun i lbl ->
+      Label.Tbl.replace rpo_index lbl i)
+    rpo;
+  let idom = Label.Tbl.create 16 in
+  Label.Tbl.replace idom t.entry_label
+    t.entry_label;
+  let intersect b1 b2 =
+    let b1 = ref b1 and b2 = ref b2 in
+    while not (Label.equal !b1 !b2) do
+      while Label.Tbl.find rpo_index !b1
+            > Label.Tbl.find rpo_index !b2
+      do
+        b1 := Label.Tbl.find idom !b1
+      done;
+      while Label.Tbl.find rpo_index !b2
+            > Label.Tbl.find rpo_index !b1
+      do
+        b2 := Label.Tbl.find idom !b2
+      done
+    done;
+    !b1
+  in
+  let changed = ref true in
+  while !changed do
+    changed := false;
+    List.iter
+      (fun label ->
+        if not (Label.equal label t.entry_label)
+        then
+          let preds =
+            Label.Tbl.find actual_preds label
+          in
+          let processed =
+            List.filter
+              (fun p -> Label.Tbl.mem idom p)
+              preds
+          in
+          match processed with
+          | [] -> ()
+          | first :: rest ->
+            let new_idom =
+              List.fold_left intersect first rest
+            in
             if not
-                 (Cmm.equal_machtype_component
-                    expected typ)
-            then
-              error "block %a: BlockParam %a.%d has \
-                     type %a but block params say %a"
-                Label.format label Label.format block
-                index Printcmm.machtype_component typ
-                Printcmm.machtype_component expected)
-        | Op _ | Proj _ -> ()
-      in
-      let rec check_instruction (i : instruction) =
-        check_instr_ref i;
+                 (match Label.Tbl.find_opt idom label
+                  with
+                 | Some d -> Label.equal d new_idom
+                 | None -> false)
+            then (
+              Label.Tbl.replace idom label new_idom;
+              changed := true))
+      rpo
+  done;
+  (* Build dominator tree and compute DFS in/out
+     times for O(1) dominance queries *)
+  let dom_children = Label.Tbl.create 16 in
+  Label.Tbl.iter
+    (fun label parent ->
+      if not (Label.equal label parent)
+      then
+        let kids =
+          match
+            Label.Tbl.find_opt dom_children parent
+          with
+          | Some l -> l
+          | None -> []
+        in
+        Label.Tbl.replace dom_children parent
+          (label :: kids))
+    idom;
+  let dom_in = Label.Tbl.create 16 in
+  let dom_out = Label.Tbl.create 16 in
+  let time = ref 0 in
+  let rec compute_dom_times label =
+    Label.Tbl.replace dom_in label !time;
+    incr time;
+    (match Label.Tbl.find_opt dom_children label
+     with
+    | Some kids -> List.iter compute_dom_times kids
+    | None -> ());
+    Label.Tbl.replace dom_out label !time;
+    incr time
+  in
+  compute_dom_times t.entry_label;
+  let dominates a b =
+    Label.Tbl.find dom_in a
+    <= Label.Tbl.find dom_in b
+    && Label.Tbl.find dom_out a
+       >= Label.Tbl.find dom_out b
+  in
+  (* Validate blocks in dominator tree order,
+     building Op definition map as we go *)
+  let defined_ops = InstructionId.Tbl.create 64 in
+  let rec check_arg label (i : instruction) =
+    match i with
+    | Op { id; _ } -> (
+      match InstructionId.Tbl.find_opt defined_ops id
+      with
+      | None ->
+        error "block %a: Op v%d used but not \
+               defined"
+          Label.format label
+          (InstructionId.hash id)
+      | Some def_label ->
+        if not (dominates def_label label)
+        then
+          error "block %a: Op v%d defined in \
+                 non-dominating block %a"
+            Label.format label
+            (InstructionId.hash id)
+            Label.format def_label)
+    | Block_param { block; index; typ } -> (
+      match Label.Tbl.find_opt t.blocks block with
+      | None ->
+        error "block %a: BlockParam references \
+               non-existent block %a"
+          Label.format label Label.format block
+      | Some target ->
+        if index < 0
+           || index >= Array.length target.params
+        then
+          error "block %a: BlockParam index %d \
+                 out of range for block %a \
+                 (params length %d)"
+            Label.format label index Label.format
+            block
+            (Array.length target.params);
+        let expected = target.params.(index) in
+        if not
+             (Cmm.equal_machtype_component
+                expected typ)
+        then
+          error "block %a: BlockParam %a.%d has \
+                 type %a but block params say %a"
+            Label.format label Label.format block
+            index Printcmm.machtype_component typ
+            Printcmm.machtype_component expected;
+        if not (dominates block label)
+        then
+          error "block %a: BlockParam of \
+                 non-dominating block %a"
+            Label.format label Label.format block)
+    | Proj { src; _ } -> (
+      match src with
+      | Op _ -> check_arg label src
+      | Block_param _ | Proj _ | Pushtrap _
+      | Poptrap _ | Stack_check _ | Debuginfo _ ->
+        error "block %a: Proj source must be an Op"
+          Label.format label)
+    | Pushtrap _ | Poptrap _ | Stack_check _
+    | Debuginfo _ ->
+      error "block %a: non-value instruction used \
+             as argument"
+        Label.format label
+  and check_args label args =
+    Array.iter (check_arg label) args
+  and visit_block label =
+    let bl = Label.Tbl.find t.blocks label in
+    (* Check entry block is FunctionStart *)
+    if Label.equal label t.entry_label
+    then (
+      match bl.desc with
+      | FunctionStart -> ()
+      | Merge _ | CallContinuation _
+      | TrapHandler _ ->
+        error "entry block %a is not FunctionStart"
+          Label.format label);
+    (* Check body: validate args then register Op *)
+    Array.iter
+      (fun (i : instruction) ->
         match i with
         | Op { id; args; _ } ->
-          if not
-               (InstructionId.Tbl.mem defined_ops id)
+          check_args label args;
+          if InstructionId.Tbl.mem defined_ops id
           then
-            error "block %a: Op v%d referenced but \
-                   not defined in any block body"
+            error "block %a: duplicate Op id v%d"
               Label.format label
               (InstructionId.hash id);
-          Array.iter check_instruction args
-        | Proj { src; _ } ->
-          (match src with
-           | Op _ -> ()
-           | Block_param _ | Proj _ ->
-             error "block %a: Proj source must be \
-                    an Op"
-               Label.format label);
-          check_instruction src
-        | Block_param _ -> ()
+          InstructionId.Tbl.replace defined_ops id
+            label
+        | Pushtrap _ | Poptrap _ | Stack_check _
+        | Debuginfo _ -> ()
+        | Block_param _ | Proj _ -> ())
+      bl.body;
+    (* Check terminator *)
+    (match bl.terminator with
+    | Never -> ()
+    | Always { goto; args } ->
+      check_args label args;
+      let target =
+        Label.Tbl.find t.blocks goto
       in
-      (* Check body instructions *)
+      if Array.length args
+         <> Array.length target.params
+      then
+        error "block %a: goto %a has %d args \
+               but target has %d params"
+          Label.format label Label.format goto
+          (Array.length args)
+          (Array.length target.params)
+    | Branch { conditions; else_goto } ->
       Array.iter
-        (fun (bi : body_instruction) ->
-          match bi with
-          | Instr i -> check_instruction i
-          | Pushtrap _ | Poptrap _ | Stack_check _
-          | Debuginfo _ -> ())
-        bl.body;
-      (* Check terminator instruction refs *)
-      let check_term_args args =
-        Array.iter check_instruction args
-      in
-      (match bl.terminator with
-      | Never -> ()
-      | Always { goto; args } ->
-        check_term_args args;
-        (* Goto args count must match target params *)
-        (match Label.Tbl.find_opt t.blocks goto with
-        | None -> () (* already reported above *)
-        | Some target ->
-          if Array.length args
-             <> Array.length target.params
-          then
-            error "block %a: goto %a has %d args \
-                   but target has %d params"
-              Label.format label Label.format goto
-              (Array.length args)
-              (Array.length target.params))
-      | Branch { conditions; else_goto } ->
-        Array.iter
-          (fun (cond, lbl) ->
-            check_instruction cond;
-            (match Label.Tbl.find_opt t.blocks lbl
-             with
-            | None -> ()
-            | Some target ->
-              if Array.length target.params > 0
-              then
-                error "block %a: Branch target %a \
-                       has block parameters"
-                  Label.format label Label.format
-                  lbl))
-          conditions;
-        (match Label.Tbl.find_opt t.blocks else_goto
-         with
-        | None -> ()
-        | Some target ->
+        (fun (cond, lbl) ->
+          check_arg label cond;
+          let target =
+            Label.Tbl.find t.blocks lbl
+          in
           if Array.length target.params > 0
           then
-            error "block %a: Branch else target %a \
+            error "block %a: Branch target %a \
                    has block parameters"
               Label.format label Label.format
-              else_goto)
-      | Switch (_, args) -> check_term_args args
-      | Return args -> check_term_args args
-      | Raise (_, args, _) -> check_term_args args
-      | Tailcall_self { args; _ } ->
-        check_term_args args
-      | Tailcall_func (_, args) ->
-        check_term_args args
-      | Call { args; _ } -> check_term_args args
-      | Prim { args; _ } -> check_term_args args);
-      (* Check entry block is FunctionStart *)
-      if Label.equal label t.entry_label
+              lbl)
+        conditions;
+      let target =
+        Label.Tbl.find t.blocks else_goto
+      in
+      if Array.length target.params > 0
       then
-        match bl.desc with
-        | FunctionStart -> ()
-        | Merge _ | CallContinuation _
-        | TrapHandler _ ->
-          error "entry block %a is not FunctionStart"
-            Label.format label)
-    t.blocks
+        error "block %a: Branch else target \
+               %a has block parameters"
+          Label.format label Label.format
+          else_goto
+    | Switch (_, args) -> check_args label args
+    | Return args -> check_args label args
+    | Raise (_, args, _) -> check_args label args
+    | Tailcall_self { args; _ } ->
+      check_args label args
+    | Tailcall_func (_, args) ->
+      check_args label args
+    | Call { args; _ } -> check_args label args
+    | Prim { args; _ } -> check_args label args);
+    (* Visit dominator tree children *)
+    (match Label.Tbl.find_opt dom_children label
+     with
+    | Some kids -> List.iter visit_block kids
+    | None -> ())
+  in
+  visit_block t.entry_label
