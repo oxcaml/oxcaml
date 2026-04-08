@@ -263,7 +263,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
   let main_dll =
     !Clflags.output_c_object && Filename.check_suffix output_name Config.ext_dll
   and main_obj_runtime = !Clflags.output_complete_object in
-  let files, c_lib =
+  let files, c_lib, dissector_enabled =
     match dissector_args with
     | Some args ->
       (* Dissector mode: partition files contain everything (startup,
@@ -288,7 +288,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
           (fun s -> String.starts_with ~prefix:"-l" s)
           (List.rev !Clflags.ccobjs)
       in
-      Build_linker_args.object_files args @ linker_flags, c_lib
+      Build_linker_args.object_files args @ linker_flags, c_lib, true
     | None ->
       (* Normal mode: combine startup + ml_objfiles + ccobjs + runtime_lib *)
       let file_list_rev =
@@ -306,7 +306,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
             else Config.native_c_libraries )
         else files, ""
       in
-      files, c_lib
+      files, c_lib, false
   in
   let mode =
     if main_dll
@@ -329,7 +329,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
     then Filename.temp_file (Filename.basename output_name) ".tmp"
     else output_name
   in
-  Gc.compact ();
+  if dissector_enabled then Gc.compact ();
   let exitcode =
     Profile.record_call "link_object" (fun () ->
         Ccomp.call_linker mode link_output_name files c_lib)
