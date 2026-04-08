@@ -32,14 +32,32 @@ module Env : sig
     | No
     | Auto
 
-  type t =
-    { parent : Rev_expr.rev_expr_holed;
-      conts : cont_kind Continuation.Map.t;
-      current_code_id : Code_id.t option;
-      should_preserve_direct_calls : should_preserve_direct_calls;
-      le_monde_exterieur : Name.t;
-      all_constants : Name.t
-    }
+  type t
+
+  val create :
+    parent:Rev_expr.rev_expr_holed ->
+    conts:cont_kind Continuation.Map.t ->
+    current_code_id:Code_id.t option ->
+    should_preserve_direct_calls:should_preserve_direct_calls ->
+    le_monde_exterieur:Name.t ->
+    all_constants:Name.t ->
+    t
+
+  val parent : t -> Rev_expr.rev_expr_holed
+
+  val conts : t -> cont_kind Continuation.Map.t
+
+  val current_code_id : t -> Code_id.t option
+
+  val should_preserve_direct_calls : t -> should_preserve_direct_calls
+
+  val le_monde_exterieur : t -> Name.t
+
+  val all_constants : t -> Name.t
+
+  val with_parent : t -> Rev_expr.rev_expr_holed -> t
+
+  val with_conts : t -> cont_kind Continuation.Map.t -> t
 end
 
 (** Information about a function's code that is needed for building the

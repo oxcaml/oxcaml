@@ -38,6 +38,32 @@ module Env = struct
       le_monde_exterieur : Name.t;
       all_constants : Name.t
     }
+
+  let create ~parent ~conts ~current_code_id ~should_preserve_direct_calls
+      ~le_monde_exterieur ~all_constants =
+    { parent;
+      conts;
+      current_code_id;
+      should_preserve_direct_calls;
+      le_monde_exterieur;
+      all_constants
+    }
+
+  let parent t = t.parent
+
+  let conts t = t.conts
+
+  let current_code_id t = t.current_code_id
+
+  let should_preserve_direct_calls t = t.should_preserve_direct_calls
+
+  let le_monde_exterieur t = t.le_monde_exterieur
+
+  let all_constants t = t.all_constants
+
+  let with_parent t parent = { t with parent }
+
+  let with_conts t conts = { t with conts }
 end
 
 type code_dep =

@@ -28,7 +28,7 @@ type acc = Acc.t
 let apply_cont_deps denv acc apply_cont =
   let cont = Apply_cont_expr.continuation apply_cont in
   let args = Apply_cont_expr.args apply_cont in
-  let params = Continuation.Map.find cont denv.conts in
+  let params = Continuation.Map.find cont (Acc.Env.conts denv) in
   let (Normal params) = params in
   List.iter2
     (fun param dep ->
@@ -154,9 +154,9 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
       fields;
     default_bp (fun base ->
         Acc.add_constructor_dep acc ~base Field.is_int
-          ~from:(Code_id_or_name.name denv.all_constants);
+          ~from:(Code_id_or_name.name (Acc.Env.all_constants denv));
         Acc.add_constructor_dep acc ~base Field.get_tag
-          ~from:(Code_id_or_name.name denv.all_constants))
+          ~from:(Code_id_or_name.name (Acc.Env.all_constants denv)))
   | Unary (Project_function_slot { move_from = _; move_to }, block) ->
     let block = Acc.simple_to_node acc ~denv block in
     default_bp (fun to_ ->
@@ -182,7 +182,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     | Mutable ->
       default_bp (fun to_ ->
           Acc.add_alias acc ~to_
-            ~from:(Code_id_or_name.name denv.le_monde_exterieur)))
+            ~from:(Code_id_or_name.name (Acc.Env.le_monde_exterieur denv))))
   | Unary (Is_int { variant_only = true }, arg) ->
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
@@ -238,7 +238,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     in
     default_bp (fun to_ ->
         Acc.add_use_dep acc
-          ~from:(Code_id_or_name.name denv.le_monde_exterieur)
+          ~from:(Code_id_or_name.name (Acc.Env.le_monde_exterieur denv))
           ~to_);
     default acc
 
@@ -287,9 +287,9 @@ let traverse_block_like_static_const denv acc symbol
         Acc.add_constructor_dep acc ~base:name (Field.block i kind) ~from)
       fields;
     Acc.add_constructor_dep acc ~base:name Field.is_int
-      ~from:(Code_id_or_name.name denv.all_constants);
+      ~from:(Code_id_or_name.name (Acc.Env.all_constants denv));
     Acc.add_constructor_dep acc ~base:name Field.get_tag
-      ~from:(Code_id_or_name.name denv.all_constants)
+      ~from:(Code_id_or_name.name (Acc.Env.all_constants denv))
   | Set_of_closures _ ->
     Misc.fatal_errorf
       "Unexpected [Set_of_closures] in block_like static const traversal for \
@@ -303,7 +303,8 @@ let traverse_block_like_static_const denv acc symbol
   | Immutable_nativeint_array _ | Immutable_vec128_array _
   | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
   | Mutable_string _ | Immutable_string _ ->
-    Acc.add_alias acc ~to_:name ~from:(Code_id_or_name.name denv.all_constants)
+    Acc.add_alias acc ~to_:name
+      ~from:(Code_id_or_name.name (Acc.Env.all_constants denv))
 
 let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
   let bound_static =
@@ -373,7 +374,8 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
       else
         let apply_dep =
-          { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
+          { Traverse_acc.function_containing_apply_expr =
+              Acc.Env.current_code_id denv;
             apply_code_id = code_id;
             apply_closure = callee;
             apply_call_witness = call_widget
@@ -387,7 +389,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       let closure = Acc.simple_to_node acc ~denv callee in
       Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
         ~base:closure;
-      match denv.should_preserve_direct_calls with
+      match Acc.Env.should_preserve_direct_calls denv with
       | Yes -> add_apply acc ~only_if_closure_any_source:false
       | Auto -> add_apply acc ~only_if_closure_any_source:true
       | No ->
@@ -421,13 +423,16 @@ let traverse_apply denv acc apply : rev_expr =
     match Apply.continuation apply with
     | Never_returns -> []
     | Return cont -> (
-      match Continuation.Map.find cont denv.conts with Normal params -> params)
+      match Continuation.Map.find cont (Acc.Env.conts denv) with
+      | Normal params -> params)
   in
   let exn_arg =
     let exn = Apply.exn_continuation apply in
     let extra_args = Exn_continuation.extra_args exn in
     let (Normal exn_params) =
-      Continuation.Map.find (Exn_continuation.exn_handler exn) denv.conts
+      Continuation.Map.find
+        (Exn_continuation.exn_handler exn)
+        (Acc.Env.conts denv)
     in
     match exn_params with
     | [] ->
@@ -474,12 +479,12 @@ let traverse_apply denv acc apply : rev_expr =
   in
   traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc;
   let expr = Apply apply in
-  { expr; holed_expr = denv.parent }
+  { expr; holed_expr = Acc.Env.parent denv }
 
 let traverse_apply_cont denv acc apply_cont : rev_expr =
   let expr = Apply_cont apply_cont in
   apply_cont_deps denv acc apply_cont;
-  { expr; holed_expr = denv.parent }
+  { expr; holed_expr = Acc.Env.parent denv }
 
 let traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
@@ -487,11 +492,11 @@ let traverse_switch denv acc switch : rev_expr =
   Target_ocaml_int.Map.iter
     (fun _ apply_cont -> apply_cont_deps denv acc apply_cont)
     (Switch_expr.arms switch);
-  { expr; holed_expr = denv.parent }
+  { expr; holed_expr = Acc.Env.parent denv }
 
 let traverse_invalid denv _acc ~message =
   let expr = Invalid { message } in
-  { expr; holed_expr = denv.parent }
+  { expr; holed_expr = Acc.Env.parent denv }
 
 let rec traverse_let denv acc let_expr : rev_expr =
   let bound_pattern, body =
@@ -551,8 +556,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
           ~code:(fun rev_group code_id code ->
             let code =
               traverse_code acc code_id code
-                ~le_monde_exterieur:denv.le_monde_exterieur
-                ~all_constants:denv.all_constants
+                ~le_monde_exterieur:(Acc.Env.le_monde_exterieur denv)
+                ~all_constants:(Acc.Env.all_constants denv)
             in
             Code code :: rev_group)
           ~deleted_code:(fun rev_group _ -> Deleted_code :: rev_group)
@@ -570,17 +575,16 @@ let rec traverse_let denv acc let_expr : rev_expr =
     | Rec_info _ as defining_expr -> Named defining_expr
   in
   let let_acc =
-    Let { bound_pattern; defining_expr = named; parent = denv.parent }
+    Let { bound_pattern; defining_expr = named; parent = Acc.Env.parent denv }
   in
-  traverse
-    { parent = let_acc;
-      conts = denv.conts;
-      current_code_id = denv.current_code_id;
-      should_preserve_direct_calls = denv.should_preserve_direct_calls;
-      le_monde_exterieur = denv.le_monde_exterieur;
-      all_constants = denv.all_constants
-    }
-    acc body
+  let denv =
+    Acc.Env.create ~parent:let_acc ~conts:(Acc.Env.conts denv)
+      ~current_code_id:(Acc.Env.current_code_id denv)
+      ~should_preserve_direct_calls:(Acc.Env.should_preserve_direct_calls denv)
+      ~le_monde_exterieur:(Acc.Env.le_monde_exterieur denv)
+      ~all_constants:(Acc.Env.all_constants denv)
+  in
+  traverse denv acc body
 
 and traverse_let_cont denv acc (let_cont : Let_cont.t) : rev_expr =
   match let_cont with
@@ -621,26 +625,23 @@ and traverse_let_cont_non_recursive denv acc cont ~body handler =
          [raise_notrace], could we avoid setting it to [any_usage] in that
          case? *)
       Acc.add_cond_any_usage acc ~denv (Simple.var (List.hd params)));
-    let conts = Continuation.Map.add cont (Normal params) denv.conts in
+    let conts =
+      Continuation.Map.add cont (Normal params) (Acc.Env.conts denv)
+    in
     let denv =
-      { parent = Let_cont { cont; handler; parent = denv.parent };
-        conts;
-        should_preserve_direct_calls = denv.should_preserve_direct_calls;
-        current_code_id = denv.current_code_id;
-        le_monde_exterieur = denv.le_monde_exterieur;
-        all_constants = denv.all_constants
-      }
+      Acc.Env.create
+        ~parent:(Let_cont { cont; handler; parent = Acc.Env.parent denv })
+        ~conts
+        ~current_code_id:(Acc.Env.current_code_id denv)
+        ~should_preserve_direct_calls:
+          (Acc.Env.should_preserve_direct_calls denv)
+        ~le_monde_exterieur:(Acc.Env.le_monde_exterieur denv)
+        ~all_constants:(Acc.Env.all_constants denv)
     in
     traverse denv acc body
   in
   traverse_cont_handler
-    { parent = Hole;
-      conts = denv.conts;
-      should_preserve_direct_calls = denv.should_preserve_direct_calls;
-      current_code_id = denv.current_code_id;
-      le_monde_exterieur = denv.le_monde_exterieur;
-      all_constants = denv.all_constants
-    }
+    (Acc.Env.with_parent denv Hole)
     acc cont_handler traverse_handler
 
 and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
@@ -666,7 +667,7 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
         in
         Acc.continuation_info acc cont ~params ~arity ~is_exn_handler:false;
         Continuation.Map.add cont (Normal params) conts)
-      handlers denv.conts
+      handlers (Acc.Env.conts denv)
   in
   Bound_parameters.iter
     (fun bp -> Acc.bound_parameter_kind acc bp)
@@ -682,13 +683,7 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
         let is_cold = Continuation_handler.is_cold cont_handler in
         let expr =
           traverse
-            { parent = Hole;
-              conts;
-              should_preserve_direct_calls = denv.should_preserve_direct_calls;
-              current_code_id = denv.current_code_id;
-              le_monde_exterieur = denv.le_monde_exterieur;
-              all_constants = denv.all_constants
-            }
+            (Acc.Env.with_conts (Acc.Env.with_parent denv Hole) conts)
             acc handler
         in
         let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
@@ -696,13 +691,11 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
       handlers
   in
   let denv =
-    { parent = Let_cont_rec { invariant_params; handlers; parent = denv.parent };
-      conts;
-      should_preserve_direct_calls = denv.should_preserve_direct_calls;
-      current_code_id = denv.current_code_id;
-      le_monde_exterieur = denv.le_monde_exterieur;
-      all_constants = denv.all_constants
-    }
+    Acc.Env.with_conts
+      (Acc.Env.with_parent denv
+         (Let_cont_rec
+            { invariant_params; handlers; parent = Acc.Env.parent denv }))
+      conts
   in
   traverse denv acc body
 
@@ -788,13 +781,8 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     | Auto -> Auto
   in
   let denv =
-    { parent = Hole;
-      conts;
-      should_preserve_direct_calls;
-      current_code_id = Some code_id;
-      le_monde_exterieur;
-      all_constants
-    }
+    Acc.Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
+      ~current_code_id:(Some code_id) ~le_monde_exterieur ~all_constants
   in
   Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind acc bp) params;
   Acc.kind acc (Name.var my_closure) K.value;
@@ -896,13 +884,10 @@ let run0 unit acc ~all_constants () =
     | Auto -> Auto
   in
   traverse
-    { parent = Hole;
-      conts;
-      should_preserve_direct_calls;
-      current_code_id = None;
-      le_monde_exterieur = Name.symbol le_monde_exterieur;
-      all_constants = Name.symbol all_constants
-    }
+    (Acc.Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
+       ~current_code_id:None
+       ~le_monde_exterieur:(Name.symbol le_monde_exterieur)
+       ~all_constants:(Name.symbol all_constants))
     acc (Flambda_unit.body unit)
 
 let run (unit : Flambda_unit.t) =
