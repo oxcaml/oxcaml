@@ -14,11 +14,12 @@
 (**************************************************************************)
 
 module Graph = Global_flow_graph
+module K = Flambda_kind
 
 type continuation_info =
   { is_exn_handler : bool;
     params : Variable.t list;
-    arity : Flambda_kind.With_subkind.t list
+    arity : K.With_subkind.t list
   }
 
 module Env = struct
@@ -69,7 +70,7 @@ type t =
     mutable apply_deps : apply_dep list;
     mutable set_of_closures_dep : closure_dep list;
     deps : Graph.graph;
-    mutable kinds : Flambda_kind.t Name.Map.t;
+    mutable kinds : K.t Name.Map.t;
     mutable fixed_arity_conts : Continuation.Set.t;
     mutable continuation_info : continuation_info Continuation.Map.t
   }
@@ -91,7 +92,7 @@ let kinds t = t.kinds
 let kind t name k = t.kinds <- Name.Map.add name k t.kinds
 
 let bound_parameter_kind t (bp : Bound_parameter.t) =
-  let kind = Flambda_kind.With_subkind.kind (Bound_parameter.kind bp) in
+  let kind = K.With_subkind.kind (Bound_parameter.kind bp) in
   let name = Name.var (Bound_parameter.var bp) in
   t.kinds <- Name.Map.add name kind t.kinds
 
@@ -114,25 +115,25 @@ let alias_kind t name simple =
       ~name:(fun name ~coercion:_ ->
         (* Symbols are always values and might not be in t.kinds *)
         if Name.is_symbol name
-        then Flambda_kind.value
+        then K.value
         else
           match Name.Map.find_opt name t.kinds with
           | Some k -> k
           | None -> Misc.fatal_errorf "Unbound name %a" Name.print name)
       ~const:(fun const ->
         match Int_ids.Const.descr const with
-        | Naked_immediate _ -> Flambda_kind.naked_immediate
-        | Tagged_immediate _ | Null -> Flambda_kind.value
-        | Naked_float _ -> Flambda_kind.naked_float
-        | Naked_float32 _ -> Flambda_kind.naked_float32
-        | Naked_int8 _ -> Flambda_kind.naked_int8
-        | Naked_int16 _ -> Flambda_kind.naked_int16
-        | Naked_int32 _ -> Flambda_kind.naked_int32
-        | Naked_int64 _ -> Flambda_kind.naked_int64
-        | Naked_nativeint _ -> Flambda_kind.naked_nativeint
-        | Naked_vec128 _ -> Flambda_kind.naked_vec128
-        | Naked_vec256 _ -> Flambda_kind.naked_vec256
-        | Naked_vec512 _ -> Flambda_kind.naked_vec512)
+        | Naked_immediate _ -> K.naked_immediate
+        | Tagged_immediate _ | Null -> K.value
+        | Naked_float _ -> K.naked_float
+        | Naked_float32 _ -> K.naked_float32
+        | Naked_int8 _ -> K.naked_int8
+        | Naked_int16 _ -> K.naked_int16
+        | Naked_int32 _ -> K.naked_int32
+        | Naked_int64 _ -> K.naked_int64
+        | Naked_nativeint _ -> K.naked_nativeint
+        | Naked_vec128 _ -> K.naked_vec128
+        | Naked_vec256 _ -> K.naked_vec256
+        | Naked_vec512 _ -> K.naked_vec512)
   in
   t.kinds <- Name.Map.add name kind t.kinds
 
@@ -260,7 +261,7 @@ let create_known_arity_call_witness t code_id ~params ~returns ~exn =
   let witness =
     Variable.create
       (Format.asprintf "known_arity_witness_%s" (Code_id.name code_id))
-      Flambda_kind.rec_info
+      K.rec_info
     (* dummy kind to make sure the rest of the code breaks if this is ever
        used *)
   in
@@ -284,8 +285,7 @@ let create_known_arity_call_witness t code_id ~params ~returns ~exn =
 
 let make_known_arity_apply_widget t ~(denv : Env.t) ~params ~returns ~exn =
   let witness =
-    Code_id_or_name.var
-      (Variable.create "known_arity_apply" Flambda_kind.rec_info)
+    Code_id_or_name.var (Variable.create "known_arity_apply" K.rec_info)
   in
   List.iteri
     (fun i v ->
@@ -300,14 +300,10 @@ let make_known_arity_apply_widget t ~(denv : Env.t) ~params ~returns ~exn =
     returns;
   add_accessor_dep t ~base:witness Field.exn_return_of_call
     ~to_:(Code_id_or_name.var exn);
-  let called =
-    Code_id_or_name.var (Variable.create "called" Flambda_kind.rec_info)
-  in
+  let called = Code_id_or_name.var (Variable.create "called" K.rec_info) in
   add_accessor_dep t ~base:witness Field.code_id_of_call_witness ~to_:called;
   add_any_usage t called;
-  let apply =
-    Code_id_or_name.var (Variable.create "apply" Flambda_kind.rec_info)
-  in
+  let apply = Code_id_or_name.var (Variable.create "apply" K.rec_info) in
   cond_alias t ~denv ~from:apply ~to_:witness;
   apply
 
@@ -319,7 +315,7 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
       Variable.create
         (Format.asprintf "unknown_arity_witness_tupled_%s"
            (Code_id.name code_id))
-        Flambda_kind.rec_info
+        K.rec_info
     in
     let witness = Code_id_or_name.var witness in
     List.iteri
@@ -333,14 +329,13 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
     add_constructor_dep t ~base:witness Field.code_id_of_call_witness
       ~from:(Code_id_or_name.code_id code_id);
     let untuple_var =
-      Code_id_or_name.var (Variable.create "untuple_var" Flambda_kind.value)
+      Code_id_or_name.var (Variable.create "untuple_var" K.value)
     in
     add_parameter_dep t ~base:witness (Cofield.param 0) ~to_:untuple_var;
     (* CR ncourant: this should be changed if we ever allow non-value tuples *)
     List.iteri
       (fun i v ->
-        add_accessor_dep t ~to_:(Code_id_or_name.var v)
-          (Field.block i Flambda_kind.value)
+        add_accessor_dep t ~to_:(Code_id_or_name.var v) (Field.block i K.value)
           ~base:untuple_var)
       params;
     [witness])
@@ -369,8 +364,7 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
             returns
         | (_, next_witness) :: _ ->
           let v =
-            Code_id_or_name.var
-              (Variable.create "partial_apply" Flambda_kind.value)
+            Code_id_or_name.var (Variable.create "partial_apply" K.value)
           in
           add_constructor_dep t ~from:v
             (Field.normal_return_of_call 0)
@@ -387,7 +381,7 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
             (Variable.create
                (Format.asprintf "unknown_arity_witness_%d_%s" i
                   (Code_id.name code_id))
-               Flambda_kind.rec_info))
+               K.rec_info))
         params
     in
     add_deps (List.combine params witnesses);
@@ -395,9 +389,7 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
 
 let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
     ~exn =
-  let called =
-    Code_id_or_name.var (Variable.create "called" Flambda_kind.rec_info)
-  in
+  let called = Code_id_or_name.var (Variable.create "called" K.rec_info) in
   add_any_usage t called;
   let rec add_deps params_and_witnesses =
     match params_and_witnesses with
@@ -420,10 +412,7 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
               ~to_:(Code_id_or_name.var v))
           returns
       | (_, next_witness) :: _ ->
-        let v =
-          Code_id_or_name.var
-            (Variable.create "partial_apply" Flambda_kind.value)
-        in
+        let v = Code_id_or_name.var (Variable.create "partial_apply" K.value) in
         add_accessor_dep t ~base:witness (Field.normal_return_of_call 0) ~to_:v;
         add_accessor_dep t ~base:v Field.unknown_arity_call_witness
           ~to_:next_witness;
@@ -436,13 +425,11 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
         Code_id_or_name.var
           (Variable.create
              (Format.asprintf "unknown_arity_apply_%d" i)
-             Flambda_kind.rec_info))
+             K.rec_info))
       params
   in
   add_deps (List.combine params witnesses);
-  let apply =
-    Code_id_or_name.var (Variable.create "apply" Flambda_kind.rec_info)
-  in
+  let apply = Code_id_or_name.var (Variable.create "apply" K.rec_info) in
   cond_alias t ~denv ~from:apply ~to_:(List.hd witnesses);
   apply
 
@@ -468,7 +455,7 @@ let record_set_of_closure_deps t =
             (Variable.create
                (Format.asprintf "external_code_id_witness_%s"
                   (Code_id.name code_id))
-               Flambda_kind.value)
+               K.value)
         in
         add_any_source t witness;
         add_constructor_dep t ~from:witness Field.known_arity_call_witness
