@@ -420,49 +420,46 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
   cond_alias t ~denv ~from:apply ~to_:(List.hd witnesses);
   apply
 
+let record_set_of_closures_dep t
+    { let_bound_name_of_the_closure = name;
+      closure_code_id = code_id;
+      only_full_applications = _
+    } =
+  let name = Code_id_or_name.name name in
+  (* CR ncourant: use only_full_applications; not done here to avoid conflicts
+     in code that will be rewritten for unbox-fv-closures anyway. *)
+  match find_code t code_id with
+  | None ->
+    assert (
+      not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id)));
+    (* The code comes from another compilation unit, so we don't know what
+       happens once it is applied. As such, it must cause the whole block to
+       escape. *)
+    let witness =
+      Code_id_or_name.var
+        (Variable.create
+           (Format.asprintf "external_code_id_witness_%s" (Code_id.name code_id))
+           K.value)
+    in
+    add_any_source t witness;
+    add_constructor_dep t ~from:witness Field.known_arity_call_witness
+      ~base:name;
+    add_constructor_dep t ~from:witness Field.unknown_arity_call_witness
+      ~base:name;
+    add_constructor_dep t ~base:witness Field.code_id_of_call_witness ~from:name
+  | Some code_dep ->
+    add_propagate_dep t
+      ~to_:(Code_id_or_name.var code_dep.my_closure)
+      ~from:name
+      ~if_used:(Code_id_or_name.code_id code_id);
+    add_constructor_dep t ~from:code_dep.known_arity_call_witness
+      Field.known_arity_call_witness ~base:name;
+    add_constructor_dep t
+      ~from:(List.hd code_dep.unknown_arity_call_witnesses)
+      Field.unknown_arity_call_witness ~base:name
+
 let record_set_of_closures_deps t =
-  List.iter
-    (fun { let_bound_name_of_the_closure = name;
-           closure_code_id = code_id;
-           only_full_applications = _
-         } ->
-      let name = Code_id_or_name.name name in
-      (* CR ncourant: use only_full_applications; not done here to avoid
-         conflicts in code that will be rewritten for unbox-fv-closures
-         anyway. *)
-      match find_code t code_id with
-      | None ->
-        assert (
-          not
-            (Compilation_unit.is_current (Code_id.get_compilation_unit code_id)));
-        (* The code comes from another compilation unit, so we don't know what
-           happens once it is applied. As such, it must cause the whole block to
-           escape. *)
-        let witness =
-          Code_id_or_name.var
-            (Variable.create
-               (Format.asprintf "external_code_id_witness_%s"
-                  (Code_id.name code_id))
-               K.value)
-        in
-        add_any_source t witness;
-        add_constructor_dep t ~from:witness Field.known_arity_call_witness
-          ~base:name;
-        add_constructor_dep t ~from:witness Field.unknown_arity_call_witness
-          ~base:name;
-        add_constructor_dep t ~base:witness Field.code_id_of_call_witness
-          ~from:name
-      | Some code_dep ->
-        add_propagate_dep t
-          ~to_:(Code_id_or_name.var code_dep.my_closure)
-          ~from:name
-          ~if_used:(Code_id_or_name.code_id code_id);
-        add_constructor_dep t ~from:code_dep.known_arity_call_witness
-          Field.known_arity_call_witness ~base:name;
-        add_constructor_dep t
-          ~from:(List.hd code_dep.unknown_arity_call_witnesses)
-          Field.unknown_arity_call_witness ~base:name)
-    t.set_of_closures_dep
+  List.iter (record_set_of_closures_dep t) t.set_of_closures_dep
 
 let deps t ~all_constants =
   List.iter
