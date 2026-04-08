@@ -87,9 +87,6 @@ let () =
   in
   Clflags.include_dirs := List.rev_append extra_paths !Clflags.include_dirs
 
-(* Ensure Opttopdirs is linked so that its toplevel directives are registered *)
-let () = ignore (Opttopdirs.dir_quit)
-
 let main () =
   let ppf = Format.err_formatter in
   Clflags.native_code := true;
