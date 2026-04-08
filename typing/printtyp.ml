@@ -866,10 +866,7 @@ let same_printing_env env =
   && Compilation_unit.Name.Set.equal !printing_pers used_pers
 
 let set_printing_env env =
-  (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
-     errors track their stage, as we should usually print at stage 0.
-     See ticket 6726. *)
-  printing_env := Env.enter_future env;
+  printing_env := env;
   if !Clflags.real_paths ||
      env == Env.empty ||
      same_printing_env env then
@@ -1636,16 +1633,25 @@ let rec tree_of_modal_typexp mode modal ty =
     | Tobject (fi, nm) ->
         tree_of_typobject mode fi !nm
     | Tquote ty ->
-        Otyp_quote (tree_of_typexp mode alloc_mode ty)
+        wrap_printing_env ~error:false
+          (Env.enter_quotation !printing_env)
+          (fun () -> Otyp_quote (tree_of_typexp mode alloc_mode ty))
     | Tsplice ty ->
-        Otyp_splice (tree_of_typexp mode alloc_mode ty)
+        wrap_printing_env ~error:false
+          (Env.enter_splice ~loc:Location.none !printing_env)
+          (fun () -> Otyp_splice (tree_of_typexp mode alloc_mode ty))
     | Tquote_eval ty ->
         (* We use [Predef]'s [eval] as the syntax, so we need to quote [ty]. *)
         let ty = newgenty (Tquote ty) in
         let p', s = best_type_path Predef.path_eval in
         let tyl = apply_subst s [ty] in
         Internal_names.add p';
-        Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl)
+        let tyl =
+          wrap_printing_env ~error:false
+            (Env.enter_quotation !printing_env)
+            (fun () -> tree_of_typlist mode tyl)
+        in
+        Otyp_constr (tree_of_path (Some Type) p', tyl)
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->
@@ -1886,8 +1892,16 @@ and tree_of_typfields rest = function
       (field :: fields, rest)
 
 let tree_of_typexp mode ty =
-  (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-  wrap_mutation (fun () -> tree_of_typexp mode Alloc.Const.legacy ty)
+  (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
+     errors track their stage, as we should usually print at stage 0.
+     See ticket 6726. *)
+  wrap_printing_env ~error:false
+    (if Ctype.contains_toplevel_splice (Env.stage !printing_env :> int) ty
+     then Env.enter_future !printing_env
+     else !printing_env)
+    (fun () ->
+      (* [tree_of_typexp] mutates state, which we need to backtrack. *)
+      wrap_mutation (fun () -> tree_of_typexp mode Alloc.Const.legacy ty))
 
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
