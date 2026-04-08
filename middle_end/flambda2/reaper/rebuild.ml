@@ -1801,6 +1801,31 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures ~hole =
     let set_of_closures, res =
       rewrite_set_of_closures env res ~bound set_of_closures ~is_phantom
     in
+    let size_of_defining_expr =
+      Cost_metrics.size
+        (Cost_metrics.set_of_closures
+           ~find_code_characteristics:(fun code_id ->
+             let code_metadata =
+               if
+                 Compilation_unit.is_current
+                   (Code_id.get_compilation_unit code_id)
+               then
+                 match Code_id.Map.find code_id res.all_code with
+                 | exception Not_found ->
+                   Misc.fatal_errorf
+                     "When rebuilding set of closures %a, code_id %a not found \
+                      in [all_code]"
+                     Set_of_closures.print set_of_closures Code_id.print code_id
+                 | code -> Code.code_metadata code
+               else env.get_code_metadata code_id
+             in
+             { cost_metrics = Code_metadata.cost_metrics code_metadata;
+               params_arity =
+                 Flambda_arity.num_params
+                   (Code_metadata.params_arity code_metadata)
+             })
+           set_of_closures)
+    in
     let expr =
       RE.create_let bound_pattern
         (Named.create_set_of_closures set_of_closures)
@@ -1857,7 +1882,7 @@ let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
           then Some arg
           else (
             (match e with
-            | Code _ -> ()
+            | Code -> ()
             | Deleted_code -> ()
             | Static_const _ ->
               Misc.fatal_errorf
@@ -2198,9 +2223,22 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       in
       Code_metadata.with_result_types result_types code_metadata
   in
+  let update_size code_metadata (body : RE.t) =
+    let cost_metrics = Cost_metrics.from_size body.code_size in
+    Code_metadata.with_inlining_decision
+      (Function_decl_inlining_decision.make_decision
+         ~inlining_arguments:(Code_metadata.inlining_arguments code_metadata)
+         ~inline:(Code_metadata.inline code_metadata)
+         ~stub:(Code_metadata.stub code_metadata)
+         ~cost_metrics
+         ~is_a_functor:(Code_metadata.is_a_functor code_metadata)
+         ~recursive:(Code_metadata.recursive code_metadata))
+      (Code_metadata.with_cost_metrics cost_metrics code_metadata)
+  in
   match updating_calling_convention with
   | Not_changing_calling_convention ->
     let body, res = rebuild_body () in
+    let code_metadata = update_size code_metadata body in
     (* Format.eprintf "REBUILD %a FREE %a@." Code_id.print code_id
        Name_occurrences.print body.free_names; *)
     ( Function_params_and_body.create ~return_continuation ~exn_continuation
@@ -2290,6 +2328,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
         (Code_metadata.with_param_modes modes code_metadata)
     in
     let body, res = rebuild_body () in
+    let code_metadata = update_size code_metadata body in
     (* Format.eprintf "REBUILD %a FREE %a@." Code_id.print code_id
        Name_occurrences.print body.free_names; *)
     (* assert (List.exists Fun.id (Continuation.Map.find return_continuation
@@ -2301,38 +2340,54 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       code_metadata,
       res )
 
+and rebuild_code env res
+    ({ params_and_body; code_metadata; free_names_of_params_and_body = _ } :
+      Rev_expr.rev_code) =
+  let is_my_closure_used = is_var_used env params_and_body.my_closure in
+  let code_metadata =
+    if
+      Bool.equal is_my_closure_used
+        (Code_metadata.is_my_closure_used code_metadata)
+    then code_metadata
+    else (
+      assert (not is_my_closure_used);
+      Code_metadata.with_is_my_closure_used is_my_closure_used code_metadata)
+  in
+  let params_and_body, code_metadata, res =
+    rebuild_function_params_and_body env res code_metadata params_and_body
+  in
+  let code =
+    Code.create_with_metadata ~params_and_body ~code_metadata
+      ~free_names_of_params_and_body:
+        (function_params_and_body_free_names params_and_body)
+  in
+  assert (
+    Compilation_unit.is_current
+      (Code_id.get_compilation_unit (Code.code_id code)));
+  let res =
+    { res with
+      all_code = Code_id.Map.add (Code.code_id code) code res.all_code
+    }
+  in
+  res
+
 and rebuild_static_const_or_code env res
     ( (bound_to : Bound_static.Pattern.t),
       (static_const_or_code : Rev_expr.rev_static_const_or_code) ) =
   match static_const_or_code with
   | Deleted_code -> Static_const_or_code.deleted_code, res
-  | Code { params_and_body; code_metadata; free_names_of_params_and_body = _ }
-    ->
-    let is_my_closure_used = is_var_used env params_and_body.my_closure in
-    let code_metadata =
-      if
-        Bool.equal is_my_closure_used
-          (Code_metadata.is_my_closure_used code_metadata)
-      then code_metadata
-      else (
-        assert (not is_my_closure_used);
-        Code_metadata.with_is_my_closure_used is_my_closure_used code_metadata)
-    in
-    let params_and_body, code_metadata, res =
-      rebuild_function_params_and_body env res code_metadata params_and_body
+  | Code ->
+    let code_id =
+      match bound_to with
+      | Set_of_closures _ | Block_like _ -> Misc.fatal_error "Expected Code"
+      | Code code_id -> code_id
     in
     let code =
-      Code.create_with_metadata ~params_and_body ~code_metadata
-        ~free_names_of_params_and_body:
-          (function_params_and_body_free_names params_and_body)
-    in
-    assert (
-      Compilation_unit.is_current
-        (Code_id.get_compilation_unit (Code.code_id code)));
-    let res =
-      { res with
-        all_code = Code_id.Map.add (Code.code_id code) code res.all_code
-      }
+      try Code_id.Map.find code_id res.all_code
+      with Not_found ->
+        Misc.fatal_errorf
+          "Rebuilding let code, but could not find code_id %a in [all_code]"
+          Code_id.print code_id
     in
     Static_const_or_code.create_code code, res
   | Static_const (Set_of_closures set_of_closures) ->
@@ -2372,7 +2427,7 @@ type result =
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
     ~fixed_arity_continuations ~final_typing_env kinds
-    (solved_dep : Analysis.result) get_code_metadata holed =
+    (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
   let should_keep_function_param code_id =
     let cannot_change_calling_convention =
       Analysis.cannot_change_calling_convention solved_dep code_id
@@ -2526,7 +2581,34 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
   in
   let rebuilt_expr, { all_slot_offsets; all_code; code_ids_to_remember } =
     Profile.record_call ~accumulate:true "up" (fun () ->
-        rebuild_expr env res holed)
+        (* Invariant: if a code with code_id [f] contains a set of closures with
+           code_id [g], the size of the code with code_id [f] is larger than the
+           size of the code with code_id [g] before the reaper. Since the reaper
+           never puts code_ids in sets of closures that weren't there before,
+           rebuilding code in increasing order of code size is enough to ensure
+           that when we rebuild a set of closures, we have already rebuilt the
+           code of the mentionned code_ids. *)
+        let code = Code_id.Map.bindings code in
+        let code =
+          List.stable_sort
+            (fun (_, rev_code1) (_, rev_code2) ->
+              let meta1 = rev_code1.Rev_expr.code_metadata in
+              let meta2 = rev_code2.Rev_expr.code_metadata in
+              let size1 =
+                Cost_metrics.size (Code_metadata.cost_metrics meta1)
+              in
+              let size2 =
+                Cost_metrics.size (Code_metadata.cost_metrics meta2)
+              in
+              Int.compare (Code_size.to_int size1) (Code_size.to_int size2))
+            code
+        in
+        let res =
+          List.fold_left
+            (fun res (_, rev_code) -> rebuild_code env res rev_code)
+            res code
+        in
+        rebuild_expr env res toplevel_expr)
   in
   { body = rebuilt_expr.expr;
     free_names = rebuilt_expr.free_names;

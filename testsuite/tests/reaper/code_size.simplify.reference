@@ -1,0 +1,26 @@
+let code h_2 deleted in
+let code g_1 deleted in
+let code f_0 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(h_2)
+      h_2_1 (u) my_closure _region _ghost_region my_depth -> k * k1 =
+  cont k (u)
+in
+let $camlCode_size__h_4 = closure h_2_1 @h in
+let code loopify(never) size(14) newer_version_of(g_1)
+      g_1_1 (y) my_closure _region _ghost_region my_depth -> k * k1 =
+  let x = %project_value_slot.[`g`].[`x`] (my_closure) in
+  (let Pmakeblock = %block.[`0`] (x, y) in
+   apply direct(h_2_1)
+     ($camlCode_size__h_4 : _ -> [ 0 of val * val ]) (Pmakeblock) -> k2 * k1)
+    where k2 (`*match*` : [ 0 of val * val ]) =
+      let Pfield = %block_load.[`0`] (`*match*`) in
+      cont k (Pfield)
+in
+let code loopify(never) size(23) newer_version_of(f_0)
+      f_0_1 (x) my_closure _region _ghost_region my_depth -> k * k1 : val =
+  let g = closure g_1_1 @g with { x = x } in
+  cont k (g)
+in
+let $camlCode_size__f_3 = closure f_0_1 @f in
+let $camlCode_size = Block 0 ($camlCode_size__f_3) in
+cont done ($camlCode_size)

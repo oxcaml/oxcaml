@@ -95,7 +95,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
         Acc.add_any_source acc param)
       params);
   if never_delete then Acc.add_any_usage acc (Code_id_or_name.code_id code_id);
-  Acc.add_code acc code_id code_dep
+  Acc.add_code_dep acc code_id code_dep
 
 let record_set_of_closures_deps denv names_and_function_slots set_of_closures
     acc : unit =
@@ -556,7 +556,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
                 ~le_monde_exterieur:(Env.le_monde_exterieur denv)
                 ~all_constants:(Env.all_constants denv)
             in
-            Code code :: rev_group)
+            Acc.add_code acc code_id code;
+            Code :: rev_group)
           ~deleted_code:(fun rev_group _ -> Deleted_code :: rev_group)
           ~set_of_closures:(fun rev_group ~closure_symbols:_ set_of_closures ->
             Static_const
@@ -727,7 +728,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     | Check _ -> true
   in
   let code_dep =
-    match Acc.find_code acc code_id with
+    match Acc.find_code_dep acc code_id with
     | Some code_dep -> code_dep
     | None -> Misc.fatal_errorf "No code dep found for %a" Code_id.print code_id
   in
@@ -821,7 +822,8 @@ and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
   | Invalid { message } -> traverse_invalid denv acc ~message
 
 type result =
-  { holed : Rev_expr.t;
+  { toplevel_expr : Rev_expr.t;
+    code : Rev_expr.rev_code Code_id.Map.t;
     deps : Global_flow_graph.graph;
     kinds : K.t Name.Map.t;
     fixed_arity_continuations : Continuation.Set.t;
@@ -881,7 +883,8 @@ let run (unit : Flambda_unit.t) =
   let continuation_info = Acc.get_continuation_info acc in
   let code_deps = Acc.code_deps acc in
   if Flambda_features.debug_reaper "print-raw" then Dot.print_dep deps;
-  { holed;
+  { toplevel_expr = holed;
+    code = Acc.get_all_code acc;
     deps;
     kinds;
     fixed_arity_continuations;

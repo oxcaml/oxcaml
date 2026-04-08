@@ -50,7 +50,8 @@ type closure_dep =
   }
 
 type t =
-  { mutable code : code_dep Code_id.Map.t;
+  { mutable code_deps : code_dep Code_id.Map.t;
+    mutable code : Rev_expr.rev_code Code_id.Map.t;
     mutable apply_deps : apply_dep list;
     mutable set_of_closures_deps : closure_dep list;
     deps : Graph.graph;
@@ -59,10 +60,11 @@ type t =
     mutable continuation_info : continuation_info Continuation.Map.t
   }
 
-let code_deps t = t.code
+let code_deps t = t.code_deps
 
 let create () =
-  { code = Code_id.Map.empty;
+  { code_deps = Code_id.Map.empty;
+    code = Code_id.Map.empty;
     apply_deps = [];
     set_of_closures_deps = [];
     deps = Graph.create ();
@@ -108,9 +110,14 @@ let alias_kind t name simple =
   in
   t.kinds <- Name.Map.add name kind t.kinds
 
-let add_code t code_id dep = t.code <- Code_id.Map.add code_id dep t.code
+let add_code_dep t code_id dep =
+  t.code_deps <- Code_id.Map.add code_id dep t.code_deps
 
-let find_code t code_id = Code_id.Map.find_opt code_id t.code
+let find_code_dep t code_id = Code_id.Map.find_opt code_id t.code_deps
+
+let add_code t code_id code = t.code <- Code_id.Map.add code_id code t.code
+
+let get_all_code t = t.code
 
 let add_alias t ~to_ ~from = Graph.add_alias t.deps ~to_ ~from
 
@@ -423,7 +430,7 @@ let record_set_of_closures_deps_one_closure t
   let name = Code_id_or_name.name name in
   (* CR ncourant: use only_full_applications; not done here to avoid conflicts
      in code that will be rewritten for unbox-fv-closures anyway. *)
-  match find_code t code_id with
+  match find_code_dep t code_id with
   | None ->
     assert (
       not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id)));
@@ -464,7 +471,7 @@ let deps t ~all_constants =
            apply_call_witness
          } ->
       let code_dep =
-        match Code_id.Map.find_opt apply_code_id t.code with
+        match Code_id.Map.find_opt apply_code_id t.code_deps with
         | Some code_dep -> code_dep
         | None ->
           Misc.fatal_errorf

@@ -47,4 +47,5 @@ val rebuild :
   Unboxing_analysis.result ->
   (Code_id.t -> Code_metadata.t) ->
   Rev_expr.t ->
+  Rev_expr.rev_code Code_id.Map.t ->
   result

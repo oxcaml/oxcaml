@@ -91,14 +91,18 @@ val get_continuation_info : t -> continuation_info Continuation.Map.t
 
 (** Register a [code_dep] for a code id, recording the function's parameters,
     returns, and call witnesses in the accumulator. *)
-val add_code : t -> Code_id.t -> code_dep -> unit
+val add_code_dep : t -> Code_id.t -> code_dep -> unit
 
 (** Look up the [code_dep] for a code id. Returns [None] if the code id has not
     been registered (e.g. it belongs to another compilation unit). *)
-val find_code : t -> Code_id.t -> code_dep option
+val find_code_dep : t -> Code_id.t -> code_dep option
 
 (** Return the map of all registered code deps. *)
 val code_deps : t -> code_dep Code_id.Map.t
+
+val add_code : t -> Code_id.t -> Rev_expr.rev_code -> unit
+
+val get_all_code : t -> Rev_expr.rev_code Code_id.Map.t
 
 (** Add a (directed) alias edge: [from] flows into [to_], meaning that every
     usage of [to_] is a usage of [from]; and every source of [from] is a source
