@@ -21,7 +21,13 @@ f_unboxed_unit:
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
+<<<<<<< HEAD
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+.L107:
+=======
+.L111:
+>>>>>>> de3d4ac415 (working prototype)
   addq  $8, %rsp
   ret
 |}]
@@ -38,8 +44,16 @@ mutual_recursion:
   subq  $8, %rsp
   subq  $56, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+  jb    .L106
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+  jb    .L106
+.L108:
+=======
+  jb    .L110
+.L112:
+>>>>>>> de3d4ac415 (working prototype)
   leaq  8(%r15), %rdi
   movq  $6391, -8(%rdi)
   movq  camlTOP3__g_6_9_code@GOTPCREL(%rip), %rsi
@@ -59,9 +73,21 @@ mutual_recursion:
 mutual_recursion.f:
   movq  %rbx, %rdi
   cmpq  $1, %rax
+<<<<<<< HEAD
   jge   .L0
+||||||| parent of de3d4ac415 (working prototype)
+  jge   .L114
+=======
+  jge   .L118
+>>>>>>> de3d4ac415 (working prototype)
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+.L114:
+=======
+.L118:
+>>>>>>> de3d4ac415 (working prototype)
   leaq  -24(%rdi), %rbx
   movq  16(%rdi), %rdi
   subq  %rdi, %rax
@@ -70,9 +96,21 @@ mutual_recursion.f:
 
 mutual_recursion.g:
   cmpq  $1, %rax
+<<<<<<< HEAD
   jge   .L0
+||||||| parent of de3d4ac415 (working prototype)
+  jge   .L127
+=======
+  jge   .L139
+>>>>>>> de3d4ac415 (working prototype)
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+.L127:
+=======
+.L139:
+>>>>>>> de3d4ac415 (working prototype)
   addq  $24, %rbx
   addq  $-60, %rax
   jmp   camlTOP3__f_5_8_code@PLT
@@ -94,11 +132,25 @@ f.(fun):
 f:
   subq  $8, %rsp
   cmpq  $1, %rax
+<<<<<<< HEAD
   jge   .L1
+||||||| parent of de3d4ac415 (working prototype)
+  jge   .L119
+=======
+  jge   .L125
+>>>>>>> de3d4ac415 (working prototype)
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+  jb    .L128
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+  jb    .L128
+.L130:
+=======
+  jb    .L143
+.L145:
+>>>>>>> de3d4ac415 (working prototype)
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
   leaq  .LcamlTOP4__fn$5b$3a1$2c29$2d$2d50$5d_10_15_code(%rip), %rdi
@@ -106,12 +158,28 @@ f:
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
   movq  %rax, 16(%rbx)
+<<<<<<< HEAD
   jmp   .L3
 .L1:
+||||||| parent of de3d4ac415 (working prototype)
+  jmp   .L123
+.L119:
+=======
+  jmp   .L129
+.L125:
+>>>>>>> de3d4ac415 (working prototype)
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+  jb    .L131
 .L2:
+||||||| parent of de3d4ac415 (working prototype)
+  jb    .L131
+.L133:
+=======
+  jb    .L146
+.L148:
+>>>>>>> de3d4ac415 (working prototype)
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
   leaq  .LcamlTOP4__fn$5b$3a1$2c56$2d$2d69$5d_9_14_code(%rip), %rdi
@@ -119,7 +187,13 @@ f:
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
   movq  %rax, 16(%rbx)
+<<<<<<< HEAD
 .L3:
+||||||| parent of de3d4ac415 (working prototype)
+.L123:
+=======
+.L129:
+>>>>>>> de3d4ac415 (working prototype)
   movl  $1, %eax
   movq  (%rbx), %rdi
   addq  $8, %rsp

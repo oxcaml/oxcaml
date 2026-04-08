@@ -57,19 +57,19 @@ spill_slot_lifetime:
   subq  $24, %rsp
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L0:
+.L118:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L1:
+.L119:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L2:
+.L120:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L3:
+.L121:
   subq  $40, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
@@ -88,6 +88,6 @@ spill_slot_lifetime:
   ret
 
 spill_slot_lifetime.get_one:
-  vmovsd .L122(%rip), %xmm0
+  vmovsd .L129(%rip), %xmm0
   ret
 |}]

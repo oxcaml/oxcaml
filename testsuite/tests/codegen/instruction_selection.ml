@@ -172,8 +172,16 @@ two_element_list:
   movq  %rax, %rbx
   subq  $48, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+  jb    .L105
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+  jb    .L105
+.L107:
+=======
+  jb    .L108
+.L110:
+>>>>>>> de3d4ac415 (working prototype)
   leaq  8(%r15), %rdi
   addq  $24, %rdi
   movq  $2048, -8(%rdi)
@@ -267,8 +275,16 @@ pause:
   subq  $8, %rsp
   pause
   cmpq  (%r14), %r15
-  jbe   <hidden GC jump pad>
+<<<<<<< HEAD
+  jbe   .L105
 .L0:
+||||||| parent of de3d4ac415 (working prototype)
+  jbe   .L105
+.L106:
+=======
+  jbe   .L108
+.L109:
+>>>>>>> de3d4ac415 (working prototype)
   movl  $1, %eax
   addq  $8, %rsp
   ret
