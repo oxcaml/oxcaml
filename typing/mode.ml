@@ -2119,96 +2119,167 @@ module Report = struct
     (** Given a branch of two constant bounds on a single axis, choose the the
         one that's responsible for the branch. *)
     let choose_branch_axis : type a l r.
-        (l * r) Solver_intf.branch -> a C.obj -> a -> a -> [`First | `Second] =
-     fun b a_obj x y ->
+        (l * r) Solver_intf.branch ->
+        a C.obj ->
+        a ->
+        a ->
+        a ->
+        [`First | `Second] =
+     fun b a_obj x y c ->
       (* CR-someday zqian: in the case where [x = y], we currently arbitrarily choose from
          [x] and [y], which are unordered anyway. In the future we might want to keep an
          order for better error messages. For example, order them by occurrence in the
          source code such that the more recent hint is returned.
 
          nmatschke: Likewise for [x <> y] (middle modes of diamonds). *)
-      if
-        begin match b with Join -> C.le a_obj y x | Meet -> C.le a_obj x y
+      let le_y_x = C.le a_obj y x in
+      let le_x_y = C.le a_obj x y in
+      let parallel = (not le_y_x) && not le_x_y in
+      let choose_y =
+        match b with Join -> C.le a_obj x c | Meet -> C.le a_obj c x
+      in
+      let choose_x =
+        match b with Join -> C.le a_obj y c | Meet -> C.le a_obj c y
+      in
+      if parallel && choose_y
+      then begin
+        assert (not choose_x);
+        `Second
+      end
+      else if parallel && choose_x
+      then begin
+        assert (not choose_y);
+        `First
+      end
+      else
+        begin if
+          begin match b with Join -> le_y_x | Meet -> le_x_y
+          end
+        then `First
+        else `Second
         end
-      then `First
-      else `Second
+
+    type 'd sided =
+      | Left : left_only sided
+      | Right : right_only sided
+      constraint 'd = 'l * 'r
+    [@@ocaml.warning "-62"]
+
+    let adjoint : type a b l r.
+        a C.obj ->
+        (l * r) sided ->
+        (b, a, l * r) C.morph ->
+        (a, b, r * l) C.morph =
+     fun obj lorr morph ->
+      match lorr with
+      | Left -> C.right_adjoint obj morph
+      | Right -> C.left_adjoint obj morph
 
     (** Given a solver hint on a product lattice, and an axis in that product
         that we are interested in, returns a human-readible hint.*)
     let rec hint_apply : type a b l r.
         a C.obj ->
+        (l * r) sided ->
         (l * r) morph ->
         (b, a, l * r) C.morph ->
+        a ->
         (b, l * r) S.ahint ->
         b C.For_hint.responsible_axis ->
         (l * r) hint =
-     fun obj morph_hint morph ahint res ->
-      let obj = C.src obj morph in
+     fun obj lorr morph_hint morph c ahint res ->
+      let src = C.src obj morph in
       match res with
       | NoneResponsible -> Irrelevant
       | SourceIsSingle ->
-        let ahint = ahint_axis obj ahint in
-        Apply (morph_hint, obj, ahint)
+        let morph' = adjoint obj lorr morph in
+        let c = C.apply src morph' c in
+        let ahint = ahint_axis src lorr c ahint in
+        Apply (morph_hint, src, ahint)
       | Axis ax ->
-        let ahint = ahint_prod obj ax ahint in
-        let obj = C.proj_obj ax obj in
+        let morph' = adjoint obj lorr morph in
+        let c = C.apply src morph' c in
+        let ahint = ahint_prod src lorr ax c ahint in
+        let obj = C.proj_obj ax src in
         Apply (morph_hint, obj, ahint)
 
     and hint_prod : type t a l r.
-        t C.obj -> (t, a) Axis.t -> (t, l * r) S.hint -> (l * r) hint =
-     fun obj ax -> function
+        t C.obj ->
+        (l * r) sided ->
+        (t, a) Axis.t ->
+        t ->
+        t ->
+        (t, l * r) S.hint ->
+        a * (l * r) hint =
+     fun obj lorr ax c a -> function
       | Apply (morph_hint, morph, ahint) ->
-        hint_apply obj morph_hint morph ahint
-          (C.For_hint.find_responsible_axis_prod morph ax)
-      | Const c -> Const c
+        ( Axis.proj ax a,
+          hint_apply obj lorr morph_hint morph c ahint
+            (C.For_hint.find_responsible_axis_prod morph ax) )
+      | Const c' -> Axis.proj ax a, Const c'
       | Branch (b, (a1, hint1), (a2, hint2)) ->
-        let chosen_hint =
-          let proj1 = Axis.proj ax a1 in
-          let proj2 = Axis.proj ax a2 in
-          let obj = C.proj_obj ax obj in
-          match choose_branch_axis b obj proj1 proj2 with
-          | `First -> hint1
-          | `Second -> hint2
+        let proj1 = Axis.proj ax a1 in
+        let proj2 = Axis.proj ax a2 in
+        let pobj = C.proj_obj ax obj in
+        let pc = Axis.proj ax c in
+        let a, chosen_hint =
+          match choose_branch_axis b pobj proj1 proj2 pc with
+          | `First -> a1, hint1
+          | `Second -> a2, hint2
         in
-        hint_prod obj ax chosen_hint
+        hint_prod obj lorr ax c a chosen_hint
 
     and ahint_prod : type t a l r.
-        t C.obj -> (t, a) Axis.t -> (t, l * r) S.ahint -> (a, l * r) ahint =
-     fun obj ax (t, hint) ->
-      let a = Axis.proj ax t in
-      let hint = hint_prod obj ax hint in
+        t C.obj ->
+        (l * r) sided ->
+        (t, a) Axis.t ->
+        t ->
+        (t, l * r) S.ahint ->
+        (a, l * r) ahint =
+     fun obj lorr ax c (t, hint) ->
+      let a, hint = hint_prod obj lorr ax c t hint in
       a, hint
 
     (** Given a solver hint on a single axis lattice, returns a human-readible
         hint. *)
-    and hint_axis : type a l r. a C.obj -> (a, l * r) S.hint -> (l * r) hint =
-     fun obj -> function
+    and hint_axis : type a l r.
+        a C.obj ->
+        (l * r) sided ->
+        a ->
+        a ->
+        (a, l * r) S.hint ->
+        a * (l * r) hint =
+     fun obj lorr c a -> function
       | Apply (morph_hint, morph, ahint) ->
-        hint_apply obj morph_hint morph ahint
-          (C.For_hint.find_responsible_axis_single morph)
-      | Const c -> Const c
+        ( a,
+          hint_apply obj lorr morph_hint morph c ahint
+            (C.For_hint.find_responsible_axis_single morph) )
+      | Const c -> a, Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
-        let chosen_hint =
-          match choose_branch_axis b obj a1 a2 with
-          | `First -> hint1
-          | `Second -> hint2
+        let a, chosen_hint =
+          match choose_branch_axis b obj a1 a2 c with
+          | `First -> a1, hint1
+          | `Second -> a2, hint2
         in
-        hint_axis obj chosen_hint
+        hint_axis obj lorr c a chosen_hint
 
     and ahint_axis : type a l r.
-        a Lattices_mono.obj -> (a, l * r) S.ahint -> (a, l * r) ahint =
-     fun obj (a, hint) -> a, hint_axis obj hint
+        a Lattices_mono.obj ->
+        (l * r) sided ->
+        a ->
+        (a, l * r) S.ahint ->
+        (a, l * r) ahint =
+     fun obj lorr c (a, hint) -> hint_axis obj lorr c a hint
 
     let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
-     fun obj axis { left; right } ->
-      let left = ahint_prod obj axis left in
-      let right = ahint_prod obj axis right in
+     fun obj axis { left = l, lhint; right = r, rhint } ->
+      let left = ahint_prod obj Left axis r (l, lhint) in
+      let right = ahint_prod obj Right axis l (r, rhint) in
       { left; right }
 
     let error_axis : type a. a C.obj -> a S.error -> a t =
-     fun obj { left; right } ->
-      let left = ahint_axis obj left in
-      let right = ahint_axis obj right in
+     fun obj { left = l, lhint; right = r, rhint } ->
+      let left = ahint_axis obj Left r (l, lhint) in
+      let right = ahint_axis obj Right l (r, rhint) in
       { left; right }
   end
 

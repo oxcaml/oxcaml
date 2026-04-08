@@ -190,8 +190,7 @@ Error: Signature mismatch:
          val bar : unit -> unit (* in a structure at nonportable *)
        is not included in
          val bar : unit -> unit @@ portable (* in a structure at nonportable *)
-       The first is "nonportable"
-         because it is allocated at line 5, characters 10-50 containing data.
+       The first is "nonportable" because it crosses with something.
        However, the second is "portable".
 |}]
 

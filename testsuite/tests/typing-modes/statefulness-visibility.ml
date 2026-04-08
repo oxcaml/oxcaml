@@ -2259,8 +2259,7 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in
          val f : unit -> unit @@ stateless (* in a structure at stateful *)
-       The first is "stateful"
-         because it is allocated at line 5, characters 8-41 containing data.
+       The first is "stateful" because it crosses with something.
        However, the second is "stateless".
 |}]
 
@@ -2296,7 +2295,6 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in
          val f : unit -> unit @@ stateless (* in a structure at stateful *)
-       The first is "stateful"
-         because it is allocated at line 7, characters 8-27 containing data.
+       The first is "stateful" because it crosses with something.
        However, the second is "stateless".
 |}]
