@@ -120,20 +120,7 @@ let alias_kind t name simple =
           match Name.Map.find_opt name t.kinds with
           | Some k -> k
           | None -> Misc.fatal_errorf "Unbound name %a" Name.print name)
-      ~const:(fun const ->
-        match Int_ids.Const.descr const with
-        | Naked_immediate _ -> K.naked_immediate
-        | Tagged_immediate _ | Null -> K.value
-        | Naked_float _ -> K.naked_float
-        | Naked_float32 _ -> K.naked_float32
-        | Naked_int8 _ -> K.naked_int8
-        | Naked_int16 _ -> K.naked_int16
-        | Naked_int32 _ -> K.naked_int32
-        | Naked_int64 _ -> K.naked_int64
-        | Naked_nativeint _ -> K.naked_nativeint
-        | Naked_vec128 _ -> K.naked_vec128
-        | Naked_vec256 _ -> K.naked_vec256
-        | Naked_vec512 _ -> K.naked_vec512)
+      ~const:Reg_width_const.kind
   in
   t.kinds <- Name.Map.add name kind t.kinds
 
