@@ -653,7 +653,6 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
         Continuation.Map.add cont (Normal params) conts)
       handlers denv.conts
   in
-  (* Record kinds of bound parameters *)
   Bound_parameters.iter
     (fun bp -> Acc.bound_parameter_kind bp acc)
     invariant_params;
