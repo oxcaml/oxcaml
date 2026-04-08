@@ -577,8 +577,7 @@ val set_externality_upper_bound :
   Types.jkind_r -> Jkind_axis.Externality.t -> Types.jkind_r
 
 (** Gets the nullability from a jkind. Expands abstract kinds if needed. *)
-val get_nullability :
-  Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
+val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
 
 (** Computes a jkind that is the same as the input but with an updated
     nullability on the layout's scannable axis *)

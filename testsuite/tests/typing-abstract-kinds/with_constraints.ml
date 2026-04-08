@@ -114,10 +114,11 @@ Error: Signature mismatch:
          type t = int
        is not included in
          type t : bits64
-       The layout of the first is immediate
+       The layout of the first is value non_pointer
          because it is the primitive type int.
        But the layout of the first must be a sublayout of bits64
          because of the definition of t at line 3, characters 2-12.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 module M3' : S with kind_ k := value = struct

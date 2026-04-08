@@ -145,8 +145,9 @@ Line 2, characters 2-31:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "string" is value non_float
          because it is the primitive type string.
-       But the layout of type "string" must be a sublayout of immediate
+       But the layout of type "string" must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-31.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 (* CR layouts v2.9: The "of the definition of t ..." part is not great and it
    should only refer to definitions that type check. Fixing it will involve
@@ -162,8 +163,9 @@ Line 2, characters 2-41:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "t" is value non_float
          because it's a boxed variant type.
-       But the layout of type "t" must be a sublayout of immediate
+       But the layout of type "t" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* Cannot directly declare a non-immediate type as immediate (record) *)
@@ -176,8 +178,9 @@ Line 2, characters 2-38:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "t" is value non_float
          because it's a boxed record type.
-       But the layout of type "t" must be a sublayout of immediate
+       But the layout of type "t" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* Not guaranteed that t is immediate, so this is an invalid declaration *)
@@ -191,8 +194,9 @@ Line 3, characters 2-26:
       ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "t" is value
          because of the definition of t at line 2, characters 2-8.
-       But the layout of type "t" must be a sublayout of immediate
+       But the layout of type "t" must be a sublayout of value non_pointer
          because of the definition of s at line 3, characters 2-26.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* Can't ascribe to an immediate type signature with a non-immediate type *)
@@ -215,8 +219,9 @@ Error: Signature mismatch:
          type t : immediate
        The layout of the first is value non_float
          because it is the primitive type string.
-       But the layout of the first must be a sublayout of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 1, characters 15-35.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* Same as above but with explicit signature *)
@@ -233,8 +238,9 @@ Error: Signature mismatch:
          type t : immediate
        The layout of the first is value non_float
          because it is the primitive type string.
-       But the layout of the first must be a sublayout of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 1, characters 20-40.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 module FM_invalid = F (struct type t = string end);;
@@ -250,8 +256,9 @@ Error: Modules do not match: sig type t = string end is not included in
        type t : immediate
      The layout of the first is value non_float
        because it is the primitive type string.
-     But the layout of the first must be a sublayout of immediate
+     But the layout of the first must be a sublayout of value non_pointer
        because of the definition of t at line 1, characters 20-40.
+     Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* Can't use a non-immediate type even if mutually recursive *)
@@ -265,8 +272,9 @@ Line 2, characters 2-26:
       ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "s" is value non_float
          because it is the primitive type string.
-       But the layout of type "s" must be a sublayout of immediate
+       But the layout of type "s" must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-26.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 

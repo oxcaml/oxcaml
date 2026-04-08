@@ -187,16 +187,6 @@ module Layout = struct
       let rec to_string nested (t : t) =
         match t with
         | Any sa -> String.concat " " ("any" :: Scannable_axes.to_string_list sa)
-        (* To avoid error messages containing "scannable", we print out all
-           layouts with a scannable base in terms of [value], with a special
-           case for the (common) immediate. There is room for improvement. *)
-        (* CR layouts-scannable: Consider factoring out layout abbreviations,
-           especially if more of these will be added. *)
-        | Base (Scannable, sa) when Scannable_axes.(equal sa immediate_axes) ->
-          "immediate"
-        | Base (Scannable, sa) when Scannable_axes.(equal sa immediate64_axes)
-          ->
-          "immediate64"
         | Base (Scannable, sa) ->
           String.concat " "
             ("value" :: Scannable_axes.(to_string_list_diff ~base:value_axes) sa)
@@ -211,6 +201,13 @@ module Layout = struct
         | Genvar v -> Sort.to_string_genvar v
       in
       to_string false t
+
+    let rec has_component ~component t =
+      equal component t
+      ||
+      match t with
+      | Base _ | Any _ | Univar _ | Genvar _ -> false
+      | Product ts -> List.exists (has_component ~component) ts
 
     module Debug_printers = struct
       open Format
@@ -415,10 +412,6 @@ module Layout = struct
       | Any sa -> pp_string_list ppf ("any" :: Scannable_axes.to_string_list sa)
       | Sort (s, sa) -> (
         match Sort.get s with
-        | Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
-          Fmt.fprintf ppf "immediate"
-        | Base Scannable when Scannable_axes.(equal sa immediate64_axes) ->
-          Fmt.fprintf ppf "immediate64"
         | Base Scannable ->
           let value_axes_diff =
             Scannable_axes.(to_string_list_diff ~base:value_axes sa)
@@ -1827,7 +1820,7 @@ module Const = struct
       let { base; scannable_axes; modal_bounds; printable_with_bounds } =
         match simplest with
         | Some simplest -> simplest
-        | None ->
+        | None -> (
           (* CR layouts v2.8: sometimes there is no valid way to build a jkind
              from a built-in abbreviation. For now, we just pretend that the
              layout name is a valid jkind abbreviation whose modal bounds are
@@ -1844,14 +1837,12 @@ module Const = struct
                 }
               jkind
           in
-          (match out_jkind_verbose with
+          match out_jkind_verbose with
           | Some out_jkind -> out_jkind
           | None ->
             (* If we fail, try again with nullable/maybe-separable
                jkinds. *)
-            let expanded =
-              Base_and_axes.fully_expand_aliases_const env jkind
-            in
+            let expanded = Base_and_axes.fully_expand_aliases_const env jkind in
             let layout_str =
               match (expanded.base : Layout.Const.t jkind_base) with
               | Layout (Base (Scannable, _)) ->
@@ -1859,8 +1850,7 @@ module Const = struct
                    of the value_or_null alias, even if we're printing an
                    expanded jkind. *)
                 "value_or_null"
-              | _ ->
-                Base.to_string Layout.Const.to_string expanded.base
+              | _ -> Base.to_string Layout.Const.to_string expanded.base
             in
             let out_jkind_verbose =
               convert_with_base ~verbosity env
@@ -2134,10 +2124,7 @@ module Const = struct
           Typemode.transl_with_bound_modifiers modalities
         in
         let relevant_axes =
-          let axes =
-            Mod_bounds.relevant_axes_of_modality
-              ~modality
-          in
+          let axes = Mod_bounds.relevant_axes_of_modality ~modality in
           match externality with
           | None -> axes
           | Some ext ->
@@ -2629,12 +2616,12 @@ let get_nullability env jk =
   let sa =
     match get_root_scannable_axes jk with
     | Some _ as sa -> sa
-    | None ->
+    | None -> (
       (* Expand abstract kinds (Kconstr) to access the layout *)
       let expanded = Base_and_axes.fully_expand_aliases env jk.jkind in
       match expanded.base with
       | Layout l -> Layout.get_root_scannable_axes l
-      | Kconstr _ -> None
+      | Kconstr _ -> None)
   in
   Option.map (fun ({ nullability; _ } : Scannable_axes.t) -> nullability) sa
 
@@ -3294,6 +3281,55 @@ module Violation = struct
               sub.jkind pp_bound super.jkind))
     | No_intersection _ -> ()
 
+  (* CR layouts-scannable: For now, this is special-cased to print out notes
+     iff the layout error message prints containing
+     [value non_pointer(64)] since [immediate(64)] is such a common jkind
+     abbreviation. There is probably room to print out better notes (maybe
+     by looking at the full jkinds?) *)
+  let report_layout_notes env ppf violation mismatch_type ~print_as_value_layout
+      =
+    match mismatch_type with
+    | Kind -> ()
+    | Layout ->
+      let immediate_layout =
+        match Const.Builtin.immediate.jkind.base with
+        | Layout l -> l
+        | Kconstr _ -> assert false
+      in
+      let immediate64_layout =
+        match Const.Builtin.immediate64.jkind.base with
+        | Layout l -> l
+        | Kconstr _ -> assert false
+      in
+      let check_has_component component jkind =
+        match get_layout env jkind with
+        | None -> false
+        | Some const -> Layout.Const.has_component ~component const
+      in
+      let check_both_jkinds jk1 jk2 =
+        let should_check_jk2 = not print_as_value_layout in
+        ( check_has_component immediate_layout jk1
+          || (should_check_jk2 && check_has_component immediate_layout jk2),
+          check_has_component immediate64_layout jk1
+          || (should_check_jk2 && check_has_component immediate64_layout jk2) )
+      in
+      let should_note_immediate, should_note_immediate64 =
+        match violation with
+        (* If we are printing the jkind on the right as a value layout, then
+           we should not look at it to determine whether to emit a note *)
+        (* Can't use an or-pattern since the jkinds have different
+           allowances *)
+        | Not_a_subjkind (jkind1, jkind2, _) -> check_both_jkinds jkind1 jkind2
+        | No_intersection (jkind1, jkind2) -> check_both_jkinds jkind1 jkind2
+      in
+      if should_note_immediate
+      then
+        fprintf ppf "@;@[Note: The layout of immediate is value non_pointer.@]";
+      if should_note_immediate64
+      then
+        fprintf ppf
+          "@;@[Note: The layout of immediate64 is value non_pointer64.@]"
+
   let report_fuel ppf violation =
     let report_fuel_for_type which =
       fprintf ppf
@@ -3367,6 +3403,11 @@ module Violation = struct
      value (scannable) layouts, a more useful error should be reported.
      Specifically, the first mismatched axis should be reported as a reason,
      like "because it is not non_pointer" for a value vs immediate error. *)
+  (* CR layouts-scannable: Also, better error messages should be reported for
+     products! For instance, an error message blaming an arity difference, or
+     an error message that drills down into two products to find the first
+     conflicing component. Note reporting should be adjusted
+     appropriately. *)
   let report_general env preamble pp_former former ppf t =
     let mismatch_type, print_as_value_layout, missing_cmis =
       categorize_mismatch env t
@@ -3385,8 +3426,6 @@ module Violation = struct
       | Layout l -> has_sort_var_layout l
     in
     let indent = pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "") in
-    (* On the left / for actual kinds, always print out the entire layout,
-       even if [mismatch_type] says to print as "a value layout" *)
     let format_base_or_kind (type l r) ppf (jkind : (l * r) jkind) =
       match mismatch_type with
       | Kind -> fprintf ppf "%t%a" indent (format env) jkind
@@ -3476,6 +3515,8 @@ module Violation = struct
         fmt_k1 fmt_k2;
     report_missing_cmis ppf missing_cmis;
     report_reason ppf t.violation;
+    (* otherwise, we get notes for layout abbreviations that get omitted. *)
+    report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
     report_fuel ppf t.violation
 
   let pp_t ppf x = fprintf ppf "%t" x
