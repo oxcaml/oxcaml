@@ -230,7 +230,7 @@ Line 2, characters 11-13:
 Error: The type "r" has no unboxed version.
 Hint: [@@unboxed] records don't get unboxed versions.
 |}]
-type ('a : float64) t = { i : 'a ; j : 'a }
+type ('a : float64) t = { i : 'a ; j : 'a } [@@floatu_record]
 type floatu_t : float64 & float64 = float t#
 [%%expect{|
 type ('a : float64) t = { i : 'a; j : 'a; }

@@ -146,8 +146,12 @@ val f : unit -> (t, float#) idx_imm = <fun>
 type t = { fu : float# }
 let fu () = (.fu)
 [%%expect{|
-type t = { fu : float#; }
-val fu : unit -> (t, float#) idx_imm = <fun>
+Line 1, characters 0-24:
+1 | type t = { fu : float# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This record type contains only unboxed float fields,
+       which gives it an unboxed float record representation.
+       You must annotate it with "[@@floatu_record]".
 |}]
 
 type t_float64 : float64
@@ -155,8 +159,12 @@ type t = { t_float64 : t_float64 }
 let t_float64 () = (.t_float64)
 [%%expect{|
 type t_float64 : float64
-type t = { t_float64 : t_float64; }
-val t_float64 : unit -> (t, t_float64) idx_imm = <fun>
+Line 2, characters 0-34:
+2 | type t = { t_float64 : t_float64 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This record type contains only unboxed float fields,
+       which gives it an unboxed float record representation.
+       You must annotate it with "[@@floatu_record]".
 |}]
 
 (* Singleton unboxed records containing floats can appear in float records *)

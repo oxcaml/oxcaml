@@ -155,6 +155,7 @@ type error =
   | Layout_poly_unsupported
   | Missing_flatten_floats
   | Misplaced_flatten_floats
+  | Missing_floatu_record
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
 
 open Typedtree
@@ -2286,6 +2287,17 @@ let update_decls_jkind env decls =
            raise (Error (decl.type_loc, Misplaced_flatten_floats))
          | true, true | false, false -> ()
          end;
+         let has_floatu_record =
+           Builtin_attributes.has_floatu_record decl.type_attributes
+         in
+         let is_ufloat_record =
+           match new_decl.type_kind with
+           | Type_record (_, Record_ufloat, _) -> true
+           | _ -> false
+         in
+         if is_ufloat_record && not has_floatu_record
+         then
+           raise (Error (decl.type_loc, Missing_floatu_record));
          (id, decl, allow_any_crossing, new_decl)))
     decls
 
@@ -5177,6 +5189,12 @@ let report_error_doc ppf = function
       Style.inline_code "[@@flatten_floats]"
       Style.inline_code "float"
       Style.inline_code "float#"
+  | Missing_floatu_record ->
+    fprintf ppf
+      "@[This record type contains only unboxed float fields,@ \
+       which gives it an unboxed float record representation.@ \
+       You must annotate it with %a.@]"
+      Style.inline_code "[@@floatu_record]"
   | Recursive_jkind_definition (path, env, reaching_path) ->
     Printtyp.wrap_printing_env ~error:true env @@ fun () ->
     fprintf ppf "@[<v>The kind %a is cyclic%a@]"

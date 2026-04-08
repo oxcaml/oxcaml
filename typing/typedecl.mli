@@ -219,6 +219,7 @@ type error =
   | Layout_poly_unsupported
   | Missing_flatten_floats
   | Misplaced_flatten_floats
+  | Missing_floatu_record
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
 
 exception Error of Location.t * error

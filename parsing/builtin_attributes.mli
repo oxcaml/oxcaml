@@ -199,6 +199,7 @@ val explicit_arity: Parsetree.attributes -> bool
 val has_unboxed: Parsetree.attributes -> bool
 val has_boxed: Parsetree.attributes -> bool
 val has_flatten_floats: Parsetree.attributes -> bool
+val has_floatu_record: Parsetree.attributes -> bool
 
 val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 

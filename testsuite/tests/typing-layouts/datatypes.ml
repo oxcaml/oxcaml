@@ -412,8 +412,8 @@ and t9_3 = { x : 'a. 'a t9_1; }
 |}]
 
 type 'a floaty = float#
-and t9_4 = { x : float#; y : string floaty }
-and t9_5 = { x : float#; y : 'a. 'a floaty }
+and t9_4 = { x : float#; y : string floaty } [@@floatu_record]
+and t9_5 = { x : float#; y : 'a. 'a floaty } [@@floatu_record]
 
 [%%expect {|
 type 'a floaty = float#

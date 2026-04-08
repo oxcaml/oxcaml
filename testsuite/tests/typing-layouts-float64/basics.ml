@@ -185,7 +185,7 @@ Error: Tuple element types must have layout value.
    value fields. See [tests/typing-layouts/mixed_records.ml] for tests of mixed
    records.
 *)
-type t5_1 = { x : t_float64 };;
+type t5_1 = { x : t_float64 } [@@floatu_record];;
 [%%expect{|
 type t5_1 = { x : t_float64; }
 |}];;
@@ -226,7 +226,7 @@ type ('a : float64) t5_7 = A of int
 type ('a : float64) t5_8 = A of 'a
 |}]
 
-type ('a : float64, 'b : float64) t5_9 = {x : 'a; y : 'b; z : 'a}
+type ('a : float64, 'b : float64) t5_9 = {x : 'a; y : 'b; z : 'a} [@@floatu_record]
 
 type 'a t5_10 = 'a t_float64_id
 and 'a t5_11 = {x : 'a t5_10; y : 'a}
@@ -249,12 +249,12 @@ Error: Layout mismatch in final type declaration consistency check.
        the declaration where this error is reported.
 |}];;
 
-type ('a : float64) t5_12 = {x : 'a; y : float#};;
+type ('a : float64) t5_12 = {x : 'a; y : float#} [@@floatu_record];;
 [%%expect{|
 type ('a : float64) t5_12 = { x : 'a; y : float#; }
 |}];;
 
-type ('a : float64) t5_13 = {x : 'a; y : float#};;
+type ('a : float64) t5_13 = {x : 'a; y : float#} [@@floatu_record];;
 [%%expect{|
 type ('a : float64) t5_13 = { x : 'a; y : float#; }
 |}];;
@@ -264,7 +264,7 @@ type 'a t5_14 = {x : 'a; y : float#};;
 type 'a t5_14 = { x : 'a; y : float#; }
 |}];;
 
-type ufref = { mutable contents : float# };;
+type ufref = { mutable contents : float# } [@@floatu_record];;
 [%%expect{|
 type ufref = { mutable contents : float#; }
 |}];;
@@ -790,7 +790,7 @@ Error: This expression has type "t_float64"
 
 module FU = Stdlib_upstream_compatible.Float_u
 
-type t14_1 = { x : float#; y : float# }
+type t14_1 = { x : float#; y : float# } [@@floatu_record]
 
 (* pattern matching *)
 let f14_1 {x;y} = FU.sub x y
@@ -805,7 +805,7 @@ let f14_2 ({y;_} as r) = FU.sub r.x y
 
 let sum14_2 = FU.to_float (f14_1 r14)
 
-type t14_2 = { mutable a : float#; b : float#; mutable c : float# }
+type t14_2 = { mutable a : float#; b : float#; mutable c : float# } [@@floatu_record]
 
 let f14_3 ({b; c; _} as r) =
   (* pure record update *)
