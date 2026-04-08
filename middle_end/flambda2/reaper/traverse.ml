@@ -582,13 +582,11 @@ and traverse_let_cont_non_recursive denv acc cont ~body handler =
   let traverse handler acc =
     let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
     let params = Bound_parameters.vars handler.bound_parameters in
-    Acc.continuation_info acc cont
-      { params;
-        arity =
-          Flambda_arity.unarize
-            (Bound_parameters.arity handler.bound_parameters);
-        is_exn_handler
-      };
+    Acc.continuation_info acc cont ~params
+      ~arity:
+        (Flambda_arity.unarize
+           (Bound_parameters.arity handler.bound_parameters))
+      ~is_exn_handler;
     if is_exn_handler
     then (
       (* The exception parameter of any exception handler is assumed to have any
@@ -646,7 +644,7 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
           invariant_params_arity
           @ Flambda_arity.unarize (Bound_parameters.arity bp)
         in
-        Acc.continuation_info acc cont { params; is_exn_handler = false; arity };
+        Acc.continuation_info acc cont ~params ~arity ~is_exn_handler:false;
         Continuation.Map.add cont (Normal params) conts)
       handlers denv.conts
   in
@@ -750,15 +748,13 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     Continuation.Map.of_list
       [return_continuation, Normal return; exn_continuation, Normal [exn]]
   in
-  Acc.continuation_info acc return_continuation
-    { is_exn_handler = false;
-      params = return;
-      arity =
-        Flambda_arity.unarized_components
-          (Code_metadata.result_arity code_metadata)
-    };
-  Acc.continuation_info acc exn_continuation
-    { is_exn_handler = true; params = [exn]; arity = [KS.any_value] };
+  Acc.continuation_info acc return_continuation ~is_exn_handler:false
+    ~params:return
+    ~arity:
+      (Flambda_arity.unarized_components
+         (Code_metadata.result_arity code_metadata));
+  Acc.continuation_info acc exn_continuation ~is_exn_handler:true ~params:[exn]
+    ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
   let should_preserve_direct_calls =
@@ -864,16 +860,10 @@ let run0 unit acc ~all_constants () =
       [ return_continuation, Normal [dummy_toplevel_return];
         exn_continuation, Normal [dummy_toplevel_exn] ]
   in
-  Acc.continuation_info acc return_continuation
-    { is_exn_handler = false;
-      params = [dummy_toplevel_return];
-      arity = [KS.any_value]
-    };
-  Acc.continuation_info acc exn_continuation
-    { is_exn_handler = true;
-      params = [dummy_toplevel_exn];
-      arity = [KS.any_value]
-    };
+  Acc.continuation_info acc return_continuation ~is_exn_handler:false
+    ~params:[dummy_toplevel_return] ~arity:[KS.any_value];
+  Acc.continuation_info acc exn_continuation ~is_exn_handler:true
+    ~params:[dummy_toplevel_exn] ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
   let should_preserve_direct_calls =

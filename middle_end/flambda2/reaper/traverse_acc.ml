@@ -203,7 +203,8 @@ let fixed_arity_continuation t k =
 
 let fixed_arity_continuations t = t.fixed_arity_conts
 
-let continuation_info t k info =
+let continuation_info t k ~params ~arity ~is_exn_handler =
+  let info = { is_exn_handler; params; arity } in
   t.continuation_info <- Continuation.Map.add k info t.continuation_info
 
 let get_continuation_info t = t.continuation_info
