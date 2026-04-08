@@ -6,19 +6,48 @@
 module type S = sig
   val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b -> unit
 end
+[%%expect{|
+module type S =
+  sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end
+|}]
 
-module F (M : S) : sig
+(* layout instantiation requires static *)
+module F (M : S) = struct
+  let h = M.f
+end
+[%%expect{|
+Line 2, characters 10-13:
+2 |   let h = M.f
+              ^^^
+Error: The value "M.f" is "dynamic"
+       but is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
+|}]
+
+(* layout-poly values after instantiation are still [static]. The same cannot be
+said for general static evaluation. *)
+module F (M : S @ static) : sig
+  val h : 'a -> 'b -> unit
+end @ static = struct
+  let h = M.f
+end
+[%%expect{|
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [value, value])
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+module F (M : S @ static) : sig
   val g : int
 end = struct
   let g = M.f
 end
 [%%expect{|
-module type S =
-  sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end
-Lines 7-9, characters 6-3:
-7 | ......struct
-8 |   let g = M.f
-9 | end
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let g = M.f
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val g : 'a -> 'b -> unit end
@@ -31,7 +60,7 @@ Error: Signature mismatch:
        The type "'a -> 'b -> unit" is not compatible with the type "int"
 |}]
 
-module F (M : S) : sig
+module F (M : S @ static) : sig
   val g : int
 end = struct
   let poly_ g = M.f
@@ -53,7 +82,7 @@ Error: Signature mismatch:
        The type "'a -> 'b -> unit" is not compatible with the type "int"
 |}]
 
-module F (M : S) = struct
+module F (M : S @ static) = struct
   let g (x : int) (y : float#) =
     M.f x y;
     M.f y x
@@ -68,7 +97,7 @@ Uncaught exception: Misc.Fatal_error
 (* Two layout variables instantiated independently *)
 module G (M : sig
   val map : layout_ x y. ('a : x) ('b : y). ('a -> 'b) -> 'a -> 'b
-end) = struct
+end @ static) = struct
   let apply_int_to_float (f : int -> float#) (x : int) = M.map f x
 end
 [%%expect{|
@@ -79,7 +108,7 @@ Uncaught exception: Misc.Fatal_error
 |}]
 
 (* partial instantiation; the uninstantiated sort stays a variable for further unification *)
-module F (M :S) = struct
+module F (M :S @ static) = struct
   let g = M.f 42
   let h (x : float#)= g x
 end
@@ -93,7 +122,7 @@ Uncaught exception: Misc.Fatal_error
 (* partial instantiation; the uninstantiated sort defaults to [value] *)
 module F (M : sig
   val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b -> unit
-end) : sig
+end @ static) : sig
   val g : layout_ y. ('b : y). 'b -> unit
 end = struct
   let g = M.f 42
@@ -119,7 +148,7 @@ Error: Signature mismatch:
 (* Re-generalization *)
 module F (M : sig
   val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b -> unit
-end) : sig
+end @ static) : sig
   val g : layout_ y. ('b : y). 'b -> unit
 end = struct
   let poly_ g x = M.f 42 x
@@ -134,7 +163,7 @@ Uncaught exception: Misc.Fatal_error
 (* don't work without eta-expansion *)
 module F (M : sig
   val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b -> unit
-end) : sig
+end @ static) : sig
   val g : layout_ y. ('b : y). 'b -> unit
 end = struct
   let poly_ g = M.f 42
@@ -166,7 +195,7 @@ Error: Signature mismatch:
 (* Calling the function multiple times at different layouts *)
 module H (M : sig
   val id : layout_ x. ('a : x). 'a -> 'a
-end) = struct
+end @ static) = struct
   let use (x : int) (y : float#) =
     let x' = M.id x in
     let y' = M.id y in
@@ -187,7 +216,7 @@ Error: This expression has type "float#" but an expression was expected of type
 (* Let binding: binding a layout-poly value *)
 module I (M : sig
   val f : layout_ x. ('a : x). 'a -> 'a
-end) = struct
+end @ static) = struct
   let _ = M.f
 end
 [%%expect{|
@@ -200,7 +229,7 @@ Uncaught exception: Misc.Fatal_error
 (* Layout-poly value used in a type-constrained binding *)
 module J (M : sig
   val id : layout_ x. ('a : x). 'a -> 'a
-end) = struct
+end @ static) = struct
   let f : int -> int = M.id
 end
 [%%expect{|
@@ -235,7 +264,7 @@ Error: Layout polymorphism is not supported in term-level type annotations
 (* Binding_op from a module signature raises the unsupported error *)
 module F (M : sig
   val ( let+ ) : layout_ x. ('a : x). 'a -> ('a -> 'b) -> 'b
-end) = struct
+end @ static) = struct
   open M
   let g = let+ x = 42 in x
 end

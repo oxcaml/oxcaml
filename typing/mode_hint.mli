@@ -95,6 +95,7 @@ type 'd const =
   | Module_allocated_on_heap : (disallowed * 'r) pos const
   | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
   | Branching : ('l * disallowed) neg const
+  | Lpoly_inst : (disallowed * 'r) neg const
   | Is_used_in : pinpoint -> (disallowed * 'r) const
       (** A variant of [Is_closed_by] where the closure mode is constant.
           INVARIANT: The [pinpoint] cannot be [Unknown]. *)

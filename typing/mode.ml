@@ -188,6 +188,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Quoted_computation -> Quoted_computation
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
+        | Lpoly_inst -> Lpoly_inst
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -231,6 +232,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
         | Quoted_computation -> Quoted_computation
+        | Lpoly_inst -> Lpoly_inst
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
 
@@ -255,6 +257,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Lpoly_inst -> Lpoly_inst
         | Quoted_computation -> Quoted_computation
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
@@ -2475,6 +2478,9 @@ module Report = struct
     | Escape_region reg ->
       Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
     | Quoted_computation -> Fmt.fprintf ppf "it is the quote of a computation"
+    | Lpoly_inst ->
+      Fmt.pp_print_string ppf
+        "it is layout-polymorphic and being instantiated here"
     | Spliced _ -> Fmt.fprintf ppf "it is spliced"
 
   let print_allocation_l : allocation -> Fmt.formatter -> unit =
