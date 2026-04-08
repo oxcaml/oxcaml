@@ -18,6 +18,10 @@
 
 module Graph = Global_flow_graph
 
+(** Information about a continuation, including its parameters, arity, and
+    whether it is an exception handler. This is used to determine how to
+    register dependencies on the continuation at call sites and exception
+    handlers. *)
 type continuation_info =
   { is_exn_handler : bool;
     params : Variable.t list;
@@ -43,8 +47,10 @@ module Env : sig
     | No
     | Auto
 
+  (** The type of downwards environments. *)
   type t
 
+  (** Create a new downwards environment. *)
   val create :
     parent:Rev_expr.rev_expr_holed ->
     conts:cont_kind Continuation.Map.t ->
@@ -108,6 +114,7 @@ type apply_dep =
     apply_call_witness : Code_id_or_name.t
   }
 
+(** The type of traversal accumulators. *)
 type t
 
 (** Create a fresh, empty accumulator. *)
