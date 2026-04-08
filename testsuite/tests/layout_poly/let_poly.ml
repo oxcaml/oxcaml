@@ -429,7 +429,8 @@ Line 4, characters 16-17:
 4 |   let rec poly_ f x = x
                     ^
 Warning 218: "poly_" has no effect in recursive bindings, which do not support layout polymorphism. Consider using a regular "let rec" instead.
-Uncaught exception: File "lambda/translcore.ml", line 2040, characters 19-25: Assertion failed
+>> Fatal error: Translcore.transl_let
+Uncaught exception: Misc.Fatal_error
 
 |}]
 

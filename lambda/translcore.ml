@@ -2037,7 +2037,7 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
               Tpat_var { id; uid; _ } -> id, uid
-            | _ -> assert false)
+            | _ -> Misc.fatal_error "Translcore.transl_let")
         pat_expr_list in
       let transl_case
             {vb_expr=expr; vb_sort; vb_attributes; vb_rec_kind = rkind;
