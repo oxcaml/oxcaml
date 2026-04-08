@@ -294,85 +294,90 @@ let make_known_arity_apply_widget t ~(denv : Env.t) ~params ~returns ~exn =
   cond_alias t ~denv ~from:apply ~to_:witness;
   apply
 
+let create_unknown_arity_tupled_call_witnesses t code_id ~params ~returns ~exn =
+  let witness =
+    Variable.create
+      (Format.asprintf "unknown_arity_witness_tupled_%s" (Code_id.name code_id))
+      K.rec_info
+  in
+  let witness = Code_id_or_name.var witness in
+  List.iteri
+    (fun i v ->
+      add_constructor_dep t ~base:witness
+        (Field.normal_return_of_call i)
+        ~from:(Code_id_or_name.var v))
+    returns;
+  add_constructor_dep t ~base:witness Field.exn_return_of_call
+    ~from:(Code_id_or_name.var exn);
+  add_constructor_dep t ~base:witness Field.code_id_of_call_witness
+    ~from:(Code_id_or_name.code_id code_id);
+  let untuple_var =
+    Code_id_or_name.var (Variable.create "untuple_var" K.value)
+  in
+  add_parameter_dep t ~base:witness (Cofield.param 0) ~to_:untuple_var;
+  (* CR ncourant: this should be changed if we ever allow non-value tuples *)
+  List.iteri
+    (fun i v ->
+      add_accessor_dep t ~to_:(Code_id_or_name.var v) (Field.block i K.value)
+        ~base:untuple_var)
+    params;
+  [witness]
+
+let create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params
+    ~returns ~exn =
+  let rec add_deps params_and_witnesses =
+    match params_and_witnesses with
+    | [] -> Misc.fatal_error "add_deps: no params"
+    | (first, witness) :: rest -> (
+      List.iteri
+        (fun i arg ->
+          add_parameter_dep t ~to_:(Code_id_or_name.var arg) (Cofield.param i)
+            ~base:witness)
+        first;
+      add_constructor_dep t ~base:witness Field.code_id_of_call_witness
+        ~from:(Code_id_or_name.code_id code_id);
+      match rest with
+      | [] ->
+        add_constructor_dep t ~base:witness Field.exn_return_of_call
+          ~from:(Code_id_or_name.var exn);
+        List.iteri
+          (fun i return_arg ->
+            add_constructor_dep t
+              ~from:(Code_id_or_name.var return_arg)
+              (Field.normal_return_of_call i)
+              ~base:witness)
+          returns
+      | (_, next_witness) :: _ ->
+        let v = Code_id_or_name.var (Variable.create "partial_apply" K.value) in
+        add_constructor_dep t ~from:v
+          (Field.normal_return_of_call 0)
+          ~base:witness;
+        add_constructor_dep t ~from:next_witness
+          Field.unknown_arity_call_witness ~base:v;
+        add_deps rest)
+  in
+  let params = Flambda_arity.group_by_parameter arity params in
+  let witnesses =
+    List.mapi
+      (fun i _ ->
+        Code_id_or_name.var
+          (Variable.create
+             (Format.asprintf "unknown_arity_witness_%d_%s" i
+                (Code_id.name code_id))
+             K.rec_info))
+      params
+  in
+  add_deps (List.combine params witnesses);
+  witnesses
+
 let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
     ~returns ~exn =
   if is_tupled
-  then (
-    let witness =
-      Variable.create
-        (Format.asprintf "unknown_arity_witness_tupled_%s"
-           (Code_id.name code_id))
-        K.rec_info
-    in
-    let witness = Code_id_or_name.var witness in
-    List.iteri
-      (fun i v ->
-        add_constructor_dep t ~base:witness
-          (Field.normal_return_of_call i)
-          ~from:(Code_id_or_name.var v))
-      returns;
-    add_constructor_dep t ~base:witness Field.exn_return_of_call
-      ~from:(Code_id_or_name.var exn);
-    add_constructor_dep t ~base:witness Field.code_id_of_call_witness
-      ~from:(Code_id_or_name.code_id code_id);
-    let untuple_var =
-      Code_id_or_name.var (Variable.create "untuple_var" K.value)
-    in
-    add_parameter_dep t ~base:witness (Cofield.param 0) ~to_:untuple_var;
-    (* CR ncourant: this should be changed if we ever allow non-value tuples *)
-    List.iteri
-      (fun i v ->
-        add_accessor_dep t ~to_:(Code_id_or_name.var v) (Field.block i K.value)
-          ~base:untuple_var)
-      params;
-    [witness])
+  then
+    create_unknown_arity_tupled_call_witnesses t code_id ~params ~returns ~exn
   else
-    let rec add_deps params_and_witnesses =
-      match params_and_witnesses with
-      | [] -> Misc.fatal_error "add_deps: no params"
-      | (first, witness) :: rest -> (
-        List.iteri
-          (fun i arg ->
-            add_parameter_dep t ~to_:(Code_id_or_name.var arg) (Cofield.param i)
-              ~base:witness)
-          first;
-        add_constructor_dep t ~base:witness Field.code_id_of_call_witness
-          ~from:(Code_id_or_name.code_id code_id);
-        match rest with
-        | [] ->
-          add_constructor_dep t ~base:witness Field.exn_return_of_call
-            ~from:(Code_id_or_name.var exn);
-          List.iteri
-            (fun i return_arg ->
-              add_constructor_dep t
-                ~from:(Code_id_or_name.var return_arg)
-                (Field.normal_return_of_call i)
-                ~base:witness)
-            returns
-        | (_, next_witness) :: _ ->
-          let v =
-            Code_id_or_name.var (Variable.create "partial_apply" K.value)
-          in
-          add_constructor_dep t ~from:v
-            (Field.normal_return_of_call 0)
-            ~base:witness;
-          add_constructor_dep t ~from:next_witness
-            Field.unknown_arity_call_witness ~base:v;
-          add_deps rest)
-    in
-    let params = Flambda_arity.group_by_parameter arity params in
-    let witnesses =
-      List.mapi
-        (fun i _ ->
-          Code_id_or_name.var
-            (Variable.create
-               (Format.asprintf "unknown_arity_witness_%d_%s" i
-                  (Code_id.name code_id))
-               K.rec_info))
-        params
-    in
-    add_deps (List.combine params witnesses);
-    witnesses
+    create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params
+      ~returns ~exn
 
 let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
     ~exn =
