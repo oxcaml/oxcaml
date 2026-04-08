@@ -272,28 +272,11 @@ let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
         acc)
     ~block_like:(fun () symbol static_const ->
       let name = Name.symbol symbol in
-      let[@inline always] block_field_kind i =
-        match static_const with
-        | Block (_, _, shape, _) -> K.Scannable_block_shape.element_kind shape i
-        | Immutable_value_array _ -> K.value
-        | Set_of_closures _ | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _
-        | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _
-        | Boxed_vec512 _ | Immutable_float_block _ | Immutable_float_array _
-        | Immutable_float32_array _ | Immutable_int_array _
-        | Immutable_int8_array _ | Immutable_int16_array _
-        | Immutable_int32_array _ | Immutable_int64_array _
-        | Immutable_nativeint_array _ | Immutable_vec128_array _
-        | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
-        | Mutable_string _ | Immutable_string _ ->
-          Misc.fatal_errorf
-            "Unexpected static const %a in [block_field_kind] for symbol %a"
-            Static_const.print static_const Symbol.print symbol
-      in
       match static_const with
       | Block (_, _, _, fields) | Immutable_value_array fields ->
         List.iteri
           (fun i (field : Simple.With_debuginfo.t) ->
-            let kind = block_field_kind i in
+            let kind = Static_const.block_field_kind static_const i in
             let from =
               Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field)
             in
