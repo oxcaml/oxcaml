@@ -33,9 +33,9 @@ type value_halves = Slambdaeval.halves =
   }
 
 (** [eval inspect tlambda] fractures [tlambda] into [slambda], passes it through
-    [inspect], then evaluates it. It returns a [Slambdaeval.halves] so that the
-    caller can save/manipulate the compile-time part of the value represented by
-    the [tlambda].
+    [inspect], then evaluates it. It returns a [value_halves] so that the caller
+    can save/manipulate the compile-time part of the value represented by the
+    [tlambda].
 
     [inspect] can arbitrarily modify the [slambda] but it's expected to be used
     by drivers to print the slambda if requested and return it unchanged. *)
