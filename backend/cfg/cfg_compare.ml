@@ -125,6 +125,11 @@ let is_move (i : Cfg.basic Cfg.instruction) =
     && i.res.(0).Reg.loc = Reg.Unknown
   | _ -> false
 
+let effective_arg (i : Cfg.basic Cfg.instruction) =
+  match i.desc with
+  | Op (Name_for_debugger { regs; _ }) -> regs
+  | _ -> i.arg
+
 let basic_desc_match label_map (old_d : Cfg.basic)
     (new_d : Cfg.basic) =
   match old_d, new_d with
@@ -305,6 +310,16 @@ let process_backward ~ppf_check label_map eqs
   (* Process terminator *)
   let old_t = old_block.terminator in
   let new_t = new_block.terminator in
+  if Debuginfo.compare old_t.dbg new_t.dbg <> 0
+  then
+    report
+      "Debuginfo mismatch at terminator \
+       old=%a(id:%a) new=%a(id:%a) %a: %a vs %a@."
+      Label.format ol InstructionId.print old_t.id
+      Label.format nl InstructionId.print new_t.id
+      (Cfg.dump_terminator ~sep:"") old_t.desc
+      Debuginfo.print_compact old_t.dbg
+      Debuginfo.print_compact new_t.dbg;
   let eqs =
     Array.fold_left remove_old eqs old_t.res
   in
@@ -369,6 +384,16 @@ let process_backward ~ppf_check label_map eqs
           ni.desc;
         eqs)
       else (
+        if Debuginfo.compare oi.dbg ni.dbg <> 0
+        then
+          report
+            "Debuginfo mismatch at old=%a(id:%a) \
+             new=%a(id:%a) %a: %a vs %a@."
+            Label.format ol InstructionId.print oi.id
+            Label.format nl InstructionId.print ni.id
+            Cfg.dump_basic oi.desc
+            Debuginfo.print_compact oi.dbg
+            Debuginfo.print_compact ni.dbg;
         (* Remove matched output pairs *)
         let eqs =
           let n =
@@ -393,9 +418,11 @@ let process_backward ~ppf_check label_map eqs
         let eqs =
           Array.fold_left remove_new eqs ni.res
         in
+        let oi_arg = effective_arg oi in
+        let ni_arg = effective_arg ni in
         let eqs =
-          if Array.length oi.arg
-             <> Array.length ni.arg
+          if Array.length oi_arg
+             <> Array.length ni_arg
           then (
             report
               "Reg count mismatch at \
@@ -405,12 +432,12 @@ let process_backward ~ppf_check label_map eqs
               InstructionId.print oi.id
               Label.format nl
               InstructionId.print ni.id
-              (Array.length oi.arg)
-              (Array.length ni.arg)
+              (Array.length oi_arg)
+              (Array.length ni_arg)
               Cfg.dump_basic oi.desc;
             eqs)
           else
-            add_reg_pairs eqs oi.arg ni.arg
+            add_reg_pairs eqs oi_arg ni_arg
         in
         loop eqs old_rest new_rest)
     | _ :: _, [] | [], _ :: _ ->

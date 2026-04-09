@@ -15,21 +15,21 @@ let unwrap_twice o = Option.value ~default:7 o + Option.value ~default:7 o
 [%%expect_asm X86_64{|
 unwrap_twice:
   testb $1, %al
-  je    .L108
+  je    .L104
   movl  $15, %ebx
   testb $1, %al
-  je    .L119
-  jmp   .L117
-.L108:
+  je    .L109
+  jmp   .L108
+.L104:
   movq  (%rax), %rbx
   testb $1, %al
-  je    .L119
-.L117:
+  je    .L109
+.L108:
   movl  $15, %eax
-  jmp   .L123
-.L119:
+  jmp   .L106
+.L109:
   movq  (%rax), %rax
-.L123:
+.L106:
   leaq  -1(%rax,%rbx), %rax
   ret
 |}]
@@ -45,34 +45,36 @@ let arr_sum arr =
 ;;
 [%%expect_asm X86_64{|
 arr_sum:
-  movq  %rax, %rbx
-  movq  -8(%rbx), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
-  orq   $1, %rdi
-  leaq  -2(%rdi), %rsi
+  movq  %rax, %rdi
+  movq  -8(%rdi), %rbx
+  salq  $8, %rbx
+  shrq  $17, %rbx
+  orq   $1, %rbx
+  leaq  -2(%rbx), %rsi
   cmpq  $1, %rsi
-  jl    .L137
+  jl    .L107
+  subq  $8, %rsp
   sarq  $1, %rsi
   movl  $1, %eax
   xorl  %edx, %edx
-.L114:
+.L109:
   leaq  1(%rdx,%rdx), %rcx
-  cmpq  %rdi, %rcx
-  jae   .L133
-  movq  -4(%rbx,%rcx,4), %rcx
+  cmpq  %rbx, %rcx
+  jae   .L112
+  movq  -4(%rdi,%rcx,4), %rcx
   leaq  -1(%rax,%rcx), %rax
   incq  %rdx
   cmpq  %rsi, %rdx
-  jle   .L114
+  jle   .L109
+  addq  $8, %rsp
   ret
-.L133:
+.L112:
   movq  camlTOP2__block101@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L137:
+.L107:
   movl  $1, %eax
   ret
 |}]
@@ -94,34 +96,36 @@ let search ~target (start : int list) =
 ;;
 [%%expect_asm X86_64{|
 search:
+  subq  $8, %rsp
   movq  %rax, %rdi
   testb $1, %bl
-  je    .L116
-.L114:
+  je    .L108
+.L107:
   xorl  %esi, %esi
   movq  %rbx, %rax
-  jmp   .L131
-.L116:
+  jmp   .L115
+.L108:
   movq  (%rbx), %rax
   cmpq  %rax, %rdi
   setl  %al
   movzbq %al, %rsi
   testq %rsi, %rsi
-  je    .L123
+  je    .L112
   movq  8(%rbx), %rax
   testq %rsi, %rsi
-  jne   .L129
-  jmp   .L131
-.L123:
+  jne   .L114
+  jmp   .L115
+.L112:
   movq  %rbx, %rax
   testq %rsi, %rsi
-  je    .L131
-.L129:
+  je    .L115
+.L114:
   movq  %rax, %rbx
   testb $1, %bl
-  je    .L116
-  jmp   .L114
-.L131:
+  je    .L108
+  jmp   .L107
+.L115:
+  addq  $8, %rsp
   ret
 |}]
 
@@ -130,12 +134,12 @@ let redundant_compare (x: int) = if x > 0 && x > 5 then 100 else 200
 [%%expect_asm X86_64{|
 redundant_compare:
   cmpq  $1, %rax
-  jle   .L110
+  jle   .L104
   cmpq  $11, %rax
-  jle   .L110
+  jle   .L104
   movl  $201, %eax
   ret
-.L110:
+.L104:
   movl  $401, %eax
   ret
 |}]
@@ -148,10 +152,10 @@ let learn_from_branch (x : int) : int =
 [%%expect_asm X86_64{|
 learn_from_branch:
   cmpq  $7, %rax
-  je    .L105
+  je    .L102
   movl  $201, %eax
   ret
-.L105:
+.L102:
   leaq  -1(%rax,%rax), %rax
   ret
 |}]

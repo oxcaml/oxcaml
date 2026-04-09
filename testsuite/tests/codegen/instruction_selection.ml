@@ -66,10 +66,10 @@ let do_intersect t1 t2 =
 do_intersect:
   andq  %rbx, %rax
   testq %rax, %rax
-  jne   .L106
+  jne   .L103
   movl  $100, %eax
   ret
-.L106:
+.L103:
   movl  $200, %eax
   ret
 |}]
@@ -82,11 +82,11 @@ logand_branch:
   movq  %rdi, %rbx
   andl  $33, %eax
   cmpq  $1, %rax
-  je    .L108
+  je    .L103
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L108:
+.L103:
   movl  $1, %eax
   ret
 |}]
@@ -107,12 +107,12 @@ combine_comparisons:
   setl  %al
   movzbq %al, %rax
   cmpq  $11, %rbx
-  jle   .L114
+  jle   .L107
   testq %rax, %rax
-  je    .L114
+  je    .L107
   movq  %rbx, %rax
   ret
-.L114:
+.L107:
   movl  $1, %eax
   ret
 |}]
@@ -130,12 +130,12 @@ repeat_comparisons:
   setg  %al
   movzbq %al, %rax
   cmpq  $11, %rbx
-  jle   .L113
+  jle   .L107
   testq %rax, %rax
-  je    .L113
+  je    .L107
   movl  $3, %eax
   ret
-.L113:
+.L107:
   movl  $5, %eax
   ret
 |}]
@@ -154,10 +154,10 @@ branch_and_return:
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
   cmpq  $3, %rax
-  jne   .L107
+  jne   .L104
   movq  %rbx, %rax
   ret
-.L107:
+.L104:
   movl  $15, %eax
   ret
 |}]
@@ -169,20 +169,20 @@ let two_element_list x = [x; x]
 [%%expect_asm X86_64{|
 two_element_list:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $48, %r15
   cmpq  (%r14), %r15
-  jb    .L108
-.L110:
+  jb    .L103
+.L105:
   leaq  8(%r15), %rdi
   addq  $24, %rdi
   movq  $2048, -8(%rdi)
-  movq  %rbx, (%rdi)
+  movq  %rax, (%rdi)
   movq  $1, 8(%rdi)
-  leaq  -24(%rdi), %rax
-  movq  $2048, -8(%rax)
-  movq  %rbx, (%rax)
-  movq  %rdi, 8(%rax)
+  leaq  -24(%rdi), %rbx
+  movq  $2048, -8(%rbx)
+  movq  %rax, (%rbx)
+  movq  %rdi, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -196,15 +196,15 @@ let constant_folding (x : int) =
 [%%expect_asm X86_64{|
 constant_folding:
   cmpq  %rax, %rax
-  jl    .L109
+  jl    .L105
   subq  %rax, %rax
   incq  %rax
   cmpq  $1, %rax
-  jne   .L111
-.L109:
+  jne   .L106
+.L105:
   movl  $7, %eax
   ret
-.L111:
+.L106:
   movl  $9, %eax
   ret
 |}]
@@ -224,9 +224,9 @@ let int32_box_unbox_after_call (a : ptr) (b : ptr) =
 [%%expect_asm X86_64{|
 int32_box_unbox_after_call:
   subq  $8, %rsp
+  movl  $5, %edx
   movq  %rax, %rdi
   movq  %rbx, %rsi
-  movl  $5, %edx
   call  memcmp@PLT
   movslq %eax, %rax
   movslq %eax, %rax
@@ -267,8 +267,8 @@ pause:
   subq  $8, %rsp
   pause
   cmpq  (%r14), %r15
-  jbe   .L108
-.L109:
+  jbe   .L103
+.L104:
   movl  $1, %eax
   addq  $8, %rsp
   ret
@@ -339,11 +339,11 @@ let is_int_branch (x : 'a) f = if Obj.is_int(Obj.repr x) then f()
 [%%expect_asm X86_64{|
 is_int_branch:
   testb $1, %al
-  je    .L107
+  je    .L102
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L107:
+.L102:
   movl  $1, %eax
   ret
 |}]
@@ -354,10 +354,10 @@ let is_block_branch (x : 'a) f = if not(Obj.is_int(Obj.repr x)) then f()
 [%%expect_asm X86_64{|
 is_block_branch:
   testb $1, %al
-  je    .L105
+  je    .L102
   movl  $1, %eax
   ret
-.L105:
+.L102:
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
@@ -375,13 +375,14 @@ let branch_or_tailcall x =
 [%%expect_asm X86_64{|
 branch_or_tailcall:
   cmpq  $5, %rax
-  jbe   .L105
+  jbe   .L102
+  subq  $8, %rsp
   movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L105:
+.L102:
   movq  camlTOP28__switch_block919@GOTPCREL(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
@@ -396,9 +397,9 @@ let shift_of_logand (a : int64#) =
 ;;
 [%%expect_asm X86_64{|
 shift_of_logand:
+  movl  $1, %ebx
   movq  %rax, %rcx
-  movl  $1, %eax
-  andq  %rax, %rcx
+  andq  %rbx, %rcx
   movl  $3, %eax
   shrq  %cl, %rax
   orq   $1, %rax

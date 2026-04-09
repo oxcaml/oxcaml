@@ -57,8 +57,8 @@ let set_b r v = r.b <- v
 [%%expect_asm X86_64{|
 set_b:
   subq  $8, %rsp
-  movq  %rbx, %rsi
   leaq  8(%rax), %rdi
+  movq  %rbx, %rsi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
@@ -89,17 +89,17 @@ let header x = get_header x
 [%%expect_asm X86_64{|
 header:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L108
-.L110:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  jb    .L103
+.L105:
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  -8(%rbx), %rbx
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  -8(%rax), %rax
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -135,14 +135,14 @@ let make_ref x = ref x
 [%%expect_asm X86_64{|
 make_ref:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L106
-.L108:
-  leaq  8(%r15), %rax
-  movq  $1024, -8(%rax)
-  movq  %rbx, (%rax)
+  jb    .L102
+.L104:
+  leaq  8(%r15), %rbx
+  movq  $1024, -8(%rbx)
+  movq  %rax, (%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
