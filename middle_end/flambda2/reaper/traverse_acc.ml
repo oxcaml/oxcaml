@@ -22,55 +22,7 @@ type continuation_info =
     arity : K.With_subkind.t list
   }
 
-module Env = struct
-  type cont_kind = Normal of Variable.t list
-
-  type should_preserve_direct_calls =
-    | Yes
-    | No
-    | Auto
-
-  type t =
-    { parent : Rev_expr.rev_expr_holed;
-      conts : cont_kind Continuation.Map.t;
-      current_code_id : Code_id.t option;
-      should_preserve_direct_calls : should_preserve_direct_calls;
-      le_monde_exterieur : Name.t;
-      all_constants : Name.t
-    }
-
-  let create ~parent ~conts ~current_code_id ~should_preserve_direct_calls
-      ~le_monde_exterieur ~all_constants =
-    { parent;
-      conts;
-      current_code_id;
-      should_preserve_direct_calls;
-      le_monde_exterieur;
-      all_constants
-    }
-
-  let parent t = t.parent
-
-  let current_code_id t = t.current_code_id
-
-  let should_preserve_direct_calls t = t.should_preserve_direct_calls
-
-  let le_monde_exterieur t = t.le_monde_exterieur
-
-  let all_constants t = t.all_constants
-
-  let with_parent t parent = { t with parent }
-
-  let find_cont t cont =
-    match Continuation.Map.find_opt cont t.conts with
-    | Some cont_kind -> cont_kind
-    | None ->
-      Misc.fatal_errorf "[Env.find_cont]: continuation %a not found in env"
-        Continuation.print cont
-
-  let add_cont t cont cont_kind =
-    { t with conts = Continuation.Map.add cont cont_kind t.conts }
-end
+module Env = Traverse_env
 
 type code_dep =
   { arity : [`Complex] Flambda_arity.t;
@@ -195,8 +147,8 @@ let add_code_id_my_closure t code_id my_closure =
   Graph.add_code_id_my_closure t.deps code_id my_closure
 
 let add_cond_any_usage t ~(denv : Env.t) simple =
-  let node = simple_to_node t ~all_constants:denv.all_constants simple in
-  match denv.current_code_id with
+  let node = simple_to_node t ~all_constants:(Env.all_constants denv) simple in
+  match Env.current_code_id denv with
   | None -> add_any_usage t node
   | Some code_id ->
     (* CR ncourant: this always makes [node] any_source, we should improve
@@ -204,16 +156,16 @@ let add_cond_any_usage t ~(denv : Env.t) simple =
     add_use_dep t ~to_:(Code_id_or_name.code_id code_id) ~from:node
 
 let add_cond_any_source t ~(denv : Env.t) v =
-  match denv.current_code_id with
+  match Env.current_code_id denv with
   | None -> add_any_source t v
   | Some code_id ->
     add_propagate_dep t
       ~if_used:(Code_id_or_name.code_id code_id)
-      ~from:(Code_id_or_name.name denv.le_monde_exterieur)
+      ~from:(Code_id_or_name.name (Env.le_monde_exterieur denv))
       ~to_:v
 
 let cond_alias t ~(denv : Env.t) ~from ~to_ =
-  match denv.current_code_id with
+  match Env.current_code_id denv with
   | None -> add_alias t ~from ~to_
   | Some code_id ->
     add_propagate_dep t ~if_used:(Code_id_or_name.code_id code_id) ~from ~to_
@@ -310,7 +262,7 @@ let make_known_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
   List.iteri
     (fun i v ->
       add_argument_dep t ~base:witness (Cofield.param i)
-        ~from:(simple_to_node t ~all_constants:denv.all_constants v))
+        ~from:(simple_to_node t ~all_constants:(Env.all_constants denv) v))
     args;
   List.iteri
     (fun i v ->
@@ -428,7 +380,7 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
       List.iteri
         (fun i v ->
           add_argument_dep t ~base:witness (Cofield.param i)
-            ~from:(simple_to_node t ~all_constants:denv.all_constants v))
+            ~from:(simple_to_node t ~all_constants:(Env.all_constants denv) v))
         first;
       add_accessor_dep t ~base:witness Field.exn_return_of_call
         ~to_:(Code_id_or_name.var exn);
@@ -542,4 +494,4 @@ let deps t ~all_constants =
   t.deps
 
 let simple_to_node t ~denv s =
-  simple_to_node t ~all_constants:denv.Env.all_constants s
+  simple_to_node t ~all_constants:(Env.all_constants denv) s

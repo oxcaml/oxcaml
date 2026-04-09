@@ -16,7 +16,7 @@
 open! Flambda.Import
 open! Rev_expr
 module Acc = Traverse_acc
-module Env = Acc.Env
+module Env = Traverse_env
 module Dot = Dot_printer
 module K = Flambda_kind
 module KS = Flambda_kind.With_subkind
