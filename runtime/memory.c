@@ -619,7 +619,7 @@ void caml_free_local_arenas(caml_local_arenas* s) {
   if (s == NULL) return;
 
   for (int i = 0; i < s->count; i++) {
-    caml_stat_free(s->arenas[i].alloc_block);
+    caml_stat_free(s->arenas[i].base);
   }
 
   caml_stat_free(s);
@@ -630,7 +630,6 @@ void caml_local_realloc(void)
   caml_local_arenas* s = caml_refresh_locals(Caml_state->current_stack);
   intnat i;
   char* arena;
-  caml_stat_block block;
   if (s == NULL) {
     s = caml_stat_alloc(sizeof(*s));
     s->count = 0;
@@ -650,7 +649,7 @@ void caml_local_realloc(void)
     /* may need to loop, if a very large allocation was requested */
   } while (Caml_state->local_sp + s->next_length < 0);
 
-  arena = caml_stat_alloc_aligned_noexc(s->next_length, 0, &block);
+  arena = caml_stat_alloc_noexc(s->next_length);
   if (arena == NULL)
     caml_fatal_error("Local allocation stack overflow - out of memory");
 #ifdef DEBUG
@@ -667,7 +666,6 @@ void caml_local_realloc(void)
   s->count++;
   s->arenas[s->count-1].length = s->next_length;
   s->arenas[s->count-1].base = arena;
-  s->arenas[s->count-1].alloc_block = block;
   caml_use_local_arenas(s, Caml_state->local_sp);
   CAMLassert(Caml_state->local_limit <= Caml_state->local_sp);
 }
@@ -884,44 +882,6 @@ CAMLexport caml_stat_block caml_stat_alloc_noexc(asize_t sz)
     link_pool_block(pb);
     return &(pb->data);
   }
-}
-
-/* [sz] and [modulo] are numbers of bytes */
-CAMLexport void* caml_stat_alloc_aligned_noexc(asize_t sz, int modulo,
-                                               caml_stat_block *b)
-{
-  char *raw_mem;
-  uintnat aligned_mem;
-  CAMLassert(0 <= modulo);
-  CAMLassert(modulo < Page_size);
-  raw_mem = (char *) caml_stat_alloc_noexc(sz + Page_size);
-  if (raw_mem == NULL) return NULL;
-  *b = raw_mem;
-  raw_mem += modulo;                /* Address to be aligned */
-  aligned_mem = (((uintnat) raw_mem / Page_size + 1) * Page_size);
-#ifdef DEBUG
-  {
-    uintnat *p0 = (void *) *b;
-    uintnat *p1 = (void *) (aligned_mem - modulo);
-    uintnat *p2 = (void *) (aligned_mem - modulo + sz);
-    uintnat *p3 = (void *) ((char *) *b + sz + Page_size);
-    for (uintnat *p = p0; p < p1; p++) *p = Debug_filler_align;
-    for (uintnat *p = p1; p < p2; p++) *p = Debug_uninit_align;
-    for (uintnat *p = p2; p < p3; p++) *p = Debug_filler_align;
-  }
-#endif
-  return (char *) (aligned_mem - modulo);
-}
-
-/* [sz] and [modulo] are numbers of bytes */
-CAMLexport void* caml_stat_alloc_aligned(asize_t sz, int modulo,
-                                         caml_stat_block *b)
-{
-  void *result = caml_stat_alloc_aligned_noexc(sz, modulo, b);
-  /* malloc() may return NULL if size is 0 */
-  if ((result == NULL) && (sz != 0))
-    caml_fatal_out_of_memory();
-  return result;
 }
 
 /* [sz] is a number of bytes */
