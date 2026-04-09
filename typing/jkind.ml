@@ -175,13 +175,17 @@ module Layout = struct
       | Univar _ -> t
       | Genvar _ -> t
 
-    let to_string t =
+    let to_string t ~include_redundant_scannable_axes =
       let rec to_string nested (t : t) =
         match t with
         | Any sa -> String.concat " " ("any" :: Scannable_axes.to_string_list sa)
         | Base (Scannable, sa) ->
-          String.concat " "
-            ("value" :: Scannable_axes.(to_string_list_diff ~base:value_axes) sa)
+          let sa =
+            if include_redundant_scannable_axes
+            then Scannable_axes.to_string_list sa
+            else Scannable_axes.(to_string_list_diff ~base:value_axes) sa
+          in
+          String.concat " " ("value" :: sa)
         | Base (b, _) -> Sort.to_string_base b
         | Product ts ->
           String.concat ""
@@ -193,6 +197,10 @@ module Layout = struct
         | Genvar v -> Sort.to_string_genvar v
       in
       to_string false t
+
+    let to_string_verbose = to_string ~include_redundant_scannable_axes:true
+
+    let to_string = to_string ~include_redundant_scannable_axes:false
 
     let rec has_component ~component t =
       equal component t
@@ -1824,6 +1832,11 @@ module Const = struct
              from a built-in abbreviation. For now, we just pretend that the
              layout name is a valid jkind abbreviation whose modal bounds are
              all max, even though this is a lie. Internal ticket 3284. *)
+          let layout_to_string =
+            match (verbosity : Format_verbosity.t) with
+            | Expanded_with_all_mod_bounds -> Layout.Const.to_string_verbose
+            | Not_verbose | Expanded -> Layout.Const.to_string
+          in
           let out_jkind_verbose =
             convert_with_base ~verbosity env
               ~base:
@@ -1832,7 +1845,7 @@ module Const = struct
                       mod_bounds = Mod_bounds.max;
                       with_bounds = No_with_bounds
                     };
-                  name = Base.to_string Layout.Const.to_string jkind.base
+                  name = Base.to_string layout_to_string jkind.base
                 }
               jkind
           in
@@ -1849,7 +1862,7 @@ module Const = struct
                    of the value_or_null alias, even if we're printing an
                    expanded jkind. *)
                 "value_or_null"
-              | _ -> Base.to_string Layout.Const.to_string expanded.base
+              | _ -> Base.to_string layout_to_string expanded.base
             in
             let out_jkind_verbose =
               convert_with_base ~verbosity env

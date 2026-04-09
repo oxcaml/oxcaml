@@ -15,7 +15,7 @@ type t
 type t : immutable_data
 [%%expect {|
 type t
-  : value non_float
+  : value non_float non_null
       mod forkable
           unyielding
           many
@@ -32,7 +32,7 @@ type t
 type t : immediate
 [%%expect {|
 type t
-  : value non_pointer
+  : value non_pointer non_null
       mod global
           many
           stateless
@@ -83,7 +83,7 @@ type t
 type t : value mod portable
 [%%expect {|
 type t
-  : value
+  : value separable non_null
       mod portable
           local
           unforkable
@@ -100,7 +100,7 @@ type t
 type t : value mod stateless
 [%%expect {|
 type t
-  : value
+  : value separable non_null
       mod stateless
           portable
           local
@@ -117,7 +117,7 @@ type t
 type 'a t : immutable_data with 'a
 [%%expect {|
 type 'a t
-  : value non_float
+  : value non_float non_null
       mod forkable
           unyielding
           many
@@ -135,7 +135,7 @@ type 'a t
 type ('a : immutable_data) t
 [%%expect {|
 type ('a
-     : value non_float
+     : value non_float non_null
          mod forkable
              unyielding
              many
@@ -153,7 +153,7 @@ type ('a
 type ('a : value mod stateless) t
 [%%expect {|
 type ('a
-     : value
+     : value separable non_null
          mod stateless
              portable
              local
@@ -171,7 +171,7 @@ type ('a
 type 'a t : value mod portable external_ with 'a @@ external_
 [%%expect {|
 type 'a t
-  : value
+  : value separable non_null
       mod portable
           external_
           local
@@ -189,7 +189,7 @@ type 'a t
 type 'a t : value mod external_ with 'a @@ external_
 [%%expect {|
 type 'a t
-  : value
+  : value separable non_null
       mod external_
           local
           unforkable
@@ -206,7 +206,7 @@ type 'a t
 type 'a t : immutable_data with 'a @@ external_
 [%%expect {|
 type 'a t
-  : value non_float
+  : value non_float non_null
       mod forkable
           unyielding
           many
