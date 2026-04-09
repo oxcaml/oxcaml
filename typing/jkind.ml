@@ -158,22 +158,6 @@ module Layout = struct
       | Genvar v1, Genvar v2 -> v1 == v2
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
 
-    let set_root_nullability t nullability =
-      match t with
-      | Any sa -> Any { sa with nullability }
-      | Base (b, sa) -> Static.of_base b { sa with nullability }
-      | Product _ -> t
-      | Univar _ -> t
-      | Genvar _ -> t
-
-    let set_root_separability t separability =
-      match t with
-      | Any sa -> Any { sa with separability }
-      | Base (b, sa) -> Static.of_base b { sa with separability }
-      | Product _ -> t
-      | Genvar _ -> t
-      | Univar _ -> t
-
     (* Returns [None] if the root has no meaningful scannable axes. *)
     let get_root_scannable_axes t =
       match t with
@@ -182,6 +166,14 @@ module Layout = struct
       | Product _ -> None
       | Univar _ -> None
       | Genvar _ -> None
+
+    let set_root_scannable_axes t sa =
+      match t with
+      | Any _ -> Any sa
+      | Base (b, _) -> if is_scannable_or_any t then Base (b, sa) else t
+      | Product _ -> t
+      | Univar _ -> t
+      | Genvar _ -> t
 
     let to_string t =
       let rec to_string nested (t : t) =
@@ -1899,91 +1891,52 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-  let set_nullability ~abbrev env (nul : Nullability.t Location.loc option) t =
-    match nul with
+  let apply_kind_modifier env t (modifier : 'a Location.loc option)
+      (f : Scannable_axes.t -> 'a -> Warnings.loc -> Scannable_axes.t) =
+    match modifier with
     | None -> t
-    | Some { txt = new_nullability; loc } ->
+    | Some { txt = modifier; loc } -> (
       let t = Base_and_axes.fully_expand_aliases_const env t in
-      (match t.base with
+      match t.base with
+      | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
       | Layout layout -> (
         match Layout.Const.get_root_scannable_axes layout with
-        | None -> ()
-        | Some { nullability; separability = _ } ->
-          if new_nullability = nullability
-          then
-            Location.prerr_warning loc
-              (Warnings.Redundant_kind_modifier
-                 (Format.asprintf "%a" Pprintast.longident abbrev)))
-      | Kconstr _ -> ());
-      let new_layout =
-        match t.base with
-        | Layout layout ->
-          Layout (Layout.Const.set_root_nullability layout new_nullability)
-        | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
-      in
-      { t with base = new_layout }
+        | None -> t
+        | Some sa ->
+          { t with
+            base =
+              Layout
+                (Layout.Const.set_root_scannable_axes layout (f sa modifier loc))
+          }))
+
+  let set_nullability ~abbrev env (nul : Nullability.t Location.loc option) t =
+    apply_kind_modifier env t nul (fun sa nullability loc ->
+        if nullability = sa.nullability
+        then
+          Location.prerr_warning loc
+            (Warnings.Redundant_kind_modifier
+               (Format.asprintf "%a" Pprintast.longident abbrev));
+        { sa with nullability })
 
   let set_separability ~abbrev env (sep : Separability.t Location.loc option) t
       =
-    match sep with
-    | None -> t
-    | Some { txt = new_separability; loc } ->
-      (* Expand Kconstr so we can access the underlying layout *)
-      let t = Base_and_axes.fully_expand_aliases_const env t in
-      (match t.base with
-      | Layout layout -> (
-        match Layout.Const.get_root_scannable_axes layout with
-        | None -> ()
-        | Some { nullability = _; separability } ->
-          if new_separability = separability
-          then
-            Location.prerr_warning loc
-              (Warnings.Redundant_kind_modifier
-                 (Format.asprintf "%a" Pprintast.longident abbrev)))
-      | Kconstr _ -> ());
-      let new_layout =
-        match t.base with
-        | Layout layout ->
-          Layout (Layout.Const.set_root_separability layout new_separability)
-        | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
-      in
-      { t with base = new_layout }
+    apply_kind_modifier env t sep (fun sa separability loc ->
+        if separability = sa.separability
+        then
+          Location.prerr_warning loc
+            (Warnings.Redundant_kind_modifier
+               (Format.asprintf "%a" Pprintast.longident abbrev));
+        { sa with separability })
 
   let meet_nullability env (nul : Nullability.t Location.loc option) t =
-    match nul with
-    | None -> t
-    | Some { txt = new_nullability; loc } ->
-      let t = Base_and_axes.fully_expand_aliases_const env t in
-      let new_base =
-        match t.base with
-        | Layout layout -> (
-          match Layout.Const.get_root_scannable_axes layout with
-          | None -> t.base
-          | Some { nullability; separability = _ } ->
-            Layout
-              (Layout.Const.set_root_nullability layout
-                 (Nullability.meet nullability new_nullability)))
-        | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
-      in
-      { t with base = new_base }
+    apply_kind_modifier env t nul (fun sa nullability _loc ->
+        { sa with nullability = Nullability.meet sa.nullability nullability })
 
   let meet_separability env (sep : Separability.t Location.loc option) t =
-    match sep with
-    | None -> t
-    | Some { txt = new_separability; loc } ->
-      let t = Base_and_axes.fully_expand_aliases_const env t in
-      let new_base =
-        match t.base with
-        | Layout layout -> (
-          match Layout.Const.get_root_scannable_axes layout with
-          | None -> t.base
-          | Some { nullability = _; separability } ->
-            Layout
-              (Layout.Const.set_root_separability layout
-                 (Separability.meet separability new_separability)))
-        | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
-      in
-      { t with base = new_base }
+    apply_kind_modifier env t sep (fun sa separability _loc ->
+        { sa with
+          separability = Separability.meet sa.separability separability
+        })
 
   let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
       =
