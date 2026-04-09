@@ -174,7 +174,9 @@ let rec eval_slam env slam : value Or_missing.t =
       (SLVclosure
          { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
   | SLinstantiate { sapp_func; sapp_arguments } ->
-    let* closure = eval_slam env sapp_func |>> expect Tclosure in
+    let closure =
+      eval_slam env sapp_func |> expect_not_missing |> expect Tclosure
+    in
     let eval_arg arg = eval_slam env arg |> expect_not_missing in
     let args = Array.map eval_arg sapp_arguments in
     let { clo_params; clo_body; clo_env } = closure in
