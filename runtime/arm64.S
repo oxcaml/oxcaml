@@ -190,6 +190,21 @@ G(name):
         .size   G(name), .-G(name)
 #endif
 
+/* Function prologue and epilogue */
+
+.macro ENTER_FUNCTION
+        CFI_OFFSET(29, -16)
+        CFI_OFFSET(30, -8)
+        stp     x29, x30, [sp, -16]!
+        CFI_ADJUST(16)
+        add     x29, sp, #0
+.endm
+
+.macro LEAVE_FUNCTION
+        ldp     x29, x30, [sp], 16
+        CFI_ADJUST(-16)
+.endm
+
 /* Stack switching operations */
 
 /* struct stack_info */
@@ -367,6 +382,32 @@ G(name):
         str     xzr, [TMP, (Dynamic_cache + 7*Dynamic_binding_size + Dynamic_binding_var)]
 .endm
 
+/* Updates the oldest saved frame pointer in the target fiber.
+
+   A fiber stack may need to grow, causing the reallocation of the entire fiber,
+   including stack_info and stack_handler structures.
+   caml_try_realloc_stack will not be able to update the linked list of
+   frame-pointers if it has been split (i.e., in a continuation).
+   caml_resume and caml_reperform use this macro to update the oldest saved x29
+   (highest one in the stack) in case the fiber was reallocated to reattach the
+   frame-pointer linked list.
+
+   REG: Stack_handler(target_fiber)
+
+   The frame pointer will be pushed into the stack immediately after these
+   instructions. The offset of the oldest saved x29 in a fiber from the stack
+   handler is 48 = 4 words (caml_runstack) + 2 words (x30 and x29).
+   */
+#ifdef WITH_FRAME_POINTERS
+.macro UPDATE_BASE_POINTER reg
+        sub     TMP2, sp, 16
+        str     TMP2, [\reg, -48]
+.endm
+#else
+.macro UPDATE_BASE_POINTER reg
+.endm
+#endif
+
 #if defined(WITH_THREAD_SANITIZER) /* { */
 
 /* Push the current value of the link register to the stack. */
@@ -508,11 +549,7 @@ FUNCTION(caml_call_realloc_stack)
         CFI_STARTPROC
         CFI_SIGNAL_FRAME
     /* Save return address and frame pointer */
-        CFI_OFFSET(29, -16)
-        CFI_OFFSET(30, -8)
-        stp     x29, x30, [sp, -16]!
-        CFI_ADJUST(16)
-        add     x29, sp, #0
+        ENTER_FUNCTION
     /* Save all registers (including ALLOC_PTR & TRAP_PTR) */
         SAVE_ALL_REGS
         ldr     C_ARG_1, [sp, 16] /* argument */
@@ -544,11 +581,7 @@ FUNCTION(caml_call_gc)
 L(caml_call_gc):
         CFI_SIGNAL_FRAME
     /* Save return address and frame pointer */
-        CFI_OFFSET(29, -16)
-        CFI_OFFSET(30, -8)
-        stp     x29, x30, [sp, -16]!
-        CFI_ADJUST(16)
-        add     x29, sp, #0
+        ENTER_FUNCTION
     /* Store all registers (including ALLOC_PTR & TRAP_PTR) */
         SAVE_ALL_REGS
         TSAN_ENTER_FUNCTION
@@ -559,7 +592,7 @@ L(caml_call_gc):
         TSAN_EXIT_FUNCTION
         RESTORE_ALL_REGS
     /* Free stack space and return to caller */
-        ldp     x29, x30, [sp], 16
+        LEAVE_FUNCTION
         ret
         CFI_ENDPROC
 END_FUNCTION(caml_call_gc)
@@ -609,11 +642,7 @@ FUNCTION(caml_call_local_realloc)
         CFI_STARTPROC
 L(caml_call_local_realloc):
     /* Save return address and frame pointer */
-        CFI_OFFSET(29, -16)
-        CFI_OFFSET(30, -8)
-        stp     x29, x30, [sp, -16]!
-        CFI_ADJUST(16)
-        add     x29, sp, #0
+        ENTER_FUNCTION
     /* Store all registers (including ALLOC_PTR & TRAP_PTR) */
         SAVE_ALL_REGS
         SWITCH_OCAML_TO_C
@@ -622,7 +651,7 @@ L(caml_call_local_realloc):
         SWITCH_C_TO_OCAML
         RESTORE_ALL_REGS
     /* Free stack space and return to caller */
-        ldp     x29, x30, [sp], 16
+        LEAVE_FUNCTION
         ret
         CFI_ENDPROC
 END_FUNCTION(caml_call_local_realloc)
@@ -642,11 +671,7 @@ END_FUNCTION(caml_call_local_realloc)
 FUNCTION(caml_c_call)
         CFI_STARTPROC
         CFI_SIGNAL_FRAME
-        CFI_OFFSET(29, -16)
-        CFI_OFFSET(30, -8)
-        stp     x29, x30, [sp, -16]!
-        CFI_ADJUST(16)
-        add     x29, sp, #0
+        ENTER_FUNCTION
         TSAN_SAVE_CALLER_REGS
         TSAN_ENTER_FUNCTION
         TSAN_RESTORE_CALLER_REGS
@@ -678,7 +703,7 @@ FUNCTION(caml_c_call)
         CFI_ADJUST(-16)
 #endif
     /* Return */
-        ldp     x29, x30, [sp], 16
+        LEAVE_FUNCTION
         RET_FROM_C_CALL
         CFI_ENDPROC
 END_FUNCTION(caml_c_call)
@@ -691,11 +716,7 @@ FUNCTION(caml_c_call_stack_args)
         C function   : ADDITIONAL_ARG
         C stack args : begin=STACK_ARG_BEGIN
                        end=STACK_ARG_END */
-        CFI_OFFSET(29, -16)
-        CFI_OFFSET(30, -8)
-        stp     x29, x30, [sp, -16]!
-        CFI_ADJUST(16)
-        add     x29, sp, #0
+        ENTER_FUNCTION
     /* Switch from OCaml to C */
         SWITCH_OCAML_TO_C
     /* Make the exception handler alloc ptr available to the C code */
@@ -709,7 +730,7 @@ FUNCTION(caml_c_call_stack_args)
     /* Switch from C to OCaml */
         SWITCH_C_TO_OCAML
     /* Return */
-        ldp     x29, x30, [sp], 16
+        LEAVE_FUNCTION
         RET_FROM_C_CALL
         CFI_ENDPROC
 END_FUNCTION(caml_c_call_stack_args)
@@ -721,11 +742,7 @@ END_FUNCTION(caml_c_call_stack_args)
    of arguments is done by this separate function */
 FUNCTION(caml_c_call_copy_stack_args)
         CFI_STARTPROC
-        CFI_OFFSET(29, -16)
-        CFI_OFFSET(30, -8)
-        stp     x29, x30, [sp, -16]!
-        CFI_ADJUST(16)
-        add     x29, sp, #0
+        ENTER_FUNCTION
         CFI_DEF_CFA_REGISTER(DW_REG_x29)
     /* Copy arguments from OCaml to C stack
        NB: STACK_ARG_{BEGIN,END} are 16-byte aligned */
@@ -1219,6 +1236,9 @@ FUNCTION(caml_reperform)
         ldr     x2, Caml_state(current_stack) /* x2 := old stack */
         str     x2, Handler_parent(TMP) /* Append to last_fiber */
         add     x3, x2, 1 /* x3 (last_fiber) := Val_ptr(old stack) */
+    /* Need to update the oldest saved frame pointer here as the execution of
+       the handler may have caused the current fiber stack to reallocate. */
+        UPDATE_BASE_POINTER TMP
         b       L(do_perform)
         CFI_ENDPROC
 END_FUNCTION(caml_reperform)
@@ -1278,6 +1298,10 @@ FUNCTION(caml_resume)
         ldr     x8, Stack_handler(x23)
         ldr     x9, Caml_state(current_stack)
         str     x9, Handler_parent(x8)
+    /* Need to update the oldest saved frame pointer here as the current fiber
+       stack may have been reallocated or we may be resuming a computation
+       that was not originally run here. */
+        UPDATE_BASE_POINTER x8
     /* Pop our frame before stack switch */
         ldp     x29, x30, [sp], 16
         CFI_ADJUST(-16)
