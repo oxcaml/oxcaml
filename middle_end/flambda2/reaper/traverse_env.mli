@@ -20,11 +20,10 @@
     parameters. *)
 type cont_kind = Normal of Variable.t list
 
-(** Controls whether the reaper preserves direct function calls when the
-    code_id being called might otherwise be dead. The typical situation is a
-    call to a code_id [f], which has two newer versions [f1] and [f2], and the
-    closure that is used could have either code_id [f1] or [f2], but never
-    [f].
+(** Controls whether the reaper preserves direct function calls when the code_id
+    being called might otherwise be dead. The typical situation is a call to a
+    code_id [f], which has two newer versions [f1] and [f2], and the closure
+    that is used could have either code_id [f1] or [f2], but never [f].
 
     - [Yes]: always preserve direct calls: this has the consequence that it
       needs to keep old code_ids ([f] in this case) alive.
@@ -34,8 +33,8 @@ type cont_kind = Normal of Variable.t list
     - [Auto]: preserve only if the closure is [any_source], preventing a
       determination of a set of possibly called code_ids. In this case, direct
       calls can never be completely degraded to [Indirect_known_arity] that
-      doesn't know the set of possibly called code_ids: if that were to
-      happen, the direct call is instead kept. *)
+      doesn't know the set of possibly called code_ids: if that were to happen,
+      the direct call is instead kept. *)
 type should_preserve_direct_calls =
   | Yes
   | No
@@ -54,8 +53,7 @@ val create :
   all_constants:Name.t ->
   t
 
-(** The reversed expression context above the current point in the traversal.
-*)
+(** The reversed expression context above the current point in the traversal. *)
 val parent : t -> Rev_expr.rev_expr_holed
 
 (** Get parameters of a given continuation *)
@@ -64,8 +62,8 @@ val find_cont : t -> Continuation.t -> cont_kind
 (** Add new continuation in scope with given parameters. *)
 val add_cont : t -> Continuation.t -> cont_kind -> t
 
-(** The code id of the function currently being traversed, or [None] at the
-    top level. *)
+(** The code id of the function currently being traversed, or [None] at the top
+    level. *)
 val current_code_id : t -> Code_id.t option
 
 (** Whether direct calls in the current function should be preserved by the
@@ -77,8 +75,8 @@ val should_preserve_direct_calls : t -> should_preserve_direct_calls
     Dependencies on this node model side effects. *)
 val le_monde_exterieur : t -> Name.t
 
-(** A distinguished [any_source] symbol to which all compile-time constants
-    are mapped. *)
+(** A distinguished [any_source] symbol to which all compile-time constants are
+    mapped. *)
 val all_constants : t -> Name.t
 
 (** Return a copy of the environment with a new parent context. *)
