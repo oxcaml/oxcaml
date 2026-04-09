@@ -3,6 +3,7 @@
    frame_pointers;
    readonly_files = "fp_backtrace.c";
    all_modules = "${readonly_files} effects.ml";
+   reference = "${test_source_directory}/effects.${arch}.reference";
    native;
 *)
 

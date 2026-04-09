@@ -1248,36 +1248,32 @@ FUNCTION(caml_resume)
     /*  x0: continuation
         x1: fun
         x2: arg */
-        CFI_OFFSET(29, -16)
-        CFI_OFFSET(30, -8)
+    /* Save x30 across the bl to caml_c_call. Use stp x29,x30 so
+       the frame pointer chain is maintained when frame pointers are
+       enabled. Without frame pointers, the push is still needed to
+       preserve the return address. */
         stp     x29, x30, [sp, -16]!
         CFI_ADJUST(16)
-        add     x29, sp, #0
-        ldr     x3, [x0, #8] /* x3 = last_fiber */
-        mov     x22, x2 /* move arg to callee-saved x22 */
-        mov     x23, x3 /* move last_fiber to callee-saved x23 */
+        ldr     x22, [x0, #8] /* x22 = last_fiber (callee-saved) */
+        mov     x23, x2 /* move arg to callee-saved x23 */
         mov     x24, x1 /* move fun to callee-saved x24 */
         ADDRGLOBAL(ADDITIONAL_ARG, caml_continuation_use_noexc)
         bl      G(caml_c_call) /* x0 := stack */
         sub     x0, x0, 1 /* x0 (new stack) = Ptr_val(x0) */
-        mov     x2, x22 /* x2 := argument */
+        mov     x2, x23 /* x2 := argument */
         mov     x1, x24 /* x1 := fun */
     /* Check if stack null, then already used */
         cbz     x0, 1f
         ldr     x4, [x1]  /* code pointer */
 #if defined(WITH_THREAD_SANITIZER)
-    /* Save non-callee-saved registers x0, x1, x2, x3 and x4 */
+    /* Save non-callee-saved registers x0, x1, x2 and x4 */
         stp     x0, x1, [sp, -16]!
         CFI_ADJUST(16)
-        stp     x2, x3, [sp, -16]!
-        CFI_ADJUST(16)
-        str     x4, [sp, -16]!
+        stp     x2, x4, [sp, -16]!
         CFI_ADJUST(16)
     /* Necessary to include the caller of caml_resume in the TSan backtrace */
         TSAN_ENTER_FUNCTION
-        ldr     x4, [sp], 16
-        CFI_ADJUST(-16)
-        ldp     x2, x3, [sp], 16
+        ldp     x2, x4, [sp], 16
         CFI_ADJUST(-16)
         ldp     x0, x1, [sp], 16
         CFI_ADJUST(-16)
@@ -1293,9 +1289,9 @@ FUNCTION(caml_resume)
         TSAN_C_CALL G(caml_tsan_entry_on_resume)
         TSAN_RESTORE_CALLER_REGS
 #endif
-    /* Add current stack to the end */
-        sub     x23, x23, 1 /* x23 = Ptr_val(last_fiber) */
-        ldr     x8, Stack_handler(x23)
+    /* Add current stack to the end of last_fiber */
+        sub     x22, x22, 1 /* x22 = Ptr_val(last_fiber) */
+        ldr     x8, Stack_handler(x22)
         ldr     x9, Caml_state(current_stack)
         str     x9, Handler_parent(x8)
     /* Need to update the oldest saved frame pointer here as the current fiber
