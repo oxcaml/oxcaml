@@ -393,8 +393,7 @@ let equiv_instruction : type a.
     && Misc.Stdlib.Array.equal same_loc left_res right_res
     && equiv_desc subst left_desc right_desc
 
-let equiv_basic_block subst
-    (left : Cfg.basic_block) (right : Cfg.basic_block) =
+let equiv_basic_block subst (left : Cfg.basic_block) (right : Cfg.basic_block) =
   match left, right with
   | ( { Cfg.start = left_start;
         body = left_body;
@@ -426,11 +425,11 @@ let equiv_basic_block subst
     && DLL.equal
          (equiv_instruction ~equiv_desc:equiv_basic subst)
          left_body right_body
-    && equiv_instruction ~equiv_desc:equiv_terminator subst
-         left_terminator right_terminator
+    && equiv_instruction ~equiv_desc:equiv_terminator subst left_terminator
+         right_terminator
 
-let equiv_cfg_with_layout ~symbols ~func_symbols
-    (left : Cfg_with_layout.t) (right : Cfg_with_layout.t) =
+let equiv_cfg_with_layout ~symbols ~func_symbols (left : Cfg_with_layout.t)
+    (right : Cfg_with_layout.t) =
   let left_layout = Cfg_with_layout.layout left in
   let right_layout = Cfg_with_layout.layout right in
   let left_len = DLL.length left_layout in
@@ -439,15 +438,14 @@ let equiv_cfg_with_layout ~symbols ~func_symbols
   then false
   else begin
     let labels = Label.Tbl.create left_len in
-    DLL.iter2 left_layout right_layout
-      ~f:(fun left_lbl right_lbl ->
+    DLL.iter2 left_layout right_layout ~f:(fun left_lbl right_lbl ->
         Label.Tbl.add labels left_lbl right_lbl);
     let subst = { Cfg_equiv_subst.labels; symbols; func_symbols } in
     let left_cfg = Cfg_with_layout.cfg left in
     let right_cfg = Cfg_with_layout.cfg right in
     DLL.for_all left_layout ~f:(fun left_lbl ->
-      let left_block = Cfg.get_block_exn left_cfg left_lbl in
-      let right_lbl = Cfg_equiv_subst.subst_label subst left_lbl in
-      let right_block = Cfg.get_block_exn right_cfg right_lbl in
-      equiv_basic_block subst left_block right_block)
+        let left_block = Cfg.get_block_exn left_cfg left_lbl in
+        let right_lbl = Cfg_equiv_subst.subst_label subst left_lbl in
+        let right_block = Cfg.get_block_exn right_cfg right_lbl in
+        equiv_basic_block subst left_block right_block)
   end

@@ -62,23 +62,21 @@ val equiv_instruction :
     equivalent basic blocks. The fields [start], [body], [terminator],
     [stack_offset], [exn], [is_trap_handler], and [cold] are compared (with
     labels going through [subst_label]). The fields [predecessors] and
-    [can_raise] are not compared: [predecessors] is derived from the overall
-    CFG structure, and [can_raise] is derivable from the block's
-    instructions. *)
+    [can_raise] are not compared: [predecessors] is derived from the overall CFG
+    structure, and [can_raise] is derivable from the block's instructions. *)
 val equiv_basic_block :
   Cfg_equiv_subst.t -> Cfg.basic_block -> Cfg.basic_block -> bool
 
 (** [equiv_cfg_with_layout ~symbols ~func_symbols left right] checks whether
     [left] and [right] are equivalent [Cfg_with_layout.t] values. The label
-    substitution is computed by zipping the two layouts: each label in the
-    left layout is mapped to the label at the same position in the right
-    layout. [symbols] and [func_symbols] provide the symbol and
-    function-symbol parts of the substitution, allowing the caller to declare
-    which symbols are considered equivalent. If the layouts have different
-    lengths [false] is returned immediately. Otherwise, each block in the
-    left layout is compared with the corresponding block in the right layout
-    using [equiv_basic_block]; the comparison stops at the first
-    non-equivalent pair. *)
+    substitution is computed by zipping the two layouts: each label in the left
+    layout is mapped to the label at the same position in the right layout.
+    [symbols] and [func_symbols] provide the symbol and function-symbol parts of
+    the substitution, allowing the caller to declare which symbols are
+    considered equivalent. If the layouts have different lengths [false] is
+    returned immediately. Otherwise, each block in the left layout is compared
+    with the corresponding block in the right layout using [equiv_basic_block];
+    the comparison stops at the first non-equivalent pair. *)
 val equiv_cfg_with_layout :
   symbols:Cmm.symbol Cmm.Symbol_tbl.t ->
   func_symbols:string Misc.Stdlib.String.Tbl.t ->
