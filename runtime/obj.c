@@ -423,13 +423,6 @@ CAMLprim value caml_alloc_dummy(value size)
   return caml_alloc (wosize, 0);
 }
 
-/* [size] is a [value] representing number of words (fields) */
-CAMLprim value caml_alloc_dummy_function(value size,value arity)
-{
-  /* the arity argument is used by the js_of_ocaml runtime */
-  return caml_alloc_dummy(size);
-}
-
 /* [size] is a [value] representing number of floats. */
 CAMLprim value caml_alloc_dummy_float (value size)
 {
@@ -461,23 +454,6 @@ CAMLprim value caml_alloc_dummy_mixed (value size, value scannable_size)
   reserved_t reserved = Faux_mixed_block_sentinel;
 #endif // NATIVE_CODE
   return caml_alloc_with_reserved (wosize, 0, reserved);
-}
-
-CAMLprim value caml_alloc_dummy_infix(value vsize, value voffset)
-{
-  mlsize_t wosize = Long_val(vsize), offset = Long_val(voffset);
-  value v = caml_alloc(wosize, Closure_tag);
-  /* The following choice of closure info causes the GC to skip
-     the whole block contents.  This is correct since the dummy
-     block contains no pointers into the heap.  However, the block
-     cannot be marshaled or hashed, because not all closinfo fields
-     and infix header fields are correctly initialized. */
-  Closinfo_val(v) = Make_closinfo(0, wosize, 1);
-  if (offset > 0) {
-    v += Bsize_wsize(offset);
-    (((header_t *) (v)) [-1]) = Make_header(offset, Infix_tag, 0);
-  }
-  return v;
 }
 
 /* This is a specialized primitive despite being expressible in terms

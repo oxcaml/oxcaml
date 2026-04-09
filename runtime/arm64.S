@@ -1132,10 +1132,7 @@ L(do_perform):
         TSAN_C_CALL G(caml_tsan_exit_on_perform)
         TSAN_RESTORE_CALLER_REGS
 #endif
-#if 0
-/* TODO: why is this instruction in OCaml but not OxCaml?
         str     x3, [x1, 8] /* Set the last_fiber field in the continuation */
-#endif
         ldr     x9, Stack_handler(x2)  /* x9 := old stack -> handler */
         ldr     x10, Handler_parent(x9) /* x10 := parent stack */
         cbz     x10, 1f

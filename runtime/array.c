@@ -1238,9 +1238,7 @@ static value floatarray_gather(intnat num_arrays,
   mlsize_t wsize = size * Double_wosize; /* total size, in words */
   res = local ?
     caml_alloc_local(wsize, Double_array_tag) :
-    (wsize <= Max_young_wosize) ?
-    caml_alloc_small(wsize, Double_array_tag) :
-    caml_alloc_shr(wsize, Double_array_tag);
+    caml_alloc(wsize, Double_array_tag);
 
   mlsize_t pos = 0;
   for (mlsize_t i = 0; i < num_arrays; i++) {
