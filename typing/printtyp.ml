@@ -868,7 +868,7 @@ let same_printing_env env =
 let set_printing_env env =
   printing_env := env;
   if !Clflags.real_paths ||
-     env == Env.empty ||
+     !printing_env == Env.empty ||
      same_printing_env env then
     ()
   else begin
@@ -1895,16 +1895,20 @@ and tree_of_typfields rest = function
       (field :: fields, rest)
 
 let tree_of_typexp mode ty =
+  (* [tree_of_typexp] mutates state, which we need to backtrack. *)
+  wrap_mutation (fun () -> tree_of_typexp mode Alloc.Const.legacy ty)
+
+let tree_of_typexp mode ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
      errors track their stage, as we should usually print at stage 0.
      See ticket 6726. *)
-  wrap_printing_env_unguarded
-    (if Ctype.contains_toplevel_splice (Env.stage !printing_env :> int) ty
-     then Env.enter_future !printing_env
-     else !printing_env)
-    (fun () ->
-      (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-      wrap_mutation (fun () -> tree_of_typexp mode Alloc.Const.legacy ty))
+  if Ctype.contains_toplevel_splice (Env.stage !printing_env :> int) ty
+  then
+    wrap_printing_env_unguarded
+      (Env.enter_future !printing_env)
+      (fun () -> tree_of_typexp mode ty)
+  else
+    tree_of_typexp mode ty
 
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
