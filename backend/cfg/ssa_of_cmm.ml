@@ -946,8 +946,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let pred_label = b.current_label in
     let b_body = fork body_label (Merge { predecessors = [pred_label] }) [||] in
     let r_body = emit_expr env b_body catch_body in
-    emit_block b ~dbg:Debuginfo.none
-      (Goto { goto = body_label; args = [||] });
+    emit_block b ~dbg:Debuginfo.none (Goto { goto = body_label; args = [||] });
     let handler_results =
       List.map
         (fun (_, ids, handler_body, info) ->
@@ -1236,8 +1235,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let pred_label = b.current_label in
     let b_body = fork body_label (Merge { predecessors = [pred_label] }) [||] in
     emit_tail env b_body catch_body;
-    emit_block b ~dbg:Debuginfo.none
-      (Goto { goto = body_label; args = [||] });
+    emit_block b ~dbg:Debuginfo.none (Goto { goto = body_label; args = [||] });
     let handler_builders =
       List.map
         (fun (_, ids, handler_body, info) ->
