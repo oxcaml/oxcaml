@@ -478,7 +478,7 @@ and r = { x : int; y : float#; }
 and u = r#
 |}]
 
-(* CR layouts-scannable: improve this error message *)
+(* CR layouts-scannable: improve this error message (internal ticket 6111) *)
 type s_bad = r# t
 and r = {x:int; y:bool}
 [%%expect{|
@@ -493,7 +493,7 @@ Error: The layout of type "r#" is value non_pointer & value non_pointer
        Note: The layout of immediate is value non_pointer.
 |}]
 
-(* CR layouts-scannable: improve this error message *)
+(* CR layouts-scannable: improve this error message (internal ticket 6111) *)
 type s_bad = q t
 and r = {x:int; y:bool}
 and q = r#
