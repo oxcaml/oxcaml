@@ -3256,6 +3256,11 @@ module Violation = struct
         | Layout l -> l
         | Kconstr _ -> assert false
       in
+      let non_float_abbrevs_layout =
+        match Const.Builtin.mutable_data.jkind.base with
+        | Layout l -> l
+        | Kconstr _ -> assert false
+      in
       let check_has_component component jkind =
         match get_layout env jkind with
         | None -> false
@@ -3263,12 +3268,26 @@ module Violation = struct
       in
       let check_both_jkinds jk1 jk2 =
         let should_check_jk2 = not print_as_value_layout in
-        ( check_has_component immediate_layout jk1
-          || (should_check_jk2 && check_has_component immediate_layout jk2),
+        let should_note_immediate =
+          check_has_component immediate_layout jk1
+          || (should_check_jk2 && check_has_component immediate_layout jk2)
+        in
+        let should_note_immediate64 =
           check_has_component immediate64_layout jk1
-          || (should_check_jk2 && check_has_component immediate64_layout jk2) )
+          || (should_check_jk2 && check_has_component immediate64_layout jk2)
+        in
+        let should_note_non_float_abbrevs =
+          check_has_component non_float_abbrevs_layout jk1
+          || should_check_jk2
+             && check_has_component non_float_abbrevs_layout jk2
+        in
+        ( ~should_note_immediate,
+          ~should_note_immediate64,
+          ~should_note_non_float_abbrevs )
       in
-      let should_note_immediate, should_note_immediate64 =
+      let ( ~should_note_immediate,
+            ~should_note_immediate64,
+            ~should_note_non_float_abbrevs ) =
         match violation with
         (* If we are printing the jkind on the right as a value layout, then
            we should not look at it to determine whether to emit a note *)
@@ -3283,7 +3302,13 @@ module Violation = struct
       if should_note_immediate64
       then
         fprintf ppf
-          "@;@[Note: The layout of immediate64 is value non_pointer64.@]"
+          "@;@[Note: The layout of immediate64 is value non_pointer64.@]";
+      if should_note_non_float_abbrevs
+      then
+        fprintf ppf
+          "@;\
+           @[Note: The kinds mutable_data, immutable_data, and sync_data have@ \
+           the layout value non_pointer64.@]"
 
   let report_fuel ppf violation =
     let report_fuel_for_type which =

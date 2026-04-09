@@ -244,6 +244,8 @@ Error: The layout of type "u" is value non_float
        But the layout of type "u" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type u.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type 'a u : immutable_data =
@@ -277,6 +279,8 @@ Error: The layout of type "t" is value non_float
        But the layout of type "t" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type 'a t : immutable_data =
@@ -296,6 +300,8 @@ Error: The layout of type "t" is value non_float
        But the layout of type "t" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type 'a cell : mutable_data with 'a =
@@ -353,6 +359,8 @@ Error: The layout of type "existential_abstract" is value non_float
            value non_pointer
          because of the annotation on the declaration of the type existential_abstract.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
@@ -526,6 +534,8 @@ Error: The layout of type "(int ref, int ref) box2" is value non_float
            value non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-59.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* Demonstrate that this is only a printing issue *)
@@ -540,6 +550,8 @@ Error: The layout of type "box" is value non_float
        But the layout of type "box" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type box.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* Only the first type parameter matters *)
@@ -582,6 +594,8 @@ Error: The layout of type "t2" is value non_float
        But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* Existential row variables *)
@@ -602,6 +616,8 @@ Error: The layout of type "exist_row1" is value non_float
            value non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-46.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 let foo (x : exist_row1 @ nonportable) = use_portable x
@@ -637,6 +653,8 @@ Error: The layout of type "exist_row2" is value non_float
            value non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-46.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 let foo (x : exist_row2 @ nonportable) = use_portable x
@@ -672,6 +690,8 @@ Error: The layout of type "'a option exist_row3" is value non_float
            value non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-59.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 let foo (x : [`A | `B of int ref] option exist_row3 @ contended) = use_uncontended x

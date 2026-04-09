@@ -49,6 +49,8 @@ Error: Tuple element types must have layout value.
        But the layout of "#(string * bool)" must be a value layout
          because it's the type of a tuple element.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type t_nope_inner = #{ s : string; b : bool }
@@ -64,6 +66,8 @@ Error: Tuple element types must have layout value.
        But the layout of "t_nope_inner" must be a value layout
          because it's the type of a tuple element.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (********************************************)
@@ -95,6 +99,8 @@ Error: The layout of type "#(string option * t1)" is
            value & float64 & value
          because of the definition of t2_wrong at line 1, characters 0-63.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
@@ -109,6 +115,8 @@ Error: The layout of type "t2_wrong" is
            value & float64 & value
          because of the annotation on the declaration of the type t2_wrong.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type ('a : value & bits64) t3 = 'a
@@ -225,6 +233,8 @@ Error: This type "#(int * int64)" should be an instance of type
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 (* CR layouts v7.1: The above error should identify the component of the product
    that is problematic. *)
@@ -1447,6 +1457,8 @@ Error: Types in an external must have a representable layout.
          because it is an unboxed tuple.
        But the layout of #(string * 'a * float#) must be representable
          because it's the type of an argument in an external declaration.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 external foo2 : ('a : any). int -> #( string * 'a * float# ) = "foo" "bar"
@@ -1460,6 +1472,8 @@ Error: Types in an external must have a representable layout.
          because it is an unboxed tuple.
        But the layout of #(string * 'a * float#) must be representable
          because it's the type of the result of an external declaration.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* Test 9b: @unpacked on product args *)
@@ -2446,6 +2460,8 @@ Error: The layout of type "t" is value non_pointer & value & value non_float
            value maybe_separable maybe_null & bits32
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* modal axes have the same problem *)
@@ -2480,6 +2496,8 @@ Error: The layout of type "t" is value non_pointer & value & value non_float
            value maybe_separable maybe_null & bits32
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* modal axes have the same problem *)
@@ -2498,4 +2516,6 @@ Error: The layout of type "t" is value non_pointer & value & value non_float
            value maybe_separable maybe_null & bits32
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]

@@ -125,6 +125,8 @@ Error: The layout of type "r" is value non_float
          because it's a boxed record type.
        But the layout of type "r" must be a sublayout of void
          because of the annotation on the declaration of the type r.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}];;
 
 (* Boxed_variant *)
@@ -137,6 +139,8 @@ Error: The layout of type "v" is value non_float
          because it's a boxed variant type.
        But the layout of type "v" must be a sublayout of void
          because of the annotation on the declaration of the type v.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}];;
 
 (* Extensible_variant *)
@@ -149,6 +153,8 @@ Error: The layout of type "attr" is value non_float
          because it's an extensible variant type.
        But the layout of type "attr" must be a sublayout of void
          because of the annotation on the declaration of the type attr.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* Primitive *)
@@ -163,6 +169,8 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of void
          because of the annotation on the type variable 'a.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}];;
 
 (* Type_argument *)
@@ -191,6 +199,8 @@ Error: This expression has type "'b * 'c"
          because it's a tuple type.
        But the layout of 'a * 'b must be a sublayout of void
          because of the annotation on the type variable 'a.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}];;
 
 (* Row_variable *)
@@ -210,6 +220,8 @@ Error: This expression has type "[ `A of int | `B ]"
          because it's a polymorphic variant type.
        But the layout of [ `A of int | `B ] must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* Arrow *)
@@ -226,6 +238,8 @@ Error: This expression has type "int -> int"
          because it's a function type.
        But the layout of int -> int must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* Tfield *)
@@ -252,6 +266,8 @@ Error: This expression has type "(module X_int)"
          because it's a first-class module type.
        But the layout of (module X_int) must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* Separability_check *)

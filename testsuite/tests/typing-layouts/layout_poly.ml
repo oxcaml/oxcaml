@@ -83,6 +83,8 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of float64
          because of the definition of id' at line 2, characters 10-18.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (********************)
@@ -307,6 +309,8 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of float64
          because of the definition of id at line 2, characters 2-35.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 

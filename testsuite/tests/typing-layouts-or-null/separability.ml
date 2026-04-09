@@ -893,6 +893,8 @@ Error: This expression has type "float" but an expression was expected of type
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* Module inclusion tests with or_null and separability *)

@@ -247,6 +247,8 @@ Error: This alias is bound to type "int list"
        But the layout of int list must be a sublayout of value non_pointer
          because of the annotation on the type variable 'a.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}, Principal{|
 Line 1, characters 21-23:
 1 | let x : int list as ('a : immediate) = [3;4;5]
@@ -258,6 +260,8 @@ Error: This alias is bound to type "int list"
        But the layout of int list must be a sublayout of value non_pointer
          because of the annotation on the type variable 'a.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 (* CR layouts: error message could be phrased better *)
 
@@ -412,6 +416,8 @@ Error: This type "string" should be an instance of type "('a : immediate)"
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of t2_imm at line 1, characters 0-28.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type t = string t2_global
@@ -654,6 +660,8 @@ Error: This expression has type "string" but an expression was expected of type
        But the layout of string must be a sublayout of value non_pointer
          because of the definition of r at line 1, characters 0-47.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 let f { fieldg } = fieldg "hello"
@@ -682,6 +690,8 @@ Error: This expression has type "string" but an expression was expected of type
          because it is the primitive type string.
        But the layout of string must be a sublayout of word
          because of the definition of rc at line 1, characters 0-71.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 let r = { field = fun x -> x }
@@ -1067,6 +1077,8 @@ Error: This expression has type "string" but an expression was expected of type
        But the layout of string must be a sublayout of value non_pointer
          because of the annotation on the universal variable 'a.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 let f (x : ('a : value mod global). 'a -> 'a) = x "string"

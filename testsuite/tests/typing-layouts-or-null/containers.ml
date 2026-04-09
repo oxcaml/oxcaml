@@ -96,6 +96,8 @@ Error: This expression has type "float" but an expression was expected of type
          because it is the primitive type float.
        But the layout of float must be a sublayout of value non_float
          because it's the type of an array element.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type t_any : any
@@ -190,6 +192,8 @@ Error: This expression has type "float" but an expression was expected of type
          because it is the primitive type float.
        But the layout of float must be a sublayout of value non_float
          because it's the type of an array element.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* List type arguments are [value_or_null]: *)

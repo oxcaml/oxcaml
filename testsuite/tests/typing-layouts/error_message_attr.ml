@@ -236,6 +236,8 @@ Error: This expression has type "string" but an expression was expected of type
        But the layout of string must be a sublayout of value non_pointer
          because of the annotation on the wildcard _ at line 1, characters 26-41.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (* Doesn't apply when the mismatch is deep *)

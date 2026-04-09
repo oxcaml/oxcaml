@@ -400,6 +400,8 @@ Error: This alias is bound to type "[> `bad ]"
          because it's a polymorphic variant type.
        But the layout of [> `bad ] must be a sublayout of bits32
          because of the annotation on the implicit kind of type variables named a.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 module type S21_alias_annot = sig

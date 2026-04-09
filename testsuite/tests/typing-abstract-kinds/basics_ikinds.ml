@@ -323,6 +323,8 @@ Error: The layout of type "string" is value non_float
          because it is the primitive type string.
        But the layout of type "string" must be a sublayout of float64 & float64
          because of the definition of t at line 1, characters 0-29.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (***********************************)

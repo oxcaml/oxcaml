@@ -322,6 +322,8 @@ Error: The layout of type "t2" is value non_float
        But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 type t3 : immediate non_float with [ `A of string] t1 = C of string  (* should be accepted *)
 (* CR layouts v2.8: This should be accepted, but still fails in principal mode.
@@ -349,6 +351,8 @@ Error: The layout of type "t2" is value non_float
        But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 type t3 : immediate non_float with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
 (* CR layouts v2.8: This should be accepted, but still fails in principal mode.
@@ -382,6 +386,8 @@ Error: The layout of type "t2" is value non_float
        But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 module M2 : S with type t = [ `A of string ] = struct
@@ -410,6 +416,8 @@ Error: The layout of type "t4" is value non_float
        But the layout of type "t4" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t4.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 module type S = sig
@@ -430,6 +438,8 @@ Error: The layout of type "t2" is value non_float
        But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type t2 : immediate with string = M1.t
@@ -442,6 +452,8 @@ Error: The layout of type "M1.t" is value non_float
        But the layout of type "M1.t" must be a sublayout of value non_pointer
          because of the definition of t2 at line 1, characters 0-38.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type t2 : value mod portable = M1.t
@@ -477,6 +489,8 @@ Error: The layout of type "t2" is value non_float
        But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 module type S2 = sig
@@ -505,6 +519,8 @@ Error: The layout of type "t4" is value non_float
        But the layout of type "t4" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t4.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 type json : immutable_data =

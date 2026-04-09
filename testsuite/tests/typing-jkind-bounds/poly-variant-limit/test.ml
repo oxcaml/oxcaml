@@ -33,4 +33,6 @@ Error: The layout of type "Types.poly_variant_with_101" is value
        But the layout of type "Types.poly_variant_with_101" must be a sublayout of
          value non_float
          because of the definition of foo at line 1, characters 0-55.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]

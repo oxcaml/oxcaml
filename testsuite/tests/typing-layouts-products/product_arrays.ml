@@ -2185,6 +2185,8 @@ Error: This expression has type "#(string * a * bool option) array"
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 let f_any_external_1 (type a : any mod separable mod external_)
@@ -2220,6 +2222,8 @@ Error: This expression has type "#(string * a * bool option) array"
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 
 (****************************************************)

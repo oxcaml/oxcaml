@@ -1165,6 +1165,8 @@ Error: The layout of type "t" is value
          chosen to have layout value.
        But the layout of type "t" must be a sublayout of value non_float
          because of the annotation on the declaration of the type t.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_pointer64.
 |}]
 (* CR layouts v2.8: this could be accepted, if we infer ('a : value mod
    unyielding). We do not currently do this, because we finish inference of the
