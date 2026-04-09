@@ -58,8 +58,13 @@ module rec Types : sig
       clo_env : Env.t
     }
 
-  type value =
-    | SLVhalves of slambda_halves
+  type halves =
+    { slv_comptime : value Or_missing.t;
+      slv_runtime : lambda
+    }
+
+  and value =
+    | SLVhalves of halves
     | SLVlayout of layout
     | SLVrecord of value Or_missing.t array
     | SLVclosure of closure
@@ -93,12 +98,12 @@ end = struct
   let find t id = Map.find_opt id t |> Or_missing.of_option
 end
 
-open Types
+include Types
 
 let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
 type _ value_type =
-  | Thalves : slambda_halves value_type
+  | Thalves : halves value_type
   | Tlayout : layout value_type
   | Trecord : value Or_missing.t array value_type
   | Tclosure : closure value_type
@@ -144,8 +149,9 @@ let expect_not_missing (a : 'a Or_missing.t) : 'a =
 let rec eval_slam env slam : value Or_missing.t =
   match slam with
   | SLhalves { sval_comptime; sval_runtime } ->
-    let sval_runtime = eval_lam env sval_runtime in
-    Present (SLVhalves { sval_comptime; sval_runtime })
+    let slv_comptime = eval_slam env sval_comptime in
+    let slv_runtime = eval_lam env sval_runtime in
+    Present (SLVhalves { slv_comptime; slv_runtime })
   | SLlayout layout -> Present (SLVlayout layout)
   | SLglobal _ -> errf "cross-module eval not implemented"
   | SLvar id -> eval_var env id
@@ -162,7 +168,7 @@ let rec eval_slam env slam : value Or_missing.t =
     fields.(i)
   | SLproj_comptime slam ->
     let* halves = eval_slam env slam |>> expect Thalves in
-    eval_slam env halves.sval_comptime
+    halves.slv_comptime
   | SLtemplate { sfun_params; sfun_body } ->
     Present
       (SLVclosure
@@ -303,7 +309,7 @@ and eval_lam env lam =
   | Lexclave lam -> Lexclave (eval_lam env lam)
   | Lsplice (_loc, slam) ->
     let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
-    halves.sval_runtime
+    halves.slv_runtime
   | Lvar _id | Lmutvar _id -> lam
 
 and eval_structured_const env const =
@@ -522,7 +528,7 @@ let do_eval slam =
 let eval slam =
   Profile.record_call "static_eval" (fun () ->
       let halves = do_eval slam in
-      (try assert_no_splices halves.sval_runtime
+      (try assert_no_splices halves.slv_runtime
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
