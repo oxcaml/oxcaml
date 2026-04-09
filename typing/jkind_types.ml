@@ -624,11 +624,11 @@ module Sort = struct
 
   let rec get_representable : t -> t option = function
     | (Base _ | Univar _) as t -> Some t
-    | Product ts -> begin
-      match get_representable_product ts with
+    | Product ts ->
+      begin match get_representable_product ts with
       | None -> None
       | Some ts' -> Some (Product ts')
-    end
+      end
     | Var v -> get_representable_var v
 
   and get_representable_product : t list -> t list option =
@@ -643,16 +643,20 @@ module Sort = struct
   and get_representable_var : var -> t option =
    fun v ->
     match v.contents with
-    | None -> begin if is_rigidvar v then Some (Var v) else None end
+    | None ->
+      begin if is_rigidvar v then Some (Var v) else None
+      end
     | Some t -> get_representable t
 
   let rec subst s t =
     match t with
-    | Var v -> begin
-      match v.contents with
-      | None -> begin match List.assq_opt v s with Some t -> t | None -> t end
+    | Var v ->
+      begin match v.contents with
+      | None ->
+        begin match List.assq_opt v s with Some t -> t | None -> t
+        end
       | Some t -> subst s t
-    end
+      end
     | Base _ | Univar _ -> t
     | Product ts -> Product (List.map (subst s) ts)
 
