@@ -423,6 +423,15 @@ static struct lf_skiplist mmap_blocks;
 
 void* caml_mem_map(uintnat size, uintnat flags, const char* name)
 {
+#ifdef DEBUG
+  if (mmap_blocks.head == NULL) {
+    /* The first call to caml_mem_map should be during caml_init_domains, called
+       by caml_init_gc during startup - i.e. before any domains have started. */
+    CAMLassert(atomic_load_acquire(&caml_num_domains_running) <= 1);
+    caml_lf_skiplist_init(&mmap_blocks);
+  }
+#endif
+
   void* mem = caml_plat_mem_map(size, flags, name);
 
   if (mem == 0) {
