@@ -1076,6 +1076,14 @@ module Lattices = struct
     | Comonadic_with_locality -> Comonadic_with_locality.le a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.le a b
 
+  let compare : type a. a obj -> a -> a -> (a, a) Misc.comparison =
+   fun obj c1 c2 ->
+    if le obj c1 c2
+    then begin
+      if le obj c2 c1 then Equal else Less_than
+    end
+    else Greater_than
+
   let equal : type a. a obj -> a -> a -> bool =
    fun obj a b ->
     match obj with
@@ -1564,12 +1572,10 @@ module Lattices_mono = struct
       | Equal -> Equal)
     | Min_with _, _ -> Less_than
     | _, Min_with _ -> Greater_than
-    | Meet_const c1, Meet_const c2 ->
-      if c1 = c2 then Equal else if c1 < c2 then Less_than else Greater_than
+    | Meet_const c1, Meet_const c2 -> compare dst c1 c2
     | Meet_const _, _ -> Less_than
     | _, Meet_const _ -> Greater_than
-    | Imply_const c1, Imply_const c2 ->
-      if c1 = c2 then Equal else if c1 < c2 then Less_than else Greater_than
+    | Imply_const c1, Imply_const c2 -> compare dst c1 c2
     | Imply_const _, _ -> Less_than
     | _, Imply_const _ -> Greater_than
     | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
