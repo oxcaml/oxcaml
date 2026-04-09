@@ -16,7 +16,7 @@ let parse_flambda filename =
       Parse_flambda.make_compilation_unit ~extension:".fl" ~filename ()
     in
     let unit_info = Unit_info.make_dummy ~input_name:filename comp_unit in
-    Env.set_unit_name (Some unit_info);
+    Env.set_current_unit (Some unit_info);
     Format.printf "%a@.@." Print_fexpr.flambda_unit unit;
     let fl2 = Fexpr_to_flambda.conv comp_unit unit in
     Format.printf "flambda:@.%a@.@." Flambda_unit.print fl2;
