@@ -43,7 +43,7 @@ The type system also supports one *composite* layout: unboxed products:
 The `value` layout describes the representation of "vanilla" OCaml values. In OxCaml, we introduce finer distinctions within `value`, such as that some values are `non_pointer` and can thus get more efficient code generation; we also *broaden* the set of representations that the GC can handle, such as with `value maybe_null`, which contains all values in legacy OCaml plus the `NULL` pointer.
 
 The most general of the `value`-like layouts is `scannable`, whose only requirement of its elements is that they can be scanned by the GC.
-We call the sublayouts of `scannable` the "value layouts" (choosing to emphasize the more familiar layout, `value`, instead of the top of the lattice, `scannable`.)
+We call the sublayouts of `scannable` the "value layouts" (choosing to emphasize the more familiar layout, `value`, instead of the top of the lattice, `scannable`).
 
 All value layouts can be written as modifications of each other; for example, `value` is `scannable non_null separable`. Below, we describe the two axes that modify value layouts, also known as the "scannable axes": nullability and separability.
 
@@ -52,7 +52,7 @@ All value layouts can be written as modifications of each other; for example, `v
 The nullability axis records whether `NULL` (the machine word 0) is a possible
 value of a type, and is used to support the non-allocating option `'a or_null`
 type. The axis has two possible values, with `non_null < maybe_null`. A type may
-be `non_null` if none of its values are `NULL`.
+be `non_null` only if none of its values are `NULL`.
 
 The kind of values with `NULL` added as a possibility is written
 `value_or_null`, which is equivalent to `value maybe_null maybe_separable`.
@@ -73,8 +73,7 @@ This axis has five possible values, with `non_pointer < non_pointer64 < non_floa
 - A type is `non_pointer` if none of its values are pointers (i.e., the bottom bit is tagged or the value is NULL).
 - A type is `non_pointer64` if none of its values are pointers, when compiled to native code for 64-bit systems.
 - A type is `non_float` if none of its values are floats.
-- A type is `separable` if either all or none of its values are floats. Separability is used to track types for which it is safe
-to apply the float array optimization.
+- A type is `separable` if either all or none of its values are floats. In order for the float array optimization to be sound, only `separable` types may be stored in `array`s.
 
 The `value_or_null` layout is considered `maybe_separable`, since `float or_null` has both float
 and non-float elements. However, all types in vanilla OCaml are `separable`.
@@ -84,6 +83,7 @@ and non-float elements. However, all types in vanilla OCaml are `separable`.
 Scannable axes written after a value layout overwrite the previous value of the axis. They can also be written after non-value layouts, but have no effect, e.g. `float64 = float64 non_null = float64 maybe_null`. Scannable axes can also be written on `any`, in which case they take effect *only in the case* that it is lowered to a value layout. For example, `float64` and `value` are both sublayouts of `any non_null`, but not `value maybe_null`.
 
 We also support the `mod` syntax for scannable axes, which only lowers the scannable axis (takes the meet). For example, `value mod non_pointer` is equivalent to `value non_pointer`, but `value mod maybe_separable` is equivalent to `value`.
+(This support is meant to be transitional; we expect to remove this eventually. New code should write the scannable axes before the `mod`.)
 
 ### Relationship between `immediate` and value layouts
 
