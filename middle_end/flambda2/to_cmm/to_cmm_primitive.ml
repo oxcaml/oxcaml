@@ -857,7 +857,8 @@ let unary_float_arith_primitive _env dbg width op arg =
   | Float32, Abs -> C.float32_abs ~dbg arg
   | Float32, Neg -> C.float32_neg ~dbg arg
 
-let arithmetic_conversion dbg src dst arg =
+let arithmetic_conversion dbg src _signedness dst arg =
+  (* CR jrayman: use signedness *)
   if K.Standard_int_or_float.equal src dst
   then None, arg
   else
@@ -1152,8 +1153,8 @@ let unary_primitive env res dbg f arg =
     None, res, unary_int_arith_primitive env dbg kind op arg
   | Float_arith (width, op) ->
     None, res, unary_float_arith_primitive env dbg width op arg
-  | Num_conv { src; dst } ->
-    let extra, expr = arithmetic_conversion dbg src dst arg in
+  | Num_conv { src; dst; signedness } ->
+    let extra, expr = arithmetic_conversion dbg src signedness dst arg in
     extra, res, expr
   | Boolean_not -> None, res, C.mk_not dbg arg
   | Reinterpret_64_bit_word reinterpret ->

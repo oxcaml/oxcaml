@@ -637,7 +637,7 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
   let naked scalar = Scalar.naked (Scalar.width scalar) in
   let static_cast ~src ~dst =
     let src = Scalar.ignore_locality src in
-    unary (Static_cast { src; dst })
+    unary (Static_cast { src; dst; signedness = Signed })
   in
   let i = Scalar.integral in
   let f = Scalar.floating in

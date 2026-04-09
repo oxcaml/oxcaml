@@ -444,7 +444,8 @@ type unary_primitive =
   | Float_arith of float_bitwidth * unary_float_arith_op
   | Num_conv of
       { src : Flambda_kind.Standard_int_or_float.t;
-        dst : Flambda_kind.Standard_int_or_float.t
+        dst : Flambda_kind.Standard_int_or_float.t;
+        signedness : Scalar.Signedness.t
       }
   (* CR gbury: check that chains of conversions are not simplified away by
      flambda, particularly those involving an int32. Indeed, a chain of

@@ -148,12 +148,12 @@ let rec_catch_for_for_loop env loc ident duid start stop
     L.static_cast
       ~src:(Scalar.ignore_locality (Scalar.integral L.int))
       ~dst:(Scalar.integral naked_int64_scalar)
-      arg ~loc
+      ~signedness:Signed arg ~loc
   in
   let naked_int64_to_tagged arg =
     L.static_cast
       ~src:(Scalar.ignore_locality (Scalar.integral naked_int64_scalar))
-      ~dst:(Scalar.integral L.int) arg ~loc
+      ~dst:(Scalar.integral L.int) ~signedness:Signed arg ~loc
   in
   let next_value_of_counter : L.lambda =
     match dir with

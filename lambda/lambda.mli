@@ -1508,6 +1508,7 @@ val icmp :
 val static_cast
    : src:any_locality_mode Scalar.t
   -> dst:locality_mode Scalar.t
+  -> signedness:Scalar.Signedness.t
   -> lambda
   -> loc:scoped_location
   -> lambda

@@ -264,10 +264,21 @@ module Signedness = struct
     (* polymorphic equality is fast and simple when they are all constant constructors *)
     x = y
 
+  let compare x y =
+    match x, y with
+    | Signed, Signed | Unsigned, Unsigned -> 0
+    | Unsigned, Signed -> 1
+    | Signed, Unsigned -> -1
+
   let print ppf t =
     match t with
     | Signed -> Format.pp_print_string ppf "signed"
     | Unsigned -> Format.pp_print_string ppf "unsigned"
+
+  let print_as_suffix ppf t =
+    match t with
+    | Signed -> ()
+    | Unsigned -> Format.pp_print_string ppf "_unsigned"
 end
 
 module Integer_comparison = struct
@@ -439,7 +450,8 @@ module Operation = struct
       | Floating of 'mode Floating.t * Float_op.t
       | Static_cast of
           { src : any_locality_mode t;
-            dst : 'mode t
+            dst : 'mode t;
+            signedness : Signedness.t
           }
 
     let all =
@@ -450,13 +462,17 @@ module Operation = struct
               ListLabels.map Float_op.all ~f:(fun op -> Floating (size, op)));
           ListLabels.concat_map all ~f:(fun src ->
               ListLabels.concat_map all ~f:(fun dst ->
-                  if src = dst then [] else [Static_cast { src; dst }])) ]
+                  ListLabels.concat_map Signedness.all ~f:(fun signedness ->
+                      if src = dst
+                      then []
+                      else [Static_cast { src; dst; signedness }]))) ]
 
     let map (type a b) (t : a t) ~(f : a -> b) : b t =
       match t with
       | Integral (size, op) -> Integral (Integral.map size ~f, op)
       | Floating (size, op) -> Floating (Floating.map size ~f, op)
-      | Static_cast { src; dst } -> Static_cast { src; dst = map dst ~f }
+      | Static_cast { src; dst; signedness } ->
+        Static_cast { src; dst = map dst ~f; signedness }
 
     let info = function
       | Integral (size, (Neg | Bswap | Succ | Pred)) ->

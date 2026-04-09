@@ -81,6 +81,9 @@ let standard_int_or_float =
         "int64", Naked_int64;
         "nativeint", Naked_nativeint ]
 
+let signedness =
+  D.constructor_value Scalar.Signedness.["signed", Signed; "unsigned", Unsigned]
+
 let int_shift_op =
   D.(
     constructor_flag
@@ -641,10 +644,11 @@ let num_conv =
   D.(
     unary "%num_conv"
       ~params:
-        (param2
+        (param3
            (positional standard_int_or_float)
-           (positional standard_int_or_float))
-      (fun _ (src, dst) -> P.Num_conv { src; dst }))
+           (positional standard_int_or_float)
+           (positional signedness))
+      (fun _ (src, dst, signedness) -> P.Num_conv { src; dst; signedness }))
 
 let make_lazy = D.(unary "%lazy" ~params:lazy_tag (fun _ lt -> P.Make_lazy lt))
 
@@ -1057,7 +1061,7 @@ module OfFlambda = struct
     | Is_int _ -> is_int env () (* CR vlaviron: discuss *)
     | Is_null -> is_null env ()
     | Make_lazy lt -> make_lazy env lt
-    | Num_conv { src; dst } -> num_conv env (src, dst)
+    | Num_conv { src; dst; signedness } -> num_conv env (src, dst, signedness)
     | Opaque_identity _ -> opaque_identity env ()
     | Unbox_number bk -> unbox_num env bk
     | Untag_immediate -> untag_immediate env ()
