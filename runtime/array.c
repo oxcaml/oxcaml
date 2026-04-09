@@ -387,10 +387,20 @@ CAMLprim value caml_floatarray_make_unboxed(intnat size, double init)
   return floatarray_make_unboxed(size, init, false);
 }
 
+CAMLprim value caml_floatarray_make_unboxed_local(intnat size, double init)
+{
+  return floatarray_make_unboxed(size, init, true);
+}
+
 /* [int -> float -> floatarray] */
 CAMLprim value caml_floatarray_make(value len, value init)
 {
   return caml_floatarray_make_unboxed(Long_val(len), Double_val(init));
+}
+
+CAMLprim value caml_floatarray_make_local(value len, value init)
+{
+  return caml_floatarray_make_unboxed_local(Long_val(len), Double_val(init));
 }
 
 static value uniform_array_make(value len, value init, bool local)
@@ -433,6 +443,12 @@ static value uniform_array_make(value len, value init, bool local)
 CAMLprim value caml_uniform_array_make(value len, value init)
 {
   return uniform_array_make(len, init, false);
+}
+
+
+CAMLprim value caml_uniform_array_make_local(value len, value init)
+{
+  return uniform_array_make(len, init, true);
 }
 
 /* Naming convention: "make" is used for functions that take an init value,
@@ -1259,7 +1275,7 @@ static value uniform_array_gather(intnat num_arrays,
     /* If total size = 0, just return an empty array */
     res = Atom(0);
   }
-  if (size > Max_wosize/Double_wosize) caml_invalid_argument("Array.concat");
+  else if (size > Max_wosize/Double_wosize) caml_invalid_argument("Array.concat");
   else if (size <= Max_young_wosize || local) {
     /* Array of values, small enough to fit in young generation. */
     res = local ? caml_alloc_local(size, 0) : caml_alloc_small(size, 0);

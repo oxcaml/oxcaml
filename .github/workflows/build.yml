@@ -305,28 +305,80 @@ jobs:
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlc.opt
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
 
-      - name: Build, install and test OxCaml
+      - name: Build OxCaml
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
+        id: build
         run: |
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
             mkdir $GITHUB_WORKSPACE/_profile_csv
-            ORIG_BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM"
-            ORIG_OCAMLPARAM="$OCAMLPARAM"
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
-          if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
           ulimit -c unlimited
-          make $target \
+          make compiler \
             || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
 
-          # Install the compiler for metrics_collection configuration to populate _install directory
-          # This is needed for the metrics collection step to analyze installed artifacts
+      - name: Run OxCaml testsuite
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
+          # CR dallsopp: this mechanism is messy and runtime4 only?
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
-            BUILD_OCAMLPARAM="$ORIG_BUILD_OCAMLPARAM"
-            OCAMLPARAM="$ORIG_OCAMLPARAM"
-            make install
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
+          ulimit -c unlimited
+          make runtest \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Run upstream testsuite
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
+          # CR dallsopp: this mechanism is messy and runtime4 only?
+          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
+          ulimit -c unlimited
+          make runtest-upstream \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Run minimizer
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
+          # CR dallsopp: this mechanism is messy and runtime4 only?
+          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
+          ulimit -c unlimited
+          make minimizer \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+        # Install the compiler for metrics_collection configuration to populate _install directory
+        # This is needed for the metrics collection step to analyze installed artifacts
+      - name: Reinstall the compiler for metrics collection
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && matrix.collect_metrics == true
+        run: make install
         env:
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
