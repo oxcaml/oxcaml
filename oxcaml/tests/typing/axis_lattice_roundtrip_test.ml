@@ -30,9 +30,7 @@ type sample =
     statefulness : Mode.Statefulness.Const.t;
     visibility : Mode.Visibility.Const.t;
     staticity : Mode.Staticity.const;
-    externality : Jkind_axis.Externality.t;
-    nullability : Jkind_axis.Nullability.t;
-    separability : Jkind_axis.Separability.t
+    externality : Jkind_axis.Externality.t
   }
 
 let sample_of_lattice x =
@@ -46,9 +44,7 @@ let sample_of_lattice x =
     statefulness = statefulness x;
     visibility = visibility x;
     staticity = staticity x;
-    externality = externality x;
-    nullability = nullability x;
-    separability = separability x
+    externality = externality x
   }
 
 let lattice_of_sample sample =
@@ -57,8 +53,7 @@ let lattice_of_sample sample =
     ~contention:sample.contention ~forkable:sample.forkable
     ~yielding:sample.yielding ~statefulness:sample.statefulness
     ~visibility:sample.visibility ~staticity:sample.staticity
-    ~externality:sample.externality ~nullability:sample.nullability
-    ~separability:sample.separability
+    ~externality:sample.externality
 
 let base_samples = [sample_of_lattice bot; sample_of_lattice top]
 
@@ -105,8 +100,7 @@ let mod_bounds_of_sample sample =
            (Mode.Modality.Comonadic.Atom.Meet_const sample.statefulness))
   in
   Btype.Jkind0.Mod_bounds.create { monadic; comonadic }
-    ~externality:sample.externality ~nullability:sample.nullability
-    ~separability:sample.separability
+    ~externality:sample.externality
 
 let check_mod_bounds_roundtrip label sample =
   let bounds = mod_bounds_of_sample sample in
@@ -218,12 +212,6 @@ let mask_of_axis : type a. a Jkind_axis.Axis.t -> t =
   | Nonmodal Externality ->
     lattice_of_sample
       { sample with externality = Jkind_axis.Externality.Internal }
-  | Nonmodal Nullability ->
-    lattice_of_sample
-      { sample with nullability = Jkind_axis.Nullability.Maybe_null }
-  | Nonmodal Separability ->
-    lattice_of_sample
-      { sample with separability = Jkind_axis.Separability.Maybe_separable }
 
 let of_axis_set' (set : Jkind_axis.Axis_set.t) : t =
   Jkind_axis.Axis_set.to_seq set
@@ -328,18 +316,4 @@ let () =
     [ Jkind_axis.Externality.External;
       Jkind_axis.Externality.External64;
       Jkind_axis.Externality.Internal ];
-  check_axis
-    (module Jkind_axis.Nullability)
-    "nullability"
-    (fun sample nullability -> { sample with nullability })
-    nullability
-    [Jkind_axis.Nullability.Non_null; Jkind_axis.Nullability.Maybe_null];
-  check_axis
-    (module Jkind_axis.Separability)
-    "separability"
-    (fun sample separability -> { sample with separability })
-    separability
-    [ Jkind_axis.Separability.Non_float;
-      Jkind_axis.Separability.Separable;
-      Jkind_axis.Separability.Maybe_separable ];
   check_of_axis_set ()
