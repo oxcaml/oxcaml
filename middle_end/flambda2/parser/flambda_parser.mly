@@ -328,14 +328,17 @@ prim_param_val:
   | i = INT { make_located (fst i) ($startpos, $endpos)}
 
 prim_param:
-  | DOT; flag = IDENT { Flag flag }
-  | DOT LBRACK; p = prim_param_val; RBRACK
-    { Positional p }
-  | DOT; label = IDENT; LBRACK; value = prim_param_val; RBRACK
-    { Labeled { label; value } }
+  | flag = prim_param_val { Labeled (flag, []) }
+  | label = prim_param_val; LBRACK;
+      subvals = separated_nonempty_list(COMMA, prim_param);
+    RBRACK
+    { Labeled (label, subvals) }
+  | LBRACK; ps = separated_nonempty_list(COMMA, prim_param); RBRACK
+    { Anonymous ps }
 
 prim_op:
-  | prim = PRIM; params = prim_param* { { prim; params} }
+  | prim = PRIM; ps = pair(DOT, prim_param)*
+    { { prim; params = List.map snd ps } }
 
 named:
   | s = simple { Simple s }
