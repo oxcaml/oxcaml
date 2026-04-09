@@ -42,7 +42,7 @@ let rec get_regs env (i : Ssa.instruction) : Reg.t array =
     let src_regs = get_regs env src in
     [| src_regs.(index) |]
   | Pushtrap _ | Poptrap _ | Stack_check _
-  | Debuginfo _ ->
+  | Name_for_debugger _ ->
     Misc.fatal_error
       "Cfg_of_ssa.get_regs: unexpected instruction"
 
@@ -57,7 +57,7 @@ let rec allocate_regs env (i : Ssa.instruction) =
   | Block_param _ -> ()
   | Proj { src; _ } -> allocate_regs env src
   | Pushtrap _ | Poptrap _ | Stack_check _
-  | Debuginfo _ -> ()
+  | Name_for_debugger _ -> ()
 
 let allocate_block_params_regs env
     (block : Ssa.basic_block) =
@@ -77,8 +77,8 @@ let get_block_params_regs env (block : Ssa.basic_block) =
 let allocate_body_regs env (i : Ssa.instruction) =
   match i with
   | Op _ | Block_param _ | Proj _ -> allocate_regs env i
-  | Pushtrap _ | Poptrap _ | Stack_check _ | Debuginfo _ ->
-    ()
+  | Pushtrap _ | Poptrap _ | Stack_check _
+  | Name_for_debugger _ -> ()
 
 let make_cfg_instr desc arg res dbg =
   { Cfg.desc;
@@ -231,11 +231,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let exn_bucket = [| Proc.loc_exn_bucket |] in
     let first_param = [| virt_res.(0) |] in
     emit_moves body ~src:exn_bucket ~dst:first_param
-  | Merge _ | FunctionStart -> ());
+  | Merge _ | BranchTarget _ | FunctionStart -> ());
   Array.iter
     (fun (i : Ssa.instruction) ->
       match i with
-      | Op { id; op; args; _ } ->
+      | Op { id; op; args; dbg; _ } ->
         let is_branch_cond =
           match skip_id with
           | Some sid -> Ssa.InstructionId.equal id sid
@@ -247,7 +247,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             concat_map_regs (get_regs renv) args
           in
           let res = get_regs renv i in
-          emit_op body op Debuginfo.none arg res)
+          emit_op body op dbg arg res)
       | Block_param _ | Proj _ -> ()
       | Pushtrap { lbl_handler } ->
         DLL.add_end body
@@ -262,8 +262,46 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (make_cfg_instr
              (Cfg.Stack_check { max_frame_size_bytes })
              [||] [||] Debuginfo.none)
-      | Debuginfo _ -> ())
+      | Name_for_debugger
+          { ident; provenance; which_parameter;
+            regs
+          } ->
+        let regs =
+          concat_map_regs (get_regs renv) regs
+        in
+        let naming_instr =
+          make_cfg_instr
+            (Cfg.Op
+               (Name_for_debugger
+                  { ident;
+                    provenance;
+                    which_parameter;
+                    regs
+                  }))
+            [||] [||] Debuginfo.none
+        in
+        (* Insert naming right after the instruction
+           that defines the referenced registers,
+           matching bind_let in cfg_selectgen. *)
+        let rec find_def cell =
+          let (instr : Cfg.basic Cfg.instruction) =
+            DLL.value cell
+          in
+          if Array.exists
+               (fun r ->
+                 Array.exists (Reg.same r) instr.res)
+               regs
+          then DLL.insert_after cell naming_instr
+          else
+            match DLL.prev cell with
+            | Some prev -> find_def prev
+            | None -> DLL.add_end body naming_instr
+        in
+        (match DLL.last_cell body with
+        | Some cell -> find_def cell
+        | None -> DLL.add_end body naming_instr))
     block.body;
+  let dbg = block.terminator_dbg in
   let terminator, can_raise =
     match block.terminator with
     | Never ->
@@ -274,9 +312,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                stack_align = Align_16;
                label_after = None
              })
-          [||] [||] Debuginfo.none,
+          [||] [||] dbg,
         false )
-    | Always { goto; args } ->
+    | Goto { goto; args } ->
       let target_block = Label.Tbl.find ssa.blocks goto in
       let dst_regs =
         get_block_params_regs renv target_block
@@ -284,14 +322,26 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let src_regs =
         concat_map_regs (get_regs renv) args
       in
-      (* Use intermediate registers to handle cases
-         where src and dst overlap (e.g. loop-carried
-         phi nodes), matching cfg_selectgen. *)
-      let tmp_regs = Reg.createv_with_typs src_regs in
-      emit_moves body ~src:src_regs ~dst:tmp_regs;
-      emit_moves body ~src:tmp_regs ~dst:dst_regs;
+      (* Use intermediate registers when src and dst
+         overlap (e.g. loop-carried phi nodes),
+         matching cfg_selectgen. *)
+      let has_overlap =
+        Array.exists
+          (fun s ->
+            Array.exists (fun d -> Reg.same s d)
+              dst_regs)
+          src_regs
+      in
+      if has_overlap
+      then (
+        let tmp_regs =
+          Reg.createv_with_typs src_regs
+        in
+        emit_moves body ~src:src_regs ~dst:tmp_regs;
+        emit_moves body ~src:tmp_regs ~dst:dst_regs)
+      else emit_moves body ~src:src_regs ~dst:dst_regs;
       ( make_cfg_instr (Cfg.Always goto) [||] [||]
-          Debuginfo.none,
+          dbg,
         false )
     | Branch { conditions; else_goto } -> (
       match conditions with
@@ -301,7 +351,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             ~true_label:target_label
             ~false_label:else_goto
         in
-        (make_cfg_instr term arg [||] Debuginfo.none, false)
+        (make_cfg_instr term arg [||] dbg, false)
       | _ ->
         Misc.fatal_error
           "Cfg_of_ssa: multi-condition Branch not yet \
@@ -311,7 +361,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         concat_map_regs (get_regs renv) args
       in
       ( make_cfg_instr (Cfg.Switch labels) arg [||]
-          Debuginfo.none,
+          dbg,
         false )
     | Return args ->
       let arg = concat_map_regs (get_regs renv) args in
@@ -320,7 +370,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       in
       emit_moves body ~src:arg ~dst:loc_res;
       ( make_cfg_instr Cfg.Return loc_res [||]
-          Debuginfo.none,
+          dbg,
         false )
     | Raise (k, args, handler_label) ->
       let exn_val =
@@ -360,7 +410,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       in
       emit_moves body ~src ~dst;
       ( make_cfg_instr (Cfg.Raise k) exn_bucket [||]
-          Debuginfo.none,
+          dbg,
         true )
     | Tailcall_self { destination; args } ->
       let virt_args =
@@ -372,7 +422,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       emit_moves body ~src:virt_args ~dst:loc_arg;
       ( make_cfg_instr
           (Cfg.Tailcall_self { destination })
-          loc_arg [||] Debuginfo.none,
+          loc_arg [||] dbg,
         false )
     | Tailcall_func (call_op, args) ->
       let virt_args =
@@ -403,7 +453,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Direct _ -> loc_arg
       in
       ( make_cfg_instr (Cfg.Tailcall_func call_op)
-          call_arg [||] Debuginfo.none,
+          call_arg [||] dbg,
         false )
     | Call { op = call_op; args; continuation;
              exn_continuation = _ } ->
@@ -459,7 +509,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
              { op = call_op;
                label_after = continuation
              })
-          call_arg loc_res Debuginfo.none,
+          call_arg loc_res dbg,
         true )
     | Prim
         { op = prim_op; args; continuation;
@@ -516,7 +566,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                      { ext with stack_ofs; stack_align };
                  label_after = continuation
                })
-            loc_arg loc_res Debuginfo.none,
+            loc_arg loc_res dbg,
           true )
       | Probe _ ->
         ( make_cfg_instr
@@ -524,7 +574,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                { op = prim_op;
                  label_after = continuation
                })
-            virt_args virt_res Debuginfo.none,
+            virt_args virt_res dbg,
           true ))
   in
   let is_trap_handler =
@@ -542,7 +592,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     cold = false
   }
 
-let convert (ssa : Ssa.t) : Cfg_with_layout.t =
+let convert ~future_funcnames (ssa : Ssa.t)
+    : Cfg_with_layout.t =
   let renv = create_reg_env () in
   Label.Tbl.iter
     (fun _label (block : Ssa.basic_block) ->
@@ -629,6 +680,7 @@ let convert (ssa : Ssa.t) : Cfg_with_layout.t =
   let loc_arg =
     Proc.loc_parameters (Reg.typv fun_arg_regs)
   in
+  let prologue_poll_instr_id = ref None in
   let cfg =
     Cfg.create ~fun_name:ssa.fun_name ~fun_args:loc_arg
       ~fun_codegen_options:
@@ -641,9 +693,42 @@ let convert (ssa : Ssa.t) : Cfg_with_layout.t =
       ~allowed_to_be_irreducible:false
   in
   let layout = DLL.make_empty () in
+  let entry_body = DLL.make_empty () in
+  (* Emit Name_for_debugger for function params,
+     matching insert_param_name_for_debugger in
+     cfg_selectgen. *)
+  let loc_arg_idx = ref 0 in
+  List.iteri
+    (fun param_index (var, ty) ->
+      let provenance =
+        Backend_var.With_provenance.provenance var
+      in
+      let ident =
+        Backend_var.With_provenance.var var
+      in
+      let n = Array.length ty in
+      let hard_regs =
+        Array.init n (fun i ->
+          loc_arg.(!loc_arg_idx + i))
+      in
+      loc_arg_idx := !loc_arg_idx + n;
+      if Option.is_some provenance
+      then
+        DLL.add_end entry_body
+          (make_cfg_instr
+             (Cfg.Op
+                (Name_for_debugger
+                   { ident;
+                     provenance;
+                     which_parameter =
+                       Some param_index;
+                     regs = hard_regs
+                   }))
+             hard_regs [||] Debuginfo.none))
+    ssa.fun_args_names;
   let entry_block =
     { Cfg.start = Cfg.entry_label cfg;
-      body = DLL.make_empty ();
+      body = entry_body;
       terminator =
         make_cfg_instr (Cfg.Always ssa.entry_label) [||]
           [||] Debuginfo.none;
@@ -657,17 +742,29 @@ let convert (ssa : Ssa.t) : Cfg_with_layout.t =
   in
   Cfg.add_block_exn cfg entry_block;
   DLL.add_end layout entry_block.start;
-  Label.Tbl.iter
-    (fun label (ssa_block : Ssa.basic_block) ->
+  List.iter
+    (fun label ->
+      let ssa_block = Label.Tbl.find ssa.blocks label in
       let cfg_block =
         convert_block renv ssa ssa_block
       in
       cfg_block.can_raise
         <- Cfg.can_raise_terminator
              cfg_block.terminator.desc;
-      (* Insert arg moves at start of entry block *)
+      (* Insert arg moves and prologue poll at start
+         of entry block *)
       if Label.equal label ssa.entry_label
-      then
+      then (
+        (* Poll instruction (may be deleted later by
+           Cfg_polling if not needed) *)
+        let poll_instr =
+          make_cfg_instr (Cfg.Op Poll) [||] [||]
+            Debuginfo.none
+        in
+        prologue_poll_instr_id := Some poll_instr.id;
+        DLL.add_begin cfg_block.body poll_instr;
+        (* Arg moves (added at beginning, so they
+           end up before poll) *)
         Array.iter2
           (fun s d ->
             if not (Reg.same s d)
@@ -679,6 +776,39 @@ let convert (ssa : Ssa.t) : Cfg_with_layout.t =
              (List.rev (Array.to_list loc_arg)))
           (Array.of_list
              (List.rev (Array.to_list fun_arg_regs)));
+        (* Param naming (added at beginning AFTER
+           arg moves, so ends up before them,
+           matching cfg_selectgen) *)
+        let loc_idx = ref 0 in
+        List.iteri
+          (fun pi (var, ty) ->
+            let prov =
+              Backend_var.With_provenance.provenance
+                var
+            in
+            let ident =
+              Backend_var.With_provenance.var var
+            in
+            let n = Array.length ty in
+            let regs =
+              Array.init n (fun i ->
+                loc_arg.(!loc_idx + i))
+            in
+            loc_idx := !loc_idx + n;
+            if Option.is_some prov
+            then
+              DLL.add_begin cfg_block.body
+                (make_cfg_instr
+                   (Cfg.Op
+                      (Name_for_debugger
+                         { ident;
+                           provenance = prov;
+                           which_parameter =
+                             Some pi;
+                           regs
+                         }))
+                   regs [||] Debuginfo.none))
+          ssa.fun_args_names);
       if Cfg.is_return_terminator
            cfg_block.terminator.desc
       then
@@ -687,9 +817,41 @@ let convert (ssa : Ssa.t) : Cfg_with_layout.t =
              Debuginfo.none);
       Cfg.add_block_exn cfg cfg_block;
       DLL.add_end layout label)
-    ssa.blocks;
+    ssa.block_order;
   Select_utils.Stack_offset_and_exn.update_cfg cfg;
   Cfg.register_predecessors_for_all_blocks cfg;
+  (* Delete prologue poll if not needed, matching
+     cfg_selectgen *)
+  (match !prologue_poll_instr_id with
+  | None -> ()
+  | Some poll_id ->
+    let delete =
+      not
+        (Cfg_polling.requires_prologue_poll
+           ~future_funcnames
+           ~fun_name:ssa.fun_name
+           ~optimistic_prologue_poll_instr_id:poll_id
+           cfg)
+    in
+    if delete
+    then (
+      let found = ref false in
+      Cfg.iter_blocks cfg
+        ~f:(fun _label (block : Cfg.basic_block) ->
+          if not !found
+          then
+            DLL.filter_left block.body
+              ~f:
+                (fun
+                  (instr :
+                    Cfg.basic Cfg.instruction)
+                ->
+                let is_poll =
+                  InstructionId.equal instr.id
+                    poll_id
+                in
+                if is_poll then found := true;
+                not is_poll))));
   let cfg_with_layout =
     Cfg_with_layout.create cfg ~layout
   in

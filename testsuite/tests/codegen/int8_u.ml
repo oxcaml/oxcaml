@@ -134,9 +134,9 @@ bswap:
 let neg x = Int8_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret
@@ -165,13 +165,26 @@ let div x y = Int8_u.div x y
 div:
   movq  %rbx, %rcx
   testq %rcx, %rcx
+<<<<<<< HEAD
   je    .L0
+||||||| parent of 42782c097b (passes testsuite)
+  je    .L114
+=======
+  je    .L101
+>>>>>>> 42782c097b (passes testsuite)
   cqto
   idivq %rcx
   salq  $56, %rax
   sarq  $56, %rax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L114:
+=======
+.L101:
+  subq  $8, %rsp
+>>>>>>> 42782c097b (passes testsuite)
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -184,14 +197,27 @@ let rem x y = Int8_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
+<<<<<<< HEAD
   je    .L0
+||||||| parent of 42782c097b (passes testsuite)
+  je    .L114
+=======
+  je    .L101
+>>>>>>> 42782c097b (passes testsuite)
   cqto
   idivq %rcx
   movq  %rdx, %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L114:
+=======
+.L101:
+  subq  $8, %rsp
+>>>>>>> 42782c097b (passes testsuite)
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -461,15 +487,31 @@ let to_float x = Int8_u.to_float x
 [%%expect_asm X86_64{|
 to_float:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+  jb    .L105
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vcvtsi2sdq %rbx, %xmm0, %xmm0
   vmovsd %xmm0, (%rax)
+||||||| parent of 42782c097b (passes testsuite)
+  jb    .L105
+.L107:
+  leaq  8(%r15), %rax
+  movq  $1277, -8(%rax)
+  vcvtsi2sdq %rbx, %xmm0, %xmm0
+  vmovsd %xmm0, (%rax)
+=======
+  jb    .L103
+.L105:
+  leaq  8(%r15), %rbx
+  movq  $1277, -8(%rbx)
+  vcvtsi2sdq %rax, %xmm0, %xmm0
+  vmovsd %xmm0, (%rbx)
+  movq  %rbx, %rax
+>>>>>>> 42782c097b (passes testsuite)
   addq  $8, %rsp
   ret
 |}]
@@ -485,17 +527,29 @@ let to_float32 x = Int8_u.to_float32 x
 [%%expect_asm X86_64{|
 to_float32:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+  jb    .L105
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
+||||||| parent of 42782c097b (passes testsuite)
+  jb    .L105
+.L107:
+  leaq  8(%r15), %rax
+  movq  $2303, -8(%rax)
+=======
+  jb    .L103
+.L105:
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
+>>>>>>> 42782c097b (passes testsuite)
   movq  caml_float32_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  vcvtsi2ssq %rbx, %xmm0, %xmm0
-  vmovss %xmm0, 8(%rax)
+  movq  %rdi, (%rbx)
+  vcvtsi2ssq %rax, %xmm0, %xmm0
+  vmovss %xmm0, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -537,17 +591,29 @@ let to_int32 x = Int8_u.to_int32 x
 [%%expect_asm X86_64{|
 to_int32:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+  jb    .L105
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
+||||||| parent of 42782c097b (passes testsuite)
+  jb    .L105
+.L107:
+  leaq  8(%r15), %rax
+  movq  $2303, -8(%rax)
+=======
+  jb    .L103
+.L105:
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
+>>>>>>> 42782c097b (passes testsuite)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movslq %ebx, %rbx
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movslq %eax, %rax
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -562,16 +628,28 @@ let to_int64 x = Int8_u.to_int64 x
 [%%expect_asm X86_64{|
 to_int64:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+  jb    .L104
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
+||||||| parent of 42782c097b (passes testsuite)
+  jb    .L104
+.L106:
+  leaq  8(%r15), %rax
+  movq  $2303, -8(%rax)
+=======
+  jb    .L102
+.L104:
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
+>>>>>>> 42782c097b (passes testsuite)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -593,16 +671,28 @@ let to_nativeint x = Int8_u.to_nativeint x
 [%%expect_asm X86_64{|
 to_nativeint:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+  jb    .L104
 .L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
+||||||| parent of 42782c097b (passes testsuite)
+  jb    .L104
+.L106:
+  leaq  8(%r15), %rax
+  movq  $2303, -8(%rax)
+=======
+  jb    .L102
+.L104:
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
+>>>>>>> 42782c097b (passes testsuite)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -680,10 +770,9 @@ shr:
 let select x y z = Int8_u.select x y z
 [%%expect_asm X86_64{|
 select:
-  movq  %rax, %rsi
+  cmpq  $1, %rax
+  cmovne %rbx, %rdi
   movq  %rdi, %rax
-  cmpq  $1, %rsi
-  cmovne %rbx, %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret
