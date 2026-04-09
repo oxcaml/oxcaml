@@ -108,21 +108,6 @@ type t = ..
 type t += K : ('a : float64). 'a ignore -> t
 |}]
 
-(* CR layouts v2.8: re-enable this. Internal ticket 5118. *)
-(*
-module M : sig
-  kind_abbrev_ k = immediate
-end = struct
-  kind_abbrev_ k = immediate
-end
-
-[%%expect{|
->> Fatal error: kind_abbrev not supported!
-Uncaught exception: Misc.Fatal_error
-
-|}]
-*)
-
 type t1 : any
 type t2 : any mod separable
 type t3 : value_or_null
@@ -1312,8 +1297,8 @@ Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 
-(***************)
-(* Modal kinds *)
+(*************************************)
+(* Modal kinds and kind declarations *)
 
 (* supported *)
 type 'a list : immutable_data with 'a
@@ -1359,6 +1344,15 @@ module M :
     kind_ data = value mod many
     kind_ abstract
   end @@ stateless
+|}]
+
+module type S = sig kind_ k end
+module type S1 = S with kind_ k = value mod portable
+module type S2 = S with kind_ k := value mod global
+[%%expect{|
+module type S = sig kind_ k end
+module type S1 = sig kind_ k = value mod portable end
+module type S2 = sig end
 |}]
 
 (* not yet supported *)
@@ -1562,7 +1556,8 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1137, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -1680,18 +1675,31 @@ val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
 
 let poly_ id : 'a. 'a -> 'a = fun x -> x
 [%%expect{|
-Line 1, characters 0-40:
+Line 1, characters 10-12:
 1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+              ^^
+Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+>> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+let poly_ id = fun x -> x
+[%%expect{|
+>> Fatal error: layout: unexpected genvar
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 [%%expect{|
-Line 1, characters 0-54:
+Line 1, characters 10-15:
 1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+              ^^^^^
+Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+>> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 module type S_poly = sig
@@ -1708,20 +1716,28 @@ Error: The "val poly_" annotation is not yet implemented.
 let poly_ f : 'a. 'a -> 'a = fun x -> x
 and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 [%%expect{|
-Line 1, characters 0-39:
+Line 2, characters 10-11:
+2 | and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+              ^
+Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+
+Line 1, characters 10-11:
 1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+              ^
+Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+>> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* Mixed poly and non-poly in mutually recursive bindings *)
 let poly_ f : 'a. 'a -> 'a = fun x -> x
 and g = fun x -> x
 [%%expect{|
-Line 1, characters 0-39:
-1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+Line 2, characters 0-18:
+2 | and g = fun x -> x
+    ^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 |}]
 
 let h = fun x -> x
@@ -1730,7 +1746,7 @@ and poly_ k : 'a. 'a -> 'a = fun x -> x
 Line 2, characters 0-39:
 2 | and poly_ k : 'a. 'a -> 'a = fun x -> x
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 |}]
 
 let m = fun x -> x
@@ -1740,7 +1756,7 @@ and p = fun x -> x
 Line 2, characters 0-39:
 2 | and poly_ n : 'a. 'a -> 'a = fun x -> x
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 |}]
 
 module type S = sig

@@ -3,7 +3,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2025--2026 Jane Street Group LLC                             *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -25,23 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* CR metaprogramming jrickard: This file has not been code reviewed *)
-
 (** Evaluate a quoted OCaml expression at runtime. *)
-val eval : 'a expr -> 'a eval
-
-module type Jit_intf = sig
-  val jit_load :
-    phrase_name:string ->
-    Format.formatter ->
-    Lambda.program ->
-    (Obj.t, exn) Result.t
-
-  val jit_lookup_symbol : string -> Obj.t option
-end
-
-(** Use the given JIT instead of the compiler's one. *)
-val set_jit : (module Jit_intf) -> unit
+val eval : 'a expr @ once -> 'a eval
 
 (** Disallow the reading of bundles from the current executable. Instead, fetch
     them via the normal mechanisms used by compilerlibs. This should only be

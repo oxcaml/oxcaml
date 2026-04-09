@@ -22,6 +22,8 @@ module type Common_options = sig
   val _locs : unit -> unit
   val _no_locs : unit -> unit
   val _alert : string -> unit
+  val _ikinds : unit -> unit
+  val _ikinds_debug : unit -> unit
   val _I : string -> unit
   val _H : string -> unit
   val _I_manifest : string -> unit
@@ -186,6 +188,7 @@ module type Bytecomp_options = sig
   include Core_options
   include Compiler_options
   val _compat_32 : unit -> unit
+  val _thunkify_cu_init : unit -> unit
   val _custom : unit -> unit
   val _no_check_prims : unit -> unit
   val _dllib : string -> unit

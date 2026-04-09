@@ -5,6 +5,18 @@
 
 #syntax quotations on
 
+(* Preamble types for use in tests *)
+
+module E = struct
+  type existential = Exists : 'a -> existential
+end
+[%%expect {|
+module E : sig type existential = Exists : 'a -> existential end
+|}];;
+#mark_toplevel_in_quotations;;
+
+(* Tests *)
+
 <[ 42 ]>;;
 [%%expect {|
 - : <[int]> expr = <[42]>
@@ -138,7 +150,7 @@
 - : <[[> `A of int ] as '_weak1]> expr = <[`A 42]>
 |}];;
 
-let _ = <[ `B 123 ]>;;
+<[ `B 123 ]>;;
 [%%expect {|
 - : <[[> `B of int ] as '_weak2]> expr = <[`B 123]>
 |}];;
@@ -307,6 +319,23 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 [%%expect {|
 - : <[('a. 'a -> 'a) -> $('b) -> $('b)]> expr =
 <[fun (f : 'a. 'a -> 'a) -> f f]>
+|}];;
+
+(* CR metaprogramming jbachurski: This should fail an assertion (ticket 6789).
+   We should also support this construct (ticket 6790). *)
+<[ let f : type a. a -> a = fun x -> x in f ]>
+[%%expect {|
+Uncaught exception: Stdlib.Exit
+
+|}];;
+
+(* CR metaprogramming jbachurski: We should support this (ticket 6791). *)
+<[ function E.Exists (type a) (x : a) -> ignore (x : a) ]>
+[%%expect {|
+>> Fatal error: Translquote [at Line 1, characters 12-37]:
+Constructor patterns introducing locally abstract types are not supported in quotes.
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 <[ fun x -> fun x -> fun x -> 42 ]>;;
@@ -713,6 +742,15 @@ Hint: Label "x" is defined outside any quotations.
 <[fun () -> exclave_ stack_ (Some 42)]>
 |}];;
 
+(* Expressions cannot be stack-allocated *)
+stack_ <[ 42 ]>;;
+[%%expect {|
+Line 1, characters 7-15:
+1 | stack_ <[ 42 ]>;;
+           ^^^^^^^^
+Error: This expression is not an allocation site.
+|}];;
+
 <[ let x = borrow_ 42 in x + 1 ]>;;
 [%%expect {|
 - : <[int]> expr = <[let x = (borrow_ 42) in x + 1]>
@@ -794,39 +832,39 @@ let x = <[ 123 ]> in <[ $x ]>;;
 - : <[int]> expr = <[123]>
 |}];;
 
-let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 ] ]>;;
+<[ [ a * b for a = 1 to 10 for b = a to 10 ] ]>;;
 [%%expect {|
 - : <[int list]> expr = <[[ a * b for a = 1 to 10 for b = a to 10 ]]>
 |}];;
 
-let _ = <[ [ a * b for a = 1 to 10 and b = 1 to 10 ] ]>;;
+<[ [ a * b for a = 1 to 10 and b = 1 to 10 ] ]>;;
 [%%expect {|
 - : <[int list]> expr = <[[ a * b for a = 1 to 10 and b = 1 to 10 ]]>
 |}];;
 
-let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 ] ]>;;
+<[ [ a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 ] ]>;;
 [%%expect {|
 - : <[int list]> expr =
 <[[ a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 ]]>
 |}];;
 
-let _ = <[ [| a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 |] ]>;;
+<[ [| a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 |] ]>;;
 [%%expect {|
 - : <[int array]> expr =
 <[[| a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 |]]>
 |}];;
 
-let _ = <[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
+<[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
 [%%expect {|
 - : <[string array]> expr = <[[| a ^ "!" for a in [|"foo"; "bar"|] |]]>
 |}];;
 
-let _ = <[ [: a ^ "!" for a in [:"foo"; "bar":] :] ]>;;
+<[ [: a ^ "!" for a in [:"foo"; "bar":] :] ]>;;
 [%%expect {|
 - : <[string iarray]> expr = <[[: a ^ "!" for a in [|"foo"; "bar"|] :]]>
 |}];;
 
-let _ = <[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
+<[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
 [%%expect {|
 - : <[string list]> expr =
 <[[ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ]]>
@@ -913,9 +951,9 @@ Error: Adding attributes on tags in polymorphic variant types
 - : <[int]> expr = <[2 + 2]>
 |}];;
 
-<[ <[ $ (<[ 123 ]>) ]> ]>;;
+<[ fun () -> <[ $ (<[ 123 ]>) ]> ]>;;
 [%%expect {|
-- : <[<[int]> expr]> expr = <[<[$<[123]>]>]>
+- : <[unit -> <[int]> expr @ once]> expr = <[fun () -> <[$<[123]>]>]>
 |}];;
 
 let x = <[ "foo" ]> and y = <[ "bar" ]> in <[ $x ^ $y ]>;;
@@ -923,15 +961,15 @@ let x = <[ "foo" ]> and y = <[ "bar" ]> in <[ $x ^ $y ]>;;
 - : <[string]> expr = <["foo" ^ "bar"]>
 |}];;
 
-<[ fun x -> <[ <[ $($x) ]> ]> ]>;;
+<[ fun x -> <[ fun () -> <[ $($x) ]> ]> ]>;;
 [%%expect {|
-- : <[<[$($('a)) expr]> expr -> <[$($('a)) expr]> expr]> expr =
-<[fun x -> <[<[$($x)]>]>]>
+- : <[<[$($('a)) expr]> expr -> <[unit -> $($('a)) expr @ once]> expr]> expr
+= <[fun x -> <[fun () -> <[$($x)]>]>]>
 |}];;
 
-let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
+let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
 [%%expect {|
-- : <[<[int]> expr]> expr = <[<[$<[42]>]>]>
+- : <[unit -> <[int]> expr @ once]> expr = <[fun () -> <[$<[42]>]>]>
 |}];;
 
 <[ raise Out_of_fibers ]>;;
@@ -1336,4 +1374,138 @@ Error: Annotating types with kinds
      $('a) @ local unique -> $('b) @ local unique]>
     expr
 = <[fun (f : _ @ local unique -> _ @ local unique) -> f]>
+|}];;
+
+(** Jkind annotations **)
+
+(* Variable *)
+<[ fun (x : ('a : immediate)) -> x ]>
+[%%expect {|
+Line 4, characters 18-27:
+4 | <[ fun (x : ('a : immediate)) -> x ]>
+                      ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 4, characters 18-27.
+|}];;
+(* Alias *)
+<[ fun (x : ('a as ('b : immediate))) -> x ]>
+[%%expect {|
+Line 1, characters 25-34:
+1 | <[ fun (x : ('a as ('b : immediate))) -> x ]>
+                             ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 25-34.
+|}];;
+(* Universal quantifier *)
+<[ let f : ('a : immediate). 'a -> 'a = fun x -> x in f ]>
+[%%expect {|
+Line 1, characters 17-26:
+1 | <[ let f : ('a : immediate). 'a -> 'a = fun x -> x in f ]>
+                     ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-26.
+|}];;
+<[ let f : ('a : value) ('b : immediate). #('a * 'b) -> 'a =
+    fun #(x, y) -> x
+   in f ]>
+[%%expect {|
+Line 1, characters 17-22:
+1 | <[ let f : ('a : value) ('b : immediate). #('a * 'b) -> 'a =
+                     ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-22.
+|}];;
+(* Locally abstract type *)
+(* handled differently depending if [type] is the initial parameter *)
+<[ fun (type t : immediate) (x : t) -> x ]> (* initial *)
+[%%expect {|
+Line 1, characters 17-26:
+1 | <[ fun (type t : immediate) (x : t) -> x ]> (* initial *)
+                     ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-26.
+|}];;
+<[ fun () (type t : immediate) (x : t) -> x ]> (* non-initial *)
+[%%expect {|
+Line 1, characters 20-29:
+1 | <[ fun () (type t : immediate) (x : t) -> x ]> (* non-initial *)
+                        ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 20-29.
+|}];;
+<[ fun (type s : value) (x : s)
+       (type t : immediate) (y : t) -> #(x, y) ]> (* both *)
+[%%expect {|
+Line 1, characters 17-22:
+1 | <[ fun (type s : value) (x : s)
+                     ^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 17-22.
+|}];;
+<[ fun (type (s : immediate) (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* double initial *)
+[%%expect {|
+Line 1, characters 18-27:
+1 | <[ fun (type (s : immediate) (t : immediate))
+                      ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 18-27.
+|}];;
+<[ fun (type (s : immediate)) (type (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* split double initial *)
+[%%expect {|
+Line 1, characters 18-27:
+1 | <[ fun (type (s : immediate)) (type (t : immediate))
+                      ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 18-27.
+|}];;
+<[ fun () (type (s : immediate)) (type (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* double non-initial *)
+[%%expect {|
+Line 1, characters 21-30:
+1 | <[ fun () (type (s : immediate)) (type (t : immediate))
+                         ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 21-30.
+|}];;
+<[ fun () (type (s : immediate) (t : immediate))
+       (x : s) (y : t) -> #(x, y) ]> (* split double non-initial *)
+[%%expect {|
+Line 1, characters 21-30:
+1 | <[ fun () (type (s : immediate) (t : immediate))
+                         ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 21-30.
+|}];;
+(* Universally quantified locally abstract type *)
+<[ let f : type (a : immediate). a -> a = fun x -> x in f ]>
+[%%expect {|
+Line 1, characters 21-30:
+1 | <[ let f : type (a : immediate). a -> a = fun x -> x in f ]>
+                         ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 21-30.
+|}];;
+(* Constructor with locally abstract type *)
+<[ function E.Exists (type a : immediate) (x : a) -> ignore (x : a) ]>
+[%%expect {|
+Line 1, characters 31-40:
+1 | <[ function E.Exists (type a : immediate) (x : a) -> ignore (x : a) ]>
+                                   ^^^^^^^^^
+Error: Annotating types with kinds
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 31-40.
 |}];;

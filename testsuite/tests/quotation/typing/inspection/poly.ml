@@ -40,11 +40,13 @@ let () =
 ;;
 
 (* Method polymorphic in a jkind-annotated variable *)
-(* FIXME: Enable this test when TypePoly keeps track of jkind annotation *)
+(* CR metaprogramming jbachurski: Enable when we can quote jkind annotations. *)
+(*
 let () =
   let (f : <[to4]> expr) = <[fun obj -> (obj#f 42, obj#f true)]> in
   test ~eval:false <[ ignore (((fun x -> x) $f) : to4) ]>
 ;;
+*)
 
 (* Method with recursive type *)
 let () =
@@ -127,11 +129,13 @@ let () =
 ;;
 
 (* Parameter polymorphic in a jkind-annotated variable *)
-(* FIXME: Enable this test when TypePoly keeps track of jkind annotation *)
+(* CR metaprogramming jbachurski: Enable when we can quote jkind annotations. *)
+(*
 let () =
   let (f : <[t4]> expr) = <[fun f -> (f 42, f true)]> in
   test ~eval:false <[ ignore (((fun x -> x) $f) : t4) ]>
 ;;
+*)
 
 
 (** Polymorphic parameters: higher-rank function elimination **)
@@ -157,8 +161,10 @@ let () =
 ;;
 
 (* Parameter polymorphic in a jkind-annotated variable *)
-(* FIXME: Enable this test when TypePoly keeps track of jkind annotation *)
+(* CR metaprogramming jbachurski: Enable when we can quote jkind annotations. *)
+(*
 let () =
   let (f : <[te4]> expr) = <[fun f -> f (fun x -> x)]> in
   test ~eval:false <[ ignore (((fun x -> x) $f) : te4) ]>
 ;;
+*)

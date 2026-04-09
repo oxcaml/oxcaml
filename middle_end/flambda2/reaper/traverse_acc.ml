@@ -142,6 +142,9 @@ let find_code t code_id = Code_id.Map.find code_id t.code
 
 let add_alias t ~to_ ~from = Graph.add_alias t.deps ~to_ ~from
 
+let add_alias_vars t ~to_ ~from =
+  add_alias t ~to_:(Code_id_or_name.var to_) ~from:(Code_id_or_name.var from)
+
 let add_use_dep t ~to_ ~from = Graph.add_use_dep t.deps ~to_ ~from
 
 let add_accessor_dep t ~to_ relation ~base =
@@ -200,7 +203,8 @@ let fixed_arity_continuation t k =
 
 let fixed_arity_continuations t = t.fixed_arity_conts
 
-let continuation_info t k info =
+let continuation_info t k ~params ~arity ~is_exn_handler =
+  let info = { is_exn_handler; params; arity } in
   t.continuation_info <- Continuation.Map.add k info t.continuation_info
 
 let get_continuation_info t = t.continuation_info

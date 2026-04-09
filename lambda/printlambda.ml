@@ -396,8 +396,14 @@ let primitive ppf = function
   | Pbytes_to_string -> fprintf ppf "bytes_to_string"
   | Pbytes_of_string -> fprintf ppf "bytes_of_string"
   | Pignore -> fprintf ppf "ignore"
-  | Pgetglobal cu ->
-      fprintf ppf "global %a!" (Format_doc.compat Compilation_unit.print) cu
+  | Pgetglobal (cu, staticity) ->
+      let static =
+        match staticity with
+        | Static -> " static"
+        | Dynamic -> ""
+      in
+      fprintf ppf "global%s %a!"
+        static (Format_doc.compat Compilation_unit.print) cu
   | Pgetpredef id -> fprintf ppf "getpredef %a!" Ident.print id
   | Pmakeblock(tag, Immutable, shape, mode) ->
       fprintf ppf "make%sblock %i%a"
@@ -1447,9 +1453,17 @@ and slam ppf = function
   | SLproj_comptime value -> fprintf ppf "%a.c" slam value
   | SLtemplate func -> fprintf ppf "(template %a)" slambda_function func
   | SLinstantiate apply -> fprintf ppf "(%a)" slambda_apply apply
-  | SLlet { slet_name; slet_value; slet_body } ->
-    fprintf ppf "@[<hv 2>(let %a =@;<1 2>%a in@ %a)@]"
-      Slambdaident.print slet_name slam slet_value slam slet_body
+  | SLlet _ as slet ->
+    let rec letbody ~sp = function
+    | SLlet { slet_name; slet_value; slet_body} ->
+        if sp then fprintf ppf "@ ";
+        fprintf ppf "@[<2>%a =@ %a@]"
+          Slambdaident.print slet_name slam slet_value;
+        letbody ~sp:true slet_body
+    | e -> e in
+    fprintf ppf "@[<2>(let@ @[<hv 1>(";
+    let expr = letbody ~sp:false slet in
+    fprintf ppf ")@]@ %a)@]" slam expr
 
 and slambda_function ppf { sfun_params; sfun_body } =
   let print_params ppf =

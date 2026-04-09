@@ -30,13 +30,6 @@ Stdlib.ignore
 Stdlib.ignore
   ((fun x -> x)
      (fun obj ->
-        (((obj : < f : 'a. 'a -> 'a; .. >)#f 42),
-         ((obj : < f : 'a__1. 'a__1 -> 'a__1; .. >)#f true)))
-  : Poly_types.to4)
-
-Stdlib.ignore
-  ((fun x -> x)
-     (fun obj ->
         (((obj : < f : 'a. 'a -> _ -> 'a; .. >)#f
             ((obj : < f : 'a__1. 'a__1 -> _ -> 'a__1; .. >)#f 42 obj) 
             obj),
@@ -88,10 +81,6 @@ Stdlib.ignore
   -> unit)
 
 Stdlib.ignore
-  ((fun x -> x) (fun (f : 'a. 'a -> 'a) -> ((f 42), (f true))) :
-  Poly_types.t4)
-
-Stdlib.ignore
   ((fun x -> x) (fun f -> (f : ('a. 'a -> 'a) -> _) (fun x__1 -> x__1)) :
   Poly_types.te1)
 
@@ -106,8 +95,4 @@ Stdlib.ignore
         (f : ('a. 'a -> _ -> [ `Foo of 'a ] * _) -> _)
           (fun x__1 -> Stdlib.Sys.opaque_identity (fun y -> ((`Foo x__1), y))))
   : Poly_types.te3')
-
-Stdlib.ignore
-  ((fun x -> x) (fun f -> (f : ('a. 'a -> 'a) -> _) (fun x__1 -> x__1)) :
-  Poly_types.te4)
 

@@ -77,9 +77,11 @@ module Mode_axis_pair = struct
     | "once" -> comonadic Linearity Once
     | "many" -> comonadic Linearity Many
     | "nonportable" -> comonadic Portability Nonportable
+    | "corruptible" -> comonadic Portability Corruptible
     | "shareable" -> comonadic Portability Shareable
     | "portable" -> comonadic Portability Portable
     | "contended" -> monadic Contention Contended
+    | "corrupted" -> monadic Contention Corrupted
     | "shared" -> monadic Contention Shared
     | "uncontended" -> monadic Contention Uncontended
     | "unforkable" -> comonadic Forkable Unforkable
@@ -88,9 +90,11 @@ module Mode_axis_pair = struct
     | "unyielding" -> comonadic Yielding Unyielding
     | "stateless" -> comonadic Statefulness Stateless
     | "reading" -> comonadic Statefulness Reading
+    | "writing" -> comonadic Statefulness Writing
     | "stateful" -> comonadic Statefulness Stateful
     | "immutable" -> monadic Visibility Immutable
     | "read" -> monadic Visibility Read
+    | "write" -> monadic Visibility Write
     | "read_write" -> monadic Visibility Read_write
     | "static" -> monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
@@ -231,6 +235,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       match a with
       | Immutable -> Contended
       | Read -> Shared
+      | Write -> Corrupted
       | Read_write -> Uncontended
     in
     [Atom (Monadic Contention, Join_const b)]
@@ -239,6 +244,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       match a with
       | Stateless -> Portable
       | Reading -> Shareable
+      | Writing -> Corruptible
       | Stateful -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_const b)]
@@ -384,6 +390,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     | (Some _ as c), _ | c, None -> c
     | None, Some Visibility.Const.Immutable -> Some Contention.Const.Contended
     | None, Some Visibility.Const.Read -> Some Contention.Const.Shared
+    | None, Some Visibility.Const.Write -> Some Contention.Const.Corrupted
     | None, Some Visibility.Const.Read_write ->
       Some Contention.Const.Uncontended
   in
@@ -393,6 +400,8 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     | (Some _ as p), _ | p, None -> p
     | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
     | None, Some Statefulness.Const.Reading -> Some Portability.Const.Shareable
+    | None, Some Statefulness.Const.Writing ->
+      Some Portability.Const.Corruptible
     | None, Some Statefulness.Const.Stateful ->
       Some Portability.Const.Nonportable
   in

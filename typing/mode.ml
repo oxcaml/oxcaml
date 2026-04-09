@@ -185,12 +185,17 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lazy_forced -> Lazy_forced
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Quoted_computation -> Quoted_computation
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
+        | Lpoly_inst -> Lpoly_inst
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
         match h with
         | Unknown -> Unknown
         | Legacy x -> Legacy x
+        | Toplevel_expression -> Toplevel_expression
         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
         | Tailcall_function -> Tailcall_function
         | Tailcall_argument -> Tailcall_argument
@@ -202,6 +207,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -209,6 +216,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Unknown -> Unknown
         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
         | Legacy x -> Legacy x
+        | Toplevel_expression -> Toplevel_expression
         | Tailcall_function -> Tailcall_function
         | Tailcall_argument -> Tailcall_argument
         | Mutable_read m -> Mutable_read m
@@ -223,6 +231,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Quoted_computation -> Quoted_computation
+        | Lpoly_inst -> Lpoly_inst
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -230,6 +242,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Unknown -> Unknown
         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
         | Legacy x -> Legacy x
+        | Toplevel_expression -> Toplevel_expression
         | Tailcall_function -> Tailcall_function
         | Tailcall_argument -> Tailcall_argument
         | Mutable_read m -> Mutable_read m
@@ -244,6 +257,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
+        | Lpoly_inst -> Lpoly_inst
+        | Quoted_computation -> Quoted_computation
+        | Spliced Monadic -> Spliced Monadic
+        | Spliced Comonadic -> Spliced Comonadic
     end)
   end
 end
@@ -323,6 +340,84 @@ module Lattices = struct
     (* A total lattice has a heyting structure. The proof for [imply] is dual
        and omitted. *)
     let imply c b = if le c b then L.max else b
+  end
+  [@@inline]
+
+  module type Diamond = sig
+    (** A lattice is a partial order, if for any [a] [b], either:
+        - [a <= b] or [b <= a]
+        - [a] and [b] are incomparable.
+
+        This interface and the [Diamond] functor below are specialized to
+        partial lattices of the form
+        {v
+            Max
+            / \
+          Fst Snd
+            \ /
+            Min
+        v}
+        where [Fst] and [Snd] are incomparable.
+
+        The [Diamond] functor relies on the representation of immediate variant
+        types to efficiently implement bitwise operations over such lattices. *)
+
+    (** This must be an enumeration with four constructors, in the order of
+        [min], [fst], [snd], and [max]. Anything else will fail in the [Diamond]
+        functor. *)
+    type t [@@immediate]
+
+    val min : t
+
+    val fst : t
+
+    val snd : t
+
+    val max : t
+  end
+
+  module Diamond (L : Diamond) = struct
+    open struct
+      external l_to_int : L.t -> int = "%identity"
+
+      external l_of_int : int -> L.t = "%identity"
+
+      let mask = 0b11
+
+      let () =
+        assert (l_to_int L.min = 0b00);
+        assert (l_to_int L.fst = 0b01);
+        assert (l_to_int L.snd = 0b10);
+        assert (l_to_int L.max = 0b11)
+    end
+
+    let min = L.min
+
+    let max = L.max
+
+    let equal a b = a = b
+
+    let join a b = l_of_int (l_to_int a lor l_to_int b)
+
+    let meet a b = l_of_int (l_to_int a land l_to_int b)
+
+    let le a b = meet a b = a
+
+    (* We can treat [fst] and [snd] as independent axes.
+       0b0 land (lnot 0b0) = 0b0 (min = min => min)
+       0b0 land (lnot 0b1) = 0b0 (min < max => min)
+       0b1 land (lnot 0b0) = 0b1 (max > min => max)
+       0b1 land (lnot 0b1) = 0b0 (max = max => min) *)
+    let subtract a c = l_of_int (l_to_int a land lnot (l_to_int c))
+
+    (* We can treat [fst] and [snd] as independent axes.
+       (lnot 0b0) lor 0b0 = 0b1 (min = min => max)
+       (lnot 0b0) lor 0b1 = 0b1 (min < max => max)
+       (lnot 0b1) lor 0b0 = 0b0 (max > min => min)
+       (lnot 0b1) lor 0b1 = 0b1 (max = max => max)
+
+       [lnot c lor b] sets the top 61 bits to 1, so we must mask them out. *)
+    let imply c b = l_of_int (lnot (l_to_int c) lor l_to_int b land mask)
   end
   [@@inline]
 
@@ -431,19 +526,23 @@ module Lattices = struct
   end
 
   module Portability = struct
+    (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
-      | Portable
-      | Shareable
-      | Nonportable
+      | Portable (* 0b00 *)
+      | Shareable (* 0b01 *)
+      | Corruptible (* 0b10 *)
+      | Nonportable (* 0b11 *)
 
-    include Total (struct
+    include Diamond (struct
       type nonrec t = t
 
       let min = Portable
 
-      let max = Nonportable
+      let fst = Shareable
 
-      let ord = function Portable -> 0 | Shareable -> 1 | Nonportable -> 2
+      let snd = Corruptible
+
+      let max = Nonportable
     end)
 
     let legacy = Nonportable
@@ -451,29 +550,35 @@ module Lattices = struct
     let print ppf = function
       | Portable -> Fmt.fprintf ppf "portable"
       | Shareable -> Fmt.fprintf ppf "shareable"
+      | Corruptible -> Fmt.fprintf ppf "corruptible"
       | Nonportable -> Fmt.fprintf ppf "nonportable"
   end
 
   module Contention = struct
+    (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
-      | Uncontended
-      | Shared
-      | Contended
+      | Uncontended (* 0b00 *)
+      | Corrupted (* 0b01 *)
+      | Shared (* 0b10 *)
+      | Contended (* 0b11 *)
 
-    include Total (struct
+    include Diamond (struct
       type nonrec t = t
 
       let min = Uncontended
 
-      let max = Contended
+      let fst = Corrupted
 
-      let ord = function Uncontended -> 0 | Shared -> 1 | Contended -> 2
+      let snd = Shared
+
+      let max = Contended
     end)
 
     let legacy = Uncontended
 
     let print ppf = function
       | Contended -> Fmt.fprintf ppf "contended"
+      | Corrupted -> Fmt.fprintf ppf "corrupted"
       | Shared -> Fmt.fprintf ppf "shared"
       | Uncontended -> Fmt.fprintf ppf "uncontended"
   end
@@ -523,43 +628,52 @@ module Lattices = struct
   end
 
   module Statefulness = struct
+    (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
-      | Stateless
-      | Reading
-      | Stateful
+      | Stateless (* 0b00 *)
+      | Writing (* 0b01 *)
+      | Reading (* 0b10 *)
+      | Stateful (* 0b11 *)
 
-    include Total (struct
+    include Diamond (struct
       type nonrec t = t
 
       let min = Stateless
 
-      let max = Stateful
+      let fst = Writing
 
-      let ord = function Stateless -> 0 | Reading -> 1 | Stateful -> 2
+      let snd = Reading
+
+      let max = Stateful
     end)
 
     let legacy = Stateful
 
     let print ppf = function
       | Stateless -> Fmt.fprintf ppf "stateless"
+      | Writing -> Fmt.fprintf ppf "writing"
       | Reading -> Fmt.fprintf ppf "reading"
       | Stateful -> Fmt.fprintf ppf "stateful"
   end
 
   module Visibility = struct
+    (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
-      | Read_write
-      | Read
-      | Immutable
+      | Read_write (* 0b00 *)
+      | Read (* 0b01 *)
+      | Write (* 0b10 *)
+      | Immutable (* 0b11 *)
 
-    include Total (struct
+    include Diamond (struct
       type nonrec t = t
 
       let min = Read_write
 
-      let max = Immutable
+      let fst = Read
 
-      let ord = function Read_write -> 0 | Read -> 1 | Immutable -> 2
+      let snd = Write
+
+      let max = Immutable
     end)
 
     let legacy = Read_write
@@ -567,6 +681,7 @@ module Lattices = struct
     let print ppf = function
       | Immutable -> Fmt.fprintf ppf "immutable"
       | Read -> Fmt.fprintf ppf "read"
+      | Write -> Fmt.fprintf ppf "write"
       | Read_write -> Fmt.fprintf ppf "read_write"
   end
 
@@ -1631,11 +1746,13 @@ module Lattices_mono = struct
   let portable_to_contended = function
     | Portability.Portable -> Contention.Contended
     | Portability.Shareable -> Contention.Shared
+    | Portability.Corruptible -> Contention.Corrupted
     | Portability.Nonportable -> Contention.Uncontended
 
   let contended_to_portable = function
     | Contention.Contended -> Portability.Portable
     | Contention.Shared -> Portability.Shareable
+    | Contention.Corrupted -> Portability.Corruptible
     | Contention.Uncontended -> Portability.Nonportable
 
   let local_to_regional = function
@@ -1662,12 +1779,14 @@ module Lattices_mono = struct
 
   let statefulness_to_visibility = function
     | Statefulness.Stateless -> Visibility.Immutable
+    | Statefulness.Writing -> Visibility.Write
     | Statefulness.Reading -> Visibility.Read
     | Statefulness.Stateful -> Visibility.Read_write
 
   let visibility_to_statefulness = function
     | Visibility.Immutable -> Statefulness.Stateless
     | Visibility.Read -> Statefulness.Reading
+    | Visibility.Write -> Statefulness.Writing
     | Visibility.Read_write -> Statefulness.Stateful
 
   let min_with dst ax a = Axis.set ax a (min dst)
@@ -2098,20 +2217,14 @@ module Report = struct
       (* CR-someday zqian: in the case where [x = y], we currently arbitrarily choose from
          [x] and [y], which are unordered anyway. In the future we might want to keep an
          order for better error messages. For example, order them by occurrence in the
-         source code such that the more recent hint is returned. *)
-      match b with
-      | Join ->
-        if C.le a_obj x y
-        then `Second
-        else if C.le a_obj y x
-        then `First
-        else Misc.fatal_error "A single axis should be a total ordering."
-      | Meet ->
-        if C.le a_obj x y
-        then `First
-        else if C.le a_obj y x
-        then `Second
-        else Misc.fatal_error "A single axis should be a total ordering."
+         source code such that the more recent hint is returned.
+
+         nmatschke: Likewise for [x <> y] (middle modes of diamonds). *)
+      if
+        begin match b with Join -> C.le a_obj y x | Meet -> C.le a_obj x y
+      end
+      then `First
+      else `Second
 
     (** Given a solver hint on a product lattice, and an axis in that product
         that we are interested in, returns a human-readible hint.*)
@@ -2234,6 +2347,7 @@ module Report = struct
     | Function -> Some (print_article_noun Consonant "function")
     | Functor -> Some (print_article_noun Consonant "functor")
     | Lazy -> Some (print_article_noun Consonant "lazy expression")
+    | Quote -> Some (print_article_noun Consonant "quoted expression")
     | Expression -> Some (print_article_noun Vowel "expression")
     | Allocation -> Some (print_article_noun Vowel "allocation")
     | Class -> Some (print_article_noun Consonant "class")
@@ -2288,6 +2402,7 @@ module Report = struct
     | Toplevel -> print_article_noun Consonant "top-level clause"
     | Compilation_unit -> print_article_noun Consonant "compilation unit"
     | Class -> print_article_noun Consonant "class"
+    | Quoted -> print_article_noun Consonant "quoted expression's result"
 
   let print_region_desc : region_desc -> _ = function
     | Borrow -> print_article_noun Consonant "borrow region"
@@ -2321,6 +2436,8 @@ module Report = struct
         Fmt.fprintf ppf "it is %t and thus always"
           (print_legacy m ~definite:false ~capitalize:false));
       Fmt.pp_print_string ppf " at the legacy modes"
+    | Toplevel_expression ->
+      Fmt.pp_print_string ppf "it is a top-level expression"
     | Tailcall_function ->
       Fmt.pp_print_string ppf "it is the function in a tail call"
     | Tailcall_argument ->
@@ -2360,6 +2477,11 @@ module Report = struct
     | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
     | Escape_region reg ->
       Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
+    | Quoted_computation -> Fmt.fprintf ppf "it is the quote of a computation"
+    | Lpoly_inst ->
+      Fmt.pp_print_string ppf
+        "it is layout-polymorphic and being instantiated here"
+    | Spliced _ -> Fmt.fprintf ppf "it is spliced"
 
   let print_allocation_l : allocation -> Fmt.formatter -> unit =
    fun { txt; loc } ->
@@ -2537,8 +2659,14 @@ module Report = struct
          uncontended is expected. *)
       Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
         C.Contention.Uncontended
+    | `Expected, Contention_op, Corrupted ->
+      Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Corrupted
+        mode_printer C.Contention.Uncontended
     | `Expected, Visibility_op, Read ->
       Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
+        C.Visibility.Read_write
+    | `Expected, Visibility_op, Write ->
+      Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Write mode_printer
         C.Visibility.Read_write
     | `Expected, Regionality, Regional ->
       Fmt.fprintf ppf "%a to the parent region or %a" mode_printer
@@ -3080,6 +3208,8 @@ module Statefulness = struct
 
   let reading = of_const Reading
 
+  let writing = of_const Writing
+
   let stateful = of_const Stateful
 
   let legacy = of_const Const.legacy
@@ -3101,6 +3231,8 @@ module Visibility = struct
   let immutable = of_const Immutable
 
   let read = of_const Read
+
+  let write = of_const Write
 
   let read_write = of_const Read_write
 
@@ -3125,7 +3257,9 @@ module Portability = struct
   (* CR dkalinichenko: ideally, [reading] should zap to [shareable]. *)
   let zap_to_legacy ~statefulness =
     match statefulness with
-    | Statefulness.Const.Stateful | Statefulness.Const.Reading -> zap_to_ceil
+    | Statefulness.Const.Stateful | Statefulness.Const.Reading
+    | Statefulness.Const.Writing ->
+      zap_to_ceil
     | Statefulness.Const.Stateless -> zap_to_floor
 end
 
@@ -3165,7 +3299,9 @@ module Contention = struct
   (* CR dkalinichenko: ideally, [read] should zap to [shared]. *)
   let zap_to_legacy ~visibility =
     match visibility with
-    | Visibility.Const.Read_write | Visibility.Const.Read -> zap_to_floor
+    | Visibility.Const.Read_write | Visibility.Const.Read
+    | Visibility.Const.Write ->
+      zap_to_floor
     | Visibility.Const.Immutable -> zap_to_ceil
 end
 

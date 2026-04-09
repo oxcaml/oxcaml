@@ -77,6 +77,8 @@
 
 (copy_files# backend/peephole/*.ml{,i})
 
+(copy_files# backend/x86_peephole/*.ml{,i})
+
 (copy_files# backend/regalloc/*.ml{,i})
 
 (copy_files# file_formats/*.ml{,i})
@@ -249,6 +251,10 @@
   includemod_errorprinter
   typemode
   jkind_axis
+  ldd_intf
+  ldd
+  axis_lattice
+  ikind
   typetexp
   patterns
   printpat
@@ -616,6 +622,10 @@
   x86_dsl
   x86_gas
   x86_masm
+  x86_peephole_optimize
+  x86_peephole_rules
+  x86_peephole_utils
+  x86_section
   x86_proc
   jit_backend
   zero_alloc_checker

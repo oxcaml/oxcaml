@@ -218,6 +218,9 @@ module type Sort = sig
       this will default to [void] instead. *)
   val default_for_transl_and_get : t -> Const.t
 
+  (** Like [default_to_value_and_get] but operates directly on a [var]. *)
+  val var_default_to_value_and_get : var -> Const.t
+
   (** To record changes to sorts, for use with [Types.snapshot] and
       [Types.backtrack]. *)
   type change
@@ -260,6 +263,17 @@ module type Sort = sig
       calls [f] with those names, and returns the result. Within the call to
       [f], {!to_string_genvar} will return the assigned name for each var. *)
   val print_with_genvars : var list -> (string list -> 'a) -> 'a
+
+  (** [generalize_with f] runs [f] with sort generalization enabled (for let
+      poly_ support). Returns the result of [f] and the list of sort variables
+      lifted to generic during [f]. *)
+  val generalize_with : (unit -> 'a) -> 'a * var list
+
+  (** Generalize sort variables when in sort generalization context. Sets the
+      level of sort variables to Ident.highest_scope and accumulates them. This
+      should be called from Ctype.generalize. Only has an effect when called
+      within {!generalize_with}. *)
+  val generalize : current_level:int -> t -> unit
 
   module Debug_printers : sig
     val base : Format.formatter -> base -> unit
@@ -351,6 +365,7 @@ module History = struct
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
+    | Idx_base
 
   type value_creation_reason =
     | Class_let_binding
@@ -379,7 +394,6 @@ module History = struct
     | Univar
     | Default_type_jkind
     | Existential_type_variable
-    | Idx_base
     | List_comprehension_iterator_element
     | Lazy_expression
     | Class_type_argument

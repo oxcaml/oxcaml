@@ -138,6 +138,9 @@ val merge_row_fields:
 val filter_row_fields:
         bool -> (label * row_field) list -> (label * row_field) list
 
+val iter_type_expr_with_stages:
+        (Env.t -> type_expr -> unit) -> Env.t -> type_expr -> unit
+
 val generalize: type_expr -> unit
         (* Generalize in-place the given type *)
 val lower_contravariant: Env.t -> type_expr -> unit
@@ -194,8 +197,11 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       allow_recursive_equations : bool;
       (* true iff checking counter examples *)
+      is_lpoly : bool;
+      (* true iff the pattern is under let poly_ *)
     }
-  val make: Env.t -> equations_scope:int -> allow_recursive_equations:bool -> t
+  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+    -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
 end
@@ -748,7 +754,7 @@ val check_type_separability :
 
    *)
 val check_and_update_generalized_ty_jkind :
-  ?name:Ident.t -> loc:Location.t -> Env.t -> type_expr -> unit
+  ?name:Ident.t -> loc:Location.t -> type_expr -> unit
 
 (* False if running in principal mode and the type is not principal.
    True otherwise. *)

@@ -342,11 +342,62 @@ and fracture_fun
 
 (** Fracture [lambda = Lprim (prim, args, loc)]. *)
 and fracture_prim lambda prim args loc =
+  let wrong_arity ~expected =
+    Misc.fatal_errorf "Slambda_fracture: %a takes exactly %d %s got %d"
+      Printlambda.primitive prim expected
+      (if expected = 1 then "argument" else "arguments")
+      (List.length args)
+  in
+  let check_arity ~arity =
+    match List.compare_length_with args arity with
+    | 0 -> ()
+    | _ -> wrong_arity ~expected:arity
+  in
   match prim with
-  | Pgetglobal _ | Pmakeblock _ | Pfield _ | Pmixedfield _
+  | Pgetglobal (cu, Static) ->
+    check_arity ~arity:0;
+    SLhalves { sval_comptime = SLglobal cu; sval_runtime = lambda }
+  | Pmakeblock _ ->
+    let rec fracture_make_block unchanged i args_c args_r = function
+      | [] ->
+        SLhalves
+          { sval_comptime = SLrecord args_c;
+            sval_runtime =
+              (if unchanged then lambda else Lprim (prim, args_r, loc))
+          }
+      | arg :: args ->
+        slet_local
+          ("field" ^ string_of_int i)
+          arg
+          (fun arg_c arg_r ->
+            let unchanged = unchanged && arg_r == arg in
+            fracture_make_block unchanged (i - 1) (arg_c :: args_c)
+              (arg_r :: args_r) args)
+    in
+    (* Bind the fields in reverse because Lprim(Pmakeblock) evaluates its arguments in
+       reverse order. *)
+    fracture_make_block true (List.length args - 1) [] [] (List.rev args)
+  | Pfield (pos, _ptr, _sem) ->
+    let arg = match args with [arg] -> arg | _ -> wrong_arity ~expected:1 in
+    slet_local "arg" arg (fun arg_c arg_r ->
+        SLhalves
+          { sval_comptime = SLfield (arg_c, pos);
+            sval_runtime =
+              (if arg_r == arg then lambda else Lprim (prim, [arg_r], loc))
+          })
+  | Pmixedfield (path, _shape, _sem) ->
+    let arg = match args with [arg] -> arg | _ -> wrong_arity ~expected:1 in
+    slet_local "arg" arg (fun arg_c arg_r ->
+        SLhalves
+          { sval_comptime =
+              List.fold_left (fun acc pos -> SLfield (acc, pos)) arg_c path;
+            sval_runtime =
+              (if arg_r == arg then lambda else Lprim (prim, [arg_r], loc))
+          })
   (* Dynamic output *)
-  | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetpredef _
-  | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pbytes_to_string | Pbytes_of_string | Pignore
+  | Pgetglobal (_, Dynamic)
+  | Pgetpredef _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
   | Pufloatfield _ | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
   | Pduprecord _ | Pmake_unboxed_product _ | Punboxed_product_field _

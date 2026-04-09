@@ -110,24 +110,27 @@ allocation](../../stack-allocation/intro).
 
 ## Past modes: Contention
 
-|-----------------|
-| contended       |
-| `|`             |
-| shared          |
-| `|`             |
-| **uncontended** |
+|----------------------|
+| contended            |
+| `|`                  |
+| corrupted `|` shared |
+| `|`                  |
+| **uncontended**      |
 {: .table }
 
 Contention is a past axis that tracks whether a value has been shared between
-threads. A value is *contended* if another thread can write to it, *shared* if
-multiple threads have read-only access to it, and *uncontended* otherwise.
+threads. A value is *contended* if another thread can both read and write to it,
+*shared* if multiple threads have read-only access to it, *corrupted* if multiple
+threads have write-only access to it, and *uncontended* otherwise. Note that *corrupted*
+and *shared* are incomparable: neither is a submode of the other.
 
 To enforce data race freedom, the typechecker does not permit reading or writing
 unprotected mutable portions of contended values. (Types like `Atomic.t` protect
 mutable values from data races and allow contended values to still retain
 mutable components.) The unprotected mutable portions of shared values
-may be read, but not written to. Uncontended values may be accessed and mutated
-freely.
+may be read, but not written to. The unprotected mutable portions of corrupted
+values may be written to, but not read from. Uncontended values may be accessed
+and mutated freely.
 
 Contention is irrelevant for types that are deeply immutable. Values of such
 types *mode cross* on the contention axis; they may be used as uncontended even
@@ -135,26 +138,28 @@ when they are contended.
 
 ## Future modes: Portability
 
-|-----------------|
-| **nonportable** |
-| `|`             |
-| shareable       |
-| `|`             |
-| portable        |
+|---------------------------|
+| **nonportable**           |
+| `|`                       |
+| shareable `|` corruptible |
+| `|`                       |
+| portable                  |
 {: .table }
 
 Portability is a future axis that tracks whether a value is allowed to move across
 thread boundaries. Functions that capture uncontended state are *nonportable*,
 so cannot escape the current thread. Functions that capture shared state are
-*shareable*, so may be executed in parallel. Functions that capture all values at
-contended are *portable*, so may execute concurrently.
+*shareable*, so may be executed in parallel. Functions that only close over
+corrupted values are *corruptible*. Functions that capture all values at
+contended are *portable*, so may execute concurrently. Note that *shareable* and
+*corruptible* are incomparable: neither is a submode of the other.
 
 Notably, it is generally safe to send mutable data *itself* to other threads,
 because it will then be *contended*, so the mutable portions will be
 inaccessible. What is scary is to send a function that *captures* uncontended
 mutable data to another thread, because the captured data would remain
 uncontended even when the function is shared. When the second thread runs the
-funtion, both threads would be accessing the same uncontended mutable state (a
+function, both threads would be accessing the same uncontended mutable state (a
 data race!).
 
 Portability is irrelevant for types that do not contain functions. Values of
@@ -272,15 +277,16 @@ when they are yielding.
 |----------------|
 | immutable      |
 | `|`            |
-| read           |
+| read | write   |
 | `|`            |
 | **read_write** |
 {: .table}
 
 Visibility is a past axis that controls access to mutable portions of values.
 It's similar to contention: the typechecker forbids accessing mutable fields of values
-with *immutable* visiblity, and forbids writing to mutable fields of values
-with *read* visibility. Unlike for contention, even thread-safe access is disallowed.
+with *immutable* visiblity, forbids writing to mutable fields of values
+with *read* visibility, and forbids reading from mutable fields of values with *write*
+visibility. Unlike for contention, even thread-safe access is disallowed.
 
 Visibility is irrelevant for types that are deeply immutable. Values of such
 types *mode cross* on the visibility axis; they may be used as read_write even
@@ -288,21 +294,22 @@ when they are immutable.
 
 ## Future modes: Statefulness
 
-|--------------|
-| **stateful** |
-| `|`          |
-| reading      |
-| `|`          |
-| stateless    |
+|-------------------|
+| **stateful**      |
+| `|`               |
+| writing | reading |
+| `|`               |
+| stateless         |
 {: .table}
 
 Statefulness is a future axis that tracks whether a function reads or writes to some
 mutable state that it closes over (in other words, state that is not explicitly passed to it in an argument).
 
-*Stateless* functions may not either read or write such state, and *reading*
-functions can only read it. *Stateful* functions have no restrictions.
-Stateless closures capture all values at visibility *immutable*,
-while reading closures capture all values at visibility *read*.
+*Stateless* functions may not either read or write such state, *reading* functions can
+only read it, and *writing* functions can only write it. *Stateful* functions have no
+restrictions. Stateless closures capture all values at visibility *immutable*, while
+reading closures capture all values at visibility *read*, and writing closures
+capture all values at visibility *write*.
 
 Statefulness is irrelevant for types that do not contain functions, and values of such
 types *mode cross* on the statefulness axis; they may be used as stateless

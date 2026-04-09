@@ -317,7 +317,7 @@ let _ = (fun (x : layout_ a. ('t : a). 't) -> x)
 Line 1, characters 18-41:
 1 | let _ = (fun (x : layout_ a. ('t : a). 't) -> x)
                       ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
 let f : layout_ a. ('t : a). 't -> 't = fun x -> x
@@ -325,7 +325,7 @@ let f : layout_ a. ('t : a). 't -> 't = fun x -> x
 Line 1, characters 8-37:
 1 | let f : layout_ a. ('t : a). 't -> 't = fun x -> x
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
 (* layout_ in a record field type is not yet supported *)
@@ -334,17 +334,18 @@ type t = { id : layout_ k. ('a : k). 'a -> 'a }
 Line 1, characters 16-45:
 1 | type t = { id : layout_ k. ('a : k). 'a -> 'a }
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
-module F (M : sig val f : layout_ x. ('a : x). 'a -> 'a end) = struct
+(* CR-soon zqian: should work once layout instantiation is handled by slambda *)
+module F (M : sig val f : layout_ x. ('a : x). 'a -> 'a end  @ static) = struct
   let () = let _ = M.f in ()
 end
 [%%expect{|
-Line 2, characters 19-22:
-2 |   let () = let _ = M.f in ()
-                       ^^^
-Error: Instantiation of layout-polymorphic values is not yet supported.
+>> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
+(layout args: [value])
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* You can add additional constraint on the modal bounds, which doesn't affect
@@ -375,9 +376,9 @@ module F :
     end
 |}]
 
-(* CR zqian: the error message should mention modal bounds; this is because (it
-seems like) jkind error reporting happens outside of the inclusion check (where
-the abstract univar are marked equal). *)
+(* CR zqian: the error message prints <genvar> because jkind error elaboration
+happens outside of the jkind checking (where the genvar has a proper name like
+[l]. *)
 module F (M : sig
   val bar : layout_ x. ('a : x mod contended) ('b : x). 'a -> 'b
 end) : sig
@@ -399,9 +400,9 @@ Error: Signature mismatch:
        is not included in
          val bar : layout_ l. ('a : l) ('b : l). 'a -> 'b
        The type "'a -> 'b" is not compatible with the type "'c -> 'd"
-       The kind of 'a is 's1
+       The kind of 'a is <genvar>
          because of the definition of bar at line 4, characters 2-50.
-       But the kind of 'a must be representable
+       But the kind of 'a must be a subkind of <genvar> mod contended
          because of the definition of bar at line 2, characters 2-64.
 |}]
 
@@ -443,9 +444,9 @@ Error: Signature mismatch:
        is not included in
          val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
        The type "'a -> 'b" is not compatible with the type "'a -> 'c"
-       The kind of 'a is 's2
+       The kind of 'a is <genvar>
          because of the definition of bar at line 4, characters 2-64.
-       But the kind of 'a must be representable
+       But the kind of 'a must be a subkind of <genvar> mod contended
          because of the definition of bar at line 2, characters 2-78.
 |}]
 

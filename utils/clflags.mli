@@ -109,6 +109,7 @@ val uses_metaprogramming : bool ref
 val custom_runtime : bool ref
 val no_check_prims : bool ref
 val bytecode_compatible_32 : bool ref
+val thunkify_cu_init : bool ref
 val output_c_object : bool ref
 val output_complete_object : bool ref
 val output_complete_executable : bool ref
@@ -254,6 +255,10 @@ val emit_optimized_probes : bool ref
 val supports_optimized_probes : bool
 
 val llvm_backend : bool ref
+
+(* Dedicated flag to enable the ikinds kind checker. *)
+val ikinds : bool ref
+val ikinds_debug : bool ref
 
 val all_passes : string list ref
 val dumped_pass : string -> bool

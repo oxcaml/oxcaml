@@ -45,12 +45,12 @@ val f : 'a eval -> 'a eval = <fun>
 
 (* [eval] stub *)
 open (struct
-  let eval = Obj.magic
+  let eval x = x |> Obj.magic_many |> Obj.magic
 end : sig
-  val eval : 'a expr -> 'a eval
+  val eval : 'a expr @ once -> 'a eval
 end)
 [%%expect {|
-val eval : 'a expr -> 'a eval = <fun>
+val eval : 'a expr @ once -> 'a eval = <fun>
 |}]
 
 let f (x : <[int]> expr) : int = eval x
@@ -154,7 +154,7 @@ Error: This expression has type "<[#($('a) * $('b) * $('c))]> expr"
          because it is an unboxed tuple.
        But the layout of <[#($('a) * $('b) * $('c))]> must be a sublayout of
            value
-         because of the definition of eval at line 7, characters 2-31.
+         because of the definition of eval at line 7, characters 2-38.
 |}]
 
 (* Objects *)
@@ -361,19 +361,19 @@ Error: This expression has type "<[(module Z.T with type s = t)]> eval"
 
 (* Quoted [eval] stubs *)
 open (struct
-  let eval0 = Obj.magic ()
-  let eval1 = <[Obj.magic ()]>
-  let eval2 = <[<[Obj.magic ()]>]>
+  let eval0 = Obj.magic (fun x -> x)
+  let eval1 = Obj.magic <[fun x -> x]>
+  let eval2 = Obj.magic <[<[fun x -> x]>]>
 end : sig
-  val eval0 : 'a expr -> 'a eval
-  val eval1 : <[ $('a) expr -> $('a) eval ]> expr
-  val eval2 : <[ <[ $($('a)) expr -> $($('a)) eval ]> expr ]> expr
+  val eval0 : 'a expr @ once -> 'a eval
+  val eval1 : <[ $('a) expr @ once -> $('a) eval ]> expr
+  val eval2 : <[ <[ $($('a)) expr @ once -> $($('a)) eval ]> expr ]> expr
 end)
 [%%expect {|
-val eval0 : 'a expr -> 'a eval = <fun>
-val eval1 : <[$('a) expr -> $('a) eval]> expr = <[Stdlib.Obj.magic ()]>
-val eval2 : <[<[$($('a)) expr -> $($('a)) eval]> expr]> expr =
-  <[<[Stdlib.Obj.magic ()]>]>
+val eval0 : 'a expr @ once -> 'a eval = <fun>
+val eval1 : <[$('a) expr @ once -> $('a) eval]> expr = <[fun x -> x]>
+val eval2 : <[<[$($('a)) expr @ once -> $($('a)) eval]> expr]> expr =
+  <[<[fun x -> x]>]>
 |}]
 
 (* The obvious form of eval composition -- [fun x -> eval (eval x)] --

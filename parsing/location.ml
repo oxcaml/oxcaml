@@ -1134,4 +1134,4 @@ let raise_errorf ?(loc = none) ?(sub = []) =
 
 let todo_overwrite_not_implemented ?(kind = "") t =
   alert ~kind t "Overwrite not implemented.";
-  assert false
+  Misc.fatal_error "Location.todo_overwrite_not_implemented"

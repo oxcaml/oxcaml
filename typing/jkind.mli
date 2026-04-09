@@ -123,7 +123,15 @@ module Layout : sig
 end
 
 module Mod_bounds : sig
-  val debug_print : Format.formatter -> Types.mod_bounds -> unit
+  type t = Types.mod_bounds
+
+  val to_axis_lattice : t -> Axis_lattice.t
+
+  val of_axis_lattice : Axis_lattice.t -> t
+
+  val to_mode_crossing : t -> Mode.Crossing.t
+
+  val debug_print : Format.formatter -> t -> unit
 end
 
 module With_bounds : sig
@@ -137,6 +145,10 @@ module With_bounds : sig
     ('l * 'r) Types.with_bounds
 
   val format : Format_doc.formatter -> ('l * 'r) Types.with_bounds -> unit
+
+  val to_seq :
+    ('l * 'r) Types.with_bounds ->
+    (Types.type_expr * Types.With_bounds_type_info.t) Seq.t
 end
 
 module Base_and_axes : sig
@@ -192,8 +204,11 @@ end
 (** Context for jkind operations. *)
 type jkind_context =
   { jkind_of_type : Types.type_expr -> Types.jkind_l option;
-    is_abstract : Path.t -> bool
+    is_abstract : Path.t -> bool;
         (* Check if a type path refers to an abstract type *)
+    lookup_type : Path.t -> Types.type_declaration option
+        (* Lookup a type in the environment. Returns the full
+           [Types.type_declaration] if found, or [None] otherwise. *)
   }
 
 (******************************)
@@ -463,9 +478,9 @@ val for_unboxed_record :
     [decl_params] is the parameters in the head of the type declaration.
     [type_apply] should be [Ctype.apply] partially applied to an [env].
 
-    [free_vars] is a function that, given a list of [Types.type_expr]s that are
-    used in the boxed variant, returns all type variables that are free within
-    the [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good
+    [get_free_vars] is a function that, given a list of [Types.type_expr]s that
+    are used in the boxed variant, returns all type variables that are free
+    within the [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good
     candidate for implementing this function. *)
 val for_boxed_variant :
   loc:Location.t ->
@@ -475,7 +490,7 @@ val for_boxed_variant :
     Types.type_expr ->
     Types.type_expr list ->
     Types.type_expr) ->
-  free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
+  get_free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
   Types.constructor_declaration list ->
   Types.jkind_l
 
@@ -549,6 +564,10 @@ val default_to_value : 'd Types.jkind -> unit
 (* CR layouts v5: When we have proper support for void, we'll want to change
    these three functions to default to void - it's the most efficient thing
    when we have a choice. *)
+
+(** Generalize the sorts in a jkind when in sort generalization context. Only
+    has an effect when called within {!Sort.generalize_with}. *)
+val generalize : current_level:int -> 'd Types.jkind -> unit
 
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)
@@ -774,8 +793,8 @@ val sub :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
   Env.t ->
-  Types.jkind_l ->
-  Types.jkind_r ->
+  (allowed * 'r) Types.jkind ->
+  ('l * allowed) Types.jkind ->
   bool
 
 type sub_or_intersect =
@@ -812,8 +831,8 @@ val sub_or_error :
 val sub_layout_or_error :
   context:jkind_context ->
   Env.t ->
-  Types.jkind_l ->
-  Types.jkind_l ->
+  (allowed * 'r1) Types.jkind ->
+  ('l2 * 'r2) Types.jkind ->
   (unit, Violation.t) result
 
 (** Like [sub], but compares a left jkind against another left jkind.

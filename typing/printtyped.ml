@@ -524,6 +524,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_or\n";
       pattern i ppf p1;
       pattern i ppf p2;
+  | Tpat_fun_layout { id = s; sort; mode = m; _ } ->
+      line i ppf "Tpat_fun_layout \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" fmt_sort sort;
+      value_mode i ppf m
 
 and labeled_pattern : type k . _ -> _ -> string option * k general_pattern -> unit =
   fun i ppf (label, x) ->
@@ -647,6 +651,9 @@ and expression i ppf x =
   end;
   match x.exp_desc with
   | Texp_ident { path; _ } -> line i ppf "Texp_ident %a\n" fmt_path path;
+  | Texp_apply_layout (exp, args) ->
+      line i ppf "Texp_apply_layout (%d args)\n" (List.length args);
+      expression (i+1) ppf exp;
   | Texp_instvar (_, li,_) -> line i ppf "Texp_instvar %a\n" fmt_path li;
   | Texp_mutvar id -> line i ppf "Texp_mutvar %a\n" fmt_ident id.txt;
   | Texp_constant (c) -> line i ppf "Texp_constant %a\n" fmt_constant c;
@@ -1244,6 +1251,12 @@ and with_constraint i ppf x =
   | Twith_modtypesubst mty ->
       line i ppf "Twith_modtype\n";
       module_type (i+1) ppf mty
+  | Twith_jkind kd ->
+      line i ppf "Twith_jkind\n";
+      jkind_declaration (i+1) ppf kd;
+  | Twith_jkindsubst kd ->
+      line i ppf "Twith_jkindsubst\n";
+      jkind_declaration (i+1) ppf kd;
 
 and module_expr i ppf x =
   line i ppf "module_expr %a\n" fmt_location x.mod_loc;

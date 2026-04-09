@@ -306,6 +306,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
+      type_ikind = Types.ikinds_todo "transl_declaration initial unboxed";
       type_private = sdecl.ptype_private;
       type_manifest = unboxed_type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -324,6 +325,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
+      type_ikind = Types.ikinds_todo "transl_declaration initial";
       type_private = sdecl.ptype_private;
       type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1092,6 +1094,7 @@ let transl_declaration env sdecl (id, uid) =
         type_arity = arity;
         type_kind = kind;
         type_jkind = jkind;
+        type_ikind = Types.ikinds_todo "update_decl_jkind initial";
         type_private = sdecl.ptype_private;
         type_manifest = man;
         type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1268,6 +1271,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_arity = decl.type_arity;
         type_kind = kind;
         type_jkind = jkind;
+        type_ikind = Types.ikinds_todo "derive_unboxed_versions";
         type_private = decl.type_private;
         type_manifest;
         type_variance =
@@ -1364,7 +1368,8 @@ let rec check_constraints_rec env loc visited ty =
       let ty = Ctype.instance_poly tl ty in
       check_constraints_rec env loc visited ty
   | _ ->
-      Btype.iter_type_expr (check_constraints_rec env loc visited) ty
+      Ctype.iter_type_expr_with_stages
+        (fun env -> check_constraints_rec env loc visited) env ty
   end
 
 let check_constraints_labels env visited l pl =
@@ -1460,7 +1465,7 @@ let check_constraints env sdecl (_, decl) =
    corresponds to the manifest (e.g., in the case where [type_jkind] is
    immediate, we should check the manifest is immediate). Also, update the
    resulting jkind to match the manifest. *)
-let narrow_to_manifest_jkind env loc decl =
+let narrow_to_manifest_jkind env loc path decl =
   match decl.type_manifest, decl.type_kind with
   | None, _ -> decl
   | Some _, (Type_record _ | Type_record_unboxed_product _ | Type_variant _ | Type_open)
@@ -1520,24 +1525,55 @@ let narrow_to_manifest_jkind env loc decl =
        until we have proper subsumption working, as this hack will likely hold
        up for a little while. Internal ticket 5115. *)
     begin match Jkind.try_allow_r decl.type_jkind with
-    | None -> begin
+    | None ->
+        if !Clflags.ikinds_debug then
+          Format.eprintf
+            "[ikind-narrow] path=%a branch=ikind_sub_jkind_l@."
+            (Format_doc.compat Path.print) path;
+        (* Under -ikinds we keep [decl.type_jkind] in left/Best form, so
+           [try_allow_r] returns [None] and we route through Ikind. We also
+           fall back here when [decl.type_jkind] cannot allow-right
+           (e.g. due to with-bounds/Best). *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
-        match
-          Jkind.sub_jkind_l ~type_equal ~context
-            env manifest_jkind
-            decl.type_jkind
-        with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
-      end
-    | Some type_jkind -> begin
-        match Ctype.constrain_type_jkind env ty type_jkind with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
-      end
+        (match
+           Ikind.sub_jkind_l
+             ~origin:(Format.asprintf
+                        "typedecl:manifest_vs_decl %a"
+                        Location.print_loc decl.type_loc)
+             ~type_equal
+             ~context
+             env
+             manifest_jkind
+             decl.type_jkind
+         with
+         | Ok () -> ()
+         | Error v ->
+             if !Clflags.ikinds_debug then
+               Format.eprintf
+                 "[ikind-narrow] path=%a branch=ikind_sub_jkind_l error@."
+                 (Format_doc.compat Path.print) path;
+             raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
+    | Some type_jkind ->
+        if !Clflags.ikinds_debug then
+          Format.eprintf
+            "[ikind-narrow] path=%a branch=constrain_type_jkind@."
+            (Format_doc.compat Path.print) path;
+        (* Legacy path: refine via [constrain_type_jkind] when ikinds disabled
+           and we can allow-right. *)
+        (match Ctype.constrain_type_jkind env ty type_jkind with
+         | Ok () -> ()
+         | Error v ->
+             if !Clflags.ikinds_debug then
+               Format.eprintf
+                 "[ikind-narrow] path=%a branch=constrain_type_jkind error@."
+                 (Format_doc.compat Path.print) path;
+             raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
     end;
-    { decl with type_jkind = manifest_jkind }
+    let type_ikind =
+      Ikind.type_declaration_ikind_gated ~env:(Some env) ~path
+    in
+    { decl with type_jkind = manifest_jkind; type_ikind }
 
 (* Check that the type expression (if present) is compatible with the kind.
    If both a variant/record definition and a type equation are given,
@@ -1595,8 +1631,9 @@ let check_coherence env loc dpath decl =
   | None -> ()
 
 let check_abbrev env sdecl (id, decl) =
-  check_coherence env sdecl.ptype_loc (Path.Pident id) decl;
-  (id, narrow_to_manifest_jkind env sdecl.ptype_loc decl)
+  let path = Path.Pident id in
+  check_coherence env sdecl.ptype_loc path decl;
+  (id, narrow_to_manifest_jkind env sdecl.ptype_loc path decl)
 
 (* The [update_x_sorts] functions infer more precise jkinds in the type kind,
    including which fields of a record are void.  This would be hard to do during
@@ -2135,7 +2172,7 @@ let rec update_decl_jkind env dpath decl =
           ~loc
           ~decl_params:decl.type_params
           ~type_apply:(Ctype.apply env)
-          ~free_vars:(Ctype.free_variable_set_of_list env)
+          ~get_free_vars:(Ctype.free_variable_set_of_list env)
           cstrs
       in
       List.rev cstrs, rep, jkind
@@ -2161,13 +2198,22 @@ let rec update_decl_jkind env dpath decl =
            we mark jkinds as best *)
         |> Jkind.mark_best
       in
-      { decl with type_jkind }
+      let reason = "update_decl_jkind open" in
+      { decl with
+        type_jkind;
+        type_ikind = Types.ikinds_todo reason
+      }
     | Type_record (lbls, rep, umc) ->
       let lbls, rep, type_jkind = update_record_kind decl.type_loc lbls rep in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
-      { decl with type_kind = Type_record (lbls, rep, umc); type_jkind }
+      let reason = "update_decl_jkind record" in
+      { decl with
+        type_kind = Type_record (lbls, rep, umc);
+        type_jkind;
+        type_ikind = Types.ikinds_todo reason
+      }
     (* CR layouts v3.0: handle this case in [update_variant_jkind] when
        [Variant_with_null] introduced.
 
@@ -2199,8 +2245,12 @@ let rec update_decl_jkind env dpath decl =
           (* See Note [Quality of jkinds during inference] for more information about when we
              mark jkinds as best *)
           let type_jkind = Jkind.mark_best type_jkind in
-          { decl with type_kind = Type_record_unboxed_product (lbls, rep, umc);
-                      type_jkind }
+          let reason = "update_decl_jkind unboxed record" in
+          { decl with
+            type_kind = Type_record_unboxed_product (lbls, rep, umc);
+            type_jkind;
+            type_ikind = Types.ikinds_todo reason
+          }
         end
     | Type_variant _ when
       Builtin_attributes.has_or_null_reexport decl.type_attributes ->
@@ -2212,7 +2262,12 @@ let rec update_decl_jkind env dpath decl =
       (* See Note [Quality of jkinds during inference] for more information
          about when we mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
-      { decl with type_kind = Type_variant (cstrs, rep, umc); type_jkind }
+      let reason = "update_decl_jkind variant" in
+      { decl with
+        type_kind = Type_variant (cstrs, rep, umc);
+        type_jkind;
+        type_ikind = Types.ikinds_todo reason
+      }
   in
 
   (* Check the layout here, both to check it, but more importantly to fill in any sort
@@ -2228,12 +2283,12 @@ let rec update_decl_jkind env dpath decl =
   | Error err ->
     raise (Error (decl.type_loc, Jkind_mismatch_of_path (env, dpath, err)))
 
-let update_decls_jkind_reason env decls =
+let update_decls_jkind_reason decls =
   List.map
     (fun (id, decl) ->
        let update_generalized =
         Ctype.check_and_update_generalized_ty_jkind
-          ~name:id ~loc:decl.type_loc env
+          ~name:id ~loc:decl.type_loc
        in
        List.iter update_generalized decl.type_params;
        Btype.iter_type_expr_kind update_generalized decl.type_kind;
@@ -2428,7 +2483,7 @@ let check_unboxed_paths decls ~unboxed_version_banned =
      if they go through an object or polymorphic variant type *)
 
 let check_well_founded ~abs_env env loc path to_check visited ty0 =
-  let rec check parents trace ty =
+  let rec check parents trace env ty =
     if TypeSet.mem ty parents then begin
       (*Format.eprintf "@[%a@]@." Printtyp.raw_type_expr ty;*)
       let err =
@@ -2472,19 +2527,20 @@ let check_well_founded ~abs_env env loc path to_check visited ty0 =
     match get_desc ty with
     | Tconstr(p, tyl, _) ->
         let to_check = to_check p in
-        if to_check then List.iter (check_subtype parents trace ty) tyl;
+        if to_check then List.iter (check_subtype parents trace ty env) tyl;
         begin match Ctype.try_expand_once_opt env ty with
-        | ty' -> check parents (Expands_to (ty, ty') :: trace) ty'
+        | ty' -> check parents (Expands_to (ty, ty') :: trace) env ty'
         | exception Ctype.Cannot_expand ->
-            if not to_check then List.iter (check_subtype parents trace ty) tyl
+            if not to_check then
+              List.iter (check_subtype parents trace ty env) tyl
         end
     | _ ->
-        Btype.iter_type_expr (check_subtype parents trace ty) ty
-  and check_subtype parents trace outer_ty inner_ty =
-      check parents (Contains (outer_ty, inner_ty) :: trace) inner_ty
+        Ctype.iter_type_expr_with_stages (check_subtype parents trace ty) env ty
+  and check_subtype parents trace outer_ty env inner_ty =
+      check parents (Contains (outer_ty, inner_ty) :: trace) env inner_ty
   in
   let snap = Btype.snapshot () in
-  try Ctype.wrap_trace_gadt_instances env (check TypeSet.empty []) ty0
+  try Ctype.wrap_trace_gadt_instances env (check TypeSet.empty [] env) ty0
   with Ctype.Escape _ ->
     (* Will be detected by check_regularity *)
     Btype.backtrack snap
@@ -2720,7 +2776,7 @@ let check_regularity ~abs_env env loc path decl to_check =
 
   let visited = ref TypeSet.empty in
 
-  let rec check_regular cpath args prev_exp trace ty =
+  let rec check_regular cpath args prev_exp trace env ty =
     if not (TypeSet.mem ty !visited) then begin
       visited := TypeSet.add ty !visited;
       match get_desc ty with
@@ -2754,20 +2810,20 @@ let check_regularity ~abs_env env loc path decl to_check =
               end;
               check_regular path' args
                 (path' :: prev_exp) (Expands_to (ty,body) :: trace)
-                body
+                env body
             with Not_found -> ()
           end;
-          List.iter (check_subtype cpath args prev_exp trace ty) args'
+          List.iter (check_subtype cpath args prev_exp trace ty env) args'
       | Tpoly (ty, tl) ->
           let ty = Ctype.instance_poly ~keep_names:true tl ty in
-          check_regular cpath args prev_exp trace ty
+          check_regular cpath args prev_exp trace env ty
       | _ ->
-          Btype.iter_type_expr
-            (check_subtype cpath args prev_exp trace ty) ty
+          Ctype.iter_type_expr_with_stages
+            (check_subtype cpath args prev_exp trace ty) env ty
     end
-    and check_subtype cpath args prev_exp trace outer_ty inner_ty =
+    and check_subtype cpath args prev_exp trace outer_ty env inner_ty =
       let trace = Contains (outer_ty, inner_ty) :: trace in
-      check_regular cpath args prev_exp trace inner_ty
+      check_regular cpath args prev_exp trace env inner_ty
   in
 
   Option.iter
@@ -2775,8 +2831,8 @@ let check_regularity ~abs_env env loc path decl to_check =
       let (args, body) =
         Ctype.instance_parameterized_type
           ~keep_names:true decl.type_params body in
-      List.iter (check_regular path args [] []) args;
-      check_regular path args [] [] body)
+      List.iter (check_regular path args [] [] env) args;
+      check_regular path args [] [] env body)
     decl.type_manifest
 
 let check_abbrev_regularity ~abs_env env id_loc_list to_check tdecl =
@@ -2839,8 +2895,13 @@ let name_recursion sdecl id decl =
     if Ctype.deep_occur ty ty' then
       let td = Tconstr(Path.Pident id, decl.type_params, ref Mnil) in
       link_type ty (newty2 ~level:(get_level ty) td);
-      {decl with type_manifest = Some ty'}
-    else decl
+      { decl with 
+        type_manifest = Some ty';
+        type_ikind =
+          Types.ikinds_todo
+            (Format_doc.asprintf "name_recursion path=%a"
+              Path.print (Path.Pident id)) }
+else decl
   | _ -> decl
 
 let name_recursion_decls sdecls decls =
@@ -2885,16 +2946,23 @@ let normalize_decl_jkinds env decls =
           allow_any_crossing type_unboxed_version (Path.unboxed_version path))
       decl.type_unboxed_version
     in
+    let normalization_context =
+      Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
+    in
     let normalized_jkind =
       Jkind.normalize
         ~mode:Require_best
-        ~context:(Ctype.mk_jkind_context env (fun ty ->
-          Some (Ctype.type_jkind env ty)))
+        ~context:normalization_context
         env
         decl.type_jkind
     in
     let decl =
-      { decl with type_jkind = normalized_jkind; type_unboxed_version }
+      { decl with
+        type_jkind = normalized_jkind;
+        type_ikind =
+          Ikind.type_declaration_ikind_gated ~env:(Some env) ~path;
+        type_unboxed_version
+      }
     in
     if normalized_jkind != original_decl.type_jkind then begin
       (* If the jkind has changed, check that it is a subjkind of the original jkind
@@ -2910,7 +2978,11 @@ let normalize_decl_jkinds env decls =
       match
         (* CR layouts v2.8: Consider making a function that doesn't compute
            histories for this use-case, which doesn't need it. *)
-        Jkind.sub_jkind_l
+        Ikind.sub_jkind_l
+          ~origin:(Format.asprintf
+                     "typedecl:normalize %a (%a)"
+                     (Format_doc.compat Path.print) path
+                     Location.print_loc decl.type_loc)
           ~type_equal
           ~context
           ~allow_any_crossing
@@ -2940,7 +3012,13 @@ let normalize_decl_jkinds env decls =
             | Type_variant (cs, rep, _) ->
               Type_variant (cs, rep, umc)
           in
-          { decl with type_jkind; type_kind; }
+          let type_ikind =
+            Ikind.type_declaration_ikind_of_jkind
+              ~env:(Some env)
+              ~params:decl.type_params
+              type_jkind
+          in
+          { decl with type_jkind; type_kind; type_ikind }
         else decl
       | Error err ->
         raise(Error(decl.type_loc, Jkind_mismatch_of_path (env, path, err)))
@@ -3171,7 +3249,7 @@ let transl_type_decl env rec_flag sdecl_list =
       if not (Path.Set.is_empty removed) then
         check_unboxed_paths decls
           ~unboxed_version_banned:(fun p -> Path.Set.mem p removed);
-      new_env, update_decls_jkind_reason new_env decls
+      new_env, update_decls_jkind_reason decls
     with
     | Typedecl_variance.Error (loc, err) ->
         raise (Error (loc, Variance err))
@@ -4049,7 +4127,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       in
       { val_type = ty;
         val_kind = Val_reg sort;
-        val_lpoly = lpoly;
+        val_lpoly = Lpoly.determined lpoly;
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
@@ -4093,7 +4171,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
       && not (String.starts_with ~prefix:"%" prim.prim_name)
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
-      { val_type = ty; val_kind = Val_prim prim; val_lpoly = lpoly;
+      { val_type = ty; val_kind = Val_prim prim;
+        val_lpoly = Lpoly.determined lpoly;
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;
@@ -4104,7 +4183,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
     Env.enter_value ~mode valdecl.pval_name.txt v env
       ~check:(fun s -> Warnings.Unused_value_declaration s)
   in
-  Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc newenv ty;
+  Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc ty;
   let desc =
     {
      val_id = id;
@@ -4142,6 +4221,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   (* In the first part of this function, we typecheck the syntactic
      declaration [sdecl] in the outer environment [outer_env]. *)
   let env = outer_env in
+  let decl_path = Path.Pident id in
   let loc = sdecl.ptype_loc in
   let tparams = make_params env (Pident id) sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
@@ -4219,6 +4299,12 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
           type_arity = arity;
           type_kind;
           type_jkind;
+          type_ikind =
+            (let reason =
+               Format.asprintf "transl_with_constraint unboxed path=%a"
+                 (Format_doc.compat Path.print) (Path.unboxed_version path)
+             in
+             Types.ikinds_todo reason);
           type_private = priv;
           type_manifest = Some man;
           type_variance = [];
@@ -4252,6 +4338,12 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_arity = arity;
       type_kind;
       type_jkind;
+      type_ikind =
+        (let reason =
+           Format.asprintf "transl_with_constraint path=%a"
+             (Format_doc.compat Path.print) decl_path
+         in
+         Types.ikinds_todo reason);
       type_private = priv;
       type_manifest = Some man;
       type_variance = [];
@@ -4292,6 +4384,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_arity = new_sig_decl.type_arity;
       type_kind = new_sig_decl.type_kind;
       type_jkind = new_sig_decl.type_jkind;
+      type_ikind = new_sig_decl.type_ikind;
       type_private = new_sig_decl.type_private;
       type_manifest = new_sig_decl.type_manifest;
       type_unboxed_default = new_sig_decl.type_unboxed_default;
@@ -4356,6 +4449,7 @@ let transl_package_constraint ~loc ty =
     (* There is no reason to calculate an accurate jkind here.  This typedecl
        will be thrown away once it is used for the package constraint inclusion
        check, and that check will expand the manifest as needed. *)
+    type_ikind = Types.ikinds_todo "transl_package_constraint";
     type_private = Public;
     type_manifest = Some ty;
     type_variance = [];
@@ -4379,6 +4473,7 @@ let abstract_type_decl ~injective ~jkind ~params =
       type_arity = arity;
       type_kind = Type_abstract Definition;
       type_jkind = jkind;
+      type_ikind = Types.ikinds_todo "abstract_type_decl";
       type_private = Public;
       type_manifest = None;
       type_variance = Variance.unknown_signature ~injective ~arity;
@@ -4395,6 +4490,7 @@ let abstract_type_decl ~injective ~jkind ~params =
           type_arity = arity;
           type_kind = Type_abstract Definition;
           type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+          type_ikind = Types.ikinds_todo "abstract_type_decl unboxed";
           type_private = Public;
           type_manifest = None;
           type_variance = Variance.unknown_signature ~injective ~arity;
@@ -4496,6 +4592,35 @@ let transl_jkind_decl env
 let transl_jkind_decl env pjkind =
   Builtin_attributes.warning_scope pjkind.pjkind_attributes
     (fun () -> transl_jkind_decl env pjkind)
+
+let transl_jkind_constraint id env orig_decl new_decl =
+  (* This can be much simpler than [transl_with_constraint] because the
+     considerations that require us to re-check the declaration in the inner
+     environment (e.g., [constraint]s) do not occur for lr-jkinds. *)
+  Env.mark_jkind_used orig_decl.jkind_uid;
+  let jkind_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
+  let context = Jkind.History.Jkind_declaration (Pident id) in
+  let jka =
+    match new_decl.pjkind_manifest with
+    | None -> Misc.fatal_error "Typedecl.transl_jkind_constraint : no manifest"
+    | Some jka -> jka
+  in
+  let jkind_manifest = Some (Jkind.Const.of_annotation env ~context jka) in
+  let jkind_jkind =
+    { jkind_manifest;
+      jkind_attributes = new_decl.pjkind_attributes;
+      jkind_uid;
+      jkind_loc = new_decl.pjkind_loc }
+  in
+  let decl =
+    { jkind_id = id;
+      jkind_name = new_decl.pjkind_name;
+      jkind_jkind;
+      jkind_attributes = new_decl.pjkind_attributes;
+      jkind_annotation = Some jka;
+      jkind_loc = new_decl.pjkind_loc }
+  in
+  decl
 
 (**** Error report ****)
 

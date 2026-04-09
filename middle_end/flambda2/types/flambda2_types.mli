@@ -291,6 +291,26 @@ module Join_analysis : sig
 
   val simple_refined_at_join :
     'a t -> Typing_env.t -> Simple.t -> 'a simple_refined_at_join
+
+  module Simples_at_join : sig
+    type 'a t
+
+    type definition_at_use = At_normal_mode of Simple.t [@@unboxed]
+
+    val fold_definitions_at_uses :
+      ('a -> definition_at_use -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  end
+
+  (* Fold over the variables created during the join with information about
+     their value at each use.
+
+     Note that the variable may not have a value at all uses; for uses with no
+     value, the variable does not exist and can be poisoned. *)
+  val fold_variables_created_at_join :
+    f:(Name.t -> 'a Simples_at_join.t -> Flambda_kind.t -> 'b -> 'b) ->
+    'a t ->
+    init:'b ->
+    'b
 end
 
 val cut_and_n_way_join :

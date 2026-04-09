@@ -379,6 +379,7 @@ module type S = sig
       type t =
         | Portable
         | Shareable
+        | Corruptible
         | Nonportable
 
       include Const with type t := t
@@ -407,6 +408,7 @@ module type S = sig
     module Const : sig
       type t =
         | Uncontended
+        | Corrupted
         | Shared
         | Contended
 
@@ -452,6 +454,7 @@ module type S = sig
     module Const : sig
       type t =
         | Stateless
+        | Writing
         | Reading
         | Stateful
 
@@ -461,6 +464,8 @@ module type S = sig
     include Common_axis_pos with module Const := Const
 
     val stateless : lr
+
+    val writing : lr
 
     val reading : lr
 
@@ -472,6 +477,7 @@ module type S = sig
       type t =
         | Read_write
         | Read
+        | Write
         | Immutable
 
       include Const with type t := t
@@ -482,6 +488,8 @@ module type S = sig
     val immutable : lr
 
     val read : lr
+
+    val write : lr
 
     val read_write : lr
   end

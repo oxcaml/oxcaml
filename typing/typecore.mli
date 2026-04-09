@@ -71,6 +71,9 @@ type pattern_variable =
     pv_as_var: bool;
     pv_attributes: Typedtree.attributes;
     pv_sort: Jkind.Sort.t;
+    pv_lpoly: Types.Lpoly.t;
+    (** Not yet determined; gets determined during generalization in
+        [type_let]. *)
   }
 
 val mk_expected:
@@ -301,6 +304,7 @@ type error =
   | Illegal_letrec_pat
   | Illegal_letrec_expr
   | Illegal_mutable_pat
+  | Mixed_poly_nonpoly_bindings
   | Illegal_class_expr
   | Letop_type_clash of string * Errortrace.unification_error
   | Andop_type_clash of string * Errortrace.unification_error
@@ -344,7 +348,10 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Let_poly_not_yet_implemented
-  | Layout_poly_inst_not_yet_supported
+  | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+
+and invalid_layout_poly_inst_context =
+  | Binding_op
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

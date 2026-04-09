@@ -368,12 +368,16 @@ module MT = struct
         Pwith_module (map_loc sub lid, map_loc sub lid2)
     | Pwith_modtype (lid, mty) ->
         Pwith_modtype (map_loc sub lid, sub.module_type sub mty)
+    | Pwith_jkind (lid, d) ->
+        Pwith_jkind (map_loc sub lid, sub.jkind_declaration sub d)
     | Pwith_typesubst (lid, d) ->
         Pwith_typesubst (map_loc sub lid, sub.type_declaration sub d)
     | Pwith_modsubst (s, lid) ->
         Pwith_modsubst (map_loc sub s, map_loc sub lid)
     | Pwith_modtypesubst (lid, mty) ->
         Pwith_modtypesubst (map_loc sub lid, sub.module_type sub mty)
+    | Pwith_jkindsubst (lid, d) ->
+        Pwith_jkindsubst (map_loc sub lid, sub.jkind_declaration sub d)
 
   let map_signature_item sub {psig_desc = desc; psig_loc = loc} =
     let open Sig in

@@ -1385,6 +1385,10 @@ AS_CASE([$host],
   [*-*-linux*],
     [AC_CHECK_HEADER([linux/futex.h], [AC_DEFINE([HAS_LINUX_FUTEX_H])])])
 
+AC_CHECK_HEADER([sys/epoll.h], [AC_DEFINE([HAS_SYS_EPOLL_H])])
+AC_CHECK_HEADER([sys/timerfd.h], [AC_DEFINE([HAS_SYS_TIMERFD_H])])
+AC_CHECK_HEADER([sys/eventfd.h], [AC_DEFINE([HAS_SYS_EVENTFD_H])])
+
 # Checks for types
 
 ## off_t

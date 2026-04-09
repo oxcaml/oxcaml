@@ -30,13 +30,18 @@ let vectorize_max_block_size =
 
 let cfg_peephole_optimize = ref true    (* -[no-]cfg-peephole-optimize *)
 
+let x86_peephole_optimize = ref false   (* -[no-]x86-peephole-optimize *)
+let x86_peephole_remove_mov_to_dead_register = ref true
+let x86_peephole_remove_redundant_cmp = ref true
+let x86_peephole_combine_add_rsp = ref true
+
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
 let cfg_eliminate_dead_trap_handlers = ref false  (* -cfg-eliminate-dead-trap-handlers *)
 
-let cfg_prologue_validate = ref false    (* -[no-]cfg-prologue-validate *)
-let cfg_prologue_shrink_wrap = ref false    (* -[no-]cfg-prologue-shrink-wrap *)
+let cfg_prologue_validate = ref true     (* -[no-]cfg-prologue-validate *)
+let cfg_prologue_shrink_wrap = ref true     (* -[no-]cfg-prologue-shrink-wrap *)
 let cfg_prologue_shrink_wrap_threshold = ref 16384
                                        (* -cfg-prologue-shrink-wrap-threshold *)
 

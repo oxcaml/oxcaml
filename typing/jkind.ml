@@ -377,6 +377,11 @@ module Layout = struct
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     in
     pp_element ~nested:false ppf layout
+
+  let rec generalize ~current_level : _ Layout.t -> unit = function
+    | Sort (sort, _) -> Sort.generalize ~current_level sort
+    | Product layouts -> List.iter (generalize ~current_level) layouts
+    | Any _ -> ()
 end
 
 module Externality = Externality
@@ -428,13 +433,6 @@ let raise ~loc err = raise (Error.User_error (loc, err))
 (******************************)
 module Mod_bounds = struct
   include Jkind0.Mod_bounds
-
-  let meet t1 t2 =
-    let crossing = Crossing.meet (crossing t1) (crossing t2) in
-    let externality = Externality.meet (externality t1) (externality t2) in
-    let nullability = Nullability.meet (nullability t1) (nullability t2) in
-    let separability = Separability.meet (separability t1) (separability t2) in
-    create crossing ~externality ~nullability ~separability
 
   let less_or_equal t1 t2 =
     let[@inline] modal_less_or_equal ax : Sub_result.t =
@@ -640,6 +638,11 @@ module With_bounds = struct
         fprintf ppf "%a"
           (pp_print_list (fun ppf -> fprintf ppf "with@ %s"))
           type_exprs)
+
+  let to_seq (type l r) (t : (l * r) t) =
+    match t with
+    | No_with_bounds -> Seq.empty
+    | With_bounds tys -> With_bounds_types.to_seq tys
 end
 
 (******************************)
@@ -647,7 +650,8 @@ end
 
 type jkind_context =
   { jkind_of_type : Types.type_expr -> Types.jkind_l option;
-    is_abstract : Path.t -> bool
+    is_abstract : Path.t -> bool;
+    lookup_type : Path.t -> Types.type_declaration option
   }
 
 module Base = struct
@@ -1107,9 +1111,12 @@ module Base_and_axes = struct
                     };
                   skippable_axes = relevant_axes_when_seen
                 }
+          (* CR metaprogramming jbachurski: Since quotes/splices inherit
+             (quoted/spliced) with-bounds from their operand, they do not
+             belong in the next case. What is the right behaviour here? *)
+          | Tquote _ | Tsplice _ | Tquote_eval _ -> Skip
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tunivar _ | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _
-          | Tof_kind _ ->
+          | Tunivar _ | Tpackage _ | Tof_kind _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
@@ -2444,6 +2451,12 @@ let default_to_value t =
   | Kconstr _ -> ()
   | Layout l -> ignore (Layout.default_to_value_and_get l)
 
+let generalize ~current_level t =
+  (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
+  match t.jkind.base with
+  | Kconstr _ -> ()
+  | Layout l -> Layout.generalize ~current_level l
+
 let get t = Jkind_desc.get t.jkind
 
 (* CR layouts: this function is suspect; it seems likely to reisenberg
@@ -2900,6 +2913,10 @@ module Format_history = struct
       fprintf ppf
         "it's the element type of an array that is iterated over in a \
          comprehension"
+    | Idx_base ->
+      fprintf ppf
+        "it's the base type (the first type parameter) for a@ block index (idx \
+         or mut_idx)"
 
   let format_value_creation_reason ppf ~layout_or_kind :
       History.value_creation_reason -> _ = function
@@ -2939,10 +2956,6 @@ module Format_history = struct
       fprintf ppf "an abstract type has the value %s by default" layout_or_kind
     | Existential_type_variable ->
       fprintf ppf "it's an unannotated existential type variable"
-    | Idx_base ->
-      fprintf ppf
-        "it's the base type (the first type parameter) for a@ block index (idx \
-         or mut_idx)"
     | List_comprehension_iterator_element ->
       fprintf ppf
         "it's the element type of a list that is iterated over in a \
@@ -3790,6 +3803,7 @@ module Debug_printers = struct
     | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | Array_comprehension_iterator_element ->
       fprintf ppf "Array_comprehension_iterator_element"
+    | Idx_base -> fprintf ppf "Idx_base"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function
     | Class_let_binding -> fprintf ppf "Class_let_binding"
@@ -3816,7 +3830,6 @@ module Debug_printers = struct
     | Univar -> fprintf ppf "Univar"
     | Default_type_jkind -> fprintf ppf "Default_type_jkind"
     | Existential_type_variable -> fprintf ppf "Existential_type_variable"
-    | Idx_base -> fprintf ppf "Idx_base"
     | List_comprehension_iterator_element ->
       fprintf ppf "List_comprehension_iterator_element"
     | Lazy_expression -> fprintf ppf "Lazy_expression"

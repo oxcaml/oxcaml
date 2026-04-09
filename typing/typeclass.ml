@@ -490,7 +490,7 @@ let enter_ancestor_met ~loc name ~sign ~meths ~cl_num ~ty ~attrs met_env =
   let kind = Val_anc (sign, meths, cl_num) in
   let desc =
     { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
-      val_lpoly = [];
+      val_lpoly = Lpoly.determined [];
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       Types.val_loc = loc;
@@ -507,7 +507,7 @@ let add_self_met loc id sign self_var_kind vars cl_num
   let kind = Val_self (sign, self_var_kind, vars, cl_num) in
   let desc =
     { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
-      val_lpoly = [];
+      val_lpoly = Lpoly.determined [];
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       Types.val_loc = loc;
@@ -524,7 +524,7 @@ let add_instance_var_met loc label id sign cl_num attrs met_env =
   let kind = Val_ivar (mut, cl_num) in
   let desc =
     { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
-      val_lpoly = [];
+      val_lpoly = Lpoly.determined [];
       val_attributes = attrs;
       Types.val_loc = loc;
       val_zero_alloc = Zero_alloc.default;
@@ -1487,7 +1487,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                {val_type = expr.exp_type;
                 val_modalities = Modality.undefined;
                 val_kind = Val_ivar (Immutable, cl_num);
-                val_lpoly = [];
+                val_lpoly = Lpoly.determined [];
                 val_attributes = [];
                 val_zero_alloc = Zero_alloc.default;
                 Types.val_loc = vd.val_loc;
@@ -1630,6 +1630,7 @@ let temp_abbrev loc id arity uid =
        type_arity = arity;
        type_kind = Type_abstract Definition;
        type_jkind = Jkind.Builtin.value ~why:Object;
+       type_ikind = Types.ikinds_todo "typeclass temp_abbrev";
        type_private = Public;
        type_manifest = Some ty;
        type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1861,6 +1862,7 @@ let class_infos define_class kind
      type_arity = arity;
      type_kind = Type_abstract Definition;
      type_jkind = Jkind.Builtin.value ~why:Object;
+     type_ikind = Types.ikinds_todo "typeclass temp_abbrev";
      type_private = Public;
      type_manifest = Some obj_ty;
      type_variance = Variance.unknown_signature ~injective:false ~arity;

@@ -8,8 +8,10 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -358,6 +360,15 @@ to_int:
   ret
 |}]
 
+(* CR ttebbi: This is the identity. *)
+let int_roundtrip x = Int64_u.of_int x |> Int64_u.to_int
+[%%expect_asm X86_64{|
+int_roundtrip:
+  sarq  $1, %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
 let unsigned_to_int x = Int64_u.unsigned_to_int x
 [%%expect_asm X86_64{|
 unsigned_to_int:
@@ -366,7 +377,7 @@ unsigned_to_int:
   jl    .L112
   movabsq $4611686018427387903, %rax
   cmpq  %rax, %rbx
-  jg    .L109
+  jg    .L112
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
@@ -377,9 +388,6 @@ unsigned_to_int:
   leaq  1(%rbx,%rbx), %rbx
   movq  %rbx, (%rax)
   addq  $8, %rsp
-  ret
-.L109:
-  movl  $1, %eax
   ret
 .L112:
   movl  $1, %eax
@@ -511,8 +519,7 @@ float_of_bits:
   ret
 |}]
 
-(* CR ttebbi: Double cmp instruction, subtraction should be done on byte
-   registers. *)
+(* CR ttebbi: Subtraction should be done on byte registers. *)
 let compare x y = Int64_u.compare x y
 [%%expect_asm X86_64{|
 compare:
@@ -520,7 +527,6 @@ compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
@@ -539,7 +545,6 @@ unsigned_compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
@@ -565,7 +570,6 @@ equal_using_compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax

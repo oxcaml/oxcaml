@@ -388,6 +388,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
+  | Texp_apply_layout (_, args) ->
+      let sorts = List.map Jkind.Sort.var_default_to_value_and_get args in
+      Misc.fatal_errorf
+        "Translcore: translation of layout-polymorphic instantiation is not \
+         yet supported@ (layout args: [%a])"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
+           (Format_doc.compat Jkind.Sort.Const.format))
+        sorts
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
       let return_layout = layout_exp sort body in
@@ -2028,7 +2037,7 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
               Tpat_var { id; uid; _ } -> id, uid
-            | _ -> assert false)
+            | _ -> Misc.fatal_error "Translcore.transl_let")
         pat_expr_list in
       let transl_case
             {vb_expr=expr; vb_sort; vb_attributes; vb_rec_kind = rkind;

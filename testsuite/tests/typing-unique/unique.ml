@@ -206,6 +206,12 @@ Error: This value is "once" but is expected to be "many".
 let foo () = once_ x
 [%%expect{|
 val foo : unit -> string @ once = <fun>
+|}];;
+
+(* Top-level expressions (not bindings) can be once *)
+("foo" : _ @ once);;
+[%%expect{|
+- : string = "foo"
 |}]
 
 (* top-level must be aliased; the following unique is weakened to aliased *)
@@ -222,8 +228,13 @@ Line 1, characters 21-22:
 1 | let foo () = unique_ x
                          ^
 Error: This value is "aliased" but is expected to be "unique".
-|}]
+|}];;
 
+(* Top-level expressions (not bindings) can be unique *)
+("foo" : _ @ unique);;
+[%%expect{|
+- : string = "foo"
+|}]
 
 (* CR zqian: [global] should imply [aliased]/[many], once we introduce borrowing whose
 scope is controlled by locality *)

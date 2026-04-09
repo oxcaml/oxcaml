@@ -308,6 +308,7 @@ let pat
   | Tpat_or (p1, p2, _) ->
       sub.pat sub p1;
       sub.pat sub p2
+  | Tpat_fun_layout { name = s; _ } -> iter_loc sub s
 
 let extra sub = function
   | Texp_constraint (cty) -> sub.typ sub cty
@@ -374,6 +375,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   in
   match exp_desc with
   | Texp_ident { lid; _ } -> iter_loc sub lid
+  | Texp_apply_layout (exp, _) -> sub.expr sub exp
   | Texp_constant _ -> ()
   | Texp_let (rec_flag, list, exp) ->
       sub.value_bindings sub (rec_flag, list);
@@ -587,6 +589,8 @@ let with_constraint sub = function
   | Twith_modsubst  (_, lid) -> iter_loc sub lid
   | Twith_modtype      mty -> sub.module_type sub mty
   | Twith_modtypesubst mty -> sub.module_type sub mty
+  | Twith_jkind      jd -> sub.jkind_declaration sub jd
+  | Twith_jkindsubst jd -> sub.jkind_declaration sub jd
 
 
 let open_description sub {open_loc; open_expr; open_env; open_attributes; _} =

@@ -866,9 +866,12 @@ let same_printing_env env =
   && Compilation_unit.Name.Set.equal !printing_pers used_pers
 
 let set_printing_env env =
-  printing_env := env;
+  (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
+     errors track their stage, as we should usually print at stage 0.
+     See ticket 6726. *)
+  printing_env := Env.enter_future env;
   if !Clflags.real_paths ||
-     !printing_env == Env.empty ||
+     env == Env.empty ||
      same_printing_env env then
     ()
   else begin
@@ -1471,7 +1474,10 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     (* [contention] has implied defaults based on [visibility]: *)
     let contention =
       match modes.visibility, modes.contention with
-      | Immutable, Contended | Read, Shared | Read_write, Uncontended -> None
+      | Immutable, Contended
+      | Read, Shared
+      | Write, Corrupted
+      | Read_write, Uncontended -> None
       | _, _ -> Some modes.contention
     in
 
@@ -1480,6 +1486,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
       match modes.statefulness, modes.portability with
       | Stateless, Portable
       | Reading, Shareable
+      | Writing, Corruptible
       | Stateful, Nonportable -> None
       | _, _ -> Some modes.portability
     in
@@ -1929,6 +1936,8 @@ let tree_of_type_scheme ty =
 
 let () =
   Env.print_type_expr := type_expr;
+  Env.report_jkind_violation_with_offender :=
+    Jkind.Violation.report_with_offender;
   Jkind.set_outcometrees_of_types (fun tys ->
     prepare_for_printing tys;
     List.map (tree_of_typexp Type) tys);
@@ -2403,8 +2412,8 @@ let tree_of_value_description id decl =
     (* Important: process the fvs *after* the type; tree_of_type_scheme
        resets the naming context. Both must be inside print_with_genvars
        so that sort poly var names are registered when jkinds are printed. *)
-    Jkind_types.Sort.print_with_genvars decl.val_lpoly (fun names ->
-      names, extract_qtvs [decl.val_type])
+    Jkind_types.Sort.print_with_genvars (Lpoly.get_exn decl.val_lpoly)
+      (fun names -> names, extract_qtvs [decl.val_type])
   in
   let apparent_arity =
     let rec count n typ =
@@ -2670,6 +2679,7 @@ let dummy =
     type_arity = 0;
     type_kind = Type_abstract Definition;
     type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+    type_ikind = Types.ikinds_todo "print dummy";
     type_private = Public;
     type_manifest = None;
     type_variance = [];

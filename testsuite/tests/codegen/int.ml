@@ -1,8 +1,10 @@
 (* TEST
  flags += " -O3";
  flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  only-default-codegen;
  expect.opt;
 *)
@@ -266,7 +268,7 @@ shift_right_logical:
 |}]
 
 
-(* CR ttebbi: There is no need to repeat cmpq. *)
+(* CR ttebbi: We should sign-extend after the subtraction. *)
 let compare (x : int) (y : int) = compare x y
 [%%expect_asm X86_64{|
 compare:
@@ -274,7 +276,6 @@ compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
@@ -303,7 +304,6 @@ equal_using_compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
