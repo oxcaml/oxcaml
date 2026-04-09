@@ -34,7 +34,7 @@ val print : Format.formatter -> t -> unit
 
 val print_view : Format.formatter -> t -> unit
 
-val merge : Code_id.t -> t -> t -> t option
+val merge : Code_id.t -> t -> t -> t
 
 val create : Code.t -> t
 

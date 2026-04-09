@@ -355,6 +355,14 @@ module Tree_operations (Tree : Tree) : sig
 
   val union_shared : ('a, 'a, 'a) Merge_callback.t -> 'a t -> 'a t -> 'a t
 
+  val union_total : (key -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+
+  val union_total_shared : (key -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+
+  val union_left_biased : 'a t -> 'a t -> 'a t
+
+  val union_right_biased : 'a t -> 'a t -> 'a t
+
   val update_many :
     (key -> 'a option -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
 
@@ -646,7 +654,7 @@ end = struct
 
   let no_phys_eq_shortcut _iv _t0 _t1 = None
 
-  let phys_eq_shortcut_union_left _iv t0 t1 = if t0 == t1 then Some t0 else None
+  let phys_eq_shortcut_union _iv t0 t1 = if t0 == t1 then Some t0 else None
 
   let phys_eq_shortcut_diff iv t0 t1 =
     if t0 == t1 then Some (empty iv) else None
@@ -800,8 +808,7 @@ end = struct
 
   let rec union_shared f t0 t1 =
     let iv = is_value_of t0 in
-    pattern_match_pair_merge_sharing
-      ~phys_eq_shortcut:phys_eq_shortcut_union_left
+    pattern_match_pair_merge_sharing ~phys_eq_shortcut:phys_eq_shortcut_union
       ~phys_eq_check_branch_right:phys_eq_check_branch
       ~phys_eq_check_leaf_right:phys_eq_check_leaf
       ~only_left:(fun t0 -> t0)
@@ -809,6 +816,52 @@ end = struct
       ~both_sides:(fun t0 t1 -> union_shared f t0 t1)
       iv
       (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
+      t0 t1
+
+  let rec union_total f t0 t1 =
+    let iv = is_value_of t0 in
+    pattern_match_pair_merge
+      ~only_left:(fun t0 -> t0)
+      ~only_right:(fun t1 -> t1)
+      ~both_sides:(fun t0 t1 -> union_total f t0 t1)
+      iv
+      (fun[@inline] k t t' -> Some (f k t t'))
+      t0 t1
+
+  let rec union_total_shared f t0 t1 =
+    let iv = is_value_of t0 in
+    pattern_match_pair_merge_sharing ~phys_eq_shortcut:phys_eq_shortcut_union
+      ~phys_eq_check_branch_right:phys_eq_check_branch
+      ~phys_eq_check_leaf_right:phys_eq_check_leaf
+      ~only_left:(fun t0 -> t0)
+      ~only_right:(fun t1 -> t1)
+      ~both_sides:(fun t0 t1 -> union_total_shared f t0 t1)
+      iv
+      (fun[@inline] k t t' -> Some (f k t t'))
+      t0 t1
+
+  let rec union_left_biased t0 t1 =
+    let iv = is_value_of t0 in
+    pattern_match_pair_merge_sharing ~phys_eq_shortcut:phys_eq_shortcut_union
+      ~phys_eq_check_branch_right:phys_eq_check_branch
+      ~phys_eq_check_leaf_right:phys_eq_check_leaf
+      ~only_left:(fun t0 -> t0)
+      ~only_right:(fun t1 -> t1)
+      ~both_sides:(fun t0 t1 -> union_left_biased t0 t1)
+      iv
+      (fun[@inline] _k t _t' -> Some t)
+      t0 t1
+
+  let rec union_right_biased t0 t1 =
+    let iv = is_value_of t0 in
+    pattern_match_pair_merge_sharing ~phys_eq_shortcut:phys_eq_shortcut_union
+      ~phys_eq_check_branch_right:phys_eq_check_branch
+      ~phys_eq_check_leaf_right:phys_eq_check_leaf
+      ~only_left:(fun t0 -> t0)
+      ~only_right:(fun t1 -> t1)
+      ~both_sides:(fun t0 t1 -> union_right_biased t0 t1)
+      iv
+      (fun[@inline] _k _t t' -> Some t')
       t0 t1
 
   let rec diff f t0 t1 =
