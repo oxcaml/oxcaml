@@ -47,6 +47,8 @@ module type Lattices = sig
 
   val print : 'a obj -> Fmt.formatter -> 'a elt -> unit
 
+  (** Compares two objects. Used for deduplication only; it is sound (but not
+      recommended) to return a nonzero value for equal objects. *)
   val compare_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.comparison
 
   val print_obj : Fmt.formatter -> 'a obj -> unit

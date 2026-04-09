@@ -276,8 +276,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     { mutable vlower : 'a lmorphvar VarMap.t;
           (** A list of variables directly under the current variable. Each is a
               pair [f] [v], and we have [f v <= u] where [u] is the current
-              variable. TODO: consider using hashset for quicker deduplication
-          *)
+              variable. *)
       mutable upper : 'a;  (** The precise upper bound of the variable *)
       mutable upper_hint : ('a, right_only) Comp_hint.t;
           (** Hints for [upper] *)
