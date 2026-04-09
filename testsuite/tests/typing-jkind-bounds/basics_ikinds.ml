@@ -36,7 +36,7 @@ Line 1, characters 12-13:
 Error: Unimplemented kind syntax
 |}]
 
-kind_ immediate = value mod everything non_float
+kind_ immediate = value non_pointer mod everything
 
 [%%expect{|
 kind_ immediate = immediate
@@ -209,7 +209,7 @@ Error: The layout of type "a" is value
          because of the definition of b at line 2, characters 0-30.
 |}]
 
-type a : value mod global aliased many immutable stateless external_ unyielding non_float
+type a : value non_pointer mod global aliased many immutable stateless external_ unyielding
 type b : value mod local unique once contended nonportable internal = a
 [%%expect{|
 type a : immediate
@@ -267,8 +267,8 @@ type d = c
 |}]
 
 type a : immediate
-type b : value mod global aliased many immutable stateless unyielding external_ non_float = a
-type c : value mod global aliased many immutable stateless unyielding external_ non_float
+type b : value non_pointer mod global aliased many immutable stateless unyielding external_ = a
+type c : value non_pointer mod global aliased many immutable stateless unyielding external_
 type d : immediate = c
 [%%expect{|
 type a : immediate
@@ -278,8 +278,8 @@ type d = c
 |}]
 
 type a : immediate64
-type b : value mod global aliased many immutable stateless unyielding external64 non_float = a
-type c : value mod global aliased many immutable stateless unyielding external64 non_float
+type b : value non_pointer64 mod global aliased many immutable stateless unyielding external64 = a
+type c : value non_pointer64 mod global aliased many immutable stateless unyielding external64
 type d : immediate64 = c
 [%%expect{|
 type a : immediate64
@@ -1650,25 +1650,6 @@ Error: This expression has type "int t" but an expression was expected of type
 |}]
 
 (*********************************)
-(* Test 15: extensible variants *)
-
-(* The best kind an extensible variant can get is [value mod non_float] *)
-type extensible : value mod non_float = ..
-[%%expect{|
-type extensible = ..
-|}]
-
-(* Since the kind is [best], it should normalize away *)
-module M : sig
-  type t : immediate with extensible
-end = struct
-  type t : value mod non_float
-end
-[%%expect{|
-module M : sig type t : value mod non_float end
-|}]
-
-(*********************************)
 (* Test 16: principality *)
 
 let id x = x
@@ -1715,7 +1696,7 @@ type extensible = ..
 
 (* Since the kind is [best], it should normalize away *)
 module M : sig
-  type t : immediate with extensible
+  type t : immediate non_float with extensible
 end = struct
   type t : value mod non_float
 end
@@ -1821,7 +1802,6 @@ module M : sig
 end = struct
   type 'a t : value_or_null mod everything
 end
-(* CR layouts v2.8: Fix printing ([mod everything mod separable] is wrong) *)
 [%%expect{|
 Lines 3-5, characters 6-3:
 3 | ......struct

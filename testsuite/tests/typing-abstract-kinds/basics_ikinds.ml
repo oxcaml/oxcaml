@@ -783,6 +783,7 @@ Error: This type "t1" should be an instance of type "('a : any mod separable)"
          because it's the type argument to the array type.
 |}]
 
+(* CR layouts-scannable: support scannable axes on abstract kinds *)
 type t2 : k mod separable
 type s2 = t2 array
 [%%expect{|
@@ -1613,10 +1614,10 @@ Error: The kind "Visible_local_mty_a.X.k" is cyclic:
 (************************************************************)
 (* Test: Asymmetric GADT refinement of abstract-kind equalities *)
 (* Upshot: GADT pattern matching refines the kinds of abstract types,
-   but it does currently *not* refine the kind variables. 
-   Doing so in the future would be safe, but we would have to be 
+   but it does currently *not* refine the kind variables.
+   Doing so in the future would be safe, but we would have to be
    very careful in combination with the above hidden recursive cycles:
-   if GADT matching refined kind variables, we could expose the 
+   if GADT matching refined kind variables, we could expose the
    hidden cycles, and the typechecker could then go into an infinite
    loop if it is not carefully rewritten to handle cycles.
    This is probably doable (after all, it works for rectypes),

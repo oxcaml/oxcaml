@@ -443,10 +443,11 @@ Error: This expression has type "('a, 'a or_null) gadt"
          because of the definition of t at line 1, characters 0-69.
 |}]
 
-type t : immediate & immediate = #(int or_null * int)
-[%%expect{|
-type t = #(int or_null * int)
-|}]
+type t : immediate_or_null & immediate = #(int or_null * int)
+[%%expect{||}]
+
+type bad : immediate & immediate = #(int or_null * int)
+[%%expect{||}]
 
 module M : sig
   type t : immediate_or_null
