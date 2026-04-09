@@ -64,7 +64,6 @@ let print_param_decision ppf param_decision =
       fields
 
 type should_preserve_direct_calls =
-      Traverse_acc.Env.should_preserve_direct_calls =
   | Yes
   | No
   | Auto
