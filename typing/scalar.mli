@@ -211,7 +211,11 @@ module Signedness : sig
 
   val equal : t -> t -> bool
 
+  val compare : t -> t -> int
+
   val print : Format.formatter -> t -> unit
+
+  val print_as_suffix : Format.formatter -> t -> unit
 end
 
 module Integer_comparison : sig
@@ -310,7 +314,8 @@ module Operation : sig
       | Floating of 'mode Floating.t * Float_op.t
       | Static_cast of
           { src : any_locality_mode scalar;
-            dst : 'mode scalar
+            dst : 'mode scalar;
+            signedness : Signedness.t
           }
           (** [Static_cast] performs a conversion between numeric types, which
               may include (un)tagging or (un)boxing. The jane/doc/scalars.md

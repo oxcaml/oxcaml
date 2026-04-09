@@ -1221,7 +1221,8 @@ type unary_primitive =
   | Float_arith of float_bitwidth * unary_float_arith_op
   | Num_conv of
       { src : Flambda_kind.Standard_int_or_float.t;
-        dst : Flambda_kind.Standard_int_or_float.t
+        dst : Flambda_kind.Standard_int_or_float.t;
+        signedness : Scalar.Signedness.t
       }
   | Boolean_not
   | Reinterpret_64_bit_word of Reinterpret_64_bit_word.t
@@ -1353,9 +1354,14 @@ let compare_unary_primitive p1 p2 =
   | Int_arith (kind1, op1), Int_arith (kind2, op2) ->
     let c = K.Standard_int.compare kind1 kind2 in
     if c <> 0 then c else Stdlib.compare op1 op2
-  | Num_conv { src = src1; dst = dst1 }, Num_conv { src = src2; dst = dst2 } ->
+  | ( Num_conv { src = src1; dst = dst1; signedness = signedness1 },
+      Num_conv { src = src2; dst = dst2; signedness = signedness2 } ) ->
     let c = K.Standard_int_or_float.compare src1 src2 in
-    if c <> 0 then c else K.Standard_int_or_float.compare dst1 dst2
+    if c <> 0
+    then c
+    else
+      let c = K.Standard_int_or_float.compare dst1 dst2 in
+      if c <> 0 then c else Scalar.Signedness.compare signedness1 signedness2
   | Float_arith (width1, op1), Float_arith (width2, op2) ->
     let c = Stdlib.compare width1 width2 in
     if c <> 0 then c else Stdlib.compare op1 op2
@@ -1438,10 +1444,11 @@ let print_unary_primitive ppf p =
     fprintf ppf "@[(Opaque_identity@ (middle_end_only %b) (kind %a))@]"
       middle_end_only K.print kind
   | Int_arith (_k, o) -> print_unary_int_arith_op ppf o
-  | Num_conv { src; dst } ->
-    fprintf ppf "Num_conv_%a_to_%a"
+  | Num_conv { src; dst; signedness } ->
+    fprintf ppf "Num_conv_%a_to_%a%a"
       Flambda_kind.Standard_int_or_float.print_lowercase src
       Flambda_kind.Standard_int_or_float.print_lowercase dst
+      Scalar.Signedness.print_as_suffix signedness
   | Boolean_not -> fprintf ppf "Boolean_not"
   | Reinterpret_64_bit_word reinterpret ->
     fprintf ppf "@[<hov 1>(Reinterpret_64_bit_word@ %a)@]"
@@ -1490,7 +1497,8 @@ let arg_kind_of_unary_primitive p =
   | Int_as_pointer _ -> K.value
   | Opaque_identity { middle_end_only = _; kind } -> kind
   | Int_arith (kind, _) -> K.Standard_int.to_kind kind
-  | Num_conv { src; dst = _ } -> K.Standard_int_or_float.to_kind src
+  | Num_conv { src; dst = _; signedness = _ } ->
+    K.Standard_int_or_float.to_kind src
   | Boolean_not -> K.value
   | Reinterpret_boxed_vector -> K.value
   | Reinterpret_64_bit_word reinterpret -> (
@@ -1528,7 +1536,8 @@ let result_kind_of_unary_primitive p : result_kind =
     Singleton K.value
   | Opaque_identity { middle_end_only = _; kind } -> Singleton kind
   | Int_arith (kind, _) -> Singleton (K.Standard_int.to_kind kind)
-  | Num_conv { src = _; dst } -> Singleton (K.Standard_int_or_float.to_kind dst)
+  | Num_conv { src = _; dst; signedness = _ } ->
+    Singleton (K.Standard_int_or_float.to_kind dst)
   | Boolean_not -> Singleton K.value
   | Reinterpret_boxed_vector -> Singleton K.value
   | Reinterpret_64_bit_word reinterpret -> (

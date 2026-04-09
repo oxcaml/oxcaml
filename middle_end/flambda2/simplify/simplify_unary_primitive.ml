@@ -1011,7 +1011,8 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
       | Naked_nativeint -> Unary_int_arith_naked_nativeint.simplify op)
     | Float_arith (Float64, op) -> simplify_float_arith_op op
     | Float_arith (Float32, op) -> simplify_float32_arith_op op
-    | Num_conv { src; dst } -> (
+    | Num_conv { src; dst; signedness = _ } -> (
+      (* CR jrayman: should signedness be used? *)
       match src with
       | Tagged_immediate -> Simplify_int_conv_tagged_immediate.simplify ~dst
       | Naked_immediate -> Simplify_int_conv_naked_immediate.simplify ~dst
