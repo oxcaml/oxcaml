@@ -42,18 +42,6 @@ module Or_missing = struct
   let[@inline] bind t ~f =
     match t with Present a -> (f [@inlined hint]) a | Missing -> Missing
 
-  exception Found_missing
-
-  let all_array arr =
-    try
-      let arr =
-        Array.map
-          (function Present a -> a | Missing -> raise Found_missing)
-          arr
-      in
-      Present arr
-    with Found_missing -> Missing
-
   module Syntax = struct
     let[@inline] ( let* ) t f = bind t ~f
 
@@ -76,7 +64,7 @@ module rec Types : sig
     | SLVhalves of slambda_halves
     | SLVlambda of lambda
     | SLVlayout of layout
-    | SLVrecord of value array
+    | SLVrecord of value Or_missing.t array
     | SLVclosure of closure
 end =
   Types
@@ -116,7 +104,7 @@ type _ value_type =
   | Thalves : slambda_halves value_type
   | Tlambda : lambda value_type
   | Tlayout : layout value_type
-  | Trecord : value array value_type
+  | Trecord : value Or_missing.t array value_type
   | Tclosure : closure value_type
 
 let describe_value_type (type a) : a value_type -> string = function
@@ -174,12 +162,10 @@ let rec eval_slam env slam : value Or_missing.t =
     eval_slam env_body slet_body
   | SLmissing -> Missing
   | SLrecord slams ->
-    let+ values =
-      Array.map (eval_slam env) (Array.of_list slams) |> Or_missing.all_array
-    in
-    SLVrecord values
+    let values = Array.map (eval_slam env) (Array.of_list slams) in
+    Present (SLVrecord values)
   | SLfield (slam, i) ->
-    let+ fields = eval_slam env slam |>> expect Trecord in
+    let* fields = eval_slam env slam |>> expect Trecord in
     fields.(i)
   | SLproj_comptime slam ->
     let* halves = eval_slam env slam |>> expect Thalves in
