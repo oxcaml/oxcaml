@@ -1,19 +1,20 @@
 (* TEST
- runtime5;
- frame_pointers;
- readonly_files = "fp_backtrace.c stack_realloc_.c";
- all_modules = "${readonly_files} stack_realloc2.ml";
- {
-   (* NOTE clang on MacOS and gcc on Linux are less eager to inline
-           certain C functions in the runtime. *)
-   reference = "${test_source_directory}/stack_realloc2.arm64.reference";
-   arch_arm64;
-   native;
- } {
-   reference = "${test_source_directory}/stack_realloc2.reference";
-   arch_amd64;
-   native;
- }
+   runtime5;
+   frame_pointers;
+   readonly_files = "fp_backtrace.c stack_realloc_.c";
+   all_modules = "${readonly_files} stack_realloc2.ml";
+   (* TODO ocaml#14545 and ocaml#13762 tidy up the ocamltest language
+           in this case. not-macos really implies Linux with gcc and
+           macos implies clang on arm64. *)
+   {
+     not-macos;
+     reference = "${test_source_directory}/stack_realloc2.reference";
+     native;
+   } {
+     macos;
+     reference = "${test_source_directory}/stack_realloc2.${arch}.reference";
+     native;
+   }
 *)
 
 open Effect

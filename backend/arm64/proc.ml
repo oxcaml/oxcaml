@@ -23,6 +23,8 @@ open Misc
 open Reg
 open Arch
 
+let fp = Config.with_frame_pointers
+
 (* Registers available for register allocation *)
 
 (* Integer register map:
@@ -232,9 +234,13 @@ let domainstate_ptr_dwarf_register_number = 28
 (* Registers destroyed by operations *)
 
 let destroyed_at_c_noalloc_call =
-  (* x20-x28, d8-d15 preserved *)
+  (* x19-x28, d8-d15 preserved.
+     x19 is also clobbered when [runtime5 && fp], as it then holds the OCaml
+     stack pointer across noalloc C calls. See emit.ml. *)
   let int_regs_destroyed_at_c_noalloc_call =
-    Regs.[| X0;X1;X2;X3;X4;X5;X6;X7;X8;X9;X10;X11;X12;X13;X14;X15;X19 |]
+    if Config.runtime5 && fp
+    then Regs.[| X0;X1;X2;X3;X4;X5;X6;X7;X8;X9;X10;X11;X12;X13;X14;X15;X19 |]
+    else Regs.[| X0;X1;X2;X3;X4;X5;X6;X7;X8;X9;X10;X11;X12;X13;X14;X15 |]
   in
   let float_regs_destroyed_at_c_noalloc_call =
     Regs.[|D0;D1;D2;D3;D4;D5;D6;D7;
@@ -395,7 +401,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
 
 let initial_stack_offset ~num_stack_slots ~contains_calls =
   Stack_class.Tbl.total_size_in_bytes num_stack_slots
-  + if contains_calls then 8 else 0
+  + (if fp then 16 else if contains_calls then 8 else 0)
 
 let trap_frame_size_in_bytes = 16
 
@@ -406,7 +412,9 @@ let frame_size ~stack_offset ~contains_calls ~num_stack_slots =
   Misc.align sz 16
 
 let frame_required ~fun_contains_calls ~fun_num_stack_slots =
-  fun_contains_calls || Stack_class.Tbl.exists fun_num_stack_slots ~f:(fun _stack_class num -> num > 0)
+  fp || fun_contains_calls
+  || Stack_class.Tbl.exists fun_num_stack_slots
+       ~f:(fun _stack_class num -> num > 0)
 
 let prologue_required ~fun_contains_calls ~fun_num_stack_slots =
   frame_required ~fun_contains_calls ~fun_num_stack_slots

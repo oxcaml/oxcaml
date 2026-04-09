@@ -385,9 +385,10 @@ G(name):
 
    REG: Stack_handler(target_fiber)
 
-   The frame pointer will be pushed into the stack immediately after these
-   instructions. The offset of the oldest saved x29 in a fiber from the stack
-   handler is 48 = 4 words (caml_runstack) + 2 words (x30 and x29).
+   The macro records [sp - 16] as the new oldest saved x29 for the target
+   fiber. This anticipates the next x29/x30 pair push on the target stack.
+   The offset of the oldest saved x29 in a fiber from the stack handler is
+   48 = 4 words (caml_runstack) + 2 words (x30 and x29).
    */
 #ifdef WITH_FRAME_POINTERS
 .macro UPDATE_BASE_POINTER reg
@@ -1345,7 +1346,6 @@ FUNCTION(caml_resume)
         CFI_OFFSET(30, -8)
         stp     x29, x30, [sp, -16]!
         CFI_ADJUST(16)
-        add     x29, sp, #0
         mov     x22, x2                       /* x22 := arg */
         ldr     x23, Cont_last_fiber(x0)      /* x23 := last_fiber */
         mov     x24, x1                       /* x24 := fun */
@@ -1401,6 +1401,10 @@ FUNCTION(caml_resume)
     /* Pop our frame before stack switch */
         ldp     x29, x30, [sp], 16
         CFI_ADJUST(-16)
+    /* Need to update the oldest saved frame pointer here as the current fiber
+       stack may have been reallocated or we may be resuming a computation
+       that was not originally run here. */
+        UPDATE_BASE_POINTER x8
         SWITCH_OCAML_STACKS x9, x0
         FLUSH_DYNAMIC_CACHE
     /* Is this a preemption continuation? */
