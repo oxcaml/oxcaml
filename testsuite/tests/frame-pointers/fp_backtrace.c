@@ -9,20 +9,27 @@
 
 #define ARR_SIZE(a)    (sizeof(a) / sizeof(*(a)))
 
+#if defined(__APPLE__)
+#define RE_FUNC_NAME "^[[:digit:]]+[[:space:]]+[[:alnum:]_\\.]+[[:space:]]+0x[[:xdigit:]]+[[:space:]]([[:alnum:]_\\.\\$]+).*$"
+#else
 #define RE_FUNC_NAME  "^.*\\((.+)\\+0x[[:xdigit:]]+\\) \\[0x[[:xdigit:]]+\\]$"
+#endif
 #define RE_TRIM_FUNC  "(caml.*)_[[:digit:]]+"
 #define CAML_ENTRY    "caml_program"
 
 typedef struct frame_info
 {
-  struct frame_info*  prev;     /* rbp */
-  void*               retaddr;  /* rip */
+  struct frame_info*  prev;     /* base pointer / frame pointer */
+  void*               retaddr;  /* instruction pointer / program counter */
 } frame_info;
 
-
 /*
- * A backtrace symbol looks like:
- * ./path/to/binary(camlModule_fn_123+0xAABBCC) [0xAABBCCDDEE]
+ * A backtrace symbol looks like this on Linux:
+ * ./path/to/binary(camlModule.fn_123+0xAABBCC) [0xAABBCCDDEE]
+ *
+ * or this on macOS:
+ * 0   c_call.opt                          0x000000010e621079 camlC_call.entry + 57
+ *
  */
 static const char* backtrace_symbol(const struct frame_info* fi)
 {
@@ -99,7 +106,7 @@ static void print_symbol(const char* symbol, const regmatch_t* match)
   regoff_t off = match->rm_so;
   regoff_t len = match->rm_eo - match->rm_so;
 
-  fprintf(stdout, "%.*s\n", len, symbol + off);
+  fprintf(stdout, "%.*s\n", (int)len, symbol + off);
   fflush(stdout);
 }
 
@@ -121,10 +128,6 @@ void fp_backtrace(value argv0)
     symbol = backtrace_symbol(fi);
     if (!symbol)
       continue;
-
-    /* Skip entries not from the test */
-    if (!is_from_executable(symbol, execname))
-      goto skip;
 
     /* Exctract the full function name */
     regmatch_t funcname = func_name_from_symbol(symbol);
