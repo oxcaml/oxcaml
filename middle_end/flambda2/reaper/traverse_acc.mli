@@ -19,9 +19,8 @@
 module Graph = Global_flow_graph
 
 (** Information about a continuation, including its parameters, arity, and
-    whether it is an exception handler. This is used to determine how to
-    register dependencies on the continuation at call sites and exception
-    handlers. *)
+    whether it is an exception handler. This is used to register dependencies on
+    the continuation at call sites. *)
 type continuation_info =
   { is_exn_handler : bool;
     params : Variable.t list;
@@ -31,17 +30,26 @@ type continuation_info =
 (** Environment threaded through the downward traversal of a function body.
     Tracks the context needed to register dependencies at each expression. *)
 module Env : sig
-  (** [Normal params] carries the dummy variables representing a continuation's
+  (** [Normal params] carries the variables representing a continuation's
       parameters. *)
   type cont_kind = Normal of Variable.t list
 
-  (** Controls whether the reaper preserves direct function calls even when the
-      closure might be dead.
+  (** Controls whether the reaper preserves direct function calls when the
+      code_id being called might otherwise be dead. The typical situation is a
+      call to a code_id [f], which has two newer versions [f1] and [f2], and the
+      closure that is used could have either code_id [f1] or [f2], but never
+      [f].
 
-      - [Yes]: always preserve direct calls.
-      - [No]: allow removal of direct calls if the closure is dead.
-      - [Auto]: preserve only if the closure is independently marked as
-        [any_source]. *)
+      - [Yes]: always preserve direct calls: this has the consequence that it
+        needs to keep old code_ids ([f] in this case) alive.
+      - [No]: never preserve direct calls to dead code_ids: the call will be
+        replaced by [Indirect_known_arity] if the reaper isn't able to determine
+        the possibly called code_ids.
+      - [Auto]: preserve only if the closure is [any_source], preventing a
+        determination of a set of possibly called code_ids. In this case, direct
+        calls can never be completely degraded to [Indirect_known_arity] that
+        doesn't know the set of possibly called code_ids: if that were to
+        happen, the direct call is instead kept. *)
   type should_preserve_direct_calls =
     | Yes
     | No
@@ -93,7 +101,8 @@ end
 
 (** Information about a function's code that is needed for building the
     dependency graph. Created by [prepare_code] during traversal and looked up
-    when processing function bodies and call sites. *)
+    when processing function bodies and call sites at the end of the traversal.
+*)
 type code_dep =
   { arity : [`Complex] Flambda_arity.t;
     params : Variable.t list;
@@ -132,8 +141,8 @@ val alias_kind : t -> Name.t -> Simple.t -> unit
 (** Return the map of all recorded kinds. *)
 val kinds : t -> Flambda_kind.t Name.Map.t
 
-(** Mark a continuation as having fixed arity: the rebuild pass may not change
-    its number of parameters. *)
+(** Mark a continuation as having fixed arity (mostly function return
+    continuations): the rebuild pass may not change its number of parameters. *)
 val fixed_arity_continuation : t -> Continuation.t -> unit
 
 (** Return the set of all fixed-arity continuations. *)
@@ -163,19 +172,19 @@ val find_code : t -> Code_id.t -> code_dep option
 (** Return the map of all registered code deps. *)
 val code_deps : t -> code_dep Code_id.Map.t
 
-(** Add an alias edge: if [to_] is used, [from] is also used, and they share the
-    same source. *)
+(** Add a (directed) alias edge: [from] flows into [to_], meaning that every
+    usage of [to_] is a usage of [from]; and every source of [from] is a source
+    of [to_]. *)
 val add_alias : t -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
 
 (** Convenience wrapper around [add_alias] for variables. *)
 val add_alias_vars : t -> to_:Variable.t -> from:Variable.t -> unit
 
-(** Add a use-dependency edge: if [to_] is used then [from] is also used. Unlike
-    [add_alias], source information does not propagate. *)
+(** Add a use-dependency edge: if [to_] has an usage, then [from] is
+    [any_usage]. Besides, this is a source for [to_]. *)
 val add_use_dep : t -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
 
-(** Add an accessor edge: if [to_] is used, then [base] is used and the field
-    [relation] of [base] flows into [to_]. *)
+(** Add an accessor edge: the field [relation] of [base] flows into [to_]. *)
 val add_accessor_dep :
   t -> to_:Code_id_or_name.t -> Field.t -> base:Code_id_or_name.t -> unit
 
@@ -183,18 +192,16 @@ val add_accessor_dep :
 val add_constructor_dep :
   t -> base:Code_id_or_name.t -> Field.t -> from:Code_id_or_name.t -> unit
 
-(** Add an argument edge (dual of accessor): if [base] is used, [from] flows
-    into the cofield [relation] of [base]. *)
+(** Add an argument edge: [from] flows into parameters of sources of [base]. *)
 val add_argument_dep :
   t -> from:Code_id_or_name.t -> Cofield.t -> base:Code_id_or_name.t -> unit
 
-(** Add a parameter edge (dual of constructor): the cofield [relation] of [base]
-    flows into [to_]. *)
+(** Add a parameter edge: arguments of usages of [base] flow into [to_]. *)
 val add_parameter_dep :
   t -> base:Code_id_or_name.t -> Cofield.t -> to_:Code_id_or_name.t -> unit
 
-(** Add a conditional propagation edge: if [if_used] is used then add an alias
-    from [from] to [to_]. *)
+(** Add a conditional propagation edge: if [if_used] is [any_usage] then add an
+    alias from [from] to [to_]. *)
 val add_propagate_dep :
   t ->
   if_used:Code_id_or_name.t ->
@@ -218,7 +225,9 @@ val add_any_usage : t -> Code_id_or_name.t -> unit
 *)
 val add_any_source : t -> Code_id_or_name.t -> unit
 
-(** Mark a node as a source for zero-alloc checking purposes. *)
+(** Mark a node as a "magic" source for zero-alloc checking purposes. This is a
+    hack to mostly preserve zero_alloc correctness before we have zero_alloc
+    regions. *)
 val add_zero_alloc_source : t -> Code_id_or_name.t -> unit
 
 (** Record the [my_closure] variable associated with a code id. *)
