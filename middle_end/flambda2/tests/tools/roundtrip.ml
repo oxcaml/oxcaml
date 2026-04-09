@@ -31,7 +31,7 @@ let () =
     let unit_info = Unit_info.make_dummy ~input_name:file modname in
     (* Need to get this right or the conversion will complain about binding
        non-local symbols *)
-    Env.set_unit_name (Some unit_info);
+    Env.set_current_unit (Some unit_info);
     let unit =
       match Parse_flambda.parse file with
       | Ok unit -> unit
