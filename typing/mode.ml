@@ -1382,8 +1382,6 @@ module Lattices_mono = struct
       | Staticity -> { t with staticity = r }
   end
 
-  type neither = disallowed * disallowed
-
   module Locality_morph = struct
     (* Following is a chain of adjunctions (this can be extended one
        further, but we never need the missing operation) *)
