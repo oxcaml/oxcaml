@@ -1364,37 +1364,303 @@ module Lattices_mono = struct
 
   type neither = disallowed * disallowed
 
-  type ('a, 'b, 'd) locality_morph =
+  module Locality_morph = struct
     (* Following is a chain of adjunctions (this can be extended one
        further, but we never need the missing operation) *)
-    | Local_to_regional :
-        (Locality.t, Regionality.t, 'l * disallowed) locality_morph
-        (** Maps local to regional, global to global *)
-    | Regional_to_local : (Regionality.t, Locality.t, 'l * 'r) locality_morph
-        (** Maps regional to local, identity otherwise *)
-    | Locality_as_regionality :
-        (Locality.t, Regionality.t, 'l * 'r) locality_morph
-        (** Inject locality into regionality *)
-    | Regional_to_global :
-        (Regionality.t, Locality.t, disallowed * 'r) locality_morph
-        (** Maps regional to global, identity otherwise *)
-    (* Versions of the above morphisms operating on regionality. *)
-    | Local_to_regional_regionality :
-        (Regionality.t, Regionality.t, 'l * disallowed) locality_morph
-        (** Maps regional to local, identity otherwise. *)
-    | Regional_to_local_regionality :
-        (Regionality.t, Regionality.t, 'l * 'r) locality_morph
-        (** Maps regional to local, identity otherwise. *)
-    | Regional_to_global_regionality :
-        (Regionality.t, Regionality.t, disallowed * 'r) locality_morph
-        (** Maps regional to global, identity otherwise. *)
+    type ('a, 'b, 'd) t =
+      | Local_to_regional : (Locality.t, Regionality.t, 'l * disallowed) t
+          (** Maps local to regional, global to global *)
+      | Regional_to_local : (Regionality.t, Locality.t, 'l * 'r) t
+          (** Maps regional to local, identity otherwise *)
+      | Locality_as_regionality : (Locality.t, Regionality.t, 'l * 'r) t
+          (** Inject locality into regionality *)
+      | Regional_to_global : (Regionality.t, Locality.t, disallowed * 'r) t
+          (** Maps regional to global, identity otherwise *)
+      (* Versions of the above morphisms operating on regionality. *)
+      | Local_to_regional_regionality :
+          (Regionality.t, Regionality.t, 'l * disallowed) t
+          (** Maps regional to local, identity otherwise. *)
+      | Regional_to_local_regionality :
+          (Regionality.t, Regionality.t, 'l * 'r) t
+          (** Maps regional to local, identity otherwise. *)
+      | Regional_to_global_regionality :
+          (Regionality.t, Regionality.t, disallowed * 'r) t
+          (** Maps regional to global, identity otherwise. *)
+
+    let local_to_regional = function
+      | Locality.Global -> Regionality.Global
+      | Locality.Local -> Regionality.Regional
+
+    let regional_to_local = function
+      | Regionality.Global -> Locality.Global
+      | Regionality.Regional -> Locality.Local
+      | Regionality.Local -> Locality.Local
+
+    let locality_as_regionality = function
+      | Locality.Global -> Regionality.Global
+      | Locality.Local -> Regionality.Local
+
+    let regional_to_global = function
+      | Regionality.Global -> Locality.Global
+      | Regionality.Regional -> Locality.Global
+      | Regionality.Local -> Locality.Local
+
+    let local_to_regional_regionality = function
+      | Regionality.Global -> Regionality.Global
+      | Regionality.Regional -> Regionality.Regional
+      | Regionality.Local -> Regionality.Regional
+
+    let regional_to_local_regionality = function
+      | Regionality.Global -> Regionality.Global
+      | Regionality.Regional -> Regionality.Local
+      | Regionality.Local -> Regionality.Local
+
+    let regional_to_global_regionality = function
+      | Regionality.Global -> Regionality.Global
+      | Regionality.Regional -> Regionality.Global
+      | Regionality.Local -> Regionality.Local
+
+    let src_restricted : type a b d. (a, b, d) t -> a obj = function
+      | Local_to_regional -> Locality
+      | Regional_to_local -> Regionality
+      | Locality_as_regionality -> Locality
+      | Regional_to_global -> Regionality
+      | Local_to_regional_regionality -> Regionality
+      | Regional_to_local_regionality -> Regionality
+      | Regional_to_global_regionality -> Regionality
+
+    let src_full : type a b d. (a, b, d) t -> a comonadic_with obj = function
+      | Local_to_regional -> Comonadic_with_locality
+      | Regional_to_local -> Comonadic_with_regionality
+      | Locality_as_regionality -> Comonadic_with_locality
+      | Regional_to_global -> Comonadic_with_regionality
+      | Local_to_regional_regionality -> Comonadic_with_regionality
+      | Regional_to_local_regionality -> Comonadic_with_regionality
+      | Regional_to_global_regionality -> Comonadic_with_regionality
+
+    let equal : type a1 l1 r1 a2 b l2 r2.
+        (a1, b, l1 * r1) t -> (a2, b, l2 * r2) t -> (a1, a2) Misc.eq option =
+     fun f1 f2 ->
+      match f1, f2 with
+      | Local_to_regional, Local_to_regional -> Some Refl
+      | Regional_to_local, Regional_to_local -> Some Refl
+      | Locality_as_regionality, Locality_as_regionality -> Some Refl
+      | Regional_to_global, Regional_to_global -> Some Refl
+      | Local_to_regional_regionality, Local_to_regional_regionality ->
+        Some Refl
+      | Regional_to_local_regionality, Regional_to_local_regionality ->
+        Some Refl
+      | Regional_to_global_regionality, Regional_to_global_regionality ->
+        Some Refl
+      | ( ( Local_to_regional | Regional_to_local | Locality_as_regionality
+          | Regional_to_global | Local_to_regional_regionality
+          | Regional_to_local_regionality | Regional_to_global_regionality ),
+          _ ) ->
+        None
+
+    let compare : type a1 l1 r1 a2 b l2 r2.
+        (a1, b, l1 * r1) t -> (a2, b, l2 * r2) t -> (a1, a2) Misc.comparison =
+     fun m1 m2 ->
+      match m1, m2 with
+      | Local_to_regional, Local_to_regional -> Equal
+      | Local_to_regional, _ -> Less_than
+      | _, Local_to_regional -> Greater_than
+      | Regional_to_local, Regional_to_local -> Equal
+      | Regional_to_local, _ -> Less_than
+      | _, Regional_to_local -> Greater_than
+      | Locality_as_regionality, Locality_as_regionality -> Equal
+      | Locality_as_regionality, _ -> Less_than
+      | _, Locality_as_regionality -> Greater_than
+      | Regional_to_global, Regional_to_global -> Equal
+      | Regional_to_global, _ -> .
+      | _, Regional_to_global -> .
+      | Local_to_regional_regionality, Local_to_regional_regionality -> Equal
+      | Local_to_regional_regionality, _ -> Less_than
+      | _, Local_to_regional_regionality -> Greater_than
+      | Regional_to_local_regionality, Regional_to_local_regionality -> Equal
+      | Regional_to_local_regionality, _ -> Less_than
+      | _, Regional_to_local_regionality -> Greater_than
+      | Regional_to_global_regionality, Regional_to_global_regionality -> Equal
+      | Regional_to_global_regionality, _ -> .
+      | _, Regional_to_global_regionality -> .
+
+    let print : type a b d. Fmt.formatter -> (a, b, d) t -> unit =
+     fun ppf -> function
+      | Local_to_regional -> Fmt.fprintf ppf "local_to_regional"
+      | Regional_to_local -> Fmt.fprintf ppf "regional_to_local"
+      | Locality_as_regionality -> Fmt.fprintf ppf "locality_as_regionality"
+      | Regional_to_global -> Fmt.fprintf ppf "regional_to_global"
+      | Local_to_regional_regionality ->
+        Fmt.fprintf ppf "local_to_regional_regionality"
+      | Regional_to_local_regionality ->
+        Fmt.fprintf ppf "regional_to_local_regionality"
+      | Regional_to_global_regionality ->
+        Fmt.fprintf ppf "regional_to_global_regionality"
+
+    let apply : type a b d. (a, b, d) t -> a -> b =
+     fun f a ->
+      match f with
+      | Local_to_regional -> local_to_regional a
+      | Regional_to_local -> regional_to_local a
+      | Locality_as_regionality -> locality_as_regionality a
+      | Regional_to_global -> regional_to_global a
+      | Local_to_regional_regionality -> local_to_regional_regionality a
+      | Regional_to_local_regionality -> regional_to_local_regionality a
+      | Regional_to_global_regionality -> regional_to_global_regionality a
+
+    let right_adjoint : type a b r.
+        (a, b, allowed * r) t -> (b, a, disallowed * allowed) t = function
+      | Local_to_regional -> Regional_to_local
+      | Regional_to_local -> Locality_as_regionality
+      | Locality_as_regionality -> Regional_to_global
+      | Local_to_regional_regionality -> Regional_to_local_regionality
+      | Regional_to_local_regionality -> Regional_to_global_regionality
+
+    let left_adjoint : type a b l.
+        (a, b, l * allowed) t -> (b, a, allowed * disallowed) t = function
+      | Regional_to_local -> Local_to_regional
+      | Locality_as_regionality -> Regional_to_local
+      | Regional_to_global -> Locality_as_regionality
+      | Regional_to_local_regionality -> Local_to_regional_regionality
+      | Regional_to_global_regionality -> Regional_to_local_regionality
+
+    let allow_left : type a b l r. (a, b, allowed * r) t -> (a, b, l * r) t =
+      function
+      | Local_to_regional -> Local_to_regional
+      | Locality_as_regionality -> Locality_as_regionality
+      | Regional_to_local -> Regional_to_local
+      | Local_to_regional_regionality -> Local_to_regional_regionality
+      | Regional_to_local_regionality -> Regional_to_local_regionality
+
+    let allow_right : type a b l r. (a, b, l * allowed) t -> (a, b, l * r) t =
+      function
+      | Regional_to_local -> Regional_to_local
+      | Locality_as_regionality -> Locality_as_regionality
+      | Regional_to_global -> Regional_to_global
+      | Regional_to_local_regionality -> Regional_to_local_regionality
+      | Regional_to_global_regionality -> Regional_to_global_regionality
+
+    let disallow_left : type a b l r.
+        (a, b, l * r) t -> (a, b, disallowed * r) t = function
+      | Local_to_regional -> Local_to_regional
+      | Regional_to_local -> Regional_to_local
+      | Locality_as_regionality -> Locality_as_regionality
+      | Regional_to_global -> Regional_to_global
+      | Local_to_regional_regionality -> Local_to_regional_regionality
+      | Regional_to_local_regionality -> Regional_to_local_regionality
+      | Regional_to_global_regionality -> Regional_to_global_regionality
+
+    let disallow_right : type a b l r.
+        (a, b, l * r) t -> (a, b, l * disallowed) t = function
+      | Local_to_regional -> Local_to_regional
+      | Regional_to_local -> Regional_to_local
+      | Locality_as_regionality -> Locality_as_regionality
+      | Regional_to_global -> Regional_to_global
+      | Local_to_regional_regionality -> Local_to_regional_regionality
+      | Regional_to_local_regionality -> Regional_to_local_regionality
+      | Regional_to_global_regionality -> Regional_to_global_regionality
+
+    type ('a, 'b, 'd) maybe_allowed_right =
+      | Allowed_right :
+          ('a, 'b, 'l * allowed) t
+          -> ('a, 'b, 'l * 'r) maybe_allowed_right
+      | Not_allowed_right : ('a, 'b, 'l * disallowed) maybe_allowed_right
+
+    let maybe_allowed_right : type a b d.
+        (a, b, d) t -> (a, b, d) maybe_allowed_right = function
+      | Regional_to_local as m -> Allowed_right m
+      | Locality_as_regionality as m -> Allowed_right m
+      | Regional_to_global as m -> Allowed_right m
+      | Regional_to_local_regionality as m -> Allowed_right m
+      | Regional_to_global_regionality as m -> Allowed_right m
+      | Local_to_regional -> Not_allowed_right
+      | Local_to_regional_regionality -> Not_allowed_right
+
+    type ('a, 'b, 'd) maybe_allowed_left =
+      | Allowed_left :
+          ('a, 'b, allowed * 'r) t
+          -> ('a, 'b, 'l * 'r) maybe_allowed_left
+      | Not_allowed_left : ('a, 'b, disallowed * 'r) maybe_allowed_left
+
+    let maybe_allowed_left : type a b d.
+        (a, b, d) t -> (a, b, d) maybe_allowed_left = function
+      | Local_to_regional as m -> Allowed_left m
+      | Regional_to_local as m -> Allowed_left m
+      | Locality_as_regionality as m -> Allowed_left m
+      | Local_to_regional_regionality as m -> Allowed_left m
+      | Regional_to_local_regionality as m -> Allowed_left m
+      | Regional_to_global -> Not_allowed_left
+      | Regional_to_global_regionality -> Not_allowed_left
+
+    type ('a, 'b, 'd) composition =
+      | Id : ('a, 'a, 'd) composition
+      | Morph : ('a, 'b, 'd) t -> ('a, 'b, 'd) composition
+      | Disallowed : ('a, 'b, neither) composition
+
+    let compose : type a b c d.
+        (b, c, d) t -> (a, b, d) t -> (a, c, d) composition =
+     fun m1 m2 ->
+      match m1, m2 with
+      | Local_to_regional, Regional_to_local ->
+        Morph Local_to_regional_regionality
+      | Regional_to_local, Local_to_regional -> Id
+      | Regional_to_local, Locality_as_regionality -> Id
+      | Regional_to_local, Local_to_regional_regionality ->
+        Morph Regional_to_local
+      | Regional_to_local, Regional_to_local_regionality ->
+        Morph Regional_to_local
+      | Regional_to_local, Regional_to_global_regionality ->
+        Morph Regional_to_global
+      | Locality_as_regionality, Regional_to_local ->
+        Morph Regional_to_local_regionality
+      | Locality_as_regionality, Regional_to_global ->
+        Morph Regional_to_global_regionality
+      | Regional_to_global, Locality_as_regionality -> Id
+      | Regional_to_global, Regional_to_local_regionality ->
+        Morph Regional_to_local
+      | Regional_to_global, Regional_to_global_regionality ->
+        Morph Regional_to_global
+      | Local_to_regional_regionality, Local_to_regional ->
+        Morph Local_to_regional
+      | Local_to_regional_regionality, Locality_as_regionality ->
+        Morph Local_to_regional
+      | Local_to_regional_regionality, Local_to_regional_regionality ->
+        Morph Local_to_regional_regionality
+      | Local_to_regional_regionality, Regional_to_local_regionality ->
+        Morph Local_to_regional_regionality
+      | Regional_to_local_regionality, Local_to_regional ->
+        Morph Locality_as_regionality
+      | Regional_to_local_regionality, Locality_as_regionality ->
+        Morph Locality_as_regionality
+      | Regional_to_local_regionality, Local_to_regional_regionality ->
+        Morph Regional_to_local_regionality
+      | Regional_to_local_regionality, Regional_to_local_regionality ->
+        Morph Regional_to_local_regionality
+      | Regional_to_local_regionality, Regional_to_global_regionality ->
+        Morph Regional_to_global_regionality
+      | Regional_to_global_regionality, Locality_as_regionality ->
+        Morph Locality_as_regionality
+      | Regional_to_global_regionality, Regional_to_local_regionality ->
+        Morph Regional_to_local_regionality
+      | Regional_to_global_regionality, Regional_to_global_regionality ->
+        Morph Regional_to_global_regionality
+      (* Operations that cannot appear on the same side *)
+      | Local_to_regional, Regional_to_global -> Disallowed
+      | Regional_to_global, Local_to_regional -> Disallowed
+      | Regional_to_global, Local_to_regional_regionality -> Disallowed
+      | Local_to_regional_regionality, Regional_to_global_regionality ->
+        Disallowed
+      | Regional_to_global_regionality, Local_to_regional -> Disallowed
+      | Regional_to_global_regionality, Local_to_regional_regionality ->
+        Disallowed
+  end
 
   type ('a, 'b, 'd) core_morph =
     | Locality_restricted :
-        ('a, 'b, 'l * 'r) locality_morph
+        ('a, 'b, 'l * 'r) Locality_morph.t
         -> ('a, 'b, 'l * 'r) core_morph
     | Locality_full :
-        ('a, 'b, 'l * 'r) locality_morph
+        ('a, 'b, 'l * 'r) Locality_morph.t
         -> ('a comonadic_with, 'b comonadic_with, 'l * 'r) core_morph
     | Uniqueness_op_to_linearity :
         (Uniqueness_op.t, Linearity.t, 'l * 'r) core_morph
@@ -1488,19 +1754,11 @@ module Lattices_mono = struct
   include Magic_allow_disallow (struct
     type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph constraint 'd = _ * _
 
-    let allow_left_locality : type a b l r.
-        (a, b, allowed * r) locality_morph -> (a, b, l * r) locality_morph =
-      function
-      | Local_to_regional -> Local_to_regional
-      | Locality_as_regionality -> Locality_as_regionality
-      | Regional_to_local -> Regional_to_local
-      | Local_to_regional_regionality -> Local_to_regional_regionality
-      | Regional_to_local_regionality -> Regional_to_local_regionality
-
     let allow_left_core : type a b l r.
         (a, b, allowed * r) core_morph -> (a, b, l * r) core_morph = function
-      | Locality_restricted m -> Locality_restricted (allow_left_locality m)
-      | Locality_full m -> Locality_full (allow_left_locality m)
+      | Locality_restricted m ->
+        Locality_restricted (Locality_morph.allow_left m)
+      | Locality_full m -> Locality_full (Locality_morph.allow_left m)
       | Uniqueness_op_to_linearity -> Uniqueness_op_to_linearity
       | Linearity_to_uniqueness_op -> Linearity_to_uniqueness_op
       | Contention_op_to_portability -> Contention_op_to_portability
@@ -1525,19 +1783,11 @@ module Lattices_mono = struct
       | Min_with_simple (ax, m) -> Min_with_simple (ax, allow_left_simple m)
       | Const_min src -> Const_min src
 
-    let allow_right_locality : type a b l r.
-        (a, b, l * allowed) locality_morph -> (a, b, l * r) locality_morph =
-      function
-      | Regional_to_local -> Regional_to_local
-      | Locality_as_regionality -> Locality_as_regionality
-      | Regional_to_global -> Regional_to_global
-      | Regional_to_local_regionality -> Regional_to_local_regionality
-      | Regional_to_global_regionality -> Regional_to_global_regionality
-
     let allow_right_core : type a b l r.
         (a, b, l * allowed) core_morph -> (a, b, l * r) core_morph = function
-      | Locality_restricted m -> Locality_restricted (allow_right_locality m)
-      | Locality_full m -> Locality_full (allow_right_locality m)
+      | Locality_restricted m ->
+        Locality_restricted (Locality_morph.allow_right m)
+      | Locality_full m -> Locality_full (Locality_morph.allow_right m)
       | Uniqueness_op_to_linearity -> Uniqueness_op_to_linearity
       | Linearity_to_uniqueness_op -> Linearity_to_uniqueness_op
       | Contention_op_to_portability -> Contention_op_to_portability
@@ -1562,21 +1812,11 @@ module Lattices_mono = struct
       | Max_with_simple (ax, m) -> Max_with_simple (ax, allow_right_simple m)
       | Const_max src -> Const_max src
 
-    let disallow_left_locality : type a b l r.
-        (a, b, l * r) locality_morph -> (a, b, disallowed * r) locality_morph =
-      function
-      | Local_to_regional -> Local_to_regional
-      | Regional_to_local -> Regional_to_local
-      | Locality_as_regionality -> Locality_as_regionality
-      | Regional_to_global -> Regional_to_global
-      | Local_to_regional_regionality -> Local_to_regional_regionality
-      | Regional_to_local_regionality -> Regional_to_local_regionality
-      | Regional_to_global_regionality -> Regional_to_global_regionality
-
     let disallow_left_core : type a b l r.
         (a, b, l * r) core_morph -> (a, b, disallowed * r) core_morph = function
-      | Locality_restricted m -> Locality_restricted (disallow_left_locality m)
-      | Locality_full m -> Locality_full (disallow_left_locality m)
+      | Locality_restricted m ->
+        Locality_restricted (Locality_morph.disallow_left m)
+      | Locality_full m -> Locality_full (Locality_morph.disallow_left m)
       | Uniqueness_op_to_linearity -> Uniqueness_op_to_linearity
       | Linearity_to_uniqueness_op -> Linearity_to_uniqueness_op
       | Contention_op_to_portability -> Contention_op_to_portability
@@ -1616,21 +1856,11 @@ module Lattices_mono = struct
         let ma = disallow_left ma in
         Compose (mb, ma)
 
-    let disallow_right_locality : type a b l r.
-        (a, b, l * r) locality_morph -> (a, b, l * disallowed) locality_morph =
-      function
-      | Local_to_regional -> Local_to_regional
-      | Regional_to_local -> Regional_to_local
-      | Locality_as_regionality -> Locality_as_regionality
-      | Regional_to_global -> Regional_to_global
-      | Local_to_regional_regionality -> Local_to_regional_regionality
-      | Regional_to_local_regionality -> Regional_to_local_regionality
-      | Regional_to_global_regionality -> Regional_to_global_regionality
-
     let disallow_right_core : type a b l r.
         (a, b, l * r) core_morph -> (a, b, l * disallowed) core_morph = function
-      | Locality_restricted m -> Locality_restricted (disallow_right_locality m)
-      | Locality_full m -> Locality_full (disallow_right_locality m)
+      | Locality_restricted m ->
+        Locality_restricted (Locality_morph.disallow_right m)
+      | Locality_full m -> Locality_full (Locality_morph.disallow_right m)
       | Uniqueness_op_to_linearity -> Uniqueness_op_to_linearity
       | Linearity_to_uniqueness_op -> Linearity_to_uniqueness_op
       | Contention_op_to_portability -> Contention_op_to_portability
@@ -1697,29 +1927,9 @@ module Lattices_mono = struct
     | Locality -> Comonadic_with_locality
     | Regionality -> Comonadic_with_regionality
 
-  let src_locality_restricted : type a b d. (a, b, d) locality_morph -> a obj =
-    function
-    | Local_to_regional -> Locality
-    | Regional_to_local -> Regionality
-    | Locality_as_regionality -> Locality
-    | Regional_to_global -> Regionality
-    | Local_to_regional_regionality -> Regionality
-    | Regional_to_local_regionality -> Regionality
-    | Regional_to_global_regionality -> Regionality
-
-  let src_locality_full : type a b d.
-      (a, b, d) locality_morph -> a comonadic_with obj = function
-    | Local_to_regional -> Comonadic_with_locality
-    | Regional_to_local -> Comonadic_with_regionality
-    | Locality_as_regionality -> Comonadic_with_locality
-    | Regional_to_global -> Comonadic_with_regionality
-    | Local_to_regional_regionality -> Comonadic_with_regionality
-    | Regional_to_local_regionality -> Comonadic_with_regionality
-    | Regional_to_global_regionality -> Comonadic_with_regionality
-
   let src_core : type a b d. (a, b, d) core_morph -> a obj = function
-    | Locality_restricted m -> src_locality_restricted m
-    | Locality_full m -> src_locality_full m
+    | Locality_restricted m -> Locality_morph.src_restricted m
+    | Locality_full m -> Locality_morph.src_full m
     | Uniqueness_op_to_linearity -> Uniqueness_op
     | Linearity_to_uniqueness_op -> Linearity
     | Contention_op_to_portability -> Contention_op
@@ -1773,26 +1983,6 @@ module Lattices_mono = struct
       let mid = src dst mb in
       src mid ma
 
-  let equal_locality_morph : type a1 l1 r1 a2 b l2 r2.
-      (a1, b, l1 * r1) locality_morph ->
-      (a2, b, l2 * r2) locality_morph ->
-      (a1, a2) Misc.eq option =
-   fun f1 f2 ->
-    match f1, f2 with
-    | Local_to_regional, Local_to_regional -> Some Refl
-    | Regional_to_local, Regional_to_local -> Some Refl
-    | Locality_as_regionality, Locality_as_regionality -> Some Refl
-    | Regional_to_global, Regional_to_global -> Some Refl
-    | Local_to_regional_regionality, Local_to_regional_regionality -> Some Refl
-    | Regional_to_local_regionality, Regional_to_local_regionality -> Some Refl
-    | Regional_to_global_regionality, Regional_to_global_regionality ->
-      Some Refl
-    | ( ( Local_to_regional | Regional_to_local | Locality_as_regionality
-        | Regional_to_global | Local_to_regional_regionality
-        | Regional_to_local_regionality | Regional_to_global_regionality ),
-        _ ) ->
-      None
-
   let equal_core_morph : type a1 l1 r1 a2 b l2 r2.
       (a1, b, l1 * r1) core_morph ->
       (a2, b, l2 * r2) core_morph ->
@@ -1800,9 +1990,9 @@ module Lattices_mono = struct
    fun f1 f2 ->
     match f1, f2 with
     | Locality_restricted l1, Locality_restricted l2 ->
-      equal_locality_morph l1 l2
+      Locality_morph.equal l1 l2
     | Locality_full l1, Locality_full l2 -> begin
-      match equal_locality_morph l1 l2 with
+      match Locality_morph.equal l1 l2 with
       | None as eq -> eq
       | Some Refl as eq -> eq
     end
@@ -1917,34 +2107,6 @@ module Lattices_mono = struct
         _ ) ->
       None
 
-  let compare_locality_morph : type a1 l1 r1 a2 b l2 r2.
-      (a1, b, l1 * r1) locality_morph ->
-      (a2, b, l2 * r2) locality_morph ->
-      (a1, a2) Misc.comparison =
-   fun m1 m2 ->
-    match m1, m2 with
-    | Local_to_regional, Local_to_regional -> Equal
-    | Local_to_regional, _ -> Less_than
-    | _, Local_to_regional -> Greater_than
-    | Regional_to_local, Regional_to_local -> Equal
-    | Regional_to_local, _ -> Less_than
-    | _, Regional_to_local -> Greater_than
-    | Locality_as_regionality, Locality_as_regionality -> Equal
-    | Locality_as_regionality, _ -> Less_than
-    | _, Locality_as_regionality -> Greater_than
-    | Regional_to_global, Regional_to_global -> Equal
-    | Regional_to_global, _ -> .
-    | _, Regional_to_global -> .
-    | Local_to_regional_regionality, Local_to_regional_regionality -> Equal
-    | Local_to_regional_regionality, _ -> Less_than
-    | _, Local_to_regional_regionality -> Greater_than
-    | Regional_to_local_regionality, Regional_to_local_regionality -> Equal
-    | Regional_to_local_regionality, _ -> Less_than
-    | _, Regional_to_local_regionality -> Greater_than
-    | Regional_to_global_regionality, Regional_to_global_regionality -> Equal
-    | Regional_to_global_regionality, _ -> .
-    | _, Regional_to_global_regionality -> .
-
   let compare_core_morph : type a1 d1 a2 b d2.
       (a1, b, d1) core_morph ->
       (a2, b, d2) core_morph ->
@@ -1952,11 +2114,11 @@ module Lattices_mono = struct
    fun m1 m2 ->
     match m1, m2 with
     | Locality_restricted l1, Locality_restricted l2 ->
-      compare_locality_morph l1 l2
+      Locality_morph.compare l1 l2
     | Locality_restricted _, _ -> .
     | _, Locality_restricted _ -> .
     | Locality_full l1, Locality_full l2 -> begin
-      match compare_locality_morph l1 l2 with
+      match Locality_morph.compare l1 l2 with
       | Equal as c -> c
       | (Less_than | Greater_than) as c -> c
     end
@@ -2115,25 +2277,11 @@ module Lattices_mono = struct
     | Compose _, _ -> .
     | _, Compose _ -> .
 
-  let print_locality_morph : type a b d.
-      Fmt.formatter -> (a, b, d) locality_morph -> unit =
-   fun ppf -> function
-    | Local_to_regional -> Fmt.fprintf ppf "local_to_regional"
-    | Regional_to_local -> Fmt.fprintf ppf "regional_to_local"
-    | Locality_as_regionality -> Fmt.fprintf ppf "locality_as_regionality"
-    | Regional_to_global -> Fmt.fprintf ppf "regional_to_global"
-    | Local_to_regional_regionality ->
-      Fmt.fprintf ppf "local_to_regional_regionality"
-    | Regional_to_local_regionality ->
-      Fmt.fprintf ppf "regional_to_local_regionality"
-    | Regional_to_global_regionality ->
-      Fmt.fprintf ppf "regional_to_global_regionality"
-
   let print_core_morph : type a b d.
       Fmt.formatter -> (a, b, d) core_morph -> unit =
    fun ppf -> function
-    | Locality_restricted l -> print_locality_morph ppf l
-    | Locality_full l -> Fmt.fprintf ppf "%a_full" print_locality_morph l
+    | Locality_restricted l -> Locality_morph.print ppf l
+    | Locality_full l -> Fmt.fprintf ppf "%a_full" Locality_morph.print l
     | Uniqueness_op_to_linearity -> Fmt.fprintf ppf "uniqueness_op_to_linearity"
     | Linearity_to_uniqueness_op -> Fmt.fprintf ppf "linearity_to_uniqueness_op"
     | Contention_op_to_portability ->
@@ -2194,39 +2342,6 @@ module Lattices_mono = struct
       Fmt.fprintf ppf "%a . %a" (print_morph dst) mb (print_morph mid) ma
 
   let id = Simple Id
-
-  let local_to_regional = function
-    | Locality.Global -> Regionality.Global
-    | Locality.Local -> Regionality.Regional
-
-  let regional_to_local = function
-    | Regionality.Global -> Locality.Global
-    | Regionality.Regional -> Locality.Local
-    | Regionality.Local -> Locality.Local
-
-  let locality_as_regionality = function
-    | Locality.Global -> Regionality.Global
-    | Locality.Local -> Regionality.Local
-
-  let regional_to_global = function
-    | Regionality.Global -> Locality.Global
-    | Regionality.Regional -> Locality.Global
-    | Regionality.Local -> Locality.Local
-
-  let local_to_regional_regionality = function
-    | Regionality.Global -> Regionality.Global
-    | Regionality.Regional -> Regionality.Regional
-    | Regionality.Local -> Regionality.Regional
-
-  let regional_to_local_regionality = function
-    | Regionality.Global -> Regionality.Global
-    | Regionality.Regional -> Regionality.Local
-    | Regionality.Local -> Regionality.Local
-
-  let regional_to_global_regionality = function
-    | Regionality.Global -> Regionality.Global
-    | Regionality.Regional -> Regionality.Global
-    | Regionality.Local -> Regionality.Local
 
   let uniqueness_op_to_linearity = function
     | Uniqueness.Unique -> Linearity.Once
@@ -2310,23 +2425,12 @@ module Lattices_mono = struct
     let staticity = Staticity_op.max in
     { uniqueness; contention; visibility; staticity }
 
-  let apply_locality : type a b d. (a, b, d) locality_morph -> a -> b =
-   fun f a ->
-    match f with
-    | Local_to_regional -> local_to_regional a
-    | Regional_to_local -> regional_to_local a
-    | Locality_as_regionality -> locality_as_regionality a
-    | Regional_to_global -> regional_to_global a
-    | Local_to_regional_regionality -> local_to_regional_regionality a
-    | Regional_to_local_regionality -> regional_to_local_regionality a
-    | Regional_to_global_regionality -> regional_to_global_regionality a
-
   let apply_core : type a b d. b obj -> (a, b, d) core_morph -> a -> b =
    fun dst f a ->
     match f with
-    | Locality_restricted m -> apply_locality m a
+    | Locality_restricted m -> Locality_morph.apply m a
     | Locality_full m ->
-      let areality = apply_locality m a.areality in
+      let areality = Locality_morph.apply m a.areality in
       { a with areality }
     | Uniqueness_op_to_linearity -> uniqueness_op_to_linearity a
     | Linearity_to_uniqueness_op -> linearity_to_uniqueness_op a
@@ -2370,22 +2474,14 @@ module Lattices_mono = struct
       let mid = src dst mb in
       apply dst mb (apply mid ma a)
 
-  let right_adjoint_locality : type a b r.
-      (a, b, allowed * r) locality_morph ->
-      (b, a, disallowed * allowed) locality_morph = function
-    | Local_to_regional -> Regional_to_local
-    | Regional_to_local -> Locality_as_regionality
-    | Locality_as_regionality -> Regional_to_global
-    | Local_to_regional_regionality -> Regional_to_local_regionality
-    | Regional_to_local_regionality -> Regional_to_global_regionality
-
   let right_adjoint_core : type a b r.
       b obj ->
       (a, b, allowed * r) core_morph ->
       (b, a, disallowed * allowed) core_morph =
    fun dst -> function
-    | Locality_restricted m -> Locality_restricted (right_adjoint_locality m)
-    | Locality_full m -> Locality_full (right_adjoint_locality m)
+    | Locality_restricted m ->
+      Locality_restricted (Locality_morph.right_adjoint m)
+    | Locality_full m -> Locality_full (Locality_morph.right_adjoint m)
     | Uniqueness_op_to_linearity -> Linearity_to_uniqueness_op
     | Linearity_to_uniqueness_op -> Uniqueness_op_to_linearity
     | Contention_op_to_portability -> Portability_to_contention_op
@@ -2418,22 +2514,14 @@ module Lattices_mono = struct
       Simple_proj (right_adjoint_simple mid m, ax, dst)
     | Const_min _ -> Const_max dst
 
-  let left_adjoint_locality : type a b l.
-      (a, b, l * allowed) locality_morph ->
-      (b, a, allowed * disallowed) locality_morph = function
-    | Regional_to_local -> Local_to_regional
-    | Locality_as_regionality -> Regional_to_local
-    | Regional_to_global -> Locality_as_regionality
-    | Regional_to_local_regionality -> Local_to_regional_regionality
-    | Regional_to_global_regionality -> Regional_to_local_regionality
-
   let left_adjoint_core : type a b l.
       b obj ->
       (a, b, l * allowed) core_morph ->
       (b, a, allowed * disallowed) core_morph =
    fun dst -> function
-    | Locality_restricted m -> Locality_restricted (left_adjoint_locality m)
-    | Locality_full m -> Locality_full (left_adjoint_locality m)
+    | Locality_restricted m ->
+      Locality_restricted (Locality_morph.left_adjoint m)
+    | Locality_full m -> Locality_full (Locality_morph.left_adjoint m)
     | Uniqueness_op_to_linearity -> Linearity_to_uniqueness_op
     | Linearity_to_uniqueness_op -> Uniqueness_op_to_linearity
     | Contention_op_to_portability -> Portability_to_contention_op
@@ -2466,104 +2554,6 @@ module Lattices_mono = struct
       Simple_proj (left_adjoint_simple mid m, ax, dst)
     | Const_max _ -> Const_min dst
 
-  type ('a, 'b, 'd) maybe_allowed_right_locality =
-    | Allowed_right :
-        ('a, 'b, 'l * allowed) locality_morph
-        -> ('a, 'b, 'l * 'r) maybe_allowed_right_locality
-    | Not_allowed_right : ('a, 'b, 'l * disallowed) maybe_allowed_right_locality
-
-  let maybe_allowed_right_locality : type a b d.
-      (a, b, d) locality_morph -> (a, b, d) maybe_allowed_right_locality =
-    function
-    | Regional_to_local as m -> Allowed_right m
-    | Locality_as_regionality as m -> Allowed_right m
-    | Regional_to_global as m -> Allowed_right m
-    | Regional_to_local_regionality as m -> Allowed_right m
-    | Regional_to_global_regionality as m -> Allowed_right m
-    | Local_to_regional -> Not_allowed_right
-    | Local_to_regional_regionality -> Not_allowed_right
-
-  type ('a, 'b, 'd) maybe_allowed_left_locality =
-    | Allowed_left :
-        ('a, 'b, allowed * 'r) locality_morph
-        -> ('a, 'b, 'l * 'r) maybe_allowed_left_locality
-    | Not_allowed_left : ('a, 'b, disallowed * 'r) maybe_allowed_left_locality
-
-  let maybe_allowed_left_locality : type a b d.
-      (a, b, d) locality_morph -> (a, b, d) maybe_allowed_left_locality =
-    function
-    | Local_to_regional as m -> Allowed_left m
-    | Regional_to_local as m -> Allowed_left m
-    | Locality_as_regionality as m -> Allowed_left m
-    | Local_to_regional_regionality as m -> Allowed_left m
-    | Regional_to_local_regionality as m -> Allowed_left m
-    | Regional_to_global -> Not_allowed_left
-    | Regional_to_global_regionality -> Not_allowed_left
-
-  type ('a, 'b, 'd) locality_composition =
-    | Id : ('a, 'a, 'd) locality_composition
-    | Morph : ('a, 'b, 'd) locality_morph -> ('a, 'b, 'd) locality_composition
-    | Disallowed : ('a, 'b, neither) locality_composition
-
-  let compose_locality : type a b c d.
-      (b, c, d) locality_morph ->
-      (a, b, d) locality_morph ->
-      (a, c, d) locality_composition =
-   fun m1 m2 ->
-    match m1, m2 with
-    | Local_to_regional, Regional_to_local ->
-      Morph Local_to_regional_regionality
-    | Regional_to_local, Local_to_regional -> Id
-    | Regional_to_local, Locality_as_regionality -> Id
-    | Regional_to_local, Local_to_regional_regionality ->
-      Morph Regional_to_local
-    | Regional_to_local, Regional_to_local_regionality ->
-      Morph Regional_to_local
-    | Regional_to_local, Regional_to_global_regionality ->
-      Morph Regional_to_global
-    | Locality_as_regionality, Regional_to_local ->
-      Morph Regional_to_local_regionality
-    | Locality_as_regionality, Regional_to_global ->
-      Morph Regional_to_global_regionality
-    | Regional_to_global, Locality_as_regionality -> Id
-    | Regional_to_global, Regional_to_local_regionality ->
-      Morph Regional_to_local
-    | Regional_to_global, Regional_to_global_regionality ->
-      Morph Regional_to_global
-    | Local_to_regional_regionality, Local_to_regional ->
-      Morph Local_to_regional
-    | Local_to_regional_regionality, Locality_as_regionality ->
-      Morph Local_to_regional
-    | Local_to_regional_regionality, Local_to_regional_regionality ->
-      Morph Local_to_regional_regionality
-    | Local_to_regional_regionality, Regional_to_local_regionality ->
-      Morph Local_to_regional_regionality
-    | Regional_to_local_regionality, Local_to_regional ->
-      Morph Locality_as_regionality
-    | Regional_to_local_regionality, Locality_as_regionality ->
-      Morph Locality_as_regionality
-    | Regional_to_local_regionality, Local_to_regional_regionality ->
-      Morph Regional_to_local_regionality
-    | Regional_to_local_regionality, Regional_to_local_regionality ->
-      Morph Regional_to_local_regionality
-    | Regional_to_local_regionality, Regional_to_global_regionality ->
-      Morph Regional_to_global_regionality
-    | Regional_to_global_regionality, Locality_as_regionality ->
-      Morph Locality_as_regionality
-    | Regional_to_global_regionality, Regional_to_local_regionality ->
-      Morph Regional_to_local_regionality
-    | Regional_to_global_regionality, Regional_to_global_regionality ->
-      Morph Regional_to_global_regionality
-    (* Operations that cannot appear on the same side *)
-    | Local_to_regional, Regional_to_global -> Disallowed
-    | Regional_to_global, Local_to_regional -> Disallowed
-    | Regional_to_global, Local_to_regional_regionality -> Disallowed
-    | Local_to_regional_regionality, Regional_to_global_regionality ->
-      Disallowed
-    | Regional_to_global_regionality, Local_to_regional -> Disallowed
-    | Regional_to_global_regionality, Local_to_regional_regionality ->
-      Disallowed
-
   let compose_core : type a b c d.
       c obj ->
       (b, c, d) core_morph ->
@@ -2572,13 +2562,13 @@ module Lattices_mono = struct
    fun dst m1 m2 ->
     match m1, m2 with
     | Locality_restricted lm1, Locality_restricted lm2 -> begin
-      match compose_locality lm1 lm2 with
+      match Locality_morph.compose lm1 lm2 with
       | Id -> Id
       | Morph lm -> Core (Locality_restricted lm)
       | Disallowed -> Compose (Core m1, Core m2)
     end
     | Locality_full lm1, Locality_full lm2 -> begin
-      match compose_locality lm1 lm2 with
+      match Locality_morph.compose lm1 lm2 with
       | Id -> Id
       | Morph lm -> Core (Locality_full lm)
       | Disallowed -> Compose (Core m1, Core m2)
@@ -2641,20 +2631,20 @@ module Lattices_mono = struct
     | Monadic_to_comonadic_min, Comonadic_to_monadic_max _ ->
       Compose (Core m1, Core m2)
     | Comonadic_to_monadic_min _, Locality_full m2 ->
-      let src = src_locality_full m2 in
+      let src = Locality_morph.src_full m2 in
       Core (Comonadic_to_monadic_min (comonadic_obj_areality src))
     | Comonadic_to_monadic_max _, Locality_full m2 ->
-      let src = src_locality_full m2 in
+      let src = Locality_morph.src_full m2 in
       Core (Comonadic_to_monadic_max (comonadic_obj_areality src))
     | Locality_full lm1, Monadic_to_comonadic_min -> begin
-      match maybe_allowed_left_locality lm1 with
+      match Locality_morph.maybe_allowed_left lm1 with
       | Allowed_left _ ->
         (* Has a right adjoint so it preserves min *)
         Core Monadic_to_comonadic_min
       | Not_allowed_left -> Compose (Core m1, Core Monadic_to_comonadic_min)
     end
     | Locality_full lm1, Monadic_to_comonadic_max -> begin
-      match maybe_allowed_right_locality lm1 with
+      match Locality_morph.maybe_allowed_right lm1 with
       | Allowed_right _ ->
         (* Has a left adjoint so it preserves max *)
         Core Monadic_to_comonadic_max
@@ -2674,12 +2664,12 @@ module Lattices_mono = struct
   let maybe_allowed_right_core : type a b d.
       (a, b, d) core_morph -> (a, b, d) maybe_allowed_right_core = function
     | Locality_restricted lm -> begin
-      match maybe_allowed_right_locality lm with
+      match Locality_morph.maybe_allowed_right lm with
       | Allowed_right lm -> Allowed_right (Locality_restricted lm)
       | Not_allowed_right -> Not_allowed_right
     end
     | Locality_full lm -> begin
-      match maybe_allowed_right_locality lm with
+      match Locality_morph.maybe_allowed_right lm with
       | Allowed_right lm -> Allowed_right (Locality_full lm)
       | Not_allowed_right -> Not_allowed_right
     end
@@ -2703,12 +2693,12 @@ module Lattices_mono = struct
   let maybe_allowed_left_core : type a b d.
       (a, b, d) core_morph -> (a, b, d) maybe_allowed_left_core = function
     | Locality_restricted lm -> begin
-      match maybe_allowed_left_locality lm with
+      match Locality_morph.maybe_allowed_left lm with
       | Allowed_left lm -> Allowed_left (Locality_restricted lm)
       | Not_allowed_left -> Not_allowed_left
     end
     | Locality_full lm -> begin
-      match maybe_allowed_left_locality lm with
+      match Locality_morph.maybe_allowed_left lm with
       | Allowed_left lm -> Allowed_left (Locality_full lm)
       | Not_allowed_left -> Not_allowed_left
     end
@@ -2958,18 +2948,18 @@ module Lattices_mono = struct
     | Proj_const_min : 'a obj -> ('a, 'b, 'l * disallowed) compose_proj_result
 
   let compose_projection_locality_morph : type a b p l r.
-      (a, b, l * r) locality_morph ->
+      (a, b, l * r) Locality_morph.t ->
       (b comonadic_with, p) Axis.t ->
       (a comonadic_with, p, l * r) compose_proj_result =
    fun lm1 ax0 ->
+    let src = Locality_morph.src_full lm1 in
     match ax0 with
-    | Forkable -> Proj_id (Forkable, src_locality_full lm1)
-    | Yielding -> Proj_id (Yielding, src_locality_full lm1)
-    | Linearity -> Proj_id (Linearity, src_locality_full lm1)
-    | Statefulness -> Proj_id (Statefulness, src_locality_full lm1)
-    | Portability -> Proj_id (Portability, src_locality_full lm1)
-    | Areality ->
-      Proj_core (Locality_restricted lm1, Areality, src_locality_full lm1)
+    | Forkable -> Proj_id (Forkable, src)
+    | Yielding -> Proj_id (Yielding, src)
+    | Linearity -> Proj_id (Linearity, src)
+    | Statefulness -> Proj_id (Statefulness, src)
+    | Portability -> Proj_id (Portability, src)
+    | Areality -> Proj_core (Locality_restricted lm1, Areality, src)
 
   let compose_projection_core : type a b p d.
       (b, p) Axis.t -> (a, b, d) core_morph -> (a, p, d) compose_proj_result =
@@ -3037,7 +3027,7 @@ module Lattices_mono = struct
     | Disallowed : ('a, 'b, neither) compose_and_max_result
 
   let compose_max_with_simple_locality_morph : type b c q r.
-      (b, c, disallowed * r) locality_morph ->
+      (b, c, disallowed * r) Locality_morph.t ->
       (b comonadic_with, q) Axis.t ->
       (q, c comonadic_with, disallowed * r) compose_and_max_result =
    fun lm1 ax0 ->
@@ -3088,7 +3078,7 @@ module Lattices_mono = struct
     | Disallowed : ('a, 'b, neither) compose_and_min_result
 
   let compose_min_with_simple_locality_morph : type b c q l.
-      (b, c, l * disallowed) locality_morph ->
+      (b, c, l * disallowed) Locality_morph.t ->
       (b comonadic_with, q) Axis.t ->
       (q, c comonadic_with, l * disallowed) compose_and_min_result =
    fun lm1 ax0 ->
@@ -4218,9 +4208,12 @@ module Report = struct
     | None -> (
       match a_obj, b_obj with
       | Locality, Regionality ->
-        Misc.Le_result.equal ~le:(C.le b_obj) (C.locality_as_regionality a) b
+        Misc.Le_result.equal ~le:(C.le b_obj)
+          (C.Locality_morph.apply Locality_as_regionality a)
+          b
       | Regionality, Locality ->
-        Misc.Le_result.equal ~le:(C.le a_obj) a (C.locality_as_regionality b)
+        Misc.Le_result.equal ~le:(C.le a_obj) a
+          (C.Locality_morph.apply Locality_as_regionality b)
       | _, _ -> false)
 
   let rec print_ahint : type a l r.
@@ -5829,7 +5822,7 @@ module Value = Value_with (Regionality)
 module Alloc = Value_with (Locality)
 
 module Const = struct
-  let locality_as_regionality = C.locality_as_regionality
+  let locality_as_regionality = C.Locality_morph.apply Locality_as_regionality
 
   let alloc_as_value
       ({ areality;
@@ -5844,7 +5837,7 @@ module Const = struct
          staticity
        } :
         Alloc.Const.t) : Value.Const.t =
-    let areality = C.locality_as_regionality areality in
+    let areality = locality_as_regionality areality in
     { areality;
       linearity;
       portability;
