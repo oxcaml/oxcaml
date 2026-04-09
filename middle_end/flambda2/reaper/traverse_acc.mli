@@ -72,8 +72,11 @@ module Env : sig
   *)
   val parent : t -> Rev_expr.rev_expr_holed
 
-  (** Map from continuations in scope to their parameter variables. *)
-  val conts : t -> cont_kind Continuation.Map.t
+  (** Get parameters of a given continuation *)
+  val find_cont : t -> Continuation.t -> cont_kind
+
+  (** Add new continuation in scope with given parameters. *)
+  val add_cont : t -> Continuation.t -> cont_kind -> t
 
   (** The code id of the function currently being traversed, or [None] at the
       top level. *)
@@ -94,9 +97,6 @@ module Env : sig
 
   (** Return a copy of the environment with a new parent context. *)
   val with_parent : t -> Rev_expr.rev_expr_holed -> t
-
-  (** Return a copy of the environment with a new continuation map. *)
-  val with_conts : t -> cont_kind Continuation.Map.t -> t
 end
 
 (** Information about a function's code that is needed for building the

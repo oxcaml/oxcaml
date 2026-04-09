@@ -51,8 +51,6 @@ module Env = struct
 
   let parent t = t.parent
 
-  let conts t = t.conts
-
   let current_code_id t = t.current_code_id
 
   let should_preserve_direct_calls t = t.should_preserve_direct_calls
@@ -63,7 +61,15 @@ module Env = struct
 
   let with_parent t parent = { t with parent }
 
-  let with_conts t conts = { t with conts }
+  let find_cont t cont =
+    match Continuation.Map.find_opt cont t.conts with
+    | Some cont_kind -> cont_kind
+    | None ->
+      Misc.fatal_errorf "[Env.find_cont]: continuation %a not found in env"
+        Continuation.print cont
+
+  let add_cont t cont cont_kind =
+    { t with conts = Continuation.Map.add cont cont_kind t.conts }
 end
 
 type code_dep =

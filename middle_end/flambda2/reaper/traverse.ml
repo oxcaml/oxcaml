@@ -28,8 +28,7 @@ type acc = Acc.t
 let apply_cont_deps denv acc apply_cont =
   let cont = Apply_cont_expr.continuation apply_cont in
   let args = Apply_cont_expr.args apply_cont in
-  let params = Continuation.Map.find cont (Acc.Env.conts denv) in
-  let (Normal params) = params in
+  let (Normal params) = Acc.Env.find_cont denv cont in
   List.iter2
     (fun param dep ->
       Acc.add_alias acc
@@ -422,17 +421,15 @@ let traverse_apply denv acc apply : rev_expr =
   let return_args =
     match Apply.continuation apply with
     | Never_returns -> []
-    | Return cont -> (
-      match Continuation.Map.find cont (Acc.Env.conts denv) with
-      | Normal params -> params)
+    | Return cont ->
+      let (Normal params) = Acc.Env.find_cont denv cont in
+      params
   in
   let exn_arg =
     let exn = Apply.exn_continuation apply in
     let extra_args = Exn_continuation.extra_args exn in
     let (Normal exn_params) =
-      Continuation.Map.find
-        (Exn_continuation.exn_handler exn)
-        (Acc.Env.conts denv)
+      Acc.Env.find_cont denv (Exn_continuation.exn_handler exn)
     in
     match exn_params with
     | [] ->
@@ -577,13 +574,7 @@ let rec traverse_let denv acc let_expr : rev_expr =
   let let_acc =
     Let { bound_pattern; defining_expr = named; parent = Acc.Env.parent denv }
   in
-  let denv =
-    Acc.Env.create ~parent:let_acc ~conts:(Acc.Env.conts denv)
-      ~current_code_id:(Acc.Env.current_code_id denv)
-      ~should_preserve_direct_calls:(Acc.Env.should_preserve_direct_calls denv)
-      ~le_monde_exterieur:(Acc.Env.le_monde_exterieur denv)
-      ~all_constants:(Acc.Env.all_constants denv)
-  in
+  let denv = Acc.Env.with_parent denv let_acc in
   traverse denv acc body
 
 and traverse_let_cont denv acc (let_cont : Let_cont.t) : rev_expr =
@@ -625,19 +616,11 @@ and traverse_let_cont_non_recursive denv acc cont ~body handler =
          [raise_notrace], could we avoid setting it to [any_usage] in that
          case? *)
       Acc.add_cond_any_usage acc ~denv (Simple.var (List.hd params)));
-    let conts =
-      Continuation.Map.add cont (Normal params) (Acc.Env.conts denv)
-    in
     let denv =
-      Acc.Env.create
-        ~parent:(Let_cont { cont; handler; parent = Acc.Env.parent denv })
-        ~conts
-        ~current_code_id:(Acc.Env.current_code_id denv)
-        ~should_preserve_direct_calls:
-          (Acc.Env.should_preserve_direct_calls denv)
-        ~le_monde_exterieur:(Acc.Env.le_monde_exterieur denv)
-        ~all_constants:(Acc.Env.all_constants denv)
+      Acc.Env.with_parent denv
+        (Let_cont { cont; handler; parent = Acc.Env.parent denv })
     in
+    let denv = Acc.Env.add_cont denv cont (Normal params) in
     traverse denv acc body
   in
   traverse_cont_handler
@@ -657,17 +640,17 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
             cont_handler, bound_parameters, handler))
       (Continuation_handlers.to_map handlers)
   in
-  let conts =
+  let denv =
     Continuation.Lmap.fold
-      (fun cont (_, bp, _) conts ->
+      (fun cont (_, bp, _) denv ->
         let params = invariant_params_vars @ Bound_parameters.vars bp in
         let arity =
           invariant_params_arity
           @ Flambda_arity.unarize (Bound_parameters.arity bp)
         in
         Acc.continuation_info acc cont ~params ~arity ~is_exn_handler:false;
-        Continuation.Map.add cont (Normal params) conts)
-      handlers (Acc.Env.conts denv)
+        Acc.Env.add_cont denv cont (Normal params))
+      handlers denv
   in
   Bound_parameters.iter
     (fun bp -> Acc.bound_parameter_kind acc bp)
@@ -681,21 +664,14 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
       (fun (cont_handler, bound_parameters, handler) ->
         let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
         let is_cold = Continuation_handler.is_cold cont_handler in
-        let expr =
-          traverse
-            (Acc.Env.with_conts (Acc.Env.with_parent denv Hole) conts)
-            acc handler
-        in
+        let expr = traverse (Acc.Env.with_parent denv Hole) acc handler in
         let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
         handler)
       handlers
   in
   let denv =
-    Acc.Env.with_conts
-      (Acc.Env.with_parent denv
-         (Let_cont_rec
-            { invariant_params; handlers; parent = Acc.Env.parent denv }))
-      conts
+    Acc.Env.with_parent denv
+      (Let_cont_rec { invariant_params; handlers; parent = Acc.Env.parent denv })
   in
   traverse denv acc body
 
