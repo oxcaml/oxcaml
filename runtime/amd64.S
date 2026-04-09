@@ -23,7 +23,7 @@
 
 #if defined(SYS_macosx)
 
-#define CAMLSEP(x,y) caml_##x##$##y
+#define CAMLSEP(x,y) caml_##x##__##y
 #define LBL(x) L##x
 #define G(r) _##r
 #define GREL(r) _##r@GOTPCREL
@@ -39,7 +39,7 @@ G(name):
 
 #elif defined(SYS_mingw64) || defined(SYS_cygwin)
 
-#define CAMLSEP(x,y) caml_##x##$##y
+#define CAMLSEP(x,y) caml_##x##__##y
 #define LBL(x) .L##x
 #define G(r) r
 #undef  GREL
@@ -56,7 +56,7 @@ G(name):
 
 #else /* Unix-like operating systems using ELF binaries */
 
-#define CAMLSEP(x,y) caml_##x##.##y
+#define CAMLSEP(x,y) caml_##x##__##y
 #define LBL(x) .L##x
 #define G(r) r
 #define GREL(r) r@GOTPCREL
