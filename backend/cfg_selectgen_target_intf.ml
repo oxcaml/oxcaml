@@ -124,8 +124,5 @@ module type S = sig
     insert_op_debug_result
 
   val pseudoregs_for_operation :
-    Operation.t ->
-    Reg.t array ->
-    Reg.t array ->
-    pseudoregs_for_operation_result
+    Operation.t -> Reg.t array -> Reg.t array -> pseudoregs_for_operation_result
 end

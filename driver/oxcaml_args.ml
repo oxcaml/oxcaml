@@ -379,9 +379,7 @@ let mk_caml_apply_inline_fast_path f =
     " Inline the fast path of caml_applyN" )
 
 let mk_use_ssa f =
-  ( "-use-ssa",
-    Arg.Unit f,
-    " Use SSA intermediate representation (EXPERIMENTAL)" )
+  ("-use-ssa", Arg.Unit f, " Use SSA intermediate representation (EXPERIMENTAL)")
 
 let mk_dump_inlining_paths f =
   ( "-dump-inlining-paths",
@@ -1734,7 +1732,6 @@ module Oxcaml_options_impl = struct
     set' Oxcaml_flags.caml_apply_inline_fast_path
 
   let use_ssa = set' Oxcaml_flags.use_ssa
-
   let internal_assembler = set' Oxcaml_flags.internal_assembler
   let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
