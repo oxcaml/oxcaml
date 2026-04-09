@@ -2088,36 +2088,578 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_min a -> Allowed_left (Comonadic_to_monadic_min a)
       | Monadic_to_comonadic_max -> Not_allowed_left
       | Comonadic_to_monadic_max _ -> Not_allowed_left
+
+    (* Commutes a meet through a morphism from the right, such that:
+       [apply dst m (meet_const c x)] is equivalent to
+       [meet_const (commute_meet_const_from_right dst m c) (apply dst m x)]
+    *)
+    let commute_meet_const_from_right : type a b d.
+        b obj -> (a, b, d) t -> a -> b =
+     fun dst m c ->
+      (* All our morphisms preserve binary meets *)
+      apply dst m c
+
+    (* Commutes an implication through a morphism from the left, such that:
+       [apply dst m (meet_const c x)] is equivalent to
+       [meet_const (commute_imply_from_left dst m c) (apply dst m x)]
+    *)
+    let commute_imply_from_left : type a b l.
+        b obj -> b -> (a, b, l * allowed) t -> a =
+     fun dst c m ->
+      (* As all our morphisms preserve binary meets, implications can be
+         pushed inside of [m] by applying the left adjoint of [m] to the
+         implicant. *)
+      apply (src m) (left_adjoint dst m) c
   end
 
-  type ('a, 'b, 'd) simple_morph =
-    | Id : ('a, 'a, 'd) simple_morph  (** identity morphism *)
-    | Core : ('a, 'b, 'd) Core_morph.t -> ('a, 'b, 'd) simple_morph
-    | Meet_const : 'a -> ('a, 'a, 'l * disallowed) simple_morph
-        (** Meet the input with the parameter *)
-    | Imply_const : 'a -> ('a, 'a, disallowed * 'r) simple_morph
-        (** The right adjoint of [Meet_const] *)
-    | Meet_const_core :
-        'b * ('a, 'b, 'l * disallowed) Core_morph.t
-        -> ('a, 'b, 'l * disallowed) simple_morph
-        (** Composition of [Core] and [Meet_const]. We only need to include one
-            order of composition because currently all our core left morphisms
-            preserve binary meets. *)
-    | Core_imply_const :
-        ('a, 'b, disallowed * 'r) Core_morph.t * 'a
-        -> ('a, 'b, disallowed * 'r) simple_morph
-        (** Composition of [Core] and [Imply_const]. We only need to include one
-            order of composition because currently all our core right morphisms
-            commute with implication. *)
-    | Compose :
-        ('b, 'c, neither) simple_morph * ('a, 'b, neither) simple_morph
-        -> ('a, 'c, neither) simple_morph
-        (** Compoistion of two morphisms. We don't allow compositions to appear
-            on either side to ensure that there are a finite number of morphisms
-            we can encounter in practice. *)
+  module Simple_morph = struct
+    type ('a, 'b, 'd) t =
+      | Id : ('a, 'a, 'd) t  (** identity morphism *)
+      | Core : ('a, 'b, 'd) Core_morph.t -> ('a, 'b, 'd) t
+      | Meet_const : 'a -> ('a, 'a, 'l * disallowed) t
+          (** Meet the input with the parameter *)
+      | Imply_const : 'a -> ('a, 'a, disallowed * 'r) t
+          (** The right adjoint of [Meet_const] *)
+      | Meet_const_core :
+          'b * ('a, 'b, 'l * disallowed) Core_morph.t
+          -> ('a, 'b, 'l * disallowed) t
+          (** Composition of [Core] and [Meet_const]. We only need to include one
+              order of composition because currently all our core left morphisms
+              preserve binary meets. *)
+      | Core_imply_const :
+          ('a, 'b, disallowed * 'r) Core_morph.t * 'a
+          -> ('a, 'b, disallowed * 'r) t
+          (** Composition of [Core] and [Imply_const]. We only need to include
+              one order of composition because currently all our core right
+              morphisms commute with implication. *)
+      | Compose :
+          ('b, 'c, neither) t * ('a, 'b, neither) t
+          -> ('a, 'c, neither) t
+          (** Compoistion of two morphisms. We don't allow compositions to appear
+              on either side to ensure that there are a finite number of morphisms
+              we can encounter in practice. *)
+
+    let allow_left : type a b l r.
+        (a, b, allowed * r) t -> (a, b, l * r) t = function
+      | Id -> Id
+      | Core m -> Core (Core_morph.allow_left m)
+      | Meet_const c -> Meet_const c
+      | Meet_const_core (c, m) ->
+        Meet_const_core (c, Core_morph.allow_left m)
+
+    let allow_right : type a b l r.
+        (a, b, l * allowed) t -> (a, b, l * r) t = function
+      | Id -> Id
+      | Core m -> Core (Core_morph.allow_right m)
+      | Imply_const c -> Imply_const c
+      | Core_imply_const (m, c) ->
+        Core_imply_const (Core_morph.allow_right m, c)
+
+    let rec disallow_left : type a b l r.
+        (a, b, l * r) t -> (a, b, disallowed * r) t = function
+      | Id -> Id
+      | Core m -> Core (Core_morph.disallow_left m)
+      | Meet_const c -> Meet_const c
+      | Imply_const c -> Imply_const c
+      | Meet_const_core (c, m) ->
+        Meet_const_core (c, Core_morph.disallow_left m)
+      | Core_imply_const (m, c) ->
+        Core_imply_const (Core_morph.disallow_left m, c)
+      | Compose (mb, ma) ->
+        let mb = disallow_left mb in
+        let ma = disallow_left ma in
+        Compose (mb, ma)
+
+    let rec disallow_right : type a b l r.
+        (a, b, l * r) t -> (a, b, l * disallowed) t = function
+      | Id -> Id
+      | Core m -> Core (Core_morph.disallow_right m)
+      | Meet_const c -> Meet_const c
+      | Imply_const c -> Imply_const c
+      | Meet_const_core (c, m) ->
+        Meet_const_core (c, Core_morph.disallow_right m)
+      | Core_imply_const (m, c) ->
+        Core_imply_const (Core_morph.disallow_right m, c)
+      | Compose (mb, ma) ->
+        let mb = disallow_right mb in
+        let ma = disallow_right ma in
+        Compose (mb, ma)
+
+    let equal_val = equal
+
+    let le_val = le
+
+    let rec src : type a b d. b obj -> (a, b, d) t -> a obj =
+     fun dst f ->
+      match f with
+      | Id -> dst
+      | Core m -> Core_morph.src m
+      | Meet_const _ -> dst
+      | Imply_const _ -> dst
+      | Meet_const_core (_, m) -> Core_morph.src m
+      | Core_imply_const (m, _) -> Core_morph.src m
+      | Compose (mb, ma) ->
+        let mid = src dst mb in
+        src mid ma
+
+    let rec equal : type a1 l1 r1 a2 b l2 r2.
+        b obj ->
+        (a1, b, l1 * r1) t ->
+        (a2, b, l2 * r2) t ->
+        (a1, a2) Misc.eq option =
+     fun dst f1 f2 ->
+      match f1, f2 with
+      | Id, Id -> Some Refl
+      | Core m1, Core m2 -> Core_morph.equal m1 m2
+      | Meet_const c1, Meet_const c2 ->
+        if equal_val dst c1 c2 then Some Refl else None
+      | Imply_const c1, Imply_const c2 ->
+        if equal_val dst c1 c2 then Some Refl else None
+      | Meet_const_core (c1, m1), Meet_const_core (c2, m2) ->
+        if equal_val dst c1 c2
+        then begin
+          match Core_morph.equal m1 m2 with
+          | None as eq -> eq
+          | Some Refl as eq -> eq
+        end
+        else None
+      | Core_imply_const (m1, c1), Core_imply_const (m2, c2) -> begin
+        match Core_morph.equal m1 m2 with
+        | None -> None
+        | Some Refl ->
+          if equal_val (Core_morph.src m1) c1 c2 then Some Refl else None
+      end
+      | Compose (mb1, ma1), Compose (mb2, ma2) -> begin
+        match equal dst mb1 mb2 with
+        | None -> None
+        | Some Refl -> (
+          match equal (src dst mb1) ma1 ma2 with
+          | None as eq -> eq
+          | Some Refl as eq -> eq)
+      end
+      | ( ( Id | Core _ | Meet_const _ | Imply_const _ | Meet_const_core _
+          | Core_imply_const _ | Compose _ ),
+          _ ) ->
+        None
+
+    let rec compare : type a1 d1 a2 b d2.
+        b obj ->
+        (a1, b, d1) t ->
+        (a2, b, d2) t ->
+        (a1, a2) Misc.comparison =
+     fun dst m1 m2 ->
+      match m1, m2 with
+      | Id, Id -> Equal
+      | Id, _ -> Less_than
+      | _, Id -> Greater_than
+      | Core m1, Core m2 -> Core_morph.compare m1 m2
+      | Core _, _ -> Less_than
+      | _, Core _ -> Greater_than
+      | Meet_const c1, Meet_const c2 ->
+        if le_val dst c1 c2
+        then if equal_val dst c1 c2 then Equal else Less_than
+        else Greater_than
+      | Meet_const _, _ -> Less_than
+      | _, Meet_const _ -> Greater_than
+      | Imply_const c1, Imply_const c2 ->
+        if le_val dst c1 c2
+        then if equal_val dst c1 c2 then Equal else Less_than
+        else Greater_than
+      | Imply_const _, _ -> Less_than
+      | _, Imply_const _ -> Greater_than
+      | Meet_const_core (c1, m1), Meet_const_core (c2, m2) ->
+        if le_val dst c1 c2
+        then if equal_val dst c1 c2 then Core_morph.compare m1 m2 else Less_than
+        else Greater_than
+      | Meet_const_core _, _ -> Less_than
+      | _, Meet_const_core _ -> Greater_than
+      | Core_imply_const (m1, c1), Core_imply_const (m2, c2) -> begin
+        match Core_morph.compare m1 m2 with
+        | Less_than -> Less_than
+        | Greater_than -> Greater_than
+        | Equal ->
+          let src = Core_morph.src m1 in
+          if le_val src c1 c2
+          then if equal_val src c1 c2 then Equal else Less_than
+          else Greater_than
+      end
+      | Core_imply_const _, _ -> Less_than
+      | _, Core_imply_const _ -> Greater_than
+      | Compose (mb1, ma1), Compose (mb2, ma2) -> begin
+        match compare dst mb1 mb2 with
+        | (Greater_than | Less_than) as c -> c
+        | Equal -> compare (src dst mb1) ma1 ma2
+      end
+      | Compose _, _ -> .
+      | _, Compose _ -> .
+
+    let print_val = print
+
+    let rec print : type a b d.
+        b obj -> Fmt.formatter -> (a, b, d) t -> unit =
+     fun dst ppf -> function
+      | Id -> Fmt.fprintf ppf "id"
+      | Core m -> Core_morph.print ppf m
+      | Meet_const c -> Fmt.fprintf ppf "meet(%a)" (print_val dst) c
+      | Imply_const c -> Fmt.fprintf ppf "imply(%a)" (print_val dst) c
+      | Meet_const_core (c, m) ->
+        Fmt.fprintf ppf "meet(%a) . %a" (print_val dst) c Core_morph.print m
+      | Core_imply_const (m, c) ->
+        Fmt.fprintf ppf "%a . imply(%a)" Core_morph.print m
+          (print_val (Core_morph.src m))
+          c
+      | Compose (mb, ma) ->
+        let mid = src dst mb in
+        Fmt.fprintf ppf "%a . %a" (print dst) mb (print mid) ma
+
+    let rec apply : type a b d. b obj -> (a, b, d) t -> a -> b =
+     fun dst f a ->
+      match f with
+      | Id -> a
+      | Core m -> Core_morph.apply dst m a
+      | Meet_const c -> meet dst c a
+      | Imply_const c -> imply dst c a
+      | Meet_const_core (c, m) -> meet dst c (Core_morph.apply dst m a)
+      | Core_imply_const (m, c) ->
+        Core_morph.apply dst m (imply (Core_morph.src m) c a)
+      | Compose (mb, ma) ->
+        let mid = src dst mb in
+        apply dst mb (apply mid ma a)
+
+    let right_adjoint : type a b r.
+        b obj ->
+        (a, b, allowed * r) t ->
+        (b, a, disallowed * allowed) t =
+     fun dst f ->
+      match f with
+      | Id -> Id
+      | Core m -> Core (Core_morph.right_adjoint dst m)
+      | Meet_const c -> Imply_const c
+      | Meet_const_core (c, m) ->
+        Core_imply_const (Core_morph.right_adjoint dst m, c)
+
+    let left_adjoint : type a b l.
+        b obj ->
+        (a, b, l * allowed) t ->
+        (b, a, allowed * disallowed) t =
+     fun dst f ->
+      match f with
+      | Id -> Id
+      | Core m -> Core (Core_morph.left_adjoint dst m)
+      | Imply_const c -> Meet_const c
+      | Core_imply_const (m, c) ->
+        Meet_const_core (c, Core_morph.left_adjoint dst m)
+
+    type ('a, 'b, 'd) maybe_allowed_right =
+      | Allowed_right :
+          ('a, 'b, 'l * allowed) t
+          -> ('a, 'b, 'l * 'r) maybe_allowed_right
+      | Not_allowed_right : ('a, 'b, 'l * disallowed) maybe_allowed_right
+
+    let maybe_allowed_right : type a b l r.
+        (a, b, l * r) t -> (a, b, l * r) maybe_allowed_right = function
+      | Id -> Allowed_right Id
+      | Core m -> begin
+        match Core_morph.maybe_allowed_right m with
+        | Allowed_right m -> Allowed_right (Core m)
+        | Not_allowed_right -> Not_allowed_right
+      end
+      | Meet_const _ -> Not_allowed_right
+      | Imply_const c -> Allowed_right (Imply_const c)
+      | Meet_const_core _ -> Not_allowed_right
+      | Core_imply_const (m, c) -> begin
+        match Core_morph.maybe_allowed_right m with
+        | Allowed_right m -> Allowed_right (Core_imply_const (m, c))
+        | Not_allowed_right -> Not_allowed_right
+      end
+      | Compose _ -> Not_allowed_right
+
+    type ('a, 'b, 'd) maybe_allowed_left =
+      | Allowed_left :
+          ('a, 'b, allowed * 'r) t
+          -> ('a, 'b, 'l * 'r) maybe_allowed_left
+      | Not_allowed_left : ('a, 'b, disallowed * 'r) maybe_allowed_left
+
+    let maybe_allowed_left : type a b l r.
+        (a, b, l * r) t -> (a, b, l * r) maybe_allowed_left = function
+      | Id -> Allowed_left Id
+      | Core m -> begin
+        match Core_morph.maybe_allowed_left m with
+        | Allowed_left m -> Allowed_left (Core m)
+        | Not_allowed_left -> Not_allowed_left
+      end
+      | Meet_const c -> Allowed_left (Meet_const c)
+      | Imply_const _ -> Not_allowed_left
+      | Meet_const_core (c, m) -> begin
+        match Core_morph.maybe_allowed_left m with
+        | Allowed_left m -> Allowed_left (Meet_const_core (c, m))
+        | Not_allowed_left -> Not_allowed_left
+      end
+      | Core_imply_const _ -> Not_allowed_left
+      | Compose _ -> Not_allowed_left
+
+    let compose_meet_const_left : type a b l.
+        b obj ->
+        b ->
+        (a, b, l * disallowed) t ->
+        (a, b, l * disallowed) t =
+     fun dst c m ->
+      match m with
+      | Id -> Meet_const c
+      | Core m -> Meet_const_core (c, m)
+      | Meet_const c' -> Meet_const (meet dst c c')
+      | Meet_const_core (c', m) -> Meet_const_core (meet dst c c', m)
+      | Imply_const _ as m -> Compose (Meet_const c, m)
+      | Core_imply_const _ as m -> Compose (Meet_const c, m)
+      | Compose _ as m -> Compose (Meet_const c, m)
+
+    let compose_imply_const_right : type a b r.
+        b obj ->
+        (a, b, disallowed * r) t ->
+        a ->
+        (a, b, disallowed * r) t =
+     fun dst m c ->
+      match m with
+      | Id -> Imply_const c
+      | Core m -> Core_imply_const (m, c)
+      | Imply_const c' -> Imply_const (meet dst c c')
+      | Core_imply_const (m, c') ->
+        Core_imply_const (m, meet (Core_morph.src m) c' c)
+      | Meet_const _ as m -> Compose (m, Imply_const c)
+      | Meet_const_core _ as m -> Compose (m, Imply_const c)
+      | Compose _ as m -> Compose (m, Imply_const c)
+
+    let compose_meet_const_right : type a b l.
+        b obj ->
+        (a, b, l * disallowed) t ->
+        a ->
+        (a, b, l * disallowed) t =
+     fun dst m c ->
+      match m with
+      | Id -> Meet_const c
+      | Core m ->
+        let c = Core_morph.commute_meet_const_from_right dst m c in
+        Meet_const_core (c, m)
+      | Meet_const c' -> Meet_const (meet dst c' c)
+      | Meet_const_core (c', m) ->
+        let c = Core_morph.commute_meet_const_from_right dst m c in
+        Meet_const_core (meet dst c' c, m)
+      | Imply_const _ as m -> Compose (m, Meet_const c)
+      | Core_imply_const _ as m -> Compose (m, Meet_const c)
+      | Compose _ as m -> Compose (m, Meet_const c)
+
+    let compose_imply_const_left : type a b r.
+        b obj ->
+        b ->
+        (a, b, disallowed * r) t ->
+        (a, b, disallowed * r) t =
+     fun dst c m ->
+      match m with
+      | Id -> Imply_const c
+      | Core m -> begin
+        match Core_morph.maybe_allowed_right m with
+        | Not_allowed_right -> Compose (Imply_const c, Core m)
+        | Allowed_right m' ->
+          let c = Core_morph.commute_imply_from_left dst c m' in
+          Core_imply_const (m, c)
+      end
+      | Imply_const c' -> Imply_const (meet dst c c')
+      | Core_imply_const (m, c') -> begin
+        match Core_morph.maybe_allowed_right m with
+        | Not_allowed_right ->
+          Compose (Imply_const c, Core_imply_const (m, c'))
+        | Allowed_right m' ->
+          let c = Core_morph.commute_imply_from_left dst c m' in
+          Core_imply_const (m, meet (Core_morph.src m) c c')
+      end
+      | Meet_const _ as m -> Compose (Imply_const c, m)
+      | Meet_const_core _ as m -> Compose (Imply_const c, m)
+      | Compose _ as m -> Compose (Imply_const c, m)
+
+    let compose_core : type a b c d.
+        c obj ->
+        (b, c, d) Core_morph.t ->
+        (a, b, d) Core_morph.t ->
+        (a, c, d) t =
+     fun dst m1 m2 ->
+      match m1, m2 with
+      | Locality_restricted lm1, Locality_restricted lm2 -> begin
+        match Locality_morph.compose lm1 lm2 with
+        | Id -> Id
+        | Morph lm -> Core (Locality_restricted lm)
+        | Disallowed -> Compose (Core m1, Core m2)
+      end
+      | Locality_full lm1, Locality_full lm2 -> begin
+        match Locality_morph.compose lm1 lm2 with
+        | Id -> Id
+        | Morph lm -> Core (Locality_full lm)
+        | Disallowed -> Compose (Core m1, Core m2)
+      end
+      | Uniqueness_op_to_linearity, Linearity_to_uniqueness_op -> Id
+      | Linearity_to_uniqueness_op, Uniqueness_op_to_linearity -> Id
+      | Contention_op_to_portability, Portability_to_contention_op -> Id
+      | Portability_to_contention_op, Contention_op_to_portability -> Id
+      | Visibility_op_to_statefulness, Statefulness_to_visibility_op -> Id
+      | Statefulness_to_visibility_op, Visibility_op_to_statefulness -> Id
+      | Comonadic_to_monadic_min areality, Monadic_to_comonadic_min ->
+        let c =
+          match areality with
+          | Locality ->
+            Core_morph.apply dst (Comonadic_to_monadic_min Locality)
+              Comonadic_with_locality.max
+          | Regionality ->
+            Core_morph.apply dst (Comonadic_to_monadic_min Regionality)
+              Comonadic_with_regionality.max
+        in
+        Meet_const c
+      | Monadic_to_comonadic_min, Comonadic_to_monadic_min areality -> begin
+        let c = Core_morph.apply dst Monadic_to_comonadic_min Monadic_op.max in
+        match areality, dst with
+        | Locality, Comonadic_with_locality -> Meet_const c
+        | Regionality, Comonadic_with_locality ->
+          Meet_const_core (c, Locality_full Regional_to_local)
+        | Locality, Comonadic_with_regionality ->
+          Meet_const_core (c, Locality_full Locality_as_regionality)
+        | Regionality, Comonadic_with_regionality -> Meet_const c
+      end
+      | Monadic_to_comonadic_max, Comonadic_to_monadic_max areality -> begin
+        let src = areality_comonadic_obj areality in
+        let c = Core_morph.apply src Monadic_to_comonadic_min Monadic_op.max in
+        match areality, dst with
+        | Locality, Comonadic_with_locality -> Imply_const c
+        | Regionality, Comonadic_with_locality ->
+          Core_imply_const (Locality_full Regional_to_local, c)
+        | Locality, Comonadic_with_regionality ->
+          Core_imply_const (Locality_full Locality_as_regionality, c)
+        | Regionality, Comonadic_with_regionality -> Imply_const c
+      end
+      | Comonadic_to_monadic_max areality, Monadic_to_comonadic_max ->
+        let c =
+          match areality with
+          | Locality ->
+            Core_morph.apply dst (Comonadic_to_monadic_min Locality)
+              Comonadic_with_locality.max
+          | Regionality ->
+            Core_morph.apply dst (Comonadic_to_monadic_min Regionality)
+              Comonadic_with_regionality.max
+        in
+        Imply_const c
+      | Comonadic_to_monadic_min _, Monadic_to_comonadic_max ->
+        Compose (Core m1, Core m2)
+      | Monadic_to_comonadic_max, Comonadic_to_monadic_min _ ->
+        Compose (Core m1, Core m2)
+      | Comonadic_to_monadic_max _, Monadic_to_comonadic_min ->
+        Compose (Core m1, Core m2)
+      | Monadic_to_comonadic_min, Comonadic_to_monadic_max _ ->
+        Compose (Core m1, Core m2)
+      | Comonadic_to_monadic_min _, Locality_full m2 ->
+        let src = Locality_morph.src_full m2 in
+        Core (Comonadic_to_monadic_min (comonadic_obj_areality src))
+      | Comonadic_to_monadic_max _, Locality_full m2 ->
+        let src = Locality_morph.src_full m2 in
+        Core (Comonadic_to_monadic_max (comonadic_obj_areality src))
+      | Locality_full lm1, Monadic_to_comonadic_min -> begin
+        match Locality_morph.maybe_allowed_left lm1 with
+        | Allowed_left _ ->
+          (* Has a right adjoint so it preserves min *)
+          Core Monadic_to_comonadic_min
+        | Not_allowed_left ->
+          Compose (Core m1, Core Monadic_to_comonadic_min)
+      end
+      | Locality_full lm1, Monadic_to_comonadic_max -> begin
+        match Locality_morph.maybe_allowed_right lm1 with
+        | Allowed_right _ ->
+          (* Has a left adjoint so it preserves max *)
+          Core Monadic_to_comonadic_max
+        | Not_allowed_right ->
+          Compose (Core m1, Core Monadic_to_comonadic_max)
+      end
+      | Locality_restricted _, _ -> .
+      | _, Locality_restricted _ -> .
+      | Locality_full _, _ -> .
+      | _, Locality_full _ -> .
+
+    let compose_core_right : type a b c d.
+        c obj ->
+        (b, c, d) t ->
+        (a, b, d) Core_morph.t ->
+        (a, c, d) t =
+     fun dst m1 m2 ->
+      match m1 with
+      | Id -> Core m2
+      | Core m1 -> compose_core dst m1 m2
+      | Imply_const c1 -> begin
+        match Core_morph.maybe_allowed_right m2 with
+        | Not_allowed_right -> Compose (Imply_const c1, Core m2)
+        | Allowed_right m2' ->
+          let c1 = Core_morph.commute_imply_from_left dst c1 m2' in
+          Core_imply_const (m2, c1)
+      end
+      | Core_imply_const (m1, c1) -> begin
+        match Core_morph.maybe_allowed_right m2 with
+        | Not_allowed_right -> Compose (Core_imply_const (m1, c1), Core m2)
+        | Allowed_right m2' ->
+          let mid = Core_morph.src m1 in
+          let c1 = Core_morph.commute_imply_from_left mid c1 m2' in
+          let m = compose_core dst m1 m2 in
+          compose_imply_const_right dst m c1
+      end
+      | Meet_const c1 -> Meet_const_core (c1, m2)
+      | Meet_const_core (c1, m1) ->
+        compose_meet_const_left dst c1 (compose_core dst m1 m2)
+      | Compose _ as m1 -> Compose (m1, Core m2)
+
+    let compose_core_left : type a b c d.
+        c obj ->
+        (b, c, d) Core_morph.t ->
+        (a, b, d) t ->
+        (a, c, d) t =
+     fun dst m1 m2 ->
+      match m2 with
+      | Id -> Core m1
+      | Core m2 -> compose_core dst m1 m2
+      | Imply_const c2 -> Core_imply_const (m1, c2)
+      | Core_imply_const (m2, c2) ->
+        compose_imply_const_right dst (compose_core dst m1 m2) c2
+      | Meet_const c2 ->
+        let c2 = Core_morph.commute_meet_const_from_right dst m1 c2 in
+        Meet_const_core (c2, m1)
+      | Meet_const_core (c2, m2) ->
+        let c2 = Core_morph.commute_meet_const_from_right dst m1 c2 in
+        let m = compose_core dst m1 m2 in
+        compose_meet_const_left dst c2 m
+      | Compose _ as m2 -> Compose (Core m1, m2)
+
+    let compose : type a b c d.
+        c obj ->
+        (b, c, d) t ->
+        (a, b, d) t ->
+        (a, c, d) t =
+     fun dst m1 m2 ->
+      match m1, m2 with
+      | m1, Id -> m1
+      | Id, m2 -> m2
+      | m1, Meet_const c2 -> compose_meet_const_right dst m1 c2
+      | Meet_const c1, m2 -> compose_meet_const_left dst c1 m2
+      | m1, Imply_const c2 -> compose_imply_const_right dst m1 c2
+      | Imply_const c1, m2 -> compose_imply_const_left dst c1 m2
+      | m1, Core m2 -> compose_core_right dst m1 m2
+      | Core m1, m2 -> compose_core_left dst m1 m2
+      | m1, Meet_const_core (c2, m2) ->
+        compose_core_right dst (compose_meet_const_right dst m1 c2) m2
+      | Meet_const_core (c1, m1), m2 ->
+        compose_meet_const_left dst c1 (compose_core_left dst m1 m2)
+      | m1, Core_imply_const (m2, c2) ->
+        compose_imply_const_right dst (compose_core_right dst m1 m2) c2
+      | Core_imply_const (m1, c1), m2 ->
+        let mid = Core_morph.src m1 in
+        compose_core_left dst m1 (compose_imply_const_left mid c1 m2)
+      | (Compose _ as m1), m2 -> Compose (m1, m2)
+      | _, Compose _ -> .
+  end
 
   type ('a, 'b, 'd) morph =
-    | Simple : ('a, 'b, 'd) simple_morph -> ('a, 'b, 'd) morph
+    | Simple : ('a, 'b, 'd) Simple_morph.t -> ('a, 'b, 'd) morph
     | Const_max : 'a obj -> ('a, 'c, disallowed * 'r) morph
         (** Discards an arbitrary input and apply a simple morphism to the
             maximum of a lattice *)
@@ -2128,16 +2670,16 @@ module Lattices_mono = struct
         (** A constant function on any constant: we don't allow arbitrary
             constant functions to appear on either side *)
     | Simple_proj :
-        ('p, 'q, 'd) simple_morph * ('s, 'p) Axis.t * 's obj
+        ('p, 'q, 'd) Simple_morph.t * ('s, 'p) Axis.t * 's obj
         -> ('s, 'q, 'd) morph
         (** Composition of projecting out an axis and a simple morphism. *)
     | Max_with_simple :
-        ('s, 'q) Axis.t * ('p, 'q, disallowed * 'r) simple_morph
+        ('s, 'q) Axis.t * ('p, 'q, disallowed * 'r) Simple_morph.t
         -> ('p, 's, disallowed * 'r) morph
         (** Composition of a morphism and combining an axis with the maxima
             along other axes. *)
     | Min_with_simple :
-        ('s, 'q) Axis.t * ('p, 'q, 'l * disallowed) simple_morph
+        ('s, 'q) Axis.t * ('p, 'q, 'l * disallowed) Simple_morph.t
         -> ('p, 's, 'l * disallowed) morph
         (** Composition of a morphism and combining an axis with the minima
             along other axes. *)
@@ -2151,57 +2693,33 @@ module Lattices_mono = struct
   include Magic_allow_disallow (struct
     type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph constraint 'd = _ * _
 
-    let allow_left_simple : type a b l r.
-        (a, b, allowed * r) simple_morph -> (a, b, l * r) simple_morph =
-      function
-      | Id -> Id
-      | Core m -> Core (Core_morph.allow_left m)
-      | Meet_const c -> Meet_const c
-      | Meet_const_core (c, m) -> Meet_const_core (c, Core_morph.allow_left m)
-
     let allow_left : type a b l r.
         (a, b, allowed * r) morph -> (a, b, l * r) morph = function
-      | Simple m -> Simple (allow_left_simple m)
-      | Simple_proj (m, ax, src) -> Simple_proj (allow_left_simple m, ax, src)
-      | Min_with_simple (ax, m) -> Min_with_simple (ax, allow_left_simple m)
+      | Simple m -> Simple (Simple_morph.allow_left m)
+      | Simple_proj (m, ax, src) ->
+        Simple_proj (Simple_morph.allow_left m, ax, src)
+      | Min_with_simple (ax, m) ->
+        Min_with_simple (ax, Simple_morph.allow_left m)
       | Const_min src -> Const_min src
-
-    let allow_right_simple : type a b l r.
-        (a, b, l * allowed) simple_morph -> (a, b, l * r) simple_morph =
-      function
-      | Id -> Id
-      | Core m -> Core (Core_morph.allow_right m)
-      | Imply_const c -> Imply_const c
-      | Core_imply_const (m, c) -> Core_imply_const (Core_morph.allow_right m, c)
 
     let allow_right : type a b l r.
         (a, b, l * allowed) morph -> (a, b, l * r) morph = function
-      | Simple m -> Simple (allow_right_simple m)
-      | Simple_proj (m, ax, src) -> Simple_proj (allow_right_simple m, ax, src)
-      | Max_with_simple (ax, m) -> Max_with_simple (ax, allow_right_simple m)
+      | Simple m -> Simple (Simple_morph.allow_right m)
+      | Simple_proj (m, ax, src) ->
+        Simple_proj (Simple_morph.allow_right m, ax, src)
+      | Max_with_simple (ax, m) ->
+        Max_with_simple (ax, Simple_morph.allow_right m)
       | Const_max src -> Const_max src
-
-    let rec disallow_left_simple : type a b l r.
-        (a, b, l * r) simple_morph -> (a, b, disallowed * r) simple_morph =
-      function
-      | Id -> Id
-      | Core m -> Core (Core_morph.disallow_left m)
-      | Meet_const c -> Meet_const c
-      | Imply_const c -> Imply_const c
-      | Meet_const_core (c, m) -> Meet_const_core (c, Core_morph.disallow_left m)
-      | Core_imply_const (m, c) ->
-        Core_imply_const (Core_morph.disallow_left m, c)
-      | Compose (mb, ma) ->
-        let mb = disallow_left_simple mb in
-        let ma = disallow_left_simple ma in
-        Compose (mb, ma)
 
     let rec disallow_left : type a b l r.
         (a, b, l * r) morph -> (a, b, disallowed * r) morph = function
-      | Simple m -> Simple (disallow_left_simple m)
-      | Simple_proj (m, ax, src) -> Simple_proj (disallow_left_simple m, ax, src)
-      | Max_with_simple (ax, m) -> Max_with_simple (ax, disallow_left_simple m)
-      | Min_with_simple (ax, m) -> Min_with_simple (ax, disallow_left_simple m)
+      | Simple m -> Simple (Simple_morph.disallow_left m)
+      | Simple_proj (m, ax, src) ->
+        Simple_proj (Simple_morph.disallow_left m, ax, src)
+      | Max_with_simple (ax, m) ->
+        Max_with_simple (ax, Simple_morph.disallow_left m)
+      | Min_with_simple (ax, m) ->
+        Min_with_simple (ax, Simple_morph.disallow_left m)
       | Const_max src -> Const_max src
       | Const_min src -> Const_min src
       | Const (src, c) -> Const (src, c)
@@ -2210,29 +2728,15 @@ module Lattices_mono = struct
         let ma = disallow_left ma in
         Compose (mb, ma)
 
-    let rec disallow_right_simple : type a b l r.
-        (a, b, l * r) simple_morph -> (a, b, l * disallowed) simple_morph =
-      function
-      | Id -> Id
-      | Core m -> Core (Core_morph.disallow_right m)
-      | Meet_const c -> Meet_const c
-      | Imply_const c -> Imply_const c
-      | Meet_const_core (c, m) ->
-        Meet_const_core (c, Core_morph.disallow_right m)
-      | Core_imply_const (m, c) ->
-        Core_imply_const (Core_morph.disallow_right m, c)
-      | Compose (mb, ma) ->
-        let mb = disallow_right_simple mb in
-        let ma = disallow_right_simple ma in
-        Compose (mb, ma)
-
     let rec disallow_right : type a b l r.
         (a, b, l * r) morph -> (a, b, l * disallowed) morph = function
-      | Simple m -> Simple (disallow_right_simple m)
+      | Simple m -> Simple (Simple_morph.disallow_right m)
       | Simple_proj (m, ax, src) ->
-        Simple_proj (disallow_right_simple m, ax, src)
-      | Max_with_simple (ax, m) -> Max_with_simple (ax, disallow_right_simple m)
-      | Min_with_simple (ax, m) -> Min_with_simple (ax, disallow_right_simple m)
+        Simple_proj (Simple_morph.disallow_right m, ax, src)
+      | Max_with_simple (ax, m) ->
+        Max_with_simple (ax, Simple_morph.disallow_right m)
+      | Min_with_simple (ax, m) ->
+        Min_with_simple (ax, Simple_morph.disallow_right m)
       | Const_max src -> Const_max src
       | Const_min src -> Const_min src
       | Const (src, c) -> Const (src, c)
@@ -2262,71 +2766,19 @@ module Lattices_mono = struct
     | Visibility, Monadic_op -> Visibility_op
     | Staticity, Monadic_op -> Staticity_op
 
-  let rec src_simple : type a b d. b obj -> (a, b, d) simple_morph -> a obj =
-   fun dst f ->
-    match f with
-    | Id -> dst
-    | Core m -> Core_morph.src m
-    | Meet_const _ -> dst
-    | Imply_const _ -> dst
-    | Meet_const_core (_, m) -> Core_morph.src m
-    | Core_imply_const (m, _) -> Core_morph.src m
-    | Compose (mb, ma) ->
-      let mid = src_simple dst mb in
-      src_simple mid ma
-
   let rec src : type a b d. b obj -> (a, b, d) morph -> a obj =
    fun dst f ->
     match f with
-    | Simple m -> src_simple dst m
+    | Simple m -> Simple_morph.src dst m
     | Simple_proj (_, _, src) -> src
-    | Max_with_simple (ax, m) -> src_simple (proj_obj ax dst) m
-    | Min_with_simple (ax, m) -> src_simple (proj_obj ax dst) m
+    | Max_with_simple (ax, m) -> Simple_morph.src (proj_obj ax dst) m
+    | Min_with_simple (ax, m) -> Simple_morph.src (proj_obj ax dst) m
     | Const_min src -> src
     | Const_max src -> src
     | Const (src, _) -> src
     | Compose (mb, ma) ->
       let mid = src dst mb in
       src mid ma
-
-  let rec equal_simple_morph : type a1 l1 r1 a2 b l2 r2.
-      b obj ->
-      (a1, b, l1 * r1) simple_morph ->
-      (a2, b, l2 * r2) simple_morph ->
-      (a1, a2) Misc.eq option =
-   fun dst f1 f2 ->
-    match f1, f2 with
-    | Id, Id -> Some Refl
-    | Core m1, Core m2 -> Core_morph.equal m1 m2
-    | Meet_const c1, Meet_const c2 ->
-      if equal dst c1 c2 then Some Refl else None
-    | Imply_const c1, Imply_const c2 ->
-      if equal dst c1 c2 then Some Refl else None
-    | Meet_const_core (c1, m1), Meet_const_core (c2, m2) ->
-      if equal dst c1 c2
-      then begin
-        match Core_morph.equal m1 m2 with
-        | None as eq -> eq
-        | Some Refl as eq -> eq
-      end
-      else None
-    | Core_imply_const (m1, c1), Core_imply_const (m2, c2) -> begin
-      match Core_morph.equal m1 m2 with
-      | None -> None
-      | Some Refl -> if equal (Core_morph.src m1) c1 c2 then Some Refl else None
-    end
-    | Compose (mb1, ma1), Compose (mb2, ma2) -> begin
-      match equal_simple_morph dst mb1 mb2 with
-      | None -> None
-      | Some Refl -> (
-        match equal_simple_morph (src_simple dst mb1) ma1 ma2 with
-        | None as eq -> eq
-        | Some Refl as eq -> eq)
-    end
-    | ( ( Id | Core _ | Meet_const _ | Imply_const _ | Meet_const_core _
-        | Core_imply_const _ | Compose _ ),
-        _ ) ->
-      None
 
   let rec equal_morph : type a1 l1 r1 a2 b l2 r2.
       b obj ->
@@ -2335,7 +2787,7 @@ module Lattices_mono = struct
       (a1, a2) Misc.eq option =
    fun dst f1 f2 ->
     match f1, f2 with
-    | Simple m1, Simple m2 -> equal_simple_morph dst m1 m2
+    | Simple m1, Simple m2 -> Simple_morph.equal dst m1 m2
     | Const_max src1, Const_max src2 -> equal_obj src1 src2
     | Const_min src1, Const_min src2 -> equal_obj src1 src2
     | Const (src1, c1), Const (src2, c2) -> begin
@@ -2344,7 +2796,7 @@ module Lattices_mono = struct
       | Some Refl -> if equal dst c1 c2 then Some Refl else None
     end
     | Simple_proj (m1, ax1, src1), Simple_proj (m2, ax2, src2) -> begin
-      match equal_simple_morph dst m1 m2 with
+      match Simple_morph.equal dst m1 m2 with
       | None -> None
       | Some Refl -> (
         match equal_obj src1 src2 with
@@ -2357,12 +2809,12 @@ module Lattices_mono = struct
     | Max_with_simple (ax1, m1), Max_with_simple (ax2, m2) -> begin
       match Axis.equal ax1 ax2 with
       | None as eq -> eq
-      | Some Refl -> equal_simple_morph (proj_obj ax1 dst) m1 m2
+      | Some Refl -> Simple_morph.equal (proj_obj ax1 dst) m1 m2
     end
     | Min_with_simple (ax1, m1), Min_with_simple (ax2, m2) -> begin
       match Axis.equal ax1 ax2 with
       | None as eq -> eq
-      | Some Refl -> equal_simple_morph (proj_obj ax1 dst) m1 m2
+      | Some Refl -> Simple_morph.equal (proj_obj ax1 dst) m1 m2
     end
     | Compose (mb1, ma1), Compose (mb2, ma2) -> begin
       match equal_morph dst mb1 mb2 with
@@ -2377,57 +2829,6 @@ module Lattices_mono = struct
         _ ) ->
       None
 
-  let rec compare_simple_morph : type a1 d1 a2 b d2.
-      b obj ->
-      (a1, b, d1) simple_morph ->
-      (a2, b, d2) simple_morph ->
-      (a1, a2) Misc.comparison =
-   fun dst m1 m2 ->
-    match m1, m2 with
-    | Id, Id -> Equal
-    | Id, _ -> Less_than
-    | _, Id -> Greater_than
-    | Core m1, Core m2 -> Core_morph.compare m1 m2
-    | Core _, _ -> Less_than
-    | _, Core _ -> Greater_than
-    | Meet_const c1, Meet_const c2 ->
-      if le dst c1 c2
-      then if equal dst c1 c2 then Equal else Less_than
-      else Greater_than
-    | Meet_const _, _ -> Less_than
-    | _, Meet_const _ -> Greater_than
-    | Imply_const c1, Imply_const c2 ->
-      if le dst c1 c2
-      then if equal dst c1 c2 then Equal else Less_than
-      else Greater_than
-    | Imply_const _, _ -> Less_than
-    | _, Imply_const _ -> Greater_than
-    | Meet_const_core (c1, m1), Meet_const_core (c2, m2) ->
-      if le dst c1 c2
-      then if equal dst c1 c2 then Core_morph.compare m1 m2 else Less_than
-      else Greater_than
-    | Meet_const_core _, _ -> Less_than
-    | _, Meet_const_core _ -> Greater_than
-    | Core_imply_const (m1, c1), Core_imply_const (m2, c2) -> begin
-      match Core_morph.compare m1 m2 with
-      | Less_than -> Less_than
-      | Greater_than -> Greater_than
-      | Equal ->
-        let src = Core_morph.src m1 in
-        if le src c1 c2
-        then if equal src c1 c2 then Equal else Less_than
-        else Greater_than
-    end
-    | Core_imply_const _, _ -> Less_than
-    | _, Core_imply_const _ -> Greater_than
-    | Compose (mb1, ma1), Compose (mb2, ma2) -> begin
-      match compare_simple_morph dst mb1 mb2 with
-      | (Greater_than | Less_than) as c -> c
-      | Equal -> compare_simple_morph (src_simple dst mb1) ma1 ma2
-    end
-    | Compose _, _ -> .
-    | _, Compose _ -> .
-
   let rec compare_morph : type a1 d1 a2 b d2.
       b obj ->
       (a1, b, d1) morph ->
@@ -2435,7 +2836,7 @@ module Lattices_mono = struct
       (a1, a2) Misc.comparison =
    fun dst m1 m2 ->
     match m1, m2 with
-    | Simple m1, Simple m2 -> compare_simple_morph dst m1 m2
+    | Simple m1, Simple m2 -> Simple_morph.compare dst m1 m2
     | Simple _, _ -> Less_than
     | _, Simple _ -> Greater_than
     | Const_max obj1, Const_max obj2 -> compare_obj obj1 obj2
@@ -2455,7 +2856,7 @@ module Lattices_mono = struct
     | Const _, _ -> Less_than
     | _, Const _ -> Greater_than
     | Simple_proj (m1, ax1, src1), Simple_proj (m2, ax2, src2) -> begin
-      match compare_simple_morph dst m1 m2 with
+      match Simple_morph.compare dst m1 m2 with
       | (Less_than | Greater_than) as c -> c
       | Equal -> (
         match compare_obj src1 src2 with
@@ -2470,14 +2871,14 @@ module Lattices_mono = struct
     | Max_with_simple (ax1, m1), Max_with_simple (ax2, m2) -> begin
       match Axis.compare ax1 ax2 with
       | (Less_than | Greater_than) as c -> c
-      | Equal -> compare_simple_morph (proj_obj ax1 dst) m1 m2
+      | Equal -> Simple_morph.compare (proj_obj ax1 dst) m1 m2
     end
     | Max_with_simple _, _ -> Less_than
     | _, Max_with_simple _ -> Greater_than
     | Min_with_simple (ax1, m1), Min_with_simple (ax2, m2) -> begin
       match Axis.compare ax1 ax2 with
       | (Less_than | Greater_than) as c -> c
-      | Equal -> compare_simple_morph (proj_obj ax1 dst) m1 m2
+      | Equal -> Simple_morph.compare (proj_obj ax1 dst) m1 m2
     end
     | Min_with_simple _, _ -> Less_than
     | _, Min_with_simple _ -> Greater_than
@@ -2489,45 +2890,27 @@ module Lattices_mono = struct
     | Compose _, _ -> .
     | _, Compose _ -> .
 
-  let rec print_simple_morph : type a b d.
-      b obj -> Fmt.formatter -> (a, b, d) simple_morph -> unit =
-   fun dst ppf -> function
-    | Id -> Fmt.fprintf ppf "id"
-    | Core m -> Core_morph.print ppf m
-    | Meet_const c -> Fmt.fprintf ppf "meet(%a)" (print dst) c
-    | Imply_const c -> Fmt.fprintf ppf "imply(%a)" (print dst) c
-    | Meet_const_core (c, m) ->
-      Fmt.fprintf ppf "meet(%a) . %a" (print dst) c Core_morph.print m
-    | Core_imply_const (m, c) ->
-      Fmt.fprintf ppf "%a . imply(%a)" Core_morph.print m
-        (print (Core_morph.src m))
-        c
-    | Compose (mb, ma) ->
-      let mid = src_simple dst mb in
-      Fmt.fprintf ppf "%a . %a" (print_simple_morph dst) mb
-        (print_simple_morph mid) ma
-
   let rec print_morph : type a b d.
       b obj -> Fmt.formatter -> (a, b, d) morph -> unit =
    fun dst ppf -> function
-    | Simple m -> print_simple_morph dst ppf m
+    | Simple m -> Simple_morph.print dst ppf m
     | Simple_proj (Id, ax, src) ->
       Fmt.fprintf ppf "proj_%a" print_obj (proj_obj ax src)
     | Simple_proj (m, ax, src) ->
-      Fmt.fprintf ppf "%a . proj_%a" (print_simple_morph dst) m print_obj
+      Fmt.fprintf ppf "%a . proj_%a" (Simple_morph.print dst) m print_obj
         (proj_obj ax src)
     | Max_with_simple (ax, Id) ->
       Fmt.fprintf ppf "max_with_%a" print_obj (proj_obj ax dst)
     | Max_with_simple (ax, m) ->
       let mid = proj_obj ax dst in
-      Fmt.fprintf ppf "max_with_%a . %a" print_obj mid (print_simple_morph mid)
-        m
+      Fmt.fprintf ppf "max_with_%a . %a" print_obj mid
+        (Simple_morph.print mid) m
     | Min_with_simple (ax, Id) ->
       Fmt.fprintf ppf "min_with_%a" print_obj (proj_obj ax dst)
     | Min_with_simple (ax, m) ->
       let mid = proj_obj ax dst in
-      Fmt.fprintf ppf "min_with_%a . %a" print_obj mid (print_simple_morph mid)
-        m
+      Fmt.fprintf ppf "min_with_%a . %a" print_obj mid
+        (Simple_morph.print mid) m
     | Const_max _ -> Fmt.fprintf ppf "const_%a" (print dst) (max dst)
     | Const_min _ -> Fmt.fprintf ppf "const_%a" (print dst) (min dst)
     | Const (_, c) -> Fmt.fprintf ppf "const_%a" (print dst) c
@@ -2541,31 +2924,17 @@ module Lattices_mono = struct
 
   let max_with dst ax a = Axis.set ax a (max dst)
 
-  let rec apply_simple : type a b d. b obj -> (a, b, d) simple_morph -> a -> b =
-   fun dst f a ->
-    match f with
-    | Id -> a
-    | Core m -> Core_morph.apply dst m a
-    | Meet_const c -> meet dst c a
-    | Imply_const c -> imply dst c a
-    | Meet_const_core (c, m) -> meet dst c (Core_morph.apply dst m a)
-    | Core_imply_const (m, c) ->
-      Core_morph.apply dst m (imply (Core_morph.src m) c a)
-    | Compose (mb, ma) ->
-      let mid = src_simple dst mb in
-      apply_simple dst mb (apply_simple mid ma a)
-
   let rec apply : type a b d. b obj -> (a, b, d) morph -> a -> b =
    fun dst f a ->
     match f with
-    | Simple m -> apply_simple dst m a
-    | Simple_proj (m, ax, _) -> apply_simple dst m (Axis.proj ax a)
+    | Simple m -> Simple_morph.apply dst m a
+    | Simple_proj (m, ax, _) -> Simple_morph.apply dst m (Axis.proj ax a)
     | Max_with_simple (ax, m) ->
       let mid = proj_obj ax dst in
-      max_with dst ax (apply_simple mid m a)
+      max_with dst ax (Simple_morph.apply mid m a)
     | Min_with_simple (ax, m) ->
       let mid = proj_obj ax dst in
-      min_with dst ax (apply_simple mid m a)
+      min_with dst ax (Simple_morph.apply mid m a)
     | Const_max _ -> max dst
     | Const_min _ -> min dst
     | Const (_, c) -> c
@@ -2573,377 +2942,29 @@ module Lattices_mono = struct
       let mid = src dst mb in
       apply dst mb (apply mid ma a)
 
-  let right_adjoint_simple : type a b r.
-      b obj ->
-      (a, b, allowed * r) simple_morph ->
-      (b, a, disallowed * allowed) simple_morph =
-   fun dst f ->
-    match f with
-    | Id -> Id
-    | Core m -> Core (Core_morph.right_adjoint dst m)
-    | Meet_const c -> Imply_const c
-    | Meet_const_core (c, m) ->
-      Core_imply_const (Core_morph.right_adjoint dst m, c)
-
   let right_adjoint : type a b r.
       b obj -> (a, b, allowed * r) morph -> (b, a, disallowed * allowed) morph =
    fun dst f ->
     match f with
-    | Simple m -> Simple (right_adjoint_simple dst m)
-    | Simple_proj (m, ax, _) -> Max_with_simple (ax, right_adjoint_simple dst m)
+    | Simple m -> Simple (Simple_morph.right_adjoint dst m)
+    | Simple_proj (m, ax, _) ->
+      Max_with_simple (ax, Simple_morph.right_adjoint dst m)
     | Min_with_simple (ax, m) ->
       let mid = proj_obj ax dst in
-      Simple_proj (right_adjoint_simple mid m, ax, dst)
+      Simple_proj (Simple_morph.right_adjoint mid m, ax, dst)
     | Const_min _ -> Const_max dst
-
-  let left_adjoint_simple : type a b l.
-      b obj ->
-      (a, b, l * allowed) simple_morph ->
-      (b, a, allowed * disallowed) simple_morph =
-   fun dst f ->
-    match f with
-    | Id -> Id
-    | Core m -> Core (Core_morph.left_adjoint dst m)
-    | Imply_const c -> Meet_const c
-    | Core_imply_const (m, c) ->
-      Meet_const_core (c, Core_morph.left_adjoint dst m)
 
   let left_adjoint : type a b l.
       b obj -> (a, b, l * allowed) morph -> (b, a, allowed * disallowed) morph =
    fun dst f ->
     match f with
-    | Simple m -> Simple (left_adjoint_simple dst m)
-    | Simple_proj (m, ax, _) -> Min_with_simple (ax, left_adjoint_simple dst m)
+    | Simple m -> Simple (Simple_morph.left_adjoint dst m)
+    | Simple_proj (m, ax, _) ->
+      Min_with_simple (ax, Simple_morph.left_adjoint dst m)
     | Max_with_simple (ax, m) ->
       let mid = proj_obj ax dst in
-      Simple_proj (left_adjoint_simple mid m, ax, dst)
+      Simple_proj (Simple_morph.left_adjoint mid m, ax, dst)
     | Const_max _ -> Const_min dst
-
-  let compose_core : type a b c d.
-      c obj ->
-      (b, c, d) Core_morph.t ->
-      (a, b, d) Core_morph.t ->
-      (a, c, d) simple_morph =
-   fun dst m1 m2 ->
-    match m1, m2 with
-    | Locality_restricted lm1, Locality_restricted lm2 -> begin
-      match Locality_morph.compose lm1 lm2 with
-      | Id -> Id
-      | Morph lm -> Core (Locality_restricted lm)
-      | Disallowed -> Compose (Core m1, Core m2)
-    end
-    | Locality_full lm1, Locality_full lm2 -> begin
-      match Locality_morph.compose lm1 lm2 with
-      | Id -> Id
-      | Morph lm -> Core (Locality_full lm)
-      | Disallowed -> Compose (Core m1, Core m2)
-    end
-    | Uniqueness_op_to_linearity, Linearity_to_uniqueness_op -> Id
-    | Linearity_to_uniqueness_op, Uniqueness_op_to_linearity -> Id
-    | Contention_op_to_portability, Portability_to_contention_op -> Id
-    | Portability_to_contention_op, Contention_op_to_portability -> Id
-    | Visibility_op_to_statefulness, Statefulness_to_visibility_op -> Id
-    | Statefulness_to_visibility_op, Visibility_op_to_statefulness -> Id
-    | Comonadic_to_monadic_min areality, Monadic_to_comonadic_min ->
-      let c =
-        match areality with
-        | Locality ->
-          Core_morph.apply dst (Comonadic_to_monadic_min Locality)
-            Comonadic_with_locality.max
-        | Regionality ->
-          Core_morph.apply dst (Comonadic_to_monadic_min Regionality)
-            Comonadic_with_regionality.max
-      in
-      Meet_const c
-    | Monadic_to_comonadic_min, Comonadic_to_monadic_min areality -> begin
-      let c = Core_morph.apply dst Monadic_to_comonadic_min Monadic_op.max in
-      match areality, dst with
-      | Locality, Comonadic_with_locality -> Meet_const c
-      | Regionality, Comonadic_with_locality ->
-        Meet_const_core (c, Locality_full Regional_to_local)
-      | Locality, Comonadic_with_regionality ->
-        Meet_const_core (c, Locality_full Locality_as_regionality)
-      | Regionality, Comonadic_with_regionality -> Meet_const c
-    end
-    | Monadic_to_comonadic_max, Comonadic_to_monadic_max areality -> begin
-      let src = areality_comonadic_obj areality in
-      let c = Core_morph.apply src Monadic_to_comonadic_min Monadic_op.max in
-      match areality, dst with
-      | Locality, Comonadic_with_locality -> Imply_const c
-      | Regionality, Comonadic_with_locality ->
-        Core_imply_const (Locality_full Regional_to_local, c)
-      | Locality, Comonadic_with_regionality ->
-        Core_imply_const (Locality_full Locality_as_regionality, c)
-      | Regionality, Comonadic_with_regionality -> Imply_const c
-    end
-    | Comonadic_to_monadic_max areality, Monadic_to_comonadic_max ->
-      let c =
-        match areality with
-        | Locality ->
-          Core_morph.apply dst (Comonadic_to_monadic_min Locality)
-            Comonadic_with_locality.max
-        | Regionality ->
-          Core_morph.apply dst (Comonadic_to_monadic_min Regionality)
-            Comonadic_with_regionality.max
-      in
-      Imply_const c
-    | Comonadic_to_monadic_min _, Monadic_to_comonadic_max ->
-      Compose (Core m1, Core m2)
-    | Monadic_to_comonadic_max, Comonadic_to_monadic_min _ ->
-      Compose (Core m1, Core m2)
-    | Comonadic_to_monadic_max _, Monadic_to_comonadic_min ->
-      Compose (Core m1, Core m2)
-    | Monadic_to_comonadic_min, Comonadic_to_monadic_max _ ->
-      Compose (Core m1, Core m2)
-    | Comonadic_to_monadic_min _, Locality_full m2 ->
-      let src = Locality_morph.src_full m2 in
-      Core (Comonadic_to_monadic_min (comonadic_obj_areality src))
-    | Comonadic_to_monadic_max _, Locality_full m2 ->
-      let src = Locality_morph.src_full m2 in
-      Core (Comonadic_to_monadic_max (comonadic_obj_areality src))
-    | Locality_full lm1, Monadic_to_comonadic_min -> begin
-      match Locality_morph.maybe_allowed_left lm1 with
-      | Allowed_left _ ->
-        (* Has a right adjoint so it preserves min *)
-        Core Monadic_to_comonadic_min
-      | Not_allowed_left -> Compose (Core m1, Core Monadic_to_comonadic_min)
-    end
-    | Locality_full lm1, Monadic_to_comonadic_max -> begin
-      match Locality_morph.maybe_allowed_right lm1 with
-      | Allowed_right _ ->
-        (* Has a left adjoint so it preserves max *)
-        Core Monadic_to_comonadic_max
-      | Not_allowed_right -> Compose (Core m1, Core Monadic_to_comonadic_max)
-    end
-    | Locality_restricted _, _ -> .
-    | _, Locality_restricted _ -> .
-    | Locality_full _, _ -> .
-    | _, Locality_full _ -> .
-
-  type ('a, 'b, 'd) maybe_allowed_right_simple =
-    | Allowed_right :
-        ('a, 'b, 'l * allowed) simple_morph
-        -> ('a, 'b, 'l * 'r) maybe_allowed_right_simple
-    | Not_allowed_right : ('a, 'b, 'l * disallowed) maybe_allowed_right_simple
-
-  let maybe_allowed_right_simple : type a b l r.
-      (a, b, l * r) simple_morph -> (a, b, l * r) maybe_allowed_right_simple =
-    function
-    | Id -> Allowed_right Id
-    | Core m -> begin
-      match Core_morph.maybe_allowed_right m with
-      | Allowed_right m -> Allowed_right (Core m)
-      | Not_allowed_right -> Not_allowed_right
-    end
-    | Meet_const _ -> Not_allowed_right
-    | Imply_const c -> Allowed_right (Imply_const c)
-    | Meet_const_core _ -> Not_allowed_right
-    | Core_imply_const (m, c) -> begin
-      match Core_morph.maybe_allowed_right m with
-      | Allowed_right m -> Allowed_right (Core_imply_const (m, c))
-      | Not_allowed_right -> Not_allowed_right
-    end
-    | Compose _ -> Not_allowed_right
-
-  type ('a, 'b, 'd) maybe_allowed_left_simple =
-    | Allowed_left :
-        ('a, 'b, allowed * 'r) simple_morph
-        -> ('a, 'b, 'l * 'r) maybe_allowed_left_simple
-    | Not_allowed_left : ('a, 'b, disallowed * 'r) maybe_allowed_left_simple
-
-  let maybe_allowed_left_simple : type a b l r.
-      (a, b, l * r) simple_morph -> (a, b, l * r) maybe_allowed_left_simple =
-    function
-    | Id -> Allowed_left Id
-    | Core m -> begin
-      match Core_morph.maybe_allowed_left m with
-      | Allowed_left m -> Allowed_left (Core m)
-      | Not_allowed_left -> Not_allowed_left
-    end
-    | Meet_const c -> Allowed_left (Meet_const c)
-    | Imply_const _ -> Not_allowed_left
-    | Meet_const_core (c, m) -> begin
-      match Core_morph.maybe_allowed_left m with
-      | Allowed_left m -> Allowed_left (Meet_const_core (c, m))
-      | Not_allowed_left -> Not_allowed_left
-    end
-    | Core_imply_const _ -> Not_allowed_left
-    | Compose _ -> Not_allowed_left
-
-  let compose_meet_const_left : type a b l.
-      b obj ->
-      b ->
-      (a, b, l * disallowed) simple_morph ->
-      (a, b, l * disallowed) simple_morph =
-   fun dst c m ->
-    match m with
-    | Id -> Meet_const c
-    | Core m -> Meet_const_core (c, m)
-    | Meet_const c' -> Meet_const (meet dst c c')
-    | Meet_const_core (c', m) -> Meet_const_core (meet dst c c', m)
-    | Imply_const _ as m -> Compose (Meet_const c, m)
-    | Core_imply_const _ as m -> Compose (Meet_const c, m)
-    | Compose _ as m -> Compose (Meet_const c, m)
-
-  let compose_imply_const_right : type a b r.
-      b obj ->
-      (a, b, disallowed * r) simple_morph ->
-      a ->
-      (a, b, disallowed * r) simple_morph =
-   fun dst m c ->
-    match m with
-    | Id -> Imply_const c
-    | Core m -> Core_imply_const (m, c)
-    | Imply_const c' -> Imply_const (meet dst c c')
-    | Core_imply_const (m, c') ->
-      Core_imply_const (m, meet (Core_morph.src m) c' c)
-    | Meet_const _ as m -> Compose (m, Imply_const c)
-    | Meet_const_core _ as m -> Compose (m, Imply_const c)
-    | Compose _ as m -> Compose (m, Imply_const c)
-
-  (* Commutes a meet through a morphism from the right, such that:
-     [apply dst m (meet_const c x)] is equivalent to
-     [meet_const (commute_meet_const_from_right dst m c) (apply dst m x)] *)
-  let commute_meet_const_from_right : type a b d.
-      b obj -> (a, b, d) Core_morph.t -> a -> b =
-   fun dst m c ->
-    (* All our morphisms preserve binary meets *)
-    Core_morph.apply dst m c
-
-  (* Commutes an implication through a morphism from the left, such that:
-     [apply dst m (meet_const c x)] is equivalent to
-     [meet_const (commute_imply_from_left dst m c) (apply dst m x)] *)
-  let commute_imply_from_left : type a b l.
-      b obj -> b -> (a, b, l * allowed) Core_morph.t -> a =
-   fun dst c m ->
-    (* As all our morphisms preserve binary meets, implications can be
-       pushed inside of [m] by applying the left adjoint of [m] to the
-       implicant. *)
-    Core_morph.apply (Core_morph.src m) (Core_morph.left_adjoint dst m) c
-
-  let compose_meet_const_right : type a b l.
-      b obj ->
-      (a, b, l * disallowed) simple_morph ->
-      a ->
-      (a, b, l * disallowed) simple_morph =
-   fun dst m c ->
-    match m with
-    | Id -> Meet_const c
-    | Core m ->
-      let c = commute_meet_const_from_right dst m c in
-      Meet_const_core (c, m)
-    | Meet_const c' -> Meet_const (meet dst c' c)
-    | Meet_const_core (c', m) ->
-      let c = commute_meet_const_from_right dst m c in
-      Meet_const_core (meet dst c' c, m)
-    | Imply_const _ as m -> Compose (m, Meet_const c)
-    | Core_imply_const _ as m -> Compose (m, Meet_const c)
-    | Compose _ as m -> Compose (m, Meet_const c)
-
-  let compose_imply_const_left : type a b r.
-      b obj ->
-      b ->
-      (a, b, disallowed * r) simple_morph ->
-      (a, b, disallowed * r) simple_morph =
-   fun dst c m ->
-    match m with
-    | Id -> Imply_const c
-    | Core m -> begin
-      match Core_morph.maybe_allowed_right m with
-      | Not_allowed_right -> Compose (Imply_const c, Core m)
-      | Allowed_right m' ->
-        let c = commute_imply_from_left dst c m' in
-        Core_imply_const (m, c)
-    end
-    | Imply_const c' -> Imply_const (meet dst c c')
-    | Core_imply_const (m, c') -> begin
-      match Core_morph.maybe_allowed_right m with
-      | Not_allowed_right -> Compose (Imply_const c, Core_imply_const (m, c'))
-      | Allowed_right m' ->
-        let c = commute_imply_from_left dst c m' in
-        Core_imply_const (m, meet (Core_morph.src m) c c')
-    end
-    | Meet_const _ as m -> Compose (Imply_const c, m)
-    | Meet_const_core _ as m -> Compose (Imply_const c, m)
-    | Compose _ as m -> Compose (Imply_const c, m)
-
-  let compose_core_right : type a b c d.
-      c obj ->
-      (b, c, d) simple_morph ->
-      (a, b, d) Core_morph.t ->
-      (a, c, d) simple_morph =
-   fun dst m1 m2 ->
-    match m1 with
-    | Id -> Core m2
-    | Core m1 -> compose_core dst m1 m2
-    | Imply_const c1 -> begin
-      match Core_morph.maybe_allowed_right m2 with
-      | Not_allowed_right -> Compose (Imply_const c1, Core m2)
-      | Allowed_right m2' ->
-        let c1 = commute_imply_from_left dst c1 m2' in
-        Core_imply_const (m2, c1)
-    end
-    | Core_imply_const (m1, c1) -> begin
-      match Core_morph.maybe_allowed_right m2 with
-      | Not_allowed_right -> Compose (Core_imply_const (m1, c1), Core m2)
-      | Allowed_right m2' ->
-        let mid = Core_morph.src m1 in
-        let c1 = commute_imply_from_left mid c1 m2' in
-        let m = compose_core dst m1 m2 in
-        compose_imply_const_right dst m c1
-    end
-    | Meet_const c1 -> Meet_const_core (c1, m2)
-    | Meet_const_core (c1, m1) ->
-      compose_meet_const_left dst c1 (compose_core dst m1 m2)
-    | Compose _ as m1 -> Compose (m1, Core m2)
-
-  let compose_core_left : type a b c d.
-      c obj ->
-      (b, c, d) Core_morph.t ->
-      (a, b, d) simple_morph ->
-      (a, c, d) simple_morph =
-   fun dst m1 m2 ->
-    match m2 with
-    | Id -> Core m1
-    | Core m2 -> compose_core dst m1 m2
-    | Imply_const c2 -> Core_imply_const (m1, c2)
-    | Core_imply_const (m2, c2) ->
-      compose_imply_const_right dst (compose_core dst m1 m2) c2
-    | Meet_const c2 ->
-      let c2 = commute_meet_const_from_right dst m1 c2 in
-      Meet_const_core (c2, m1)
-    | Meet_const_core (c2, m2) ->
-      let c2 = commute_meet_const_from_right dst m1 c2 in
-      let m = compose_core dst m1 m2 in
-      compose_meet_const_left dst c2 m
-    | Compose _ as m2 -> Compose (Core m1, m2)
-
-  let compose_simple : type a b c d.
-      c obj ->
-      (b, c, d) simple_morph ->
-      (a, b, d) simple_morph ->
-      (a, c, d) simple_morph =
-   fun dst m1 m2 ->
-    match m1, m2 with
-    | m1, Id -> m1
-    | Id, m2 -> m2
-    | m1, Meet_const c2 -> compose_meet_const_right dst m1 c2
-    | Meet_const c1, m2 -> compose_meet_const_left dst c1 m2
-    | m1, Imply_const c2 -> compose_imply_const_right dst m1 c2
-    | Imply_const c1, m2 -> compose_imply_const_left dst c1 m2
-    | m1, Core m2 -> compose_core_right dst m1 m2
-    | Core m1, m2 -> compose_core_left dst m1 m2
-    | m1, Meet_const_core (c2, m2) ->
-      compose_core_right dst (compose_meet_const_right dst m1 c2) m2
-    | Meet_const_core (c1, m1), m2 ->
-      compose_meet_const_left dst c1 (compose_core_left dst m1 m2)
-    | m1, Core_imply_const (m2, c2) ->
-      compose_imply_const_right dst (compose_core_right dst m1 m2) c2
-    | Core_imply_const (m1, c1), m2 ->
-      let mid = Core_morph.src m1 in
-      compose_core_left dst m1 (compose_imply_const_left mid c1 m2)
-    | (Compose _ as m1), m2 -> Compose (m1, m2)
-    | _, Compose _ -> .
 
   type ('a, 'b, 'd) compose_proj_result =
     | Proj_core :
@@ -3128,35 +3149,35 @@ module Lattices_mono = struct
 
   let compose_simple_with_proj_core : type a c p d.
       c obj ->
-      (p, c, d) simple_morph ->
+      (p, c, d) Simple_morph.t ->
       (a, p, d) compose_proj_result ->
       (a, c, d) morph =
    fun dst m0 pm1 ->
     match pm1 with
     | Proj_core (m1, ax1, obj1) ->
-      Simple_proj (compose_simple dst m0 (Core m1), ax1, obj1)
+      Simple_proj (Simple_morph.compose dst m0 (Core m1), ax1, obj1)
     | Proj_id (ax1, obj1) -> Simple_proj (m0, ax1, obj1)
     | Proj_const_max obj1 -> Const_max obj1
     | Proj_const_min obj1 -> Const_min obj1
 
   let compose_simple_with_proj_meet_const_core : type a c p l.
       c obj ->
-      (p, c, l * disallowed) simple_morph ->
+      (p, c, l * disallowed) Simple_morph.t ->
       p ->
       (a, p, l * disallowed) compose_proj_result ->
       (a, c, l * disallowed) morph =
    fun dst m0 c1 pm1 ->
     match pm1 with
     | Proj_core (m1, ax1, obj1) ->
-      Simple_proj (compose_simple dst m0 (Meet_const_core (c1, m1)), ax1, obj1)
+      Simple_proj (Simple_morph.compose dst m0 (Meet_const_core (c1, m1)), ax1, obj1)
     | Proj_id (ax1, obj1) ->
-      Simple_proj (compose_simple dst m0 (Meet_const c1), ax1, obj1)
+      Simple_proj (Simple_morph.compose dst m0 (Meet_const c1), ax1, obj1)
     | Proj_const_max obj1 -> Const_max obj1
     | Proj_const_min obj1 -> Const_min obj1
 
   let compose_simple_with_proj_core_imply_const : type a c p r.
       c obj ->
-      (p, c, disallowed * r) simple_morph ->
+      (p, c, disallowed * r) Simple_morph.t ->
       a ->
       (a, p, disallowed * r) compose_proj_result ->
       (a, c, disallowed * r) morph =
@@ -3164,22 +3185,22 @@ module Lattices_mono = struct
     match pm1 with
     | Proj_core (m1, ax1, obj1) ->
       let c1 = Axis.proj ax1 c1 in
-      Simple_proj (compose_simple dst m0 (Core_imply_const (m1, c1)), ax1, obj1)
+      Simple_proj (Simple_morph.compose dst m0 (Core_imply_const (m1, c1)), ax1, obj1)
     | Proj_id (ax1, obj1) ->
       let c1 = Axis.proj ax1 c1 in
-      Simple_proj (compose_simple dst m0 (Imply_const c1), ax1, obj1)
+      Simple_proj (Simple_morph.compose dst m0 (Imply_const c1), ax1, obj1)
     | Proj_const_max obj1 -> Const_max obj1
     | Proj_const_min obj1 -> Const_min obj1
 
   let rec lift_simple_morph_max : type a b p q.
       a obj ->
       b obj ->
-      (p, q, disallowed * allowed) simple_morph ->
+      (p, q, disallowed * allowed) Simple_morph.t ->
       (a, p) Axis.t ->
       (b, q) Axis.t ->
-      (a, b, disallowed * allowed) simple_morph =
+      (a, b, disallowed * allowed) Simple_morph.t =
    fun src dst m ax0 ax1 ->
-    let m : (a, b, disallowed * allowed) simple_morph =
+    let m : (a, b, disallowed * allowed) Simple_morph.t =
       match m with
       | Id -> begin
         match src, dst, ax0, ax1 with
@@ -3214,10 +3235,10 @@ module Lattices_mono = struct
         let c = Axis.set ax1 c (max dst) in
         begin match src, dst, ax0, ax1 with
         | Comonadic_with_regionality, Comonadic_with_locality, _, _ ->
-          compose_simple dst (Imply_const c)
+          Simple_morph.compose dst (Imply_const c)
             (Core (Locality_full Regional_to_global))
         | Comonadic_with_locality, Comonadic_with_regionality, _, _ ->
-          compose_simple dst (Imply_const c)
+          Simple_morph.compose dst (Imply_const c)
             (Core (Locality_full Locality_as_regionality))
         | Comonadic_with_regionality, Comonadic_with_regionality, _, _ ->
           Imply_const c
@@ -3229,21 +3250,21 @@ module Lattices_mono = struct
       | Core_imply_const (m, c) ->
         let m = lift_simple_morph_max src dst (Core m) ax0 ax1 in
         let c = Axis.set ax0 c (max src) in
-        compose_simple dst m (Imply_const c)
+        Simple_morph.compose dst m (Imply_const c)
     in
     let q_obj = proj_obj ax1 dst in
     let c = min_with dst ax1 (max q_obj) in
-    compose_simple dst (Imply_const c) m
+    Simple_morph.compose dst (Imply_const c) m
 
   let rec lift_simple_morph_min : type a b p q.
       a obj ->
       b obj ->
-      (p, q, allowed * disallowed) simple_morph ->
+      (p, q, allowed * disallowed) Simple_morph.t ->
       (a, p) Axis.t ->
       (b, q) Axis.t ->
-      (a, b, allowed * disallowed) simple_morph =
+      (a, b, allowed * disallowed) Simple_morph.t =
    fun src dst m ax0 ax1 ->
-    let m : (a, b, allowed * disallowed) simple_morph =
+    let m : (a, b, allowed * disallowed) Simple_morph.t =
       match m with
       | Id -> begin
         match src, dst, ax0, ax1 with
@@ -3278,10 +3299,10 @@ module Lattices_mono = struct
         let c = Axis.set ax1 c (min dst) in
         begin match src, dst, ax0, ax1 with
         | Comonadic_with_regionality, Comonadic_with_locality, _, _ ->
-          compose_simple dst (Meet_const c)
+          Simple_morph.compose dst (Meet_const c)
             (Core (Locality_full Regional_to_local))
         | Comonadic_with_locality, Comonadic_with_regionality, _, _ ->
-          compose_simple dst (Meet_const c)
+          Simple_morph.compose dst (Meet_const c)
             (Core (Locality_full Locality_as_regionality))
         | Comonadic_with_regionality, Comonadic_with_regionality, _, _ ->
           Meet_const c
@@ -3292,18 +3313,18 @@ module Lattices_mono = struct
       | Meet_const_core (c, m) ->
         let m = lift_simple_morph_min src dst (Core m) ax0 ax1 in
         let c = Axis.set ax1 c (min dst) in
-        compose_simple dst (Meet_const c) m
+        Simple_morph.compose dst (Meet_const c) m
     in
     let q_obj = proj_obj ax1 dst in
     let c = min_with dst ax1 (max q_obj) in
-    compose_simple dst (Meet_const c) m
+    Simple_morph.compose dst (Meet_const c) m
 
   let compose_simple_proj_with_simple : type a b c p d.
       c obj ->
-      (p, c, d) simple_morph ->
+      (p, c, d) Simple_morph.t ->
       (b, p) Axis.t ->
       b obj ->
-      (a, b, d) simple_morph ->
+      (a, b, d) Simple_morph.t ->
       (a, c, d) morph =
    fun dst m0 ax0 obj0 m1 ->
     match m1 with
@@ -3313,10 +3334,10 @@ module Lattices_mono = struct
       compose_simple_with_proj_core dst m0 pm1
     | Meet_const c1 ->
       let c1 = Axis.proj ax0 c1 in
-      Simple_proj (compose_simple dst m0 (Meet_const c1), ax0, obj0)
+      Simple_proj (Simple_morph.compose dst m0 (Meet_const c1), ax0, obj0)
     | Imply_const c1 ->
       let c1 = Axis.proj ax0 c1 in
-      Simple_proj (compose_simple dst m0 (Imply_const c1), ax0, obj0)
+      Simple_proj (Simple_morph.compose dst m0 (Imply_const c1), ax0, obj0)
     | Meet_const_core (c1, m1) ->
       let c1 = Axis.proj ax0 c1 in
       let pm1 = compose_projection_core ax0 m1 in
@@ -3328,12 +3349,12 @@ module Lattices_mono = struct
 
   let compose_simple_with_and_max : type a b c q r.
       c obj ->
-      (b, c, disallowed * r) simple_morph ->
+      (b, c, disallowed * r) Simple_morph.t ->
       (b, q) Axis.t ->
-      (a, q, disallowed * r) simple_morph ->
+      (a, q, disallowed * r) Simple_morph.t ->
       (a, c, disallowed * r) morph =
    fun dst sm0 ax1 m1 ->
-    let b_obj = src_simple dst sm0 in
+    let b_obj = Simple_morph.src dst sm0 in
     let a_obj = src b_obj (Max_with_simple (ax1, m1)) in
     match sm0 with
     | Id -> Max_with_simple (ax1, m1)
@@ -3341,7 +3362,7 @@ module Lattices_mono = struct
       match compose_max_with_simple_core ax1 m0 with
       | And_max_core (ax1, m0) ->
         let obj0 = proj_obj ax1 dst in
-        Max_with_simple (ax1, compose_simple obj0 (Core m0) m1)
+        Max_with_simple (ax1, Simple_morph.compose obj0 (Core m0) m1)
       | Const_max_core -> Const_max a_obj
       | And_max_id ax1 -> Max_with_simple (ax1, m1)
       | Disallowed -> Compose (Simple sm0, Max_with_simple (ax1, m1))
@@ -3349,13 +3370,13 @@ module Lattices_mono = struct
     | Imply_const c0 ->
       let c0 = Axis.proj ax1 c0 in
       let obj0 = proj_obj ax1 dst in
-      Max_with_simple (ax1, compose_simple obj0 (Imply_const c0) m1)
+      Max_with_simple (ax1, Simple_morph.compose obj0 (Imply_const c0) m1)
     | Core_imply_const (m0, c0) -> begin
       let c0 = Axis.proj ax1 c0 in
       match compose_max_with_simple_core ax1 m0 with
       | And_max_core (ax1, m0) ->
         let obj0 = proj_obj ax1 dst in
-        Max_with_simple (ax1, compose_simple obj0 (Core_imply_const (m0, c0)) m1)
+        Max_with_simple (ax1, Simple_morph.compose obj0 (Core_imply_const (m0, c0)) m1)
       | Const_max_core -> Const_max a_obj
       | And_max_id ax1 -> Max_with_simple (ax1, m1)
       | Disallowed -> Compose (Simple sm0, Max_with_simple (ax1, m1))
@@ -3366,12 +3387,12 @@ module Lattices_mono = struct
 
   let compose_simple_with_and_min : type a b c q l.
       c obj ->
-      (b, c, l * disallowed) simple_morph ->
+      (b, c, l * disallowed) Simple_morph.t ->
       (b, q) Axis.t ->
-      (a, q, l * disallowed) simple_morph ->
+      (a, q, l * disallowed) Simple_morph.t ->
       (a, c, l * disallowed) morph =
    fun dst sm0 ax1 m1 ->
-    let b_obj = src_simple dst sm0 in
+    let b_obj = Simple_morph.src dst sm0 in
     let a_obj = src b_obj (Min_with_simple (ax1, m1)) in
     match sm0 with
     | Id -> Min_with_simple (ax1, m1)
@@ -3379,7 +3400,7 @@ module Lattices_mono = struct
       match compose_min_with_simple_core ax1 m0 with
       | And_min_core (ax1, m0) ->
         let obj0 = proj_obj ax1 dst in
-        Min_with_simple (ax1, compose_simple obj0 (Core m0) m1)
+        Min_with_simple (ax1, Simple_morph.compose obj0 (Core m0) m1)
       | Const_min_core -> Const_min a_obj
       | And_min_id ax1 -> Min_with_simple (ax1, m1)
       | Disallowed -> Compose (Simple sm0, Min_with_simple (ax1, m1))
@@ -3387,13 +3408,13 @@ module Lattices_mono = struct
     | Meet_const c0 ->
       let c0 = Axis.proj ax1 c0 in
       let obj0 = proj_obj ax1 dst in
-      Min_with_simple (ax1, compose_simple obj0 (Meet_const c0) m1)
+      Min_with_simple (ax1, Simple_morph.compose obj0 (Meet_const c0) m1)
     | Meet_const_core (c0, m0) -> begin
       match compose_min_with_simple_core ax1 m0 with
       | And_min_core (ax1, m0) ->
         let obj0 = proj_obj ax1 dst in
         let c0 = Axis.proj ax1 c0 in
-        Min_with_simple (ax1, compose_simple obj0 (Meet_const_core (c0, m0)) m1)
+        Min_with_simple (ax1, Simple_morph.compose obj0 (Meet_const_core (c0, m0)) m1)
       | Const_min_core -> Const_min a_obj
       | And_min_id ax1 -> Min_with_simple (ax1, m1)
       | Disallowed -> Compose (Simple sm0, Min_with_simple (ax1, m1))
@@ -3405,7 +3426,7 @@ module Lattices_mono = struct
   let refute_compose_and_with : type a b c q0 q1 d.
       c obj ->
       (c, q0) Axis.t ->
-      (b, q0, d) simple_morph ->
+      (b, q0, d) Simple_morph.t ->
       (b, q1) Axis.t ->
       (b, c, d) morph ->
       (a, b, d) morph ->
@@ -3422,27 +3443,27 @@ module Lattices_mono = struct
       c obj -> (b, c, d) morph -> (a, b, d) morph -> (a, c, d) morph =
    fun dst m0 m1 ->
     match m0, m1 with
-    | Simple m0, Simple m1 -> Simple (compose_simple dst m0 m1)
+    | Simple m0, Simple m1 -> Simple (Simple_morph.compose dst m0 m1)
     | Const_max b_obj, _ -> Const_max (src b_obj m1)
     | Const_min b_obj, _ -> Const_min (src b_obj m1)
     | Const (b_obj, c), _ -> Const (src b_obj m1, c)
     | Simple m0, Simple_proj (m1, ax1, obj1) ->
-      Simple_proj (compose_simple dst m0 m1, ax1, obj1)
+      Simple_proj (Simple_morph.compose dst m0 m1, ax1, obj1)
     | Simple_proj (m0, ax0, obj0), Simple m1 ->
       compose_simple_proj_with_simple dst m0 ax0 obj0 m1
     | Max_with_simple (ax0, m0), Simple m1 ->
       let dst = proj_obj ax0 dst in
-      Max_with_simple (ax0, compose_simple dst m0 m1)
+      Max_with_simple (ax0, Simple_morph.compose dst m0 m1)
     | Simple m0, Max_with_simple (ax1, m1) ->
       compose_simple_with_and_max dst m0 ax1 m1
     | Min_with_simple (ax0, m0), Simple m1 ->
       let dst = proj_obj ax0 dst in
-      Min_with_simple (ax0, compose_simple dst m0 m1)
+      Min_with_simple (ax0, Simple_morph.compose dst m0 m1)
     | Simple m0, Min_with_simple (ax1, m1) ->
       compose_simple_with_and_min dst m0 ax1 m1
     | Simple_proj (m0, ax0, obj1), Max_with_simple (ax1, m1) -> begin
       match Axis.equal ax0 ax1 with
-      | Some Refl -> Simple (compose_simple dst m0 m1)
+      | Some Refl -> Simple (Simple_morph.compose dst m0 m1)
       | None ->
         let b_obj = src dst (Simple_proj (m0, ax0, obj1)) in
         let a_obj = src b_obj (Max_with_simple (ax1, m1)) in
@@ -3450,7 +3471,7 @@ module Lattices_mono = struct
     end
     | Simple_proj (m0, ax0, obj1), Min_with_simple (ax1, m1) -> begin
       match Axis.equal ax0 ax1 with
-      | Some Refl -> Simple (compose_simple dst m0 m1)
+      | Some Refl -> Simple (Simple_morph.compose dst m0 m1)
       | None ->
         let b_obj = src dst (Simple_proj (m0, ax0, obj1)) in
         let a_obj = src b_obj (Min_with_simple (ax1, m1)) in
@@ -3461,8 +3482,8 @@ module Lattices_mono = struct
       let q_obj = proj_obj ax0 dst in
       let b_obj = src dst (Max_with_simple (ax0, m0)) in
       let a_obj = src b_obj (Simple_proj (m1, ax1, obj1)) in
-      let m0m1 = compose_simple q_obj m0 m1 in
-      begin match maybe_allowed_right_simple m0m1 with
+      let m0m1 = Simple_morph.compose q_obj m0 m1 in
+      begin match Simple_morph.maybe_allowed_right m0m1 with
       | Allowed_right m0m1 ->
         allow_right (Simple (lift_simple_morph_max a_obj dst m0m1 ax1 ax0))
       | Not_allowed_right -> Compose (m0', m1')
@@ -3472,52 +3493,52 @@ module Lattices_mono = struct
       let q_obj = proj_obj ax0 dst in
       let b_obj = src dst (Min_with_simple (ax0, m0)) in
       let a_obj = src b_obj (Simple_proj (m1, ax1, obj1)) in
-      let m0m1 = compose_simple q_obj m0 m1 in
-      begin match maybe_allowed_left_simple m0m1 with
+      let m0m1 = Simple_morph.compose q_obj m0 m1 in
+      begin match Simple_morph.maybe_allowed_left m0m1 with
       | Allowed_left m0m1 ->
         allow_left (Simple (lift_simple_morph_min a_obj dst m0m1 ax1 ax0))
       | Not_allowed_left -> Compose (m0', m1')
       end
     | Simple m0, Const_max a_obj -> begin
-      match maybe_allowed_right_simple m0 with
+      match Simple_morph.maybe_allowed_right m0 with
       | Allowed_right _ -> Const_max a_obj
       | Not_allowed_right ->
-        let b_obj = src_simple dst m0 in
-        Const (a_obj, apply_simple dst m0 (max b_obj))
+        let b_obj = Simple_morph.src dst m0 in
+        Const (a_obj, Simple_morph.apply dst m0 (max b_obj))
     end
     | Simple m0, Const_min a_obj -> begin
-      match maybe_allowed_left_simple m0 with
+      match Simple_morph.maybe_allowed_left m0 with
       | Allowed_left _ -> Const_min a_obj
       | Not_allowed_left ->
-        let b_obj = src_simple dst m0 in
-        Const (a_obj, apply_simple dst m0 (min b_obj))
+        let b_obj = Simple_morph.src dst m0 in
+        Const (a_obj, Simple_morph.apply dst m0 (min b_obj))
     end
     | Simple_proj (_m0, _ax0, _obj0), Const_max obj1 -> Const_max obj1
     | Simple_proj (_m0, _ax0, _obj0), Const_min obj1 -> Const_min obj1
     | Min_with_simple (ax0, m0), Const_max obj1 ->
       let q_obj = proj_obj ax0 dst in
-      let b_obj = src_simple q_obj m0 in
-      Const (obj1, min_with dst ax0 (apply_simple q_obj m0 (max b_obj)))
+      let b_obj = Simple_morph.src q_obj m0 in
+      Const (obj1, min_with dst ax0 (Simple_morph.apply q_obj m0 (max b_obj)))
     | Min_with_simple (ax0, m0), Const_min obj1 -> begin
-      match maybe_allowed_left_simple m0 with
+      match Simple_morph.maybe_allowed_left m0 with
       | Allowed_left _ -> Const_min obj1
       | Not_allowed_left ->
         let q_obj = proj_obj ax0 dst in
-        let b_obj = src_simple q_obj m0 in
-        Const (obj1, min_with dst ax0 (apply_simple q_obj m0 (min b_obj)))
+        let b_obj = Simple_morph.src q_obj m0 in
+        Const (obj1, min_with dst ax0 (Simple_morph.apply q_obj m0 (min b_obj)))
     end
     | Max_with_simple (ax0, m0), Const_max obj1 -> begin
-      match maybe_allowed_right_simple m0 with
+      match Simple_morph.maybe_allowed_right m0 with
       | Allowed_right _ -> Const_max obj1
       | Not_allowed_right ->
         let q_obj = proj_obj ax0 dst in
-        let b_obj = src_simple q_obj m0 in
-        Const (obj1, max_with dst ax0 (apply_simple q_obj m0 (max b_obj)))
+        let b_obj = Simple_morph.src q_obj m0 in
+        Const (obj1, max_with dst ax0 (Simple_morph.apply q_obj m0 (max b_obj)))
     end
     | Max_with_simple (ax0, m0), Const_min obj1 ->
       let q_obj = proj_obj ax0 dst in
-      let b_obj = src_simple q_obj m0 in
-      Const (obj1, max_with dst ax0 (apply_simple q_obj m0 (min b_obj)))
+      let b_obj = Simple_morph.src q_obj m0 in
+      Const (obj1, max_with dst ax0 (Simple_morph.apply q_obj m0 (min b_obj)))
     | (_ as m0), Const (obj1, c1) -> Const (obj1, apply dst m0 c1)
     | (_ as m0), Compose (m1, m2) -> Compose (Compose (m0, m1), m2)
     | Compose (m0, m1), (_ as m2) -> Compose (Compose (m0, m1), m2)
@@ -3599,7 +3620,7 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_max _, Staticity -> None_responsible
 
     let rec find_responsible_axis_proj_simple : type a b b_ax l r.
-        (a, b, l * r) simple_morph -> (b, b_ax) Axis.t -> a responsible_axis =
+        (a, b, l * r) Simple_morph.t -> (b, b_ax) Axis.t -> a responsible_axis =
      fun m ax ->
       match m with
       | Id -> Axis ax
@@ -5550,10 +5571,10 @@ module Value_with (Areality : Areality) = struct
       }
 
     let comonadic_to_monadic_min =
-      C.comonadic_to_monadic_min Areality.Const.areality
+      C.Core_morph.comonadic_to_monadic_min Areality.Const.areality
 
     let monadic_to_comonadic_min =
-      C.monadic_to_comonadic_min (C.comonadic_with_obj Areality.Obj.obj)
+      C.Core_morph.monadic_to_comonadic_min (C.comonadic_with_obj Areality.Obj.obj)
 
     (** See [Alloc.close_over] for explanation. *)
     let close_over m =
