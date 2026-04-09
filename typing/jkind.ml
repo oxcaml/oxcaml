@@ -473,6 +473,7 @@ module Error = struct
     | Unimplemented_syntax
     | With_on_right : (_ * allowed) History.annotation_context -> t
     | Abstract_kind_in_product
+    | Abstract_kind_with_kind_modifier
 
   exception User_error of Location.t * t
 end
@@ -1902,12 +1903,7 @@ module Const = struct
     match nul with
     | None -> t
     | Some { txt = new_nullability; loc } ->
-      (* Expand Kconstr so we can access the underlying layout *)
-      let t =
-        match t.base with
-        | Kconstr _ -> Base_and_axes.fully_expand_aliases_const env t
-        | Layout _ -> t
-      in
+      let t = Base_and_axes.fully_expand_aliases_const env t in
       (match t.base with
       | Layout layout -> (
         match Layout.Const.get_root_scannable_axes layout with
@@ -1923,7 +1919,7 @@ module Const = struct
         match t.base with
         | Layout layout ->
           Layout (Layout.Const.set_root_nullability layout new_nullability)
-        | Kconstr _ -> t.base
+        | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
       in
       { t with base = new_layout }
 
@@ -1933,11 +1929,7 @@ module Const = struct
     | None -> t
     | Some { txt = new_separability; loc } ->
       (* Expand Kconstr so we can access the underlying layout *)
-      let t =
-        match t.base with
-        | Kconstr _ -> Base_and_axes.fully_expand_aliases_const env t
-        | Layout _ -> t
-      in
+      let t = Base_and_axes.fully_expand_aliases_const env t in
       (match t.base with
       | Layout layout -> (
         match Layout.Const.get_root_scannable_axes layout with
@@ -1953,19 +1945,15 @@ module Const = struct
         match t.base with
         | Layout layout ->
           Layout (Layout.Const.set_root_separability layout new_separability)
-        | Kconstr _ -> t.base
+        | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
       in
       { t with base = new_layout }
 
   let meet_nullability env (nul : Nullability.t Location.loc option) t =
     match nul with
     | None -> t
-    | Some { txt = new_nullability; loc = _ } ->
-      let t =
-        match t.base with
-        | Kconstr _ -> Base_and_axes.fully_expand_aliases_const env t
-        | Layout _ -> t
-      in
+    | Some { txt = new_nullability; loc } ->
+      let t = Base_and_axes.fully_expand_aliases_const env t in
       let new_base =
         match t.base with
         | Layout layout -> (
@@ -1975,19 +1963,15 @@ module Const = struct
             Layout
               (Layout.Const.set_root_nullability layout
                  (Nullability.meet nullability new_nullability)))
-        | Kconstr _ -> t.base
+        | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
       in
       { t with base = new_base }
 
   let meet_separability env (sep : Separability.t Location.loc option) t =
     match sep with
     | None -> t
-    | Some { txt = new_separability; loc = _ } ->
-      let t =
-        match t.base with
-        | Kconstr _ -> Base_and_axes.fully_expand_aliases_const env t
-        | Layout _ -> t
-      in
+    | Some { txt = new_separability; loc } ->
+      let t = Base_and_axes.fully_expand_aliases_const env t in
       let new_base =
         match t.base with
         | Layout layout -> (
@@ -1997,7 +1981,7 @@ module Const = struct
             Layout
               (Layout.Const.set_root_separability layout
                  (Separability.meet separability new_separability)))
-        | Kconstr _ -> t.base
+        | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
       in
       { t with base = new_base }
 
@@ -4156,6 +4140,9 @@ let report_error ~loc : Error.t -> _ = function
       Location.errorf ~loc "'with' syntax is not allowed on a right mode.")
   | Abstract_kind_in_product ->
     Location.errorf ~loc "Abstract kinds are not yet supported in products."
+  | Abstract_kind_with_kind_modifier ->
+    Location.errorf ~loc
+      "Abstract kinds with kind modifiers are not yet supported."
 
 let () =
   Location.register_error_of_exn (function

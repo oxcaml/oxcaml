@@ -787,43 +787,28 @@ Error: This type "t1" should be an instance of type "('a : any separable)"
 type t2 : k mod separable
 type s2 = t2 array
 [%%expect{|
-type t2 : k
-Line 2, characters 10-12:
-2 | type s2 = t2 array
-              ^^
-Error: This type "t2" should be an instance of type "('a : any separable)"
-       The kind of t2 is k
-         because of the definition of t2 at line 1, characters 0-25.
-       But the kind of t2 must be a subkind of any separable
-         because it's the type argument to the array type.
+Line 1, characters 16-25:
+1 | type t2 : k mod separable
+                    ^^^^^^^^^
+Error: Abstract kinds with kind modifiers are not yet supported.
 |}]
 
 type ('a : k mod separable) s3 = 'a array
 [%%expect{|
-Line 1, characters 33-35:
+Line 1, characters 17-26:
 1 | type ('a : k mod separable) s3 = 'a array
-                                     ^^
-Error: This type "('a : k)" should be an instance of type "('b : any separable)"
-       The kind of 'a is k
-         because of the annotation on 'a in the declaration of the type s3.
-       But the kind of 'a must overlap with any separable
-         because it's the type argument to the array type.
+                     ^^^^^^^^^
+Error: Abstract kinds with kind modifiers are not yet supported.
 |}]
 
 kind_ k' = k mod separable
 type t4 : k'
 type s4 = t4 array
 [%%expect{|
-kind_ k' = k
-type t4 : k
-Line 3, characters 10-12:
-3 | type s4 = t4 array
-              ^^
-Error: This type "t4" should be an instance of type "('a : any separable)"
-       The kind of t4 is k
-         because of the definition of t4 at line 2, characters 0-12.
-       But the kind of t4 must be a subkind of any separable
-         because it's the type argument to the array type.
+Line 1, characters 17-26:
+1 | kind_ k' = k mod separable
+                     ^^^^^^^^^
+Error: Abstract kinds with kind modifiers are not yet supported.
 |}]
 
 (******************************)
