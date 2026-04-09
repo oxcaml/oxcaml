@@ -345,7 +345,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
-    | Tpat_var (id, name,_,_,_) ->
+    | Tpat_var (id, name, _, _, _) ->
         begin
           match (Ident.name id).[0] with
             'A'..'Z' ->
@@ -358,12 +358,11 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
        The compiler transforms (x:t) into (_ as x : t).
        This avoids transforming a warning 27 into a 26.
      *)
-    | Tpat_alias
-      ({pat_desc = Tpat_any; pat_loc}, _id, name, _uid, _sort, _mode, _ty)
+    | Tpat_alias ({pat_desc = Tpat_any; pat_loc}, _id, name, _, _, _, _ty)
          when pat_loc = pat.pat_loc ->
        Ppat_var name
 
-    | Tpat_alias (pat, _id, name, _uid, _sort, _mode, _ty) ->
+    | Tpat_alias (pat, _id, name, _, _, _, _ty) ->
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
     | Tpat_unboxed_unit -> Ppat_unboxed_unit
@@ -460,7 +459,9 @@ let value_binding sub vb =
     match pat.ppat_desc with
     | Ppat_constraint (pat, Some ({ ptyp_desc = Ptyp_poly _; _ } as cty),
                        modes) ->
-      let constr = Pvc_constraint {locally_abstract_univars = []; typ = cty } in
+      let constr =
+        Pvc_constraint { locally_abstract_univars = []; typ = cty }
+      in
       pat, Some constr, modes
     | _ -> pat, None, []
   in
@@ -1084,7 +1085,7 @@ let core_type sub ct =
   let loc = sub.location sub ct.ctyp_loc in
   let attrs = sub.attributes sub ct.ctyp_attributes in
   let desc = match ct.ctyp_desc with
-    | Ttyp_var (None, jkind) -> Ptyp_any jkind
+      Ttyp_var (None, jkind) -> Ptyp_any jkind
     | Ttyp_var (Some s, jkind) -> Ptyp_var (s, jkind)
     | Ttyp_arrow (arg_label, ct1, modes1, ct2, modes2) ->
         let modes1 = Typemode.untransl_mode modes1 in
@@ -1095,7 +1096,7 @@ let core_type sub ct =
         Ptyp_tuple (List.map (fun (l, typ) -> l, sub.typ sub typ) list)
     | Ttyp_unboxed_tuple list ->
         Ptyp_unboxed_tuple
-          (List.map (fun (lbl, t) -> lbl, sub.typ sub t) list)
+          (List.map (fun (l, typ) -> l, sub.typ sub typ) list)
     | Ttyp_constr (_path, lid, list) ->
         Ptyp_constr (map_loc sub lid,
           List.map (sub.typ sub) list)
@@ -1128,7 +1129,7 @@ let core_type sub ct =
 
 let class_structure sub cs =
   let rec remove_self = function
-    | { pat_desc = Tpat_alias (p, id, _s, _uid, _sort, _mode, _ty) }
+    | { pat_desc = Tpat_alias (p, id, _s, _, _, _, _ty) }
       when String.starts_with ~prefix:"selfpat-" (Ident.name id) ->
         remove_self p
     | p -> p
@@ -1158,7 +1159,7 @@ let object_field sub {of_loc; of_desc; of_attributes;} =
   Of.mk ~loc ~attrs desc
 
 and is_self_pat = function
-  | { pat_desc = Tpat_alias(_pat, id, _, _uid, _sort, _mode, _ty) } ->
+  | { pat_desc = Tpat_alias(_pat, id, _, _, _, _, _ty) } ->
       String.starts_with ~prefix:"self-" (Ident.name id)
   | _ -> false
 

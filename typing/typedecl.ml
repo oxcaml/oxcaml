@@ -363,6 +363,8 @@ in
 
 (* Update a temporary definition to share recursion *)
 let update_type temp_env env id loc =
+  (* CR dkalinichenko: what's happening here? This wasn't present in either
+     OxCaml or upstream. Why do we need this change now? *)
   let unify_manifest env type_manifest path type_params =
     match type_manifest with
     | Some ty ->
@@ -604,11 +606,7 @@ let make_constructor
          then widen so as to not introduce any new constraints *)
       (* narrow and widen are now invoked through with_local_scope *)
       TyVarEnv.with_local_scope begin fun () ->
-      let closed =
-        match svars with
-        | [] -> false
-        | _ -> true
-      in
+      let closed = svars <> [] in
       let targs, tret_type, args, ret_type, univars =
         Ctype.with_local_level_generalize_if closed begin fun () ->
           TyVarEnv.reset ();
@@ -645,6 +643,7 @@ let make_constructor
           end;
           (targs, tret_type, args, ret_type, univar_list)
         end
+        (* CR dkalinichenko: I'd like for Chris to double-check those bits *)
         ~before_generalize: begin fun (_, _, args, ret_type, univars) ->
           Btype.iter_type_expr_cstr_args Ctype.generalize args;
           Ctype.generalize ret_type;
@@ -4078,7 +4077,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       let cty =
         transl_simple_type ~new_var_jkind:Any env ~closed:no_row Mode.Alloc.Const.legacy sty
       in
-        cty, cty.ctyp_type
+      cty, cty.ctyp_type
   in
   (* In the second part, we check the consistency between the two
      declarations and compute a "merged" declaration; we now need to
@@ -4539,7 +4538,6 @@ let variance_context =
         (Out_type.prepared_extension_constructor id)
         e
 
-
 let variance_variable_error ~v1 ~v2 variable error ppf =
   let open Typedecl_variance in
   match error with
@@ -4590,9 +4588,10 @@ let report_error ~loc = function
        -- maximum is %i non-constant constructors@]"
       (Config.max_tag + 1)
   | Duplicate_label s ->
-      Location.errorf "Two labels are named %a" Style.inline_code s
+      (* CR dkalinichenko: why is upstream missing [~loc] here? *)
+      Location.errorf ~loc "Two labels are named %a" Style.inline_code s
   | Unboxed_mutable_label ->
-      Location.errorf "Unboxed record labels cannot be mutable"
+      Location.errorf ~loc "Unboxed record labels cannot be mutable"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->

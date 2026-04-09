@@ -793,12 +793,12 @@ let decl_of_type_constr tconstr =
     decl2 ~variance:(Variance.full, Variance.covariant)
        ~param_jkinds:(
          Jkind.Builtin.value ~why:(Type_argument {
-           parent_path = Path.Pident type_ident;
+           parent_path = Path.Pident ident_idx_imm;
            position = 1;
            arity = 2;
          }),
          Jkind.Builtin.any ~why:(Type_argument {
-           parent_path = Path.Pident type_ident;
+           parent_path = Path.Pident ident_idx_imm;
            position = 2;
            arity = 2;
          }))
@@ -1019,7 +1019,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_extension ident_undefined_recursive_module
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
        Jkind_types.Sort.Const.value]
-
+  |> add_extension ident_continuation_already_taken []
 
 let add_or_null add_type env =
   let tconstr = `Or_null in

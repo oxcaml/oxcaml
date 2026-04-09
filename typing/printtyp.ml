@@ -27,6 +27,8 @@ module Doc = struct
   let ident ppf id = Fmt.pp_print_string ppf
       (Out_name.print (ident_name None id))
 
+
+
   let typexp mode ppf ty =
     !Oprint.out_type ppf (tree_of_typexp mode ty)
 
@@ -58,7 +60,7 @@ module Doc = struct
     prepared_type_scheme ppf ty
 
   let path ppf p =
-    !Oprint.out_ident ppf (tree_of_path p)
+    !Oprint.out_ident ppf (tree_of_path ~disambiguation:false p)
 
   let () = Env.print_path := path
 
@@ -88,8 +90,7 @@ module Doc = struct
     prepared_constructor ppf c
 
   let constructor_arguments ppf a =
-    let tys = tree_of_constructor_arguments a in
-    !Oprint.out_constr_args ppf tys
+    !Oprint.out_constr_args ppf (tree_of_constructor_arguments a)
 
   let label ppf l =
     prepare_for_printing [l.Types.ld_type];

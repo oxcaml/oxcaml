@@ -21,9 +21,9 @@ open Longident
 open Path
 open Asttypes
 open Types
-open Mode
 open Btype
 open Outcometree
+open Mode
 
 module String = Misc.Stdlib.String
 module Int = Misc.Stdlib.Int
@@ -508,15 +508,15 @@ let expand_longident_head name =
 
 (* Simple heuristic to print Foo__bar.* as Foo.Bar.* when Foo.Bar is an alias
    for Foo__bar. This pattern is used by the stdlib. *)
-let rec rewrite_double_underscore_paths env p =
+let rec rewrite_double_underscore_paths_impl env p =
   match p with
   | Pdot (p, s) ->
-    Pdot (rewrite_double_underscore_paths env p, s)
+    Pdot (rewrite_double_underscore_paths_impl env p, s)
   | Papply (a, b) ->
-    Papply (rewrite_double_underscore_paths env a,
-            rewrite_double_underscore_paths env b)
+    Papply (rewrite_double_underscore_paths_impl env a,
+            rewrite_double_underscore_paths_impl env b)
   | Pextra_ty (p, extra) ->
-    Pextra_ty (rewrite_double_underscore_paths env p, extra)
+    Pextra_ty (rewrite_double_underscore_paths_impl env p, extra)
   | Pident id ->
     let name = Ident.name id in
     match expand_longident_head name with
@@ -529,6 +529,45 @@ let rec rewrite_double_underscore_paths env p =
             p'
           else
           p
+
+let rewrite_double_underscore_paths env p =
+  if env == Env.empty then
+    p
+  else
+    rewrite_double_underscore_paths_impl env p
+
+let rec rewrite_double_underscore_longidents env (l : Longident.t) =
+  match l with
+  | Ldot (l, s) ->
+      Ldot (Location.map (rewrite_double_underscore_longidents env) l, s)
+  | Lapply (a, b) ->
+      Lapply
+        ( Location.map (rewrite_double_underscore_longidents env) a,
+          Location.map (rewrite_double_underscore_longidents env) b )
+  | Lident name ->
+      begin
+        match find_double_underscore name with
+        | None -> l
+        | Some i ->
+            let l' =
+              Ldot
+                ( Location.mknoloc (Lident (String.sub name 0 i)),
+                  Location.mknoloc
+                    (Unit_info.modulize
+                       (String.sub name (i + 2)
+                          (String.length name - i - 2))) )
+            in
+            begin
+              match
+                (Env.find_module_by_name_lazy l env,
+                 Env.find_module_by_name_lazy l' env)
+              with
+              | exception Not_found -> l
+              | (p, _), (p', _) ->
+                  if module_path_is_an_alias_of env p' ~alias_of:p then l'
+                  else l
+            end
+      end
 
 let rec tree_of_path namespace = function
   | Pident id ->
@@ -1684,6 +1723,10 @@ let type_expr_with_reserved_names ppf ty =
 
 let prepared_type_scheme ppf ty = typexp Type_scheme ppf ty
 
+let tree_of_type_scheme ty =
+  prepare_for_printing [ty];
+  tree_of_typexp Type_scheme ty
+
 (* Print one type declaration *)
 
 let tree_of_constraints params =
@@ -2107,8 +2150,7 @@ let prepared_extension_constructor id ppf ext =
 let tree_of_value_description id decl =
   (* Format.eprintf "@[%a@]@." raw_type_expr decl.val_type; *)
   let id = Ident.name id in
-  let () = prepare_for_printing [decl.val_type] in
-  let ty = tree_of_typexp Type_scheme decl.val_type in
+  let ty = tree_of_type_scheme decl.val_type in
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
   wrap_mutation (fun () ->

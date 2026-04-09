@@ -3318,8 +3318,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       | { loc = app_loc; attributes = app_attributes;
           arg = Some { shape = arg_shape; path = arg_path; arg } } ->
       let coercion =
-        try Includemod.modtypes
-              ~loc:arg.mod_loc ~mark:true env arg.mod_type mty_param
+        try Includemod.modtypes ~loc:arg.mod_loc ~mark:true env
+              arg.mod_type mty_param
               ~modes:(Specific (arg.mod_mode, mm_param))
         with Includemod.Error _ -> apply_error ()
       in
@@ -3350,8 +3350,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                     raise (Error(app_loc, env, error))
             in
             begin match
-              Includemod.modtypes
-                ~loc:app_loc ~mark:false env mty_res nondep_mty
+              Includemod.modtypes ~loc:app_loc ~mark:false env
+                mty_res nondep_mty
                 ~modes:(Specific ((mm_res, None), mm_res))
             with
             | Tcoerce_none -> ()
@@ -3896,11 +3896,6 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         raise (Error_forward (Builtin_attributes.error_of_extension ext))
     | Pstr_attribute x ->
         Builtin_attributes.parse_standard_implementation_attributes x;
-        (* CR rtjoa for dkalinichenko: saw this in your version but looks like
-           it's deleted upstream, leaving this here in case it affects tests *)
-        (* if Option.is_some toplevel
-         * || not (Warnings.is_active (Misplaced_attribute "")) then
-         *   Builtin_attributes.mark_alert_used x; *)
         Tstr_attribute x, [], shape_map, env
     | Pstr_kind_abbrev _ ->
         Misc.fatal_error "kind_abbrev not supported!"

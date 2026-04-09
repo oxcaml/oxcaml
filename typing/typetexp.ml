@@ -277,9 +277,9 @@ end = struct
        with a non-variable type expression like [int], it stays valid as long as
        the final expression checks against the rigid jkind.
     *)
-    unused : bool ref;
     rigid : jkind_lr option;
-    stage : Env.stage
+    stage : Env.stage;
+    unused : bool ref;
   }
 
   let used_variables =
@@ -1287,7 +1287,7 @@ and transl_type_poly env ~policy ~row_context mode loc vars st =
 
 and transl_type_repr env ~policy ~row_context mode loc vars st =
   let sort_vars, new_univars, cty =
-    with_local_level begin fun () ->
+    with_local_level_generalize begin fun () ->
       let vars_with_stage = List.map (fun var -> var, Env.stage env) vars in
       let sort_vars, new_univars = TyVarEnv.make_repr_univars vars_with_stage in
       let cty = TyVarEnv.with_univars new_univars begin fun () ->
