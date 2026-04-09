@@ -428,24 +428,15 @@ module Solver = struct
         (* Boxed tuples: immutable_data base + per-element contributions
            under id modality. *)
         let base = Ldd.const Axis_lattice.immutable_data in
-        let mask = Ldd.const Axis_lattice.mask_shallow in
         Ldd.sum elts
           ~base
-          ~f:(fun (_lbl, t) ->
-            Ldd.meet mask (kind ~use_tables:true ctx t))
+          ~f:(fun (_lbl, t) -> kind ~use_tables:true ctx t)
       | Types.Tunboxed_tuple elts ->
         (* Unboxed tuples: per-element contributions; shallow axes relevant
            only for arity = 1. *)
-        let mask =
-          match elts with
-          | [_] -> Axis_lattice.top (* arity 1: include all axes *)
-          | _ -> Axis_lattice.mask_shallow (* arity > 1: exclude shallow axes *)
-        in
-        let mask = Ldd.const mask in
         Ldd.sum elts
           ~base:Ldd.bot
-          ~f:(fun (_lbl, t) ->
-            Ldd.meet mask (kind ~use_tables:true ctx t))
+          ~f:(fun (_lbl, t) -> kind ~use_tables:true ctx t)
       | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
         (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
         Ldd.const Axis_lattice.arrow
@@ -479,12 +470,10 @@ module Solver = struct
             (* Closed, boxed polymorphic variant: immutable_data base plus
                per-constructor args. *)
             let base = Ldd.const Axis_lattice.immutable_data in
-            let mask = Ldd.const Axis_lattice.mask_shallow in
             Btype.fold_row
               (fun acc ty ->
                 let ty_kind = kind ~use_tables:true ctx ty in
-                let contribution = Ldd.meet mask ty_kind in
-                Ldd.join acc contribution)
+                Ldd.join acc ty_kind)
               base row
           else
             (* CR ikinds: open rows get conservative non-float value (boxed)
@@ -566,20 +555,8 @@ let label_mutability_contribution (lbl : Types.label_declaration) =
     | Mutable { atomic = Nonatomic; _ } ->
       Axis_lattice.mutable_data)
 
-(* This function determines whether the shallow axes are relevant for a given
-   representation. For example, for unboxed types, shallow axes of inner data
-   stay relevant. For boxed types, shallow axes of inner data are not
-   relevant. *)
-let shallow_axes_are_relevant_for_rep = function
-  | `Record Types.Record_unboxed
-  | `Record (Types.Record_inlined (_, _, Types.Variant_unboxed)) ->
-    `Relevant
-  | `Variant Types.Variant_unboxed -> `Relevant
-  | `Record _ | `Variant _ -> `Irrelevant
-
 let sum_record_label_contributions
     ~(base : Ldd.node)
-    ~relevant_for_shallow
     ~(payload_kind : Types.type_expr -> Ldd.node)
     ~(validate_label : Types.label_declaration -> unit)
     (lbls : Types.label_declaration list) : Ldd.node =
@@ -588,8 +565,7 @@ let sum_record_label_contributions
     ~f:(fun (lbl : Types.label_declaration) ->
       validate_label lbl;
       let mask =
-        Axis_lattice.mask_of_modality ~relevant_for_shallow
-          lbl.ld_modalities
+        Axis_lattice.mask_of_modality lbl.ld_modalities
       in
       Ldd.join
         (label_mutability_contribution lbl)
@@ -799,30 +775,21 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
               | Types.Record_unboxed -> Axis_lattice.immediate
               | _ -> Axis_lattice.immutable_data)
           in
-          let relevant_for_shallow =
-            shallow_axes_are_relevant_for_rep (`Record rep)
-          in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
             sum_record_label_contributions
               ~base:immutable_base
-              ~relevant_for_shallow
               ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
               ~validate_label:no_validation lbls
           in
           Solver.Ty
             { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
-          (* Unboxed products: shallow axes relevant only for arity = 1. *)
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
             let base = Ldd.const Axis_lattice.immediate in
-            let relevant_for_shallow =
-              match List.length lbls with 1 -> `Relevant | _ -> `Irrelevant
-            in
             sum_record_label_contributions
               ~base
-              ~relevant_for_shallow
               ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
               ~validate_label:validate_immutable_unboxed_label lbls
           in
@@ -856,9 +823,6 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
                     lbls)
               cstrs
           in
-          let relevant_for_shallow =
-            shallow_axes_are_relevant_for_rep (`Variant rep)
-          in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
             let base_lat0 =
@@ -881,8 +845,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
                   ~base:Ldd.bot
                   ~f:(fun (arg : Types.constructor_argument) ->
                     let mask =
-                      Axis_lattice.mask_of_modality
-                        ~relevant_for_shallow arg.ca_modalities
+                      Axis_lattice.mask_of_modality arg.ca_modalities
                     in
                     Ldd.meet
                       (Ldd.const mask)
@@ -890,7 +853,6 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
               | Types.Cstr_record lbls ->
                 sum_record_label_contributions
                   ~base:Ldd.bot
-                  ~relevant_for_shallow
                   ~payload_kind
                   ~validate_label:no_validation lbls
             in
@@ -1206,7 +1168,7 @@ let fast_sub_of_any_super :
   match sub.jkind.base with
   | Types.Layout
       (Jkind_types.Layout.Sort
-         (_sub_sort, { pointerness = _ })) ->
+         (_sub_sort, { nullability = _; separability = _ })) ->
     fast_sub_of_value_sub
       (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
       sub
@@ -1222,7 +1184,7 @@ let fast_sub_of_sort_super :
   match sub.jkind.base with
   | Types.Layout
       (Jkind_types.Layout.Sort
-         (sub_sort, { pointerness = _ })) ->
+         (sub_sort, { nullability = _; separability = _ })) ->
     if not (Jkind_types.Sort.equate sub_sort super_sort)
     then false
     else
@@ -1243,17 +1205,20 @@ let fast_sub :
     (super : (l2 * Allowance.allowed) Types.jkind) ->
   match super.jkind with
   | { base =
+        (* CR rtjoa for jujacobs: I guessed you want [max] here? *)
         Types.Layout
           (Jkind_types.Layout.Sort
              ( super_sort,
-               { pointerness = Jkind_axis.Pointerness.Maybe_pointer } ));
+               { separability = Jkind_axis.Separability.Maybe_separable;
+                 nullability = Jkind_axis.Nullability.Maybe_null } ));
       mod_bounds;
       with_bounds = Types.No_with_bounds
     } -> fast_sub_of_sort_super super_sort mod_bounds sub
   | { base =
         Types.Layout
           (Jkind_types.Layout.Any
-             { pointerness = Jkind_axis.Pointerness.Maybe_pointer });
+             { separability = Jkind_axis.Separability.Maybe_separable;
+               nullability = Jkind_axis.Nullability.Maybe_null });
       mod_bounds;
       with_bounds = Types.No_with_bounds
     } -> fast_sub_of_any_super mod_bounds sub

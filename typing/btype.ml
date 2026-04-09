@@ -1053,13 +1053,10 @@ module Jkind0 = struct
         ~forkable:(forkable_const t) ~yielding:(yielding_const t)
         ~statefulness:(statefulness_const t) ~visibility:(visibility_const t)
         ~staticity:(staticity_const t) ~externality:(externality t)
-        ~nullability:(nullability t) ~separability:(separability t)
 
     let of_axis_lattice (x : Axis_lattice.t) : t =
       let crossing = Axis_lattice.to_mode_crossing x in
       create crossing ~externality:(Axis_lattice.externality x)
-        ~nullability:(Axis_lattice.nullability x)
-        ~separability:(Axis_lattice.separability x)
 
     let meet t1 t2 =
       let crossing = Crossing.meet (crossing t1) (crossing t2) in
