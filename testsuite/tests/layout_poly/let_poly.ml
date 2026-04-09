@@ -239,11 +239,7 @@ Error: The right-hand side of a "let poly_" binding must be a syntactic value.
 |}]
 
 (* RHS might constrain a layout and makes it not polymorphic *)
-module M : sig
-  val f : int
-end = struct
-  let poly_ f x y = #(x, (y, y))
-end
+let poly_ f x y = #(x, (y, y))
 [%%expect{|
 Lines 3-5, characters 6-3:
 3 | ......struct
