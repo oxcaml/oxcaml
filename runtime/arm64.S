@@ -71,11 +71,11 @@
 
 /* Globals and labels */
 #if defined(SYS_macosx)
-#define CAMLSEP(x,y) caml_##x##$##y
+#define CAMLSEP(x,y) caml_##x##__##y
 #define G(sym) _##sym
 #define L(lbl) L##lbl
 #else
-#define CAMLSEP(x,y) caml_##x##.##y
+#define CAMLSEP(x,y) caml_##x##__##y
 #define G(sym) sym
 #define L(lbl) .L##lbl
 #endif
