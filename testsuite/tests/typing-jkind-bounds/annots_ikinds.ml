@@ -32,7 +32,7 @@ type t_void : void
 type t_any_mod_separable : any mod separable;;
 
 [%%expect{|
-type t_any_mod_separable : any mod separable
+type t_any_mod_separable : any separable
 |}]
 
 type t_value_or_null : value_or_null;;
@@ -155,10 +155,7 @@ Error: The externality axis has already been specified.
 
 type t13 : value mod maybe_null non_null
 [%%expect {|
-Line 1, characters 32-40:
-1 | type t13 : value mod maybe_null non_null
-                                    ^^^^^^^^
-Error: The nullability axis has already been specified.
+type t13
 |}]
 
 type t14 : value mod unique aliased
@@ -223,10 +220,11 @@ Line 1, characters 16-18:
                     ^^
 Error: This alias is bound to type "int" but is used as an instance of type
          "('a : float64)"
-       The layout of int is value
+       The layout of int is value non_pointer
          because it is the primitive type int.
        But the layout of int must be a sublayout of float64
          because of the annotation on the type variable 'a.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let x : (int as ('a : immediate)) list as ('b : value) = [3;4;5]
@@ -243,20 +241,22 @@ Line 1, characters 21-23:
                          ^^
 Error: This alias is bound to type "int list"
        but is used as an instance of type "('a : immediate)"
-       The kind of int list is immutable_data
+       The layout of int list is value non_float
          because it's a boxed variant type.
-       But the kind of int list must be a subkind of immediate
+       But the layout of int list must be a sublayout of value non_pointer
          because of the annotation on the type variable 'a.
+       Note: The layout of immediate is value non_pointer.
 |}, Principal{|
 Line 1, characters 21-23:
 1 | let x : int list as ('a : immediate) = [3;4;5]
                          ^^
 Error: This alias is bound to type "int list"
        but is used as an instance of type "('a : immediate)"
-       The kind of int list is immutable_data with int
+       The layout of int list is value non_float
          because it's a boxed variant type.
-       But the kind of int list must be a subkind of immediate
+       But the layout of int list must be a sublayout of value non_pointer
          because of the annotation on the type variable 'a.
+       Note: The layout of immediate is value non_pointer.
 |}]
 (* CR layouts: error message could be phrased better *)
 
@@ -406,10 +406,11 @@ Line 1, characters 9-15:
 1 | type t = string t2_imm
              ^^^^^^
 Error: This type "string" should be an instance of type "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of t2_imm at line 1, characters 0-28.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type t = string t2_global
@@ -647,10 +648,11 @@ Line 1, characters 24-31:
                             ^^^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of r at line 1, characters 0-47.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let f { fieldg } = fieldg "hello"
@@ -675,7 +677,7 @@ Line 1, characters 26-33:
                               ^^^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : word mod many aliased)"
-       The layout of string is value
+       The layout of string is value non_float
          because it is the primitive type string.
        But the layout of string must be a sublayout of word
          because of the definition of rc at line 1, characters 0-71.
@@ -713,10 +715,11 @@ Line 2, characters 18-55:
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This field value has type "'b -> 'b" which is less general than
          "'a. 'a -> 'a"
-       The kind of 'a is value
+       The layout of 'a is value
          because of the definition of r_value at line 1, characters 0-39.
-       But the kind of 'a must be a subkind of immediate
+       But the layout of 'a must be a sublayout of value non_pointer
          because of the annotation on the abstract type declaration for a.
+       Note: The layout of immediate is value non_pointer.
 |}]
 (* CR layouts v1.5: that's a pretty awful error message *)
 
@@ -749,10 +752,11 @@ Error: Layout mismatch in final type declaration consistency check.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The kind of 'a is value
+         The layout of 'a is value
            because of the annotation on the universal variable 'a.
-         But the kind of 'a must be a subkind of immediate
+         But the layout of 'a must be a sublayout of value non_pointer
            because of the definition of t_imm at line 1, characters 0-27.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]
@@ -1057,10 +1061,11 @@ Line 1, characters 43-51:
                                                ^^^^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the annotation on the universal variable 'a.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let f (x : ('a : value mod global). 'a -> 'a) = x "string"
@@ -1677,10 +1682,11 @@ Line 1, characters 37-53:
                                          ^^^^^^^^^^^^^^^^
 Error: This definition has type "'b -> 'b" which is less general than
          "'a. 'a -> 'a"
-       The kind of 'a is value
+       The layout of 'a is value
          because of the annotation on the universal variable 'a.
-       But the kind of 'a must be a subkind of immediate
+       But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of f_imm at line 1, characters 4-9.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type (_ : value) g =
@@ -1735,6 +1741,6 @@ Error: This expression has type "a" but an expression was expected of type
          "('a : value_or_null)"
        The layout of a is float64
          because of the annotation on the existential variable a.
-       But the layout of a must be a sublayout of value
+       But the layout of a must be a value layout
          because the type argument of option has layout value_or_null.
 |}]

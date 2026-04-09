@@ -418,10 +418,11 @@ type t2 : immediate with string = M1.t
 Line 1, characters 0-38:
 1 | type t2 : immediate with string = M1.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "M1.t" is value mod non_float
+Error: The layout of type "M1.t" is value non_float
          because it's a polymorphic variant type.
-       But the kind of type "M1.t" must be a subkind of immutable_data
+       But the layout of type "M1.t" must be a sublayout of value non_pointer
          because of the definition of t2 at line 1, characters 0-38.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type t2 : value mod portable = M1.t
@@ -429,7 +430,7 @@ type t2 : value mod portable = M1.t
 Line 1, characters 0-35:
 1 | type t2 : value mod portable = M1.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "M1.t" is value mod non_float
+Error: The kind of type "M1.t" is value non_float
          because it's a polymorphic variant type.
        But the kind of type "M1.t" must be a subkind of value mod portable
          because of the definition of t2 at line 1, characters 0-35.
@@ -452,10 +453,11 @@ type t2 : immediate with M1b.t = C of string
 Line 1, characters 0-44:
 1 | type t2 : immediate with M1b.t = C of string
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
+Error: The layout of type "t2" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of immediate with M1b.t
+       But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 module type S2 = sig

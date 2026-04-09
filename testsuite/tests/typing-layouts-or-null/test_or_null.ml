@@ -444,10 +444,23 @@ Error: This expression has type "('a, 'a or_null) gadt"
 |}]
 
 type t : immediate_or_null & immediate = #(int or_null * int)
-[%%expect{||}]
+[%%expect{|
+type t = #(int or_null * int)
+|}]
 
 type bad : immediate & immediate = #(int or_null * int)
-[%%expect{||}]
+[%%expect{|
+Line 1, characters 0-55:
+1 | type bad : immediate & immediate = #(int or_null * int)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "#(int or_null * int)" is
+           value maybe_separable maybe_null & value non_pointer
+         because it is an unboxed tuple.
+       But the layout of type "#(int or_null * int)" must be a sublayout of
+           value non_pointer & value non_pointer
+         because of the definition of bad at line 1, characters 0-55.
+       Note: The layout of immediate is value non_pointer.
+|}]
 
 module M : sig
   type t : immediate_or_null
@@ -464,5 +477,5 @@ end = struct
   type t = #(int or_null * int)
 end
 [%%expect{|
-module M : sig type t : immediate_or_null & immediate_or_null end
+module M : sig type t : immediate_or_null & immediate end
 |}]

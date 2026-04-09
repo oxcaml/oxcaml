@@ -13,9 +13,9 @@ type t_vn : value_or_null
 Line 2, characters 0-23:
 2 | type q_v : value = t_vn
     ^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_vn" is value_or_null
+Error: The layout of type "t_vn" is value maybe_separable maybe_null
          because of the definition of t_vn at line 1, characters 0-25.
-       But the kind of type "t_vn" must be a subkind of value
+       But the layout of type "t_vn" must be a sublayout of value
          because of the definition of q_v at line 2, characters 0-23.
 |}]
 
@@ -28,9 +28,9 @@ type t_any : any
 Line 2, characters 0-42:
 2 | type q_any_sep : any mod separable = t_any
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_any" is any
+Error: The layout of type "t_any" is any
          because of the definition of t_any at line 1, characters 0-16.
-       But the kind of type "t_any" must be a subkind of any mod separable
+       But the layout of type "t_any" must be a sublayout of any separable
          because of the definition of q_any_sep at line 2, characters 0-42.
 |}]
 
@@ -39,7 +39,7 @@ type t_sep : any mod separable
 type q_any2 : any = t_sep
 
 [%%expect{|
-type t_sep : any mod separable
+type t_sep : any separable
 type q_any2 = t_sep
 |}]
 
@@ -61,9 +61,9 @@ type t_vn2 : value_or_null
 Line 2, characters 0-39:
 2 | type q_sep2 : any mod separable = t_vn2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_vn2" is value_or_null
+Error: The layout of type "t_vn2" is value maybe_separable maybe_null
          because of the definition of t_vn2 at line 1, characters 0-26.
-       But the kind of type "t_vn2" must be a subkind of any mod separable
+       But the layout of type "t_vn2" must be a sublayout of any separable
          because of the definition of q_sep2 at line 2, characters 0-39.
 |}]
 
