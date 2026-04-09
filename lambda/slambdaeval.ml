@@ -187,7 +187,9 @@ let rec eval_slam env slam : value Or_missing.t =
 
 and eval_var env id = Env.find env id
 
-and eval_lam env lam =
+and eval_lam env lam = Lambda.map (eval_lam_shallow env) lam
+
+and eval_lam_shallow env lam =
   match lam with
   | Lconst const -> Lconst (eval_structured_const env const)
   | Lapply
@@ -202,8 +204,6 @@ and eval_lam env lam =
         ap_specialised;
         ap_probe
       } ->
-    let ap_func = eval_lam env ap_func in
-    let ap_args = List.map (eval_lam env) ap_args in
     let ap_result_layout = eval_layout env ap_result_layout in
     Lapply
       { ap_func;
@@ -217,102 +217,68 @@ and eval_lam env lam =
         ap_specialised;
         ap_probe
       }
-  | Lfunction lfunction -> Lfunction (eval_lfunction env lfunction)
+  | Lfunction lfunction -> Lfunction (eval_lfunction_shallow env lfunction)
   | Llet (kind, layout, id, uid, rhs, body) ->
     let layout = eval_layout env layout in
-    let rhs = eval_lam env rhs in
-    let body = eval_lam env body in
     Llet (kind, layout, id, uid, rhs, body)
   | Lmutlet (layout, id, uid, rhs, body) ->
     let layout = eval_layout env layout in
-    let rhs = eval_lam env rhs in
-    let body = eval_lam env body in
     Lmutlet (layout, id, uid, rhs, body)
   | Lletrec (bindings, body) ->
     let eval_binding { id; debug_uid; def } =
-      let def = eval_lfunction env def in
+      let def = eval_lfunction_shallow env def in
       { id; debug_uid; def }
     in
     let bindings = List.map eval_binding bindings in
-    let body = eval_lam env body in
     Lletrec (bindings, body)
   | Lprim (prim, args, loc) ->
     let prim = eval_prim env prim in
-    let args = List.map (eval_lam env) args in
     Lprim (prim, args, loc)
   | Lswitch (lam, switch, loc, layout) ->
-    let { sw_numconsts; sw_consts; sw_numblocks; sw_blocks; sw_failaction } =
-      switch
-    in
-    let lam = eval_lam env lam in
-    let sw_consts = List.map (fun (i, lam) -> i, eval_lam env lam) sw_consts in
-    let sw_blocks = List.map (fun (i, lam) -> i, eval_lam env lam) sw_blocks in
-    let sw_failaction = Option.map (eval_lam env) sw_failaction in
-    let switch =
-      { sw_numconsts; sw_consts; sw_numblocks; sw_blocks; sw_failaction }
-    in
     let layout = eval_layout env layout in
     Lswitch (lam, switch, loc, layout)
   | Lstringswitch (lam, branches, failaction, loc, layout) ->
-    let lam = eval_lam env lam in
-    let branches = List.map (fun (i, lam) -> i, eval_lam env lam) branches in
-    let failaction = Option.map (eval_lam env) failaction in
     let layout = eval_layout env layout in
     Lstringswitch (lam, branches, failaction, loc, layout)
-  | Lstaticraise (label, args) ->
-    let args = List.map (eval_lam env) args in
-    Lstaticraise (label, args)
   | Lstaticcatch (body, (label, params), handler_body, pop_region, layout) ->
-    let body = eval_lam env body in
     let params =
       List.map (fun (id, uid, layout) -> id, uid, eval_layout env layout) params
     in
-    let handler_body = eval_lam env handler_body in
     let layout = eval_layout env layout in
     Lstaticcatch (body, (label, params), handler_body, pop_region, layout)
   | Ltrywith (body, id, debug_uid, handler_body, layout) ->
-    let body = eval_lam env body in
-    let handler_body = eval_lam env handler_body in
     let layout = eval_layout env layout in
     Ltrywith (body, id, debug_uid, handler_body, layout)
   | Lifthenelse (lam, iftrue, iffalse, layout) ->
-    let lam = eval_lam env lam in
-    let iftrue = eval_lam env iftrue in
-    let iffalse = eval_lam env iffalse in
     let layout = eval_layout env layout in
     Lifthenelse (lam, iftrue, iffalse, layout)
-  | Lsequence (lam1, lam2) ->
-    let lam1 = eval_lam env lam1 in
-    let lam2 = eval_lam env lam2 in
-    Lsequence (lam1, lam2)
-  | Lwhile { wh_cond; wh_body } ->
-    let wh_cond = eval_lam env wh_cond in
-    let wh_body = eval_lam env wh_body in
-    Lwhile { wh_cond; wh_body }
-  | Lfor { for_id; for_debug_uid; for_loc; for_from; for_to; for_dir; for_body }
-    ->
-    let for_from = eval_lam env for_from in
-    let for_to = eval_lam env for_to in
-    let for_body = eval_lam env for_body in
-    Lfor { for_id; for_debug_uid; for_loc; for_from; for_to; for_dir; for_body }
-  | Lassign (id, lam) -> Lassign (id, eval_lam env lam)
   | Lsend (kind, met, obj, args, region_close, mode, loc, layout) ->
-    let met = eval_lam env met in
-    let obj = eval_lam env obj in
-    let args = List.map (eval_lam env) args in
     let layout = eval_layout env layout in
     Lsend (kind, met, obj, args, region_close, mode, loc, layout)
-  | Levent (lam, ev) -> Levent (eval_lam env lam, ev)
-  | Lifused (id, lam) -> Lifused (id, eval_lam env lam)
   | Lregion (lam, layout) ->
-    let lam = eval_lam env lam in
     let layout = eval_layout env layout in
     Lregion (lam, layout)
-  | Lexclave lam -> Lexclave (eval_lam env lam)
   | Lsplice (_loc, slam) ->
     let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
     halves.slv_runtime
-  | Lvar _id | Lmutvar _id -> lam
+  | Lvar _ | Lmutvar _
+  | Lstaticraise (_, _)
+  | Lsequence (_, _)
+  | Lwhile { wh_cond = _; wh_body = _ }
+  | Lfor
+      { for_id = _;
+        for_debug_uid = _;
+        for_loc = _;
+        for_from = _;
+        for_to = _;
+        for_dir = _;
+        for_body = _
+      }
+  | Lassign (_, _)
+  | Levent (_, _)
+  | Lifused (_, _)
+  | Lexclave _ ->
+    lam
 
 and eval_structured_const env const =
   match const with
@@ -360,15 +326,14 @@ and eval_layout env layout =
   | Punboxed_vector _ | Pbottom ->
     layout
 
-and eval_lfunction env { kind; params; return; body; attr; loc; mode; ret_mode }
-    =
+and eval_lfunction_shallow env
+    { kind; params; return; body; attr; loc; mode; ret_mode } =
   let eval_lparam { name; debug_uid; layout; attributes; mode } =
     let layout = eval_layout env layout in
     { name; debug_uid; layout; attributes; mode }
   in
   let params = List.map eval_lparam params in
   let return = eval_layout env return in
-  let body = eval_lam env body in
   lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode
 
 and eval_prim env prim =
