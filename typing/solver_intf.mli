@@ -47,8 +47,8 @@ module type Lattices = sig
 
   val print : 'a obj -> Fmt.formatter -> 'a elt -> unit
 
-  val equal_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.eq option
-
+  (** Compares two objects. Used for deduplication only; it is sound (but not
+      recommended) to return a nonzero value for equal objects. *)
   val compare_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.comparison
 
   val print_obj : Fmt.formatter -> 'a obj -> unit
@@ -151,17 +151,8 @@ module type Lattices_mono = sig
   (** Apply morphism on constant *)
   val apply : 'b obj -> ('a, 'b, 'd) morph -> 'a -> 'b
 
-  (** Checks if two morphisms are equal. Used for deduplication only; it is fine
-      (but not recommended) to return [Not_equal] for equal morphisms. *)
-  val equal_morph :
-    'b obj ->
-    ('a0, 'b, 'l0 * 'r0) morph ->
-    ('a1, 'b, 'l1 * 'r1) morph ->
-    ('a0, 'a1) Misc.eq option
-
-  (** Compares two morphisms. Should be compatible with [equal_morph]. Used for
-      deduplication only; it is fine (but not recommended) to return a nonzero
-      value for equal morphisms. *)
+  (** Compares two morphisms. Used for deduplication only; it is fine (but not
+      recommended) to return a nonzero value for equal morphisms. *)
   val compare_morph :
     'b obj ->
     ('a0, 'b, 'd0) morph ->

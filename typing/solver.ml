@@ -276,8 +276,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     { mutable vlower : 'a lmorphvar VarMap.t;
           (** A list of variables directly under the current variable. Each is a
               pair [f] [v], and we have [f v <= u] where [u] is the current
-              variable. TODO: consider using hashset for quicker deduplication
-          *)
+              variable. *)
       mutable upper : 'a;  (** The precise upper bound of the variable *)
       mutable upper_hint : ('a, right_only) Comp_hint.t;
           (** Hints for [upper] *)
@@ -764,9 +763,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     Morphvar.(
       disallow_left (disallow_right mv0) == disallow_left (disallow_right mv1))
     ||
-    match C.equal_morph dst f0 f1 with
-    | None -> false
-    | Some Refl -> v0 == v1
+    match C.compare_morph dst f0 f1 with
+    | Less_than | Greater_than -> false
+    | Equal -> v0 == v1
 
   let submode_mvmv (type a) ~log (pp : H.Pinpoint.t) (dst : a C.obj)
       (Amorphvar (v, f, f_hint) as mv) (Amorphvar (u, g, g_hint) as mu) =

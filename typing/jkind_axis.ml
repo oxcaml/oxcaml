@@ -306,14 +306,6 @@ module Per_axis = struct
       | Nullability -> Nullability.print
       | Separability -> Separability.print
 
-    let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
-     fun a b ->
-      match a, b with
-      | Externality, Externality -> Some Refl
-      | Nullability, Nullability -> Some Refl
-      | Separability, Separability -> Some Refl
-      | _ -> None
-
     let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
      fun a b ->
       match a, b with
@@ -361,13 +353,6 @@ module Per_axis = struct
   let print : type a. a t -> Fmt.formatter -> a -> unit = function
     | Modal ax -> Mode.Crossing.Per_axis.print ax
     | Nonmodal ax -> Nonmodal.print ax
-
-  let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
-   fun a b ->
-    match a, b with
-    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.equal_obj ax0 ax1
-    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.equal_obj ax0 ax1
-    | _ -> None
 
   let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
    fun a b ->
