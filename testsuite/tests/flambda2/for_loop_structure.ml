@@ -11,19 +11,45 @@ let f bound r t =
 [%%expect_asm X86_64{|
 f:
   cmpq  $1, %rax
+<<<<<<< HEAD
   jl    .L1
+||||||| parent of 42782c097b (passes testsuite)
+  jl    .L121
+=======
+  jl    .L102
+  subq  $8, %rsp
+>>>>>>> 42782c097b (passes testsuite)
   sarq  $1, %rax
   xorl  %ebx, %ebx
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L109:
+=======
+.L104:
+>>>>>>> 42782c097b (passes testsuite)
   movq  (%rdi), %rsi
   leaq  (%rsi,%rbx,2), %rsi
   movq  %rsi, (%rdi)
   incq  %rbx
   cmpq  %rax, %rbx
+<<<<<<< HEAD
   jle   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jle   .L109
+=======
+  jle   .L104
+>>>>>>> 42782c097b (passes testsuite)
   movl  $1, %eax
+  addq  $8, %rsp
   ret
+<<<<<<< HEAD
 .L1:
+||||||| parent of 42782c097b (passes testsuite)
+.L121:
+=======
+.L102:
+>>>>>>> 42782c097b (passes testsuite)
   movl  $1, %eax
   ret
 |}]

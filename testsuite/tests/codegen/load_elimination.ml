@@ -13,13 +13,26 @@ let immutable_load l = (List.hd l) + (List.hd l)
 [%%expect_asm X86_64{|
 immutable_load:
   testb $1, %al
+<<<<<<< HEAD
   je    .L0
+||||||| parent of 42782c097b (passes testsuite)
+  je    .L105
+=======
+  je    .L102
+  subq  $8, %rsp
+>>>>>>> 42782c097b (passes testsuite)
   movq  camlStdlib__List__Pmakeblock2305@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L105:
+=======
+.L102:
+>>>>>>> 42782c097b (passes testsuite)
   movq  (%rax), %rax
   leaq  -1(%rax,%rax), %rax
   ret
@@ -48,8 +61,9 @@ let mutable_load_branch r b =
   x + if b then !r else 7
 [%%expect_asm X86_64{|
 mutable_load_branch:
-  movq  (%rax), %rax
+  movq  (%rax), %rdi
   cmpq  $1, %rbx
+<<<<<<< HEAD
   jne   .L0
   movl  $15, %ebx
   jmp   .L1
@@ -57,6 +71,23 @@ mutable_load_branch:
   movq  %rax, %rbx
 .L1:
   leaq  -1(%rax,%rbx), %rax
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L109
+  movl  $15, %ebx
+  jmp   .L113
+.L109:
+  movq  %rax, %rbx
+.L113:
+  leaq  -1(%rax,%rbx), %rax
+=======
+  jne   .L105
+  movl  $15, %eax
+  jmp   .L102
+.L105:
+  movq  %rdi, %rax
+.L102:
+  leaq  -1(%rdi,%rax), %rax
+>>>>>>> 42782c097b (passes testsuite)
   ret
 |}]
 
@@ -70,18 +101,48 @@ let immutable_load_loop (t: t) =
   foo 10 (t.a)
 [%%expect_asm X86_64{|
 immutable_load_loop:
+<<<<<<< HEAD
   movq  (%rax), %rbx
   movl  $21, %edi
   movq  %rbx, %rax
   jmp   .L1
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+  movq  (%rax), %rbx
+  movl  $21, %edi
+  movq  %rbx, %rax
+  jmp   .L111
+.L109:
+=======
+  movq  (%rax), %rdi
+  movl  $21, %ebx
+  movq  %rdi, %rax
+  jmp   .L105
+.L104:
+>>>>>>> 42782c097b (passes testsuite)
   ret
+<<<<<<< HEAD
 .L1:
   leaq  -1(%rax,%rbx), %rax
   addq  $-2, %rdi
   cmpq  $1, %rdi
   jne   .L1
   jmp   .L0
+||||||| parent of 42782c097b (passes testsuite)
+.L111:
+  leaq  -1(%rax,%rbx), %rax
+  addq  $-2, %rdi
+  cmpq  $1, %rdi
+  jne   .L111
+  jmp   .L109
+=======
+.L105:
+  leaq  -1(%rax,%rdi), %rax
+  addq  $-2, %rbx
+  cmpq  $1, %rbx
+  jne   .L105
+  jmp   .L104
+>>>>>>> 42782c097b (passes testsuite)
 |}]
 
 (* CR ttebbi: Load elimination inside the loop is not working. *)
@@ -93,16 +154,38 @@ mutable_load_loop:
   movq  %rax, %rbx
   movq  (%rbx), %rax
   movl  $21, %edi
+<<<<<<< HEAD
   jmp   .L1
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+  jmp   .L111
+.L109:
+=======
+  jmp   .L105
+.L104:
+>>>>>>> 42782c097b (passes testsuite)
   ret
+<<<<<<< HEAD
 .L1:
+||||||| parent of 42782c097b (passes testsuite)
+.L111:
+=======
+.L105:
+>>>>>>> 42782c097b (passes testsuite)
   movq  (%rbx), %rsi
   leaq  -1(%rax,%rsi), %rax
   addq  $-2, %rdi
   cmpq  $1, %rdi
+<<<<<<< HEAD
   jne   .L1
   jmp   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L111
+  jmp   .L109
+=======
+  jne   .L105
+  jmp   .L104
+>>>>>>> 42782c097b (passes testsuite)
 |}]
 
 (* CR ttebbi: We should figure out that the store and the load cannot alias. *)

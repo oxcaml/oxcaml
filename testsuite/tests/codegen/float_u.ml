@@ -110,7 +110,9 @@ to_float:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+<<<<<<< HEAD
+  jb    .L104
 .L0:
 ||||||| parent of de3d4ac415 (working prototype)
   jb    .L104
@@ -119,6 +121,13 @@ to_float:
   jb    .L106
 .L108:
 >>>>>>> de3d4ac415 (working prototype)
+||||||| parent of 42782c097b (passes testsuite)
+  jb    .L106
+.L108:
+=======
+  jb    .L102
+.L104:
+>>>>>>> 42782c097b (passes testsuite)
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd %xmm0, (%rax)
@@ -154,29 +163,73 @@ min:
   vmovsd 8(%rsp), %xmm0
   vmovsd (%rsp), %xmm1
   vcomisd %xmm1, %xmm0
+<<<<<<< HEAD
   ja    .L1
+||||||| parent of 42782c097b (passes testsuite)
+  ja    .L134
+=======
+  ja    .L101
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
+<<<<<<< HEAD
   jne   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L126
+=======
+  jne   .L103
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
+<<<<<<< HEAD
   jne   .L1
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L134
+.L126:
+=======
+  jne   .L101
+.L103:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
+<<<<<<< HEAD
   jp    .L3
   jmp   .L2
 .L1:
+||||||| parent of 42782c097b (passes testsuite)
+  jp    .L138
+  jmp   .L136
+.L134:
+=======
+  jp    .L116
+  jmp   .L115
+.L101:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
+<<<<<<< HEAD
   jnp   .L3
 .L2:
+||||||| parent of 42782c097b (passes testsuite)
+  jnp   .L138
+.L136:
+=======
+  jnp   .L116
+.L115:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   addq  $24, %rsp
   ret
+<<<<<<< HEAD
 .L3:
+||||||| parent of 42782c097b (passes testsuite)
+.L138:
+=======
+.L116:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -193,29 +246,73 @@ max:
   vmovsd 8(%rsp), %xmm0
   vmovsd (%rsp), %xmm1
   vcomisd %xmm1, %xmm0
+<<<<<<< HEAD
   ja    .L1
+||||||| parent of 42782c097b (passes testsuite)
+  ja    .L134
+=======
+  ja    .L101
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
+<<<<<<< HEAD
   jne   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L126
+=======
+  jne   .L103
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
+<<<<<<< HEAD
   jne   .L1
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L134
+.L126:
+=======
+  jne   .L101
+.L103:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
+<<<<<<< HEAD
   jp    .L3
   jmp   .L2
 .L1:
+||||||| parent of 42782c097b (passes testsuite)
+  jp    .L138
+  jmp   .L136
+.L134:
+=======
+  jp    .L116
+  jmp   .L115
+.L101:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
+<<<<<<< HEAD
   jnp   .L3
 .L2:
+||||||| parent of 42782c097b (passes testsuite)
+  jnp   .L138
+.L136:
+=======
+  jnp   .L116
+.L115:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   addq  $24, %rsp
   ret
+<<<<<<< HEAD
 .L3:
+||||||| parent of 42782c097b (passes testsuite)
+.L138:
+=======
+.L116:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -232,29 +329,73 @@ min_num:
   vmovsd 8(%rsp), %xmm0
   vmovsd (%rsp), %xmm1
   vcomisd %xmm1, %xmm0
+<<<<<<< HEAD
   ja    .L1
+||||||| parent of 42782c097b (passes testsuite)
+  ja    .L134
+=======
+  ja    .L101
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
+<<<<<<< HEAD
   jne   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L126
+=======
+  jne   .L103
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
+<<<<<<< HEAD
   jne   .L1
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L134
+.L126:
+=======
+  jne   .L101
+.L103:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
+<<<<<<< HEAD
   jp    .L3
   jmp   .L2
 .L1:
+||||||| parent of 42782c097b (passes testsuite)
+  jp    .L138
+  jmp   .L136
+.L134:
+=======
+  jp    .L116
+  jmp   .L115
+.L101:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
+<<<<<<< HEAD
   jnp   .L3
 .L2:
+||||||| parent of 42782c097b (passes testsuite)
+  jnp   .L138
+.L136:
+=======
+  jnp   .L116
+.L115:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   addq  $24, %rsp
   ret
+<<<<<<< HEAD
 .L3:
+||||||| parent of 42782c097b (passes testsuite)
+.L138:
+=======
+.L116:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -271,29 +412,73 @@ max_num:
   vmovsd 8(%rsp), %xmm0
   vmovsd (%rsp), %xmm1
   vcomisd %xmm1, %xmm0
+<<<<<<< HEAD
   ja    .L1
+||||||| parent of 42782c097b (passes testsuite)
+  ja    .L134
+=======
+  ja    .L101
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
+<<<<<<< HEAD
   jne   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L126
+=======
+  jne   .L103
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
+<<<<<<< HEAD
   jne   .L1
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L134
+.L126:
+=======
+  jne   .L101
+.L103:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
+<<<<<<< HEAD
   jp    .L3
   jmp   .L2
 .L1:
+||||||| parent of 42782c097b (passes testsuite)
+  jp    .L138
+  jmp   .L136
+.L134:
+=======
+  jp    .L116
+  jmp   .L115
+.L101:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
+<<<<<<< HEAD
   jnp   .L3
 .L2:
+||||||| parent of 42782c097b (passes testsuite)
+  jnp   .L138
+.L136:
+=======
+  jnp   .L116
+.L115:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd (%rsp), %xmm0
   addq  $24, %rsp
   ret
+<<<<<<< HEAD
 .L3:
+||||||| parent of 42782c097b (passes testsuite)
+.L138:
+=======
+.L116:
+>>>>>>> 42782c097b (passes testsuite)
   vmovsd 8(%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -309,10 +494,22 @@ min_unchecked:
   vmovapd %xmm0, %xmm2
   vmovapd %xmm1, %xmm0
   vcomisd %xmm2, %xmm0
+<<<<<<< HEAD
   jbe   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jbe   .L105
+=======
+  jbe   .L102
+>>>>>>> 42782c097b (passes testsuite)
   vmovapd %xmm2, %xmm0
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L105:
+=======
+.L102:
+>>>>>>> 42782c097b (passes testsuite)
   ret
 |}]
 

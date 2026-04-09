@@ -83,7 +83,9 @@ to_float:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    <hidden GC jump pad>
+<<<<<<< HEAD
+<<<<<<< HEAD
+  jb    .L105
 .L0:
 ||||||| parent of de3d4ac415 (working prototype)
   jb    .L105
@@ -92,6 +94,13 @@ to_float:
   jb    .L108
 .L110:
 >>>>>>> de3d4ac415 (working prototype)
+||||||| parent of 42782c097b (passes testsuite)
+  jb    .L108
+.L110:
+=======
+  jb    .L103
+.L105:
+>>>>>>> 42782c097b (passes testsuite)
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vcvtss2sd %xmm0, %xmm0, %xmm0

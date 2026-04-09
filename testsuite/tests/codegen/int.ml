@@ -14,9 +14,9 @@
 let neg x = -x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  movl  $2, %eax
-  subq  %rbx, %rax
+  movl  $2, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -57,14 +57,27 @@ let div x y = x / y
 div:
   movq  %rbx, %rcx
   cmpq  $1, %rcx
+<<<<<<< HEAD
   je    .L0
+||||||| parent of 42782c097b (passes testsuite)
+  je    .L115
+=======
+  je    .L101
+>>>>>>> 42782c097b (passes testsuite)
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
   idivq %rcx
   leaq  1(%rax,%rax), %rax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L115:
+=======
+.L101:
+  subq  $8, %rsp
+>>>>>>> 42782c097b (passes testsuite)
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -110,14 +123,27 @@ let rem x y = x mod y
 rem:
   movq  %rbx, %rcx
   cmpq  $1, %rcx
+<<<<<<< HEAD
   je    .L0
+||||||| parent of 42782c097b (passes testsuite)
+  je    .L115
+=======
+  je    .L101
+>>>>>>> 42782c097b (passes testsuite)
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
   idivq %rcx
   leaq  1(%rdx,%rdx), %rax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L115:
+=======
+.L101:
+  subq  $8, %rsp
+>>>>>>> 42782c097b (passes testsuite)
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -189,10 +215,22 @@ let abs x = abs x
 abs:
   movq  %rax, %rbx
   cmpq  $1, %rbx
+<<<<<<< HEAD
   jl    .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jl    .L105
+=======
+  jl    .L102
+>>>>>>> 42782c097b (passes testsuite)
   movq  %rbx, %rax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L105:
+=======
+.L102:
+>>>>>>> 42782c097b (passes testsuite)
   movl  $2, %eax
   subq  %rbx, %rax
   ret
@@ -321,10 +359,22 @@ min:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
+<<<<<<< HEAD
   jg    .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jg    .L105
+=======
+  jg    .L102
+>>>>>>> 42782c097b (passes testsuite)
   movq  %rdi, %rax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L105:
+=======
+.L102:
+>>>>>>> 42782c097b (passes testsuite)
   ret
 |}]
 
@@ -335,10 +385,22 @@ max:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
+<<<<<<< HEAD
   jl    .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jl    .L105
+=======
+  jl    .L102
+>>>>>>> 42782c097b (passes testsuite)
   movq  %rdi, %rax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L105:
+=======
+.L102:
+>>>>>>> 42782c097b (passes testsuite)
   ret
 |}]
 
@@ -369,10 +431,24 @@ collatz:
   movq  %rax, %rbx
   movl  $1, %eax
   cmpq  $3, %rbx
+<<<<<<< HEAD
   jg    .L1
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+  jg    .L110
+.L108:
+=======
+  jg    .L104
+.L103:
+>>>>>>> 42782c097b (passes testsuite)
   ret
+<<<<<<< HEAD
 .L1:
+||||||| parent of 42782c097b (passes testsuite)
+.L110:
+=======
+.L104:
+>>>>>>> 42782c097b (passes testsuite)
   addq  $2, %rax
   movq  %rbx, %rdi
   sarq  $1, %rdi
@@ -385,15 +461,39 @@ collatz:
   subq  %rsi, %rdi
   leaq  1(%rdi,%rdi), %rdi
   cmpq  $1, %rdi
+<<<<<<< HEAD
   jne   .L2
+||||||| parent of 42782c097b (passes testsuite)
+  jne   .L126
+=======
+  jne   .L113
+>>>>>>> 42782c097b (passes testsuite)
   sarq  $1, %rdx
   leaq  1(%rdx,%rdx), %rbx
   cmpq  $3, %rbx
+<<<<<<< HEAD
   jg    .L1
   jmp   .L0
 .L2:
+||||||| parent of 42782c097b (passes testsuite)
+  jg    .L110
+  jmp   .L108
+.L126:
+=======
+  jg    .L104
+  jmp   .L103
+.L113:
+>>>>>>> 42782c097b (passes testsuite)
   leaq  (%rbx,%rbx,2), %rbx
   cmpq  $3, %rbx
+<<<<<<< HEAD
   jg    .L1
   jmp   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jg    .L110
+  jmp   .L108
+=======
+  jg    .L104
+  jmp   .L103
+>>>>>>> 42782c097b (passes testsuite)
 |}]

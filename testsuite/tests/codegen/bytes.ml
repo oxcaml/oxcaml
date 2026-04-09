@@ -198,10 +198,23 @@ bytes_safe_get_int32:
   xorq  $-1, %rsi
   andq  %rdi, %rsi
   cmpq  %rsi, %rbx
+<<<<<<< HEAD
   jae   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jae   .L123
+=======
+  jae   .L101
+>>>>>>> 42782c097b (passes testsuite)
   movslq (%rax,%rbx), %rax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L123:
+=======
+.L101:
+  subq  $8, %rsp
+>>>>>>> 42782c097b (passes testsuite)
   movq  camlTOP18__block602@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

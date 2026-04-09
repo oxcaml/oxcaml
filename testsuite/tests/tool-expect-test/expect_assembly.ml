@@ -14,10 +14,22 @@ val helper2 : int -> int = <fun>
 [%%expect_asm X86_64{|
 helper2:
   cmpq  $7, %rax
+<<<<<<< HEAD
   jle   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jle   .L106
+=======
+  jle   .L102
+>>>>>>> 42782c097b (passes testsuite)
   addq  $14, %rax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L106:
+=======
+.L102:
+>>>>>>> 42782c097b (passes testsuite)
   imulq $7, %rax
   addq  $-6, %rax
   ret
@@ -27,10 +39,22 @@ let helper x = if x > 3 then x + 7 else x * 7
 [%%expect_asm X86_64{|
 helper:
   cmpq  $7, %rax
+<<<<<<< HEAD
   jle   .L0
+||||||| parent of 42782c097b (passes testsuite)
+  jle   .L106
+=======
+  jle   .L102
+>>>>>>> 42782c097b (passes testsuite)
   addq  $14, %rax
   ret
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L106:
+=======
+.L102:
+>>>>>>> 42782c097b (passes testsuite)
   imulq $7, %rax
   addq  $-6, %rax
   ret
@@ -56,7 +80,13 @@ f:
   movq  %rax, %rbx
   movq  camlTOP4__fn$5b$3a1$2c19$2d$2d45$5d_10@GOTPCREL(%rip), %rax
   call  camlStdlib__List__map_15_113_code@PLT
+<<<<<<< HEAD
 .L0:
+||||||| parent of 42782c097b (passes testsuite)
+.L113:
+=======
+.L109:
+>>>>>>> 42782c097b (passes testsuite)
   movq  %rax, %rbx
   movq  camlTOP4__fn$5b$3a1$2c60$2d$2d86$5d_11@GOTPCREL(%rip), %rax
   addq  $8, %rsp
