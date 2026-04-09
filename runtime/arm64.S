@@ -108,15 +108,11 @@
 #if defined(FUNCTION_SECTIONS)
         TEXT_SECTION(CAMLSEP(hot,code_begin))
         .globl  G(CAMLSEP(hot,code_begin))
-        .globl  G(caml_hot.code_begin)
 G(CAMLSEP(hot,code_begin)):
-G(caml_hot.code_begin):
 
         TEXT_SECTION(CAMLSEP(hot,code_end))
         .globl  G(CAMLSEP(hot,code_end))
-        .globl  G(caml_hot.code_end)
 G(CAMLSEP(hot,code_end)):
-G(caml_(hot.code_end):
 #endif
 
 #if defined(SYS_macosx)

@@ -477,10 +477,7 @@ G(CAMLSEP(hot,code_begin)):
 
         TEXT_SECTION(CAMLSEP(hot,code_end))
         .globl  G(CAMLSEP(hot,code_end))
-        .globl  G(CAMLSEP(hot,code_end))
-        .globl  G(caml_hot__code_end)
 G(CAMLSEP(hot,code_end)):
-G(caml_hot__code_end):
 #endif
 
 /******************************************************************************/
