@@ -51,6 +51,11 @@ type addressing_mode =
   | Iindexed of Arm64_ast.Ast.DSL.Validated_mem_offset.t  (* reg + displ *)
   | Ibased of Asm_targets.Asm_symbol.t * int              (* symbol + displ *)
 
+let asm_to_cmm_global (v : Asm_targets.Asm_symbol.visibility) : Cmm.is_global =
+  match v with
+  | Asm_targets.Asm_symbol.Global -> Global
+  | Asm_targets.Asm_symbol.Local -> Local
+
 (* We do not support the reg + shifted reg addressing mode, because
    what we really need is reg + shifted reg + displ,
    and this is decomposed in two instructions (reg + shifted reg -> tmp,

@@ -567,6 +567,7 @@
   cfg_selectgen
   cfg_selectgen_target_intf
   cfg_selection
+  cfg_equiv_target
   cfg_invariants
   cmm_helpers
   cmm_builtins
@@ -649,6 +650,8 @@
   cfg_simplify
   cfg_prologue
   cfg_merge_blocks
+  cfg_equiv_subst
+  cfg_equiv
   extra_debug
   label
   linear_utils
