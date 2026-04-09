@@ -933,8 +933,6 @@ and slambda =
   | SLhalves of slambda_halves
   | SLproj_comptime of slambda
     (** Project out the compiletime half of a [slambda_halves] *)
-  | SLproj_runtime of slambda
-    (** Project out the runtime half of a [slambda_halves] *)
   | SLtemplate of slambda_function
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let

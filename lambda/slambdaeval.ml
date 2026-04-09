@@ -45,8 +45,6 @@ module Or_missing = struct
   module Syntax = struct
     let[@inline] ( let* ) t f = bind t ~f
 
-    let[@inline] ( let+ ) t f = map t ~f
-
     let[@inline] ( |>> ) t f = map t ~f
   end
 end
@@ -62,7 +60,6 @@ module rec Types : sig
 
   type value =
     | SLVhalves of slambda_halves
-    | SLVlambda of lambda
     | SLVlayout of layout
     | SLVrecord of value Or_missing.t array
     | SLVclosure of closure
@@ -102,14 +99,12 @@ let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
 type _ value_type =
   | Thalves : slambda_halves value_type
-  | Tlambda : lambda value_type
   | Tlayout : layout value_type
   | Trecord : value Or_missing.t array value_type
   | Tclosure : closure value_type
 
 let describe_value_type (type a) : a value_type -> string = function
   | Thalves -> "program"
-  | Tlambda -> "dynamic code"
   | Tlayout -> "layout value"
   | Trecord -> "record"
   | Tclosure -> "template"
@@ -118,7 +113,6 @@ type value_type_packed = TP : _ value_type -> value_type_packed
 
 let typeof = function
   | SLVhalves _ -> TP Thalves
-  | SLVlambda _ -> TP Tlambda
   | SLVlayout _ -> TP Tlayout
   | SLVrecord _ -> TP Trecord
   | SLVclosure _ -> TP Tclosure
@@ -137,7 +131,6 @@ let expect_err ?reason ~expected ~actual =
 let expect (type a) ?reason (vty : a value_type) (v : value) : a =
   match vty, v with
   | Thalves, SLVhalves halves -> halves
-  | Tlambda, SLVlambda lambda -> lambda
   | Tlayout, SLVlayout layout -> layout
   | Trecord, SLVrecord record -> record
   | Tclosure, SLVclosure closure -> closure
@@ -170,9 +163,6 @@ let rec eval_slam env slam : value Or_missing.t =
   | SLproj_comptime slam ->
     let* halves = eval_slam env slam |>> expect Thalves in
     eval_slam env halves.sval_comptime
-  | SLproj_runtime slam ->
-    let+ halves = eval_slam env slam |>> expect Thalves in
-    SLVlambda halves.sval_runtime
   | SLtemplate { sfun_params; sfun_body } ->
     Present
       (SLVclosure
@@ -312,7 +302,8 @@ and eval_lam env lam =
     Lregion (lam, layout)
   | Lexclave lam -> Lexclave (eval_lam env lam)
   | Lsplice (_loc, slam) ->
-    eval_slam env slam |> expect_not_missing |> expect Tlambda
+    let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
+    halves.sval_runtime
   | Lvar _id | Lmutvar _id -> lam
 
 and eval_structured_const env const =

@@ -976,7 +976,6 @@ and slambda =
   | SLfield of slambda * int
   | SLhalves of slambda_halves
   | SLproj_comptime of slambda
-  | SLproj_runtime of slambda
   | SLtemplate of slambda_function
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
