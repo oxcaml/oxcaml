@@ -382,7 +382,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               (make_cfg_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
                  Debuginfo.none);
           Array.iteri
-            (fun i arg -> emit_moves body ~src:[| arg |] ~dst:locs.(i))
+            (fun i arg ->
+              (* On some architectures, a single SSA argument may map to
+                 multiple physical registers. Move the single virtual reg to the
+                 first location reg; the rest are handled by the calling
+                 convention. *)
+              if Array.length locs.(i) = 1
+              then emit_moves body ~src:[| arg |] ~dst:locs.(i)
+              else
+                DLL.add_end body
+                  (make_cfg_instr (Cfg.Op Move) [| arg |]
+                     [| locs.(i).(0) |]
+                     Debuginfo.none))
             virt_args;
           Ssa.Block.Tbl.replace renv.call_result_locs continuation loc_res;
           Ssa.Block.Tbl.replace renv.call_stack_ofs continuation stack_ofs;
@@ -444,7 +455,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     List.iter
       (fun (blk : Ssa.block) ->
         Ssa.Block.Tbl.replace block_labels blk (Cmm.new_label ()))
-      ssa.blocks;
+      ssa.blocks_create_order;
     let label_of blk = Ssa.Block.Tbl.find block_labels blk in
     let renv = create_reg_env () in
     List.iter

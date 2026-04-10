@@ -42,18 +42,18 @@ push:
   salq  $8, %rax
   shrq  $17, %rax
   cmpq  %rax, %r12
-  jb    .L109
-  movq  camlTOP3__block33@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
-.L109:
+  jae   .L111
   leaq  -4(%rbx,%r12,4), %rdi
   call  caml_modify@PLT
   leaq  2(%r12), %rax
   addq  $8, %rsp
   ret
+.L111:
+  movq  camlTOP3__block33@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
 |}]
 
 
@@ -130,8 +130,8 @@ poly_unsafe_get:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L119
-.L121:
+  jb    .L107
+.L109:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd -4(%rdi,%rbx,4), %xmm0
@@ -430,15 +430,15 @@ int_safe_get:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jb    .L107
+  jae   .L108
+  movq  -4(%rax,%rbx,4), %rax
+  ret
+.L108:
   movq  camlTOP38__block1142@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L107:
-  movq  -4(%rax,%rbx,4), %rax
-  ret
 |}]
 
 let ref_safe_set (a : string array) (i : int) (v : string) =
@@ -451,18 +451,18 @@ ref_safe_set:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jb    .L108
-  movq  camlTOP39__block1184@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
-.L108:
+  jae   .L110
   leaq  -4(%rax,%rbx,4), %rdi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
+.L110:
+  movq  camlTOP39__block1184@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
 |}]
 
 (* CR ttebbi: The header is loaded twice: once for the bounds check and once
@@ -478,31 +478,31 @@ poly_safe_get:
   salq  $8, %rax
   shrq  $17, %rax
   cmpq  %rax, %rbx
-  jb    .L110
-  subq  $8, %rsp
-  movq  camlTOP40__block1227@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
-.L110:
+  jae   .L113
   movzbq -8(%rdi), %rax
   cmpq  $254, %rax
-  jne   .L113
+  jne   .L111
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L140
-.L142:
+  jb    .L114
+.L116:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd -4(%rdi,%rbx,4), %xmm0
   vmovsd %xmm0, (%rax)
   addq  $8, %rsp
   ret
-.L113:
+.L111:
   movq  -4(%rdi,%rbx,4), %rax
   ret
+.L113:
+  subq  $8, %rsp
+  movq  camlTOP40__block1227@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
 |}]
 
 let poly_safe_set (a : 'a array) (i : int) (v : 'a) =
@@ -514,28 +514,28 @@ poly_safe_set:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jb    .L111
-  subq  $8, %rsp
-  movq  camlTOP41__block1282@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
-.L111:
+  jae   .L115
   movzbq -8(%rax), %rdi
   cmpq  $254, %rdi
-  jne   .L114
+  jne   .L112
   vmovsd (%rsi), %xmm0
   vmovsd %xmm0, -4(%rax,%rbx,4)
   movl  $1, %eax
   ret
-.L114:
+.L112:
   subq  $8, %rsp
   leaq  -4(%rax,%rbx,4), %rdi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
+.L115:
+  subq  $8, %rsp
+  movq  camlTOP41__block1282@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
 |}]
 
 (* CR ttebbi: shrq $18 followed by salq $1 could be shrq $17. *)
@@ -548,15 +548,15 @@ int64_safe_get:
   shrq  $18, %rdi
   salq  $1, %rdi
   cmpq  %rdi, %rbx
-  jb    .L108
+  jae   .L109
+  movq  -4(%rax,%rbx,4), %rax
+  ret
+.L109:
   movq  camlTOP42__block1339@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L108:
-  movq  -4(%rax,%rbx,4), %rax
-  ret
 |}]
 
 let float_safe_get (a : float# array) (i : int) =
@@ -567,15 +567,15 @@ float_safe_get:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jb    .L107
+  jae   .L108
+  vmovsd -4(%rax,%rbx,4), %xmm0
+  ret
+.L108:
   movq  camlTOP43__block1380@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L107:
-  vmovsd -4(%rax,%rbx,4), %xmm0
-  ret
 |}]
 
 let float_safe_get_plain (a : float array) (i : int) =
@@ -586,15 +586,15 @@ float_safe_get_plain:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rbx
-  jb    .L107
+  jae   .L108
+  vmovsd -4(%rax,%rbx,4), %xmm0
+  ret
+.L108:
   movq  camlTOP44__block1421@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L107:
-  vmovsd -4(%rax,%rbx,4), %xmm0
-  ret
 |}]
 
 let int32_safe_get (a : int32# array) (i : int) =
@@ -610,13 +610,13 @@ int32_safe_get:
   subq  %rdi, %rsi
   salq  $1, %rsi
   cmpq  %rsi, %rbx
-  jb    .L112
+  jae   .L113
+  movslq -2(%rax,%rbx,2), %rax
+  ret
+.L113:
   movq  camlTOP45__block1466@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L112:
-  movslq -2(%rax,%rbx,2), %rax
-  ret
 |}]
