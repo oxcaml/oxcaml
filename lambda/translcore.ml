@@ -2050,7 +2050,10 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       let idlist =
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
-              Tpat_var { id; uid; _ } -> id, uid
+            | Tpat_var { id; uid; _ } -> id, uid
+            | Tpat_fun_layout { id; uid; lpoly }
+                when List.is_empty (Lpoly.get_exn lpoly) ->
+              id, uid
             | _ -> Misc.fatal_error "Translcore.transl_let")
         pat_expr_list in
       let transl_case

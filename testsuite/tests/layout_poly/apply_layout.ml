@@ -32,8 +32,7 @@ end @ static = struct
   let h = M.f
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, value])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -151,18 +150,10 @@ end = struct
   let poly_ g x = M.f 42 x
 end
 [%%expect{|
->> Fatal error: Failed to find value_desc for M/337 in (function {nlocal = 0}
-                                                         x/340[$layout!79]
-                                                         : int
-                                                         (region
-                                                           (applytail
-                                                             (instantiate[L]
-                                                               (field_imm 0
-                                                                 M/337)
-                                                               ? $layout!79)
-                                                             42 x/340)))
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor
+    (M : sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end)
+    -> sig val g : layout_ l. ('b : l). 'b -> unit end
 |}]
 
 (* don't work without eta-expansion *)
