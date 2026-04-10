@@ -6205,26 +6205,26 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
 *)
 let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
   let old_level = !current_level in
-  current_level := generic_level - 1;
-  (*
-     Generic variables are first duplicated with [instance].  So,
-     their levels are lowered to [generic_level - 1].  The subject is
-     then copied with [duplicate_type].  That way, its levels won't be
-     changed.
-  *)
-  let (subj_sorts, subj_inst) =
-    Jkind_types.Sort.instance_with ~level:!current_level subj_sort_vars
-      (fun () -> instance subj_sch)
-  in
-  let subj = duplicate_type subj_inst in
-  current_level := generic_level;
-  (* Duplicate generic variables *)
-  let (pat_sorts, patt) =
-    Jkind_types.Sort.instance_with ~level:!current_level pat_sort_vars
-      (fun () -> instance pat_sch)
-  in
   Misc.try_finally
     (fun () ->
+      current_level := generic_level - 1;
+      (*
+         Generic variables are first duplicated with [instance].  So,
+         their levels are lowered to [generic_level - 1].  The subject is
+         then copied with [duplicate_type].  That way, its levels won't be
+         changed.
+      *)
+      let (subj_sorts, subj_inst) =
+        Jkind_types.Sort.instance_with ~level:!current_level subj_sort_vars
+          (fun () -> instance subj_sch)
+      in
+      let subj = duplicate_type subj_inst in
+      current_level := generic_level;
+      (* Duplicate generic variables *)
+      let (pat_sorts, patt) =
+        Jkind_types.Sort.instance_with ~level:!current_level pat_sort_vars
+          (fun () -> instance pat_sch)
+      in
        try
          Misc.protect_refs [R (univar_pairs, [])] begin fun () ->
          let type_pairs = fresh_moregen_pairs () in
