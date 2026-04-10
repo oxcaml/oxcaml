@@ -16,7 +16,7 @@ Error: The layout of type "t" is value non_float
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 type 'a t : immutable_data = A of 'a
@@ -161,7 +161,7 @@ Error: This type "a" should be an instance of type "('a : immutable_data)"
        But the layout of a must be a sublayout of value non_float
          because of the definition of t at line 2, characters 0-28.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 type a = int ref

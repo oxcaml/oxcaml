@@ -95,7 +95,7 @@ Error: This alias is bound to type "'a -> int"
        But the layout of 'a -> int must be a sublayout of void
          because of the annotation on the type variable 'b.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (* Type_wildcard *)
@@ -111,5 +111,5 @@ Error: Bad layout annotation:
          But the layout of "'a -> int" must be a sublayout of void
            because of the annotation on the wildcard _ at line 1, characters 27-31.
          Note: The kinds mutable_data, immutable_data, and sync_data have
-         the layout value non_pointer64.
+         the layout value non_float.
 |}]

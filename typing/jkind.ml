@@ -3308,7 +3308,7 @@ module Violation = struct
         fprintf ppf
           "@;\
            @[Note: The kinds mutable_data, immutable_data, and sync_data have@ \
-           the layout value non_pointer64.@]"
+           the layout value non_float.@]"
 
   let report_fuel ppf violation =
     let report_fuel_for_type which =

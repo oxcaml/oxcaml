@@ -340,7 +340,7 @@ Error: Signature mismatch:
        But the layout of the first must be a value layout
          because of the definition of t at line 2, characters 2-8.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 module M : sig

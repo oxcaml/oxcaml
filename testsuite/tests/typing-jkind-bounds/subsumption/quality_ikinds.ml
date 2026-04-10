@@ -29,7 +29,7 @@ Error: Signature mismatch:
        But the layout of the first must be a sublayout of value non_float
          because of the definition of t at line 2, characters 2-36.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (* This appears sound to accept. But it isn't. See the following test. *)

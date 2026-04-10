@@ -43,7 +43,7 @@ Error: The layout of type "bad" is value non_float
          because of the annotation on the declaration of the type bad.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (* With-bounds for all-void variants *)

@@ -424,7 +424,7 @@ Error: The layout of type "M1.t" is value non_float
          because of the definition of t2 at line 1, characters 0-38.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 type t2 : value mod portable = M1.t
@@ -461,7 +461,7 @@ Error: The layout of type "t2" is value non_float
          because of the annotation on the declaration of the type t2.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 module type S2 = sig

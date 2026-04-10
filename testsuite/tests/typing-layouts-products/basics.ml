@@ -50,7 +50,7 @@ Error: Tuple element types must have layout value.
          because it's the type of a tuple element.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 type t_nope_inner = #{ s : string; b : bool }
@@ -67,7 +67,7 @@ Error: Tuple element types must have layout value.
          because it's the type of a tuple element.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (********************************************)
@@ -100,7 +100,7 @@ Error: The layout of type "#(string option * t1)" is
          because of the definition of t2_wrong at line 1, characters 0-63.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
@@ -116,7 +116,7 @@ Error: The layout of type "t2_wrong" is
          because of the annotation on the declaration of the type t2_wrong.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 type ('a : value & bits64) t3 = 'a
@@ -234,7 +234,7 @@ Error: This type "#(int * int64)" should be an instance of type
                                       t6_wrong.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 (* CR layouts v7.1: The above error should identify the component of the product
    that is problematic. *)
@@ -1458,7 +1458,7 @@ Error: Types in an external must have a representable layout.
        But the layout of #(string * 'a * float#) must be representable
          because it's the type of an argument in an external declaration.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 external foo2 : ('a : any). int -> #( string * 'a * float# ) = "foo" "bar"
@@ -1473,7 +1473,7 @@ Error: Types in an external must have a representable layout.
        But the layout of #(string * 'a * float#) must be representable
          because it's the type of the result of an external declaration.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (* Test 9b: @unpacked on product args *)
@@ -2461,7 +2461,7 @@ Error: The layout of type "t" is value non_pointer & value & value non_float
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (* modal axes have the same problem *)
@@ -2497,7 +2497,7 @@ Error: The layout of type "t" is value non_pointer & value & value non_float
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (* modal axes have the same problem *)
@@ -2517,5 +2517,5 @@ Error: The layout of type "t" is value non_pointer & value & value non_float
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]

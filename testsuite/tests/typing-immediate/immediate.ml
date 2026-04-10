@@ -149,7 +149,7 @@ Error: The layout of type "string" is value non_float
          because of the definition of t at line 2, characters 2-31.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}];;
 (* CR layouts v2.9: The "of the definition of t ..." part is not great and it
    should only refer to definitions that type check. Fixing it will involve
@@ -169,7 +169,7 @@ Error: The layout of type "t" is value non_float
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}];;
 
 (* Cannot directly declare a non-immediate type as immediate (record) *)
@@ -186,7 +186,7 @@ Error: The layout of type "t" is value non_float
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}];;
 
 (* Not guaranteed that t is immediate, so this is an invalid declaration *)
@@ -229,7 +229,7 @@ Error: Signature mismatch:
          because of the definition of t at line 1, characters 15-35.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}];;
 
 (* Same as above but with explicit signature *)
@@ -250,7 +250,7 @@ Error: Signature mismatch:
          because of the definition of t at line 1, characters 20-40.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}];;
 
 module FM_invalid = F (struct type t = string end);;
@@ -270,7 +270,7 @@ Error: Modules do not match: sig type t = string end is not included in
        because of the definition of t at line 1, characters 20-40.
      Note: The layout of immediate is value non_pointer.
      Note: The kinds mutable_data, immutable_data, and sync_data have
-     the layout value non_pointer64.
+     the layout value non_float.
 |}];;
 
 (* Can't use a non-immediate type even if mutually recursive *)
@@ -288,7 +288,7 @@ Error: The layout of type "s" is value non_float
          because of the definition of t at line 2, characters 2-26.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}];;
 
 

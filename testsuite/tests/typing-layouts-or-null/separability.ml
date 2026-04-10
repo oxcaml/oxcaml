@@ -894,7 +894,7 @@ Error: This expression has type "float" but an expression was expected of type
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (* Module inclusion tests with or_null and separability *)

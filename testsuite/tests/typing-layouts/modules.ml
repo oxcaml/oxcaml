@@ -160,7 +160,7 @@ Error: This expression has type "string" but an expression was expected of type
          because of the definition of t at line 2, characters 2-25.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (******************************************************************)
@@ -359,7 +359,7 @@ Error: This type "M4.s" should be an instance of type "('a : float64)"
        But the layout of M4.s must be a sublayout of float64
          because of the definition of t4_float64 at line 1, characters 0-30.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 module F4'(X : sig type t : immediate end) = struct
@@ -427,7 +427,7 @@ Error: This expression has type "string" but an expression was expected of type
          because of the definition of f at line 3, characters 2-20.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 module type S3_2 = sig
@@ -452,7 +452,7 @@ Error: In this "with" constraint, the new definition of "t"
          because of the definition of t at line 2, characters 2-20.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (*****************************************)
@@ -539,7 +539,7 @@ Error: In this "with" constraint, the new definition of "t"
          because of the definition of t at line 2, characters 2-20.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}];;
 
 module type S6_6' = sig

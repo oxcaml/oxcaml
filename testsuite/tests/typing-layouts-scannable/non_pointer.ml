@@ -201,7 +201,7 @@ Error: This type "string" should be an instance of type
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 type ('a : float64) accepts_float64
@@ -408,7 +408,7 @@ Error: This expression has type "a or_null"
          because of the definition of g at line 3, characters 10-51.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 module M : sig

@@ -241,7 +241,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because of the definition of imm_id at line 1, characters 0-33.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}];;
 
 let id_for_imms (x : 'a imm_id) = x
@@ -267,7 +267,7 @@ Error: This expression has type "string" but an expression was expected of type
          because of the definition of id_for_imms at line 1, characters 16-35.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (************************************)
@@ -286,7 +286,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because of the annotation on 'a in the declaration of the type t4.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}];;
 
 type s4 = string t4
@@ -303,7 +303,7 @@ Error: This type "string" should be an instance of type "('a : immediate)"
          because of the annotation on 'a in the declaration of the type t4.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 type s4 = int t4
@@ -339,7 +339,7 @@ Error:
          because of the annotation on 'a in the declaration of the type t4.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 type ('a : any) t4 = 'a
@@ -492,7 +492,7 @@ Error: This type "int * int" should be an instance of type "('a : immediate)"
          because of the definition of t7 at line 1, characters 0-37.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (**********************************************************)
@@ -755,7 +755,7 @@ Error: Signature mismatch:
          because of the definition of x at line 8, characters 10-26.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}];;
 
 (* This hits the second linktype in moregen (requires expansion to see it's a
@@ -799,7 +799,7 @@ Error: Signature mismatch:
          because of the definition of x at line 8, characters 10-26.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (**************************************************************)
@@ -1756,7 +1756,7 @@ Error:
          because of the definition of t35 at line 1, characters 0-30.
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (**************************************************)

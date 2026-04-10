@@ -53,7 +53,7 @@ Error: The layout of type "t" is value non_float
        But the layout of type "t" must be a sublayout of float64
          because of the annotation on the declaration of the type t.
        Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_pointer64.
+       the layout value non_float.
 |}]
 
 (* Annotations with with-bounds are allowed *)
