@@ -710,7 +710,38 @@ let ocaml_ignored_flags =
     "-no-manual-module-init";
     "-dfexpr-annot";
     "-dfexpr-annot-after";
-    "-linscan"
+    "-linscan";
+    "-clambda-checks";
+    "-dasm-comments";
+    "-dcfg";
+    "-dcfg-invariants";
+    "-dcmm-invariants";
+    "-ddebug-available-regs";
+    "-dfexpr";
+    "-dflambda-invariants";
+    "-dflow";
+    "-dfreshen";
+    "-dno-asm-comments";
+    "-drawfexpr";
+    "-dslot-offsets";
+    "-dump-inlining-paths";
+    "-enable-poll-insertion";
+    "-fno-asan";
+    "-fno-trap-notes";
+    "-ftrap-notes";
+    "-function-sections";
+    "-gdwarf-may-alter-codegen-experimental";
+    "-gno-dwarf-may-alter-codegen-experimental";
+    "-gno-startup";
+    "-gstartup";
+    "-gupstream-dwarf";
+    "-insn-sched";
+    "-internal-assembler";
+    "-long-frames";
+    "-no-insn-sched";
+    "-no-long-frames";
+    "-no-unbox-free-vars-of-closures";
+    "-verify-binary-emitter"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -811,7 +842,12 @@ let ocaml_ignored_parametrized_flags =
     "-reaper-debug-flags";
     "-dissector-partition-size";
     "-ddissector-inputs";
-    "-dfexpr-after"
+    "-dfexpr-after";
+    "-debug-long-frames-threshold";
+    "-flambda2-expert-max-function-simplify-run";
+    "-llvm-flags";
+    "-reaper-preserve-direct-calls";
+    "-save-ir-after"
   ]
 
 let ocaml_warnings_spec ~error =
