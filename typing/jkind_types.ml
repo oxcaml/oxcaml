@@ -71,7 +71,7 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
-      mutable level : int; (** See comments on [level_generic] *)
+      mutable level : int;  (** See comments on [level_generic] *)
       id : int
     }
 
