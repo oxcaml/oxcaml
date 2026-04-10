@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension runtime_metaprogramming -extension comprehensions";
+ flags = "-extension runtime_metaprogramming -extension comprehensions -extension layout_poly_alpha";
  expect;
 *)
 
@@ -13,6 +13,17 @@ end
 [%%expect {|
 module E : sig type existential = Exists : 'a -> existential end
 |}];;
+
+type pv = [`A | `B]
+[%%expect {|
+type pv = [ `A | `B ]
+|}];;
+
+class cls = object method meth () = 42 end;;
+[%%expect {|
+class cls : object method meth : unit -> int end
+|}];;
+
 #mark_toplevel_in_quotations;;
 
 (* Tests *)
@@ -807,6 +818,39 @@ Error: Module definition using "struct..end"
        as seen at line 1, characters 18-52.
 |}];;
 
+<[ let poly_ foo x = x in foo ]>;;
+[%%expect {|
+Line 1, characters 3-22:
+1 | <[ let poly_ foo x = x in foo ]>;;
+       ^^^^^^^^^^^^^^^^^^^
+Error: Layout polymorphism is not supported inside quoted expressions,
+       as seen at line 1, characters 3-22.
+|}];;
+
+<[
+  function (x: [pv | `A])
+  | #pv -> "something else"
+  | `A -> "A"
+]>;;
+[%%expect {|
+Line 3, characters 4-7:
+3 |   | #pv -> "something else"
+        ^^^
+Error: Adding type constraint patterns (here #pv)
+       is not supported inside quoted expressions,
+       as seen at line 3, characters 4-7.
+|}];;
+
+<[ let f (o : #cls) = o#meth () in f ]>;;
+[%%expect {|
+Line 1, characters 14-18:
+1 | <[ let f (o : #cls) = o#meth () in f ]>;;
+                  ^^^^
+Error: Using class type annotations
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 14-18.
+|}];;
+
 <[ Mod.mk 42 ]>;;
 [%%expect {|
 Line 1, characters 3-9:
@@ -1259,12 +1303,12 @@ Error: Annotating types with kinds
 (* Ptyp_of_kind: (type : value) *)
 <[ fun (x : (type : value)) -> x ]>;;
 [%%expect {|
-Line 1, characters 20-25:
+Line 1, characters 12-26:
 1 | <[ fun (x : (type : value)) -> x ]>;;
-                        ^^^^^
+                ^^^^^^^^^^^^^^
 Error: Annotating types with kinds
        is not supported inside quoted expressions,
-       as seen at line 1, characters 20-25.
+       as seen at line 1, characters 12-26.
 |}];;
 
 (* Pexp_newtype with jkind annotation: fun (type t : value) -> *)

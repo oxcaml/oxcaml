@@ -3503,6 +3503,8 @@ and type_pat_aux
         type_pat ~alloc_mode tps category sp_constrained expected_ty sort
       end
   | Ppat_type lid ->
+      Env.check_no_open_quotations sp.ppat_loc !!penv
+        (Env.Tconst_pat_qt lid.txt);
       let (path, p) = build_or_pat !!penv loc lid in
       pure category @@ solve_expected
         { p with pat_extra = (Tpat_type (path, lid), loc, sp.ppat_attributes)
@@ -10331,9 +10333,11 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     match spat_sexp_list with
     | [] -> false
     | first :: rest ->
-      if first.pvb_is_poly then
+      if first.pvb_is_poly then begin
         Language_extension.assert_enabled ~loc:first.pvb_loc
           Layout_poly Language_extension.Alpha;
+        Env.check_no_open_quotations first.pvb_loc env Layout_polymorphism_qt
+      end;
       List.iter (fun binding ->
         if binding.pvb_is_poly <> first.pvb_is_poly then
           raise (Error(binding.pvb_loc, env, Mixed_poly_nonpoly_bindings))

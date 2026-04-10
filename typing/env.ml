@@ -837,6 +837,9 @@ type no_open_quotations_context =
   | Object_field_with_attribute_qt
   | Variant_tag_with_attribute_qt
   | Jkind_annotation_qt
+  | Layout_polymorphism_qt
+  | Tconst_pat_qt of Longident.t
+  | Class_type_qt
 
 let print_structure_components_reason ppf = function
   | Project -> Format_doc.fprintf ppf "have any components"
@@ -5004,6 +5007,13 @@ let print_unsupported_quotation ppf =
       fprintf ppf "Adding attributes on tags in polymorphic variant types"
   | Jkind_annotation_qt ->
       fprintf ppf "Annotating types with kinds"
+  | Layout_polymorphism_qt ->
+      fprintf ppf "Layout polymorphism"
+  | Tconst_pat_qt tconst ->
+      fprintf ppf "Adding type constraint patterns (here #%s)"
+        (Format.asprintf "%a" Pprintast.longident tconst)
+  | Class_type_qt ->
+      fprintf ppf "Using class type annotations"
 
 let print_unbound_in_quotation ppf =
   function
