@@ -116,7 +116,7 @@ let maybe_pointer_type env ty =
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
 let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
-  | Any _ -> false
+  | Any _ | Univar _ | Genvar _ -> false
   | Base _ -> true
   | Product sorts ->
     List.for_all layout_is_representable sorts
