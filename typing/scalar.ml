@@ -464,8 +464,11 @@ module Operation = struct
               ListLabels.concat_map all ~f:(fun dst ->
                   let src_signedness : Signedness.t list =
                     match (src : (_ Width.t, _ Width.t) Maybe_naked.t) with
-                    | Value (Integral _) | Naked (Integral _) -> Signedness.all
-                    | Value (Floating _) | Naked (Floating _) -> [Signed]
+                    | Naked (Integral _) -> Signedness.all
+                    | Value (Integral _)
+                    | Value (Floating _)
+                    | Naked (Floating _) ->
+                      [Signed]
                   in
                   ListLabels.concat_map src_signedness ~f:(fun signedness ->
                       if src = dst

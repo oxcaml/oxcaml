@@ -5636,6 +5636,10 @@ module Scalar_type = struct
       |> static_cast ~src:outer ~dst:inner ~dbg
       |> f
       |> static_cast ~src:inner ~dst:outer ~dbg
+
+    let bit_width = function
+      | Tagged t -> Integer.bit_width t
+      | Untagged t -> Tagged_integer.bit_width t
   end
 
   type t =

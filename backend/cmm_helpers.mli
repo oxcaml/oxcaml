@@ -1678,6 +1678,8 @@ module Scalar_type : sig
         untagged, this becomes the identity function *)
     val untagged_or_identity : t -> Integer.t
 
+    val bit_width : t -> int
+
     include Integral_ops with type t := t
   end
 
