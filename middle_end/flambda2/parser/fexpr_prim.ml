@@ -68,7 +68,7 @@ let standard_int_or_float =
         "nativeint", Naked_nativeint ]
 
 let signedness =
-  D.constructor_value Scalar.Signedness.["signed", Signed; "unsigned", Unsigned]
+  D.constructor_flag Scalar.Signedness.["signed", Signed; "unsigned", Unsigned]
 
 let int_shift_op =
   D.(
