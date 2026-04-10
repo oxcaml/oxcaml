@@ -358,39 +358,36 @@ let find_sections_with_prefix sections prefix =
   |> List.filter (fun (section : Elf.section) ->
       String.starts_with ~prefix section.sh_name_str)
 
-let rewrite unix ~input_file ~output_file ~partition_kind ~igot_and_iplt
+let rewrite unix ~input_buf ~output_file ~partition_kind ~igot_and_iplt
     ~relocations =
-  let run input_buf =
-    let header, sections = Elf.read_elf input_buf in
-    let symtab_section =
-      match
-        Array.find_opt
-          (fun (s : Elf.section) ->
-            Elf.Section_type.(equal (of_u32 s.sh_type) sht_symtab))
-          sections
-      with
-      | Some s -> s
-      | None -> Misc.fatal_error "rewrite_sections: no symbol table found"
-    in
-    let strtab_section = sections.(symtab_section.sh_link) in
-    (* Find all .rela.text* sections (handles function sections) *)
-    let rela_text_section_list =
-      find_sections_with_prefix sections ".rela.text"
-    in
-    let shstrtab_section = sections.(header.e_shstrndx) in
-    let symtab_body = Elf.section_body input_buf symtab_section in
-    let strtab_body = Elf.section_body input_buf strtab_section in
-    (* Build list of (section, body) pairs *)
-    let rela_text_sections =
-      List.map
-        (fun section -> section, Elf.section_body input_buf section)
-        rela_text_section_list
-    in
-    let plan =
-      FRP.compute ~header ~sections ~symtab_body ~strtab_body
-        ~rela_text_sections ~partition_kind ~igot_and_iplt ~relocations
-    in
-    execute_plan unix ~input_buf ~output_file ~header ~sections
-      ~shstrtab_section ~igot_and_iplt ~plan
+  let header, sections = Elf.read_elf input_buf in
+  let symtab_section =
+    match
+      Array.find_opt
+        (fun (s : Elf.section) ->
+          Elf.Section_type.(equal (of_u32 s.sh_type) sht_symtab))
+        sections
+    with
+    | Some s -> s
+    | None -> Misc.fatal_error "rewrite_sections: no symbol table found"
   in
-  Buf.with_map_binary unix input_file run
+  let strtab_section = sections.(symtab_section.sh_link) in
+  (* Find all .rela.text* sections (handles function sections) *)
+  let rela_text_section_list =
+    find_sections_with_prefix sections ".rela.text"
+  in
+  let shstrtab_section = sections.(header.e_shstrndx) in
+  let symtab_body = Elf.section_body input_buf symtab_section in
+  let strtab_body = Elf.section_body input_buf strtab_section in
+  (* Build list of (section, body) pairs *)
+  let rela_text_sections =
+    List.map
+      (fun section -> section, Elf.section_body input_buf section)
+      rela_text_section_list
+  in
+  let plan =
+    FRP.compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
+      ~partition_kind ~igot_and_iplt ~relocations
+  in
+  execute_plan unix ~input_buf ~output_file ~header ~sections ~shstrtab_section
+    ~igot_and_iplt ~plan

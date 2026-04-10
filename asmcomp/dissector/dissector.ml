@@ -180,8 +180,9 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
         prefix;
       let input_file = Partition.Linked.linked_object linked in
       let output_file = input_file ^ ".rewritten" in
-      Rewrite_sections.rewrite unix ~input_file ~output_file
-        ~partition_kind:kind ~igot_and_iplt ~relocations;
+      Compiler_owee.Owee_buf.with_map_binary unix input_file (fun input_buf ->
+          Rewrite_sections.rewrite unix ~input_buf ~output_file
+            ~partition_kind:kind ~igot_and_iplt ~relocations);
       log "rewrote %s -> %s" input_file output_file)
     linked_partitions;
   let existing_script = extract_linker_script_from_ccopts !Clflags.all_ccopts in
