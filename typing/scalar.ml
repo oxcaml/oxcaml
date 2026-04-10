@@ -479,7 +479,8 @@ module Operation = struct
         { result = integral size; can_raise = false }
       | Floating (size, (Neg | Abs)) ->
         { result = floating size; can_raise = false }
-      | Static_cast { src = _; dst } -> { result = dst; can_raise = false }
+      | Static_cast { src = _; dst; signedness = _ } ->
+        { result = dst; can_raise = false }
 
     let to_string t =
       let i = Integral.to_string in
@@ -489,8 +490,9 @@ module Operation = struct
         Printf.sprintf "%s_%s" (i size) (Int_op.to_string op)
       | Floating (size, op) ->
         Printf.sprintf "%s_%s" (f size) (Float_op.to_string op)
-      | Static_cast { src; dst } ->
-        Printf.sprintf "%s_of_%s" (to_string dst) (to_string src)
+      | Static_cast { src; dst; signedness } ->
+        Format.asprintf "%s_of_%s%a" (to_string dst) (to_string src)
+          Signedness.print_as_suffix signedness
 
     let sort = function
       | Integral (width, _) ->
@@ -499,7 +501,7 @@ module Operation = struct
       | Floating (width, _) ->
         let sort = Floating.sort width in
         sort, sort
-      | Static_cast { src; dst } -> sort src, sort dst
+      | Static_cast { src; dst; signedness = _ } -> sort src, sort dst
   end
 
   module Binary = struct
