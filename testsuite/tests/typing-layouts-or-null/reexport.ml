@@ -18,7 +18,7 @@ Error: This variant or record definition does not match that of type
          "'a or_null"
        Their internal representations differ:
        the original definition has a constructor represented as a null pointer.
-       Hint: add [@@or_null_reexport].
+       Hint: add [@@or_null] or [@@or_null_reexport].
 |}]
 
 module Or_null = struct
@@ -26,6 +26,21 @@ module Or_null = struct
 end
 [%%expect{|
 module Or_null : sig type 'a t = 'a or_null end
+|}]
+
+module Or_null_via_attr = struct
+  type ('a : value) t : value_or_null = 'a or_null =
+    | Null
+    | This of 'a
+  [@@or_null]
+end
+let n = Or_null_via_attr.Null
+let t v = Or_null_via_attr.This v
+[%%expect{|
+module Or_null_via_attr :
+  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null] end
+val n : 'a Or_null_via_attr.t = Or_null_via_attr.Null
+val t : 'a -> 'a Or_null_via_attr.t = <fun>
 |}]
 
 (* Omitting the type representation leaves constructors unexported. *)
@@ -187,6 +202,16 @@ Line 1, characters 0-30:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Invalid reexport declaration.
        Type t must be defined equal to the primitive type or_null.
+|}]
+
+type 'a both_attrs = 'a or_null [@@or_null] [@@or_null_reexport]
+
+[%%expect{|
+Line 1, characters 0-64:
+1 | type 'a both_attrs = 'a or_null [@@or_null] [@@or_null_reexport]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Invalid [@or_null] declaration:
+       it cannot be both [@@or_null] and [@@or_null_reexport].
 |}]
 
 (* CR layouts v3: This would be nice to accept, but it's somewhat complicated

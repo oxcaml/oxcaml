@@ -184,6 +184,17 @@ module M :
 val x : unit -> #('a M.t * string M.t) = <fun>
 |}]
 
+module Or_null_names = struct
+  type 'a t = Nope | Yep of 'a [@@or_null]
+end
+let y () = #( Or_null_names.Nope, Or_null_names.Yep "hi" )
+
+[%%expect{|
+module Or_null_names : sig type 'a t = Nope | Yep of 'a [@@or_null] end @@
+  stateless
+val y : unit -> #('a Or_null_names.t * string Or_null_names.t) = <fun>
+|}]
+
 external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
 
 [%%expect{|

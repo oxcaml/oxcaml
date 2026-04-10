@@ -487,10 +487,13 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                           constr_list
                       with
                       | Datarepr.Constr_not_found | Not_found ->
-                        (* If a [Variant_with_null] is not a [Null],
-                            it's guaranteed to be [This value]. *)
                         match rep with
-                        | Variant_with_null -> List.nth constr_list 1
+                        | Variant_with_null ->
+                          (match
+                             Datarepr.find_variant_with_null_payload constr_list
+                           with
+                           | Some { payload_cstr; _ } -> payload_cstr
+                           | None -> raise Datarepr.Constr_not_found)
                         | _ -> raise Datarepr.Constr_not_found
                     in
                     let type_params =

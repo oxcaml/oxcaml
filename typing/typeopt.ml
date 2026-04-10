@@ -828,13 +828,13 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
   match rep with
   | Variant_extensible -> assert false
   | Variant_with_null -> begin
-    match cstrs with
-    | [_; {cd_args=Cstr_tuple [{ca_type=ty}]}] ->
+    match Datarepr.find_variant_with_null_payload cstrs with
+    | Some { payload_arg = { Types.ca_type = ty; _ }; _ } ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       num_nodes_visited + 1, { kind with nullable = Nullable }
-    | _ -> assert false
+    | None -> assert false
     end
   | Variant_unboxed -> begin
       (* CR layouts v1.5: This should only be reachable in the case of a missing

@@ -137,6 +137,7 @@ type error =
   | Local_not_enabled
   | Unexpected_layout_any_in_primitive of string
   | Useless_layout_poly
+  | Bad_or_null_attribute of string
   | Zero_alloc_attr_unsupported of Builtin_attributes.zero_alloc_attribute
   | Zero_alloc_attr_non_function
   | Zero_alloc_attr_bad_user_arity
@@ -167,6 +168,72 @@ let get_unboxed_from_attributes sdecl =
   | true, false -> Some false
   | false, true -> Some true
   | false, false -> None
+
+let get_or_null_attributes sdecl =
+  let or_null = Builtin_attributes.has_or_null sdecl.ptype_attributes in
+  let or_null_reexport =
+    Builtin_attributes.has_or_null_reexport sdecl.ptype_attributes
+  in
+  if or_null && or_null_reexport then
+    raise (Error (sdecl.ptype_loc,
+      Bad_or_null_attribute
+        "it cannot be both [@@or_null] and [@@or_null_reexport]"));
+  or_null, or_null_reexport
+
+let check_or_null_decl bad sdecl =
+  begin match get_unboxed_from_attributes sdecl with
+  | None -> ()
+  | Some _ ->
+    bad "it must not also use [@@boxed] or [@@unboxed]"
+  end;
+  match sdecl.ptype_private with
+  | Private ->
+    bad "private types are not supported with [@@or_null]"
+  | Public ->
+    ()
+
+let get_or_null_type_param_name bad sdecl params =
+  match sdecl.ptype_params, params with
+  | [({ ptyp_desc = Ptyp_var (name, _); _ }, _)], [_] -> name
+  | [_], [_] ->
+    bad "its single type parameter must be written as a type variable"
+  | _ ->
+    bad "it must have exactly one type parameter"
+
+let check_or_null_constructors bad type_param_name = function
+  | [c1; c2] ->
+    let check_no_gadt ({ pcd_res; _ } : Parsetree.constructor_declaration) =
+      match pcd_res with
+      | None -> ()
+      | Some _ ->
+        bad "GADT constructors are not supported with [@@or_null]"
+    in
+    check_no_gadt c1;
+    check_no_gadt c2;
+    begin match c1.pcd_args, c2.pcd_args with
+    | Pcstr_tuple [],
+      Pcstr_tuple
+        [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }]
+    | Pcstr_tuple
+        [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }],
+      Pcstr_tuple [] ->
+      if not (String.equal name type_param_name) then
+        bad "its payload constructor must carry the sole type parameter"
+    | _ ->
+      bad
+        "it must have exactly one nullary constructor and one unary \
+         constructor carrying the sole type parameter"
+    end
+  | _ ->
+    bad "it must have exactly two constructors"
+
+let check_or_null_variant_shape _path params sdecl scstrs =
+  let bad msg =
+    raise (Error (sdecl.ptype_loc, Bad_or_null_attribute msg))
+  in
+  check_or_null_decl bad sdecl;
+  let type_param_name = get_or_null_type_param_name bad sdecl params in
+  check_or_null_constructors bad type_param_name scstrs
 
 (* [make_params] creates sort variables - these can be defaulted away (as in
    transl_type_decl) or unified with existing sort-variable-free types (as in
@@ -843,6 +910,7 @@ let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
   Ctype.with_local_level begin fun () ->
   TyVarEnv.reset();
+  let or_null, or_null_reexport = get_or_null_attributes sdecl in
   let path = Path.Pident id in
   let tparams = make_params env path sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
@@ -906,8 +974,7 @@ let transl_declaration env sdecl (id, uid) =
 
          Remove when we allow users to define their own null constructors.
       *)
-      | Ptype_abstract when
-        Builtin_attributes.has_or_null_reexport sdecl.ptype_attributes ->
+      | Ptype_abstract when or_null_reexport ->
           let param =
             (* We require users to define ['a t = 'a or_null]. Manifest
                must be set to [or_null] so typechecking stays correct. *)
@@ -922,13 +989,29 @@ let transl_declaration env sdecl (id, uid) =
           let jkind = Predef.or_null_jkind param in
           Ttype_abstract, type_kind, jkind
       | (Ptype_variant _ | Ptype_record _ | Ptype_record_unboxed_product _
-        | Ptype_open)
-        when Builtin_attributes.has_or_null_reexport sdecl.ptype_attributes ->
+        | Ptype_open) when or_null_reexport ->
         raise (Error (sdecl.ptype_loc, Non_abstract_reexport path))
       | Ptype_abstract ->
         Ttype_abstract, Type_abstract Definition,
         Jkind.Builtin.value ~why:Default_type_jkind
       | Ptype_variant scstrs ->
+        if or_null then begin
+          check_or_null_variant_shape path params sdecl scstrs;
+          match sdecl.ptype_params, params with
+          | [({ ptyp_desc = Ptyp_var (_, _);
+                ptyp_loc;
+                _
+              }, _)],
+            [param] ->
+            let required = Btype.Jkind0.for_or_null_argument id in
+            begin match Ctype.constrain_type_jkind env param required with
+            | Ok () -> ()
+            | Error err ->
+              raise
+                (Error (ptyp_loc, Jkind_mismatch_of_type (env, param, err)))
+            end
+          | _ -> assert false
+        end;
         if List.exists (fun cstr -> cstr.pcd_res <> None) scstrs then begin
           match cstrs with
             [] -> ()
@@ -980,7 +1063,13 @@ let transl_declaration env sdecl (id, uid) =
         in
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         let rep, jkind =
-          if unbox then
+          if or_null then
+            match params with
+            | [param] ->
+              Variant_with_null,
+              Btype.Jkind0.for_variant_with_null_result path param
+            | _ -> assert false
+          else if unbox then
             Variant_unboxed,
             Jkind.of_new_sort ~why:Old_style_unboxed_type
               ~level:(Ctype.get_current_level ())
@@ -2113,10 +2202,41 @@ let rec update_decl_jkind env dpath decl =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
-      (* CR layouts v3.5: this case only happens with [or_null_reexport].
-         Change when we allow users to write their own null constructors. *)
-      (* CR layouts v3.3: use the kind of the argument + [maybe_null]. *)
-      cstrs, rep, Jkind.Builtin.value_or_null ~why:(Primitive Predef.ident_or_null)
+      begin match Datarepr.find_variant_with_null_payload cstrs with
+      | Some
+          { payload_cstr = { Types.cd_uid; _ };
+            payload_arg = { ca_type = ty; ca_modalities = modality; _ } } ->
+        let jkind = Ctype.type_jkind env ty in
+        let sort = Jkind.sort_of_jkind env jkind in
+        let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+        let cstrs =
+          List.map
+            (fun (cstr : Types.constructor_declaration) ->
+               if Uid.equal cstr.cd_uid cd_uid then
+                 match cstr.cd_args with
+                 | Cstr_tuple [{ ca_type; ca_modalities; ca_loc; _ }] ->
+                   { cstr with
+                     cd_args =
+                       Cstr_tuple
+                         [{ ca_type; ca_sort; ca_modalities; ca_loc }] }
+                 | Cstr_tuple [] | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
+                   Misc.fatal_error "Invalid constructor for Variant_with_null"
+               else cstr)
+            cstrs
+        in
+        begin match
+          Jkind.apply_modality_l modality jkind
+          |> Jkind.apply_or_null_l
+        with
+        | Ok type_jkind -> cstrs, rep, type_jkind
+        | Error () ->
+          Misc.fatal_error
+            "Typedecl.update_variant_kind: Variant_with_null payload is \
+             already maybe-null"
+        end
+      | None ->
+        Misc.fatal_error "Invalid constructor for Variant_with_null"
+      end
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin
         match cd_args with
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
@@ -5205,6 +5325,8 @@ let report_error_doc ppf = function
            effect. Consider removing it or adding a type@ \
            variable for it to operate on.@]"
         Style.inline_code "[@layout_poly]"
+  | Bad_or_null_attribute msg ->
+      fprintf ppf "@[Invalid [@@or_null] declaration:@ %s.@]" msg
   | Zero_alloc_attr_unsupported ca ->
       let variety = match ca with
         | Default_zero_alloc  | Check _ -> assert false
