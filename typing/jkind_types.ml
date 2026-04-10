@@ -71,13 +71,7 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
-      mutable level : int;
-      (* When [contents = None], [level = Ident.highest_scope] indicates
-        generic sort variables, and [level = Ident.highest_scope - 1] indicates
-        rigid variables. When [contents = Some t], [level] is meaningless and
-        the variable means whatever [t] means. *)
-      (* CR-soon zqian: Add the invariant that, when [contents = Some v], we
-         have [level >= v.level]. This can improve performance. *)
+      mutable level : int; (** See comments on [level_generic] *)
       id : int
     }
 
@@ -89,7 +83,7 @@ module Sort = struct
     assert (Option.is_none var.contents);
     var.level = level_generic
 
-  let create_var ~level ~id contents = { contents; level; id }
+  let create_var_with_id ~level ~id contents = { contents; level; id }
 
   let equal_base b1 b2 =
     match b1, b2 with

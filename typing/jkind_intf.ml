@@ -257,7 +257,7 @@ module type Sort = sig
       used to determined sort variable equality, [new_genvar] is the preferred
       option in almost all cases. Currently, [create_var] is only used in the
       context of saving signatures, where [id] is a negative number. *)
-  val create_var : level:int -> id:int -> t option -> var
+  val create_var_with_id : level:int -> id:int -> t option -> var
 
   (** [instance_with ~level vars f] creates a fresh sort var at [level] for each
       var in [vars], calls [f] with {!instance} configured to replace each var
