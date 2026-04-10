@@ -168,42 +168,43 @@ let find_symtab_section sections =
 (* Internal version that adds to an accumulator *)
 let extract_into_accumulator (unix : (module Compiler_owee.Unix_intf.S))
     ~filename acc =
-  let module Unix = (val unix) in
   log_verbose "extracting relocations from %s" filename;
-  let buf = Compiler_owee.Owee_buf.map_binary (module Unix) filename in
-  let _header, sections = Elf.read_elf buf in
-  (* Find all .rela.text* sections (handles function sections: .rela.text,
-     .rela.text.foo, .rela.text.bar, etc.) *)
-  let rela_text_sections = find_sections_with_prefix sections ".rela.text" in
-  match rela_text_sections with
-  | [] ->
-    log_verbose "  no .rela.text* sections found";
-    acc
-  | _ -> (
-    log_verbose "  found %d .rela.text* sections"
-      (List.length rela_text_sections);
-    (* Find symbol table *)
-    match find_symtab_section sections with
-    | None -> acc
-    | Some symtab_section ->
-      (* Find string table (sh_link of symtab points to it) *)
-      let strtab_index = symtab_section.sh_link in
-      if strtab_index >= Array.length sections
-      then acc
-      else
-        let strtab_section = sections.(strtab_index) in
-        let symtab_body = Elf.section_body buf symtab_section in
-        let strtab_body = Elf.section_body buf strtab_section in
-        (* Process all .rela.text* sections and accumulate results *)
-        List.fold_left
-          (fun acc (rela_section : Elf.section) ->
-            log_verbose "  processing section %s" rela_section.sh_name_str;
-            let rela_body = Elf.section_body buf rela_section in
-            let result =
-              parse_rela_section ~rela_body ~symtab_body ~strtab_body
-            in
-            accumulate acc result)
-          acc rela_text_sections)
+  Compiler_owee.Owee_buf.with_map_binary unix filename (fun buf ->
+      let _header, sections = Elf.read_elf buf in
+      (* Find all .rela.text* sections (handles function sections: .rela.text,
+         .rela.text.foo, .rela.text.bar, etc.) *)
+      let rela_text_sections =
+        find_sections_with_prefix sections ".rela.text"
+      in
+      match rela_text_sections with
+      | [] ->
+        log_verbose "  no .rela.text* sections found";
+        acc
+      | _ -> (
+        log_verbose "  found %d .rela.text* sections"
+          (List.length rela_text_sections);
+        (* Find symbol table *)
+        match find_symtab_section sections with
+        | None -> acc
+        | Some symtab_section ->
+          (* Find string table (sh_link of symtab points to it) *)
+          let strtab_index = symtab_section.sh_link in
+          if strtab_index >= Array.length sections
+          then acc
+          else
+            let strtab_section = sections.(strtab_index) in
+            let symtab_body = Elf.section_body buf symtab_section in
+            let strtab_body = Elf.section_body buf strtab_section in
+            (* Process all .rela.text* sections and accumulate results *)
+            List.fold_left
+              (fun acc (rela_section : Elf.section) ->
+                log_verbose "  processing section %s" rela_section.sh_name_str;
+                let rela_body = Elf.section_body buf rela_section in
+                let result =
+                  parse_rela_section ~rela_body ~symtab_body ~strtab_body
+                in
+                accumulate acc result)
+              acc rela_text_sections))
 
 let extract unix ~filename =
   finalize (extract_into_accumulator unix ~filename empty_accumulator)
