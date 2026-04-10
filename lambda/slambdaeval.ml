@@ -191,11 +191,13 @@ and eval_lam env lam = Lambda.map (eval_lam_shallow env) lam
 
 and eval_lam_shallow env lam =
   match lam with
-  | Lconst const -> Lconst (eval_structured_const env const)
+  | Lconst old_const ->
+    let new_const = eval_structured_const env old_const in
+    if new_const == old_const then lam else Lconst new_const
   | Lapply
       { ap_func;
         ap_args;
-        ap_result_layout;
+        ap_result_layout = old_result_layout;
         ap_region_close;
         ap_mode;
         ap_loc;
@@ -204,60 +206,88 @@ and eval_lam_shallow env lam =
         ap_specialised;
         ap_probe
       } ->
-    let ap_result_layout = eval_layout env ap_result_layout in
-    Lapply
-      { ap_func;
-        ap_args;
-        ap_result_layout;
-        ap_region_close;
-        ap_mode;
-        ap_loc;
-        ap_tailcall;
-        ap_inlined;
-        ap_specialised;
-        ap_probe
-      }
-  | Lfunction lfunction -> Lfunction (eval_lfunction_shallow env lfunction)
-  | Llet (kind, layout, id, uid, rhs, body) ->
-    let layout = eval_layout env layout in
-    Llet (kind, layout, id, uid, rhs, body)
-  | Lmutlet (layout, id, uid, rhs, body) ->
-    let layout = eval_layout env layout in
-    Lmutlet (layout, id, uid, rhs, body)
-  | Lletrec (bindings, body) ->
-    let eval_binding { id; debug_uid; def } =
-      let def = eval_lfunction_shallow env def in
-      { id; debug_uid; def }
+    let new_result_layout = eval_layout env old_result_layout in
+    if new_result_layout == old_result_layout
+    then lam
+    else
+      Lapply
+        { ap_func;
+          ap_args;
+          ap_result_layout = new_result_layout;
+          ap_region_close;
+          ap_mode;
+          ap_loc;
+          ap_tailcall;
+          ap_inlined;
+          ap_specialised;
+          ap_probe
+        }
+  | Lfunction old_lfunction ->
+    let new_lfunction = eval_lfunction_shallow env old_lfunction in
+    if new_lfunction == old_lfunction then lam else Lfunction new_lfunction
+  | Llet (kind, old_layout, id, uid, rhs, body) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then lam
+    else Llet (kind, new_layout, id, uid, rhs, body)
+  | Lmutlet (old_layout, id, uid, rhs, body) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then lam
+    else Lmutlet (new_layout, id, uid, rhs, body)
+  | Lletrec (old_bindings, body) ->
+    let eval_binding ({ id; debug_uid; def = old_def } as binding) =
+      let new_def = eval_lfunction_shallow env old_def in
+      if new_def == old_def then binding else { id; debug_uid; def = new_def }
     in
-    let bindings = List.map eval_binding bindings in
-    Lletrec (bindings, body)
-  | Lprim (prim, args, loc) ->
-    let prim = eval_prim env prim in
-    Lprim (prim, args, loc)
-  | Lswitch (lam, switch, loc, layout) ->
-    let layout = eval_layout env layout in
-    Lswitch (lam, switch, loc, layout)
-  | Lstringswitch (lam, branches, failaction, loc, layout) ->
-    let layout = eval_layout env layout in
-    Lstringswitch (lam, branches, failaction, loc, layout)
-  | Lstaticcatch (body, (label, params), handler_body, pop_region, layout) ->
-    let params =
-      List.map (fun (id, uid, layout) -> id, uid, eval_layout env layout) params
+    let new_bindings = Misc.Stdlib.List.map_sharing eval_binding old_bindings in
+    if new_bindings == old_bindings then lam else Lletrec (new_bindings, body)
+  | Lprim (old_prim, args, loc) ->
+    let new_prim = eval_prim env old_prim in
+    if new_prim == old_prim then lam else Lprim (new_prim, args, loc)
+  | Lswitch (scrutinee, switch, loc, old_layout) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then lam
+    else Lswitch (scrutinee, switch, loc, new_layout)
+  | Lstringswitch (body, branches, failaction, loc, old_layout) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then lam
+    else Lstringswitch (body, branches, failaction, loc, new_layout)
+  | Lstaticcatch
+      (body, (label, old_params), handler_body, pop_region, old_layout) ->
+    let new_params =
+      Misc.Stdlib.List.map_sharing
+        (fun ((id, uid, old_layout) as param) ->
+          let new_layout = eval_layout env old_layout in
+          if new_layout == old_layout then param else id, uid, new_layout)
+        old_params
     in
-    let layout = eval_layout env layout in
-    Lstaticcatch (body, (label, params), handler_body, pop_region, layout)
-  | Ltrywith (body, id, debug_uid, handler_body, layout) ->
-    let layout = eval_layout env layout in
-    Ltrywith (body, id, debug_uid, handler_body, layout)
-  | Lifthenelse (lam, iftrue, iffalse, layout) ->
-    let layout = eval_layout env layout in
-    Lifthenelse (lam, iftrue, iffalse, layout)
-  | Lsend (kind, met, obj, args, region_close, mode, loc, layout) ->
-    let layout = eval_layout env layout in
-    Lsend (kind, met, obj, args, region_close, mode, loc, layout)
-  | Lregion (lam, layout) ->
-    let layout = eval_layout env layout in
-    Lregion (lam, layout)
+    let new_layout = eval_layout env old_layout in
+    if new_params == old_params && new_layout == old_layout
+    then lam
+    else
+      Lstaticcatch
+        (body, (label, new_params), handler_body, pop_region, new_layout)
+  | Ltrywith (body, id, debug_uid, handler_body, old_layout) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then lam
+    else Ltrywith (body, id, debug_uid, handler_body, new_layout)
+  | Lifthenelse (cond, iftrue, iffalse, old_layout) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then lam
+    else Lifthenelse (cond, iftrue, iffalse, new_layout)
+  | Lsend (kind, met, obj, args, region_close, mode, loc, old_layout) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then lam
+    else Lsend (kind, met, obj, args, region_close, mode, loc, new_layout)
+  | Lregion (body, old_layout) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then lam else Lregion (body, new_layout)
   | Lsplice (_loc, slam) ->
     let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
     halves.slv_runtime
@@ -282,25 +312,34 @@ and eval_lam_shallow env lam =
 
 and eval_structured_const env const =
   match const with
-  | Const_mixed_block (n, shape, consts) ->
-    let shape = eval_mixed_block_shape env shape in
-    let consts = List.map (eval_structured_const env) consts in
-    Const_mixed_block (n, shape, consts)
-  | Const_block (n, consts) ->
-    let consts = List.map (eval_structured_const env) consts in
-    Const_block (n, consts)
+  | Const_mixed_block (n, old_shape, old_consts) ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_consts =
+      Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
+    in
+    if new_shape == old_shape && new_consts == old_consts
+    then const
+    else Const_mixed_block (n, new_shape, new_consts)
+  | Const_block (n, old_consts) ->
+    let new_consts =
+      Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
+    in
+    if new_consts == old_consts then const else Const_block (n, new_consts)
   | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
   | Const_null ->
     const
 
-and eval_block_shape env shape =
-  match shape with
-  | All_value -> All_value
-  | Shape shape -> Shape (eval_mixed_block_shape env shape)
+and eval_block_shape env block_shape =
+  match block_shape with
+  | All_value -> block_shape
+  | Shape old_shape ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape then block_shape else Shape new_shape
 
 and eval_mixed_block_shape :
     'a. Env.t -> 'a mixed_block_element array -> 'a mixed_block_element array =
- fun env shape -> Array.map (eval_mixed_block_element env) shape
+ fun env shape ->
+  Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) shape
 
 and eval_mixed_block_element :
     'a. Env.t -> 'a mixed_block_element -> 'a mixed_block_element =
@@ -309,8 +348,11 @@ and eval_mixed_block_element :
   | Splice_variable id ->
     eval_var env (id |> Slambdaident.of_ident)
     |> expect_not_missing |> expect Tlayout |> mixed_block_element_of_layout
-  | Product elements ->
-    Product (Array.map (eval_mixed_block_element env) elements)
+  | Product old_elements ->
+    let new_elements =
+      Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
+    in
+    if new_elements == old_elements then element else Product new_elements
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
     element
@@ -320,47 +362,98 @@ and eval_layout env layout =
   | Psplicevar id ->
     eval_var env (id |> Slambdaident.of_ident)
     |> expect_not_missing |> expect Tlayout
-  | Punboxed_product layouts ->
-    Punboxed_product (List.map (eval_layout env) layouts)
+  | Punboxed_product old_layouts ->
+    let new_layouts =
+      Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
+    in
+    if new_layouts == old_layouts then layout else Punboxed_product new_layouts
   | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
   | Punboxed_vector _ | Pbottom ->
     layout
 
 and eval_lfunction_shallow env
-    { kind; params; return; body; attr; loc; mode; ret_mode } =
-  let eval_lparam { name; debug_uid; layout; attributes; mode } =
-    let layout = eval_layout env layout in
-    { name; debug_uid; layout; attributes; mode }
+    ({ kind;
+       params = old_params;
+       return = old_return;
+       body;
+       attr;
+       loc;
+       mode;
+       ret_mode
+     } as lfunction) =
+  let eval_lparam
+      ({ name; debug_uid; layout = old_layout; attributes; mode } as lparam) =
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then lparam
+    else { name; debug_uid; layout = new_layout; attributes; mode }
   in
-  let params = List.map eval_lparam params in
-  let return = eval_layout env return in
-  lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode
+  let new_params = Misc.Stdlib.List.map_sharing eval_lparam old_params in
+  let new_return = eval_layout env old_return in
+  if new_params == old_params && new_return == old_return
+  then lfunction
+  else
+    lfunction' ~kind ~params:new_params ~return:new_return ~body ~attr ~loc
+      ~mode ~ret_mode
 
 and eval_prim env prim =
   match prim with
-  | Pmakeblock (n, mut, shape, mode) ->
-    Pmakeblock (n, mut, eval_block_shape env shape, mode)
-  | Pmixedfield (is, shape, sem) ->
-    Pmixedfield (is, eval_mixed_block_shape env shape, sem)
-  | Psetmixedfield (is, shape, init_or_assign) ->
-    Psetmixedfield (is, eval_mixed_block_shape env shape, init_or_assign)
-  | Pmake_unboxed_product layouts ->
-    Pmake_unboxed_product (List.map (eval_layout env) layouts)
-  | Punboxed_product_field (i, layouts) ->
-    Punboxed_product_field (i, List.map (eval_layout env) layouts)
-  | Pmake_idx_mixed_field (shape, i, path) ->
-    Pmake_idx_mixed_field (eval_mixed_block_shape env shape, i, path)
-  | Pmake_idx_array (kind, index_kind, element, path) ->
-    Pmake_idx_array
-      (kind, index_kind, eval_mixed_block_element env element, path)
-  | Pidx_deepen (element, path) ->
-    Pidx_deepen (eval_mixed_block_element env element, path)
-  | Popaque layout -> Popaque (eval_layout env layout)
-  | Pobj_magic layout -> Pobj_magic (eval_layout env layout)
-  | Pget_idx (layout, mut) -> Pget_idx (eval_layout env layout, mut)
-  | Pset_idx (layout, mode) -> Pset_idx (eval_layout env layout, mode)
-  | Pget_ptr (layout, mut) -> Pget_ptr (eval_layout env layout, mut)
-  | Pset_ptr (layout, mode) -> Pset_ptr (eval_layout env layout, mode)
+  | Pmakeblock (n, mut, old_shape, mode) ->
+    let new_shape = eval_block_shape env old_shape in
+    if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
+  | Pmixedfield (is, old_shape, sem) ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape then prim else Pmixedfield (is, new_shape, sem)
+  | Psetmixedfield (is, old_shape, init_or_assign) ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape
+    then prim
+    else Psetmixedfield (is, new_shape, init_or_assign)
+  | Pmake_unboxed_product old_layouts ->
+    let new_layouts =
+      Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
+    in
+    if new_layouts == old_layouts
+    then prim
+    else Pmake_unboxed_product new_layouts
+  | Punboxed_product_field (i, old_layouts) ->
+    let new_layouts =
+      Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
+    in
+    if new_layouts == old_layouts
+    then prim
+    else Punboxed_product_field (i, new_layouts)
+  | Pmake_idx_mixed_field (old_shape, i, path) ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape
+    then prim
+    else Pmake_idx_mixed_field (new_shape, i, path)
+  | Pmake_idx_array (kind, index_kind, old_element, path) ->
+    let new_element = eval_mixed_block_element env old_element in
+    if new_element == old_element
+    then prim
+    else Pmake_idx_array (kind, index_kind, new_element, path)
+  | Pidx_deepen (old_element, path) ->
+    let new_element = eval_mixed_block_element env old_element in
+    if new_element == old_element then prim else Pidx_deepen (new_element, path)
+  | Popaque old_layout ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Popaque new_layout
+  | Pobj_magic old_layout ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Pobj_magic new_layout
+  | Pget_idx (old_layout, mut) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Pget_idx (new_layout, mut)
+  | Pset_idx (old_layout, mode) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Pset_idx (new_layout, mode)
+  | Pget_ptr (old_layout, mut) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Pget_ptr (new_layout, mut)
+  | Pset_ptr (old_layout, mode) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Pset_ptr (new_layout, mode)
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _

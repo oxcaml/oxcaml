@@ -41,7 +41,7 @@ let eval inspect_slambda template_lam =
          any templates. (which is cheap to check if it's combined with
          fracturing) *)
       if
-        (not Language_extension.(is_enabled Layout_poly))
+        (not Language_extension.(is_at_least Layout_poly Alpha))
         && not (template_lam == halves.slv_runtime)
       then
         Misc.fatal_error
