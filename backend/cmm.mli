@@ -462,8 +462,8 @@ type operation =
   | Casr
   | Cbswap of { bitwidth : bswap_bitwidth }
   | Ccsel of machtype
-  | Cclz of { arg_is_non_zero : bool }
-  | Cctz of { arg_is_non_zero : bool }
+  | Cclz
+  | Cctz
   | Cpopcnt
   | Cprefetch of
       { is_write : bool;

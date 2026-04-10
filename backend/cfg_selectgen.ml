@@ -72,7 +72,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (* The remaining operations are simple if their args are *)
       | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Caddi128
       | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Ccmpi _
-      | Caddv | Cadda | Cnegf _ | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccsel _
+      | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccsel _
       | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
       | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
       | Cdls_get | Ctls_get | Cdomain_index ->
@@ -129,9 +129,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
         | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
-        | Ccsel _ | Cclz _ | Cctz _ | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _
-        | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
-        | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
+        | Ccsel _ | Cclz | Cctz | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _ | Caddv
+        | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
+        | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
           EC.none
       in
       EC.join from_op (EC.join_list_map args effects_of)
@@ -356,10 +356,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Clsl -> select_arith Ilsl args
     | Clsr -> select_arith Ilsr args
     | Casr -> select_arith Iasr args
-    | Cclz { arg_is_non_zero } ->
-      SU.basic_op (Intop (Iclz { arg_is_non_zero })), args
-    | Cctz { arg_is_non_zero } ->
-      SU.basic_op (Intop (Ictz { arg_is_non_zero })), args
+    | Cclz -> SU.basic_op (Intop Iclz), args
+    | Cctz -> SU.basic_op (Intop Ictz), args
     | Cpopcnt -> SU.basic_op (Intop Ipopcnt), args
     | Ccmpi comp -> select_arith_comp comp args
     | Caddv -> select_arith_comm Iadd args

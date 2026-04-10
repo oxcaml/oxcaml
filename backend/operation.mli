@@ -56,8 +56,8 @@ type integer_operation =
   | Ilsl
   | Ilsr
   | Iasr
-  | Iclz of { arg_is_non_zero : bool }
-  | Ictz of { arg_is_non_zero : bool }
+  | Iclz
+  | Ictz
   | Ipopcnt
   | Icomp of integer_comparison
 

@@ -900,8 +900,8 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
       emit_ins t (I.convert Zext ~arg:bool_res ~to_:T.i64)
     (* ctlz and cttz have a second optional argument that indicates whether 0 is
        poison or not. We pass false to match OCaml's behaviour. *)
-    | Iclz _ -> do_unary_intrinsic_extra_args "ctlz" [V.of_int ~typ:T.i1 0]
-    | Ictz _ -> do_unary_intrinsic_extra_args "cttz" [V.of_int ~typ:T.i1 0]
+    | Iclz -> do_unary_intrinsic_extra_args "ctlz" [V.of_int ~typ:T.i1 0]
+    | Ictz -> do_unary_intrinsic_extra_args "cttz" [V.of_int ~typ:T.i1 0]
     | Ipopcnt -> do_unary_intrinsic "ctpop"
   in
   store_into_reg t i.res.(0) res
