@@ -29,6 +29,16 @@ let map_binary_write unix path size =
   Unix.close fd;
   t
 
+external unmap : t -> unit = "owee_buf_unmap" [@@noalloc]
+
+let with_map_binary unix path f =
+  let buf = map_binary unix path in
+  Fun.protect ~finally:(fun () -> unmap buf) (fun () -> f buf)
+
+let with_map_binary_write unix path size f =
+  let buf = map_binary_write unix path size in
+  Fun.protect ~finally:(fun () -> unmap buf) (fun () -> f buf)
+
 exception Invalid_format of string
 let invalid_format msg = raise (Invalid_format msg)
 let invalid_formatf fmt = Printf.ksprintf invalid_format fmt
