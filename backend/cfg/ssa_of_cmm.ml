@@ -33,50 +33,25 @@ let current_exn_continuation env : Label.t option =
     | Some handler -> Some handler.handler_label
     | None -> None)
 
-type builder =
-  { mutable blocks : Ssa.basic_block list;
-    mutable current_label : Label.t;
-    mutable current_desc : Ssa.block_desc;
-    mutable current_params : Cmm.machtype;
-    mutable body : Ssa.instruction list
-  }
+type builder = Ssa.Builder.t
 
-let add_body b (i : Ssa.instruction) = b.body <- i :: b.body
+let emit_instruction = Ssa.Builder.emit_instruction
 
-let emit_block b ~dbg term =
-  let block =
-    { Ssa.label = b.current_label;
-      desc = b.current_desc;
-      params = b.current_params;
-      body = Array.of_list (List.rev b.body);
-      terminator = term;
-      terminator_dbg = dbg
-    }
-  in
-  b.blocks <- block :: b.blocks;
-  b.body <- []
+let emit_op = Ssa.Builder.emit_op
 
-let start_block b label desc params =
-  b.current_label <- label;
-  b.current_desc <- desc;
-  b.current_params <- params;
-  b.body <- []
+let finish_block = Ssa.Builder.finish_block
 
-let fork label desc params =
-  { blocks = [];
-    current_label = label;
-    current_desc = desc;
-    current_params = params;
-    body = []
-  }
+let start_block = Ssa.Builder.start_block
 
-let merge_into parent sub = parent.blocks <- sub.blocks @ parent.blocks
+let fork = Ssa.Builder.fork
 
-let block_params label (types : Cmm.machtype) =
-  Array.mapi
-    (fun i typ ->
-      (Ssa.Block_param { block = label; index = i; typ } : Ssa.instruction))
-    types
+let merge_into parent sub = Ssa.Builder.merge_into parent ~from:sub
+
+let block_params = Ssa.Builder.block_params
+
+let current_label = Ssa.Builder.current_label
+
+let transfer_open_block b from = Ssa.Builder.transfer_open_block b ~from
 
 module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* Reuse pure functions from Cfg_selectgen with the same Target. *)
@@ -116,21 +91,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let provenance = VP.provenance v in
     if Option.is_some provenance
     then
-      add_body b
+      emit_instruction b
         (Name_for_debugger
            { ident = VP.var v; provenance; which_parameter = None; regs = r1 });
     env
 
-  let insert_debug b ~typ ~dbg op args : Ssa.instruction =
-    let i : Ssa.instruction =
-      Op { id = Ssa.InstructionId.create (); op; typ; args; dbg }
-    in
-    b.body <- i :: b.body;
-    i
-
   let insert_op_debug b op dbg args typ : Ssa.instruction array =
-    let i = insert_debug b ~typ ~dbg op args in
-    if Array.length typ <= 1
+    let i = emit_op b ~op ~dbg ~typ ~args in
+    if Array.length typ = 1
     then [| i |]
     else
       Array.init (Array.length typ) (fun index ->
@@ -205,12 +173,26 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     size e
 
-  let emit_unreachable_handler _env b =
-    let dummy =
-      insert_debug b ~typ:Cmm.typ_int ~dbg:Debuginfo.none (Const_int 1n) [||]
+  (* Matching cfg_selectgen's [unreachable_handler]: emit a segfault
+     (load from address 0) followed by a notrace raise, with trap stack
+     set to Uncaught. The segfault ensures a crash if this code is
+     somehow reached at runtime. *)
+  let unreachable_handler_body : Cmm.expression =
+    let dummy_constant : Cmm.expression = Cconst_int (1, Debuginfo.none) in
+    let segfault : Cmm.expression =
+      Cop
+        ( Cload
+            { memory_chunk = Word_int;
+              mutability = Mutable;
+              is_atomic = false
+            },
+          [Cconst_int (0, Debuginfo.none)],
+          Debuginfo.none )
     in
-    emit_block b ~dbg:Debuginfo.none
-      (Raise (Lambda.Raise_notrace, [| dummy |], None))
+    let dummy_raise : Cmm.expression =
+      Cop (Craise Raise_notrace, [dummy_constant], Debuginfo.none)
+    in
+    Csequence (segfault, dummy_raise)
 
   (* select_arith_comm, select_arith, select_arith_comp, select_operation0,
      select_operation: all reused from Cfg_selectgen.Make(Target) via Sel
@@ -219,8 +201,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* --- SSA-specific: branch encoding --- *)
   let emit_branch b (test : Operation.test) rarg ~true_label ~false_label :
       Ssa.terminator =
-    let make_cond op a =
-      insert_debug b ~typ:Cmm.typ_int ~dbg:Debuginfo.none op a
+    let make_cond op args =
+      emit_op b ~op ~dbg:Debuginfo.none ~typ:Cmm.typ_int ~args
     in
     let is_comparison (v : Ssa.instruction) =
       match v with
@@ -397,15 +379,15 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             (fun (r : Ssa.instruction) ->
               let chunk = chunk_of_component (typ_of_instruction r) in
               ignore
-                (insert_debug b ~typ:Cmm.typ_void ~dbg
-                   (Store (chunk, !addressing_mode, false))
-                   [| r; regs_addr |]);
+                (emit_op b
+                   ~op:(Store (chunk, !addressing_mode, false))
+                   ~dbg ~typ:Cmm.typ_void ~args:[| r; regs_addr |]);
               advance (SU.size_component (typ_of_instruction r)))
             regs
         | Some op ->
           ignore
-            (insert_debug b ~typ:Cmm.typ_void ~dbg op
-               (Array.append regs [| regs_addr |]));
+            (emit_op b ~op ~dbg ~typ:Cmm.typ_void
+               ~args:(Array.append regs [| regs_addr |]));
           advance (size_of_cmm_expr env original_arg))
       | Never_returns ->
         Misc.fatal_error
@@ -540,43 +522,38 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Never_returns -> ()
     | Ok r ->
       emit_trap_actions env b traps;
-      emit_block b ~dbg:Debuginfo.none (Return r)
+      finish_block b ~dbg:Debuginfo.none (Return r)
 
-  and emit_invalid env b _message symbol =
+  and emit_invalid env b message symbol =
     let arg_expr = Cmm.Cconst_symbol (symbol, Debuginfo.none) in
     let* arg_instrs = emit_tuple env b [arg_expr] in
     if !SU.current_function_is_check_enabled
     then (
       (* For zero alloc checking we need to treat [Invalid] as returning. *)
       let label_after = Cmm.new_label () in
-      let ext =
-        { Cfg.func_symbol = Cmm.caml_flambda2_invalid;
-          alloc = true;
-          effects = Arbitrary_effects;
-          ty_res = Cmm.typ_int;
-          ty_args = [Cmm.XInt];
-          stack_ofs = 0;
-          stack_align = Align_16
-        }
-      in
-      let r =
-        emit_expr_op_cont env b ~ty:Cmm.typ_int
-          (Terminator (Prim { op = External ext; label_after })
-            : Cfg.basic_or_terminator)
-          arg_instrs label_after Debuginfo.none
-      in
+      let pred_label = current_label b in
+      finish_block b ~dbg:Debuginfo.none
+        (Invalid
+           { message;
+             args = arg_instrs;
+             continuation = Some label_after
+           });
+      start_block b label_after
+        (CallContinuation { predecessor = pred_label })
+        Cmm.typ_int;
       set_traps_for_raise env;
-      r)
+      Ok (block_params label_after Cmm.typ_int))
     else (
       (* When not zero alloc checking we treat [Invalid] as non-returning. *)
-      emit_block b ~dbg:Debuginfo.none Never;
+      finish_block b ~dbg:Debuginfo.none
+        (Invalid { message; args = arg_instrs; continuation = None });
       set_traps_for_raise env;
       Never_returns)
 
   and emit_expr_raise env b k args dbg =
     let* r = emit_tuple env b args in
     let handler_label = current_exn_continuation env in
-    emit_block b ~dbg (Raise (k, r, handler_label));
+    finish_block b ~dbg (Raise (k, r, handler_label));
     set_traps_for_raise env;
     Never_returns
 
@@ -590,10 +567,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     match new_op with
     | Terminator (Call { op = call_op; label_after }) ->
-      let pred_label = b.current_label in
+      let pred_label = current_label b in
       let cont_label = label_after in
       let exn_cont = current_exn_continuation env in
-      emit_block b ~dbg
+      finish_block b ~dbg
         (Call
            { op = call_op;
              args = arg_instrs;
@@ -607,10 +584,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Ok (block_params cont_label ty)
     | Terminator
         (Prim { op = External ({ ty_res; _ } as ext_call); label_after }) ->
-      let pred_label = b.current_label in
+      let pred_label = current_label b in
       let cont_label = label_after in
       let exn_cont = current_exn_continuation env in
-      emit_block b ~dbg
+      finish_block b ~dbg
         (Prim
            { op = External ext_call;
              args = arg_instrs;
@@ -623,9 +600,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ty_res;
       Ok (block_params cont_label ty_res)
     | Terminator (Prim { op = Probe _ as probe_op; label_after }) ->
-      let pred_label = b.current_label in
+      let pred_label = current_label b in
       let cont_label = label_after in
-      emit_block b ~dbg
+      finish_block b ~dbg
         (Prim
            { op = probe_op;
              args = arg_instrs;
@@ -638,7 +615,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ty;
       Ok (block_params cont_label ty)
     | Terminator (Call_no_return _) ->
-      emit_block b ~dbg Never;
+      finish_block b ~dbg Never;
       set_traps_for_raise env;
       Never_returns
     | Basic _ ->
@@ -671,7 +648,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               mode
             }
         in
-        let rd = insert_debug b ~typ:Cmm.typ_val ~dbg op [||] in
+        let rd = emit_op b ~op ~dbg ~typ:Cmm.typ_val ~args:[||] in
         set_traps_for_raise env;
         emit_stores env b dbg new_args rd;
         Ok [| rd |]
@@ -695,11 +672,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ok rarg ->
       let then_label = Cmm.new_label () in
       let else_label = Cmm.new_label () in
-      let pred_label = b.current_label in
+      let pred_label = current_label b in
       let term =
         emit_branch b cond rarg ~true_label:then_label ~false_label:else_label
       in
-      emit_block b ~dbg:Debuginfo.none term;
+      finish_block b ~dbg:Debuginfo.none term;
       let b_then =
         fork then_label (BranchTarget { predecessor = pred_label }) [||]
       in
@@ -716,7 +693,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match emit_expr env b esel ~bound_name:None with
     | Never_returns -> Never_returns
     | Ok rsel ->
-      let pred_label = b.current_label in
+      let pred_label = current_label b in
       let case_results =
         Array.map
           (fun (case_expr, _dbg) ->
@@ -735,7 +712,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             label)
           index
       in
-      emit_block b ~dbg:Debuginfo.none (Switch (labels, rsel));
+      finish_block b ~dbg:Debuginfo.none (Switch (labels, rsel));
       join_array b case_results
 
   and emit_expr_catch env b _bound_name (flag : Cmm.ccatch_flag) handlers body :
@@ -770,64 +747,94 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         env handlers_info
     in
     let body_label = Cmm.new_label () in
-    let pred_label = b.current_label in
+    let pred_label = current_label b in
     let b_body = fork body_label (Merge { predecessors = [pred_label] }) [||] in
     let r_body = emit_expr env b_body body ~bound_name:None in
-    emit_block b ~dbg:Debuginfo.none (Goto { goto = body_label; args = [||] });
-    let handler_results =
-      List.map
-        (fun (_, ids, handler_body, info) ->
-          let block_desc : Ssa.block_desc =
-            match flag with
-            | Cmm.Exn_handler -> TrapHandler { predecessors = [] }
-            | Cmm.Normal | Cmm.Recursive -> Merge { predecessors = [] }
+    finish_block b ~dbg:Debuginfo.none (Goto { goto = body_label; args = [||] });
+    let translate_one_handler (_, ids, handler_body, info) =
+      let block_desc : Ssa.block_desc =
+        match flag with
+        | Cmm.Exn_handler -> TrapHandler { predecessors = [] }
+        | Cmm.Normal | Cmm.Recursive -> Merge { predecessors = [] }
+      in
+      let b_handler =
+        fork info.handler_label block_desc info.handler_types
+      in
+      let trap_stack, handler_body =
+        match !(info.traps_ref) with
+        | SU.Unreachable ->
+          assert (Cmm.is_exn_handler flag);
+          Operation.Uncaught, unreachable_handler_body
+        | SU.Reachable trap_stack -> trap_stack, handler_body
+      in
+      let r =
+        let handler_env = { env with trap_stack } in
+          let handler_env =
+            let param_idx = ref 0 in
+            List.fold_left
+              (fun env (id, ty) ->
+                let n = Array.length ty in
+                let proj_instrs =
+                  Array.init n (fun i ->
+                      (Ssa.Block_param
+                         { block = info.handler_label;
+                           index = !param_idx + i;
+                           typ = ty.(i)
+                         }
+                        : Ssa.instruction))
+                in
+                param_idx := !param_idx + n;
+                env_add id proj_instrs env)
+              handler_env ids
           in
-          let b_handler =
-            fork info.handler_label block_desc info.handler_types
-          in
-          let r =
+          List.iter
+            (fun (id, _ty) ->
+              let provenance = VP.provenance id in
+              if Option.is_some provenance
+              then
+                let regs = V.Map.find (VP.var id) handler_env.vars in
+                emit_instruction b_handler
+                  (Name_for_debugger
+                     { ident = VP.var id;
+                       provenance;
+                       which_parameter = None;
+                       regs
+                     }))
+            ids;
+          emit_expr handler_env b_handler handler_body ~bound_name:None
+      in
+      info.handler_label, r, b_handler
+    in
+    let rec build_all_reachable_handlers ~already_built ~not_built =
+      let not_built, to_build =
+        List.partition
+          (fun (_, _, _, info) ->
             match !(info.traps_ref) with
-            | SU.Unreachable ->
-              emit_unreachable_handler env b_handler;
-              Never_returns
-            | SU.Reachable trap_stack ->
-              let handler_env = { env with trap_stack } in
-              let handler_env =
-                let param_idx = ref 0 in
-                List.fold_left
-                  (fun env (id, ty) ->
-                    let n = Array.length ty in
-                    let proj_instrs =
-                      Array.init n (fun i ->
-                          (Ssa.Block_param
-                             { block = info.handler_label;
-                               index = !param_idx + i;
-                               typ = ty.(i)
-                             }
-                            : Ssa.instruction))
-                    in
-                    param_idx := !param_idx + n;
-                    env_add id proj_instrs env)
-                  handler_env ids
-              in
-              List.iter
-                (fun (id, _ty) ->
-                  let provenance = VP.provenance id in
-                  if Option.is_some provenance
-                  then
-                    let regs = V.Map.find (VP.var id) handler_env.vars in
-                    add_body b_handler
-                      (Name_for_debugger
-                         { ident = VP.var id;
-                           provenance;
-                           which_parameter = None;
-                           regs
-                         }))
-                ids;
-              emit_expr handler_env b_handler handler_body ~bound_name:None
-          in
-          info.handler_label, r, b_handler)
-        handlers_info
+            | SU.Unreachable -> true
+            | SU.Reachable _ -> false)
+          not_built
+      in
+      if List.compare_length_with to_build 0 = 0
+      then already_built
+      else
+        let already_built =
+          List.fold_left
+            (fun acc handler -> translate_one_handler handler :: acc)
+            already_built to_build
+        in
+        build_all_reachable_handlers ~already_built ~not_built
+    in
+    let handler_results =
+      match flag with
+      | Normal | Recursive ->
+        build_all_reachable_handlers ~already_built:[] ~not_built:handlers_info
+        (* Note: we're dropping unreachable handlers here *)
+      | Exn_handler ->
+        (* We cannot drop exception handlers as some trap instructions may
+           refer to them even if they're unreachable. Instead,
+           [translate_one_handler] will generate a dummy handler for the
+           unreachable cases. *)
+        List.map translate_one_handler handlers_info
     in
     let all_results =
       Array.of_list ((body_label, r_body, b_body) :: handler_results)
@@ -848,7 +855,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           | Push handler_id -> find_handler env handler_id
           | Pop handler_id -> find_handler env handler_id
         in
-        add_body b
+        emit_instruction b
           (match trap with
           | Push _ -> Pushtrap { lbl_handler = h.handler_label }
           | Pop _ -> Poptrap { lbl_handler = h.handler_label }))
@@ -865,13 +872,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let handler = find_handler env nfail in
         emit_trap_actions env b traps;
         SU.set_traps nfail handler.traps_ref env.trap_stack traps;
-        emit_block b ~dbg:Debuginfo.none
+        finish_block b ~dbg:Debuginfo.none
           (Goto { goto = handler.handler_label; args = src });
         Never_returns
       | Return_lbl ->
         let* src = emit_tuple ext_env b simple_list in
         emit_trap_actions env b traps;
-        emit_block b ~dbg:Debuginfo.none (Return src);
+        finish_block b ~dbg:Debuginfo.none (Return src);
         Never_returns)
 
   (* Same, but in tail position *)
@@ -907,16 +914,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         match new_op with
         | Terminator (Call { op = Indirect callees; _ })
           when can_tailcall (Indirect callees) ->
-          emit_block b ~dbg (Tailcall_func (Indirect callees, arg_instrs))
+          finish_block b ~dbg (Tailcall_func (Indirect callees, arg_instrs))
         | Terminator (Call { op = Direct func; _ })
           when String.equal func.sym_name !SU.current_function_name
                && can_tailcall (Direct func) ->
-          emit_block b ~dbg
+          finish_block b ~dbg
             (Tailcall_self
                { destination = env.tailrec_label; args = arg_instrs })
         | Terminator (Call { op = Direct func; _ })
           when can_tailcall (Direct func) ->
-          emit_block b ~dbg (Tailcall_func (Direct func, arg_instrs))
+          finish_block b ~dbg (Tailcall_func (Direct func, arg_instrs))
         | _ ->
           let ty = SU.oper_result_type op in
           let r =
@@ -937,11 +944,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ok rarg ->
       let then_label = Cmm.new_label () in
       let else_label = Cmm.new_label () in
-      let pred_label = b.current_label in
+      let pred_label = current_label b in
       let term =
         emit_branch b cond rarg ~true_label:then_label ~false_label:else_label
       in
-      emit_block b ~dbg:Debuginfo.none term;
+      finish_block b ~dbg:Debuginfo.none term;
       let b_then =
         fork then_label (BranchTarget { predecessor = pred_label }) [||]
       in
@@ -957,7 +964,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match emit_expr env b esel ~bound_name:None with
     | Never_returns -> ()
     | Ok rsel ->
-      let pred_label = b.current_label in
+      let pred_label = current_label b in
       let case_builders =
         Array.map
           (fun (case_expr, _dbg) ->
@@ -976,7 +983,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             label)
           index
       in
-      emit_block b ~dbg:Debuginfo.none (Switch (labels, rsel));
+      finish_block b ~dbg:Debuginfo.none (Switch (labels, rsel));
       Array.iter (fun (_, b_case) -> merge_into b b_case) case_builders
 
   and emit_tail_catch env b (flag : Cmm.ccatch_flag) handlers e1 =
@@ -1008,60 +1015,87 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         env handlers_info
     in
     let body_label = Cmm.new_label () in
-    let pred_label = b.current_label in
+    let pred_label = current_label b in
     let b_body = fork body_label (Merge { predecessors = [pred_label] }) [||] in
     emit_tail env b_body e1;
-    emit_block b ~dbg:Debuginfo.none (Goto { goto = body_label; args = [||] });
+    finish_block b ~dbg:Debuginfo.none (Goto { goto = body_label; args = [||] });
+    let translate_one_handler (_, ids, e2, info) =
+      let block_desc : Ssa.block_desc =
+        match flag with
+        | Cmm.Exn_handler -> TrapHandler { predecessors = [] }
+        | Cmm.Normal | Cmm.Recursive -> Merge { predecessors = [] }
+      in
+      let b_handler =
+        fork info.handler_label block_desc info.handler_types
+      in
+      let trap_stack, e2 =
+        match !(info.traps_ref) with
+        | SU.Unreachable ->
+          assert (Cmm.is_exn_handler flag);
+          Operation.Uncaught, unreachable_handler_body
+        | SU.Reachable trap_stack -> trap_stack, e2
+      in
+      (let handler_env = { env with trap_stack } in
+        let param_idx = ref 0 in
+        let handler_env =
+          List.fold_left
+            (fun env (id, ty) ->
+              let n = Array.length ty in
+              let proj_instrs =
+                Array.init n (fun i ->
+                    (Ssa.Block_param
+                       { block = info.handler_label;
+                         index = !param_idx + i;
+                         typ = ty.(i)
+                       }
+                      : Ssa.instruction))
+              in
+              param_idx := !param_idx + n;
+              env_add id proj_instrs env)
+            handler_env ids
+        in
+        List.iter
+          (fun (id, _ty) ->
+            let provenance = VP.provenance id in
+            if Option.is_some provenance
+            then
+              let regs = V.Map.find (VP.var id) handler_env.vars in
+              emit_instruction b_handler
+                (Name_for_debugger
+                   { ident = VP.var id;
+                     provenance;
+                     which_parameter = None;
+                     regs
+                   }))
+          ids;
+        emit_tail handler_env b_handler e2);
+      b_handler
+    in
+    let rec build_all_reachable_handlers ~already_built ~not_built =
+      let not_built, to_build =
+        List.partition
+          (fun (_, _, _, info) ->
+            match !(info.traps_ref) with
+            | SU.Unreachable -> true
+            | SU.Reachable _ -> false)
+          not_built
+      in
+      if List.compare_length_with to_build 0 = 0
+      then already_built
+      else
+        let already_built =
+          List.fold_left
+            (fun acc handler -> translate_one_handler handler :: acc)
+            already_built to_build
+        in
+        build_all_reachable_handlers ~already_built ~not_built
+    in
     let handler_builders =
-      List.map
-        (fun (_, ids, e2, info) ->
-          let block_desc : Ssa.block_desc =
-            match flag with
-            | Cmm.Exn_handler -> TrapHandler { predecessors = [] }
-            | Cmm.Normal | Cmm.Recursive -> Merge { predecessors = [] }
-          in
-          let b_handler =
-            fork info.handler_label block_desc info.handler_types
-          in
-          (match !(info.traps_ref) with
-          | SU.Unreachable -> emit_unreachable_handler env b_handler
-          | SU.Reachable trap_stack ->
-            let handler_env = { env with trap_stack } in
-            let param_idx = ref 0 in
-            let handler_env =
-              List.fold_left
-                (fun env (id, ty) ->
-                  let n = Array.length ty in
-                  let proj_instrs =
-                    Array.init n (fun i ->
-                        (Ssa.Block_param
-                           { block = info.handler_label;
-                             index = !param_idx + i;
-                             typ = ty.(i)
-                           }
-                          : Ssa.instruction))
-                  in
-                  param_idx := !param_idx + n;
-                  env_add id proj_instrs env)
-                handler_env ids
-            in
-            List.iter
-              (fun (id, _ty) ->
-                let provenance = VP.provenance id in
-                if Option.is_some provenance
-                then
-                  let regs = V.Map.find (VP.var id) handler_env.vars in
-                  add_body b_handler
-                    (Name_for_debugger
-                       { ident = VP.var id;
-                         provenance;
-                         which_parameter = None;
-                         regs
-                       }))
-              ids;
-            emit_tail handler_env b_handler e2);
-          b_handler)
-        handlers_info
+      match flag with
+      | Normal | Recursive ->
+        build_all_reachable_handlers ~already_built:[] ~not_built:handlers_info
+      | Exn_handler ->
+        List.map translate_one_handler handlers_info
     in
     merge_into b b_body;
     List.iter (merge_into b) handler_builders
@@ -1076,28 +1110,22 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ok r, Never_returns ->
       merge_into b b2;
       merge_into b b1;
-      b.current_label <- b1.current_label;
-      b.current_desc <- b1.current_desc;
-      b.current_params <- b1.current_params;
-      b.body <- b1.body;
+      transfer_open_block b b1;
       Ok r
     | Never_returns, Ok r ->
       merge_into b b1;
       merge_into b b2;
-      b.current_label <- b2.current_label;
-      b.current_desc <- b2.current_desc;
-      b.current_params <- b2.current_params;
-      b.body <- b2.body;
+      transfer_open_block b b2;
       Ok r
     | Ok r1_instrs, Ok r2_instrs ->
       let join_label = Cmm.new_label () in
       assert (Array.length r1_instrs = Array.length r2_instrs);
       let join_types = Array.map typ_of_instruction r1_instrs in
-      emit_block b1 ~dbg:Debuginfo.none
+      finish_block b1 ~dbg:Debuginfo.none
         (Goto { goto = join_label; args = r1_instrs });
-      emit_block b2 ~dbg:Debuginfo.none
+      finish_block b2 ~dbg:Debuginfo.none
         (Goto { goto = join_label; args = r2_instrs });
-      let preds = [b1.current_label; b2.current_label] in
+      let preds = [current_label b1; current_label b2] in
       merge_into b b1;
       merge_into b b2;
       start_block b join_label (Merge { predecessors = preds }) join_types;
@@ -1132,8 +1160,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (match r with
           | Never_returns -> ()
           | Ok instrs ->
-            preds := sub.current_label :: !preds;
-            emit_block sub ~dbg:Debuginfo.none
+            preds := current_label sub :: !preds;
+            finish_block sub ~dbg:Debuginfo.none
               (Goto { goto = join_label; args = instrs }));
           merge_into b sub)
         results;
@@ -1147,6 +1175,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* --- Entry point --- *)
 
   let emit_fundecl (f : Cmm.fundecl) : Ssa.t =
+    SU.current_function_name := f.fun_name.sym_name;
+    SU.current_function_is_check_enabled
+      := Zero_alloc_checker.is_check_enabled f.fun_codegen_options
+           f.fun_name.sym_name f.fun_dbg;
     let entry_label = Cmm.new_label () in
     let fun_arg_types = List.map snd f.fun_args |> Array.concat in
     let env =
@@ -1171,20 +1203,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let b = fork entry_label FunctionStart fun_arg_types in
     emit_tail env b f.fun_body;
-    let blocks = Label.Tbl.create 31 in
-    let fun_contains_calls = ref false in
-    let block_order =
-      List.rev_map
-        (fun (block : Ssa.basic_block) ->
-          Label.Tbl.add blocks block.label block;
-          (match block.terminator with
-          | Call _ | Prim _ -> fun_contains_calls := true
-          | Never | Goto _ | Branch _ | Switch _ | Return _ | Raise _
-          | Tailcall_self _ | Tailcall_func _ ->
-            ());
-          block.label)
-        b.blocks
-    in
+    let blocks, block_order = Ssa.Builder.finish b in
     { Ssa.blocks;
       block_order;
       fun_name = f.fun_name.sym_name;
@@ -1193,7 +1212,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       fun_codegen_options = f.fun_codegen_options;
       fun_dbg = f.fun_dbg;
       entry_label;
-      fun_contains_calls = !fun_contains_calls;
       fun_poll = f.fun_poll;
       fun_ret_type = f.fun_ret_type
     }

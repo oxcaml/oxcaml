@@ -76,8 +76,13 @@ div:
 .L115:
 =======
 .L101:
+<<<<<<< HEAD
   subq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  subq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -142,8 +147,13 @@ rem:
 .L115:
 =======
 .L101:
+<<<<<<< HEAD
   subq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  subq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

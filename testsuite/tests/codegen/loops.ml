@@ -167,7 +167,6 @@ let loop_with_non_dominating_load x l =
   loop 100 0
 [%%expect_asm X86_64{|
 loop_with_non_dominating_load:
-  subq  $8, %rsp
   movl  $1, %eax
   movl  $201, %edi
 <<<<<<< HEAD
@@ -207,8 +206,13 @@ loop_with_non_dominating_load:
   jg    .L108
 =======
   jg    .L103
+<<<<<<< HEAD
   addq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  addq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   ret
 |}]
 
@@ -259,7 +263,6 @@ f:
   jmp   camlTOP5__do_work_11_15_code@PLT
 
 f.do_work:
-  subq  $8, %rsp
   movq  16(%rbx), %rax
   leaq  -1(%rax,%rax), %rax
   movl  $1, %edi
@@ -292,8 +295,13 @@ f.do_work:
   jle   .L123
 =======
   jle   .L112
+<<<<<<< HEAD
   addq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  addq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   ret
 |}]
 
@@ -305,6 +313,7 @@ let noop_loop lo hi = for i = lo to hi do () done
 noop_loop:
   cmpq  %rbx, %rax
 <<<<<<< HEAD
+<<<<<<< HEAD
   jg    .L1
 ||||||| parent of 42782c097b (passes testsuite)
   jg    .L119
@@ -312,6 +321,12 @@ noop_loop:
   jg    .L102
   subq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  jg    .L102
+  subq  $8, %rsp
+=======
+  jg    .L109
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   sarq  $1, %rax
   sarq  $1, %rbx
 <<<<<<< HEAD
@@ -331,11 +346,20 @@ noop_loop:
 .L119:
 =======
   jle   .L105
+<<<<<<< HEAD
   movl  $1, %eax
   addq  $8, %rsp
   ret
 .L102:
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  movl  $1, %eax
+  addq  $8, %rsp
+  ret
+.L102:
+=======
+.L109:
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   movl  $1, %eax
   ret
 |}]
@@ -362,8 +386,13 @@ f:
   jl    .L121
 =======
   jl    .L102
+<<<<<<< HEAD
   subq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  subq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   sarq  $1, %rbx
   movl  $1, %eax
   xorl  %edi, %edi
@@ -385,8 +414,13 @@ f:
   jle   .L109
 =======
   jle   .L104
+<<<<<<< HEAD
   addq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  addq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   ret
 <<<<<<< HEAD
 .L1:
@@ -438,8 +472,13 @@ M.f:
   jl    .L132
 =======
   jl    .L109
+<<<<<<< HEAD
   subq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  subq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   sarq  $1, %rax
   vxorpd %xmm0, %xmm0, %xmm0
 <<<<<<< HEAD
@@ -473,8 +512,13 @@ M.f:
   incq  %rbx
   cmpq  %rax, %rbx
   jle   .L111
+<<<<<<< HEAD
   addq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  addq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   ret
 <<<<<<< HEAD
 .L1:

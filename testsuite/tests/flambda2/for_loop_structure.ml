@@ -17,8 +17,13 @@ f:
   jl    .L121
 =======
   jl    .L102
+<<<<<<< HEAD
   subq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  subq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   sarq  $1, %rax
   xorl  %ebx, %ebx
 <<<<<<< HEAD
@@ -41,7 +46,6 @@ f:
   jle   .L104
 >>>>>>> 42782c097b (passes testsuite)
   movl  $1, %eax
-  addq  $8, %rsp
   ret
 <<<<<<< HEAD
 .L1:
