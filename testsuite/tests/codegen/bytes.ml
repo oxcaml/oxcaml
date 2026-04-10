@@ -198,33 +198,15 @@ bytes_safe_get_int32:
   xorq  $-1, %rsi
   andq  %rdi, %rsi
   cmpq  %rsi, %rbx
-<<<<<<< HEAD
-  jae   .L0
-||||||| parent of 42782c097b (passes testsuite)
-  jae   .L123
-=======
-  jae   .L101
->>>>>>> 42782c097b (passes testsuite)
-  movslq (%rax,%rbx), %rax
-  ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L123:
-=======
-.L101:
-<<<<<<< HEAD
-  subq  $8, %rsp
->>>>>>> 42782c097b (passes testsuite)
-||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
-  subq  $8, %rsp
-=======
->>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
+  jb    .L115
   movq  camlTOP18__block602@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L115:
+  movslq (%rax,%rbx), %rax
+  ret
 |}]
 
 let bytes_get_int64_indexed_by_int64

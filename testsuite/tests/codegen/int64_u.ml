@@ -64,53 +64,23 @@ div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   testq %rcx, %rcx
-<<<<<<< HEAD
-  je    .L1
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L118
-=======
-  je    .L101
->>>>>>> 42782c097b (passes testsuite)
-  cmpq  $-1, %rcx
-<<<<<<< HEAD
-  je    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L111
-=======
-  je    .L106
->>>>>>> 42782c097b (passes testsuite)
-  movq  %rdi, %rax
-  cqto
-  idivq %rcx
-  ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L111:
-=======
-.L106:
->>>>>>> 42782c097b (passes testsuite)
-  xorl  %eax, %eax
-  subq  %rdi, %rax
-  ret
-<<<<<<< HEAD
-.L1:
-||||||| parent of 42782c097b (passes testsuite)
-.L118:
-=======
-.L101:
-<<<<<<< HEAD
-  subq  $8, %rsp
->>>>>>> 42782c097b (passes testsuite)
-||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
-  subq  $8, %rsp
-=======
->>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
+  jne   .L105
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L105:
+  cmpq  $-1, %rcx
+  je    .L108
+  movq  %rdi, %rax
+  cqto
+  idivq %rcx
+  ret
+.L108:
+  xorl  %eax, %eax
+  subq  %rdi, %rax
+  ret
 |}]
 
 let div_by_constant x = Int64_u.div x #1234L
@@ -132,83 +102,39 @@ unsigned_div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-<<<<<<< HEAD
-  jge   .L1
-||||||| parent of 42782c097b (passes testsuite)
-  jge   .L115
-=======
-  jge   .L108
->>>>>>> 42782c097b (passes testsuite)
+  jge   .L117
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rcx
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rdi
   cmpq  %rcx, %rdi
-<<<<<<< HEAD
-  jge   .L0
-||||||| parent of 42782c097b (passes testsuite)
-  jge   .L109
-=======
-  jge   .L106
->>>>>>> 42782c097b (passes testsuite)
+  jge   .L115
   xorl  %eax, %eax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L109:
-=======
-.L106:
->>>>>>> 42782c097b (passes testsuite)
+.L115:
   movl  $1, %eax
   ret
-<<<<<<< HEAD
-.L1:
-||||||| parent of 42782c097b (passes testsuite)
-.L115:
-=======
-.L108:
->>>>>>> 42782c097b (passes testsuite)
+.L116:
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+.L117:
   testq %rcx, %rcx
-<<<<<<< HEAD
-  je    .L5
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L141
-=======
-  je    .L107
->>>>>>> 42782c097b (passes testsuite)
+  je    .L116
   movq  %rdi, %rbx
   shrq  $1, %rbx
   cmpq  $-1, %rcx
-<<<<<<< HEAD
-  je    .L2
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L123
-=======
-  je    .L113
->>>>>>> 42782c097b (passes testsuite)
+  je    .L121
   movq  %rbx, %rax
   cqto
   idivq %rcx
-<<<<<<< HEAD
-  jmp   .L3
-.L2:
-||||||| parent of 42782c097b (passes testsuite)
-  jmp   .L126
-.L123:
-=======
-  jmp   .L116
-.L113:
->>>>>>> 42782c097b (passes testsuite)
+  jmp   .L122
+.L121:
   xorl  %eax, %eax
   subq  %rbx, %rax
-<<<<<<< HEAD
-.L3:
-||||||| parent of 42782c097b (passes testsuite)
-.L126:
-=======
-.L116:
->>>>>>> 42782c097b (passes testsuite)
+.L122:
   salq  $1, %rax
   movabsq $-9223372036854775808, %rsi
   movq  %rcx, %rbx
@@ -219,41 +145,11 @@ unsigned_div:
   subq  %rsi, %rdi
   subq  %rdx, %rdi
   cmpq  %rbx, %rdi
-<<<<<<< HEAD
-  jge   .L4
-||||||| parent of 42782c097b (passes testsuite)
-  jge   .L134
-=======
-  jge   .L123
->>>>>>> 42782c097b (passes testsuite)
+  jge   .L124
   ret
-<<<<<<< HEAD
-.L4:
-||||||| parent of 42782c097b (passes testsuite)
-.L134:
-=======
-.L123:
->>>>>>> 42782c097b (passes testsuite)
+.L124:
   incq  %rax
   ret
-<<<<<<< HEAD
-.L5:
-||||||| parent of 42782c097b (passes testsuite)
-.L141:
-=======
-.L107:
-<<<<<<< HEAD
-  subq  $8, %rsp
->>>>>>> 42782c097b (passes testsuite)
-||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
-  subq  $8, %rsp
-=======
->>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
-  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
 |}]
 
 let rem x y = Int64_u.rem x y
@@ -261,52 +157,22 @@ let rem x y = Int64_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-<<<<<<< HEAD
-  je    .L1
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L117
-=======
-  je    .L101
->>>>>>> 42782c097b (passes testsuite)
-  cmpq  $-1, %rcx
-<<<<<<< HEAD
-  je    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L111
-=======
-  je    .L106
->>>>>>> 42782c097b (passes testsuite)
-  cqto
-  idivq %rcx
-  movq  %rdx, %rax
-  ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L111:
-=======
-.L106:
->>>>>>> 42782c097b (passes testsuite)
-  xorl  %eax, %eax
-  ret
-<<<<<<< HEAD
-.L1:
-||||||| parent of 42782c097b (passes testsuite)
-.L117:
-=======
-.L101:
-<<<<<<< HEAD
-  subq  $8, %rsp
->>>>>>> 42782c097b (passes testsuite)
-||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
-  subq  $8, %rsp
-=======
->>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
+  jne   .L104
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L104:
+  cmpq  $-1, %rcx
+  je    .L107
+  cqto
+  idivq %rcx
+  movq  %rdx, %rax
+  ret
+.L107:
+  xorl  %eax, %eax
+  ret
 |}]
 
 (* CR ttebbi: These are way too many instructions. *)
@@ -316,13 +182,15 @@ unsigned_rem:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-<<<<<<< HEAD
-  jge   .L1
-||||||| parent of 42782c097b (passes testsuite)
-  jge   .L118
-=======
-  jge   .L110
->>>>>>> 42782c097b (passes testsuite)
+  jge   .L121
+  jmp   .L116
+.L114:
+  movq  %rax, %rbx
+  imulq %rcx, %rbx
+  movq  %rdi, %rax
+  subq  %rbx, %rax
+  ret
+.L116:
   movabsq $-9223372036854775808, %rbx
   movq  %rcx, %rax
   subq  %rbx, %rax
@@ -330,126 +198,47 @@ unsigned_rem:
   movq  %rdi, %rbx
   subq  %rsi, %rbx
   cmpq  %rax, %rbx
-<<<<<<< HEAD
-  jge   .L0
-||||||| parent of 42782c097b (passes testsuite)
-  jge   .L112
-=======
-  jge   .L108
->>>>>>> 42782c097b (passes testsuite)
-  xorl  %ebx, %ebx
-<<<<<<< HEAD
-  jmp   .L5
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-  jmp   .L148
-.L112:
-=======
-  jmp   .L101
-.L108:
->>>>>>> 42782c097b (passes testsuite)
-  movl  $1, %ebx
-<<<<<<< HEAD
-  jmp   .L5
-.L1:
-||||||| parent of 42782c097b (passes testsuite)
-  jmp   .L148
-.L118:
-=======
-  jmp   .L101
-.L110:
->>>>>>> 42782c097b (passes testsuite)
-  testq %rcx, %rcx
-<<<<<<< HEAD
-  je    .L4
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L144
-=======
-  je    .L109
->>>>>>> 42782c097b (passes testsuite)
-  movq  %rdi, %rax
-  shrq  $1, %rax
-  cmpq  $-1, %rcx
-<<<<<<< HEAD
-  je    .L2
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L126
-=======
-  je    .L115
->>>>>>> 42782c097b (passes testsuite)
-  cqto
-  idivq %rcx
-  movq  %rax, %rbx
-<<<<<<< HEAD
-  jmp   .L3
-.L2:
-||||||| parent of 42782c097b (passes testsuite)
-  jmp   .L129
-.L126:
-=======
-  jmp   .L118
-.L115:
->>>>>>> 42782c097b (passes testsuite)
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-<<<<<<< HEAD
-.L3:
-||||||| parent of 42782c097b (passes testsuite)
-.L129:
-=======
-.L118:
->>>>>>> 42782c097b (passes testsuite)
-  salq  $1, %rbx
-  movabsq $-9223372036854775808, %rsi
-  movq  %rcx, %rax
-  subq  %rsi, %rax
-  movabsq $-9223372036854775808, %r8
-  movq  %rbx, %rsi
-  imulq %rcx, %rsi
-  movq  %rdi, %rdx
-  subq  %rsi, %rdx
-  subq  %r8, %rdx
-  cmpq  %rax, %rdx
-<<<<<<< HEAD
-  jl    .L5
-||||||| parent of 42782c097b (passes testsuite)
-  jl    .L148
-=======
-  jl    .L101
->>>>>>> 42782c097b (passes testsuite)
-  incq  %rbx
-<<<<<<< HEAD
-  jmp   .L5
-.L4:
-||||||| parent of 42782c097b (passes testsuite)
-  jmp   .L148
-.L144:
-=======
-  jmp   .L101
-.L109:
-<<<<<<< HEAD
-  subq  $8, %rsp
->>>>>>> 42782c097b (passes testsuite)
-||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
-  subq  $8, %rsp
-=======
->>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
+  jge   .L119
+  xorl  %eax, %eax
+  jmp   .L114
+.L119:
+  movl  $1, %eax
+  jmp   .L114
+.L120:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-<<<<<<< HEAD
-.L5:
-||||||| parent of 42782c097b (passes testsuite)
-.L148:
-=======
-.L101:
->>>>>>> 42782c097b (passes testsuite)
-  imulq %rcx, %rbx
-  movq  %rdi, %rax
+.L121:
+  testq %rcx, %rcx
+  je    .L120
+  movq  %rdi, %rbx
+  shrq  $1, %rbx
+  cmpq  $-1, %rcx
+  je    .L125
+  movq  %rbx, %rax
+  cqto
+  idivq %rcx
+  jmp   .L126
+.L125:
+  xorl  %eax, %eax
   subq  %rbx, %rax
-  ret
+.L126:
+  salq  $1, %rax
+  movabsq $-9223372036854775808, %rsi
+  movq  %rcx, %rbx
+  subq  %rsi, %rbx
+  movabsq $-9223372036854775808, %r8
+  movq  %rax, %rsi
+  imulq %rcx, %rsi
+  movq  %rdi, %rdx
+  subq  %rsi, %rdx
+  subq  %r8, %rdx
+  cmpq  %rbx, %rdx
+  jl    .L114
+  incq  %rax
+  jmp   .L114
 |}]
 
 (* CR ttebbi: This could be just a bitwise and. *)
@@ -471,24 +260,14 @@ unsigned_rem_2:
   subq  %rdi, %rsi
   subq  %rcx, %rsi
   cmpq  %rdx, %rsi
-<<<<<<< HEAD
-  jl    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  jl    .L120
-=======
-  jl    .L101
->>>>>>> 42782c097b (passes testsuite)
-  incq  %rbx
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L120:
-=======
-.L101:
->>>>>>> 42782c097b (passes testsuite)
+  jge   .L115
+.L112:
   salq  $1, %rbx
   subq  %rbx, %rax
   ret
+.L115:
+  incq  %rbx
+  jmp   .L112
 |}]
 
 let succ x = Int64_u.succ x
@@ -511,22 +290,10 @@ let abs x = Int64_u.abs x
 abs:
   movq  %rax, %rbx
   cmpq  $0, %rbx
-<<<<<<< HEAD
-  jl    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  jl    .L105
-=======
-  jl    .L102
->>>>>>> 42782c097b (passes testsuite)
+  jl    .L103
   movq  %rbx, %rax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L105:
-=======
-.L102:
->>>>>>> 42782c097b (passes testsuite)
+.L103:
   xorl  %eax, %eax
   subq  %rbx, %rax
   ret
@@ -612,56 +379,22 @@ let unsigned_to_int x = Int64_u.unsigned_to_int x
 unsigned_to_int:
   movq  %rax, %rbx
   cmpq  $0, %rbx
-<<<<<<< HEAD
-  jl    .L1
-||||||| parent of 42782c097b (passes testsuite)
-  jl    .L112
-=======
-  jl    .L104
->>>>>>> 42782c097b (passes testsuite)
+  jl    .L106
   movabsq $4611686018427387903, %rax
   cmpq  %rax, %rbx
-<<<<<<< HEAD
-  jg    .L1
-||||||| parent of 42782c097b (passes testsuite)
-  jg    .L112
-=======
-  jg    .L104
->>>>>>> 42782c097b (passes testsuite)
+  jg    .L106
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jb    .L115
-.L0:
-||||||| parent of de3d4ac415 (working prototype)
-  jb    .L115
-.L117:
-=======
   jb    .L122
 .L124:
->>>>>>> de3d4ac415 (working prototype)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L122
-.L124:
-=======
-  jb    .L107
-.L109:
->>>>>>> 42782c097b (passes testsuite)
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)
   leaq  1(%rbx,%rbx), %rbx
   movq  %rbx, (%rax)
   addq  $8, %rsp
   ret
-<<<<<<< HEAD
-.L1:
-||||||| parent of 42782c097b (passes testsuite)
-.L112:
-=======
-.L104:
->>>>>>> 42782c097b (passes testsuite)
+.L106:
   movl  $1, %eax
   ret
 |}]
@@ -681,24 +414,8 @@ to_float:
   vcvtsi2sdq %rax, %xmm0, %xmm0
   subq  $16, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jb    .L105
-.L0:
-||||||| parent of de3d4ac415 (working prototype)
-  jb    .L105
-.L107:
-=======
   jb    .L108
 .L110:
->>>>>>> de3d4ac415 (working prototype)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L108
-.L110:
-=======
-  jb    .L103
-.L105:
->>>>>>> 42782c097b (passes testsuite)
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd %xmm0, (%rax)
@@ -719,27 +436,8 @@ to_int32:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jb    .L106
-.L0:
-||||||| parent of de3d4ac415 (working prototype)
-  jb    .L106
-.L108:
-=======
   jb    .L110
 .L112:
->>>>>>> de3d4ac415 (working prototype)
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L110
-.L112:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-=======
-  jb    .L104
-.L106:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
 >>>>>>> 42782c097b (passes testsuite)
@@ -765,27 +463,8 @@ to_nativeint:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jb    .L104
-.L0:
-||||||| parent of de3d4ac415 (working prototype)
-  jb    .L104
-.L106:
-=======
   jb    .L106
 .L108:
->>>>>>> de3d4ac415 (working prototype)
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L106
-.L108:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-=======
-  jb    .L102
-.L104:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
 >>>>>>> 42782c097b (passes testsuite)
@@ -836,31 +515,8 @@ float_of_bits:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jb    .L105
-.L0:
-||||||| parent of de3d4ac415 (working prototype)
-  jb    .L105
-.L107:
-=======
   jb    .L108
 .L110:
->>>>>>> de3d4ac415 (working prototype)
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vmovq %rbx, %xmm0
-  vmovsd %xmm0, (%rax)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L108
-.L110:
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vmovq %rbx, %xmm0
-  vmovsd %xmm0, (%rax)
-=======
-  jb    .L103
-.L105:
   leaq  8(%r15), %rbx
   movq  $1277, -8(%rbx)
   vmovq %rax, %xmm0
@@ -988,27 +644,8 @@ to_int64:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jb    .L104
-.L0:
-||||||| parent of de3d4ac415 (working prototype)
-  jb    .L104
-.L106:
-=======
   jb    .L106
 .L108:
->>>>>>> de3d4ac415 (working prototype)
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L106
-.L108:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-=======
-  jb    .L102
-.L104:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
 >>>>>>> 42782c097b (passes testsuite)

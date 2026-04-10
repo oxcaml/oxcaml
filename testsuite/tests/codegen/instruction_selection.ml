@@ -94,23 +94,11 @@ logand_branch:
   movq  %rdi, %rbx
   andl  $33, %eax
   cmpq  $1, %rax
-<<<<<<< HEAD
-  je    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L108
-=======
-  je    .L103
->>>>>>> 42782c097b (passes testsuite)
+  je    .L105
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L108:
-=======
-.L103:
->>>>>>> 42782c097b (passes testsuite)
+.L105:
   movl  $1, %eax
   ret
 |}]
@@ -131,30 +119,12 @@ combine_comparisons:
   cmpq  $41, %rbx
   setl  %al
   cmpq  $11, %rbx
-<<<<<<< HEAD
-  jle   .L0
-||||||| parent of 42782c097b (passes testsuite)
-  jle   .L114
-=======
-  jle   .L107
->>>>>>> 42782c097b (passes testsuite)
+  jle   .L108
   testq %rax, %rax
-<<<<<<< HEAD
-  je    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L114
-=======
-  je    .L107
->>>>>>> 42782c097b (passes testsuite)
+  je    .L108
   movq  %rbx, %rax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L114:
-=======
-.L107:
->>>>>>> 42782c097b (passes testsuite)
+.L108:
   movl  $1, %eax
   ret
 |}]
@@ -243,24 +213,8 @@ two_element_list:
   subq  $8, %rsp
   subq  $48, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jb    .L105
-.L0:
-||||||| parent of de3d4ac415 (working prototype)
-  jb    .L105
-.L107:
-=======
   jb    .L108
 .L110:
->>>>>>> de3d4ac415 (working prototype)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L108
-.L110:
-=======
-  jb    .L103
-.L105:
->>>>>>> 42782c097b (passes testsuite)
   leaq  8(%r15), %rdi
   addq  $24, %rdi
   movq  $2048, -8(%rdi)
@@ -375,24 +329,8 @@ pause:
   subq  $8, %rsp
   pause
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jbe   .L105
-.L0:
-||||||| parent of de3d4ac415 (working prototype)
-  jbe   .L105
-.L106:
-=======
   jbe   .L108
 .L109:
->>>>>>> de3d4ac415 (working prototype)
-||||||| parent of 42782c097b (passes testsuite)
-  jbe   .L108
-.L109:
-=======
-  jbe   .L103
-.L104:
->>>>>>> 42782c097b (passes testsuite)
   movl  $1, %eax
   addq  $8, %rsp
   ret
@@ -463,23 +401,11 @@ let is_int_branch (x : 'a) f = if Obj.is_int(Obj.repr x) then f()
 [%%expect_asm X86_64{|
 is_int_branch:
   testb $1, %al
-<<<<<<< HEAD
-  je    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L107
-=======
-  je    .L102
->>>>>>> 42782c097b (passes testsuite)
+  je    .L104
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L107:
-=======
-.L102:
->>>>>>> 42782c097b (passes testsuite)
+.L104:
   movl  $1, %eax
   ret
 |}]
@@ -490,22 +416,10 @@ let is_block_branch (x : 'a) f = if not(Obj.is_int(Obj.repr x)) then f()
 [%%expect_asm X86_64{|
 is_block_branch:
   testb $1, %al
-<<<<<<< HEAD
-  je    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L105
-=======
-  je    .L102
->>>>>>> 42782c097b (passes testsuite)
+  je    .L104
   movl  $1, %eax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L105:
-=======
-.L102:
->>>>>>> 42782c097b (passes testsuite)
+.L104:
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
@@ -523,31 +437,13 @@ let branch_or_tailcall x =
 [%%expect_asm X86_64{|
 branch_or_tailcall:
   cmpq  $5, %rax
-<<<<<<< HEAD
-  jbe   .L0
-||||||| parent of 42782c097b (passes testsuite)
-  jbe   .L105
-=======
-  jbe   .L102
-<<<<<<< HEAD
-  subq  $8, %rsp
->>>>>>> 42782c097b (passes testsuite)
-||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
-  subq  $8, %rsp
-=======
->>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
+  jbe   .L103
   movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L105:
-=======
-.L102:
->>>>>>> 42782c097b (passes testsuite)
+.L103:
   movq  camlTOP28__switch_block919@GOTPCREL(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
