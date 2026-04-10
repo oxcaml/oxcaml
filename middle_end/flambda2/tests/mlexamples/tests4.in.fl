@@ -29,7 +29,7 @@
        cont k3 (a, b)
      where k3 (a : imm tagged, b : float boxed) =
        let prim = %untag_imm (a) in
-       let prim_1 = %num_conv.[`imm`].[`float`] (prim) in
+       let prim_1 = %num_conv.[`imm`].[`float`].[`signed`] (prim) in
        let float_of_int = %box_num.`float` (prim_1) in
        let prim_2 = %unbox_num.`float` (b) in
        let prim_3 = %unbox_num.`float` (float_of_int) in
@@ -66,7 +66,7 @@
        cont k3 (a, b)
      where k3 (a : imm tagged, b : float boxed) =
        let prim = %untag_imm (a) in
-       let prim_1 = %num_conv.[`imm`].[`float`] (prim) in
+       let prim_1 = %num_conv.[`imm`].[`float`].[`signed`] (prim) in
        let float_of_int = %box_num.`float` (prim_1) in
        let prim_2 = %unbox_num.`float` (b) in
        let prim_3 = %unbox_num.`float` (float_of_int) in
@@ -107,7 +107,7 @@
        let Pfield = %block_load.[`1`] (pair) in
        let Pfield_1 = %block_load.[`0`] (pair) in
        let prim = %untag_imm (Pfield_1) in
-       let prim_1 = %num_conv.[`imm`].[`float`] (prim) in
+       let prim_1 = %num_conv.[`imm`].[`float`].[`signed`] (prim) in
        let float_of_int = %box_num.`float` (prim_1) in
        let prim_2 = %unbox_num.`float` (Pfield) in
        let prim_3 = %unbox_num.`float` (float_of_int) in
@@ -161,7 +161,7 @@
        let a = %block_load.[`0`] (pair) in
        let Pfield = %block_load.[`0`] (b) in
        let prim = %untag_imm (a) in
-       let prim_1 = %num_conv.[`imm`].[`int32`] (prim) in
+       let prim_1 = %num_conv.[`imm`].[`int32`].[`signed`] (prim) in
        let int32_of_int = %box_num.`int32` (prim_1) in
        let prim_2 = %unbox_num.`int32` (Pfield) in
        let prim_3 = %unbox_num.`int32` (int32_of_int) in
@@ -169,7 +169,7 @@
        let int32_sub = %box_num.`int32` (prim_4) in
        let Pfield_1 = %block_load.[`1`] (b) in
        let prim_5 = %untag_imm (a) in
-       let prim_6 = %num_conv.[`imm`].[`int64`] (prim_5) in
+       let prim_6 = %num_conv.[`imm`].[`int64`].[`signed`] (prim_5) in
        let int64_of_int = %box_num.`int64` (prim_6) in
        let prim_7 = %unbox_num.`int64` (Pfield_1) in
        let prim_8 = %unbox_num.`int64` (int64_of_int) in
