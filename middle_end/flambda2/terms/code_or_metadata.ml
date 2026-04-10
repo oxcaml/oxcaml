@@ -13,8 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module File_sections = Oxcaml_utils.File_sections
-
 type code_status =
   | Loaded of Code.t
   | Not_loaded of

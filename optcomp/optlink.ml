@@ -26,7 +26,7 @@ module type S = sig
   val link_partial : string -> string list -> unit
 
   val check_consistency :
-    Linkenv.t -> string -> Cmx_format.unit_infos -> Digest.t -> unit
+    Linkenv.t -> string -> Compilenv_flambda.unit_infos -> Digest.t -> unit
 end
 
 module Make (Backend : Optcomp_intf.Backend) : S = struct
@@ -51,7 +51,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   (* First pass: determine which units are needed *)
 
   type file =
-    | Unit of string * unit_infos * Digest.t
+    | Unit of string * Compilenv_flambda.unit_infos * Digest.t
     | Library of string * library_infos
 
   (* CR mshinwell: This should not be raising errors from [Linkenv] *)
@@ -66,7 +66,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
          see which modules it requires. *)
       let info, crc =
         Profile.record_call ~accumulate:true "link/scan/read_cmx" (fun () ->
-            read_unit_info file_name)
+            Compilenv_flambda.read_unit_info file_name)
       in
       Unit (file_name, info, crc)
     else if Filename.check_suffix file_name Backend.ext_flambda_lib

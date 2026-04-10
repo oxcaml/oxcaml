@@ -63,14 +63,14 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
         { cmi with cmi_sign = Subst.Lazy.of_signature cmi.cmi_sign })
       bundled_cmis
   in
-  let bundled_cmxs : (Cmx_format.unit_infos_raw * string array) list =
+  let bundled_cmxs : (Compilenv_flambda.unit_infos_raw * string array) list =
     Marshal.from_string marshalled_cmx_bundle 0
   in
   let new_cmxs =
     List.map
-      (fun ((uir, sections) : Cmx_format.unit_infos_raw * _) ->
+      (fun ((uir, sections) : Compilenv_flambda.unit_infos_raw * _) ->
         let sections =
-          Oxcaml_utils.File_sections.from_array
+          File_sections.from_array
             (Array.map (fun s -> Marshal.from_string s 0) sections)
         in
         let export_info =
@@ -78,7 +78,7 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
             uir.uir_export_info
         in
-        let ui : Cmx_format.unit_infos =
+        let ui : Compilenv_flambda.unit_infos =
           { ui_unit = uir.uir_unit;
             ui_defines = uir.uir_defines;
             ui_format = uir.uir_format;
@@ -160,8 +160,8 @@ let eval (expr : 'a expr) =
      refill the cache. *);
   let _ =
     List.for_all
-      (fun (info : Cmx_format.unit_infos) ->
-        Compilenv.cache_unit_info info;
+      (fun (info : Compilenv_flambda.unit_infos) ->
+        Compilenv_flambda.cache_unit_info info;
         true)
       !cmxs
   in

@@ -53,7 +53,7 @@ val prepare_for_export :
 
 val iter_code : t -> f:(Code.t -> unit) -> unit
 
-val from_raw : sections:Oxcaml_utils.File_sections.t -> raw -> t
+val from_raw : sections:File_sections.t -> raw -> t
 
 val to_raw : add_section:(Obj.t -> int) -> t -> raw
 

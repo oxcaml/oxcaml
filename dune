@@ -143,6 +143,7 @@
   asttypes
   cmo_format
   cmj_format
+  cmx_format
   outcometree
   parsetree
   debug_event
@@ -188,6 +189,10 @@
   language_extension
   zero_alloc_utils
   zero_alloc_annotations
+  zero_alloc_info
+  lru
+  file_sections
+  compilenv
   ;; PARSING
   location
   longident
@@ -331,6 +336,7 @@
   asttypes
   cmo_format
   cmj_format
+  cmx_format
   outcometree
   parsetree
   debug_event
@@ -530,17 +536,15 @@
   (backend bisect_ppx))
  (modules_without_implementation
   branch_relaxation_intf
-  cmx_format
   cmxs_format
   x86_ast)
  (modules
   ;; To match the Makefiles, ocamloptcomp needs to include ocamlmiddleend.
   ;; file_formats/
-  cmx_format
   cmxs_format
   ;; middle_end/
   backend_var
-  compilenv
+  compilenv_flambda
   ;; asmcomp/
   asmgen
   binary_emitter_verify
@@ -630,7 +634,6 @@
   x86_proc
   jit_backend
   zero_alloc_checker
-  zero_alloc_info
   ;; backend/cfg
   cfg
   cfg_available_regs

@@ -38,7 +38,7 @@ end) : S = struct
       try Load_path.find name
       with Not_found -> raise (Error (File_not_found name))
     in
-    let info, crc = Compilenv.read_unit_info filename in
+    let info, crc = Compilenv_flambda.read_unit_info filename in
     info.ui_force_link <- info.ui_force_link || !Clflags.link_everything;
     (* There is no need to keep the approximation in the flambda library file,
        since the compiler will go looking directly for flambda object files. The
