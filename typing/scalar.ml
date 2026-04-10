@@ -462,7 +462,12 @@ module Operation = struct
               ListLabels.map Float_op.all ~f:(fun op -> Floating (size, op)));
           ListLabels.concat_map all ~f:(fun src ->
               ListLabels.concat_map all ~f:(fun dst ->
-                  ListLabels.concat_map Signedness.all ~f:(fun signedness ->
+                  let src_signedness : Signedness.t list =
+                    match (src : (_ Width.t, _ Width.t) Maybe_naked.t) with
+                    | Value (Integral _) | Naked (Integral _) -> Signedness.all
+                    | Value (Floating _) | Naked (Floating _) -> [Signed]
+                  in
+                  ListLabels.concat_map src_signedness ~f:(fun signedness ->
                       if src = dst
                       then []
                       else [Static_cast { src; dst; signedness }]))) ]
