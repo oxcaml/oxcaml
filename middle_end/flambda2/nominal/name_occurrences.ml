@@ -793,11 +793,7 @@ let inter_domain_is_non_empty t1 t2 =
 let union_list ts =
   List.fold_left
     (fun acc t ->
-      if is_empty acc
-      then t
-      else if is_empty t
-      then acc
-      else union acc t)
+      if is_empty acc then t else if is_empty t then acc else union acc t)
     empty ts
 
 let function_slots_in_normal_projections t =

@@ -43,8 +43,7 @@ module Make_map (T : Thing) (Set : Set_plus_stdlib with type elt = T.t) = struct
 
   let union_left_biased t1 t2 = union_total (fun _ left _right -> left) t1 t2
 
-  let union_right_biased t1 t2 =
-    union_total (fun _ _left right -> right) t1 t2
+  let union_right_biased t1 t2 = union_total (fun _ _left right -> right) t1 t2
 
   let disjoint_union ?eq ?print m1 m2 =
     ignore print;
