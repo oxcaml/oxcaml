@@ -31,7 +31,7 @@ let get_module_info comp_unit =
       (Flambda2_identifiers.Symbol.external_symbols_compilation_unit ()
       |> Compilation_unit.name)
   then None
-  else Compilenv.get_unit_export_info comp_unit
+  else Compilenv_flambda.get_unit_export_info comp_unit
 
 let dump_to_target_if_any main_dump_ppf target ~header ~f a =
   match (target : Flambda_features.dump_target) with
@@ -249,7 +249,7 @@ let flambda_to_flambda0 : type m.
   (match cmx with
   | None ->
     () (* Either opaque was passed, or there is no need to export offsets *)
-  | Some cmx -> Compilenv.set_export_info cmx);
+  | Some cmx -> Compilenv_flambda.set_export_info cmx);
   { flambda; offsets; reachable_names; all_code }
 
 let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width ~code_slot_offsets

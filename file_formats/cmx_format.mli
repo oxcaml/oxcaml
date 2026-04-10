@@ -51,7 +51,7 @@ type generic_fns =
     apply_fun: apply_fn list;
     send_fun: apply_fn list }
 
-type 'format unit_infos_gen =
+type ('format, 'export_info) unit_infos_gen =
   { mutable ui_unit: Compilation_unit.t;  (* Compilation unit implemented *)
     mutable ui_defines: Compilation_unit.t list;
                                           (* All compilation units in the
@@ -69,7 +69,7 @@ type 'format unit_infos_gen =
     mutable ui_format: 'format;
                                           (* Structure of the main module block *)
     mutable ui_generic_fns: generic_fns;  (* Generic functions needed *)
-    mutable ui_export_info: Flambda2_cmx.Flambda_cmx_format.t option;
+    mutable ui_export_info: 'export_info;
     mutable ui_zero_alloc_info: Zero_alloc_info.t;
     mutable ui_force_link: bool;          (* Always linked *)
     mutable ui_requires_metaprogramming: bool;
@@ -77,9 +77,7 @@ type 'format unit_infos_gen =
     mutable ui_external_symbols: string list; (* Set of external symbols *)
   }
 
-type unit_infos = Lambda.main_module_block_format unit_infos_gen
-
-type unit_infos_raw =
+type 'raw_export_info unit_infos_raw =
   { uir_unit: Compilation_unit.t;
     uir_defines: Compilation_unit.t list;
     uir_arg_descr: Lambda.arg_descr option;
@@ -88,7 +86,7 @@ type unit_infos_raw =
     uir_quoted_globals: Compilation_unit.Name.t array;
     uir_format: Lambda.main_module_block_format;
     uir_generic_fns: generic_fns;
-    uir_export_info: Flambda2_cmx.Flambda_cmx_format.raw option;
+    uir_export_info: 'raw_export_info;
     uir_zero_alloc_info: Zero_alloc_info.Raw.t;
     uir_force_link: bool;
     uir_requires_metaprogramming: bool;

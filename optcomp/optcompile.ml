@@ -238,7 +238,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   include Optlibrarian.Make (Link_input)
 
   let read_unit_info file : Instantiator.unit_info =
-    let unit_info, _crc = Compilenv.read_unit_info file in
+    let unit_info, _sections, _crc = Compilenv.read_unit_info file in
     let { Cmx_format.ui_unit; ui_arg_descr; ui_format; _ } = unit_info in
     { Instantiator.ui_unit; ui_arg_descr; ui_format }
 
