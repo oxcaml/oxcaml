@@ -64,84 +64,84 @@ let unwrap_loc located = located.Fexpr.txt
 (* Parsing fexpr parameters. Low-brow iteration through constructors in
    declaration order, consuming the param list on match. *)
 let extract_param (env : decode_env) (params : param list)
-    (cons : 'p param_cons) : 'p option * param list =
+    (cons : 'p param_cons) : ('p * param list) option =
   let rec value conv lp params =
     match params with
-    | [] -> None, lp
+    | [] -> None
     | (Labeled (l, args) as p) :: rp -> (
       match conv env l args with
-      | Some p -> Some p, lp @ rp
-      | None -> value conv (lp @ [p]) rp)
-    | (Anonymous _ as p) :: rp -> value conv (lp @ [p]) rp
+      | Some p -> Some (p, List.rev_append lp rp)
+      | None -> value conv (p :: lp) rp)
+    | (Anonymous _ as p) :: rp -> value conv (p :: lp) rp
   in
-  let void params = Some (), params in
+  let void params = Some ((), params) in
   let rec atom : type p.
-      p param_cons -> param list -> param list -> p option * param list =
+      p param_cons -> param list -> param list -> (p * param list) option =
    fun cons lp params ->
     match params with
-    | [] -> None, lp
-    | (Labeled _ as p) :: rp -> atom cons (lp @ [p]) rp
-    | (Anonymous ps as _p) :: _rp -> (
+    | [] -> None
+    | (Labeled _ as p) :: rp -> atom cons (p :: lp) rp
+    | Anonymous ps :: rp -> (
       match aux cons ps with
-      | None, _ | Some _, _ :: _ -> None, params
-      | Some p, [] -> Some p, params)
+      | None | Some (_, _ :: _) -> None
+      | Some (p, []) -> Some (p, List.rev_append lp rp))
   and lbl : type p a.
-      (p, a) labeled_lens -> a param_cons -> param list -> p option * param list
-      =
+      (p, a) labeled_lens ->
+      a param_cons ->
+      param list ->
+      (p * param list) option =
    fun lens cons params ->
     let decode env label args =
       match aux cons args with
-      | None, _ | Some _, _ :: _ -> None
-      | Some args, [] -> lens.decode env (label, args)
+      | None | Some (_, _ :: _) -> None
+      | Some (args, []) -> lens.decode env (label, args)
     in
     value decode [] params
-  and def : type p. p -> p param_cons -> param list -> p option * param list =
+  and def : type p. p -> p param_cons -> param list -> (p * param list) option =
    fun d cons params ->
-    match aux cons params with
-    | None, params -> Some d, params
-    | found, params -> found, params
-  and opt : type p. p param_cons -> param list -> p option option * param list =
+    match aux cons params with None -> Some (d, params) | found -> found
+  and opt : type p. p param_cons -> param list -> (p option * param list) option
+      =
    fun cons params ->
-    let (found : p option), params = aux cons params in
-    Some found, params
-  and etr : type p. p case_cons list -> param list -> p option * param list =
+    match aux cons params with
+    | None -> Some (None, params)
+    | Some (p, params) -> Some (Some p, params)
+  and etr : type p. p case_cons list -> param list -> (p * param list) option =
    fun cases params ->
     match cases with
-    | [] -> None, params
+    | [] -> None
     | Case (conv, param_cons) :: cases -> (
       match aux param_cons params with
-      | Some p, params -> Some (conv.decode env (Some p)), params
-      | None, _ -> etr cases params)
+      | Some (p, params) -> Some (conv.decode env (Some p), params)
+      | None -> etr cases params)
   and map : type a b.
       a param_cons ->
       (decode_env -> a -> b) ->
       param list ->
-      b option * param list =
+      (b * param list) option =
    fun cons f params ->
-    let p, params = aux cons params in
-    Option.map (f env) p, params
+    Option.map (fun (p, params) -> f env p, params) (aux cons params)
   and param2 : type p q.
-      p param_cons -> q param_cons -> param list -> (p * q) option * param list
-      =
+      p param_cons ->
+      q param_cons ->
+      param list ->
+      ((p * q) * param list) option =
    fun pc1 pc2 params ->
-    let p1, params = aux pc1 params in
-    let p2, params = aux pc2 params in
-    Option.bind p1 (fun p1 -> Option.bind p2 (fun p2 -> Some (p1, p2))), params
+    Option.bind (aux pc1 params) (fun (p1, params) ->
+        Option.bind (aux pc2 params) (fun (p2, params) ->
+            Some ((p1, p2), params)))
   and param3 : type p q r.
       p param_cons ->
       q param_cons ->
       r param_cons ->
       param list ->
-      (p * q * r) option * param list =
+      ((p * q * r) * param list) option =
    fun pc1 pc2 pc3 params ->
-    let p1, params = aux pc1 params in
-    let p2, params = aux pc2 params in
-    let p3, params = aux pc3 params in
-    ( Option.bind p1 (fun p1 ->
-          Option.bind p2 (fun p2 ->
-              Option.bind p3 (fun p3 -> Some (p1, p2, p3)))),
-      params )
-  and aux : type p. p param_cons -> param list -> p option * param list =
+    Option.bind (aux pc1 params) (fun (p1, params) ->
+        Option.bind (aux pc2 params) (fun (p2, params) ->
+            Option.bind (aux pc3 params) (fun (p3, params) ->
+                Some ((p1, p2, p3), params))))
+  and aux : type p. p param_cons -> param list -> (p * param list) option =
     function
     | CLabeled (llens, pc) -> lbl llens pc
     | CDefault (pcons, default, _) -> def default pcons
@@ -187,15 +187,16 @@ let lens_of_cons id (cons : 'p param_cons) : 'p params_lens =
   { encode = (fun env p -> build_param env p cons);
     decode =
       (fun env params ->
-        let ps, rem = extract_param env params cons in
-        match ps with
-        | None -> Misc.fatal_errorf "Missing parameter for %s" id
-        | Some ps -> (
+        match extract_param env params cons with
+        | None ->
+          Misc.fatal_errorf "Missing parameter for@ %s%a" id
+            Print_fexpr.prim_params params
+        | Some (ps, rem) -> (
           match rem with
           | [] -> ps
           | _ ->
-            Format.eprintf "Unexpected parameter %a\n" Print_fexpr.prim_params
-              rem;
+            Format.eprintf "Unexpected parameter %a@ in %a\n"
+              Print_fexpr.prim_params rem Print_fexpr.prim_params params;
             ps))
   }
 

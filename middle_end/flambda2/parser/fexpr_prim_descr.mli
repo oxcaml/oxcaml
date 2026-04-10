@@ -66,11 +66,11 @@ val unwrap_loc : 'a Fexpr.located -> 'a
 
     As {!type:param} shows, there is two kinds of primitive parameter:
     - Tuples, written [.[val1, ..., valN]]
-    - Labeled, written [.label[val1, ..., valN]].
-      They can be without arguments [.label] to denote flags.
-    Both of them can be nested, the dot separator is only for toplevel parameters.
+    - Labeled, written [.label[val1, ..., valN]]. They can be without arguments
+      [.label] to denote flags.
 
-    Flags and labeled can appear in any order, at any positions.
+    Flags and labeled can appear in any order, at any positions. Both of them
+    can be nested, the dot separator is only for toplevel parameters.
 
     The type {!type:value_lens} is used to describe conversions of custom types.
     Label, flags and inner values are all treated the same.
@@ -215,7 +215,6 @@ module Describe : sig
   (** Same as {!val:string}. With some tweaks to the parser, we could call
       actual parsing start-points in it. *)
   val diy : string Fexpr.located param_cons
-
 end
 
 (** Fetch primitive conversion function from registered descriptions *)
