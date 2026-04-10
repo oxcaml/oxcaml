@@ -39,6 +39,8 @@ val set_label : t -> unit
 
 val cur_label : unit -> t
 
+val with_saved_counter : (unit -> 'a) -> 'a
+
 val reset : unit -> unit
 
 val to_int : t -> int

@@ -538,12 +538,13 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
          Printexc.raise_with_backtrace exn bt
      in
      let cfg_old =
-       let saved_instr_id = InstructionId.save Sub_cfg.instr_id in
-       let result =
-         Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
-       in
-       InstructionId.restore Sub_cfg.instr_id saved_instr_id;
-       result
+       Label.with_saved_counter (fun () ->
+           let saved_instr_id = InstructionId.save Sub_cfg.instr_id in
+           let result =
+             Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+           in
+           InstructionId.restore Sub_cfg.instr_id saved_instr_id;
+           result)
      in
      Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name ~fd_cmm ~ssa
        ~old_cfg:cfg_old ~new_cfg:cfg_new ppf_dump;

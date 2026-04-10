@@ -32,18 +32,16 @@ spill_cold_path:
   subq  $8, %rsp
   addq  $2, %rax
   cmpq  $201, %rax
-  je    .L106
-.L104:
-  addq  $4, %rax
-  addq  $8, %rsp
-  ret
-.L106:
+  jne   .L108
   movq  %rax, (%rsp)
   movl  $1, %eax
   call  camlTOP2__cold_1_3_code@PLT
-.L128:
+.L111:
   movq  (%rsp), %rax
-  jmp   .L104
+.L108:
+  addq  $4, %rax
+  addq  $8, %rsp
+  ret
 
 spill_cold_path.cold:
   movl  $1, %eax
@@ -109,11 +107,11 @@ f:
   subq  $24, %rsp
   movq  %rax, (%rsp)
   call  camlTOP7__g_11_13_code@PLT
-.L114:
+.L108:
   movq  %rax, 8(%rsp)
   movq  (%rsp), %rax
   call  camlTOP7__g_11_13_code@PLT
-.L115:
+.L109:
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
   addq  $24, %rsp
@@ -146,7 +144,7 @@ loop_readonly_use_spilled_var:
   ret
 .L106:
   call  camlTOP8__g_15_18_code@PLT
-.L125:
+.L109:
   movq  (%rsp), %rbx
   cmpq  $1, %rax
   jge   .L106
@@ -172,27 +170,17 @@ spill_unspill_loop_movement:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  $3, %rax
-  jl    .L110
-  jmp   .L109
-.L107:
-  leaq  -1(%rdi,%rsi), %rax
-  addq  $40, %rsp
-  ret
-.L109:
+  jl    .L119
   movq  %rax, (%rsp)
-  movq  %rdi, 32(%rsp)
+  movq  %rdi, 24(%rsp)
   movq  %rax, %rbx
   sarq  $1, %rbx
   movq  %rbx, 8(%rsp)
   movl  $1, %edi
-  jmp   .L111
 .L110:
-  movl  $1, %esi
-  jmp   .L107
-.L111:
   movq  %rdi, 16(%rsp)
   call  camlTOP9__f_20_23_code@PLT
-.L166:
+.L124:
   movq  %rax, %rsi
   movq  16(%rsp), %rdi
   movq  %rdi, %rdx
@@ -200,25 +188,27 @@ spill_unspill_loop_movement:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   cmpq  $11, %rdx
-  jg    .L116
-.L114:
-  incq  %rdi
-  cmpq  %rbx, %rdi
-  jg    .L120
-  jmp   .L111
-.L116:
-  movq  %rsi, 24(%rsp)
+  jle   .L116
+  movq  %rsi, 32(%rsp)
   movq  %rdi, 16(%rsp)
   call  camlTOP9__f_20_23_code@PLT
-.L167:
+.L125:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   movq  16(%rsp), %rdi
-  movq  24(%rsp), %rsi
-  jmp   .L114
+  movq  32(%rsp), %rsi
+.L116:
+  incq  %rdi
+  cmpq  %rbx, %rdi
+  jle   .L110
+  movq  24(%rsp), %rdi
+  jmp   .L120
+.L119:
+  movl  $1, %esi
 .L120:
-  movq  32(%rsp), %rdi
-  jmp   .L107
+  leaq  -1(%rdi,%rsi), %rax
+  addq  $40, %rsp
+  ret
 
 spill_unspill_loop_movement.f:
   ret
@@ -260,7 +250,7 @@ spill_xmm_on_caml_modify:
   movq  %rax, %r12
   vmovsd (%r12), %xmm0
   vmovsd %xmm0, (%rsp)
-  vmovsd .L117(%rip), %xmm0
+  vmovsd .L108(%rip), %xmm0
   vmovsd (%rsp), %xmm1
   vaddsd %xmm0, %xmm1, %xmm0
   vmovsd %xmm0, 8(%rsp)
@@ -296,19 +286,17 @@ unnecessary_moves:
   ret
 .L105:
   cmpq  %rsi, %rdi
-  jge   .L107
+  jge   .L108
   subq  $8, %rsp
   movq  %rax, (%rsp)
   movq  (%rbx), %rdi
   movq  %rcx, %rax
   call  *%rdi
-.L126:
-  jmp   .L108
-.L107:
-  ret
-.L108:
+.L110:
   movq  (%rsp), %rax
   addq  $8, %rsp
+  ret
+.L108:
   ret
 |}]
 
@@ -328,7 +316,7 @@ spill_one_or_two:
   movq  (%rdi), %rsi
   movq  %rdi, %rbx
   call  *%rsi
-.L112:
+.L106:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
@@ -356,32 +344,26 @@ double_loop_no_definition_at_beginning:
   movq  %rbx, %rsi
   movq  64(%r14), %rbx
   cmpq  $1, %rsi
-  jge   .L114
-.L112:
-  movq  %rbx, 64(%r14)
-  movl  $1, %eax
-  addq  $72, %rsp
-  ret
-.L114:
-  movq  %rbx, 56(%rsp)
-  movq  %rdi, 8(%rsp)
-  movq  %rax, (%rsp)
+  jl    .L126
+  movq  %rbx, 16(%rsp)
+  movq  %rdi, 32(%rsp)
+  movq  %rax, 24(%rsp)
   sarq  $1, %rsi
-  movq  %rsi, 16(%rsp)
+  movq  %rsi, 40(%rsp)
   xorl  %edx, %edx
-.L116:
-  movq  %rdx, 40(%rsp)
+.L115:
+  movq  %rdx, (%rsp)
   movq  64(%r14), %rbx
-  movq  %rbx, 48(%rsp)
+  movq  %rbx, 8(%rsp)
   movq  64(%r14), %rbx
   subq  $40, %rbx
   movq  %rbx, 64(%r14)
   cmpq  80(%r14), %rbx
-  jl    .L183
-.L184:
+  jl    .L130
+.L131:
   addq  72(%r14), %rbx
   addq  $8, %rbx
-  movq  %rbx, 24(%rsp)
+  movq  %rbx, 48(%rsp)
   movq  $5111, -8(%rbx)
   movq  camlTOP15__f_33_37_code@GOTPCREL(%rip), %rcx
   movq  %rcx, (%rbx)
@@ -392,30 +374,33 @@ double_loop_no_definition_at_beginning:
   movq  %rax, 24(%rbx)
   movq  %rdi, %rdx
   testb $1, %dl
-  je    .L123
-.L118:
-  movq  48(%rsp), %rbx
-  movq  %rbx, 64(%r14)
-  movq  40(%rsp), %rdx
-  incq  %rdx
-  cmpq  %rsi, %rdx
-  jle   .L116
-  movq  56(%rsp), %rbx
-  jmp   .L112
-.L123:
-  movq  %rdx, 32(%rsp)
+  jne   .L122
+.L120:
+  movq  %rdx, 56(%rsp)
   movq  (%rdx), %rax
   call  camlTOP15__f_33_37_code@PLT
-.L185:
-  movq  32(%rsp), %rdx
+.L132:
+  movq  56(%rsp), %rdx
   movq  8(%rdx), %rdx
-  movq  (%rsp), %rax
-  movq  8(%rsp), %rdi
-  movq  16(%rsp), %rsi
-  movq  24(%rsp), %rbx
+  movq  24(%rsp), %rax
+  movq  32(%rsp), %rdi
+  movq  40(%rsp), %rsi
+  movq  48(%rsp), %rbx
   testb $1, %dl
-  je    .L123
-  jmp   .L118
+  je    .L120
+.L122:
+  movq  8(%rsp), %rbx
+  movq  %rbx, 64(%r14)
+  movq  (%rsp), %rdx
+  incq  %rdx
+  cmpq  %rsi, %rdx
+  jle   .L115
+  movq  16(%rsp), %rbx
+.L126:
+  movq  %rbx, 64(%r14)
+  movl  $1, %eax
+  addq  $72, %rsp
+  ret
 
 double_loop_no_definition_at_beginning.f:
   movq  24(%rbx), %rsi
@@ -423,17 +408,17 @@ double_loop_no_definition_at_beginning.f:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rax
-  jb    .L196
+  jae   .L144
+  movq  16(%rbx), %rbx
+  movq  %rbx, -4(%rsi,%rax,4)
+  movl  $1, %eax
+  ret
+.L144:
   movq  camlTOP15__block741@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L196:
-  movq  16(%rbx), %rbx
-  movq  %rbx, -4(%rsi,%rax,4)
-  movl  $1, %eax
-  ret
 |}]
 
 
@@ -457,16 +442,7 @@ spilled_phi_merge:
   call  caml_sys_time_unboxed@PLT
   movq  8(%rsp), %rax
   cmpq  $1, %rax
-  jne   .L109
-.L106:
-  movq  %rbp, %rax
-  movq  24(%rsp), %rdi
-  movq  %r12, %rsi
-  movq  %r13, %rdx
-  movq  (%rsp), %rcx
-  addq  $56, %rsp
-  jmp   caml_apply5@PLT
-.L109:
+  je    .L110
   movq  %r13, 40(%rsp)
   movq  %r12, 32(%rsp)
   movq  24(%rsp), %rax
@@ -478,7 +454,7 @@ spilled_phi_merge:
   movq  (%rbx), %rdi
   movq  48(%rsp), %rbx
   call  *%rdi
-.L131:
+.L113:
   movq  (%rsp), %rsi
   movq  8(%rsp), %rbp
   movq  16(%rsp), %rbx
@@ -489,7 +465,14 @@ spilled_phi_merge:
   movq  %rdx, 24(%rsp)
   movq  %rax, %r12
   movq  %rdi, %r13
-  jmp   .L106
+.L110:
+  movq  %rbp, %rax
+  movq  24(%rsp), %rdi
+  movq  %r12, %rsi
+  movq  %r13, %rdx
+  movq  (%rsp), %rcx
+  addq  $56, %rsp
+  jmp   caml_apply5@PLT
 |}]
 
 
@@ -519,35 +502,35 @@ spill_slot_lifetime:
   subq  $56, %rsp
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L152:
+.L133:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L153:
+.L134:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L154:
+.L135:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L155:
+.L136:
   vmovsd %xmm0, 24(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L156:
+.L137:
   vmovsd %xmm0, 32(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L157:
+.L138:
   vmovsd %xmm0, 40(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L158:
+.L139:
   vmovsd %xmm0, 48(%rsp)
   movl  $1, %eax
   call  camlTOP17__get_one_39_43_code@PLT
-.L159:
+.L140:
   vxorpd %xmm1, %xmm1, %xmm1
   vmovsd (%rsp), %xmm2
   vaddsd %xmm2, %xmm1, %xmm1
@@ -568,7 +551,7 @@ spill_slot_lifetime:
   ret
 
 spill_slot_lifetime.get_one:
-  vmovsd .L164(%rip), %xmm0
+  vmovsd .L142(%rip), %xmm0
   ret
 |}]
 

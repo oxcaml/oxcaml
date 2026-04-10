@@ -57,7 +57,7 @@ end
 Variant_with_uneven_mutability.get:
   movzbq -8(%rax), %rbx
   cmpq  $1, %rbx
-  je    .L107
+  jne   .L107
   movq  (%rax), %rax
   ret
 .L107:
@@ -192,7 +192,7 @@ let unnecessary_match = function
 [%%expect_asm X86_64{|
 unnecessary_match:
   sarq  $1, %rax
-  leaq  .L143(%rip), %rdx
+  leaq  .L118(%rip), %rdx
   movslq (%rdx,%rax,4), %rax
   addq  %rax, %rdx
   jmp   *%rdx
@@ -251,49 +251,46 @@ double_match:
   movq  64(%r14), %rsi
   sarq  $1, %rax
   cmpq  $1, %rax
-  jb    .L111
-  je    .L112
-  ja    .L113
-.L109:
-  movq  (%rax), %rax
-  movq  %rsi, 64(%r14)
-  addq  $8, %rsp
-  ret
+  je    .L111
+  ja    .L112
+  movq  64(%r14), %rax
+  subq  $16, %rax
+  movq  %rax, 64(%r14)
+  cmpq  80(%r14), %rax
+  jl    .L114
+.L115:
+  addq  72(%r14), %rax
+  addq  $8, %rax
+  movq  $1792, -8(%rax)
+  movq  %rbx, (%rax)
+  jmp   .L113
 .L111:
   movq  64(%r14), %rax
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L138
-.L139:
+  jl    .L116
+.L117:
   addq  72(%r14), %rax
   addq  $8, %rax
-  movq  $1792, -8(%rax)
-  movq  %rbx, (%rax)
-  jmp   .L109
+  movq  $1793, -8(%rax)
+  movq  %rdi, (%rax)
+  jmp   .L113
 .L112:
   movq  64(%r14), %rax
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L140
-.L141:
-  addq  72(%r14), %rax
-  addq  $8, %rax
-  movq  $1793, -8(%rax)
-  movq  %rdi, (%rax)
-  jmp   .L109
-.L113:
-  movq  64(%r14), %rax
-  subq  $16, %rax
-  movq  %rax, 64(%r14)
-  cmpq  80(%r14), %rax
-  jl    .L142
-.L143:
+  jl    .L118
+.L119:
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)
   leaq  2(%rdi), %rbx
   movq  %rbx, (%rax)
-  jmp   .L109
+.L113:
+  movq  (%rax), %rax
+  movq  %rsi, 64(%r14)
+  addq  $8, %rsp
+  ret
 |}]

@@ -50,17 +50,14 @@ let mutable_load_branch r b =
 mutable_load_branch:
   movq  (%rax), %rdi
   cmpq  $1, %rbx
-  jne   .L107
-  jmp   .L106
-.L104:
+  jne   .L106
+  movl  $15, %eax
+  jmp   .L107
+.L106:
+  movq  %rdi, %rax
+.L107:
   leaq  -1(%rdi,%rax), %rax
   ret
-.L106:
-  movl  $15, %eax
-  jmp   .L104
-.L107:
-  movq  %rdi, %rax
-  jmp   .L104
 |}]
 
 type t = {a: int; b: string}

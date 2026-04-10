@@ -995,8 +995,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (env, 0) f.fun_args
     in
     emit_tail env entry_b f.fun_body;
-    let blocks = B.finish entry_b in
+    let blocks, blocks_create_order = B.finish entry_b in
     { Ssa.blocks;
+      Ssa.blocks_create_order;
       fun_name = f.fun_name.sym_name;
       fun_args = fun_arg_types;
       fun_args_names = f.fun_args;

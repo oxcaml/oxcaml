@@ -174,6 +174,7 @@ end
 
 type t =
   { blocks : block list;
+    blocks_create_order : block list;
     fun_name : string;
     fun_args : Cmm.machtype;
     fun_args_names : (Backend_var.With_provenance.t * Cmm.machtype) list;
@@ -248,13 +249,14 @@ module Builder : sig
   val block_params : t -> instruction array
 
   (** Finalize: collect all created blocks. Returns blocks in emission order. *)
-  val finish : t -> block list
+  val finish : t -> block list * block list
 end = struct
   (* Each [t] represents an incomplete block being built. All [t] values created
      from the same [make] call share the same [blocks] ref, which accumulates
      all created blocks in reverse order. *)
   type t =
     { blocks : block list ref;
+      blocks_create_order : block list ref;
       current_block : block;
       mutable body : instruction list;
       mutable block_finished : bool
@@ -262,21 +264,25 @@ end = struct
 
   let create_block_from t desc params =
     let blk = create_block ~desc ~params in
+    t.blocks_create_order := blk :: !(t.blocks_create_order);
     let new_t =
       { blocks = t.blocks;
+        blocks_create_order = t.blocks_create_order;
         current_block = blk;
         body = [];
         block_finished = false
       }
     in
-    t.blocks := blk :: !(t.blocks);
     new_t
 
   let make params =
-    let blocks = ref [] in
-    let blk = create_block ~desc:FunctionStart ~params in
-    blocks := [blk];
-    { blocks; current_block = blk; body = []; block_finished = false }
+    let start_block = create_block ~desc:FunctionStart ~params in
+    { blocks = ref [];
+      blocks_create_order = ref [start_block];
+      current_block = start_block;
+      body = [];
+      block_finished = false
+    }
 
   let current_block t = t.current_block
 
@@ -297,7 +303,8 @@ end = struct
     t.current_block.terminator <- term;
     t.current_block.terminator_dbg <- dbg;
     add_terminator_preds t.current_block term;
-    t.block_finished <- true
+    t.block_finished <- true;
+    t.blocks := t.current_block :: !(t.blocks)
 
   let create_merge t params =
     create_block_from t (Merge { predecessors = [] }) params
@@ -319,7 +326,7 @@ end = struct
         (Block_param { block = t.current_block; index = i; typ } : instruction))
       t.current_block.params
 
-  let finish t = List.rev !(t.blocks)
+  let finish t = List.rev !(t.blocks), List.rev !(t.blocks_create_order)
 end
 
 (* Printing *)
