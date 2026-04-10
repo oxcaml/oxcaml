@@ -96,8 +96,13 @@ arr_sum:
   jl    .L137
 =======
   jl    .L107
+<<<<<<< HEAD
   subq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  subq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   sarq  $1, %rsi
   movl  $1, %eax
   xorl  %edx, %edx
@@ -131,8 +136,13 @@ arr_sum:
   jle   .L114
 =======
   jle   .L109
+<<<<<<< HEAD
   addq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  addq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   ret
 <<<<<<< HEAD
 .L1:
@@ -174,7 +184,6 @@ let search ~target (start : int list) =
 ;;
 [%%expect_asm X86_64{|
 search:
-  subq  $8, %rsp
   movq  %rax, %rdi
   testb $1, %bl
 <<<<<<< HEAD
@@ -252,8 +261,13 @@ search:
   je    .L108
   jmp   .L107
 .L115:
+<<<<<<< HEAD
   addq  $8, %rsp
 >>>>>>> 42782c097b (passes testsuite)
+||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
+  addq  $8, %rsp
+=======
+>>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
   ret
 |}]
 
