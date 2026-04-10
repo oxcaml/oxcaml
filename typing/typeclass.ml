@@ -2039,7 +2039,10 @@ let type_classes define_class approx kind env cls =
     (* XCR rtjoa: there was no ~post here before - do we need to generalize? with
        local level generalize for class differs from the normal one
 
-       dkalinichenko: I'm not sure we do, but if we didn't before, let's not start? *)
+       dkalinichenko: I'm not sure we do, but if we didn't before, let's not start?
+
+       rtjoa: agreed, but will just leave this here until the testsuite passes
+    *)
     ~before_generalize:ignore
   in
   let res = List.rev_map (final_decl env define_class) res in
