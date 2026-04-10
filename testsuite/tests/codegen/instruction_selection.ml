@@ -376,7 +376,6 @@ let branch_or_tailcall x =
 branch_or_tailcall:
   cmpq  $5, %rax
   jbe   .L102
-  subq  $8, %rsp
   movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

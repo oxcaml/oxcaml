@@ -107,6 +107,11 @@ type terminator =
         continuation : Label.t;
         exn_continuation : Label.t option
       }
+  | Invalid of
+      { message : string;
+        args : instruction array;
+        continuation : Label.t option
+      }
 
 type block_desc =
   | Merge of { mutable predecessors : Label.t list }
@@ -133,10 +138,172 @@ type t =
     fun_codegen_options : Cmm.codegen_option list;
     fun_dbg : Debuginfo.t;
     entry_label : Label.t;
-    fun_contains_calls : bool;
     fun_poll : Lambda.poll_attribute;
     fun_ret_type : Cmm.machtype
   }
+
+(* === Builder: assembler-like interface for constructing SSA graphs ===
+   Maintains a current open block. [finish_block] seals the current block with a
+   terminator. *)
+
+module Builder : sig
+  type t
+
+  (** Create a builder with an initial open block. *)
+  val make : label:Label.t -> desc:block_desc -> params:Cmm.machtype -> t
+
+  (** The label of the current open block. *)
+  val current_label : t -> Label.t
+
+  (** Add an instruction to the current open block's body. *)
+  val emit_instruction : t -> instruction -> unit
+
+  (** Create an Op instruction and add it to the current block. *)
+  val emit_op :
+    t ->
+    op:Operation.t ->
+    dbg:Debuginfo.t ->
+    typ:Cmm.machtype ->
+    args:instruction array ->
+    instruction
+
+  (** Seal the current block with a terminator. *)
+  val finish_block : t -> dbg:Debuginfo.t -> terminator -> unit
+
+  (** Open a new block as the current block. Must be called after
+      [finish_block]. *)
+  val start_block : t -> Label.t -> block_desc -> Cmm.machtype -> unit
+
+  (** Create a sub-builder for a branch. *)
+  val fork : Label.t -> block_desc -> Cmm.machtype -> t
+
+  (** Merge a sub-builder's sealed blocks into this builder. *)
+  val merge_into : t -> from:t -> unit
+
+  (** Transfer the open-block state from [from] into [b], so that [b] continues
+      building where [from] left off. [from] should not be used after this. *)
+  val transfer_open_block : t -> from:t -> unit
+
+  (** Create block_param instructions for a given block. *)
+  val block_params : Label.t -> Cmm.machtype -> instruction array
+
+  (** Finalize: collect all sealed blocks into a table and order list. *)
+  val finish : t -> basic_block Label.Tbl.t * Label.t list
+end = struct
+  type t =
+    { mutable blocks : basic_block list;
+      mutable current_label : Label.t;
+      mutable current_desc : block_desc;
+      mutable current_params : Cmm.machtype;
+      mutable body : instruction list
+    }
+
+  let make ~label ~desc ~params =
+    { blocks = [];
+      current_label = label;
+      current_desc = desc;
+      current_params = params;
+      body = []
+    }
+
+  let current_label b = b.current_label
+
+  let emit_instruction b (i : instruction) = b.body <- i :: b.body
+
+  let emit_op b ~op ~dbg ~typ ~args =
+    let i : instruction =
+      Op { id = InstructionId.create (); op; typ; args; dbg }
+    in
+    emit_instruction b i;
+    i
+
+  let finish_block b ~dbg term =
+    let block =
+      { label = b.current_label;
+        desc = b.current_desc;
+        params = b.current_params;
+        body = Array.of_list (List.rev b.body);
+        terminator = term;
+        terminator_dbg = dbg
+      }
+    in
+    b.blocks <- block :: b.blocks;
+    b.body <- []
+
+  let start_block b label desc params =
+    b.current_label <- label;
+    b.current_desc <- desc;
+    b.current_params <- params;
+    b.body <- []
+
+  let fork label desc params = make ~label ~desc ~params
+
+  let merge_into parent ~from = parent.blocks <- from.blocks @ parent.blocks
+
+  let transfer_open_block b ~from =
+    b.current_label <- from.current_label;
+    b.current_desc <- from.current_desc;
+    b.current_params <- from.current_params;
+    b.body <- from.body
+
+  let block_params label (types : Cmm.machtype) =
+    Array.mapi
+      (fun i typ ->
+        (Block_param { block = label; index = i; typ } : instruction))
+      types
+
+  (* Recompute Merge/TrapHandler predecessors from actual control flow. *)
+  let recompute_predecessors (blocks : basic_block Label.Tbl.t) =
+    (* Clear all mutable predecessors *)
+    Label.Tbl.iter
+      (fun _ (bl : basic_block) ->
+        match bl.desc with
+        | Merge r -> r.predecessors <- []
+        | TrapHandler r -> r.predecessors <- []
+        | BranchTarget _ | FunctionStart | CallContinuation _ -> ())
+      blocks;
+    (* Recompute from terminators *)
+    let add_pred ~src ~dst =
+      match Label.Tbl.find_opt blocks dst with
+      | None -> ()
+      | Some target -> (
+        match target.desc with
+        | Merge r -> r.predecessors <- src :: r.predecessors
+        | TrapHandler r -> r.predecessors <- src :: r.predecessors
+        | BranchTarget _ | FunctionStart | CallContinuation _ -> ())
+    in
+    Label.Tbl.iter
+      (fun label (bl : basic_block) ->
+        match bl.terminator with
+        | Never | Return _ | Raise _ | Tailcall_func _ -> ()
+        | Goto { goto; _ } -> add_pred ~src:label ~dst:goto
+        | Branch { conditions; else_goto } ->
+          Array.iter (fun (_, lbl) -> add_pred ~src:label ~dst:lbl) conditions;
+          add_pred ~src:label ~dst:else_goto
+        | Switch (labels, _) ->
+          Array.iter (fun lbl -> add_pred ~src:label ~dst:lbl) labels
+        | Tailcall_self { destination; _ } ->
+          add_pred ~src:label ~dst:destination
+        | Call { continuation; exn_continuation; _ }
+        | Prim { continuation; exn_continuation; _ } ->
+          add_pred ~src:label ~dst:continuation;
+          Option.iter (fun l -> add_pred ~src:label ~dst:l) exn_continuation
+        | Invalid { continuation; _ } ->
+          Option.iter (fun l -> add_pred ~src:label ~dst:l) continuation)
+      blocks
+
+  let finish b =
+    let blocks = Label.Tbl.create 31 in
+    let block_order =
+      List.rev_map
+        (fun (block : basic_block) ->
+          Label.Tbl.add blocks block.label block;
+          block.label)
+        b.blocks
+    in
+    recompute_predecessors blocks;
+    blocks, block_order
+end
 
 (* Printing *)
 
@@ -230,6 +397,11 @@ let print_terminator ppf (t : terminator) =
   | Prim { op = Probe { name; _ }; args; continuation; _ } ->
     Format.fprintf ppf "probe %s(%a) -> %a" name print_instr_array args
       Label.format continuation
+  | Invalid { message = _; args; continuation } -> (
+    Format.fprintf ppf "invalid(%a)" print_instr_array args;
+    match continuation with
+    | Some l -> Format.fprintf ppf " -> %a" Label.format l
+    | None -> ())
 
 let print_preds ppf predecessors =
   Format.fprintf ppf "preds=[%a]"
@@ -304,6 +476,8 @@ let validate (t : t) =
       match exn_continuation with
       | Some l -> add_pred ~src:label ~dst:l
       | None -> ())
+    | Invalid { continuation; _ } ->
+      Option.iter (fun l -> add_pred ~src:label ~dst:l) continuation
   in
   Label.Tbl.iter
     (fun label (bl : basic_block) -> successor_labels label bl.terminator)
@@ -323,6 +497,8 @@ let validate (t : t) =
     | Call { continuation; exn_continuation; _ }
     | Prim { continuation; exn_continuation; _ } ->
       continuation :: (match exn_continuation with Some l -> [l] | None -> [])
+    | Invalid { continuation; _ } ->
+      (match continuation with Some l -> [l] | None -> [])
   in
   (* Compute reverse postorder via DFS *)
   let rpo =
@@ -482,7 +658,31 @@ let validate (t : t) =
           "block %a: BranchTarget declares predecessor %a but it is not an \
            actual predecessor"
           Label.format label Label.format predecessor
-    | Merge _ | FunctionStart | CallContinuation _ | TrapHandler _ -> ());
+    | Merge { predecessors } ->
+      let preds = Label.Tbl.find actual_preds label in
+      let pred_set =
+        List.fold_left (fun s l -> Label.Set.add l s) Label.Set.empty preds
+      in
+      let declared_set =
+        List.fold_left
+          (fun s l -> Label.Set.add l s)
+          Label.Set.empty predecessors
+      in
+      if not (Label.Set.equal pred_set declared_set)
+      then
+        error
+          "block %a: Merge declares predecessors {%a} but actual predecessors \
+           are {%a}"
+          Label.format label
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+             Label.format)
+          predecessors
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+             Label.format)
+          preds
+    | FunctionStart | CallContinuation _ | TrapHandler _ -> ());
     (* Check body: validate args then register Op *)
     Array.iter
       (fun (i : instruction) ->
@@ -539,7 +739,8 @@ let validate (t : t) =
     | Tailcall_self { args; _ } -> check_args label args
     | Tailcall_func (_, args) -> check_args label args
     | Call { args; _ } -> check_args label args
-    | Prim { args; _ } -> check_args label args);
+    | Prim { args; _ } -> check_args label args
+    | Invalid { args; _ } -> check_args label args);
     (* Visit dominator tree children *)
     match Label.Tbl.find_opt dom_children label with
     | Some kids -> List.iter visit_block kids

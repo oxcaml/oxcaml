@@ -12,7 +12,6 @@ let f bound r t =
 f:
   cmpq  $1, %rax
   jl    .L102
-  subq  $8, %rsp
   sarq  $1, %rax
   xorl  %ebx, %ebx
 .L104:
@@ -23,7 +22,6 @@ f:
   cmpq  %rax, %rbx
   jle   .L104
   movl  $1, %eax
-  addq  $8, %rsp
   ret
 .L102:
   movl  $1, %eax

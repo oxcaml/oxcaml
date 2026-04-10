@@ -65,7 +65,6 @@ div:
   leaq  1(%rax,%rax), %rax
   ret
 .L101:
-  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -119,7 +118,6 @@ rem:
   leaq  1(%rdx,%rdx), %rax
   ret
 .L101:
-  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

@@ -95,7 +95,6 @@ let loop_with_non_dominating_load x l =
   loop 100 0
 [%%expect_asm X86_64{|
 loop_with_non_dominating_load:
-  subq  $8, %rsp
   movl  $1, %eax
   movl  $201, %edi
 .L103:
@@ -112,7 +111,6 @@ loop_with_non_dominating_load:
   addq  $-2, %rdi
   cmpq  $1, %rdi
   jg    .L103
-  addq  $8, %rsp
   ret
 |}]
 
@@ -147,7 +145,6 @@ f:
   jmp   camlTOP5__do_work_11_15_code@PLT
 
 f.do_work:
-  subq  $8, %rsp
   movq  16(%rbx), %rax
   leaq  -1(%rax,%rax), %rax
   movl  $1, %edi
@@ -157,7 +154,6 @@ f.do_work:
   incq  %rdi
   cmpq  $100, %rdi
   jle   .L112
-  addq  $8, %rsp
   ret
 |}]
 
@@ -168,18 +164,14 @@ let noop_loop lo hi = for i = lo to hi do () done
 [%%expect_asm X86_64{|
 noop_loop:
   cmpq  %rbx, %rax
-  jg    .L102
-  subq  $8, %rsp
+  jg    .L109
   sarq  $1, %rax
   sarq  $1, %rbx
 .L105:
   incq  %rax
   cmpq  %rbx, %rax
   jle   .L105
-  movl  $1, %eax
-  addq  $8, %rsp
-  ret
-.L102:
+.L109:
   movl  $1, %eax
   ret
 |}]
@@ -201,7 +193,6 @@ f:
   movq  %rax, %rbx
   cmpq  $1, %rbx
   jl    .L102
-  subq  $8, %rsp
   sarq  $1, %rbx
   movl  $1, %eax
   xorl  %edi, %edi
@@ -212,7 +203,6 @@ f:
   incq  %rdi
   cmpq  %rbx, %rdi
   jle   .L104
-  addq  $8, %rsp
   ret
 .L102:
   movl  $1, %eax
@@ -253,7 +243,6 @@ M.f:
   leaq  -1(%rax,%rax), %rax
   cmpq  $1, %rax
   jl    .L109
-  subq  $8, %rsp
   sarq  $1, %rax
   vxorpd %xmm0, %xmm0, %xmm0
   xorl  %ebx, %ebx
@@ -268,7 +257,6 @@ M.f:
   incq  %rbx
   cmpq  %rax, %rbx
   jle   .L111
-  addq  $8, %rsp
   ret
 .L109:
   vxorpd %xmm0, %xmm0, %xmm0

@@ -76,7 +76,6 @@ div:
   subq  %rdi, %rax
   ret
 .L101:
-  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -146,7 +145,6 @@ unsigned_div:
   incq  %rax
   ret
 .L107:
-  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -170,7 +168,6 @@ rem:
   xorl  %eax, %eax
   ret
 .L101:
-  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -229,7 +226,6 @@ unsigned_rem:
   incq  %rbx
   jmp   .L101
 .L109:
-  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

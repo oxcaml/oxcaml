@@ -434,7 +434,6 @@ int_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L101:
-  subq  $8, %rsp
   movq  camlTOP38__block1142@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -553,7 +552,6 @@ int64_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L101:
-  subq  $8, %rsp
   movq  camlTOP42__block1339@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -573,7 +571,6 @@ float_safe_get:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L101:
-  subq  $8, %rsp
   movq  camlTOP43__block1380@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -593,7 +590,6 @@ float_safe_get_plain:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L101:
-  subq  $8, %rsp
   movq  camlTOP44__block1421@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -618,7 +614,6 @@ int32_safe_get:
   movslq -2(%rax,%rbx,2), %rax
   ret
 .L101:
-  subq  $8, %rsp
   movq  camlTOP45__block1466@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

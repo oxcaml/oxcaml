@@ -53,7 +53,6 @@ arr_sum:
   leaq  -2(%rbx), %rsi
   cmpq  $1, %rsi
   jl    .L107
-  subq  $8, %rsp
   sarq  $1, %rsi
   movl  $1, %eax
   xorl  %edx, %edx
@@ -66,7 +65,6 @@ arr_sum:
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L109
-  addq  $8, %rsp
   ret
 .L112:
   movq  camlTOP2__block101@GOTPCREL(%rip), %rax
@@ -96,7 +94,6 @@ let search ~target (start : int list) =
 ;;
 [%%expect_asm X86_64{|
 search:
-  subq  $8, %rsp
   movq  %rax, %rdi
   testb $1, %bl
   je    .L108
@@ -125,7 +122,6 @@ search:
   je    .L108
   jmp   .L107
 .L115:
-  addq  $8, %rsp
   ret
 |}]
 

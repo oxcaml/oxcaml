@@ -381,6 +381,9 @@ let mk_caml_apply_inline_fast_path f =
 let mk_use_ssa f =
   ("-use-ssa", Arg.Unit f, " Use SSA intermediate representation (EXPERIMENTAL)")
 
+let mk_no_use_ssa f =
+  ("-no-use-ssa", Arg.Unit f, " Disable SSA intermediate representation")
+
 let mk_dump_inlining_paths f =
   ( "-dump-inlining-paths",
     Arg.Unit f,
@@ -1266,6 +1269,7 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val use_ssa : unit -> unit
+  val no_use_ssa : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
@@ -1445,6 +1449,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_debug_long_frames_threshold F.long_frames_threshold;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
       mk_use_ssa F.use_ssa;
+      mk_no_use_ssa F.no_use_ssa;
       mk_internal_assembler F.internal_assembler;
       mk_verify_binary_emitter F.verify_binary_emitter;
       mk_dissector F.dissector;
@@ -1732,6 +1737,7 @@ module Oxcaml_options_impl = struct
     set' Oxcaml_flags.caml_apply_inline_fast_path
 
   let use_ssa = set' Oxcaml_flags.use_ssa
+  let no_use_ssa () = Oxcaml_flags.use_ssa := false
   let internal_assembler = set' Oxcaml_flags.internal_assembler
   let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
