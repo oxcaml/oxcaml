@@ -1144,7 +1144,8 @@ let transl_declaration env sdecl (id, uid) =
       match jkind_from_annotation, man with
       | Some annot, _ -> annot
       | None, Some _ -> Jkind.Builtin.any ~why:Initial_typedecl_env
-      | None, None -> Option.value recursive_default_jkind ~default:jkind_default
+      | None, None ->
+        Option.value recursive_default_jkind ~default:jkind_default
     in
     let jkind =
       (* Hack: unboxed records are given a product-of-[any]s layout
@@ -1884,7 +1885,9 @@ module Element_repr = struct
             |> List.map (fun ty -> classify env ty (Ctype.type_jkind env ty))
             |> Array.of_list))
 
-  and classify : type l r. Env.t -> Types.type_expr -> (l * r) Types.jkind -> t =
+  and classify
+      : type l r. Env.t -> Types.type_expr -> (l * r) Types.jkind -> t
+    =
     fun env ty jkind ->
     if is_float env ty
     then Float_element
