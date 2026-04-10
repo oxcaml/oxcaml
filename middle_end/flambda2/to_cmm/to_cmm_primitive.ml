@@ -815,11 +815,11 @@ let scalar_type_of_standard_int_or_float :
   | Tagged_immediate -> Integral tagged_immediate
   | Naked_float32 ->
     if Scalar.Signedness.equal signedness Unsigned
-    then failwith "to_cmm_primitive: here are no unsigned floats";
+    then failwith "to_cmm_primitive: there are no unsigned floats";
     Float Float32
   | Naked_float ->
     if Scalar.Signedness.equal signedness Unsigned
-    then failwith "to_cmm_primitive: here are no unsigned floats";
+    then failwith "to_cmm_primitive: there are no unsigned floats";
     Float Float64
 
 let unary_int_arith_primitive _env dbg kind op arg =
@@ -871,12 +871,22 @@ let unary_float_arith_primitive _env dbg width op arg =
   | Float32, Neg -> C.float32_neg ~dbg arg
 
 let arithmetic_conversion dbg src signedness dst arg =
-  (* CR jrayman: use signedness *)
   if K.Standard_int_or_float.equal src dst
   then None, arg
   else
     let src = scalar_type_of_standard_int_or_float ~signedness src in
     let dst = scalar_type_of_standard_int_or_float ~signedness:Signed dst in
+    let arg =
+      (* [C.Scalar_type.static_cast] assumes that [src] is sign/zero-extended
+         according to [signedness]. However, we only ever sign-extend
+         integers. *)
+      match src, (signedness : Scalar.Signedness.t) with
+      | _, Signed -> arg
+      | Integral integral, Unsigned ->
+        C.zero_extend arg ~bits:(C.Scalar_type.Integral.bit_width integral) ~dbg
+      | Float _, Unsigned ->
+        Misc.fatal_error "to_cmm_primitive: There are no unsigned floats"
+    in
     let extra =
       (* CR-someday jvanburen: add Env.Tag? *)
       match src, dst with
