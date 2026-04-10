@@ -165,36 +165,18 @@ let div x y = Int8_u.div x y
 div:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-<<<<<<< HEAD
-  je    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L114
-=======
-  je    .L101
->>>>>>> 42782c097b (passes testsuite)
-  cqto
-  idivq %rcx
-  salq  $56, %rax
-  sarq  $56, %rax
-  ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L114:
-=======
-.L101:
-<<<<<<< HEAD
-  subq  $8, %rsp
->>>>>>> 42782c097b (passes testsuite)
-||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
-  subq  $8, %rsp
-=======
->>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
+  jne   .L106
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L106:
+  cqto
+  idivq %rcx
+  salq  $56, %rax
+  sarq  $56, %rax
+  ret
 |}]
 
 let rem x y = Int8_u.rem x y
@@ -202,37 +184,19 @@ let rem x y = Int8_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-<<<<<<< HEAD
-  je    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L114
-=======
-  je    .L101
->>>>>>> 42782c097b (passes testsuite)
+  jne   .L106
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+.L106:
   cqto
   idivq %rcx
   movq  %rdx, %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L114:
-=======
-.L101:
-<<<<<<< HEAD
-  subq  $8, %rsp
->>>>>>> 42782c097b (passes testsuite)
-||||||| parent of fa03a226ba (fixes and cleanups, make ci passes now)
-  subq  $8, %rsp
-=======
->>>>>>> fa03a226ba (fixes and cleanups, make ci passes now)
-  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
 |}]
 
 let unsafe_div x y = Int8_u.unsafe_div x y
@@ -499,23 +463,8 @@ to_float:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-  jb    .L105
-.L0:
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vcvtsi2sdq %rbx, %xmm0, %xmm0
-  vmovsd %xmm0, (%rax)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L105
-.L107:
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vcvtsi2sdq %rbx, %xmm0, %xmm0
-  vmovsd %xmm0, (%rax)
-=======
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rbx
   movq  $1277, -8(%rbx)
   vcvtsi2sdq %rax, %xmm0, %xmm0
@@ -539,19 +488,8 @@ to_float32:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-  jb    .L105
-.L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L105
-.L107:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-=======
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
 >>>>>>> 42782c097b (passes testsuite)
@@ -603,19 +541,8 @@ to_int32:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-  jb    .L105
-.L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L105
-.L107:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-=======
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
 >>>>>>> 42782c097b (passes testsuite)
@@ -640,19 +567,8 @@ to_int64:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-  jb    .L104
-.L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L104
-.L106:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-=======
-  jb    .L102
-.L104:
+  jb    .L106
+.L108:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
 >>>>>>> 42782c097b (passes testsuite)
@@ -683,19 +599,8 @@ to_nativeint:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-<<<<<<< HEAD
-  jb    .L104
-.L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-||||||| parent of 42782c097b (passes testsuite)
-  jb    .L104
-.L106:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
-=======
-  jb    .L102
-.L104:
+  jb    .L106
+.L108:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
 >>>>>>> 42782c097b (passes testsuite)

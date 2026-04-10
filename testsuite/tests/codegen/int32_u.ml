@@ -35,22 +35,10 @@ min:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
-<<<<<<< HEAD
-  jg    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  jg    .L105
-=======
   jg    .L102
->>>>>>> 42782c097b (passes testsuite)
   movq  %rdi, %rax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L105:
-=======
 .L102:
->>>>>>> 42782c097b (passes testsuite)
   ret
 |}]
 

@@ -28,22 +28,10 @@ end
 [%%expect_asm X86_64{|
 Variant_as_index.get:
   cmpq  $1, %rbx
-<<<<<<< HEAD
-  jne   .L0
-||||||| parent of 42782c097b (passes testsuite)
-  jne   .L106
-=======
-  jne   .L102
->>>>>>> 42782c097b (passes testsuite)
+  jne   .L104
   movq  (%rax), %rax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L106:
-=======
-.L102:
->>>>>>> 42782c097b (passes testsuite)
+.L104:
   movq  8(%rax), %rax
   ret
 |}]
@@ -69,22 +57,10 @@ end
 Variant_with_uneven_mutability.get:
   movzbq -8(%rax), %rbx
   cmpq  $1, %rbx
-<<<<<<< HEAD
-  jne   .L0
-||||||| parent of 42782c097b (passes testsuite)
-  jne   .L113
-=======
-  jne   .L101
->>>>>>> 42782c097b (passes testsuite)
+  je    .L107
   movq  (%rax), %rax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L113:
-=======
-.L101:
->>>>>>> 42782c097b (passes testsuite)
+.L107:
   movq  (%rax), %rax
   ret
 |}]
@@ -134,26 +110,14 @@ let even_variant (t : t) : bool =
 [%%expect_asm X86_64{|
 even_variant:
   cmpq  $3, %rax
-<<<<<<< HEAD
-  je    .L0
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L108
-=======
-  je    .L102
->>>>>>> 42782c097b (passes testsuite)
+  je    .L105
   cmpq  $7, %rax
   setge %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
   xorq  $2, %rax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L108:
-=======
-.L102:
->>>>>>> 42782c097b (passes testsuite)
+.L105:
   movl  $1, %eax
   ret
 |}]
@@ -253,53 +217,29 @@ let unnecessary_match = function
 [%%expect_asm X86_64{|
 unnecessary_match:
   sarq  $1, %rax
-  leaq  .L118(%rip), %rdx
+  leaq  .L143(%rip), %rdx
   movslq (%rdx,%rax,4), %rax
   addq  %rax, %rdx
   jmp   *%rdx
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
-.L104:
-=======
-.L102:
->>>>>>> 42782c097b (passes testsuite)
+.L114:
   movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-<<<<<<< HEAD
-.L1:
-||||||| parent of 42782c097b (passes testsuite)
-.L109:
-=======
-.L106:
->>>>>>> 42782c097b (passes testsuite)
+.L115:
   movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $3, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-<<<<<<< HEAD
-.L2:
-||||||| parent of 42782c097b (passes testsuite)
-.L114:
-=======
-.L110:
->>>>>>> 42782c097b (passes testsuite)
+.L116:
   movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $5, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-<<<<<<< HEAD
-.L3:
-||||||| parent of 42782c097b (passes testsuite)
-.L119:
-=======
-.L114:
->>>>>>> 42782c097b (passes testsuite)
+.L117:
   movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $7, %eax
@@ -336,124 +276,49 @@ double_match:
   movq  64(%r14), %rsi
   sarq  $1, %rax
   cmpq  $1, %rax
-<<<<<<< HEAD
-  je    .L1
-  ja    .L3
-||||||| parent of 42782c097b (passes testsuite)
-  je    .L111
-  ja    .L114
-=======
-  je    .L107
-  ja    .L109
->>>>>>> 42782c097b (passes testsuite)
+  jb    .L111
+  je    .L112
+  ja    .L113
+.L109:
+  movq  (%rax), %rax
+  movq  %rsi, 64(%r14)
+  addq  $8, %rsp
+  ret
+.L111:
   movq  64(%r14), %rax
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jl    .L124
-.L0:
-||||||| parent of de3d4ac415 (working prototype)
-  jl    .L124
-.L125:
-=======
   jl    .L138
 .L139:
->>>>>>> de3d4ac415 (working prototype)
-||||||| parent of 42782c097b (passes testsuite)
-  jl    .L138
-.L139:
-=======
-  jl    .L114
-.L115:
->>>>>>> 42782c097b (passes testsuite)
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1792, -8(%rax)
   movq  %rbx, (%rax)
-<<<<<<< HEAD
-  jmp   .L5
-.L1:
-||||||| parent of 42782c097b (passes testsuite)
-  jmp   .L119
-.L111:
-=======
-  jmp   .L102
-.L107:
->>>>>>> 42782c097b (passes testsuite)
+  jmp   .L109
+.L112:
   movq  64(%r14), %rax
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jl    .L126
-.L2:
-||||||| parent of de3d4ac415 (working prototype)
-  jl    .L126
-.L127:
-=======
   jl    .L140
 .L141:
->>>>>>> de3d4ac415 (working prototype)
-||||||| parent of 42782c097b (passes testsuite)
-  jl    .L140
-.L141:
-=======
-  jl    .L116
-.L117:
->>>>>>> 42782c097b (passes testsuite)
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)
   movq  %rdi, (%rax)
-<<<<<<< HEAD
-  jmp   .L5
-.L3:
-||||||| parent of 42782c097b (passes testsuite)
-  jmp   .L119
-.L114:
-=======
-  jmp   .L102
-.L109:
->>>>>>> 42782c097b (passes testsuite)
+  jmp   .L109
+.L113:
   movq  64(%r14), %rax
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-<<<<<<< HEAD
-<<<<<<< HEAD
-  jl    .L128
-.L4:
-||||||| parent of de3d4ac415 (working prototype)
-  jl    .L128
-.L129:
-=======
   jl    .L142
 .L143:
->>>>>>> de3d4ac415 (working prototype)
-||||||| parent of 42782c097b (passes testsuite)
-  jl    .L142
-.L143:
-=======
-  jl    .L118
-.L119:
->>>>>>> 42782c097b (passes testsuite)
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)
   leaq  2(%rdi), %rbx
   movq  %rbx, (%rax)
-<<<<<<< HEAD
-.L5:
-||||||| parent of 42782c097b (passes testsuite)
-.L119:
-=======
-.L102:
->>>>>>> 42782c097b (passes testsuite)
-  movq  (%rax), %rax
-  movq  %rsi, 64(%r14)
-  addq  $8, %rsp
-  ret
+  jmp   .L109
 |}]
