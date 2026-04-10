@@ -120,8 +120,8 @@ let map_body_labels ~map_label old_body new_body =
     | [], _ | _, [] -> ()
     | oi :: rest, _ when is_move oi -> loop rest new_is
     | _, ni :: rest when is_move ni -> loop old_is rest
-    | (oi : Cfg.basic Cfg.instruction) :: old_rest,
-      (ni : Cfg.basic Cfg.instruction) :: new_rest ->
+    | ( (oi : Cfg.basic Cfg.instruction) :: old_rest,
+        (ni : Cfg.basic Cfg.instruction) :: new_rest ) ->
       ignore (basic_desc_match ~map_label oi.desc ni.desc : bool);
       loop old_rest new_rest
   in
@@ -244,9 +244,9 @@ let process_backward ~ppf_check ~map_label eqs ~(old_block : Cfg.basic_block)
                       "Residual output equation at old=%a(id:%a) \
                        new=%a(id:%a): %a still paired with %a after removing \
                        matched outputs (%a)@."
-                      Label.format ol InstructionId.print old_i.id
-                      Label.format nl InstructionId.print new_i.id
-                      Printreg.reg r Printreg.reg r' Cfg.dump_basic desc)
+                      Label.format ol InstructionId.print old_i.id Label.format
+                      nl InstructionId.print new_i.id Printreg.reg r
+                      Printreg.reg r' Cfg.dump_basic desc)
                   partners)
             res
         in
@@ -364,16 +364,15 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
   let mismatches = Buffer.create 256 in
   let ppf_m = Format.formatter_of_buffer mismatches in
   let label_map = Label.Tbl.create 64 in
-  (* Map a new_label -> old_label pair and enqueue for DFS.
-     Reports a mismatch if the mapping conflicts with an existing one. *)
+  (* Map a new_label -> old_label pair and enqueue for DFS. Reports a mismatch
+     if the mapping conflicts with an existing one. *)
   let map_label queue ol nl =
     match Label.Tbl.find_opt label_map nl with
     | Some mapped ->
       if not (Label.equal mapped ol)
       then
         Format.fprintf ppf_m
-          "Label mapping conflict: new=%a already maps to old=%a, \
-           not old=%a@."
+          "Label mapping conflict: new=%a already maps to old=%a, not old=%a@."
           Label.format nl Label.format mapped Label.format ol
     | None ->
       Label.Tbl.replace label_map nl ol;
@@ -435,8 +434,8 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
         (* Check terminator structure, map labels *)
         if
           not
-            (terminator_structure_match ~map_label
-               ob.terminator.desc nb.terminator.desc)
+            (terminator_structure_match ~map_label ob.terminator.desc
+               nb.terminator.desc)
         then
           Format.fprintf ppf_m
             "Terminator mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
@@ -479,8 +478,8 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
       let nb = Cfg.get_block_exn new_cfg_t nl in
       let eqs = Label.Tbl.find block_eqs ol in
       let start_eqs =
-        process_backward ~ppf_check:None ~map_label:check_label eqs ~old_block:ob
-          ~new_block:nb
+        process_backward ~ppf_check:None ~map_label:check_label eqs
+          ~old_block:ob ~new_block:nb
       in
       List.iter
         (fun pred_ol ->
@@ -500,8 +499,8 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
       let nb = Cfg.get_block_exn new_cfg_t nl in
       let eqs = Label.Tbl.find block_eqs ol in
       let start_eqs =
-        process_backward ~ppf_check:(Some ppf_m) ~map_label:check_label eqs ~old_block:ob
-          ~new_block:nb
+        process_backward ~ppf_check:(Some ppf_m) ~map_label:check_label eqs
+          ~old_block:ob ~new_block:nb
       in
       if Label.equal ol old_entry then entry_start_eqs := start_eqs)
     block_pairs;
@@ -524,26 +523,21 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
     Format.fprintf ppf_m "Block count mismatch: old=%d new=%d@." old_count
       new_count;
   (* Check CFG metadata *)
-  if not
-       (Bool.equal old_cfg_t.fun_contains_calls new_cfg_t.fun_contains_calls)
+  if not (Bool.equal old_cfg_t.fun_contains_calls new_cfg_t.fun_contains_calls)
   then
-    Format.fprintf ppf_m
-      "fun_contains_calls mismatch: old=%b new=%b@."
+    Format.fprintf ppf_m "fun_contains_calls mismatch: old=%b new=%b@."
       old_cfg_t.fun_contains_calls new_cfg_t.fun_contains_calls;
-  if not
-       (String.equal old_cfg_t.fun_name new_cfg_t.fun_name)
+  if not (String.equal old_cfg_t.fun_name new_cfg_t.fun_name)
   then
-    Format.fprintf ppf_m
-      "fun_name mismatch: old=%s new=%s@."
-      old_cfg_t.fun_name new_cfg_t.fun_name;
+    Format.fprintf ppf_m "fun_name mismatch: old=%s new=%s@." old_cfg_t.fun_name
+      new_cfg_t.fun_name;
   if old_cfg_t.fun_codegen_options <> new_cfg_t.fun_codegen_options
-  then
-    Format.fprintf ppf_m "fun_codegen_options mismatch@.";
+  then Format.fprintf ppf_m "fun_codegen_options mismatch@.";
   if Debuginfo.compare old_cfg_t.fun_dbg new_cfg_t.fun_dbg <> 0
   then
     Format.fprintf ppf_m "fun_dbg mismatch: old=%a new=%a@."
-      Debuginfo.print_compact old_cfg_t.fun_dbg
-      Debuginfo.print_compact new_cfg_t.fun_dbg;
+      Debuginfo.print_compact old_cfg_t.fun_dbg Debuginfo.print_compact
+      new_cfg_t.fun_dbg;
   if old_cfg_t.fun_poll <> new_cfg_t.fun_poll
   then Format.fprintf ppf_m "fun_poll mismatch@.";
   if old_cfg_t.fun_ret_type <> new_cfg_t.fun_ret_type

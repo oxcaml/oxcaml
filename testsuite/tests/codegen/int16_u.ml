@@ -178,18 +178,18 @@ let div x y = Int16_u.div x y
 div:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L101
-  cqto
-  idivq %rcx
-  salq  $48, %rax
-  sarq  $48, %rax
-  ret
-.L101:
+  jne   .L106
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L106:
+  cqto
+  idivq %rcx
+  salq  $48, %rax
+  sarq  $48, %rax
+  ret
 |}]
 
 let rem x y = Int16_u.rem x y
@@ -197,19 +197,19 @@ let rem x y = Int16_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L101
+  jne   .L106
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+.L106:
   cqto
   idivq %rcx
   movq  %rdx, %rax
   salq  $48, %rax
   sarq  $48, %rax
   ret
-.L101:
-  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
 |}]
 
 let unsafe_div x y = Int16_u.unsafe_div x y
@@ -476,8 +476,8 @@ to_float:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rbx
   movq  $1277, -8(%rbx)
   vcvtsi2sdq %rax, %xmm0, %xmm0
@@ -500,8 +500,8 @@ to_float32:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
   movq  caml_float32_ops@GOTPCREL(%rip), %rdi
@@ -546,8 +546,8 @@ to_int32:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
@@ -571,8 +571,8 @@ to_int64:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L102
-.L104:
+  jb    .L106
+.L108:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi
@@ -612,8 +612,8 @@ to_nativeint:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L102
-.L104:
+  jb    .L106
+.L108:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi

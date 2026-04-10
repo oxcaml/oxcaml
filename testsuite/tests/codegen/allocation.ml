@@ -18,22 +18,22 @@ one_or_two_element_list:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    .L115
+.L117:
   leaq  8(%r15), %rdi
   movq  $2048, -8(%rdi)
   movq  %rbx, (%rdi)
   movq  $1, 8(%rdi)
   cmpq  $1, %rax
-  jne   .L103
+  jne   .L104
   movq  %rdi, %rax
   addq  $8, %rsp
   ret
-.L103:
+.L104:
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L108
-.L110:
+  jb    .L118
+.L120:
   leaq  8(%r15), %rax
   movq  $2048, -8(%rax)
   movq  %rbx, (%rax)
@@ -57,23 +57,23 @@ spill_slot_lifetime:
   subq  $24, %rsp
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L110:
+.L122:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L111:
+.L123:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L112:
+.L124:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
   call  camlTOP3__get_one_3_5_code@PLT
-.L113:
+.L125:
   subq  $40, %r15
   cmpq  (%r14), %r15
-  jb    .L114
-.L116:
+  jb    .L126
+.L128:
   leaq  8(%r15), %rax
   movq  $4350, -8(%rax)
   vmovsd (%rsp), %xmm1
@@ -87,6 +87,6 @@ spill_slot_lifetime:
   ret
 
 spill_slot_lifetime.get_one:
-  vmovsd .L118(%rip), %xmm0
+  vmovsd .L133(%rip), %xmm0
   ret
 |}]

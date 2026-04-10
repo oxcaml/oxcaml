@@ -64,23 +64,23 @@ div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L101
-  cmpq  $-1, %rcx
-  je    .L106
-  movq  %rdi, %rax
-  cqto
-  idivq %rcx
-  ret
-.L106:
-  xorl  %eax, %eax
-  subq  %rdi, %rax
-  ret
-.L101:
+  jne   .L105
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L105:
+  cmpq  $-1, %rcx
+  je    .L108
+  movq  %rdi, %rax
+  cqto
+  idivq %rcx
+  ret
+.L108:
+  xorl  %eax, %eax
+  subq  %rdi, %rax
+  ret
 |}]
 
 let div_by_constant x = Int64_u.div x #1234L
@@ -102,33 +102,39 @@ unsigned_div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-  jge   .L108
+  jge   .L117
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rcx
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rdi
   cmpq  %rcx, %rdi
-  jge   .L106
+  jge   .L115
   xorl  %eax, %eax
   ret
-.L106:
+.L115:
   movl  $1, %eax
   ret
-.L108:
+.L116:
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+.L117:
   testq %rcx, %rcx
-  je    .L107
+  je    .L116
   movq  %rdi, %rbx
   shrq  $1, %rbx
   cmpq  $-1, %rcx
-  je    .L113
+  je    .L121
   movq  %rbx, %rax
   cqto
   idivq %rcx
-  jmp   .L116
-.L113:
+  jmp   .L122
+.L121:
   xorl  %eax, %eax
   subq  %rbx, %rax
-.L116:
+.L122:
   salq  $1, %rax
   movabsq $-9223372036854775808, %rsi
   movq  %rcx, %rbx
@@ -139,17 +145,11 @@ unsigned_div:
   subq  %rsi, %rdi
   subq  %rdx, %rdi
   cmpq  %rbx, %rdi
-  jge   .L123
+  jge   .L124
   ret
-.L123:
+.L124:
   incq  %rax
   ret
-.L107:
-  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
 |}]
 
 let rem x y = Int64_u.rem x y
@@ -157,22 +157,22 @@ let rem x y = Int64_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L101
-  cmpq  $-1, %rcx
-  je    .L106
-  cqto
-  idivq %rcx
-  movq  %rdx, %rax
-  ret
-.L106:
-  xorl  %eax, %eax
-  ret
-.L101:
+  jne   .L104
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L104:
+  cmpq  $-1, %rcx
+  je    .L107
+  cqto
+  idivq %rcx
+  movq  %rdx, %rax
+  ret
+.L107:
+  xorl  %eax, %eax
+  ret
 |}]
 
 (* CR ttebbi: These are way too many instructions. *)
@@ -182,7 +182,15 @@ unsigned_rem:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-  jge   .L110
+  jge   .L121
+  jmp   .L116
+.L114:
+  movq  %rax, %rbx
+  imulq %rcx, %rbx
+  movq  %rdi, %rax
+  subq  %rbx, %rax
+  ret
+.L116:
   movabsq $-9223372036854775808, %rbx
   movq  %rcx, %rax
   subq  %rbx, %rax
@@ -190,52 +198,47 @@ unsigned_rem:
   movq  %rdi, %rbx
   subq  %rsi, %rbx
   cmpq  %rax, %rbx
-  jge   .L108
-  xorl  %ebx, %ebx
-  jmp   .L101
-.L108:
-  movl  $1, %ebx
-  jmp   .L101
-.L110:
-  testq %rcx, %rcx
-  je    .L109
-  movq  %rdi, %rax
-  shrq  $1, %rax
-  cmpq  $-1, %rcx
-  je    .L115
-  cqto
-  idivq %rcx
-  movq  %rax, %rbx
-  jmp   .L118
-.L115:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-.L118:
-  salq  $1, %rbx
-  movabsq $-9223372036854775808, %rsi
-  movq  %rcx, %rax
-  subq  %rsi, %rax
-  movabsq $-9223372036854775808, %r8
-  movq  %rbx, %rsi
-  imulq %rcx, %rsi
-  movq  %rdi, %rdx
-  subq  %rsi, %rdx
-  subq  %r8, %rdx
-  cmpq  %rax, %rdx
-  jl    .L101
-  incq  %rbx
-  jmp   .L101
-.L109:
+  jge   .L119
+  xorl  %eax, %eax
+  jmp   .L114
+.L119:
+  movl  $1, %eax
+  jmp   .L114
+.L120:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L101:
-  imulq %rcx, %rbx
-  movq  %rdi, %rax
+.L121:
+  testq %rcx, %rcx
+  je    .L120
+  movq  %rdi, %rbx
+  shrq  $1, %rbx
+  cmpq  $-1, %rcx
+  je    .L125
+  movq  %rbx, %rax
+  cqto
+  idivq %rcx
+  jmp   .L126
+.L125:
+  xorl  %eax, %eax
   subq  %rbx, %rax
-  ret
+.L126:
+  salq  $1, %rax
+  movabsq $-9223372036854775808, %rsi
+  movq  %rcx, %rbx
+  subq  %rsi, %rbx
+  movabsq $-9223372036854775808, %r8
+  movq  %rax, %rsi
+  imulq %rcx, %rsi
+  movq  %rdi, %rdx
+  subq  %rsi, %rdx
+  subq  %r8, %rdx
+  cmpq  %rbx, %rdx
+  jl    .L114
+  incq  %rax
+  jmp   .L114
 |}]
 
 (* CR ttebbi: This could be just a bitwise and. *)
@@ -257,12 +260,14 @@ unsigned_rem_2:
   subq  %rdi, %rsi
   subq  %rcx, %rsi
   cmpq  %rdx, %rsi
-  jl    .L101
-  incq  %rbx
-.L101:
+  jge   .L115
+.L112:
   salq  $1, %rbx
   subq  %rbx, %rax
   ret
+.L115:
+  incq  %rbx
+  jmp   .L112
 |}]
 
 let succ x = Int64_u.succ x
@@ -285,10 +290,10 @@ let abs x = Int64_u.abs x
 abs:
   movq  %rax, %rbx
   cmpq  $0, %rbx
-  jl    .L102
+  jl    .L103
   movq  %rbx, %rax
   ret
-.L102:
+.L103:
   xorl  %eax, %eax
   subq  %rbx, %rax
   ret
@@ -374,22 +379,22 @@ let unsigned_to_int x = Int64_u.unsigned_to_int x
 unsigned_to_int:
   movq  %rax, %rbx
   cmpq  $0, %rbx
-  jl    .L104
+  jl    .L106
   movabsq $4611686018427387903, %rax
   cmpq  %rax, %rbx
-  jg    .L104
+  jg    .L106
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L107
-.L109:
+  jb    .L122
+.L124:
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)
   leaq  1(%rbx,%rbx), %rbx
   movq  %rbx, (%rax)
   addq  $8, %rsp
   ret
-.L104:
+.L106:
   movl  $1, %eax
   ret
 |}]
@@ -409,8 +414,8 @@ to_float:
   vcvtsi2sdq %rax, %xmm0, %xmm0
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd %xmm0, (%rax)
@@ -431,8 +436,8 @@ to_int32:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    .L110
+.L112:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
@@ -457,8 +462,8 @@ to_nativeint:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L102
-.L104:
+  jb    .L106
+.L108:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
@@ -508,8 +513,8 @@ float_of_bits:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rbx
   movq  $1277, -8(%rbx)
   vmovq %rax, %xmm0
@@ -615,8 +620,8 @@ to_int64:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L102
-.L104:
+  jb    .L106
+.L108:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi

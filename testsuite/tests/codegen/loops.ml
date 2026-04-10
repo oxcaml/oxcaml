@@ -33,20 +33,22 @@ let loop_code_layout n =
 loop_code_layout:
   subq  $8, %rsp
   movl  $1, %ebx
-.L101:
+.L104:
   leaq  -1(%rbx,%rax), %rbx
   cmpq  $1, %rax
-  jne   .L105
+  jne   .L107
   movq  %rbx, (%rsp)
   movl  $1, %eax
   call  camlTOP2__cold_1_4_code@PLT
-.L109:
+.L127:
+  jmp   .L108
+.L107:
+  addq  $-2, %rax
+  jmp   .L104
+.L108:
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
-.L105:
-  addq  $-2, %rax
-  jmp   .L101
 
 loop_code_layout.cold:
   movl  $1, %eax
@@ -60,29 +62,30 @@ let for_loop_layout n f =
 [%%expect_asm X86_64{|
 for_loop_layout:
   cmpq  $1, %rax
-  jl    .L102
+  jl    .L106
   subq  $24, %rsp
   movq  %rbx, (%rsp)
   sarq  $1, %rax
   movq  %rax, 8(%rsp)
   xorl  %eax, %eax
-.L104:
+  jmp   .L107
+.L106:
+  movl  $1, %eax
+  ret
+.L107:
   movq  %rax, 16(%rsp)
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
-.L112:
+.L136:
   movq  16(%rsp), %rax
   incq  %rax
   movq  (%rsp), %rbx
   movq  8(%rsp), %rdi
   cmpq  %rdi, %rax
-  jle   .L104
+  jle   .L107
   movl  $1, %eax
   addq  $24, %rsp
-  ret
-.L102:
-  movl  $1, %eax
   ret
 |}]
 
@@ -97,21 +100,25 @@ let loop_with_non_dominating_load x l =
 loop_with_non_dominating_load:
   movl  $1, %eax
   movl  $201, %edi
-.L103:
+.L106:
   testb $1, %bl
-  je    .L106
+  je    .L109
+  jmp   .L108
+.L107:
+  ret
+.L108:
   movq  camlStdlib__List__Pmakeblock2305@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L106:
+.L109:
   movq  (%rbx), %rsi
   leaq  -1(%rax,%rsi), %rax
   addq  $-2, %rdi
   cmpq  $1, %rdi
-  jg    .L103
-  ret
+  jle   .L107
+  jmp   .L106
 |}]
 
 
@@ -131,8 +138,8 @@ f:
   subq  $8, %rsp
   subq  $32, %r15
   cmpq  (%r14), %r15
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
   movq  camlTOP5__do_work_11_15_code@GOTPCREL(%rip), %rdi
@@ -148,12 +155,12 @@ f.do_work:
   movq  16(%rbx), %rax
   leaq  -1(%rax,%rax), %rax
   movl  $1, %edi
-.L112:
+.L120:
   movq  16(%rbx), %rsi
   leaq  -1(%rax,%rsi), %rax
   incq  %rdi
   cmpq  $100, %rdi
-  jle   .L112
+  jle   .L120
   ret
 |}]
 
@@ -167,10 +174,10 @@ noop_loop:
   jg    .L109
   sarq  $1, %rax
   sarq  $1, %rbx
-.L105:
+.L106:
   incq  %rax
   cmpq  %rbx, %rax
-  jle   .L105
+  jle   .L106
 .L109:
   movl  $1, %eax
   ret
@@ -192,20 +199,21 @@ let f n =
 f:
   movq  %rax, %rbx
   cmpq  $1, %rbx
-  jl    .L102
+  jl    .L107
   sarq  $1, %rbx
   movl  $1, %eax
   xorl  %edi, %edi
-.L104:
+  jmp   .L108
+.L107:
+  movl  $1, %eax
+  ret
+.L108:
   movq  %rdi, %rsi
   imulq $6, %rsi
   addq  %rsi, %rax
   incq  %rdi
   cmpq  %rbx, %rdi
-  jle   .L104
-  ret
-.L102:
-  movl  $1, %eax
+  jle   .L108
   ret
 |}]
 
@@ -242,11 +250,15 @@ M.f:
   leaq  (%rdx,%rbx), %rax
   leaq  -1(%rax,%rax), %rax
   cmpq  $1, %rax
-  jl    .L109
+  jl    .L118
   sarq  $1, %rax
   vxorpd %xmm0, %xmm0, %xmm0
   xorl  %ebx, %ebx
-.L111:
+  jmp   .L119
+.L118:
+  vxorpd %xmm0, %xmm0, %xmm0
+  ret
+.L119:
   movq  %rbx, %rsi
   imulq $6, %rsi
   incq  %rsi
@@ -256,10 +268,7 @@ M.f:
   vaddsd %xmm1, %xmm0, %xmm0
   incq  %rbx
   cmpq  %rax, %rbx
-  jle   .L111
-  ret
-.L109:
-  vxorpd %xmm0, %xmm0, %xmm0
+  jle   .L119
   ret
 |}]
 
@@ -276,24 +285,24 @@ loop_invariant_code:
   movq  %rbx, 8(%rsp)
   xorl  %edi, %edi
   cmpq  $1, %rax
-  jne   .L106
-  jmp   .L103
-.L104:
-  cmpq  $1, %rax
-  je    .L103
+  jne   .L109
 .L106:
+  incq  %rdi
+  cmpq  $9, %rdi
+  jg    .L112
+  cmpq  $1, %rax
+  je    .L106
+.L109:
   movq  %rdi, 16(%rsp)
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
-.L114:
+.L143:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   movq  16(%rsp), %rdi
-.L103:
-  incq  %rdi
-  cmpq  $9, %rdi
-  jle   .L104
+  jmp   .L106
+.L112:
   movl  $1, %eax
   addq  $24, %rsp
   ret

@@ -28,10 +28,10 @@ end
 [%%expect_asm X86_64{|
 Variant_as_index.get:
   cmpq  $1, %rbx
-  jne   .L102
+  jne   .L104
   movq  (%rax), %rax
   ret
-.L102:
+.L104:
   movq  8(%rax), %rax
   ret
 |}]
@@ -57,10 +57,10 @@ end
 Variant_with_uneven_mutability.get:
   movzbq -8(%rax), %rbx
   cmpq  $1, %rbx
-  jne   .L101
+  je    .L107
   movq  (%rax), %rax
   ret
-.L101:
+.L107:
   movq  (%rax), %rax
   ret
 |}]
@@ -110,14 +110,14 @@ let even_variant (t : t) : bool =
 [%%expect_asm X86_64{|
 even_variant:
   cmpq  $3, %rax
-  je    .L102
+  je    .L105
   cmpq  $7, %rax
   setge %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
   xorq  $2, %rax
   ret
-.L102:
+.L105:
   movl  $1, %eax
   ret
 |}]
@@ -192,29 +192,29 @@ let unnecessary_match = function
 [%%expect_asm X86_64{|
 unnecessary_match:
   sarq  $1, %rax
-  leaq  .L118(%rip), %rdx
+  leaq  .L143(%rip), %rdx
   movslq (%rdx,%rax,4), %rax
   addq  %rax, %rdx
   jmp   *%rdx
-.L102:
+.L114:
   movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L106:
+.L115:
   movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $3, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L110:
+.L116:
   movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $5, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L114:
+.L117:
   movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $7, %eax
@@ -251,46 +251,49 @@ double_match:
   movq  64(%r14), %rsi
   sarq  $1, %rax
   cmpq  $1, %rax
-  je    .L107
-  ja    .L109
+  jb    .L111
+  je    .L112
+  ja    .L113
+.L109:
+  movq  (%rax), %rax
+  movq  %rsi, 64(%r14)
+  addq  $8, %rsp
+  ret
+.L111:
   movq  64(%r14), %rax
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L114
-.L115:
+  jl    .L138
+.L139:
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1792, -8(%rax)
   movq  %rbx, (%rax)
-  jmp   .L102
-.L107:
+  jmp   .L109
+.L112:
   movq  64(%r14), %rax
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L116
-.L117:
+  jl    .L140
+.L141:
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)
   movq  %rdi, (%rax)
-  jmp   .L102
-.L109:
+  jmp   .L109
+.L113:
   movq  64(%r14), %rax
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L118
-.L119:
+  jl    .L142
+.L143:
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)
   leaq  2(%rdi), %rbx
   movq  %rbx, (%rax)
-.L102:
-  movq  (%rax), %rax
-  movq  %rsi, 64(%r14)
-  addq  $8, %rsp
-  ret
+  jmp   .L109
 |}]

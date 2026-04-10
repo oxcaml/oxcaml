@@ -198,15 +198,15 @@ bytes_safe_get_int32:
   xorq  $-1, %rsi
   andq  %rdi, %rsi
   cmpq  %rsi, %rbx
-  jae   .L101
-  movslq (%rax,%rbx), %rax
-  ret
-.L101:
+  jb    .L115
   movq  camlTOP18__block602@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
+.L115:
+  movslq (%rax,%rbx), %rax
+  ret
 |}]
 
 let bytes_get_int64_indexed_by_int64

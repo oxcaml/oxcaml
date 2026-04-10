@@ -14,10 +14,10 @@ val helper2 : int -> int = <fun>
 [%%expect_asm X86_64{|
 helper2:
   cmpq  $7, %rax
-  jle   .L102
+  jle   .L105
   addq  $14, %rax
   ret
-.L102:
+.L105:
   imulq $7, %rax
   addq  $-6, %rax
   ret
@@ -27,10 +27,10 @@ let helper x = if x > 3 then x + 7 else x * 7
 [%%expect_asm X86_64{|
 helper:
   cmpq  $7, %rax
-  jle   .L102
+  jle   .L105
   addq  $14, %rax
   ret
-.L102:
+.L105:
   imulq $7, %rax
   addq  $-6, %rax
   ret
@@ -56,7 +56,7 @@ f:
   movq  %rax, %rbx
   movq  camlTOP4__fn$5b$3a1$2c19$2d$2d45$5d_10@GOTPCREL(%rip), %rax
   call  camlStdlib__List__map_15_113_code@PLT
-.L109:
+.L122:
   movq  %rax, %rbx
   movq  camlTOP4__fn$5b$3a1$2c60$2d$2d86$5d_11@GOTPCREL(%rip), %rax
   addq  $8, %rsp
