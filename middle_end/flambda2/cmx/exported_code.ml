@@ -59,8 +59,8 @@ let merge t1 t2 =
       | Some t -> t
       | None ->
         Misc.fatal_errorf
-          "Unexpected deletion while merging exported code for %a"
-          Code_id.print code_id)
+          "Unexpected deletion while merging exported code for %a" Code_id.print
+          code_id)
     t1 t2
 
 let mem code_id t = Code_id.Map.mem code_id t
