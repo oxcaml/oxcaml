@@ -57,19 +57,19 @@ let div x y = x / y
 div:
   movq  %rbx, %rcx
   cmpq  $1, %rcx
-  jne   .L107
-  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
-.L107:
+  je    .L108
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
   idivq %rcx
   leaq  1(%rax,%rax), %rax
   ret
+.L108:
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
 |}]
 
 let div_by_constant x = x / 1234
@@ -110,19 +110,19 @@ let rem x y = x mod y
 rem:
   movq  %rbx, %rcx
   cmpq  $1, %rcx
-  jne   .L107
-  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
-.L107:
+  je    .L108
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
   idivq %rcx
   leaq  1(%rdx,%rdx), %rax
   ret
+.L108:
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
 |}]
 
 (* CR ttebbi: This could be:
