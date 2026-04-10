@@ -1594,7 +1594,7 @@ module Scalar_type : sig
   end
 
   module Signedness : sig
-    type t =
+    type t = Scalar.Signedness.t =
       | Signed
       | Unsigned
 

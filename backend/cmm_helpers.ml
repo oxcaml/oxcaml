@@ -5450,18 +5450,7 @@ module Scalar_type = struct
       | Float64, Float32 -> float32_of_float ~dbg exp
   end
 
-  module Signedness = struct
-    type t =
-      | Signed
-      | Unsigned
-
-    let equal (x : t) (y : t) = x = y
-
-    let print ppf t =
-      match t with
-      | Signed -> Format.pp_print_string ppf "signed"
-      | Unsigned -> Format.pp_print_string ppf "unsigned"
-  end
+  module Signedness = Scalar.Signedness
 
   module Bit_width_and_signedness : sig
     (** An integer with signedness [signedness t] that fits into a
