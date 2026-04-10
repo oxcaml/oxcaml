@@ -15,19 +15,16 @@ let empty_eqs = { old_to_new = Reg.Map.empty; new_to_old = Reg.Map.empty }
 
 let eqs_equal a b = Reg.Map.equal Reg.Set.equal a.old_to_new b.old_to_new
 
+let add_to_map key value m =
+  Reg.Map.update key
+    (function
+      | None -> Some (Reg.Set.singleton value)
+      | Some s -> Some (Reg.Set.add value s))
+    m
+
 let add_pair eqs ~old_r ~new_r =
-  { old_to_new =
-      Reg.Map.update old_r
-        (function
-          | None -> Some (Reg.Set.singleton new_r)
-          | Some s -> Some (Reg.Set.add new_r s))
-        eqs.old_to_new;
-    new_to_old =
-      Reg.Map.update new_r
-        (function
-          | None -> Some (Reg.Set.singleton old_r)
-          | Some s -> Some (Reg.Set.add old_r s))
-        eqs.new_to_old
+  { old_to_new = add_to_map old_r new_r eqs.old_to_new;
+    new_to_old = add_to_map new_r old_r eqs.new_to_old
   }
 
 let remove_from_map r partner m =
@@ -109,25 +106,37 @@ let is_move (i : Cfg.basic Cfg.instruction) =
 let effective_arg (i : Cfg.basic Cfg.instruction) =
   match i.desc with Op (Name_for_debugger { regs; _ }) -> regs | _ -> i.arg
 
+let map_or_add_label label_map ~old_label ~new_label =
+  match Label.Tbl.find_opt label_map new_label with
+  | Some mapped -> Label.equal mapped old_label
+  | None ->
+    Label.Tbl.replace label_map new_label old_label;
+    true
+
 let basic_desc_match label_map (old_d : Cfg.basic) (new_d : Cfg.basic) =
   match old_d, new_d with
   | Pushtrap { lbl_handler = ol }, Pushtrap { lbl_handler = nl }
-  | Poptrap { lbl_handler = ol }, Poptrap { lbl_handler = nl } -> (
-    match Label.Tbl.find_opt label_map nl with
-    | Some mapped -> Label.equal mapped ol
-    | None ->
-      Label.Tbl.replace label_map nl ol;
-      true)
+  | Poptrap { lbl_handler = ol }, Poptrap { lbl_handler = nl } ->
+    map_or_add_label label_map ~old_label:ol ~new_label:nl
   | _ -> Cfg.equal_basic old_d new_d
+
+let map_body_labels label_map old_body new_body =
+  let rec loop old_is new_is =
+    match old_is, new_is with
+    | [], _ | _, [] -> ()
+    | oi :: rest, _ when is_move oi -> loop rest new_is
+    | _, ni :: rest when is_move ni -> loop old_is rest
+    | (oi : Cfg.basic Cfg.instruction) :: old_rest,
+      (ni : Cfg.basic Cfg.instruction) :: new_rest ->
+      ignore (basic_desc_match label_map oi.desc ni.desc : bool);
+      loop old_rest new_rest
+  in
+  loop (DLL.to_list old_body) (DLL.to_list new_body)
 
 let terminator_structure_match label_map (old_t : Cfg.terminator)
     (new_t : Cfg.terminator) =
   let map_label ol nl =
-    match Label.Tbl.find_opt label_map nl with
-    | Some mapped -> Label.equal mapped ol
-    | None ->
-      Label.Tbl.replace label_map nl ol;
-      true
+    map_or_add_label label_map ~old_label:ol ~new_label:nl
   in
   match old_t, new_t with
   | Never, Never -> true
@@ -211,38 +220,26 @@ let process_backward ~ppf_check label_map eqs ~(old_block : Cfg.basic_block)
       match ppf_check with
       | None -> ()
       | Some _ ->
-        Array.iter
-          (fun old_r ->
-            match Reg.Map.find_opt old_r eqs.old_to_new with
-            | None -> ()
-            | Some new_rs ->
-              Reg.Set.iter
-                (fun new_r ->
-                  report
-                    "Residual output equation at old=%a(id:%a) new=%a(id:%a): \
-                     %a still paired with %a after removing matched outputs \
-                     (%a)@."
-                    Label.format ol InstructionId.print old_i.id Label.format nl
-                    InstructionId.print new_i.id Printreg.reg old_r Printreg.reg
-                    new_r Cfg.dump_basic old_i.desc)
-                new_rs)
-          old_i.res;
-        Array.iter
-          (fun new_r ->
-            match Reg.Map.find_opt new_r eqs.new_to_old with
-            | None -> ()
-            | Some old_rs ->
-              Reg.Set.iter
-                (fun old_r ->
-                  report
-                    "Residual output equation at old=%a(id:%a) new=%a(id:%a): \
-                     %a still paired with %a after removing matched outputs \
-                     (%a)@."
-                    Label.format ol InstructionId.print old_i.id Label.format nl
-                    InstructionId.print new_i.id Printreg.reg new_r Printreg.reg
-                    old_r Cfg.dump_basic new_i.desc)
-                old_rs)
-          new_i.res
+        let check_side res eqs_map desc =
+          Array.iter
+            (fun r ->
+              match Reg.Map.find_opt r eqs_map with
+              | None -> ()
+              | Some partners ->
+                Reg.Set.iter
+                  (fun r' ->
+                    report
+                      "Residual output equation at old=%a(id:%a) \
+                       new=%a(id:%a): %a still paired with %a after removing \
+                       matched outputs (%a)@."
+                      Label.format ol InstructionId.print old_i.id
+                      Label.format nl InstructionId.print new_i.id
+                      Printreg.reg r Printreg.reg r' Cfg.dump_basic desc)
+                  partners)
+            res
+        in
+        check_side old_i.res eqs.old_to_new old_i.desc;
+        check_side new_i.res eqs.new_to_old new_i.desc
     in
     (* Process terminator *)
     let old_t = old_block.terminator in
@@ -389,18 +386,17 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
             Label.format ol Label.format nl;
         (* Map exn successors *)
         (match ob.exn, nb.exn with
-        | Some oe, Some ne -> (
-          match Label.Tbl.find_opt label_map ne with
-          | Some mapped ->
-            if not (Label.equal mapped oe)
-            then
-              Format.fprintf ppf_m "Exn label conflict at old=%a new=%a@."
-                Label.format ol Label.format nl
-          | None -> Label.Tbl.replace label_map ne oe)
+        | Some oe, Some ne ->
+          if not (map_or_add_label label_map ~old_label:oe ~new_label:ne)
+          then
+            Format.fprintf ppf_m "Exn label conflict at old=%a new=%a@."
+              Label.format ol Label.format nl
         | None, None -> ()
         | _ ->
           Format.fprintf ppf_m "Exn presence mismatch at old=%a new=%a@."
             Label.format ol Label.format nl);
+        (* Map labels from Pushtrap/Poptrap in body *)
+        map_body_labels label_map ob.body nb.body;
         (* Check terminator structure, map labels *)
         if
           not
@@ -440,11 +436,12 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
      into all predecessors' block_eqs. Since the backward processing is
      monotone, this converges. *)
   let block_eqs = Label.Tbl.create 64 in
-  Label.Tbl.iter
-    (fun ol _ -> Label.Tbl.replace block_eqs ol empty_eqs)
-    block_pairs;
   let worklist = Queue.create () in
-  Label.Tbl.iter (fun ol _ -> Queue.add ol worklist) block_pairs;
+  Label.Tbl.iter
+    (fun ol _ ->
+      Label.Tbl.replace block_eqs ol empty_eqs;
+      Queue.add ol worklist)
+    block_pairs;
   while not (Queue.is_empty worklist) do
     let ol = Queue.pop worklist in
     match Label.Tbl.find_opt block_pairs ol with
