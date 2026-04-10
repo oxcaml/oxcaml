@@ -381,8 +381,8 @@ unsigned_to_int:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L107
-.L109:
+  jb    .L122
+.L124:
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)
   leaq  1(%rbx,%rbx), %rbx
@@ -409,8 +409,8 @@ to_float:
   vcvtsi2sdq %rax, %xmm0, %xmm0
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd %xmm0, (%rax)
@@ -431,8 +431,8 @@ to_int32:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    .L110
+.L112:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
@@ -457,8 +457,8 @@ to_nativeint:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L102
-.L104:
+  jb    .L106
+.L108:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
@@ -508,8 +508,8 @@ float_of_bits:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L103
-.L105:
+  jb    .L108
+.L110:
   leaq  8(%r15), %rbx
   movq  $1277, -8(%rbx)
   vmovq %rax, %xmm0
@@ -615,8 +615,8 @@ to_int64:
   subq  $8, %rsp
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L102
-.L104:
+  jb    .L106
+.L108:
   leaq  8(%r15), %rbx
   movq  $2303, -8(%rbx)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi

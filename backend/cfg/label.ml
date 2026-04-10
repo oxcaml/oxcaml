@@ -49,12 +49,6 @@ let new_label () =
   incr label_counter;
   !label_counter
 
-let with_saved_counter f =
-  let saved = !label_counter in
-  let result = f () in
-  label_counter := saved;
-  result
-
 let reset () = label_counter := init_label
 
 let to_int t = t

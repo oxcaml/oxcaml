@@ -455,7 +455,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     List.iter
       (fun (blk : Ssa.block) ->
         Ssa.Block.Tbl.replace block_labels blk (Cmm.new_label ()))
-      ssa.blocks_create_order;
+      ssa.blocks;
     let label_of blk = Ssa.Block.Tbl.find block_labels blk in
     let renv = create_reg_env () in
     List.iter
@@ -571,6 +571,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                   (make_cfg_instr (Cfg.Op Move) [| s |] [| d |] Debuginfo.none))
             (Array.of_list (List.rev (Array.to_list loc_arg)))
             (Array.of_list (List.rev (Array.to_list fun_arg_regs)));
+          let param_namings = ref [] in
           let loc_idx = ref 0 in
           List.iteri
             (fun pi (var, ty) ->
@@ -581,17 +582,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               loc_idx := !loc_idx + n;
               if Option.is_some prov
               then
-                DLL.add_begin cfg_block.body
-                  (make_cfg_instr
-                     (Cfg.Op
-                        (Name_for_debugger
-                           { ident;
-                             provenance = prov;
-                             which_parameter = Some pi;
-                             regs
-                           }))
-                     regs [||] Debuginfo.none))
-            ssa.fun_args_names);
+                param_namings
+                  := make_cfg_instr
+                       (Cfg.Op
+                          (Name_for_debugger
+                             { ident;
+                               provenance = prov;
+                               which_parameter = Some pi;
+                               regs
+                             }))
+                       regs [||] Debuginfo.none
+                     :: !param_namings)
+            ssa.fun_args_names;
+          List.iter (DLL.add_begin cfg_block.body) !param_namings);
         if Cfg.is_return_terminator cfg_block.terminator.desc
         then
           DLL.add_end cfg_block.body
