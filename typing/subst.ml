@@ -421,7 +421,7 @@ let newpersty desc =
 
 let newsortvar desc =
   decr new_sort_id;
-  Jkind_types.Sort.create_var
+  Jkind_types.Sort.create_var_with_id
     desc ~level:generic_level ~id:!new_sort_id
 
 (* CR layouts: remove this. While we're still developing, though, it might
