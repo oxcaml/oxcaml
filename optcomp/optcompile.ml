@@ -96,9 +96,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
         |> Slambda.eval
              (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-        |> fun { Slambda.slv_comptime = _; slv_runtime } ->
-        (* CR layout poly: Drop the comptime part until top-level modules can be
-           static. *)
+        |> fun { Slambda.slv_comptime; slv_runtime } ->
         { program with Lambda.code = slv_runtime }
         |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
             Type_shape.print_debug_uid_tables ppf)
@@ -132,7 +130,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             (Unit_info.Artifact.filename
                (Unit_info.artifact i.target ~extension:Backend.ext_flambda_obj))
             ~main_module_block_format:program.main_module_block_format
-            ~arg_descr))
+            ~arg_descr
+            ~static_data:slv_comptime))
 
   let compile_from_typed i typed ~keep_symbol_tables ~as_arg_for =
     let loc = Location.in_file (Unit_info.original_source_file i.target) in

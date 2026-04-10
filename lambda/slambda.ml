@@ -25,8 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type value_halves = Slambdaeval.halves =
-  { slv_comptime : Slambdaeval.value Slambdaeval.Or_missing.t;
+type value_halves = Slambda_types.halves =
+  { slv_comptime : Slambda_types.value Slambda_types.Or_missing.t;
     slv_runtime : Lambda.lambda
   }
 

@@ -230,7 +230,8 @@ end) : S = struct
         ui_export_info;
         ui_zero_alloc_info;
         ui_external_symbols =
-          union (List.map (fun info -> info.ui_external_symbols) units)
+          union (List.map (fun info -> info.ui_external_symbols) units);
+        ui_static_data = Missing;
       }
     in
     Compilenv_flambda.write_unit_info pkg_infos cmxfile

@@ -51,7 +51,7 @@ let cached_zero_alloc_info = Zero_alloc_info.create ()
 
 let cache_zero_alloc_info c = Zero_alloc_info.merge c ~into:cached_zero_alloc_info
 
-let current_unit =
+let current_unit  =
   { ui_unit = CU.dummy;
     ui_defines = [];
     ui_arg_descr = None;
@@ -65,6 +65,7 @@ let current_unit =
     ui_zero_alloc_info = Zero_alloc_info.create ();
     ui_export_info = None;
     ui_external_symbols = [];
+    ui_static_data = Missing;
   }
 
 let reset unit_info =
@@ -126,6 +127,7 @@ let read_unit_info filename =
       ui_force_link = uir.uir_force_link;
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+      ui_static_data = uir.uir_static_data;
     }
     in
     (ui, sections, crc)
@@ -200,6 +202,20 @@ let ensure_unit_loaded comp_unit =
       current_unit.ui_imports_cmx <- import :: current_unit.ui_imports_cmx;
       Infos_table.add global_infos_table name infos
     end
+  end
+
+let get_cached_static_data comp_unit =
+  if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
+  then
+    current_unit.ui_static_data
+  else begin
+    let name = CU.to_global_name_without_prefix comp_unit in
+    try
+      let ui = Infos_table.find global_infos_table name in
+      match ui with
+      | Some ui -> ui.ui_static_data
+      | None -> Slambda_types.Or_missing.Missing
+    with Not_found -> Slambda_types.Or_missing.Missing
   end
 
 let get_cached_export_info comp_unit =
@@ -287,6 +303,7 @@ let write_unit_info info ~export_info_sections filename =
     uir_section_toc = toc;
     uir_sections_length = total_length;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
+    uir_static_data = info.ui_static_data;
   } in
   Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
@@ -296,10 +313,11 @@ let write_unit_info info ~export_info_sections filename =
   let crc = Digest.file filename in
   Digest.output oc crc)
 
-let save_unit_info filename ~main_module_block_format ~arg_descr =
+let save_unit_info filename ~main_module_block_format ~arg_descr ~static_data =
   current_unit.ui_imports_cmi <- Env.imports();
   current_unit.ui_quoted_globals <- Env.quoted_globals();
   current_unit.ui_arg_descr <- arg_descr;
+  current_unit.ui_static_data <- static_data;
   let export_info, export_info_sections =
     match current_unit.ui_export_info with
     | None -> None, File_sections.empty

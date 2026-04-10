@@ -69,6 +69,7 @@ val write_unit_info:
 val save_unit_info:
   string -> main_module_block_format:Lambda.main_module_block_format ->
   arg_descr:Lambda.arg_descr option ->
+  static_data:(Slambda_types.value Slambda_types.Or_missing.t) ->
   unit
         (* Save the infos for the current unit in the given file *)
 
@@ -81,6 +82,9 @@ val cache_unit_info:
 val ensure_unit_loaded : Compilation_unit.t -> unit
         (* Load the .cmx file for the given compilation unit if not
            already cached, and record the import dependency. *)
+
+val get_cached_static_data:
+  Compilation_unit.t -> Slambda_types.value Slambda_types.Or_missing.t
 
 val get_cached_export_info : Compilation_unit.t -> Obj.t option
         (* Return the cached export info for a loaded compilation unit,
