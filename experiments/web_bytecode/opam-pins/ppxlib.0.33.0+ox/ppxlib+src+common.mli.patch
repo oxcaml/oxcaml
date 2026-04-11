@@ -1,0 +1,10 @@
+--- a/src/common.mli
++++ b/src/common.mli
+@@ -100,3 +100,7 @@ module With_errors : sig
+ 
+   val combine_errors : 'a t list -> 'a list t
+ end
++
++(** [valid_string_constant_delimiter x] finds a delimiter [y] such that
++    [Pconst_string (x, loc, Some y)] is valid. *)
++val valid_string_constant_delimiter : string -> string

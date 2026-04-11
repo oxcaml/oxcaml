@@ -1,0 +1,13 @@
+--- a/src/location.mli
++++ b/src/location.mli
+@@ -85,6 +85,10 @@ module Error : sig
+ 
+   val get_location : t -> location
+   (** Find out where the error is located. *)
++
++  val of_extension : extension -> t option
++  (** Convert an extension point to an error. Extension points must have the exact form as
++      created by [to_extension]. *)
+ end
+ with type location := t
+ 

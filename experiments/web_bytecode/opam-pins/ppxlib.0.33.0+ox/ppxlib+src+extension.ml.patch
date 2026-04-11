@@ -1,0 +1,13 @@
+--- a/src/extension.ml
++++ b/src/extension.ml
+@@ -326,6 +326,10 @@ let collect_unhandled_extension_errors =
+             "extension not expected here, Ppxlib.Extension needs updating!";
+         ]
+ 
++    (* Skip extensions in attributes, they will be handled by the PPX that handles each
++       specific attribute. *)
++    method! attribute _x acc = acc
++
+     method! core_type_desc x acc =
+       match x with
+       | Ptyp_extension ext -> acc @ unhandled_extension_error Core_type ext

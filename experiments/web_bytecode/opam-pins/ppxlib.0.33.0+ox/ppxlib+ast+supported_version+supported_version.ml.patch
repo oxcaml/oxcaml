@@ -1,0 +1,38 @@
+--- a/ast/supported_version/supported_version.ml
++++ b/ast/supported_version/supported_version.ml
+@@ -2,21 +2,22 @@ type t = int * int
+ 
+ let all =
+   [
+-    (4, 02);
+-    (4, 03);
+-    (4, 04);
+-    (4, 05);
+-    (4, 06);
+-    (4, 07);
+-    (4, 08);
+-    (4, 09);
+-    (4, 10);
+-    (4, 11);
+-    (4, 12);
+-    (4, 13);
++    (* We support many fewer versions of the parsetree internally.
++       (4, 02);
++       (4, 03);
++       (4, 04);
++       (4, 05);
++       (4, 06);
++       (4, 07);
++       (4, 08);
++       (4, 09);
++       (4, 10);
++       (4, 11);
++       (4, 12);
++       (4, 13); *)
+     (4, 14);
+     (5, 0);
+-    (5, 1);
++    (9, 99);
+   ]
+ 
+ let to_string (a, b) =

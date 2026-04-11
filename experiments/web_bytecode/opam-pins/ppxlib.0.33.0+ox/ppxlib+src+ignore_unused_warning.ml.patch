@@ -1,0 +1,11 @@
+--- a/src/ignore_unused_warning.ml
++++ b/src/ignore_unused_warning.ml
+@@ -61,7 +61,7 @@ let binds_module_names =
+     method! functor_parameter fp acc =
+       match fp with
+       | Unit -> acc
+-      | Named (name, _) -> (
++      | Named (name, _, _) -> (
+           match name.txt with
+           | Some (_ : string) -> true
+           | None -> super#functor_parameter fp acc)

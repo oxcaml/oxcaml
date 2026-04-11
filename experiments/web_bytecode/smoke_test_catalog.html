@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <div id="status"><span class="status-text"></span></div>
+    <select id="sample-picker"></select>
+    <textarea id="source"></textarea>
+    <pre id="highlight"></pre>
+    <div id="output-panel"><div id="output"></div></div>
+    <div id="output-label"></div>
+    <pre id="report">booting</pre>
+    <script type="module">
+      import { checkString, runString } from "./app.js";
+      import {
+        allSamples,
+        defaultSample,
+        getVisibleSamplesByTopic,
+        matchesExpectedText,
+        topicOrder,
+        visibleSamples,
+      } from "./sample_catalog.js";
+      import { unsupportedSamples } from "./unsupported_samples.js";
+
+      const reportEl = document.getElementById("report");
+      const pickerEl = document.getElementById("sample-picker");
+
+      function show(result) {
+        reportEl.textContent = JSON.stringify(result, null, 2);
+      }
+
+      function assert(condition, message, details = null) {
+        if (!condition) {
+          throw new Error(details === null ? message : `${message}: ${details}`);
+        }
+      }
+
+      function requiredFieldNames(sample) {
+        return [
+          "id",
+          "topic",
+          "label",
+          "filename",
+          "mode",
+          "source",
+          "expected_kind",
+          "expected_text",
+          "browser_status",
+          "local_status",
+          "origin",
+        ].filter((field) => sample[field] === undefined);
+      }
+
+      window.addEventListener("error", (event) => {
+        show({
+          ok: false,
+          phase: "window.error",
+          message: String(event.message),
+          error: String(event.error),
+        });
+      });
+
+      window.addEventListener("unhandledrejection", (event) => {
+        show({
+          ok: false,
+          phase: "unhandledrejection",
+          reason: String(event.reason),
+        });
+      });
+
+      const ids = allSamples.map((sample) => sample.id);
+      const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+      const missingFields = allSamples
+        .map((sample) => ({ id: sample.id, missing: requiredFieldNames(sample) }))
+        .filter((entry) => entry.missing.length > 0);
+
+      const visibleIds = new Set(visibleSamples.map((sample) => sample.id));
+      const leakedUnsupported = unsupportedSamples
+        .map((sample) => sample.id)
+        .filter((id) => visibleIds.has(id));
+
+      const grouped = getVisibleSamplesByTopic();
+      const renderedTopics = Array.from(pickerEl.querySelectorAll("optgroup")).map(
+        (group) => group.label,
+      );
+      const expectedTopics = grouped.map((group) => group.topic);
+      const declaredTopics = topicOrder.filter((topic) =>
+        visibleSamples.some((sample) => sample.topic === topic),
+      );
+      const renderedValues = Array.from(pickerEl.querySelectorAll("option")).map(
+        (option) => option.value,
+      );
+      const expectedValues = grouped.flatMap((group) => group.samples.map((sample) => sample.id));
+
+      const unsupportedBrowserChecks = [];
+      for (const sample of unsupportedSamples) {
+        const actual =
+          sample.mode === "run"
+            ? await runString(sample.filename, sample.source)
+            : await checkString(sample.filename, sample.source);
+        unsupportedBrowserChecks.push({
+          id: sample.id,
+          ok: matchesExpectedText(actual, sample.expected_text),
+          actual,
+        });
+      }
+
+      try {
+        assert(duplicateIds.length === 0, "duplicate ids", duplicateIds.join(", "));
+        assert(missingFields.length === 0, "missing required fields", JSON.stringify(missingFields));
+        assert(
+          visibleSamples.every((sample) => sample.browser_status === "supported"),
+          "visible samples must all be supported",
+        );
+        assert(
+          unsupportedSamples.every((sample) => sample.browser_status === "unsupported"),
+          "unsupported samples must all be unsupported",
+        );
+        assert(leakedUnsupported.length === 0, "unsupported samples leaked into picker", leakedUnsupported.join(", "));
+        assert(
+          unsupportedSamples.every((sample) => Boolean(sample.failure_reason)),
+          "unsupported samples need failure_reason",
+        );
+        assert(
+          unsupportedSamples.every((sample) => Boolean(sample.local_result_summary)),
+          "unsupported samples need local_result_summary",
+        );
+        assert(
+          unsupportedSamples.every((sample) => Boolean(sample.next_support_guess)),
+          "unsupported samples need next_support_guess",
+        );
+        assert(
+          JSON.stringify(expectedTopics) === JSON.stringify(renderedTopics),
+          "picker topic order mismatch",
+          JSON.stringify({ expectedTopics, renderedTopics }),
+        );
+        assert(
+          JSON.stringify(declaredTopics) === JSON.stringify(expectedTopics),
+          "catalog topic order mismatch",
+          JSON.stringify({ declaredTopics, expectedTopics }),
+        );
+        assert(
+          JSON.stringify(expectedValues) === JSON.stringify(renderedValues),
+          "picker sample order mismatch",
+          JSON.stringify({ expectedValues, renderedValues }),
+        );
+        assert(defaultSample !== null, "default sample missing");
+        assert(
+          pickerEl.value === defaultSample.id,
+          "default picker value mismatch",
+          JSON.stringify({ expected: defaultSample.id, actual: pickerEl.value }),
+        );
+        assert(
+          topicOrder.every((topic, index) => index === topicOrder.indexOf(topic)),
+          "topicOrder contains duplicates",
+        );
+        assert(
+          unsupportedBrowserChecks.every((result) => result.ok),
+          "unsupported sample browser expectations mismatch",
+          JSON.stringify(unsupportedBrowserChecks.filter((result) => !result.ok)),
+        );
+
+        show({
+          ok: true,
+          visible_count: visibleSamples.length,
+          unsupported_count: unsupportedSamples.length,
+          topics: expectedTopics,
+          picker_default: pickerEl.value,
+          unsupported_browser_checks: unsupportedBrowserChecks,
+        });
+      } catch (error) {
+        show({
+          ok: false,
+          error: String(error && error.stack ? error.stack : error),
+          duplicate_ids: duplicateIds,
+          missing_fields: missingFields,
+          leaked_unsupported: leakedUnsupported,
+          topics: { expected: expectedTopics, rendered: renderedTopics },
+          picker_values: { expected: expectedValues, rendered: renderedValues },
+          unsupported_browser_checks: unsupportedBrowserChecks,
+        });
+      }
+    </script>
+  </body>
+</html>

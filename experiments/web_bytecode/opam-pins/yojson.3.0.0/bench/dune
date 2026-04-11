@@ -1,0 +1,23 @@
+(executables
+ (names generic buf)
+ (package yojson-bench)
+ (public_names yojson-bench -)
+ (libraries yojson benchmark))
+
+(rule
+ (alias bench-generic)
+ (deps bench.json)
+ (action
+  (run ./generic.exe)))
+
+(rule
+ (alias bench-buffer)
+ (deps bench.json)
+ (action
+  (run ./buf.exe)))
+
+(alias
+ (name bench)
+ (deps
+  (alias bench-generic)
+  (alias bench-buffer)))

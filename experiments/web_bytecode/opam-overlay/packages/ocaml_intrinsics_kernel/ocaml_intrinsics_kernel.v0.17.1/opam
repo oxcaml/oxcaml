@@ -1,0 +1,38 @@
+opam-version: "2.0"
+name: "ocaml_intrinsics_kernel"
+version: "v0.17.1"
+synopsis: "Intrinsics"
+description: """\
+Provides functions to invoke amd64 instructions (such as cmov, min/maxsd, popcnt)
+     when available, or compatible software implementation on other targets.
+     See also ocaml_intrinsics library."""
+maintainer: "Jane Street developers"
+authors: "Jane Street Group, LLC"
+license: "MIT"
+homepage: "https://github.com/janestreet/ocaml_intrinsics_kernel"
+doc:
+  "https://ocaml.janestreet.com/ocaml-core/latest/doc/ocaml_intrinsics_kernel/index.html"
+bug-reports: "https://github.com/janestreet/ocaml_intrinsics_kernel/issues"
+depends: [
+  "ocaml" {>= "5.1.0"}
+  "dune" {>= "3.11.0"}
+]
+available: arch != "x86_32"
+build: [
+  [
+    "sh"
+    "-ec"
+    "python3 - <<'PY'\nfrom pathlib import Path\n\nfor rel in ['src/float.ml', 'src/float.mli']:\n    path = Path(rel)\n    text = path.read_text()\n    old = '[@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]'\n    new = '[@@noalloc] [@@no_effects] [@@no_coeffects]'\n    if old not in text:\n        raise SystemExit(f'ocaml_intrinsics_kernel overlay: expected annotation not found in {rel}')\n    path.write_text(text.replace(old, new))\nPY"
+  ]
+  ["dune" "build" "-p" name "-j" jobs]
+]
+dev-repo: "git+https://github.com/janestreet/ocaml_intrinsics_kernel.git"
+url {
+  src:
+    "https://github.com/janestreet/ocaml_intrinsics_kernel/archive/refs/tags/v0.17.1.tar.gz"
+  checksum: [
+    "md5=56ed7d0b0331e5bcfa4e016515c0267d"
+    "sha512=21e596d6407a620866cee7cab47ef1a9446d6a733b4994e809ea5566d5fa956682a5c6a6190ffb0ed48458abd658301944ed10c4389d91ecb8df677a5f87f2ab"
+  ]
+}
+x-maintenance-intent: ["(latest)"]

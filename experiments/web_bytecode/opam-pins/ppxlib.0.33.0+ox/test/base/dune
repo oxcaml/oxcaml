@@ -1,0 +1,33 @@
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (>= %{ocaml_version} "4.09.0")
+   (< %{ocaml_version} "5.1.0")))
+ (deps
+  (:test test.ml)
+  (package ppxlib))
+ (action
+  (chdir
+   %{project_root}
+   (progn
+    (run expect-test %{test})
+    (diff? %{test} %{test}.corrected)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (>= %{ocaml_version} "5.1.0"))
+ (deps
+  (:test test.ml)
+  (:t test_510.ml)
+  (package ppxlib))
+ (action
+  (chdir
+   %{project_root}
+   (progn
+    (run mv %{t} %{t}.old)
+    (run cp %{test} %{t})
+    (run expect-test %{t})
+    (run mv %{t}.old %{t})
+    (diff? %{t} %{t}.corrected)))))

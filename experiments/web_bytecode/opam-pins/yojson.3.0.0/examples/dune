@@ -1,0 +1,13 @@
+(executable
+ (name filtering)
+ (modules filtering)
+ (libraries yojson))
+
+(executable
+ (name constructing)
+ (modules constructing)
+ (libraries yojson))
+
+(alias
+ (name examples)
+ (deps filtering.exe))

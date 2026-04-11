@@ -1,0 +1,43 @@
+<!doctype html>
+<html><body>
+<input id="file" type="file">
+<button id="check"></button>
+<button id="run"></button>
+<button id="sample"></button>
+<div id="status"></div>
+<textarea id="source"></textarea>
+<pre id="output">booting</pre>
+<script type="module">
+  const out = document.getElementById('output');
+  const status = document.getElementById('status');
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const show = (x) => { out.innerHTML = esc(typeof x === 'string' ? x : JSON.stringify(x, null, 2)); };
+  window.addEventListener('error', (event) => {
+    show({ phase: 'window.error', message: String(event.message), error: String(event.error) });
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    show({ phase: 'unhandledrejection', reason: String(event.reason) });
+  });
+  import('./app.js').then(async () => {
+    const waitForApi = async () => {
+      for (let i = 0; i < 200; i += 1) {
+        if (window.webBytecode) return window.webBytecode;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      throw new Error('window.webBytecode not ready');
+    };
+    try {
+      const api = await waitForApi();
+      const results = {};
+      results.check_ok = await api.checkString('ok.ml', 'let x = 1\n');
+      results.check_err = await api.checkString('bad.ml', 'let x : string = 1\n');
+      results.run_ok = await api.runString('run.ml', 'print_endline "hi";;\n');
+      results.run_err = await api.runString('boom.ml', 'raise (Failure "boom");;\n');
+      results.status = status.textContent;
+      show(results);
+    } catch (error) {
+      show({ phase: 'main.catch', error: String(error && error.stack ? error.stack : error), status: status.textContent });
+    }
+  });
+</script>
+</body></html>

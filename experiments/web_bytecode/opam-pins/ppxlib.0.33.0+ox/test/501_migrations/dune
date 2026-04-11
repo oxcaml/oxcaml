@@ -1,0 +1,36 @@
+(executable
+ (name identity_driver)
+ (modules identity_driver)
+ (libraries ppxlib))
+
+(executable
+ (name reverse_migrations)
+ (modules reverse_migrations)
+ (libraries ppxlib))
+
+(executable
+ (name compare_on)
+ (libraries unix)
+ (modules compare_on))
+
+(cram
+ (enabled_if
+  (and
+   (>= %{ocaml_version} "5.1.0~alpha2")
+   (< %{ocaml_version} "5.2.0")))
+ (applies_to normal_migrations)
+ (deps identity_driver.exe compare_on.exe))
+
+(cram
+ (enabled_if
+  (= %{ocaml_version} "5.0.0"))
+ (applies_to reverse_migrations)
+ (deps reverse_migrations.exe compare_on.exe))
+
+(cram
+ (enabled_if
+  (and
+   (>= %{ocaml_version} "5.0.0")
+   (< %{ocaml_version} "5.2.0")))
+ (applies_to one_migration)
+ (deps identity_driver.exe compare_on.exe))

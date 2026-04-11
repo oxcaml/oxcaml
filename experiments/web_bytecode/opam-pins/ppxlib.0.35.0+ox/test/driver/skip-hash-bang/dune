@@ -1,0 +1,12 @@
+(library
+ (name empty_rewriter)
+ (modules empty_rewriter)
+ (kind ppx_rewriter)
+ (libraries ppxlib))
+
+(tests
+ (package ppxlib)
+ (names test test2)
+ (modules test test2)
+ (preprocess
+  (pps empty_rewriter)))

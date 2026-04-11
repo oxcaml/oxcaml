@@ -1,0 +1,16 @@
+--- a/src/utils.mli
++++ b/src/utils.mli
+@@ -1,5 +1,13 @@
+ open Import
+ 
++(** Converts [@@ocaml.doc " My doc comment "] to [@@ocaml.doc {| My doc comment |}] if the
++    origin of the attribute is a doc comment (i.e. (** *)). *)
++val prettify_odoc_attributes : Ast_traverse.map
++
++(** Updates the locations of [structure_item]s and [signature_item]s to include the
++    locations of doc comments (i.e. (** *)). *)
++val update_locs_to_include_doc_comments : Ast_traverse.map
++
+ val with_output : label option -> binary:bool -> f:(out_channel -> 'a) -> 'a
+ 
+ module Kind : sig

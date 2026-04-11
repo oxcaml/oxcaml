@@ -1,0 +1,21 @@
+--- a/src/attribute.mli
++++ b/src/attribute.mli
+@@ -73,6 +73,8 @@ module Context : sig
+   val psig_extension : signature_item t
+   val rtag : row_field t
+   val object_type_field : object_field t
++
++  val equal : 'a t -> 'b t -> bool
+ end
+ 
+ val declare :
+@@ -216,6 +218,9 @@ module Floating : sig
+     ('a, 'b) t list -> 'a -> ('b option, Location.Error.t NonEmptyList.t) result
+ 
+   val convert : ('a, 'b) t list -> 'a -> 'b option
++
++  val convert_attr_res :
++    ('a, 'b) t -> attribute -> ('b option, Location.Error.t NonEmptyList.t) result
+ end
+ 
+ val explicitly_drop : Ast_traverse0.iter

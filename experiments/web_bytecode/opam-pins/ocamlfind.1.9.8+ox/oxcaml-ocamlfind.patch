@@ -1,0 +1,13 @@
+diff --git a/src/findlib/topfind.ml.in b/src/findlib/topfind.ml.in
+index 1234567..abcdefg 100644
+--- a/src/findlib/topfind.ml.in
++++ b/src/findlib/topfind.ml.in
+@@ -22,7 +22,7 @@ let directories = ref [ ] ;;
+ let real_toploop =
+   !Sys.interactive;;
+
+-let log = ref (if real_toploop then prerr_endline else ignore)
++let log = ref (if real_toploop then fun s -> prerr_endline s else fun _ -> ())
+
+ let rec remove_dups l =
+   match l with

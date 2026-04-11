@@ -1,0 +1,40 @@
+opam-version: "2.0"
+synopsis: "The OCaml compiler (virtual package)"
+description: """\
+This package requires a matching implementation of OCaml,
+and polls it to initialise specific variables like `ocaml:native-dynlink`"""
+maintainer: "Local OxCaml experiment"
+authors: [
+  "Xavier Leroy"
+  "Damien Doligez"
+  "Alain Frisch"
+  "Jacques Garrigue"
+  "Didier Rémy"
+  "KC Sivaramakrishnan"
+  "Jerome Vouillon"
+]
+license: "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
+homepage: "https://ocaml.org"
+depends: [
+  "ocaml-config" {>= "3"}
+  "ocaml-system" {= "5.2.0+ox"}
+]
+flags: conf
+setenv: [
+  [OCAMLTOP_INCLUDE_PATH += "%{toplevel}%"]
+  [CAML_LD_LIBRARY_PATH = "%{_:stubsdir}%"]
+  [CAML_LD_LIBRARY_PATH += "%{lib}%/stublibs"]
+  [OCAML_TOPLEVEL_PATH = "%{toplevel}%"]
+]
+build: [
+  "ocaml" "%{ocaml-config:share}%/gen_ocaml_config.ml" _:version _:name
+]
+build-env: [
+  [CAML_LD_LIBRARY_PATH = ""]
+  [LSAN_OPTIONS = "detect_leaks=0,exitcode=0"]
+  [ASAN_OPTIONS = "detect_leaks=0,exitcode=0"]
+]
+x-env-path-rewrite: [
+  [CAML_LD_LIBRARY_PATH (";" {os = "win32"} ":" {os != "win32"}) "target"]
+  [OCAMLTOP_INCLUDE_PATH (";" {os = "win32"} ":" {os != "win32"}) "target"]
+]

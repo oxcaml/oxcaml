@@ -1,0 +1,111 @@
+--- a/src/utils.ml
++++ b/src/utils.ml
+@@ -1,5 +1,95 @@
+ open Import
+
++(* We want to make sure we only convert actual odoc comments [(** ... *)] and not
++   actual instances of [@@ocaml.doc "..."]. When parsed, both get translated as
++   an attribute.
++
++   To differentiate them, we can take advantage of the fact that the location
++   attached to the attribute node for (** ... *) comments is equal to the location of
++   the string itself, while for [@@ocaml.doc "..."] they are different.
++
++   The same is true for [@@@ocaml.text]. *)
++let get_odoc_contents_if_comment = function
++  | {
++      attr_loc;
++      attr_name = { txt = ("doc" | "ocaml.doc" | "text" | "ocaml.text"); _};
++      attr_payload =
++        PStr [
++          {
++            pstr_desc =
++              Pstr_eval
++                ({ pexp_desc = Pexp_constant (Pconst_string (text, loc, _)); _ }, _);
++            _
++          }
++        ];
++    } when Location.compare attr_loc loc = 0 -> Some text
++  | _ -> None
++
++let prettify_odoc_attributes =
++  object
++    inherit Ast_traverse.map as super
++
++    method! attribute attr =
++      let attr = super#attribute attr in
++      match get_odoc_contents_if_comment attr with
++      | Some txt ->
++        let open Ast_builder.Default in
++        let loc = Location.none in
++        let delim = Some (Common.valid_string_constant_delimiter txt) in
++        let expr = pexp_constant ~loc (Pconst_string (txt, loc, delim)) in
++        { attr with attr_payload = PStr [ pstr_eval ~loc expr [] ] }
++      | None -> attr
++  end
++
++let merge_locs loc1 loc2 ~loc_ghost =
++  let loc_start = Location.min_pos loc1.loc_start loc2.loc_start in
++  let loc_end = Location.max_pos loc1.loc_end loc2.loc_end in
++  { loc_start; loc_end; loc_ghost }
++
++let get_doc_comments_loc_bounds =
++  object
++    inherit [location option] Ast_traverse.fold as super
++
++    method! attribute attr acc =
++      let acc = super#attribute attr acc in
++      match acc with
++      | Some loc when Option.is_some (get_odoc_contents_if_comment attr) ->
++        Some (merge_locs loc attr.attr_loc ~loc_ghost:true)
++      | _ -> Some attr.attr_loc
++  end
++
++
++let update_locs_to_include_doc_comments =
++  object
++    inherit Ast_traverse.map as super
++
++    method! structure_item item =
++      let item = super#structure_item item in
++      match get_doc_comments_loc_bounds#structure_item item None with
++      | Some loc ->
++        { item with
++          pstr_loc =
++            merge_locs
++              ~loc_ghost:item.pstr_loc.loc_ghost
++              item.pstr_loc
++              loc
++        }
++      | None -> item
++
++    method! signature_item item =
++      let item = super#signature_item item in
++      match get_doc_comments_loc_bounds#signature_item item None with
++      | Some loc ->
++        { item with
++          psig_loc =
++            merge_locs
++              ~loc_ghost:item.psig_loc.loc_ghost
++              item.psig_loc
++              loc
++        }
++      | None -> item
++  end
++
+ let with_output fn ~binary ~f =
+   match fn with
+   | None | Some "-" -> f stdout
+@@ -86,9 +176,12 @@ module Ast_io = struct
+       lexbuf.lex_curr_p <-
+         { pos_fname = input_name; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 };
+       Skip_hash_bang.skip_hash_bang lexbuf;
++      (* Force-enable all Jane Street language extensions, which enables standalone
++         ppx drivers to parse all constructs. *)
++      Ocaml_common.Language_extension.(set_universe_and_enable_all Universe.maximal);
+       let ast : Intf_or_impl.t =
+         match kind with
+         | Intf -> Intf (Parse.interface lexbuf)
+         | Impl -> Impl (Parse.implementation lexbuf)
+       in
+       Ok { input_name; input_version; ast }

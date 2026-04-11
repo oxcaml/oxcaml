@@ -1,0 +1,114 @@
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"matching-code"}< Destructing AST nodes}{%html: </div><div>%}{{!"good-practices"}Good practices >}{%html: </div></div>%}
+
+{0 AST Traversals}
+
+The {{!Ppxlib.Parsetree}[Parsetree]} is a very complex type. Other {!Ppxlib} modules such as
+{{!Ppxlib_metaquot}[Metaquot]}, {{!Ppxlib.Ast_builder}[Ast_builder]} and {{!Ppxlib.Ast_pattern}[Ast_pattern]} help in generating and matching values,
+but only when the overall structure of the code is known in advance.
+
+For other use cases, such as extracting all identifiers, checking that a
+property is verified, or replacing all integer constants by something else,
+those modules cannot really help. All these examples relate with another kind
+of {{!Ppxlib.Parsetree}[Parsetree]} manipulations known as traversals.
+
+A traversal is a recursive function that will be called on a value, and recursively on all
+of its subvalues, combining the result in a certain way. For instance, {{!Stdlib.List.map}[List.map]} is a traversal of the
+[list] type. In the case of a [list], a map is very simple to write, but in the
+case of the long {{!Ppxlib.Parsetree}[Parsetree]} type, it is a lot of boilerplate code! Fortunately,
+{{!Ppxlib}[ppxlib]} provides a way to ease this.
+
+In [ppxlib], traversals are implemented using the "visitor" object-oriented pattern.
+
+{1 Writing Traverses}
+
+For each kind of traversal (described below), [ppxlib] provides a "default" traversal,
+in the form of a class following the visitors pattern. For instance, in the case of the map traversal, the
+default map is the identity AST map, and any object of class {{!Ppxlib.Ast_traverse.map}[Ast_traverse.map]}
+will be this identity map. To apply a map to a node of a given type, one needs
+to call the appropriate method:
+
+{[
+  # let f payload =
+      let map = new Ppxlib.Ast_traverse.map in
+      map#payload ;;
+  val f : payload -> payload = <fun>
+]}
+
+In the example above, [f] is the identity map. But we want to define proper maps,
+not just identity. This is done by creating a new class, making it inherit the
+methods, and replacing the one that we want to replace. Here is an example, for
+both the [iter] and [map] traversals:
+
+{[
+let f payload =
+  let checker =
+    object
+      inherit Ast_traverse.iter as super
+
+      method! extension ext =
+        match ext with
+        | { txt = "forbidden"; _ }, _ ->
+            failwith "Fordidden extension nodes are forbidden!"
+        | _ -> super#extension ext (* Continue traversing inside the node *)
+    end
+  in
+  let replace_constant =
+    object
+      inherit Ast_traverse.map
+      method! int i = i + 1
+    end
+  in
+  checker#payload payload;
+  replace_constant#payload payload
+]}
+
+Note that when redefining methods, unless explicitly wanting the traversal to
+stop, the original method needs to be called! That should be all that’s necessary to
+know and understand the {{!Ppxlib.Ast_traverse.map}API}.
+
+{1 The Different Kinds of Traversals}
+
+{{!Ppxlib}[ppxlib]} offers different kind of {{!Ppxlib.Parsetree}[Parsetree]} traversals:
+
+- {{!Ppxlib.Ast_traverse.iter}Iterators}, which will traverse the type, calling
+  a function on each node for side effects.
+
+- {{!Ppxlib.Ast_traverse.map}Maps}, where the content is replaced. A map will
+  transform a [Parsetree] into another [Parsetree], replacing nodes following the
+  map function.
+
+- {{!Ppxlib.Ast_traverse.fold}Folds}, which will traverse the nodes, carrying a
+  value (often called an accumulator) that will be updated on each node.
+
+- {{!Ppxlib.Ast_traverse.lift}Lifts}, a transformation that turns a [Parsetree] value in one of another type by
+  transforming it in a bottom-up manner. For instance, with a simple tree
+  structure, the corresponding [lift] function would be:
+
+{[
+  let lift ~f = function
+      Leaf a -> f.leaf a
+    | Node(a,x,y) -> f.node a (lift ~f x) (lift ~f y)
+]}
+
+- Combinations of the two traversals, such as
+  {{!Ppxlib.Ast_traverse.fold_map}Fold-maps} and
+  {{!Ppxlib.Ast_traverse.lift_map_with_context}Lift-maps}.
+
+- Variants of the above traversal, such as
+  {{!Ppxlib.Ast_traverse.map_with_context}Maps with context}, where a context
+  can be modified and passed down to child nodes during traversal. The context
+  never goes up; it is only propagated down. It is used for instance to track
+  opened module. To give a simple example, such a context could be the depth of
+  the current node, as in the following implementation for the simple tree type:
+
+{[
+  let map_with_depth_context ~f ctxt = function
+      Leaf a -> f.leaf ctxt a
+    | Node(a,x,y) ->
+        f.node ctxt a
+          (map_with_depth_context (ctxt+1) ~f x)
+          (map_with_depth_context (ctxt+1) ~f y)
+]}
+
+
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"matching-code"}< Destructing AST nodes}{%html: </div><div>%}{{!"good-practices"}Good practices >}{%html: </div></div>%}

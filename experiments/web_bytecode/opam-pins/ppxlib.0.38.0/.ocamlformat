@@ -1,0 +1,3 @@
+version=0.28.1
+profile=conventional
+parse-docstrings=true

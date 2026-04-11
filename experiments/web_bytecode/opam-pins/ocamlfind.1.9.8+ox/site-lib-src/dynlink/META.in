@@ -1,0 +1,8 @@
+# Specifications for the "dynlink" library:
+requires = ""
+version = "[distributed with Ocaml]"
+description = "Dynamic loading and linking of object files"
+directory = "%%dynlink_dir%%"
+browse_interfaces = "%%interfaces%%"
+archive(byte) = "dynlink.cma"
+%%natdynlink%%
