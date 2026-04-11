@@ -42,6 +42,66 @@ let file_prefix filename =
   | "" -> filename
   | ext -> String.sub filename 0 (String.length filename - String.length ext)
 
+let cleanup_if_exists path =
+  try Sys.remove path
+  with Sys_error _ -> ()
+
+let cleanup_build_artifacts ~source_path ~output_prefix =
+  List.iter cleanup_if_exists
+    [ source_path;
+      output_prefix ^ ".cmo";
+      output_prefix ^ ".cmi";
+      output_prefix ^ ".cmt";
+      output_prefix ^ ".cms";
+      output_prefix ^ ".annot" ]
+
+let replace_all ~pattern ~with_ text =
+  let pattern_length = String.length pattern in
+  if pattern_length = 0
+  then text
+  else (
+    let buffer = Buffer.create (String.length text) in
+    let rec loop search_start =
+      if search_start >= String.length text
+      then Buffer.contents buffer
+      else (
+        match String.index_from_opt text search_start pattern.[0] with
+        | None ->
+          Buffer.add_substring buffer text search_start
+            (String.length text - search_start);
+          Buffer.contents buffer
+        | Some index ->
+          if index + pattern_length <= String.length text
+             && String.sub text index pattern_length = pattern
+          then (
+            Buffer.add_substring buffer text search_start (index - search_start);
+            Buffer.add_string buffer with_;
+            loop (index + pattern_length))
+          else (
+            Buffer.add_substring buffer text search_start (index + 1 - search_start);
+            loop (index + 1)))
+    in
+    loop 0)
+
+let write_source_file ~source_path ~source =
+  let oc = open_out_bin source_path in
+  Fun.protect
+    (fun () -> output_string oc source)
+    ~finally:(fun () -> close_out_noerr oc)
+
+let compile_source_file ~source_path ~output_prefix =
+  let saved_dont_write_files = !Clflags.dont_write_files in
+  Fun.protect
+    (fun () ->
+      Clflags.dont_write_files := false;
+      Compile.implementation
+        ~start_from:Clflags.Compiler_pass.Parsing
+        ~source_file:source_path
+        ~output_prefix
+        ~keep_symbol_tables:false;
+      output_prefix ^ ".cmo")
+    ~finally:(fun () -> Clflags.dont_write_files := saved_dont_write_files)
+
 let prepare_lexbuf ~filename source =
   let lexbuf = Lexing.from_string source in
   Location.input_name := filename;
@@ -76,4 +136,10 @@ let prepare_compiler environment ~filename =
     | Browser -> ""
   in
   Compmisc.init_path ~dir ();
+  (match environment with
+   | Native -> ()
+   | Browser ->
+     List.iter
+       (fun include_dir -> Load_path.add_dir ~hidden:false include_dir)
+       browser_include_dirs);
   Compmisc.init_parameters ()

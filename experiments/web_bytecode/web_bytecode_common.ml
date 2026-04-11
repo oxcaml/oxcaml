@@ -3,6 +3,10 @@ type environment =
   | Browser
 
 let browser_cmis_dir = "/static/cmis"
+let native_include_dirs : string list ref = ref []
+
+let set_native_include_dirs dirs =
+  native_include_dirs := dirs
 
 let make_formatter_buffer () =
   let buffer = Buffer.create 256 in
@@ -48,7 +52,7 @@ let reset_flags environment =
   Clflags.no_cwd := environment = Browser;
   Clflags.include_dirs :=
     (match environment with
-     | Native -> []
+     | Native -> !native_include_dirs
      | Browser -> [browser_cmis_dir]);
   Clflags.hidden_include_dirs := [];
   Clflags.open_modules := [];

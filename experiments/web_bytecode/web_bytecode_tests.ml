@@ -74,4 +74,50 @@ let () =
       ~source:"x;;\n"
   in
   expect_contains "run_reset_2" "Unbound value x" run_reset_2;
+  let check_parallel =
+    Web_bytecode_native.check_string
+      ~filename:"check_parallel.ml"
+      ~source:
+        "open Core\n\
+         let scheduler = Parallel.Scheduler.Sequential.create ()\n\
+         let run () =\n\
+           Parallel.Scheduler.Sequential.parallel scheduler ~f:(fun parallel ->\n\
+             let #(a, b) = Parallel.fork_join2 parallel (fun _ -> 21) (fun _ -> 21) in\n\
+             a + b)\n"
+  in
+  expect_equal "check_parallel" "" check_parallel;
+  let run_parallel =
+    Web_bytecode_native.run_string
+      ~filename:"run_parallel.ml"
+      ~source:
+        "open Core\n\
+         let scheduler = Parallel.Scheduler.Sequential.create ()\n\
+         let () =\n\
+           Parallel.Scheduler.Sequential.parallel scheduler ~f:(fun parallel ->\n\
+             let #(a, b) = Parallel.fork_join2 parallel (fun _ -> 21) (fun _ -> 21) in\n\
+             Stdlib.print_endline (Int.to_string (a + b)))\n"
+  in
+  expect_equal "run_parallel" "42\n" run_parallel;
+  let run_parallel_recursive =
+    Web_bytecode_native.run_string
+      ~filename:"run_parallel_recursive.ml"
+      ~source:
+        "open Core\n\
+         let rec fib_par parallel n =\n\
+           match n with\n\
+           | 0 | 1 -> 1\n\
+           | n ->\n\
+             let #(a, b) =\n\
+               Parallel.fork_join2\n\
+                 parallel\n\
+                 (fun parallel -> fib_par parallel (n - 1))\n\
+                 (fun parallel -> fib_par parallel (n - 2))\n\
+             in\n\
+             a + b\n\
+         let () =\n\
+           let scheduler = Parallel.Scheduler.Sequential.create () in\n\
+           Parallel.Scheduler.Sequential.parallel scheduler ~f:(fun parallel ->\n\
+             Stdlib.print_endline (Int.to_string (fib_par parallel 10)))\n"
+  in
+  expect_equal "run_parallel_recursive" "89\n" run_parallel_recursive;
   print_endline "web_bytecode tests passed"

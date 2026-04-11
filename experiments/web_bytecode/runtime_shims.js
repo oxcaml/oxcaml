@@ -102,6 +102,85 @@
     return 0;
   };
 
+  global.parallel_acquire_heartbeat = function parallel_acquire_heartbeat() {
+    noteShimCall("parallel_acquire_heartbeat");
+    return 0;
+  };
+
+  global.parallel_release_heartbeat = function parallel_release_heartbeat() {
+    noteShimCall("parallel_release_heartbeat");
+    return 0;
+  };
+
+  global.parallel_setup_heartbeat = function parallel_setup_heartbeat() {
+    noteShimCall("parallel_setup_heartbeat");
+    return 0;
+  };
+
+  global.parallel_create_dynamic = function parallel_create_dynamic(initialValue) {
+    noteShimCall("parallel_create_dynamic");
+    return { oxcamlDynamicValue: initialValue };
+  };
+
+  global.parallel_unsafe_set_dynamic = function parallel_unsafe_set_dynamic(
+    slot,
+    value,
+  ) {
+    noteShimCall("parallel_unsafe_set_dynamic");
+    if (slot && typeof slot === "object") {
+      slot.oxcamlDynamicValue = value;
+    }
+    return 0;
+  };
+
+  global.caml_native_pointer_of_value_bytecode =
+    function caml_native_pointer_of_value_bytecode(value) {
+      noteShimCall("caml_native_pointer_of_value_bytecode");
+      return { oxcamlNativePointerValue: value };
+    };
+
+  global.caml_native_pointer_of_value = global.caml_native_pointer_of_value_bytecode;
+
+  global.caml_native_pointer_to_value_bytecode =
+    function caml_native_pointer_to_value_bytecode(pointer) {
+      noteShimCall("caml_native_pointer_to_value_bytecode");
+      if (
+        pointer &&
+        typeof pointer === "object" &&
+        Object.prototype.hasOwnProperty.call(pointer, "oxcamlNativePointerValue")
+      ) {
+        return pointer.oxcamlNativePointerValue;
+      }
+      return 0;
+    };
+
+  global.caml_native_pointer_to_value = global.caml_native_pointer_to_value_bytecode;
+
+  global.caml_ext_pointer_as_native_pointer_bytecode =
+    function caml_ext_pointer_as_native_pointer_bytecode(value) {
+      noteShimCall("caml_ext_pointer_as_native_pointer_bytecode");
+      return value;
+    };
+
+  global.caml_ext_pointer_as_native_pointer =
+    global.caml_ext_pointer_as_native_pointer_bytecode;
+
+  global.caml_reinterpret_unboxed_int64_as_tagged_int63 =
+    function caml_reinterpret_unboxed_int64_as_tagged_int63(value) {
+      noteShimCall("caml_reinterpret_unboxed_int64_as_tagged_int63");
+      if (typeof value === "number") {
+        return value | 0;
+      }
+      if (
+        typeof global.caml_int64_lo32 === "function" &&
+        value !== null &&
+        value !== undefined
+      ) {
+        return global.caml_int64_lo32(value) | 0;
+      }
+      return 0;
+    };
+
   global.caml_effective_tick_interval_usec_bytecode =
     function caml_effective_tick_interval_usec_bytecode() {
       noteShimCall("caml_effective_tick_interval_usec_bytecode");
