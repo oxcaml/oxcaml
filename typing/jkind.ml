@@ -2955,6 +2955,9 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s value"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Or_null_payload parent_path ->
+      fprintf ppf "the payload of %a has %s value" !printtyp_path parent_path
+        layout_or_kind
     | Tuple -> fprintf ppf "it's a tuple type"
     | Row_variable -> format_with_notify_js ppf "it's a row variable"
     | Polymorphic_variant -> fprintf ppf "it's a polymorphic variant type"
@@ -3960,6 +3963,10 @@ module Debug_printers = struct
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
+        (Fmt.compat !printtyp_path)
+        parent_path
+    | Or_null_payload parent_path ->
+      fprintf ppf "Or_null_payload of %a"
         (Fmt.compat !printtyp_path)
         parent_path
     | Tuple -> fprintf ppf "Tuple"
