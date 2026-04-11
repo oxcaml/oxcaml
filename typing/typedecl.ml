@@ -194,14 +194,6 @@ let check_or_null_decl bad sdecl =
 
 let check_or_null_constructors bad = function
   | [c1; c2] ->
-    let check_no_gadt ({ pcd_res; _ } : Parsetree.constructor_declaration) =
-      match pcd_res with
-      | None -> ()
-      | Some _ ->
-        bad "GADT constructors are not supported with [@@or_null]"
-    in
-    check_no_gadt c1;
-    check_no_gadt c2;
     begin match c1.pcd_args, c2.pcd_args with
     | Pcstr_tuple [],
       Pcstr_tuple
@@ -995,8 +987,14 @@ let transl_declaration env sdecl (id, uid) =
         Ttype_abstract, Type_abstract Definition,
         Jkind.Builtin.value ~why:Default_type_jkind
       | Ptype_variant scstrs ->
+        let has_gadt =
+          List.exists
+            (fun ({ pcd_res; _ } : Parsetree.constructor_declaration) ->
+              Option.is_some pcd_res)
+            scstrs
+        in
         if or_null then check_or_null_variant_shape sdecl scstrs;
-        if List.exists (fun cstr -> cstr.pcd_res <> None) scstrs then begin
+        if has_gadt then begin
           match cstrs with
             [] -> ()
           | (_,_,loc)::_ ->
@@ -1059,9 +1057,12 @@ let transl_declaration env sdecl (id, uid) =
         let rep, jkind =
           match or_null_payload_arg with
           | Some payload_arg ->
-            let payload_ty = payload_arg.Types.ca_type in
             Variant_with_null,
-            Btype.Jkind0.for_variant_with_null_result path payload_ty
+            if has_gadt then
+              Jkind.Builtin.value_or_null ~why:(Primitive Predef.ident_or_null)
+            else
+              let payload_ty = payload_arg.Types.ca_type in
+              Btype.Jkind0.for_variant_with_null_result path payload_ty
           | None ->
             if unbox then
               Variant_unboxed,
@@ -2198,9 +2199,21 @@ let rec update_decl_jkind env dpath decl =
     | _, Variant_with_null ->
       begin match Datarepr.find_variant_with_null_payload cstrs with
       | Some
-          { payload_cstr = { Types.cd_uid; _ };
+          { payload_cstr = ({ Types.cd_uid; cd_res; _ } as payload_cstr);
             payload_arg = { ca_type = ty; ca_modalities = modality; _ } } ->
-        let jkind = Ctype.type_jkind env ty in
+        let projected_payload_ty =
+          match
+            Btype.Jkind0.project_variant_constructor_arg_tys
+              ~decl_params:decl.type_params
+              ~type_apply:(Ctype.apply env)
+              ~get_free_vars:(Ctype.free_variable_set_of_list env)
+              payload_cstr
+          with
+          | [payload_ty] -> payload_ty
+          | [] | _ :: _ :: _ ->
+            Misc.fatal_error "Invalid constructor for Variant_with_null"
+        in
+        let jkind = Ctype.type_jkind env projected_payload_ty in
         let sort = Jkind.sort_of_jkind env jkind in
         let ca_sort = Jkind.Sort.default_to_value_and_get sort in
         let cstrs =
@@ -2218,15 +2231,21 @@ let rec update_decl_jkind env dpath decl =
                else cstr)
             cstrs
         in
-        begin match
-          Jkind.apply_modality_l modality jkind
-          |> Jkind.apply_or_null_l
-        with
-        | Ok type_jkind -> cstrs, rep, type_jkind
-        | Error () ->
-          Misc.fatal_error
-            "Typedecl.update_variant_kind: Variant_with_null payload is \
-             already maybe-null"
+        begin match cd_res with
+        | Some _ ->
+          cstrs, rep,
+          Jkind.Builtin.value_or_null ~why:(Primitive Predef.ident_or_null)
+        | None ->
+          begin match
+            Jkind.apply_modality_l modality (Ctype.type_jkind env ty)
+            |> Jkind.apply_or_null_l
+          with
+          | Ok type_jkind -> cstrs, rep, type_jkind
+          | Error () ->
+            Misc.fatal_error
+              "Typedecl.update_variant_kind: Variant_with_null payload is \
+               already maybe-null"
+          end
         end
       | None ->
         Misc.fatal_error "Invalid constructor for Variant_with_null"

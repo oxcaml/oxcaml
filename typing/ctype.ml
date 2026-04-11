@@ -2634,10 +2634,25 @@ let unbox_once env ty =
         | Type_variant (cstrs, Variant_with_null, _) ->
           begin match Datarepr.find_variant_with_null_payload cstrs with
           | Some
-              { payload_arg = { ca_type = ty; ca_modalities = modality; _ };
-                _ } ->
+              { payload_cstr = { Types.cd_res; _ };
+                payload_arg = { ca_type = ty; ca_modalities = modality; _ } } ->
+            let extra_substs =
+              match cd_res with
+              | Some res ->
+                let res_args =
+                  match get_desc res with
+                  | Tconstr (_, res_args, _) -> res_args
+                  | _ -> Misc.fatal_error "Ctype.unbox_once: Variant_with_null"
+                in
+                Btype.Jkind0.gadt_payload_subst
+                  ~projected_params:args
+                  ~res_args
+                  ~payload_tys:[ty]
+                  ~get_free_vars:(free_variable_set_of_list env)
+              | None -> []
+            in
             Stepped_or_null
-              { ty = apply ty ~extra_substs:[];
+              { ty = apply ty ~extra_substs;
                 modality }
           | None ->
             Misc.fatal_error "Invalid constructor for Variant_with_null"
