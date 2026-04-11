@@ -1,0 +1,48 @@
+#!/bin/sh
+
+set -eu
+
+case "$0" in
+  */*) wrapper_path=$0 ;;
+  *) wrapper_path=$(command -v -- "$0") ;;
+esac
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$wrapper_path")/.." && pwd)
+repo_root=$(CDPATH= cd -- "$script_dir/../../.." && pwd)
+tool_name=$(basename -- "$wrapper_path")
+
+if [ "$tool_name" = "ocamlopt" ] || [ "$tool_name" = "ocamlopt.opt" ]; then
+  echo "native compilation is unavailable in this reduced OxCaml browser toolchain" >&2
+  exit 2
+fi
+
+export OCAMLLIB="$repo_root/_install/lib/ocaml"
+export CAML_LD_LIBRARY_PATH="$repo_root/_install/lib/ocaml/stublibs"
+
+if [ "$tool_name" = "ocamlc" ] || [ "$tool_name" = "ocamlc.opt" ]; then
+  if [ "${1-}" = "-config" ] && [ "$#" -eq 1 ]; then
+    config_output=$("$repo_root/_install/bin/$tool_name" "$@")
+    printf '%s\n' "$config_output" | sed \
+      -e 's/^native_compiler: true$/native_compiler: false/' \
+      -e 's/^native_dynlink: true$/native_dynlink: false/'
+    exit 0
+  fi
+
+  if [ "${1-}" = "-config-var" ] && [ "$#" -eq 2 ]; then
+    case "$2" in
+      native_compiler|native_dynlink)
+        printf 'false\n'
+        exit 0
+        ;;
+    esac
+  fi
+fi
+
+if [ "$tool_name" = "ocamlmklib" ]; then
+  exec "$repo_root/_install/bin/ocamlmklib" \
+    -ocamlc "$repo_root/_install/bin/ocamlc" \
+    -ocamlopt "$repo_root/_install/bin/ocamlopt" \
+    "$@"
+fi
+
+exec "$repo_root/_install/bin/$tool_name" "$@"

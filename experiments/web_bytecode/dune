@@ -1,0 +1,75 @@
+(data_only_dirs opam-overlay opam-pins toolchain)
+
+(library
+ (name web_bytecode_common)
+ (wrapped false)
+ (modules web_bytecode_common)
+ (libraries ocamlcommon))
+
+(library
+ (name web_bytecode_check)
+ (wrapped false)
+ (modules web_bytecode_check)
+ (libraries web_bytecode_common))
+
+(library
+ (name web_bytecode_run)
+ (wrapped false)
+ (modules web_bytecode_run)
+ (libraries web_bytecode_common ocamltoplevel))
+
+(library
+ (name web_bytecode_native)
+ (wrapped false)
+ (modules web_bytecode_native)
+ (libraries unix ocamltoplevel web_bytecode_check web_bytecode_run))
+
+(executable
+ (name web_bytecode_cli)
+ (modules web_bytecode_cli)
+ (libraries web_bytecode_native)
+ (modes byte))
+
+(executable
+ (name web_bytecode_tests)
+ (modules web_bytecode_tests)
+ (libraries web_bytecode_native)
+ (modes byte))
+
+(executable
+ (name web_bytecode_check_cli)
+ (modules web_bytecode_check_cli)
+ (libraries web_bytecode_check)
+ (modes byte))
+
+(executable
+ (name web_bytecode_check_demo)
+ (modules web_bytecode_check_demo)
+ (libraries web_bytecode_check)
+ (modes byte))
+
+(rule
+ (alias runtest)
+ (action (run %{exe:web_bytecode_tests.bc})))
+
+(executable
+ (name web_bytecode_js)
+ (modules web_bytecode_js)
+ (libraries
+  ocamlcommon
+  ocamltoplevel
+  js_of_ocaml
+  js_of_ocaml-toplevel
+  web_bytecode_check
+  web_bytecode_run)
+ (flags
+  (:standard -linkall))
+ (modes byte))
+
+(executable
+ (name web_bytecode_wasm)
+ (modules web_bytecode_wasm)
+ (libraries js_of_ocaml web_bytecode_check)
+ (flags
+  (:standard -linkall))
+ (modes byte))

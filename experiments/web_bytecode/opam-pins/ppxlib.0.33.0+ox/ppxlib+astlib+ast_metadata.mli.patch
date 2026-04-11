@@ -1,0 +1,29 @@
+--- a/astlib/ast_metadata.mli
++++ b/astlib/ast_metadata.mli
+@@ -13,14 +13,24 @@ val drop_ppx_context_str :
+ (** Drop the ocaml.ppx.context attribute from a structure. If [restore] is true,
+     also restore the associated data in the current process. *)
+ 
+-val add_ppx_context_sig :
++val add_ppx_context_sig_items :
+   tool_name:string ->
+   Parsetree.signature_item list ->
+   Parsetree.signature_item list
++(** Same as [add_ppx_context_str], but for signature items. *)
++
++val drop_ppx_context_sig_items :
++  restore:bool -> Parsetree.signature_item list -> Parsetree.signature_item list
++(** Same as [drop_ppx_context_str], but for signatures items. *)
++
++val add_ppx_context_sig:
++  tool_name:string ->
++  Parsetree.signature->
++  Parsetree.signature
+ (** Same as [add_ppx_context_str], but for signatures. *)
+ 
+ val drop_ppx_context_sig :
+-  restore:bool -> Parsetree.signature_item list -> Parsetree.signature_item list
++  restore:bool -> Parsetree.signature -> Parsetree.signature
+ (** Same as [drop_ppx_context_str], but for signatures. *)
+ 
+ val tool_name : unit -> string

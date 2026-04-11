@@ -1,0 +1,13 @@
+--- a/astlib/ast_500.ml
++++ b/astlib/ast_500.ml
+@@ -9,6 +9,8 @@ module Parsetree = struct
+ end
+ 
+ module Config = struct
+-  let ast_impl_magic_number = "Caml1999M032"
+-  let ast_intf_magic_number = "Caml1999N032"
++  (** There is no version of the compiler with this parsetree, so these magic numbers are
++      made up *)
++  let ast_impl_magic_number = "Caml1999M999"
++  let ast_intf_magic_number = "Caml1999N999"
+ end

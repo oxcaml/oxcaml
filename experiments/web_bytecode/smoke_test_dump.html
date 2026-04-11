@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <body>
+    <pre id="output">booting</pre>
+    <script type="module">
+      const out = document.getElementById("output");
+
+      function show(value) {
+        out.textContent =
+          typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      }
+
+      window.addEventListener("error", (event) => {
+        show({
+          phase: "window.error",
+          message: String(event.message),
+          error: String(event.error),
+        });
+      });
+
+      window.addEventListener("unhandledrejection", (event) => {
+        show({
+          phase: "unhandledrejection",
+          reason: String(event.reason),
+        });
+      });
+
+      try {
+        const { checkString, runString } = await import("./app.js");
+        const results = {};
+        results.check_ok = await checkString("ok.ml", "let x = 1\n");
+        results.check_err = await checkString("bad.ml", "let x : string = 1\n");
+        results.run_ok = await runString("run.ml", 'print_endline "hi";;\n');
+        results.run_err = await runString("boom.ml", 'raise (Failure "boom");;\n');
+        console.log("SMOKE_RESULT", JSON.stringify(results));
+        show(results);
+      } catch (error) {
+        console.error(
+          "SMOKE_ERROR",
+          String(error && error.stack ? error.stack : error),
+        );
+        show({
+          phase: "main.catch",
+          error: String(error && error.stack ? error.stack : error),
+        });
+      }
+    </script>
+  </body>
+</html>

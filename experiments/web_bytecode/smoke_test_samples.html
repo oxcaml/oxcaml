@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <pre id="output">booting</pre>
+    <script type="module">
+      import { checkString, runString } from "./app.js";
+      import { matchesExpectedText, visibleSamples } from "./sample_catalog.js";
+
+      const outputEl = document.getElementById("output");
+
+      function show(result) {
+        outputEl.textContent = JSON.stringify(result, null, 2);
+      }
+
+      window.addEventListener("error", (event) => {
+        show({
+          ok: false,
+          phase: "window.error",
+          message: String(event.message),
+          error: String(event.error),
+        });
+      });
+
+      window.addEventListener("unhandledrejection", (event) => {
+        show({
+          ok: false,
+          phase: "unhandledrejection",
+          reason: String(event.reason),
+        });
+      });
+
+      async function verifySample(sample) {
+        const actual =
+          sample.mode === "run"
+            ? await runString(sample.filename, sample.source)
+            : await checkString(sample.filename, sample.source);
+        return {
+          id: sample.id,
+          topic: sample.topic,
+          ok: matchesExpectedText(actual, sample.expected_text),
+          mode: sample.mode,
+          expected_kind: sample.expected_kind,
+          expected_text: sample.expected_text,
+          actual,
+        };
+      }
+
+      const results = [];
+      for (const sample of visibleSamples) {
+        results.push(await verifySample(sample));
+      }
+
+      show({
+        ok: results.every((result) => result.ok),
+        total: results.length,
+        failures: results.filter((result) => !result.ok),
+        results,
+      });
+    </script>
+  </body>
+</html>
