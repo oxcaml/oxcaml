@@ -324,6 +324,21 @@ Error: Invalid [@or_null] declaration:
        GADT constructors are not supported with [@@or_null].
 |}]
 
+type 'a existential_gadt =
+  | Nothing : 'a existential_gadt
+  | Something : 'b -> 'a existential_gadt
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type 'a existential_gadt =
+2 |   | Nothing : 'a existential_gadt
+3 |   | Something : 'b -> 'a existential_gadt
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       GADT constructors are not supported with [@@or_null].
+|}]
+
 type ('a : value_or_null) widened_bad_jkind =
   | A
   | B of 'a
