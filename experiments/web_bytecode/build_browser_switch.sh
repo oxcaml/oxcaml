@@ -54,7 +54,7 @@ require_dir "$release_opam_root" "OPAM root"
 require_dir "$release_opam_root/$release_opam_switch" "OPAM switch"
 
 missing_packages=()
-for package_name in findlib js_of_ocaml js_of_ocaml-toplevel stdlib_stable base core; do
+for package_name in findlib js_of_ocaml js_of_ocaml-toplevel stdlib_stable base core parallel; do
   require_package "$package_name"
 done
 
@@ -97,7 +97,7 @@ fi
 
 mkdir -p "$build_dir" "$tmpdir/cmis"
 
-js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core"
+js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core,parallel"
 install_lib_root=$(run_tool ocamlc -where)
 package_lib_root=$(dirname "$(run_tool ocamlfind query base)")
 js_of_ocaml_compiler_dir="$(run_tool ocamlfind query js_of_ocaml-compiler)"
@@ -204,17 +204,19 @@ done > "$tmpdir/browser_fs.map"
 cat "$tmpdir/browser_packages.map" >> "$tmpdir/browser_fs.map"
 
 python3 - "$tmpdir/browser_fs.map" "$build_dir" <<'PY'
+import base64
 import gzip
 import json
 import os
-import shutil
 import sys
 
 map_path, build_dir = sys.argv[1:]
 asset_root = os.path.join(build_dir, "browser_fs")
 manifest_path = os.path.join(build_dir, "browser_fs_manifest.json")
+bundle_path = os.path.join(build_dir, "browser_fs_bundle.json.gz")
 os.makedirs(asset_root, exist_ok=True)
 entries = []
+bundle_entries = []
 
 with open(map_path) as map_file:
     for raw_line in map_file:
@@ -226,7 +228,9 @@ with open(map_path) as map_file:
         asset_rel = f"browser_fs/{rel}.gz"
         asset_path = os.path.join(build_dir, asset_rel)
         os.makedirs(os.path.dirname(asset_path), exist_ok=True)
-        with open(src, "rb") as src_file, open(asset_path, "wb") as dst_file:
+        with open(src, "rb") as src_file:
+            content = src_file.read()
+        with open(asset_path, "wb") as dst_file:
             with gzip.GzipFile(
                 filename="",
                 mode="wb",
@@ -234,7 +238,7 @@ with open(map_path) as map_file:
                 compresslevel=6,
                 mtime=0,
             ) as gz_file:
-                shutil.copyfileobj(src_file, gz_file)
+                gz_file.write(content)
         entries.append(
             {
                 "fs_path": fs_path,
@@ -242,8 +246,24 @@ with open(map_path) as map_file:
                 "compression": "gzip",
             }
         )
+        bundle_entries.append(
+            {
+                "fs_path": fs_path,
+                "content_base64": base64.b64encode(content).decode("ascii"),
+            }
+        )
 
 with open(manifest_path, "w") as manifest_file:
     json.dump(entries, manifest_file, indent=2)
     manifest_file.write("\n")
+
+with open(bundle_path, "wb") as bundle_file:
+    with gzip.GzipFile(
+        filename="browser_fs_bundle.json",
+        mode="wb",
+        fileobj=bundle_file,
+        compresslevel=6,
+        mtime=0,
+    ) as gz_file:
+        gz_file.write(json.dumps(bundle_entries, separators=(",", ":")).encode("utf-8"))
 PY

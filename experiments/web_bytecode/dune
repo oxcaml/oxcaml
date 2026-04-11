@@ -21,19 +21,30 @@
 (library
  (name web_bytecode_native)
  (wrapped false)
- (modules web_bytecode_native)
- (libraries unix ocamltoplevel web_bytecode_check web_bytecode_run))
+ (modules web_bytecode_native web_bytecode_native_packages)
+ (libraries
+  unix
+  ocamlbytecomp
+  ocamltoplevel
+  findlib
+  findlib.top
+  web_bytecode_check
+  web_bytecode_run))
 
 (executable
  (name web_bytecode_cli)
  (modules web_bytecode_cli)
  (libraries web_bytecode_native)
+ (flags
+  (:standard -linkall))
  (modes byte))
 
 (executable
  (name web_bytecode_tests)
  (modules web_bytecode_tests)
  (libraries web_bytecode_native)
+ (flags
+  (:standard -linkall))
  (modes byte))
 
 (executable
