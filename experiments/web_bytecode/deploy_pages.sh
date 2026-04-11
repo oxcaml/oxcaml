@@ -46,6 +46,10 @@ require_file "$script_dir/app.js"
 require_file "$script_dir/runtime_shims.js"
 require_file "$script_dir/sample_catalog.js"
 require_file "$script_dir/unsupported_samples.js"
+if [[ ! -d "$script_dir/vendor" ]]; then
+  echo "Missing required directory: $script_dir/vendor" >&2
+  exit 1
+fi
 require_file "$build_dir/web_bytecode_js.bc.js"
 require_file "$build_dir/browser_fs_manifest.json"
 require_file "$build_dir/browser_fs_bundle.json.gz"
@@ -60,6 +64,7 @@ cp "$script_dir/app.js" "$stage_dir/app.js"
 cp "$script_dir/runtime_shims.js" "$stage_dir/runtime_shims.js"
 cp "$script_dir/sample_catalog.js" "$stage_dir/sample_catalog.js"
 cp "$script_dir/unsupported_samples.js" "$stage_dir/unsupported_samples.js"
+cp -R "$script_dir/vendor" "$stage_dir/vendor"
 cp "$build_dir/web_bytecode_js.bc.js" "$stage_dir/build/web_bytecode_js.bc.js"
 cp "$build_dir/browser_fs_manifest.json" "$stage_dir/build/browser_fs_manifest.json"
 cp "$build_dir/browser_fs_bundle.json.gz" "$stage_dir/build/browser_fs_bundle.json.gz"
