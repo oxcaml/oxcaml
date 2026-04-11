@@ -15,6 +15,7 @@ import {
   drawSelection,
   highlightActiveLine,
   highlightActiveLineGutter,
+  hoverTooltip,
   keymap,
   lineNumbers,
 } from "@codemirror/view";
@@ -30,8 +31,7 @@ import {
 } from "@codemirror/commands";
 import { Parser, Language, Query } from "./vendor/tree_sitter/web-tree-sitter.js";
 
-const autoCheckDelayMs = 280;
-const autoRunDelayMs = 420;
+const autoRunDelayMs = 360;
 const buildBase = "../../_build/default/experiments/web_bytecode";
 const treeSitterCoreWasmUrl = new URL("./vendor/tree_sitter/web-tree-sitter.wasm", import.meta.url).href;
 const treeSitterOcamlWasmUrl = new URL("./vendor/tree_sitter/tree-sitter-ocaml.wasm", import.meta.url).href;
@@ -54,14 +54,8 @@ const fullUi = Boolean(
 
 let currentFilename = "snippet.ml";
 let currentSampleId = null;
-let pendingCheckTimer = null;
 let pendingRunTimer = null;
 let currentRevision = 0;
-let lastCompletedCheck = {
-  revision: -1,
-  result: { diagnostics: "", hasError: false, hasWarning: false },
-};
-let runRevision = -1;
 let editorMarkers = [];
 let editorView = null;
 let suppressEditorChanges = false;
@@ -100,27 +94,22 @@ const treeSitterCaptureClass = new Map([
   ["tag", "tok-tag"],
 ]);
 
+const oxcamlIdentifierNames = new Set(["local_", "stack_", "exclave_"]);
+const packageModuleNames = new Set(["Base", "Core", "Stdlib_stable"]);
+
 function buildDiagnosticDecorations(doc, markers) {
   if (!markers.length) {
     return Decoration.none;
   }
   const builder = new RangeSetBuilder();
   for (const marker of markers) {
-    let line;
-    try {
-      line = doc.line(marker.line + 1);
-    } catch {
-      continue;
-    }
-    const lineEnd = line.to;
-    const from = Math.min(line.from + marker.start, lineEnd);
-    const to = Math.min(Math.max(line.from + marker.end, from + 1), lineEnd);
-    if (from >= to) {
+    const range = markerDocRange(doc, marker);
+    if (!range) {
       continue;
     }
     builder.add(
-      from,
-      to,
+      range.from,
+      range.to,
       Decoration.mark({
         class: marker.severity === "warning" ? "cm-diagnostic-warning" : "cm-diagnostic-error",
       }),
@@ -161,6 +150,24 @@ const syntaxField = StateField.define({
   provide: (field) => EditorView.decorations.from(field),
 });
 
+const diagnosticHover = hoverTooltip((view, pos) => {
+  const match = markerAtPosition(view, pos);
+  if (!match) {
+    return null;
+  }
+  return {
+    pos: match.range.from,
+    end: match.range.to,
+    above: true,
+    create() {
+      const dom = document.createElement("div");
+      dom.className = `cm-diagnostic-tooltip ${match.marker.severity}`;
+      dom.textContent = match.marker.message || "Diagnostic";
+      return { dom };
+    },
+  };
+});
+
 function buildByteOffsetTable(source) {
   const table = [0];
   let byteIndex = 0;
@@ -188,6 +195,73 @@ function byteIndexToOffset(table, byteIndex, fallback) {
   return fallback;
 }
 
+function previousNonWhitespace(source, offset) {
+  for (let index = offset - 1; index >= 0; index -= 1) {
+    const char = source[index];
+    if (!/\s/.test(char)) {
+      return char;
+    }
+  }
+  return "";
+}
+
+function nextNonWhitespaceWord(source, offset) {
+  let index = offset;
+  while (index < source.length && /\s/.test(source[index])) {
+    index += 1;
+  }
+  const match = /^[A-Za-z_][A-Za-z0-9_']*/.exec(source.slice(index));
+  return match ? match[0] : "";
+}
+
+function classifyCaptureClasses(capture, source, from, to, baseClassName) {
+  const text = source.slice(from, to);
+  const classes = [baseClassName];
+
+  if (oxcamlIdentifierNames.has(text)) {
+    classes.unshift("tok-oxcaml");
+  }
+
+  if (text === "local" && previousNonWhitespace(source, from) === "@") {
+    classes.unshift("tok-annotation");
+  }
+
+  if (packageModuleNames.has(text)) {
+    classes.unshift("tok-package");
+  }
+
+  if (baseClassName === "tok-property" && previousNonWhitespace(source, from) === "~") {
+    classes.unshift("tok-label");
+  }
+
+  if (text === "open") {
+    const openedModule = nextNonWhitespaceWord(source, to);
+    if (packageModuleNames.has(openedModule)) {
+      classes.unshift("tok-package-open");
+    }
+  }
+
+  return Array.from(new Set(classes)).join(" ");
+}
+
+function collectSupplementalSyntaxRanges(source) {
+  const ranges = [];
+  const pushMatches = (regex, className) => {
+    let match;
+    while ((match = regex.exec(source)) !== null) {
+      const from = match.index;
+      const to = from + match[0].length;
+      if (from < to) {
+        ranges.push({ from, to, className });
+      }
+    }
+  };
+
+  pushMatches(/@[ \t\r\n]*local\b/g, "tok-annotation");
+  pushMatches(/~[A-Za-z_][A-Za-z0-9_']*/g, "tok-label");
+  return ranges;
+}
+
 function buildSyntaxDecorations(source, captures) {
   const byteOffsets = buildByteOffsetTable(source);
   const ranges = [];
@@ -201,8 +275,13 @@ function buildSyntaxDecorations(source, captures) {
     if (from >= to) {
       continue;
     }
-    ranges.push({ from, to, className });
+    ranges.push({
+      from,
+      to,
+      className: classifyCaptureClasses(capture, source, from, to, className),
+    });
   }
+  ranges.push(...collectSupplementalSyntaxRanges(source));
   ranges.sort(
     (left, right) =>
       left.from - right.from ||
@@ -271,6 +350,16 @@ function scheduleSyntaxRefresh() {
     });
 }
 
+function clearEditorMarkers() {
+  editorMarkers = [];
+  if (!editorView) {
+    return;
+  }
+  editorView.dispatch({
+    effects: setDiagnosticsEffect.of([]),
+  });
+}
+
 function createEditor() {
   if (!editorHostEl) {
     return null;
@@ -297,13 +386,13 @@ function createEditor() {
         }),
         diagnosticField,
         syntaxField,
+        diagnosticHover,
         EditorView.updateListener.of((update) => {
           if (!update.docChanged || suppressEditorChanges) {
             return;
           }
           scheduleSyntaxRefresh();
           currentRevision += 1;
-          runRevision = -1;
           editorMarkers = [];
           schedulePipeline();
         }),
@@ -628,12 +717,13 @@ function parseDiagnosticMarkers(text, filename) {
     if (diagnosticFilename !== filename) {
       continue;
     }
+    let blockEnd = index + 1;
+    while (blockEnd < lines.length && !/^File /.test(lines[blockEnd])) {
+      blockEnd += 1;
+    }
     let severity = "error";
-    for (let lookahead = index + 1; lookahead < Math.min(lines.length, index + 8); lookahead += 1) {
+    for (let lookahead = index + 1; lookahead < Math.min(blockEnd, index + 8); lookahead += 1) {
       const line = lines[lookahead];
-      if (/^File /.test(line)) {
-        break;
-      }
       if (/^Warning\b|^Alert\b/.test(line)) {
         severity = "warning";
         break;
@@ -645,14 +735,73 @@ function parseDiagnosticMarkers(text, filename) {
     }
     const start = Number.parseInt(startText, 10);
     const end = Math.max(Number.parseInt(endText, 10), start + 1);
+    const message = lines
+      .slice(index + 1, blockEnd)
+      .filter((line) => line !== "")
+      .join("\n")
+      .trim();
     markers.push({
       line: Math.max(Number.parseInt(lineText, 10) - 1, 0),
       start,
       end,
       severity,
+      message,
+      blockStartLine: index,
+      blockEndLine: Math.max(index, blockEnd - 1),
     });
+    index = blockEnd - 1;
   }
   return markers;
+}
+
+function markerDocRange(doc, marker) {
+  try {
+    const line = doc.line(marker.line + 1);
+    const lineEnd = line.to;
+    const from = Math.min(line.from + marker.start, lineEnd);
+    const to = Math.min(Math.max(line.from + marker.end, from + 1), lineEnd);
+    if (from >= to) {
+      return null;
+    }
+    return { from, to };
+  } catch {
+    return null;
+  }
+}
+
+function markerAtPosition(view, pos) {
+  let bestMatch = null;
+  for (const marker of editorMarkers) {
+    const range = markerDocRange(view.state.doc, marker);
+    if (!range) {
+      continue;
+    }
+    if (pos < range.from || pos > range.to) {
+      continue;
+    }
+    if (
+      bestMatch === null ||
+      range.to - range.from < bestMatch.range.to - bestMatch.range.from
+    ) {
+      bestMatch = { marker, range };
+    }
+  }
+  return bestMatch;
+}
+
+function jumpToMarker(marker) {
+  if (!editorView) {
+    return;
+  }
+  const range = markerDocRange(editorView.state.doc, marker);
+  if (!range) {
+    return;
+  }
+  editorView.dispatch({
+    selection: { anchor: range.from, head: range.to },
+    effects: EditorView.scrollIntoView(range.from, { y: "center" }),
+  });
+  editorView.focus();
 }
 
 function setStatus(state, text = "") {
@@ -734,7 +883,19 @@ function classifyTranscriptLine(line, inDiagnosticBlock, forceDiagnostics) {
     nextDiagnosticBlock: true,
     hasWarning: isWarning,
     hasError: isError || isException,
+    hasException: isException,
+    hasCompilerError: isError,
   };
+}
+
+function buildDiagnosticLineMarkerMap(markers) {
+  const lineToMarker = new Map();
+  markers.forEach((marker, index) => {
+    for (let line = marker.blockStartLine; line <= marker.blockEndLine; line += 1) {
+      lineToMarker.set(line, index);
+    }
+  });
+  return lineToMarker;
 }
 
 function buildTranscript(text, { emptyPlaceholder = null, forceDiagnostics = false } = {}) {
@@ -743,28 +904,43 @@ function buildTranscript(text, { emptyPlaceholder = null, forceDiagnostics = fal
     return {
       hasWarning: false,
       hasError: false,
+      hasException: false,
+      hasCompilerError: false,
       tone: "output",
       html: `<pre class="transcript"><span class="transcript-line stream placeholder">${escapeHtml(emptyPlaceholder)}</span></pre>`,
     };
   }
 
   const lines = normalized.replace(/\n$/, "").split("\n");
+  const markerByLine = buildDiagnosticLineMarkerMap(editorMarkers);
   let hasWarning = false;
   let hasError = false;
+  let hasException = false;
+  let hasCompilerError = false;
   let inDiagnosticBlock = forceDiagnostics;
   const body = lines
-    .map((line) => {
+    .map((line, lineIndex) => {
       const info = classifyTranscriptLine(line, inDiagnosticBlock, forceDiagnostics);
       inDiagnosticBlock = info.nextDiagnosticBlock;
       hasWarning ||= info.hasWarning;
       hasError ||= info.hasError;
-      return `<span class="transcript-line ${info.cls}">${escapeHtml(line || " ")}\n</span>`;
+      hasException ||= info.hasException;
+      hasCompilerError ||= info.hasCompilerError;
+      const markerIndex = markerByLine.get(lineIndex);
+      const attrs =
+        markerIndex === undefined
+          ? ""
+          : ` data-marker-index="${markerIndex}" tabindex="0" role="button"`;
+      const clickableClass = markerIndex === undefined ? "" : " clickable";
+      return `<span class="transcript-line ${info.cls}${clickableClass}"${attrs}>${escapeHtml(line || " ")}\n</span>`;
     })
     .join("");
 
   return {
     hasWarning,
     hasError,
+    hasException,
+    hasCompilerError,
     tone: hasError ? "error" : hasWarning ? "warning" : "output",
     html: `<pre class="transcript">${body}</pre>`,
   };
@@ -802,53 +978,15 @@ function setSource(source, filename, sampleId = null) {
   currentFilename = filename;
   currentSampleId = sampleId;
   currentRevision += 1;
-  runRevision = -1;
-  editorMarkers = [];
+  clearEditorMarkers();
   replaceEditorSource(source);
   if (samplePickerEl.value !== (sampleId || "")) {
     samplePickerEl.value = sampleId || "";
   }
-  lastCompletedCheck = {
-    revision: -1,
-    result: { diagnostics: "", hasError: false, hasWarning: false },
-  };
   schedulePipeline();
 }
 
-async function performCheck(revision, { renderSuccess = false } = {}) {
-  const source = sourceText();
-  const diagnostics = await checkString(currentFilename, source);
-  if (revision !== currentSourceRevision()) {
-    return null;
-  }
-  updateEditorMarkers(source, diagnostics);
-  const transcript =
-    diagnostics === ""
-      ? { hasError: false, hasWarning: false }
-      : renderTranscript(diagnostics, { forceDiagnostics: true });
-  const result = {
-    diagnostics,
-    hasError: transcript.hasError,
-    hasWarning: transcript.hasWarning,
-  };
-  lastCompletedCheck = { revision, result };
-  if (diagnostics) {
-    if (result.hasError) {
-      setStatus("error", "type error");
-    } else {
-      setStatus("warning", "warnings");
-    }
-  } else if (renderSuccess || runRevision !== revision) {
-    setStatus("ready", "ok");
-  }
-  return result;
-}
-
 function clearPendingWork() {
-  if (pendingCheckTimer !== null) {
-    clearTimeout(pendingCheckTimer);
-    pendingCheckTimer = null;
-  }
   if (pendingRunTimer !== null) {
     clearTimeout(pendingRunTimer);
     pendingRunTimer = null;
@@ -859,50 +997,17 @@ function schedulePipeline() {
   clearPendingWork();
   const revision = currentSourceRevision();
   setOutputBusy(true);
-  setStatus("checking", "checking");
-  pendingCheckTimer = window.setTimeout(async () => {
-    pendingCheckTimer = null;
-    try {
-      await ready;
-      const checkResult = await performCheck(revision);
-      if (revision !== currentSourceRevision() || checkResult?.hasError) {
-        return;
-      }
-      setOutputBusy(true);
-      setStatus("running", "running");
-      pendingRunTimer = window.setTimeout(() => {
-        pendingRunTimer = null;
-        void runCurrentSource({ skipCheck: true, revision });
-      }, autoRunDelayMs);
-    } catch (error) {
-      if (revision !== currentSourceRevision()) {
-        return;
-      }
-      setOutputBusy(false);
-      renderTranscript(String(error), { forceDiagnostics: true });
-      setStatus("error", "offline");
-    }
-  }, autoCheckDelayMs);
+  setStatus("running", "running");
+  pendingRunTimer = window.setTimeout(() => {
+    pendingRunTimer = null;
+    void runCurrentSource({ revision });
+  }, autoRunDelayMs);
 }
 
-async function ensureFreshCheck() {
-  const revision = currentSourceRevision();
-  clearPendingWork();
-  if (lastCompletedCheck.revision === revision) {
-    return lastCompletedCheck.result;
-  }
-  return performCheck(revision, { renderSuccess: true });
-}
-
-async function runCurrentSource({ skipCheck = false, revision = currentSourceRevision() } = {}) {
+async function runCurrentSource({ revision = currentSourceRevision() } = {}) {
   try {
     setStatus("running", "running");
-    const checkResult = skipCheck
-      ? lastCompletedCheck.result
-      : await ensureFreshCheck();
-    if (checkResult?.hasError) {
-      return;
-    }
+    await ready;
     if (revision !== currentSourceRevision()) {
       return;
     }
@@ -910,11 +1015,12 @@ async function runCurrentSource({ skipCheck = false, revision = currentSourceRev
     if (revision !== currentSourceRevision()) {
       return;
     }
-    runRevision = revision;
     updateEditorMarkers(sourceText(), output);
     const transcript = renderTranscript(output, { emptyPlaceholder: "(no output)" });
-    if (transcript.hasError) {
+    if (transcript.hasException) {
       setStatus("error", "exception");
+    } else if (transcript.hasCompilerError) {
+      setStatus("error", "error");
     } else if (transcript.hasWarning) {
       setStatus("warning", "warnings");
     } else {
@@ -950,6 +1056,39 @@ if (fullUi) {
       return;
     }
     setSource(sample.source, sample.filename, sample.id);
+  });
+
+  outputEl?.addEventListener("click", (event) => {
+    const target = event.target instanceof Element
+      ? event.target.closest("[data-marker-index]")
+      : null;
+    if (!target) {
+      return;
+    }
+    const markerIndex = Number.parseInt(target.getAttribute("data-marker-index") || "", 10);
+    const marker = editorMarkers[markerIndex];
+    if (marker) {
+      jumpToMarker(marker);
+    }
+  });
+
+  outputEl?.addEventListener("keydown", (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    const target = event.target.closest("[data-marker-index]");
+    if (!target) {
+      return;
+    }
+    event.preventDefault();
+    const markerIndex = Number.parseInt(target.getAttribute("data-marker-index") || "", 10);
+    const marker = editorMarkers[markerIndex];
+    if (marker) {
+      jumpToMarker(marker);
+    }
   });
 
   populateSamples();
