@@ -1,0 +1,7 @@
+(executable
+ (name pp)
+ (libraries ppxlib))
+
+(cram
+ (applies_to print_attr_loc)
+ (deps pp.exe))

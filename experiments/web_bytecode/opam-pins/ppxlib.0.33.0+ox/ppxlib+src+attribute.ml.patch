@@ -1,0 +1,25 @@
+--- a/src/attribute.ml
++++ b/src/attribute.ml
+@@ -450,6 +450,13 @@ module Floating = struct
+       payload = Payload_parser (pattern, fun ~attr_loc:_ ~name_loc:_ -> k);
+     }
+ 
++  let convert_attr_res t attr =
++    let open Result in
++    if Name.Pattern.matches t.name attr.attr_name.txt then
++      (convert t.payload attr >>| fun value -> Some value)
++    else
++      Ok None
++
+   let convert_res ts x =
+     let open Result in
+     match ts with
+@@ -814,7 +821,7 @@ let collect =
+         =
+       let loc = Common.loc_of_attribute attr in
+       super#payload payload;
+-      Attribute_table.add not_seen name loc
++      Attribute_table.replace not_seen name loc
+   end
+ 
+ let collect_unseen_errors () =

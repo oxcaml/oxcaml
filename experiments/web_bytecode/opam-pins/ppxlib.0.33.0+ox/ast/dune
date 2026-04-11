@@ -1,0 +1,23 @@
+;; Note that to use the preprocessor for the (* IF_AT_LEAST ... *)
+;; syntax you have to make sure the module is in the module list in
+;; (per_module <action> <module_list>)
+
+(library
+ (name ppxlib_ast)
+ (public_name ppxlib_ast.ast)
+ (libraries astlib compiler-libs.common ocaml-compiler-libs.common ocaml-compiler-libs.shadow stdlib-shims)
+ (flags
+  (:standard -safe-string -open Ocaml_shadow)
+  -w
+  -9-27-32)
+ (preprocess
+  (per_module
+   ((action
+     (run %{exe:pp/pp.exe} 9.99 %{input-file}))
+    versions)))
+ (lint
+  (pps ppxlib_traverse -deriving-keep-w32=impl)))
+
+(cinaps
+ (files *.ml *.mli)
+ (libraries ast_cinaps_helpers))

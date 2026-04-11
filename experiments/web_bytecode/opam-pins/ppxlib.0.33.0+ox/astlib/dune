@@ -1,0 +1,19 @@
+(library
+ (name astlib)
+ (public_name ppxlib_ast.astlib)
+ (modules ast_414 ast_500 ast_999 ast_metadata astlib config keyword location longident
+  migrate_414_500 migrate_500_414 migrate_500_999 migrate_999_500 parse pprintast stdlib0)
+ (libraries ocaml-compiler-libs.common compiler-libs.common)
+ (flags -w -9)
+ (preprocess
+  (action
+   (run %{exe:pp/pp.exe} %{read:ast-version} %{input-file}))))
+
+(rule
+ (targets ast-version)
+ (action
+  (run %{ocaml} %{dep:config/gen.ml} 9.99)))
+
+(cinaps
+ (files *.ml *.mli)
+ (libraries astlib_cinaps_helpers))

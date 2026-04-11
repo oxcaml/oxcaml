@@ -1,0 +1,71 @@
+--- a/traverse/ppxlib_traverse.ml
++++ b/traverse/ppxlib_traverse.ml
+@@ -19,12 +19,12 @@ let tvars_of_vars = List.map ~f:tvar_of_
+ 
+ let fst_expr ~loc expr =
+   match expr.pexp_desc with
+-  | Pexp_tuple [ fst; _ ] -> fst
++  | Pexp_tuple [ None, fst; None, _ ] -> fst
+   | _ -> [%expr Stdlib.fst [%e expr]]
+ 
+ let snd_expr ~loc expr =
+   match expr.pexp_desc with
+-  | Pexp_tuple [ _; snd ] -> snd
++  | Pexp_tuple [ None, _; None, snd ] -> snd
+   | _ -> [%expr Stdlib.snd [%e expr]]
+ 
+ let methods_of_class_exn = function
+@@ -412,13 +412,16 @@ let mangle_type_name lid =
+ let rec type_expr_mapper ~(what : what) te =
+   let loc = te.ptyp_loc in
+   match te.ptyp_desc with
+-  | Ptyp_var s -> evar ~loc ("_" ^ s)
+-  | Ptyp_tuple tes ->
++  | Ptyp_var (s, _) -> evar ~loc ("_" ^ s)
++  | Ptyp_tuple labeled_tes ->
++     (match Ppxlib_jane.as_unlabeled_tuple labeled_tes with
++      | Some tes ->
+       let vars = vars_of_list tes ~get_loc:(fun t -> t.ptyp_loc) in
+       let deconstruct = ppat_tuple ~loc (pvars_of_vars vars) in
+       let reconstruct = what#tuple ~loc (evars_of_vars vars) in
+       let mappers = map_variables ~what vars tes in
+       what#abstract ~loc deconstruct (what#combine ~loc mappers ~reconstruct)
++      | None -> what#any ~loc)
+   | Ptyp_constr (path, params) -> (
+       let map =
+         pexp_send ~loc (evar ~loc "self") (Loc.map path ~f:mangle_type_name)
+@@ -465,7 +468,7 @@ let erase_type_variables =
+     inherit Ast_traverse.map as super
+ 
+     method! core_type_desc =
+-      function Ptyp_var _ -> Ptyp_any | x -> super#core_type_desc x
++      function Ptyp_var (_, jkind) -> Ptyp_any jkind | x -> super#core_type_desc x
+   end
+ 
+ let gen_variant ~(what : what) ~loc cds =
+@@ -488,6 +491,7 @@ let gen_variant ~(what : what) ~loc cds 
+           in
+           match args with
+           | Pcstr_tuple args ->
++              let args = List.map args ~f:(fun ca -> ca.pca_type) in
+               let vars = vars_of_list args ~get_loc:(fun t -> t.ptyp_loc) in
+               let deconstruct =
+                 ppat_construct cstr ~loc
+@@ -518,6 +522,8 @@ let gen_mapper ~(what : what) td =
+     match td.ptype_kind with
+     | Ptype_open -> what#any ~loc
+     | Ptype_record lds -> gen_record ~what lds ~loc
++    | Ptype_record_unboxed_product _ ->
++      Location.raise_errorf ~loc "ppxlib_traverse doesn't support unboxed records"
+     | Ptype_variant cds -> gen_variant ~what cds ~loc
+     | Ptype_abstract -> (
+         match td.ptype_manifest with
+@@ -527,7 +533,7 @@ let gen_mapper ~(what : what) td =
+   List.fold_right td.ptype_params ~init:body ~f:(fun (ty, _) acc ->
+       let loc = ty.ptyp_loc in
+       match ty.ptyp_desc with
+-      | Ptyp_var s -> pexp_fun ~loc Nolabel None (pvar ~loc ("_" ^ s)) acc
++      | Ptyp_var (s, _) -> pexp_fun ~loc Nolabel None (pvar ~loc ("_" ^ s)) acc
+       | _ -> pexp_fun ~loc Nolabel None (ppat_any ~loc) acc)
+ 
+ let type_deps =

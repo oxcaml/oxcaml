@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1">
+    <title>OxCaml Playground</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f2eee7;
+        --paper: #fffdf9;
+        --editor: #12161d;
+        --editor-ink: #ebf3ff;
+        --panel-ink: #18212c;
+        --muted: #6d7988;
+        --border: rgba(19, 31, 47, 0.12);
+        --accent: #c24e2a;
+        --accent-strong: #8f3114;
+        --ok: #0f7b5f;
+        --warn: #b14b2b;
+        --shadow: 0 24px 60px rgba(26, 31, 42, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, #fff8ed 0%, transparent 38%),
+          radial-gradient(circle at top right, #efe7da 0%, transparent 30%),
+          linear-gradient(180deg, #faf7f1 0%, var(--page) 100%);
+        color: var(--panel-ink);
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 36px;
+      }
+
+      .topbar {
+        display: block;
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0;
+        font: 600 clamp(2rem, 5vw, 3.2rem) / 0.95 "Baskerville", "Iowan Old Style", serif;
+        letter-spacing: -0.04em;
+      }
+
+      .picker {
+        position: relative;
+      }
+
+      select {
+        appearance: none;
+        border: 1px solid rgba(19, 31, 47, 0.14);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.78);
+        color: var(--panel-ink);
+        height: 36px;
+        padding: 8px 40px 8px 14px;
+        font: 500 0.92rem/1 "Avenir Next", "Segoe UI", sans-serif;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      }
+
+      .picker::after {
+        content: "▾";
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--muted);
+        pointer-events: none;
+      }
+
+      .status {
+        position: relative;
+        min-width: 78px;
+        padding-right: 18px;
+        color: var(--muted);
+        font: 500 0.9rem/1 "Avenir Next", "Segoe UI", sans-serif;
+        text-align: right;
+      }
+
+      .status-dot {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(24, 33, 44, 0.12);
+        transform: translateY(-50%);
+        transition: background 140ms ease, transform 140ms ease;
+      }
+
+      .status[data-state="loading"] .status-dot,
+      .status[data-state="checking"] .status-dot {
+        background: #d79947;
+      }
+
+      .status[data-state="running"] .status-dot {
+        background: var(--accent);
+        transform: translateY(-50%) scale(1.2);
+      }
+
+      .status[data-state="warning"] .status-dot {
+        background: #d79947;
+      }
+
+      .status[data-state="ready"] .status-dot {
+        background: var(--ok);
+      }
+
+      .status[data-state="error"] .status-dot {
+        background: var(--warn);
+      }
+
+      .status-text:empty {
+        display: none;
+      }
+
+      .status-text {
+        display: inline-block;
+        min-width: 2.4em;
+      }
+
+      .header-tools {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
+        gap: 18px;
+      }
+
+      .surface {
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.84);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+      }
+
+      .surface-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 56px;
+        padding: 10px 18px;
+        background: rgba(255, 255, 255, 0.84);
+        border-bottom: 1px solid rgba(19, 31, 47, 0.08);
+      }
+
+      .editor-head {
+        padding-right: 10px;
+      }
+
+      .output-head {
+        padding-right: 20px;
+      }
+
+      .surface-label {
+        font: 600 0.78rem/1 "Avenir Next", "Segoe UI", sans-serif;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .surface-meta {
+        color: var(--muted);
+        font: 500 0.9rem/1 "Avenir Next", "Segoe UI", sans-serif;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .editor-frame {
+        position: relative;
+        display: grid;
+        min-height: 68vh;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+          var(--editor);
+      }
+
+      .editor-highlight,
+      textarea {
+        grid-area: 1 / 1;
+        margin: 0;
+        border: 0;
+        padding: 22px 24px 28px;
+        white-space: pre-wrap;
+        overflow: auto;
+        font: 15px/1.65 "Berkeley Mono", "SFMono-Regular", "IBM Plex Mono", monospace;
+        tab-size: 2;
+      }
+
+      .editor-highlight {
+        pointer-events: none;
+        color: var(--editor-ink);
+      }
+
+      textarea {
+        resize: none;
+        background: transparent;
+        color: transparent;
+        caret-color: #ffd28f;
+        outline: none;
+      }
+
+      textarea::selection {
+        background: rgba(255, 210, 143, 0.22);
+      }
+
+      .tok-keyword { color: #ffb57e; }
+      .tok-module { color: #8ed2ff; }
+      .tok-string { color: #b6f09c; }
+      .tok-comment { color: #6a768c; }
+      .tok-number { color: #f7cd74; }
+      .tok-operator { color: #f0f5ff; }
+
+      .diag-error {
+        text-decoration-line: underline;
+        text-decoration-style: wavy;
+        text-decoration-color: #ff7b5f;
+        text-decoration-thickness: 1.5px;
+        text-underline-offset: 0.18em;
+      }
+
+      .diag-warning {
+        text-decoration-line: underline;
+        text-decoration-style: wavy;
+        text-decoration-color: #e6b14a;
+        text-decoration-thickness: 1.5px;
+        text-underline-offset: 0.18em;
+      }
+
+      .output-panel {
+        display: flex;
+        flex-direction: column;
+        min-height: 68vh;
+      }
+
+      .output-panel[data-state="warning"] {
+        background: linear-gradient(180deg, rgba(215, 153, 71, 0.08), rgba(255, 255, 255, 0.9));
+      }
+
+      .output-panel[data-state="error"] {
+        background: linear-gradient(180deg, rgba(193, 78, 42, 0.06), rgba(255, 255, 255, 0.9));
+      }
+
+      .output-panel[data-state="output"] {
+        background: linear-gradient(180deg, rgba(15, 123, 95, 0.05), rgba(255, 255, 255, 0.9));
+      }
+
+      .output-body {
+        flex: 1;
+        min-height: 0;
+        padding: 18px;
+        overflow: auto;
+        font: 14px/1.6 "Berkeley Mono", "SFMono-Regular", "IBM Plex Mono", monospace;
+        transition: opacity 140ms ease;
+      }
+
+      .output-panel[data-busy="true"] .output-body {
+        opacity: 0.62;
+      }
+
+      .output-empty {
+        height: 100%;
+        min-height: 180px;
+        border-radius: 18px;
+        background:
+          linear-gradient(180deg, rgba(250, 247, 241, 0.8), rgba(245, 240, 232, 0.8)),
+          repeating-linear-gradient(
+            -45deg,
+            rgba(24, 33, 44, 0.018) 0,
+            rgba(24, 33, 44, 0.018) 12px,
+            transparent 12px,
+            transparent 24px
+          );
+      }
+
+      .transcript {
+        margin: 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .transcript-line {
+        display: block;
+      }
+
+      .transcript-line.stream {
+        color: #18212c;
+      }
+
+      .transcript-line.placeholder {
+        color: #6d7988;
+      }
+
+      .transcript-line.file {
+        color: #7a4d35;
+      }
+
+      .transcript-line.warning {
+        color: #9b5b1e;
+        font-weight: 600;
+      }
+
+      .transcript-line.error,
+      .transcript-line.exception {
+        color: #8f3114;
+        font-weight: 600;
+      }
+
+      .transcript-line.hint {
+        color: #6d5d3f;
+      }
+
+      .transcript-line.caret {
+        color: #c24e2a;
+      }
+
+      .transcript-line.code {
+        color: #233040;
+      }
+
+      .transcript-line.detail,
+      .transcript-line.trace {
+        color: #4f5c6b;
+      }
+
+      @media (max-width: 940px) {
+        main {
+          width: min(100vw - 24px, 1180px);
+          padding-top: 18px;
+        }
+
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .editor-frame,
+        .output-panel {
+          min-height: 46vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="topbar">
+        <h1>OxCaml Playground</h1>
+      </div>
+      <div class="layout">
+        <section class="surface">
+          <div class="surface-head editor-head">
+            <div class="surface-label">Editor</div>
+            <div class="picker">
+              <select id="sample-picker" aria-label="Sample">
+                <option value="">Sample</option>
+              </select>
+            </div>
+          </div>
+          <div class="editor-frame">
+            <pre id="highlight" class="editor-highlight" aria-hidden="true"></pre>
+            <textarea
+              id="source"
+              spellcheck="false"
+              aria-label="Source code"></textarea>
+          </div>
+        </section>
+        <section id="output-panel" class="surface output-panel" data-state="idle">
+          <div class="surface-head output-head">
+            <div id="output-label" class="surface-label">Output</div>
+            <div id="status" class="status" data-state="loading" aria-live="polite">
+              <span class="status-dot"></span>
+              <span class="status-text">loading</span>
+            </div>
+          </div>
+          <div id="output" class="output-body"></div>
+        </section>
+      </div>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+(executable
+ (name driver)
+ (enabled_if
+  (>= %{ocaml_version} "5.4"))
+ (libraries ppxlib ocaml-compiler-libs.common compiler-libs.common))
+
+(cram
+ (enabled_if
+  (>= %{ocaml_version} "5.4"))
+ (deps driver.exe))

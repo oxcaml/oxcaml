@@ -1,0 +1,116 @@
+--- a/src/ast_pattern.mli
++++ b/src/ast_pattern.mli
+@@ -108,6 +108,9 @@ val map1 : ('a, 'v1 -> 'b, 'c) t -> f:('
+ val map2 :
+   ('a, 'v1 -> 'v2 -> 'b, 'c) t -> f:('v1 -> 'v2 -> 'v) -> ('a, 'v -> 'b, 'c) t
+ 
++val map3 :
++  ('a, 'v1 -> 'v2 -> 'v3 -> 'b, 'c) t -> f:('v1 -> 'v2 -> 'v3 -> 'v) -> ('a, 'v -> 'b, 'c) t
++
+ val map0' : ('a, 'b, 'c) t -> f:(Location.t -> 'v) -> ('a, 'v -> 'b, 'c) t
+ 
+ val map1' :
+@@ -118,6 +121,11 @@ val map2' :
+   f:(Location.t -> 'v1 -> 'v2 -> 'v) ->
+   ('a, 'v -> 'b, 'c) t
+ 
++val map3' :
++  ('a, 'v1 -> 'v2 -> 'v3 -> 'b, 'c) t ->
++  f:(Location.t -> 'v1 -> 'v2 -> 'v3 -> 'v) ->
++  ('a, 'v -> 'b, 'c) t
++
+ val map_value : ('a, 'b, 'c) t -> f:('d -> 'a) -> ('d, 'b, 'c) t
+ val map_value' : ('a, 'b, 'c) t -> f:(location -> 'd -> 'a) -> ('d, 'b, 'c) t
+ val nil : (_ list, 'a, 'a) t
+@@ -171,6 +179,72 @@ include module type of Ast_pattern_gener
+         (expression, 'a, 'c) t
+     ]} *)
+ 
++(*-------------------------------------------------------*)
++
++(* override changed nodes *)
++
++val ptyp_arrow
++  :  (arg_label, 'a, 'b) t
++  -> (core_type, 'b, 'c) t
++  -> (core_type, 'c, 'd) t
++  -> (core_type, 'a, 'd) t
++
++val ptyp_tuple
++  :  (core_type list, 'a, 'b) t
++  -> (core_type, 'a, 'b) t
++
++val ptyp_var : (string, 'a, 'b) t -> (core_type, 'a, 'b) t
++
++val type_declaration :
++  name:(string, 'a, 'b) t ->
++  params:((core_type * (variance * injectivity)) list, 'b, 'c) t ->
++  cstrs:((core_type * core_type * Location.t) list, 'c, 'd) t ->
++  kind:(type_kind, 'd, 'e) t ->
++  private_:(private_flag, 'e, 'f) t ->
++  manifest:(core_type option, 'f, 'g) t ->
++  (type_declaration, 'a, 'g) t
++
++val value_binding
++  :  pat:(pattern, 'a, 'b) t
++  -> expr:(expression, 'b, 'c) t
++  -> (value_binding, 'a, 'c) t
++
++val value_description
++  :  name:(string, 'a, 'b) t
++  -> type_:(core_type, 'b, 'c) t
++  -> prim:(string list, 'c, 'd) t
++  -> (value_description, 'a, 'd) t
++
++val ppat_constraint
++  :  (pattern, 'a, 'b) t
++  -> (core_type, 'b, 'c) t
++  -> (pattern, 'a, 'c) t
++
++val ppat_tuple
++  :  (pattern list, 'a, 'b) t
++  -> (pattern, 'a, 'b) t
++
++val pexp_constraint
++  :  (expression, 'a, 'b) t
++  -> (core_type, 'b, 'c) t
++  -> (expression, 'a, 'c) t
++
++val pexp_tuple
++  :  (expression list, 'a, 'b) t
++  -> (expression, 'a, 'b) t
++
++val signature : (signature_item list, 'a, 'b) t -> (signature, 'a, 'b) t
++
++val module_declaration: name:(string option, 'a, 'b) t -> type_:(module_type, 'b, 'c) t ->
++  (module_declaration, 'a, 'c) t
++
++val pexp_let :
++  (rec_flag, 'a, 'b) t ->
++  (value_binding list, 'b, 'c) t ->
++  (expression, 'c, 'd) t -> (expression, 'a, 'd) t
++
++(* ----------------------------------------------------- *)
++
+ val true_ : (bool, 'a, 'a) t
+ val false_ : (bool, 'a, 'a) t
+ val eint : (int, 'a, 'b) t -> (expression, 'a, 'b) t
+@@ -189,6 +263,8 @@ val pint64 : (int64, 'a, 'b) t -> (patte
+ val pnativeint : (nativeint, 'a, 'b) t -> (pattern, 'a, 'b) t
+ val single_expr_payload : (expression, 'a, 'b) t -> (payload, 'a, 'b) t
+ 
++val pexp_function : (case list, 'a, 'b) t -> (expression, 'a, 'b) t
++
+ val no_label :
+   (expression, 'a, 'b) t -> (Asttypes.arg_label * expression, 'a, 'b) t
+ 
+@@ -205,6 +281,9 @@ val elist : (expression, 'a -> 'a, 'b) t
+ val esequence :
+   (expression, 'a -> 'a, 'b) t -> (expression, 'b list -> 'c, 'c) t
+ 
++val fail : Location.t -> string -> _
++(** Raises the exception that [Ast_pattern] recognizes as a matching failure. *)
++
+ type context
+ 
+ val of_func : (context -> Location.t -> 'a -> 'b -> 'c) -> ('a, 'b, 'c) t

@@ -1,0 +1,23 @@
+(executables
+ (names
+  whole_file_exception
+  whole_file_extension_point
+  whole_file_located_error
+  extender
+  deriver
+  whole_file_multiple_errors
+  constant_type
+  special_functions)
+ (libraries ppxlib))
+
+(cram
+ (package ppxlib)
+ (deps
+  extender.exe
+  whole_file_exception.exe
+  whole_file_located_error.exe
+  deriver.exe
+  whole_file_extension_point.exe
+  whole_file_multiple_errors.exe
+  constant_type.exe
+  special_functions.exe))

@@ -1,0 +1,7 @@
+# disable ocamlformat on files that are processed by CPPO
+lib/*.cppo.ml*
+lib/monomorphic.ml
+lib/write.ml*
+lib/prettyprint.ml
+lib/type.ml
+lib/util.ml
