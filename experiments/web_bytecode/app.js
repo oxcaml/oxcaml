@@ -19,11 +19,8 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import {
-  HighlightStyle,
-  StreamLanguage,
   bracketMatching,
   indentOnInput,
-  syntaxHighlighting,
 } from "@codemirror/language";
 import {
   defaultKeymap,
@@ -31,21 +28,15 @@ import {
   historyKeymap,
   indentWithTab,
 } from "@codemirror/commands";
-import { tags as t } from "@lezer/highlight";
+import { Parser, Language, Query } from "./vendor/tree_sitter/web-tree-sitter.js";
 
 const autoCheckDelayMs = 280;
 const autoRunDelayMs = 420;
 const buildBase = "../../_build/default/experiments/web_bytecode";
-
-const keywordSet = new Set([
-  "and", "as", "assert", "begin", "class", "constraint", "do", "done",
-  "downto", "else", "end", "exception", "external", "false", "for",
-  "fun", "function", "functor", "if", "in", "include", "inherit",
-  "initializer", "lazy", "let", "match", "method", "module", "mutable",
-  "new", "nonrec", "object", "of", "open", "or", "private", "rec",
-  "sig", "struct", "then", "to", "true", "try", "type", "val",
-  "virtual", "when", "while", "with",
-]);
+const treeSitterCoreWasmUrl = new URL("./vendor/tree_sitter/web-tree-sitter.wasm", import.meta.url).href;
+const treeSitterOcamlWasmUrl = new URL("./vendor/tree_sitter/tree-sitter-ocaml.wasm", import.meta.url).href;
+const treeSitterOcamlHighlightsUrl =
+  new URL("./vendor/tree_sitter/ocaml-highlights.scm", import.meta.url).href;
 
 const editorHostEl = document.getElementById("editor");
 const outputEl = document.getElementById("output");
@@ -79,99 +70,35 @@ let browserFsPromise = null;
 const browserFsConcurrency = 4;
 const browserFsFetchRetries = 4;
 let bootStatusActive = false;
+let treeSitterBackendPromise = null;
+let syntaxRequestRevision = 0;
 
 const setDiagnosticsEffect = StateEffect.define();
+const setSyntaxDecorationsEffect = StateEffect.define();
 
-const oxcamlHighlightStyle = HighlightStyle.define([
-  { tag: t.keyword, color: "#ffb57e" },
-  { tag: [t.typeName, t.className, t.namespace], color: "#8ed2ff" },
-  { tag: t.string, color: "#b6f09c" },
-  { tag: t.comment, color: "#6a768c" },
-  { tag: t.number, color: "#f7cd74" },
-  { tag: [t.operator, t.punctuation], color: "#f0f5ff" },
+const treeSitterCaptureClass = new Map([
+  ["keyword", "tok-keyword"],
+  ["operator", "tok-operator"],
+  ["punctuation.delimiter", "tok-operator"],
+  ["punctuation.bracket", "tok-operator"],
+  ["punctuation.special", "tok-operator"],
+  ["string", "tok-string"],
+  ["string.special", "tok-string"],
+  ["escape", "tok-string"],
+  ["comment", "tok-comment"],
+  ["number", "tok-number"],
+  ["module", "tok-module"],
+  ["function", "tok-function"],
+  ["function.method", "tok-function"],
+  ["function.builtin", "tok-function"],
+  ["variable.parameter", "tok-parameter"],
+  ["type", "tok-type"],
+  ["type.builtin", "tok-type"],
+  ["constructor", "tok-constructor"],
+  ["constant", "tok-constructor"],
+  ["property", "tok-property"],
+  ["tag", "tok-tag"],
 ]);
-
-const oxcamlLanguage = StreamLanguage.define({
-  startState() {
-    return { commentDepth: 0 };
-  },
-  token(stream, state) {
-    if (state.commentDepth > 0) {
-      while (!stream.eol()) {
-        if (stream.match("(*")) {
-          state.commentDepth += 1;
-        } else if (stream.match("*)")) {
-          state.commentDepth -= 1;
-          if (state.commentDepth === 0) {
-            break;
-          }
-        } else {
-          stream.next();
-        }
-      }
-      return "comment";
-    }
-
-    if (stream.eatSpace()) {
-      return null;
-    }
-
-    if (stream.match("(*")) {
-      state.commentDepth = 1;
-      while (!stream.eol()) {
-        if (stream.match("(*")) {
-          state.commentDepth += 1;
-        } else if (stream.match("*)")) {
-          state.commentDepth -= 1;
-          if (state.commentDepth === 0) {
-            break;
-          }
-        } else {
-          stream.next();
-        }
-      }
-      return "comment";
-    }
-
-    if (stream.peek() === "\"") {
-      stream.next();
-      let escaped = false;
-      while (!stream.eol()) {
-        const ch = stream.next();
-        if (escaped) {
-          escaped = false;
-        } else if (ch === "\\") {
-          escaped = true;
-        } else if (ch === "\"") {
-          break;
-        }
-      }
-      return "string";
-    }
-
-    if (stream.match(/[0-9][0-9_]*/)) {
-      return "number";
-    }
-
-    if (stream.match(/[:=<>|@.^+\-*/?!$~]+/)) {
-      return "operator";
-    }
-
-    if (stream.match(/[A-Za-z_][A-Za-z0-9_']*/)) {
-      const word = stream.current();
-      if (keywordSet.has(word)) {
-        return "keyword";
-      }
-      if (/^[A-Z]/.test(word)) {
-        return "typeName";
-      }
-      return null;
-    }
-
-    stream.next();
-    return null;
-  },
-});
 
 function buildDiagnosticDecorations(doc, markers) {
   if (!markers.length) {
@@ -218,6 +145,132 @@ const diagnosticField = StateField.define({
   provide: (field) => EditorView.decorations.from(field),
 });
 
+const syntaxField = StateField.define({
+  create() {
+    return Decoration.none;
+  },
+  update(decorations, tr) {
+    let next = tr.docChanged ? decorations.map(tr.changes) : decorations;
+    for (const effect of tr.effects) {
+      if (effect.is(setSyntaxDecorationsEffect)) {
+        next = effect.value;
+      }
+    }
+    return next;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+function buildByteOffsetTable(source) {
+  const table = [0];
+  let byteIndex = 0;
+  for (let index = 0; index < source.length; ) {
+    const codePoint = source.codePointAt(index);
+    const codeUnitLength = codePoint > 0xffff ? 2 : 1;
+    let utf8Length = 1;
+    if (codePoint > 0x7f) utf8Length = codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
+    byteIndex += utf8Length;
+    while (table.length <= byteIndex) {
+      table.push(index + codeUnitLength);
+    }
+    index += codeUnitLength;
+  }
+  return table;
+}
+
+function byteIndexToOffset(table, byteIndex, fallback) {
+  if (byteIndex < 0) {
+    return 0;
+  }
+  if (byteIndex < table.length) {
+    return table[byteIndex];
+  }
+  return fallback;
+}
+
+function buildSyntaxDecorations(source, captures) {
+  const byteOffsets = buildByteOffsetTable(source);
+  const ranges = [];
+  for (const capture of captures) {
+    const className = treeSitterCaptureClass.get(capture.name);
+    if (!className) {
+      continue;
+    }
+    const from = byteIndexToOffset(byteOffsets, capture.node.startIndex, source.length);
+    const to = byteIndexToOffset(byteOffsets, capture.node.endIndex, source.length);
+    if (from >= to) {
+      continue;
+    }
+    ranges.push({ from, to, className });
+  }
+  ranges.sort(
+    (left, right) =>
+      left.from - right.from ||
+      left.to - right.to ||
+      left.className.localeCompare(right.className),
+  );
+  const builder = new RangeSetBuilder();
+  for (const { from, to, className } of ranges) {
+    builder.add(from, to, Decoration.mark({ class: className }));
+  }
+  return builder.finish();
+}
+
+async function ensureTreeSitterBackend() {
+  if (treeSitterBackendPromise) {
+    return treeSitterBackendPromise;
+  }
+  treeSitterBackendPromise = (async () => {
+    await Parser.init({
+      locateFile(scriptName) {
+        if (scriptName === "tree-sitter.wasm" || scriptName === "web-tree-sitter.wasm") {
+          return treeSitterCoreWasmUrl;
+        }
+        return scriptName;
+      },
+    });
+    const [language, querySource] = await Promise.all([
+      Language.load(treeSitterOcamlWasmUrl),
+      fetchText(treeSitterOcamlHighlightsUrl),
+    ]);
+    const parser = new Parser();
+    parser.setLanguage(language);
+    const query = new Query(language, querySource);
+    return { parser, query };
+  })();
+  return treeSitterBackendPromise;
+}
+
+function scheduleSyntaxRefresh() {
+  if (!editorView) {
+    return;
+  }
+  const request = ++syntaxRequestRevision;
+  const source = sourceText();
+  ensureTreeSitterBackend()
+    .then(({ parser, query }) => {
+      if (!editorView || request !== syntaxRequestRevision) {
+        return;
+      }
+      const tree = parser.parse(source);
+      if (!tree) {
+        return;
+      }
+      const captures = query.captures(tree.rootNode);
+      const decorations = buildSyntaxDecorations(source, captures);
+      tree.delete();
+      if (!editorView || request !== syntaxRequestRevision) {
+        return;
+      }
+      editorView.dispatch({
+        effects: setSyntaxDecorationsEffect.of(decorations),
+      });
+    })
+    .catch((error) => {
+      console.warn("Tree-sitter highlighting failed", error);
+    });
+}
+
 function createEditor() {
   if (!editorHostEl) {
     return null;
@@ -242,13 +295,13 @@ function createEditor() {
           autocapitalize: "off",
           "aria-label": "Source code",
         }),
-        syntaxHighlighting(oxcamlHighlightStyle),
-        oxcamlLanguage,
         diagnosticField,
+        syntaxField,
         EditorView.updateListener.of((update) => {
           if (!update.docChanged || suppressEditorChanges) {
             return;
           }
+          scheduleSyntaxRefresh();
           currentRevision += 1;
           runRevision = -1;
           editorMarkers = [];
@@ -277,6 +330,7 @@ function replaceEditorSource(source) {
     effects: setDiagnosticsEffect.of([]),
   });
   suppressEditorChanges = false;
+  scheduleSyntaxRefresh();
 }
 
 function loadScript(url) {
