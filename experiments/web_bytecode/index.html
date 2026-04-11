@@ -190,40 +190,59 @@
 
       .editor-frame {
         position: relative;
-        display: grid;
         min-height: 68vh;
         background:
           linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
           var(--editor);
       }
 
-      .editor-highlight,
-      textarea {
-        grid-area: 1 / 1;
-        margin: 0;
-        border: 0;
-        padding: 22px 24px 28px;
-        white-space: pre-wrap;
-        overflow: auto;
-        font: 15px/1.65 "Berkeley Mono", "SFMono-Regular", "IBM Plex Mono", monospace;
-        tab-size: 2;
+      .editor-host {
+        height: 100%;
       }
 
-      .editor-highlight {
-        pointer-events: none;
+      .editor-frame .cm-editor {
+        height: 100%;
+        background: transparent;
         color: var(--editor-ink);
       }
 
-      textarea {
-        resize: none;
-        background: transparent;
-        color: transparent;
-        caret-color: #ffd28f;
-        outline: none;
+      .editor-frame .cm-scroller {
+        overflow: auto;
+        font: 15px/1.65 "Berkeley Mono", "SFMono-Regular", "IBM Plex Mono", monospace;
       }
 
-      textarea::selection {
-        background: rgba(255, 210, 143, 0.22);
+      .editor-frame .cm-gutters {
+        background: rgba(5, 8, 12, 0.22);
+        border-right: 1px solid rgba(255, 255, 255, 0.06);
+        color: #6a768c;
+      }
+
+      .editor-frame .cm-gutterElement {
+        padding: 0 10px 0 14px;
+      }
+
+      .editor-frame .cm-content {
+        padding: 22px 24px 28px 18px;
+        min-height: 100%;
+        caret-color: #ffd28f;
+      }
+
+      .editor-frame .cm-line {
+        padding: 0;
+      }
+
+      .editor-frame .cm-activeLine,
+      .editor-frame .cm-activeLineGutter {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .editor-frame .cm-selectionBackground {
+        background: rgba(255, 210, 143, 0.22) !important;
+      }
+
+      .editor-frame .cm-cursor,
+      .editor-frame .cm-dropCursor {
+        border-left-color: #ffd28f;
       }
 
       .tok-keyword { color: #ffb57e; }
@@ -242,6 +261,22 @@
       }
 
       .diag-warning {
+        text-decoration-line: underline;
+        text-decoration-style: wavy;
+        text-decoration-color: #e6b14a;
+        text-decoration-thickness: 1.5px;
+        text-underline-offset: 0.18em;
+      }
+
+      .cm-diagnostic-error {
+        text-decoration-line: underline;
+        text-decoration-style: wavy;
+        text-decoration-color: #ff7b5f;
+        text-decoration-thickness: 1.5px;
+        text-underline-offset: 0.18em;
+      }
+
+      .cm-diagnostic-warning {
         text-decoration-line: underline;
         text-decoration-style: wavy;
         text-decoration-color: #e6b14a;
@@ -378,11 +413,7 @@
             </div>
           </div>
           <div class="editor-frame">
-            <pre id="highlight" class="editor-highlight" aria-hidden="true"></pre>
-            <textarea
-              id="source"
-              spellcheck="false"
-              aria-label="Source code"></textarea>
+            <div id="editor" class="editor-host" aria-label="Source code"></div>
           </div>
         </section>
         <section id="output-panel" class="surface output-panel" data-state="idle">
@@ -397,6 +428,17 @@
         </section>
       </div>
     </main>
+    <script type="importmap">
+      {
+        "imports": {
+          "@codemirror/state": "https://esm.sh/@codemirror/state@6.5.2",
+          "@codemirror/view": "https://esm.sh/@codemirror/view@6.38.6?external=@codemirror/state",
+          "@codemirror/language": "https://esm.sh/@codemirror/language@6.11.3?external=@codemirror/state,@codemirror/view,@lezer/highlight",
+          "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.8.1?external=@codemirror/state,@codemirror/view",
+          "@lezer/highlight": "https://esm.sh/@lezer/highlight@1.2.1"
+        }
+      }
+    </script>
     <script type="module" src="./app.js"></script>
   </body>
 </html>
