@@ -3,6 +3,35 @@ import {
   getSampleById,
   getVisibleSamplesByTopic,
 } from "./sample_catalog.js";
+import {
+  EditorState,
+  RangeSetBuilder,
+  StateEffect,
+  StateField,
+} from "@codemirror/state";
+import {
+  Decoration,
+  EditorView,
+  drawSelection,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  keymap,
+  lineNumbers,
+} from "@codemirror/view";
+import {
+  HighlightStyle,
+  StreamLanguage,
+  bracketMatching,
+  indentOnInput,
+  syntaxHighlighting,
+} from "@codemirror/language";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+} from "@codemirror/commands";
+import { tags as t } from "@lezer/highlight";
 
 const autoCheckDelayMs = 280;
 const autoRunDelayMs = 420;
@@ -18,8 +47,7 @@ const keywordSet = new Set([
   "virtual", "when", "while", "with",
 ]);
 
-const sourceEl = document.getElementById("source");
-const highlightEl = document.getElementById("highlight");
+const editorHostEl = document.getElementById("editor");
 const outputEl = document.getElementById("output");
 const outputLabelEl = document.getElementById("output-label");
 const outputPanelEl = document.getElementById("output-panel");
@@ -27,8 +55,7 @@ const statusEl = document.getElementById("status");
 const statusTextEl = statusEl?.querySelector(".status-text") ?? null;
 const samplePickerEl = document.getElementById("sample-picker");
 const fullUi = Boolean(
-  sourceEl &&
-  highlightEl &&
+  editorHostEl &&
   outputLabelEl &&
   outputPanelEl &&
   samplePickerEl,
@@ -45,11 +72,212 @@ let lastCompletedCheck = {
 };
 let runRevision = -1;
 let editorMarkers = [];
+let editorView = null;
+let suppressEditorChanges = false;
 const loadedScriptUrls = new Map();
 let browserFsPromise = null;
 const browserFsConcurrency = 4;
 const browserFsFetchRetries = 4;
 let bootStatusActive = false;
+
+const setDiagnosticsEffect = StateEffect.define();
+
+const oxcamlHighlightStyle = HighlightStyle.define([
+  { tag: t.keyword, color: "#ffb57e" },
+  { tag: [t.typeName, t.className, t.namespace], color: "#8ed2ff" },
+  { tag: t.string, color: "#b6f09c" },
+  { tag: t.comment, color: "#6a768c" },
+  { tag: t.number, color: "#f7cd74" },
+  { tag: [t.operator, t.punctuation], color: "#f0f5ff" },
+]);
+
+const oxcamlLanguage = StreamLanguage.define({
+  startState() {
+    return { commentDepth: 0 };
+  },
+  token(stream, state) {
+    if (state.commentDepth > 0) {
+      while (!stream.eol()) {
+        if (stream.match("(*")) {
+          state.commentDepth += 1;
+        } else if (stream.match("*)")) {
+          state.commentDepth -= 1;
+          if (state.commentDepth === 0) {
+            break;
+          }
+        } else {
+          stream.next();
+        }
+      }
+      return "comment";
+    }
+
+    if (stream.eatSpace()) {
+      return null;
+    }
+
+    if (stream.match("(*")) {
+      state.commentDepth = 1;
+      while (!stream.eol()) {
+        if (stream.match("(*")) {
+          state.commentDepth += 1;
+        } else if (stream.match("*)")) {
+          state.commentDepth -= 1;
+          if (state.commentDepth === 0) {
+            break;
+          }
+        } else {
+          stream.next();
+        }
+      }
+      return "comment";
+    }
+
+    if (stream.peek() === "\"") {
+      stream.next();
+      let escaped = false;
+      while (!stream.eol()) {
+        const ch = stream.next();
+        if (escaped) {
+          escaped = false;
+        } else if (ch === "\\") {
+          escaped = true;
+        } else if (ch === "\"") {
+          break;
+        }
+      }
+      return "string";
+    }
+
+    if (stream.match(/[0-9][0-9_]*/)) {
+      return "number";
+    }
+
+    if (stream.match(/[:=<>|@.^+\-*/?!$~]+/)) {
+      return "operator";
+    }
+
+    if (stream.match(/[A-Za-z_][A-Za-z0-9_']*/)) {
+      const word = stream.current();
+      if (keywordSet.has(word)) {
+        return "keyword";
+      }
+      if (/^[A-Z]/.test(word)) {
+        return "typeName";
+      }
+      return null;
+    }
+
+    stream.next();
+    return null;
+  },
+});
+
+function buildDiagnosticDecorations(doc, markers) {
+  if (!markers.length) {
+    return Decoration.none;
+  }
+  const builder = new RangeSetBuilder();
+  for (const marker of markers) {
+    let line;
+    try {
+      line = doc.line(marker.line + 1);
+    } catch {
+      continue;
+    }
+    const lineEnd = line.to;
+    const from = Math.min(line.from + marker.start, lineEnd);
+    const to = Math.min(Math.max(line.from + marker.end, from + 1), lineEnd);
+    if (from >= to) {
+      continue;
+    }
+    builder.add(
+      from,
+      to,
+      Decoration.mark({
+        class: marker.severity === "warning" ? "cm-diagnostic-warning" : "cm-diagnostic-error",
+      }),
+    );
+  }
+  return builder.finish();
+}
+
+const diagnosticField = StateField.define({
+  create() {
+    return Decoration.none;
+  },
+  update(decorations, tr) {
+    let next = tr.docChanged ? Decoration.none : decorations.map(tr.changes);
+    for (const effect of tr.effects) {
+      if (effect.is(setDiagnosticsEffect)) {
+        next = buildDiagnosticDecorations(tr.state.doc, effect.value);
+      }
+    }
+    return next;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+function createEditor() {
+  if (!editorHostEl) {
+    return null;
+  }
+  return new EditorView({
+    parent: editorHostEl,
+    state: EditorState.create({
+      doc: "",
+      extensions: [
+        EditorState.tabSize.of(2),
+        lineNumbers(),
+        history(),
+        drawSelection(),
+        highlightActiveLine(),
+        highlightActiveLineGutter(),
+        indentOnInput(),
+        bracketMatching(),
+        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        EditorView.contentAttributes.of({
+          spellcheck: "false",
+          autocorrect: "off",
+          autocapitalize: "off",
+          "aria-label": "Source code",
+        }),
+        syntaxHighlighting(oxcamlHighlightStyle),
+        oxcamlLanguage,
+        diagnosticField,
+        EditorView.updateListener.of((update) => {
+          if (!update.docChanged || suppressEditorChanges) {
+            return;
+          }
+          currentRevision += 1;
+          runRevision = -1;
+          editorMarkers = [];
+          schedulePipeline();
+        }),
+      ],
+    }),
+  });
+}
+
+function sourceText() {
+  return editorView ? editorView.state.doc.toString() : "";
+}
+
+function replaceEditorSource(source) {
+  if (!editorView) {
+    return;
+  }
+  suppressEditorChanges = true;
+  editorView.dispatch({
+    changes: {
+      from: 0,
+      to: editorView.state.doc.length,
+      insert: source,
+    },
+    effects: setDiagnosticsEffect.of([]),
+  });
+  suppressEditorChanges = false;
+}
 
 function loadScript(url) {
   const href = url instanceof URL ? url.href : String(url);
@@ -334,30 +562,6 @@ function escapeHtml(text) {
   }[char]));
 }
 
-function readIdentifier(source, start) {
-  let end = start + 1;
-  while (end < source.length && /[A-Za-z0-9_']/.test(source[end])) {
-    end += 1;
-  }
-  return source.slice(start, end);
-}
-
-function markRange(target, start, end, value) {
-  for (let index = start; index < end; index += 1) {
-    target[index] = value;
-  }
-}
-
-function buildLineStarts(source) {
-  const starts = [0];
-  for (let index = 0; index < source.length; index += 1) {
-    if (source[index] === "\n") {
-      starts.push(index + 1);
-    }
-  }
-  return starts;
-}
-
 function parseDiagnosticMarkers(text, filename) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const markers = [];
@@ -397,132 +601,6 @@ function parseDiagnosticMarkers(text, filename) {
   return markers;
 }
 
-function markerRangesToClasses(source, markers) {
-  const markerClasses = new Array(source.length).fill("");
-  const lineStarts = buildLineStarts(source);
-  for (const marker of markers) {
-    const lineStart = lineStarts[marker.line];
-    if (lineStart === undefined) {
-      continue;
-    }
-    const lineEndWithNewline =
-      marker.line + 1 < lineStarts.length ? lineStarts[marker.line + 1] : source.length;
-    const lineEnd = source[lineEndWithNewline - 1] === "\n"
-      ? lineEndWithNewline - 1
-      : lineEndWithNewline;
-    const absoluteStart = Math.min(lineStart + marker.start, lineEnd);
-    const absoluteEnd = Math.min(Math.max(lineStart + marker.end, absoluteStart + 1), lineEnd);
-    if (absoluteStart >= absoluteEnd) {
-      continue;
-    }
-    markRange(
-      markerClasses,
-      absoluteStart,
-      absoluteEnd,
-      marker.severity === "warning" ? "diag-warning" : "diag-error",
-    );
-  }
-  return markerClasses;
-}
-
-function highlightSource(source) {
-  if (!highlightEl) {
-    return;
-  }
-  const syntaxClasses = new Array(source.length).fill("");
-  let index = 0;
-  while (index < source.length) {
-    if (source.startsWith("(*", index)) {
-      const close = source.indexOf("*)", index + 2);
-      const end = close === -1 ? source.length : close + 2;
-      markRange(syntaxClasses, index, end, "tok-comment");
-      index = end;
-      continue;
-    }
-    if (source[index] === "\"") {
-      let end = index + 1;
-      while (end < source.length) {
-        if (source[end] === "\\") {
-          end += 2;
-          continue;
-        }
-        if (source[end] === "\"") {
-          end += 1;
-          break;
-        }
-        end += 1;
-      }
-      markRange(syntaxClasses, index, end, "tok-string");
-      index = end;
-      continue;
-    }
-    if (/[A-Za-z_]/.test(source[index])) {
-      const word = readIdentifier(source, index);
-      if (keywordSet.has(word)) {
-        markRange(syntaxClasses, index, index + word.length, "tok-keyword");
-      } else if (/^[A-Z]/.test(word)) {
-        markRange(syntaxClasses, index, index + word.length, "tok-module");
-      }
-      index += word.length;
-      continue;
-    }
-    if (/[0-9]/.test(source[index])) {
-      let end = index + 1;
-      while (end < source.length && /[0-9_]/.test(source[end])) {
-        end += 1;
-      }
-      markRange(syntaxClasses, index, end, "tok-number");
-      index = end;
-      continue;
-    }
-    if (/[:=<>|@.^+\-*/?!$~]/.test(source[index])) {
-      syntaxClasses[index] = "tok-operator";
-      index += 1;
-      continue;
-    }
-    index += 1;
-  }
-  const markerClasses = markerRangesToClasses(source, editorMarkers);
-  let html = "";
-  index = 0;
-  while (index < source.length) {
-    const syntaxClass = syntaxClasses[index];
-    const markerClass = markerClasses[index];
-    let end = index + 1;
-    while (
-      end < source.length &&
-      syntaxClasses[end] === syntaxClass &&
-      markerClasses[end] === markerClass
-    ) {
-      end += 1;
-    }
-    const classes = [];
-    if (syntaxClass) {
-      classes.push(syntaxClass);
-    }
-    if (markerClass) {
-      classes.push(markerClass);
-    }
-    const content = escapeHtml(source.slice(index, end));
-    html += classes.length > 0
-      ? `<span class="${classes.join(" ")}">${content}</span>`
-      : content;
-    index = end;
-  }
-  if (source.endsWith("\n")) {
-    html += "\n";
-  }
-  highlightEl.innerHTML = html || " ";
-}
-
-function syncEditorScroll() {
-  if (!highlightEl || !sourceEl) {
-    return;
-  }
-  highlightEl.scrollTop = sourceEl.scrollTop;
-  highlightEl.scrollLeft = sourceEl.scrollLeft;
-}
-
 function setStatus(state, text = "") {
   if (!statusEl || !statusTextEl) {
     return;
@@ -531,7 +609,7 @@ function setStatus(state, text = "") {
   statusTextEl.textContent = text;
 }
 
-function setOutputState(state, label = "Output", meta = "") {
+function setOutputState(state) {
   if (!outputPanelEl || !outputLabelEl) {
     return;
   }
@@ -551,7 +629,7 @@ function renderEmptyOutput() {
     return;
   }
   setOutputBusy(false);
-  setOutputState("idle", "Output", "");
+  setOutputState("idle");
   outputEl.innerHTML = '<div class="output-empty"></div>';
 }
 
@@ -644,14 +722,19 @@ function renderTranscript(text, options) {
   }
   const transcript = buildTranscript(text, options);
   setOutputBusy(false);
-  setOutputState(transcript.tone, "Output", "");
+  setOutputState(transcript.tone);
   outputEl.innerHTML = transcript.html;
   return transcript;
 }
 
-function updateEditorMarkers(source, diagnostics) {
+function updateEditorMarkers(_source, diagnostics) {
   editorMarkers = diagnostics ? parseDiagnosticMarkers(diagnostics, currentFilename) : [];
-  highlightSource(source);
+  if (!editorView) {
+    return;
+  }
+  editorView.dispatch({
+    effects: setDiagnosticsEffect.of(editorMarkers),
+  });
 }
 
 function currentSourceRevision() {
@@ -667,9 +750,7 @@ function setSource(source, filename, sampleId = null) {
   currentRevision += 1;
   runRevision = -1;
   editorMarkers = [];
-  sourceEl.value = source;
-  highlightSource(source);
-  syncEditorScroll();
+  replaceEditorSource(source);
   if (samplePickerEl.value !== (sampleId || "")) {
     samplePickerEl.value = sampleId || "";
   }
@@ -681,7 +762,7 @@ function setSource(source, filename, sampleId = null) {
 }
 
 async function performCheck(revision, { renderSuccess = false } = {}) {
-  const source = sourceEl.value;
+  const source = sourceText();
   const diagnostics = await checkString(currentFilename, source);
   if (revision !== currentSourceRevision()) {
     return null;
@@ -771,12 +852,12 @@ async function runCurrentSource({ skipCheck = false, revision = currentSourceRev
     if (revision !== currentSourceRevision()) {
       return;
     }
-    const output = await runString(currentFilename, sourceEl.value);
+    const output = await runString(currentFilename, sourceText());
     if (revision !== currentSourceRevision()) {
       return;
     }
     runRevision = revision;
-    updateEditorMarkers(sourceEl.value, output);
+    updateEditorMarkers(sourceText(), output);
     const transcript = renderTranscript(output, { emptyPlaceholder: "(no output)" });
     if (transcript.hasError) {
       setStatus("error", "exception");
@@ -807,15 +888,7 @@ function populateSamples() {
 }
 
 if (fullUi) {
-  sourceEl.addEventListener("input", () => {
-    currentRevision += 1;
-    runRevision = -1;
-    editorMarkers = [];
-    highlightSource(sourceEl.value);
-    schedulePipeline();
-  });
-
-  sourceEl.addEventListener("scroll", syncEditorScroll);
+  editorView = createEditor();
 
   samplePickerEl.addEventListener("change", () => {
     const sample = getSampleById(samplePickerEl.value);
@@ -826,13 +899,13 @@ if (fullUi) {
   });
 
   populateSamples();
+  renderEmptyOutput();
   if (defaultSample) {
     setSource(defaultSample.source, defaultSample.filename, defaultSample.id);
   }
-  renderEmptyOutput();
 
   ready.then(
-    (_backend) => {
+    () => {
       if (bootStatusActive) {
         clearBootStatus();
         if (statusEl?.dataset.state === "loading") {
@@ -844,5 +917,6 @@ if (fullUi) {
       clearBootStatus();
       renderTranscript(String(error), { forceDiagnostics: true });
       setStatus("error", "offline");
-    });
+    },
+  );
 }
