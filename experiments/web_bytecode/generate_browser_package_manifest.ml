@@ -1,9 +1,7 @@
 let package_roots = [ "stdlib_stable"; "base"; "core" ]
 
 let linked_packages =
-  [ "findlib"
-  ; "findlib.top"
-  ; "compiler-libs"
+  [ "compiler-libs"
   ; "compiler-libs.common"
   ; "compiler-libs.bytecomp"
   ; "compiler-libs.toplevel"
@@ -89,14 +87,7 @@ let browser_dir_for ~install_lib_root ~package_lib_root dir =
 let staged_files_for_package_dir dir =
   Sys.readdir dir
   |> Array.to_list
-  |> List.filter (fun entry ->
-         Filename.check_suffix entry ".cmi"
-         || Filename.check_suffix entry ".cma"
-         || Filename.check_suffix entry ".cmi"
-         || Filename.check_suffix entry ".cmo"
-         || Filename.check_suffix entry ".js"
-         || Filename.check_suffix entry ".jsa"
-         || entry = "META")
+  |> List.filter (fun entry -> Filename.check_suffix entry ".cmi")
   |> List.sort String.compare
 
 let write_ml_list oc indent values =
@@ -122,7 +113,7 @@ let () =
     ();
   let preload_closure = Findlib.package_deep_ancestors [ "byte" ] package_roots |> uniq in
   let staged_closure =
-    Findlib.package_deep_ancestors [ "byte" ] (linked_packages @ package_roots)
+    preload_closure
     |> List.concat_map package_with_parents
     |> uniq
     |> List.sort (fun left right -> compare (package_sort_key left) (package_sort_key right))
@@ -170,7 +161,7 @@ let () =
   output_string oc "\nlet browser_preload_packages = ";
   write_ml_list oc "" preload_closure;
   output_string oc "\nlet browser_dont_load_packages = ";
-  write_ml_list oc "" linked_packages;
+  write_ml_list oc "" [];
   close_out oc;
   let map_oc = open_out map_output in
   List.iter
