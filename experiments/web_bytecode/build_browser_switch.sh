@@ -97,7 +97,7 @@ fi
 
 mkdir -p "$build_dir" "$tmpdir/cmis"
 
-js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,findlib,findlib.top,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core"
+js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core"
 install_lib_root=$(run_tool ocamlc -where)
 package_lib_root=$(dirname "$(run_tool ocamlfind query base)")
 js_of_ocaml_compiler_dir="$(run_tool ocamlfind query js_of_ocaml-compiler)"
