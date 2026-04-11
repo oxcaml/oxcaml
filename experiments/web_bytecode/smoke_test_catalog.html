@@ -9,7 +9,7 @@
     <div id="output-label"></div>
     <pre id="report">booting</pre>
     <script type="module">
-      import { checkString, runString } from "./app.js";
+      import { runString } from "./app.js";
       import {
         allSamples,
         defaultSample,
@@ -92,10 +92,7 @@
 
       const unsupportedBrowserChecks = [];
       for (const sample of unsupportedSamples) {
-        const actual =
-          sample.mode === "run"
-            ? await runString(sample.filename, sample.source)
-            : await checkString(sample.filename, sample.source);
+        const actual = await runString(sample.filename, sample.source);
         unsupportedBrowserChecks.push({
           id: sample.id,
           ok: matchesExpectedText(actual, sample.expected_text),

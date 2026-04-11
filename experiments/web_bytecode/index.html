@@ -102,8 +102,7 @@
         transition: background 140ms ease, transform 140ms ease;
       }
 
-      .status[data-state="loading"] .status-dot,
-      .status[data-state="checking"] .status-dot {
+      .status[data-state="loading"] .status-dot {
         background: #d79947;
       }
 
@@ -139,6 +138,7 @@
         gap: 12px;
         min-width: 0;
       }
+
 
       .layout {
         display: grid;
@@ -257,6 +257,11 @@
       .tok-constructor { color: #f2c572; }
       .tok-property { color: #d7c1ff; }
       .tok-tag { color: #ff9f7a; }
+      .tok-oxcaml { color: #ff9f7a; font-weight: 700; }
+      .tok-annotation { color: #ffd28f; font-style: italic; }
+      .tok-package { color: #7fd6c2; font-weight: 700; }
+      .tok-package-open { color: #a8bcff; }
+      .tok-label { color: #f4b5ff; }
 
       .diag-error {
         text-decoration-line: underline;
@@ -288,6 +293,27 @@
         text-decoration-color: #e6b14a;
         text-decoration-thickness: 1.5px;
         text-underline-offset: 0.18em;
+      }
+
+      .cm-tooltip.cm-tooltip-hover,
+      .cm-diagnostic-tooltip {
+        max-width: min(560px, calc(100vw - 48px));
+        border: 1px solid rgba(19, 31, 47, 0.14);
+        border-radius: 14px;
+        background: rgba(255, 252, 247, 0.98);
+        box-shadow: 0 18px 40px rgba(19, 31, 47, 0.16);
+        color: var(--panel-ink);
+        white-space: pre-wrap;
+        padding: 10px 12px;
+        font: 13px/1.45 "Berkeley Mono", "SFMono-Regular", "IBM Plex Mono", monospace;
+      }
+
+      .cm-diagnostic-tooltip.warning {
+        border-color: rgba(215, 153, 71, 0.42);
+      }
+
+      .cm-diagnostic-tooltip.error {
+        border-color: rgba(193, 78, 42, 0.38);
       }
 
       .output-panel {
@@ -344,6 +370,16 @@
 
       .transcript-line {
         display: block;
+      }
+
+      .transcript-line.clickable {
+        cursor: pointer;
+      }
+
+      .transcript-line.clickable:hover,
+      .transcript-line.clickable:focus-visible {
+        background: rgba(24, 33, 44, 0.06);
+        outline: none;
       }
 
       .transcript-line.stream {
@@ -412,10 +448,12 @@
         <section class="surface">
           <div class="surface-head editor-head">
             <div class="surface-label">Editor</div>
-            <div class="picker">
-              <select id="sample-picker" aria-label="Sample">
-                <option value="">Sample</option>
-              </select>
+            <div class="header-tools">
+              <div class="picker">
+                <select id="sample-picker" aria-label="Sample">
+                  <option value="">Sample</option>
+                </select>
+              </div>
             </div>
           </div>
           <div class="editor-frame">
