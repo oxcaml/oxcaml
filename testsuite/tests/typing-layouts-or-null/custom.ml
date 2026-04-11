@@ -186,6 +186,54 @@ Error: Invalid [@or_null] declaration:
        it must have exactly one type parameter.
 |}]
 
+type no_param_nonfloat =
+  | A_nonfloat
+  | B_nonfloat of t_non_float
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type no_param_nonfloat =
+2 |   | A_nonfloat
+3 |   | B_nonfloat of t_non_float
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one type parameter.
+|}]
+
+type float_payload =
+  | Nope_float
+  | Yep_float of float
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type float_payload =
+2 |   | Nope_float
+3 |   | Yep_float of float
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one type parameter.
+|}]
+
+type float_payload_fails_sep = float_payload accepts_sep
+
+[%%expect{|
+Line 1, characters 31-44:
+1 | type float_payload_fails_sep = float_payload accepts_sep
+                                   ^^^^^^^^^^^^^
+Error: Unbound type constructor "float_payload"
+|}]
+
+type float_payload_fails_nonfloat = float_payload accepts_nonfloat
+
+[%%expect{|
+Line 1, characters 36-49:
+1 | type float_payload_fails_nonfloat = float_payload accepts_nonfloat
+                                        ^^^^^^^^^^^^^
+Error: Unbound type constructor "float_payload"
+|}]
+
 (* CR or-null: allow custom [@@or_null] types with unused type parameters.
    Internal ticket 6853. *)
 
@@ -199,6 +247,55 @@ Lines 1-4, characters 0-11:
 1 | type 'a unused_param =
 2 |   | A
 3 |   | B of int
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one nullary constructor and one unary constructor carrying the sole type parameter.
+|}]
+
+type ('a, 'b) multi_param =
+  | Nope_multi
+  | Yep_multi of ('a list * 'b)
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type ('a, 'b) multi_param =
+2 |   | Nope_multi
+3 |   | Yep_multi of ('a list * 'b)
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one type parameter.
+|}]
+
+type ('a, 'b) multi_param_succeeds_sep = ('a, 'b) multi_param accepts_sep
+
+[%%expect{|
+Line 1, characters 50-61:
+1 | type ('a, 'b) multi_param_succeeds_sep = ('a, 'b) multi_param accepts_sep
+                                                      ^^^^^^^^^^^
+Error: Unbound type constructor "multi_param"
+|}]
+
+type ('a, 'b) multi_param_succeeds_nonfloat =
+  ('a, 'b) multi_param accepts_nonfloat
+
+[%%expect{|
+Line 2, characters 11-22:
+2 |   ('a, 'b) multi_param accepts_nonfloat
+               ^^^^^^^^^^^
+Error: Unbound type constructor "multi_param"
+|}]
+
+type bad_payload =
+  | Nope_bad
+  | Yep_bad of int t
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type bad_payload =
+2 |   | Nope_bad
+3 |   | Yep_bad of int t
 4 | [@@or_null]
 Error: Invalid [@or_null] declaration:
        it must have exactly one nullary constructor and one unary constructor carrying the sole type parameter.
