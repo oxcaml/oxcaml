@@ -27,7 +27,7 @@ require_file() {
   fi
 }
 
-if [[ ! -d "${repo_root}/.git" ]]; then
+if [[ ! -e "${repo_root}/.git" ]]; then
   echo "Missing source repo at $repo_root" >&2
   exit 1
 fi
@@ -48,6 +48,7 @@ require_file "$script_dir/sample_catalog.js"
 require_file "$script_dir/unsupported_samples.js"
 require_file "$build_dir/web_bytecode_js.bc.js"
 require_file "$build_dir/browser_fs_manifest.json"
+require_file "$build_dir/browser_fs_bundle.json.gz"
 if [[ ! -d "$build_dir/browser_fs" ]]; then
   echo "Missing required directory: $build_dir/browser_fs" >&2
   exit 1
@@ -61,6 +62,7 @@ cp "$script_dir/sample_catalog.js" "$stage_dir/sample_catalog.js"
 cp "$script_dir/unsupported_samples.js" "$stage_dir/unsupported_samples.js"
 cp "$build_dir/web_bytecode_js.bc.js" "$stage_dir/build/web_bytecode_js.bc.js"
 cp "$build_dir/browser_fs_manifest.json" "$stage_dir/build/browser_fs_manifest.json"
+cp "$build_dir/browser_fs_bundle.json.gz" "$stage_dir/build/browser_fs_bundle.json.gz"
 cp -R "$build_dir/browser_fs" "$stage_dir/build/browser_fs"
 
 perl -0pi -e 's#^const buildBase = .*;$#const buildBase = "./build";#m' \
