@@ -1,0 +1,97 @@
+--- a/metaquot/ppxlib_metaquot.ml
++++ b/metaquot/ppxlib_metaquot.ml
+@@ -34,6 +34,11 @@ module Make (M : sig
+   val location_stack : (location -> result) option
+   val attributes : (location -> result) option
+ 
++  (* This is called on the result of evaluating the lifter on an expression.
++     We special case some expressions internally to Jane Street to support syntactic
++     function arity. See the comment on the generated call to [coalesce_fun_arity]. *)
++  val on_expression : expression -> result -> result
++
+   class std_lifters : location -> [result] Ppxlib_traverse_builtins.std_lifters
+ end) =
+ struct
+@@ -77,7 +82,8 @@ struct
+               }
+             in
+             M.cast self ext (Some attributes) ~type_name:"expression"
+-        | _ -> super#expression e
++        | _ ->
++            M.on_expression e (super#expression e)
+ 
+       method! pattern p =
+         match p.ppat_desc with
+@@ -217,6 +223,45 @@ module Expr = Make (struct
+         pexp_extension ~loc:(loc_of_extension ext)
+           (Location.error_extensionf ~loc:(loc_of_extension ext)
+              "expression expected")
++
++  (* In expressions, convert:
++
++     {[
++       [%expr fun P -> [%e y]]
++     ]}
++
++     to:
++
++     {[
++       Ppxlib_jane.Ast_builder.Default.coalesce_fun_arity [%expr fun P -> [%e y]]
++     ]}
++
++     and similarly with newtypes:
++
++     {[
++       [%expr fun (type a) -> [%e y]]
++     ]}
++
++     In this example, this makes the arity of the resulting expression equal to
++     [1 + arity(y)] instead of [1].
++
++     This notion of "arity" is introduced in an internal Jane Street compiler change
++     and upstream in (most likely) OCaml 5.2.
++  *)
++  let on_expression (input_expression : expression) (lifted : result) =
++    match input_expression.pexp_desc with
++    | Pexp_function _ | Pexp_newtype _ ->
++      let loc = input_expression.pexp_loc in
++      let fun_binding =
++        Ldot
++          ( Ldot (Ldot (Lident "Ppxlib_jane", "Ast_builder") ,"Default")
++          , "coalesce_fun_arity" )
++      in
++      pexp_apply
++        ~loc
++        (pexp_ident ~loc { txt = fun_binding; loc })
++        [ Nolabel, lifted ]
++    | _ -> lifted
+ end)
+ 
+ module Patt = Make (struct
+@@ -250,6 +295,9 @@ module Patt = Make (struct
+           ppat_extension ~loc:(loc_of_extension ext)
+             (Location.error_extensionf ~loc:(loc_of_extension ext)
+                "pattern expected"))
++
++
++  let on_expression _ pat = pat
+ end)
+ 
+ let () =
+@@ -281,10 +329,15 @@ let () =
+           let lift = lifter loc in
+           lift#typed (lift#signature s) "signature");
+       E.declare "metaquot.sigi" ctx
+-        A.(psig (__ ^:: nil))
++        A.(psig (signature (__ ^:: nil)))
+         (fun ~loc ~path:_ s ->
+           let lift = lifter loc in
+           lift#typed (lift#signature_item s) "signature_item");
++      E.declare "metaquot.sigil" ctx
++        A.(psig (signature __))
++        (fun ~loc ~path:_ s ->
++          let lift = lifter loc in
++          lift#typed (lift#signature_items s) "signature_items");
+       E.declare "metaquot.type" ctx
+         A.(ptyp __)
+         (fun ~loc ~path:_ t ->

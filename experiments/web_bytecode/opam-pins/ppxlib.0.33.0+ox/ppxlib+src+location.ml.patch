@@ -1,0 +1,19 @@
+--- a/src/location.ml
++++ b/src/location.ml
+@@ -8,7 +8,7 @@ type t = location = {
+ }
+ 
+ let in_file name =
+-  let loc = { pos_fname = name; pos_lnum = 1; pos_bol = 0; pos_cnum = -1 } in
++  let loc = { pos_fname = name; pos_lnum = 0; pos_bol = 0; pos_cnum = -1 } in
+   { loc_start = loc; loc_end = loc; loc_ghost = true }
+ 
+ let set_filename loc fn =
+@@ -76,6 +76,6 @@ let error_extensionf ~loc fmt =
+ exception Error = L.Error
+ 
+ let () =
+-  Stdlib.Printexc.register_printer (function
++  (Stdlib.Printexc.register_printer [@alert "-unsafe_multidomain"]) (function
+     | Error e -> Some (Error.message e)
+     | _ -> None)

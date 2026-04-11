@@ -1,0 +1,53 @@
+name: Build on `trunk`
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    # Every weekday, at 5:43 UTC
+    - cron: '43 5 * * 1-5'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pick up a robust cache prefix
+        id: setup
+        run: |
+          # Ensure that cache is flushed when trunk is updated
+          cache_prefix="$(git ls-remote https://github.com/ocaml/ocaml.git refs/heads/trunk | cut -f 1)"
+          echo "cache_prefix=$cache_prefix" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+      - name: Install OCaml compiler
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: 'ocaml-variants.5.3.0+trunk'
+          dune-cache: true
+          cache-prefix: ${{ steps.setup.outputs.cache_prefix }}
+
+      - name: Install ppxlib dependencies
+        run: |
+          opam install ./ppxlib.opam --deps-only
+
+      - name: Show configuration
+        run: |
+          opam exec -- ocamlc -config
+          opam config list
+          opam exec -- dune printenv
+          opam list
+
+      - name: Build the ppxlib
+        run: opam exec -- dune build -p ppxlib @install
+
+      - name: Install test dependencies
+        run: |
+          opam install ./ppxlib.opam --deps-only -t
+          opam exec -- dune build -p ppxlib @runtest
+        continue-on-error: true

@@ -1,0 +1,48 @@
+opam-version: "2.0"
+name: "base"
+version: "v0.17.3"
+synopsis: "Full standard library replacement for OCaml"
+description: """\
+Full standard library replacement for OCaml
+
+Base is a complete and portable alternative to the OCaml standard
+library. It provides all standard functionalities one would expect
+from a language standard library. It uses consistent conventions
+across all of its module.
+
+Base aims to be usable in any context. As a result system dependent
+features such as I/O are not offered by Base. They are instead
+provided by companion libraries such as stdio:
+
+  https://github.com/janestreet/stdio"""
+maintainer: "Jane Street developers"
+authors: "Jane Street Group, LLC"
+license: "MIT"
+homepage: "https://github.com/janestreet/base"
+doc: "https://ocaml.janestreet.com/ocaml-core/latest/doc/base/index.html"
+bug-reports: "https://github.com/janestreet/base/issues"
+depends: [
+  "ocaml" {>= "5.1.0"}
+  "ocaml_intrinsics_kernel" {>= "v0.17.0" & < "v0.18~"}
+  "sexplib0" {>= "v0.17.0" & < "v0.18~"}
+  "dune" {>= "3.11.0"}
+  "dune-configurator"
+]
+available: arch != "arm32" & arch != "x86_32"
+build: [
+  [
+    "sh"
+    "-ec"
+    "python3 - <<'PY'\nfrom pathlib import Path\n\ndef replace_once(path_str, old, new, label):\n    path = Path(path_str)\n    text = path.read_text()\n    if old not in text:\n        raise SystemExit(f'base overlay: expected {label} not found in {path_str}')\n    path.write_text(text.replace(old, new, 1))\n\nreplace_once(\n    'shadow-stdlib/gen/gen.ml',\n    \"\"\"    Mapper.permissive := permissive;\n    List.iter lines ~f:(fun line ->\n      let repl = Mapper.line (Lexing.from_string line) in\n      if repl <> \\\"\\\" then Printf.fprintf oc \\\"%s\\\\n\\\\n\\\" repl);\n\"\"\",\n    \"\"\"    let rewrite_shadow_aliases repl =\n      repl\n      |> Str.global_replace\n           (Str.regexp_string \\\"type nonrec in_channel = Stdlib.in_channel : value mod portable contended\\\")\n           \\\"type nonrec in_channel = Stdlib.in_channel as (_ : value mod portable contended)\\\"\n      |> Str.global_replace\n           (Str.regexp_string \\\"type nonrec out_channel = Stdlib.out_channel : value mod portable contended\\\")\n           \\\"type nonrec out_channel = Stdlib.out_channel as (_ : value mod portable contended)\\\"\n    in\n    Mapper.permissive := permissive;\n    List.iter lines ~f:(fun line ->\n      let repl = Mapper.line (Lexing.from_string line) |> rewrite_shadow_aliases in\n      if repl <> \\\"\\\" then Printf.fprintf oc \\\"%s\\\\n\\\\n\\\" repl);\n\"\"\",\n    'shadow_stdlib generator block',\n)\nreplace_once(\n    'src/import0.ml',\n    \"with type 'a ref := 'a ref\",\n    \"with type ('a : value_or_null) ref := ('a : value_or_null) ref\",\n    'import0 ref constraint',\n)\nreplace_once(\n    'src/import0.ml',\n    \"type 'a ref = 'a Stdlib.ref = { mutable contents : 'a }\",\n    \"type ('a : value_or_null) ref = ('a : value_or_null) Stdlib.ref = { mutable contents : 'a }\",\n    'import0 ref alias',\n)\nreplace_once(\n    'src/base.ml',\n    \"with type 'a ref := 'a ref)\",\n    \"with type ('a : value_or_null) ref := ('a : value_or_null) ref)\",\n    'base ref constraint',\n)\nreplace_once(\n    'src/ref.mli',\n    \"type 'a t = 'a Stdlib.ref = { mutable contents : 'a }\",\n    \"type ('a : value_or_null) t = ('a : value_or_null) Stdlib.ref = { mutable contents : 'a }\",\n    'ref.mli alias',\n)\nreplace_once(\n    'src/ref.ml',\n    \"type 'a t = 'a ref = { mutable contents : 'a }\",\n    \"type ('a : value_or_null) t = ('a : value_or_null) ref = { mutable contents : 'a }\",\n    'ref.ml alias',\n)\nreplace_once(\n    'src/buffer.ml',\n    \"\"\"     (Stdlib.Buffer.blit : Stdlib.Buffer.t -> int -> Bytes.t -> int -> int -> unit)\n    : Stdlib.Buffer.t -> int -> Bytes.t -> int -> int -> unit\"\"\",\n    \"\"\"     (Stdlib.Buffer.blit : Stdlib.Buffer.t @ local -> int -> Bytes.t @ local -> int -> int -> unit)\n    : Stdlib.Buffer.t @ local -> int -> Bytes.t @ local -> int -> int -> unit\"\"\",\n    'buffer blit locality annotation',\n)\nreplace_once(\n    'src/buffer_intf.ml',\n    \"val add_string : t -> string -> unit\",\n    \"val add_string : t @ local -> string @ local -> unit\",\n    'buffer_intf add_string signature',\n)\nreplace_once(\n    'src/buffer_intf.ml',\n    \"val add_bytes : t -> bytes -> unit\",\n    \"val add_bytes : t @ local -> bytes @ local -> unit\",\n    'buffer_intf add_bytes signature',\n)\nreplace_once(\n    'src/linked_queue0.ml',\n    \"let caml_iter : ('a -> unit) -> 'a t -> unit =\",\n    \"let caml_iter : ('a -> unit) @ local -> 'a t @ local -> unit =\",\n    'linked_queue0 iter annotation',\n)\nreplace_once(\n    'src/linked_queue0.ml',\n    \"Stdlib.Obj.magic (Stdlib.Queue.iter : ('a -> unit) -> 'a t -> unit)\",\n    \"Stdlib.Obj.magic (Stdlib.Queue.iter : ('a -> unit) @ local -> 'a t @ local -> unit)\",\n    'linked_queue0 iter coercion',\n)\nreplace_once(\n    'src/linked_queue0.ml',\n    \"let caml_fold : ('b -> 'a -> 'b) -> 'b -> 'a t -> 'b =\",\n    \"let caml_fold : ('b -> 'a -> 'b) @ local -> 'b -> 'a t @ local -> 'b =\",\n    'linked_queue0 fold annotation',\n)\nreplace_once(\n    'src/linked_queue0.ml',\n    \"Stdlib.Obj.magic (Stdlib.Queue.fold : ('b -> 'a -> 'b) -> 'b -> 'a t -> 'b)\",\n    \"Stdlib.Obj.magic (Stdlib.Queue.fold : ('b -> 'a -> 'b) @ local -> 'b -> 'a t @ local -> 'b)\",\n    'linked_queue0 fold coercion',\n)\nPY"
+  ]
+  ["dune" "build" "-p" name "-j" jobs]
+]
+dev-repo: "git+https://github.com/janestreet/base.git"
+url {
+  src: "https://github.com/janestreet/base/archive/refs/tags/v0.17.3.tar.gz"
+  checksum: [
+    "md5=2100b0ed13fecf43be86ed45c5b2cc4d"
+    "sha512=628610caff7e124631870fa1e29661caac28bdfdb18750ee43b868037da3d65d6dd9023b4be7c4c52405679efb5e865a6632d95606a22b28a36636a6bf706ef3"
+  ]
+}
+x-maintenance-intent: ["(latest)"]

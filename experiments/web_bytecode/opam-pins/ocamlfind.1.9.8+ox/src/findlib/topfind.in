@@ -1,0 +1,148 @@
+(* $Id$ -*- tuareg -*- *)
+
+(* For Ocaml-3.03 and up, so you can do: #use "topfind" and get a
+ * working findlib toploop.
+ *)
+
+(* To access Toploop in OCaml >= 4.00. This directory will be later removed from path if possible *)
+#directory "+compiler-libs";;
+
+let exists path =
+  match Sys.file_exists path with
+  | true -> Some path
+  | false -> None
+in
+
+let ( / ) = Filename.concat in
+
+let findlib_conf_of_path path =
+  match exists (path / "etc" / "findlib.conf") with
+  | Some etc_path -> etc_path
+  | None -> path / "lib" / "findlib.conf"
+in
+
+let install_dir_from_opam_switch_prefix path =
+  match Sys.file_exists (findlib_conf_of_path path) with
+  | false -> None
+  | true -> Some path
+in
+
+let install_dir_from_ocaml_toplevel_path path =
+  let exe_dir = Filename.dirname path in
+  let install_dir = Filename.dirname exe_dir in
+  let config_path = findlib_conf_of_path install_dir in
+  match Sys.file_exists config_path with
+  | true -> Some install_dir
+  | false -> None
+in
+
+let fl_split_path_separator =
+  match Sys.os_type with
+    | "Unix" | "BeOS"   -> ':'
+    | "Cygwin" -> ';'   (* You might want to change this *)
+    | "Win32"  -> ';'
+    | "MacOS"  -> failwith "Findlib: I do not know what is the correct path separator for MacOS. If you can help me, write a mail to gerd@gerd-stolpmann.de"
+    | _ -> failwith "Findlib: unknown operating system"
+in
+
+let string_split_on_char sep s =
+  let r = ref [] in
+  let j = ref (String.length s) in
+  for i = String.length s - 1 downto 0 do
+    if String.unsafe_get s i = sep then begin
+      r := String.sub s (i + 1) (!j - i - 1) :: !r;
+      j := i
+    end
+  done;
+  String.sub s 0 !j :: !r
+in
+
+let rec list_find_map f = function
+  | [] -> None
+  | x :: l ->
+     begin match f x with
+       | Some _ as result -> result
+       | None -> list_find_map f l
+     end
+in
+
+let install_dir_from_ld_library_path paths =
+  let v = string_split_on_char fl_split_path_separator paths in
+  list_find_map (fun path ->
+    let parent = Filename.dirname path in
+    let parent' = Filename.dirname parent in
+    match Sys.file_exists (findlib_conf_of_path parent') with
+    | true -> Some parent'
+    | false -> None) v
+in
+
+let getenv_opt v = try Some (Sys.getenv v) with Not_found -> None in
+
+let rec try_vars = function
+  | [] -> None
+  | (var, mapper)::xs -> (
+    match getenv_opt var with
+    | None -> try_vars xs
+    | Some content -> (
+      match mapper content with
+      | None -> try_vars xs
+      | Some _ as found -> found))
+in
+
+let location =
+  match try_vars [
+    ("OPAM_SWITCH_PREFIX", install_dir_from_opam_switch_prefix);
+    ("CAML_LD_LIBRARY_PATH", install_dir_from_ld_library_path);
+    ("OCAML_TOPLEVEL_PATH", install_dir_from_ocaml_toplevel_path);
+  ] with
+  | Some location -> location
+  | None -> "@SITELIB@"
+in
+
+let findlib_directory = match @RELATIVE_PATHS@ with
+  | true -> location / "lib" / "findlib"
+  | false -> "@SITELIB@/findlib"
+in
+
+let () = Topdirs.dir_directory findlib_directory in
+  (* OCaml-4.00 requires to use dir_directory before we load anything *)
+
+let exec_test s =
+  let l = Lexing.from_string s in
+  let ph = !Toploop.parse_toplevel_phrase l in
+  let fmt = Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) in
+  try
+    Toploop.execute_phrase false fmt ph
+  with
+      _ -> false
+in
+
+(* one of the few observable differences... *)
+let is_native = (Gc.get ()).Gc.stack_limit = 0 in
+
+let suffix = if is_native then "cmxs" else "cma" in
+
+(* First test whether findlib_top is already loaded. If not, load it now.
+ * The test works by executing the toplevel phrase "Topfind.reset" and
+ * checking whether this causes an error.
+ *)
+if not (exec_test "Topfind.reset;;") then (
+  Topdirs.dir_load Format.err_formatter (findlib_directory / ("findlib." ^ suffix));
+  Topdirs.dir_load Format.err_formatter (findlib_directory / ("findlib_top." ^ suffix)))
+;;
+(* phrase has to end here otherwise Topfind is not accessible *)
+
+(* REMOVE_DIRECTORY_BEGIN *)
+(* OCaml < 4.00 do not have this so only include this code if it was detected *)
+let () = Topdirs.dir_remove_directory "+compiler-libs" in
+(* REMOVE_DIRECTORY_END *)
+
+(* The following is always executed. It is harmless if findlib was already
+ * initialized
+ *)
+let is_native = (Gc.get ()).Gc.stack_limit = 0 in
+let pred = if is_native then "native" else "byte" in
+
+Topfind.add_predicates [ pred; "toploop" ];
+Topfind.don't_load ["findlib"];
+Topfind.announce ();;

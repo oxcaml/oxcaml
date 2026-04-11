@@ -1,0 +1,84 @@
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{%html: </div><div>%}{{!driver}The Driver >}{%html: </div></div>%}
+
+{0 Introduction}
+
+This guide is intended at authors or future authors of PPX rewriters. If you
+don't know what a PPX is, or if you are looking for a guide intended at PPX
+users, read the {{:https://ocaml.org/docs/metaprogramming}OCaml
+official guide on meta-programming} first, although the beginning of this guide
+may be of interest to everyone.
+
+{1 Preprocessing in OCaml}
+
+OCaml doesn't have a macro system, that is, there is no official part of the
+OCaml language that will be executed at compile time in order to generate or
+alter the source code. However, OCaml does have an official part of its syntax dedicated to this: {{:https://v3.ocaml.org/manual/extensionnodes.html}extension nodes} and {{:https://v2.ocaml.org/manual/attributes.html}attributes}; both of them introduced in OCaml 4.02. The preprocessing itself, though, is left to external programs,
+written by the community and specialised for their own tasks. However, without a
+unification framework, the following issues arise:
+
+- Ambiguity when using several preprocessors due to lacking clear composition semantics
+- Duplication of code and efforts on the different preprocessors
+- Performance loss with many phases (parsing, pretty-printing, etc.) being
+  executed multiple times
+- Lack of cross-compiler compatibility
+- Incompatibility among the different preprocessor rather than one homogeneous preprocessor ecosystem
+
+{1 [ppxlib]}
+
+The goal of [ppxlib] is to solve these problems, by providing a unifying
+framework for writing preprocessors. It sits in between the OCaml compiler and
+toolchain, and the PPX authors provide an API for them. One could sum up the
+[ppxlib] features as:
+
+- It deals with all boilerplate, such as parsing the input, outputting the rewritten
+  output, generating an executable, etc.
+- It generates a single executable for multiple transformations and defines clear composition semantics for local transformations
+- It integrates well with Dune and Merlin
+- It provides a more stable API than the compiler for manipulating the AST
+- A single PPX codebase usually works on several OCaml versions of the AST
+- It defines restricted rewriters whose semantic ensure better confidence for the
+  user and better compositional semantics
+- It provides many helpers to pattern-match and generate AST nodes, as well as traverse the
+  AST.
+
+{1 This Guide}
+
+This guide is separated into several parts.
+
+First, we focus on the {{!driver}driver} that performs the AST transformations:
+how it is generated, executed, and more importantly, what it does exactly, from
+migrating the AST to the different rewriting phases it goes through.
+
+After that, we explain {{!"writing-ppxs"}the different kinds} of transformations
+that [ppxlib] supports, and how to register them to the driver. This section only
+describes the transformations and their properties, not how to actually
+manipulate the AST.
+
+The part where we discuss how to manipulate the AST is split in three pages:
+{{!"generating-code"}generating AST nodes} to generate OCaml code,
+{{!"matching-code"}destructing AST nodes} to extract information and act
+differently depending on what is extracted, and {{!"ast-traversal"}traversing
+the AST} to use [fold], [iter], and [map] on the AST. This code-manipulation part
+explains using the modules {{!Ppxlib.Ast_builder}[Ast_builder]}, {{!Ppxlib.Ast_pattern}[Ast_pattern]}, and the [ppxlib]'s
+PPX {{!Ppxlib_metaquot}[Metaquot]}.
+
+We finally discuss several {{!"good-practices"}good practices}, such as how to
+properly report errors, how to test your PPX, or how to migrate from other PPX
+libraries, such as [OMP] and [ppx_deriving].
+
+We end by including some {{!"examples"}examples}, which you can also find in the
+[examples] {{:https://github.com/ocaml-ppx/ppxlib/tree/main/examples}folder} of
+[ppxlib]'s repository.
+
+{1 PPXs and [ppxlib] History}
+
+The preprocessing history of OCaml started long before [ppxlib]. However, this
+section is not yet written. You can find more information in these resources:
+{{:https://lists.ocaml.org/pipermail/wg-camlp4/2013-January/000000.html}1}
+{{:https://caml.inria.fr/pub/docs/manual-camlp4/manual002.html}2}
+{{:https://camlp5.github.io/}3}
+{{:https://discuss.ocaml.org/t/an-update-on-the-state-of-the-ppx-ecosystem-and-ppxlib-s-transition/8200}5}.
+You can also contribute to the [ppxlib] documentation by opening a pull request in
+the {{:https://github.com/ocaml-ppx/ppxlib/}repository}.
+
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{%html: </div><div>%}{{!driver}The Driver >}{%html: </div></div>%}

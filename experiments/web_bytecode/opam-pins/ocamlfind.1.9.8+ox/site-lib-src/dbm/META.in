@@ -1,0 +1,10 @@
+# Specification for the "dbm" library
+requires = ""
+version = "[distributed with Ocaml]"
+description = "Access to NDBM databases"
+directory = "^"
+browse_interfaces = "%%interfaces%%"
+archive(byte) = "dbm.cma"
+archive(native) = "dbm.cmxa"
+plugin(byte) = "dbm.cma"
+plugin(native) = "dbm.cmxs"

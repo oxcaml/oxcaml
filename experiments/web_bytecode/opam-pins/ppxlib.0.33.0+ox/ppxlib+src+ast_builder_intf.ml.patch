@@ -1,0 +1,95 @@
+--- a/src/ast_builder_intf.ml
++++ b/src/ast_builder_intf.ml
+@@ -45,6 +45,10 @@ module type Additional_helpers = sig
+   val elist : (expression list -> expression) with_loc
+   val plist : (pattern list -> pattern) with_loc
+ 
++  val pexp_function : (case list -> expression) with_loc
++  val pexp_fun :
++    (arg_label -> expression option -> pattern -> expression -> expression) with_loc
++
+   val pstr_value_list :
+     loc:Location.t ->
+     Asttypes.rec_flag ->
+@@ -110,6 +114,73 @@ module type Additional_helpers = sig
+ 
+   val eta_reduce_if_possible_and_nonrec :
+     expression -> rec_flag:rec_flag -> expression
++
++  (*---------------------------------------------------------------*)
++
++  (* override changed nodes to use [Ppxlib_jane] interface *)
++  val label_declaration :
++    (name:string loc ->
++    mutable_:mutable_flag ->
++    type_:core_type ->
++    label_declaration) with_loc
++
++  val value_description :
++    (name:string loc ->
++    type_:core_type ->
++    prim:string list ->
++    value_description) with_loc
++
++  val ptyp_arrow
++    : (arg_label -> core_type -> core_type -> core_type) with_loc
++  val ptyp_tuple : (core_type list -> core_type) with_loc
++
++  val pexp_let : (rec_flag -> value_binding list -> expression -> expression) with_loc
++  val pexp_constraint : (expression -> core_type -> expression) with_loc
++  val pexp_tuple : (expression list -> expression) with_loc
++
++  val ppat_constraint : (pattern -> core_type -> pattern) with_loc
++  val ppat_tuple : (pattern list -> pattern) with_loc
++  val ppat_array : (pattern list -> pattern) with_loc
++
++  val value_binding
++    : (pat:pattern -> expr:expression -> value_binding) with_loc
++
++  val include_infos
++    : (?attrs:attributes -> 'a -> 'a include_infos) with_loc
++
++  val psig_include : (include_description -> signature_item) with_loc
++
++  val pmty_signature : (signature_item list -> module_type) with_loc
++
++  (* Use Ppxlib_jane in open source code, and [Latest] in non-open-sourced
++     code. *)
++  val signature : [ `Use_Ppxlib_jane ]
++
++  val ptyp_any : core_type with_loc
++  val ptyp_var : (string -> core_type) with_loc
++  val ptyp_alias : (core_type -> string loc -> core_type) with_loc
++  val ptyp_poly : (string loc list -> core_type -> core_type) with_loc
++  val pexp_newtype : (string loc -> expression -> expression) with_loc
++  val pexp_array : (expression list -> expression) with_loc
++
++  val type_declaration :
++    (name:string loc ->
++     params:(core_type * (variance * injectivity)) list ->
++     cstrs:(core_type * core_type * location) list ->
++     kind:type_kind ->
++     private_:private_flag ->
++     manifest:core_type option ->
++     type_declaration)
++      with_loc
++
++  val module_declaration :
++    (name:string option loc -> type_:module_type -> module_declaration) with_loc
++
++  val pmty_functor : (functor_parameter -> module_type -> module_type) with_loc
++
++  val pmod_constraint : (module_expr -> module_type -> module_expr) with_loc
++
++  (* ----------------------------------------------------- *)
+ end
+ 
+ module type Located = sig
+@@ -133,5 +204,7 @@ module type S = sig
+     let loc = Location.none
+   end)
+ 
++  val pexp_apply : expression -> (arg_label * expression) list -> expression
++
+   include Additional_helpers with type 'a with_loc := 'a without_location
+ end

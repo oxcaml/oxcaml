@@ -1,0 +1,7 @@
+--- a/ast/location_error.mli
++++ b/ast/location_error.mli
+@@ -11,3 +11,4 @@ val to_extension : t -> Import.Parsetree
+ val raise : t -> 'a
+ val update_loc : t -> Location.t -> t
+ val get_location : t -> Location.t
++val of_extension : Import.Parsetree.extension -> t option

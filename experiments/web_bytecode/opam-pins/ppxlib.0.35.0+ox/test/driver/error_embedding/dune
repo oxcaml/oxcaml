@@ -1,0 +1,7 @@
+(executables
+ (names raiser pp)
+ (libraries ppxlib))
+
+(cram
+ (package ppxlib)
+ (deps raiser.exe pp.exe))

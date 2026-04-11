@@ -1,0 +1,78 @@
+opam-version: "2.0"
+synopsis: "Fast, portable, and opinionated build system"
+description: """
+
+Dune is a build system that was designed to simplify the release of
+Jane Street packages. It reads metadata from "dune" files following a
+very simple s-expression syntax.
+
+Dune is fast, has very low-overhead, and supports parallel builds on
+all platforms. It has no system dependencies; all you need to build
+dune or packages using dune is OCaml. You don't need make or bash
+as long as the packages themselves don't use bash explicitly.
+
+Dune is composable; supporting multi-package development by simply
+dropping multiple repositories into the same directory.
+
+Dune also supports multi-context builds, such as building against
+several opam roots/switches simultaneously. This helps maintaining
+packages across several versions of OCaml and gives cross-compilation
+for free.
+"""
+maintainer: ["Jane Street Group, LLC <opensource@janestreet.com>"]
+authors: ["Jane Street Group, LLC <opensource@janestreet.com>"]
+license: "MIT"
+homepage: "https://github.com/ocaml/dune"
+doc: "https://dune.readthedocs.io/"
+bug-reports: "https://github.com/ocaml/dune/issues"
+conflicts: [
+  "merlin" {< "3.4.0"}
+  "ocaml-lsp-server" {< "1.3.0"}
+  "dune-configurator" {< "2.3.0"}
+  "odoc" {< "2.0.1"}
+  "dune-release" {< "2.0.0"}
+  "js_of_ocaml-compiler" {< "3.6.0"}
+  "jbuilder" {= "transition"}
+]
+dev-repo: "git+https://github.com/ocaml/dune.git"
+x-maintenance-intent: ["(latest)"]
+build: [
+  [
+    "sh"
+    "-ec"
+    "python3 - <<'PY'\nfrom pathlib import Path\narray_path = Path('otherlibs/stdune/src/array.mli')\narray_text = array_path.read_text()\narray_old = \"include module type of Stdlib.ArrayLabels with type 'a t = 'a array\"\narray_new = \"include module type of Stdlib.ArrayLabels with type ('a : any mod separable) t = 'a array\"\nif array_old not in array_text:\n    raise SystemExit('dune overlay: expected stdune array include not found')\narray_path.write_text(array_text.replace(array_old, array_new, 1))\nstring_path = Path('otherlibs/stdune/src/string.mli')\nstring_text = string_path.read_text()\nfor old, new in [\n    ('val index_from : t -> int -> char -> int option', 'val index_from : t @ local -> int -> char -> int option'),\n    ('val rindex_from : t -> int -> char -> int option', 'val rindex_from : t @ local -> int -> char -> int option'),\n]:\n    if old not in string_text:\n        raise SystemExit(f'dune overlay: expected stdune string declaration not found: {old}')\n    string_text = string_text.replace(old, new, 1)\nstring_path.write_text(string_text)\nlexer_path = Path('src/dune_sexp/lexer.mll')\nlexer_text = lexer_path.read_text()\nfor old, new in [\n    ('    let add_text   = Buffer.add_string text_buf', '    let add_text s = Buffer.add_string text_buf s'),\n    ('    let add_text_c = Buffer.add_char text_buf', '    let add_text_c c = Buffer.add_char text_buf c'),\n]:\n    if old not in lexer_text:\n        raise SystemExit(f'dune overlay: expected dune_sexp lexer helper not found: {old}')\n    lexer_text = lexer_text.replace(old, new, 1)\nlexer_path.write_text(lexer_text)\nmerlin_path = Path('src/dune_rules/merlin/merlin.ml')\nmerlin_text = merlin_path.read_text()\nmerlin_old = '    let print = Buffer.add_string b in'\nmerlin_new = '    let print s = Buffer.add_string b s in'\nif merlin_old not in merlin_text:\n    raise SystemExit('dune overlay: expected merlin buffer helper not found')\nmerlin_path.write_text(merlin_text.replace(merlin_old, merlin_new, 1))\nPY"
+  ]
+  ["ocaml" "boot/bootstrap.ml" "-j" jobs]
+  ["./_boot/dune.exe" "build" "dune.install" "--release" "--profile" "dune-bootstrap" "-j" jobs]
+]
+depends: [
+  "ocaml" {>= "4.08"}
+  "base-unix"
+  "base-threads"
+  "lwt" { with-dev-setup & os != "win32" }
+  "cinaps" { with-dev-setup }
+  "csexp" { with-dev-setup & >= "1.3.0" }
+  "js_of_ocaml" { with-dev-setup & >= "6.1.0" & os != "win32" }
+  "js_of_ocaml-compiler" { with-dev-setup & >= "6.1.0" & os != "win32" }
+  "mdx" { with-dev-setup & >= "2.3.0" & os != "win32" }
+  "menhir" { with-dev-setup & os != "win32" }
+  "ocamlfind" { with-dev-setup & os != "win32" }
+  "odoc" { with-dev-setup & >= "2.4.0" & os != "win32" }
+  "ppx_expect" { with-dev-setup & >= "v0.17" & os != "win32" }
+  "spawn" { with-dev-setup }
+  "ppx_inline_test" { with-dev-setup & os != "win32" }
+  "ppxlib" { with-dev-setup & >= "0.37.0" & os != "win32" }
+  "ctypes" { with-dev-setup & os != "win32" }
+  "utop" { with-dev-setup & >= "2.6.0" & os != "win32" }
+  "melange" { with-dev-setup & >= "5.1.0-51" & os != "win32" }
+  "uutf" { with-dev-setup }
+]
+url {
+  src:
+    "https://github.com/ocaml/dune/releases/download/3.22.1/dune-3.22.1.tbz"
+  checksum: [
+    "sha256=0c0b98396c32ec426886c2c2294024fd687ac5114d4dda0af9dc8a2e584d47fd"
+    "sha512=4dc4ed45fb52a3017bc73fdbcb7b88c1710cebfdbb87ecb6f933582f8f0a27ef740f8c4009439ff6a878e1115c3f29d199e63d0367a88a09d2ea19b61517a814"
+  ]
+}
+x-commit-hash: "8aefc6cb021f4c276859c8c07386d1dfbc58cec8"

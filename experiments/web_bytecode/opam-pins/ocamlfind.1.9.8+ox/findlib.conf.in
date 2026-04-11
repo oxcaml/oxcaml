@@ -1,0 +1,2 @@
+destdir="@SITELIB@"
+path="@FINDLIB_PATH@"

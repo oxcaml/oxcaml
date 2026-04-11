@@ -1,0 +1,607 @@
+--- a/src/context_free.ml
++++ b/src/context_free.ml
+@@ -1,4 +1,3 @@
+-(*$ open Ppxlib_cinaps_helpers $*)
+ open! Import
+ open Common
+ open With_errors
+@@ -8,6 +7,34 @@ module A = Attribute
+ module AC = Attribute.Context
+ 
+ module Rule = struct
++  module Attribute_list = struct
++    type ('a, _) t =
++      | [] : ('a, unit) t
++      | ( :: ) : ('a, 'b) Attribute.t * ('a, 'c) t -> ('a, 'b * 'c) t
++
++    let rec to_packed_list : type a l. (a, l) t -> Attribute.packed list =
++      function
++      | [] -> []
++      | x :: xs -> T x :: to_packed_list xs
++  end
++
++  module Parsed_payload_list = struct
++    type _ t = [] : unit t | ( :: ) : 'a option * 'b t -> ('a * 'b) t
++  end
++
++  module Attr_replace = struct
++    type ('a, 'list) unpacked = {
++      name : string;
++      attributes : ('a, 'list) Attribute_list.t;
++      expand :
++        ctxt:Expansion_context.Base.t -> 'a -> 'list Parsed_payload_list.t -> 'a;
++    }
++
++    type 'a t = T : ('a, _) unpacked -> 'a t
++
++    let name (T t) = t.name
++  end
++
+   module Attr_group_inline = struct
+     type ('a, 'b, 'c) unpacked = {
+       attribute : ('b, 'c) Attribute.t;
+@@ -43,6 +70,21 @@ module Rule = struct
+       List.partition l ~f:(fun (T t) -> not t.expect)
+   end
+ 
++  module Attr_floating_inline = struct
++    type ('a, 'b) unpacked = {
++      attribute : ('a, 'b) Attribute.Floating.t;
++      expand_items: bool;
++      expand : ctxt:Expansion_context.Deriver.t -> 'b -> 'a list;
++    }
++
++    type 'a t = T : ('a, _) unpacked -> 'a t
++
++    let attr_name (T t) = Attribute.Floating.name t.attribute
++
++    let split_normal_and_expand l =
++      List.partition l ~f:(fun (T t) -> not t.expand_items)
++  end
++
+   module Special_function = struct
+     type t = {
+       name : string;
+@@ -68,6 +110,7 @@ module Rule = struct
+       | Extension : Extension.t t
+       | Special_function : Special_function.t t
+       | Constant : Constant.t t
++      | Attr_replace : 'a EC.t -> 'a Attr_replace.t t
+       | Attr_str_type_decl
+           : (structure_item, type_declaration) Attr_group_inline.t t
+       | Attr_sig_type_decl
+@@ -80,6 +123,8 @@ module Rule = struct
+       | Attr_sig_type_ext : (signature_item, type_extension) Attr_inline.t t
+       | Attr_str_exception : (structure_item, type_exception) Attr_inline.t t
+       | Attr_sig_exception : (signature_item, type_exception) Attr_inline.t t
++      | Attr_str_floating : structure_item Attr_floating_inline.t t
++      | Attr_sig_floating : signature_item Attr_floating_inline.t t
+ 
+     type (_, _) equality = Eq : ('a, 'a) equality | Ne : (_, _) equality
+ 
+@@ -89,6 +134,8 @@ module Rule = struct
+       | Extension, Extension -> Eq
+       | Special_function, Special_function -> Eq
+       | Constant, Constant -> Eq
++      | Attr_replace a, Attr_replace b -> (
++          match EC.eq a b with Eq -> Eq | Ne -> Ne)
+       | Attr_str_type_decl, Attr_str_type_decl -> Eq
+       | Attr_sig_type_decl, Attr_sig_type_decl -> Eq
+       | Attr_str_type_ext, Attr_str_type_ext -> Eq
+@@ -97,6 +144,8 @@ module Rule = struct
+       | Attr_sig_exception, Attr_sig_exception -> Eq
+       | Attr_str_module_type_decl, Attr_str_module_type_decl -> Eq
+       | Attr_sig_module_type_decl, Attr_sig_module_type_decl -> Eq
++      | Attr_str_floating, Attr_str_floating -> Eq
++      | Attr_sig_floating, Attr_sig_floating -> Eq
+       | _ -> Ne
+   end
+ 
+@@ -116,6 +165,11 @@ module Rule = struct
+     (ctxt:Expansion_context.Deriver.t -> 'b -> 'c -> 'a list) ->
+     t
+ 
++  type ('item, 'parsed_payload) attr_floating_inline =
++    ('item, 'parsed_payload) Attribute.Floating.t ->
++    (ctxt:Expansion_context.Deriver.t -> 'parsed_payload -> 'item list) ->
++    t
++
+   let rec filter : type a. a Field.t -> t list -> a list =
+    fun field l ->
+     match l with
+@@ -132,6 +186,23 @@ module Rule = struct
+ 
+   let constant kind suffix expand = T (Constant, { suffix; kind; expand })
+ 
++  let attr_replace name kind attribute expand =
++    T
++      ( Attr_replace kind,
++        T
++          {
++            name;
++            attributes = [ attribute ];
++            expand =
++              (fun ~ctxt item payload ->
++                match payload with
++                | [ None ] -> assert false
++                | [ Some payload ] -> expand ~ctxt item payload);
++          } )
++
++  let attr_multiple_replace name kind attributes expand =
++    T (Attr_replace kind, T { name; attributes; expand })
++
+   let attr_str_type_decl attribute expand =
+     T (Attr_str_type_decl, T { attribute; expand; expect = false })
+ 
+@@ -179,6 +250,18 @@ module Rule = struct
+ 
+   let attr_sig_exception_expect attribute expand =
+     T (Attr_sig_exception, T { attribute; expand; expect = true })
++
++  let attr_str_floating_expect attribute expand =
++    T (Attr_str_floating, T { attribute; expand; expand_items = false })
++
++  let attr_sig_floating_expect attribute expand =
++    T (Attr_sig_floating, T { attribute; expand; expand_items = false })
++
++  let attr_str_floating_expect_and_expand attribute expand =
++    T (Attr_str_floating, T { attribute; expand; expand_items = true })
++
++  let attr_sig_floating_expect_and_expand attribute expand =
++    T (Attr_sig_floating, T { attribute; expand; expand_items = true })
+ end
+ 
+ module Generated_code_hook = struct
+@@ -316,6 +399,10 @@ let rev_concat = function
+   | [ x; y ] -> y @ x
+   | l -> List.concat (List.rev l)
+ 
++let sort_attr_replace l =
++  List.sort l ~cmp:(fun a b ->
++      String.compare (Rule.Attr_replace.name a) (Rule.Attr_replace.name b))
++
+ let sort_attr_group_inline l =
+   List.sort l ~cmp:(fun a b ->
+       String.compare
+@@ -328,12 +415,53 @@ let sort_attr_inline l =
+         (Rule.Attr_inline.attr_name a)
+         (Rule.Attr_inline.attr_name b))
+ 
++let sort_attr_floating_inline l =
++  List.sort l ~cmp:(fun a b ->
++      String.compare
++        (Rule.Attr_floating_inline.attr_name a)
++        (Rule.Attr_floating_inline.attr_name b))
++
+ let context_free_attribute_modification ~loc =
+   Error
+     ( Location.Error.createf ~loc
+         "A context-free rule deleted or added attribues of a str/sig item",
+       [] )
+ 
++let handle_attr_replace_once context attrs item base_ctxt : 'a option t =
++  let result =
++    List.find_map attrs ~f:(fun (Rule.Attr_replace.T a) ->
++      let rec get_attr_payloads : type l.
++          ('a, l) Rule.Attribute_list.t ->
++          (bool * l Rule.Parsed_payload_list.t) t = function
++        | [] -> return (false, Rule.Parsed_payload_list.[])
++        | x :: xs ->
++            (if Attribute.Context.equal context (Attribute.context x) then
++                Attribute.get_res x item |> of_result ~default:None
++              else return None)
++            >>= fun p ->
++            get_attr_payloads xs >>| fun (any_attrs, ps) ->
++            (Option.is_some p || any_attrs, Rule.Parsed_payload_list.(p :: ps))
++      in
++      let (any_attrs, payloads), errors = get_attr_payloads a.attributes in
++      if any_attrs then
++        Some
++          ( (payloads, errors) >>= fun payloads ->
++            Attribute.remove_seen_res context
++              (Rule.Attribute_list.to_packed_list a.attributes)
++              item
++            |> of_result ~default:item
++            >>| fun item -> a.expand ~ctxt:base_ctxt item payloads )
++      else None)
++  in
++  match result with
++  | Some (item, errors) -> (Some item, errors)
++  | None -> (None, [])
++
++let rec handle_attr_replace_fix context attrs item base_ctxt =
++  handle_attr_replace_once context attrs item base_ctxt >>= function
++  | Some item -> handle_attr_replace_fix context attrs item base_ctxt
++  | None -> return item
++
+ (* Returns the code generated by attribute handlers. We don't remove these attributes, as
+    another pass might interpret them later. For instance both ppx_deriving and
+    ppxlib_deriving interprets [@@deriving] attributes.
+@@ -378,6 +506,20 @@ let handle_attr_inline attrs ~item ~expa
+           let expect_items = a.expand ~ctxt expanded_item value in
+           return (expect_items :: acc))
+ 
++let handle_attr_floating_inline attrs ~item ~loc ~base_ctxt =
++  List.fold_left attrs ~init:(return []) ~f:(fun acc (Rule.Attr_floating_inline.T a) ->
++      acc >>= fun acc ->
++      Attribute.Floating.convert_attr_res a.attribute item |> of_result ~default:None
++      >>= function
++      | None -> return acc
++      | Some value ->
++          let ctxt =
++            Expansion_context.Deriver.make ~derived_item_loc:loc
++              ~inline:true ~base:base_ctxt ()
++          in
++          let expect_items = a.expand ~ctxt value in
++          return (expect_items :: acc))
++
+ module Expect_mismatch_handler = struct
+   type t = {
+     f : 'a. 'a Attribute.Floating.Context.t -> Location.t -> 'a list -> unit;
+@@ -386,6 +528,20 @@ module Expect_mismatch_handler = struct
+   let nop = { f = (fun _ _ _ -> ()) }
+ end
+ 
++(** Apply any code-path attributes to the context. *)
++let with_context base_ctxt e =
++  Attribute.get_res Ast_traverse.enter_value e |> of_result ~default:None
++  >>= fun option ->
++  match option with
++  | None -> return (base_ctxt, e)
++  | Some { loc; txt } ->
++    Attribute.remove_seen_res Expression
++      [ T Ast_traverse.enter_value ]
++      e
++    |> of_result ~default:e
++    >>| fun e ->
++    (Expansion_context.Base.enter_value ~loc txt base_ctxt, e)
++
+ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
+   ?(generated_code_hook = Generated_code_hook.nop) rules =
+   let hook = generated_code_hook in
+@@ -412,6 +568,31 @@ class map_top_down ?(expect_mismatch_han
+   and structure_item = E.filter_by_context EC.structure_item extensions
+   and ppx_import = E.filter_by_context EC.Ppx_import extensions in
+ 
++  let attr_class_expr_replaces =
++    Rule.filter (Attr_replace EC.class_expr) rules |> sort_attr_replace
++  and attr_class_field_replaces =
++    Rule.filter (Attr_replace EC.class_field) rules |> sort_attr_replace
++  and attr_class_type_replaces =
++    Rule.filter (Attr_replace EC.class_type) rules |> sort_attr_replace
++  and attr_class_type_field_replaces =
++    Rule.filter (Attr_replace EC.class_type_field) rules |> sort_attr_replace
++  and attr_core_type_replaces =
++    Rule.filter (Attr_replace EC.core_type) rules |> sort_attr_replace
++  and attr_expression_replaces =
++    Rule.filter (Attr_replace EC.expression) rules |> sort_attr_replace
++  and attr_module_expr_replaces =
++    Rule.filter (Attr_replace EC.module_expr) rules |> sort_attr_replace
++  and attr_module_type_replaces =
++    Rule.filter (Attr_replace EC.module_type) rules |> sort_attr_replace
++  and attr_pattern_replaces =
++    Rule.filter (Attr_replace EC.pattern) rules |> sort_attr_replace
++  and attr_signature_item_replaces =
++    Rule.filter (Attr_replace EC.signature_item) rules |> sort_attr_replace
++  and attr_structure_item_replaces =
++    Rule.filter (Attr_replace EC.structure_item) rules |> sort_attr_replace
++    (* Intentionally ignoring [EC.Ppx_import] *)
++  in
++
+   let attr_str_type_decls, attr_str_type_decls_expect =
+     Rule.filter Attr_str_type_decl rules
+     |> sort_attr_group_inline |> Rule.Attr_group_inline.split_normal_and_expect
+@@ -448,6 +629,15 @@ class map_top_down ?(expect_mismatch_han
+     |> sort_attr_inline |> Rule.Attr_inline.split_normal_and_expect
+   in
+ 
++  let attr_str_floating_expect, attr_str_floating_expect_and_expand =
++    Rule.filter Attr_str_floating rules
++    |> sort_attr_floating_inline |> Rule.Attr_floating_inline.split_normal_and_expand
++  in
++  let attr_sig_floating_expect, attr_sig_floating_expect_and_expand =
++    Rule.filter Attr_sig_floating rules
++    |> sort_attr_floating_inline |> Rule.Attr_floating_inline.split_normal_and_expand
++  in
++
+   let map_node = map_node ~hook in
+   let map_nodes = map_nodes ~hook in
+ 
+@@ -458,27 +648,25 @@ class map_top_down ?(expect_mismatch_han
+     method! location _ x = return x
+ 
+     method! core_type base_ctxt x =
++      let x =
++        handle_attr_replace_fix AC.core_type attr_core_type_replaces x base_ctxt
++      in
++      x >>= fun x ->
+       map_node EC.core_type core_type super#core_type x.ptyp_loc base_ctxt x
+ 
+     method! pattern base_ctxt x =
++      let x =
++        handle_attr_replace_fix AC.pattern attr_pattern_replaces x base_ctxt
++      in
++      x >>= fun x ->
+       map_node EC.pattern pattern super#pattern x.ppat_loc base_ctxt x
+ 
+     method! expression base_ctxt e =
+-      let with_context =
+-        (* Make sure code-path attribute is applied before expanding. *)
+-        Attribute.get_res Ast_traverse.enter_value e |> of_result ~default:None
+-        >>= fun option ->
+-        match option with
+-        | None -> return (base_ctxt, e)
+-        | Some { loc; txt } ->
+-            Attribute.remove_seen_res Expression
+-              [ T Ast_traverse.enter_value ]
+-              e
+-            |> of_result ~default:e
+-            >>| fun e ->
+-            (Expansion_context.Base.enter_value ~loc txt base_ctxt, e)
++      with_context base_ctxt e >>= fun (base_ctxt, e) ->
++      let e =
++        handle_attr_replace_fix AC.expression attr_expression_replaces e base_ctxt
+       in
+-      with_context >>= fun (base_ctxt, e) ->
++      e >>= fun e ->
+       let expanded =
+         match e.pexp_desc with
+         | Pexp_extension _ ->
+@@ -524,14 +712,28 @@ class map_top_down ?(expect_mismatch_han
+         =
+       let { pexp_desc = _; pexp_loc; pexp_attributes; pexp_loc_stack } = e in
+       let func =
+-        let { pexp_desc; pexp_loc; pexp_attributes; pexp_loc_stack } = func in
+-        self#attributes base_ctxt pexp_attributes >>| fun pexp_attributes ->
+-        {
+-          pexp_desc;
+-          pexp_loc (* location doesn't need to be traversed *);
+-          pexp_attributes;
+-          pexp_loc_stack;
+-        }
++        with_context base_ctxt func >>= fun (base_ctxt, func) ->
++        let rec handle_attr_replace_fix replaced item =
++          handle_attr_replace_once AC.expression attr_expression_replaces item base_ctxt >>= function
++          | Some item -> handle_attr_replace_fix true item
++          | None -> return (replaced, item)
++        in
++        handle_attr_replace_fix false func >>= fun (replaced, func) ->
++        match replaced with
++        (* If the attribute replacement changed the func then we should traverse it after
++           all. This might cause some weirdness if the attribute replacement doesn't
++           actually change the name of the function, because the special_function handling
++           code will get called again on the ident, but that feels mostly unavoidable. *)
++        | true -> super#expression base_ctxt func
++        | false ->
++          let { pexp_desc; pexp_loc; pexp_attributes; pexp_loc_stack } = func in
++          self#attributes base_ctxt pexp_attributes >>| fun pexp_attributes ->
++          {
++            pexp_desc;
++            pexp_loc (* location doesn't need to be traversed *);
++            pexp_attributes;
++            pexp_loc_stack;
++          }
+       in
+       func >>= fun func ->
+       let args =
+@@ -549,20 +751,41 @@ class map_top_down ?(expect_mismatch_han
+       }
+ 
+     method! class_type base_ctxt x =
++      let x =
++        handle_attr_replace_fix AC.class_type attr_class_type_replaces x base_ctxt
++      in
++      x >>= fun x ->
+       map_node EC.class_type class_type super#class_type x.pcty_loc base_ctxt x
+ 
+     method! class_type_field base_ctxt x =
++      let x =
++        handle_attr_replace_fix AC.class_type_field attr_class_type_field_replaces x
++          base_ctxt
++      in
++      x >>= fun x ->
+       map_node EC.class_type_field class_type_field super#class_type_field
+         x.pctf_loc base_ctxt x
+ 
+     method! class_expr base_ctxt x =
++      let x =
++        handle_attr_replace_fix AC.class_expr attr_class_expr_replaces x base_ctxt
++      in
++      x >>= fun x ->
+       map_node EC.class_expr class_expr super#class_expr x.pcl_loc base_ctxt x
+ 
+     method! class_field base_ctxt x =
++      let x =
++        handle_attr_replace_fix AC.class_field attr_class_field_replaces x base_ctxt
++      in
++      x >>= fun x ->
+       map_node EC.class_field class_field super#class_field x.pcf_loc base_ctxt
+         x
+ 
+     method! module_type base_ctxt x =
++      let x =
++        handle_attr_replace_fix AC.module_type attr_module_type_replaces x base_ctxt
++      in
++      x >>= fun x ->
+       map_node EC.module_type module_type super#module_type x.pmty_loc base_ctxt
+         x
+ 
+@@ -579,6 +802,10 @@ class map_top_down ?(expect_mismatch_han
+            >>| fun x ->
+            (Expansion_context.Base.enter_module ~loc txt base_ctxt, x))
+       >>= fun (base_ctxt, x) ->
++      let x =
++        handle_attr_replace_fix AC.module_expr attr_module_expr_replaces x base_ctxt
++      in
++      x >>= fun x ->
+       map_node EC.module_expr module_expr super#module_expr x.pmod_loc base_ctxt
+         x
+ 
+@@ -592,6 +819,15 @@ class map_top_down ?(expect_mismatch_han
+ 
+     method! class_structure base_ctxt { pcstr_self; pcstr_fields } =
+       self#pattern base_ctxt pcstr_self >>= fun pcstr_self ->
++      let rec map_fields = function
++        | [] -> return []
++        | x :: xs ->
++            handle_attr_replace_fix AC.class_field attr_class_field_replaces x base_ctxt
++            >>= fun x ->
++            map_fields xs >>| fun xs ->
++            x :: xs
++      in
++      map_fields pcstr_fields >>= fun pcstr_fields ->
+       map_nodes EC.class_field class_field super#class_field
+         (fun x -> x.pcf_loc)
+         base_ctxt pcstr_fields
+@@ -603,6 +839,16 @@ class map_top_down ?(expect_mismatch_han
+ 
+     method! class_signature base_ctxt { pcsig_self; pcsig_fields } =
+       self#core_type base_ctxt pcsig_self >>= fun pcsig_self ->
++      let rec map_fields = function
++        | [] -> return []
++        | x :: xs ->
++          handle_attr_replace_fix AC.class_type_field attr_class_type_field_replaces
++            x base_ctxt
++          >>= fun x ->
++          map_fields xs >>| fun xs ->
++          x :: xs
++      in
++      map_fields pcsig_fields >>= fun pcsig_fields ->
+       map_nodes EC.class_type_field class_type_field super#class_type_field
+         (fun x -> x.pctf_loc)
+         base_ctxt pcsig_fields
+@@ -634,6 +880,20 @@ class map_top_down ?(expect_mismatch_han
+         match st with
+         | [] -> return []
+         | item :: rest -> (
++            let rec fix item =
++              (match item.pstr_desc with
++              | Pstr_extension _ ->
++                  handle_attr_replace_once AC.Pstr_extension
++                    attr_structure_item_replaces item base_ctxt
++              | Pstr_eval _ ->
++                  handle_attr_replace_once AC.Pstr_eval attr_structure_item_replaces
++                    item base_ctxt
++              | _ -> return None)
++              >>= function
++              | Some item -> fix item
++              | None -> return item
++            in
++            fix item >>= fun item ->
+             let loc = item.pstr_loc in
+             match item.pstr_desc with
+             | Pstr_extension (ext, attrs) -> (
+@@ -656,6 +916,31 @@ class map_top_down ?(expect_mismatch_han
+                       Generated_code_hook.replace hook Structure_item
+                         item.pstr_loc (Many items);
+                     loop rest ~in_generated_code >>| fun rest -> items @ rest)
++            | Pstr_attribute at ->
++                handle_attr_floating_inline attr_str_floating_expect
++                  ~item:at ~loc ~base_ctxt
++                >>= fun expect_items ->
++                handle_attr_floating_inline attr_str_floating_expect_and_expand
++                  ~item:at ~loc ~base_ctxt
++                >>= fun expect_items_unexpanded ->
++                List.map expect_items_unexpanded ~f:(self#structure base_ctxt)
++                |> combine_errors
++                >>= fun expect_items_expanded ->
++                (* Shouldn't matter if we use [rev_concat] or [List.concat] here, there
++                   should be only one (outer) list among [expect_items] and
++                   [expect_items_expanded] unless a single floating attribute is somehow
++                   registered twice. *)
++                (match rev_concat (expect_items @ expect_items_expanded) with
++                | [] -> return ()
++                | expected ->
++                  Code_matcher.match_structure_res rest
++                    ~pos:item.pstr_loc.loc_end
++                    ~expected
++                    ~mismatch_handler:(expect_mismatch_handler.f Structure_item)
++                  |> of_result ~default:())
++                >>= fun () -> super#structure_item base_ctxt item
++                >>= fun expanded_item -> loop rest ~in_generated_code
++                >>| fun expanded_rest -> expanded_item :: expanded_rest
+             | _ -> (
+                 super#structure_item base_ctxt item >>= fun expanded_item ->
+                 match (item.pstr_desc, expanded_item.pstr_desc) with
+@@ -704,8 +989,8 @@ class map_top_down ?(expect_mismatch_han
+       in
+       loop st ~in_generated_code:false
+ 
+-    (*$ str_to_sig _last_text_block *)
+-    method! signature base_ctxt sg =
++
++    method! signature_items base_ctxt psg_items =
+       let rec with_extra_items item ~extra_items ~expect_items ~rest
+           ~in_generated_code =
+         loop (rev_concat extra_items) ~in_generated_code:true
+@@ -729,6 +1014,17 @@ class map_top_down ?(expect_mismatch_han
+         match sg with
+         | [] -> return []
+         | item :: rest -> (
++            let rec fix item =
++              (match item.psig_desc with
++              | Psig_extension _ ->
++                  handle_attr_replace_once AC.Psig_extension
++                    attr_signature_item_replaces item base_ctxt
++              | _ -> return None)
++              >>= function
++              | Some item -> fix item
++              | None -> return item
++            in
++            fix item >>= fun item ->
+             let loc = item.psig_loc in
+             match item.psig_desc with
+             | Psig_extension (ext, attrs) -> (
+@@ -742,7 +1038,7 @@ class map_top_down ?(expect_mismatch_han
+                 >>= function
+                 | None ->
+                     super#signature_item base_ctxt item >>= fun item ->
+-                    self#signature base_ctxt rest >>| fun rest -> item :: rest
++                    self#signature_items base_ctxt rest >>| fun rest -> item :: rest
+                 | Some items ->
+                     ((), attributes_errors attrs) >>= fun () ->
+                     (* assert_no_attributes attrs; *)
+@@ -751,6 +1047,27 @@ class map_top_down ?(expect_mismatch_han
+                       Generated_code_hook.replace hook Signature_item
+                         item.psig_loc (Many items);
+                     loop rest ~in_generated_code >>| fun rest -> items @ rest)
++            | Psig_attribute at ->
++                handle_attr_floating_inline attr_sig_floating_expect
++                  ~item:at ~loc ~base_ctxt
++                >>= fun expect_items ->
++                handle_attr_floating_inline attr_sig_floating_expect_and_expand
++                  ~item:at ~loc ~base_ctxt
++                >>= fun expect_items_unexpanded ->
++                List.map expect_items_unexpanded ~f:(self#signature_items base_ctxt)
++                |> combine_errors
++                >>= fun expect_items_expanded ->
++                (match rev_concat (expect_items @ expect_items_expanded) with
++                | [] -> return ()
++                | expected ->
++                  Code_matcher.match_signature_res rest
++                    ~pos:item.psig_loc.loc_end
++                    ~expected
++                    ~mismatch_handler:(expect_mismatch_handler.f Signature_item)
++                  |> of_result ~default:())
++                >>= fun () -> super#signature_item base_ctxt item
++                >>= fun expanded_item -> loop rest ~in_generated_code
++                >>| fun expanded_rest -> expanded_item :: expanded_rest
+             | _ -> (
+                 super#signature_item base_ctxt item >>= fun expanded_item ->
+                 match (item.psig_desc, expanded_item.psig_desc) with
+@@ -794,10 +1111,12 @@ class map_top_down ?(expect_mismatch_han
+                     with_extra_items expanded_item ~extra_items ~expect_items
+                       ~rest ~in_generated_code
+                 | _, _ ->
+-                    self#signature base_ctxt rest >>| fun rest ->
++                    self#signature_items base_ctxt rest >>| fun rest ->
+                     expanded_item :: rest))
+       in
+-      loop sg ~in_generated_code:false
++      loop psg_items ~in_generated_code:false
+ 
+-    (*$*)
++    method! signature base_ctxt { psg_items; psg_modalities; psg_loc} =
++      let psg_items, l = self#signature_items base_ctxt psg_items in
++      { psg_items; psg_modalities; psg_loc }, l
+   end

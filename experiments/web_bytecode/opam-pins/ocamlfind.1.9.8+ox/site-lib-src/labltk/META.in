@@ -1,0 +1,10 @@
+# Specifications for the "labltk" library:
+requires = ""
+version = "[distributed with Ocaml]"
+description = "The Tk windowing toolkit"
+directory = "+labltk"
+browse_interfaces = "%%interfaces%%"
+archive(byte) = "labltk.cma"
+archive(native) = "labltk.cmxa"
+linkopts = ""
+

@@ -1,0 +1,22 @@
+--- a/astlib/cinaps/astlib_cinaps_helpers.ml
++++ b/astlib/cinaps/astlib_cinaps_helpers.ml
+@@ -7,6 +7,7 @@ let nl () = printf "\n"
+ 
+ let supported_versions =
+   [
++    (* We use many fewer versions of ppxlib internally.
+     ("402", "4.02");
+     ("403", "4.03");
+     ("404", "4.04");
+@@ -19,9 +20,10 @@ let supported_versions =
+     ("411", "4.11");
+     ("412", "4.12");
+     ("413", "4.13");
++    *)
+     ("414", "4.14");
+     ("500", "5.00");
+-    ("501", "5.01");
++    ("999", "9.99");
+   ]
+ 
+ let foreach_version f =

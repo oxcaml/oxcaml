@@ -1,0 +1,18 @@
+--- a/src/cinaps/ppxlib_cinaps_helpers.ml
++++ b/src/cinaps/ppxlib_cinaps_helpers.ml
+@@ -7,10 +7,11 @@ let str_to_sig =
+   in
+   let map s =
+     match Str.matched_string s with
+-    | "st" -> "sg"
+-    | "Str" -> "Sig"
+-    | "structure" -> "signature"
+-    | "Structure" -> "Signature"
++    | "st" -> "sg_items"
++    | "Str" -> "Sig_items"
++    | "structure_item" -> "signature_item"
++    | "structure" -> "signature_item list"
++    | "Structure" -> "(List Signature_item)"
+     | "_structure" -> "_signature"
+     | "_Structure" -> "_Signature"
+     | "str_" -> "sig_"

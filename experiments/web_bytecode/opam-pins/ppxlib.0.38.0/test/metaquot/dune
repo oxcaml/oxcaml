@@ -1,0 +1,33 @@
+(executable
+ (name driver)
+ (modules driver)
+ (libraries ppxlib ppxlib.metaquot))
+
+(cram
+ (applies_to run)
+ (deps ./driver.exe)
+ (enabled_if
+  (>= %{ocaml_version} "5.2.0"))
+ (package ppxlib))
+
+(cram
+ (applies_to pre_max_arity)
+ (deps ./driver.exe)
+ (enabled_if
+  (< %{ocaml_version} "5.2.0"))
+ (package ppxlib))
+
+(rule
+ (package ppxlib)
+ (alias runtest)
+ (enabled_if
+  (>= %{ocaml_version} "4.14.0"))
+ (deps
+  (:test test.ml)
+  (package ppxlib))
+ (action
+  (chdir
+   %{project_root}
+   (progn
+    (run expect-test %{test})
+    (diff? %{test} %{test}.corrected)))))

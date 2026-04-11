@@ -1,0 +1,113 @@
+--- a/src/location_check.ml
++++ b/src/location_check.ml
+@@ -91,18 +91,18 @@ let reloc_pmty_functors x =
+   let outmost_loc = x.pmty_loc in
+   let rec aux x =
+     match x.pmty_desc with
+-    | Pmty_functor (Unit, initial_res) ->
++    | Pmty_functor (Unit, initial_res, modes) ->
+         let res = aux initial_res in
+         if res == initial_res then x
+-        else { x with pmty_desc = Pmty_functor (Unit, res) }
+-    | Pmty_functor (Named (id, mty), initial_res) ->
++        else { x with pmty_desc = Pmty_functor (Unit, res, modes) }
++    | Pmty_functor (Named (id, mty, m0), initial_res, m1) ->
+         let res = aux initial_res in
+         if Location.compare outmost_loc res.pmty_loc = 0 then
+           let loc_start = mty.pmty_loc.loc_end in
+           let res = { res with pmty_loc = { res.pmty_loc with loc_start } } in
+-          { x with pmty_desc = Pmty_functor (Named (id, mty), res) }
++          { x with pmty_desc = Pmty_functor (Named (id, mty, m0), res, m1) }
+         else if res == initial_res then x
+-        else { x with pmty_desc = Pmty_functor (Named (id, mty), res) }
++        else { x with pmty_desc = Pmty_functor (Named (id, mty, m0), res, m1) }
+     | _ -> x
+   in
+   aux x
+@@ -115,14 +115,14 @@ let reloc_pmod_functors x =
+         let res = aux initial_res in
+         if res == initial_res then x
+         else { x with pmod_desc = Pmod_functor (Unit, res) }
+-    | Pmod_functor (Named (id, mty), initial_res) ->
++    | Pmod_functor (Named (id, mty, m0), initial_res) ->
+         let res = aux initial_res in
+         if Location.compare outmost_loc res.pmod_loc = 0 then
+           let loc_start = mty.pmty_loc.loc_end in
+           let res = { res with pmod_loc = { res.pmod_loc with loc_start } } in
+-          { x with pmod_desc = Pmod_functor (Named (id, mty), res) }
++          { x with pmod_desc = Pmod_functor (Named (id, mty, m0), res) }
+         else if res == initial_res then x
+-        else { x with pmod_desc = Pmod_functor (Named (id, mty), res) }
++        else { x with pmod_desc = Pmod_functor (Named (id, mty, m0), res) }
+     | _ -> x
+   in
+   aux x
+@@ -161,12 +161,12 @@ let should_ignore loc attrs =
+
+ let rec extract_constraint e =
+   match e.pexp_desc with
+-  | Pexp_constraint (e, ct) | Pexp_coerce (e, _, ct) -> Some (e, ct)
+-  | Pexp_newtype (name, exp) ->
++  | Pexp_constraint (e, Some ct, _) | Pexp_coerce (e, _, ct) -> Some (e, ct)
++  | Pexp_newtype (name, jkind, exp) ->
+       Option.map (extract_constraint exp) ~f:(fun (exp, ct) ->
+           ( {
+               e with
+-              pexp_desc = Pexp_newtype (name, exp);
++              pexp_desc = Pexp_newtype (name, jkind, exp);
+               pexp_loc = { e.pexp_loc with loc_ghost = true };
+             },
+             ct ))
+@@ -399,15 +399,17 @@ let enforce_invariants fname =
+       else
+         let childrens_locs =
+           match (x.pvb_pat.ppat_desc, extract_constraint x.pvb_expr) with
+-          (* let x : type a b c. ct = e *)
+-          | ( Ppat_constraint
+-                (pvb_pat, { ptyp_desc = Ptyp_poly (_ :: _, ctp); _ }),
+-              Some (pvb_expr, cte) )
+-          (* let x :  ct = e
++          (* let x :  type a b c. ct = e
++             let x :  ct = e
+              let x :> ct = e *)
+-          | ( Ppat_constraint (pvb_pat, { ptyp_desc = Ptyp_poly ([], ctp); _ }),
+-              Some (pvb_expr, cte) )
+-            when Location.compare ctp.ptyp_loc cte.ptyp_loc = 0 ->
++          | ( Ppat_constraint (pvb_pat, Some ctp, _), Some (pvb_expr, cte) )
++            when
++            let ctp =
++              match ctp with
++              | { ptyp_desc = Ptyp_poly (_, ctp); _ } -> ctp
++              | _ -> ctp
++            in
++            Location.compare ctp.ptyp_loc cte.ptyp_loc = 0 ->
+               let acc = Non_intersecting_ranges.empty in
+               let acc = self#pattern pvb_pat acc in
+               let _acc = self#core_type ctp acc in
+@@ -590,7 +592,7 @@ let enforce_invariants fname =
+                     self#longident_loc lid acc
+                   else
+                     match e.pexp_desc with
+-                    | Pexp_constraint (e, c) ->
++                    | Pexp_constraint (e, Some c, _) ->
+                         (* { foo : int } and { foo : int = x } ... *)
+                         let _ = self#core_type c acc in
+                         self#expression e acc
+@@ -656,7 +658,7 @@ let enforce_invariants fname =
+                   self#longident_loc lid acc
+                 else
+                   match pat.ppat_desc with
+-                  | Ppat_constraint (p, c) ->
++                  | Ppat_constraint (p, Some c, _) ->
+                       (* { foo : int } and { foo : int = x } ... *)
+                       let _ = self#core_type c acc in
+                       self#pattern p acc
+@@ -668,7 +670,7 @@ let enforce_invariants fname =
+                 let acc = self#pattern pat acc in
+                 acc)
+             labels acc
+-      | Ppat_constraint ({ ppat_desc = Ppat_unpack a; _ }, b) ->
++      | Ppat_constraint ({ ppat_desc = Ppat_unpack a; _ }, Some b, _) ->
+           let acc = self#loc (self#option self#string) a acc in
+           self#core_type b acc
+       | _ -> super#pattern_desc x acc

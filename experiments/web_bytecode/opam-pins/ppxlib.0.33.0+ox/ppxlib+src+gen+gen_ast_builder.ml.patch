@@ -1,0 +1,70 @@
+--- a/src/gen/gen_ast_builder.ml
++++ b/src/gen/gen_ast_builder.ml
+@@ -15,8 +15,8 @@ struct
+       ~wrapper:(wpath, wprefix, has_attrs, has_loc_stack) path ~prefix cd =
+     match cd.pcd_args with
+     | Pcstr_record _ ->
+-        (* TODO. *)
+-        failwith "Pcstr_record not supported"
++
++      None
+     | Pcstr_tuple cd_args ->
+         let args = List.mapi cd_args ~f:(fun i _ -> sprintf "x%d" i) in
+         let exp =
+@@ -66,9 +66,10 @@ struct
+         let body =
+           if fixed_loc then body else M.expr "fun ~loc -> %a" A.expr body
+         in
+-        M.stri "let %a = %a" A.patt
+-          (pvar (function_name_of_id ~prefix cd.pcd_name.txt))
+-          A.expr body
++        Some (
++          M.stri "let %a = %a" A.patt
++            (pvar (function_name_of_id ~prefix cd.pcd_name.txt))
++            A.expr body)
+ 
+   let gen_combinator_for_record path ~prefix lds =
+     let fields =
+@@ -88,10 +89,15 @@ struct
+     let body =
+       let l = List.filter funcs ~f:(fun f -> f <> "loc" && f <> "attributes") in
+       match l with
+-      | [ x ] -> Exp.fun_ Nolabel None (pvar x) body
++      | [ x ] ->
++          Ppxlib_jane.Ast_builder.Default.add_fun_param
++            ~loc:!Ast_helper.default_loc
++            Nolabel None (pvar x) body
+       | _ ->
+           List.fold_right l ~init:body ~f:(fun func acc ->
+-              Exp.fun_ (Labelled func) None (pvar func) acc)
++            Ppxlib_jane.Ast_builder.Default.add_fun_param
++              ~loc:!Ast_helper.default_loc
++              (Labelled func) None (pvar func) acc)
+     in
+     (* let body =
+          if List.mem "attributes" ~set:funcs then
+@@ -117,11 +123,13 @@ struct
+               let prefix =
+                 common_prefix (List.map cds ~f:(fun cd -> cd.pcd_name.txt))
+               in
+-              List.map cds ~f:(fun cd ->
++              List.filter_map cds ~f:(fun cd ->
+                   gen_combinator_for_constructor ~wrapper path ~prefix cd))
+       | Ptype_record lds ->
+           let prefix = prefix_of_record lds in
+           [ gen_combinator_for_record path ~prefix lds ]
++      | Ptype_record_unboxed_product _ ->
++        failwith "Gen_ast_builder.Gen.gen_td: unboxed records are not yet supported"
+       | Ptype_abstract | Ptype_open -> []
+ end
+ 
+@@ -206,7 +214,8 @@ let generate filename =
+               (Named
+                  ( Loc.mk (Some "Loc"),
+                    Mty.signature
+-                     [ Sig.value (Val.mk (Loc.mk "loc") (M.ctyp "Location.t")) ]
++                     [ Sig.value (Val.mk (Loc.mk "loc") (M.ctyp "Location.t")) ],
++                   []
+                  ))
+               (Mod.structure (M.stri "let loc = Loc.loc" :: items true))));
+     ]

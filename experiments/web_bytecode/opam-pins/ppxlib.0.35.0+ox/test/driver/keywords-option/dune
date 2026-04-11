@@ -1,0 +1,11 @@
+(executable
+ (name driver)
+ (enabled_if
+  (>= %{ocaml_version} "5.3"))
+ (libraries ppxlib))
+
+(cram
+ (package ppxlib)
+ (enabled_if
+  (>= %{ocaml_version} "5.3"))
+ (deps driver.exe))

@@ -1,0 +1,8 @@
+(library
+ (name ppxlib_metaquot)
+ (public_name ppxlib.metaquot)
+ (kind ppx_rewriter)
+ (flags
+  (:standard -safe-string))
+ (libraries astlib ppxlib ppxlib_traverse_builtins ppxlib_metaquot_lifters)
+ (ppx_runtime_libraries ppxlib_ast))

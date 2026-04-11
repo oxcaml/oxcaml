@@ -1,0 +1,413 @@
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"quick_intro"}< Introduction}{%html: </div><div>%}{{!"writing-ppxs"}Writing PPXs >}{%html: </div></div>%}
+
+{0 How It Works}
+
+{1 General Concepts}
+
+{2 The Driver}
+
+[ppxlib] sits in between the PPXs authors and the compiler toolchain. For the PPX
+author, it provides an API to define the transformation and register it to
+[ppxlib]. Then, all registered transformations can be turned into a single
+executable, called the {e driver}, that is responsible for applying all the
+transformations. The driver will be called by the compiler.
+
+The PPX authors register their transformations using the
+{{!Ppxlib.Driver.register_transformation}[Driver.register_transformation]} function, as explained in the
+{{!"writing-ppxs"}Writing PPXs} section. The different arguments of this function
+corresponds to the {{!"derivers-and-extenders"}different kinds} of PPXs supported by
+[ppxlib] or the {{!driver_execution}phase}, at which time they will be executed.
+
+The driver is created by calling either {{!Ppxlib.Driver.standalone}[Driver.standalone]} or
+{{!Ppxlib.Driver.run_as_ppx_rewriter}[Driver.run_as_ppx_rewriter]}. Note that when used through Dune, none of
+these functions will need to be called by the PPX author. As we will see, Dune
+will be responsible for generating the driver after all required PPXs from
+different libraries have been registered. These functions will interpret the
+command line arguments and start the rewriting accordingly.
+
+The {{!Ppxlib.Driver.standalone}[Driver.standalone]} function creates an executable that
+parses an OCaml file, transforms it according to the registered transformations,
+and outputs the transformed file. This makes it suitable for use with the [-pp]
+{{:https://v2.ocaml.org/releases/5.0/htmlman/comp.html#s:comp-options}option} of the OCaml compiler. It is a preprocessor for sources and is
+standalone in the sense that it can be called independently from the OCaml
+compiler (e.g., it includes an OCaml parser).
+
+On the other hand, the
+{{!Ppxlib.Driver.run_as_ppx_rewriter}[Driver.run_as_ppx_rewriter]}-generated driver is a
+proper PPX, as it will read and output a {{!Ppxlib.Parsetree}[Parsetree]} marshalled
+value directly. This version is suitable for use with the [-ppx] {{:https://v2.ocaml.org/releases/5.0/htmlman/comp.html#s:comp-options}option} of the OCaml
+compiler, as well as any tool that requires control of parsing the file.
+For instance, {{:https://ocaml.github.io/merlin/}Merlin} includes an OCaml parser that tries
+hard to recover from errors in order to generate a valid AST most of the time.
+
+Several arguments can be passed to the driver when executing it. Those arguments
+can also be easily passed using Dune, as explained in its
+{{:https://dune.readthedocs.io/en/stable/concepts.html#preprocessing-with-ppx-rewriters}manual}.
+PPX authors can add arguments to their generated drivers using {{!Ppxlib.Driver.add_arg}[Driver.add_arg]}. Here are the default arguments for respectively
+{{!Ppxlib.Driver.standalone}[standalone]} and
+{{!Ppxlib.Driver.run_as_ppx_rewriter}[run_as_ppx_rewriter]} generated drivers:
+
+{%html: <details><summary>Standalone driver</summary>%}
+{v
+driver.exe [extra_args] [<files>]
+  -as-ppx                     Run as a -ppx rewriter (must be the first argument)
+  --as-ppx                    Same as -as-ppx
+  -as-pp                      Shorthand for: -dump-ast -embed-errors
+  --as-pp                     Same as -as-pp
+  -o <filename>               Output file (use '-' for stdout)
+  -                           Read input from stdin
+  -dump-ast                   Dump the marshaled ast to the output file instead of pretty-printing it
+  --dump-ast                  Same as -dump-ast
+  -dparsetree                 Print the parsetree (same as ocamlc -dparsetree)
+  -embed-errors               Embed errors in the output AST (default: true when -dump-ast, false otherwise)
+  -null                       Produce no output, except for errors
+  -impl <file>                Treat the input as a .ml file
+  --impl <file>               Same as -impl
+  -intf <file>                Treat the input as a .mli file
+  --intf <file>               Same as -intf
+  -debug-attribute-drop       Debug attribute dropping
+  -print-transformations      Print linked-in code transformations, in the order they are applied
+  -print-passes               Print the actual passes over the whole AST in the order they are applied
+  -ite-check                  (no effect -- kept for compatibility)
+  -pp <command>               Pipe sources through preprocessor <command> (incompatible with -as-ppx)
+  -reconcile                  (WIP) Pretty print the output using a mix of the input source and the generated code
+  -reconcile-with-comments    (WIP) same as -reconcile but uses comments to enclose the generated code
+  -no-color                   Don't use colors when printing errors
+  -diff-cmd                   Diff command when using code expectations (use - to disable diffing)
+  -pretty                     Instruct code generators to improve the prettiness of the generated code
+  -styler                     Code styler
+  -output-metadata FILE       Where to store the output metadata
+  -corrected-suffix SUFFIX    Suffix to append to corrected files
+  -loc-filename <string>      File name to use in locations
+  -reserve-namespace <string> Mark the given namespace as reserved
+  -no-check                   Disable checks (unsafe)
+  -check                      Enable checks
+  -no-check-on-extensions     Disable checks on extension point only
+  -check-on-extensions        Enable checks on extension point only
+  -no-locations-check         Disable locations check only
+  -locations-check            Enable locations check only
+  -apply <names>              Apply these transformations in order (comma-separated list)
+  -dont-apply <names>         Exclude these transformations
+  -no-merge                   Do not merge context free transformations (better for debugging rewriters). As a result, the context-free transformations are not all applied before all impl and intf.
+  -cookie NAME=EXPR           Set the cookie NAME to EXPR
+  --cookie                    Same as -cookie
+  -deriving-keep-w32 {impl|intf|both}
+                               Do not try to disable warning 32 for the generated code
+  -deriving-disable-w32-method {code|attribute}
+                               How to disable warning 32 for the generated code
+  -type-conv-keep-w32 {impl|intf|both}
+                               Deprecated, use -deriving-keep-w32
+  -type-conv-w32 {code|attribute}
+                               Deprecated, use -deriving-disable-w32-method
+  -deriving-keep-w60 {impl|intf|both}
+                               Do not try to disable warning 60 for the generated code
+  -unused-code-warnings {true|false|force}
+                               Allow ppx derivers to enable unused code warnings (default: false)
+  -unused-type-warnings {true|false|force}
+                               Allow unused type warnings for types with [@@deriving ...] (default: false)
+  -help                        Display this list of options
+  --help                       Display this list of options
+
+v}
+{%html: </details>%}
+
+and
+
+{%html: <details><summary>Ppx rewriter driver</summary>%}
+{v
+driver.exe [extra_args] <infile> <outfile>
+  -loc-filename <string>      File name to use in locations
+  -reserve-namespace <string> Mark the given namespace as reserved
+  -no-check                   Disable checks (unsafe)
+  -check                      Enable checks
+  -no-check-on-extensions     Disable checks on extension point only
+  -check-on-extensions        Enable checks on extension point only
+  -no-locations-check         Disable locations check only
+  -locations-check            Enable locations check only
+  -apply <names>              Apply these transformations in order (comma-separated list)
+  -dont-apply <names>         Exclude these transformations
+  -no-merge                   Do not merge context free transformations (better for debugging rewriters). As a result, the context-free transformations are not all applied before all impl and intf.
+  -cookie NAME=EXPR           Set the cookie NAME to EXPR
+  --cookie                    Same as -cookie
+  -help                       Display this list of options
+  --help                      Display this list of options
+v}
+{%html: </details>%}
+
+{3:exception_handling Exception handling}
+
+In general, raising an exception in a registered transformation will make the
+ppxlib driver crash with an uncaught exception error. However, when spawned with
+the [-embed-errors] or [-as-ppx] flags (that's the case when Merlin calls the
+driver) the ppxlib driver still handles a specific kind of exception: Located
+exceptions. They have type {{!Ppxlib.Location.exception-Error}[Location.Error]}
+and contain enough information to display a located error message.
+
+During its {{!page-driver.driver_execution}execution}, the driver will run many
+different rewriters. In the case described above, it will catch any located
+exception thrown by a rewriter. When catching an exception, it will collect the
+error in a list, take the last valid AST (the one that was given to the raising
+rewriter) and continue its execution from there.
+
+At the end of the rewriting process, the driver will prepend all collected errors
+to the beginning of the AST, in the order in which they appeared.
+
+The same mechanism applies for the {{!"derivers-and-extenders"}context-free rewriters}: if any of them raises,
+the error is collected, the part of the AST that the rewriter was responsible to
+rewrite remains unmodified, and the {{!"context-free-phase"}context-free phase} continues.
+
+{2 Cookies}
+
+Cookies are values that are passed to the driver via the command line, or set as
+side effects of transformations, which can be accessed by the
+transformations. They have a name to identify them and a value consisting of an
+OCaml expression. The module to access cookies is {{!Ppxlib.Driver.Cookies}[Driver.Cookies]}.
+
+{2 Integration With Dune}
+
+The {{:https://dune.build}Dune} build system is well integrated with the [ppxlib]
+mechanism of registering transformations. In every [dune] file, Dune will read
+the set of PPXs that are to be used (i.e. the PPXs in `(preprocess (pps <list of PPXs that are to be used>))`). For a given set of rewriters, it will
+generate a driver using {{!Ppxlib.Driver.run_as_ppx_rewriter}[Driver.run_as_ppx_rewriter]} that contains all registered
+transformations. Using a single driver for multiple
+transformations from multiple PPXs ensures better composition semantics and
+improves the speed of the combined transformations.
+Moreover, [ppxlib] communicates with Dune through [.corrected] files to allow for
+promotion, for instance when using {{!"writing-ppxs"."inlining-transformations"}[[@@deriving_inline]]}. A PPX author can also
+generate its own promotion suggestion using the
+{{!Ppxlib.Driver.register_correction}[Driver.register_correction]} function.
+
+{1:compat_mult_ver Compatibility With Multiple OCaml Versions}
+
+One of the important issues with working with the
+{{!Ppxlib.Parsetree}[Parsetree]} is that the API is not stable. For instance, in
+the {{:https://ocaml.org/releases/4.13.0}OCaml 4.13 release}, the following
+{{:https://github.com/ocaml/ocaml/pull/9584/files#diff-ebecf307cba2d756cc28f0ec614dfc57d3adc6946eb4faa9825eb25a92b2596d}two}
+{{:https://github.com/ocaml/ocaml/pull/10133/files#diff-ebecf307cba2d756cc28f0ec614dfc57d3adc6946eb4faa9825eb25a92b2596d}changes}
+were made to the {{!Ppxlib.Parsetree}[Parsetree]} type. Although they are small changes, they may
+break any PPX that is written to directly manipulate the (evolving) type.
+
+This instability causes an issue with maintenance. PPX authors wish to maintain
+a single version of their PPX, not one per OCaml version, and ideally not have
+to update their code when an irrelevant (for them) field is changed in the
+{{!Ppxlib.Parsetree}[Parsetree]}.
+
+[ppxlib] helps to solve both issues. The first one, having to maintain a single
+PPX version working for every OCaml version, is done by migrating the
+{{!Ppxlib.Parsetree}[Parsetree]}. The PPX author only maintains a version
+working with the latest version, and the [ppxlib] driver will convert the values from one version to another.
+
+For example, say a deriver is applied in the context of OCaml 4.08. After the
+4.08 {{!Ppxlib.Parsetree}[Parsetree]} has been given to it, the [ppxlib] driver
+will migrate this value into the latest {{!Ppxlib.Parsetree}[Parsetree]}
+version, using the {!Astlib} module. The "latest" here depends on the version of
+[ppxlib], but at any given time, the latest released version of [ppxlib] will always
+use the latest released version of the {{!Ppxlib.Parsetree}[Parsetree]}.
+
+After the migration to the latest {{!Ppxlib.Parsetree}[Parsetree]},
+the driver runs all transformations on it, which ends with a rewritten
+{{!Ppxlib.Parsetree}[Parsetree]} of the latest version. However, since the
+context of rewriting is OCaml 4.08 (in this example), the driver needs to
+migrate back the rewritten {{!Ppxlib.Parsetree}[Parsetree]} to an OCaml 4.08
+version. Again, [ppxlib] uses the {!Astlib} module for this migration. Once the
+driver has rewritten the AST for OCaml 4.08, the compilation can continue as usual.
+
+{1:derivers-and-extenders Context-Free Transformations}
+
+[ppxlib] defines several kinds of transformations whose core property is that they
+can only read and modify the code locally. The parts of the AST given
+to the transformation are only portions of the whole AST. In this regard, they
+are usually called {e context-free} transformations. While being not as
+general-purpose as plain AST transformations, they are more than often
+sufficient and have many nice properties such as a well-defined semantics for
+composition.
+The two most important context-free transformations are {e derivers} and
+{e extenders}.
+
+{2:def_derivers Derivers}
+
+A {e deriver} is a context-free transformation that, given a certain structure or
+signature item, will generate code {e to append after} this item. The given code is
+never modified. A deriver can be very useful to generate values depending on the
+structure of a user-defined type, for instance a converter for a type
+to and from a JSON value. A deriver is triggered by adding an
+{{:https://v2.ocaml.org/manual/attributes.html}attribute} to a structure or
+signature item. For instance, the folowing code:
+
+{@ocaml[
+  type t = Int of int | Float of float [@@deriving yojson]
+
+  let x = ...
+]}
+
+would be rewritten to:
+
+{@ocaml[
+  type ty = Int of int | Float of float [@@deriving yojson]
+
+  let ty_of_yojson = ...
+  let ty_to_yojson = ...
+
+  let x = ...
+]}
+
+{2:def_extenders Extenders}
+
+An {e extender} is a context-free transformation that is triggered on
+{{:https://v2.ocaml.org/manual/extensionnodes.html}extension nodes}, and that
+will replace the extension node by some code generated from the extension node's payload. This can be very useful to generate values of a DSL using a more
+user-friendly syntax, e.g., to generate OCaml values from the JSON
+syntax.
+
+For instance, the following code:
+
+{@ocaml[
+  let json =
+    [%yojson
+      [ { name = "Anne"; grades = ["A"; "B-"; "B+"] }
+      ; { name = "Bernard"; grades = ["B+"; "A"; "B-"] }
+      ]
+    ]
+]}
+
+could be rewritten into:
+
+{@ocaml[
+  let json =
+    `List
+      [ `Assoc
+          [ ("name", `String "Anne")
+          ; ("grades", `List [`String "A"; `String "B-"; `String "B+"])
+          ]
+      ; `Assoc
+          [ ("name", `String "Bernard")
+          ; ("grades", `List [`String "B+"; `String "A"; `String "B-"])
+          ]
+      ]
+]}
+
+{2 Advantages}
+
+There are multiple advantages of using context-free transformations. First, they
+provide the PPX user a much clearer understanding of the AST parts that
+will be rewritten, rather than a fully general AST rewriting. Secondly, they provide
+a much better composition semantic, which does not depend on the order. Finally,
+context-free transformations are applied in a single phase factorising the work
+for all transformations, resulting in a much faster driver than when combining
+multiple, whole AST transformations. More details on the execution of this phase
+are given in its {{!"context-free-phase"}dedicated section.}
+
+See the {{!"writing-ppxs"}Writing PPXs} section for how to define derivers and
+extenders.
+
+{1:driver_execution The Execution of the Driver}
+
+The actual rewriting of the AST is done in multiple phases:
+
+{ol
+{- The linting phase}
+{- The preprocessing phase}
+{- The first instrumentation phase}
+{- The context-free phase}
+{- The global transformation phase}
+{- The last instrumentation phase}
+}
+
+When registering a transformation through the
+{{!Ppxlib.Driver.register_transformation}[Driver.register_transformation]} function, the phase in which the
+transformation has to be applied is specified. The multiplicity of phases is
+mostly to account for potential constraints on the execution order. However,
+most of the time there are no such constraints, and in this case, either the
+{{!"context-free-phase"}context-free} or the
+{{!"global-transfo-phase"}global transformation phase} should be used. (Note that
+whenever possible, which should be almost always, context-free transformations
+are possible and better.) If you register in another phase, be sure to know what
+you are doing.
+
+{2 The Linter Phase}
+
+Linters are preprocessors that take as input the whole AST and output a list
+of "lint" errors. Such an error is of type {{!Ppxlib.Driver.Lint_error.t}[Driver.Lint_error.t]} and includes a
+string (the error message) and the location of the error. The errors will be
+reported as preprocessors warnings.
+
+This is the first phase, so linting errors can only be reported for code
+handwritten by the user.
+
+An example of a PPX registered in this phase is
+{{:https://github.com/janestreet/ppx_js_style}ppx_js_style}.
+
+{2 The Preprocessing Phase}
+
+The preprocessing phase is the first transformation that actually alters the
+AST. In fact, the property of being the "first transformation applied" is what
+defines this phase, and [ppxlib] will thus ensure that only one transformation is
+registered in this phase; otherwise, it will generate an error.
+
+You should only register a transformation in this phase if it is really strongly
+necessary, and you know what you are doing. Your PPX will not be usable at the
+same time as another one registering a transformation in this phase.
+
+An example of a PPX registered in this phase is
+{{:https://github.com/thierry-martinez/metapp}metapp}.
+
+{2 The First Instrumentation Phase}
+
+This phase is for transformations that {e need} to be run before the
+context-free phase. Historically, it was meant for
+{{:https://en.wikipedia.org/wiki/Instrumentation_(computer_programming)}instrumentation}-related
+PPXs, hence the name. Unlike the {{!"the-preprocessing-phase"}preprocessing
+phase}, registering to this phase provides no guarantee that the transformation
+is run early in the rewriting, as there is no limit in the number of
+transformations registered in this phase, which are then applied in the
+alphabetical order by their name.
+
+If it is not crucial for a transformation to run before the context-free
+phase, it should be registered to the {{!"global-transfo-phase"}global
+transformation phase}.
+
+{2:context-free-phase The Context-Free Phase}
+
+The execution of all registered context-free rules is done in a single top-down
+pass through the AST. Whenever the top-down pass encounters a situation
+that triggers rewriting, the corresponding transformation is called. For instance,
+when encountering an extension point corresponding to a rewriting rule, the
+extension point is replaced by the rule's execution, and the top-down pass
+continues inside the generated code. Similarly, when a deriving attribute is
+found attached to a structure or signature item, the result of the
+deriving rule’s application is appended to the AST, and the top-down pass
+continues in the generated code.
+
+Note that the code generation for derivers is applied when "leaving" the AST
+node, that is when all rewriters have been run. Indeed, a deriver like this:
+
+{[
+  type t = [%my_type] [@@deriving deriver_from_type]
+]}
+
+would need the information generated by the [my_type] extender to match on the
+structure of [t].
+
+Also note that in this phase, the execution of the context-free rules are
+intertwined altogether, and it would not make sense to speak about the order of
+application, contrary to the next phase.
+
+{2:global-transfo-phase The Global Transformation Phase}
+
+The global transformation phase is the phase where registered transformations,
+seen as function from and to the {{!Ppxlib.Parsetree}[Parsetree]}, are run. The applied order might matter and change the outcome, but since [ppxlib] knows nothing
+about the transformations, the order applied is alphabetical by the transformation's name.
+
+{2 The Last Instrumentation Phase}
+
+This phase is for global transformation to escape the alphabetical order and be
+executed as a last phase. For instance, {{:https://github.com/aantron/bisect_ppx}[bisect_ppx]}
+needs to be executed after all rewriting has occurred.
+
+Note that only one global transformation can be executed last. If several
+transformations rely on being the last transformation, it will be true for only
+one of them. Thus, only register your transformation in this phase if it is
+absolutely vital to be the last transformation, as your PPX will become
+incompatible with any other that registers a transformation during this phase.
+
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"quick_intro"}< Introduction}{%html: </div><div>%}{{!"writing-ppxs"}Writing PPXs >}{%html: </div></div>%}

@@ -1,0 +1,360 @@
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"writing-ppxs"}< Writing PPXs}{%html: </div><div>%}{{!"matching-code"}Destructing AST nodes >}{%html: </div></div>%}
+
+{0 Generating AST Nodes}
+
+The rewriter's core is a function that outputs code in the form of an AST.
+However, there are some issues with generating AST values when using the
+constructors directly:
+
+- The type is {{!Ppxlib.Parsetree}pretty verbose}, with many fields
+  rarely used.
+- The AST type might change at a version bump. In this case, the types used in
+the PPX would become incompatible with the types of the new OCaml version.
+
+The second point is important: since [ppxlib] {{!page-driver.compat_mult_ver}translates} the AST to
+the newest OCaml AST available before rewriting, your PPX would not
+only become incompatible with the new OCaml version, but also with all [ppxlib]
+versions released after the new AST type is introduced.
+
+For this reason, [ppxlib] provides abstractions over the OCaml AST, with a focus
+on usability and stability.
+
+{1 The Different Options}
+
+The two main options are:
+
+- {{!Ppxlib.Ast_builder}[Ast_builder]},
+- {!Ppxlib_metaquot}.
+
+{{!Ppxlib.Ast_builder}[Ast_builder]} provides an API to generate AST nodes for the latest OCaml
+version in a backward-compatible way. {!Ppxlib_metaquot} is different: it is a PPX that
+lets you generate OCaml AST nodes by writing OCaml code, using quotations and
+anti-quotations.
+
+Using {!Ppxlib_metaquot} requires less knowledge of the OCaml AST than
+{{!Ppxlib.Ast_builder}[Ast_builder]} as it only uses natural OCaml syntax;
+however, it's more restrictive than `Ast_builder` for two reasons: first, it's less flexible, since on its own it lacks the ability to generate nodes dynamically from other kind of data: e.g. it's not possible to build an expression containing a string, given the string as input. Second, it's less general because it only allows users to generate few different nodes such as
+structure items, expressions, patterns, etc., but it is not possible to generate a
+value of type {{!Ppxlib.Parsetree.row_field_desc}[row_field_desc]}! A typical workflow is to use `metaquot` for the constant skeleton of the node, and to use the `metaquot` anti-quotation workflow (see below) together with `Ast_builder` to fill in the dynamic parts.
+
+Note: `Ppxlib` also re-exports the OCaml compiler API `Ast_helper` for historic reasons. It might get deprecated at some point, though. Please, use `Ast_builder` instead.
+manipulate the AST. This module is in [ppxlib] for compatiblity reasons and it is recommended to use {{!Ppxlib.Ast_builder}[Ast_builder]} instead.
+
+{1:ast_builder The [AST_builder] Module}
+
+{2 General Presentation}
+
+The {{!Ppxlib.Ast_builder}[Ast_builder]} module provides several kinds of functions to generate AST
+nodes. The first kind are ones whose name matches closely the {{!Ppxlib.Parsetree}[Parsetree]} type names.
+equivalents, but there are also "higher level" wrappers around those basic
+blocks for common patterns such as creating an integer or string constant.
+
+{3 Low-Level Builders}
+
+The function names match the {{!Ppxlib.Parsetree}[Parsetree]} names closely, which makes it easy to
+build AST fragments by just knowing the {{!Ppxlib.Parsetree}[Parsetree]}.
+
+For types wrapped in a record's [_desc] field, helpers are
+generated for each constructor that generates the record wrapper, e.g., 
+for the type {{!Ppxlib.Parsetree.expression}[Parsetree.expression]}:
+
+{[
+  type expression =
+    { pexp_desc       : expression_desc
+    ; pexp_loc        : Location.t
+    ; pexp_attributes : attributes
+    }
+  and expression_desc =
+    | Pexp_ident    of Longident.t loc
+    | Pexp_constant of constant
+    | Pexp_let      of rec_flag * value_binding list * expression
+    ...
+]}
+
+The following helpers are created:
+
+{[
+  val pexp_ident    : loc:Location.t -> Longident.t loc -> expression
+  val pexp_constant : loc:Location.t -> constant -> expression
+  val pexp_let      : loc:Location.t -> rec_flag -> value_binding list -> expression -> expression
+  ...
+]}
+
+For other record types, such as [type_declaration], we have the following
+helper:
+
+{[
+  type type_declaration =
+    { ptype_name       : string Located.t
+    ; ptype_params     : (core_type * variance) list
+    ; ptype_cstrs      : (core_type * core_type * Location.t) list
+    ; ptype_kind       : type_kind
+    ; ptype_private    : private_flag
+    ; ptype_manifest   : core_type option
+    ; ptype_attributes : attributes
+    ; ptype_loc        : Location.t
+    }
+
+  val type_declaration
+    :  loc      : Location.t
+    -> name     : string Located.t
+    -> params   : (core_type * variance) list
+    -> cstrs    : (core_type * core_type * Location.t) list
+    -> kind     : type_kind
+    -> private  : private_flag
+    -> manifest : core_type option
+    -> type_declaration
+]}
+
+Attributes are always set to the empty list. If you want to set them, you
+have to override the field with the [{ e with pexp_attributes = ... }]
+notation.
+
+{3 High-Level Builders}
+
+Those functions are just wrappers on the low-level functions for simplifying the
+most common use. For instance, to simply create a [1] integer constant with the
+low-level building block, it would look like:
+
+{[
+  Ast_builder.Default.pexp_constant ~loc (Parsetree.Pconst_integer ("1", None))
+]}
+
+This seems a lot for such a simple node. So, in addition to the low-level
+building blocks, {{!Ppxlib.Ast_builder}[Ast_builder]} provides higher level-building blocks, such as
+{{!Ppxlib.Ast_builder.Default.eint}[Ast_builder.Default.eint]}, to create integer constants:
+
+{[
+  Ast_builder.Default.eint ~loc 1
+]}
+
+Those functions also follow a pattern in their name to make them easier to use.
+Functions that generate an expression start with an [e], followed by what they
+build, such as [eint], [echar], [estring], [eapply], [elist], etc. Similarly, names
+that start with a [p] define a pattern, such as [pstring], [pconstruct],
+[punit], etc.
+
+{2 Dealing With Locations}
+
+As explained in the {{!page-"good-practices"."resp_loc"}dedicated section}, it is crucial
+to correctly deal with locations. For this, {{!Ppxlib.Ast_builder}[Ast_builder]} can be used in
+several ways, depending on the context:
+
+{{!Ppxlib.Ast_builder.Default}[Ast_builder.Default]} contains functions which take the location as a named
+argument. This is the strongly recommended workflow and lets you control locations in a fine-grained way.
+
+If you have a concrete reason to specify the location once and for all, and always use this
+specific one later in AST constructions, you can use the {{!Ppxlib.Ast_builder.Make}[Ast_builder.Make]} functor
+or the {{!Ppxlib.Ast_builder.make}[Ast_builder.make]} function (outputing a first order module). Notice that this is quite a rare use case.
+
+{2 Compatibility}
+
+In order to stay as compatible as possible when a new option appears in the AST,
+{{!Ppxlib.Ast_builder}[Ast_builder]} always integrates the new option in a retro-compatible way (this is the case since the AST bump from 4.13 to 4.14). So, the
+signature of each function won't change, and {{!Ppxlib.Ast_builder}[Ast_builder]} will choose a
+retrocompatible way of generating an updated type’s AST node.
+
+However, sometimes you might want to use a feature that was introduced recently
+in OCaml and is not integrated in {{!Ppxlib.Ast_builder}[Ast_builder]}. For instance, OCaml
+4.14 introduced the possibility to explicitly introduce type variables in a
+constructor declaration. This modified the AST type, and for
+backwards compatibility, {{!Ppxlib.Ast_builder}[Ast_builder]} did not modify the signature of the
+function. It is thus impossible to generate code using this new feature via the `Ast_module` directly.
+
+In the case you need to access a new feature, you can use the [Latest] submodule
+(e.g., {{!Ppxlib.Ast_builder.Default.Latest}[Ast_builder.Default.Latest]} when specifying the locations). This module includes new functions, letting you
+control all features introduced, at the cost of potentially breaking
+changes when a new feature modifies the function in use.
+
+If a feature that was introduced in some recent version of OCaml is essential
+for your PPX to work, it might imply that you need to restrict the OCaml version
+on your opam dependencies.
+{{!page-driver.compat_mult_ver}Remember} that
+[ppxlib] will rewrite using the latest [Parsetree] version, {e but} it will then migrate the
+[Parsetree] back to the OCaml version of the switch, possibly losing the information
+given by the new feature.
+
+{1:metaquot [Metaquot] Metaprogramming}
+
+{2 General Presentation}
+
+As you have seen, defining code with {{!Ppxlib.Ast_builder}[Ast_builder]} does
+not feel perfectly natural. Some knowledge of the [Parsetree] types is needed.
+Yet, every part of a program we write corresponds to a specific AST node, so
+there is no need for AST generation to be more difficult than that.
+
+[Metaquot] is a very useful PPX that allows users to define values of a [Parsetree]
+type by writing natural code, using the quotations and antiquotations mechanism of
+metaprogramming.
+
+Simplifying a bit, {{!Ppxlib_metaquot}[Metaquot]} rewrites an expression extension point directly
+with its payload. Since the payload was parsed by the OCaml parser to a
+[Parsetree] type's value, this rewriting turns naturally written code into AST values.
+
+{2 Usage}
+
+First, in order to use [Metaquot], add it in your [preprocess] Dune stanza:
+
+{[
+  (preprocess (pps ppxlib.metaquot))
+]}
+
+Using Metaquot to generate code is simple: any [Metaquot] extension node in an
+expression context will be rewritten into the [Parsetree] value that lies in its payload.
+Notice that you'll need the [Ppxlib] opened, and a [loc] value of type
+{{!Ppxlib.Location.t}Location.t} in scope when using metaquot. That location
+will be attached to the [Parsetree] nodes your metaquot invokation produces.
+Getting the location right is extremely important for error messages.
+
+However, the {{!Ppxlib.Parsetree.payload}[Parsetree.payload]} of an extension node can only take few forms: a
+{{!Ppxlib.Parsetree.structure}[structure]}, a {{!Ppxlib.Parsetree.signature}[signature]}, a {{!Ppxlib.Parsetree.core_type}[core type]}, or a {{!Ppxlib.Parsetree.pattern}[pattern]}. We might want to generate
+other kind of nodes, such as {{!Ppxlib.Parsetree.expression}[expressions]} or {{!Ppxlib.Parsetree.structure_item}[structure items]}, for instance.
+{!Ppxlib_metaquot} provides different extension nodes for this:
+
+- The [expr] extension node to generate {{!Ppxlib.Parsetree.expression}[expressions]}:
+{[let e = [%expr 1 + 1]]}
+- The [pat] extension node to generate {{!Ppxlib.Parsetree.pattern}[patterns]}: 
+{[let p = [%pat? ("", _)]]}
+- The [type] extension node to generate {{!Ppxlib.Parsetree.core_type}[core types]}:
+  {[let t = [%type: int -> string]]}
+- The [stri] extension node to generate {{!Ppxlib.Parsetree.structure_item}[structure_item]}, with its [sigi] counterpart for {{!Ppxlib.Parsetree.signature_item}[signature_item]}::
+  {[
+    let stri = [%stri let a = 1]
+    let sigi = [%sigi: val i : int]
+  ]}
+- The [str] and [sig] extension nodes to respectively generate
+  {{!Ppxlib.Parsetree.structure}[structure]}
+  and {{!Ppxlib.Parsetree.signature}[signature]}.
+  {[
+let str =
+  [%str
+    let x = 5
+    let y = 6.3]
+
+let sig_ =
+  [%sig:
+    val x : int
+    val y : float]
+]}
+
+Note the replacement work when the extension node is an "expression"
+extension node: Indeed, the [payload] is a {e value} (of [Parsetree] type) that would not fit
+elsewhere in the AST. So, [let x : [%str "incoherent"]] would not be rewritten by [metaquot].
+(Actually, it also rewrites "pattern" extension nodes, as you'll see in the
+chapter on {{!page-"matching-code".metaquot}matching AST nodes}.)
+
+Also note the [:] and [?] in the [sigi], [type], and [pat] cases: they are needed for
+the payload to be parsed as the right kind of node.
+
+Consider now the extension node [[%expr 1 + 1]] in an expression context.
+[Metaquot] will actually expand it into the following code:
+
+{[
+          {
+            pexp_desc =
+              (Pexp_apply
+                 ({
+                    pexp_desc = (Pexp_ident { txt = (Lident "+"); loc });
+                    pexp_loc = loc;
+                    pexp_attributes = []
+                  },
+                   [(Nolabel,
+                      {
+                        pexp_desc = (Pexp_constant (Pconst_integer ("1", None)));
+                        pexp_loc = loc;
+                        pexp_attributes = []
+                      });
+                   (Nolabel,
+                     {
+                       pexp_desc = (Pexp_constant (Pconst_integer ("1", None)));
+                       pexp_loc = loc;
+                       pexp_attributes = []
+                     })]));
+            pexp_loc = loc;
+            pexp_attributes = []
+          }
+]}
+
+Looking at the example, you might notice two things:
+
+- The AST types are used without a full path to the module.
+- There is a free variable named [loc] and of type [Location.t] in the code.
+
+So for this to compile, you need both to open [ppxlib] and to have a [loc : Location.t]
+variable in scope.
+The produced AST node value, and every other node within it, will be located in
+this [loc]. You should therefore make sure that [loc] is the location you want for
+your generated code when using [metaquot].
+
+{2:antiquotations Anti-Quotations}
+
+Using these extensions alone, you can only produce constant/static AST nodes.
+[metaquot] has a solution for that: anti-quotation. You can use anti-quotation
+to insert any expression representing an AST node. That way, you can include
+dynamically generated nodes inside a [metaquot] expression extension point.
+
+Consider the following example:
+
+{[
+          let with_suffix_expr ~loc s =
+            let dynamic_node = Ast_builder.Default.estring ~loc s in
+            [%expr [%e dynamic_node] ^ "some_fixed_suffix"]
+]}
+
+The [with_suffix_expr] function will create an [expression] which represents the
+concatenation of the [s] argument and the fixed suffix, i.e., 
+[with_suffix_expr "some_dynamic_stem"] is equivalent to
+[[%expr "some_dynamic_stem" ^ "some_fixed_suffix"]].
+
+The syntax for anti-quotation depends on the type of the node you wish to insert
+(which must also correspond to the context of the anti-quotation extension node):
+
+- [e] is the extension point used to anti-quote values of type
+  {{!Ppxlib.Parsetree.expression}[expression]}:
+  {[let f some_expr_node = [%expr 1 + [%e some_expr_node]]]}
+- [p] is the extension point used to anti-quote values of type
+  {{!Ppxlib.Parsetree.pattern}[pattern]}:
+  {[let f some_pat_node = [%pat? (1, [%p some_pat_node])]]}
+- [t] is the extension point used to anti-quote values of type
+  {{!Ppxlib.Parsetree.core_type}[core_type]}:
+  {[let f some_core_type_node [%type: int -> [%t some_core_type_node]]]}
+- [m] is the extension point used to anti-quote values of type
+  {{!Ppxlib.Parsetree.module_expr}[module_expr]}
+  or {{!Ppxlib.Parsetree.module_type}[module_type]}:
+  {[
+  let f some_module_expr_node = [%expr let module M = [%m some_module_expr_node] in M.x]
+  let f some_module_type_node = [%sigi: module M : [%m some_module_type_node]]
+  ]}
+- [i] is the extension point used to anti-quote values of type
+  {{!Ppxlib.Parsetree.structure_item}[structure_item]} or
+  {{!Ppxlib.Parsetree.signature_item}[signature_item]}. Note that the syntax for structure/signature item extension nodes uses two [%%]:
+  {[
+let f some_structure_item_node =
+  [%str
+    let a = 1
+
+    [%%i some_structure_item_node]]
+
+let f some_signature_item_node =
+  [%sig:
+    val a : int
+
+    [%%i some_signature_item_node]]
+]}
+
+If an anti-quote extension node is in the wrong context, it won't be
+rewritten by {{!Ppxlib_metaquot}[Metaquot]}. For instance, in [[%expr match [] with [%e some_value] -> 1]]
+the anti-quote extension node for expressions is put in a pattern context,
+and it won't be rewritten.
+
+On the contrary, you should use anti-quotes whose kind ([[%e ...]], [[%p ...]])
+match the context. For example, you should write:
+
+{@ocaml[
+  let let_generator pat type_ expr =
+    [%stri let [%p pat] : [%t type_] = [%e expr]] ;;
+]}
+
+Finally, remember that we are inserting values, so we never use patterns in the payloads of anti-quotations. Those will be used for {{!page-"matching-code".antiquotations}matching}.
+
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"writing-ppxs"}< Writing PPXs}{%html: </div><div>%}{{!"matching-code"}Destructing AST nodes >}{%html: </div></div>%}

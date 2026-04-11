@@ -1,0 +1,9 @@
+(executable
+ (name print_greetings)
+ (libraries ppxlib)
+ (preprocess
+  (pps ppxlib.metaquot)))
+
+(cram
+ (package ppxlib)
+ (deps print_greetings.exe))
