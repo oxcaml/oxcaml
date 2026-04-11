@@ -47,6 +47,8 @@ let runRevision = -1;
 let editorMarkers = [];
 const loadedScriptUrls = new Map();
 let browserFsPromise = null;
+const browserFsConcurrency = 4;
+const browserFsFetchRetries = 4;
 
 function loadScript(url) {
   const href = url instanceof URL ? url.href : String(url);
@@ -103,6 +105,38 @@ async function readBlobAsBinaryString(blob) {
 }
 
 async function fetchBinaryString(url, compression) {
+  let lastError = null;
+  for (let attempt = 0; attempt < browserFsFetchRetries; attempt += 1) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`failed to fetch ${url}`);
+      }
+      if (compression === "gzip") {
+        if (typeof DecompressionStream !== "function") {
+          throw new Error("gzip-compressed browser assets require DecompressionStream support");
+        }
+        if (!response.body) {
+          throw new Error(`missing response body for ${url}`);
+        }
+        const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
+        return readBlobAsBinaryString(await new Response(stream).blob());
+      }
+      return readBlobAsBinaryString(await response.blob());
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 >= browserFsFetchRetries) {
+        break;
+      }
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 40 * (attempt + 1));
+      });
+    }
+  }
+  throw lastError ?? new Error(`failed to fetch ${url}`);
+}
+
+async function fetchText(url, compression) {
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`failed to fetch ${url}`);
@@ -115,9 +149,9 @@ async function fetchBinaryString(url, compression) {
       throw new Error(`missing response body for ${url}`);
     }
     const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
-    return readBlobAsBinaryString(await new Response(stream).blob());
+    return new Response(stream).text();
   }
-  return readBlobAsBinaryString(await response.blob());
+  return response.text();
 }
 
 async function ensureBrowserFsLoaded() {
@@ -125,12 +159,21 @@ async function ensureBrowserFsLoaded() {
     return browserFsPromise;
   }
   browserFsPromise = (async () => {
-    const manifest = await fetchJson(buildAssetUrl("browser_fs_manifest.json"));
     if (typeof globalThis.jsoo_create_file !== "function") {
       throw new Error("js_of_ocaml filesystem initializer is not ready");
     }
+    try {
+      const bundle = JSON.parse(await fetchText(buildAssetUrl("browser_fs_bundle.json.gz"), "gzip"));
+      for (const entry of bundle) {
+        globalThis.jsoo_create_file(entry.fs_path, atob(entry.content_base64));
+      }
+      return;
+    } catch (error) {
+      console.warn("OxCaml browser_fs bundle load failed; falling back to manifest", error);
+    }
+    const manifest = await fetchJson(buildAssetUrl("browser_fs_manifest.json"));
     let nextIndex = 0;
-    const concurrency = Math.min(6, manifest.length || 1);
+    const concurrency = Math.min(browserFsConcurrency, manifest.length || 1);
     async function worker() {
       while (nextIndex < manifest.length) {
         const entry = manifest[nextIndex];
