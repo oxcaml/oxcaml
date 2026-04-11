@@ -731,6 +731,7 @@ module Jkind0 : sig
       Types.jkind_l
 
     val for_or_null_argument : Ident.t -> 'd jkind
+    val for_or_null_payload : Path.t -> 'd jkind
     val for_variant_with_null_result : Path.t -> type_expr -> jkind_l
 
     val for_effect_arg : Ident.t -> 'd jkind

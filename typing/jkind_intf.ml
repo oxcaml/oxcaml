@@ -421,6 +421,7 @@ module History = struct
           arity : int
         }
     (* [position] is 1-indexed *)
+    | Or_null_payload of Path.t
     | Tuple
     | Row_variable
     | Polymorphic_variant
