@@ -38,10 +38,10 @@ type forbidden_modality_kind =
           [aliased]. Otherwise, borrowing would be unsound:
 
           {v
-      type 'a t = { x : 'a @@ global unique }
+          type 'a t = { x : 'a @@ global unique }
 
-      let clone (x @ unique) =
-        borrow {x} ~f:(fun (t @ local) -> t.x : 'a @ global) (* leak *)
+          let clone (x @ unique) =
+            borrow {x} ~f:(fun (t @ local) -> t.x : 'a @ global) (* leak *)
           v} *)
 
 type error =

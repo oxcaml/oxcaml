@@ -3,13 +3,15 @@ synopsis: "OxCaml 5.2.0 CI dependencies meta-package"
 maintainer: "oxcaml-team"
 license: "MIT"
 authors: "oxcaml-team"
-homepage: "https://github.com/ocaml-flambda/flambda-backend"
-bug-reports: "https://github.com/ocaml-flambda/flambda-backend/issues"
-dev-repo: "git+https://github.com/ocaml-flambda/flambda-backend"
+homepage: "https://github.com/oxcaml/oxcaml"
+bug-reports: "https://github.com/oxcaml/oxcaml/issues"
+dev-repo: "git+https://github.com/oxcaml/oxcaml"
 depends: [
-  "ocaml-base-compiler" {= "4.14.2+oxcaml"}
+  "ocaml-base-compiler" {= "5.4.0+oxcaml"}
   "menhir" {= "20231231"}
-  "ocamlformat" {= "0.28.1"}
+  "ocamlformat" {= "0.29.0"}
+  # This version should be the same as in default.nix
+  "dune" {= "3.20.2"}
   "re" {>= "1.10.0"}
   # js_of_ocaml-compiler dependencies
   "ppxlib" {>= "0.15"}

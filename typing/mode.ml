@@ -1079,9 +1079,9 @@ module Lattices = struct
   let compare : type a. a obj -> a -> a -> (a, a) Misc.comparison =
    fun obj c1 c2 ->
     if le obj c1 c2
-    then begin
-      if le obj c2 c1 then Equal else Less_than
-    end
+    then
+      begin if le obj c2 c1 then Equal else Less_than
+      end
     else Greater_than
 
   let equal : type a. a obj -> a -> a -> bool =
@@ -2144,7 +2144,7 @@ module Report = struct
          nmatschke: Likewise for [x <> y] (middle modes of diamonds). *)
       if
         begin match b with Join -> C.le a_obj y x | Meet -> C.le a_obj x y
-      end
+        end
       then `First
       else `Second
 
@@ -5116,20 +5116,20 @@ module Crossing = struct
     let compare : type a b. a t -> b t -> (a, b) Misc.comparison =
      fun ax1 ax2 ->
       match ax1, ax2 with
-      | Monadic ax1, Monadic ax2 -> begin
-        match Axis.compare ax1 ax2 with
+      | Monadic ax1, Monadic ax2 ->
+        begin match Axis.compare ax1 ax2 with
         | Less_than -> Less_than
         | Equal -> Equal
         | Greater_than -> Greater_than
-      end
+        end
       | Monadic _, _ -> Less_than
       | _, Monadic _ -> Greater_than
-      | Comonadic ax1, Comonadic ax2 -> begin
-        match Axis.compare ax1 ax2 with
+      | Comonadic ax1, Comonadic ax2 ->
+        begin match Axis.compare ax1 ax2 with
         | Less_than -> Less_than
         | Equal -> Equal
         | Greater_than -> Greater_than
-      end
+        end
 
     let print : type a. Fmt.formatter -> a t -> unit =
      fun ppf -> function

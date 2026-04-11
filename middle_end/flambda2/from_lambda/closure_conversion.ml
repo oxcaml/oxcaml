@@ -1220,8 +1220,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
           (* There should not be any way to reach this from Ocaml code. *)
           Misc.fatal_error
             "Non-zero tag on empty block allocation in [Closure_conversion]"
-        else begin
-          if Lambda.is_uniform_block_shape shape
+        else
+          begin if Lambda.is_uniform_block_shape shape
           then
             register_const0 acc
               (Static_const.block Tag.Scannable.zero Immutable Value_only [])
@@ -1229,7 +1229,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
           else
             Misc.fatal_error
               "Unexpected empty mixed block in [Closure_conversion]"
-        end
+          end
       | Pmakefloatblock _ ->
         Misc.fatal_error "Unexpected empty float block in [Closure_conversion]"
       | Pmakeufloatblock _ ->
