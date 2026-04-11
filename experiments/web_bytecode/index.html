@@ -142,7 +142,7 @@
 
       .layout {
         display: grid;
-        grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
+        grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr);
         gap: 18px;
       }
 
@@ -297,8 +297,8 @@
 
       .transcript {
         margin: 0;
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
+        white-space: pre;
+        overflow-wrap: normal;
       }
 
       .transcript-line {
@@ -345,7 +345,7 @@
         color: #4f5c6b;
       }
 
-      @media (max-width: 940px) {
+      @media (max-width: 1180px) {
         main {
           width: min(100vw - 24px, 1180px);
           padding-top: 18px;

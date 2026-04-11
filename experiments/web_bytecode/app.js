@@ -49,6 +49,7 @@ const loadedScriptUrls = new Map();
 let browserFsPromise = null;
 const browserFsConcurrency = 4;
 const browserFsFetchRetries = 4;
+let bootStatusActive = false;
 
 function loadScript(url) {
   const href = url instanceof URL ? url.href : String(url);
@@ -154,6 +155,73 @@ async function fetchText(url, compression) {
   return response.text();
 }
 
+function formatByteCount(byteCount) {
+  if (!Number.isFinite(byteCount) || byteCount < 0) {
+    return "";
+  }
+  if (byteCount < 1024 * 1024) {
+    return `${Math.round(byteCount / 1024)} KB`;
+  }
+  return `${(byteCount / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function fetchTextWithProgress(url, compression, onProgress) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`failed to fetch ${url}`);
+  }
+  if (!response.body) {
+    if (onProgress) {
+      onProgress(null);
+    }
+    return fetchText(url, compression);
+  }
+
+  const totalHeader = response.headers.get("content-length");
+  const totalBytes = totalHeader ? Number.parseInt(totalHeader, 10) : null;
+  const reader = response.body.getReader();
+  const chunks = [];
+  let receivedBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    chunks.push(value);
+    receivedBytes += value.byteLength;
+    if (onProgress) {
+      onProgress({ receivedBytes, totalBytes });
+    }
+  }
+
+  const buffer = new Uint8Array(receivedBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  if (compression === "gzip") {
+    if (typeof DecompressionStream !== "function") {
+      throw new Error("gzip-compressed browser assets require DecompressionStream support");
+    }
+    const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream("gzip"));
+    return new Response(stream).text();
+  }
+
+  return new TextDecoder().decode(buffer);
+}
+
+function setBootStatus(text) {
+  bootStatusActive = true;
+  setStatus("loading", text);
+}
+
+function clearBootStatus() {
+  bootStatusActive = false;
+}
+
 async function ensureBrowserFsLoaded() {
   if (browserFsPromise) {
     return browserFsPromise;
@@ -163,7 +231,32 @@ async function ensureBrowserFsLoaded() {
       throw new Error("js_of_ocaml filesystem initializer is not ready");
     }
     try {
-      const bundle = JSON.parse(await fetchText(buildAssetUrl("browser_fs_bundle.json.gz"), "gzip"));
+      const bundle = JSON.parse(
+        await fetchTextWithProgress(
+          buildAssetUrl("browser_fs_bundle.json.gz"),
+          "gzip",
+          (progress) => {
+            if (!bootStatusActive) {
+              return;
+            }
+            if (!progress) {
+              setBootStatus("loading runtime");
+              return;
+            }
+            const { receivedBytes, totalBytes } = progress;
+            if (Number.isFinite(totalBytes) && totalBytes > 0) {
+              const percent = Math.max(
+                0,
+                Math.min(100, Math.round((receivedBytes / totalBytes) * 100)),
+              );
+              setBootStatus(`loading runtime ${percent}%`);
+              return;
+            }
+            setBootStatus(`loading runtime ${formatByteCount(receivedBytes)}`);
+          },
+        ),
+      );
+      setBootStatus("starting runtime");
       for (const entry of bundle) {
         globalThis.jsoo_create_file(entry.fs_path, atob(entry.content_base64));
       }
@@ -191,10 +284,14 @@ async function ensureBrowserFsLoaded() {
 }
 
 const ready = (async () => {
+  setBootStatus("loading runtime");
   await loadScript(new URL("./runtime_shims.js", import.meta.url));
+  setBootStatus("loading compiler");
   await loadScript(buildAssetUrl("web_bytecode_js.bc.js"));
+  setBootStatus("loading standard library");
   installGlobalScriptEvaluator();
   await ensureBrowserFsLoaded();
+  setBootStatus("starting compiler");
   const backend = window.WebBytecodeJs;
   if (
     !backend ||
@@ -736,9 +833,15 @@ if (fullUi) {
 
   ready.then(
     (_backend) => {
-      setStatus("ready", "ok");
+      if (bootStatusActive) {
+        clearBootStatus();
+        if (statusEl?.dataset.state === "loading") {
+          setStatus("ready", "ok");
+        }
+      }
     },
     (error) => {
+      clearBootStatus();
       renderTranscript(String(error), { forceDiagnostics: true });
       setStatus("error", "offline");
     });
