@@ -3,7 +3,7 @@
   <body>
     <pre id="output">booting</pre>
     <script type="module">
-      import { checkString, runString } from "./app.js";
+      import { runString } from "./app.js";
       import { matchesExpectedText, visibleSamples } from "./sample_catalog.js";
 
       const outputEl = document.getElementById("output");
@@ -30,15 +30,12 @@
       });
 
       async function verifySample(sample) {
-        const actual =
-          sample.mode === "run"
-            ? await runString(sample.filename, sample.source)
-            : await checkString(sample.filename, sample.source);
+        const actual = await runString(sample.filename, sample.source);
         return {
           id: sample.id,
           topic: sample.topic,
           ok: matchesExpectedText(actual, sample.expected_text),
-          mode: sample.mode,
+          mode: "run",
           expected_kind: sample.expected_kind,
           expected_text: sample.expected_text,
           actual,
