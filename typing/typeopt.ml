@@ -132,7 +132,13 @@ let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
    for nullable jkinds.*)
 let type_representable_layout ~why env loc ty =
   let jkind = Ctype.type_jkind env ty in
-  let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
+  let layout =
+    match Jkind.get_layout_defaulting_to_scannable env jkind with
+    | Some layout -> layout
+    | None ->
+      Misc.fatal_error
+        "Typeopt.type_representable_layout: unexpected missing layout (1)"
+  in
   if layout_is_representable layout then
     layout
   else
@@ -152,7 +158,13 @@ let type_representable_layout ~why env loc ty =
     (match Ctype.type_sort ~why ~fixed:false env ty with
     | Ok _sort ->
       let jkind = Ctype.type_jkind env ty in
-      let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
+      let layout =
+        match Jkind.get_layout_defaulting_to_scannable env jkind with
+        | Some layout -> layout
+        | None ->
+          Misc.fatal_error
+            "Typeopt.type_representable_layout: unexpected missing layout (2)"
+      in
       (match Jkind_types.Layout.Const.get_sort layout with
       | None -> Misc.fatal_error
                    "called type_sort but didn't get a representable layout"

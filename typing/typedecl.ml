@@ -1899,7 +1899,11 @@ module Element_repr = struct
       | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
       | Genvar _ -> Misc.fatal_error "sort_to_t: unexpected genvar"
       in
-      layout_to_t layout
+      match layout with
+      | Some layout ->
+        layout_to_t layout
+      | None ->
+        Misc.fatal_error "Element_repr.classify: unexpected missing layout"
 
   let mixed_product_shape loc ts kind =
     let boxed_elements =
