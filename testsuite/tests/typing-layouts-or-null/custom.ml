@@ -177,13 +177,7 @@ type no_param =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type no_param =
-2 |   | A
-3 |   | B of int
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       it must have exactly one type parameter.
+type no_param = A | B of int [@@or_null]
 |}]
 
 type no_param_nonfloat =
@@ -192,13 +186,15 @@ type no_param_nonfloat =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type no_param_nonfloat =
-2 |   | A_nonfloat
-3 |   | B_nonfloat of t_non_float
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       it must have exactly one type parameter.
+type no_param_nonfloat = A_nonfloat | B_nonfloat of t_non_float [@@or_null]
+|}]
+
+type succeeds_sep = no_param_nonfloat accepts_sep
+type succeeds_nonfloat = no_param_nonfloat accepts_nonfloat
+
+[%%expect{|
+type succeeds_sep = no_param_nonfloat accepts_sep
+type succeeds_nonfloat = no_param_nonfloat accepts_nonfloat
 |}]
 
 type float_payload =
@@ -207,13 +203,7 @@ type float_payload =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type float_payload =
-2 |   | Nope_float
-3 |   | Yep_float of float
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       it must have exactly one type parameter.
+type float_payload = Nope_float | Yep_float of float [@@or_null]
 |}]
 
 type float_payload_fails_sep = float_payload accepts_sep
@@ -222,7 +212,13 @@ type float_payload_fails_sep = float_payload accepts_sep
 Line 1, characters 31-44:
 1 | type float_payload_fails_sep = float_payload accepts_sep
                                    ^^^^^^^^^^^^^
-Error: Unbound type constructor "float_payload"
+Error: This type "float_payload" should be an instance of type
+         "('a : any mod separable)"
+       The kind of float_payload is
+           value_or_null mod forkable unyielding many stateless immutable
+         because of the definition of float_payload at lines 1-4, characters 0-11.
+       But the kind of float_payload must be a subkind of any mod separable
+         because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
 type float_payload_fails_nonfloat = float_payload accepts_nonfloat
@@ -231,7 +227,14 @@ type float_payload_fails_nonfloat = float_payload accepts_nonfloat
 Line 1, characters 36-49:
 1 | type float_payload_fails_nonfloat = float_payload accepts_nonfloat
                                         ^^^^^^^^^^^^^
-Error: Unbound type constructor "float_payload"
+Error: This type "float_payload" should be an instance of type
+         "('a : value_or_null mod non_float)"
+       The kind of float_payload is
+           value_or_null mod forkable unyielding many stateless immutable
+         because of the definition of float_payload at lines 1-4, characters 0-11.
+       But the kind of float_payload must be a subkind of
+           value_or_null mod non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
 |}]
 
 (* CR or-null: allow custom [@@or_null] types with unused type parameters.
@@ -243,13 +246,7 @@ type 'a unused_param =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type 'a unused_param =
-2 |   | A
-3 |   | B of int
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       it must have exactly one nullary constructor and one unary constructor carrying the sole type parameter.
+type 'a unused_param = A | B of int [@@or_null]
 |}]
 
 type ('a, 'b) multi_param =
@@ -258,32 +255,21 @@ type ('a, 'b) multi_param =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type ('a, 'b) multi_param =
-2 |   | Nope_multi
-3 |   | Yep_multi of ('a list * 'b)
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       it must have exactly one type parameter.
+type ('a, 'b) multi_param = Nope_multi | Yep_multi of ('a list * 'b) [@@or_null]
 |}]
 
 type ('a, 'b) multi_param_succeeds_sep = ('a, 'b) multi_param accepts_sep
 
 [%%expect{|
-Line 1, characters 50-61:
-1 | type ('a, 'b) multi_param_succeeds_sep = ('a, 'b) multi_param accepts_sep
-                                                      ^^^^^^^^^^^
-Error: Unbound type constructor "multi_param"
+type ('a, 'b) multi_param_succeeds_sep = ('a, 'b) multi_param accepts_sep
 |}]
 
 type ('a, 'b) multi_param_succeeds_nonfloat =
   ('a, 'b) multi_param accepts_nonfloat
 
 [%%expect{|
-Line 2, characters 11-22:
-2 |   ('a, 'b) multi_param accepts_nonfloat
-               ^^^^^^^^^^^
-Error: Unbound type constructor "multi_param"
+type ('a, 'b) multi_param_succeeds_nonfloat =
+    ('a, 'b) multi_param accepts_nonfloat
 |}]
 
 type bad_payload =
@@ -292,13 +278,14 @@ type bad_payload =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type bad_payload =
-2 |   | Nope_bad
+Line 3, characters 15-20:
 3 |   | Yep_bad of int t
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       it must have exactly one nullary constructor and one unary constructor carrying the sole type parameter.
+                   ^^^^^
+Error: The kind of type "int t" is value_or_null
+         because of the definition of t at lines 1-4, characters 0-11.
+       But the kind of type "int t" must be a subkind of
+           value_or_null mod non_null
+         because the type argument of bad_payload has kind value.
 |}]
 
 (* CR or-null: allow GADT custom [@@or_null] types.
@@ -406,9 +393,9 @@ type ('a : float64) wrong_payload_kind : value_or_null =
 [@@or_null]
 
 [%%expect{|
-Line 1, characters 6-18:
-1 | type ('a : float64) wrong_payload_kind : value_or_null =
-          ^^^^^^^^^^^^
+Line 3, characters 9-11:
+3 |   | B of 'a
+             ^^
 Error: The layout of type "'a" is float64
          because of the annotation on 'a in the declaration of the type
                                       wrong_payload_kind.

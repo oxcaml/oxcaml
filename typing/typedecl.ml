@@ -192,15 +192,7 @@ let check_or_null_decl bad sdecl =
   | Public ->
     ()
 
-let get_or_null_type_param_name bad sdecl params =
-  match sdecl.ptype_params, params with
-  | [({ ptyp_desc = Ptyp_var (name, _); _ }, _)], [_] -> name
-  | [_], [_] ->
-    bad "its single type parameter must be written as a type variable"
-  | _ ->
-    bad "it must have exactly one type parameter"
-
-let check_or_null_constructors bad type_param_name = function
+let check_or_null_constructors bad = function
   | [c1; c2] ->
     let check_no_gadt ({ pcd_res; _ } : Parsetree.constructor_declaration) =
       match pcd_res with
@@ -213,27 +205,35 @@ let check_or_null_constructors bad type_param_name = function
     begin match c1.pcd_args, c2.pcd_args with
     | Pcstr_tuple [],
       Pcstr_tuple
-        [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }]
+        [_]
     | Pcstr_tuple
-        [{ pca_type = { ptyp_desc = Ptyp_var (name, _); _ }; _ }],
+        [_],
       Pcstr_tuple [] ->
-      if not (String.equal name type_param_name) then
-        bad "its payload constructor must carry the sole type parameter"
+      ()
     | _ ->
       bad
         "it must have exactly one nullary constructor and one unary \
-         constructor carrying the sole type parameter"
+         constructor"
     end
   | _ ->
     bad "it must have exactly two constructors"
 
-let check_or_null_variant_shape _path params sdecl scstrs =
-  let bad msg =
-    raise (Error (sdecl.ptype_loc, Bad_or_null_attribute msg))
-  in
-  check_or_null_decl bad sdecl;
-  let type_param_name = get_or_null_type_param_name bad sdecl params in
-  check_or_null_constructors bad type_param_name scstrs
+let check_or_null_variant_shape sdecl scstrs =
+  let bad msg = Error (sdecl.ptype_loc, Bad_or_null_attribute msg) in
+  check_or_null_decl (fun msg -> raise (bad msg)) sdecl;
+  check_or_null_constructors (fun msg -> raise (bad msg)) scstrs
+
+let get_or_null_payload_arg cstrs : Types.constructor_argument =
+  match Datarepr.find_variant_with_null_payload cstrs with
+  | Some { payload_arg; _ } -> payload_arg
+  | None -> Misc.fatal_error "Invalid constructor for Variant_with_null"
+
+let constrain_or_null_payload ~env ~id payload_ty payload_loc =
+  let required = Btype.Jkind0.for_or_null_argument id in
+  match Ctype.constrain_type_jkind env payload_ty required with
+  | Ok () -> ()
+  | Error err ->
+    raise (Error (payload_loc, Jkind_mismatch_of_type (env, payload_ty, err)))
 
 (* [make_params] creates sort variables - these can be defaulted away (as in
    transl_type_decl) or unified with existing sort-variable-free types (as in
@@ -995,23 +995,7 @@ let transl_declaration env sdecl (id, uid) =
         Ttype_abstract, Type_abstract Definition,
         Jkind.Builtin.value ~why:Default_type_jkind
       | Ptype_variant scstrs ->
-        if or_null then begin
-          check_or_null_variant_shape path params sdecl scstrs;
-          match sdecl.ptype_params, params with
-          | [({ ptyp_desc = Ptyp_var (_, _);
-                ptyp_loc;
-                _
-              }, _)],
-            [param] ->
-            let required = Btype.Jkind0.for_or_null_argument id in
-            begin match Ctype.constrain_type_jkind env param required with
-            | Ok () -> ()
-            | Error err ->
-              raise
-                (Error (ptyp_loc, Jkind_mismatch_of_type (env, param, err)))
-            end
-          | _ -> assert false
-        end;
+        if or_null then check_or_null_variant_shape sdecl scstrs;
         if List.exists (fun cstr -> cstr.pcd_res <> None) scstrs then begin
           match cstrs with
             [] -> ()
@@ -1062,36 +1046,46 @@ let transl_declaration env sdecl (id, uid) =
             (fun () -> make_cstr scstr)
         in
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
+        let or_null_payload_arg =
+          if or_null then begin
+            let payload_arg = get_or_null_payload_arg cstrs in
+            let payload_ty = payload_arg.Types.ca_type in
+            let payload_loc = payload_arg.Types.ca_loc in
+            constrain_or_null_payload ~env ~id payload_ty payload_loc;
+            Some payload_arg
+          end else
+            None
+        in
         let rep, jkind =
-          if or_null then
-            match params with
-            | [param] ->
-              Variant_with_null,
-              Btype.Jkind0.for_variant_with_null_result path param
-            | _ -> assert false
-          else if unbox then
-            Variant_unboxed,
-            Jkind.of_new_sort ~why:Old_style_unboxed_type
-              ~level:(Ctype.get_current_level ())
-          else
-            (* We mark all arg sorts "void" here.  They are updated later,
-               after the circular type checks make it safe to check sorts.
-               Likewise, [Constructor_uniform_value] is potentially wrong
-               and will be updated later.
-            *)
-            Variant_boxed (
-              Array.map
-                (fun cstr ->
-                   let sorts =
-                     match Types.(cstr.cd_args) with
-                     | Cstr_tuple args ->
-                       Array.make (List.length args) Jkind.Sort.Const.void
-                     | Cstr_record _ -> [| Jkind.Sort.Const.value |]
-                   in
-                   Constructor_uniform_value, sorts)
-                (Array.of_list cstrs)
-            ),
-          Jkind.for_non_float ~why:Boxed_variant
+          match or_null_payload_arg with
+          | Some payload_arg ->
+            let payload_ty = payload_arg.Types.ca_type in
+            Variant_with_null,
+            Btype.Jkind0.for_variant_with_null_result path payload_ty
+          | None ->
+            if unbox then
+              Variant_unboxed,
+              Jkind.of_new_sort ~why:Old_style_unboxed_type
+                ~level:(Ctype.get_current_level ())
+            else
+              (* We mark all arg sorts "void" here.  They are updated later,
+                 after the circular type checks make it safe to check sorts.
+                 Likewise, [Constructor_uniform_value] is potentially wrong
+                 and will be updated later.
+              *)
+              Variant_boxed (
+                Array.map
+                  (fun cstr ->
+                     let sorts =
+                       match Types.(cstr.cd_args) with
+                       | Cstr_tuple args ->
+                         Array.make (List.length args) Jkind.Sort.Const.void
+                       | Cstr_record _ -> [| Jkind.Sort.Const.value |]
+                     in
+                     Constructor_uniform_value, sorts)
+                  (Array.of_list cstrs)
+              ),
+              Jkind.for_non_float ~why:Boxed_variant
         in
           Ttype_variant tcstrs, Type_variant (cstrs, rep, None), jkind
       | Ptype_record lbls ->
