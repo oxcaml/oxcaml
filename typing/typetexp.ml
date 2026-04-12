@@ -271,6 +271,7 @@ end = struct
   type used_info = {
     ty : type_expr;
     loc : Location.t;
+    unused : bool ref;
     (* Rigid variables are set at a given jkind.
 
        Note that a rigid variable can still be unified; if it's unified
@@ -279,9 +280,6 @@ end = struct
     *)
     rigid : jkind_lr option;
     stage : Env.stage;
-    unused : bool ref;
-    (* CR rtjoa: I was thinking of grouping [unused] with the other fields that
-       exist upstream, but I don't feel particularly strongly *)
   }
 
   let used_variables =

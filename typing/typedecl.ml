@@ -363,20 +363,6 @@ in
 
 (* Update a temporary definition to share recursion *)
 let update_type temp_env env id loc =
-  (* XCR dkalinichenko: what's happening here? This wasn't present in either
-     OxCaml or upstream. Why do we need this change now?
-
-     rtjoa: In general, we have to perform many updates/checks both on the boxed
-     and unboxed versions of decls.
-
-     We already did this in the OxCaml version of [update_type], but then
-     upstream added more complexity here, which I thought made it pass the point
-     where it's okay to duplicate, and factored out the [unify_manifest]
-     function.
-
-     There is kind of a similar pattern in [check_coherence],
-     [update_decl_jkind], [check_unboxed_recursion_decl].
-  *)
   let unify_manifest env type_manifest path type_params =
     match type_manifest with
     | Some ty ->
@@ -4605,13 +4591,6 @@ let report_error ~loc = function
        -- maximum is %i non-constant constructors@]"
       (Config.max_tag + 1)
   | Duplicate_label s ->
-      (* XCR dkalinichenko: why is upstream missing [~loc] here?
-
-         rtjoa: Hmm good catch. If we just want an *accurate* merge, that
-         indicates we should remove it. Not sure if that was intended.
-
-         Removed for now.
-      *)
       Location.errorf "Two labels are named %a" Style.inline_code s
   | Unboxed_mutable_label ->
       Location.errorf ~loc "Unboxed record labels cannot be mutable"

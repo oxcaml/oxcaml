@@ -2150,13 +2150,8 @@ let prepared_extension_constructor id ppf ext =
 let tree_of_value_description id decl =
   (* Format.eprintf "@[%a@]@." raw_type_expr decl.val_type; *)
   let id = Ident.name id in
-  (* CR rtjoa: upstream 5.4 seems to use
   let () = prepare_for_printing [decl.val_type] in
   let ty = tree_of_typexp Type_scheme decl.val_type in
-
-  5.2 and oxcaml 5.2 use the line below. this makes me learn towards upstream's?
-  *)
-  let ty = tree_of_type_scheme decl.val_type in
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
   wrap_mutation (fun () ->
