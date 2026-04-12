@@ -763,7 +763,6 @@ struct callbacks_exception_holder {
 static value extract_perf_data(uint64_t header, uint64_t *buf, int buf_len) {
   value perf_data;
 
-  #ifdef PERF_COUNTERS
   int nperf = RUNTIME_EVENTS_ITEM_PERF_COUNTERS(header);
   int perf_start_index = buf_len - (2 * nperf);
 
@@ -779,11 +778,6 @@ static value extract_perf_data(uint64_t header, uint64_t *buf, int buf_len) {
     perf_data = caml_makearray_dynamic_non_scannable_unboxed_product(
         Val_long(2), Val_true, Val_long(0));
   }
-  #else
-  (void)header; (void)buf; (void)buf_len;
-  perf_data = caml_makearray_dynamic_non_scannable_unboxed_product(
-      Val_long(2), Val_true, Val_long(0));
-  #endif
 
   return perf_data;
 }
