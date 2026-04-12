@@ -322,7 +322,8 @@ static const char* perf_events_setup(struct perf_counters* counters)
   }
 }
 
-void perf_events_sample(struct perf_counters* counters, uint64_t* samples)
+static void perf_events_sample(struct perf_counters* counters,
+                               uint64_t* samples)
 {
   if (*counters->leader_seq_lock != counters->last_seq)
     perf_events_setup_rdpmc(counters);
