@@ -143,7 +143,8 @@ static void stw_teardown_runtime_events(
   caml_domain_state **participating_domains);
 
 #ifdef PERF_COUNTERS
-uint64_t perf_counter_configs[RUNTIME_EVENTS_MAX_PERF_EVENTS];
+static uint64_t perf_counter_configs[RUNTIME_EVENTS_MAX_PERF_EVENTS];
+static int num_perf_configs = 0;
 
 struct perf_counter_rdpmc_info {
   uint64_t offset;
@@ -160,8 +161,6 @@ struct perf_counters {
 };
 
 static CAMLthread_local struct perf_counters* thread_counters = NULL;
-static int num_perf_configs = 0;
-static uint64_t parsed_perf_configs[RUNTIME_EVENTS_MAX_PERF_EVENTS];
 static atomic_bool perf_counters_globally_disabled = false;
 
 #define seqlock_barrier() asm volatile("" ::: "memory")
@@ -193,7 +192,7 @@ static const char* parse_perf_config_string(const char* format)
                RUNTIME_EVENTS_MAX_PERF_EVENTS);
       return err;
     }
-    parsed_perf_configs[count++] = config;
+    perf_counter_configs[count++] = config;
   }
   num_perf_configs = count;
   return NULL;
@@ -248,7 +247,7 @@ static const char* perf_events_setup(struct perf_counters* counters)
   int leader_fd = -1;
 
   for (int i = 0; i < num_perf_configs; i++) {
-    uint64_t config = parsed_perf_configs[i];
+    uint64_t config = perf_counter_configs[i];
     counters->ncounters++;
 
     struct perf_event_attr attr = {
@@ -296,8 +295,6 @@ static const char* perf_events_setup(struct perf_counters* counters)
       close(fd);
       break;
     }
-
-    perf_counter_configs[i] = config;
 
     if (i == 0) {
       leader_fd = fd;
