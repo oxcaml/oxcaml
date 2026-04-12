@@ -134,6 +134,16 @@ let () =
       set arr 0 (Mnpnp.mk 3 4);
       ignore (Sys.opaque_identity arr))
 
+let () =
+  let open struct
+    type 'a t = { mutable x : 'a or_null }
+  end in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let t = { x = This 1 } in
+      t.x <- This 2;
+      ignore (Sys.opaque_identity t))
+
 (* A product containing one value non_pointer component should skip caml_modify
    for that one component *)
 
