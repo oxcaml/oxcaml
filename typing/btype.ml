@@ -2411,6 +2411,42 @@ module Jkind0 = struct
       (orphaned_type_var_list @ domain)
       (type_of_kind_list @ range)
 
+  let variant_constructor_gadt_extra_substs
+      ~projected_params ~cstr_res ~payload_tys ~get_free_vars =
+    match cstr_res with
+    | None -> []
+    | Some res ->
+      let res_args =
+        match get_desc res with
+        | Tconstr (_, args, _) -> args
+        | _ -> Misc.fatal_error "cd_res must be Tconstr"
+      in
+      gadt_payload_subst
+        ~projected_params
+        ~res_args
+        ~payload_tys
+        ~get_free_vars
+
+  let project_variant_constructor_arg_tys
+      ~decl_params ~type_apply ~get_free_vars cstr =
+    let cstr_arg_tys =
+      match cstr.cd_args with
+      | Cstr_tuple args -> List.map (fun arg -> arg.ca_type) args
+      | Cstr_record lbls -> List.map (fun lbl -> lbl.ld_type) lbls
+    in
+    let extra_substs =
+      variant_constructor_gadt_extra_substs
+        ~projected_params:decl_params
+        ~cstr_res:cstr.cd_res
+        ~payload_tys:cstr_arg_tys
+        ~get_free_vars
+    in
+    if Misc.Stdlib.List.is_empty extra_substs then
+      cstr_arg_tys
+    else
+      let domain, range = List.split extra_substs in
+      List.map (fun ty -> type_apply domain ty range) cstr_arg_tys
+
   let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars cstrs =
     let base =
       let all_args_void =
@@ -2451,47 +2487,19 @@ module Jkind0 = struct
     in
     let base = mark_best base in
     let add_with_bounds_for_cstr jkind_so_far cstr =
-      let cstr_arg_tys, cstr_arg_modalities =
+      let cstr_arg_modalities =
         match cstr.cd_args with
         | Cstr_tuple args ->
-          List.fold_left
-            (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
-            ([], []) args
+          List.map (fun arg -> arg.ca_modalities) args
         | Cstr_record lbls ->
-          List.fold_left
-            (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
-            ([], []) lbls
+          List.map (fun lbl -> lbl.ld_modalities) lbls
       in
       let cstr_arg_tys =
-        match cstr.cd_res with
-        | None -> cstr_arg_tys
-        | Some res ->
-          (* See Note [With-bounds for GADTs] for an overview. *)
-          let apply_subst domain range tys =
-            if Misc.Stdlib.List.is_empty domain
-            then tys
-            else List.map (fun ty -> type_apply domain ty range) tys
-          in
-          let res_args =
-            match get_desc res with
-            | Tconstr (_, args, _) -> args
-            | _ -> Misc.fatal_error "cd_res must be Tconstr"
-          in
-          let extra_substs =
-            gadt_payload_subst
-              ~projected_params:decl_params
-              ~res_args
-              ~payload_tys:cstr_arg_tys
-              ~get_free_vars
-          in
-          let domain, range = List.split extra_substs in
-          let cstr_arg_tys =
-            apply_subst
-              domain
-              range
-              cstr_arg_tys
-          in
-          cstr_arg_tys
+        project_variant_constructor_arg_tys
+          ~decl_params
+          ~type_apply
+          ~get_free_vars
+          cstr
       in
       List.fold_left2
         (fun jkind type_expr modality ->

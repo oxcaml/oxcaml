@@ -297,13 +297,44 @@ type 'a gadt =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type 'a gadt =
-2 |   | A : 'a gadt
-3 |   | B : 'a -> 'a gadt
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       GADT constructors are not supported with [@@or_null].
+type 'a gadt = A : 'a gadt | B : 'a -> 'a gadt [@@or_null]
+|}]
+
+type gadt_succeeds_sep = int gadt accepts_sep
+type gadt_succeeds_nonfloat = int gadt accepts_nonfloat
+
+[%%expect{|
+type gadt_succeeds_sep = int gadt accepts_sep
+type gadt_succeeds_nonfloat = int gadt accepts_nonfloat
+|}]
+
+type gadt_fails_sep = float gadt accepts_sep
+
+[%%expect{|
+Line 1, characters 22-32:
+1 | type gadt_fails_sep = float gadt accepts_sep
+                          ^^^^^^^^^^
+Error: This type "float gadt" should be an instance of type
+         "('a : any mod separable)"
+       The kind of float gadt is value_or_null
+         because of the definition of gadt at lines 1-4, characters 0-11.
+       But the kind of float gadt must be a subkind of any mod separable
+         because of the definition of accepts_sep at line 2, characters 0-41.
+|}]
+
+type gadt_fails_nonfloat = float gadt accepts_nonfloat
+
+[%%expect{|
+Line 1, characters 27-37:
+1 | type gadt_fails_nonfloat = float gadt accepts_nonfloat
+                               ^^^^^^^^^^
+Error: This type "float gadt" should be an instance of type
+         "('a : value_or_null mod non_float)"
+       The kind of float gadt is value_or_null
+         because of the definition of gadt at lines 1-4, characters 0-11.
+       But the kind of float gadt must be a subkind of
+           value_or_null mod non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
 |}]
 
 (* CR or-null: allow GADT custom [@@or_null] types with concrete indices.
@@ -315,13 +346,73 @@ type 'a concrete_gadt =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type 'a concrete_gadt =
-2 |   | Null : int concrete_gadt
-3 |   | This : string -> bool concrete_gadt
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       GADT constructors are not supported with [@@or_null].
+type 'a concrete_gadt =
+    Null : int concrete_gadt
+  | This : string -> bool concrete_gadt [@@or_null]
+|}]
+
+type 'a existential_gadt =
+  | Nothing : 'a existential_gadt
+  | Something : 'b -> 'a existential_gadt
+[@@or_null]
+
+[%%expect{|
+type 'a existential_gadt =
+    Nothing : 'a existential_gadt
+  | Something : 'b -> 'a existential_gadt [@@or_null]
+|}]
+
+module _ = struct
+  let _ : int existential_gadt = Something 3.14
+end
+
+[%%expect{|
+|}]
+
+type existential_fails_sep = int existential_gadt accepts_sep
+
+[%%expect{|
+Line 1, characters 29-49:
+1 | type existential_fails_sep = int existential_gadt accepts_sep
+                                 ^^^^^^^^^^^^^^^^^^^^
+Error: This type "int existential_gadt" should be an instance of type
+         "('a : any mod separable)"
+       The kind of int existential_gadt is value_or_null
+         because of the definition of existential_gadt at lines 1-4, characters 0-11.
+       But the kind of int existential_gadt must be a subkind of
+           any mod separable
+         because of the definition of accepts_sep at line 2, characters 0-41.
+|}]
+
+type existential_fails_nonfloat = int existential_gadt accepts_nonfloat
+
+[%%expect{|
+Line 1, characters 34-54:
+1 | type existential_fails_nonfloat = int existential_gadt accepts_nonfloat
+                                      ^^^^^^^^^^^^^^^^^^^^
+Error: This type "int existential_gadt" should be an instance of type
+         "('a : value_or_null mod non_float)"
+       The kind of int existential_gadt is value_or_null
+         because of the definition of existential_gadt at lines 1-4, characters 0-11.
+       But the kind of int existential_gadt must be a subkind of
+           value_or_null mod non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
+type 'a bad_gadt_payload =
+  | Nope_bad_gadt : 'a bad_gadt_payload
+  | Yep_bad_gadt : int t -> 'a bad_gadt_payload
+[@@or_null]
+
+[%%expect{|
+Line 3, characters 19-24:
+3 |   | Yep_bad_gadt : int t -> 'a bad_gadt_payload
+                       ^^^^^
+Error: The kind of type "int t" is value_or_null
+         because of the definition of t at lines 1-4, characters 0-11.
+       But the kind of type "int t" must be a subkind of
+           value_or_null mod non_null
+         because the type argument of bad_gadt_payload has kind value.
 |}]
 
 type ('a : value_or_null) widened_bad_jkind =
