@@ -271,14 +271,15 @@ static int perf_events_setup(struct perf_counters* counters,
       break;
     }
     struct perf_event_mmap_page* page;
-    page = counters->mmap_pages[i] =
-      mmap(NULL, sysconf(_SC_PAGESIZE), PROT_READ, MAP_SHARED, fd, 0);
-    if (page == NULL) {
+    page = mmap(NULL, sysconf(_SC_PAGESIZE), PROT_READ, MAP_SHARED, fd, 0);
+    if (page == MAP_FAILED) {
+      counters->mmap_pages[i] = NULL;
       close(fd);
       snprintf(err, err_len, "event %d (r%llx): mmap: %s",
                i, (unsigned long long)config, strerror(errno));
       break;
     }
+    counters->mmap_pages[i] = page;
 
     int rdpmc_ok;
     uint32_t seq;
