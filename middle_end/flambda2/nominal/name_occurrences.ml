@@ -238,9 +238,9 @@ end = struct
   let diff t1 t2 = N.Map.diff_domains t1 t2
 
   let union t1 t2 =
-    N.Map.union
+    N.Map.union_total
       (fun _name for_one_name1 for_one_name2 ->
-        Some (For_one_name.union for_one_name1 for_one_name2))
+        For_one_name.union for_one_name1 for_one_name2)
       t1 t2
 
   let keys t = N.Map.keys t
@@ -649,6 +649,29 @@ let binary_op ~for_names ~for_continuations ~for_function_slots ~for_value_slots
     newer_version_of_code_ids
   }
 
+let is_empty
+    { names;
+      continuations;
+      continuations_with_traps;
+      continuations_in_trap_actions;
+      function_slots_in_projections;
+      value_slots_in_projections;
+      function_slots_in_declarations;
+      value_slots_in_declarations;
+      code_ids;
+      newer_version_of_code_ids
+    } =
+  For_names.is_empty names
+  && For_continuations.is_empty continuations
+  && For_continuations.is_empty continuations_with_traps
+  && For_continuations.is_empty continuations_in_trap_actions
+  && For_function_slots.is_empty function_slots_in_projections
+  && For_value_slots.is_empty value_slots_in_projections
+  && For_function_slots.is_empty function_slots_in_declarations
+  && For_value_slots.is_empty value_slots_in_declarations
+  && For_code_ids.is_empty code_ids
+  && For_code_ids.is_empty newer_version_of_code_ids
+
 let diff
     { names = names1;
       continuations = continuations1;
@@ -716,11 +739,16 @@ let diff
   }
 
 let union t1 t2 =
-  binary_op ~for_names:For_names.union
-    ~for_continuations:For_continuations.union
-    ~for_function_slots:For_function_slots.union
-    ~for_value_slots:For_value_slots.union ~for_code_ids:For_code_ids.union t1
-    t2
+  if is_empty t1
+  then t2
+  else if is_empty t2
+  then t1
+  else
+    binary_op ~for_names:For_names.union
+      ~for_continuations:For_continuations.union
+      ~for_function_slots:For_function_slots.union
+      ~for_value_slots:For_value_slots.union ~for_code_ids:For_code_ids.union t1
+      t2
 
 let equal t1 t2 =
   binary_conjunction ~for_names:For_names.equal
@@ -728,8 +756,6 @@ let equal t1 t2 =
     ~for_function_slots:For_function_slots.equal
     ~for_value_slots:For_value_slots.equal ~for_code_ids:For_code_ids.equal t1
     t2
-
-let is_empty t = equal t empty
 
 let no_variables t =
   For_names.for_all t.names ~f:(fun var -> not (Name.is_var var))
@@ -764,8 +790,11 @@ let inter_domain_is_non_empty t1 t2 =
     ~for_value_slots:For_value_slots.inter_domain_is_non_empty
     ~for_code_ids:For_code_ids.inter_domain_is_non_empty t1 t2
 
-let rec union_list ts =
-  match ts with [] -> empty | t :: ts -> union t (union_list ts)
+let union_list ts =
+  List.fold_left
+    (fun acc t ->
+      if is_empty acc then t else if is_empty t then acc else union acc t)
+    empty ts
 
 let function_slots_in_normal_projections t =
   For_function_slots.fold_with_mode t.function_slots_in_projections
