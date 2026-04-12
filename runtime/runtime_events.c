@@ -143,9 +143,7 @@ static void stw_teardown_runtime_events(
   caml_domain_state **participating_domains);
 
 #ifdef PERF_COUNTERS
-enum { MAX_PERF_EVENTS = 20 };
-
-uint64_t perf_counter_configs[MAX_PERF_EVENTS];
+uint64_t perf_counter_configs[RUNTIME_EVENTS_RUNTIME_EVENTS_MAX_PERF_EVENTS];
 
 struct perf_counter_rdpmc_info {
   uint64_t offset;
@@ -154,16 +152,16 @@ struct perf_counter_rdpmc_info {
 };
 struct perf_counters {
   int ncounters;
-  void* mmap_pages[MAX_PERF_EVENTS];
+  void* mmap_pages[RUNTIME_EVENTS_MAX_PERF_EVENTS];
 
   uint32_t* leader_seq_lock;
   uint32_t last_seq;
-  struct perf_counter_rdpmc_info rdpmc_info[MAX_PERF_EVENTS];
+  struct perf_counter_rdpmc_info rdpmc_info[RUNTIME_EVENTS_MAX_PERF_EVENTS];
 };
 
 static CAMLthread_local struct perf_counters* thread_counters = NULL;
 static int num_perf_configs = 0;
-static uint64_t parsed_perf_configs[MAX_PERF_EVENTS];
+static uint64_t parsed_perf_configs[RUNTIME_EVENTS_MAX_PERF_EVENTS];
 static atomic_bool perf_counters_globally_disabled = false;
 
 #define seqlock_barrier() asm volatile("" ::: "memory")
@@ -190,9 +188,9 @@ static const char* parse_perf_config_string(const char* format)
                format);
       return err;
     }
-    if (count >= MAX_PERF_EVENTS) {
+    if (count >= RUNTIME_EVENTS_MAX_PERF_EVENTS) {
       snprintf(err, sizeof err, "events: too many events (max %d)",
-               MAX_PERF_EVENTS);
+               RUNTIME_EVENTS_MAX_PERF_EVENTS);
       return err;
     }
     parsed_perf_configs[count++] = config;
@@ -214,7 +212,7 @@ static void perf_events_teardown(struct perf_counters* counters)
 
 static int perf_events_setup_rdpmc(struct perf_counters* counters)
 {
-  uint32_t seqs[MAX_PERF_EVENTS];
+  uint32_t seqs[RUNTIME_EVENTS_MAX_PERF_EVENTS];
   struct perf_event_mmap_page* pg;
  retry:
   for (int i = 0; i < counters->ncounters; i++) {
@@ -926,7 +924,7 @@ static void write_to_ring(ev_category category, ev_message_type type,
   /* for EV_BEGIN and EV_END events messages may have 0 or more perf counters
     appended to the end of a message */
   if (sample_counters) {
-      uint64_t tmp[MAX_PERF_EVENTS];
+      uint64_t tmp[RUNTIME_EVENTS_MAX_PERF_EVENTS];
       perf_counters = counters->ncounters;
       perf_events_sample(counters, tmp);
 

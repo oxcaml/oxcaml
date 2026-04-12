@@ -341,6 +341,8 @@ CAMLextern void caml_runtime_events_domain_stop(void);
 CAMLextern void caml_runtime_events_thread_start(void);
 CAMLextern void caml_runtime_events_thread_stop(void);
 
+#define RUNTIME_EVENTS_MAX_PERF_EVENTS 20
+
 #if defined(__linux__) && (defined(__x86_64__) || defined(__i386__))
 #define PERF_COUNTERS
 #endif

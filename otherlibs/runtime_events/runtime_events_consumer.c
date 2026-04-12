@@ -47,9 +47,6 @@
 #define PERF_COUNTERS
 #endif
 
-/* Maximum number of perf events - must match runtime/runtime_events.c */
-#define MAX_PERF_EVENTS 20
-
 #if defined(HAS_UNISTD)
 #include <unistd.h>
 #endif
