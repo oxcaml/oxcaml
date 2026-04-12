@@ -797,6 +797,11 @@ static int ml_runtime_begin(int domain_id, void *callback_data,
 
   tmp_callback = Field(callbacks_root, 0); /* ev_runtime_begin */
   if (Is_some(tmp_callback)) {
+    /* Save local_sp so that the local_ perf_data array allocated by
+       extract_perf_data is freed after the callback returns. Without
+       this, each callback invocation in a read_poll loop would
+       accumulate local arrays until the enclosing OCaml region ends. */
+    intnat local_sp = Caml_state->local_sp;
     perf_data = extract_perf_data(header, buf, buf_len);
 
     params[0] = Val_long(domain_id);
@@ -805,6 +810,7 @@ static int ml_runtime_begin(int domain_id, void *callback_data,
     params[3] = perf_data;
 
     res = caml_callbackN_exn(Some_val(tmp_callback), 4, params);
+    Caml_state->local_sp = local_sp;
 
     if( Is_exception_result(res) ) {
       res = Extract_exception(res);
@@ -831,6 +837,7 @@ static int ml_runtime_end(int domain_id, void *callback_data,
 
   tmp_callback = Field(callbacks_root, 1); /* ev_runtime_end */
   if (Is_some(tmp_callback)) {
+    intnat local_sp = Caml_state->local_sp;
     perf_data = extract_perf_data(header, buf, buf_len);
 
     params[0] = Val_long(domain_id);
@@ -839,6 +846,7 @@ static int ml_runtime_end(int domain_id, void *callback_data,
     params[3] = perf_data;
 
     res = caml_callbackN_exn(Some_val(tmp_callback), 4, params);
+    Caml_state->local_sp = local_sp;
 
     if( Is_exception_result(res) ) {
       res = Extract_exception(res);
@@ -1119,6 +1127,7 @@ static int ml_user_unit(int domain_id, void *callback_data, int64_t timestamp,
                                                                 event);
 
   if (Is_block(callback_list)) {
+    intnat local_sp = Caml_state->local_sp;
     perf_data = extract_perf_data(header, buf, buf_len);
 
     params[0] = Val_long(domain_id);
@@ -1127,7 +1136,9 @@ static int ml_user_unit(int domain_id, void *callback_data, int64_t timestamp,
     params[3] = Val_unit;
     params[4] = perf_data;
 
-    if (user_events_call_callback_list(holder, callback_list, params) == 0) {
+    int ret = user_events_call_callback_list(holder, callback_list, params);
+    Caml_state->local_sp = local_sp;
+    if (ret == 0) {
       CAMLreturnT(int, 0);
     }
   }
@@ -1159,6 +1170,7 @@ static int ml_user_span(int domain_id, void *callback_data, int64_t timestamp,
                                                                 event);
 
   if (Is_block(callback_list)) {
+    intnat local_sp = Caml_state->local_sp;
     perf_data = extract_perf_data(header, buf, buf_len);
 
     params[0] = Val_long(domain_id);
@@ -1167,7 +1179,9 @@ static int ml_user_span(int domain_id, void *callback_data, int64_t timestamp,
     params[3] = Val_int(span);
     params[4] = perf_data;
 
-    if (user_events_call_callback_list(holder, callback_list, params) == 0) {
+    int ret = user_events_call_callback_list(holder, callback_list, params);
+    Caml_state->local_sp = local_sp;
+    if (ret == 0) {
       CAMLreturnT(int, 0);
     }
   }
@@ -1198,6 +1212,7 @@ static int ml_user_int(int domain_id, void *callback_data,
                                                                 event);
 
   if (Is_block(callback_list)) {
+    intnat local_sp = Caml_state->local_sp;
     perf_data = extract_perf_data(header, buf, buf_len);
 
     params[0] = Val_long(domain_id);
@@ -1206,7 +1221,9 @@ static int ml_user_int(int domain_id, void *callback_data,
     params[3] = Val_int(val);
     params[4] = perf_data;
 
-    if (user_events_call_callback_list(holder, callback_list, params) == 0) {
+    int ret = user_events_call_callback_list(holder, callback_list, params);
+    Caml_state->local_sp = local_sp;
+    if (ret == 0) {
       CAMLreturnT(int, 0);
     }
   }
@@ -1273,6 +1290,7 @@ static int ml_user_custom(int domain_id, void *callback_data, int64_t timestamp,
 
     data = caml_callback2(deserializer, read_buffer, Val_int(caml_string_len));
 
+    intnat local_sp = Caml_state->local_sp;
     perf_data = extract_perf_data(header, buf, buf_len);
 
     params[0] = Val_long(domain_id);
@@ -1281,8 +1299,9 @@ static int ml_user_custom(int domain_id, void *callback_data, int64_t timestamp,
     params[3] = data;
     params[4] = perf_data;
 
-    // payload is prepared, we call the callbacks sequentially.
-    if (user_events_call_callback_list(holder, callback_list, params) == 0) {
+    int ret = user_events_call_callback_list(holder, callback_list, params);
+    Caml_state->local_sp = local_sp;
+    if (ret == 0) {
       CAMLreturnT(int, 0);
     }
   }
