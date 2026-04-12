@@ -674,7 +674,7 @@ static void runtime_events_create_from_stw_single(void) {
       current_user_event = Field(current_user_event, 1);
     }
 
-    #ifdef PERF_COUNTERS
+#ifdef PERF_COUNTERS
     if (num_perf_configs == 0) {
       const char* env =
         caml_secure_getenv(T("OCAML_RUNTIME_EVENTS_PERF_COUNTERS"));
@@ -686,7 +686,7 @@ static void runtime_events_create_from_stw_single(void) {
         }
       }
     }
-    #endif
+#endif
   }
 }
 
