@@ -2411,6 +2411,22 @@ module Jkind0 = struct
       (orphaned_type_var_list @ domain)
       (type_of_kind_list @ range)
 
+  let variant_constructor_gadt_extra_substs
+      ~projected_params ~cstr_res ~payload_tys ~get_free_vars =
+    match cstr_res with
+    | None -> []
+    | Some res ->
+      let res_args =
+        match get_desc res with
+        | Tconstr (_, args, _) -> args
+        | _ -> Misc.fatal_error "cd_res must be Tconstr"
+      in
+      gadt_payload_subst
+        ~projected_params
+        ~res_args
+        ~payload_tys
+        ~get_free_vars
+
   let project_variant_constructor_arg_tys
       ~decl_params ~type_apply ~get_free_vars cstr =
     let cstr_arg_tys =
@@ -2418,26 +2434,18 @@ module Jkind0 = struct
       | Cstr_tuple args -> List.map (fun arg -> arg.ca_type) args
       | Cstr_record lbls -> List.map (fun lbl -> lbl.ld_type) lbls
     in
-    match cstr.cd_res with
-    | None -> cstr_arg_tys
-    | Some res ->
-      let res_args =
-        match get_desc res with
-        | Tconstr (_, args, _) -> args
-        | _ -> Misc.fatal_error "cd_res must be Tconstr"
-      in
-      let extra_substs =
-        gadt_payload_subst
-          ~projected_params:decl_params
-          ~res_args
-          ~payload_tys:cstr_arg_tys
-          ~get_free_vars
-      in
-      if Misc.Stdlib.List.is_empty extra_substs then
-        cstr_arg_tys
-      else
-        let domain, range = List.split extra_substs in
-        List.map (fun ty -> type_apply domain ty range) cstr_arg_tys
+    let extra_substs =
+      variant_constructor_gadt_extra_substs
+        ~projected_params:decl_params
+        ~cstr_res:cstr.cd_res
+        ~payload_tys:cstr_arg_tys
+        ~get_free_vars
+    in
+    if Misc.Stdlib.List.is_empty extra_substs then
+      cstr_arg_tys
+    else
+      let domain, range = List.split extra_substs in
+      List.map (fun ty -> type_apply domain ty range) cstr_arg_tys
 
   let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars cstrs =
     let base =

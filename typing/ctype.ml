@@ -2600,14 +2600,9 @@ let unbox_once env ty =
             (* Unboxed GADT wrappers need the same B1-B4 projection as boxed
                GADTs, but projected onto the instantiated head arguments of the
                wrapper type rather than the declaration parameters. *)
-            let res_args =
-              match get_desc cstr.Types.cstr_res with
-              | Tconstr (_, res_args, _) -> res_args
-              | _ -> Misc.fatal_error "Ctype.unbox_once: cstr_res"
-            in
-            Btype.Jkind0.gadt_payload_subst
+            Btype.Jkind0.variant_constructor_gadt_extra_substs
               ~projected_params:args
-              ~res_args
+              ~cstr_res:(Some cstr.Types.cstr_res)
               ~payload_tys:[ty2]
               ~get_free_vars:(free_variable_set_of_list env)
           | Type_variant ([{ cstr_generalized = false }], _, _) -> []
@@ -2634,22 +2629,14 @@ let unbox_once env ty =
         | Type_variant (cstrs, Variant_with_null, _) ->
           begin match Datarepr.find_variant_with_null_payload cstrs with
           | Some
-              { payload_cstr = { Types.cd_res; _ };
+              { payload_cstr;
                 payload_arg = { ca_type = ty; ca_modalities = modality; _ } } ->
             let extra_substs =
-              match cd_res with
-              | Some res ->
-                let res_args =
-                  match get_desc res with
-                  | Tconstr (_, res_args, _) -> res_args
-                  | _ -> Misc.fatal_error "Ctype.unbox_once: Variant_with_null"
-                in
-                Btype.Jkind0.gadt_payload_subst
-                  ~projected_params:args
-                  ~res_args
-                  ~payload_tys:[ty]
-                  ~get_free_vars:(free_variable_set_of_list env)
-              | None -> []
+              Btype.Jkind0.variant_constructor_gadt_extra_substs
+                ~projected_params:args
+                ~cstr_res:payload_cstr.cd_res
+                ~payload_tys:[ty]
+                ~get_free_vars:(free_variable_set_of_list env)
             in
             Stepped_or_null
               { ty = apply ty ~extra_substs;

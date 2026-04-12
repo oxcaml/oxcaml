@@ -711,6 +711,12 @@ module Jkind0 : sig
       payload_tys:Types.type_expr list ->
       get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       (Types.type_expr * Types.type_expr) list
+    val variant_constructor_gadt_extra_substs :
+      projected_params:Types.type_expr list ->
+      cstr_res:Types.type_expr option ->
+      payload_tys:Types.type_expr list ->
+      get_free_vars:(Types.type_expr list -> TypeSet.t) ->
+      (Types.type_expr * Types.type_expr) list
     val project_variant_constructor_arg_tys :
       decl_params:Types.type_expr list ->
       type_apply:
