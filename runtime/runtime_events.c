@@ -143,7 +143,7 @@ static void stw_teardown_runtime_events(
   caml_domain_state **participating_domains);
 
 #ifdef PERF_COUNTERS
-uint64_t perf_counter_configs[RUNTIME_EVENTS_RUNTIME_EVENTS_MAX_PERF_EVENTS];
+uint64_t perf_counter_configs[RUNTIME_EVENTS_MAX_PERF_EVENTS];
 
 struct perf_counter_rdpmc_info {
   uint64_t offset;
@@ -901,7 +901,11 @@ static void write_to_ring(ev_category category, ev_message_type type,
     ring_tail_offset = 0;
   }
 
-  uint64_t perf_counters = sample_counters ? counters->ncounters : 0;
+#ifdef PERF_COUNTERS
+  uint64_t num_perf = sample_counters ? counters->ncounters : 0;
+#else
+  uint64_t num_perf = 0;
+#endif
 
   /* Below we write the header. See runtime_events.h for the layout structure
      of event headers.
@@ -912,30 +916,27 @@ static void write_to_ring(ev_category category, ev_message_type type,
                                   category == EV_RUNTIME,
                                   (type.runtime | type.user),
                                   event_id,
-                                  perf_counters);
+                                  num_perf);
 
   ring_ptr[ring_tail_offset++] = timestamp;
   if (content != NULL) {
     memcpy(&ring_ptr[ring_tail_offset], content + word_offset,
            event_length * sizeof(uint64_t));
+    ring_tail_offset += event_length;
   }
 
-  #ifdef PERF_COUNTERS
-  /* for EV_BEGIN and EV_END events messages may have 0 or more perf counters
-    appended to the end of a message */
+#ifdef PERF_COUNTERS
   if (sample_counters) {
       uint64_t tmp[RUNTIME_EVENTS_MAX_PERF_EVENTS];
-      perf_counters = counters->ncounters;
       perf_events_sample(counters, tmp);
 
-      void* ring_events_ptr = &ring_ptr[ring_tail_offset];
-      /* write config first */
-      uint64_t counter_length_bytes = perf_counters * sizeof(uint64_t);
-      memcpy(ring_events_ptr, &perf_counter_configs, counter_length_bytes);
-      ring_events_ptr += counter_length_bytes;
-      memcpy(ring_events_ptr, &tmp, counter_length_bytes);
+      char *dest = (char *)&ring_ptr[ring_tail_offset];
+      uint64_t counter_length_bytes = num_perf * sizeof(uint64_t);
+      memcpy(dest, perf_counter_configs, counter_length_bytes);
+      dest += counter_length_bytes;
+      memcpy(dest, tmp, counter_length_bytes);
   }
-  #endif
+#endif
 
   atomic_store_release(&domain_ring_header->ring_tail,
                        ring_tail + length_with_header_ts);
