@@ -160,7 +160,9 @@ struct perf_counters {
   struct perf_counter_rdpmc_info rdpmc_info[RUNTIME_EVENTS_MAX_PERF_EVENTS];
 };
 
+static _Atomic uint64_t perf_counter_generation = 0;
 static CAMLthread_local struct perf_counters* thread_counters = NULL;
+static CAMLthread_local uint64_t thread_counter_generation = 0;
 static atomic_bool perf_counters_globally_disabled = false;
 
 #define seqlock_barrier() asm volatile("" ::: "memory")
@@ -338,10 +340,18 @@ retry:
   }
 }
 
+static void cleanup_thread_counters(void);
+
 static struct perf_counters* get_thread_counters(void)
 {
   if (atomic_load(&perf_counters_globally_disabled))
     return NULL;
+
+  uint64_t current_gen = atomic_load(&perf_counter_generation);
+  if (thread_counters != NULL
+      && thread_counter_generation != current_gen) {
+    cleanup_thread_counters();
+  }
 
   if (thread_counters == NULL && num_perf_configs > 0) {
     thread_counters = caml_stat_alloc(sizeof(struct perf_counters));
@@ -354,6 +364,7 @@ static struct perf_counters* get_thread_counters(void)
       thread_counters = NULL;
       return NULL;
     }
+    thread_counter_generation = current_gen;
   }
   return thread_counters;
 }
@@ -450,10 +461,10 @@ static void runtime_events_teardown_from_stw_single(int remove_file) {
     current_metadata = NULL;
 
 #ifdef PERF_COUNTERS
-    /* Clean up current thread's counters (if any) */
     cleanup_thread_counters();
     num_perf_configs = 0;
     atomic_store(&perf_counters_globally_disabled, false);
+    atomic_fetch_add(&perf_counter_generation, 1);
 #endif
 
     atomic_store_release(&runtime_events_enabled, 0);
