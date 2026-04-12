@@ -241,9 +241,9 @@ static int perf_events_setup_rdpmc(struct perf_counters* counters)
   return 0;
 }
 
-static const char* perf_events_setup(struct perf_counters* counters)
+static int perf_events_setup(struct perf_counters* counters,
+                             char* err, size_t err_len)
 {
-  static char err[256];
   err[0] = 0;
   memset(counters, 0, sizeof(*counters));
   int leader_fd = -1;
@@ -266,7 +266,7 @@ static const char* perf_events_setup(struct perf_counters* counters)
               leader_fd,
               PERF_FLAG_FD_CLOEXEC);
     if (fd < 0) {
-      snprintf(err, sizeof err, "event %d (r%llx): perf_event_open: %s",
+      snprintf(err, err_len, "event %d (r%llx): perf_event_open: %s",
                i, (unsigned long long)config, strerror(errno));
       break;
     }
@@ -275,7 +275,7 @@ static const char* perf_events_setup(struct perf_counters* counters)
       mmap(NULL, sysconf(_SC_PAGESIZE), PROT_READ, MAP_SHARED, fd, 0);
     if (page == NULL) {
       close(fd);
-      snprintf(err, sizeof err, "event %d (r%llx): mmap: %s",
+      snprintf(err, err_len, "event %d (r%llx): mmap: %s",
                i, (unsigned long long)config, strerror(errno));
       break;
     }
@@ -291,7 +291,7 @@ static const char* perf_events_setup(struct perf_counters* counters)
     } while (page->lock != seq);
 
     if (!rdpmc_ok) {
-      snprintf(err, sizeof err,
+      snprintf(err, err_len,
                "event %d (r%llx): rdpmc reads unavailable (too many counters?)",
                i, (unsigned long long)config);
       close(fd);
@@ -309,13 +309,13 @@ static const char* perf_events_setup(struct perf_counters* counters)
   /* Close the leader fd - mmap keeps the event alive */
   if (leader_fd != -1) close(leader_fd);
   if (err[0] == 0 && perf_events_setup_rdpmc(counters) != 0) {
-    snprintf(err, sizeof err, "events: failed to setup rdpmc info");
+    snprintf(err, err_len, "events: failed to setup rdpmc info");
   }
   if (err[0]) {
     perf_events_teardown(counters);
-    return err;
+    return -1;
   } else {
-    return NULL;
+    return 0;
   }
 }
 
@@ -356,8 +356,8 @@ static struct perf_counters* get_thread_counters(void)
   if (thread_counters == NULL && num_perf_configs > 0) {
     thread_counters = caml_stat_alloc(sizeof(struct perf_counters));
     memset(thread_counters, 0, sizeof(struct perf_counters));
-    const char* err = perf_events_setup(thread_counters);
-    if (err) {
+    char err[256];
+    if (perf_events_setup(thread_counters, err, sizeof err) != 0) {
       caml_gc_log("perf_events setup failed, disabling globally: %s", err);
       atomic_store(&perf_counters_globally_disabled, true);
       caml_stat_free(thread_counters);
