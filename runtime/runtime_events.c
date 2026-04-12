@@ -42,7 +42,7 @@
 #include <sys/mman.h>
 #endif
 
-/* hardware events is linux only for now */
+/* hardware events are linux only for now */
 #ifdef PERF_COUNTERS
 #include <linux/perf_event.h>
 #include <linux/hw_breakpoint.h>
