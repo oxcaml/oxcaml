@@ -20,7 +20,8 @@
 open Runtime_events
 
 (* External for getting length of unboxed product arrays *)
-external[@layout_poly] array_length : ('a : any mod separable). 'a array -> int =
+external[@layout_poly] array_length :
+  ('a : any mod separable). local_ 'a array -> int =
   "%array_length"
 
 let samples_seen_begin = ref 0
