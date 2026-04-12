@@ -45,7 +45,6 @@
 /* hardware events are linux only for now */
 #ifdef PERF_COUNTERS
 #include <linux/perf_event.h>
-#include <linux/hw_breakpoint.h>
 #include <sys/syscall.h>
 #include <x86intrin.h>
 #endif
