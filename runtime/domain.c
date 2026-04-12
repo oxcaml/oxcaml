@@ -2259,19 +2259,24 @@ value caml_process_tick_exn(void)
                                memory_order_acquire)) {
     caml_domain_tick_hook();
 
-    bool any_preemptible = false;
+    /* 1. walk up the list of fibers, keeping track of the reverse list of
+          preemptible fibers in `stack->handler->preemptible_child` */
     struct stack_info *stack = caml_state->current_stack;
-    while (stack->handler->parent) {
-      if (stack->handler->handle_tick != Val_unit) {
-        any_preemptible = true;
+    struct stack_info *last_preemptible = 0;
+    while (stack) {
+      if (Stack_is_preemptible(stack)) {
+        if (last_preemptible) {
+          stack->handler->preemptible_child = last_preemptible;
+        }
+        last_preemptible = stack;
       }
       stack = stack->handler->parent;
     }
 
-    if (!any_preemptible) {
-      return Val_unit;
-    }
-
+    /* walk *down* the list of preemptible fibers (potentially skipping over
+       non-preemptible fibers), calling each one's tick handler until one
+       decides to preempt. */
+    stack = last_preemptible;
     while (stack) {
       if (stack->handler->handle_tick != Val_unit) {
         value res = caml_callback_exn(stack->handler->handle_tick, Val_unit);
@@ -2281,7 +2286,7 @@ value caml_process_tick_exn(void)
 
         switch (Long_val(res)) {
         case 0: /* Preempt */
-          caml_domain_setup_preemption();
+          caml_domain_preempt_self(Val_unit);
           return Val_unit;
         case 1: /* Continue */
           break;

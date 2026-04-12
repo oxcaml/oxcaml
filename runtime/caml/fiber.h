@@ -36,8 +36,8 @@ struct stack_handler {
   value handle_effect;
   value handle_tick; /* tick handler callback, Val_unit if not preemptible */
   struct stack_info* parent; /* parent OCaml stack if any */
-  /* Next /preemptible* descendant fiber, if any. May not be the immediate child
-     fiber. */
+  /* Next /preemptible* descendant fiber, if any. Might not be the immediate
+     child fiber. */
   struct stack_info* preemptible_child;
 };
 
@@ -96,6 +96,7 @@ struct stack_info {
 #define Stack_handle_exception(stk) (stk)->handler->handle_exn
 #define Stack_handle_effect(stk) (stk)->handler->handle_effect
 #define Stack_handle_tick(stk) (stk)->handler->handle_tick
+#define Stack_is_preemptible(stk) Stack_handle_tick(stk) != Val_unit
 #define Stack_parent(stk) (stk)->handler->parent
 
 /* Stack layout for native code. Stack grows downwards.

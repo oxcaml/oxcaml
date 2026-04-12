@@ -48,10 +48,7 @@ type ('a,'b) preemptible_handler =
     effc: 'c.'c t -> (('c,'b) continuation -> 'b) option;
     tickc: unit -> tick_outcome }
 
-external enable_tick_thread : bool -> unit = "caml_enable_tick_thread"
-
 let match_with_preemptible comp arg handler =
-  enable_tick_thread true;
   let effc eff k last_fiber =
     match handler.effc eff with
     | Some f ->
@@ -118,7 +115,6 @@ let perform_normal_effect () =
 
 let preempt_on_tick () =
   print_endline "# Preempt on tick";
-  enable_tick_thread true;
   let preempted = ref false in
   match_with_preemptible
     (fun () ->
@@ -676,7 +672,7 @@ let multiple_layers_outer_preempts () =
 ;;
 
 let () =
-  enable_tick_thread true;
+  let tick = Domain.Tick.acquire ~interval_usec:1000 in
   perform_normal_effect ();
   preempt_on_tick ();
   preempt_after_two_ticks ();
@@ -690,5 +686,6 @@ let () =
   inner_preemptible_finishes_then_outer_ticks ();
   inner_preemptible_finishes_sibling_ticks ();
   three_preemptible_middle_finishes ();
-  multiple_layers_outer_preempts ()
+  multiple_layers_outer_preempts ();
+  Domain.Tick.release tick
 ;;
