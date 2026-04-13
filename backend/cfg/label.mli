@@ -41,6 +41,8 @@ val cur_label : unit -> t
 
 val reset : unit -> unit
 
+val with_saved_counter : (unit -> 'a) -> 'a
+
 val to_int : t -> int
 
 (** [of_int_unsafe] is used for testing and ocamlfdo. *)

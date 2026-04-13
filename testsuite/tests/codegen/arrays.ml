@@ -130,8 +130,8 @@ poly_unsafe_get:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L119
-.L121:
+  jb    .L112
+.L114:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd -4(%rdi,%rbx,4), %xmm0
@@ -485,8 +485,8 @@ poly_safe_get:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L140
-.L142:
+  jb    .L126
+.L128:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd -4(%rdi,%rbx,4), %xmm0

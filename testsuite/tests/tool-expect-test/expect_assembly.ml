@@ -56,7 +56,7 @@ f:
   movq  %rax, %rbx
   movq  camlTOP4__fn$5b$3a1$2c19$2d$2d45$5d_10@GOTPCREL(%rip), %rax
   call  camlStdlib__List__map_15_113_code@PLT
-.L122:
+.L113:
   movq  %rax, %rbx
   movq  camlTOP4__fn$5b$3a1$2c60$2d$2d86$5d_11@GOTPCREL(%rip), %rax
   addq  $8, %rsp
