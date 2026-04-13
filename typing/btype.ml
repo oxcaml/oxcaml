@@ -1501,6 +1501,15 @@ module Jkind0 = struct
           name = "void"
         }
 
+      let void_internal =
+        { jkind =
+            mk_jkind (Base (Void, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null ~separability:Non_float;
+          name = "void_internal"
+        }
+
       let void_mod_everything =
         { jkind =
             mk_jkind (Base (Void, Scannable_axes.max))
@@ -1600,6 +1609,19 @@ module Jkind0 = struct
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
+      let float64_internal =
+        { jkind =
+            mk_jkind (Base (Float64, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null ~separability:Non_float;
+          (* [separability] is intentionally [Non_float]:
+             only boxed floats are relevant for separability. *)
+          name = "float64_internal"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_float =
         { jkind =
             mk_jkind (Base (Float64, Scannable_axes.max))
@@ -1622,6 +1644,19 @@ module Jkind0 = struct
           (* [separability] is intentionally [Non_float]:
              only boxed floats are relevant for separability. *)
           name = "float32"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let float32_internal =
+        { jkind =
+            mk_jkind (Base (Float32, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null ~separability:Non_float;
+          (* [separability] is intentionally [Non_float]:
+             only boxed floats are relevant for separability. *)
+          name = "float32_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1650,6 +1685,17 @@ module Jkind0 = struct
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
+      let word_internal =
+        { jkind =
+            mk_jkind (Base (Word, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "word_internal"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_nativeint =
         { jkind =
             mk_jkind (Base (Word, Scannable_axes.max))
@@ -1666,6 +1712,15 @@ module Jkind0 = struct
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "untagged_immediate"
+        }
+
+      let untagged_immediate_internal =
+        { jkind =
+            mk_jkind (Base (Untagged_immediate, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "untagged_immediate_internal"
         }
 
       let kind_of_untagged_int =
@@ -1686,6 +1741,17 @@ module Jkind0 = struct
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits8"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let bits8_internal =
+        { jkind =
+            mk_jkind (Base (Bits8, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "bits8_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1714,6 +1780,17 @@ module Jkind0 = struct
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
+      let bits16_internal =
+        { jkind =
+            mk_jkind (Base (Bits16, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "bits16_internal"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_int16 =
         { jkind =
             mk_jkind (Base (Bits16, Scannable_axes.max))
@@ -1736,6 +1813,17 @@ module Jkind0 = struct
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
+      let bits32_internal =
+        { jkind =
+            mk_jkind (Base (Bits32, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "bits32_internal"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_int32 =
         { jkind =
             mk_jkind (Base (Bits32, Scannable_axes.max))
@@ -1754,6 +1842,17 @@ module Jkind0 = struct
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits64"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let bits64_internal =
+        { jkind =
+            mk_jkind (Base (Bits64, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "bits64_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1789,6 +1888,17 @@ module Jkind0 = struct
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
+      let vec128_internal =
+        { jkind =
+            mk_jkind (Base (Vec128, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "vec128_internal"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
       let vec256 =
         { jkind =
             mk_jkind (Base (Vec256, Scannable_axes.max))
@@ -1800,6 +1910,17 @@ module Jkind0 = struct
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
+      let vec256_internal =
+        { jkind =
+            mk_jkind (Base (Vec256, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "vec256_internal"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
       let vec512 =
         { jkind =
             mk_jkind (Base (Vec512, Scannable_axes.max))
@@ -1807,6 +1928,17 @@ module Jkind0 = struct
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "vec512"
+        }
+
+      (* CR or_null: nullability here should be [Maybe_null], but is set
+         to [Non_null] for now due to inference limitations. *)
+      let vec512_internal =
+        { jkind =
+            mk_jkind (Base (Vec512, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+              ~separability:Non_float;
+          name = "vec512_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1850,21 +1982,33 @@ module Jkind0 = struct
           sync_data;
           mutable_data;
           void;
+          void_internal;
           immediate;
           immediate_or_null;
           immediate64;
           immediate64_or_null;
           untagged_immediate;
+          untagged_immediate_internal;
           float64;
+          float64_internal;
           float32;
+          float32_internal;
           word;
+          word_internal;
           bits8;
+          bits8_internal;
           bits16;
+          bits16_internal;
           bits32;
+          bits32_internal;
           bits64;
+          bits64_internal;
           vec128;
+          vec128_internal;
           vec256;
-          vec512 ]
+          vec256_internal;
+          vec512;
+          vec512_internal ]
 
       let additional_common_jkinds =
         [ any_mod_everything;
