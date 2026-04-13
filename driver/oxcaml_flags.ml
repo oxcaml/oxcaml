@@ -350,7 +350,7 @@ module Flambda2 = struct
     }
 
     let o4 = {
-      default with
+      o3 with
       cont_lifting_budget = 3_000;
       cont_spec_threshold = 0.;
     }
