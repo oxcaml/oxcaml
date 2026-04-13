@@ -238,7 +238,7 @@ module Flambda2 = struct
 
   let o3 = {
     o2 with
-    function_result_types = Functors_only;
+    function_result_types = Functors_only
   }
 
   let o4 = {
