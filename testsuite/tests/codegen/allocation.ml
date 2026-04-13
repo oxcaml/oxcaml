@@ -25,11 +25,11 @@ one_or_two_element_list:
   movq  %rbx, (%rdi)
   movq  $1, 8(%rdi)
   cmpq  $1, %rax
-  jne   .L104
+  jne   .L106
   movq  %rdi, %rax
   addq  $8, %rsp
   ret
-.L104:
+.L106:
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    .L118

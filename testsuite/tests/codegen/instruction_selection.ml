@@ -66,22 +66,10 @@ let do_intersect t1 t2 =
 do_intersect:
   andq  %rbx, %rax
   testq %rax, %rax
-<<<<<<< HEAD
-  jne   .L0
-||||||| parent of 42782c097b (passes testsuite)
   jne   .L106
-=======
-  jne   .L103
->>>>>>> 42782c097b (passes testsuite)
   movl  $100, %eax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
 .L106:
-=======
-.L103:
->>>>>>> 42782c097b (passes testsuite)
   movl  $200, %eax
   ret
 |}]
@@ -94,11 +82,11 @@ logand_branch:
   movq  %rdi, %rbx
   andl  $33, %eax
   cmpq  $1, %rax
-  je    .L105
+  je    .L108
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L105:
+.L108:
   movl  $1, %eax
   ret
 |}]
@@ -119,12 +107,12 @@ combine_comparisons:
   cmpq  $41, %rbx
   setl  %al
   cmpq  $11, %rbx
-  jle   .L108
+  jle   .L114
   testq %rax, %rax
-  je    .L108
+  je    .L114
   movq  %rbx, %rax
   ret
-.L108:
+.L114:
   movl  $1, %eax
   ret
 |}]
@@ -142,30 +130,12 @@ repeat_comparisons:
   cmpq  $11, %rbx
   setg  %al
   cmpq  $11, %rbx
-<<<<<<< HEAD
-  jle   .L0
-||||||| parent of 42782c097b (passes testsuite)
   jle   .L113
-=======
-  jle   .L107
->>>>>>> 42782c097b (passes testsuite)
   testq %rax, %rax
-<<<<<<< HEAD
-  je    .L0
-||||||| parent of 42782c097b (passes testsuite)
   je    .L113
-=======
-  je    .L107
->>>>>>> 42782c097b (passes testsuite)
   movl  $3, %eax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
 .L113:
-=======
-.L107:
->>>>>>> 42782c097b (passes testsuite)
   movl  $5, %eax
   ret
 |}]
@@ -184,22 +154,10 @@ branch_and_return:
   setne %al
   leaq  1(%rax,%rax), %rax
   cmpq  $3, %rax
-<<<<<<< HEAD
-  jne   .L0
-||||||| parent of 42782c097b (passes testsuite)
   jne   .L107
-=======
-  jne   .L104
->>>>>>> 42782c097b (passes testsuite)
   movq  %rbx, %rax
   ret
-<<<<<<< HEAD
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
 .L107:
-=======
-.L104:
->>>>>>> 42782c097b (passes testsuite)
   movl  $15, %eax
   ret
 |}]
@@ -238,35 +196,15 @@ let constant_folding (x : int) =
 [%%expect_asm X86_64{|
 constant_folding:
   cmpq  %rax, %rax
-<<<<<<< HEAD
-  jl    .L0
-||||||| parent of 42782c097b (passes testsuite)
   jl    .L109
-=======
-  jl    .L105
->>>>>>> 42782c097b (passes testsuite)
   subq  %rax, %rax
   incq  %rax
   cmpq  $1, %rax
-<<<<<<< HEAD
-  jne   .L1
-.L0:
-||||||| parent of 42782c097b (passes testsuite)
   jne   .L111
 .L109:
-=======
-  jne   .L106
-.L105:
->>>>>>> 42782c097b (passes testsuite)
   movl  $7, %eax
   ret
-<<<<<<< HEAD
-.L1:
-||||||| parent of 42782c097b (passes testsuite)
 .L111:
-=======
-.L106:
->>>>>>> 42782c097b (passes testsuite)
   movl  $9, %eax
   ret
 |}]
@@ -401,11 +339,11 @@ let is_int_branch (x : 'a) f = if Obj.is_int(Obj.repr x) then f()
 [%%expect_asm X86_64{|
 is_int_branch:
   testb $1, %al
-  je    .L104
+  je    .L107
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L104:
+.L107:
   movl  $1, %eax
   ret
 |}]
@@ -416,10 +354,10 @@ let is_block_branch (x : 'a) f = if not(Obj.is_int(Obj.repr x)) then f()
 [%%expect_asm X86_64{|
 is_block_branch:
   testb $1, %al
-  je    .L104
+  je    .L105
   movl  $1, %eax
   ret
-.L104:
+.L105:
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
@@ -437,13 +375,13 @@ let branch_or_tailcall x =
 [%%expect_asm X86_64{|
 branch_or_tailcall:
   cmpq  $5, %rax
-  jbe   .L103
+  jbe   .L105
   movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L103:
+.L105:
   movq  camlTOP28__switch_block919@GOTPCREL(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
