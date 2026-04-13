@@ -5,8 +5,8 @@ let $camlArguments_for_unboxed_closure__first_const = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let y = %project_value_slot.[`g`].[`y`] (my_closure) in
-   let x = %project_value_slot.[`g`].[`x`] (my_closure) in
+   let y = %project_value_slot.[g].[y] (my_closure) in
+   let x = %project_value_slot.[g].[x] (my_closure) in
    apply h (y) -> k3 * k2
      where k3 (apply_result : imm tagged) =
        let int_add = %int_barith.add (x, apply_result) in
@@ -31,8 +31,8 @@ let $camlArguments_for_unboxed_closure__first_const = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let g = %project_value_slot.[`u`].[`g`] (my_closure) in
-   let `id` = %project_value_slot.[`u`].[`id`] (my_closure) in
+   let g = %project_value_slot.[u].[g] (my_closure) in
+   let `id` = %project_value_slot.[u].[`id`] (my_closure) in
    apply direct(g_1) inlined(always) (g : _ -> imm tagged) (`id`) -> k1 * k2
  in
  let code size(65)
