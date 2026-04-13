@@ -5969,7 +5969,8 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
         Mode.Value.meet (List.map as_single_mode [exp_mode; env_mode])
       in
       Some env_alloc_mode, mode_default exp_mode
-    else None, exp_mode
+    else
+      None, mode_morph (Crossing.apply_right mode_crossing_staticity) exp_mode
   in
   attrs, pat_mode, env_alloc_mode, exp_mode, spat
 

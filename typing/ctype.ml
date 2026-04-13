@@ -5897,6 +5897,13 @@ let mode_crossing_functor =
 (** The mode crossing of any module. *)
 let mode_crossing_module = Mode.Crossing.max
 
+let mode_crossing_staticity =
+  Crossing.create
+    ~uniqueness:false ~contention:false ~visibility:false
+    ~regionality:false ~linearity:false ~portability:false
+    ~forkable:false ~yielding:false ~statefulness:false
+    ~staticity:true
+
 let zap_modalities_to_floor_if_at_least level =
   if Language_extension.(is_at_least Mode level)
     then Mode.Modality.zap_to_floor
