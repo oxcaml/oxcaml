@@ -1229,8 +1229,7 @@ let mode_unit =
       yielding = Unyielding;
       statefulness = Stateful;
       visibility = Read_write;
-      staticity = Dynamic;
-      (* CR-soon zqian: persistent modules are always static *)
+      staticity = Static;
     }
     ~hint_monadic:hint ~hint_comonadic:hint
 
