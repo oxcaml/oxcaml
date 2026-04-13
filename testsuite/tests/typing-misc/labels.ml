@@ -21,7 +21,7 @@ let g ?x () = ();;
 foo ((); g);;
 [%%expect{|
 val foo : (unit -> unit) -> unit = <fun>
-val g : ?x:'a -> unit -> unit = <fun>
+val g : ('a : any). ?x:'a -> unit -> unit = <fun>
 - : unit = ()
 |}];;
 
