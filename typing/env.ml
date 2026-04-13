@@ -2964,7 +2964,12 @@ let add_local_constraint ~since_stage ~stage path info env =
     local_constraints =
       StagedPath.Map.add spath (since_stage, info) env.local_constraints;
     local_constraints_since =
-      Stage.Map.add_to_list since_stage spath env.local_constraints_since }
+      (* We cannot go below stage 0, so we never access
+         [local_constraints_since] at stage 0. *)
+      if since_stage > 0 then
+        Stage.Map.add_to_list since_stage spath env.local_constraints_since
+      else
+        env.local_constraints_since }
 
 let add_implicit_jkind ~loc name jkind env =
   match String.Map.find_opt name env.implicit_jkinds with
