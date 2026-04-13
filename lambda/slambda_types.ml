@@ -72,3 +72,34 @@ end
 type env = Env.t
 
 include Types
+
+open Format
+
+let rec print_value ppf = function
+  | SLVhalves h -> print_halves ppf h
+  | SLVlayout l -> fprintf ppf "⟪%a⟫" Printlambda.layout l
+  | SLVrecord fields ->
+    let print_fields ppf =
+      Array.iter
+        (fun v -> fprintf ppf "%a;@ " print_or_missing v)
+        fields
+    in
+    fprintf ppf "@[<hv 2>[@ %t]@]" print_fields
+  | SLVclosure c -> print_closure ppf c
+
+and print_halves ppf { slv_comptime; slv_runtime } =
+  fprintf ppf "@[<hv>@[<2>{ c =@ %a@]@,@[<2>; r =@ ⟪%a⟫@] }@]"
+    print_or_missing slv_comptime Printlambda.lambda slv_runtime
+
+and print_or_missing ppf = function
+  | Or_missing.Present v -> print_value ppf v
+  | Or_missing.Missing -> fprintf ppf "(missing)"
+
+and print_closure ppf { clo_params; clo_body; clo_env = _ } =
+  let print_params ppf =
+    Array.iter
+      (fun id -> fprintf ppf "%a@ " Slambdaident.print id)
+      clo_params
+  in
+  fprintf ppf "@[<2>(closure @[<2>%t->@]@ %a)@]" print_params
+    Printlambda.slambda clo_body

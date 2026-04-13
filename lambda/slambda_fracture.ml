@@ -339,12 +339,12 @@ let rec fracture_lam lambda : slambda =
       ({ kind = _; params; return; body; attr; loc; mode; ret_mode }, free_vars)
     ->
     let free_vars = Ident.Map.to_list free_vars in
-    let free_vars_shape =
+    (* let free_vars_shape =
       List.map
         (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
         free_vars
       |> Array.of_list
-    in
+    in *)
     let templated_function_body =
       slet_local "body" body (fun body_c body_r ->
           let closure_id = Ident.create_local "closure" in
@@ -366,7 +366,7 @@ let rec fracture_lam lambda : slambda =
                       ident,
                       debug_uid_none,
                       Lprim
-                        ( Pmixedfield ([i], free_vars_shape, Reads_agree),
+                        ( Pfield (i, Pointer, Reads_agree),
                           [Lvar closure_id],
                           loc ),
                       lam ) ))

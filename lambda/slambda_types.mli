@@ -31,6 +31,14 @@ and value =
   | SLVclosure of closure
 
 
+val print_value : Format.formatter -> value -> unit
+
+val print_halves : Format.formatter -> halves -> unit
+
+val print_or_missing : Format.formatter -> value Or_missing.t -> unit
+
+val print_closure : Format.formatter -> closure -> unit
+
 module Env : sig
   type t = env
 

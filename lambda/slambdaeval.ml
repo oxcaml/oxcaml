@@ -82,7 +82,9 @@ let rec eval_slam env slam : value Or_missing.t =
     let slv_runtime = eval_lam env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
   | SLlayout layout -> Present (SLVlayout layout)
-  | SLglobal cu -> Compilenv.get_cached_static_data cu
+  | SLglobal cu ->
+    Compilenv.ensure_unit_loaded cu;
+    Compilenv.get_cached_static_data cu
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
     let value = eval_slam env slet_value in
