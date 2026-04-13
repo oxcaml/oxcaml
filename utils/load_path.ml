@@ -570,7 +570,7 @@ let find_normalized_with_visibility fn =
       | Some result -> result
       | None ->
         match search_dirs (List.rev !hidden_dirs) fn with
-        | Some (path, _) -> (path, Hidden)
+        | Some result -> result
         | None -> raise Not_found
   with Not_found ->
     let fn_uncap = String.uncapitalize_ascii fn in
