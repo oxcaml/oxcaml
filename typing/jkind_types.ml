@@ -410,9 +410,9 @@ module Sort = struct
     let t = Option.get t_op in
     (* [v.level] is meaningful and should affect all variables in [t]. *)
     update_level v.level t;
-    set_without_level v t_op
-  (* [v.contents] is set, which renders [v.level] meaningless, so we don't
+    (* [v.contents] is set, which renders [v.level] meaningless, so we don't
        need to update that. *)
+    set_without_level v t_op
 
   let[@inline] set_to_compress : var -> t option -> unit =
    fun v t_op ->
@@ -687,7 +687,7 @@ module Sort = struct
     | Var v ->
       if v.level > current_level && v.level <> Ident.highest_scope
       then begin
-        (* Mark as visited / make generic *)
+        (* If [v.contents] is [Some _], [v.level] is meaningless and only serves as a *)
         v.level <- Ident.highest_scope;
         match v.contents with
         | Some s -> generalize_rec ~current_level ~vars_ref s
