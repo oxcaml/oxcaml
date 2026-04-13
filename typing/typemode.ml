@@ -201,9 +201,15 @@ module Transled_modifiers = struct
     | Modal (Monadic Staticity) -> { t with staticity = value }
     | Nonmodal Externality -> { t with externality = value }
 
-  let set_nullability t nullability = { t with nullability }
+  let meet_nullability t (nullability : Nullability.t loc) =
+    match t.nullability with
+    | Some existing when Nullability.le existing.txt nullability.txt -> t
+    | _ -> { t with nullability = Some nullability }
 
-  let set_separability t separability = { t with separability }
+  let meet_separability t separability =
+    match t.separability with
+    | Some existing when Separability.le existing.txt separability.txt -> t
+    | _ -> { t with separability = Some separability }
 end
 
 (* Since [unforkable yielding] is the default mode in presence of [local], the
@@ -286,26 +292,26 @@ let transl_mod_bounds annots =
          because the warnings would be reported 3 times. If this is fixed before
          the syntax is deprecated, dupes really should raise warnings! *)
       | "non_pointer" ->
-        Transled_modifiers.set_separability bounds_so_far
-          (Some { txt = Non_pointer; loc })
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Non_pointer; loc }
       | "non_pointer64" ->
-        Transled_modifiers.set_separability bounds_so_far
-          (Some { txt = Non_pointer64; loc })
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Non_pointer64; loc }
       | "non_float" ->
-        Transled_modifiers.set_separability bounds_so_far
-          (Some { txt = Non_float; loc })
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Non_float; loc }
       | "separable" ->
-        Transled_modifiers.set_separability bounds_so_far
-          (Some { txt = Separable; loc })
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Separable; loc }
       | "maybe_separable" ->
-        Transled_modifiers.set_separability bounds_so_far
-          (Some { txt = Maybe_separable; loc })
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Maybe_separable; loc }
       | "non_null" ->
-        Transled_modifiers.set_nullability bounds_so_far
-          (Some { txt = Non_null; loc })
+        Transled_modifiers.meet_nullability bounds_so_far
+          { txt = Non_null; loc }
       | "maybe_null" ->
-        Transled_modifiers.set_nullability bounds_so_far
-          (Some { txt = Maybe_null; loc })
+        Transled_modifiers.meet_nullability bounds_so_far
+          { txt = Maybe_null; loc }
       | "everything" ->
         Transled_modifiers.
           { areality =

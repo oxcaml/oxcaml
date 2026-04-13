@@ -584,3 +584,23 @@ end
 [%%expect{|
 module M : sig type t : value non_float end
 |}]
+
+(* Multiple mod bounds *)
+type ('a : value mod non_pointer) require_non_pointer
+[%%expect{|
+type ('a : value non_pointer) require_non_pointer
+|}]
+
+type non_pointer  : value mod non_pointer maybe_separable
+type check = non_pointer require_non_pointer
+[%%expect{|
+type non_pointer : value non_pointer
+type check = non_pointer require_non_pointer
+|}]
+
+type non_pointer : value mod maybe_separable non_pointer
+type check = non_pointer require_non_pointer
+[%%expect{|
+type non_pointer : value non_pointer
+type check = non_pointer require_non_pointer
+|}]
