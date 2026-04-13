@@ -306,26 +306,6 @@ let size_vec128 = 16
 let size_vec256 = 32
 let size_vec512 = 64
 
-let specific_op_result_type
-    (op : specific_operation) : Cmm.machtype =
-  match op with
-  | Ifloatarithmem (Float64, _, _) -> Cmm.typ_float
-  | Ifloatarithmem (Float32, _, _) -> Cmm.typ_float32
-  | Ipackf32 -> Cmm.typ_float
-  | Istore_int _ | Ioffset_loc _ | Ilfence | Isfence
-  | Imfence | Icldemote _ | Iprefetch _ ->
-    Cmm.typ_void
-  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Irdtsc
-  | Irdpmc | Illvm_intrinsic _ ->
-    Cmm.typ_int
-  | Isimd op -> (
-    match[@ocaml.warning "-4"] op.instr with
-    | Sequence { id = Sqrtsd | Roundsd; _ } ->
-      Cmm.typ_float
-    | Sequence { id = Sqrtss | Roundss; _ } ->
-      Cmm.typ_float32
-    | _ -> Cmm.typ_vec128)
-  | Isimd_mem _ -> Cmm.typ_vec128
 
 let allow_unaligned_access = true
 

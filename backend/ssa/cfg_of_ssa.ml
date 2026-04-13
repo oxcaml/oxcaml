@@ -86,6 +86,19 @@ let emit_moves body ~src ~dst =
           (make_cfg_instr (Cfg.Op Move) [| s |] [| d |] Debuginfo.none))
     src dst
 
+let emit_moves_prefix body ~src ~dst =
+  let src =
+    if Array.length src > Array.length dst
+    then Array.sub src 0 (Array.length dst)
+    else src
+  in
+  let dst =
+    if Array.length dst > Array.length src
+    then Array.sub dst 0 (Array.length src)
+    else dst
+  in
+  emit_moves body ~src ~dst
+
 let reconstruct_test renv (cond : Ssa.instruction) ~true_label ~false_label :
     Cfg.terminator * Reg.t array =
   match cond with
@@ -137,20 +150,12 @@ let branch_cond_id (block : Ssa.block) : Ssa.InstructionId.t option =
   | _ -> None
 
 module Make (Target : Cfg_selectgen_target_intf.S) = struct
-  let pad_to a target_len filler =
-    let n = Array.length a in
-    if n >= target_len
-    then a
-    else Array.init target_len (fun i -> if i < n then a.(i) else filler.(i))
-
   let emit_op body op dbg rs rd =
     match Target.pseudoregs_for_operation op rs rd with
     | Constrained (rsrc, rdst) ->
-      let rs = pad_to rs (Array.length rsrc) rsrc in
-      let rd = pad_to rd (Array.length rdst) rdst in
-      emit_moves body ~src:rs ~dst:rsrc;
+      emit_moves_prefix body ~src:rs ~dst:rsrc;
       DLL.add_end body (make_cfg_instr (Cfg.Op op) rsrc rdst dbg);
-      emit_moves body ~src:rdst ~dst:rd
+      emit_moves_prefix body ~src:rdst ~dst:rd
     | Use_default_regs ->
       DLL.add_end body (make_cfg_instr (Cfg.Op op) rs rd dbg)
 
@@ -211,26 +216,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             (make_cfg_instr
                (Cfg.Stack_check { max_frame_size_bytes })
                [||] [||] Debuginfo.none)
-        | Name_for_debugger { ident; provenance; which_parameter; regs } -> (
+        | Name_for_debugger { ident; provenance; which_parameter; regs } ->
           let regs = Array.map (get_reg renv) regs in
-          let naming_instr =
-            make_cfg_instr
-              (Cfg.Op
-                 (Name_for_debugger { ident; provenance; which_parameter; regs }))
-              [||] [||] Debuginfo.none
-          in
-          let rec find_def cell =
-            let (instr : Cfg.basic Cfg.instruction) = DLL.value cell in
-            if Array.exists (fun r -> Array.exists (Reg.same r) instr.res) regs
-            then DLL.insert_after cell naming_instr
-            else
-              match DLL.prev cell with
-              | Some prev -> find_def prev
-              | None -> DLL.add_end body naming_instr
-          in
-          match DLL.last_cell body with
-          | Some cell -> find_def cell
-          | None -> DLL.add_end body naming_instr))
+          DLL.add_end body
+            (make_cfg_instr
+               (Cfg.Op
+                  (Name_for_debugger
+                     { ident; provenance; which_parameter; regs }))
+               [||] [||] Debuginfo.none))
       block.body;
     let dbg = block.terminator_dbg in
     let terminator, can_raise =
@@ -417,7 +410,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         in
         let loc_arg = Array.concat (Array.to_list locs) in
         Array.iteri
-          (fun i arg -> emit_moves body ~src:[| arg |] ~dst:locs.(i))
+          (fun i arg ->
+            if Array.length locs.(i) = 1
+            then emit_moves body ~src:[| arg |] ~dst:locs.(i)
+            else
+              DLL.add_end body
+                (make_cfg_instr (Cfg.Op Move) [| arg |]
+                   [| locs.(i).(0) |]
+                   Debuginfo.none))
           virt_args;
         let label_after, loc_res =
           match continuation with
