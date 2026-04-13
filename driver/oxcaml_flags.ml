@@ -245,6 +245,7 @@ module Flambda2 = struct
     o3 with
     enable_reaper = true;
     reaper_local_fields = true;
+    match_in_match = true;
   }
 
   let default_for_opt_level opt_level =
@@ -348,7 +349,11 @@ module Flambda2 = struct
       cont_spec_threshold = 0.;
     }
 
-    let o4 = default
+    let o4 = {
+      default with
+      cont_lifting_budget = 3_000;
+      cont_spec_threshold = 0.;
+    }
 
     let default_for_opt_level opt_level =
       flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 ~o4
