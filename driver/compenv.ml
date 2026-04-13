@@ -767,9 +767,15 @@ let deferred_actions = ref []
 let defer action =
   deferred_actions := action :: !deferred_actions
 
-let anonymous filename = defer (action_of_file filename)
-let impl filename = defer (ProcessImplementation filename)
-let intf filename = defer (ProcessInterface filename)
+let anonymous filename =
+  Opt_fuel.add_arg filename;
+  defer (action_of_file filename)
+let impl filename =
+  Opt_fuel.add_arg filename;
+  defer (ProcessImplementation filename)
+let intf filename =
+  Opt_fuel.add_arg filename;
+  defer (ProcessInterface filename)
 
 let process_deferred_actions env =
   let final_output_name = !output_name in

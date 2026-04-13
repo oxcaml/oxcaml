@@ -321,6 +321,7 @@
   main_args
   compenv
   compmisc
+  opt_fuel
   makedepend
   compile_common
   instantiator
