@@ -800,6 +800,7 @@ val crossing_of_jkind : Env.t -> 'd Types.jkind -> Mode.Crossing.t
 val crossing_of_ty :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
+  ?val_lpoly:Types.Lpoly.t ->
   Types.type_expr ->
   Mode.Crossing.t
 

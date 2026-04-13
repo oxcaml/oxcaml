@@ -200,7 +200,7 @@ let value_descriptions ~loc env name
   | Ok () -> ()
   | Error e -> raise (Dont_match (Zero_alloc e))
   end;
-  let crossing = Ctype.crossing_of_ty env vd2.val_type in
+  let crossing = Ctype.crossing_of_ty env ~val_lpoly:vd2.val_lpoly vd2.val_type in
   let modalities = vd1.val_modalities, vd2.val_modalities in
   let modes =
     match child_modes_with_modalities name ~modalities mmodes with
