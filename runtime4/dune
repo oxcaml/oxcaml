@@ -67,6 +67,7 @@
   libasmruni.a
   libasmrun_pic.a
   libasmrunnnp.a
+  libasmrunnnp_noasan.a
   libasmrun_shared.so
   libcamlrun.a
   libcamlrund.a
@@ -123,6 +124,7 @@
   libasmruni.a
   libasmrun_pic.a
   libasmrunnnp.a
+  libasmrunnnp_noasan.a
   libasmrun_shared.so)
  (section lib)
  (package ocaml_runtime_stdlib))
