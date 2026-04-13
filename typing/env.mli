@@ -234,6 +234,9 @@ type no_open_quotations_context =
   | Object_field_with_attribute_qt
   | Variant_tag_with_attribute_qt
   | Jkind_annotation_qt
+  | Layout_polymorphism_qt
+  | Tconst_pat_qt of Longident.t
+  | Class_type_qt
 
 type none_in_quotations_context =
   | Constructor
