@@ -866,12 +866,9 @@ let same_printing_env env =
   && Compilation_unit.Name.Set.equal !printing_pers used_pers
 
 let set_printing_env env =
-  (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
-     errors track their stage, as we should usually print at stage 0.
-     See ticket 6726. *)
-  printing_env := Env.enter_future env;
+  printing_env := env;
   if !Clflags.real_paths ||
-     env == Env.empty ||
+     !printing_env == Env.empty ||
      same_printing_env env then
     ()
   else begin
@@ -913,14 +910,17 @@ let wrap_mutation f =
   let snap = Btype.snapshot () in
   try_finally f ~always:(fun () -> Btype.backtrack snap)
 
-let wrap_printing_env env f =
+let wrap_printing_env ~reset_names env f =
   let old_env = !printing_env in
-  set_printing_env env; reset_naming_context ();
+  set_printing_env env;
+  if reset_names then reset_naming_context ();
   try_finally f ~always:(fun () -> set_printing_env old_env)
 
 let wrap_printing_env ~error env f =
-  if error then Env.without_cmis (wrap_printing_env env) f
-  else wrap_printing_env env f
+  if error then Env.without_cmis (wrap_printing_env ~reset_names:true env) f
+  else wrap_printing_env ~reset_names:true env f
+and wrap_printing_env_unguarded env f =
+  wrap_printing_env ~reset_names:false env f
 
 let rec lid_of_path = function
     Path.Pident id ->
@@ -1636,16 +1636,25 @@ let rec tree_of_modal_typexp mode modal ty =
     | Tobject (fi, nm) ->
         tree_of_typobject mode fi !nm
     | Tquote ty ->
-        Otyp_quote (tree_of_typexp mode alloc_mode ty)
+        wrap_printing_env_unguarded
+          (Env.enter_quotation !printing_env)
+          (fun () -> Otyp_quote (tree_of_typexp mode alloc_mode ty))
     | Tsplice ty ->
-        Otyp_splice (tree_of_typexp mode alloc_mode ty)
+        wrap_printing_env_unguarded
+          (Env.enter_splice ~loc:Location.none !printing_env)
+          (fun () -> Otyp_splice (tree_of_typexp mode alloc_mode ty))
     | Tquote_eval ty ->
         (* We use [Predef]'s [eval] as the syntax, so we need to quote [ty]. *)
         let ty = newgenty (Tquote ty) in
         let p', s = best_type_path Predef.path_eval in
         let tyl = apply_subst s [ty] in
         Internal_names.add p';
-        Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl)
+        let tyl =
+          wrap_printing_env_unguarded
+            (Env.enter_quotation !printing_env)
+            (fun () -> tree_of_typlist mode tyl)
+        in
+        Otyp_constr (tree_of_path (Some Type) p', tyl)
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->
@@ -1888,6 +1897,18 @@ and tree_of_typfields rest = function
 let tree_of_typexp mode ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
   wrap_mutation (fun () -> tree_of_typexp mode Alloc.Const.legacy ty)
+
+let tree_of_typexp mode ty =
+  (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
+     errors track their stage, as we should usually print at stage 0.
+     See ticket 6726. *)
+  if Ctype.contains_toplevel_splice (Env.stage !printing_env :> int) ty
+  then
+    wrap_printing_env_unguarded
+      (Env.enter_future !printing_env)
+      (fun () -> tree_of_typexp mode ty)
+  else
+    tree_of_typexp mode ty
 
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
