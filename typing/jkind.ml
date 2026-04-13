@@ -3241,6 +3241,8 @@ module Violation = struct
      [value non_pointer(64)] since [immediate(64)] is such a common jkind
      abbreviation. There is probably room to print out better notes (maybe
      by looking at the full jkinds?) *)
+  (* If [print_as_value_layout] is true, we refer to the second layout simply as
+     "a value layout" instead of printing its full scannable axes. *)
   let report_layout_notes env ppf violation mismatch_type ~print_as_value_layout
       =
     match mismatch_type with
@@ -3266,6 +3268,11 @@ module Violation = struct
         | None -> false
         | Some const -> Layout.Const.has_component ~component const
       in
+      (* CR layouts-scannable: Whenever we print out "non_pointer",
+         "non_pointer64", or "non_float" in an error message, we also include
+         hints listing common kinds with that layout. We should revisit this and
+         print a history/hints based on what the user actually wrote - see
+         internal ticket 6933 *)
       let check_both_jkinds jk1 jk2 =
         let should_check_jk2 = not print_as_value_layout in
         let should_note_immediate =
@@ -3355,6 +3362,10 @@ module Violation = struct
         let base1, base2, cmis = expand k1 k2 in
         base1, base2, cmis
     in
+    (* When we have a non-value layout but expected a value layout, e.g.
+       [float64 </= value non_pointer], we simplify the error message by eliding
+       the scannable axes of the right layout and instead refer to it as "a
+       value layout". *)
     let mismatch_type, print_as_value_layout =
       match base1, base2 with
       | Kconstr _, Kconstr _ -> Kind, false
