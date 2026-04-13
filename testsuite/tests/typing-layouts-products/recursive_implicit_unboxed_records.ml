@@ -78,12 +78,94 @@ type t = { f1 : t# -> t# ; f2 : t# -> t# }
 type t = { f1 : t# -> t#; f2 : t# -> t#; }
 |}]
 
+(* A single recursive declaration can also flatten nested products. *)
+type t = { next : unit -> t#; pair : #(unit * unit) }
+[%%expect{|
+type t = { next : unit -> t#; pair : #(unit * unit); }
+|}]
+
 (* Guarded by a tuple *)
 type a = { b : b }
 and b = a# * a#
 [%%expect{|
 type a = { b : b; }
 and b = a# * a#
+|}]
+
+(* Boxing one edge can make a mutually recursive product finite *)
+type t = { u : u# }
+and u = { t1 : t; t2 : t }
+[%%expect{|
+type t = { u : u#; }
+and u = { t1 : t; t2 : t; }
+|}]
+
+type t = { u : u# }
+and u = { x : #(unit * unit); y : unit }
+[%%expect{|
+type t = { u : u#; }
+and u = { x : #(unit * unit); y : unit; }
+|}]
+
+type 'a operation = Resume of 'a resumable#
+and 'a suspended = { run : 'a -> unit; ctx : string }
+and 'a resumable = { suspended : 'a suspended#; x : 'a }
+[%%expect{|
+type 'a operation = Resume of 'a resumable#
+and 'a suspended = { run : 'a -> unit; ctx : string; }
+and 'a resumable = { suspended : 'a suspended#; x : 'a; }
+|}]
+
+module Kinds = struct
+  kind_ single = value
+  kind_ pair = value & value
+end
+[%%expect{|
+module Kinds : sig kind_ single = value kind_ pair = value & value end
+|}]
+
+type pairish : Kinds.pair = #(unit * unit)
+[%%expect{|
+type pairish = #(unit * unit)
+|}]
+
+type ('a : Kinds.single) operation_k = Resume_k of 'a resumable_k#
+and ('a : Kinds.single) suspended_k = { run_k : 'a -> unit; ctx_k : string }
+and ('a : Kinds.single) resumable_k =
+  { suspended_k : 'a suspended_k#; x_k : 'a }
+[%%expect{|
+type 'a operation_k = Resume_k of 'a resumable_k#
+and 'a suspended_k = { run_k : 'a -> unit; ctx_k : string; }
+and 'a resumable_k = { suspended_k : 'a suspended_k#; x_k : 'a; }
+|}]
+
+type t_kind = { u_kind : u_kind# }
+and u_kind = { x_kind : pairish; y_kind : unit }
+[%%expect{|
+type t_kind = { u_kind : u_kind#; }
+and u_kind = { x_kind : pairish; y_kind : unit; }
+|}]
+
+type t_bad_kind = { u_bad_kind : u_bad_kind# }
+and u_bad_kind : Kinds.pair =
+  { x_bad_kind : #(unit * unit); y_bad_kind : unit }
+[%%expect{|
+Lines 2-3, characters 0-52:
+2 | and u_bad_kind : Kinds.pair =
+3 |   { x_bad_kind : #(unit * unit); y_bad_kind : unit }
+Error: The layout of type "u_bad_kind" is value
+         because it's a boxed record type.
+       But the layout of type "u_bad_kind" must be a sublayout of value & value
+         because of the annotation on the declaration of the type u_bad_kind.
+|}]
+
+type a_chain = { b_chain : b_chain# }
+and b_chain = { c_chain : c_chain#; z_chain : unit }
+and c_chain = { x_chain : #(unit * unit); y_chain : unit }
+[%%expect{|
+type a_chain = { b_chain : b_chain#; }
+and b_chain = { c_chain : c_chain#; z_chain : unit; }
+and c_chain = { x_chain : #(unit * unit); y_chain : unit; }
 |}]
 
 (* Guarded by a function *)
@@ -133,6 +215,46 @@ Line 1, characters 0-31:
 Error: The definition of "a_bad#" is recursive without boxing:
          "a_bad#" contains "b_bad#",
          "b_bad#" contains "a_bad#"
+|}]
+
+type t = { u1 : u#; u2 : u# }
+and u = { t1 : t#; t2 : t# }
+[%%expect{|
+Line 1, characters 0-29:
+1 | type t = { u1 : u#; u2 : u# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The definition of "t#" is recursive without boxing:
+         "t#" contains "u#",
+         "u#" contains "t#"
+|}]
+
+type t = { u : pair_u# }
+and pair_u = { t1 : t#; t2 : t# }
+[%%expect{|
+Line 1, characters 0-24:
+1 | type t = { u : pair_u# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The definition of "t#" is recursive without boxing:
+         "t#" contains "pair_u#",
+         "pair_u#" contains "t#"
+|}]
+
+type t = { u : pair_u# }
+and pair_u = { t1 : t; t2 : t }
+[%%expect{|
+type t = { u : pair_u#; }
+and pair_u = { t1 : t; t2 : t; }
+|}]
+
+type 'a t = { u1 : 'a u#; u2 : 'a u# }
+and 'a u = { t1 : 'a t#; t2 : 'a t# }
+[%%expect{|
+Line 1, characters 0-38:
+1 | type 'a t = { u1 : 'a u#; u2 : 'a u# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The definition of "t#" is recursive without boxing:
+         "'a t#" contains "'a u#",
+         "'a u#" contains "'a t#"
 |}]
 
 type bad : any = { bad : bad# }

@@ -81,6 +81,15 @@ type u = string uu#
 and 'a uu = unit
 |}]
 
+(* And through a longer chain in the same recursive group. *)
+type g : float64 = unit gg#
+and 'a gg = 'a hh
+and 'a hh = float
+[%%expect{|
+type g = unit gg#
+and 'a gg = 'a hh
+and 'a hh = float
+|}]
 (* If a type with an unboxed version is shadowed by another, [#]
    also points to the new type. *)
 type float = int32
@@ -1239,6 +1248,18 @@ Line 5, characters 13-23:
                  ^^^^^^^^^^
 Error: In the signature of this functor application:
        The type "s" has no unboxed version.
+|}]
+
+(* Mutually recursive aliases with an unboxed version should stay accepted. *)
+module Good(M : sig type t = float end) = struct
+  type u = unit s#
+  and 'a s = 'a inner
+  and 'a inner = M.t
+end
+[%%expect{|
+module Good :
+  functor (M : sig type t = float end) ->
+    sig type u = unit s# and 'a s = 'a inner and 'a inner = M.t end
 |}]
 
 (* Make sure our check isn't too restrictive. We allow a module with a
