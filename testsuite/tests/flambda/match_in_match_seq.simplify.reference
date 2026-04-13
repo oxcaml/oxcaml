@@ -17,8 +17,8 @@ let code loopify(never) size(35) newer_version_of(foo_12)
                 let prim_1 = %int_comp.gt (s_1, 5) in
                 switch prim_1
                   | 0 -> self_1 (int_add)
-                  | 1 -> k2 (s_1, int_add))
-         where k2 (s_1, int_add) =
+                  | 1 -> k2 (int_add, s_1))
+         where k2 (int_add, s_1) =
            let int_add_1 = int_add in
            let s_2 = s_1 in
            let int_mul = %int_barith.mul (s_2, s_2) in
@@ -26,10 +26,10 @@ let code loopify(never) size(35) newer_version_of(foo_12)
            cont self (int_add_2, int_add_1))
 in
 let $camlMatch_in_match_seq__foo_22 = closure foo_12_1 @foo in
-let $camlMatch_in_match_seq__Pmakeblock856 =
+let $camlMatch_in_match_seq__Pmakeblock899 =
   Block 0 ($camlMatch_in_match_seq__foo_22)
 in
 let $camlMatch_in_match_seq =
-  Block 0 ($camlMatch_in_match_seq__Pmakeblock856)
+  Block 0 ($camlMatch_in_match_seq__Pmakeblock899)
 in
 cont done ($camlMatch_in_match_seq)
