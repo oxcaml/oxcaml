@@ -557,12 +557,12 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
       (Cfg_with_layout.dump ~msg:"")
       new_cfg;
     Misc.fatal_errorf "CFG comparison MISMATCH for %s" fun_name);
-  (* Relabel the new CFG to use the old pipeline's labels, so that the
-     generated assembly has the same label numbers. *)
+  (* Relabel the new CFG to use the old pipeline's labels, so that the generated
+     assembly has the same label numbers. *)
   let f lbl =
     match Label.Tbl.find_opt label_map lbl with
     | Some old_lbl -> old_lbl
-    | None -> lbl
+    | None -> Misc.fatal_error "CFG compare failed to visit label"
   in
   let relabel_terminator_desc (desc : Cfg.terminator) : Cfg.terminator =
     match desc with
@@ -603,17 +603,12 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
           match instr.desc with
           | Cfg.Pushtrap { lbl_handler } ->
             DLL.set_value cell
-              { instr with
-                desc = Cfg.Pushtrap { lbl_handler = f lbl_handler }
-              }
+              { instr with desc = Cfg.Pushtrap { lbl_handler = f lbl_handler } }
           | Cfg.Poptrap { lbl_handler } ->
             DLL.set_value cell
-              { instr with
-                desc = Cfg.Poptrap { lbl_handler = f lbl_handler }
-              }
+              { instr with desc = Cfg.Poptrap { lbl_handler = f lbl_handler } }
           | _ -> ());
       Label.Tbl.add new_cfg_t.blocks block.start block)
     all_blocks;
   let layout = Cfg_with_layout.layout new_cfg in
-  DLL.iter_cell layout ~f:(fun cell ->
-      DLL.set_value cell (f (DLL.value cell)))
+  DLL.iter_cell layout ~f:(fun cell -> DLL.set_value cell (f (DLL.value cell)))

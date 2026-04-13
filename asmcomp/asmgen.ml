@@ -524,7 +524,9 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
        InstructionId.restore Sub_cfg.instr_id saved_instr_id;
        result
      in
-     let ssa = Ssa_selection.emit_fundecl fd_cmm in
+     let ssa =
+       Label.with_saved_counter @@ fun () -> Ssa_selection.emit_fundecl fd_cmm
+     in
      (try Ssa.validate ssa
       with exn ->
         let bt = Printexc.get_raw_backtrace () in
@@ -536,6 +538,7 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
      if !Oxcaml_flags.dump_cfg
      then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa.print ssa;
      let cfg_new =
+       Label.with_saved_counter @@ fun () ->
        try Ssa_lowering.convert ~future_funcnames:funcnames ssa
        with exn ->
          let bt = Printexc.get_raw_backtrace () in

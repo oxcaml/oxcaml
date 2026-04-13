@@ -192,7 +192,7 @@ let unnecessary_match = function
 [%%expect_asm X86_64{|
 unnecessary_match:
   sarq  $1, %rax
-  leaq  .L143(%rip), %rdx
+  leaq  .L125(%rip), %rdx
   movslq (%rdx,%rax,4), %rax
   addq  %rax, %rdx
   jmp   *%rdx
@@ -257,8 +257,8 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L138
-.L139:
+  jl    .L124
+.L125:
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1792, -8(%rax)
@@ -269,8 +269,8 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L140
-.L141:
+  jl    .L126
+.L127:
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)
@@ -281,8 +281,8 @@ double_match:
   subq  $16, %rax
   movq  %rax, 64(%r14)
   cmpq  80(%r14), %rax
-  jl    .L142
-.L143:
+  jl    .L128
+.L129:
   addq  72(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)

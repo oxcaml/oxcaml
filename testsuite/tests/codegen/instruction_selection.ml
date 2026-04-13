@@ -171,8 +171,8 @@ two_element_list:
   subq  $8, %rsp
   subq  $48, %r15
   cmpq  (%r14), %r15
-  jb    .L108
-.L110:
+  jb    .L105
+.L107:
   leaq  8(%r15), %rdi
   addq  $24, %rdi
   movq  $2048, -8(%rdi)
@@ -267,8 +267,8 @@ pause:
   subq  $8, %rsp
   pause
   cmpq  (%r14), %r15
-  jbe   .L108
-.L109:
+  jbe   .L105
+.L106:
   movl  $1, %eax
   addq  $8, %rsp
   ret

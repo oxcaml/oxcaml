@@ -51,6 +51,12 @@ let new_label () =
 
 let reset () = label_counter := init_label
 
+let with_saved_counter f =
+  let saved = !label_counter in
+  let result = f () in
+  label_counter := saved;
+  result
+
 let to_int t = t
 
 let of_int_unsafe t = t
