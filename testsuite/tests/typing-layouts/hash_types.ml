@@ -199,6 +199,17 @@ type r = { f : float#; si : #(string * int64); }
 type u = r#
 |}]
 
+type ('a : float64) t = { i : 'a ; j : 'a }
+type floatu_t : float64 & float64 = float# t#
+[%%expect{|
+type ('a : float64) t = { i : 'a; j : 'a; }
+Line 2, characters 43-45:
+2 | type floatu_t : float64 & float64 = float# t#
+                                               ^^
+Error: The type "t" has no unboxed version.
+Hint: Float records don't get unboxed versions.
+|}]
+
 (* But not float, mixed float/float#, or [@@unboxed] records *)
 type r = { f : float ; f2 : float }
 type bad = r#
@@ -231,11 +242,12 @@ Error: The type "r" has no unboxed version.
 Hint: [@@unboxed] records don't get unboxed versions.
 |}]
 type ('a : float64) t = { i : 'a ; j : 'a }
+[@@represent_as_float_array]
 type floatu_t : float64 & float64 = float t#
 [%%expect{|
 type ('a : float64) t = { i : 'a; j : 'a; }
-Line 2, characters 42-44:
-2 | type floatu_t : float64 & float64 = float t#
+Line 3, characters 42-44:
+3 | type floatu_t : float64 & float64 = float t#
                                               ^^
 Error: The type "t" has no unboxed version.
 Hint: Float records don't get unboxed versions.
