@@ -64,18 +64,18 @@ div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L108
+  je    .L118
   cmpq  $-1, %rcx
-  je    .L106
+  je    .L111
   movq  %rdi, %rax
   cqto
   idivq %rcx
   ret
-.L106:
+.L111:
   xorl  %eax, %eax
   subq  %rdi, %rax
   ret
-.L108:
+.L118:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -102,33 +102,33 @@ unsigned_div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-  jge   .L116
+  jge   .L115
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rcx
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rdi
   cmpq  %rcx, %rdi
-  jge   .L114
+  jge   .L109
   xorl  %eax, %eax
   ret
-.L114:
+.L109:
   movl  $1, %eax
   ret
-.L116:
+.L115:
   testq %rcx, %rcx
-  je    .L124
+  je    .L141
   movq  %rdi, %rbx
   shrq  $1, %rbx
   cmpq  $-1, %rcx
-  je    .L119
+  je    .L123
   movq  %rbx, %rax
   cqto
   idivq %rcx
-  jmp   .L120
-.L119:
+  jmp   .L126
+.L123:
   xorl  %eax, %eax
   subq  %rbx, %rax
-.L120:
+.L126:
   salq  $1, %rax
   movabsq $-9223372036854775808, %rsi
   movq  %rcx, %rbx
@@ -139,12 +139,12 @@ unsigned_div:
   subq  %rsi, %rdi
   subq  %rdx, %rdi
   cmpq  %rbx, %rdi
-  jge   .L122
+  jge   .L134
   ret
-.L122:
+.L134:
   incq  %rax
   ret
-.L124:
+.L141:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -157,17 +157,17 @@ let rem x y = Int64_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L107
+  je    .L117
   cmpq  $-1, %rcx
-  je    .L105
+  je    .L111
   cqto
   idivq %rcx
   movq  %rdx, %rax
   ret
-.L105:
+.L111:
   xorl  %eax, %eax
   ret
-.L107:
+.L117:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -182,7 +182,7 @@ unsigned_rem:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-  jge   .L119
+  jge   .L118
   movabsq $-9223372036854775808, %rbx
   movq  %rcx, %rax
   subq  %rbx, %rax
@@ -190,27 +190,27 @@ unsigned_rem:
   movq  %rdi, %rbx
   subq  %rsi, %rbx
   cmpq  %rax, %rbx
-  jge   .L117
+  jge   .L112
   xorl  %ebx, %ebx
-  jmp   .L128
-.L117:
+  jmp   .L148
+.L112:
   movl  $1, %ebx
-  jmp   .L128
-.L119:
+  jmp   .L148
+.L118:
   testq %rcx, %rcx
-  je    .L127
+  je    .L144
   movq  %rdi, %rax
   shrq  $1, %rax
   cmpq  $-1, %rcx
-  je    .L122
+  je    .L126
   cqto
   idivq %rcx
   movq  %rax, %rbx
-  jmp   .L123
-.L122:
+  jmp   .L129
+.L126:
   xorl  %ebx, %ebx
   subq  %rax, %rbx
-.L123:
+.L129:
   salq  $1, %rbx
   movabsq $-9223372036854775808, %rsi
   movq  %rcx, %rax
@@ -222,16 +222,16 @@ unsigned_rem:
   subq  %rsi, %rdx
   subq  %r8, %rdx
   cmpq  %rax, %rdx
-  jl    .L128
+  jl    .L148
   incq  %rbx
-  jmp   .L128
-.L127:
+  jmp   .L148
+.L144:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L128:
+.L148:
   imulq %rcx, %rbx
   movq  %rdi, %rax
   subq  %rbx, %rax
@@ -257,9 +257,9 @@ unsigned_rem_2:
   subq  %rdi, %rsi
   subq  %rcx, %rsi
   cmpq  %rdx, %rsi
-  jl    .L115
+  jl    .L120
   incq  %rbx
-.L115:
+.L120:
   salq  $1, %rbx
   subq  %rbx, %rax
   ret
@@ -285,10 +285,10 @@ let abs x = Int64_u.abs x
 abs:
   movq  %rax, %rbx
   cmpq  $0, %rbx
-  jl    .L103
+  jl    .L105
   movq  %rbx, %rax
   ret
-.L103:
+.L105:
   xorl  %eax, %eax
   subq  %rbx, %rax
   ret
@@ -374,10 +374,10 @@ let unsigned_to_int x = Int64_u.unsigned_to_int x
 unsigned_to_int:
   movq  %rax, %rbx
   cmpq  $0, %rbx
-  jl    .L106
+  jl    .L112
   movabsq $4611686018427387903, %rax
   cmpq  %rax, %rbx
-  jg    .L106
+  jg    .L112
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
@@ -389,7 +389,7 @@ unsigned_to_int:
   movq  %rbx, (%rax)
   addq  $8, %rsp
   ret
-.L106:
+.L112:
   movl  $1, %eax
   ret
 |}]
@@ -588,10 +588,10 @@ min:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
-  jg    .L102
+  jg    .L105
   movq  %rdi, %rax
   ret
-.L102:
+.L105:
   ret
 |}]
 
@@ -602,10 +602,10 @@ max:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
-  jl    .L102
+  jl    .L105
   movq  %rdi, %rax
   ret
-.L102:
+.L105:
   ret
 |}]
 

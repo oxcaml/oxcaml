@@ -86,19 +86,6 @@ let emit_moves body ~src ~dst =
           (make_cfg_instr (Cfg.Op Move) [| s |] [| d |] Debuginfo.none))
     src dst
 
-let emit_moves_prefix body ~src ~dst =
-  let src =
-    if Array.length src > Array.length dst
-    then Array.sub src 0 (Array.length dst)
-    else src
-  in
-  let dst =
-    if Array.length dst > Array.length src
-    then Array.sub dst 0 (Array.length src)
-    else dst
-  in
-  emit_moves body ~src ~dst
-
 let reconstruct_test renv (cond : Ssa.instruction) ~true_label ~false_label :
     Cfg.terminator * Reg.t array =
   match cond with
@@ -150,12 +137,14 @@ let branch_cond_id (block : Ssa.block) : Ssa.InstructionId.t option =
   | _ -> None
 
 module Make (Target : Cfg_selectgen_target_intf.S) = struct
+  let truncate arr n = if Array.length arr > n then Array.sub arr 0 n else arr
+
   let emit_op body op dbg rs rd =
     match Target.pseudoregs_for_operation op rs rd with
     | Constrained (rsrc, rdst) ->
-      emit_moves_prefix body ~src:rs ~dst:rsrc;
+      emit_moves body ~src:rs ~dst:(truncate rsrc (Array.length rs));
       DLL.add_end body (make_cfg_instr (Cfg.Op op) rsrc rdst dbg);
-      emit_moves_prefix body ~src:rdst ~dst:rd
+      emit_moves body ~src:(truncate rdst (Array.length rd)) ~dst:rd
     | Use_default_regs ->
       DLL.add_end body (make_cfg_instr (Cfg.Op op) rs rd dbg)
 

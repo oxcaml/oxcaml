@@ -516,6 +516,14 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   ++ (fun (fd_cmm : Cmm.fundecl) ->
   (if !Oxcaml_flags.use_ssa
    then (
+     let cfg_old =
+       let saved_instr_id = InstructionId.save Sub_cfg.instr_id in
+       let result =
+         Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+       in
+       InstructionId.restore Sub_cfg.instr_id saved_instr_id;
+       result
+     in
      let ssa = Ssa_selection.emit_fundecl fd_cmm in
      (try Ssa.validate ssa
       with exn ->
@@ -536,14 +544,6 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
            fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
            fd_cmm Ssa.print ssa;
          Printexc.raise_with_backtrace exn bt
-     in
-     let cfg_old =
-       let saved_instr_id = InstructionId.save Sub_cfg.instr_id in
-       let result =
-         Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
-       in
-       InstructionId.restore Sub_cfg.instr_id saved_instr_id;
-       result
      in
      Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name ~fd_cmm ~ssa
        ~old_cfg:cfg_old ~new_cfg:cfg_new ppf_dump;

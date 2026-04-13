@@ -556,4 +556,64 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
     Format.fprintf ppf "*** New CFG (from SSA):@.%a@."
       (Cfg_with_layout.dump ~msg:"")
       new_cfg;
-    Misc.fatal_errorf "CFG comparison MISMATCH for %s" fun_name)
+    Misc.fatal_errorf "CFG comparison MISMATCH for %s" fun_name);
+  (* Relabel the new CFG to use the old pipeline's labels, so that the
+     generated assembly has the same label numbers. *)
+  let f lbl =
+    match Label.Tbl.find_opt label_map lbl with
+    | Some old_lbl -> old_lbl
+    | None -> lbl
+  in
+  let relabel_terminator_desc (desc : Cfg.terminator) : Cfg.terminator =
+    match desc with
+    | Never | Return | Raise _ | Tailcall_func _ | Call_no_return _ -> desc
+    | Always l -> Always (f l)
+    | Parity_test { ifso; ifnot } ->
+      Parity_test { ifso = f ifso; ifnot = f ifnot }
+    | Truth_test { ifso; ifnot } ->
+      Truth_test { ifso = f ifso; ifnot = f ifnot }
+    | Int_test { lt; eq; gt; is_signed; imm } ->
+      Int_test { lt = f lt; eq = f eq; gt = f gt; is_signed; imm }
+    | Float_test { width; lt; eq; gt; uo } ->
+      Float_test { width; lt = f lt; eq = f eq; gt = f gt; uo = f uo }
+    | Switch labels -> Switch (Array.map f labels)
+    | Tailcall_self { destination } ->
+      Tailcall_self { destination = f destination }
+    | Call { op; label_after } -> Call { op; label_after = f label_after }
+    | Prim { op; label_after } -> Prim { op; label_after = f label_after }
+    | Invalid ({ label_after = Some l; _ } as r) ->
+      Invalid { r with label_after = Some (f l) }
+    | Invalid { label_after = None; _ } -> desc
+  in
+  let all_blocks =
+    Label.Tbl.fold (fun _ b acc -> b :: acc) new_cfg_t.blocks []
+  in
+  Label.Tbl.reset new_cfg_t.blocks;
+  List.iter
+    (fun (block : Cfg.basic_block) ->
+      block.start <- f block.start;
+      block.predecessors <- Label.Set.map f block.predecessors;
+      block.exn <- Option.map f block.exn;
+      block.terminator
+        <- { block.terminator with
+             desc = relabel_terminator_desc block.terminator.desc
+           };
+      DLL.iter_cell block.body ~f:(fun cell ->
+          let (instr : Cfg.basic Cfg.instruction) = DLL.value cell in
+          match instr.desc with
+          | Cfg.Pushtrap { lbl_handler } ->
+            DLL.set_value cell
+              { instr with
+                desc = Cfg.Pushtrap { lbl_handler = f lbl_handler }
+              }
+          | Cfg.Poptrap { lbl_handler } ->
+            DLL.set_value cell
+              { instr with
+                desc = Cfg.Poptrap { lbl_handler = f lbl_handler }
+              }
+          | _ -> ());
+      Label.Tbl.add new_cfg_t.blocks block.start block)
+    all_blocks;
+  let layout = Cfg_with_layout.layout new_cfg in
+  DLL.iter_cell layout ~f:(fun cell ->
+      DLL.set_value cell (f (DLL.value cell)))

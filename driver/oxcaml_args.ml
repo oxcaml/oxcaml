@@ -2137,6 +2137,7 @@ module Extra_params = struct
       true
     in
     match name with
+    | "use-ssa" -> set' Oxcaml_flags.use_ssa
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings

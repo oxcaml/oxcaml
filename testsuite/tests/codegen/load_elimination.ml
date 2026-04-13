@@ -13,13 +13,13 @@ let immutable_load l = (List.hd l) + (List.hd l)
 [%%expect_asm X86_64{|
 immutable_load:
   testb $1, %al
-  je    .L104
+  je    .L105
   movq  camlStdlib__List__Pmakeblock2305@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L104:
+.L105:
   movq  (%rax), %rax
   leaq  -1(%rax,%rax), %rax
   ret
@@ -50,12 +50,12 @@ let mutable_load_branch r b =
 mutable_load_branch:
   movq  (%rax), %rdi
   cmpq  $1, %rbx
-  jne   .L106
+  jne   .L109
   movl  $15, %eax
-  jmp   .L107
-.L106:
+  jmp   .L113
+.L109:
   movq  %rdi, %rax
-.L107:
+.L113:
   leaq  -1(%rdi,%rax), %rax
   ret
 |}]
@@ -73,15 +73,15 @@ immutable_load_loop:
   movq  (%rax), %rdi
   movl  $21, %ebx
   movq  %rdi, %rax
-  jmp   .L107
-.L106:
+  jmp   .L111
+.L109:
   ret
-.L107:
+.L111:
   leaq  -1(%rax,%rdi), %rax
   addq  $-2, %rbx
   cmpq  $1, %rbx
-  jne   .L107
-  jmp   .L106
+  jne   .L111
+  jmp   .L109
 |}]
 
 (* CR ttebbi: Load elimination inside the loop is not working. *)
@@ -93,16 +93,16 @@ mutable_load_loop:
   movq  %rax, %rbx
   movq  (%rbx), %rax
   movl  $21, %edi
-  jmp   .L108
-.L107:
+  jmp   .L111
+.L109:
   ret
-.L108:
+.L111:
   movq  (%rbx), %rsi
   leaq  -1(%rax,%rsi), %rax
   addq  $-2, %rdi
   cmpq  $1, %rdi
-  jne   .L108
-  jmp   .L107
+  jne   .L111
+  jmp   .L109
 |}]
 
 (* CR ttebbi: We should figure out that the store and the load cannot alias. *)

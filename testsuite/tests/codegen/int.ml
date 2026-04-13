@@ -57,14 +57,14 @@ let div x y = x / y
 div:
   movq  %rbx, %rcx
   cmpq  $1, %rcx
-  je    .L108
+  je    .L115
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
   idivq %rcx
   leaq  1(%rax,%rax), %rax
   ret
-.L108:
+.L115:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -110,14 +110,14 @@ let rem x y = x mod y
 rem:
   movq  %rbx, %rcx
   cmpq  $1, %rcx
-  je    .L108
+  je    .L115
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
   idivq %rcx
   leaq  1(%rdx,%rdx), %rax
   ret
-.L108:
+.L115:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -189,10 +189,10 @@ let abs x = abs x
 abs:
   movq  %rax, %rbx
   cmpq  $1, %rbx
-  jl    .L103
+  jl    .L105
   movq  %rbx, %rax
   ret
-.L103:
+.L105:
   movl  $2, %eax
   subq  %rbx, %rax
   ret
@@ -323,10 +323,10 @@ min:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
-  jg    .L102
+  jg    .L105
   movq  %rdi, %rax
   ret
-.L102:
+.L105:
   ret
 |}]
 
@@ -337,10 +337,10 @@ max:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
-  jl    .L102
+  jl    .L105
   movq  %rdi, %rax
   ret
-.L102:
+.L105:
   ret
 |}]
 
@@ -371,10 +371,10 @@ collatz:
   movq  %rax, %rbx
   movl  $1, %eax
   cmpq  $3, %rbx
-  jg    .L117
-.L116:
+  jg    .L110
+.L108:
   ret
-.L117:
+.L110:
   addq  $2, %rax
   movq  %rbx, %rdi
   sarq  $1, %rdi
@@ -387,15 +387,15 @@ collatz:
   subq  %rsi, %rdi
   leaq  1(%rdi,%rdi), %rdi
   cmpq  $1, %rdi
-  jne   .L119
+  jne   .L126
   sarq  $1, %rdx
   leaq  1(%rdx,%rdx), %rbx
   cmpq  $3, %rbx
-  jg    .L117
-  jmp   .L116
-.L119:
+  jg    .L110
+  jmp   .L108
+.L126:
   leaq  (%rbx,%rbx,2), %rbx
   cmpq  $3, %rbx
-  jg    .L117
-  jmp   .L116
+  jg    .L110
+  jmp   .L108
 |}]
