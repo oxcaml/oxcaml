@@ -59,9 +59,9 @@ mutual_recursion:
 mutual_recursion.f:
   movq  %rbx, %rdi
   cmpq  $1, %rax
-  jge   .L120
+  jge   .L118
   ret
-.L120:
+.L118:
   leaq  -24(%rdi), %rbx
   movq  16(%rdi), %rdi
   subq  %rdi, %rax
@@ -94,7 +94,7 @@ f.(fun):
 f:
   subq  $8, %rsp
   cmpq  $1, %rax
-  jge   .L123
+  jge   .L125
   subq  $32, %r15
   cmpq  (%r14), %r15
   jb    .L143
@@ -106,8 +106,8 @@ f:
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
   movq  %rax, 16(%rbx)
-  jmp   .L124
-.L123:
+  jmp   .L129
+.L125:
   subq  $32, %r15
   cmpq  (%r14), %r15
   jb    .L146
@@ -119,7 +119,7 @@ f:
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
   movq  %rax, 16(%rbx)
-.L124:
+.L129:
   movl  $1, %eax
   movq  (%rbx), %rdi
   addq  $8, %rsp
@@ -134,10 +134,10 @@ let inline_identical x =
 [%%expect_asm X86_64{|
 inline_identical:
   cmpq  $1, %rax
-  jle   .L104
+  jle   .L106
   addq  $2, %rax
   ret
-.L104:
+.L106:
   addq  $2, %rax
   ret
 |}]

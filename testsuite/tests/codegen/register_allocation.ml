@@ -32,13 +32,13 @@ spill_cold_path:
   subq  $8, %rsp
   addq  $2, %rax
   cmpq  $201, %rax
-  jne   .L108
+  jne   .L113
   movq  %rax, (%rsp)
   movl  $1, %eax
   call  camlTOP2__cold_1_3_code@PLT
 .L128:
   movq  (%rsp), %rax
-.L108:
+.L113:
   addq  $4, %rax
   addq  $8, %rsp
   ret
@@ -136,18 +136,18 @@ loop_readonly_use_spilled_var:
   movq  %rax, %rbx
   movq  %rbx, (%rsp)
   cmpq  $1, %rax
-  jge   .L106
-.L105:
+  jge   .L111
+.L108:
   leaq  -1(%rbx,%rax), %rax
   addq  $8, %rsp
   ret
-.L106:
+.L111:
   call  camlTOP8__g_15_18_code@PLT
 .L125:
   movq  (%rsp), %rbx
   cmpq  $1, %rax
-  jge   .L106
-  jmp   .L105
+  jge   .L111
+  jmp   .L108
 
 loop_readonly_use_spilled_var.g:
   addq  $-2, %rax
@@ -170,13 +170,15 @@ spill_unspill_loop_movement:
   movq  %rbx, %rax
   cmpq  $3, %rax
   jl    .L119
+  jl    .L135
+  movq  %rax, (%rsp)
   movq  %rdi, 24(%rsp)
   movq  %rax, %rbx
   movq  %rax, (%rsp)
   sarq  $1, %rbx
   movq  %rbx, 8(%rsp)
   movl  $1, %edi
-.L110:
+.L112:
   movq  %rdi, 16(%rsp)
   call  camlTOP9__f_20_23_code@PLT
 .L166:
@@ -187,7 +189,7 @@ spill_unspill_loop_movement:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   cmpq  $11, %rdx
-  jle   .L116
+  jle   .L125
   movq  %rsi, 32(%rsp)
   movq  %rdi, 16(%rsp)
   call  camlTOP9__f_20_23_code@PLT
@@ -196,15 +198,15 @@ spill_unspill_loop_movement:
   movq  8(%rsp), %rbx
   movq  16(%rsp), %rdi
   movq  32(%rsp), %rsi
-.L116:
+.L125:
   incq  %rdi
   cmpq  %rbx, %rdi
-  jle   .L110
+  jle   .L112
   movq  24(%rsp), %rdi
-  jmp   .L120
-.L119:
+  jmp   .L138
+.L135:
   movl  $1, %esi
-.L120:
+.L138:
   leaq  -1(%rdi,%rsi), %rax
   addq  $40, %rsp
   ret
@@ -217,11 +219,11 @@ let f a b c = if a > 10 then b - c else a - b
 [%%expect_asm X86_64{|
 f:
   cmpq  $21, %rax
-  jle   .L106
+  jle   .L107
   subq  %rdi, %rbx
   leaq  1(%rbx), %rax
   ret
-.L106:
+.L107:
   subq  %rbx, %rax
   incq  %rax
   ret
@@ -291,13 +293,13 @@ unnecessary_moves:
 =======
   leaq  -1(%r8,%rcx), %rax
   cmpq  %rcx, %r8
-  jge   .L105
+  jge   .L106
   movq  %r8, %rax
 >>>>>>> 42782c097b (passes testsuite)
   ret
-.L105:
+.L106:
   cmpq  %rsi, %rdi
-  jge   .L108
+  jge   .L112
   subq  $8, %rsp
   movq  %rax, (%rsp)
   movq  (%rbx), %rdi
@@ -307,7 +309,7 @@ unnecessary_moves:
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
-.L108:
+.L112:
   ret
 |}]
 
@@ -370,14 +372,14 @@ double_loop_no_definition_at_beginning:
   movq  %rbx, %rsi
   movq  64(%r14), %rbx
   cmpq  $1, %rsi
-  jl    .L126
+  jl    .L149
   movq  %rbx, 16(%rsp)
   movq  %rdi, 32(%rsp)
   movq  %rax, 24(%rsp)
   sarq  $1, %rsi
   movq  %rsi, 40(%rsp)
   xorl  %edx, %edx
-.L115:
+.L113:
   movq  %rdx, (%rsp)
   movq  64(%r14), %rbx
   movq  %rbx, 8(%rsp)
@@ -401,8 +403,8 @@ double_loop_no_definition_at_beginning:
   movq  %rax, 24(%rbx)
   movq  %rdi, %rdx
   testb $1, %dl
-  jne   .L122
-.L120:
+  jne   .L135
+.L128:
   movq  %rdx, 56(%rsp)
   movq  (%rdx), %rax
   call  camlTOP15__f_33_37_code@PLT
@@ -414,16 +416,16 @@ double_loop_no_definition_at_beginning:
   movq  40(%rsp), %rsi
   movq  48(%rsp), %rbx
   testb $1, %dl
-  je    .L120
-.L122:
+  je    .L128
+.L135:
   movq  8(%rsp), %rbx
   movq  %rbx, 64(%r14)
   movq  (%rsp), %rdx
   incq  %rdx
   cmpq  %rsi, %rdx
-  jle   .L115
+  jle   .L113
   movq  16(%rsp), %rbx
-.L126:
+.L149:
   movq  %rbx, 64(%r14)
   movl  $1, %eax
   addq  $72, %rsp
@@ -435,12 +437,12 @@ double_loop_no_definition_at_beginning.f:
   salq  $8, %rdi
   shrq  $17, %rdi
   cmpq  %rdi, %rax
-  jae   .L197
+  jae   .L204
   movq  16(%rbx), %rbx
   movq  %rbx, -4(%rsi,%rax,4)
   movl  $1, %eax
   ret
-.L197:
+.L204:
   movq  camlTOP15__block741@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -469,7 +471,7 @@ spilled_phi_merge:
   call  caml_sys_time_unboxed@PLT
   movq  8(%rsp), %rax
   cmpq  $1, %rax
-  je    .L110
+  je    .L114
   movq  %r13, 40(%rsp)
   movq  %r12, 32(%rsp)
   movq  24(%rsp), %rax
@@ -512,7 +514,7 @@ spilled_phi_merge:
   movq  %rdx, 24(%rsp)
   movq  %rax, %r12
   movq  %rdi, %r13
-.L110:
+.L114:
   movq  %rbp, %rax
   movq  24(%rsp), %rdi
   movq  %r12, %rsi

@@ -178,13 +178,13 @@ let div x y = Int16_u.div x y
 div:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L107
+  je    .L114
   cqto
   idivq %rcx
   salq  $48, %rax
   sarq  $48, %rax
   ret
-.L107:
+.L114:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -197,14 +197,14 @@ let rem x y = Int16_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L107
+  je    .L114
   cqto
   idivq %rcx
   movq  %rdx, %rax
   salq  $48, %rax
   sarq  $48, %rax
   ret
-.L107:
+.L114:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
