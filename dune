@@ -695,6 +695,7 @@
   cfg_format
   ;; backend/ssa/
   ssa
+  ssa_dominators
   ssa_of_cmm
   cfg_of_ssa
   ;; backend/ssa/loop/
