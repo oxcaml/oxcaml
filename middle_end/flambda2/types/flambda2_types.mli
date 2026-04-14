@@ -637,6 +637,7 @@ val kind : t -> Flambda_kind.t
 
 (** For each of the kinds in an arity, create an "unknown" type. *)
 val unknown_types_from_arity :
+  ?alloc_mode:Alloc_mode.For_types.t ->
   machine_width:Target_system.Machine_width.t ->
   [`Unarized] Flambda_arity.t ->
   t list
