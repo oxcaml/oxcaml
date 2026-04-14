@@ -2003,11 +2003,71 @@ module Big_module_of_unboxed_products_of_values = struct
   let x24 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
   let x25 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
   let x26 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+end
+[%%expect{|
+module Big_module_of_unboxed_products_of_values :
+  sig
+    val x1 : #(int * int * int * int * int * int * int * int * int * int)
+    val x2 : #(int * int * int * int * int * int * int * int * int * int)
+    val x3 : #(int * int * int * int * int * int * int * int * int * int)
+    val x4 : #(int * int * int * int * int * int * int * int * int * int)
+    val x5 : #(int * int * int * int * int * int * int * int * int * int)
+    val x6 : #(int * int * int * int * int * int * int * int * int * int)
+    val x7 : #(int * int * int * int * int * int * int * int * int * int)
+    val x8 : #(int * int * int * int * int * int * int * int * int * int)
+    val x9 : #(int * int * int * int * int * int * int * int * int * int)
+    val x10 : #(int * int * int * int * int * int * int * int * int * int)
+    val x11 : #(int * int * int * int * int * int * int * int * int * int)
+    val x12 : #(int * int * int * int * int * int * int * int * int * int)
+    val x13 : #(int * int * int * int * int * int * int * int * int * int)
+    val x14 : #(int * int * int * int * int * int * int * int * int * int)
+    val x15 : #(int * int * int * int * int * int * int * int * int * int)
+    val x16 : #(int * int * int * int * int * int * int * int * int * int)
+    val x17 : #(int * int * int * int * int * int * int * int * int * int)
+    val x18 : #(int * int * int * int * int * int * int * int * int * int)
+    val x19 : #(int * int * int * int * int * int * int * int * int * int)
+    val x20 : #(int * int * int * int * int * int * int * int * int * int)
+    val x21 : #(int * int * int * int * int * int * int * int * int * int)
+    val x22 : #(int * int * int * int * int * int * int * int * int * int)
+    val x23 : #(int * int * int * int * int * int * int * int * int * int)
+    val x24 : #(int * int * int * int * int * int * int * int * int * int)
+    val x25 : #(int * int * int * int * int * int * int * int * int * int)
+    val x26 : #(int * int * int * int * int * int * int * int * int * int)
+  end
+|}]
+
+module Big_module_of_unboxed_products_of_values_and_f64 = struct
+  let x1 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x2 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x3 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x4 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x5 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x6 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x7 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x8 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x9 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x10 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x11 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x12 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x13 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x14 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x15 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x16 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x17 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x18 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x19 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x20 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x21 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x22 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x23 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x24 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x25 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  let x26 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
   let f64 = #0.
 end
 [%%expect{|
-Lines 1-29, characters 50-3:
- 1 | ..................................................struct
+Lines 1-29, characters 58-3:
+ 1 | ..........................................................struct
  2 |   let x1 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
  3 |   let x2 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
  4 |   let x3 = #(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)

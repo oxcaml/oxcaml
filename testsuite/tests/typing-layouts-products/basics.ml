@@ -2349,11 +2349,8 @@ Error: The kind of type "record" is value non_float mod immutable with 'a
          because of the annotation on the declaration of the type record.
 |}]
 
-(*******************************************************************************)
-(* Test 22: You can't defeat the value prefix size limit with nested products. *)
-
-(* And note that blocks with products are always mixed blocks, so we don't
-   need to add any unboxed types to hit the limit. *)
+(****************************************************************************)
+(* Test 22: Product components counted correctly for the value prefix limit *)
 
 type eight_values :
   value & value & value & value & value & value & value & value
