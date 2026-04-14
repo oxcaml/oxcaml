@@ -33,24 +33,45 @@ let with_output_capture f =
   in
   Buffer.contents buffer, result
 
+let make_result kind =
+  let obj : js_object = pure_js_expr "({})" in
+  js_set obj (js_string "kind") (js_string kind);
+  obj
+
+let ok_result output =
+  let obj = make_result "ok" in
+  js_set obj (js_string "output") (js_string output);
+  obj
+
+let missing_cmi_result filename =
+  let obj = make_result "missing_cmi" in
+  js_set obj (js_string "filename") (js_string filename);
+  obj
+
 let check_string filename source =
-  Browser_switch_check.check_string
-    ~browser:true
-    ~filename:(string_of_js_string filename)
-    ~source:(string_of_js_string source)
-  |> js_string
+  try
+    ok_result
+      (Browser_switch_check.check_string
+         ~browser:true
+         ~filename:(string_of_js_string filename)
+         ~source:(string_of_js_string source))
+  with
+  | Browser_switch_common.Missing_cmi filename -> missing_cmi_result filename
 
 let run_string filename source =
-  let output, diagnostics =
-    with_output_capture (fun () ->
-        Browser_switch_run.run_string
-          ~browser:true
-          ~filename:(string_of_js_string filename)
-          ~source:(string_of_js_string source))
-  in
-  if String.equal diagnostics ""
-  then js_string output
-  else js_string (output ^ diagnostics)
+  try
+    let output, diagnostics =
+      with_output_capture (fun () ->
+          Browser_switch_run.run_string
+            ~browser:true
+            ~filename:(string_of_js_string filename)
+            ~source:(string_of_js_string source))
+    in
+    if String.equal diagnostics ""
+    then ok_result output
+    else ok_result (output ^ diagnostics)
+  with
+  | Browser_switch_common.Missing_cmi filename -> missing_cmi_result filename
 
 let export name value =
   let global = pure_js_expr "globalThis" in
