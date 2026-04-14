@@ -2209,6 +2209,25 @@ CAMLextern void caml_stop_tick_thread(void)
   caml_plat_unlock(&tick_thread.mutex);
 }
 
+static void tick_thread_reset(void)
+{
+  /* Reset the state of the tick thread in the child process after fork().
+
+     See comment in caml_reset_domain_lock; this really is best-effort, and is
+     probably just UB. But there are tests in lib-systhreads that Unix.fork ()
+     works for multithreaded processes, so we must keep it working. */
+  caml_plat_mutex_init(&tick_thread.mutex);
+  tick_thread.thread_id = 0;
+  bool was_running = tick_thread.running;
+  tick_thread.running = false;
+  atomic_store_relaxed(&tick_thread.stop, false);
+  tick_thread_close_fds();
+  if (was_running) {
+    /* nb: this respects tick_thread.enabled */
+    caml_start_tick_thread();
+  }
+}
+
 /* Compute the interval at which the tick thread will tick. */
 CAMLextern uintnat caml_effective_tick_interval_usec(void) {
   if (!atomic_load_relaxed(&tick_thread.enabled)) {
@@ -2468,6 +2487,7 @@ static void caml_atfork_default(void)
 {
   caml_reset_domain_lock();
   caml_acquire_domain_lock();
+  tick_thread_reset();
   /* FIXME: For best portability, the IO channel locks should be
      reinitialised as well. (See comment in
      caml_reset_domain_lock.) */

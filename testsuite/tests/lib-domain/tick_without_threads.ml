@@ -1,5 +1,5 @@
 (* TEST
-   modules = "tick_without_threads_stubs.c";
+   modules = "tick_stubs.c";
    runtime5;
    flags = "-alert -unsafe_multidomain";
    { native; }
