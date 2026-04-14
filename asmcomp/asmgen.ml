@@ -536,7 +536,9 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
           fd_cmm Ssa.print ssa;
         Printexc.raise_with_backtrace exn bt);
      if !Oxcaml_flags.dump_cfg
-     then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa.print ssa;
+     then (
+       Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa.print ssa;
+       Format.fprintf ppf_dump "*** %a@." Indvar.print (Indvar.analyze ssa));
      let cfg_new =
        Label.with_saved_counter @@ fun () ->
        try Ssa_lowering.convert ~future_funcnames:funcnames ssa
