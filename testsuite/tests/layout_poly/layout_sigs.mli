@@ -19,3 +19,5 @@ end
 module type Sig_with_layout_2 = sig
   val bam : layout_ l1 l2. ('a : l1) ('b : l2). 'a -> 'b -> #('a * 'b)
 end
+
+val f : layout_ l. ('a : l). 'a -> 'a
