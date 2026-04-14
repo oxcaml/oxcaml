@@ -29,14 +29,9 @@ import {
   historyKeymap,
   indentWithTab,
 } from "@codemirror/commands";
-import { Parser, Language, Query } from "./vendor/tree_sitter/web-tree-sitter.js";
 
 const autoRunDelayMs = 360;
 const buildBase = "../../_build/default/experiments/web_bytecode";
-const treeSitterCoreWasmUrl = new URL("./vendor/tree_sitter/web-tree-sitter.wasm", import.meta.url).href;
-const treeSitterOcamlWasmUrl = new URL("./vendor/tree_sitter/tree-sitter-ocaml.wasm", import.meta.url).href;
-const treeSitterOcamlHighlightsUrl =
-  new URL("./vendor/tree_sitter/ocaml-highlights.scm", import.meta.url).href;
 
 const editorHostEl = document.getElementById("editor");
 const outputEl = document.getElementById("output");
@@ -60,42 +55,81 @@ let editorMarkers = [];
 let editorView = null;
 let suppressEditorChanges = false;
 const loadedScriptUrls = new Map();
-let browserFsPromise = null;
+let browserFsManifestPromise = null;
+let browserFsSeedPromise = null;
+const browserFsLoadedPaths = new Set();
+const browserFsLoadingPaths = new Map();
 const browserFsConcurrency = 4;
 const browserFsFetchRetries = 4;
+const browserFsRetryLimit = 32;
+const browserFsSeedPaths = [
+  "/static/cmis/stdlib.cmi",
+  "/static/cmis/stdlib__List.cmi",
+];
 let bootStatusActive = false;
-let treeSitterBackendPromise = null;
-let syntaxRequestRevision = 0;
 
 const setDiagnosticsEffect = StateEffect.define();
 const setSyntaxDecorationsEffect = StateEffect.define();
 
-const treeSitterCaptureClass = new Map([
-  ["keyword", "tok-keyword"],
-  ["operator", "tok-operator"],
-  ["punctuation.delimiter", "tok-operator"],
-  ["punctuation.bracket", "tok-operator"],
-  ["punctuation.special", "tok-operator"],
-  ["string", "tok-string"],
-  ["string.special", "tok-string"],
-  ["escape", "tok-string"],
-  ["comment", "tok-comment"],
-  ["number", "tok-number"],
-  ["module", "tok-module"],
-  ["function", "tok-function"],
-  ["function.method", "tok-function"],
-  ["function.builtin", "tok-function"],
-  ["variable.parameter", "tok-parameter"],
-  ["type", "tok-type"],
-  ["type.builtin", "tok-type"],
-  ["constructor", "tok-constructor"],
-  ["constant", "tok-constructor"],
-  ["property", "tok-property"],
-  ["tag", "tok-tag"],
-]);
-
 const oxcamlIdentifierNames = new Set(["local_", "stack_", "exclave_"]);
 const packageModuleNames = new Set(["Base", "Core", "Stdlib_stable"]);
+const keywordTokens = new Set([
+  "and",
+  "as",
+  "assert",
+  "begin",
+  "class",
+  "constraint",
+  "do",
+  "done",
+  "downto",
+  "else",
+  "end",
+  "exception",
+  "external",
+  "false",
+  "for",
+  "fun",
+  "function",
+  "functor",
+  "if",
+  "in",
+  "include",
+  "inherit",
+  "initializer",
+  "lazy",
+  "let",
+  "match",
+  "method",
+  "module",
+  "mutable",
+  "new",
+  "nonrec",
+  "object",
+  "of",
+  "open",
+  "or",
+  "private",
+  "rec",
+  "sig",
+  "struct",
+  "then",
+  "to",
+  "true",
+  "try",
+  "type",
+  "val",
+  "virtual",
+  "when",
+  "while",
+  "with",
+]);
+const moduleIntroducers = new Set(["open", "include", "module", "functor", "inherit"]);
+const declarationIntroducers = new Set(["let", "and", "external", "method", "val"]);
+const parameterIntroducers = new Set(["fun", "function"]);
+const typeIntroducers = new Set(["type", "of", "constraint"]);
+const punctuationChars = new Set(["(", ")", "[", "]", "{", "}", ";", ","]);
+const operatorChars = new Set(["!", "$", "%", "&", "*", "+", "-", ".", "/", ":", "<", "=", ">", "@", "^", "|", "~", "?"]);
 
 function buildDiagnosticDecorations(doc, markers) {
   if (!markers.length) {
@@ -168,82 +202,6 @@ const diagnosticHover = hoverTooltip((view, pos) => {
   };
 });
 
-function buildByteOffsetTable(source) {
-  const table = [0];
-  let byteIndex = 0;
-  for (let index = 0; index < source.length; ) {
-    const codePoint = source.codePointAt(index);
-    const codeUnitLength = codePoint > 0xffff ? 2 : 1;
-    let utf8Length = 1;
-    if (codePoint > 0x7f) utf8Length = codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
-    byteIndex += utf8Length;
-    while (table.length <= byteIndex) {
-      table.push(index + codeUnitLength);
-    }
-    index += codeUnitLength;
-  }
-  return table;
-}
-
-function byteIndexToOffset(table, byteIndex, fallback) {
-  if (byteIndex < 0) {
-    return 0;
-  }
-  if (byteIndex < table.length) {
-    return table[byteIndex];
-  }
-  return fallback;
-}
-
-function previousNonWhitespace(source, offset) {
-  for (let index = offset - 1; index >= 0; index -= 1) {
-    const char = source[index];
-    if (!/\s/.test(char)) {
-      return char;
-    }
-  }
-  return "";
-}
-
-function nextNonWhitespaceWord(source, offset) {
-  let index = offset;
-  while (index < source.length && /\s/.test(source[index])) {
-    index += 1;
-  }
-  const match = /^[A-Za-z_][A-Za-z0-9_']*/.exec(source.slice(index));
-  return match ? match[0] : "";
-}
-
-function classifyCaptureClasses(capture, source, from, to, baseClassName) {
-  const text = source.slice(from, to);
-  const classes = [baseClassName];
-
-  if (oxcamlIdentifierNames.has(text)) {
-    classes.unshift("tok-oxcaml");
-  }
-
-  if (text === "local" && previousNonWhitespace(source, from) === "@") {
-    classes.unshift("tok-annotation");
-  }
-
-  if (packageModuleNames.has(text)) {
-    classes.unshift("tok-package");
-  }
-
-  if (baseClassName === "tok-property" && previousNonWhitespace(source, from) === "~") {
-    classes.unshift("tok-label");
-  }
-
-  if (text === "open") {
-    const openedModule = nextNonWhitespaceWord(source, to);
-    if (packageModuleNames.has(openedModule)) {
-      classes.unshift("tok-package-open");
-    }
-  }
-
-  return Array.from(new Set(classes)).join(" ");
-}
-
 function collectSupplementalSyntaxRanges(source) {
   const ranges = [];
   const pushMatches = (regex, className) => {
@@ -258,36 +216,255 @@ function collectSupplementalSyntaxRanges(source) {
   };
 
   pushMatches(/@[ \t\r\n]*local\b/g, "tok-annotation");
-  pushMatches(/~[A-Za-z_][A-Za-z0-9_']*/g, "tok-label");
   return ranges;
 }
 
-function buildSyntaxDecorations(source, captures) {
-  const byteOffsets = buildByteOffsetTable(source);
+function isWhitespace(char) {
+  return /\s/.test(char);
+}
+
+function isIdentifierStart(char) {
+  return /[A-Za-z_]/.test(char);
+}
+
+function isIdentifierChar(char) {
+  return /[A-Za-z0-9_']/.test(char);
+}
+
+function isOperatorChar(char) {
+  return operatorChars.has(char);
+}
+
+function nextNonWhitespaceChar(source, offset) {
+  let index = offset;
+  while (index < source.length && isWhitespace(source[index])) {
+    index += 1;
+  }
+  return source[index] ?? "";
+}
+
+function previousToken(tokens, index) {
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (tokens[cursor].type !== "comment") {
+      return tokens[cursor];
+    }
+  }
+  return null;
+}
+
+function nextToken(tokens, index) {
+  for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+    if (tokens[cursor].type !== "comment") {
+      return tokens[cursor];
+    }
+  }
+  return null;
+}
+
+function pushToken(tokens, from, to, type, source) {
+  if (to > from) {
+    tokens.push({ from, to, type, text: source.slice(from, to) });
+  }
+}
+
+function tokenizeSyntax(source) {
+  const tokens = [];
+  let index = 0;
+  while (index < source.length) {
+    const char = source[index];
+    if (isWhitespace(char)) {
+      index += 1;
+      continue;
+    }
+    if (char === "(" && source[index + 1] === "*") {
+      const start = index;
+      index += 2;
+      let depth = 1;
+      while (index < source.length && depth > 0) {
+        if (source[index] === "(" && source[index + 1] === "*") {
+          depth += 1;
+          index += 2;
+        } else if (source[index] === "*" && source[index + 1] === ")") {
+          depth -= 1;
+          index += 2;
+        } else {
+          index += 1;
+        }
+      }
+      pushToken(tokens, start, index, "comment", source);
+      continue;
+    }
+    if (char === "\"") {
+      const start = index;
+      index += 1;
+      while (index < source.length) {
+        if (source[index] === "\\") {
+          index += 2;
+        } else if (source[index] === "\"") {
+          index += 1;
+          break;
+        } else {
+          index += 1;
+        }
+      }
+      pushToken(tokens, start, index, "string", source);
+      continue;
+    }
+    if (char === "'" && /[A-Za-z_]/.test(source[index + 1] ?? "")) {
+      const start = index;
+      index += 2;
+      while (index < source.length && isIdentifierChar(source[index])) {
+        index += 1;
+      }
+      pushToken(tokens, start, index, "typevar", source);
+      continue;
+    }
+    if (char === "'") {
+      const start = index;
+      index += 1;
+      while (index < source.length) {
+        if (source[index] === "\\") {
+          index += 2;
+        } else if (source[index] === "'") {
+          index += 1;
+          break;
+        } else {
+          index += 1;
+        }
+      }
+      pushToken(tokens, start, index, "string", source);
+      continue;
+    }
+    if ((char === "~" || char === "?") && isIdentifierStart(source[index + 1] ?? "")) {
+      const start = index;
+      index += 2;
+      while (index < source.length && isIdentifierChar(source[index])) {
+        index += 1;
+      }
+      if (source[index] === ":") {
+        index += 1;
+      }
+      pushToken(tokens, start, index, "label", source);
+      continue;
+    }
+    if (/[0-9]/.test(char)) {
+      const start = index;
+      const match = /^(?:0[xX][0-9A-Fa-f_]+|0[oO][0-7_]+|0[bB][01_]+|[0-9][0-9_]*(?:\.[0-9_]+)?(?:[eE][+-]?[0-9_]+)?)/.exec(source.slice(index));
+      index += match ? match[0].length : 1;
+      pushToken(tokens, start, index, "number", source);
+      continue;
+    }
+    if (isIdentifierStart(char)) {
+      const start = index;
+      index += 1;
+      while (index < source.length && isIdentifierChar(source[index])) {
+        index += 1;
+      }
+      const text = source.slice(start, index);
+      pushToken(tokens, start, index, keywordTokens.has(text) ? "keyword" : "identifier", source);
+      continue;
+    }
+    if (punctuationChars.has(char)) {
+      pushToken(tokens, index, index + 1, "operator", source);
+      index += 1;
+      continue;
+    }
+    if (isOperatorChar(char)) {
+      const start = index;
+      index += 1;
+      while (
+        index < source.length &&
+        isOperatorChar(source[index]) &&
+        !(source[index] === "(" && source[index + 1] === "*")
+      ) {
+        index += 1;
+      }
+      pushToken(tokens, start, index, "operator", source);
+      continue;
+    }
+    index += 1;
+  }
+  return tokens;
+}
+
+function classifySyntaxToken(tokens, index, source) {
+  const token = tokens[index];
+  const prev = previousToken(tokens, index);
+  const next = nextToken(tokens, index);
+  const nextChar = nextNonWhitespaceChar(source, token.to);
+  const classes = [];
+
+  switch (token.type) {
+    case "comment":
+      classes.push("tok-comment");
+      break;
+    case "string":
+      classes.push("tok-string");
+      break;
+    case "number":
+      classes.push("tok-number");
+      break;
+    case "typevar":
+      classes.push("tok-type");
+      break;
+    case "label":
+      classes.push("tok-label");
+      break;
+    case "operator":
+      classes.push("tok-operator");
+      break;
+    case "keyword":
+      classes.push("tok-keyword");
+      if (oxcamlIdentifierNames.has(token.text)) {
+        classes.unshift("tok-oxcaml");
+      }
+      break;
+    case "identifier":
+      if (oxcamlIdentifierNames.has(token.text)) {
+        classes.push("tok-oxcaml");
+      }
+      if (packageModuleNames.has(token.text)) {
+        classes.push("tok-package");
+        if (prev?.text === "open") {
+          classes.push("tok-package-open");
+        }
+      }
+      if (/^[A-Z]/.test(token.text)) {
+        classes.push(
+          moduleIntroducers.has(prev?.text ?? "") || nextChar === "." || token.text.includes("__")
+            ? "tok-module"
+            : "tok-constructor",
+        );
+      } else if (parameterIntroducers.has(prev?.text ?? "")) {
+        classes.push("tok-parameter");
+      } else if (declarationIntroducers.has(prev?.text ?? "")) {
+        classes.push("tok-function");
+      } else if (typeIntroducers.has(prev?.text ?? "") || next?.text === ":") {
+        classes.push("tok-type");
+      }
+      break;
+    default:
+      break;
+  }
+
+  if (!classes.length) {
+    return null;
+  }
+  return Array.from(new Set(classes)).join(" ");
+}
+
+function buildSyntaxDecorations(source) {
+  const tokens = tokenizeSyntax(source);
   const ranges = [];
-  for (const capture of captures) {
-    const className = treeSitterCaptureClass.get(capture.name);
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    const className = classifySyntaxToken(tokens, index, source);
     if (!className) {
       continue;
     }
-    const from = byteIndexToOffset(byteOffsets, capture.node.startIndex, source.length);
-    const to = byteIndexToOffset(byteOffsets, capture.node.endIndex, source.length);
-    if (from >= to) {
-      continue;
-    }
-    ranges.push({
-      from,
-      to,
-      className: classifyCaptureClasses(capture, source, from, to, className),
-    });
+    ranges.push({ from: token.from, to: token.to, className });
   }
   ranges.push(...collectSupplementalSyntaxRanges(source));
-  ranges.sort(
-    (left, right) =>
-      left.from - right.from ||
-      left.to - right.to ||
-      left.className.localeCompare(right.className),
-  );
   const builder = new RangeSetBuilder();
   for (const { from, to, className } of ranges) {
     builder.add(from, to, Decoration.mark({ class: className }));
@@ -295,59 +472,17 @@ function buildSyntaxDecorations(source, captures) {
   return builder.finish();
 }
 
-async function ensureTreeSitterBackend() {
-  if (treeSitterBackendPromise) {
-    return treeSitterBackendPromise;
-  }
-  treeSitterBackendPromise = (async () => {
-    await Parser.init({
-      locateFile(scriptName) {
-        if (scriptName === "tree-sitter.wasm" || scriptName === "web-tree-sitter.wasm") {
-          return treeSitterCoreWasmUrl;
-        }
-        return scriptName;
-      },
-    });
-    const [language, querySource] = await Promise.all([
-      Language.load(treeSitterOcamlWasmUrl),
-      fetchText(treeSitterOcamlHighlightsUrl),
-    ]);
-    const parser = new Parser();
-    parser.setLanguage(language);
-    const query = new Query(language, querySource);
-    return { parser, query };
-  })();
-  return treeSitterBackendPromise;
-}
-
 function scheduleSyntaxRefresh() {
   if (!editorView) {
     return;
   }
-  const request = ++syntaxRequestRevision;
-  const source = sourceText();
-  ensureTreeSitterBackend()
-    .then(({ parser, query }) => {
-      if (!editorView || request !== syntaxRequestRevision) {
-        return;
-      }
-      const tree = parser.parse(source);
-      if (!tree) {
-        return;
-      }
-      const captures = query.captures(tree.rootNode);
-      const decorations = buildSyntaxDecorations(source, captures);
-      tree.delete();
-      if (!editorView || request !== syntaxRequestRevision) {
-        return;
-      }
-      editorView.dispatch({
-        effects: setSyntaxDecorationsEffect.of(decorations),
-      });
-    })
-    .catch((error) => {
-      console.warn("Tree-sitter highlighting failed", error);
+  try {
+    editorView.dispatch({
+      effects: setSyntaxDecorationsEffect.of(buildSyntaxDecorations(sourceText())),
     });
+  } catch (error) {
+    console.warn("Local syntax highlighting failed", error);
+  }
 }
 
 function clearEditorMarkers() {
@@ -508,82 +643,6 @@ async function fetchBinaryString(url, compression) {
   throw lastError ?? new Error(`failed to fetch ${url}`);
 }
 
-async function fetchText(url, compression) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`failed to fetch ${url}`);
-  }
-  if (compression === "gzip") {
-    if (typeof DecompressionStream !== "function") {
-      throw new Error("gzip-compressed browser assets require DecompressionStream support");
-    }
-    if (!response.body) {
-      throw new Error(`missing response body for ${url}`);
-    }
-    const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
-    return new Response(stream).text();
-  }
-  return response.text();
-}
-
-function formatByteCount(byteCount) {
-  if (!Number.isFinite(byteCount) || byteCount < 0) {
-    return "";
-  }
-  if (byteCount < 1024 * 1024) {
-    return `${Math.round(byteCount / 1024)} KB`;
-  }
-  return `${(byteCount / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-async function fetchTextWithProgress(url, compression, onProgress) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`failed to fetch ${url}`);
-  }
-  if (!response.body) {
-    if (onProgress) {
-      onProgress(null);
-    }
-    return fetchText(url, compression);
-  }
-
-  const totalHeader = response.headers.get("content-length");
-  const totalBytes = totalHeader ? Number.parseInt(totalHeader, 10) : null;
-  const reader = response.body.getReader();
-  const chunks = [];
-  let receivedBytes = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    chunks.push(value);
-    receivedBytes += value.byteLength;
-    if (onProgress) {
-      onProgress({ receivedBytes, totalBytes });
-    }
-  }
-
-  const buffer = new Uint8Array(receivedBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    buffer.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
-  if (compression === "gzip") {
-    if (typeof DecompressionStream !== "function") {
-      throw new Error("gzip-compressed browser assets require DecompressionStream support");
-    }
-    const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream("gzip"));
-    return new Response(stream).text();
-  }
-
-  return new TextDecoder().decode(buffer);
-}
-
 function setBootStatus(text) {
   bootStatusActive = true;
   setStatus("loading", text);
@@ -593,65 +652,270 @@ function clearBootStatus() {
   bootStatusActive = false;
 }
 
-async function ensureBrowserFsLoaded() {
-  if (browserFsPromise) {
-    return browserFsPromise;
+function browserFsBasename(fsPath) {
+  const slashIndex = fsPath.lastIndexOf("/");
+  return slashIndex >= 0 ? fsPath.slice(slashIndex + 1) : fsPath;
+}
+
+function browserFsEntryPriority(fsPath) {
+  if (fsPath.startsWith("/static/cmis/")) {
+    return 0;
   }
-  browserFsPromise = (async () => {
+  if (fsPath.startsWith("/static/packages/opam/")) {
+    return 1;
+  }
+  if (fsPath.startsWith("/static/packages/install/")) {
+    return 2;
+  }
+  return 3;
+}
+
+async function ensureBrowserFsManifest() {
+  if (browserFsManifestPromise) {
+    return browserFsManifestPromise;
+  }
+  browserFsManifestPromise = (async () => {
+    const manifest = await fetchJson(buildAssetUrl("browser_fs_manifest.json"));
+    const entriesByPath = new Map();
+    const entriesByBasename = new Map();
+
+    for (const entry of manifest) {
+      entriesByPath.set(entry.fs_path, entry);
+
+      const basename = browserFsBasename(entry.fs_path);
+      const basenameEntries = entriesByBasename.get(basename) ?? [];
+      basenameEntries.push(entry);
+      entriesByBasename.set(basename, basenameEntries);
+    }
+
+    for (const entries of entriesByBasename.values()) {
+      entries.sort(
+        (left, right) =>
+          browserFsEntryPriority(left.fs_path) - browserFsEntryPriority(right.fs_path) ||
+          left.fs_path.localeCompare(right.fs_path),
+      );
+    }
+
+    return {
+      manifest,
+      entriesByPath,
+      entriesByBasename,
+    };
+  })();
+  return browserFsManifestPromise;
+}
+
+async function ensureBrowserFsEntryLoaded(entry) {
+  if (browserFsLoadedPaths.has(entry.fs_path)) {
+    return;
+  }
+  const existing = browserFsLoadingPaths.get(entry.fs_path);
+  if (existing) {
+    return existing;
+  }
+  const promise = (async () => {
     if (typeof globalThis.jsoo_create_file !== "function") {
       throw new Error("js_of_ocaml filesystem initializer is not ready");
     }
-    try {
-      const bundle = JSON.parse(
-        await fetchTextWithProgress(
-          buildAssetUrl("browser_fs_bundle.json.gz"),
-          "gzip",
-          (progress) => {
-            if (!bootStatusActive) {
-              return;
-            }
-            if (!progress) {
-              setBootStatus("loading runtime");
-              return;
-            }
-            const { receivedBytes, totalBytes } = progress;
-            if (Number.isFinite(totalBytes) && totalBytes > 0) {
-              const percent = Math.max(
-                0,
-                Math.min(100, Math.round((receivedBytes / totalBytes) * 100)),
-              );
-              setBootStatus(`loading runtime ${percent}%`);
-              return;
-            }
-            setBootStatus(`loading runtime ${formatByteCount(receivedBytes)}`);
-          },
-        ),
-      );
-      setBootStatus("starting runtime");
-      for (const entry of bundle) {
-        globalThis.jsoo_create_file(entry.fs_path, atob(entry.content_base64));
-      }
-      return;
-    } catch (error) {
-      console.warn("OxCaml browser_fs bundle load failed; falling back to manifest", error);
-    }
-    const manifest = await fetchJson(buildAssetUrl("browser_fs_manifest.json"));
-    let nextIndex = 0;
-    const concurrency = Math.min(browserFsConcurrency, manifest.length || 1);
-    async function worker() {
-      while (nextIndex < manifest.length) {
-        const entry = manifest[nextIndex];
-        nextIndex += 1;
-        const content = await fetchBinaryString(
-          buildAssetUrl(entry.asset_path),
-          entry.compression,
-        );
-        globalThis.jsoo_create_file(entry.fs_path, content);
-      }
-    }
-    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    const content = await fetchBinaryString(
+      buildAssetUrl(entry.asset_path),
+      entry.compression,
+    );
+    globalThis.jsoo_create_file(entry.fs_path, content);
+    browserFsLoadedPaths.add(entry.fs_path);
   })();
-  return browserFsPromise;
+  browserFsLoadingPaths.set(entry.fs_path, promise);
+  try {
+    await promise;
+  } finally {
+    browserFsLoadingPaths.delete(entry.fs_path);
+  }
+}
+
+async function ensureBrowserFsEntriesLoaded(entries) {
+  let nextIndex = 0;
+  const concurrency = Math.min(browserFsConcurrency, entries.length || 1);
+  async function worker() {
+    while (nextIndex < entries.length) {
+      const entry = entries[nextIndex];
+      nextIndex += 1;
+      await ensureBrowserFsEntryLoaded(entry);
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+}
+
+async function ensureBrowserFsSeedLoaded() {
+  if (browserFsSeedPromise) {
+    return browserFsSeedPromise;
+  }
+  browserFsSeedPromise = (async () => {
+    const manifest = await ensureBrowserFsManifest();
+    const seedEntries = browserFsSeedPaths
+      .map((fsPath) => manifest.entriesByPath.get(fsPath))
+      .filter(Boolean);
+    if (bootStatusActive) {
+      setBootStatus("loading standard library");
+    }
+    await ensureBrowserFsEntriesLoaded(seedEntries);
+  })();
+  return browserFsSeedPromise;
+}
+
+async function resolveBrowserFsEntry(filename) {
+  const manifest = await ensureBrowserFsManifest();
+  if (filename.startsWith("/")) {
+    return manifest.entriesByPath.get(filename) ?? null;
+  }
+  return manifest.entriesByBasename.get(filename)?.[0] ?? null;
+}
+
+async function ensureBrowserFsForMissingFilename(filename) {
+  const entry = await resolveBrowserFsEntry(filename);
+  if (!entry) {
+    return false;
+  }
+  await ensureBrowserFsEntryLoaded(entry);
+  return true;
+}
+
+function trimDiagnosticDelimiters(text) {
+  return text.trim().replace(/^["'`]+|["'`]+$/g, "");
+}
+
+function lowercaseFirst(text) {
+  if (!text) {
+    return text;
+  }
+  return `${text[0].toLowerCase()}${text.slice(1)}`;
+}
+
+function flattenModulePath(name) {
+  const parts = name.split(".").filter(Boolean);
+  if (!parts.length) {
+    return name;
+  }
+  let flattened = parts[0];
+  for (let index = 1; index < parts.length; index += 1) {
+    const part = parts[index];
+    flattened += flattened.endsWith("__") || part.startsWith("__") ? part : `__${part}`;
+  }
+  return flattened;
+}
+
+function flattenModulePathPrefixes(name) {
+  const parts = name.split(".").filter(Boolean);
+  if (!parts.length) {
+    return [];
+  }
+  const prefixes = [];
+  let flattened = parts[0];
+  prefixes.push(flattened);
+  for (let index = 1; index < parts.length; index += 1) {
+    const part = parts[index];
+    flattened += flattened.endsWith("__") || part.startsWith("__") ? part : `__${part}`;
+    prefixes.push(flattened);
+  }
+  return prefixes;
+}
+
+function modulePathToCmiCandidates(name) {
+  if (typeof name !== "string" || name.length === 0) {
+    return [];
+  }
+  const trimmed = trimDiagnosticDelimiters(name);
+  if (!trimmed) {
+    return [];
+  }
+  const basename = browserFsBasename(trimmed);
+  if (basename.endsWith(".cmi")) {
+    return [basename];
+  }
+  if (basename.endsWith(".ml") || basename.endsWith(".mli")) {
+    return [`${basename.replace(/\.(?:ml|mli)$/, "")}.cmi`];
+  }
+  const prefixes = flattenModulePathPrefixes(trimmed).map((prefix) => `${lowercaseFirst(prefix)}.cmi`);
+  return Array.from(new Set([
+    ...prefixes,
+    `${lowercaseFirst(basename)}.cmi`,
+  ]));
+}
+
+function legacyMissingCmiCandidates(output) {
+  if (typeof output !== "string") {
+    return [];
+  }
+  const extractedNames = [];
+  const patterns = [
+    /Could not find the \.cmi file for interface\s+["'`]?([A-Za-z0-9_'.\/-]+)["'`]?\./,
+    /The compiled interface for module\s+["'`]?([A-Za-z0-9_'.]+)["'`]?\s+was not found\./,
+    /Unbound module\s+["'`]?([A-Z][A-Za-z0-9_'.]*)["'`]?(?:\s+in instance\b|$)/m,
+    /This is an alias for module\s+["'`]?([A-Za-z0-9_'.]+)["'`]?,\s+which is missing/,
+    /The module\s+["'`]?[A-Za-z0-9_'.]+["'`]?\s+is an alias for module\s+["'`]?([A-Za-z0-9_'.]+)["'`]?,\s+which is missing/,
+    /The type of this packed module refers to\s+["'`]?([A-Za-z0-9_'.]+)["'`]?,\s+which is missing/,
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(output);
+    if (match?.[1]) {
+      extractedNames.push(match[1]);
+    }
+  }
+  return Array.from(new Set(extractedNames.flatMap(modulePathToCmiCandidates)));
+}
+
+async function legacyMissingCmiResult(output) {
+  const candidates = legacyMissingCmiCandidates(output);
+  if (!candidates.length) {
+    return null;
+  }
+  const manifest = await ensureBrowserFsManifest();
+  let firstLoadedMatch = null;
+  for (const candidate of candidates) {
+    const entry = manifest.entriesByBasename.get(candidate)?.[0];
+    if (entry) {
+      if (!browserFsLoadedPaths.has(entry.fs_path)) {
+        return { kind: "missing_cmi", filename: entry.fs_path };
+      }
+      if (!firstLoadedMatch) {
+        firstLoadedMatch = entry.fs_path;
+      }
+    }
+  }
+  if (firstLoadedMatch) {
+    return { kind: "missing_cmi", filename: firstLoadedMatch };
+  }
+  return null;
+}
+
+async function normalizeBackendResult(result) {
+  if (typeof result === "string") {
+    return (await legacyMissingCmiResult(result)) ?? { kind: "ok", output: result };
+  }
+  return result;
+}
+
+async function runBackendWithLazyFs(methodName, filename, source) {
+  const backend = await ready;
+  let previousMissingFilename = null;
+  for (let attempt = 0; attempt < browserFsRetryLimit; attempt += 1) {
+    const result = await normalizeBackendResult(backend[methodName](filename, source));
+    if (!result || result.kind === "ok") {
+      return result?.output ?? "";
+    }
+    if (result.kind !== "missing_cmi" || typeof result.filename !== "string") {
+      throw new Error(`unexpected backend result from ${methodName}`);
+    }
+    if (result.filename === previousMissingFilename) {
+      throw new Error(`lazy filesystem stalled while loading ${result.filename}`);
+    }
+    previousMissingFilename = result.filename;
+    setStatus("loading", `loading ${result.filename}`);
+    const loaded = await ensureBrowserFsForMissingFilename(result.filename);
+    if (!loaded) {
+      throw new Error(`missing browser filesystem asset for ${result.filename}`);
+    }
+  }
+  throw new Error(`lazy filesystem retry limit exceeded for ${filename}`);
 }
 
 const ready = (async () => {
@@ -659,9 +923,8 @@ const ready = (async () => {
   await loadScript(new URL("./runtime_shims.js", import.meta.url));
   setBootStatus("loading compiler");
   await loadScript(buildAssetUrl("web_bytecode_js.bc.js"));
-  setBootStatus("loading standard library");
   installGlobalScriptEvaluator();
-  await ensureBrowserFsLoaded();
+  await ensureBrowserFsSeedLoaded();
   setBootStatus("starting compiler");
   const backend = window.WebBytecodeJs;
   if (
@@ -675,13 +938,11 @@ const ready = (async () => {
 })();
 
 export async function checkString(filename, source) {
-  const backend = await ready;
-  return backend.checkString(filename, source);
+  return runBackendWithLazyFs("checkString", filename, source);
 }
 
 export async function runString(filename, source) {
-  const backend = await ready;
-  return backend.runString(filename, source);
+  return runBackendWithLazyFs("runString", filename, source);
 }
 
 export async function checkFile(file) {
