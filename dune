@@ -705,6 +705,7 @@
   ssa_tail_call
   ssa_of_cmm
   cfg_of_ssa
+  indvar
   ;; backend/debug/
   available_ranges_vars
   compute_ranges
