@@ -69,6 +69,8 @@
 
 (copy_files# backend/ssa/*.ml{,i})
 
+(copy_files# backend/ssa/loop/*.ml{,i})
+
 (copy_files# backend/debug/*.ml{,i})
 
 (copy_files# backend/debug/dwarf/dwarf_ocaml/*.ml{,i})
@@ -695,7 +697,11 @@
   ssa
   ssa_of_cmm
   cfg_of_ssa
-  indvar
+  ;; backend/ssa/loop/
+  induction_var
+  termination
+  dead_induction_var
+  delete_empty_loops
   ;; backend/debug/
   available_ranges_vars
   compute_ranges

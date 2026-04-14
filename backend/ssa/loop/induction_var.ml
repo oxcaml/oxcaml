@@ -1,4 +1,4 @@
-[@@@ocaml.warning "+a-4-40-41-42"]
+[@@@ocaml.warning "+a-4-40-41-42-44"]
 
 open Ssa
 
@@ -247,6 +247,7 @@ type biv =
   { loop : loop;
     param_index : int;
     init : instruction list;
+    update : instruction list;
     step : step;
     sign : [ `Add | `Sub ]
   }
@@ -339,16 +340,22 @@ let analyze_loop ~op_def (loop : loop) : biv list =
           if agrees
           then
             bivs
-              := { loop; param_index = index; init = init_vals; step; sign }
+              := { loop;
+                   param_index = index;
+                   init = init_vals;
+                   update = back_vals;
+                   step;
+                   sign
+                 }
                  :: !bivs))
     header.params;
   List.rev !bivs
 
-let analyze (t : Ssa.t) : biv list =
+let analyze (t : Ssa.t) : (loop * biv list) list =
   let info = compute_dom_info t in
   let loops = find_loops t info in
   let op_def = build_op_def_block t in
-  List.concat_map (analyze_loop ~op_def) loops
+  List.map (fun loop -> loop, analyze_loop ~op_def loop) loops
 
 (* === Printing === *)
 
@@ -365,16 +372,22 @@ let print_init ppf = function
          print_instr_ref)
       vs
 
-let print ppf (bivs : biv list) =
+let print_biv ppf (biv : biv) =
+  let op = match biv.sign with `Add -> "+=" | `Sub -> "-=" in
+  Format.fprintf ppf "param=%d init=%a step %s %a" biv.param_index print_init
+    biv.init op print_step biv.step
+
+let print ppf (loops : (loop * biv list) list) =
   Format.fprintf ppf "@[<v>induction variables:";
-  if bivs = []
-  then Format.fprintf ppf " <none>@]"
-  else (
+  match loops with
+  | [] -> Format.fprintf ppf " <no loops>@]"
+  | _ ->
     List.iter
-      (fun biv ->
-        let op = match biv.sign with `Add -> "+=" | `Sub -> "-=" in
-        Format.fprintf ppf "@,  header=%d param=%d init=%a step %s %a"
-          biv.loop.header.id biv.param_index print_init biv.init op print_step
-          biv.step)
-      bivs;
-    Format.fprintf ppf "@]")
+      (fun (loop, bivs) ->
+        Format.fprintf ppf "@,  loop header=%d" loop.header.id;
+        match bivs with
+        | [] -> Format.fprintf ppf "@,    <no basic induction variables>"
+        | _ ->
+          List.iter (fun b -> Format.fprintf ppf "@,    %a" print_biv b) bivs)
+      loops;
+    Format.fprintf ppf "@]"
