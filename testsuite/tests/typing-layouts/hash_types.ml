@@ -203,11 +203,7 @@ type ('a : float64) t = { i : 'a ; j : 'a }
 type floatu_t : float64 & float64 = float# t#
 [%%expect{|
 type ('a : float64) t = { i : 'a; j : 'a; }
-Line 2, characters 43-45:
-2 | type floatu_t : float64 & float64 = float# t#
-                                               ^^
-Error: The type "t" has no unboxed version.
-Hint: Float records don't get unboxed versions.
+type floatu_t = float# t#
 |}]
 
 (* But not float, mixed float/float#, or [@@unboxed] records *)
@@ -251,6 +247,24 @@ Line 3, characters 42-44:
                                               ^^
 Error: The type "t" has no unboxed version.
 Hint: Float records don't get unboxed versions.
+|}]
+
+(* Bad [@@represent_as_float_array] attribute *)
+type t = { f : float }
+[@@represent_as_float_array]
+[%%expect{|
+Lines 1-2, characters 0-28:
+1 | type t = { f : float }
+2 | [@@represent_as_float_array]
+Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
+|}]
+type ('a : value) t = { a : 'a }
+[@@represent_as_float_array]
+[%%expect{|
+Lines 1-2, characters 0-28:
+1 | type ('a : value) t = { a : 'a }
+2 | [@@represent_as_float_array]
+Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
 |}]
 
 (* A type can get an unboxed version from both the manifest and kind *)

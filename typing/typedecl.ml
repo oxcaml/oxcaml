@@ -157,6 +157,7 @@ type error =
   | Missing_flatten_floats
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
+  | Bad_represent_as_float_array_attribute
 
 open Typedtree
 
@@ -2032,6 +2033,9 @@ let rec update_decl_jkind env dpath decl =
          voids : bool;
     }
   end in
+  let represent_as_float_array =
+    Builtin_attributes.has_represent_as_float_array decl.type_attributes
+  in
   (* returns updated labels, updated rep, and updated jkind *)
   let update_record_kind loc lbls rep =
     match lbls, rep with
@@ -2090,6 +2094,17 @@ let rec update_decl_jkind env dpath decl =
         let summary : Imm_element_rep.element_repr_summary =
           { values; floats; atomic_floats; float64s;
             non_float64_unboxed_fields; atomic_fields; voids }
+        in
+        let mixed_record () =
+          let shape =
+            Element_repr.mixed_product_shape loc reprs Record
+          in
+          let shape =
+            match shape with
+            | Some x -> x
+            | None -> Misc.fatal_error "expected mixed block"
+          in
+          Record_mixed shape
         in
         match summary with
         (* We store floats flatly in mixed records if all fields are
@@ -2156,15 +2171,7 @@ let rec update_decl_jkind env dpath decl =
         | { float64s = true; voids = true; atomic_fields = false }
         | { values = true; float64s = true; atomic_fields = false }
         | { non_float64_unboxed_fields = true; atomic_fields = false } ->
-            let shape =
-              Element_repr.mixed_product_shape loc reprs Record
-            in
-            let shape =
-              match shape with
-              | Some x -> x
-              | None -> Misc.fatal_error "expected mixed block"
-            in
-            Record_mixed shape
+            mixed_record ()
         (* value-only records are stored as boxed records *)
         | { values = true; float64s = false; non_float64_unboxed_fields = false;
             voids = false }
@@ -2179,7 +2186,10 @@ let rec update_decl_jkind env dpath decl =
         | { values = false; floats = false; atomic_floats = false;
             float64s = true; non_float64_unboxed_fields = false;
             voids = false } ->
-          Record_ufloat
+          if represent_as_float_array then
+            Record_ufloat
+          else
+            mixed_record ()
         (* Records with atomic float fields cannot use flat representation *)
         | { atomic_floats = true; floats; values; _ } ->
           if floats && not values
@@ -2334,6 +2344,8 @@ let rec update_decl_jkind env dpath decl =
       }
     | Type_record (lbls, rep, umc) ->
       let lbls, rep, type_jkind = update_record_kind decl.type_loc lbls rep in
+      if represent_as_float_array && rep <> Record_ufloat then
+        raise (Error (decl.type_loc, Bad_represent_as_float_array_attribute));
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
@@ -5431,6 +5443,11 @@ let report_error_doc ppf = function
     fprintf ppf "@[<v>The kind %a is cyclic%a@]"
       (Style.as_inline_code Printtyp.path) path
       Reaching_path.pp_kind_colon reaching_path
+  | Bad_represent_as_float_array_attribute ->
+    fprintf ppf
+      "@[%a can only be used on records whose fields \
+       are all float64.@]"
+      Style.inline_code "[@@represent_as_float_array]"
 
 
 let () =
