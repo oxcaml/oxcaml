@@ -605,7 +605,7 @@ let make_constructor
       (* narrow and widen are now invoked through with_local_scope *)
       TyVarEnv.with_local_scope begin fun () ->
       let closed = svars <> [] in
-      let targs, tret_type, args, ret_type, univars =
+      let targs, tret_type, args, ret_type, _univars =
         Ctype.with_local_level_generalize_if closed begin fun () ->
           TyVarEnv.reset ();
           let univar_list =
