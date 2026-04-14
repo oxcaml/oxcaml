@@ -725,7 +725,7 @@ let decl_of_type_constr tconstr =
     let kind _ = Type_open in
     decl1 ~variance:Variance.full ~kind
       ~jkind:(builtin1 Jkind.Const.Builtin.value)
-      ~param_jkind:value_param_jkind
+      ~param_jkind:(Jkind.for_effect_arg ident_eff)
       ()
   | `Continuation ->
     let variance = Variance.(contravariant, covariant) in

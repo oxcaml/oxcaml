@@ -51,7 +51,7 @@ val with_labels: bool -> (unit -> 'a) -> 'a
 (** {1 Printing idents and paths } *)
 
 val ident_name: Shape.Sig_component_kind.t option -> Ident.t -> out_name
-val tree_of_path: ?disambiguation:bool -> Path.t -> out_ident
+val tree_of_path: Path.t -> out_ident
 val namespaced_tree_of_path: Shape.Sig_component_kind.t -> Path.t -> out_ident
 val tree_of_type_path: Path.t -> out_ident
 (** Specialized functions for printing types with [short-paths] *)

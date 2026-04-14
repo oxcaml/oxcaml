@@ -60,7 +60,7 @@ module Doc = struct
     prepared_type_scheme ppf ty
 
   let path ppf p =
-    !Oprint.out_ident ppf (tree_of_path ~disambiguation:false p)
+    !Oprint.out_ident ppf (tree_of_path p)
 
   let () = Env.print_path := path
 
