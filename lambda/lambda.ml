@@ -3318,7 +3318,8 @@ let and_ = mk_integral_binop And
 let icmp cmp size x y ~loc = binary (Icmp (size, cmp)) x y ~loc
 let phys_equal x y ~loc = Lprim (Pphys_equal Eq, [x;y], loc)
 
-let static_cast ~src ~dst arg ~loc = unary (Static_cast {src; dst}) arg ~loc
+let static_cast ~src ~dst ~signedness arg ~loc =
+  unary (Static_cast {src; dst; signedness}) arg ~loc
 
 let report_error ppf = function
   | Slambda_unsupported where ->

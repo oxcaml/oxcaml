@@ -1594,7 +1594,7 @@ module Scalar_type : sig
   end
 
   module Signedness : sig
-    type t =
+    type t = Scalar.Signedness.t =
       | Signed
       | Unsigned
 
@@ -1677,6 +1677,8 @@ module Scalar_type : sig
         untag a value of type [src], And in the cas where [src] is already
         untagged, this becomes the identity function *)
     val untagged_or_identity : t -> Integer.t
+
+    val bit_width : t -> int
 
     include Integral_ops with type t := t
   end

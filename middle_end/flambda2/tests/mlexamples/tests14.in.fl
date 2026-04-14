@@ -14,7 +14,7 @@ let $camlTests14__first_const = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let prim = %num_conv.[`tagged_imm`].[`imm`] (n) in
+   let prim = %num_conv.[`tagged_imm`].[`nativeint`].[`signed`] (n) in
    let prim_1 = %string_load.[`8`] (s, prim) in
    let Pstringrefu = %tag_imm (prim_1) in
    cont k1 (Pstringrefu)

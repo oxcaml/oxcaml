@@ -661,16 +661,30 @@ let unarize_extern_repr ~machine_width alloc_mode
   | Unboxed_or_untagged_integer Untagged_int8 ->
     [ { kind = K.naked_int8;
         arg_transformer =
-          Some (P.Num_conv { src = Tagged_immediate; dst = Naked_int8 });
+          Some
+            (P.Num_conv
+               { src = Tagged_immediate; dst = Naked_int8; signedness = Signed });
         return_transformer =
-          Some (P.Num_conv { src = Naked_int8; dst = Tagged_immediate })
+          Some
+            (P.Num_conv
+               { src = Naked_int8; dst = Tagged_immediate; signedness = Signed })
       } ]
   | Unboxed_or_untagged_integer Untagged_int16 ->
     [ { kind = K.naked_int16;
         arg_transformer =
-          Some (P.Num_conv { src = Tagged_immediate; dst = Naked_int16 });
+          Some
+            (P.Num_conv
+               { src = Tagged_immediate;
+                 dst = Naked_int16;
+                 signedness = Signed
+               });
         return_transformer =
-          Some (P.Num_conv { src = Naked_int16; dst = Tagged_immediate })
+          Some
+            (P.Num_conv
+               { src = Naked_int16;
+                 dst = Tagged_immediate;
+                 signedness = Signed
+               })
       } ]
   | Unboxed_or_untagged_integer Unboxed_nativeint ->
     [ { kind = K.naked_nativeint;

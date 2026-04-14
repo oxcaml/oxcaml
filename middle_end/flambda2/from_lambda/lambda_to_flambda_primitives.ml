@@ -599,19 +599,31 @@ let tag_int (arg : H.expr_primitive) : H.expr_primitive =
   Unary (Tag_immediate, Prim arg)
 
 let tag_int8 (arg : H.expr_primitive) : H.expr_primitive =
-  Unary (Num_conv { src = Naked_int8; dst = Tagged_immediate }, Prim arg)
+  Unary
+    ( Num_conv { src = Naked_int8; dst = Tagged_immediate; signedness = Signed },
+      Prim arg )
 
 let tag_int16 (arg : H.expr_primitive) : H.expr_primitive =
-  Unary (Num_conv { src = Naked_int16; dst = Tagged_immediate }, Prim arg)
+  Unary
+    ( Num_conv { src = Naked_int16; dst = Tagged_immediate; signedness = Signed },
+      Prim arg )
 
 let untag_int (arg : H.simple_or_prim) : H.simple_or_prim =
   Prim (Unary (Untag_immediate, arg))
 
 let untag_int8 (arg : H.simple_or_prim) : H.simple_or_prim =
-  Prim (Unary (Num_conv { src = Tagged_immediate; dst = Naked_int8 }, arg))
+  Prim
+    (Unary
+       ( Num_conv
+           { src = Tagged_immediate; dst = Naked_int8; signedness = Signed },
+         arg ))
 
 let untag_int16 (arg : H.simple_or_prim) : H.simple_or_prim =
-  Prim (Unary (Num_conv { src = Tagged_immediate; dst = Naked_int16 }, arg))
+  Prim
+    (Unary
+       ( Num_conv
+           { src = Tagged_immediate; dst = Naked_int16; signedness = Signed },
+         arg ))
 
 let unbox_float32 (arg : H.simple_or_prim) : H.simple_or_prim =
   Prim (Unary (Unbox_number K.Boxable_number.Naked_float32, arg))
@@ -694,19 +706,22 @@ let convert_index_to_tagged_int ~index ~(index_kind : Lambda.array_index_kind) =
       (Unary
          ( Num_conv
              { src = standard_int_or_float_of_unboxed_integer ubint;
-               dst = Tagged_immediate
+               dst = Tagged_immediate;
+               signedness = Signed
              },
            index ))
 
 let convert_index_to_naked_nativeint ~index
     ~(index_kind : Lambda.array_index_kind) =
   let src = convert_lambda_index_to_standard_int_or_float index_kind in
-  H.Prim (Unary (Num_conv { src; dst = Naked_nativeint }, index))
+  H.Prim
+    (Unary (Num_conv { src; dst = Naked_nativeint; signedness = Signed }, index))
 
 let convert_index_to_naked_int64 ~index ~(index_kind : Lambda.array_index_kind)
     =
   let src = convert_lambda_index_to_standard_int_or_float index_kind in
-  H.Prim (Unary (Num_conv { src; dst = Naked_int64 }, index))
+  H.Prim
+    (Unary (Num_conv { src; dst = Naked_int64; signedness = Signed }, index))
 
 let check_non_negative_imm imm prim_name =
   if not (Target_ocaml_int.is_non_negative imm)
@@ -755,7 +770,7 @@ let check_bound ~(index_kind : Lambda.array_index_kind) ~(bound_kind : I.t)
     else
       let src = I_or_f.of_standard_int src in
       let dst = I_or_f.of_standard_int comp_kind in
-      H.Prim (Unary (Num_conv { src; dst }, x))
+      H.Prim (Unary (Num_conv { src; dst; signedness = Signed }, x))
   in
   let index = conv index ~src:index_kind in
   let bound = conv bound ~src:bound_kind in
@@ -805,7 +820,13 @@ let actual_max_length_for_string_like_access_as_nativeint ~machine_width
      to work (or at least on an integer number of bytes to work). *)
   let length =
     H.Prim
-      (Unary (Num_conv { src = Naked_immediate; dst = Naked_nativeint }, length))
+      (Unary
+         ( Num_conv
+             { src = Naked_immediate;
+               dst = Naked_nativeint;
+               signedness = Signed
+             },
+           length ))
   in
   match access_len with
   | 1 -> length (* micro-optimization *)
@@ -1034,7 +1055,11 @@ let multiple_word_array_access_validity_condition array ~machine_width
     let reduced_length_nativeint =
       H.Prim
         (Unary
-           ( Num_conv { src = Naked_immediate; dst = Naked_nativeint },
+           ( Num_conv
+               { src = Naked_immediate;
+                 dst = Naked_nativeint;
+                 signedness = Signed
+               },
              reduced_length_untagged ))
     in
     let nativeint_bound =
@@ -1160,10 +1185,16 @@ let bigarray_box_or_tag_raw_value_to_read kind alloc_mode =
     fun arg -> H.Unary (Box_number (Naked_float, alloc_mode), Prim arg)
   | Naked_number Naked_int8 ->
     fun arg ->
-      H.Unary (Num_conv { src = Naked_int8; dst = Tagged_immediate }, Prim arg)
+      H.Unary
+        ( Num_conv
+            { src = Naked_int8; dst = Tagged_immediate; signedness = Signed },
+          Prim arg )
   | Naked_number Naked_int16 ->
     fun arg ->
-      H.Unary (Num_conv { src = Naked_int16; dst = Tagged_immediate }, Prim arg)
+      H.Unary
+        ( Num_conv
+            { src = Naked_int16; dst = Tagged_immediate; signedness = Signed },
+          Prim arg )
   | Naked_number Naked_int32 ->
     fun arg -> H.Unary (Box_number (Naked_int32, alloc_mode), Prim arg)
   | Naked_number Naked_int64 ->
@@ -1195,11 +1226,20 @@ let bigarray_unbox_or_untag_value_to_store kind =
   | Naked_number Naked_int8 ->
     fun arg ->
       H.Prim
-        (Unary (Num_conv { src = Tagged_immediate; dst = Naked_int8 }, arg))
+        (Unary
+           ( Num_conv
+               { src = Tagged_immediate; dst = Naked_int8; signedness = Signed },
+             arg ))
   | Naked_number Naked_int16 ->
     fun arg ->
       H.Prim
-        (Unary (Num_conv { src = Tagged_immediate; dst = Naked_int16 }, arg))
+        (Unary
+           ( Num_conv
+               { src = Tagged_immediate;
+                 dst = Naked_int16;
+                 signedness = Signed
+               },
+             arg ))
   | Naked_number Naked_int32 ->
     fun arg -> H.Prim (Unary (Unbox_number Naked_int32, arg))
   | Naked_number Naked_int64 ->
@@ -1563,8 +1603,8 @@ let opaque ~machine_width layout arg ~middle_end_only : H.expr_primitive list =
     arg kinds
 
 let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
-    ~(dst : L.locality_mode Scalar.t) (arg : H.simple_or_prim) ~current_region :
-    H.simple_or_prim =
+    ~(dst : L.locality_mode Scalar.t) ~signedness (arg : H.simple_or_prim)
+    ~current_region : H.simple_or_prim =
   match src, dst with
   | Value src, dst ->
     (* First, untag/unbox the value if necessary, then do the conversion. *)
@@ -1577,8 +1617,10 @@ let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
         let arg : H.expr_primitive = Unary (Untag_immediate, arg) in
         let src = I_or_f.Naked_immediate in
         match width with
-        | Int8 -> Unary (Num_conv { src; dst = Naked_int8 }, Prim arg)
-        | Int16 -> Unary (Num_conv { src; dst = Naked_int16 }, Prim arg)
+        | Int8 ->
+          Unary (Num_conv { src; dst = Naked_int8; signedness }, Prim arg)
+        | Int16 ->
+          Unary (Num_conv { src; dst = Naked_int16; signedness }, Prim arg)
         | Int -> arg)
       | Integral (Boxable (Int32 Any_locality_mode)) ->
         Unary (Unbox_number Naked_int32, arg)
@@ -1591,13 +1633,14 @@ let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
       | Floating (Float64 Any_locality_mode) ->
         Unary (Unbox_number Naked_float, arg)
     in
-    static_cast (H.Prim arg) ~src:(Scalar.naked src) ~dst ~current_region
+    static_cast (H.Prim arg) ~src:(Scalar.naked src) ~signedness ~dst
+      ~current_region
   | src, Value dst -> (
     (* The inverse of the previous case: first do the conversion, then tag/box
        the result. *)
     let arg =
       let dst = Scalar.naked (Scalar.Width.ignore_locality dst) in
-      static_cast arg ~src ~dst ~current_region
+      static_cast arg ~src ~dst ~signedness ~current_region
     in
     let box_number width mode : H.simple_or_prim =
       let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
@@ -1608,8 +1651,10 @@ let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
       let arg : H.simple_or_prim =
         let dst = I_or_f.Naked_immediate in
         match width with
-        | Int8 -> Prim (Unary (Num_conv { src = Naked_int8; dst }, arg))
-        | Int16 -> Prim (Unary (Num_conv { src = Naked_int16; dst }, arg))
+        | Int8 ->
+          Prim (Unary (Num_conv { src = Naked_int8; dst; signedness }, arg))
+        | Int16 ->
+          Prim (Unary (Num_conv { src = Naked_int16; dst; signedness }, arg))
         | Int -> arg
       in
       Prim (Unary (Tag_immediate, arg))
@@ -1632,13 +1677,14 @@ let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
     in
     let src = standard_int_or_float_of_scalar_width src in
     let dst = standard_int_or_float_of_scalar_width dst in
-    Prim (Unary (Num_conv { src; dst }, arg))
+    Prim (Unary (Num_conv { src; dst; signedness }, arg))
 
 and static_cast ~(src : L.any_locality_mode Scalar.t)
-    ~(dst : L.locality_mode Scalar.t) (arg : H.simple_or_prim) ~current_region =
+    ~(dst : L.locality_mode Scalar.t) ~(signedness : Scalar.Signedness.t)
+    (arg : H.simple_or_prim) ~current_region =
   if Scalar.equal (fun _ _ -> true) src dst
   then arg
-  else static_cast0 ~src ~dst arg ~current_region
+  else static_cast0 ~src ~dst ~signedness arg ~current_region
 
 let to_expr : H.simple_or_prim -> H.expr_primitive = function
   | Prim prim -> prim
@@ -2127,18 +2173,19 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pnot, [[arg]] -> [Unary (Boolean_not, arg)]
   | Pscalar (Unary unary), [[arg]] -> (
     match unary with
-    | Static_cast { src; dst } ->
-      [to_expr (static_cast arg ~src ~dst ~current_region)]
+    | Static_cast { src; dst; signedness } ->
+      [to_expr (static_cast arg ~src ~dst ~signedness ~current_region)]
     | Integral (outer, op) ->
       let width = integral_width (Scalar.Integral.ignore_locality outer) in
       let outer = Scalar.integral outer in
       let arg =
-        static_cast arg ~current_region
+        static_cast arg ~current_region ~signedness:Signed
           ~src:(Scalar.ignore_locality outer)
           ~dst:(integral_scalar width)
       in
       let maybe_wrap =
-        static_cast ~src:(integral_scalar width) ~dst:outer ~current_region
+        static_cast ~src:(integral_scalar width) ~dst:outer ~signedness:Signed
+          ~current_region
       in
       let result : H.expr_primitive =
         match op with
@@ -2160,10 +2207,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       let arg =
         static_cast arg
           ~src:(Scalar.ignore_locality outer)
-          ~dst:(floating_scalar width) ~current_region
+          ~dst:(floating_scalar width) ~signedness:Signed ~current_region
       in
       let maybe_wrap =
-        static_cast ~src:(floating_scalar width) ~dst:outer ~current_region
+        static_cast ~src:(floating_scalar width) ~dst:outer ~signedness:Signed
+          ~current_region
       in
       let result : H.expr_primitive =
         match op with
@@ -2177,14 +2225,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       let width = integral_width (Scalar.Integral.ignore_locality outer) in
       let outer = Scalar.integral outer in
       let maybe_unwrap arg =
-        static_cast arg ~current_region
+        static_cast arg ~current_region ~signedness:Signed
           ~src:(Scalar.ignore_locality outer)
           ~dst:(integral_scalar width)
       in
       let arg1 = maybe_unwrap arg1 in
       let arg2 = maybe_unwrap arg2 in
       let maybe_wrap =
-        static_cast ~src:(integral_scalar width) ~dst:outer ~current_region
+        static_cast ~src:(integral_scalar width) ~dst:outer ~signedness:Signed
+          ~current_region
       in
       let result : H.expr_primitive =
         match op with
@@ -2206,7 +2255,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       let arg1 =
         static_cast arg1
           ~src:(Scalar.ignore_locality outer)
-          ~dst:(integral_scalar width) ~current_region
+          ~dst:(integral_scalar width) ~signedness:Signed ~current_region
       in
       let arg2 =
         let int_scalar : _ Scalar.Integral.t = Value (Taggable Int) in
@@ -2214,10 +2263,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         let src = match rhs with Int -> Scalar.integral int_scalar in
         static_cast arg2 ~src
           ~dst:(Scalar.integral naked_int_scalar)
-          ~current_region
+          ~signedness:Signed ~current_region
       in
       let maybe_wrap =
-        static_cast ~src:(integral_scalar width) ~dst:outer ~current_region
+        static_cast ~src:(integral_scalar width) ~dst:outer ~signedness:Signed
+          ~current_region
       in
       let result : H.expr_primitive =
         match op with
@@ -2230,12 +2280,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       let width = floating_width outer in
       let outer = Scalar.floating outer in
       let maybe_unwrap =
-        static_cast ~current_region
+        static_cast ~current_region ~signedness:Signed
           ~src:(Scalar.ignore_locality outer)
           ~dst:(floating_scalar width)
       in
       let maybe_wrap =
-        static_cast ~src:(floating_scalar width) ~dst:outer ~current_region
+        static_cast ~src:(floating_scalar width) ~dst:outer ~signedness:Signed
+          ~current_region
       in
       let arg1 = maybe_unwrap arg1 in
       let arg2 = maybe_unwrap arg2 in
@@ -2251,7 +2302,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       let width = integral_width size in
       let maybe_unwrap arg =
         static_cast arg ~current_region ~src:(Scalar.integral size)
-          ~dst:(integral_scalar width)
+          ~dst:(integral_scalar width) ~signedness:Signed
       in
       let arg1 = maybe_unwrap arg1 in
       let arg2 = maybe_unwrap arg2 in
@@ -2263,7 +2314,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       let width = floating_width size in
       let maybe_unwrap arg =
         static_cast arg ~current_region ~src:(Scalar.floating size)
-          ~dst:(floating_scalar width)
+          ~dst:(floating_scalar width) ~signedness:Signed
       in
       let arg1 = maybe_unwrap arg1 in
       let arg2 = maybe_unwrap arg2 in
@@ -2278,7 +2329,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       let width = integral_width size in
       let maybe_unwrap arg =
         static_cast arg ~current_region ~src:(Scalar.integral size)
-          ~dst:(integral_scalar width)
+          ~dst:(integral_scalar width) ~signedness:Signed
       in
       let arg1 = maybe_unwrap arg1 in
       let arg2 = maybe_unwrap arg2 in
@@ -2291,7 +2342,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       let width = floating_width size in
       let maybe_unwrap arg =
         static_cast arg ~current_region ~src:(Scalar.floating size)
-          ~dst:(floating_scalar width)
+          ~dst:(floating_scalar width) ~signedness:Signed
       in
       let arg1 = maybe_unwrap arg1 in
       let arg2 = maybe_unwrap arg2 in

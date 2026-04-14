@@ -264,10 +264,21 @@ module Signedness = struct
     (* polymorphic equality is fast and simple when they are all constant constructors *)
     x = y
 
+  let compare x y =
+    match x, y with
+    | Signed, Signed | Unsigned, Unsigned -> 0
+    | Unsigned, Signed -> 1
+    | Signed, Unsigned -> -1
+
   let print ppf t =
     match t with
     | Signed -> Format.pp_print_string ppf "signed"
     | Unsigned -> Format.pp_print_string ppf "unsigned"
+
+  let print_as_suffix ppf t =
+    match t with
+    | Signed -> ()
+    | Unsigned -> Format.pp_print_string ppf "_unsigned"
 end
 
 module Integer_comparison = struct
@@ -439,7 +450,8 @@ module Operation = struct
       | Floating of 'mode Floating.t * Float_op.t
       | Static_cast of
           { src : any_locality_mode t;
-            dst : 'mode t
+            dst : 'mode t;
+            signedness : Signedness.t
           }
 
     let all =
@@ -450,20 +462,33 @@ module Operation = struct
               ListLabels.map Float_op.all ~f:(fun op -> Floating (size, op)));
           ListLabels.concat_map all ~f:(fun src ->
               ListLabels.concat_map all ~f:(fun dst ->
-                  if src = dst then [] else [Static_cast { src; dst }])) ]
+                  let src_signedness : Signedness.t list =
+                    match (src : (_ Width.t, _ Width.t) Maybe_naked.t) with
+                    | Naked (Integral _) -> Signedness.all
+                    | Value (Integral _)
+                    | Value (Floating _)
+                    | Naked (Floating _) ->
+                      [Signed]
+                  in
+                  ListLabels.concat_map src_signedness ~f:(fun signedness ->
+                      if src = dst
+                      then []
+                      else [Static_cast { src; dst; signedness }]))) ]
 
     let map (type a b) (t : a t) ~(f : a -> b) : b t =
       match t with
       | Integral (size, op) -> Integral (Integral.map size ~f, op)
       | Floating (size, op) -> Floating (Floating.map size ~f, op)
-      | Static_cast { src; dst } -> Static_cast { src; dst = map dst ~f }
+      | Static_cast { src; dst; signedness } ->
+        Static_cast { src; dst = map dst ~f; signedness }
 
     let info = function
       | Integral (size, (Neg | Bswap | Succ | Pred)) ->
         { result = integral size; can_raise = false }
       | Floating (size, (Neg | Abs)) ->
         { result = floating size; can_raise = false }
-      | Static_cast { src = _; dst } -> { result = dst; can_raise = false }
+      | Static_cast { src = _; dst; signedness = _ } ->
+        { result = dst; can_raise = false }
 
     let to_string t =
       let i = Integral.to_string in
@@ -473,8 +498,9 @@ module Operation = struct
         Printf.sprintf "%s_%s" (i size) (Int_op.to_string op)
       | Floating (size, op) ->
         Printf.sprintf "%s_%s" (f size) (Float_op.to_string op)
-      | Static_cast { src; dst } ->
-        Printf.sprintf "%s_of_%s" (to_string dst) (to_string src)
+      | Static_cast { src; dst; signedness } ->
+        Format.asprintf "%s_of_%s%a" (to_string dst) (to_string src)
+          Signedness.print_as_suffix signedness
 
     let sort = function
       | Integral (width, _) ->
@@ -483,7 +509,7 @@ module Operation = struct
       | Floating (width, _) ->
         let sort = Floating.sort width in
         sort, sort
-      | Static_cast { src; dst } -> sort src, sort dst
+      | Static_cast { src; dst; signedness = _ } -> sort src, sort dst
   end
 
   module Binary = struct
