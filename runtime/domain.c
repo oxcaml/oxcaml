@@ -1176,23 +1176,23 @@ static void install_backup_thread (dom_internal* di)
       caml_domain_lock_hook();
       msg = atomic_load_acquire(&di->backup_thread_msg);
     }
+
+#ifndef _WIN32
+    /* No signals on the backup thread */
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
+#endif
+
+    atomic_store_release(&di->backup_thread_msg, BT_ENTERING_OCAML);
+    err = pthread_create(&di->backup_thread, 0, backup_thread_func, (void*)di);
+    caml_check_error(err, "failed to create domain backup thread");
+
+#ifndef _WIN32
+    pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
+#endif
+
+    pthread_detach(di->backup_thread);
   }
-
-#ifndef _WIN32
-  /* No signals on the backup thread */
-  sigfillset(&mask);
-  pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
-#endif
-
-  atomic_store_release(&di->backup_thread_msg, BT_ENTERING_OCAML);
-  err = pthread_create(&di->backup_thread, 0, backup_thread_func, (void*)di);
-  caml_check_error(err, "failed to create domain backup thread");
-
-#ifndef _WIN32
-  pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
-#endif
-
-  pthread_detach(di->backup_thread);
 }
 
 static void terminate_backup_thread(dom_internal *di)
