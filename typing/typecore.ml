@@ -18,15 +18,6 @@
 [@@@ocaml.warning "-60"] module Str = Ast_helper.Str (* For ocamldep *)
 [@@@ocaml.warning "+60"]
 
-open Misc
-open Asttypes
-open Parsetree
-open Types
-open Mode
-open Typedtree
-open Btype
-open Ctype
-
 type comprehension_type =
   | List_comprehension
   | Array_comprehension of mutability
