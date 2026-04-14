@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Filter script for DWARF test output to show only function call frames
 # Removes LLDB commands, process status messages, thread info, and source locations
