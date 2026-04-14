@@ -3,6 +3,7 @@
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
+cd "$(git rev-parse --show-toplevel)"
 
 # Script arguments with their default values
 commitish=main
@@ -47,20 +48,20 @@ function sorted_files_at_committish() {
   git ls-tree -r --name-only "$1" "$2" | sed "s#^$2/##" | sort
 }
 
-git fetch "$repository" "$(cat upstream/ocaml_flambda/base-rev.txt)"
+git fetch "$repository" "$(cat external/merlin/upstream/ocaml_flambda/base-rev.txt)"
 git fetch "$repository" "$commitish"
 rev=$(git rev-parse FETCH_HEAD)
 
 function files_new_at_fetch_head() {
   comm -13 \
-    <(sorted_files_at_committish "$(cat upstream/ocaml_flambda/base-rev.txt)" "$old_subdirectory") \
+    <(sorted_files_at_committish "$(cat external/merlin/upstream/ocaml_flambda/base-rev.txt)" "$old_subdirectory") \
     <(sorted_files_at_committish FETCH_HEAD "$subdirectory")
 }
 
 function directories_from_previous_import() {
   comm -12 \
-    <(cd src/ocaml; ls -d */) \
-    <(cd upstream/ocaml_flambda; ls -d */) \
+    <(cd external/merlin/src/ocaml; ls -d */) \
+    <(cd external/merlin/upstream/ocaml_flambda; ls -d */) \
   | xargs -n 1 printf "^%s\n"
 }
 
@@ -74,9 +75,9 @@ for file in $files; do
   case ${answer} in
     y|Y|"" )
       echo "Importing $file"
-      ocaml_flambda_file=upstream/ocaml_flambda/"${file}"
+      ocaml_flambda_file=external/merlin/upstream/ocaml_flambda/"${file}"
       git show "FETCH_HEAD:$file" > "$ocaml_flambda_file"
-      cp "$ocaml_flambda_file" src/ocaml/$file
+      cp "$ocaml_flambda_file" "external/merlin/src/ocaml/$file"
       ;;
     * )
       echo "Skipping $file; run '$0' again in order to make a different decision"
