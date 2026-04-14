@@ -455,16 +455,16 @@ spilled_phi_merge:
   movq  48(%rsp), %rbx
   call  *%rdi
 .L120:
-  movq  (%rsp), %rsi
+  movq  (%rsp), %rax
   movq  8(%rsp), %rbp
   movq  16(%rsp), %rbx
-  movq  24(%rsp), %rdx
-  movq  32(%rsp), %rax
-  movq  40(%rsp), %rdi
-  movq  %rsi, (%rsp)
-  movq  %rdx, 24(%rsp)
-  movq  %rax, %r12
-  movq  %rdi, %r13
+  movq  24(%rsp), %rdi
+  movq  32(%rsp), %r8
+  movq  40(%rsp), %r9
+  movq  %rax, (%rsp)
+  movq  %rdi, 24(%rsp)
+  movq  %r8, %r12
+  movq  %r9, %r13
 .L114:
   movq  %rbp, %rax
   movq  24(%rsp), %rdi
