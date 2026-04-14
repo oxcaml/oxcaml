@@ -242,8 +242,15 @@ module type Sort = sig
   *)
   val new_genvar : unit -> var
 
-  (** Returns [true] iff the variable was created by {!new_genvar}. *)
+  (** Create a polymorphic sort variable (level = [Ident.highest_scope]),
+      intended for saving to a cmi. *)
+  val new_genvar_for_cmi : unit -> var
+
+  (** Returns [true] iff the variable was created by {!new_genvar} or
+      {!new_genvar_for_cmi}. *)
   val is_genvar : var -> bool
+
+  val reset_cmi_sort_id : unit -> unit
 
   (** Get the concrete content of a variable. The returned sort must be
       representable (including rigid sorts). *)
@@ -252,12 +259,6 @@ module type Sort = sig
   (** [subst s t] applies the variable substitution [s] to [t], replacing each
       [Var v] where [(v, t')] is in [subst] with [t']. *)
   val subst : (var * t) list -> t -> t
-
-  (** Create a polymorphic sort variable with given level and id. Since [id] is
-      used to determined sort variable equality, [new_genvar] is the preferred
-      option in almost all cases. Currently, [create_var] is only used in the
-      context of saving signatures, where [id] is a negative number. *)
-  val create_var_with_id : level:int -> id:int -> t option -> var
 
   (** [instance_with ~level vars f] creates a fresh sort var at [level] for each
       var in [vars], calls [f] with {!instance} configured to replace each var

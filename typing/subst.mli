@@ -45,6 +45,7 @@ type t = safe subst
 (** Standard substitution*)
 
 val identity: 'a subst
+val for_loading_cmi : unit -> t
 val unsafe: t -> unsafe subst
 
 val add_type: Ident.t -> Path.t -> 'k subst -> 'k subst

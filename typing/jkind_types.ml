@@ -83,8 +83,6 @@ module Sort = struct
     assert (Option.is_none var.contents);
     var.level = level_generic
 
-  let create_var_with_id ~level ~id contents = { contents; level; id }
-
   let equal_base b1 b2 =
     match b1, b2 with
     | Void, Void
@@ -582,10 +580,14 @@ module Sort = struct
 
   let last_var_id = ref 0
 
+  let last_var_cmi_id = ref 0
+
+  let reset_cmi_sort_id () = last_var_cmi_id := 0
+
   let new_var_unsafe ~level =
     incr last_var_id;
     assert (!last_var_id > 0);
-    { contents = None; id = !last_var_id; level }
+    { contents = None; level; id = !last_var_id }
 
   let new_var ~level =
     (* Guard against accidentally creating a genvar or rigidvar via this path:
@@ -598,6 +600,11 @@ module Sort = struct
     new_var_unsafe ~level
 
   let new_genvar () = new_var_unsafe ~level:level_generic
+
+  let new_genvar_for_cmi () =
+    decr last_var_cmi_id;
+    assert (!last_var_cmi_id < 0);
+    { contents = None; level = level_generic; id = !last_var_cmi_id }
 
   let new_rigidvar () = new_var_unsafe ~level:level_rigid
 
