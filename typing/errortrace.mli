@@ -95,9 +95,7 @@ type ('a, 'variety) elt =
   | Variant : 'variety variant -> ('a, 'variety) elt
   | Obj : 'variety obj -> ('a, 'variety) elt
   | Escape : 'a escape -> ('a, _) elt
-  (* CR dkalinichenko: I think we should have [Types.arg_label] here,
-     but I'm leaving until Chris' resolution. *)
-  | Function_label_mismatch of Asttypes.arg_label diff
+  | Function_label_mismatch of arg_label diff
   | Tuple_label_mismatch of string option diff
   | Incompatible_fields : { name:string; diff: type_expr diff } -> ('a, _) elt
   | First_class_module: first_class_module -> ('a,_) elt

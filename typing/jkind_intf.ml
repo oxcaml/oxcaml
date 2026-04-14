@@ -152,6 +152,10 @@ module type Sort = sig
     val for_type_extension : t
 
     val for_class : t
+
+    val for_effect : t
+
+    val for_continuation : t
   end
 
   module Var : sig
