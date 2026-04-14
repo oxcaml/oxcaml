@@ -810,8 +810,7 @@ end = struct
                   | Intop_imm (Isub, n) -> Some (reg, -n)
                   | Intop_imm
                       ( ( Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-                        | Iasr | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _
-                          ),
+                        | Iasr | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ ),
                         _ )
                   | Opaque | Begin_region | End_region | Dls_get | Tls_get
                   | Domain_index | Poll | Pause | Const_int _ | Const_float32 _

@@ -1681,8 +1681,7 @@ let emit_instr env i =
     A.ins_lsr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop (Intop_imm (Iasr, shift_in_bits)) ->
     A.ins_asr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
-  | Lop
-      (Intop_imm ((Imul | Idiv | Iclz | Ictz | Ipopcnt | Imod | Imulh _), _))
+  | Lop (Intop_imm ((Imul | Idiv | Iclz | Ictz | Ipopcnt | Imod | Imulh _), _))
     ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
       Printlinear.instr i

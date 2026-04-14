@@ -218,8 +218,7 @@ let pseudoregs_for_operation op arg res =
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
   | Intop (Ipopcnt | Iclz | Ictz | Icomp _ | Iadd)
   | Intop_imm
-      ( ( Iadd | Isub | Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz
-        | Ictz ),
+      ( (Iadd | Isub | Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz | Ictz),
         _ )
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
