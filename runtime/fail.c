@@ -181,3 +181,21 @@ void caml_check_async(caml_result res, const char *msg)
 
   caml_fatal_uncaught_exception_with_message(exn, msg);
 }
+
+value caml_get_value_or_raise (caml_result result)
+{
+  if (caml_result_is_exception(result))
+    caml_raise(result.data);
+  else
+    return result.data;
+}
+
+value caml_get_value_or_raise_async (caml_result result, const char *where)
+{
+  if (caml_result_is_exception(result)) {
+    caml_check_async(result, where);
+    caml_raise_async(result.data);
+  } else {
+    return result.data;
+  }
+}
