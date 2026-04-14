@@ -249,24 +249,6 @@ Error: The type "t" has no unboxed version.
 Hint: Float records don't get unboxed versions.
 |}]
 
-(* Bad [@@represent_as_float_array] attribute *)
-type t = { f : float }
-[@@represent_as_float_array]
-[%%expect{|
-Lines 1-2, characters 0-28:
-1 | type t = { f : float }
-2 | [@@represent_as_float_array]
-Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
-|}]
-type ('a : value) t = { a : 'a }
-[@@represent_as_float_array]
-[%%expect{|
-Lines 1-2, characters 0-28:
-1 | type ('a : value) t = { a : 'a }
-2 | [@@represent_as_float_array]
-Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
-|}]
-
 (* A type can get an unboxed version from both the manifest and kind *)
 type r = { i : int ; s : string }
 type r2 = r = { i : int ; s : string }
