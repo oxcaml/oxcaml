@@ -358,7 +358,7 @@ let package_files ~ppf_dump initial_env files targetfile =
        file *)
     Unit_info.of_artifact Impl target ~dummy_source_file:targetfile
   in
-  Env.set_current_unit (Some unit_info);
+  Env.set_current_unit unit_info;
   Misc.try_finally (fun () ->
       let coercion =
         Typemod.package_units initial_env files (Unit_info.companion_cmi target)

@@ -80,7 +80,7 @@ let process_implementation_file sourcefile =
   init_path ();
   let source = unit_from_source sourcefile Unit_info.Impl in
   let compilation_unit = Unit_info.modname source in
-  Env.set_current_unit (Some source);
+  Env.set_current_unit source;
   let inputfile = preprocess sourcefile in
   let env = initial_env () in
   try
@@ -114,7 +114,7 @@ let process_interface_file sourcefile =
   init_path ();
   let unit = unit_from_source sourcefile Unit_info.Intf in
   let compilation_unit = Unit_info.modname unit in
-  Env.set_current_unit (Some unit);
+  Env.set_current_unit unit;
   let inputfile = preprocess sourcefile in
   let ast =
     Pparse.file ~tool_name inputfile

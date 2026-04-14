@@ -87,11 +87,11 @@ let predefined_exception_typing_env () =
     Unit_info.make_dummy ~input_name:"<predefined exceptions>"
       Compilation_unit.predef_exn
   in
-  Env.set_current_unit (Some predef_unit_info);
+  Env.set_current_unit predef_unit_info;
   let typing_env =
     TE.Serializable.predefined_exceptions (all_predefined_exception_symbols ())
   in
-  Env.set_current_unit unit_info;
+  Option.iter Env.set_current_unit unit_info;
   typing_env
 
 let create_loader ~get_module_info =
