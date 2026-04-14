@@ -26,6 +26,9 @@ val get_continuation_uses : t -> Continuation.t -> Continuation_uses.t option
 
 val remove : t -> Continuation.t -> t
 
+(* Remove all uses, but keep declared continuations *)
+val reset : t -> t
+
 val clear_continuation_uses : t -> Continuation.t -> t
 
 val union : t -> t -> t
