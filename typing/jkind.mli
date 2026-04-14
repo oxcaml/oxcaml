@@ -473,7 +473,7 @@ val for_abbreviation :
 val for_array_element_sort : level:int -> Types.jkind_lr * sort
 
 (** The jkind of the parameter of the [effect] type. *)
-val for_effect_arg : Types.jkind_lr
+val for_effect_arg : Ident.t -> 'd Types.jkind
 
 (******************************)
 (* elimination and defaulting *)

@@ -1295,7 +1295,7 @@ and transl_type_repr env ~policy ~row_context mode loc vars st =
       end in
       (sort_vars, new_univars, cty)
     end
-    ~post:(fun (_, _, cty) -> generalize_ctyp cty)
+    ~before_generalize:(fun (_, _, cty) -> generalize_ctyp cty)
   in
   let ty = cty.ctyp_type in
   let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
@@ -1366,7 +1366,6 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
             end;
             (t, ty, jkind_annot_opt)
           end
-          ~before_generalize: (fun (t, _, _) -> generalize_structure t)
         in
         let t = instance t in
         let px = Btype.proxy t in

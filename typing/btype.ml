@@ -843,10 +843,6 @@ let instance_variable_type label sign =
   | (_, _, ty) -> ty
   | exception Not_found -> assert false
 
-                  (**********)
-                  (*  Misc  *)
-                  (**********)
-
                   (********************************)
                   (*  Utilities for poly types    *)
                   (********************************)
@@ -2555,6 +2551,13 @@ module Jkind0 = struct
           mod_bounds;
           with_bounds = No_with_bounds }
         ~annotation:None ~why:(Value_creation why)
+
+    let for_effect_arg ident =
+      let why : Jkind_intf.History.value_creation_reason =
+        Type_argument
+          { parent_path = Path.Pident ident; position = 1; arity = 1 }
+      in
+      Builtin.value ~why
   end
 
   include Jkind

@@ -641,12 +641,6 @@ let make_constructor
           end;
           (targs, tret_type, args, ret_type, univar_list)
         end
-        (* CR dkalinichenko: I'd like for Chris to double-check those bits
-
-           rtjoa: No objection, but noting for him that nearly all arguments to
-           [before_generaralize] are the same as the [post] argument in OxCaml
-           5.2.
-        *)
         ~before_generalize: begin fun (_, _, args, ret_type, univars) ->
           Btype.iter_type_expr_cstr_args Ctype.generalize args;
           Ctype.generalize ret_type;
@@ -656,12 +650,6 @@ let make_constructor
           set_level ret_type;
         end
       in
-      if closed then begin
-        ignore (TyVarEnv.instance_poly_univars env loc univars);
-        let set_level t = Ctype.enforce_current_level env t in
-        Btype.iter_type_expr_cstr_args set_level args;
-        set_level ret_type
-      end;
       tvars, targs, Some tret_type, args, Some ret_type
       end
 
@@ -876,15 +864,14 @@ let transl_declaration env sdecl (id, uid) =
   verify_unboxed_attr unboxed_attr sdecl;
   let transl_type sty =
     let cty =
-      Ctype.with_local_level begin fun () ->
+      (* generalize_structure is necessary so that copying during instantiation
+         traverses inside of any type constructors in the [with]-bound. It's
+         also necessary because the variables here are at generic level, and so
+         any containers of them should be, too! *)
+      Ctype.with_local_level_generalize_structure begin fun () ->
         Typetexp.transl_simple_type env ~new_var_jkind:Any
           ~closed:true Mode.Alloc.Const.legacy sty
       end
-      (* This call to [generalize_structure] is necessary so that copying
-         during instantiation traverses inside of any type constructors in the
-         [with]-bound. It's also necessary because the variables here are at
-         generic level, and so any containers of them should be, too! *)
-      ~post:(fun cty -> Ctype.generalize_structure cty.ctyp_type)
     in
     cty.ctyp_type  (* CR layouts v2.8: Do this more efficiently. Or probably
                       add with-kinds to Typedtree. Internal ticekt 4435. *)
@@ -2945,7 +2932,10 @@ let transl_type_decl env rec_flag sdecl_list =
      expand to a generic type variable. After that, we check the coherence of
      the translated declarations in the resulting new environment. *)
   let tdecls, decls, temp_env, new_env =
-    Ctype.with_local_level_iter ~post:generalize_decl begin fun () ->
+    Ctype.with_local_level_generalize
+      ~before_generalize:(fun (_, decls, _, _) ->
+        List.iter (fun (_, decl) -> generalize_decl decl) decls)
+    begin fun () ->
       (* Enter types. *)
       let temp_env =
         List.fold_left2 (enter_type rec_flag) env sdecl_list ids_list in
@@ -2996,7 +2986,7 @@ let transl_type_decl env rec_flag sdecl_list =
       check_duplicates sdecl_list;
       (* Build the final env. *)
       let new_env = add_types_to_env ~shapes:None decls env in
-      ((tdecls, decls, temp_env, new_env), List.map snd decls)
+      (tdecls, decls, temp_env, new_env)
     end
   in
   (* Check for ill-formed abbrevs *)

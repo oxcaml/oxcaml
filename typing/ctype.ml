@@ -660,13 +660,16 @@ exception Non_closed of type_expr * variable_kind
      the abbreviations for use when displaying the type).
 
    [free_vars] accumulates its answer in a monoid-like structure, with
-   an initial element [zero] and a combining function [add_one], passing
+   an initial element [init] and a combining function [add_one], passing
    [add_one] information about whether the variable is a normal type variable
    or a row variable. [add_one] also received jkind information about [Tvar]s
    (but not [Tconstr]s that are expanded).
 
    It is marked [@inline] so that calls to [add_one] are not indirect.
  *)
+ (* CR dkalinichenko: is the difference between our and upstream
+    implementation intentional? I assume ours is more performant,
+    but want to check. It seems to be quite old. *)
 let[@inline] free_vars ~init ~add_one ?env mark tys =
   let rec fv ~kind acc ty =
     if not (try_mark_node mark ty) then acc
@@ -898,7 +901,7 @@ let generalize ty =
 
 (*
    Build a copy of a type in which nodes reachable through a path composed
-   only of Tarrow, Tpoly, Ttuple, Tpackage and Tconstr, and whose level
+   only of Tarrow, Tpoly, Ttuple, Trepr, Tpackage and Tconstr, and whose level
    was no lower than [!current_level], are at [generic_level].
    This is different from [with_local_level_gen], which generalizes in place,
    and only nodes with a level higher than [!current_level].
@@ -4265,7 +4268,7 @@ and unify3 uenv t1 t1' t2 t2' =
           eq_labels Unify ~in_pattern_mode:(in_pattern_mode uenv) l1 l2;
           unify_alloc_mode_for Unify a1 a2;
           unify_alloc_mode_for Unify r1 r2;
-          unify uenv t1 t2; unify uenv  u1 u2;
+          unify uenv t1 t2; unify uenv u1 u2;
           begin match is_commu_ok c1, is_commu_ok c2 with
           | false, true -> set_commu_ok c1
           | true, false -> set_commu_ok c2
@@ -6070,7 +6073,7 @@ and eqtype_list rename type_pairs subst env tl1 tl2 ~do_jkind_check =
   eqtype_list_same_length rename type_pairs subst env tl1 tl2 ~do_jkind_check
 
 and eqtype_labeled_list rename type_pairs subst env labeled_tl1 labeled_tl2 =
-  if not (Int.equal (List.length labeled_tl1) (List.length labeled_tl2)) then
+  if 0 <> List.compare_lengths labeled_tl1 labeled_tl2 then
     raise_unexplained_for Equality;
   List.iter2
     (fun (label1, ty1) (label2, ty2) ->

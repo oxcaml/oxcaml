@@ -1202,7 +1202,7 @@ type array_info =
     mut : mutable_flag }
 
 let disambiguate_array_literal ~loc env expected_ty =
-  let return (ty_elt : (type_expr*Jkind.sort) option) (mut : mutable_flag) =
+  let return (ty_elt : (type_expr * Jkind.sort) option) (mut : mutable_flag) =
     if not (is_principal expected_ty) then
       Location.prerr_warning loc
         (not_principal "this type-based array disambiguation");
@@ -1915,6 +1915,7 @@ let solve_constructor_annotation
   let expansion_scope = penv.equations_scope in
   (* Introduce fresh type names that expand to type variables.
      They should eventually be bound to ground types. *)
+  (* CR dkalinichenko: don't we want to keep the upstream [id_decls] name? *)
   let existentials =
     List.map
       (fun (name, jkind_annot_opt) ->
@@ -1957,6 +1958,7 @@ let solve_constructor_annotation
           Ttuple tyl -> List.map snd tyl
         | _ -> assert false
   in
+  (* CR dkalinichenko: why [ignore] here? *)
   if existentials <> [] then ignore begin
     let ids_decls = List.map (fun (x,dm,_) -> (x.txt,dm)) existentials in
     let ids = List.map fst ids_decls in
@@ -3046,10 +3048,17 @@ and type_pat_aux
   and rvp x = crp (pure category x)
   and rcp x = crp (only_impure category x) in
   let type_pat_array mutability spl pat_attributes =
+    (* CR dkalinichenko: we can inline this now. *)
     (* Sharing the code between the two array cases means we're guaranteed to
        keep them in sync, at the cost of a worse diff with upstream; it
        shouldn't be too bad.  We can inline this when we upstream this code and
        combine the two array pattern constructors. *)
+    (* [: :] syntax requires the iarray extension.
+       Check for it before proceeding with type-based disambiguation.  *)
+    (match mutability with
+    | Asttypes.Mutable -> ()
+    | Asttypes.Immutable ->
+      Language_extension.assert_enabled ~loc Immutable_arrays ());
     let ty_elt, arg_sort, mutability =
       solve_Ppat_array loc penv mutability expected_ty
     in
@@ -3060,9 +3069,7 @@ and type_pat_aux
         (* CR aspsmith: Revisit once we support atomic arrays *)
         atomic = Nonatomic
       }
-      | Immutable ->
-          Language_extension.assert_enabled ~loc Immutable_arrays ();
-          Immutable
+      | Immutable -> Immutable
     in
     let modalities = Typemode.mutable_modalities mutability in
     check_project_mutability ~loc ~env:!!penv Array_elements mutability
@@ -3517,6 +3524,7 @@ and type_pat_aux
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_record_pat Unboxed_product lid_sp_list closed
   | Ppat_array (mut, spl) ->
+      (* CR dkalinichenko: why not inline this atp? *)
       type_pat_array mut spl sp.ppat_attributes
   | Ppat_or(sp1, sp2) ->
       (* Reset pattern forces for just [tps2] because later we append [tps1] and
@@ -4673,6 +4681,8 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
             | None ->
                 sargs, None
         in
+        (* CR dkalinichenko: what is happening here?
+           May be easier to explain in person/over video. *)
         match arrow_kind with
         | `Arrow (ty_arg, ty_ret, ty_arg0, ty_ret0) ->
             let sort_arg =
@@ -6617,22 +6627,25 @@ and type_expect_
         | Nontail | Default -> Value.newvar ()
       in
       let funct_expected_mode = mode_default funct_mode in
-      let outer_level_var = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
-      (* does the function return a tvar which is too generic? *)
+      let outer_level = get_current_level () in
       let rec ret_tvar seen ty_fun =
         let ty = expand_head env ty_fun in
         if TypeSet.mem ty seen then false else
           match get_desc ty with
             Tarrow (_l, ty_arg, ty_fun, _com) ->
-              (try Ctype.unify_var env outer_level_var ty_arg
+              (* CR dkalinichenko: [enforce_current_level]? *)
+              (try Ctype.unify_var env (newvar2 outer_level
+                (Jkind.Builtin.any ~why:Dummy_jkind)) ty_arg
                with Unify _ -> assert false);
               ret_tvar (TypeSet.add ty seen) ty_fun
           | Tvar _ ->
-              let rt = get_level ty > get_level outer_level_var in
-              unify_var env outer_level_var ty;
+              let v = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
+              let rt = get_level ty > get_level v in
+              unify_var env v ty;
               rt
           | _ ->
-            unify_var env outer_level_var ty;
+            let v = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
+            unify_var env v ty;
             false
       in
       (* one more level for warning on non-returning functions *)
@@ -7004,6 +7017,12 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_array(mutability, sargl) ->
+      (* [: :] syntax requires the iarray extension.
+         Check for it before proceeding with type-based disambiguation. *)
+      (match mutability with
+      | Mutable -> ()
+      | Immutable ->
+        Language_extension.assert_enabled ~loc Immutable_arrays ());
       let ty_elt, elt_sort, mutability =
         let ty_expected = generic_instance ty_expected in
         match mutability with
@@ -7039,9 +7058,7 @@ and type_expect_
           (* CR aspsmith: Revisit once we support atomic arrays *)
           atomic = Nonatomic;
         }
-        | Immutable ->
-            Language_extension.assert_enabled ~loc Immutable_arrays ();
-            Immutable
+        | Immutable -> Immutable
       in
       let alloc_mode, array_mode = register_allocation ~loc expected_mode in
       let modalities = Typemode.mutable_modalities mutability in
@@ -7888,6 +7905,7 @@ and type_expect_
             raise (Error (loc, env, Modalities_on_atomic_field lid.txt))
           end;
           submode ~loc ~env rmode argument_mode;
+          (* CR dkalinichenko: why? I don't think this is in either repo. *)
           let record =
             { record with exp_extra =
               (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
@@ -9625,8 +9643,7 @@ and type_application env app_loc expected_mode position_and_mode
     [Parsetree.Nolabel, sarg] when is_ignore funct ->
       let {ty_arg; arg_mode; ty_ret; ret_mode} =
         with_local_level_generalize_structure_if_principal (fun () ->
-          filter_arrow_mono env (instance funct.exp_type) Nolabel
-        )
+          filter_arrow_mono env (instance funct.exp_type) Nolabel)
       in
       let type_sort ~why ty =
         match Ctype.type_sort ~why ~fixed:false env ty with
@@ -10471,12 +10488,12 @@ and type_effect_cases
       with_local_level begin fun () ->
         (* Create a locally type abstract type for effect type. *)
         let new_env, ty_arg, ty_cont =
-          let decl =
-            Ctype.new_local_type ~loc Definition Jkind.for_effect_arg
-          in
           let scope = create_scope () in
           let name = Ctype.get_new_abstract_name env "%eff" in
           let id = Ident.create_scoped ~scope name in
+          let decl =
+            Ctype.new_local_type ~loc Definition (Jkind.for_effect_arg id)
+          in
           let new_env = Env.add_type ~check:false id decl env in
           let ty_eff = newgenty (Tconstr (Path.Pident id,[],ref Mnil)) in
           new_env,
