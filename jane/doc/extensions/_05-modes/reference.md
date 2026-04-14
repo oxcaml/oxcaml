@@ -127,7 +127,7 @@ let () = bar foo (* prints "foo" *)
 Exceptions also cross statefulness and visibility with identical restrictions.
 
 # Modalities
-Modalities, as described in the [syntax](./syntax) section, can be though of as functions
+Modalities, as described in the [syntax](../syntax) section, can be though of as functions
 from mode to mode. For example, let's imagine one defines a record type with some modality
 `m`:
 
@@ -183,7 +183,7 @@ Similarly, the least common supermode of `corrupted` and `shared` is `contended`
 the greatest common submode of `shareable` and `corruptible` is `portable`.
 
 # Mode crossing
-In the [intro](./intro) to modes, we saw the idea of "mode crossing", in which values of
+In the [intro](../intro) to modes, we saw the idea of "mode crossing", in which values of
 types with particular properties can cross from some supermode to some submode for free.
 For example, immutable data crosses most modes: a `string @ immutable` can always be
 treated as a `string @ read_write` (because there are no mutable fields to read or write),
