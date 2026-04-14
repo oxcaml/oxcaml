@@ -600,7 +600,14 @@ module Sort = struct
 
   let rec instance_var v =
     match v.contents with
-    | None -> if is_genvar v then Var (List.assq v !instance_map) else Var v
+    | None when is_genvar v ->
+      begin match List.assq_opt v !instance_map with
+      | Some v' -> Var v'
+      | None ->
+        Misc.fatal_error
+          "generic layout variables found in non-layout instantiation"
+      end
+    | None -> Var v
     | Some t -> instance t
 
   and instance : t -> t = function
