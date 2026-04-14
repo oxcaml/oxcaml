@@ -1219,7 +1219,7 @@ val pause : unit -> unit
    @raise Invalid_argument on Windows (no inter-process signals on
    Windows) *)
 
-val sigwait : Sys.signal list -> Sys.signal
+val sigwait : Sys.signal list @ local -> Sys.signal
 (** [sigwait sigs] waits until one of the signals in the list [sigs]
    becomes pending.  It then removes this signal from the set of pending
    signals, and returns the number of this signal.
