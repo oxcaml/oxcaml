@@ -194,7 +194,8 @@ js_of_ocaml_args+=(
 
 run_tool "$js_of_ocaml_bin" "${js_of_ocaml_args[@]}"
 
-rm -f "$build_dir/browser_fs.js" "$build_dir/browser_fs_manifest.json"
+rm -f "$build_dir/browser_fs.js" "$build_dir/browser_fs_manifest.json" \
+  "$build_dir/browser_fs_bundle.json.gz"
 rm -rf "$build_dir/browser_fs"
 
 find "$tmpdir/cmis" -maxdepth 1 -type f -name '*.cmi' | sort | while read -r file; do
@@ -204,7 +205,6 @@ done > "$tmpdir/browser_fs.map"
 cat "$tmpdir/browser_packages.map" >> "$tmpdir/browser_fs.map"
 
 python3 - "$tmpdir/browser_fs.map" "$build_dir" <<'PY'
-import base64
 import gzip
 import json
 import os
@@ -213,10 +213,8 @@ import sys
 map_path, build_dir = sys.argv[1:]
 asset_root = os.path.join(build_dir, "browser_fs")
 manifest_path = os.path.join(build_dir, "browser_fs_manifest.json")
-bundle_path = os.path.join(build_dir, "browser_fs_bundle.json.gz")
 os.makedirs(asset_root, exist_ok=True)
 entries = []
-bundle_entries = []
 
 with open(map_path) as map_file:
     for raw_line in map_file:
@@ -246,24 +244,8 @@ with open(map_path) as map_file:
                 "compression": "gzip",
             }
         )
-        bundle_entries.append(
-            {
-                "fs_path": fs_path,
-                "content_base64": base64.b64encode(content).decode("ascii"),
-            }
-        )
 
 with open(manifest_path, "w") as manifest_file:
     json.dump(entries, manifest_file, indent=2)
     manifest_file.write("\n")
-
-with open(bundle_path, "wb") as bundle_file:
-    with gzip.GzipFile(
-        filename="browser_fs_bundle.json",
-        mode="wb",
-        fileobj=bundle_file,
-        compresslevel=6,
-        mtime=0,
-    ) as gz_file:
-        gz_file.write(json.dumps(bundle_entries, separators=(",", ":")).encode("utf-8"))
 PY
