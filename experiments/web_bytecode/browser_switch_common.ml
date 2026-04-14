@@ -2,6 +2,8 @@ type environment =
   | Native
   | Browser
 
+exception Missing_cmi of string
+
 let browser_cmis_dir = Browser_switch_package_manifest.browser_cmis_dir
 let browser_package_roots = Browser_switch_package_manifest.browser_package_roots
 let browser_include_dirs =
@@ -19,8 +21,9 @@ let flush_formatter ppf =
 let capture_diagnostics f =
   let buffer, ppf = make_formatter_buffer () in
   let ok =
-    try f ppf
-    with exn ->
+    try f ppf with
+    | Missing_cmi _ as exn -> raise exn
+    | exn ->
       Location.report_exception ppf exn;
       let backtrace = Printexc.get_backtrace () in
       if not (String.equal backtrace "")
@@ -109,6 +112,12 @@ let prepare_lexbuf ~filename source =
   Location.init lexbuf filename;
   lexbuf
 
+let missing_cmi_filename unit_name =
+  let requested = Compilation_unit.Name.to_string unit_name ^ ".cmi" in
+  match Misc.normalized_unit_filename requested with
+  | Ok normalized -> normalized
+  | Error _ -> requested
+
 let reset_flags environment =
   Clflags.annotations := false;
   Clflags.binary_annotations := false;
@@ -143,3 +152,19 @@ let prepare_compiler environment ~filename =
        (fun include_dir -> Load_path.add_dir ~hidden:false include_dir)
        browser_include_dirs);
   Compmisc.init_parameters ()
+
+let with_missing_cmi_detection environment f =
+  match environment with
+  | Native -> f ()
+  | Browser ->
+    let previous_load = !Persistent_env.Persistent_signature.load in
+    Fun.protect
+      (fun () ->
+        Persistent_env.Persistent_signature.load :=
+          (fun ~allow_hidden ~unit_name ->
+            match previous_load ~allow_hidden ~unit_name with
+            | Some _ as result -> result
+            | None -> raise (Missing_cmi (missing_cmi_filename unit_name)));
+        f ())
+      ~finally:(fun () ->
+        Persistent_env.Persistent_signature.load := previous_load)
