@@ -1147,7 +1147,7 @@ module type Wrapped = sig
       have been applied and we have the real mode of the value. The original
       modalities shouldn't be looked again and is replaced by [undefined]. *)
       val_kind: value_kind;
-      val_lpoly: Lpoly.t;
+      val_lpoly: Lpoly.t wrapped;
       (** Guaranteed [determined] for all values visible outside [type_let].
           May be [to_generalize] during intermediate stages of typing a
           [let poly_] binding. See [Lpoly]. *)
@@ -1211,7 +1211,9 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) : sig
   type mapper =
     {
       map_signature: mapper -> From.signature -> To.signature;
-      map_type_expr: mapper -> type_expr From.wrapped -> type_expr To.wrapped
+      map_type_expr: mapper -> type_expr From.wrapped -> type_expr To.wrapped;
+      map_value_description:
+        mapper -> From.value_description -> To.value_description;
     }
 
   val value_description :
