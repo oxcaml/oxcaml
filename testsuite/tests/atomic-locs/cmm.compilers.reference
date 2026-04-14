@@ -61,6 +61,6 @@
  (extcall "caml_atomic_cas_field" r 3 oldv newv ->int) )
 
 (function no_cse reduce_code_size linscan camlCmm__entry () : val
- (catch (exit 13 G:"camlCmm") with(13 *ret*: val) 1) )
+ (catch (exit 1 G:"camlCmm") with(1 *ret*: val) 1) )
 
 (data)
