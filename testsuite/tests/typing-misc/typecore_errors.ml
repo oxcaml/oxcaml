@@ -17,7 +17,7 @@ let x = function 0. .. 1. -> ()
 Line 8, characters 17-19:
 8 | let x = function 0. .. 1. -> ()
                      ^^
-Error: Only character intervals are supported in patterns.
+Error: Only character intervals and untagged character intervals are supported in patterns.
 |}]
 
 (** Constructor arity mismatch *)

@@ -45,10 +45,13 @@ module type ENDO_2 = ENDO with module type Inner.T = ENDO
 module type ENDO_2' = ENDO with module type Inner.T := ENDO
 [%%expect {|
 module type ENDO =
-  sig module Inner : sig module type T module F : T -> T end end
+  sig module Inner : sig module type T module F : functor T -> T end end
 module type ENDO_2 =
-  sig module Inner : sig module type T = ENDO module F : T -> T end end
-module type ENDO_2' = sig module Inner : sig module F : ENDO -> ENDO end end
+  sig
+    module Inner : sig module type T = ENDO module F : functor T -> T end
+  end
+module type ENDO_2' =
+  sig module Inner : sig module F : functor ENDO -> ENDO end end
 |}]
 
 
@@ -286,13 +289,14 @@ end
 module X :
   sig
     module type s = sig type t end
-    module Y : (Z : s) -> sig module type Ys = sig end end
+    module Y : functor (Z : s) -> sig module type Ys = sig end end
   end
 module type fcm_path =
   sig
     module Z : sig type t end
     module F :
-      (Z : sig type t end) -> sig module type t_F = sig type ff end end
+      functor (Z : sig type t end) ->
+        sig module type t_F = sig type ff end end
     val x_s : (module X.s)
     val x_sY : (module X.Y(Z).Ys)
     val x_sFF : (module F(Z).t_F)

@@ -188,7 +188,8 @@ val non_principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 Line 3, characters 7-21:
 3 |   else f (fun x -> x)
            ^^^^^^^^^^^^^^
-Warning 18 [not-principal]: applying a higher-rank function here is not principal.
+Warning 18 [not-principal]: applying a higher-rank function here is not
+  principal.
 
 val non_principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}];;
@@ -200,7 +201,7 @@ let non_principal2 p f =
 Line 3, characters 15-16:
 3 |   else with_id f
                    ^
-Error: This expression has type "('b -> 'b) -> 'c"
+Error: The value "f" has type "('b -> 'b) -> 'c"
        but an expression was expected of type "('a. 'a -> 'a) -> 'd"
        The universal variable "'a" would escape its scope
 |}];;
@@ -249,7 +250,7 @@ let non_principal4 =
 Line 2, characters 26-35:
 2 |   [ Some (fun y -> y 6, y "goodbye");
                               ^^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "int"
 |}];;
 
@@ -280,7 +281,7 @@ let foo (f : p1) : p2 = f
 Line 1, characters 24-25:
 1 | let foo (f : p1) : p2 = f
                             ^
-Error: This expression has type "p1" = "('a. 'a -> 'a) -> int"
+Error: The value "f" has type "p1" = "('a. 'a -> 'a) -> int"
        but an expression was expected of type "('a 'b. 'a -> 'b) -> int"
        Type "'a" is not compatible with type "'b"
 |}];;
@@ -329,7 +330,7 @@ type p2 = ('a. 'a -> 'a) -> int
 Line 4, characters 24-25:
 4 | let foo (x : p1) : p2 = x
                             ^
-Error: This expression has type "p1" = "(bool -> bool) -> int"
+Error: The value "x" has type "p1" = "(bool -> bool) -> int"
        but an expression was expected of type "('a. 'a -> 'a) -> int"
        Type "bool" is not compatible with type "'a"
 |}];;

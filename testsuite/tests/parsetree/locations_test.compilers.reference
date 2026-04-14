@@ -122,7 +122,7 @@ Ptop_def
               []
   ]
 
-module type F = (A : S) (B : S) -> sig end
+module type F = functor (A : S) (B : S) -> sig end
 Ptop_def
   [
     structure_item (//toplevel//[2,1+0]..[2,1+48])
@@ -141,7 +141,7 @@ Ptop_def
               []
   ]
 
-module F : (A : S) (B : S) -> sig end
+module F : functor (A : S) (B : S) -> sig end
 Ptop_def
   [
     structure_item (//toplevel//[4,18+0]..[4,18+31])
@@ -1583,13 +1583,13 @@ Ptop_def
       Pstr_eval
       expression (//toplevel//[2,1+0]..[2,1+26])
         Pexp_newtype "a"
-        expression (//toplevel//[2,1+0]..[2,1+26]) ghost
+        expression (//toplevel//[2,1+4]..[2,1+26]) ghost
           Pexp_newtype "b"
-          expression (//toplevel//[2,1+0]..[2,1+26]) ghost
+          expression (//toplevel//[2,1+4]..[2,1+26]) ghost
             Pexp_newtype "c"
-            expression (//toplevel//[2,1+0]..[2,1+26]) ghost
+            expression (//toplevel//[2,1+4]..[2,1+26]) ghost
               Pexp_newtype "d"
-              expression (//toplevel//[2,1+0]..[2,1+26]) ghost
+              expression (//toplevel//[2,1+4]..[2,1+26]) ghost
                 Pexp_newtype "e"
                 expression (//toplevel//[2,1+24]..[2,1+26])
                   Pexp_construct "()" (//toplevel//[2,1+24]..[2,1+26])

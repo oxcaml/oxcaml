@@ -37,8 +37,8 @@ Line 3, characters 6-17:
 3 |     | Nonportable g -> g ()
           ^^^^^^^^^^^
 Error: This value is "nonportable" but is expected to be "portable".
-  Hint: All arguments of the constructor "Nonportable"
-  must cross this axis to use it in this position.
+Hint: All arguments of the constructor "Nonportable"
+must cross this axis to use it in this position.
 |}]
 
 let (foo @ portable) () =
@@ -98,13 +98,13 @@ Line 3, characters 33-44:
 3 |         exception Nonportable' = Nonportable
                                      ^^^^^^^^^^^
 Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
-       Hint: all argument types must mode-cross for rebinding to succeed.
+Hint: all argument types must mode-cross for rebinding to succeed.
 |}, Principal{|
 Line 3, characters 33-44:
 3 |         exception Nonportable' = Nonportable
                                      ^^^^^^^^^^^
 Error: This constructor is at mode "contended", but expected to be at mode "uncontended".
-       Hint: all argument types must mode-cross for rebinding to succeed.
+Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
 (* Rebinding with crossing types succeeds. *)
@@ -126,7 +126,7 @@ Line 3, characters 30-38:
 3 |         exception Crossing' = Crossing
                                   ^^^^^^^^
 Error: This constructor is at mode "contended", but expected to be at mode "uncontended".
-       Hint: all argument types must mode-cross for rebinding to succeed.
+Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
 (* CR modes: accepting this requires [coportable]. *)
@@ -141,8 +141,8 @@ Line 5, characters 4-16:
 5 |     SemiPortable (s, _) -> print_endline s
         ^^^^^^^^^^^^
 Error: This value is "nonportable" but is expected to be "portable".
-  Hint: All arguments of the constructor "SemiPortable"
-  must cross this axis to use it in this position.
+Hint: All arguments of the constructor "SemiPortable"
+must cross this axis to use it in this position.
 |}]
 
 exception Uncontended of unit
@@ -214,8 +214,8 @@ Error: This value is "contended"
          because it is used inside the function at lines 1-2, characters 21-30
          which is expected to be "portable".
        However, the highlighted expression is expected to be "uncontended".
-  Hint: All arguments of the constructor "Contended"
-  must cross this axis to use it in this position.
+Hint: All arguments of the constructor "Contended"
+must cross this axis to use it in this position.
 |}]
 
 (* rebinding counts as usage *)
@@ -229,7 +229,7 @@ Line 3, characters 31-40:
 3 |         exception Contended' = Contended
                                    ^^^^^^^^^
 Error: This constructor is at mode "contended", but expected to be at mode "uncontended".
-       Hint: all argument types must mode-cross for rebinding to succeed.
+Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
 let (bar @ portable) () =
@@ -244,7 +244,7 @@ Line 3, characters 34-45:
 3 |         exception Uncontended'' = Uncontended
                                       ^^^^^^^^^^^
 Error: This constructor is at mode "contended", but expected to be at mode "uncontended".
-       Hint: all argument types must mode-cross for rebinding to succeed.
+Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
 (* statefulness axis *)
@@ -268,8 +268,8 @@ Line 3, characters 6-17:
 3 |     | StatefulFun g -> g ()
           ^^^^^^^^^^^
 Error: This value is "stateful" but is expected to be "stateless".
-  Hint: All arguments of the constructor "StatefulFun"
-  must cross this axis to use it in this position.
+Hint: All arguments of the constructor "StatefulFun"
+must cross this axis to use it in this position.
 |}]
 
 let (foo @ stateless) f =
@@ -381,8 +381,8 @@ Error: This value is "immutable"
          because it is used inside the function at lines 1-2, characters 22-39
          which is expected to be "stateless".
        However, the highlighted expression is expected to be "read_write".
-  Hint: All arguments of the constructor "ReadWriteRef"
-  must cross this axis to use it in this position.
+Hint: All arguments of the constructor "ReadWriteRef"
+must cross this axis to use it in this position.
 |}]
 
 let (foo @ stateless) () =

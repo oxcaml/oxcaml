@@ -100,7 +100,7 @@ let foo () =
 Line 3, characters 6-7:
 3 |   let x = borrow_ y in
           ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 val foo : unit -> unit = <fun>
 |}]
@@ -284,7 +284,7 @@ let foo () =
 Line 4, characters 7-8:
 4 |   (let z = borrow_ x in ());
            ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 val foo : unit -> unit = <fun>
 |}]
@@ -319,12 +319,12 @@ let foo () =
 Line 3, characters 7-8:
 3 |   (let y = borrow_ x in
            ^
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 Line 4, characters 7-8:
 4 |   (let z = borrow_ x in ()));
            ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 val foo : unit -> unit = <fun>
 |}]
@@ -729,8 +729,8 @@ Line 4, characters 10-50:
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it escapes the borrow region at line 4, characters 10-50.
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 
 let rec foo x =

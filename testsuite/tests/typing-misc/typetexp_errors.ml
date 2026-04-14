@@ -33,9 +33,9 @@ Error: The type variable name "'_a" is not allowed in programs
 
 type underscored_bis = (int -> int as '_a)
 [%%expect{|
-Line 1, characters 38-41:
+Line 1, characters 39-41:
 1 | type underscored_bis = (int -> int as '_a)
-                                          ^^^
+                                           ^^
 Error: The type variable name "'_a" is not allowed in programs
 |}]
 

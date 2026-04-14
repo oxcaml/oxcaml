@@ -25,7 +25,7 @@ Line 1, characters 0-50:
 1 | type t18 = A : _ list abs -> t18 [@@ocaml.unboxed];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
-and would not be accepted by upstream OCaml.
+  and would not be accepted by upstream OCaml.
 
 type t18 = A : 'a list abs -> t18 [@@unboxed]
 |}];;
@@ -79,7 +79,7 @@ Line 1, characters 0-45:
 1 | type t = T : (unit -> _) M.r -> t [@@unboxed];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
-and would not be accepted by upstream OCaml.
+  and would not be accepted by upstream OCaml.
 
 type t = T : (unit -> 'a) M.r -> t [@@unboxed]
 |}];;
@@ -129,7 +129,7 @@ Line 1, characters 0-45:
 1 | type t = T : (unit -> _) N.r -> t [@@unboxed];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
-and would not be accepted by upstream OCaml.
+  and would not be accepted by upstream OCaml.
 
 type t = T : (unit -> 'a) N.r -> t [@@unboxed]
 |}];;
@@ -198,7 +198,7 @@ Line 1, characters 0-45:
 1 | type t = T : (unit -> _) M.r -> t [@@unboxed];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
-and would not be accepted by upstream OCaml.
+  and would not be accepted by upstream OCaml.
 
 type t = T : (unit -> 'a) M.r -> t [@@unboxed]
 |}];;
