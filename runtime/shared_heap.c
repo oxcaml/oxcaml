@@ -197,6 +197,7 @@ void caml_orphan_shared_heap(struct caml_heap_state* heap) {
     released +=
       move_all_pools(&heap->avail_pools[i],
                      &pool_freelist.global_avail_pools[i], NULL);
+    heap->free.lists[i] = NULL;
 
     released +=
       move_all_pools(&heap->full_pools[i],
