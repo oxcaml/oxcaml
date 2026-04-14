@@ -319,10 +319,12 @@ type t : Spicy.value = string
 Line 1, characters 0-29:
 1 | type t : Spicy.value = string
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "string" is value
+Error: The layout of type "string" is value non_float
          because it is the primitive type string.
        But the layout of type "string" must be a sublayout of float64 & float64
          because of the definition of t at line 1, characters 0-29.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (***********************************)
@@ -776,32 +778,39 @@ type t1 : k
 Line 3, characters 10-12:
 3 | type s1 = t1 array
               ^^
-Error: This type "t1" should be an instance of type "('a : any mod separable)"
+Error: This type "t1" should be an instance of type "('a : any separable)"
        The kind of t1 is k
          because of the definition of t1 at line 2, characters 0-11.
-       But the kind of t1 must be a subkind of any mod separable
+       But the kind of t1 must be a subkind of any separable
          because it's the type argument to the array type.
 |}]
 
+(* CR layouts-scannable: support scannable axes on abstract kinds *)
 type t2 : k mod separable
 type s2 = t2 array
 [%%expect{|
-type t2 : k mod separable
-type s2 = t2 array
+Line 1, characters 16-25:
+1 | type t2 : k mod separable
+                    ^^^^^^^^^
+Error: Abstract kinds with kind modifiers are not yet supported.
 |}]
 
 type ('a : k mod separable) s3 = 'a array
 [%%expect{|
-type ('a : k mod separable) s3 = 'a array
+Line 1, characters 17-26:
+1 | type ('a : k mod separable) s3 = 'a array
+                     ^^^^^^^^^
+Error: Abstract kinds with kind modifiers are not yet supported.
 |}]
 
 kind_ k' = k mod separable
 type t4 : k'
 type s4 = t4 array
 [%%expect{|
-kind_ k' = k mod separable
-type t4 : k mod separable
-type s4 = t4 array
+Line 1, characters 17-26:
+1 | kind_ k' = k mod separable
+                     ^^^^^^^^^
+Error: Abstract kinds with kind modifiers are not yet supported.
 |}]
 
 (******************************)
@@ -1613,10 +1622,10 @@ Error: The kind "Visible_local_mty_a.X.k" is cyclic:
 (************************************************************)
 (* Test: Asymmetric GADT refinement of abstract-kind equalities *)
 (* Upshot: GADT pattern matching refines the kinds of abstract types,
-   but it does currently *not* refine the kind variables. 
-   Doing so in the future would be safe, but we would have to be 
+   but it does currently *not* refine the kind variables.
+   Doing so in the future would be safe, but we would have to be
    very careful in combination with the above hidden recursive cycles:
-   if GADT matching refined kind variables, we could expose the 
+   if GADT matching refined kind variables, we could expose the
    hidden cycles, and the typechecker could then go into an infinite
    loop if it is not carefully rewritten to handle cycles.
    This is probably doable (after all, it works for rectypes),

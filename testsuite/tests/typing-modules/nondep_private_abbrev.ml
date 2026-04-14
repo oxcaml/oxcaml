@@ -150,5 +150,5 @@ module I : functor (X : sig end) -> sig type t = Priv(X).t end
 
 module IndirectPriv = I(struct end);;
 [%%expect{|
-module IndirectPriv : sig type t : value mod immutable non_float with int end
+module IndirectPriv : sig type t : value non_float mod immutable with int end
 |}]

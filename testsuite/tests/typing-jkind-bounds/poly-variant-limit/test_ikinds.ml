@@ -29,9 +29,11 @@ type foo : immutable_data = Types.poly_variant_with_101
 Line 1, characters 0-55:
 1 | type foo : immutable_data = Types.poly_variant_with_101
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "Types.poly_variant_with_101" is value
+Error: The layout of type "Types.poly_variant_with_101" is value
          because it's a polymorphic variant type that has more than 100 entries.
-       But the kind of type "Types.poly_variant_with_101" must be a subkind of
-           immutable_data
+       But the layout of type "Types.poly_variant_with_101" must be a sublayout of
+         value non_float
          because of the definition of foo at line 1, characters 0-55.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]

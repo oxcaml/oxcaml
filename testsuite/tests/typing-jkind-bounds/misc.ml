@@ -46,7 +46,7 @@ type t : immutable_data = int -> int
 Line 1, characters 0-36:
 1 | type t : immutable_data = int -> int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int -> int" is value mod aliased immutable non_float
+Error: The kind of type "int -> int" is value non_float mod aliased immutable
          because it's a function type.
        But the kind of type "int -> int" must be a subkind of immutable_data
          because of the definition of t at line 1, characters 0-36.

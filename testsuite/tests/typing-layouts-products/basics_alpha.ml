@@ -24,7 +24,7 @@ type t1 : any mod non_null separable
 type t2 : value
 type t3 : any mod non_null separable = #(t1 * t2);;
 [%%expect{|
-type t1 : any mod non_null separable
+type t1 : any separable non_null
 type t2
 type t3 = #(t1 * t2)
 |}]
@@ -33,7 +33,7 @@ type t1 : any mod non_null separable
 type t2 : value
 type t3 : any & value mod non_null separable = #(t1 * t2);;
 [%%expect{|
-type t1 : any mod non_null separable
+type t1 : any separable non_null
 type t2
 type t3 = #(t1 * t2)
 |}]
@@ -42,7 +42,7 @@ type t1 : any mod non_null separable
 type t2 : value
 type t3 : (any mod non_null separable) & (value mod non_null separable) = #(t1 * t2);;
 [%%expect{|
-type t1 : any mod non_null separable
+type t1 : any separable non_null
 type t2
 type t3 = #(t1 * t2)
 |}]
@@ -52,7 +52,7 @@ type t2 : any mod non_null separable
 type t3 : any & (any mod non_null separable) = #(t1 * t2);;
 [%%expect{|
 type t1 : any
-type t2 : any mod non_null separable
+type t2 : any separable non_null
 type t3 = #(t1 * t2)
 |}]
 
@@ -62,7 +62,7 @@ type t2 : any mod non_null separable
 type t3 : any mod non_null separable = #(t1 * t2);;
 [%%expect{|
 type t1 : any
-type t2 : any mod non_null separable
+type t2 : any separable non_null
 type t3 = #(t1 * t2)
 |}]
 
@@ -71,15 +71,35 @@ type t2 : any mod non_null separable
 type t3 : any & any mod non_null separable = #(t1 * t2);;
 [%%expect{|
 type t1 : any
-type t2 : any mod non_null separable
+type t2 : any separable non_null
 type t3 = #(t1 * t2)
 |}]
 
 type t1 : any
 type t2 : any mod non_null separable
-type t3 : (any mod non_null separable) & (any mod non_null separable) = #(t1 * t2);;
+type t3 : any & (any mod non_null separable) = #(t1 * t2);;
+type t4 : (any mod non_null) & (any mod non_null separable) = #(t1 * t2);;
 [%%expect{|
 type t1 : any
-type t2 : any mod non_null separable
+type t2 : any separable non_null
 type t3 = #(t1 * t2)
+Line 4, characters 0-72:
+4 | type t4 : (any mod non_null) & (any mod non_null separable) = #(t1 * t2);;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "#(t1 * t2)" is any & any separable non_null
+         because it is an unboxed tuple.
+       But the layout of type "#(t1 * t2)" must be a sublayout of
+           any non_null & any separable non_null
+         because of the definition of t4 at line 4, characters 0-72.
+|}]
+type t5 : (any mod separable) & (any mod non_null separable) = #(t1 * t2);;
+[%%expect{|
+Line 1, characters 0-73:
+1 | type t5 : (any mod separable) & (any mod non_null separable) = #(t1 * t2);;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "#(t1 * t2)" is any & any separable non_null
+         because it is an unboxed tuple.
+       But the layout of type "#(t1 * t2)" must be a sublayout of
+           any separable & any separable non_null
+         because of the definition of t5 at line 1, characters 0-73.
 |}]

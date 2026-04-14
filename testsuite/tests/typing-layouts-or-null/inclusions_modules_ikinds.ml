@@ -21,9 +21,9 @@ Error: Signature mismatch:
          type t : value_or_null
        is not included in
          type t
-       The kind of the first is value_or_null
+       The layout of the first is value maybe_separable maybe_null
          because of the definition of t at line 2, characters 2-24.
-       But the kind of the first must be a subkind of value
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 1, characters 16-30.
 |}]
 
@@ -40,14 +40,14 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t : any end
        is not included in
-         sig type t : any mod separable end
+         sig type t : any separable end
        Type declarations do not match:
          type t : any
        is not included in
-         type t : any mod separable
-       The kind of the first is any
+         type t : any separable
+       The layout of the first is any
          because of the definition of t at line 2, characters 2-14.
-       But the kind of the first must be a subkind of any mod separable
+       But the layout of the first must be a sublayout of any separable
          because of the definition of t at line 1, characters 16-42.
 |}]
 
@@ -64,9 +64,9 @@ Error: Signature mismatch:
        is not included in
          sig type t end
        Type declarations do not match: type t = X.t is not included in type t
-       The kind of the first is value_or_null
+       The layout of the first is value maybe_separable maybe_null
          because of the definition of t at line 1, characters 19-41.
-       But the kind of the first must be a subkind of value
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 1, characters 53-67.
 |}]
 
@@ -81,14 +81,14 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t = X.t end
        is not included in
-         sig type t : any mod separable end
+         sig type t : any separable end
        Type declarations do not match:
          type t = X.t
        is not included in
-         type t : any mod separable
-       The kind of the first is any
+         type t : any separable
+       The layout of the first is any
          because of the definition of t at line 1, characters 19-31.
-       But the kind of the first must be a subkind of any mod separable
+       But the layout of the first must be a sublayout of any separable
          because of the definition of t at line 1, characters 43-69.
 |}]
 

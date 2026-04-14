@@ -42,14 +42,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type t : immutable_data end
+         sig type t : immutable_data non_pointer end
        is not included in
          sig type t : immediate end
        Type declarations do not match:
-         type t : immutable_data
+         type t : immutable_data non_pointer
        is not included in
          type t : immediate
-       The kind of the first is immutable_data
+       The kind of the first is immutable_data non_pointer
          because of the definition of t at line 4, characters 2-32.
        But the kind of the first must be a subkind of immediate
          because of the definition of t at line 2, characters 2-20.
@@ -351,10 +351,12 @@ Error: Signature mismatch:
          type 'a t = 'a
        is not included in
          type 'a t : immutable_data with 'a
-       The kind of the first is value
+       The layout of the first is value
          because of the definition of t at line 2, characters 2-36.
-       But the kind of the first must be a subkind of immutable_data with 'a
+       But the layout of the first must be a sublayout of value non_float
          because of the definition of t at line 2, characters 2-36.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 module Foo : sig
@@ -508,11 +510,12 @@ Error: Signature mismatch:
          type 'a t = 'a t2 t1
        is not included in
          type 'a t : immutable_data with 'a t1 t2
-       The kind of the first is value
+       The layout of the first is value
          because of the definition of t1 at line 8, characters 2-12.
-       But the kind of the first must be a subkind of
-           immutable_data with 'a t1 t2
+       But the layout of the first must be a sublayout of value non_float
          because of the definition of t at line 4, characters 2-42.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 
@@ -544,7 +547,7 @@ type fails : immutable_data = int -> int
 Line 1, characters 0-40:
 1 | type fails : immutable_data = int -> int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int -> int" is value mod aliased immutable non_float
+Error: The kind of type "int -> int" is value non_float mod aliased immutable
          because it's a function type.
        But the kind of type "int -> int" must be a subkind of immutable_data
          because of the definition of fails at line 1, characters 0-40.
@@ -555,7 +558,7 @@ type should_fail : immutable_data = [`A of int -> int]
 Line 1, characters 0-54:
 1 | type should_fail : immutable_data = [`A of int -> int]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[ `A of int -> int ]" is value mod immutable non_float
+Error: The kind of type "[ `A of int -> int ]" is value non_float mod immutable
          because it's a polymorphic variant type.
        But the kind of type "[ `A of int -> int ]" must be a subkind of
            immutable_data
@@ -568,7 +571,7 @@ Line 1, characters 0-76:
 1 | type should_also_fail : immutable_data = [`A of int -> int | `B of 'a] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `A of int -> int | `B of 'a ] as 'a" is
-           value mod immutable non_float
+           value non_float mod immutable
          because it's a polymorphic variant type.
        But the kind of type "[ `A of int -> int | `B of 'a ] as 'a" must be a subkind of
          immutable_data
@@ -595,7 +598,7 @@ type should_likewise_fail : immutable_data = (int ref * (int -> int))
 Line 1, characters 0-69:
 1 | type should_likewise_fail : immutable_data = (int ref * (int -> int))
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int ref * (int -> int)" is value mod non_float
+Error: The kind of type "int ref * (int -> int)" is value non_float
          because it's a tuple type.
        But the kind of type "int ref * (int -> int)" must be a subkind of
            immutable_data
@@ -629,7 +632,7 @@ type this_fails : immutable_data = (int -> int) list
 Line 1, characters 0-52:
 1 | type this_fails : immutable_data = (int -> int) list
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "(int -> int) list" is value mod immutable non_float
+Error: The kind of type "(int -> int) list" is value non_float mod immutable
          because it's a boxed variant type.
        But the kind of type "(int -> int) list" must be a subkind of
            immutable_data

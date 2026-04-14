@@ -71,9 +71,9 @@ Line 1, characters 14-21:
                   ^^^^^^^
 Error: This expression has type "'a t" but an expression was expected of type
          "('b : value)"
-       The kind of 'a t is value_or_null
+       The layout of 'a t is value maybe_separable maybe_null
          because of the definition of t at lines 1-4, characters 0-11.
-       But the kind of 'a t must be a subkind of value
+       But the layout of 'a t must be a sublayout of value
          because of the definition of t at lines 1-4, characters 0-11.
 |}]
 
@@ -85,9 +85,9 @@ type succeeds = t_non_float t accepts_sep
 type succeeds = t_non_float t accepts_nonfloat
 
 [%%expect{|
-type t_non_float : value mod non_float
-type ('a : any mod separable) accepts_sep
-type ('a : value_or_null mod non_float) accepts_nonfloat
+type t_non_float : value non_float
+type ('a : any separable) accepts_sep
+type ('a : value_or_null non_float) accepts_nonfloat
 type succeeds = t_non_float t accepts_sep
 type succeeds = t_non_float t accepts_nonfloat
 |}]
@@ -98,11 +98,10 @@ type fails = float t accepts_sep
 Line 1, characters 13-20:
 1 | type fails = float t accepts_sep
                  ^^^^^^^
-Error: This type "float t" should be an instance of type
-         "('a : any mod separable)"
-       The kind of float t is value_or_null
+Error: This type "float t" should be an instance of type "('a : any separable)"
+       The layout of float t is value maybe_separable maybe_null
          because of the definition of t at lines 1-4, characters 0-11.
-       But the kind of float t must be a subkind of any mod separable
+       But the layout of float t must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -113,11 +112,11 @@ Line 1, characters 13-20:
 1 | type fails = float t accepts_nonfloat
                  ^^^^^^^
 Error: This type "float t" should be an instance of type
-         "('a : value_or_null mod non_float)"
-       The kind of float t is value_or_null
+         "('a : value_or_null non_float)"
+       The layout of float t is value maybe_separable maybe_null
          because of the definition of t at lines 1-4, characters 0-11.
-       But the kind of float t must be a subkind of
-           value_or_null mod non_float
+       But the layout of float t must be a sublayout of
+           value non_float maybe_null
          because of the definition of accepts_nonfloat at line 3, characters 0-56.
 |}]
 
@@ -129,27 +128,13 @@ end
 
 [%%expect{|
 type int_t = int t
-module type S = sig type t : any mod separable end
+module type S = sig type t : any separable end
 |}]
-
-(* CR separability: this should type-check. *)
 
 module type S' = S with type t = int_t
 
 [%%expect{|
-Line 1, characters 17-38:
-1 | module type S' = S with type t = int_t
-                     ^^^^^^^^^^^^^^^^^^^^^
-Error: In this "with" constraint, the new definition of "t"
-       does not match its original definition in the constrained signature:
-       Type declarations do not match:
-         type t = int_t
-       is not included in
-         type t : any mod separable
-       The kind of the first is value_or_null
-         because of the definition of t at lines 1-4, characters 0-11.
-       But the kind of the first must be a subkind of any mod separable
-         because of the definition of t at line 4, characters 2-28.
+module type S' = sig type t = int_t end
 |}]
 
 type 'a too_many =
@@ -246,7 +231,7 @@ type ('a : value_or_null) widened_bad_jkind =
 [@@or_null]
 
 [%%expect{|
-type ('a : value_or_null mod non_null) widened_bad_jkind = A | B of 'a [@@or_null]
+type ('a : value maybe_separable) widened_bad_jkind = A | B of 'a [@@or_null]
 |}]
 
 type ('a : any) widened_any : value_or_null =
@@ -255,7 +240,7 @@ type ('a : any) widened_any : value_or_null =
 [@@or_null]
 
 [%%expect{|
-type ('a : value_or_null mod non_null) widened_any = A | B of 'a [@@or_null]
+type ('a : value maybe_separable) widened_any = A | B of 'a [@@or_null]
 |}]
 
 type ('a : value_or_null) widened_nullable : value_or_null =
@@ -264,7 +249,7 @@ type ('a : value_or_null) widened_nullable : value_or_null =
 [@@or_null]
 
 [%%expect{|
-type ('a : value_or_null mod non_null) widened_nullable = A | B of 'a [@@or_null]
+type ('a : value maybe_separable) widened_nullable = A | B of 'a [@@or_null]
 |}]
 
 type ('a : immediate) widened_immediate : value_or_null =
@@ -296,10 +281,11 @@ Lines 1-4, characters 0-11:
 2 |   | A
 3 |   | B of 'a
 4 | [@@or_null]
-Error: The kind of type "wrong_result_kind" is value_or_null
+Error: The layout of type "wrong_result_kind" is
+           value maybe_separable maybe_null
          because of the annotation on 'a in the declaration of the type
                                       wrong_result_kind.
-       But the kind of type "wrong_result_kind" must be a subkind of value
+       But the layout of type "wrong_result_kind" must be a sublayout of value
          because of the annotation on the declaration of the type wrong_result_kind.
 |}]
 
@@ -315,7 +301,7 @@ Line 1, characters 6-18:
 Error: The layout of type "'a" is float64
          because of the annotation on 'a in the declaration of the type
                                       wrong_payload_kind.
-       But the layout of type "'a" must overlap with value
+       But the layout of type "'a" must be a value layout
          because the type argument of wrong_payload_kind has layout value.
 |}]
 
@@ -345,9 +331,9 @@ Error: Signature mismatch:
          type 'a t = Nope | Yep of 'a [@@or_null]
        is not included in
          type 'a t
-       The kind of the first is value_or_null
+       The layout of the first is value maybe_separable maybe_null
          because of the definition of t at lines 4-7, characters 2-13.
-       But the kind of the first must be a subkind of value
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-11.
 |}]
 
