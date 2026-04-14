@@ -117,10 +117,14 @@ let print_tag ppf s = Style.inline_code ppf ("`" ^ s)
 let print_tags ppf tags  =
   Fmt.(pp_print_list ~pp_sep:comma) print_tag ppf tags
 
-let is_unit env ty =
-  match Types.get_desc (Ctype.expand_head env ty) with
-  | Tconstr (p, _, _) -> Path.same p Predef.path_unit
-  | _ -> false
+let is_unit_arg env ty =
+  let ty, vars = Btype.tpoly_get_poly ty in
+  if vars <> [] then false
+  else begin
+    match Types.get_desc (Ctype.expand_head env ty) with
+    | Tconstr (p, _, _) -> Path.same p Predef.path_unit
+    | _ -> false
+  end
 
 let unifiable env ty1 ty2 =
   let snap = Btype.snapshot () in
@@ -134,13 +138,13 @@ let unifiable env ty1 ty2 =
 let explanation_diff env t3 t4 =
   match Types.get_desc t3, Types.get_desc t4 with
   | Tarrow (_, ty1, ty2, _), _
-    when is_unit env ty1 && unifiable env ty2 t4 ->
+    when is_unit_arg env ty1 && unifiable env ty2 t4 ->
       Some (doc_printf
           "@,@[@{<hint>Hint@}: Did you forget to provide %a as argument?@]"
           Style.inline_code "()"
         )
   | _, Tarrow (_, ty1, ty2, _)
-    when is_unit env ty1 && unifiable env t3 ty2 ->
+    when is_unit_arg env ty1 && unifiable env t3 ty2 ->
       Some (doc_printf
           "@,@[@{<hint>Hint@}: Did you forget to wrap the expression using \
            %a?@]"
@@ -175,6 +179,7 @@ let explain_fixed_row pos expl = match expl with
            print_path p ppf))
       p
   | Types.Rigid -> Format_doc.Doc.empty
+  | Types.Fixed_existential -> Format_doc.Doc.empty
 
 let explain_variant (type variety) : variety Errortrace.variant -> _ = function
   (* Common *)
@@ -198,7 +203,7 @@ let explain_variant (type variety) : variety Errortrace.variant -> _ = function
         doc_printf "@,@[%a,@ %a@]" pp_doc (explain_fixed_row pos e)
           pp_doc (explain_fixed_row_case k)
       )
-  | Errortrace.Fixed_row (_,_, Rigid) ->
+  | Errortrace.Fixed_row (_,_, (Rigid | Fixed_existential)) ->
       (* this case never happens *)
       None
   (* Equality & Moregen *)
@@ -272,27 +277,30 @@ let explain_incompatible_fields name (diff: Types.type_expr Errortrace.diff) =
 
 
 let explain_label_mismatch ~missing_label_msg  {Errortrace.got;expected} =
-  let quoted_label ppf l = Style.inline_code ppf (Asttypes.string_of_label l) in
+  let quoted_label ppf l =
+    Style.inline_code ppf (Printtyp.string_of_label l)
+  in
   match got, expected with
-  | Asttypes.Nolabel, Asttypes.(Labelled _ | Optional _ )  ->
+  | Types.Nolabel, Types.(Labelled _ | Optional _ | Position _)  ->
       doc_printf "@,@[A label@ %a@ was expected@]"
         quoted_label expected
-  | Asttypes.(Labelled _|Optional _), Asttypes.Nolabel  ->
+  | Types.(Labelled _ | Optional _ | Position _), Types.Nolabel  ->
       doc_printf missing_label_msg
         quoted_label got
- | Asttypes.Labelled g, Asttypes.Optional e when g = e ->
+  | Types.Labelled g, Types.Optional e when g = e ->
       doc_printf
         "@,@[The label@ %a@ was expected to be optional@]"
         quoted_label got
-  | Asttypes.Optional g, Asttypes.Labelled e when g = e ->
+  | Types.Optional g, Types.Labelled e when g = e ->
       doc_printf
         "@,@[The label@ %a@ was expected to not be optional@]"
         quoted_label got
-  | Asttypes.(Labelled _ | Optional _), Asttypes.(Labelled _ | Optional _) ->
+  | Types.(Labelled _ | Optional _ | Position _),
+    Types.(Labelled _ | Optional _ | Position _) ->
       doc_printf "@,@[Labels %a@ and@ %a do not match@]"
         quoted_label got
         quoted_label expected
-  | Asttypes.Nolabel, Asttypes.Nolabel ->
+  | Types.Nolabel, Types.Nolabel ->
       (* Two empty labels cannot be mismatched*)
       assert false
 
@@ -333,11 +341,11 @@ let explanation (type variety) intro prev env
     in
     Some(explain_label_mismatch ~missing_label_msg diff)
   | Errortrace.Tuple_label_mismatch diff ->
-    let ast_label = function
-      | None -> Asttypes.Nolabel
-      | Some x -> Asttypes.Labelled x
+    let types_label = function
+      | None -> Types.Nolabel
+      | Some x -> Types.Labelled x
     in
-    let diff = Errortrace.map_diff ast_label diff in
+    let diff = Errortrace.map_diff types_label diff in
     let missing_label_msg =
       format_of_string
         "@,@[The first tuple element is labeled@ %a,@ \
@@ -369,6 +377,34 @@ let explanation (type variety) intro prev env
              {[ The type int occurs inside int list -> 'a |}
         *)
     end
+  | Errortrace.Bad_jkind (t,e) ->
+    add_type_to_preparation t;
+    Some (doc_printf "@ @[<hov>%a@]"
+            (Jkind.Violation.report_with_offender
+               ~offender:(fun ppf -> prepared_type_expr ppf t)
+               ~level:(Ctype.get_current_level ())) e)
+  | Errortrace.Bad_jkind_sort (t,e) ->
+    add_type_to_preparation t;
+    Some (doc_printf "@ @[<hov>%a@]"
+            (Jkind.Violation.report_with_offender_sort
+               ~offender:(fun ppf -> prepared_type_expr ppf t)
+               ~level:(Ctype.get_current_level ())) e)
+  | Errortrace.Unequal_var_jkinds (t1,k1,t2,k2) ->
+    let fmt_history t k ppf =
+      Jkind.(format_history ~intro:(
+        dprintf "The layout of %a is %a" prepared_type_expr t format k) ppf k)
+    in
+    Some (doc_printf "@ because the layouts of their variables are different.\
+                      @ @[<v>%t@;%t@]"
+            (fmt_history t1 k1) (fmt_history t2 k2))
+  | Errortrace.Unequal_tof_kind_jkinds (k1, k2) ->
+    let fmt_history which k ppf =
+      Jkind.(format_history ~intro:(
+        dprintf "The kind of %s is %a" which format k) ppf k)
+    in
+    Some (doc_printf "@ because their kinds are different.\
+                      @ @[<v>%t@;%t@]"
+            (fmt_history "the first" k1) (fmt_history "the second" k2))
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)

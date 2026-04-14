@@ -234,6 +234,10 @@ module Sort = struct
     let for_type_extension = value
 
     let for_class = value
+
+    let for_effect = value
+
+    let for_continuation = value
   end
 
   module Var = struct

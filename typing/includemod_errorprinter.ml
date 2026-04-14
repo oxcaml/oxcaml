@@ -15,13 +15,9 @@
 
 module Style = Misc.Style
 module Fmt = Format_doc
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
 module Printtyp = Printtyp.Doc
 type inclusion_env = Includemod.Functor_inclusion_diff.inclusion_env =
   { i_env:Env.t; i_subst:Subst.t }
->>>>>>> upstream-incoming
 
 module Context = struct
   type pos =
@@ -47,21 +43,9 @@ module Context = struct
         Fmt.fprintf ppf "@[<2>module type %a =@ %a@]"
           Printtyp.ident id context_mty rem
     | Body x :: rem ->
-<<<<<<< oxcaml
-        Fmt.fprintf ppf "functor (%s) ->@ %a" (argname x) context_mty rem
-||||||| upstream-base
-        Format.fprintf ppf "functor (%s) ->@ %a" (argname x) context_mty rem
-=======
         Fmt.fprintf ppf "(%s) ->@ %a" (argname x) context_mty rem
->>>>>>> upstream-incoming
     | Arg x :: rem ->
-<<<<<<< oxcaml
-        Fmt.fprintf ppf "functor (%s : %a) -> ..."
-||||||| upstream-base
-        Format.fprintf ppf "functor (%s : %a) -> ..."
-=======
         Fmt.fprintf ppf "(%s : %a) -> ..."
->>>>>>> upstream-incoming
           (argname x) context_mty rem
     | [] ->
         Fmt.fprintf ppf "<here>"
@@ -87,47 +71,25 @@ module Context = struct
   let alt_pp ppf cxt =
     if cxt = [] then () else
     if List.for_all (function Module _ -> true | _ -> false) cxt then
-<<<<<<< oxcaml
-      Fmt.fprintf ppf "in module %t,"
+      Fmt.fprintf ppf ",@ in module %t"
         (fun ppf -> Fmt.deprecated_printer (fun fmt ->
           Format.fprintf fmt "%a"
             (Fmt.compat (Style.as_inline_code Printtyp.path))
             (path_of_context cxt)
         ) ppf)
-||||||| upstream-base
-      Format.fprintf ppf "in module %a,"
-        (Style.as_inline_code Printtyp.path) (path_of_context cxt)
-=======
-      Fmt.fprintf ppf ",@ in module %a"
-        (Style.as_inline_code Printtyp.path) (path_of_context cxt)
->>>>>>> upstream-incoming
     else
-<<<<<<< oxcaml
-      Fmt.fprintf ppf "@[<hv 2>at position@ %a,@]"
-||||||| upstream-base
-      Format.fprintf ppf "@[<hv 2>at position@ %a,@]"
-=======
       Fmt.fprintf ppf ",@ @[<hv 2>at position@ %a@]"
->>>>>>> upstream-incoming
         (Style.as_inline_code context) cxt
 
   let pp ppf cxt =
     if cxt = [] then () else
     if List.for_all (function Module _ -> true | _ -> false) cxt then
-<<<<<<< oxcaml
       Fmt.fprintf ppf "In module %t:@ "
         (fun ppf -> Fmt.deprecated_printer (fun fmt ->
           Format.fprintf fmt "%a"
             (Fmt.compat (Style.as_inline_code Printtyp.path))
             (path_of_context cxt)
         ) ppf)
-||||||| upstream-base
-      Format.fprintf ppf "In module %a:@ "
-        (Style.as_inline_code Printtyp.path) (path_of_context cxt)
-=======
-      Fmt.fprintf ppf "In module %a:@ "
-        (Style.as_inline_code Printtyp.path) (path_of_context cxt)
->>>>>>> upstream-incoming
     else
       Fmt.fprintf ppf "@[<hv 2>At position@ %a@]@ "
         (Style.as_inline_code context) cxt
@@ -157,16 +119,8 @@ module Runtime_coercion = struct
     match coerc with
     | Tcoerce_structure { pos_cc_list; _ } ->
         either
-<<<<<<< oxcaml
-          (not_fixpoint path 0) pos_cc_list
+          (first_item_transposition path 0) pos_cc_list
           (first_non_id path 0) pos_cc_list
-||||||| upstream-base
-          (not_fixpoint path 0) c
-          (first_non_id path 0) c
-=======
-          (first_item_transposition path 0) c
-          (first_non_id path 0) c
->>>>>>> upstream-incoming
     | Tcoerce_functor(arg,res) ->
         either
           (first_change_under (InArg::path)) arg
@@ -243,16 +197,7 @@ module Runtime_coercion = struct
         assert false
     | Some (path, Transposition (k,l)) ->
     try
-<<<<<<< oxcaml
-      let p, k, l = transposition c in
-      let ctx, mt = find env p mty in
-||||||| upstream-base
-      let p, k, l = transposition c in
-      let ctx, mt = find env p mty in
-      Format.fprintf ppf
-=======
       let ctx, mt = find env path mty in
->>>>>>> upstream-incoming
       Fmt.fprintf ppf
         "@[<hv 2>Illegal permutation of runtime components in a module type.@ \
          @[For example%a,@]@ @[the %a@ and the %a are not in the same order@ \
@@ -312,14 +257,8 @@ let is_big p =
 let show_loc msg ppf loc =
   let pos = loc.Location.loc_start in
   if List.mem pos.Lexing.pos_fname [""; "_none_"; "//toplevel//"] then ()
-<<<<<<< oxcaml
   else Fmt.fprintf ppf "@\n@[<2>%a:@ %s@]"
     (Location.Doc.loc ~capitalize_first:true) loc msg
-||||||| upstream-base
-  else Format.fprintf ppf "@\n@[<2>%a:@ %s@]" Location.print_loc loc msg
-=======
-  else Fmt.fprintf ppf "@\n@[<2>%a:@ %s@]" Location.Doc.loc loc msg
->>>>>>> upstream-incoming
 
 let show_locs ppf (loc1, loc2) =
   show_loc "Expected declaration" ppf loc2;
@@ -327,18 +266,10 @@ let show_locs ppf (loc1, loc2) =
 
 
 let dmodtype mty =
-<<<<<<< oxcaml
-  let tmty = Printtyp.tree_of_modtype ~abbrev:true mty in
-||||||| upstream-base
-  let tmty = Printtyp.tree_of_modtype mty in
-  Format.dprintf "%a" !Oprint.out_module_type tmty
-=======
-  let tmty = Out_type.tree_of_modtype mty in
->>>>>>> upstream-incoming
+  let tmty = Out_type.tree_of_modtype ~abbrev:true mty in
   Fmt.dprintf "%a" !Oprint.out_module_type tmty
 
 let space ppf () = Fmt.fprintf ppf "@ "
-<<<<<<< oxcaml
 
 
 (** Checks if the error is a mode error at the leaf node, and returns the
@@ -475,10 +406,6 @@ let maybe_print_alloc_mode_r ~is_modal mm =
 
 let dthen_alloc_mode_r ~is_modal mm t =
   Fmt.dprintf "%t%t" t (maybe_print_alloc_mode_r ~is_modal mm)
-||||||| upstream-base
-let space ppf () = Format.fprintf ppf "@ "
-=======
->>>>>>> upstream-incoming
 
 (**
    In order to display a list of functor arguments in a compact format,
@@ -579,19 +506,9 @@ module With_shorthand = struct
   let pp_orig ppx = function
     | Original x | Synthetic { item=x; _ } -> ppx x
 
-<<<<<<< oxcaml
   let definition ~is_modal x = match functor_param x with
     | Unit -> Fmt.dprintf "()"
     | Named(_,short_mty, mm) ->
-||||||| upstream-base
-  let definition x = match functor_param x with
-    | Unit -> Format.dprintf "()"
-    | Named(_,short_mty) ->
-=======
-  let definition x = match functor_param x with
-    | Unit -> Fmt.dprintf "()"
-    | Named(_,short_mty) ->
->>>>>>> upstream-incoming
         match short_mty with
         | Original mty -> dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
         | Synthetic {name; item = mty} ->
@@ -599,72 +516,31 @@ module With_shorthand = struct
               "%s@ =@ %t" name (dmodtype mty)
             |> dthen_alloc_mode_r ~is_modal mm
 
-<<<<<<< oxcaml
   let param ~is_modal x = match functor_param x with
     | Unit -> Fmt.dprintf "()"
     | Named (_, short_mty, mm) ->
-||||||| upstream-base
-  let param x = match functor_param x with
-    | Unit -> Format.dprintf "()"
-    | Named (_, short_mty) ->
-=======
-  let param x = match functor_param x with
-    | Unit -> Fmt.dprintf "()"
-    | Named (_, short_mty) ->
->>>>>>> upstream-incoming
         pp dmodtype short_mty
         |> dthen_alloc_mode_r ~is_modal mm
 
-<<<<<<< oxcaml
   let qualified_param ~is_modal x = match functor_param x with
     | Unit -> Fmt.dprintf "()"
     | Named (None, Original (Mty_signature []), mm) ->
         Fmt.dprintf "(sig end%t)"
           (maybe_print_alloc_mode_r ~is_modal mm)
     | Named (None, short_mty, mm) ->
-||||||| upstream-base
-  let qualified_param x = match functor_param x with
-    | Unit -> Format.dprintf "()"
-    | Named (None, Original (Mty_signature []) ) ->
-        Format.dprintf "(sig end)"
-    | Named (None, short_mty) ->
-=======
-  let qualified_param x = match functor_param x with
-    | Unit -> Fmt.dprintf "()"
-    | Named (None, Original (Mty_signature []) ) ->
-        Fmt.dprintf "(sig end)"
-    | Named (None, short_mty) ->
->>>>>>> upstream-incoming
         pp dmodtype short_mty
-<<<<<<< oxcaml
         |> dthen_alloc_mode_r ~is_modal mm
     | Named (Some p, short_mty, mm) ->
         Fmt.dprintf "(%s : %t)"
           (Ident.name p) (pp dmodtype short_mty
           |> dthen_alloc_mode_r ~is_modal mm)
-||||||| upstream-base
-    | Named (Some p, short_mty) ->
-        Format.dprintf "(%s : %t)"
-          (Ident.name p) (pp dmodtype short_mty)
-=======
-    | Named (Some p, short_mty) ->
-        Fmt.dprintf "(%s : %t)"
-          (Ident.name p) (pp dmodtype short_mty)
->>>>>>> upstream-incoming
 
   let definition_of_argument ~is_modal ua =
     let arg, mty, (mode, _locks) = ua.item in
     match (arg: Err.functor_arg_descr) with
     | Unit -> Fmt.dprintf "()"
-<<<<<<< oxcaml
     | Empty_struct ->
         Fmt.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
-||||||| upstream-base
-    | Unit -> Format.dprintf "()"
-    | Empty_struct -> Format.dprintf "(struct end)"
-=======
-    | Empty_struct -> Fmt.dprintf "(struct end)"
->>>>>>> upstream-incoming
     | Named p ->
         let mty = match mty with
           | Types.Mty_strengthen (mty,q,_) when Path.same p q -> mty
@@ -682,27 +558,15 @@ module With_shorthand = struct
         | Original mty -> dmodtype mty |> dthen_mode_l ~is_modal mode
         | Synthetic {name; item=mty} ->
             Fmt.dprintf "%s@ :@ %t" name (dmodtype mty)
-<<<<<<< oxcaml
             |> dthen_mode_l ~is_modal mode
-||||||| upstream-base
-            Format.dprintf "%s@ :@ %t" name (dmodtype mty)
-=======
->>>>>>> upstream-incoming
         end
 
   let arg ~is_modal ua =
     let arg, mty, (mode, _locks) = ua.item in
     match (arg: Err.functor_arg_descr) with
     | Unit -> Fmt.dprintf "()"
-<<<<<<< oxcaml
     | Empty_struct ->
         Fmt.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
-||||||| upstream-base
-    | Unit -> Format.dprintf "()"
-    | Empty_struct -> Format.dprintf "(struct end)"
-=======
-    | Empty_struct -> Fmt.dprintf "(struct end)"
->>>>>>> upstream-incoming
     | Named p -> fun ppf -> Printtyp.path ppf p
     | Anonymous ->
         let short_mty = modtype { ua with item=mty } in
@@ -736,10 +600,6 @@ module Functor_suberror = struct
         Fmt.pp_open_stag (Style.Style sty)
         (printer param)
         Fmt.pp_close_stag ()
-<<<<<<< oxcaml
-||||||| upstream-base
-        Format.pp_close_stag ()
-=======
     in
     let rec pp_params = function
       | [] -> ignore
@@ -751,7 +611,6 @@ module Functor_suberror = struct
       match id with
       | None -> pp_params q
       | Some id -> Out_type.Ident_names.with_fuzzy id (fun () -> pp_params q)
->>>>>>> upstream-incoming
     in
     let params = List.filter_map proj @@ List.map snd patch in
     pp_params params
@@ -805,23 +664,12 @@ module Functor_suberror = struct
           (With_shorthand.param ~is_modal:None x)
           (With_shorthand.param ~is_modal:None y)
 
-<<<<<<< oxcaml
       let diff ~is_modal g e more =
         let g = With_shorthand.definition ~is_modal g in
         let e = With_shorthand.definition ~is_modal e in
         (* Use deprecated_printer to defer evaluation of [more ()] until print
            time. This ensures that conflicts are registered by printing [g] and
            [e] before [print_explanations] is called inside [more ()]. *)
-||||||| upstream-base
-      let diff g e more =
-        let g = With_shorthand.definition g in
-        let e = With_shorthand.definition e in
-        Format.dprintf
-=======
-      let diff g e more =
-        let g = With_shorthand.definition g in
-        let e = With_shorthand.definition e in
->>>>>>> upstream-incoming
         Fmt.dprintf
           "Module types do not match:@ @[%t@]@;<1 -2>does not include@ \
            @[%t@]%t"
@@ -871,14 +719,7 @@ module Functor_suberror = struct
 
     let ok x y =
       let pp_orig_name = match With_shorthand.functor_param y with
-<<<<<<< oxcaml
         | With_shorthand.Named (_, Original mty, _) ->
-||||||| upstream-base
-        | With_shorthand.Named (_, Original mty) ->
-            Format.dprintf " %t" (dmodtype mty)
-=======
-        | With_shorthand.Named (_, Original mty) ->
->>>>>>> upstream-incoming
             Fmt.dprintf " %t" (dmodtype mty)
         | _ -> ignore
       in
@@ -887,20 +728,9 @@ module Functor_suberror = struct
         (With_shorthand.arg ~is_modal:None x)
         pp_orig_name
 
-<<<<<<< oxcaml
     let diff ~is_modal g e more =
       let g = With_shorthand.definition_of_argument ~is_modal g in
       let e = With_shorthand.definition ~is_modal e in
-||||||| upstream-base
-    let diff g e more =
-      let g = With_shorthand.definition_of_argument g in
-      let e = With_shorthand.definition e in
-      Format.dprintf
-=======
-    let diff g e more =
-      let g = With_shorthand.definition_of_argument g in
-      let e = With_shorthand.definition e in
->>>>>>> upstream-incoming
       Fmt.dprintf
         "Modules do not match:@ @[%t@]@;<1 -2>\
          is not included in@ @[%t@]%t"
@@ -914,7 +744,6 @@ module Functor_suberror = struct
     (** Specialized to avoid introducing shorthand names
         for single change difference
     *)
-<<<<<<< oxcaml
     let single_diff ~is_modal g e more =
       let _arg, mty1, (mode1, _) = g.With_shorthand.item in
       let mty1_with_mode = dmodtype mty1 |> dthen_mode_l ~is_modal mode1 in
@@ -923,19 +752,6 @@ module Functor_suberror = struct
         | Types.Unit -> Fmt.dprintf "()"
         | Types.Named(_, mty, mm) ->
             dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
-||||||| upstream-base
-    let single_diff g e more =
-      let _arg, mty = g.With_shorthand.item in
-      let e = match e.With_shorthand.item with
-        | Types.Unit -> Format.dprintf "()"
-        | Types.Named(_, mty) -> dmodtype mty
-=======
-    let single_diff g e more =
-      let _arg, mty = g.With_shorthand.item in
-      let e = match e.With_shorthand.item with
-        | Types.Unit -> Fmt.dprintf "()"
-        | Types.Named(_, mty) -> dmodtype mty
->>>>>>> upstream-incoming
       in
       Fmt.dprintf
         "Modules do not match:@ @[%t@]@;<1 -2>\
@@ -967,14 +783,7 @@ module Functor_suberror = struct
       Fmt.pp_open_tbox ()
       Diffing.prefix (pos, Diffing.classify diff)
       Fmt.pp_set_tab ()
-<<<<<<< oxcaml
-      (Printtyp.wrap_printing_env env ~error:true
-||||||| upstream-base
-      Format.pp_set_tab ()
-      (Printtyp.wrap_printing_env env ~error:true
-=======
       (Printtyp.wrap_printing_env env.i_env ~error:true
->>>>>>> upstream-incoming
          (fun () -> sub ~expansion_token env diff)
       )
      Fmt.pp_close_tbox ()
@@ -982,14 +791,7 @@ module Functor_suberror = struct
   let onlycase sub ~expansion_token env (_, diff) =
     Location.msg "%a@[<hv 2>%t@]"
       Fmt.pp_print_tab ()
-<<<<<<< oxcaml
-      (Printtyp.wrap_printing_env env ~error:true
-||||||| upstream-base
-      Format.pp_print_tab ()
-      (Printtyp.wrap_printing_env env ~error:true
-=======
       (Printtyp.wrap_printing_env env.i_env ~error:true
->>>>>>> upstream-incoming
          (fun () -> sub ~expansion_token env diff)
       )
 
@@ -1056,58 +858,28 @@ let core env id x =
         ("Modalities on " ^ (Ident.name id) ^ " do not match")
         (Includecore.report_modality_sub_error "the first" "the second") e
   | Err.Value_descriptions diff ->
-<<<<<<< oxcaml
       let is_modal = Is_modal.value_mismatch diff.symptom in
       let mode1, mode2 =
         maybe_print_modes ~in_structure:true ~is_modal diff.modes
       in
-      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a%t@ %s@;<1 2>%a%t@]%a%a%t@]"
-||||||| upstream-base
-      Format.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a%t@]"
-=======
-      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
->>>>>>> upstream-incoming
+      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a%t@ %s@;<1 2>%a%t@]%a%a@]"
         "Values do not match"
         !Oprint.out_sig_item
-<<<<<<< oxcaml
-        (Printtyp.tree_of_value_description id diff.got)
-        mode1
-||||||| upstream-base
-        (Printtyp.tree_of_value_description id diff.got)
-=======
         (Out_type.tree_of_value_description id diff.got)
->>>>>>> upstream-incoming
+        mode1
         "is not included in"
         !Oprint.out_sig_item
-<<<<<<< oxcaml
-        (Printtyp.tree_of_value_description id diff.expected)
-        mode2
-||||||| upstream-base
-        (Printtyp.tree_of_value_description id diff.expected)
-=======
         (Out_type.tree_of_value_description id diff.expected)
->>>>>>> upstream-incoming
+        mode2
         (Includecore.report_value_mismatch
            "the left-hand side" "the right-hand side" env) diff.symptom
         show_locs (diff.got.val_loc, diff.expected.val_loc)
-<<<<<<< oxcaml
-        Printtyp.Conflicts.print_explanations
   | Err.Modalities e ->
       Fmt.dprintf "@[<hv>%s:@;%a@]"
         ("Modalities on " ^ (Ident.name id) ^ " do not match")
         (Includecore.report_modality_sub_error "the first" "the second") e
-||||||| upstream-base
-        Printtyp.Conflicts.print_explanations
-=======
->>>>>>> upstream-incoming
   | Err.Type_declarations diff ->
-<<<<<<< oxcaml
-      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a%t@]"
-||||||| upstream-base
-      Format.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a%t@]"
-=======
       Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]@,%a%a@]"
->>>>>>> upstream-incoming
         "Type declarations do not match"
         !Oprint.out_sig_item
         (Out_type.tree_of_type_declaration id diff.got Trec_first)
@@ -1118,13 +890,7 @@ let core env id x =
            "the first" "the second" "declaration" env) diff.symptom
         show_locs (diff.got.type_loc, diff.expected.type_loc)
   | Err.Extension_constructors diff ->
-<<<<<<< oxcaml
-      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]@ %a%a%t@]"
-||||||| upstream-base
-      Format.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]@ %a%a%t@]"
-=======
       Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]@ %a%a@]"
->>>>>>> upstream-incoming
         "Extension declarations do not match"
         !Oprint.out_sig_item
         (Out_type.tree_of_extension_constructor id diff.got Text_first)
@@ -1141,48 +907,22 @@ let core env id x =
         !Oprint.out_sig_item
         (Out_type.tree_of_cltype_declaration id diff.got Trec_first)
         !Oprint.out_sig_item
-<<<<<<< oxcaml
-        (Printtyp.tree_of_cltype_declaration id diff.expected Trec_first)
-        (Includeclass.report_error_doc Type_scheme) diff.symptom
-        Printtyp.Conflicts.print_explanations
-  | Err.Class_declarations {got;expected;symptom=Class_type reason} ->
-      let t1 = Printtyp.tree_of_class_declaration id got Trec_first in
-      let t2 = Printtyp.tree_of_class_declaration id expected Trec_first in
-||||||| upstream-base
-        (Printtyp.tree_of_cltype_declaration id diff.expected Trec_first)
-        (Includeclass.report_error Type_scheme) diff.symptom
-        Printtyp.Conflicts.print_explanations
-  | Err.Class_declarations {got;expected;symptom} ->
-      let t1 = Printtyp.tree_of_class_declaration id got Trec_first in
-      let t2 = Printtyp.tree_of_class_declaration id expected Trec_first in
-      Format.dprintf
-=======
         (Out_type.tree_of_cltype_declaration id diff.expected Trec_first)
         (Includeclass.report_error_doc Type_scheme) diff.symptom
-  | Err.Class_declarations {got;expected;symptom} ->
+  | Err.Class_declarations {got;expected;symptom=Class_type reason} ->
       let t1 = Out_type.tree_of_class_declaration id got Trec_first in
       let t2 = Out_type.tree_of_class_declaration id expected Trec_first in
->>>>>>> upstream-incoming
       Fmt.dprintf
         "@[<hv 2>Class declarations do not match:@ \
          %a@;<1 -2>does not match@ %a@]@ %a"
         !Oprint.out_sig_item t1
         !Oprint.out_sig_item t2
-<<<<<<< oxcaml
         (Includeclass.report_error_doc Type_scheme) reason
-        Printtyp.Conflicts.print_explanations
   | Err.Class_declarations {symptom=Class_mode e} ->
       Fmt.dprintf
-        "@[<hv 2>Class declarations %s do not match:@ @]@ %a%t"
+        "@[<hv 2>Class declarations %s do not match:@ @]@ %a"
         (Ident.name id)
         (Includecore.report_mode_sub_error "first is" "second is") e
-        Printtyp.Conflicts.print_explanations
-||||||| upstream-base
-        (Includeclass.report_error Type_scheme) symptom
-        Printtyp.Conflicts.print_explanations
-=======
-        (Includeclass.report_error_doc Type_scheme) symptom
->>>>>>> upstream-incoming
 
 let missing_field ppf item =
   let id, loc, kind =  Includemod.item_ident_name item in
@@ -1191,70 +931,30 @@ let missing_field ppf item =
     (Style.as_inline_code Printtyp.ident) id
     (show_loc "Expected declaration") loc
 
-<<<<<<< oxcaml
 let module_types {Err.got=mty1; expected=mty2; modes; symptom}=
   let is_modal = Is_modal.module_type_symptom symptom in
   let mode1, mode2 = maybe_print_modes ~is_modal modes in
-||||||| upstream-base
-let module_types {Err.got=mty1; expected=mty2} =
-  Format.dprintf
-=======
-let module_types {Err.got=mty1; expected=mty2} =
->>>>>>> upstream-incoming
   Fmt.dprintf
     "@[<hv 2>Modules do not match:@ \
-<<<<<<< oxcaml
      %a%t@;<1 -2>is not included in@ %a%t@]"
-    !Oprint.out_module_type (Printtyp.tree_of_modtype ~abbrev:true mty1)
+    !Oprint.out_module_type (Out_type.tree_of_modtype ~abbrev:true mty1)
     mode1
-    !Oprint.out_module_type (Printtyp.tree_of_modtype ~abbrev:true mty2)
+    !Oprint.out_module_type (Out_type.tree_of_modtype ~abbrev:true mty2)
     mode2
-||||||| upstream-base
-     %a@;<1 -2>is not included in@ %a@]"
-    !Oprint.out_module_type (Printtyp.tree_of_modtype mty1)
-    !Oprint.out_module_type (Printtyp.tree_of_modtype mty2)
-=======
-     %a@;<1 -2>is not included in@ %a@]"
-    !Oprint.out_module_type (Out_type.tree_of_modtype mty1)
-    !Oprint.out_module_type (Out_type.tree_of_modtype mty2)
->>>>>>> upstream-incoming
 
-<<<<<<< oxcaml
 let eq_module_types ({Err.got=mty1; expected=mty2} : _ mdiff) =
-||||||| upstream-base
-let eq_module_types {Err.got=mty1; expected=mty2} =
-  Format.dprintf
-=======
-let eq_module_types {Err.got=mty1; expected=mty2} =
->>>>>>> upstream-incoming
   Fmt.dprintf
     "@[<hv 2>Module types do not match:@ \
      %a@;<1 -2>is not equal to@ %a@]"
-<<<<<<< oxcaml
-    !Oprint.out_module_type (Printtyp.tree_of_modtype ~abbrev:true mty1)
-    !Oprint.out_module_type (Printtyp.tree_of_modtype ~abbrev:true mty2)
-||||||| upstream-base
-    !Oprint.out_module_type (Printtyp.tree_of_modtype mty1)
-    !Oprint.out_module_type (Printtyp.tree_of_modtype mty2)
-=======
-    !Oprint.out_module_type (Out_type.tree_of_modtype mty1)
-    !Oprint.out_module_type (Out_type.tree_of_modtype mty2)
->>>>>>> upstream-incoming
+    !Oprint.out_module_type (Out_type.tree_of_modtype ~abbrev:true mty1)
+    !Oprint.out_module_type (Out_type.tree_of_modtype ~abbrev:true mty2)
 
 let module_type_declarations id {Err.got=d1 ; expected=d2} =
   Fmt.dprintf
     "@[<hv 2>Module type declarations do not match:@ \
      %a@;<1 -2>does not match@ %a@]"
-<<<<<<< oxcaml
-    !Oprint.out_sig_item (Printtyp.tree_of_modtype_declaration ~abbrev:true id d1)
-    !Oprint.out_sig_item (Printtyp.tree_of_modtype_declaration ~abbrev:true id d2)
-||||||| upstream-base
-    !Oprint.out_sig_item (Printtyp.tree_of_modtype_declaration id d1)
-    !Oprint.out_sig_item (Printtyp.tree_of_modtype_declaration id d2)
-=======
-    !Oprint.out_sig_item (Out_type.tree_of_modtype_declaration id d1)
-    !Oprint.out_sig_item (Out_type.tree_of_modtype_declaration id d2)
->>>>>>> upstream-incoming
+    !Oprint.out_sig_item (Out_type.tree_of_modtype_declaration ~abbrev:true id d1)
+    !Oprint.out_sig_item (Out_type.tree_of_modtype_declaration ~abbrev:true id d2)
 
 let interface_mismatch ppf (diff: _ Err.diff) =
   Fmt.fprintf ppf
@@ -1282,12 +982,6 @@ let core_module_type_symptom (x:Err.core_module_type_symptom)  =
 
 (* Construct a linearized error message from the error tree *)
 
-<<<<<<< oxcaml
-let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx
-  (diff : _ mdiff) =
-||||||| upstream-base
-let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx diff =
-=======
 let functor_expected ~before ~ctx =
   let main =
     (* The abstract module type case is detected by {!Includemod} *)
@@ -1323,8 +1017,8 @@ let unexpected_functor ~env ~before ~ctx diff =
   in
   dwith_context ctx main :: before
 
-let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx diff =
->>>>>>> upstream-incoming
+let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx
+    (diff : _ mdiff) =
   match diff.symptom with
   | Invalid_module_alias _ (* the difference is non-informative here *)
   | After_alias_expansion _ (* we print only the expanded module types *) ->
@@ -1373,18 +1067,6 @@ and module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx = function
       in
       dwith_context ctx printer :: before
 
-<<<<<<< oxcaml
-and functor_params ~expansion_token ~env ~before ~ctx {got;expected;symptom} =
-  let is_modal = Is_modal.functor_params_symptom symptom in
-  let d = Functor_suberror.Inclusion.patch env got expected in
-  let actual = Functor_suberror.Inclusion.got ~is_modal d in
-  let expected = Functor_suberror.expected ~is_modal d in
-||||||| upstream-base
-and functor_params ~expansion_token ~env ~before ~ctx {got;expected;_} =
-  let d = Functor_suberror.Inclusion.patch env got expected in
-  let actual = Functor_suberror.Inclusion.got d in
-  let expected = Functor_suberror.expected d in
-=======
 and functor_params ~expansion_token ~env ~before ~ctx diff =
   match diff.got.params, diff.expected.params with
   | [], _ -> functor_expected ~before ~ctx
@@ -1392,14 +1074,15 @@ and functor_params ~expansion_token ~env ~before ~ctx diff =
   | _ :: _, _ :: _ ->
       compare_functor_params ~expansion_token ~env ~before ~ctx diff
 
-and compare_functor_params ~expansion_token ~env ~before ~ctx {got;expected;_} =
+and compare_functor_params ~expansion_token ~env ~before ~ctx
+    {got;expected;symptom} =
+  let is_modal = Is_modal.functor_params_symptom symptom in
   let d = Functor_suberror.Inclusion.patch env
       (got.params, got.res)
       (expected.params, expected.res)
   in
-  let actual = Functor_suberror.Inclusion.got d in
-  let expected = Functor_suberror.expected d in
->>>>>>> upstream-incoming
+  let actual = Functor_suberror.Inclusion.got ~is_modal d in
+  let expected = Functor_suberror.expected ~is_modal d in
   let main =
     Fmt.dprintf
       "@[<hv 2>Modules do not match:@ \
@@ -1550,43 +1233,17 @@ let all env = function
 (* General error reporting *)
 
 let err_msgs ppf (env, err) =
-<<<<<<< oxcaml
-  Printtyp.Conflicts.reset();
-||||||| upstream-base
-let err_msgs (env, err) =
-  Printtyp.Conflicts.reset();
-=======
->>>>>>> upstream-incoming
   Printtyp.wrap_printing_env ~error:true env
-<<<<<<< oxcaml
-    (fun () -> (coalesce @@ all env err)  ppf)
-||||||| upstream-base
-    (fun () -> coalesce @@ all env err)
-=======
     (fun () -> (coalesce @@ all {i_env=env; i_subst=Subst.identity} err) ppf)
->>>>>>> upstream-incoming
 
 let report_error_doc err =
-<<<<<<< oxcaml
-  Location.errorf ~loc:Location.(in_file !input_name) "%a" err_msgs err
-||||||| upstream-base
-let report_error err =
-  let main = err_msgs err in
-  Location.errorf ~loc:Location.(in_file !input_name) "%t" main
-=======
   Location.errorf
     ~loc:Location.(in_file !input_name)
     ~footnote:Out_type.Ident_conflicts.err_msg
    "%a" err_msgs err
->>>>>>> upstream-incoming
 
 let report_apply_error_doc ~loc env (app_name, mty_f, args) =
-<<<<<<< oxcaml
-||||||| upstream-base
-let report_apply_error ~loc env (app_name, mty_f, args) =
-=======
   let footnote = Out_type.Ident_conflicts.err_msg in
->>>>>>> upstream-incoming
   let d = Functor_suberror.App.patch env ~f:mty_f ~args in
   match d with
   (* We specialize the one change and one argument case to remove the
@@ -1600,16 +1257,9 @@ let report_apply_error ~loc env (app_name, mty_f, args) =
           ~env:{i_env=env; i_subst=Subst.identity} ~before:[]
           ~ctx:[] mty_diff.symptom
       in
-<<<<<<< oxcaml
       let is_modal = Is_modal.module_type_symptom mty_diff.symptom in
-      Location.errorf ~loc "%t"
-        (Functor_suberror.App.single_diff ~is_modal g e more)
-||||||| upstream-base
-      Location.errorf ~loc "%t" (Functor_suberror.App.single_diff g e more)
-=======
       Location.errorf ~loc ~footnote "%t"
-        (Functor_suberror.App.single_diff g e more)
->>>>>>> upstream-incoming
+        (Functor_suberror.App.single_diff ~is_modal g e more)
   | _ ->
       let not_functor =
         List.for_all (function _, Diffing.Delete _ -> true | _ -> false) d

@@ -1794,6 +1794,12 @@ let for_array_element_sort ~level =
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
     sort )
 
+let for_effect_arg ident =
+  let why : History.value_creation_reason =
+    Type_argument { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  in
+  Builtin.value ~why
+
 (******************************)
 (* elimination and defaulting *)
 

@@ -51,7 +51,7 @@ val with_labels: bool -> (unit -> 'a) -> 'a
 (** {1 Printing idents and paths } *)
 
 val ident_name: Shape.Sig_component_kind.t option -> Ident.t -> out_name
-val tree_of_path: ?disambiguation:bool -> Path.t -> out_ident
+val tree_of_path: Path.t -> out_ident
 val namespaced_tree_of_path: Shape.Sig_component_kind.t -> Path.t -> out_ident
 val tree_of_type_path: Path.t -> out_ident
 (** Specialized functions for printing types with [short-paths] *)
@@ -97,6 +97,9 @@ val tree_of_typexp: type_or_scheme -> type_expr -> out_type
 (** [tree_of_typexp] generate the [outcometree] for a prepared type
     expression.*)
 
+val tree_of_type_scheme: type_expr -> out_type
+
+
 val prepared_type_scheme: type_expr printer
 val prepared_type_expr: type_expr printer
 (** The printers [prepared_type_expr] and [prepared_type_scheme] should only be
@@ -124,7 +127,8 @@ val hide_variant_name: Types.type_expr -> Types.type_expr
 
 (** {1: Label and constructors }*)
 val prepare_type_constructor_arguments: constructor_arguments -> unit
-val tree_of_constructor_arguments: constructor_arguments -> out_type list
+val tree_of_constructor_arguments:
+  constructor_arguments -> (out_type * out_modality list) list
 
 val tree_of_label: label_declaration -> out_label
 
@@ -134,16 +138,13 @@ val prepared_constructor : constructor_declaration printer
 val tree_of_extension_constructor:
     Ident.t -> extension_constructor -> ext_status -> out_sig_item
 val extension_constructor_args_and_ret_type_subtree:
-  constructor_arguments -> type_expr option -> out_type list * out_type option
+  constructor_arguments -> type_expr option ->
+  (out_type * out_modality list) list * (out_vars_jkinds * out_type) option
 val add_extension_constructor_to_preparation :
     extension_constructor -> unit
 val prepared_extension_constructor:
     Ident.t -> extension_constructor printer
 
-
-val raw_row_desc : Format.formatter -> row_desc -> unit
-val raw_type_expr: Format.formatter -> type_expr -> unit
-val raw_field : Format.formatter -> row_field -> unit
 
 val rewrite_double_underscore_longidents: Env.t -> Longident.t -> Longident.t
 
@@ -167,8 +168,6 @@ val tree_of_cltype_declaration:
 
 (** {1 Module types }*)
 
-(* CR sspies: oxcaml changed [tree_of_module] to take [module_declaration]
-   instead of [module_type]. Implementation is in printtyp.ml. *)
 val tree_of_module:
     Ident.t -> ?ellipsis:bool -> module_declaration -> rec_status ->
     out_sig_item

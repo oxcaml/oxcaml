@@ -228,7 +228,7 @@ type matched_expression_desc =
       expression * (Asttypes.arg_label * apply_arg) list * texp_apply_identifier
   | Texp_construct of
       Longident.t Location.loc
-      * constructor_description
+      * Data_types.constructor_description
       * expression list
       * texp_construct_identifier
   | Texp_tuple of expression list * texp_tuple_identifier
@@ -403,7 +403,7 @@ let option_of_arg_or_omitted arg =
   match arg with Arg (e, sort) -> Some (e, sort) | Omitted _ -> None
 
 let mk_constructor_description cstr_name =
-  { cstr_name;
+  { Data_types.cstr_name;
     cstr_res = newty2 ~level:0 (mkTvar (Some "a"));
     cstr_shape = Constructor_uniform_value;
     cstr_existentials = [];

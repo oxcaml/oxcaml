@@ -736,6 +736,8 @@ module Jkind0 : sig
 
     val for_or_null_argument : Ident.t -> 'd jkind
 
+    val for_effect_arg : Ident.t -> 'd jkind
+
     (** The jkind of a float. *)
     val for_float : Ident.t -> jkind_l
 

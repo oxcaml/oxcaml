@@ -547,7 +547,7 @@ val reset_cache: preserve_persistent_env:bool -> unit
 val reset_cache_toplevel: unit -> unit
 
 (* Remember the current compilation unit. *)
-val set_current_unit: Unit_info.t option -> unit
+val set_current_unit: Unit_info.t -> unit
 val get_current_unit : unit -> Unit_info.t option
 val get_current_unit_name: unit -> string
 
