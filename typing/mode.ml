@@ -515,9 +515,9 @@ module Lattices = struct
   end
 
   module Uniqueness = struct
-    type t =
+    (*= type t =
       | Unique
-      | Aliased
+      | Aliased *)
 
     include Total (struct
       type nonrec t = t
