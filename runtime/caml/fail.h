@@ -148,24 +148,9 @@ CAMLextern value caml_exception_sys_blocked_io (void);
 
 extern void caml_check_async(caml_result res, const char *msg);
 
-/* Returns the value of a [caml_result] or raises the exception.
-   This function replaced [caml_raise_if_exception] in 5.3. */
-Caml_inline value caml_get_value_or_raise (caml_result result)
-{
-  if (caml_result_is_exception(result))
-    caml_raise(result.data);
-  else
-    return result.data;
-}
-
-Caml_inline value caml_get_value_or_raise_async (caml_result result, const char *where)
-{
-  if (caml_result_is_exception(result)) {
-    caml_check_async(result, where);
-    caml_raise(result.data);
-  } else
-    return result.data;
-}
+/* This function replaced [caml_raise_if_exception] in 5.3. */
+CAMLextern value caml_get_value_or_raise (caml_result result);
+CAMLextern value caml_get_value_or_raise_async (caml_result result, const char *where);
 
 #ifdef CAML_INTERNALS
 /* internals only, provided for backward-compatibility */
