@@ -1133,6 +1133,10 @@ let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
             (One_continuation_use.id use)
             ~old:original_cont ~specialized:cont
         in
+        let cont_uses_env =
+          CUE.record_continuation cont_uses_env cont
+            (Bound_parameters.arity params)
+        in
         let data =
           { data with
             consts_lifted_after_fork;
@@ -1192,15 +1196,16 @@ and specialize_continuation_if_needed ~simplify_expr dacc
           let replay_history = DE.replay_history denv in
           Some (replay_history, always_inline)
         in
+        (* Remove the (generic) continuation uses from the CUE, since we will
+           then add uses for each of the specialized continuation. *)
+        let cont_uses_env = CUE.remove data.cont_uses_env_after_body cont in
         (* Use the dacc after the body to ignore any lifted constants or other
            information coming from the first traversal of the handler. We still
            reset a few values that come from the dacc after simplification of
            the handler, see comment above. *)
         let dacc = data.dacc_after_body in
         let dacc = DA.with_continuation_lifting_budget dacc lifting_budget in
-        (* Remove the (generic) continuation uses from the CUE, since we will
-           then add uses for each of the specialized continuation. *)
-        let cont_uses_env = CUE.remove data.cont_uses_env_after_body cont in
+        let dacc = DA.with_continuation_uses_env dacc ~cont_uses_env in
         (* We need to drop the constants lifted during the first downwards
            traversal of the handler. *)
         let consts_lifted_after_fork = data.consts_lifted_during_body in
@@ -1222,6 +1227,18 @@ and after_downwards_traversal_of_body_and_handlers ~simplify_expr ~denv_for_join
   (* At this point we have done a downwards traversal on the body and all the
      handlers. *)
   let dacc, lifted_conts = DA.get_and_clear_lifted_continuations dacc in
+  let data =
+    match lifted_conts with
+    | [] -> data
+    | _ :: _ ->
+      let cont_uses_env_after_body =
+        List.fold_left
+          (fun cont_uses_env_after_body (_denv, lifted_cont) ->
+            CUE.record_continuation_arity cont_uses_env_after_body lifted_cont)
+          data.cont_uses_env_after_body lifted_conts
+      in
+      { data with cont_uses_env_after_body }
+  in
   let down_to_up =
     down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join
       lifted_conts ~down_to_up
@@ -1392,7 +1409,10 @@ and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
 
 and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
     ~invariant_params ~params cont dacc handler k =
-  let dacc = DA.with_continuation_uses_env dacc ~cont_uses_env:CUE.empty in
+  let dacc =
+    DA.with_continuation_uses_env dacc
+      ~cont_uses_env:(CUE.reset_uses (DA.continuation_uses_env dacc))
+  in
   let dacc =
     DA.map_flow_acc
       ~f:
@@ -1915,6 +1935,10 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     then dacc
     else DA.map_denv dacc ~f:DE.set_has_seen_a_non_liftable_continuation
   in
+  let cont_uses_env =
+    CUE.record_continuation_arity (DA.continuation_uses_env dacc) handlers
+  in
+  let dacc = DA.with_continuation_uses_env dacc ~cont_uses_env in
   let body = data.body in
   let data : after_downwards_traversal_of_body_data =
     { denv_for_join; prior_lifted_constants; handlers }
