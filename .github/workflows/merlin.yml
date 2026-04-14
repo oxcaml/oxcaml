@@ -1,4 +1,11 @@
-name: Run Tests
+# This CI check builds and tests Merlin. Running the Merlin tests requires
+# having a corresponding compiler. Confusingly, the version of Merlin at OxCaml
+# revision X is not meant to work with the compiler at OxCaml revision X.
+# Rather, it is usually the most recently tagged version of the compiler. For
+# this reason, the CI check checks out the repo at 2 different revisions. This
+# will likely change in the near future.
+
+name: merlin
 on:
   push:
     branches: [ main ]
@@ -6,9 +13,9 @@ on:
   workflow_dispatch:
 
 # Overall approach to running the tests:
-#  - Install OCaml 5.2, as this is the version of dependencies our merlin expects.
+#  - Install OCaml 5.4, as this is the version of dependencies our merlin expects.
 #  - Build flambda-backend (which requires installing OCaml 4.14).
-#  - Build merlin using OCaml 5.2, and then run the tests while pointing merlin at
+#  - Build merlin using OCaml 5.4, and then run the tests while pointing merlin at
 #    flambda-backend's stdlib and ocamlc.
 #
 # The second step only needs to be run when we update the flambda-backend version,
@@ -35,10 +42,10 @@ jobs:
       MERLIN_TESTS: all
 
     steps:
-    - name: Checkout the merlin-jst repo
+    - name: Checkout the oxcaml repo
       uses: actions/checkout@master
       with:
-        path: 'merlin-jst'
+        path: 'oxcaml'
 
     - name: Set up OCaml ${{ matrix.ocaml-compiler }}
       uses: ocaml/setup-ocaml@v3
@@ -51,7 +58,7 @@ jobs:
       id: cache
       with:
         path: ${{ github.workspace }}/flambda-backend/_install
-        key: cache-flambda-backend-${{ matrix.name }}-${{ hashFiles('merlin-jst/upstream/ocaml_flambda/base-rev.txt') }}
+        key: cache-flambda-backend-${{ matrix.name }}-${{ hashFiles('oxcaml/external/merlin/upstream/ocaml_flambda/base-rev.txt') }}
 
     - name: Clone the flambda-backend repo
       uses: actions/checkout@master
@@ -64,7 +71,7 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       working-directory: flambda-backend
       run: |
-        REV=$(cat $GITHUB_WORKSPACE/merlin-jst/upstream/ocaml_flambda/base-rev.txt)
+        REV=$(cat $GITHUB_WORKSPACE/oxcaml/external/merlin/upstream/ocaml_flambda/base-rev.txt)
         git fetch origin "$REV"
         git checkout "$REV"
 
@@ -89,7 +96,7 @@ jobs:
         make install
 
     - name: Install dependencies
-      working-directory: merlin-jst
+      working-directory: oxcaml/external/merlin
       run: |
         opam depext conf-jq --yes # opam depext bug
         opam pin menhirLib 20231231 --no-action
@@ -97,12 +104,12 @@ jobs:
         opam install . --deps-only --with-test --yes
 
     - name: Check formatting
-      working-directory: merlin-jst
+      working-directory: oxcaml/external/merlin
       run: |
         opam exec -- dune build @fmt
 
     - name: Build and test in release mode (linux)
-      working-directory: merlin-jst
+      working-directory: oxcaml/external/merlin
       run: |
         export MERLIN_TEST_OCAML_PATH=$GITHUB_WORKSPACE/flambda-backend/_install
         opam exec -- dune build
