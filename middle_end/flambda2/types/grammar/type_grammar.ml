@@ -4475,7 +4475,7 @@ let rec must_be_singleton t ~machine_width : RWC.t option =
     | Ok (No_alias is) -> (
       match Int8.Set.get_singleton is with
       | Some i ->
-        Some (RWC.naked_immediate (Target_ocaml_int.of_int8 machine_width i))
+        Some (RWC.naked_int8 i)
       | None -> None))
   | Naked_int16 ty -> (
     match TD.descr ty with
@@ -4484,7 +4484,7 @@ let rec must_be_singleton t ~machine_width : RWC.t option =
     | Ok (No_alias is) -> (
       match Int16.Set.get_singleton is with
       | Some i ->
-        Some (RWC.naked_immediate (Target_ocaml_int.of_int16 machine_width i))
+        Some (RWC.naked_int16 i)
       | None -> None))
   | Naked_int32 ty -> (
     match TD.descr ty with
