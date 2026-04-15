@@ -190,9 +190,52 @@ end = struct
       t.foreign_templates
       (Misc.Stdlib.String.Tbl.to_seq templates)
 
+  let rec symbol_arg_of_value_kind = function
+    | Pintval -> "immediate"
+    | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _
+    | Parrayval _ | Pboxedvectorval _ -> "value"
+
+  and symbol_arg_of_unboxed_float = function
+    | Unboxed_float64 -> "float64"
+    | Unboxed_float32 -> "float32"
+
+  and symbol_arg_of_unboxed_or_untagged_integer = function
+    | Unboxed_int64 -> "int64"
+    | Unboxed_nativeint -> "nativeint"
+    | Unboxed_int32 -> "int32"
+    | Untagged_int16 -> "int16"
+    | Untagged_int8 -> "int8"
+    | Untagged_int -> "int"
+
+  and symbol_arg_of_unboxed_vector = function
+    | Unboxed_vec128 -> "vec128"
+    | Unboxed_vec256 -> "vec256"
+    | Unboxed_vec512 -> "vec512"
+
+  and symbol_arg_of_unboxed_product layouts =
+    (* CR layout poly: this should be synced up with unarize. *)
+    "(" ^ (String.concat "_" (List.map symbol_arg_of_layout layouts)) ^ ")"
+
+  and symbol_arg_of_layout = function
+    | Pvalue vk -> symbol_arg_of_value_kind vk
+    | Punboxed_float uf -> symbol_arg_of_unboxed_Float uf
+    | Punboxed_or_untagged_integer ui -> symbol_arg_of_unboxed_integer ui
+    | Punboxed_vector uv -> symbol_arg_of_unboxed_vector uv
+    | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
+    | Ptop | Pbottom | Psplicevar _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_layout: unexpected layout"
+
+  let symbol_arg_of_value = function
+    | SLVlayout l -> symbol_arg_of_layout l
+    | SLVhalves _ | SLVrecord _ | SLVclosure _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected value"
+
   let instantiate t closure_id args f =
     let closure = Misc.Stdlib.String.Tbl.find t.templates closure_id in
-    f closure args
+    let instantiation = f closure args in
+    let _arg_names = List.map symbol_arg_of_value args in
+    let _name = Ident.create_persistent (String.concat "_" (id :: arg_names)) in
+    instantiation
 
   let templates t = t.templates
 
