@@ -270,6 +270,8 @@ module Mixed_block_shape = struct
              file, and would provide an overly-permissive type in the face of
              the various restrictions as to what suffix elements are
              permitted. *)
+          (* Note: if we decide to use a kind with subkind, the shapes will
+             have to be rewritten in the reaper, see reaper/rebuild.ml. *)
     }
 
   let value_prefix_size t = t.value_prefix_size
