@@ -179,13 +179,14 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         else assign_first (succ idx)
       in
       (* assigns the available register with the highest affinity *)
-      let rec assign_affinity = function
-        | [] -> assign_first 0
-        | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
+      let rec assign_affinity aff =
+        match Regalloc_affinity.next aff with
+        | None -> assign_first 0
+        | Some { Regalloc_affinity.priority = _; phys_reg } ->
           let idx = Regs.index_in_class phys_reg in
           if idx >= 0 && idx < num_available_registers && available.(idx)
           then do_assign ~phys_reg
-          else assign_affinity tl
+          else assign_affinity aff
       in
       assign_affinity (Regalloc_affinity.get (State.affinity state) reg))
   | Reg _ | Stack _ -> Not_spilling

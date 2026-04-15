@@ -14,9 +14,14 @@ type t
 
 (** Computes the affinities for the passed CFG, i.e. for each temporary the
     number of times it moves from/to a given physical register. *)
-val compute : Cfg_with_infos.t -> (Reg.t * Reg.t) list -> t
+val compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t
+
+type affinities
 
 (** Returns the affinities for the passed temporary in descending order (i.e.
-    from the highest to the lowest affinity), returning an empty list if the
-    temporary has no affinity with any physical register. *)
-val get : t -> Reg.t -> affinity list
+    from the highest to the lowest affinity), use `next` to get the elements in
+    order. *)
+val get : t -> Reg.t -> affinities
+
+(** Returns the next affinity if there is one, `None` otherwise *)
+val next : affinities -> affinity option

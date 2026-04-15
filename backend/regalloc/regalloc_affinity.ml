@@ -79,13 +79,15 @@ end
 
 type t =
   { classes : Classes.t;
-    affinity : affinity list Reg.Tbl.t
+    affinity : affinity array Reg.Tbl.t
   }
 
-let compute : Cfg_with_infos.t -> (Reg.t * Reg.t) list -> t =
+let compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t =
  fun cfg_with_infos phi_moves ->
   let classes = Classes.make () in
-  List.iter (fun (left, right) -> Classes.unite classes left right) phi_moves;
+  List.iter
+    (fun { Regalloc_split.src; dst } -> Classes.unite classes src dst)
+    phi_moves;
   let affinity = Reg.Tbl.create 17 in
   match Lazy.force Regalloc_utils.affinity with
   | false -> { classes; affinity }
@@ -110,21 +112,43 @@ let compute : Cfg_with_infos.t -> (Reg.t * Reg.t) list -> t =
             | Some (temp, phys_reg) ->
               let temp = Classes.find classes temp in
               incr_move priorities ~temp ~phys_reg ~delta));
-    (* CR xclerc for xclerc: consider switching from list to (dynamic) array. *)
+    (* CR-someday xclerc for xclerc: consider switching to a heap, since we are
+       only interested in extracting according to priority. *)
     Reg.Tbl.iter
       (fun temp phys_reg_tbl ->
-        let affinity_list =
-          Phys_reg.Tbl.fold
-            (fun phys_reg priority acc ->
-              if priority <= 0 then acc else { priority; phys_reg } :: acc)
-            phys_reg_tbl []
-        in
-        Reg.Tbl.replace affinity temp
-          (List.sort compare_desc_proprity affinity_list))
+        let affinities = Dynarray.create () in
+        Phys_reg.Tbl.iter
+          (fun phys_reg priority ->
+            if priority > 0
+            then Dynarray.add_last affinities { priority; phys_reg })
+          phys_reg_tbl;
+        let affinities = Dynarray.to_array affinities in
+        Array.sort compare_desc_proprity affinities;
+        Reg.Tbl.replace affinity temp affinities)
       priorities;
     { classes; affinity }
 
-let get : t -> Reg.t -> affinity list =
+type affinities =
+  { mutable next_index : int;
+    affinities : affinity array
+  }
+
+let get : t -> Reg.t -> affinities =
  fun t reg ->
   let reg = Classes.find t.classes reg in
-  match Reg.Tbl.find_opt t.affinity reg with None -> [] | Some list -> list
+  let affinities =
+    match Reg.Tbl.find_opt t.affinity reg with
+    | None -> [||]
+    | Some array -> array
+  in
+  { next_index = 0; affinities }
+
+let next : affinities -> affinity option =
+ fun aff ->
+  let idx = aff.next_index in
+  if idx >= Array.length aff.affinities
+  then None
+  else
+    let res = aff.affinities.(idx) in
+    aff.next_index <- succ idx;
+    Some res
