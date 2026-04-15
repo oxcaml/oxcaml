@@ -65,15 +65,6 @@ let unwrap_loc located = located.Fexpr.txt
    declaration order, consuming the param list on match. *)
 let extract_param (env : decode_env) (params : param list)
     (cons : 'p param_cons) : ('p * param list) option =
-  let rec value conv lp params =
-    match params with
-    | [] -> None
-    | (Labeled (l, args) as p) :: rp -> (
-      match conv env l args with
-      | Some p -> Some (p, List.rev_append lp rp)
-      | None -> value conv (p :: lp) rp)
-    | (Anonymous _ as p) :: rp -> value conv (p :: lp) rp
-  in
   let void params = Some ((), params) in
   let rec atom : type p.
       p param_cons -> param list -> param list -> (p * param list) option =
@@ -89,14 +80,19 @@ let extract_param (env : decode_env) (params : param list)
       (p, a) labeled_lens ->
       a param_cons ->
       param list ->
+      param list ->
       (p * param list) option =
-   fun lens cons params ->
-    let decode env label args =
+   fun lens cons lp params ->
+    match params with
+    | [] -> None
+    | (Anonymous _ as p) :: rp -> lbl lens cons (p :: lp) rp
+    | (Labeled (label, args) as p) :: rp -> (
       match aux cons args with
-      | None | Some (_, _ :: _) -> None
-      | Some (args, []) -> lens.decode env (label, args)
-    in
-    value decode [] params
+      | None | Some (_, _ :: _) -> lbl lens cons (p :: lp) rp
+      | Some (args, []) ->
+        Option.map
+          (fun p -> p, List.rev_append lp rp)
+          (lens.decode env (label, args)))
   and def : type p. p -> p param_cons -> param list -> (p * param list) option =
    fun d cons params ->
     match aux cons params with None -> Some (d, params) | found -> found
@@ -143,7 +139,7 @@ let extract_param (env : decode_env) (params : param list)
                 Some ((p1, p2, p3), params))))
   and aux : type p. p param_cons -> param list -> (p * param list) option =
     function
-    | CLabeled (llens, pc) -> lbl llens pc
+    | CLabeled (llens, pc) -> lbl llens pc []
     | CDefault (pcons, default, _) -> def default pcons
     | COptional pcons -> opt pcons
     | CEither (cases, _) -> etr cases
