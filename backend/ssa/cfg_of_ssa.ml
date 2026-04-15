@@ -521,7 +521,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                        which_parameter = Some param_index;
                        regs = hard_regs
                      }))
-               hard_regs [||] Debuginfo.none))
+               [||] [||] Debuginfo.none))
       ssa.fun_args_names;
     let entry_label = label_of ssa.entry in
     let entry_block =
@@ -580,7 +580,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                                which_parameter = Some pi;
                                regs
                              }))
-                       regs [||] Debuginfo.none
+                       [||] [||] Debuginfo.none
                      :: !param_namings)
             ssa.fun_args_names;
           List.iter (DLL.add_begin cfg_block.body) !param_namings);
