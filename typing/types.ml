@@ -667,7 +667,7 @@ module type Wrapped = sig
     { val_type: type_expr wrapped;                (* Type of the value *)
       val_modalities : Mode.Modality.t;     (* Modalities on the value *)
       val_kind: value_kind;
-      val_lpoly: Lpoly.t;
+      val_lpoly: Lpoly.t wrapped;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
@@ -755,7 +755,9 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
   type mapper =
     {
       map_signature: mapper -> signature -> To.signature;
-      map_type_expr: mapper -> type_expr wrapped -> type_expr To.wrapped
+      map_type_expr: mapper -> type_expr wrapped -> type_expr To.wrapped;
+      map_value_description:
+        mapper -> value_description -> To.value_description;
     }
 
   let signature m = m.map_signature m
@@ -773,18 +775,7 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       | Unit -> To.Unit
       | Named (id,mty,mm) -> To.Named (id, module_type m mty,mm)
 
-  let value_description m {val_type; val_modalities; val_kind; val_lpoly;
-                           val_zero_alloc; val_attributes; val_loc; val_uid} =
-    To.{
-      val_type = m.map_type_expr m val_type;
-      val_modalities;
-      val_kind;
-      val_lpoly;
-      val_zero_alloc;
-      val_attributes;
-      val_loc;
-      val_uid
-    }
+  let value_description m vd = m.map_value_description m vd
 
   let module_declaration m {md_type; md_modalities; md_attributes;
     md_loc; md_uid} =

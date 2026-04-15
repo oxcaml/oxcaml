@@ -1049,7 +1049,19 @@ let to_lazy =
     lazy (List.map (To_lazy.signature_item m) sg) |> Wrap.of_lazy
   in
   let map_type_expr _ = Wrap.of_value in
-  To_lazy.{map_signature; map_type_expr}
+  let map_value_description _ (vd : Types.value_description) =
+    Lazy_types.{
+      val_type = Wrap.of_value vd.val_type;
+      val_lpoly = Wrap.of_value vd.val_lpoly;
+      val_modalities = vd.val_modalities;
+      val_kind = vd.val_kind;
+      val_zero_alloc = vd.val_zero_alloc;
+      val_attributes = vd.val_attributes;
+      val_loc = vd.val_loc;
+      val_uid = vd.val_uid;
+    }
+  in
+  To_lazy.{map_signature; map_type_expr; map_value_description}
 
 let lazy_value_description = To_lazy.value_description to_lazy
 let lazy_module_decl = To_lazy.module_declaration to_lazy
@@ -1063,6 +1075,8 @@ module From_lazy = Types.Map_wrapped(Lazy_types)(Types)
 let force_type_expr ty = Wrap.force (fun _ s ty ->
   let loc = Option.value s.loc ~default:Location.none in
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)) ty
+
+let force_lpoly lpoly = Wrap.force (fun _ _ x -> x) lpoly
 
 let rec subst_lazy_value_description s descr =
   let val_modalities =
@@ -1226,7 +1240,19 @@ and from_lazy =
     List.map (From_lazy.signature_item m) items
   in
   let map_type_expr _ = force_type_expr in
-  From_lazy.{map_signature; map_type_expr}
+  let map_value_description _ (vd : Lazy_types.value_description) =
+    Types.{
+      val_type = force_type_expr vd.val_type;
+      val_lpoly = force_lpoly vd.val_lpoly;
+      val_modalities = vd.val_modalities;
+      val_kind = vd.val_kind;
+      val_zero_alloc = vd.val_zero_alloc;
+      val_attributes = vd.val_attributes;
+      val_loc = vd.val_loc;
+      val_uid = vd.val_uid;
+    }
+  in
+  From_lazy.{map_signature; map_type_expr; map_value_description}
 
 and force_value_description vd = From_lazy.value_description from_lazy vd
 and force_module_decl d = From_lazy.module_declaration from_lazy d
@@ -1271,6 +1297,7 @@ module Lazy = struct
   let force_functor_parameter = force_functor_parameter
   let force_value_description = force_value_description
   let force_type_expr = force_type_expr
+  let force_lpoly = force_lpoly
 end
 
 let signature sc s sg =

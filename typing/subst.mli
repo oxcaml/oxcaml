@@ -195,4 +195,5 @@ module Lazy : sig
   val force_functor_parameter : functor_parameter -> Types.functor_parameter
   val force_value_description : value_description -> Types.value_description
   val force_type_expr : type_expr wrapped -> type_expr
+  val force_lpoly : Types.Lpoly.t wrapped -> Types.Lpoly.t
 end
