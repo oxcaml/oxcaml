@@ -14,7 +14,7 @@ type t
 
 (** Computes the affinities for the passed CFG, i.e. for each temporary the
     number of times it moves from/to a given physical register. *)
-val compute : Cfg_with_infos.t -> (Reg.t * Reg.t) list -> t
+val compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t
 
 type affinities
 

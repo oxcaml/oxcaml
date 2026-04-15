@@ -450,7 +450,7 @@ let prelude :
     then cfg_infos, Regalloc_stack_slots.make (), []
     else if Lazy.force Regalloc_split_utils.split_live_ranges
     then
-      let stack_slots, phi_moves =
+      let { Regalloc_split.stack_slots; phi_moves } =
         Profile.record ~accumulate:true "split"
           (fun () -> Regalloc_split.split_live_ranges cfg_with_infos)
           ()

@@ -82,10 +82,12 @@ type t =
     affinity : affinity array Reg.Tbl.t
   }
 
-let compute : Cfg_with_infos.t -> (Reg.t * Reg.t) list -> t =
+let compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t =
  fun cfg_with_infos phi_moves ->
   let classes = Classes.make () in
-  List.iter (fun (left, right) -> Classes.unite classes left right) phi_moves;
+  List.iter
+    (fun { Regalloc_split.src; dst } -> Classes.unite classes src dst)
+    phi_moves;
   let affinity = Reg.Tbl.create 17 in
   match Lazy.force Regalloc_utils.affinity with
   | false -> { classes; affinity }

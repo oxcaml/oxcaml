@@ -359,8 +359,13 @@ let insert_reloads :
     (State.definitions_at_beginning state);
   if debug then dedent ()
 
+type phi_move =
+  { src : Reg.t;
+    dst : Reg.t
+  }
+
 let add_phi_moves_to_instr_list :
-    phi_moves:(Reg.t * Reg.t) list ref ->
+    phi_moves:phi_move list ref ->
     instr_id:InstructionId.sequence ->
     before:Cfg.basic_block ->
     phi:Cfg.basic_block ->
@@ -383,7 +388,7 @@ let add_phi_moves_to_instr_list :
             Printreg.reg to_
       | false ->
         if debug then log "phi %a -> %a" Printreg.reg from Printreg.reg to_;
-        phi_moves := (from, to_) :: !phi_moves;
+        phi_moves := { src = from; dst = to_ } :: !phi_moves;
         let phi_move =
           Move.make_instr Move.Plain
             ~id:(InstructionId.get_and_incr instr_id)
@@ -392,14 +397,12 @@ let add_phi_moves_to_instr_list :
         DLL.add_end instrs phi_move)
     to_unify
 
-(* Insert phi moves: - to the predecessor block if the edge is an "always" one;
-   - to a newly-inserted block otherwise. Returns `true` iff at least one block
-   was inserted. *)
+(*= Insert phi moves:
+  - to the predecessor block if the edge is an "always" one;
+  - to a newly-inserted block otherwise.
+  Returns `true` iff at least one block was inserted. *)
 let insert_phi_moves :
-    State.t ->
-    Cfg_with_infos.t ->
-    Substitution.map ->
-    bool * (Reg.t * Reg.t) list =
+    State.t -> Cfg_with_infos.t -> Substitution.map -> bool * phi_move list =
  fun state cfg_with_infos substs ->
   let phi_moves = ref [] in
   let block_inserted = ref false in
@@ -466,8 +469,7 @@ let insert_phi_moves :
   !block_inserted, !phi_moves
 
 let split_at_destruction_points :
-    Cfg_with_infos.t ->
-    (Regalloc_stack_slots.t * bool * (Reg.t * Reg.t) list) option =
+    Cfg_with_infos.t -> (Regalloc_stack_slots.t * bool * phi_move list) option =
  fun cfg_with_infos ->
   if debug
   then (
@@ -519,8 +521,12 @@ let split_at_destruction_points :
       dedent ());
     Some (State.stack_slots state, block_inserted, phi_moves)
 
-let split_live_ranges :
-    Cfg_with_infos.t -> Regalloc_stack_slots.t * (Reg.t * Reg.t) list =
+type split_result =
+  { stack_slots : Regalloc_stack_slots.t;
+    phi_moves : phi_move list
+  }
+
+let split_live_ranges : Cfg_with_infos.t -> split_result =
  fun cfg_with_infos ->
   (* CR-soon xclerc for xclerc: support closure, flambda, and
      flambda2/classic *)
@@ -535,14 +541,17 @@ let split_live_ranges :
        "Regalloc_split: classic mode is currently not supported" *)
     ()
   | true, true -> assert false);
-  match split_at_destruction_points cfg_with_infos with
-  | None -> Regalloc_stack_slots.make (), []
-  | Some (stack_slots, block_inserted, phi_moves) ->
-    Cfg_with_infos.invalidate_liveness cfg_with_infos;
-    if block_inserted
-    then Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
-    let (_ : Cfg_with_infos.t) =
-      Profile.record ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
-        cfg_with_infos
-    in
-    stack_slots, phi_moves
+  let stack_slots, phi_moves =
+    match split_at_destruction_points cfg_with_infos with
+    | None -> Regalloc_stack_slots.make (), []
+    | Some (stack_slots, block_inserted, phi_moves) ->
+      Cfg_with_infos.invalidate_liveness cfg_with_infos;
+      if block_inserted
+      then Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
+      let (_ : Cfg_with_infos.t) =
+        Profile.record ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
+          cfg_with_infos
+      in
+      stack_slots, phi_moves
+  in
+  { stack_slots; phi_moves }
