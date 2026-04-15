@@ -195,6 +195,7 @@ value caml_get_value_or_raise_async (caml_result result, const char *where)
   if (caml_result_is_exception(result)) {
     caml_check_async(result, where);
     caml_raise_async(result.data);
-  } else
+  } else {
     return result.data;
+  }
 }

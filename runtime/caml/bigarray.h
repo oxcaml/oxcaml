@@ -16,12 +16,47 @@
 #ifndef CAML_BIGARRAY_H
 #define CAML_BIGARRAY_H
 
+/* ISO C++ doesn't permit flexible array members, but GCC, Clang and MSVC all
+   support them as compiler extensions. The pragmas below temporarily disable
+   the warnings which these compilers emit for this, which allows this public
+   header to be used in C++ in pedantic/non-permissive mode.
+
+   These macros are here, rather than misc.h, to discourage the potential future
+   use of flexible array members! */
+#ifdef __cplusplus
+  #if defined(__clang__)
+    #define CAML_flexible_array_member_start \
+      _Pragma("clang diagnostic push") \
+      _Pragma("GCC diagnostic ignored \"-Wc99-extensions\"")
+    #define CAML_flexible_array_member_end \
+      _Pragma("clang diagnostic pop")
+  #elif defined(__GNUC__)
+    #define CAML_flexible_array_member_start \
+      _Pragma("GCC diagnostic push") \
+      _Pragma("GCC diagnostic ignored \"-Wpedantic\"")
+    #define CAML_flexible_array_member_end \
+      _Pragma("GCC diagnostic pop")
+  #elif defined(_MSC_VER)
+    #define CAML_flexible_array_member_start \
+      _Pragma("warning(push)") \
+      _Pragma("warning(disable: 4200)")
+    #define CAML_flexible_array_member_end \
+      _Pragma("warning(pop)")
+  #else
+    #define CAML_flexible_array_member_start
+    #define CAML_flexible_array_member_end
+  #endif
+#else
+  #define CAML_flexible_array_member_start
+  #define CAML_flexible_array_member_end
+#endif
+
 #include "config.h"
 #include "mlvalues.h"
 #include "camlatomic.h"
 
-typedef signed char caml_ba_int8;
-typedef unsigned char caml_ba_uint8;
+typedef int8_t caml_ba_int8;
+typedef uint8_t caml_ba_uint8;
 typedef int16_t caml_ba_int16;
 typedef uint16_t caml_ba_uint16;
 
@@ -75,7 +110,7 @@ enum caml_ba_subarray {
 struct caml_ba_proxy {
   atomic_uintnat refcount;      /* Reference count */
   void * data;                  /* Pointer to base of actual data */
-  uintnat size;                 /* Size of data in bytes */
+  uintnat size;                 /* Size of data in bytes (if mapped file) */
 };
 
 struct caml_ba_array {
@@ -83,20 +118,13 @@ struct caml_ba_array {
   intnat num_dims;            /* Number of dimensions */
   intnat flags;  /* Kind of element array + memory layout + allocation status */
   struct caml_ba_proxy * proxy; /* The proxy for sub-arrays, or NULL */
-  /* PR#5516: use C99's flexible array types if possible */
-#if (__STDC_VERSION__ >= 199901L)
-  intnat dim[]  /*[num_dims]*/; /* Size in each dimension */
-#else
-  intnat dim[1] /*[num_dims]*/; /* Size in each dimension */
-#endif
+CAML_flexible_array_member_start
+  intnat dim[/* num_dims */]; /* Size in each dimension */
+CAML_flexible_array_member_end
 };
 
-/* Size of struct caml_ba_array, in bytes, without dummy first dimension */
-#if (__STDC_VERSION__ >= 199901L)
+/* Size of struct caml_ba_array, in bytes, without [dim] array */
 #define SIZEOF_BA_ARRAY sizeof(struct caml_ba_array)
-#else
-#define SIZEOF_BA_ARRAY (sizeof(struct caml_ba_array) - sizeof(intnat))
-#endif
 
 #define Caml_ba_array_val(v) ((struct caml_ba_array *) Data_custom_val(v))
 
