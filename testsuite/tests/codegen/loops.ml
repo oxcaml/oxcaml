@@ -62,13 +62,14 @@ for_loop_layout:
   cmpq  $1, %rax
   jl    .L120
   subq  $24, %rsp
-  movl  $1, %edi
-.L108:
-  movq  %rdi, 16(%rsp)
-  movq  %rax, (%rsp)
+  movq  %rbx, (%rsp)
+  sarq  $1, %rax
+  movq  %rax, 8(%rsp)
+  xorl  %eax, %eax
+.L109:
+  movq  %rax, 16(%rsp)
   movl  $1, %eax
   movq  (%rbx), %rdi
-  movq  %rbx, 8(%rsp)
   call  *%rdi
 .L124:
   movq  16(%rsp), %rax
