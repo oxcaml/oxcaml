@@ -404,9 +404,8 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
         false, None
     in
     let (_, last_unit : bool * Compilation_unit.t option) =
-      List.fold_left phrases ~init:(true, None) ~f:(fun (acc, _) phrase ->
-          let success, unit = exec_one phrase in
-          acc && success, unit)
+      List.fold_left phrases ~init:(true, None) ~f:(fun (acc, unit) phrase ->
+          if acc then exec_one phrase else acc, unit)
     in
     Format.pp_print_flush ppf ();
     let len = Buffer.length buf in
