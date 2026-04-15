@@ -39,4 +39,7 @@ type value_halves = Slambda_types.halves =
 
     [inspect] can arbitrarily modify the [slambda] but it's expected to be used
     by drivers to print the slambda if requested and return it unchanged. *)
-val eval : (slambda -> slambda) -> lambda -> value_halves
+val eval :
+  (slambda -> slambda) ->
+  lambda ->
+  Slambda_types.Templates.templates * value_halves

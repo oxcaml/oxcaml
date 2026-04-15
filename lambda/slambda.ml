@@ -32,10 +32,11 @@ type value_halves = Slambda_types.halves =
 
 let eval inspect_slambda template_lam =
   Profile.record_call "slambda_eval" (fun () ->
-      let _store, halves =
+      let store, halves =
         Slambda_fracture.fracture template_lam
         |> inspect_slambda |> Slambdaeval.eval
       in
+      let templates = Slambda_types.Templates.templates store in
       (* CR layout poly: We can keep this check in the future if
          [is_enabled Layout_poly] is replaced with whether template_lam contains
          any templates. (which is cheap to check if it's combined with
@@ -46,4 +47,4 @@ let eval inspect_slambda template_lam =
       then
         Misc.fatal_error
           "Slambda eval did something non-trivial but layout poly is disabled.";
-      halves)
+      templates, halves)

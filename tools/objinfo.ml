@@ -357,7 +357,9 @@ let print_cmx_infos (uir, sections, crc) =
     (fun f -> Array.iter f uir.uir_quoted_globals);
   printf "Static data:\n";
   flush stdout;
-  Format.printf "%a@." Slambda_types.print_or_missing uir.uir_static_data;
+  let static_value, templates = uir.uir_static_data in
+  Format.printf "%a@." Slambda_types.print_or_missing static_value;
+  Format.printf "%a@." Slambda_types.Templates.print_templates templates;
   begin
     match uir.uir_export_info with
     | None ->

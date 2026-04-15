@@ -69,7 +69,8 @@ val write_unit_info:
 val save_unit_info:
   string -> main_module_block_format:Lambda.main_module_block_format ->
   arg_descr:Lambda.arg_descr option ->
-  static_data:(Slambda_types.value Slambda_types.Or_missing.t) ->
+  static_data:(Slambda_types.value Slambda_types.Or_missing.t
+    * Slambda_types.Templates.templates) ->
   unit
         (* Save the infos for the current unit in the given file *)
 
@@ -89,7 +90,7 @@ val try_load_unit : Compilation_unit.t -> unit
            missing .cmx just means there is no static data available. *)
 
 val get_cached_static_data:
-  Compilation_unit.t -> Slambda_types.value Slambda_types.Or_missing.t
+  Compilation_unit.t -> Slambda_types.value Slambda_types.Or_missing.t * Slambda_types.Templates.templates
 
 val get_cached_export_info : Compilation_unit.t -> Obj.t option
         (* Return the cached export info for a loaded compilation unit,

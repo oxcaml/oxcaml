@@ -231,7 +231,7 @@ end) : S = struct
         ui_zero_alloc_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
-        ui_static_data = Missing;
+        ui_static_data = Missing, Slambda_types.Templates.empty_templates ()
       }
     in
     Compilenv_flambda.write_unit_info pkg_infos cmxfile

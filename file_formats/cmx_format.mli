@@ -75,7 +75,9 @@ type ('format, 'export_info) unit_infos_gen =
     mutable ui_requires_metaprogramming: bool;
                                           (* Requires metaprogramming libs *)
     mutable ui_external_symbols: string list; (* Set of external symbols *)
-    mutable ui_static_data: Slambda_types.value Slambda_types.Or_missing.t;
+    mutable ui_static_data:
+      Slambda_types.value Slambda_types.Or_missing.t
+      * Slambda_types.Templates.templates;
                                           (* Static data of the module *)
   }
 
@@ -97,7 +99,9 @@ type 'raw_export_info unit_infos_raw =
                                       this record *)
     uir_sections_length: int;      (* Byte length of all sections *)
     uir_external_symbols: string array;
-    uir_static_data: Slambda_types.value Slambda_types.Or_missing.t;
+    uir_static_data:
+      Slambda_types.value Slambda_types.Or_missing.t
+      * Slambda_types.Templates.templates;
   }
 
 (* Each .a library has a matching .cmxa file that provides the following

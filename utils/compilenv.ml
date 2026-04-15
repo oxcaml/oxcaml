@@ -65,7 +65,7 @@ let current_unit  =
     ui_zero_alloc_info = Zero_alloc_info.create ();
     ui_export_info = None;
     ui_external_symbols = [];
-    ui_static_data = Missing;
+    ui_static_data = Missing, (Slambda_types.Templates.empty_templates ());
   }
 
 let reset unit_info =
@@ -218,12 +218,10 @@ let get_cached_static_data comp_unit =
     current_unit.ui_static_data
   else begin
     let name = CU.to_global_name_without_prefix comp_unit in
-    try
-      let ui = Infos_table.find global_infos_table name in
-      match ui with
-      | Some ui -> ui.ui_static_data
-      | None -> Slambda_types.Or_missing.Missing
-    with Not_found -> Slambda_types.Or_missing.Missing
+    match Infos_table.find global_infos_table name with
+    | Some ui -> ui.ui_static_data
+    | None | exception Not_found ->
+      Slambda_types.Or_missing.Missing, (Slambda_types.Templates.empty_templates ())
   end
 
 let get_cached_export_info comp_unit =

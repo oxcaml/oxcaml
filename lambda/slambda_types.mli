@@ -62,7 +62,11 @@ module Templates : sig
 
   val empty : unit -> t
 
-  val add : t -> name:Slambdaident.t option -> closure -> id
+  val empty_templates : unit -> templates
+
+  val add : t -> cu:Compilation_unit.t -> name:Slambdaident.t option -> closure -> id
+
+  val add_foreign_templates : t -> templates -> unit
 
   val instantiate :
     t ->
@@ -74,4 +78,6 @@ module Templates : sig
   val templates : t -> templates
 
   val instantiations : t -> (Ident.t * lambda) list
+
+  val print_templates : Format.formatter -> templates -> unit
 end

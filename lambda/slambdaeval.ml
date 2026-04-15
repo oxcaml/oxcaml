@@ -84,7 +84,9 @@ let rec eval_slam store ?name env slam : value Or_missing.t =
   | SLlayout layout -> Present (SLVlayout layout)
   | SLglobal cu ->
     Compilenv.try_load_unit cu;
-    Compilenv.get_cached_static_data cu
+    let module_data, templates = Compilenv.get_cached_static_data cu in
+    Templates.add_foreign_templates store templates;
+    module_data
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
     let value = eval_slam store ~name:slet_name env slet_value in
@@ -104,7 +106,8 @@ let rec eval_slam store ?name env slam : value Or_missing.t =
     let closure =
       { clo_params = sfun_params; clo_body = sfun_body; clo_env = env }
     in
-    let closure_id = Templates.add store ~name closure in
+    let cu = (Compilenv.current_unit_infos ()).ui_unit in
+    let closure_id = Templates.add store ~cu ~name closure in
     Present (SLVclosure closure_id)
   | SLinstantiate { sapp_func; sapp_args } ->
     let closure =

@@ -47,7 +47,7 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
          |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
          |> Slambda.eval
               (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-         |> fun { Slambda.slv_comptime; slv_runtime } ->
+         |> fun (templates, { Slambda.slv_comptime; slv_runtime }) ->
          (* CR layout poly: Drop the comptime part until top-level modules can
              be static. *)
          slv_runtime
@@ -79,7 +79,10 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
                     (fun _ _ -> "")
                     jsir.program)
          in
-         (jsir, program.main_module_block_format, arg_descr, slv_comptime))
+         ( jsir,
+           program.main_module_block_format,
+           arg_descr,
+           (slv_comptime, templates) ))
 
 let emit_jsir i
     ({ program; imported_compilation_units } :
