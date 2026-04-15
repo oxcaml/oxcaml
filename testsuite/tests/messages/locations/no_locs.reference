@@ -27,10 +27,10 @@ Error: Signature mismatch:
          type a = M/1.t
        is not included in
          type a = M/2.t
-       The type "M/1.t" = "M/2.M.t" is not equal to the type "M/2.t"
+       The type M/1.t = M/2.M.t is not equal to the type M/2.t
        File "_none_", line _:
-         Definition of module "M/2"
-       Hint: The module "M" has been defined multiple times in this toplevel
+         Definition of module M/2
+       Hint: The module M has been defined multiple times in this toplevel
          session. Some toplevel values still refer to old versions of this
          module. Did you try to redefine them?
 

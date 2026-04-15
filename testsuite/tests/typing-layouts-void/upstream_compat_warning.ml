@@ -14,9 +14,9 @@ Line 1, characters 0-18:
 1 | type t = A of void
     ^^^^^^^^^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: This variant is immediate
-because all its constructors have all-void arguments, but after
-erasure for upstream compatibility, void is no longer zero-width,
-so it won't be immediate.
+  because all its constructors have all-void arguments,
+  but after erasure for upstream compatibility, void is no longer zero-width,
+  so it won't be immediate.
 
 type t = A of void
 |}]
@@ -28,9 +28,9 @@ Line 1, characters 0-60:
 1 | type t2 = A of void | B of void * void | C of #(void * void)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: This variant is immediate
-because all its constructors have all-void arguments, but after
-erasure for upstream compatibility, void is no longer zero-width,
-so it won't be immediate.
+  because all its constructors have all-void arguments,
+  but after erasure for upstream compatibility, void is no longer zero-width,
+  so it won't be immediate.
 
 type t2 = A of void | B of void * void | C of #(void * void)
 |}]

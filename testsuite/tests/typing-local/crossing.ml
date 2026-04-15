@@ -408,7 +408,7 @@ let _ = bar foo
 Line 1, characters 12-15:
 1 | let _ = bar foo
                 ^^^
-Error: This expression has type "int -> int"
+Error: The value "foo" has type "int -> int"
        but an expression was expected of type "int @ local -> int"
 |}]
 

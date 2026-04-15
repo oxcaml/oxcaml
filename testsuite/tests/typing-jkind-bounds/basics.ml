@@ -507,7 +507,7 @@ type ('a : value mod aliased) t = { aliased_field : 'a; }
 Line 2, characters 26-34:
 2 | let x = { aliased_field = "string" }
                               ^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : value mod aliased)"
        The kind of string is immutable_data
          because it is the primitive type string.
@@ -529,7 +529,7 @@ type t : value mod many
 Line 2, characters 42-43:
 2 | let g (x : t) : ('a : value mod global) = x
                                               ^
-Error: This expression has type "t" but an expression was expected of type
+Error: The value "x" has type "t" but an expression was expected of type
          "('a : value mod global)"
        The kind of t is value mod many
          because of the definition of t at line 1, characters 0-23.
@@ -555,7 +555,7 @@ val f : ('a : value mod aliased). 'a -> unit = <fun>
 Line 3, characters 18-19:
 3 | let g (x : t) = f x
                       ^
-Error: This expression has type "t" but an expression was expected of type
+Error: The value "x" has type "t" but an expression was expected of type
          "('a : value mod aliased)"
        The kind of t is value mod external64
          because of the definition of t at line 1, characters 0-29.
@@ -1393,7 +1393,7 @@ type _ t =
 Line 17, characters 6-7:
 17 |     f y
            ^
-Error: This expression has type "a" but an expression was expected of type
+Error: The value "y" has type "a" but an expression was expected of type
          "('a : immediate)"
        The kind of a is value
          because of the annotation on the abstract type declaration for a.

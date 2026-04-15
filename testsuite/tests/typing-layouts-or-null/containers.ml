@@ -101,7 +101,7 @@ let should_fail = [| Null; This 3.4 |]
 Line 1, characters 32-35:
 1 | let should_fail = [| Null; This 3.4 |]
                                     ^^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "3.4" has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is
            value mod forkable unyielding many stateless immutable
@@ -207,7 +207,7 @@ let should_fail_iarray = [: Null; This 3.4 :]
 Line 1, characters 39-42:
 1 | let should_fail_iarray = [: Null; This 3.4 :]
                                            ^^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "3.4" has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is
            value mod forkable unyielding many stateless immutable

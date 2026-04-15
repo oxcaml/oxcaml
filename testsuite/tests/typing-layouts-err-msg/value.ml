@@ -91,7 +91,7 @@ let f x: t_void = x # baz
 Line 1, characters 18-25:
 1 | let f x: t_void = x # baz
                       ^^^^^^^
-Error: This expression has type "('a : value)"
+Error: The method call "x#baz" has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -157,7 +157,7 @@ let f : unit -> ('a : void) = fun () -> "abc"
 Line 1, characters 40-45:
 1 | let f : unit -> ('a : void) = fun () -> "abc"
                                             ^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : void)"
        The layout of string is value
          because it is the primitive type string.
@@ -171,7 +171,7 @@ let f (x: t_void) = [x]
 Line 1, characters 21-22:
 1 | let f (x: t_void) = [x]
                          ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "x" has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -204,7 +204,7 @@ type ('a : void) t = 'a
 Line 2, characters 36-37:
 2 | let f (x: [`A of int | `B]): 'a t = x
                                         ^
-Error: This expression has type "[ `A of int | `B ]"
+Error: The value "x" has type "[ `A of int | `B ]"
        but an expression was expected of type "'a t" = "('a : void)"
        The layout of [ `A of int | `B ] is value
          because it's a polymorphic variant type.
@@ -220,8 +220,8 @@ type ('a : void) t = 'a
 Line 2, characters 31-32:
 2 | let f (x : int -> int): 'a t = x
                                    ^
-Error: This expression has type "int -> int"
-       but an expression was expected of type "'a t" = "('a : void)"
+Error: The value "x" has type "int -> int" but an expression was expected of type
+         "'a t" = "('a : void)"
        The layout of int -> int is value
          because it's a function type.
        But the layout of int -> int must be a sublayout of void
@@ -263,7 +263,7 @@ let f: 'a. 'a -> ('b : void) = fun x -> x
 Line 1, characters 40-41:
 1 | let f: 'a. 'a -> ('b : void) = fun x -> x
                                             ^
-Error: This expression has type "('a : value)"
+Error: The value "x" has type "('a : value)"
        but an expression was expected of type "('b : void)"
        The layout of 'b is void
          because of the annotation on the type variable 'b.
@@ -277,8 +277,8 @@ let f (x : t_float64) = `A x;;
 Line 1, characters 27-28:
 1 | let f (x : t_float64) = `A x;;
                                ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
        But the layout of t_float64 must be a sublayout of value
@@ -311,8 +311,8 @@ let f (x : t_float64) = [| x for i = 0 to 1 |]
 Line 1, characters 27-28:
 1 | let f (x : t_float64) = [| x for i = 0 to 1 |]
                                ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
        But the layout of t_float64 must be a sublayout of value
@@ -325,8 +325,8 @@ let f (x : t_float64) = lazy x
 Line 1, characters 29-30:
 1 | let f (x : t_float64) = lazy x
                                  ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
        But the layout of t_float64 must be a sublayout of value

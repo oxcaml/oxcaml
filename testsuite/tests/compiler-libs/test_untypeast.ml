@@ -151,7 +151,7 @@ let foo : 'a . 'a -> 'a = fun (type a) -> (fun x -> x : a -> a) in foo
 
 let run s =
   let pe = Parse.implementation (Lexing.from_string s) in
-  let te,_,_,_,_ = Typemod.type_structure Env.initial pe in
+  let te,_,_,_,_,_ = Typemod.type_structure (Lazy.force Env.initial) pe in
   let ute = Untypeast.untype_structure te in
   Format.printf "%a@." Pprintast.structure ute
 ;;

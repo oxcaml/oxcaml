@@ -208,7 +208,7 @@ let should_fail = [| This 5.; Null |]
 Line 1, characters 26-28:
 1 | let should_fail = [| This 5.; Null |]
                               ^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "5." has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is
            value mod forkable unyielding many stateless immutable
@@ -275,7 +275,7 @@ let should_fail = [: Null; This 5. :]
 Line 1, characters 32-34:
 1 | let should_fail = [: Null; This 5. :]
                                     ^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "5." has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is
            value mod forkable unyielding many stateless immutable
@@ -464,7 +464,7 @@ let should_fail_unboxed_var = This (Wrap Null)
 Line 1, characters 35-46:
 1 | let should_fail_unboxed_var = This (Wrap Null)
                                        ^^^^^^^^^^^
-Error: This expression has type "unboxed_var"
+Error: This constructor has type "unboxed_var"
        but an expression was expected of type "('a : value)"
        The kind of unboxed_var is value_or_null mod everything
          because it is the primitive type or_null.

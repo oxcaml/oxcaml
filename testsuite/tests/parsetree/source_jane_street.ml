@@ -412,7 +412,7 @@ let g () =
 Line 5, characters 52-54:
 5 |   let local_ f a b : (int -> int) @ once portable = 42 in
                                                         ^^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "42" has type "int" but an expression was expected of type
          "int -> int"
 |}]
 
@@ -426,12 +426,12 @@ let g () = exclave_ local_
 Line 2, characters 6-7:
 2 |   let f = (() : _ @ unique once) in
           ^
-Warning 26 [unused-var]: unused variable f.
+Warning 26 [unused-var]: unused variable "f".
 
 Line 3, characters 6-7:
 3 |   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
           ^
-Warning 26 [unused-var]: unused variable f.
+Warning 26 [unused-var]: unused variable "f".
 
 val g : unit -> unit @ local once = <fun>
 |}]
@@ -1511,7 +1511,7 @@ let f (x : bool) = (x : int)[@error_message "custom message"]
 Line 1, characters 20-21:
 1 | let f (x : bool) = (x : int)[@error_message "custom message"]
                         ^
-Error: This expression has type "bool" but an expression was expected of type
+Error: The value "x" has type "bool" but an expression was expected of type
          "int"
        custom message
 |}]
@@ -1522,7 +1522,7 @@ let f (v : float#) : ((_ : value)[@error_message "need a value"]) = v
 Line 1, characters 68-69:
 1 | let f (v : float#) : ((_ : value)[@error_message "need a value"]) = v
                                                                         ^
-Error: This expression has type "float#" but an expression was expected of type
+Error: The value "v" has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
@@ -1592,7 +1592,7 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1168, characters 2-8: Assertion failed
 
 |}]
 

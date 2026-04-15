@@ -97,8 +97,8 @@ let f4_1 (x : t_bits32) = x, false;;
 Line 1, characters 26-27:
 1 | let f4_1 (x : t_bits32) = x, false;;
                               ^
-Error: This expression has type "t_bits32"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits32" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits32 is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
        But the layout of t_bits32 must be a sublayout of value
@@ -110,7 +110,7 @@ let f4_2 (x : 'a t_bits32_id) = x, false;;
 Line 1, characters 32-33:
 1 | let f4_2 (x : 'a t_bits32_id) = x, false;;
                                     ^
-Error: This expression has type "'a t_bits32_id" = "('a : bits32)"
+Error: The value "x" has type "'a t_bits32_id" = "('a : bits32)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits32_id is bits32
          because of the definition of t_bits32_id at line 2, characters 0-35.
@@ -123,7 +123,7 @@ let f4_3 (x : int32#) = x, false;;
 Line 1, characters 24-25:
 1 | let f4_3 (x : int32#) = x, false;;
                             ^
-Error: This expression has type "int32#" but an expression was expected of type
+Error: The value "x" has type "int32#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
@@ -267,8 +267,8 @@ let f7_1 (x : t_bits32) = `A x;;
 Line 1, characters 29-30:
 1 | let f7_1 (x : t_bits32) = `A x;;
                                  ^
-Error: This expression has type "t_bits32"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits32" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits32 is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
        But the layout of t_bits32 must be a sublayout of value
@@ -280,7 +280,7 @@ let f7_2 (x : 'a t_bits32_id) = `A x;;
 Line 1, characters 35-36:
 1 | let f7_2 (x : 'a t_bits32_id) = `A x;;
                                        ^
-Error: This expression has type "'a t_bits32_id" = "('a : bits32)"
+Error: The value "x" has type "'a t_bits32_id" = "('a : bits32)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits32_id is bits32
          because of the definition of t_bits32_id at line 2, characters 0-35.
@@ -293,7 +293,7 @@ let f7_3 (x : int32#) = `A x;;
 Line 1, characters 27-28:
 1 | let f7_3 (x : int32#) = `A x;;
                                ^
-Error: This expression has type "int32#" but an expression was expected of type
+Error: The value "x" has type "int32#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
@@ -646,7 +646,7 @@ end;;
 Line 3, characters 17-19:
 3 |     let _ = f1_1 m1 in
                      ^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "m1" has type "('a : value_or_null)"
        but an expression was expected of type "t_bits32"
        The layout of t_bits32 is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
@@ -682,8 +682,8 @@ let f13_1 (x : t_bits32) = x = x;;
 Line 1, characters 27-28:
 1 | let f13_1 (x : t_bits32) = x = x;;
                                ^
-Error: This expression has type "t_bits32"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits32" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits32 is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
        But the layout of t_bits32 must be a sublayout of value.
@@ -694,8 +694,8 @@ let f13_2 (x : t_bits32) = compare x x;;
 Line 1, characters 35-36:
 1 | let f13_2 (x : t_bits32) = compare x x;;
                                        ^
-Error: This expression has type "t_bits32"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits32" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits32 is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
        But the layout of t_bits32 must be a sublayout of value.
@@ -706,8 +706,8 @@ let f13_3 (x : t_bits32) = Marshal.to_bytes x;;
 Line 1, characters 44-45:
 1 | let f13_3 (x : t_bits32) = Marshal.to_bytes x;;
                                                 ^
-Error: This expression has type "t_bits32"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits32" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits32 is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
        But the layout of t_bits32 must be a sublayout of value.
@@ -718,8 +718,8 @@ let f13_4 (x : t_bits32) = Hashtbl.hash x;;
 Line 1, characters 40-41:
 1 | let f13_4 (x : t_bits32) = Hashtbl.hash x;;
                                             ^
-Error: This expression has type "t_bits32"
-       but an expression was expected of type "('a : value)"
+Error: The value "x" has type "t_bits32" but an expression was expected of type
+         "('a : value)"
        The layout of t_bits32 is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
        But the layout of t_bits32 must be a sublayout of value.

@@ -307,7 +307,7 @@ let higher_order6 (unique_ x) = let f (unique_ x) = unique_ x in higher_order2 f
 Line 1, characters 79-80:
 1 | let higher_order6 (unique_ x) = let f (unique_ x) = unique_ x in higher_order2 f x
                                                                                    ^
-Error: This expression has type "'a @ unique -> 'a"
+Error: The value "f" has type "'a @ unique -> 'a"
        but an expression was expected of type "'b -> 'c @ unique"
 |}]
 
@@ -537,8 +537,7 @@ let f () =
 Line 4, characters 6-7:
 4 |   id2 r
           ^
-Error: This expression has type "int" but an expression was expected of type
-         "string"
+Error: The value "r" has type "int" but an expression was expected of type "string"
 |}]
 
 let return_local : local_ 'a -> local_ 'a = fun x -> x

@@ -676,7 +676,7 @@ let () = cross_portable func
 Line 1, characters 24-28:
 1 | let () = cross_portable func
                             ^^^^
-Error: This expression has type "(unit -> unit) t"
+Error: The value "func" has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod portable)"
        The kind of (unit -> unit) t is value mod immutable non_float
          because of the definition of t at line 1, characters 0-22.
@@ -701,7 +701,7 @@ let () = cross_external func
 Line 1, characters 24-28:
 1 | let () = cross_external func
                             ^^^^
-Error: This expression has type "(unit -> unit) t"
+Error: The value "func" has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod external_)"
        The kind of (unit -> unit) t is value mod immutable non_float
          because of the definition of t at line 1, characters 0-22.

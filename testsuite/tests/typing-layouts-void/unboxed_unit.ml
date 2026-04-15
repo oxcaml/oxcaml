@@ -97,8 +97,7 @@ Line 1, characters 8-38:
 1 | let f = function #(#(), #false) -> #()
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#(#(), #true)
+  Here is an example of a case that is not matched: "#(#(), #true)"
 
 val f : #(unit# * bool#) -> unit# = <fun>
 |}]
@@ -110,8 +109,7 @@ Line 1, characters 8-80:
 1 | let f = function #(#true, #(#(), #false)) -> #() | #(#false, #(_, #true)) -> #()
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#(#true, #(#(), #true))
+  Here is an example of a case that is not matched: "#(#true, #(#(), #true))"
 
 val f : #(bool# * #(unit# * bool#)) -> unit# = <fun>
 |}]
@@ -148,7 +146,7 @@ let f = function #() -> #() | #() -> ()
 Line 1, characters 37-39:
 1 | let f = function #() -> #() | #() -> ()
                                          ^^
-Error: This expression has type "unit" but an expression was expected of type
-         "unit#"
+Error: The constructor "()" has type "unit"
+       but an expression was expected of type "unit#"
 |}]
 

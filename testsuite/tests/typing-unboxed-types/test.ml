@@ -137,8 +137,7 @@ let rec x = A x;;
 Line 1, characters 14-15:
 1 | let rec x = A x;;
                   ^
-Error: This expression has type "t1" but an expression was expected of type
-         "string"
+Error: The value "x" has type "t1" but an expression was expected of type "string"
 |}];;
 
 (* Representation mismatch between module and signature must be rejected *)
@@ -389,7 +388,7 @@ Line 1, characters 15-18:
 1 | let f (a : int t12 array) = a.(0);;
                    ^^^
 Error: Unbound type constructor "t12"
-Hint: Did you mean "t1", "t11" or "t2"?
+Hint:              Did you mean "t1", "t11" or "t2"?
 |}];;
 
 type 'a t12 : value = #{ a : 'a t12 };;
@@ -406,7 +405,7 @@ Line 1, characters 15-18:
 1 | let f (a : int t12 array) = a.(0);;
                    ^^^
 Error: Unbound type constructor "t12"
-Hint: Did you mean "t1", "t11" or "t2"?
+Hint:              Did you mean "t1", "t11" or "t2"?
 |}];;
 
 (* Check for another possible loop *)
@@ -416,7 +415,7 @@ Line 1, characters 17-20:
 1 | type t13 = A : _ t12 -> t13 [@@ocaml.unboxed];;
                      ^^^
 Error: Unbound type constructor "t12"
-Hint: Did you mean "t1", "t11", "t13" or "t2"?
+Hint:              Did you mean "t1", "t11", "t13" or "t2"?
 |}];;
 
 

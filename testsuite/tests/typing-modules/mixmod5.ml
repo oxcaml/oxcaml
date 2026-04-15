@@ -19,7 +19,8 @@ module Types(X : sig type exp type a end) =
 module type ET = sig type exp end
 module type E = sig type exp val eval : (string * exp) list -> exp -> exp end
 module Types :
-  (X : sig type exp type a end) -> sig type exp = X.exp type a = X.a end
+  functor (X : sig type exp type a end) ->
+    sig type exp = X.exp type a = X.a end
 |}]
 
 (* Variables are common to lambda and expr *)
@@ -47,7 +48,7 @@ module type VarS =
     val eval : (string * exp) list -> exp -> exp
   end
 module Var :
-  (E : VarS) ->
+  functor (E : VarS) ->
     sig
       type exp0 = VarT.exp
       type exp = E.exp
@@ -110,7 +111,7 @@ module type LamS =
     val eval : (string * exp) list -> exp -> exp
   end
 module Lam :
-  (E : LamS) ->
+  functor (E : LamS) ->
     sig
       type exp0 = E.a LamT.exp
       type exp = E.exp
@@ -211,7 +212,7 @@ module type ExprS =
     val eval : (string * exp) list -> exp -> exp
   end
 module Expr :
-  (E : ExprS) ->
+  functor (E : ExprS) ->
     sig
       type exp0 = E.a ExprT.exp
       type exp = E.exp
@@ -288,7 +289,7 @@ module type LExprS =
     val eval : (string * exp) list -> exp -> exp
   end
 module LExpr :
-  (E : LExprS) ->
+  functor (E : LExprS) ->
     sig
       type exp = E.exp
       type a = E.a

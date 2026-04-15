@@ -3,12 +3,12 @@ File "pr10693_bad.ml", line 27, characters 26-27:
                                ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val x : 'a option module M : functor Dep -> S end
+         sig val x : 'a option module M : Dep -> S end
        is not included in
          S
        In module M:
        Modules do not match:
-         functor Dep -> S
+         Dep -> S
        is not included in
          functor (X : Dep) ->
            sig

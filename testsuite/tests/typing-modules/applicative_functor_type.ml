@@ -33,7 +33,8 @@ Error: Modules do not match:
 module F(X : sig type t = M.t val equal : unit end)
   = struct type t end
 [%%expect{|
-module F : (X : sig type t = M.t val equal : unit end) -> sig type t end
+module F :
+  functor (X : sig type t = M.t val equal : unit end) -> sig type t end
 |} ]
 
 type t = F(M).t
@@ -55,7 +56,7 @@ Error: Modules do not match:
 (* MPR#7611 *)
 module Generative() = struct type t end
 [%%expect{|
-module Generative : () -> sig type t end
+module Generative : functor () -> sig type t end
 |}]
 
 type t = Generative(M).t
@@ -76,5 +77,5 @@ end
 Line 2, characters 11-14:
 2 |   type t = X.F(Parsing).t
                ^^^
-Error: The module "X.F" is abstract, it cannot be applied
+Error: The module "X.F" is of abstract type "S", it cannot be applied
 |}]

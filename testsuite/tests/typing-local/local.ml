@@ -95,8 +95,8 @@ let f () =
 Line 3, characters 16-17:
 3 |   print_endline r
                     ^
-Error: This expression has type "int ref"
-       but an expression was expected of type "string"
+Error: The value "r" has type "int ref" but an expression was expected of type
+         "string"
 |}]
 
 (*
@@ -251,7 +251,7 @@ let foo (bar : int -> local_ (int -> int)) =
 Line 2, characters 11-14:
 2 |   let _ = (bar : int -> int -> int) in
                ^^^
-Error: This expression has type "int -> (int -> int) @ local"
+Error: The value "bar" has type "int -> (int -> int) @ local"
        but an expression was expected of type "int -> int -> int"
 |}]
 
@@ -282,8 +282,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 2 more arguments will make the value non-local
+Hint: This is a partial application
+      Adding 2 more arguments will make the value non-local
 |}]
 let apply3 x = f4 x x x
 [%%expect{|
@@ -294,8 +294,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 let apply4 x =
   f4 x x x x
@@ -363,8 +363,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 
 (* Optional argument elimination eta-expands and therefore allocates *)
@@ -2018,7 +2018,7 @@ val zz : int ref @ local -> int -> unit = <fun>
 Line 3, characters 45-49:
 3 | let zy : local_ (int ref) -> (int -> unit) = (:=)
                                                  ^^^^
-Error: This expression has type "'a ref @ local -> 'a -> unit"
+Error: The value "(:=)" has type "'a ref @ local -> 'a -> unit"
        but an expression was expected of type
          "int ref @ local -> (int -> unit)"
 |}]
@@ -2183,7 +2183,7 @@ val f : (int list @ local -> unit) -> int -> unit = <fun>
 Line 5, characters 44-45:
 5 | let z : (int list -> unit) -> int -> unit = f
                                                 ^
-Error: This expression has type "(int list @ local -> unit) -> int -> unit"
+Error: The value "f" has type "(int list @ local -> unit) -> int -> unit"
        but an expression was expected of type
          "(int list -> unit) -> int -> unit"
        Type "int list @ local -> unit" is not compatible with type
@@ -2201,7 +2201,7 @@ end
 Line 6, characters 46-47:
 6 |   let z : (int list -> unit) -> int -> unit = f
                                                   ^
-Error: This expression has type "(int list @ local -> unit) -> int -> unit"
+Error: The value "f" has type "(int list @ local -> unit) -> int -> unit"
        but an expression was expected of type
          "(int list -> unit) -> int -> unit"
        Type "int list @ local -> unit" is not compatible with type
@@ -2263,7 +2263,8 @@ val local_to_global_to_global : (float @ local -> string) -> string = <fun>
 Line 5, characters 6-31:
 5 |   [f; local_to_global_to_global]
           ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "(float @ local -> string) -> string"
+Error: The value "local_to_global_to_global" has type
+         "(float @ local -> string) -> string"
        but an expression was expected of type "(float -> string) -> string"
        Type "float @ local -> string" is not compatible with type
          "float -> string"
@@ -2789,8 +2790,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 
 (* Regression test for printing of [local_] *)
