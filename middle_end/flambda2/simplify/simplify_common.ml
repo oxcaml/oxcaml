@@ -135,22 +135,23 @@ let split_direct_over_application apply ~callee's_code_id
        value is still live (and with the caller expecting such value to have
        been allocated in their region). *)
     match result_mode with
-    | Alloc_heap ->
+    | Not_alloc_stack ->
       ( None,
-        Alloc_mode.For_applications.heap
+        Alloc_mode.For_applications.not_alloc_stack
           ~alloc_region:
             (match apply_alloc_mode with
-            | Heap { alloc_region } | Local { alloc_region; _ } -> alloc_region)
-      )
-    | Alloc_local -> (
+            | Not_alloc_stack { alloc_region }
+            | Maybe_alloc_stack { alloc_region; _ } ->
+              alloc_region) )
+    | Maybe_alloc_stack -> (
       match apply_alloc_mode with
-      | Heap { alloc_region } ->
+      | Not_alloc_stack { alloc_region } ->
         let region = Variable.create "over_app_region" K.region in
         let ghost_region = Variable.create "over_app_ghost_region" K.region in
         ( Some (region, ghost_region, Continuation.create ()),
-          Alloc_mode.For_applications.local ~alloc_region ~region ~ghost_region
-        )
-      | Local _ -> None, apply_alloc_mode)
+          Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region ~region
+            ~ghost_region )
+      | Maybe_alloc_stack _ -> None, apply_alloc_mode)
   in
   let perform_over_application =
     let continuation =

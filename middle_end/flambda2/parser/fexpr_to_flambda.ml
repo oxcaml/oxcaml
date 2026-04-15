@@ -177,12 +177,13 @@ let alloc_mode_for_applications env
   match alloc with
   | Heap { alloc_region } ->
     let alloc_region = find_region env alloc_region in
-    Alloc_mode.For_applications.heap ~alloc_region
+    Alloc_mode.For_applications.not_alloc_stack ~alloc_region
   | Local { alloc_region; region; ghost_region } ->
     let alloc_region = find_region env alloc_region in
     let region = find_region env region in
     let ghost_region = find_region env ghost_region in
-    Alloc_mode.For_applications.local ~alloc_region ~region ~ghost_region
+    Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region ~region
+      ~ghost_region
 
 let prim env ((p, args) : Fexpr.prim) : Flambda_primitive.t =
   let args = List.map (simple env) args in
@@ -724,7 +725,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               let alloc_region, _duid, env =
                 fresh_var env alloc_region Flambda_kind.region
               in
-              Alloc_mode.For_applications.heap ~alloc_region, env
+              Alloc_mode.For_applications.not_alloc_stack ~alloc_region, env
             | Local { alloc_region; region; ghost_region } ->
               let alloc_region, _duid, env =
                 fresh_var env alloc_region Flambda_kind.region
@@ -735,8 +736,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               let ghost_region, _duid, env =
                 fresh_var env ghost_region Flambda_kind.region
               in
-              ( Alloc_mode.For_applications.local ~alloc_region ~region
-                  ~ghost_region,
+              ( Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region
+                  ~region ~ghost_region,
                 env )
           in
           let my_depth, _my_depth, env =
@@ -770,8 +771,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         in
         let result_mode =
           match result_mode with
-          | Heap -> Lambda.alloc_heap
-          | Local -> Lambda.alloc_local
+          | Heap -> Lambda.not_alloc_stack
+          | Local -> Lambda.maybe_alloc_stack
         in
         let recursive = convert_recursive_flag recursive in
         let inline =

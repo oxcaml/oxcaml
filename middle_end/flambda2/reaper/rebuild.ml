@@ -315,8 +315,8 @@ let function_params_and_body_free_names fpb =
       in
       let regions =
         match (my_alloc_mode : Alloc_mode.For_applications.t) with
-        | Heap { alloc_region } -> [alloc_region]
-        | Local { alloc_region; region; ghost_region } ->
+        | Not_alloc_stack { alloc_region } -> [alloc_region]
+        | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
           [alloc_region; region; ghost_region]
       in
       List.fold_left
@@ -2189,8 +2189,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   let rebuild_body () =
     let region_vars =
       match (my_alloc_mode : Alloc_mode.For_applications.t) with
-      | Heap { alloc_region } -> [alloc_region]
-      | Local { alloc_region; region; ghost_region } ->
+      | Not_alloc_stack { alloc_region } -> [alloc_region]
+      | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
         [alloc_region; region; ghost_region]
     in
     let all_vars = region_vars @ (my_closure :: Bound_parameters.vars params) in

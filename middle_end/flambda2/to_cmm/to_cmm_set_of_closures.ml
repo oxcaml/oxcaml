@@ -502,8 +502,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let env, my_region_var, my_ghost_region_var =
     (* CR alloc_regions: my_alloc_region should be propagated as well. *)
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region = _ } -> env, None, None
-    | Local
+    | Not_alloc_stack { alloc_region = _ } -> env, None, None
+    | Maybe_alloc_stack
         { alloc_region = _; region = my_region; ghost_region = my_ghost_region }
       ->
       let my_region_duid = Flambda_debug_uid.none in

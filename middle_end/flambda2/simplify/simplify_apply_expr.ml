@@ -488,15 +488,18 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
          though it was with a local alloc_mode. *)
       let alloc_region =
         match Apply_expr.alloc_mode apply with
-        | Heap { alloc_region } | Local { alloc_region; _ } -> alloc_region
+        | Not_alloc_stack { alloc_region }
+        | Maybe_alloc_stack { alloc_region; _ } ->
+          alloc_region
       in
       Ok
-        ( Alloc_mode.For_applications.heap ~alloc_region,
+        ( Alloc_mode.For_applications.not_alloc_stack ~alloc_region,
           First_complex_local_param.Index (index - num_non_unarized_args) )
     | Index _ -> (
       match Apply_expr.alloc_mode apply with
-      | Heap _ -> (* This can happen in dead GADT match cases. *) Bottom
-      | Local _ as apply_alloc_mode ->
+      | Not_alloc_stack _ ->
+        (* This can happen in dead GADT match cases. *) Bottom
+      | Maybe_alloc_stack _ as apply_alloc_mode ->
         Ok (apply_alloc_mode, First_complex_local_param.Index 0))
     | Never_partially_applied ->
       Misc.fatal_errorf
@@ -516,11 +519,11 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       | Heap -> ()
       | Local -> (
         match (new_closure_alloc_mode : Alloc_mode.For_applications.t) with
-        | Local _ -> ()
-        | Heap _ ->
+        | Maybe_alloc_stack _ -> ()
+        | Not_alloc_stack _ ->
           Misc.fatal_errorf
-            "New closure alloc mode cannot be [Heap] when existing closure \
-             alloc mode is [Local]: direct partial application:@ %a"
+            "New closure alloc mode cannot be [Not_alloc_stack] when existing \
+             closure alloc mode is [Local]: direct partial application:@ %a"
             Apply.print apply));
       let result_mode = Code_metadata.result_mode callee's_code_metadata in
       let wrapper_taking_remaining_args, wrapper_alloc_mode, dacc, code_id, code
@@ -604,16 +607,18 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           | Some applied_callee -> applied_callee :: applied_unarized_args
         in
         let contains_no_escaping_local_allocs =
-          match result_mode with Alloc_heap -> true | Alloc_local -> false
+          match result_mode with
+          | Not_alloc_stack -> true
+          | Maybe_alloc_stack -> false
         in
         let my_closure = Variable.create "my_closure" K.value in
         let my_alloc_mode =
           if contains_no_escaping_local_allocs
           then
-            Alloc_mode.For_applications.heap
+            Alloc_mode.For_applications.not_alloc_stack
               ~alloc_region:(Variable.create "my_alloc_region" K.region)
           else
-            Alloc_mode.For_applications.local
+            Alloc_mode.For_applications.maybe_alloc_stack
               ~alloc_region:(Variable.create "my_alloc_region" K.region)
               ~region:(Variable.create "my_region" K.region)
               ~ghost_region:(Variable.create "my_ghost_region" K.region)
@@ -755,9 +760,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         in
         let new_closure_alloc_mode =
           match (new_closure_alloc_mode : Alloc_mode.For_applications.t) with
-          | Heap { alloc_region } ->
+          | Not_alloc_stack { alloc_region } ->
             Alloc_mode.For_allocations.heap ~alloc_region
-          | Local { alloc_region; region; ghost_region = _ } ->
+          | Maybe_alloc_stack { alloc_region; region; ghost_region = _ } ->
             Alloc_mode.For_allocations.local ~alloc_region ~region
         in
         ( Set_of_closures.create ~value_slots function_decls,

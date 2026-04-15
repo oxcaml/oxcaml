@@ -194,10 +194,10 @@ let alloc_mode_for_allocations env (alloc : Alloc_mode.For_allocations.t) :
 let alloc_mode_for_applications env (alloc : Alloc_mode.For_applications.t) :
     Fexpr.region Fexpr.alloc_mode_for_applications =
   match alloc with
-  | Heap { alloc_region } ->
+  | Not_alloc_stack { alloc_region } ->
     let alloc_region = Env.find_region_exn env alloc_region in
     Heap { alloc_region }
-  | Local { alloc_region; region; ghost_region } ->
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     let alloc_region = Env.find_region_exn env alloc_region in
     let region = Env.find_region_exn env region in
     let ghost_region = Env.find_region_exn env ghost_region in
@@ -472,10 +472,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
             let closure_var, env = Env.bind_var env my_closure in
             let (region_vars : _ Fexpr.alloc_mode_for_applications), env =
               match my_alloc_mode with
-              | Heap { alloc_region } ->
+              | Not_alloc_stack { alloc_region } ->
                 let alloc_region, env = Env.bind_var env alloc_region in
                 Heap { alloc_region }, env
-              | Local
+              | Maybe_alloc_stack
                   { alloc_region = my_alloc_region;
                     region = my_region;
                     ghost_region = my_ghost_region
@@ -502,8 +502,8 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       in
       let result_mode : Fexpr.alloc_mode_for_assignments =
         match Code.result_mode code with
-        | Alloc_heap -> Heap
-        | Alloc_local -> Local
+        | Not_alloc_stack -> Heap
+        | Maybe_alloc_stack -> Local
       in
       Code
         { id = code_id;

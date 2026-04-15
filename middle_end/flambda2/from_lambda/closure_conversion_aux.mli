@@ -77,7 +77,7 @@ module IR : sig
       region_close : Lambda.region_close;
       inlined : Lambda.inlined_attribute;
       probe : Lambda.probe;
-      mode : Lambda.locality_mode;
+      mode : Lambda.return_mode;
       region : Ident.t option;
       ghost_region : Ident.t option;
       alloc_region : Ident.t;
@@ -380,7 +380,7 @@ module Function_decls : sig
       Recursive.t ->
       closure_alloc_mode:Lambda.locality_mode ->
       first_complex_local_param:int ->
-      result_mode:Lambda.locality_mode ->
+      result_mode:Lambda.return_mode ->
       t
 
     val let_rec_ident : t -> Ident.t
@@ -441,7 +441,7 @@ module Function_decls : sig
 
     val first_complex_local_param : t -> int
 
-    val result_mode : t -> Lambda.locality_mode
+    val result_mode : t -> Lambda.return_mode
 
     (* Like [all_free_idents], but for just one function. *)
     val free_idents : t -> Ident.Set.t
