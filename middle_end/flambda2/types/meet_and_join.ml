@@ -544,21 +544,21 @@ let reduce_head_of_kind_naked_immediate env head : _ Or_bottom.t =
         { naked_immediates; inverse_relations }
 
 type 'a reverse_mapping_meet_return_value =
-  { left_inputs : 'a;
-    any_input : 'a meet_return_value;
-    right_inputs : 'a
+  { left_inputs_only : 'a;
+    meet_return_value : 'a meet_return_value;
+    right_inputs_only : 'a
   }
 
 let meet_inverse_relations inverse_relations1 inverse_relations2 =
   if inverse_relations1 == inverse_relations2
   then
-    { left_inputs = TG.Relation.Map.empty;
-      any_input = Both_inputs;
-      right_inputs = TG.Relation.Map.empty
+    { left_inputs_only = TG.Relation.Map.empty;
+      meet_return_value = Both_inputs;
+      right_inputs_only = TG.Relation.Map.empty
     }
   else
-    let left_inputs = ref TG.Relation.Map.empty in
-    let right_inputs = ref TG.Relation.Map.empty in
+    let left_inputs_only = ref TG.Relation.Map.empty in
+    let right_inputs_only = ref TG.Relation.Map.empty in
     let inverse_relations =
       TG.Relation.Map.merge
         (fun relation names1 names2 ->
@@ -568,25 +568,29 @@ let meet_inverse_relations inverse_relations1 inverse_relations2 =
           let right_input = Name.Set.diff names2 names1 in
           if not (Name.Set.is_empty left_input)
           then
-            left_inputs := TG.Relation.Map.add relation left_input !left_inputs;
+            left_inputs_only
+              := TG.Relation.Map.add relation left_input !left_inputs_only;
           if not (Name.Set.is_empty right_input)
           then
-            right_inputs
-              := TG.Relation.Map.add relation right_input !right_inputs;
+            right_inputs_only
+              := TG.Relation.Map.add relation right_input !right_inputs_only;
           Some (Name.Set.union names1 names2))
         inverse_relations1 inverse_relations2
     in
-    let any_input =
+    let meet_return_value =
       match
-        ( TG.Relation.Map.is_empty !left_inputs,
-          TG.Relation.Map.is_empty !right_inputs )
+        ( TG.Relation.Map.is_empty !left_inputs_only,
+          TG.Relation.Map.is_empty !right_inputs_only )
       with
       | true, true -> Both_inputs
       | false, true -> Left_input
       | true, false -> Right_input
       | false, false -> New_result inverse_relations
     in
-    { left_inputs = !left_inputs; any_input; right_inputs = !right_inputs }
+    { left_inputs_only = !left_inputs_only;
+      meet_return_value;
+      right_inputs_only = !right_inputs_only
+    }
 
 let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
   (* Kind mismatches should have been caught (either turned into Invalid or a
@@ -1223,15 +1227,15 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
         meet_inverse_relations descr1.inverse_relations descr2.inverse_relations
       in
       let head =
-        combine_meet_return_values naked_immediates inverse_relations.any_input
-          (fun () ->
+        combine_meet_return_values naked_immediates
+          inverse_relations.meet_return_value (fun () ->
             let naked_immediates =
               extract_value naked_immediates descr1.naked_immediates
                 descr2.naked_immediates
             in
             let inverse_relations =
-              extract_value inverse_relations.any_input descr1.inverse_relations
-                descr2.inverse_relations
+              extract_value inverse_relations.meet_return_value
+                descr1.inverse_relations descr2.inverse_relations
             in
             TG.Head_of_kind_naked_immediate.from_descr_non_empty
               { naked_immediates; inverse_relations })
@@ -1251,16 +1255,16 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
       | Left_input ->
         head_in_env_or_bottom
           (reduce_inverse_relations env descr1.naked_immediates
-             inverse_relations.right_inputs)
+             inverse_relations.right_inputs_only)
       | Right_input ->
         head_in_env_or_bottom
           (reduce_inverse_relations env descr2.naked_immediates
-             inverse_relations.left_inputs)
+             inverse_relations.left_inputs_only)
       | New_result naked_immediates ->
         head_in_env_or_bottom
           (reduce_inverse_relations env naked_immediates
-             (extract_value inverse_relations.any_input descr1.inverse_relations
-                descr2.inverse_relations))))
+             (extract_value inverse_relations.meet_return_value
+                descr1.inverse_relations descr2.inverse_relations))))
 
 and meet_head_of_kind_naked_float32 env t1 t2 =
   set_meet
@@ -2172,17 +2176,6 @@ and join_head_of_kind_naked_immediate env
     (head2 : TG.Head_of_kind_naked_immediate.t) :
     TG.Head_of_kind_naked_immediate.t Or_unknown.t =
   let module I = Target_ocaml_int in
-  let only_in_target_join_env inverse_relations =
-    TG.Relation.Map.filter_map
-      (fun _ names ->
-        let names' =
-          Name.Set.filter
-            (fun name -> TE.mem (Join_env.target_join_env env) name)
-            names
-        in
-        if Name.Set.is_empty names' then None else Some names')
-      inverse_relations
-  in
   match
     ( reduce_head_of_kind_naked_immediate (Join_env.left_join_env env) head1,
       reduce_head_of_kind_naked_immediate (Join_env.right_join_env env) head2 )
@@ -2192,12 +2185,7 @@ and join_head_of_kind_naked_immediate env
        some imprecision anyway; don't bother trying to do something more
        precise. This should be rare. *)
     Unknown
-  | Bottom, Ok head | Ok head, Bottom ->
-    let descr = TG.Head_of_kind_naked_immediate.descr head in
-    let inverse_relations = only_in_target_join_env descr.inverse_relations in
-    Known
-      (TG.Head_of_kind_naked_immediate.from_descr_non_empty
-         { descr with inverse_relations })
+  | Bottom, Ok head | Ok head, Bottom -> Known head
   | Ok head1, Ok head2 -> (
     let descr1 = TG.Head_of_kind_naked_immediate.descr head1 in
     let descr2 = TG.Head_of_kind_naked_immediate.descr head2 in
@@ -2213,7 +2201,6 @@ and join_head_of_kind_naked_immediate env
           Name.Set.inter names1 names2)
         descr1.inverse_relations descr2.inverse_relations
     in
-    let inverse_relations = only_in_target_join_env inverse_relations in
     match naked_immediates with
     | Unknown when TG.Relation.Map.is_empty inverse_relations -> Unknown
     | Unknown | Known _ ->

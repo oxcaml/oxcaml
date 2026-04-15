@@ -913,6 +913,8 @@ module Head_of_kind_naked_immediate : sig
   val create_naked_immediates : Target_ocaml_int.Set.t -> t Or_bottom.t
 
   val create_naked_immediates_non_empty : Target_ocaml_int.Set.t -> t
+
+  val create_inverse_relations : Name.Set.t Relation.Map.t -> t
 end
 
 module type Head_of_kind_naked_number_intf = sig

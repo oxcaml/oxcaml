@@ -70,6 +70,14 @@ module Relation : sig
 
   val descr : t -> descr
 end = struct
+  (* We use a slightly awkward separation between [t] (represented as an [int])
+     and [descr] (user-facing) so that we can use patricia trees for sets and
+     maps.
+
+     It's probably overkill for now, but expected to be useful when we add
+     support for more relations -- in particular, it gives access to efficient
+     [diff] and [union] implementations. *)
+
   type t = int
 
   let is_null = 0
@@ -3175,6 +3183,8 @@ and project_inverse_relations ~to_project ~expand inverse_relations =
                 else
                   match get_alias_opt (expand var) with
                   | None ->
+                    (* CR bclement: we should arguably update the set of known
+                       naked immediates based on the expanded type of [var]. *)
                     changed := true;
                     names
                   | Some simple ->
@@ -4596,6 +4606,9 @@ module Head_of_kind_naked_immediate = struct
       Misc.fatal_error
         "Head_of_kind_naked_immediates.create_naked_immediates_non_empty";
     Naked_immediates imms
+
+  let create_inverse_relations inverse_relations =
+    Inverse_relations inverse_relations
 end
 
 module Make_head_of_kind_naked_number (N : Container_types.S) = struct
