@@ -14,6 +14,8 @@ Globals used in quotations:
 Runtime parameters:
 	Monoid
 	Monoid_utils
+Static data:
+[ (missing); ]
 Flambda 2 unit with export information
 Currying functions: 2L0
 Apply functions:

@@ -40,6 +40,8 @@ Implementations imported:
 	00000000000000000000000000000000	Basic[P:P_string]
 	00000000000000000000000000000000	Basic[P:P_int]
 Globals used in quotations:
+Static data:
+[ (missing); ]
 Flambda 2 unit with export information
 Currying functions:
 Apply functions:

@@ -20,6 +20,8 @@ Interfaces imported:
 	00000000000000000000000000000000	CamlinternalFormatBasics
 Implementations imported:
 Globals used in quotations:
+Static data:
+[ (missing); ]
 Flambda 2 unit with export information
 Currying functions:
 Apply functions:
@@ -36,6 +38,8 @@ Interfaces imported:
 	00000000000000000000000000000000	CamlinternalFormatBasics
 Implementations imported:
 Globals used in quotations:
+Static data:
+[ (missing); ]
 Flambda 2 export information:
 Original unit: Question
 Typing env:

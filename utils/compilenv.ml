@@ -156,7 +156,7 @@ let equal_up_to_pack_prefix cu1 cu2 =
   CU.Name.equal (CU.name cu1) (CU.name cu2)
   && List.equal equal_args (CU.instance_arguments cu1) (CU.instance_arguments cu2)
 
-let ensure_unit_loaded comp_unit =
+let load_unit_infos ~warn_on_missing comp_unit =
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.ui_unit);
   if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
   then
@@ -189,12 +189,14 @@ let ensure_unit_loaded comp_unit =
             in
             (Some ui, Some crc)
           with Not_found ->
-            let warn =
-              Warnings.No_cmx_file
-                { missing_extension
-                ; module_name = Global_module.Name.to_string name }
-            in
-            Location.prerr_warning Location.none warn;
+            if warn_on_missing then begin
+              let warn =
+                Warnings.No_cmx_file
+                  { missing_extension
+                  ; module_name = Global_module.Name.to_string name }
+              in
+              Location.prerr_warning Location.none warn
+            end;
             (None, None)
           end
       in
@@ -203,6 +205,12 @@ let ensure_unit_loaded comp_unit =
       Infos_table.add global_infos_table name infos
     end
   end
+
+let ensure_unit_loaded comp_unit =
+  load_unit_infos ~warn_on_missing:true comp_unit
+
+let try_load_unit comp_unit =
+  load_unit_infos ~warn_on_missing:false comp_unit
 
 let get_cached_static_data comp_unit =
   if equal_up_to_pack_prefix comp_unit current_unit.ui_unit

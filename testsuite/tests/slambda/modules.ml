@@ -166,13 +166,13 @@ Warning 191 [unused-kind-declaration]: unused kind l.
             H =
               { c = (missing)
               ; r =
-                ⟪(apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 21]
-                   [0: [0]])⟫ }
+                ⟪(apply (field_imm 0 (global static CamlinternalMod!))
+                   [0: "" 12 21] [0: [0]])⟫ }
             I =
               { c = (missing)
               ; r =
-                ⟪(apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 35]
-                   [0: [0]])⟫ }
+                ⟪(apply (field_imm 0 (global static CamlinternalMod!))
+                   [0: "" 12 35] [0: [0]])⟫ }
             j =
               { c = (missing)
               ; r =
@@ -182,10 +182,12 @@ Warning 191 [unused-kind-declaration]: unused kind l.
                       (function {nlocal = 0} class
                         (function {nlocal = 0} env self[value<genarray>]
                           (opaque
-                            (apply (field_imm 23 (global CamlinternalOO!))
+                            (apply
+                              (field_imm 23 (global static CamlinternalOO!))
                               self class)))))
                    (opaque
-                     (apply (field_imm 18 (global CamlinternalOO!)) 0 j_init)))⟫ }
+                     (apply (field_imm 18 (global static CamlinternalOO!)) 0
+                       j_init)))⟫ }
             include = { c = H.c; r = ⟪H⟫ })
            [ a.c; D.c; E.c; F.c; H.c; I.c; j.c; ])
        ; r =
@@ -196,14 +198,16 @@ Warning 191 [unused-kind-declaration]: unused kind l.
                E = (makeblock_unique 248 "E" (caml_fresh_oo_id 0))
                F = (let (fa =[value<int>] two) (makeblock 0 fa))
                H =
-                 (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 21]
-                   [0: [0]])
+                 (apply (field_imm 0 (global static CamlinternalMod!))
+                   [0: "" 12 21] [0: [0]])
                I =
-                 (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 35]
-                   [0: [0]]))
+                 (apply (field_imm 0 (global static CamlinternalMod!))
+                   [0: "" 12 35] [0: [0]]))
               (seq
-                (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] H H)
-                (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] I I)
+                (apply (field_imm 1 (global static CamlinternalMod!))
+                  [0: [0]] H H)
+                (apply (field_imm 1 (global static CamlinternalMod!))
+                  [0: [0]] I I)
                 (let
                   (j =?
                      (let
@@ -213,10 +217,12 @@ Warning 191 [unused-kind-declaration]: unused kind l.
                             (function {nlocal = 0} env self[value<genarray>]
                               (opaque
                                 (apply
-                                  (field_imm 23 (global CamlinternalOO!))
+                                  (field_imm 23
+                                    (global static CamlinternalOO!))
                                   self class)))))
                        (opaque
-                         (apply (field_imm 18 (global CamlinternalOO!)) 0
+                         (apply
+                           (field_imm 18 (global static CamlinternalOO!)) 0
                            j_init)))
                    include =a H)
                   (makeblock 0 a D E F H I j)))))⟫ })
@@ -233,13 +239,16 @@ Warning 191 [unused-kind-declaration]: unused kind l.
              E = (makeblock_unique 248 "E" (caml_fresh_oo_id 0))
              F = (let (fa =[value<int>] two) (makeblock 0 fa))
              H =
-               (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 21]
-                 [0: [0]])
+               (apply (field_imm 0 (global static CamlinternalMod!))
+                 [0: "" 12 21] [0: [0]])
              I =
-               (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 35]
-                 [0: [0]]))
-            (seq (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] H H)
-              (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] I I)
+               (apply (field_imm 0 (global static CamlinternalMod!))
+                 [0: "" 12 35] [0: [0]]))
+            (seq
+              (apply (field_imm 1 (global static CamlinternalMod!)) [0: [0]]
+                H H)
+              (apply (field_imm 1 (global static CamlinternalMod!)) [0: [0]]
+                I I)
               (let
                 (j =?
                    (let
@@ -248,11 +257,13 @@ Warning 191 [unused-kind-declaration]: unused kind l.
                         (function {nlocal = 0} class
                           (function {nlocal = 0} env self[value<genarray>]
                             (opaque
-                              (apply (field_imm 23 (global CamlinternalOO!))
+                              (apply
+                                (field_imm 23
+                                  (global static CamlinternalOO!))
                                 self class)))))
                      (opaque
-                       (apply (field_imm 18 (global CamlinternalOO!)) 0
-                         j_init)))
+                       (apply (field_imm 18 (global static CamlinternalOO!))
+                         0 j_init)))
                  include =a H)
                 (makeblock 0 a D E F H I j))))))
      (field_imm 0 M))⟫ }

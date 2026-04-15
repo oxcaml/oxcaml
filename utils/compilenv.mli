@@ -83,6 +83,11 @@ val ensure_unit_loaded : Compilation_unit.t -> unit
         (* Load the .cmx file for the given compilation unit if not
            already cached, and record the import dependency. *)
 
+val try_load_unit : Compilation_unit.t -> unit
+        (* Like [ensure_unit_loaded] but does not emit warning 58 if the
+           .cmx file is not found. Used by the slambda evaluator where a
+           missing .cmx just means there is no static data available. *)
+
 val get_cached_static_data:
   Compilation_unit.t -> Slambda_types.value Slambda_types.Or_missing.t
 
