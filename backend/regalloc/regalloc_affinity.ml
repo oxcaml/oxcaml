@@ -124,7 +124,20 @@ let compute : Cfg_with_infos.t -> (Reg.t * Reg.t) list -> t =
       priorities;
     { classes; affinity }
 
-let get : t -> Reg.t -> affinity list =
+type affinities = affinity list ref
+
+let get : t -> Reg.t -> affinities =
  fun t reg ->
   let reg = Classes.find t.classes reg in
-  match Reg.Tbl.find_opt t.affinity reg with None -> [] | Some list -> list
+  let res =
+    match Reg.Tbl.find_opt t.affinity reg with None -> [] | Some list -> list
+  in
+  ref res
+
+let next : affinities -> affinity option =
+ fun aff ->
+  match !aff with
+  | [] -> None
+  | hd :: tl ->
+    aff := tl;
+    Some hd

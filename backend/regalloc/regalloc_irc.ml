@@ -338,14 +338,15 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
         !first_avail
       in
       (* returns the index of the first available physical register in the
-         passed affinity list *)
-      let rec get_available = function
-        | [] -> get_first_available ()
-        | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
+         passed affinities *)
+      let rec get_available aff =
+        match Regalloc_affinity.next aff with
+        | None -> get_first_available ()
+        | Some { Regalloc_affinity.priority = _; phys_reg } ->
           let idx = Regs.index_in_class phys_reg in
           if idx >= 0 && idx < reg_num_avail && Array.unsafe_get ok_colors idx
           then idx
-          else get_available tl
+          else get_available aff
       in
       let rec mark_adjacent_colors_and_get_available (adj : Reg.t list) : int =
         match adj with
