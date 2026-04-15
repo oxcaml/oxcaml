@@ -19,6 +19,10 @@ let transl_locality_mode = function
   | Locality.Const.Global -> alloc_heap
   | Locality.Const.Local -> alloc_local
 
+let transl_ret_mode = function
+  | Locality.Const.Global -> not_alloc_stack
+  | Locality.Const.Local -> maybe_alloc_stack
+
 let transl_locality_mode_l locality =
   Locality.zap_to_floor locality |> transl_locality_mode
 
@@ -36,6 +40,9 @@ let transl_alloc_mode_r mode =
   Alloc.proj_comonadic Areality mode |> transl_locality_mode_r
 
 let transl_alloc_mode (mode : Typedtree.alloc_mode) = transl_alloc_mode_r mode
+
+let transl_ret_mode mode =
+  Alloc.proj_comonadic Areality mode |> Locality.zap_to_floor |> transl_ret_mode
 
 let transl_modify_mode locality =
   match Locality.zap_to_floor locality with
