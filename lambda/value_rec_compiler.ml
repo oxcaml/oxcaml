@@ -251,17 +251,13 @@ let compute_static_size lam =
             Block (Float_record size)
         | Record_inlined (_, Constructor_mixed shape,
                           (Variant_boxed _ | Variant_extensible))
-          when Mixed_product_bytes.types_shape_is_all_value shape ->
-            Block (Regular_block
-              (all_value_mixed_block_size_types shape))
-        | Record_mixed shape
-          when Mixed_product_bytes.types_shape_is_all_value shape ->
-            Block (Regular_block
-              (all_value_mixed_block_size_types shape))
-        | Record_inlined (_, Constructor_mixed shape,
-                          (Variant_boxed _ | Variant_extensible))
         | Record_mixed shape ->
-            Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
+            if Mixed_product_bytes.types_shape_is_all_value shape
+            then
+              Block (Regular_block
+                (all_value_mixed_block_size_types shape))
+            else
+              Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"

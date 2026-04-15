@@ -2094,22 +2094,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         Naked_floats
           { length = Target_ocaml_int.of_int machine_width num_fields }
       | Record_inlined
-          (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
+          ( Ordinary { runtime_tag; _ },
+            Constructor_mixed shape,
+            Variant_boxed _ )
         when Mixed_product_bytes.types_shape_is_all_value shape ->
-        let num_fields =
-          Mixed_product_bytes.value_prefix_len
-            (Mixed_product_bytes.count_types_shape shape)
-        in
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
       | Record_mixed shape
         when Mixed_product_bytes.types_shape_is_all_value shape ->
-        let num_fields =
-          Mixed_product_bytes.value_prefix_len
-            (Mixed_product_bytes.count_types_shape shape)
-        in
         Values
           { tag = Tag.Scannable.zero;
             length = Target_ocaml_int.of_int machine_width num_fields
