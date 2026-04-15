@@ -2237,9 +2237,11 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  be supported in bytecode. See symtable.ml for the difficulty.
               *)
               raise Not_constant
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+        | Record_inlined
+            (Ordinary { runtime_tag; _ }, Constructor_mixed shape,
+             Variant_boxed _)
           when Mixed_product_bytes.types_shape_is_all_value shape ->
-            Lconst(Const_block(0, cl))
+            Lconst(Const_block(runtime_tag, cl))
         | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
         | Record_ufloat ->
             (* CR layouts v5.1: We should support structured constants for
