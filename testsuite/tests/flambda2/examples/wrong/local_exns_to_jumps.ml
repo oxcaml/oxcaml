@@ -37,6 +37,8 @@ let f1 x g =
   with Exit -> 42
 
 (* Should not be converted: 1. raise not raise_notrace *)
+(* Wrong result: without -g, [raise] gets converted to [raise_notrace]
+   so the exception handler gets converted. *)
 let f2 x g =
   let r = ref x in
   try

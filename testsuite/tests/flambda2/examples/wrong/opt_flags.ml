@@ -26,6 +26,10 @@
  * - -O2: 85 199 1
  * - -O3: 85 199 3403 *)
 
+(* Wrong result: the last field is simplified away even with the default
+   arguments because the local function optimisation applies on functors
+   (and cannot be disabled with an attribute). *)
+
 module M : sig
   val x : int
 

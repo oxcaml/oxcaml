@@ -6,6 +6,9 @@
  check-fexpr-dump;
 *)
 
+(* Wrong result: the last allocation of [Foo v] is not simplified by CSE.
+   This works with `-O2` though (it only needs a proper join). *)
+
 type 'a foo = Foo of 'a
 
 let[@inline never] id lam = lam

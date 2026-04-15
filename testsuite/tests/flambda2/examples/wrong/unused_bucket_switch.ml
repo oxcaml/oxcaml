@@ -8,8 +8,11 @@
 
 (* The Failure exception raised by failwith is never used, so its symbol should
    disappear; however the Apply_cont corresponding to the raise must be
-   rewritten to use a summy argument instead. This test creates a case where the
+   rewritten to use a dummy argument instead. This test creates a case where the
    rewriting needs to apply in a switch arm instead of a regular Apply_cont. *)
+
+(* Wrong result: [failwith] uses reraise instead of raise_notrace,
+   so the exception cannot disappear. *)
 
 let[@inline never] opaque x = x
 

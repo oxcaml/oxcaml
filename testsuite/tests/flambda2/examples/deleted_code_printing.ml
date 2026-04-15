@@ -7,10 +7,9 @@
 *)
 
 (* This example shows a case where the generated program starts with a sequence
-   of deleted code bindings, then a variable, then the rest of the program. This
-   caused a bug when printing the result if deleted bindings are not printed, as
-   the printer expects all sequences of symbol/code bindings to include at least
-   one printable element. *)
+   of deleted code bindings, then a variable, then the rest of the program.
+   This used to cause a bug when printing, which this test doesn't try
+   to catch, but the pattern seems interesting enough to keep the test. *)
 type t = { mutable foo : int }
 
 let env = { foo = 42 }

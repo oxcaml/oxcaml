@@ -9,8 +9,8 @@
 let do_stuff env = assert false
 
 let stuff env =
-  (* r fails to be removed right now because the call to do_stuff
-     unconditionnaly use its extra arg for data_flow *)
+  (* The call to [do_stuff] used to prevent data_flow from
+     seeing that [r] is unused *)
   let r = ref None in
   for i = 0 to 3 do
     try
