@@ -995,8 +995,7 @@ Lines 13-14, characters 24-19:
 13 | ........................match x with
 14 |   | M1.Int -> "int"
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-K
+  Here is an example of a case that is not matched: "K"
 
 val f1 : int M1.t -> string = <fun>
 |}]
