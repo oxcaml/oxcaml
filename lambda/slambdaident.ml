@@ -59,6 +59,8 @@ let compare i1 i2 =
   | _, Local _ -> -1
   | Ident i1, Ident i2 -> Ident.compare i1 i2
 
+let name = function Local { name; _ } -> name | Ident i -> Ident.name i
+
 let output oc =
   let open Format in
   function

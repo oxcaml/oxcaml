@@ -32,7 +32,7 @@ type value_halves = Slambda_types.halves =
 
 let eval inspect_slambda template_lam =
   Profile.record_call "slambda_eval" (fun () ->
-      let halves =
+      let _store, halves =
         Slambda_fracture.fracture template_lam
         |> inspect_slambda |> Slambdaeval.eval
       in

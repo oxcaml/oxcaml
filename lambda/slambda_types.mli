@@ -11,6 +11,7 @@ module Or_missing : sig
   end
 end
 
+type template_id
 type env
 
 type closure =
@@ -28,7 +29,7 @@ and value =
   | SLVhalves of halves
   | SLVlayout of layout
   | SLVrecord of value Or_missing.t array
-  | SLVclosure of closure
+  | SLVclosure of template_id
 
 
 val print_value : Format.formatter -> value -> unit
@@ -49,4 +50,28 @@ module Env : sig
   val add_present : t -> Slambdaident.t -> value -> t
 
   val find : t -> Slambdaident.t -> value Or_missing.t
+end
+
+
+module Templates : sig
+  type id = template_id
+
+  type templates
+
+  type t
+
+  val empty : unit -> t
+
+  val add : t -> name:Slambdaident.t option -> closure -> id
+
+  val instantiate :
+    t ->
+    id ->
+    value array ->
+    (closure -> value array -> value Or_missing.t) ->
+    value Or_missing.t
+
+  val templates : t -> templates
+
+  val instantiations : t -> (Ident.t * lambda) list
 end

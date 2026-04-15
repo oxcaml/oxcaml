@@ -38,7 +38,7 @@ module rec Types : sig
     | SLVhalves of halves
     | SLVlayout of layout
     | SLVrecord of value Or_missing.t array
-    | SLVclosure of closure
+    | SLVclosure of Templates.id
 end =
   Types
 
@@ -69,6 +69,67 @@ end = struct
   let find t id = Map.find_opt id t |> Or_missing.of_option
 end
 
+and Templates : sig
+  type id
+
+  type templates
+
+  type t
+
+  val empty : unit -> t
+
+  val add : t -> name:Slambdaident.t option -> Types.closure -> id
+
+  val instantiate :
+    t ->
+    id ->
+    Types.value array ->
+    (Types.closure -> Types.value array -> Types.value Or_missing.t) ->
+    Types.value Or_missing.t
+
+  val templates : t -> templates
+
+  val instantiations : t -> (Ident.t * lambda) list
+
+  val print_id : Format.formatter -> id -> unit
+end = struct
+  type id = string
+
+  type templates = Types.closure Misc.Stdlib.String.Tbl.t
+
+  type t =
+    { templates : templates;
+      instantiations : lambda Ident.Tbl.t
+    }
+
+  let stamp = ref 0
+
+  let empty () = {
+    templates = Misc.Stdlib.String.Tbl.create 10;
+    instantiations = Ident.Tbl.create 10 }
+
+  let add t ~name closure =
+    let id =
+      match name with
+      | Some name -> Format.sprintf "%s_%i" (Slambdaident.name name) !stamp
+      | None -> string_of_int !stamp
+    in
+    incr stamp;
+    Misc.Stdlib.String.Tbl.add t.templates id closure;
+    id
+
+  let instantiate t closure_id args f =
+    let closure = Misc.Stdlib.String.Tbl.find t.templates closure_id in
+    f closure args
+
+  let templates t = t.templates
+
+  let instantiations t = Ident.Tbl.to_list t.instantiations
+
+  let print_id = Format.pp_print_string
+end
+
+type template_id = Templates.id
 type env = Env.t
 
 include Types
@@ -85,7 +146,7 @@ let rec print_value ppf = function
         fields
     in
     fprintf ppf "@[<hv 2>[@ %t]@]" print_fields
-  | SLVclosure c -> print_closure ppf c
+  | SLVclosure c -> Templates.print_id ppf c
 
 and print_halves ppf { slv_comptime; slv_runtime } =
   fprintf ppf "@[<hv>@[<2>{ c =@ %a@]@,@[<2>; r =@ ⟪%a⟫@] }@]"

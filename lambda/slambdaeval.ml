@@ -35,7 +35,7 @@ type _ value_type =
   | Thalves : halves value_type
   | Tlayout : layout value_type
   | Trecord : value Or_missing.t array value_type
-  | Tclosure : closure value_type
+  | Tclosure : Templates.id value_type
 
 let describe_value_type (type a) : a value_type -> string = function
   | Thalves -> "program"
@@ -75,11 +75,11 @@ let expect (type a) ?reason (vty : a value_type) (v : value) : a =
 let expect_not_missing (a : 'a Or_missing.t) : 'a =
   match a with Present a -> a | Missing -> errf "unexpected missing value"
 
-let rec eval_slam env slam : value Or_missing.t =
+let rec eval_slam store ?name env slam : value Or_missing.t =
   match slam with
   | SLhalves { sval_comptime; sval_runtime } ->
-    let slv_comptime = eval_slam env sval_comptime in
-    let slv_runtime = eval_lam env sval_runtime in
+    let slv_comptime = eval_slam store env sval_comptime in
+    let slv_runtime = eval_lam store env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
   | SLlayout layout -> Present (SLVlayout layout)
   | SLglobal cu ->
@@ -87,40 +87,43 @@ let rec eval_slam env slam : value Or_missing.t =
     Compilenv.get_cached_static_data cu
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
-    let value = eval_slam env slet_value in
+    let value = eval_slam store ~name:slet_name env slet_value in
     let env_body = Env.add env slet_name value in
-    eval_slam env_body slet_body
+    eval_slam store env_body slet_body
   | SLmissing -> Missing
   | SLrecord slams ->
-    let values = Array.map (eval_slam env) (Array.of_list slams) in
+    let values = Array.map (eval_slam store env) (Array.of_list slams) in
     Present (SLVrecord values)
   | SLfield (slam, i) ->
-    let* fields = eval_slam env slam |>> expect Trecord in
+    let* fields = eval_slam store env slam |>> expect Trecord in
     fields.(i)
   | SLproj_comptime slam ->
-    let* halves = eval_slam env slam |>> expect Thalves in
+    let* halves = eval_slam store env slam |>> expect Thalves in
     halves.slv_comptime
   | SLtemplate { sfun_params; sfun_body } ->
-    Present
-      (SLVclosure
-         { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
+    let closure =
+      { clo_params = sfun_params; clo_body = sfun_body; clo_env = env }
+    in
+    let closure_id = Templates.add store ~name closure in
+    Present (SLVclosure closure_id)
   | SLinstantiate { sapp_func; sapp_args } ->
     let closure =
-      eval_slam env sapp_func |> expect_not_missing |> expect Tclosure
+      eval_slam store env sapp_func |> expect_not_missing |> expect Tclosure
     in
-    let eval_arg arg = eval_slam env arg |> expect_not_missing in
+    let eval_arg arg = eval_slam store env arg |> expect_not_missing in
     let args = Array.map eval_arg sapp_args in
-    let { clo_params; clo_body; clo_env } = closure in
-    let env_body =
-      Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
-    in
-    eval_slam env_body clo_body
+    Templates.instantiate store closure args
+      (fun { clo_params; clo_body; clo_env } args ->
+        let env_body =
+          Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+        in
+        eval_slam store env_body clo_body)
 
 and eval_var env id = Env.find env id
 
-and eval_lam env lam = Lambda.map (eval_lam_shallow env) lam
+and eval_lam store env lam = Lambda.map (eval_lam_shallow store env) lam
 
-and eval_lam_shallow env lam =
+and eval_lam_shallow store env lam =
   match lam with
   | Lconst old_const ->
     let new_const = eval_structured_const env old_const in
@@ -220,7 +223,9 @@ and eval_lam_shallow env lam =
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then lam else Lregion (body, new_layout)
   | Lsplice (_loc, slam) ->
-    let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
+    let halves =
+      eval_slam store env slam |> expect_not_missing |> expect Thalves
+    in
     halves.slv_runtime
   | Ltemplate _ | Linstantiate _ ->
     (* These constructors only exist in tlambda, fracturing has removed them
@@ -521,14 +526,19 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   Lambda.iter_head_constructor assert_no_splices lam
 
 let do_eval slam =
-  eval_slam Env.empty slam |> expect_not_missing
-  |> expect Thalves ~reason:"toplevel module"
+  let store = Templates.empty () in
+  let halves =
+    eval_slam store Env.empty slam
+    |> expect_not_missing
+    |> expect Thalves ~reason:"toplevel module"
+  in
+  store, halves
 
 let eval slam =
   Profile.record_call "static_eval" (fun () ->
-      let halves = do_eval slam in
+      let store, halves = do_eval slam in
       (try assert_no_splices halves.slv_runtime
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
-      halves)
+      store, halves)

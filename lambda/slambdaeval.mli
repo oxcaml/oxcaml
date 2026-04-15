@@ -26,5 +26,6 @@
  ******************************************************************************)
 
 open Lambda
+open Slambda_types
 
-val eval : slambda -> Slambda_types.halves
+val eval : slambda -> Templates.t * halves
