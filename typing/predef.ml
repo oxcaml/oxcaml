@@ -539,7 +539,19 @@ let list_argument_sort = Jkind_types.Sort.Const.value
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
-<<<<<<< HEAD
+let predef_jkinds =
+  List.map
+    (fun (builtin : Jkind.Const.Builtin.t) ->
+       ident_create builtin.name, builtin.jkind)
+    Jkind.Const.Builtin.builtins
+
+let all_predef_jkinds = List.map fst predef_jkinds
+
+let add_predef_jkinds add_jkind env =
+  List.fold_left
+    (fun env (id, jkind) -> add_jkind id jkind env) env
+    predef_jkinds
+
 let or_null_argument_sort = Jkind_types.Sort.Const.value
 
 let or_null_jkind param =
@@ -563,38 +575,6 @@ let decl_of_type_constr tconstr =
       ?(unboxed_jkind : Jkind.Const.Builtin.t option)
       ()
     =
-||||||| f8c6716f8c
-let mk_add_type add_type =
-  let add_type_with_jkind
-      ?manifest type_ident
-      ?(kind=Type_abstract Definition)
-      ~jkind
-      ?unboxed_jkind
-      env =
-    let type_uid = Uid.of_predef_id type_ident in
-=======
-let predef_jkinds =
-  List.map
-    (fun (builtin : Jkind.Const.Builtin.t) ->
-       ident_create builtin.name, builtin.jkind)
-    Jkind.Const.Builtin.builtins
-
-let all_predef_jkinds = List.map fst predef_jkinds
-
-let add_predef_jkinds add_jkind env =
-  List.fold_left
-    (fun env (id, jkind) -> add_jkind id jkind env) env
-    predef_jkinds
-
-let mk_add_type add_type =
-  let add_type_with_jkind
-      ?manifest type_ident
-      ?(kind=Type_abstract Definition)
-      ~jkind
-      ?unboxed_jkind
-      env =
-    let type_uid = Uid.of_predef_id type_ident in
->>>>>>> 5.2.0minus-31
     let type_unboxed_version = match unboxed_jkind with
       | None -> None
       | Some unboxed_jkind ->
@@ -672,7 +652,6 @@ let mk_add_type add_type =
       type_separability = [sep1; sep2];
     }
   in
-<<<<<<< HEAD
   let variant constrs =
     let mk_elt { cd_args } =
       let sorts = match cd_args with
@@ -682,118 +661,12 @@ let mk_add_type add_type =
           Misc.Stdlib.Array.of_list_map (fun { ld_sort } -> ld_sort) lbls
       in
       Constructor_uniform_value, sorts
-||||||| f8c6716f8c
-  add_type type_ident decl env
-
-let mk_add_extension add_extension id args =
-  List.iter (fun (_, sort) ->
-      let raise_error () = Misc.fatal_error
-          "sanity check failed: non-value jkind in predef extension \
-            constructor; should this have Constructor_mixed shape?" in
-      match (sort : Jkind_types.Sort.Const.t) with
-      | Base Value -> ()
-      | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
-             Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
-      | Univar _ | Product _ -> raise_error ())
-    args;
-  add_extension id
-    { ext_type_path = path_exn;
-      ext_type_params = [];
-      ext_args =
-        Cstr_tuple
-          (List.map
-            (fun (ca_type, ca_sort) ->
-              {
-                ca_type;
-                ca_sort;
-                ca_modalities=Mode.Modality.Const.id;
-                ca_loc=Location.none
-              })
-            args);
-      ext_shape = Constructor_uniform_value;
-      ext_constant = args = [];
-      ext_ret_type = None;
-      ext_private = Asttypes.Public;
-      ext_loc = Location.none;
-      ext_attributes = [Ast_helper.Attr.mk
-                          (Location.mknoloc "ocaml.warn_on_literal_pattern")
-                          (Parsetree.PStr [])];
-      ext_uid = Uid.of_predef_id id;
-    }
-
-let variant constrs =
-  let mk_elt { cd_args } =
-    let sorts = match cd_args with
-      | Cstr_tuple args ->
-        Misc.Stdlib.Array.of_list_map (fun { ca_sort } -> ca_sort) args
-      | Cstr_record lbls ->
-        Misc.Stdlib.Array.of_list_map (fun { ld_sort } -> ld_sort) lbls
-=======
-  add_type type_ident decl env
-
-let mk_add_extension add_extension id args =
-  List.iter (fun (_, sort) ->
-      let raise_error () = Misc.fatal_error
-          "sanity check failed: non-value jkind in predef extension \
-            constructor; should this have Constructor_mixed shape?" in
-      match (sort : Jkind_types.Sort.Const.t) with
-      | Base Value -> ()
-      | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
-             Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
-      | Univar _ | Product _ -> raise_error ())
-    args;
-  add_extension id
-    { ext_type_path = path_exn;
-      ext_type_params = [];
-      ext_args =
-        Cstr_tuple
-          (List.map
-            (fun (ca_type, ca_sort) ->
-              {
-                ca_type;
-                ca_sort;
-                ca_modalities=Mode.Modality.Const.id;
-                ca_loc=Location.none
-              })
-            args);
-      ext_shape = Constructor_uniform_value;
-      ext_constant = args = [];
-      ext_ret_type = None;
-      ext_private = Asttypes.Public;
-      ext_loc = Location.none;
-      ext_attributes = [Ast_helper.Attr.mk
-                          (Location.mknoloc "ocaml.warn_on_literal_pattern")
-                          (Parsetree.PStr [])];
-      ext_uid = Uid.of_predef_id id;
-    }
-
-let mk_add_jkind add_jkind =
-  let add_jkind id jkind env =
-    let decl =
-      { jkind_manifest = Some jkind;
-        jkind_attributes = [];
-        jkind_uid = Uid.of_predef_id id;
-        jkind_loc = Location.none }
-    in
-    add_jkind id decl env
-  in
-  add_jkind
-
-let variant constrs =
-  let mk_elt { cd_args } =
-    let sorts = match cd_args with
-      | Cstr_tuple args ->
-        Misc.Stdlib.Array.of_list_map (fun { ca_sort } -> ca_sort) args
-      | Cstr_record lbls ->
-        Misc.Stdlib.Array.of_list_map (fun { ld_sort } -> ld_sort) lbls
->>>>>>> 5.2.0minus-31
     in
     Type_variant (
       constrs,
       Variant_boxed (Misc.Stdlib.Array.of_list_map mk_elt constrs),
       None)
   in
-<<<<<<< HEAD
   let builtin jkind = Jkind.of_builtin ~why:(Primitive type_ident) jkind in
   let builtin1 jkind _param1 = builtin jkind in
   let builtin2 jkind _param1 _param2 = builtin jkind in
@@ -873,59 +746,6 @@ let variant constrs =
       ~jkind:(builtin2 Jkind.Const.Builtin.value) ()
   | `Array ->
     decl1 ~variance:Variance.full ~param_jkind:Jkind.for_array_argument
-||||||| f8c6716f8c
-  Type_variant (
-    constrs,
-    Variant_boxed (Misc.Stdlib.Array.of_list_map mk_elt constrs),
-    None)
-
-let unrestricted tvar ca_sort =
-  {ca_type=tvar;
-   ca_sort;
-   ca_modalities=Mode.Modality.Const.id;
-   ca_loc=Location.none}
-
-(* CR layouts: Changes will be needed here as we add support for the built-ins
-   to work with non-values, and as we relax the mixed block restriction. *)
-let build_initial_env add_type add_extension empty_env =
-  let add_type_with_jkind, add_type = mk_add_type add_type
-  and add_type1 = mk_add_type1 add_type
-  and add_type2 = mk_add_type2 add_type
-  and add_extension = mk_add_extension add_extension in
-  empty_env
-  (* Predefined types *)
-  |> add_type1 ident_array
-       ~variance:Variance.full
-       ~separability:Separability.Ind
-       ~param_jkind:Jkind.for_array_argument
-=======
-  Type_variant (
-    constrs,
-    Variant_boxed (Misc.Stdlib.Array.of_list_map mk_elt constrs),
-    None)
-
-let unrestricted tvar ca_sort =
-  {ca_type=tvar;
-   ca_sort;
-   ca_modalities=Mode.Modality.Const.id;
-   ca_loc=Location.none}
-
-(* CR layouts: Changes will be needed here as we add support for the built-ins
-   to work with non-values, and as we relax the mixed block restriction. *)
-let build_initial_env add_type add_extension add_jkind empty_env =
-  let add_type_with_jkind, add_type = mk_add_type add_type
-  and add_type1 = mk_add_type1 add_type
-  and add_type2 = mk_add_type2 add_type
-  and add_extension = mk_add_extension add_extension
-  and add_jkind = mk_add_jkind add_jkind
-  in
-  empty_env
-  (* Predefined types *)
-  |> add_type1 ident_array
-       ~variance:Variance.full
-       ~separability:Separability.Ind
-       ~param_jkind:Jkind.for_array_argument
->>>>>>> 5.2.0minus-31
        ~jkind:(fun param ->
          Jkind.Builtin.mutable_data ~why:(Primitive ident_array) |>
          Jkind.add_with_bounds
@@ -1149,7 +969,20 @@ let build_initial_env add_type add_extension add_jkind empty_env =
       ~jkind:or_null_jkind
       ()
 
-let build_initial_env add_type add_extension empty_env =
+let mk_add_jkind add_jkind =
+  let add_jkind id jkind env =
+    let decl =
+      { jkind_manifest = Some jkind;
+        jkind_attributes = [];
+        jkind_uid = Uid.of_predef_id id;
+        jkind_loc = Location.none }
+    in
+    add_jkind id decl env
+  in
+  add_jkind
+
+let build_initial_env add_type add_extension add_jkind empty_env =
+  let add_jkind = mk_add_jkind add_jkind in
   let add_extension id l =
     List.iter (fun (_, sort) ->
         let raise_error () = Misc.fatal_error
@@ -1212,17 +1045,13 @@ let build_initial_env add_type add_extension empty_env =
   |> add_extension ident_undefined_recursive_module
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
        Jkind_types.Sort.Const.value]
-<<<<<<< HEAD
   |> add_extension ident_continuation_already_taken []
+  (* Predefined jkinds *)
+  |> add_predef_jkinds add_jkind
 
 let add_or_null add_type env =
   let tconstr = `Or_null in
   add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
-||||||| f8c6716f8c
-=======
-  (* Predefined jkinds *)
-  |> add_predef_jkinds add_jkind
->>>>>>> 5.2.0minus-31
 
 let add_simd_stable_extension_types add_type env =
   List.fold_left (fun env tconstr ->

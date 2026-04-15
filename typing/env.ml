@@ -4871,37 +4871,12 @@ let pp_path ppf l = !print_path ppf l
 let print_type_expr : Types.type_expr printer ref =
   ref (fun _ _ -> assert false)
 
-<<<<<<< HEAD
 let report_jkind_violation_with_offender =
   ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
        : offender:(Format_doc.formatter -> unit) ->
          level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit)
 
 module Style = Misc.Style
-||||||| f8c6716f8c
-let report_jkind_violation_with_offender =
-  ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
-       : offender:(Format_doc.formatter -> unit) ->
-         level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit)
-
-let spellcheck ppf extract env lid =
-  let choices ~path name = Misc.spellcheck (extract path env) name in
-  match lid with
-    | Longident.Lapply _ -> ()
-    | Longident.Lident s ->
-       Misc.did_you_mean ppf (fun () -> choices ~path:None s)
-    | Longident.Ldot (r, s) ->
-       Misc.did_you_mean ppf (fun () -> choices ~path:(Some r) s)
-=======
-let spellcheck ppf extract env lid =
-  let choices ~path name = Misc.spellcheck (extract path env) name in
-  match lid with
-    | Longident.Lapply _ -> ()
-    | Longident.Lident s ->
-       Misc.did_you_mean ppf (fun () -> choices ~path:None s)
-    | Longident.Ldot (r, s) ->
-       Misc.did_you_mean ppf (fun () -> choices ~path:(Some r) s)
->>>>>>> 5.2.0minus-31
 
 let quoted_longident = Style.as_inline_code Pprintast.Doc.longident
 let quoted_constr = Style.as_inline_code Pprintast.Doc.constr
@@ -5125,23 +5100,13 @@ let report_lookup_error_doc loc env = function
            ]
       end
   | Unbound_cltype lid ->
-<<<<<<< HEAD
      Location.aligned_error_hint ~loc
        "@{<ralign>Unbound class type @}%a" quoted_longident lid
       (spellcheck extract_cltypes env lid)
-||||||| f8c6716f8c
-      fprintf ppf "Unbound class type %a"
-        quoted_longident lid;
-      spellcheck ppf extract_cltypes env lid
-=======
-      fprintf ppf "Unbound class type %a"
-        quoted_longident lid;
-      spellcheck ppf extract_cltypes env lid
   | Unbound_jkind lid ->
       fprintf ppf "Unbound kind %a"
         (Style.as_inline_code !print_longident) lid;
       spellcheck ppf extract_jkinds env lid
->>>>>>> 5.2.0minus-31
   | Unbound_settable_variable s ->
         Location.aligned_error_hint ~loc
           "@{<ralign>Unbound instance variable or mutable variable @}%a"
@@ -5253,13 +5218,7 @@ let report_lookup_error_doc loc env = function
         quoted_longident lid
         (fun v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
-<<<<<<< HEAD
-           ~level:Btype.generic_level v)
-||||||| f8c6716f8c
-           ~level v)
-=======
-           ~level env v)
->>>>>>> 5.2.0minus-31
+           ~level:Btype.generic_level env v)
         err
   | No_unboxed_version (lid, decl) ->
       let sub =

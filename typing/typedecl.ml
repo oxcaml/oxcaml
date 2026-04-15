@@ -4691,17 +4691,9 @@ let report_error ~loc = function
       in
       begin match List.find_map get_jkind_error err.trace with
       | Some (ty, violation) ->
-<<<<<<< HEAD
         Location.errorf ~loc "%t" (fun ppf ->
-          report_jkind_mismatch_due_to_bad_inference ppf ty violation
+          report_jkind_mismatch_due_to_bad_inference ppf env ty violation
             Check_constraints)
-||||||| f8c6716f8c
-        report_jkind_mismatch_due_to_bad_inference ppf ty violation
-          Check_constraints
-=======
-        report_jkind_mismatch_due_to_bad_inference ppf env ty violation
-          Check_constraints
->>>>>>> 5.2.0minus-31
       | None ->
       Location.errorf ~loc "Constraints are not satisfied in this type.@\n%t"
         (fun ppf ->
@@ -4710,17 +4702,10 @@ let report_error ~loc = function
             (Doc.msg "should be an instance of")
         )
       end
-<<<<<<< HEAD
-  | Jkind_mismatch_due_to_bad_inference (ty, violation, jkind_loc) ->
+  | Jkind_mismatch_due_to_bad_inference (env, ty, violation, jkind_loc) ->
       Location.errorf ~loc "%t" (fun ppf ->
-        report_jkind_mismatch_due_to_bad_inference ppf ty violation jkind_loc)
-||||||| f8c6716f8c
-  | Jkind_mismatch_due_to_bad_inference (ty, violation, loc) ->
-      report_jkind_mismatch_due_to_bad_inference ppf ty violation loc
-=======
-  | Jkind_mismatch_due_to_bad_inference (env, ty, violation, loc) ->
-      report_jkind_mismatch_due_to_bad_inference ppf env ty violation loc
->>>>>>> 5.2.0minus-31
+        report_jkind_mismatch_due_to_bad_inference ppf env ty violation
+          jkind_loc)
   | Non_regular { definition; used_as; defined_as; reaching_path } ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Out_type.prepare_for_printing [used_as; defined_as];
@@ -4870,36 +4855,16 @@ let report_error ~loc = function
       in
       fprintf ppf "type %a" Style.inline_code path_end
     in
-<<<<<<< HEAD
     Location.errorf ~loc "%t" (fun ppf ->
       Jkind.Violation.report_with_offender ~offender
-        ~level:(Ctype.get_current_level ()) ppf v)
-  | Jkind_mismatch_of_type (ty,v) ->
-||||||| f8c6716f8c
-    Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) ppf v
-  | Jkind_mismatch_of_type (ty,v) ->
-=======
-    Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) env ppf v
+        ~level:(Ctype.get_current_level ()) env ppf v)
   | Jkind_mismatch_of_type (env, ty, v) ->
->>>>>>> 5.2.0minus-31
     let offender ppf = fprintf ppf "type %a"
         (Style.as_inline_code Printtyp.type_expr) ty in
-<<<<<<< HEAD
     Location.errorf ~loc "%t" (fun ppf ->
       Jkind.Violation.report_with_offender ~offender
-        ~level:(Ctype.get_current_level ()) ppf v)
-  | Jkind_sort {kloc; typ; err} ->
-||||||| f8c6716f8c
-    Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) ppf v
-  | Jkind_sort {kloc; typ; err} ->
-=======
-    Jkind.Violation.report_with_offender ~offender
-      ~level:(Ctype.get_current_level ()) env ppf v
+        ~level:(Ctype.get_current_level ()) env ppf v)
   | Jkind_sort {env; kloc; typ; err} ->
->>>>>>> 5.2.0minus-31
     let s =
       match kloc with
       | Mixed_product -> "Structures with non-value elements"
@@ -4927,16 +4892,8 @@ let report_error ~loc = function
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
          ~level:(Ctype.get_current_level ()) env) err
   | Jkind_empty_record ->
-<<<<<<< HEAD
     Location.errorf ~loc "Records must contain at least one runtime value."
-  | Non_representable_in_module (err, ty) ->
-||||||| f8c6716f8c
-    fprintf ppf "@[Records must contain at least one runtime value.@]"
-  | Non_representable_in_module (err, ty) ->
-=======
-    fprintf ppf "@[Records must contain at least one runtime value.@]"
   | Non_representable_in_module (env, err, ty) ->
->>>>>>> 5.2.0minus-31
     let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
     Location.errorf ~loc "The type of a module-level value must have a@ \
                           representable layout.@ %a"
@@ -4997,16 +4954,10 @@ let report_error ~loc = function
             ~sub:hint)
     end
   | Bad_unboxed_attribute msg ->
-<<<<<<< HEAD
       Location.errorf ~loc "This type cannot be unboxed because@ %s." msg
-||||||| f8c6716f8c
-      fprintf ppf "@[This type cannot be unboxed because@ %s.@]" msg
-=======
-      fprintf ppf "@[This type cannot be unboxed because@ %s.@]" msg
   | Poly_not_yet_implemented ->
-      fprintf ppf "@[The %a annotation is not yet implemented.@]"
-        Style.inline_code "val poly_"
->>>>>>> 5.2.0minus-31
+    fprintf ppf "@[The %a annotation is not yet implemented.@]"
+      Style.inline_code "val poly_"
   | Separability (Typedecl_separability.Non_separable_evar evar) ->
       let pp_evar ppf = function
         | None ->
@@ -5092,25 +5043,11 @@ let report_error ~loc = function
     Location.errorf ~loc
       "[%@%@unsafe_allow_any_mode_crossing] is not allowed on this kind of \
        type declaration.@ Only records, unboxed products, and variants are \
-<<<<<<< HEAD
        supported."
-  | Illegal_baggage jkind ->
+  | Illegal_baggage (env, jkind) ->
     Location.errorf ~loc
       "Illegal %a in kind annotation of an abbreviation:@ %a"
-      Style.inline_code "with" Jkind.format jkind
-||||||| f8c6716f8c
-       supported.@]"
-  | Illegal_baggage jkind ->
-    fprintf ppf
-      "@[Illegal %a in kind annotation of an abbreviation:@ %a@]"
-      Style.inline_code "with" Jkind.format jkind
-=======
-       supported.@]"
-  | Illegal_baggage (env, jkind) ->
-    fprintf ppf
-      "@[Illegal %a in kind annotation of an abbreviation:@ %a@]"
       Style.inline_code "with" (Jkind.format env) jkind
->>>>>>> 5.2.0minus-31
   | No_unboxed_version p ->
       Location.errorf ~loc "The type %a@ has no unboxed version."
         (Style.as_inline_code Printtyp.path) p

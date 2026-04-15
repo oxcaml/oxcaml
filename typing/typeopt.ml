@@ -1228,16 +1228,8 @@ let report_error ppf = function
       | Some err ->
         fprintf ppf "@ %a"
         (Jkind.Violation.report_with_offender
-<<<<<<< HEAD
            ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ())) err
-||||||| f8c6716f8c
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ())) err
-=======
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            ~level:(Ctype.get_current_level ()) env) err
->>>>>>> 5.2.0minus-31
       end
   | Sort_without_extension (sort, maturity, ty) ->
       fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
@@ -1294,16 +1286,8 @@ let report_error ppf = function
   | Not_a_sort (env, ty, err) ->
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
-<<<<<<< HEAD
            ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ())) err
-||||||| f8c6716f8c
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ())) err
-=======
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            ~level:(Ctype.get_current_level ()) env) err
->>>>>>> 5.2.0minus-31
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
@@ -1338,16 +1322,8 @@ let report_error ppf = function
           Printtyp.Doc.type_expr array_type
           Printtyp.Doc.type_expr ty
           (Jkind.Violation.report_with_offender
-<<<<<<< HEAD
              ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
-             ~level:(Ctype.get_current_level ())) err
-||||||| f8c6716f8c
-             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-             ~level:(Ctype.get_current_level ())) err
-=======
-             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
              ~level:(Ctype.get_current_level ()) env) err
->>>>>>> 5.2.0minus-31
       | None ->
         fprintf ppf
           "This array operation expects an array type, but %a does not appear@ \

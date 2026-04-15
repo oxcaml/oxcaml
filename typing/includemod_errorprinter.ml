@@ -923,23 +923,16 @@ let core env id x =
         "@[<hv 2>Class declarations %s do not match:@ @]@ %a"
         (Ident.name id)
         (Includecore.report_mode_sub_error "first is" "second is") e
-<<<<<<< HEAD
-||||||| f8c6716f8c
-        Printtyp.Conflicts.print_explanations
-=======
-        Printtyp.Conflicts.print_explanations
   | Err.Jkind_declarations diff ->
-      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a%t@]"
+      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
         "Kind declarations do not match"
         !Oprint.out_sig_item
-        (Printtyp.tree_of_jkind_declaration id diff.got)
+        (Out_type.tree_of_jkind_declaration id diff.got)
         "is not included in"
         !Oprint.out_sig_item
-        (Printtyp.tree_of_jkind_declaration id diff.expected)
+        (Out_type.tree_of_jkind_declaration id diff.expected)
         (Includecore.report_jkind_mismatch "the first" "the second")
         diff.symptom show_locs (diff.got.jkind_loc, diff.expected.jkind_loc)
-        Printtyp.Conflicts.print_explanations
->>>>>>> 5.2.0minus-31
 
 let missing_field ppf item =
   let id, loc, kind =  Includemod.item_ident_name item in

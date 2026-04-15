@@ -141,13 +141,7 @@
   predef
   subst
   signature_with_global_bindings
-<<<<<<< HEAD
-  predef
   data_types
-||||||| f8c6716f8c
-  predef
-=======
->>>>>>> 5.2.0minus-31
   datarepr
   cmi_format
   persistent_env
@@ -376,16 +370,8 @@
 
 (copy_files ../../typing/signature_with_global_bindings.ml)
 
-<<<<<<< HEAD
-(copy_files ../../typing/predef.ml)
-
 (copy_files ../../typing/data_types.ml)
 
-||||||| f8c6716f8c
-(copy_files ../../typing/predef.ml)
-
-=======
->>>>>>> 5.2.0minus-31
 (copy_files ../../typing/datarepr.ml)
 
 (copy_files ../../typing/typedtree.ml)
@@ -578,16 +564,8 @@
 
 (copy_files ../../typing/signature_with_global_bindings.mli)
 
-<<<<<<< HEAD
-(copy_files ../../typing/predef.mli)
-
 (copy_files ../../typing/data_types.mli)
 
-||||||| f8c6716f8c
-(copy_files ../../typing/predef.mli)
-
-=======
->>>>>>> 5.2.0minus-31
 (copy_files ../../typing/datarepr.mli)
 
 (copy_files ../../typing/unit_info.mli)
@@ -760,15 +738,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Cmi_format.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Debuginfo.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Consistbl.cmo
-<<<<<<< HEAD
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Unit_info.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Data_types.cmo
-||||||| f8c6716f8c
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Unit_info.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
-=======
->>>>>>> 5.2.0minus-31
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Datarepr.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__CamlinternalMenhirLib.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser_types.cmo
@@ -887,15 +857,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Cmi_format.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Debuginfo.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Consistbl.cmx
-<<<<<<< HEAD
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Unit_info.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Data_types.cmx
-||||||| f8c6716f8c
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Unit_info.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
-=======
->>>>>>> 5.2.0minus-31
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Datarepr.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__CamlinternalMenhirLib.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser_types.cmx

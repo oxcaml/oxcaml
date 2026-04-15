@@ -179,23 +179,7 @@ value caml_exception_invalid_argument_value(value msg)
   return caml_exception_with_arg((value)caml_exn_Invalid_argument, msg);
 }
 
-<<<<<<< HEAD
 value caml_exception_out_of_memory(void)
-||||||| f8c6716f8c
-void caml_failwith (char const *msg)
-=======
-static value caml_exn_with_arg(value tag, value arg)
-{
-  CAMLparam2(tag, arg);
-  CAMLlocal1(bucket);
-  bucket = caml_alloc_small(2, 0);
-  Field(bucket, 0) = tag;
-  Field(bucket, 1) = arg;
-  CAMLreturn(bucket);
-}
-
-void caml_failwith (char const *msg)
->>>>>>> 5.2.0minus-31
 {
   return (value)caml_exn_Out_of_memory;
 }
