@@ -363,18 +363,22 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             DLL.add_end body
               (make_cfg_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
                  Debuginfo.none);
+          let ty_args_arr = Array.of_list ty_args in
           Array.iteri
             (fun i arg ->
-              (* On some architectures, a single SSA argument may map to
-                 multiple physical registers. Move the single virtual reg to the
-                 first location reg; the rest are handled by the calling
-                 convention. *)
-              if Array.length locs.(i) = 1
-              then emit_moves body ~src:[| arg |] ~dst:locs.(i)
+              let src = [| arg |] in
+              let dst = locs.(i) in
+              if Array.length dst = 1
+              then
+                let ty_arg = ty_args_arr.(i) in
+                match Target.insert_move_extcall_arg ty_arg src dst with
+                | Rewritten (basic, src, dst) ->
+                  DLL.add_end body (make_cfg_instr basic src dst dbg)
+                | Use_default -> emit_moves body ~src ~dst
               else
                 DLL.add_end body
                   (make_cfg_instr (Cfg.Op Move) [| arg |]
-                     [| locs.(i).(0) |]
+                     [| dst.(0) |]
                      Debuginfo.none))
             virt_args;
           Ssa.Block.Tbl.replace renv.call_result_locs continuation loc_res;

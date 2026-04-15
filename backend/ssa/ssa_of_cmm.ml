@@ -276,10 +276,28 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let addressing_mode =
       ref (Arch.offset_addressing Arch.identity_addressing !byte_offset)
     in
-    let advance bytes =
+    let base = ref regs_addr in
+    let reset_addressing b =
+      let tmp =
+        B.emit_op b
+          ~op:(SU.make_const_int (Nativeint.of_int !byte_offset))
+          ~dbg ~typ:Cmm.typ_int ~args:[||]
+      in
+      assert (!byte_offset > 0);
+      let new_base =
+        B.emit_op b ~op:(Operation.Intop Iadd) ~dbg ~typ:Cmm.typ_addr
+          ~args:[| !base; tmp |]
+      in
+      base := new_base;
+      byte_offset := 0;
+      addressing_mode := Arch.identity_addressing
+    in
+    let advance b bytes =
       byte_offset := !byte_offset + bytes;
-      addressing_mode
-        := Arch.offset_addressing Arch.identity_addressing !byte_offset
+      match Target.is_offset_out_of_range !byte_offset with
+      | Within_range ->
+        addressing_mode := Arch.offset_addressing !addressing_mode bytes
+      | Out_of_range -> reset_addressing b
     in
     let is_store (op : Operation.t) =
       match op with Store (_, _, _) -> true | _ -> false
@@ -312,14 +330,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               ignore
                 (B.emit_op !b
                    ~op:(Store (chunk, !addressing_mode, false))
-                   ~dbg ~typ:Cmm.typ_void ~args:[| r; regs_addr |]);
-              advance (SU.size_component (typ_of_instruction r)))
+                   ~dbg ~typ:Cmm.typ_void ~args:[| r; !base |]);
+              advance !b (SU.size_component (typ_of_instruction r)))
             regs
         | Some op ->
           ignore
             (B.emit_op !b ~op ~dbg ~typ:Cmm.typ_void
-               ~args:(Array.append regs [| regs_addr |]));
-          advance (size_of_cmm_expr env original_arg))
+               ~args:(Array.append regs [| !base |]));
+          advance !b (size_of_cmm_expr env original_arg))
       | Never_returns ->
         Misc.fatal_error
           "emit_expr did not return any registers in [emit_stores]"
