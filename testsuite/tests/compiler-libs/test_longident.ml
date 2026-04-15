@@ -1,6 +1,5 @@
 (* TEST
- flags = "-I ${ocamlsrcdir}/parsing -I ${ocamlsrcdir}/toplevel";
- include ocamltoplevel;
+ flags = "-I ${ocamlsrcdir}/parsing";
  expect;
 *)
 [@@@alert "-deprecated"]
