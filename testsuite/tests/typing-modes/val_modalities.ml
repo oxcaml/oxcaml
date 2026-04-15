@@ -150,6 +150,7 @@ module Module_type_of_error = struct
     let x = fun x -> ignore !y; x
   end
 end
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 Lines 8-12, characters 33-5:
  8 | .................................struct
@@ -174,10 +175,10 @@ Error: Signature mismatch:
          val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
-       The left-hand side is "stateful"
+       The first is "stateful"
          because it contains a usage (of the value "y" at line 11, characters 29-30)
          which is expected to be "read_write".
-       However, the right-hand side is "stateless".
+       However, the second is "stateless".
 |}, Principal{|
 Lines 8-12, characters 33-5:
  8 | .................................struct
@@ -198,10 +199,10 @@ Error: Signature mismatch:
          val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
-       The left-hand side is "stateful"
+       The first is "stateful"
          because it contains a usage (of the value "y" at line 11, characters 29-30)
          which is expected to be "read_write".
-       However, the right-hand side is "stateless".
+       However, the second is "stateless".
 |}]
 
 module Module_type_of_monadic = struct
@@ -239,6 +240,7 @@ end
 issue. See
 https://github.com/oxcaml/oxcaml/pull/3922#discussion_r2059000469
 *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 module Module_type_nested :
   sig
@@ -308,6 +310,7 @@ module Inclusion_fail = struct
     end
 end
 (* For this to type check, M has to be at [contended] *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 module Inclusion_fail :
   sig module M : sig val x : string ref end @@ contended end @@ stateless
@@ -320,6 +323,7 @@ module Inclusion_fail = struct
       let x @ contended = ref "hello"
   end
 end
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 Lines 4-6, characters 22-5:
 4 | ......................struct
@@ -334,8 +338,8 @@ Error: Signature mismatch:
          val x : string ref @@ stateless contended (* in a structure at uncontended *)
        is not included in
          val x : string ref (* in a structure at uncontended *)
-       The left-hand side is "contended"
-       but the right-hand side is "uncontended".
+       The first is "contended"
+       but the second is "uncontended".
 |}, Principal{|
 Lines 4-6, characters 22-5:
 4 | ......................struct
@@ -350,8 +354,8 @@ Error: Signature mismatch:
          val x : string ref @@ contended (* in a structure at uncontended *)
        is not included in
          val x : string ref (* in a structure at uncontended *)
-       The left-hand side is "contended"
-       but the right-hand side is "uncontended".
+       The first is "contended"
+       but the second is "uncontended".
 |}]
 
 module Inclusion_weakens_monadic = struct
@@ -406,6 +410,7 @@ module Inclusion_match = struct
     end
     let () = uncontended_use M.x
 end
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 module Inclusion_match : sig module M : sig val x : int ref end end @@
   stateless
@@ -503,8 +508,8 @@ Error: Signature mismatch:
          external length : string -> int = "%string_length" (* in a structure at nonportable *)
        is not included in
          external length : string -> int @@ portable = "%string_length" (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 module M : sig
@@ -632,8 +637,8 @@ Error: Signature mismatch:
          val f : int -> int (* in a structure at nonportable *)
        is not included in
          val f : int -> int @@ portable (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 
@@ -722,8 +727,8 @@ Error: Signature mismatch:
          val t : [> `Foo ] @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
          val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@ portable (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 (* module constraint inclusion check looks at the modes of modules *)
@@ -1502,8 +1507,8 @@ Error: Signature mismatch:
          val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val f : 'a -> 'a @@ portable (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 module rec M0 : sig
@@ -1530,8 +1535,8 @@ Error: Signature mismatch:
          val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val f : 'a -> 'a (* in a structure at portable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 (* nested signature *)

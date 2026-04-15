@@ -146,6 +146,7 @@ module Error = struct
     | In_Module_type_substitution of
         Ident.t * (Types.module_type,module_type_declaration_symptom) diff
     | In_Type_declaration of Ident.t * core_sigitem_symptom
+    | In_Jkind_declaration of Ident.t * core_sigitem_symptom
     | In_Expansion of core_module_type_symptom
 
 end
@@ -1578,6 +1579,16 @@ let type_declarations ~loc env ~mark id decl1 decl2 =
   | Ok _ -> ()
   | Error (Error.Core reason) ->
       raise (Error(env,Error.(In_Type_declaration(id,reason))))
+  | Error _ -> assert false
+
+let jkind_declarations ~loc env ~mark id decl1 decl2 =
+  let direction = Directionality.unknown ~mark in
+  match
+    jkind_declarations ~loc env ~direction Subst.identity id decl1 decl2
+  with
+  | Ok _ -> ()
+  | Error (Error.Core reason) ->
+      raise (Error(env,Error.(In_Jkind_declaration(id,reason))))
   | Error _ -> assert false
 
 let strengthened_module_decl ~loc ~aliasable env ~mark ~mmodes md1 path1 md2 =

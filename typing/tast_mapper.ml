@@ -365,6 +365,8 @@ let pat
         Tpat_alias { pattern = sub.pat sub pattern; id;
                      name = map_loc sub name; uid;
                      sort; mode; type_expr }
+    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly } ->
+        Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode; lpoly }
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -505,9 +507,6 @@ let expr sub x =
   let map_block_access sub = function
     | Baccess_field (lid, ld) ->
       Baccess_field (map_loc sub lid, ld)
-    | Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort } ->
-      let index = sub.expr sub index in
-      Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
     | Baccess_block (mut, idx) ->
       Baccess_block (mut, sub.expr sub idx)
   in
@@ -519,6 +518,8 @@ let expr sub x =
     match x.exp_desc with
     | Texp_ident r ->
         Texp_ident { r with lid = map_loc sub r.lid }
+    | Texp_apply_layout (exp, args) ->
+        Texp_apply_layout (sub.expr sub exp, args)
     | Texp_constant _ as d -> d
     | Texp_let (rec_flag, list, exp) ->
         let (rec_flag, list) = sub.value_bindings sub (rec_flag, list) in
@@ -712,8 +713,6 @@ let expr sub x =
         Texp_quotation (sub.expr sub exp)
     | Texp_antiquotation exp ->
         Texp_antiquotation (sub.expr sub exp)
-    | Texp_eval (typ, sort) ->
-        Texp_eval (sub.typ sub typ, sort)
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}
@@ -822,6 +821,8 @@ let with_constraint sub = function
   | Twith_modtypesubst mty -> Twith_modtypesubst (sub.module_type sub mty)
   | Twith_module (path, lid) -> Twith_module (path, map_loc sub lid)
   | Twith_modsubst (path, lid) -> Twith_modsubst (path, map_loc sub lid)
+  | Twith_jkind      jd -> Twith_jkind (sub.jkind_declaration sub jd)
+  | Twith_jkindsubst jd -> Twith_jkindsubst (sub.jkind_declaration sub jd)
 
 let open_description sub od =
   {od with open_loc = sub.location sub od.open_loc;
@@ -1032,6 +1033,7 @@ let typ sub x =
     | Ttyp_open (path, mod_ident, t) ->
         Ttyp_open (path, map_loc sub mod_ident, sub.typ sub t)
     | Ttyp_repr (vars, ct) -> Ttyp_repr (vars, sub.typ sub ct)
+    | Ttyp_newlayout (vars, ct) -> Ttyp_newlayout (vars, sub.typ sub ct)
     | Ttyp_of_kind jkind ->
         Ttyp_of_kind (sub.jkind_annotation sub jkind)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)

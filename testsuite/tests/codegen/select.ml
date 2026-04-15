@@ -8,8 +8,10 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -41,6 +43,27 @@ select_cmp:
   ret
 |}]
 
+(* CR ttebbi: We shouldn't materialize the bit, and ideally even share the
+   cmp instructions. *)
+let select_cmp_twice (x : int) (y: int) =
+  (Builtins.select (x < y) x y) + (Builtins.select (x < y) 10 20)
+[%%expect_asm X86_64{|
+select_cmp_twice:
+  movq  %rax, %rdi
+  cmpq  %rbx, %rdi
+  setl  %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rax
+  movl  $41, %esi
+  movl  $21, %edx
+  cmpq  $1, %rax
+  cmovne %rdx, %rsi
+  cmpq  $1, %rax
+  cmovne %rdi, %rbx
+  leaq  -1(%rbx,%rsi), %rax
+  ret
+|}]
+
 
 (* CR ttebbi: We could constant-fold this. *)
 let select_constant (x : int) = Builtins.select true x 55
@@ -50,14 +73,15 @@ select_constant:
 |}]
 
 
-(* CR ttebbi: Unnecessary sign extension. *)
+(* CR ttebbi: Unnecessary moves. *)
 let select_int32 b (x : int32#) (y : int32#) =
   Builtins.select_int32 b x y
 [%%expect_asm X86_64{|
 select_int32:
-  cmpq  $1, %rax
-  cmovne %rbx, %rdi
-  movslq %edi, %rax
+  movq  %rax, %rsi
+  movq  %rdi, %rax
+  cmpq  $1, %rsi
+  cmovne %rbx, %rax
   ret
 |}]
 
@@ -84,5 +108,52 @@ select_nativeint:
   movq  %rdi, %rax
   cmpq  $1, %rsi
   cmovne %rbx, %rax
+  ret
+|}]
+
+(* CR ttebbi: We should not materialize a boolean. *)
+let repeated_select_shared x y z w  a b =
+  let c = (Int64_u.to_int64 x) < (Int64_u.to_int64 y) in
+  let q = Builtins.select_int64 c z w in
+  let r = Builtins.select_int64 c a b in
+  #(q,r)
+[%%expect_asm X86_64{|
+repeated_select_shared:
+  movq  %rbx, %r8
+  movq  %rcx, %rbx
+  cmpq  %r8, %rax
+  setl  %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rcx
+  movq  %rsi, %rax
+  cmpq  $1, %rcx
+  cmovne %rdi, %rax
+  cmpq  $1, %rcx
+  cmovne %rdx, %rbx
+  ret
+|}]
+
+(* CR ttebbi: We should not materialize the boolean, ideally even share the cmpq. *)
+let repeated_select_repeated x y z w  a b =
+  let q =
+    Builtins.select_int64 ((Int64_u.to_int64 x) < (Int64_u.to_int64 y)) z w
+  in
+  let r =
+    Builtins.select_int64 ((Int64_u.to_int64 x) < (Int64_u.to_int64 y)) a b
+  in
+  #(q,r)
+[%%expect_asm X86_64{|
+repeated_select_repeated:
+  movq  %rbx, %r8
+  movq  %rcx, %rbx
+  cmpq  %r8, %rax
+  setl  %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rcx
+  movq  %rsi, %rax
+  cmpq  $1, %rcx
+  cmovne %rdi, %rax
+  cmpq  $1, %rcx
+  cmovne %rdx, %rbx
   ret
 |}]

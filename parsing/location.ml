@@ -267,7 +267,8 @@ let absolute_path s = (* This function could go into Filename *)
   aux s
 
 let show_filename file =
-  if !Clflags.absname then absolute_path file else file
+  let file = if !Clflags.absname then absolute_path file else file in
+  rewrite_absolute_path file
 
 module Fmt = Format_doc
 module Doc = struct
@@ -1133,4 +1134,4 @@ let raise_errorf ?(loc = none) ?(sub = []) =
 
 let todo_overwrite_not_implemented ?(kind = "") t =
   alert ~kind t "Overwrite not implemented.";
-  assert false
+  Misc.fatal_error "Location.todo_overwrite_not_implemented"

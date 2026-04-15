@@ -250,7 +250,7 @@ module Type_shape = struct
     let open Shape in
     let unknown_shape_any = Shape.unknown_type () in
     let unknown_shape_value =
-      Shape.at_layout (Shape.unknown_type ()) (Base Value)
+      Shape.at_layout (Shape.unknown_type ()) (Base Scannable)
     in
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
@@ -320,7 +320,7 @@ module Type_shape = struct
                 | Tpoly (_, _)
                 | Trepr (_, _)
                 | Tpackage (_, _)
-                | Tquote _ | Tsplice _ | Tof_kind _ ->
+                | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ ->
                   assert false
               in
               Misc.fatal_errorf
@@ -358,6 +358,7 @@ module Type_shape = struct
           | Tarrow (_, _, _, _) -> Shape.arrow ()
           | Tquote _ -> unknown_shape_any
           | Tsplice _ -> unknown_shape_any
+          | Tquote_eval _ -> unknown_shape_any
           | Tunivar _ -> unknown_shape_any
           | Tof_kind _ -> unknown_shape_any
           | Tpackage _ -> unknown_shape_value
@@ -378,7 +379,7 @@ end
 
 module Type_decl_shape = struct
   let rec mixed_block_shape_to_layout = function
-    | Types.Value -> Layout.Base Value
+    | Types.Scannable -> Layout.Base Scannable
     | Types.Float_boxed ->
       Layout.Base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime,
@@ -452,7 +453,7 @@ module Type_decl_shape = struct
             (fun { Shape.field_name = _; field_value = _, ly } ->
               if
                 not
-                  (Layout.equal ly (Layout.Base Value)
+                  (Layout.equal ly (Layout.Base Scannable)
                   || Layout.equal ly (Layout.Base Void))
               then
                 if !Clflags.dwarf_pedantic
@@ -461,7 +462,7 @@ module Type_decl_shape = struct
                     "Type_shape: variant constructor with mismatched layout, \
                      has %a but expected value or void."
                     Layout.format ly
-                else Layout.Base Value
+                else Layout.Base Scannable
               else ly)
             args
         in

@@ -85,11 +85,69 @@ type known_value =
   | Const_float32 of int32
   | Const_float of int64
 
+let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
+  let is_valid_shift =
+    Nativeint.compare right 0n >= 0
+    && Nativeint.compare right (Nativeint.of_int Nativeint.size) < 0
+  in
+  match (op : Operation.integer_operation) with
+  | Iadd -> Some (Nativeint.add left right)
+  | Isub -> Some (Nativeint.sub left right)
+  | Iand -> Some (Nativeint.logand left right)
+  | Ior -> Some (Nativeint.logor left right)
+  | Ixor -> Some (Nativeint.logxor left right)
+  | Ilsl ->
+    if is_valid_shift
+    then Some (Nativeint.shift_left left (Nativeint.to_int right))
+    else None
+  | Ilsr ->
+    if is_valid_shift
+    then Some (Nativeint.shift_right_logical left (Nativeint.to_int right))
+    else None
+  | Iasr ->
+    if is_valid_shift
+    then Some (Nativeint.shift_right left (Nativeint.to_int right))
+    else None
+  (* CR xclerc for xclerc: some of the following operations could be supported
+     in the future; care is needed as some may clobber registers beyond
+     [res.(0)] on certain targets (e.g. [Imul] may not always lower to a form
+     writing only to the destination). *)
+  | Imul | Imulh _ | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp _ -> None
+
+let eval_float_op op (left : float) (right : float option) : float option =
+  match (op : Operation.float_operation) with
+  | Iaddf -> Option.map (Float.add left) right
+  | Isubf -> Option.map (Float.sub left) right
+  | Imulf -> Option.map (Float.mul left) right
+  | Idivf -> Option.map (Float.div left) right
+  | Inegf -> Some (Float.neg left)
+  | Iabsf -> Some (Float.abs left)
+  | Icompf _ -> None
+
+(* CR-someday xclerc for xclerc: consider moving to `Misc`. *)
+let find_unique_index : 'a array -> f:('a -> bool) -> int option =
+ fun arr ~f ->
+  let rec find arr idx f acc =
+    if idx < 0
+    then acc
+    else
+      begin if f (Array.unsafe_get arr idx)
+      then
+        begin match acc with
+        | None -> find arr (idx - 1) f None
+        | Some _ -> None
+        end
+      else find arr (idx - 1) f acc
+      end
+  in
+  find arr (Array.length arr - 1) f None
+
 (* Iterates over the passed instructions, and updates `known_values` so that it
    contains a map from registers to known values after the instructions have
-   been executed. Currently only tracks constant values and moves between
-   registers. *)
-let collect_known_values (instrs : Cfg.basic_instruction_list) :
+   been executed. Currently only tracks constant values, moves between
+   registers, basic integer arithmetic, and basic float64 arithmetic over known
+   values. *)
+let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
     known_value Reg.UsingLocEquality.Tbl.t =
   let known_values = Reg.UsingLocEquality.Tbl.create 17 in
   let replace reg value =
@@ -99,7 +157,89 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
   in
   let find_opt reg = Reg.UsingLocEquality.Tbl.find_opt known_values reg in
   let remove reg = Reg.UsingLocEquality.Tbl.remove known_values reg in
-  Dll.iter instrs ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+  let remove_destroyed (instr : Cfg.basic Cfg.instruction) =
+    let destroyed_regs = Proc.destroyed_at_basic instr.desc in
+    Reg.UsingLocEquality.Tbl.filter_map_inplace
+      (fun reg known_value ->
+        let is_destroyed =
+          Array.exists (fun r -> Reg.same_loc r reg) destroyed_regs
+        in
+        if is_destroyed then None else Some known_value)
+      known_values
+  in
+  let infer_known_values_from_predecessor () =
+    (* When there is only one predecessor, we can sometimes infer the value of a
+       temporary from the predecessor's terminator. For instance, if the
+       terminator is a truth test and we are in the "ifnot" block, then we can
+       infer the tested temporary is equal to zero at the start of the block. *)
+    (* CR-someday xclerc for xclerc: that could be extended to multiple
+    predecessors, if all lead to the same inference. *)
+    begin match Label.Set.cardinal block.predecessors with
+    | 1 ->
+      let predecessor_block =
+        Cfg.get_block_exn cfg (Label.Set.choose block.predecessors)
+      in
+      let predecessor_terminator = predecessor_block.terminator in
+      begin[@ocaml.warning "-4"] match predecessor_terminator.desc with
+      | Truth_test { ifso; ifnot } ->
+        if Label.equal ifnot block.start && not (Label.equal ifso ifnot)
+        then replace predecessor_block.terminator.arg.(0) (Const_int 0n)
+      | Int_test { lt; eq; gt; is_signed = Signed; imm = Some const } ->
+        if
+          Label.equal eq block.start
+          && (not (Label.equal eq gt))
+          && not (Label.equal eq lt)
+        then
+          replace
+            predecessor_terminator.arg.(0)
+            (Const_int (Nativeint.of_int const))
+      | Switch labels ->
+        let idx =
+          find_unique_index labels ~f:(fun label ->
+              Label.equal block.start label)
+        in
+        begin match idx with
+        | None -> ()
+        | Some idx ->
+          replace
+            predecessor_terminator.arg.(0)
+            (Const_int (Nativeint.of_int idx))
+        end
+      | _ -> ()
+      end
+    | _ -> ()
+    end
+  in
+  if !Oxcaml_flags.cfg_value_propagation_flow
+  then infer_known_values_from_predecessor ();
+  Dll.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+      let apply_int_op op right_opt =
+        let result_opt =
+          match find_opt instr.arg.(0) with
+          | Some (Const_int left) -> (
+            match right_opt with
+            | Some right -> eval_int_op op left right
+            | None -> None)
+          | Some (Const_float32 _ | Const_float _) | None -> None
+        in
+        (match result_opt with
+        | Some result -> replace instr.res.(0) (Const_int result)
+        | None -> remove instr.res.(0));
+        remove_destroyed instr
+      in
+      let apply_float_op op right_opt =
+        let result_opt =
+          match find_opt instr.arg.(0) with
+          | Some (Const_float left_bits) ->
+            let left = Int64.float_of_bits left_bits in
+            Option.map Int64.bits_of_float (eval_float_op op left right_opt)
+          | Some (Const_int _ | Const_float32 _) | None -> None
+        in
+        (match result_opt with
+        | Some bits -> replace instr.res.(0) (Const_float bits)
+        | None -> remove instr.res.(0));
+        remove_destroyed instr
+      in
       match instr.desc with
       | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
       | Op (Const_float32 c) ->
@@ -117,10 +257,39 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
           ->
           replace instr.res.(0) value
         | Some _ | None -> remove instr.res.(0))
+      | Op (Intop_imm (op, imm)) ->
+        apply_int_op op (Some (Nativeint.of_int imm))
+      | Op (Intop op) ->
+        let right_opt =
+          if Operation.is_unary_integer_operation op
+          then None
+          else
+            match find_opt instr.arg.(1) with
+            | Some (Const_int v) -> Some v
+            | Some (Const_float32 _ | Const_float _) | None -> None
+        in
+        apply_int_op op right_opt
+      | Op (Floatop (Float64, op)) ->
+        if !Oxcaml_flags.cfg_value_propagation_float
+        then
+          let right_opt =
+            match (op : Operation.float_operation) with
+            | Inegf | Iabsf -> None
+            | Iaddf | Isubf | Imulf | Idivf | Icompf _ -> (
+              match find_opt instr.arg.(1) with
+              | Some (Const_float bits) -> Some (Int64.float_of_bits bits)
+              | Some (Const_int _ | Const_float32 _) | None -> None)
+          in
+          apply_float_op op right_opt
+        else begin
+          Array.iter remove instr.res;
+          remove_destroyed instr
+        end
       | Op
           ( Spill | Reload | Dummy_use | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
-          | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _
+          | Int128op _ | Intop_atomic _
+          | Floatop (Float32, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Opaque | Begin_region | End_region | Specific _
           | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
@@ -130,14 +299,7 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
         Array.iter
           (fun reg -> Reg.UsingLocEquality.Tbl.remove known_values reg)
           instr.res;
-        let destroyed_regs = Proc.destroyed_at_basic instr.desc in
-        Reg.UsingLocEquality.Tbl.filter_map_inplace
-          (fun reg known_value ->
-            let is_destroyed =
-              Array.exists (fun r -> Reg.same_loc r reg) destroyed_regs
-            in
-            if is_destroyed then None else Some known_value)
-          known_values);
+        remove_destroyed instr);
   known_values
 
 (* Compute the destination of a terminator, using [known_values] to determine
@@ -265,13 +427,13 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
   | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
     None
 
-let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool)
-    ~(allowed_to_be_irreducible : bool) : bool =
+let block_known_values (cfg : Cfg.t) (block : C.basic_block)
+    ~(is_after_regalloc : bool) ~(allowed_to_be_irreducible : bool) : bool =
   if
     !Oxcaml_flags.cfg_value_propagation
     && is_after_regalloc && allowed_to_be_irreducible
   then (
-    let known_values = collect_known_values block.body in
+    let known_values = collect_known_values cfg block in
     match evaluate_terminator known_values block.terminator with
     | None -> false
     | Some succ ->
@@ -315,7 +477,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
           !Oxcaml_flags.cfg_value_propagation
           && is_after_regalloc && cfg.allowed_to_be_irreducible
         then
-          let known_values = collect_known_values block.body in
+          let known_values = collect_known_values cfg block in
           evaluate_terminator known_values successor_block.terminator
         else None
       in
@@ -366,11 +528,11 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
         <- { block.terminator with desc = Always l; arg = [||]; res = [||] };
       false)
     else
-      block_known_values block ~is_after_regalloc
+      block_known_values cfg block ~is_after_regalloc
         ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
   | Switch labels ->
     let shortcircuit =
-      block_known_values block ~is_after_regalloc
+      block_known_values cfg block ~is_after_regalloc
         ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
     in
     if shortcircuit

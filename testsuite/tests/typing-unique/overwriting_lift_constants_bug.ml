@@ -65,6 +65,7 @@ Line 5, characters 19-48:
 5 |   if b then p else overwrite_ p with { x = 2.0 }
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]

@@ -186,7 +186,7 @@ type t : immutable_data = Foo of (unit -> unit)
 Line 1, characters 0-47:
 1 | type t : immutable_data = Foo of (unit -> unit)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod immutable non_float
+Error: The kind of type "t" is value non_float mod immutable
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -219,7 +219,7 @@ type t : mutable_data = Foo of { x : unit -> unit }
 Line 1, characters 0-51:
 1 | type t : mutable_data = Foo of { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod immutable non_float
+Error: The kind of type "t" is value non_float mod immutable
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of mutable_data
          because of the annotation on the declaration of the type t.
@@ -340,7 +340,7 @@ type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
 Line 1, characters 0-60:
 1 | type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod immutable non_float
+Error: The kind of type "t" is value non_float mod immutable
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data with 'a
          because of the annotation on the declaration of the type t.
@@ -515,7 +515,7 @@ let foo (t : ('a : immutable_data) t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type 'a t = Foo of { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -548,7 +548,7 @@ let foo (t : _ t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type ('a : immutable_data) t = Foo of { x : 'a; } | Bar of 'a
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -679,7 +679,7 @@ Line 1, characters 24-28:
                             ^^^^
 Error: This expression has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod portable)"
-       The kind of (unit -> unit) t is value mod immutable non_float
+       The kind of (unit -> unit) t is value non_float mod immutable
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
            value mod portable
@@ -704,7 +704,7 @@ Line 1, characters 24-28:
                             ^^^^
 Error: This expression has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod external_)"
-       The kind of (unit -> unit) t is value mod immutable non_float
+       The kind of (unit -> unit) t is value non_float mod immutable
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
            value mod external_
@@ -799,7 +799,7 @@ Line 1, characters 14-30:
                   ^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) t" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) t is value mod immutable non_float
+       The kind of (unit -> unit) t is value non_float mod immutable
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
            value mod portable
@@ -1028,6 +1028,7 @@ and 'a t2 = Base of 'a | T1 of 'a t1
 
 type 'a t = Degen of ('a * 'a) t | Leaf
 let f (x : int t) = cross_portable x
+(* CR layouts v2.8: This should be accepted. *)
 [%%expect {|
 type 'a t = Degen of ('a * 'a) t | Leaf
 Line 2, characters 35-36:

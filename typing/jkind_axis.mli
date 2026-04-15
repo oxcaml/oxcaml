@@ -16,6 +16,8 @@
 module type Axis_ops = sig
   include Mode_intf.Lattice
 
+  val to_string : t -> string
+
   val less_or_equal : t -> t -> Misc.Le_result.t
 
   val equal : t -> t -> bool
@@ -44,6 +46,8 @@ end
 
 module Separability : sig
   type t =
+    | Non_pointer
+    | Non_pointer64
     | Non_float
     | Separable
     | Maybe_separable
@@ -51,29 +55,9 @@ module Separability : sig
   include Axis_ops with type t := t
 end
 
-module Pointerness : sig
-  type t =
-    | Non_pointer
-    | Maybe_pointer
-
-  (* CR layouts-scannable: This included module may get refined over time.
-     There are more operations that make sense here. But also, this will
-     probably change as more things get refactored. Seems ok for now. *)
-  include Axis_ops with type t := t
-
-  val to_string : t -> string
-
-  (* CR layouts-scannable: as more axes are ported, consider adding [is_max]
-     to the [Axis_ops] signature (which helps with printing) *)
-  val is_max : t -> bool
-end
-
 module Axis : sig
   module Nonmodal : sig
-    type 'a t =
-      | Externality : Externality.t t
-      | Nullability : Nullability.t t
-      | Separability : Separability.t t
+    type 'a t = Externality : Externality.t t
   end
 
   (** Represents an axis of a jkind *)

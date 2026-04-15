@@ -227,6 +227,19 @@ and 'k pattern_desc =
       type_expr: Types.type_expr;
     } -> value pattern_desc
         (** P as a *)
+  | Tpat_fun_layout : {
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.Value.l;
+      lpoly: Types.Lpoly.t;
+    } -> value pattern_desc
+        (** x with layout polymorphism, used in let poly_ bindings.
+            [lpoly] is [pending] during type-checking and guaranteed
+            [determined] after [type_let] returns. It may be determined with
+            an empty list of sort vars if no layout poly is actually inferred
+            (in which case a [Useless_lpoly] warning is emitted). *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc
@@ -408,6 +421,16 @@ and expression_desc =
         (** x
             M.x
          *)
+  | Texp_apply_layout of expression * Jkind_types.Sort.var list
+        (** Instantiation of a layout-polymorphic identifier.
+            The expression is the [Texp_ident] being instantiated and
+            the list contains the fresh sort variables supplied as
+            layout arguments.
+
+            It contains [Sort.var] instead of [Sort.t] because they are always
+            inferred by the type checker. The consumer of the typedtree can
+            assume it has been set to some concrete layout or some generic sort
+            variable quantified by an outer [Tpat_fun_layout]. *)
   | Texp_constant of constant
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Texp_let of rec_flag * value_binding list * expression
@@ -620,7 +643,6 @@ and expression_desc =
   | Texp_hole of unique_use (** _ *)
   | Texp_quotation of expression
   | Texp_antiquotation of expression
-  | Texp_eval of core_type * Jkind.sort
 
 and function_curry =
   | More_args of { partial_mode : Mode.Alloc.l }
@@ -706,14 +728,6 @@ and meth =
 
 and block_access =
   | Baccess_field of Longident.t loc * Types.label_description
-  | Baccess_array of {
-      mut: mutable_flag;
-      index_kind: index_kind;
-      index: expression;
-      base_ty: Types.type_expr;
-      elt_ty: Types.type_expr;
-      elt_sort: Jkind.Sort.t
-    }
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
@@ -1120,9 +1134,11 @@ and with_constraint =
     Twith_type of type_declaration
   | Twith_module of Path.t * Longident.t loc
   | Twith_modtype of module_type
+  | Twith_jkind of jkind_declaration
   | Twith_typesubst of type_declaration
   | Twith_modsubst of Path.t * Longident.t loc
   | Twith_modtypesubst of module_type
+  | Twith_jkindsubst of jkind_declaration
 
 and core_type =
   { mutable ctyp_desc : core_type_desc;
@@ -1152,6 +1168,7 @@ and core_type_desc =
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
+  | Ttyp_newlayout of string loc list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position

@@ -52,3 +52,18 @@ type ('a : value mod stateless) t
 [%%expect {|
 type ('a : value mod stateless) t
 |}]
+
+type 'a t : value mod portable external_ with 'a @@ external_
+[%%expect {|
+type 'a t : value mod portable external_ with 'a @@ external_
+|}]
+
+type 'a t : value mod external_ with 'a @@ external_
+[%%expect {|
+type 'a t : value mod external_
+|}]
+
+type 'a t : immutable_data with 'a @@ external_
+[%%expect {|
+type 'a t : immutable_data with 'a
+|}]

@@ -165,7 +165,7 @@ module Sig_component_kind = struct
     | Extension_constructor -> "extension constructor"
     | Class -> "class"
     | Class_type -> "class type"
-    | Jkind -> "jkind"
+    | Jkind -> "kind"
 
   let can_appear_in_types = function
     | Value
@@ -434,7 +434,7 @@ module Predef = struct
       | Array | Bytes | Char | Extension_constructor | Float | Float32
       | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint
       | String | Simd _ | Exception ->
-        Value
+        Scannable
       | Unboxed u -> unboxed_type_to_base_layout u
 
     let to_layout (t: t) : Layout.t = Base (to_base_layout t)

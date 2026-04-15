@@ -59,6 +59,7 @@ and ident_atomic_loc = ident_create "atomic_loc"
 (* CR metaprogramming aivaskovic: there is a question about naming;
    keep `expr` for now instead of `code` *)
 and ident_code = ident_create "expr"
+and ident_eval = ident_create "eval"
 
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
@@ -112,6 +113,7 @@ and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_atomic_loc = Pident ident_atomic_loc
 and path_code = Pident ident_code
+and path_eval = Pident ident_eval
 
 and path_or_null = Pident ident_or_null
 
@@ -196,6 +198,7 @@ and type_floatarray = newgenty (Tconstr(path_floatarray, [], ref Mnil))
 and type_lexing_position = newgenty (Tconstr(path_lexing_position, [], ref Mnil))
 and type_atomic_loc t = newgenty (Tconstr(path_atomic_loc, [t], ref Mnil))
 and type_code t = newgenty (Tconstr(path_code, [t], ref Mnil))
+and type_eval t = newgenty (Tquote_eval (newgenty (Tsplice t)))
 
 and type_unboxed_unit = newgenty (Tconstr(path_unboxed_unit, [], ref Mnil))
 and type_unboxed_bool = newgenty (Tconstr(path_unboxed_bool, [], ref Mnil))
@@ -335,7 +338,7 @@ and ident_some = ident_create "Some"
 and ident_null = ident_create "Null"
 and ident_this = ident_create "This"
 
-let option_argument_sort = Jkind_types.Sort.Const.value
+let option_argument_sort = Jkind_types.Sort.Const.scannable
 let option_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_option; position = 1; arity = 1})
 
@@ -344,10 +347,20 @@ let list_jkind param =
   Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param |>
   Jkind.mark_best
 
-let list_sort = Jkind_types.Sort.Const.value
-let list_argument_sort = Jkind_types.Sort.Const.value
+let list_sort = Jkind_types.Sort.Const.scannable
+let list_argument_sort = Jkind_types.Sort.Const.scannable
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
+
+let ikind_of_jkind_ref :
+    (params:type_expr list -> jkind_l -> type_ikind) ref =
+  ref (fun ~params:_ _jkind ->
+    failwith "Predef.ikind_of_jkind called before initialization")
+
+let set_ikind_of_jkind f = ikind_of_jkind_ref := f
+
+let ikind_of_jkind ~params jkind =
+  (!ikind_of_jkind_ref) ~params jkind
 
 let predef_jkinds =
   List.map
@@ -361,7 +374,6 @@ let add_predef_jkinds add_jkind env =
   List.fold_left
     (fun env (id, jkind) -> add_jkind id jkind env) env
     predef_jkinds
-
 let mk_add_type add_type =
   let add_type_with_jkind
       ?manifest type_ident
@@ -376,6 +388,8 @@ let mk_add_type add_type =
         let type_jkind =
           Jkind.of_builtin ~why:(Unboxed_primitive type_ident) unboxed_jkind
         in
+        let type_jkind = Jkind.mark_best type_jkind in
+        let type_ikind = ikind_of_jkind ~params:[] type_jkind in
         (* All unboxed versions of types explicitly added in the predef are
            abstract, as they are special cased. Other unboxed versions are
            automatically derived. *)
@@ -390,7 +404,8 @@ let mk_add_type add_type =
           type_params = [];
           type_arity = 0;
           type_kind;
-          type_jkind = Jkind.mark_best type_jkind;
+          type_jkind;
+          type_ikind;
           type_loc = Location.none;
           type_private = Asttypes.Public;
           type_manifest;
@@ -404,11 +419,14 @@ let mk_add_type add_type =
           type_unboxed_version = None;
         }
     in
+    let type_jkind = Jkind.mark_best jkind in
+    let type_ikind = ikind_of_jkind ~params:[] type_jkind in
     let decl =
       {type_params = [];
       type_arity = 0;
       type_kind = kind;
-      type_jkind = Jkind.mark_best jkind;
+      type_jkind;
+      type_ikind;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = manifest;
@@ -431,6 +449,7 @@ let mk_add_type add_type =
   add_type_with_jkind, add_type
 
 let mk_add_type1 add_type type_ident
+      ?manifest
       ?(kind=fun _ -> Type_abstract Definition)
       ~jkind
       ?(param_jkind=Jkind.Builtin.value ~why:(
@@ -441,14 +460,17 @@ let mk_add_type1 add_type type_ident
       ))
     ~variance ~separability env =
   let param = newgenvar param_jkind in
+  let type_jkind = Jkind.mark_best (jkind param) in
+  let type_ikind = ikind_of_jkind ~params:[param] type_jkind in
   let decl =
     {type_params = [param];
       type_arity = 1;
       type_kind = kind param;
-      type_jkind = Jkind.mark_best (jkind param);
+      type_jkind;
+      type_ikind;
       type_loc = Location.none;
       type_private = Asttypes.Public;
-      type_manifest = None;
+      type_manifest = Option.map (fun f -> f param) manifest;
       type_variance = [variance];
       type_separability = [separability];
       type_is_newtype = false;
@@ -465,11 +487,14 @@ let mk_add_type2 add_type type_ident ~jkind ~param1_jkind ~param2_jkind
       ~type_variance ~type_separability env =
   let param1 = newgenvar param1_jkind in
   let param2 = newgenvar param2_jkind in
+  let type_jkind = Jkind.mark_best jkind in
+  let type_ikind = ikind_of_jkind ~params:[param1; param2] type_jkind in
   let decl =
     { type_params = [param1; param2];
       type_arity = 2;
       type_kind = Type_abstract Definition;
-      type_jkind = Jkind.mark_best jkind;
+      type_jkind;
+      type_ikind;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = None;
@@ -491,10 +516,10 @@ let mk_add_extension add_extension id args =
           "sanity check failed: non-value jkind in predef extension \
             constructor; should this have Constructor_mixed shape?" in
       match (sort : Jkind_types.Sort.Const.t) with
-      | Base Value -> ()
+      | Base Scannable -> ()
       | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
-      | Univar _ | Product _ -> raise_error ())
+      | Univar _ | Genvar _ | Product _ -> raise_error ())
     args;
   add_extension id
     { ext_type_path = path_exn;
@@ -637,7 +662,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
            ~type_expr:param)
   |> add_type2 ident_idx_imm
        ~param1_jkind:(
-         Jkind.Builtin.value ~why:(Type_argument {
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_imm;
            position = 1;
            arity = 2;
@@ -655,7 +680,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
        ~type_separability:[Separability.Ind; Separability.Ind]
   |> add_type2 ident_idx_mut
        ~param1_jkind:(
-         Jkind.Builtin.value ~why:(Type_argument {
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_mut;
            position = 1;
            arity = 2;
@@ -680,7 +705,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
                ld_mutable=Immutable;
                ld_modalities=Mode.Modality.Const.id;
                ld_type=field_type;
-               ld_sort=Jkind_types.Sort.Const.value;
+               ld_sort=Jkind_types.Sort.Const.scannable;
                ld_loc=Location.none;
                ld_attributes=[];
                ld_uid=Uid.of_predef_id id;
@@ -698,16 +723,12 @@ let build_initial_env add_type add_extension add_jkind empty_env =
            None
          )
        )
-       (* CR layouts v2.8: Possibly remove this -- and simplify [mk_add_type] --
-          when we have a better jkind subsumption check. Internal ticket 5104 *)
+       (* Fields are [int] and [string], so [immutable_data] already captures
+          their direct contribution. Encoding this directly avoids predef-time
+          constructor lookups when deriving ikinds from jkinds. *)
        ~jkind:Jkind.(
          of_builtin Const.Builtin.immutable_data
-           ~why:(Primitive ident_lexing_position) |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id
-          ~type_expr:type_string)
+           ~why:(Primitive ident_lexing_position))
   |> add_type1 ident_atomic_loc
        ~variance:Variance.full
        ~separability:Separability.Ind
@@ -719,14 +740,6 @@ let build_initial_env add_type add_extension add_jkind empty_env =
            ~modality:Mode.Modality.Const.id
            ~type_expr:param)
   |> add_type ident_string ~jkind:Jkind.Const.Builtin.immutable_data
-  |> add_type1 ident_code
-       ~variance:Variance.covariant
-       ~separability:Separability.Ind
-       ~jkind:(fun param ->
-         Jkind.Builtin.immutable_data ~why:Tquote |>
-           Jkind.add_with_bounds
-             ~modality:Mode.Modality.Const.id
-             ~type_expr:param)
   |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit
        ~kind:(variant [cstr ident_void []])
@@ -735,26 +748,26 @@ let build_initial_env add_type add_extension add_jkind empty_env =
   (* Predefined exceptions - alphabetical order *)
   |> add_extension ident_assert_failure
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
-        Jkind_types.Sort.Const.value]
+        Jkind_types.Sort.Const.scannable]
   |> add_extension ident_division_by_zero []
   |> add_extension ident_end_of_file []
   |> add_extension ident_failure [type_string,
-       Jkind_types.Sort.Const.value]
+       Jkind_types.Sort.Const.scannable]
   |> add_extension ident_invalid_argument [type_string,
-       Jkind_types.Sort.Const.value]
+       Jkind_types.Sort.Const.scannable]
   |> add_extension ident_match_failure
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
-       Jkind_types.Sort.Const.value]
+       Jkind_types.Sort.Const.scannable]
   |> add_extension ident_not_found []
   |> add_extension ident_out_of_memory []
   |> add_extension ident_out_of_fibers []
   |> add_extension ident_stack_overflow []
   |> add_extension ident_sys_blocked_io []
   |> add_extension ident_sys_error [type_string,
-       Jkind_types.Sort.Const.value]
+       Jkind_types.Sort.Const.scannable]
   |> add_extension ident_undefined_recursive_module
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
-       Jkind_types.Sort.Const.value]
+       Jkind_types.Sort.Const.scannable]
   (* Predefined jkinds *)
   |> add_predef_jkinds add_jkind
 
@@ -823,7 +836,7 @@ let add_small_number_extension_types add_type env =
 let add_small_number_beta_extension_types _add_type env =
   env
 
-let or_null_argument_sort = Jkind_types.Sort.Const.value
+let or_null_argument_sort = Jkind_types.Sort.Const.scannable
 
 let or_null_kind tvar =
   let cstrs =
@@ -854,6 +867,39 @@ let add_or_null add_type env =
   ~kind:or_null_kind
   ~param_jkind:(Jkind.for_or_null_argument ident_or_null)
   ~jkind:or_null_jkind
+
+let add_runtime_metaprogramming_types add_type env =
+  let add_type1 = mk_add_type1 add_type in
+  env
+  |> add_type1 ident_code
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~jkind:(fun param ->
+         Jkind.for_expr |>
+           Jkind.add_with_bounds
+             ~modality:Mode.Modality.Const.id
+             ~type_expr:param)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_code;
+           position = 1;
+           arity = 1;
+         }))
+  |> add_type1 ident_eval
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~manifest:type_eval
+       ~jkind:(fun param ->
+         Jkind.Builtin.any ~why:Evaluated_quote |>
+           Jkind.add_with_bounds
+             ~modality:Mode.Modality.Const.id
+             ~type_expr:param)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_eval;
+           position = 1;
+           arity = 1;
+         }))
 
 let builtin_values =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns

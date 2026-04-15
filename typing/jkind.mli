@@ -46,6 +46,7 @@ module Sort : sig
   include
     Jkind_intf.Sort
       with type t = Jkind_types.Sort.t
+       and type var = Jkind_types.Sort.var
        and type univar = Jkind_types.Sort.univar
        and type base = Jkind_types.Sort.base
        and type Const.t = Jkind_types.Sort.Const.t
@@ -54,6 +55,7 @@ module Sort : sig
     (** A flat sort is returned from [get]. *)
     type t =
       | Var of Var.id (* [Var.id] is for debugging / printing only *)
+      | Genvar of var (* generic sort variable, level = Ident.highest_scope *)
       | Univar of univar
       | Base of base
   end
@@ -112,7 +114,7 @@ module Layout : sig
     val to_string : t -> string
   end
 
-  val sub : level:int -> Sort.t t -> Sort.t t -> Sub_result.t
+  val sub : Sort.t t -> Sort.t t -> Sub_result.t
 
   module Debug_printers : sig
     val t :
@@ -121,7 +123,15 @@ module Layout : sig
 end
 
 module Mod_bounds : sig
-  val debug_print : Format.formatter -> Types.mod_bounds -> unit
+  type t = Types.mod_bounds
+
+  val to_axis_lattice : t -> Axis_lattice.t
+
+  val of_axis_lattice : Axis_lattice.t -> t
+
+  val to_mode_crossing : t -> Mode.Crossing.t
+
+  val debug_print : Format.formatter -> t -> unit
 end
 
 module With_bounds : sig
@@ -135,6 +145,10 @@ module With_bounds : sig
     ('l * 'r) Types.with_bounds
 
   val format : Format_doc.formatter -> ('l * 'r) Types.with_bounds -> unit
+
+  val to_seq :
+    ('l * 'r) Types.with_bounds ->
+    (Types.type_expr * Types.With_bounds_type_info.t) Seq.t
 end
 
 module Base_and_axes : sig
@@ -190,8 +204,11 @@ end
 (** Context for jkind operations. *)
 type jkind_context =
   { jkind_of_type : Types.type_expr -> Types.jkind_l option;
-    is_abstract : Path.t -> bool
+    is_abstract : Path.t -> bool;
         (* Check if a type path refers to an abstract type *)
+    lookup_type : Path.t -> Types.type_declaration option
+        (* Lookup a type in the environment. Returns the full
+           [Types.type_declaration] if found, or [None] otherwise. *)
   }
 
 (******************************)
@@ -232,7 +249,6 @@ module Violation : sig
       which you supply an arbitrary printer for). *)
   val report_with_offender :
     offender:(Format_doc.formatter -> unit) ->
-    level:int ->
     Env.t ->
     Format_doc.formatter ->
     t ->
@@ -242,7 +258,6 @@ module Violation : sig
       that a representable jkind was expected. *)
   val report_with_offender_sort :
     offender:(Format_doc.formatter -> unit) ->
-    level:int ->
     Env.t ->
     Format_doc.formatter ->
     t ->
@@ -251,7 +266,7 @@ module Violation : sig
   (** Simpler version of [report_with_offender] for when the thing that had an
       unexpected jkind is available as a string. *)
   val report_with_name :
-    name:string -> level:int -> Env.t -> Format_doc.formatter -> t -> unit
+    name:string -> Env.t -> Format_doc.formatter -> t -> unit
 end
 
 (******************************)
@@ -372,13 +387,8 @@ val of_new_sort_var :
 val of_new_sort :
   why:History.concrete_creation_reason -> level:int -> 'd Types.jkind
 
-(** Same as [of_new_sort_var], but the jkind is lowered to [Non_null] to mirror
-    "legacy" OCaml values. Defaulting the sort variable produces exactly
-    [value]. *)
-val of_new_legacy_sort_var :
-  why:History.concrete_legacy_creation_reason ->
-  level:int ->
-  'd Types.jkind * sort
+(** Apply {!Sort.instance} to every sort variable in a jkind. *)
+val instance : 'd Types.jkind -> 'd Types.jkind
 
 (** Same as [of_new_sort], but the jkind is lowered to [Non_null] to mirror
     "legacy" OCaml values. Defaulting the sort variable produces exactly
@@ -460,9 +470,9 @@ val for_unboxed_record :
     [decl_params] is the parameters in the head of the type declaration.
     [type_apply] should be [Ctype.apply] partially applied to an [env].
 
-    [free_vars] is a function that, given a list of [Types.type_expr]s that are
-    used in the boxed variant, returns all type variables that are free within
-    the [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good
+    [get_free_vars] is a function that, given a list of [Types.type_expr]s that
+    are used in the boxed variant, returns all type variables that are free
+    within the [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good
     candidate for implementing this function. *)
 val for_boxed_variant :
   loc:Location.t ->
@@ -472,7 +482,7 @@ val for_boxed_variant :
     Types.type_expr ->
     Types.type_expr list ->
     Types.type_expr) ->
-  free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
+  get_free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
   Types.constructor_declaration list ->
   Types.jkind_l
 
@@ -536,16 +546,22 @@ end
 (** Get a description of a jkind. *)
 val get : 'd Types.jkind -> 'd Desc.t
 
-(** [get_layout_defaulting_to_value] extracts a constant layout, defaulting any
-    sort variable to [value]. Returns [None] in the case of an abstract kind. *)
-val get_layout_defaulting_to_value :
+(** [get_layout_defaulting_to_scannable] extracts a constant layout, defaulting
+    any sort variable to [scannable]. Returns [None] in the case of an abstract
+    kind. *)
+val get_layout_defaulting_to_scannable :
   Env.t -> 'd Types.jkind -> Layout.Const.t option
 
-(** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
-val default_to_value : 'd Types.jkind -> unit
+(** [default_to_scannable t] is [ignore (get_layout_defaulting_to_scannable t)]
+*)
+val default_to_scannable : 'd Types.jkind -> unit
 (* CR layouts v5: When we have proper support for void, we'll want to change
    these three functions to default to void - it's the most efficient thing
    when we have a choice. *)
+
+(** Generalize the sorts in a jkind when in sort generalization context. Only
+    has an effect when called within {!Sort.generalize_with}. *)
+val generalize : current_level:int -> 'd Types.jkind -> unit
 
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)
@@ -575,18 +591,17 @@ val get_externality_upper_bound :
 val set_externality_upper_bound :
   Types.jkind_r -> Jkind_axis.Externality.t -> Types.jkind_r
 
-(** Gets the nullability from a jkind. *)
-val get_nullability :
-  context:jkind_context -> Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t
+(** Gets the nullability from a jkind. Expands abstract kinds if needed. *)
+val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
 
-(** Computes a jkind that is the same as the input but with an updated maximum
-    mode for the nullability axis *)
-val set_nullability_upper_bound :
+(** Computes a jkind that is the same as the input but with an updated
+    nullability on the layout's scannable axis *)
+val set_root_nullability :
   Types.jkind_r -> Jkind_axis.Nullability.t -> Types.jkind_r
 
-(** Computes a jkind that is the same as the input but with an updated maximum
-    mode for the separability axis *)
-val set_separability_upper_bound :
+(** Computes a jkind that is the same as the input but with an updated
+    separability on the layout's scannable axis *)
+val set_root_separability :
   Types.jkind_r -> Jkind_axis.Separability.t -> Types.jkind_r
 
 (** Sets the layout in a jkind. *)
@@ -708,14 +723,14 @@ val format_history :
 (** This checks for equality, and sets any variables to make two jkinds equal,
     if possible. e.g. [equate] on a var and [value] will set the variable to be
     [value] *)
-val equate : level:int -> Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+val equate : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
 
 (** This checks for equality, but has the invariant that it can only be called
     when there is no need for unification; e.g. [equal] on a var and [value]
     will crash.
 
     CR layouts (v1.5): At the moment, this is actually the same as [equate]! *)
-val equal : level:int -> Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+val equal : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
 
 (** Checks whether two jkinds have a non-empty intersection. Might mutate sort
     variables. Works over any mix of l- and r-jkinds, because the only way not
@@ -724,8 +739,7 @@ val equal : level:int -> Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
 
     When abstract kinds are involved and we cannot determine whether there is an
     intersection, this conservatively returns [true]. *)
-val may_have_intersection :
-  level:int -> Env.t -> 'd1 Types.jkind -> 'd2 Types.jkind -> bool
+val may_have_intersection : Env.t -> 'd1 Types.jkind -> 'd2 Types.jkind -> bool
 
 type 'd intersection_result =
   | Intersection of 'd Types.jkind
@@ -740,7 +754,6 @@ val intersection :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
   reason:History.interact_reason ->
-  level:int ->
   Env.t ->
   ('l1 * allowed) Types.jkind ->
   ('l2 * allowed) Types.jkind ->
@@ -762,7 +775,6 @@ val intersection_or_error :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
   reason:History.interact_reason ->
-  level:int ->
   Env.t ->
   ('l1 * allowed) Types.jkind ->
   ('l2 * allowed) Types.jkind ->
@@ -773,10 +785,9 @@ val intersection_or_error :
 val sub :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
-  level:int ->
   Env.t ->
-  Types.jkind_l ->
-  Types.jkind_r ->
+  (allowed * 'r) Types.jkind ->
+  ('l * allowed) Types.jkind ->
   bool
 
 type sub_or_intersect =
@@ -792,7 +803,6 @@ type sub_or_intersect =
 val sub_or_intersect :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
-  level:int ->
   Env.t ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
@@ -803,7 +813,6 @@ val sub_or_intersect :
 val sub_or_error :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
-  level:int ->
   Env.t ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
@@ -814,10 +823,9 @@ val sub_or_error :
     bounds at all. *)
 val sub_layout_or_error :
   context:jkind_context ->
-  level:int ->
   Env.t ->
-  Types.jkind_l ->
-  Types.jkind_l ->
+  (allowed * 'r1) Types.jkind ->
+  ('l2 * 'r2) Types.jkind ->
   (unit, Violation.t) result
 
 (** Like [sub], but compares a left jkind against another left jkind.
@@ -826,7 +834,6 @@ val sub_layout_or_error :
 val sub_jkind_l :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
-  level:int ->
   ?allow_any_crossing:bool ->
   Env.t ->
   Types.jkind_l ->

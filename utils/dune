@@ -35,7 +35,7 @@
   (with-stdout-to
    %{targets}
    (bash
-    "`grep '^CPP=' %{conf} | cut -d'=' -f2` -I ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml %{c}"))))
+    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml %{c}"))))
 
 (rule
  (targets domainstate.mli)
@@ -51,7 +51,7 @@
   (with-stdout-to
    %{targets}
    (bash
-    "`grep '^CPP=' %{conf} | cut -d'=' -f2` -I ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml %{c}"))))
+    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml %{c}"))))
 
 (include_subdirs unqualified)
 

@@ -22,6 +22,8 @@ module type Common_options = sig
   val _locs : unit -> unit
   val _no_locs : unit -> unit
   val _alert : string -> unit
+  val _ikinds : unit -> unit
+  val _ikinds_debug : unit -> unit
   val _I : string -> unit
   val _H : string -> unit
   val _I_manifest : string -> unit
@@ -85,6 +87,7 @@ module type Core_options = sig
   val _dparsetree : unit -> unit
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
+  val _dtlambda : unit -> unit
   val _dslambda : unit -> unit
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
@@ -124,6 +127,8 @@ module type Compiler_options = sig
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit
   val _linkall : unit -> unit
+  val _requires_metaprogramming : unit -> unit
+  val _uses_metaprogramming : unit -> unit
   val _noautolink : unit -> unit
   val _o : string -> unit
   val _opaque :  unit -> unit
@@ -183,6 +188,7 @@ module type Bytecomp_options = sig
   include Core_options
   include Compiler_options
   val _compat_32 : unit -> unit
+  val _thunkify_cu_init : unit -> unit
   val _custom : unit -> unit
   val _no_check_prims : unit -> unit
   val _dllib : string -> unit
@@ -228,6 +234,7 @@ module type Optcommon_options = sig
   val _no_unbox_specialised_args : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+  val _o4 : unit -> unit
   val _insn_sched : unit -> unit
   val _no_insn_sched : unit -> unit
   val _linscan : unit -> unit
@@ -317,6 +324,7 @@ module type Jscomp_options = sig
   val _classic_inlining : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+  val _o4 : unit -> unit
 end
 
 module type Ocamldoc_options = sig

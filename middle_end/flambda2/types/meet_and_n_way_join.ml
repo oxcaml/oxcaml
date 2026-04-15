@@ -415,6 +415,10 @@ let meet_code_id (env : ME.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
         code_id1 code_id2
     with
     | Bottom -> Bottom (New_result ())
+    | Unknown ->
+      (* CR bclement: We are kind of lying here -- using either input is
+         correct, but might lose different information. *)
+      Ok (Both_inputs, env)
     | Ok code_id ->
       if Code_id.equal code_id code_id1
       then Ok (Left_input, env)
@@ -1423,11 +1427,11 @@ and meet_row_like :
   let add_extra_variables_and_extract_extension scoped_env =
     let level = ME.cut scoped_env ~cut_after:common_scope in
     extra_variables
-      := Variable.Map.union
+      := Variable.Map.union_total_shared
            (fun var k1 k2 ->
              if not (K.equal k1 k2)
              then Misc.fatal_errorf "Different kinds for %a" Variable.print var;
-             Some k1)
+             k1)
            !extra_variables
            (TEL.defined_variables_with_kinds level);
     TEE.from_map (TEL.equations level)
@@ -2095,7 +2099,7 @@ and n_way_join_head_of_kind_value env
       List.map
         (fun ((id, head) : TG.head_of_kind_value Join_env.join_arg) ->
           match head.is_null with
-          | Not_null -> id, Simple.const_false machine_width
+          | Not_null -> id, Simple.untagged_const_false machine_width
           | Maybe_null { is_null = None } -> raise_notrace Cannot_track
           | Maybe_null { is_null = Some is_null } -> id, Simple.var is_null)
         heads
@@ -2112,11 +2116,11 @@ and n_way_join_head_of_kind_value env
             ~const:(fun const : TG.is_null ->
               if
                 Reg_width_const.equal const
-                  (Reg_width_const.const_false machine_width)
+                  (Reg_width_const.untagged_const_false machine_width)
               then Not_null
               else
                 (* We rely on the fact that, if we find [true] here, all the
-                   [non_null] fields must be [Bottom] already. *)
+                   [Not_null] fields must be [Bottom] already. *)
                 Maybe_null { is_null = None })
             ~symbol:(fun _ ->
               Misc.fatal_error "Unexpected symbol in join of naked immediates")

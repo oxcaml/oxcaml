@@ -8,8 +8,10 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -317,13 +319,11 @@ ptr_store_int64:
 
 (* Native pointer load/store - int32 *)
 
-(* CR ttebbi: Double sign extension: movslq from memory, then movslq again. *)
 let ptr_load_int32 (p : nativeint#) =
   Builtins.native_pointer_load_int32 p
 [%%expect_asm X86_64{|
 ptr_load_int32:
   movslq (%rax), %rax
-  movslq %eax, %rax
   ret
 |}]
 
@@ -673,7 +673,6 @@ let ext_load_int32 (p : Builtins.ext_pointer) =
 [%%expect_asm X86_64{|
 ext_load_int32:
   movslq -1(%rax), %rax
-  movslq %eax, %rax
   ret
 |}]
 
@@ -781,8 +780,8 @@ ext_cas_int:
   movq  %rbx, %rax
   sarq  $1, %rdi
   sarq  $1, %rax
-  decq  %rsi
-  lock cmpxchgq %rdi, (%rsi)
+  leaq  -1(%rsi), %rbx
+  lock cmpxchgq %rdi, (%rbx)
   sete  %al
   movzbq %al, %rax
   salq  $1, %rax
@@ -799,8 +798,8 @@ let ext_fetch_add_int64
 ext_fetch_add_int64:
   movq  %rax, %rdi
   movq  %rbx, %rax
-  decq  %rdi
-  lock xaddq %rax, (%rdi)
+  leaq  -1(%rdi), %rbx
+  lock xaddq %rax, (%rbx)
   ret
 |}]
 
@@ -826,8 +825,8 @@ let ext_fetch_add_nativeint
 ext_fetch_add_nativeint:
   movq  %rax, %rdi
   movq  %rbx, %rax
-  decq  %rdi
-  lock xaddq %rax, (%rdi)
+  leaq  -1(%rdi), %rbx
+  lock xaddq %rax, (%rbx)
   ret
 |}]
 

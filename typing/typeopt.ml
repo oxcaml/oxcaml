@@ -41,10 +41,16 @@ exception Error of Location.t * error
    and [@@unboxed] types. The returned type will be therefore be none of these
    cases (except in case of missing cmis).
 
+   Note that we look through types even if they include a modality, so the
+   crossing behavior of the scraped typed is conservative.
+
    If we fail to fully scrape the type due to missing a missing cmi file, we
    return the original, rather than a partially expanded one.  The original may
    have cached jkind information that is more accurate than can be computed
    from its expanded form. *)
+(* CR external-mode: Don't disregard modalities when using [scrape_ty] to reason
+   about the runtime properties of a type - in particular, in
+   [maybe_pointer_ty], when checking whether a type crosses externality. *)
 let scrape_ty env ty =
   let ty =
     match get_desc ty with
@@ -52,13 +58,18 @@ let scrape_ty env ty =
     | _ -> ty
   in
   match get_desc ty with
-  | Tconstr _ ->
+  | Tconstr _
+  | Tquote _ | Tsplice _ | Tquote_eval _ ->
       let ty = Ctype.correct_levels ty in
       let ty' = Ctype.expand_head_opt env ty in
       begin match get_desc ty' with
       | Tconstr (p, _, _) ->
           begin match find_unboxed_type (Env.find_type p env) with
-          | Some _ -> (Ctype.get_unboxed_type_approximation env ty').ty
+          | Some _ -> begin
+            match (Ctype.get_unboxed_type_approximation env ty') with
+            | { ty; or_null = None; modality = _ } ->
+              ty
+            | _ -> ty' end
           | None -> ty'
           | exception Not_found -> ty (* missing cmi file *)
           end
@@ -138,7 +149,7 @@ type 'a classification =
 let classify ~classify_product env ty sort : _ classification =
   let ty = scrape_ty env ty in
   match (sort : Jkind.Sort.Const.t) with
-  | Base Value -> begin
+  | Base Scannable -> begin
   if Ctype.is_always_gc_ignorable env ty
   then
     if Ctype.check_type_nullability env ty Non_null
@@ -194,10 +205,14 @@ let classify ~classify_product env ty sort : _ classification =
              Maybe we should emit a warning. *)
           Any
       end
-  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _
-  | Tquote _ | Tsplice _-> Addr
-  | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _
-  | Trepr _ ->
+  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _  | Tnil | Tvariant _ ->
+      Addr
+  (* Quotes are not representable, but it's safe to say they are [Any].
+     Unreduced splices and evals might stand for anything. *)
+  | Tquote _ | Tsplice _ | Tquote_eval _ ->
+      Any
+  | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
+  | Tof_kind _ | Trepr _ ->
       assert false
   end
   | Base Float64 -> Unboxed_float Unboxed_float64
@@ -219,6 +234,7 @@ let classify ~classify_product env ty sort : _ classification =
   | Base Void -> Void
   | Product c -> Product (classify_product ty c)
   | Univar _ -> Misc.fatal_error "classify: Univar"
+  | Genvar _ -> Misc.fatal_error "classify: Genvar"
 
 let rec scannable_product_array_kind elt_ty_for_error loc sorts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
@@ -229,7 +245,7 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
      this to traverse the type, rather than just the kind, or to add product
      kinds. *)
   match s with
-  | Base Value -> Paddr_scannable
+  | Base Scannable -> Paddr_scannable
   | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
           Untagged_immediate | Vec128 | Vec256 | Vec512) as c ->
     raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
@@ -239,6 +255,8 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
     Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
   | Univar _ ->
     Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
+  | Genvar _ ->
+    Misc.fatal_error "sort_to_scannable_product_element_kind: Genvar"
 
 let rec ignorable_product_array_kind loc (sorts : Jkind.Sort.Const.t list) =
   match sorts with
@@ -254,7 +272,7 @@ let rec ignorable_product_array_kind loc (sorts : Jkind.Sort.Const.t list) =
 
 and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   match s with
-  | Base Value -> Pint_ignorable
+  | Base Scannable -> Pint_ignorable
   | Base Float64 -> Punboxedfloat_ignorable Unboxed_float64
   | Base Float32 -> Punboxedfloat_ignorable Unboxed_float32
   | Base Bits8 -> Punboxedoruntaggedint_ignorable Untagged_int8
@@ -269,6 +287,8 @@ and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
   | Univar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
+  | Genvar _ ->
+    Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
 
 let array_kind_of_elt ~elt_sort env loc ty =
   let elt_sort =
@@ -413,8 +433,8 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
   | _ ->
       (kind, layout)
 
-let value_kind_of_value_jkind env jkind =
-  let layout = Jkind.get_layout_defaulting_to_value env jkind in
+let value_kind_of_scannable_jkind env jkind =
+  let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
@@ -423,17 +443,18 @@ let value_kind_of_value_jkind env jkind =
   in
   match layout with
   (* CR layouts-scannable: use scannable axes to improve codegen *)
-  | Some (Base (Value, _)) ->
+  | Some (Base (Scannable, _)) ->
     value_kind_of_value_with_externality externality_upper_bound
   | None
   | Some ( Any _
          | Product _
          | Univar _
+         | Genvar _
          | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
                   | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
                   | Vec512 ),
                   _ )) ->
-    Misc.fatal_error "expected a layout of value"
+    Misc.fatal_error "expected a layout of scannable"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
    current set of sort restrictions, there are two reasons this invariant may
@@ -503,21 +524,22 @@ let nullable raw_kind = { raw_kind; nullable = Nullable }
 (* CR layouts v3: This file has two approaches for checking
    nullability. [representation_properties_type] does this by calling
    [Ctype.check_type_nullability] (which is just [constrain_type_jkind] on [any
-   mod non_null]), while [add_nullability_from_jkind] just pulls it out of a
-   kind (and sometimes we compute a jkind with [estimate_type_jkind] for that
-   purpose).
+   mod non_null]), while [add_nullability_from_scannable_jkind] just pulls it
+   out of a kind (and sometimes we compute a jkind with [estimate_type_jkind]
+   for that purpose).
 
    The former is a bit more expensive (though quite cheap in the places where we
    are doing it now, as the type has already been scraped) but will give a fully
    accurate nullability. The later is conservative but cheaper when we already
    have a jkind. We should pick one, or rationalize why there are two.
 *)
-let add_nullability_from_jkind env jkind raw_kind =
-  let context = Ctype.mk_jkind_context_always_principal env in
+
+let add_nullability_from_scannable_jkind env jkind raw_kind =
   let nullable =
-    match Jkind.get_nullability ~context env jkind with
-    | Non_null -> Non_nullable
-    | Maybe_null -> Nullable
+    match Jkind.get_nullability env jkind with
+    | Some Non_null -> Non_nullable
+    | Some Maybe_null -> Nullable
+    | None -> Misc.fatal_error "expected a layout of scannable"
   in
   { raw_kind; nullable }
 
@@ -656,8 +678,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       if cannot_proceed () then
         num_nodes_visited,
-        add_nullability_from_jkind env decl.type_jkind
-          (value_kind_of_value_jkind env decl.type_jkind)
+        add_nullability_from_scannable_jkind env decl.type_jkind
+          (value_kind_of_scannable_jkind env decl.type_jkind)
       else
         let visited = Numbers.Int.Set.add (get_id ty) visited in
         (* Default of [Pgenval] is currently safe for the missing cmi fallback
@@ -689,8 +711,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
         | Type_abstract _ ->
           num_nodes_visited,
-          add_nullability_from_jkind env decl.type_jkind
-            (value_kind_of_value_jkind env decl.type_jkind)
+          add_nullability_from_scannable_jkind env decl.type_jkind
+            (value_kind_of_scannable_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
     end
   | Ttuple labeled_fields ->
@@ -722,13 +744,14 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     else non_nullable Pintval
   | _ ->
     num_nodes_visited,
-    add_nullability_from_jkind env (Ctype.estimate_type_jkind env ty) Pgenval
+    add_nullability_from_scannable_jkind env
+      (Ctype.estimate_type_jkind env scty) Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
   : int * unit Lambda.mixed_block_element =
   match field with
-  | Value ->
+  | Scannable ->
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
@@ -761,20 +784,29 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         match get_desc ty with
         | Tunboxed_tuple fields ->
           Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
-        | Tconstr(p, _, _) ->
-          begin match (Env.find_type p env).type_kind with
+        | Tconstr(p, args, _) ->
+          begin match Env.find_type p env with
           | exception Not_found -> unknown ()
-          | Type_record_unboxed_product (lbls, _, _) ->
-            Misc.Stdlib.Array.of_list_map (fun {Types.ld_type} -> Some ld_type)
-              lbls
-          | Type_variant _ | Type_record _ | Type_abstract _ | Type_open ->
-            (* We don't need to handle [@@unboxed] records/variants here,
+          | { type_kind = Type_record_unboxed_product (lbls, _, _);
+              type_params; _ } ->
+            let type_of_ld { Types.ld_type } =
+              let ld_type = Ctype.correct_levels ld_type in
+              let type_params = List.map Ctype.correct_levels type_params in
+              (* [args] is already corrected by [scrape_ty] *)
+              try Some (Ctype.apply env type_params ld_type args)
+              with Ctype.Cannot_apply -> None
+            in
+            Misc.Stdlib.Array.of_list_map type_of_ld lbls
+          | { type_kind =
+                Type_variant _ | Type_record _ | Type_abstract _ | Type_open;
+              _ } ->
+            (* We don't need to handle  records/variants here,
                because [scrape_ty] looks though them. *)
             unknown ()
           end
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
-        | Tquote _ | Tsplice _ | Tof_kind _ -> unknown ()
+        | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ -> unknown ()
         | Trepr _ -> Misc.fatal_error "value_kind_mixed_block_field: Trepr"
     in
     let (_, num_nodes_visited), kinds =
@@ -808,13 +840,13 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
   match rep with
   | Variant_extensible -> assert false
   | Variant_with_null -> begin
-    match cstrs with
-    | [_; {cd_args=Cstr_tuple [{ca_type=ty}]}] ->
+    match Datarepr.find_variant_with_null_payload cstrs with
+    | Some { payload_arg = { Types.ca_type = ty; _ }; _ } ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       num_nodes_visited + 1, { kind with nullable = Nullable }
-    | _ -> assert false
+    | None -> assert false
     end
   | Variant_unboxed -> begin
       (* CR layouts v1.5: This should only be reachable in the case of a missing
@@ -1040,7 +1072,7 @@ let transl_mixed_block_element env loc ty mbe =
 
 let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   : Jkind.Sort.Const.t -> _ = function
-  | Base Value -> Lambda.Pvalue (Lazy.force value_kind)
+  | Base Scannable -> Lambda.Pvalue (Lazy.force value_kind)
   | Base Float64 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_float Unboxed_float64
   | Base Word when Language_extension.(is_at_least Layouts Stable) ->
@@ -1084,12 +1116,13 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
+  | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
     ~value_kind:(lazy (value_kind env loc ty))
     ~error:(function
-      | Base Value -> assert false
+      | Base Scannable -> assert false
       | Base Void as const ->
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Alpha,
@@ -1107,12 +1140,13 @@ let layout env loc sort ty =
                                                    Stable,
                                                    Some ty)))
       | Univar _ -> assert false
+      | Genvar _ -> assert false
     )
 
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)
     ~error:(function
-    | Base Value -> assert false
+    | Base Scannable -> assert false
     | Base Void as const ->
       raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                  Alpha,
@@ -1129,6 +1163,7 @@ let layout_of_sort loc sort =
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
     | Univar _ -> assert false
+    | Genvar _ -> assert false
     )
 
 let layout_of_non_void_sort c =
@@ -1216,7 +1251,7 @@ let report_error ppf = function
         fprintf ppf "@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env) err
+           env) err
       end
   | Sort_without_extension (sort, maturity, ty) ->
       fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
@@ -1274,7 +1309,7 @@ let report_error ppf = function
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) env) err
+           env) err
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
@@ -1310,7 +1345,7 @@ let report_error ppf = function
           Printtyp.type_expr ty
           (Jkind.Violation.report_with_offender
              ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-             ~level:(Ctype.get_current_level ()) env) err
+             env) err
       | None ->
         fprintf ppf
           "This array operation expects an array type, but %a does not appear@ \

@@ -160,6 +160,8 @@ val mutable_string : initial_value:string -> t
 
 val immutable_string : string -> t
 
+val block_field_kind : t -> int -> Flambda_kind.t
+
 val is_block : t -> bool
 
 val is_set_of_closures : t -> bool

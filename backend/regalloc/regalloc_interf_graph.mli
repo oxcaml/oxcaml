@@ -149,12 +149,12 @@ val iter_adjacent : t -> Reg.t -> f:(Reg.t -> unit) -> unit
 
     Example:
     {[
-      iter_adjacent_if graph reg
-        ~should_visit:(fun r ->
-          match State.reg_work_list state r with
-          | Select_stack | Coalesced -> false
-          | _ -> true)
-        ~f:(fun adj -> process adj)
+    iter_adjacent_if graph reg
+      ~should_visit:(fun r ->
+        match State.reg_work_list state r with
+        | Select_stack | Coalesced -> false
+        | _ -> true)
+      ~f:(fun adj -> process adj)
     ]}
 
     This is the primary mechanism for IRC-specific filtering. *)
@@ -197,6 +197,8 @@ val incr_degree : t -> Reg.t -> unit
     does NOT affect edges - it only updates the degree counter. Typically used
     during IRC simplification phase. Does nothing if the degree is infinite. *)
 val decr_degree : t -> Reg.t -> unit
+
+val get_max_degree : t -> int
 
 (** {2 Initialization} *)
 

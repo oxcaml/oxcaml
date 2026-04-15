@@ -18,9 +18,6 @@ module Env = Lambda_to_flambda_env
 module L = Lambda
 module P = Flambda_primitive
 
-let int_scalar : _ Scalar.Maybe_naked.t =
-  Value (Scalar.Integral.Width.Taggable Int)
-
 type primitive_transform_result =
   | Primitive of L.primitive * L.lambda list * L.scoped_location
   | Transformed of L.lambda
@@ -128,23 +125,52 @@ let rec_catch_for_for_loop env loc ident duid start stop
   let start_ident_duid = Lambda.debug_uid_none in
   let stop_ident = Ident.create_local "for_stop" in
   let stop_ident_duid = Lambda.debug_uid_none in
-  let first_test : L.lambda =
-    match dir with
-    | Upto -> L.icmp Cle L.int (Lvar start_ident) (Lvar stop_ident) ~loc
-    | Downto -> L.icmp Cge L.int (Lvar start_ident) (Lvar stop_ident) ~loc
+  let cmp : Scalar.Integer_comparison.t =
+    match dir with Upto -> Cle | Downto -> Cge
   in
-  let subsequent_test : L.lambda =
-    L.icmp Cne L.int (Lvar ident) (Lvar stop_ident) ~loc
+  let first_test : L.lambda =
+    L.icmp cmp L.int (Lvar start_ident) (Lvar stop_ident) ~loc
+  in
+  (* Naked int64 scalar type — the loop counter uses naked int64 to gain one
+     extra bit of range, avoiding overflow on increment/decrement. *)
+  let naked_int64_scalar : _ Scalar.Integral.t =
+    Scalar.naked
+      (Scalar.Integral.Width.Boxable (Int64 Scalar.Any_locality_mode))
+  in
+  let layout_naked_int64 : L.layout =
+    Punboxed_or_untagged_integer Unboxed_int64
+  in
+  let start_naked = Ident.create_local "for_start_naked" in
+  let stop_naked = Ident.create_local "for_stop_naked" in
+  let counter_naked = Ident.create_local "for_counter_naked" in
+  let next_naked = Ident.create_local "for_next_naked" in
+  let tagged_to_naked_int64 arg =
+    L.static_cast
+      ~src:(Scalar.ignore_locality (Scalar.integral L.int))
+      ~dst:(Scalar.integral naked_int64_scalar)
+      arg ~loc
+  in
+  let naked_int64_to_tagged arg =
+    L.static_cast
+      ~src:(Scalar.ignore_locality (Scalar.integral naked_int64_scalar))
+      ~dst:(Scalar.integral L.int) arg ~loc
   in
   let next_value_of_counter : L.lambda =
     match dir with
-    | Upto -> L.succ int_scalar (Lvar ident) ~loc
-    | Downto -> L.pred int_scalar (Lvar ident) ~loc
+    | Upto -> L.succ naked_int64_scalar (Lvar counter_naked) ~loc
+    | Downto -> L.pred naked_int64_scalar (Lvar counter_naked) ~loc
+  in
+  let continue_test : L.lambda =
+    L.icmp cmp
+      (Scalar.Integral.ignore_locality naked_int64_scalar)
+      (Lvar next_naked) (Lvar stop_naked) ~loc
   in
   let lam : L.lambda =
-    (* Care needs to be taken here not to cause overflow if, for an incrementing
-       for-loop, the upper bound is [max_int]; likewise, for a decrementing
-       for-loop, if the lower bound is [min_int]. *)
+    (* The loop counter operates on naked int64 values, avoiding overflow when
+       incrementing past max_int or decrementing past min_int, since tagged ints
+       fit in 63 bits but we operate in 64. This enables us to avoid the problem
+       of having two branch instructions (one conditional and one unconditional)
+       at the end of "for" loops. *)
     Llet
       ( Strict,
         L.layout_int,
@@ -159,18 +185,46 @@ let rec_catch_for_for_loop env loc ident duid start stop
             stop,
             Lifthenelse
               ( first_test,
-                Lstaticcatch
-                  ( Lstaticraise (cont, [L.Lvar start_ident]),
-                    (cont, [ident, duid, L.layout_int]),
-                    Lsequence
-                      ( body,
-                        Lifthenelse
-                          ( subsequent_test,
-                            Lstaticraise (cont, [next_value_of_counter]),
-                            L.lambda_unit,
-                            L.layout_unit ) ),
-                    Same_region,
-                    L.layout_unit ),
+                Llet
+                  ( Strict,
+                    layout_naked_int64,
+                    start_naked,
+                    Lambda.debug_uid_none,
+                    tagged_to_naked_int64 (Lvar start_ident),
+                    Llet
+                      ( Strict,
+                        layout_naked_int64,
+                        stop_naked,
+                        Lambda.debug_uid_none,
+                        tagged_to_naked_int64 (Lvar stop_ident),
+                        Lstaticcatch
+                          ( Lstaticraise (cont, [Lvar start_naked]),
+                            ( cont,
+                              [ ( counter_naked,
+                                  Lambda.debug_uid_none,
+                                  layout_naked_int64 ) ] ),
+                            Llet
+                              ( Strict,
+                                L.layout_int,
+                                ident,
+                                duid,
+                                naked_int64_to_tagged (Lvar counter_naked),
+                                Lsequence
+                                  ( body,
+                                    Llet
+                                      ( Strict,
+                                        layout_naked_int64,
+                                        next_naked,
+                                        Lambda.debug_uid_none,
+                                        next_value_of_counter,
+                                        Lifthenelse
+                                          ( continue_test,
+                                            Lstaticraise
+                                              (cont, [Lvar next_naked]),
+                                            L.lambda_unit,
+                                            L.layout_unit ) ) ) ),
+                            Same_region,
+                            L.layout_unit ) ) ),
                 L.lambda_unit,
                 L.layout_unit ) ) )
   in
@@ -285,7 +339,7 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
       ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
       ~native_name:name
       ~native_repr_args:
-        ([Primitive.Prim_global, L.Same_as_ocaml_repr (Base Value)]
+        ([Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable)]
         @
         match init with
         | None -> []
@@ -295,7 +349,7 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
         ( (match mode with
           | Alloc_heap -> Prim_global
           | Alloc_local -> Prim_local),
-          L.Same_as_ocaml_repr (Base Value) )
+          L.Same_as_ocaml_repr (Base Scannable) )
       ~is_layout_poly:false
   in
   L.Lprim
@@ -323,12 +377,12 @@ let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.locality_mode) =
     ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
     ~native_name:name
     ~native_repr_args:
-      [ Prim_global, L.Same_as_ocaml_repr (Base Value);
-        Prim_local, L.Same_as_ocaml_repr (Base Value);
-        Prim_global, L.Same_as_ocaml_repr (Base Value) ]
+      [ Prim_global, L.Same_as_ocaml_repr (Base Scannable);
+        Prim_local, L.Same_as_ocaml_repr (Base Scannable);
+        Prim_global, L.Same_as_ocaml_repr (Base Scannable) ]
     ~native_repr_res:
       ( (match mode with Alloc_heap -> Prim_global | Alloc_local -> Prim_local),
-        L.Same_as_ocaml_repr (Base Value) )
+        L.Same_as_ocaml_repr (Base Scannable) )
     ~is_layout_poly:false
 
 let makearray_dynamic_non_scannable_unboxed_product env
@@ -490,7 +544,7 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
     ( env,
       Transformed
         (makearray_dynamic_singleton "" mode ~length
-           ~init:(Some (Same_as_ocaml_repr (Base Value), L.Lvar init))
+           ~init:(Some (Same_as_ocaml_repr (Base Scannable), L.Lvar init))
            loc) )
   | Punboxedfloatarray Unboxed_float32 ->
     makearray_dynamic_singleton_uninitialized "unboxed_float32" ~length mode loc
@@ -744,12 +798,12 @@ let arrayblit_runtime env args loc =
       ~coeffects:Has_coeffects ~native_name:name
       ~native_repr_args:
         [ (* The arrays might be local *)
-          Primitive.Prim_local, L.Same_as_ocaml_repr (Base Value);
-          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Value);
-          Primitive.Prim_local, L.Same_as_ocaml_repr (Base Value);
-          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Value);
-          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Value) ]
-      ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Value))
+          Primitive.Prim_local, L.Same_as_ocaml_repr (Base Scannable);
+          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable);
+          Primitive.Prim_local, L.Same_as_ocaml_repr (Base Scannable);
+          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable);
+          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable) ]
+      ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Scannable))
       ~is_layout_poly:false
   in
   env, Primitive (L.Pccall external_call_desc, args, loc)
@@ -955,7 +1009,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
   | Pignore, [arg] ->
     let result = L.Lconst (Const_base (Const_int 0)) in
     Transformed (L.Lsequence (arg, result))
-  | Pfield _, [L.Lprim (Pgetglobal cu, [], _)]
+  | Pfield _, [L.Lprim (Pgetglobal (cu, _), [], _)]
     when Compilation_unit.equal cu (Env.current_unit env) ->
     Misc.fatal_error
       "[Pfield (Pgetglobal ...)] for the current compilation unit is forbidden \

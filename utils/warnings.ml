@@ -35,8 +35,6 @@ type constructor_usage_warning =
   | Only_exported_private
 
 type upstream_compat_warning =
-  | Immediate_erasure of string (* example: annotation in
-      [type ('a : immediate) t = int] can't be erased. *)
   | Non_value_sort of string (* example: abstract type
       [t : float64] is marked as unboxed. *)
   | Unboxed_attribute of string (* example: unboxed attribute
@@ -47,6 +45,7 @@ type upstream_compat_warning =
   | Separability_check
       (* example: [type packed = | Mk of 'a t [@@unboxed]]
          where ['a t : value mod non_float]. *)
+  | Unpacked_attribute
 
 type name_out_of_scope_warning =
   | Name of string
@@ -152,6 +151,8 @@ type t =
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
+  | Useless_lpoly                           (* 217 *)
+  | Lpoly_in_letrec                         (* 218 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -250,6 +251,8 @@ let number = function
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
+  | Useless_lpoly -> 217
+  | Lpoly_in_letrec -> 218
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -597,17 +600,17 @@ let descriptions = [
     since = since 5 1 };
   { number = 183;
     names = ["redundant-kind-modifier"];
-    (* CR layouts-scannable: as more axes are added, this description (and
+    (* CR layouts-scannable: As more axes are added, this description (and
        the following description) should be updated in tandem. *)
-    description = "A pointerness axis annotation appears on a kind that \
-                   already implies the annotation.";
+    description = "A nullability or separability axis annotation appears on \
+                   a kind that already implies the annotation.";
     since = since 5 2 };
   { number = 184;
     names = ["ignored-kind-modifier"];
-    (* CR layouts-scannable: as more axes are added, this description (and
+    (* CR layouts-scannable: As more axes are added, this description (and
        the following description) should be updated in tandem. *)
-    description = "A pointerness axis annotation appears on a non-value, \
-                   non-any layout.";
+    description = "A nullability or separability axis annotation appears on \
+                   a non-value, non-any layout.";
     since = since 5 2 };
   { number = 185;
     names = ["overridden-kind-modifier"];
@@ -1296,11 +1299,6 @@ let message = function
   | Overridden_kind_modifier overridden_by ->
       "This kind modifier is overridden by \"" ^ overridden_by ^ "\" later."
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
-  | Incompatible_with_upstream (Immediate_erasure id)  ->
-      Printf.sprintf
-      "Usage of layout immediate/immediate64 in %s \n\
-       can't be erased for compatibility with upstream OCaml."
-      id
   | Incompatible_with_upstream (Non_value_sort layout) ->
       Printf.sprintf
       "External declaration here is not upstream compatible. \n\
@@ -1321,6 +1319,8 @@ let message = function
   | Incompatible_with_upstream Separability_check ->
       "This type relies on OxCaml's extended separability checking \n\
        and would not be accepted by upstream OCaml."
+  | Incompatible_with_upstream Unpacked_attribute ->
+      "[@unpacked] is not supported by upstream OCaml."
   | Unerasable_position_argument -> "this position argument cannot be erased."
   | Unnecessarily_partial_tuple_pattern ->
       "This tuple pattern\n\
@@ -1370,6 +1370,12 @@ let message = function
       implied implying
   | Use_during_borrowing ->
       "This value is used while being borrowed."
+  | Useless_lpoly ->
+      "This binding has no layout variables, so \"poly_\" has no effect. \
+       Consider using a regular \"let\" instead."
+  | Lpoly_in_letrec ->
+      "\"poly_\" has no effect in recursive bindings, which do not support \
+       layout polymorphism. Consider using a regular \"let rec\" instead."
 ;;
 
 let nerrors = ref 0

@@ -52,6 +52,10 @@ val record_frame_descr :
   (* Location, if any *)
   unit
 
+(** [with_snapshot f] runs [f] and returns its result, but also ensures that the
+    state of this [Emitaux] module is unchanged after [f] returns. *)
+val with_snapshot : f:(unit -> 'a) -> 'a
+
 type emit_frame_actions =
   { efa_code_label : Label.t -> unit;
     efa_data_label : Label.t -> unit;
@@ -155,3 +159,11 @@ val emit_elf_note :
   typ:int32 ->
   emit_desc:(unit -> unit) ->
   unit
+
+type emit_data_item_actions =
+  { global_maybe_protected : Asm_targets.Asm_symbol.t -> unit;
+    symbol_defined : string -> unit;
+    symbol_used : string -> unit
+  }
+
+val emit_data_item : emit_data_item_actions -> Cmm.data_item -> unit

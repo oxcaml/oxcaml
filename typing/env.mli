@@ -19,6 +19,14 @@ open Types
 open Misc
 module Jkind = Btype.Jkind0
 
+type stage = private int
+
+module StagedPath : sig
+    type t = { stage : stage; path : Path.t }
+
+    module Map : Map.S with type key = t
+end
+
 type value_unbound_reason =
   | Val_unbound_instance_variable
   | Val_unbound_self
@@ -47,7 +55,7 @@ type summary =
   (** The string set argument of [Env_open] represents a list of module names
       to skip, i.e. that won't be imported in the toplevel namespace. *)
   | Env_functor_arg of summary * Ident.t
-  | Env_constraints of summary * type_declaration Path.Map.t
+  | Env_constraints of summary * type_declaration StagedPath.Map.t
   | Env_copy_types of summary
   | Env_persistent of summary * Ident.t
   | Env_value_unbound of summary * string * value_unbound_reason
@@ -61,8 +69,6 @@ type address = Persistent_env.address =
   | Adot of address * Jkind_types.Sort.t array * int
 
 type t
-
-type stage
 
 val empty: t
 
@@ -227,6 +233,10 @@ type no_open_quotations_context =
   | Open_qt
   | Object_field_with_attribute_qt
   | Variant_tag_with_attribute_qt
+  | Jkind_annotation_qt
+  | Layout_polymorphism_qt
+  | Tconst_pat_qt of Longident.t
+  | Class_type_qt
 
 type none_in_quotations_context =
   | Constructor
@@ -443,7 +453,7 @@ val add_modtype_lazy: update_summary:bool ->
    Ident.t -> Subst.Lazy.modtype_declaration -> t -> t
 val add_class: Ident.t -> class_declaration -> t -> t
 val add_cltype: Ident.t -> class_type_declaration -> t -> t
-val add_local_constraint: Path.t -> type_declaration -> t -> t
+val add_local_constraint: stage:stage -> Path.t -> type_declaration -> t -> t
 val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
 val clear_implicit_jkinds : t -> t
 val add_jkind:
@@ -512,6 +522,8 @@ val enter_modtype:
 val enter_class: scope:int -> string -> class_declaration -> t -> Ident.t * t
 val enter_cltype:
   scope:int -> string -> class_type_declaration -> t -> Ident.t * t
+val enter_jkind:
+  scope:int -> string -> jkind_declaration -> t -> Ident.t * t
 
 (* Same as [add_signature] but refreshes (new stamp) and rescopes bound idents
    in the process. *)
@@ -546,11 +558,17 @@ val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t
-val mark_toplevel_in_quotations : t -> t
+
+(** Set the environment's stage to a fixed one in the far future.
+    Should only be used in cases where the stage is unknown. *)
+val enter_future : t -> t
 
 val check_no_open_quotations :
   Location.t -> t -> no_open_quotations_context -> unit
 val stage : t -> stage
+
+val mark_toplevel_in_quotations : scope:int -> t -> t
+val path_is_toplevel_in_quotations : t -> Path.t -> bool
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit
@@ -658,13 +676,13 @@ type error =
 exception Error of error
 
 
-val report_error: level:int -> error Format_doc.format_printer
-val report_error_doc: level:int -> error Format_doc.printer
+val report_error: error Format_doc.format_printer
+val report_error_doc: error Format_doc.printer
 
 val report_lookup_error:
-    level:int -> Location.t -> t -> lookup_error Format_doc.format_printer
+    Location.t -> t -> lookup_error Format_doc.format_printer
 val report_lookup_error_doc:
-    level:int -> Location.t -> t -> lookup_error Format_doc.printer
+    Location.t -> t -> lookup_error Format_doc.printer
 val in_signature: bool -> t -> t
 
 val is_in_signature: t -> bool
@@ -705,7 +723,7 @@ val print_path: Path.t Format_doc.printer ref
 val print_type_expr: Types.type_expr Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Jkind. *)
 val report_jkind_violation_with_offender:
-  (offender:(Format_doc.formatter -> unit) -> level:int -> t ->
+  (offender:(Format_doc.formatter -> unit) -> t ->
    Format_doc.formatter -> Jkind.Violation.t -> unit) ref
 
 

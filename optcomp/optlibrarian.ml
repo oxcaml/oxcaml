@@ -137,6 +137,10 @@ end) : S = struct
             lib_imports_cmx = cmxs;
             lib_quoted_globals = quoted_globals;
             lib_generic_fns = Generic_fns.Tbl.entries genfns;
+            lib_requires_metaprogramming =
+              List.exists
+                (fun (unit, _crc) -> unit.ui_requires_metaprogramming)
+                descr_list;
             lib_ccobjs = !Clflags.ccobjs;
             lib_ccopts = !Clflags.all_ccopts
           }

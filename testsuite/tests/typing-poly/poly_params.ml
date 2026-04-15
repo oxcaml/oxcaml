@@ -253,6 +253,45 @@ Error: This expression has type "string" but an expression was expected of type
          "int"
 |}];;
 
+(* These examples are similar to the above, but demonstrate we only issue
+   principality warnings for types that are genuinely polymorphic. Because,
+   e.g., explicit quantification over a phantom parameter doesn't rely on
+   inference order. *)
+type 'a phantom_int = int
+
+let use_phantom_int (f : ('a. 'a phantom_int) -> int) = f 42
+
+let phantom_principal1 p f =
+  if p then use_phantom_int f else f 42
+[%%expect {|
+type 'a phantom_int = int
+val use_phantom_int : (('a. int) -> int) -> int = <fun>
+val phantom_principal1 : bool -> (('a. int) -> int) -> int = <fun>
+|}];;
+
+let phantom_principal2 p f =
+  if p then f 42 else use_phantom_int f
+[%%expect {|
+val phantom_principal2 : bool -> (('a. int) -> int) -> int = <fun>
+|}];;
+
+type phantom_poly = ('a . 'a phantom_int) -> int
+
+let phantom_principle3 =
+  [ (Some (fun x -> x) : phantom_poly option);
+    Some (fun y -> y) ]
+[%%expect {|
+type phantom_poly = ('a. int) -> int
+val phantom_principle3 : phantom_poly option list = [Some <fun>; Some <fun>]
+|}];;
+
+let phantom_principle4 =
+  [ Some (fun x -> x);
+    (Some (fun y -> y) : phantom_poly option)]
+[%%expect {|
+val phantom_principle4 : phantom_poly option list = [Some <fun>; Some <fun>]
+|}];;
+
 (* Functions with polymorphic parameters are separate from other functions *)
 type 'a arg = 'b
   constraint 'a = 'b -> 'c

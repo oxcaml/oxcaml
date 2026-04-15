@@ -117,5 +117,4 @@ val insert_block :
   Cfg.basic_instruction_list ->
   after:Cfg.basic_block ->
   before:Cfg.basic_block option ->
-  next_instruction_id:(unit -> InstructionId.t) ->
   Cfg.basic_block list

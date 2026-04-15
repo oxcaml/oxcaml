@@ -152,7 +152,7 @@ let make_spill : type a. a make_operation =
     | Some stack_reg -> stack_reg
     | None ->
       let slots = State.stack_slots state in
-      let slot : int = Regalloc_stack_slots.get_or_fatal slots old_reg in
+      let slot : int = Regalloc_stack_slots.get_or_create slots old_reg in
       let stack : Reg.t =
         Reg.create_with_typ_and_name ~prefix_if_var:"stack" old_reg
       in
@@ -309,7 +309,7 @@ let make_reload : type a. a make_operation =
     ~id:(InstructionId.get_and_incr instr_id)
     ~copy ~from:stack_reg ~to_:new_reg
 
-(* Inserts the relaods in a block, as late as possible (i.e. immediately before
+(* Inserts the reloads in a block, as late as possible (i.e. immediately before
    the register is first read), to reduce live ranges. *)
 let insert_reloads_in_block :
     State.t ->
@@ -430,8 +430,6 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
               Cfg_with_layout.insert_block
                 (Cfg_with_infos.cfg_with_layout cfg_with_infos)
                 instrs ~after:predecessor_block ~before:(Some block)
-                ~next_instruction_id:(fun () ->
-                  InstructionId.get_and_incr instr_id)
             in
             block_inserted := true;
             if debug && Lazy.force invariants

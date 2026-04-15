@@ -230,7 +230,7 @@ let copy_unboxed_product shape ~path expr =
     | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
     | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
       expr
-    | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
+    | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
   in
   copy_element (Lambda.project_from_mixed_block_shape shape ~path) expr
 
@@ -248,7 +248,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     { id; def = comp_fun def }
   in
   match (exp : Lambda.lambda) with
-  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Lsplice _ -> Lambda.fatal_error_invalid_constructor exp
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
   | Lapply { ap_func; ap_args; ap_region_close } ->
@@ -535,7 +535,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let total_len = Array.length shape in
         pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
-    | Pgetglobal cu -> nullary (Getglobal cu)
+    | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
     | Pfield (n, _, _) | Punboxed_product_field (n, _) -> unary (Getfield n)
     | Parray_element_size_in_bytes _array_kind -> (
@@ -548,8 +548,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let element_size = Prim (Lsrint, [word_size; tagged_immediate 3]) in
         Sequence (comp_expr arg, element_size)
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
-    | Pget_idx _ -> binary (Ccall "caml_unsafe_get_idx_bytecode")
-    | Pset_idx _ -> ternary (Ccall "caml_unsafe_set_idx_bytecode")
+    | Pget_idx _ -> binary (Ccall "caml_get_idx_bytecode")
+    | Pset_idx _ -> ternary (Ccall "caml_set_idx_bytecode")
     | Pmake_idx_field pos ->
       Const (Const_block (0, [Const_base (Const_int pos)]))
     | Pmake_idx_mixed_field (_, pos, path) ->
@@ -1174,8 +1174,33 @@ and make_unsigned_comparison size signed_comparison x y =
    (pop)
 *)
 
+let thunkify_compilation_unit_initialization ~thunk_name blam =
+  (* Transforms [blam] into something like [let thunk () = blam in thunk ()].
+     Assumes no free variables in [blam]. *)
+  let thunk = Ident.create_local thunk_name in
+  Blambda.Let
+    { id = thunk;
+      arg =
+        Function
+          { params = [Ident.create_local "null"];
+            body = blam;
+            free_variables = Ident.Set.empty
+          };
+      body =
+        Apply { func = Var thunk; args = [Const Const_null]; nontail = false }
+    }
+
 let blambda_of_lambda ~compilation_unit x =
   let blam = comp_expr x in
   match compilation_unit with
   | None -> blam
-  | Some cu -> Blambda.Prim (Blambda.Setglobal cu, [blam])
+  | Some cu ->
+    let blam =
+      if !Clflags.thunkify_cu_init
+      then
+        thunkify_compilation_unit_initialization
+          ~thunk_name:("init_" ^ Compilation_unit.full_path_as_string cu)
+          blam
+      else blam
+    in
+    Blambda.Prim (Blambda.Setglobal cu, [blam])

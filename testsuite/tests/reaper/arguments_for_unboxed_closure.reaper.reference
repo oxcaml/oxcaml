@@ -1,0 +1,73 @@
+let code g_1 deleted in
+let code id_2 deleted in
+let code unused_3 deleted in
+let code u_4 deleted in
+let code f_0 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(id_2)
+      id_2_1 (z) my_closure _region _ghost_region my_depth -> k * k1 =
+  cont k (z)
+in
+let $camlArguments_for_unboxed_closure__id_6 = closure id_2_1 @`id` in
+let code inline(never) loopify(never) size(10) newer_version_of(u_4)
+      u_4_1
+        (u_into_my_closure_field_g_field_x, u_into_my_closure_field_g_field_y)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let g_into_g_field_x = u_into_my_closure_field_g_field_x in
+  let g_into_g_field_y = u_into_my_closure_field_g_field_y in
+  let y = g_into_g_field_y in
+  let x = g_into_g_field_x in
+  apply direct(id_2_1) inlining_state(depth(1))
+    $camlArguments_for_unboxed_closure__id_6 (y) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      let int_add = %int_barith.add (x, apply_result) in
+      cont k (int_add)
+in
+let code inline(never) loopify(never) size(1) newer_version_of(unused_3)
+      unused_3_1 (param)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let $camlArguments_for_unboxed_closure__unused_7 = closure unused_3_1 @unused
+in
+let code loopify(never) size(11) newer_version_of(g_1)
+      g_1_1 (g_into_my_closure_field_x, h : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let x = g_into_my_closure_field_x in
+  apply h (0) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      let int_add = %int_barith.add (x, apply_result) in
+      cont k (int_add)
+in
+let code loopify(never) size(52) newer_version_of(f_0)
+      f_0_1 (x : imm tagged, y : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let g_into_g_field_x = x in
+  let g_into_g_field_y = y in
+  let u_into_u_field_g_field_x = g_into_g_field_x in
+  let u_into_u_field_g_field_y = g_into_g_field_y in
+  apply direct(u_4_1)
+     (u_into_u_field_g_field_x, u_into_u_field_g_field_y) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      (apply direct(g_1_1) inlined(never)
+         
+           (g_into_g_field_x, $camlArguments_for_unboxed_closure__unused_7)
+           -> k2 * k1
+         where k2 (apply_result_1 : imm tagged) =
+           let int_add = %int_barith.add (apply_result_1, apply_result) in
+           let `unit` = %end_region (`region`) in
+           cont k (int_add))
+in
+let $camlArguments_for_unboxed_closure__f_5 = closure f_0_1 @f in
+let $camlArguments_for_unboxed_closure =
+  Block 0 ($camlArguments_for_unboxed_closure__f_5)
+in
+cont done ($camlArguments_for_unboxed_closure)

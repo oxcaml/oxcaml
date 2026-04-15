@@ -18,7 +18,7 @@ Error: This variant or record definition does not match that of type
          "'a or_null"
        Their internal representations differ:
        the original definition has a constructor represented as a null pointer.
-       Hint: add [@@or_null_reexport].
+       Hint: add [@@or_null] or [@@or_null_reexport].
 |}]
 
 module Or_null = struct
@@ -26,6 +26,21 @@ module Or_null = struct
 end
 [%%expect{|
 module Or_null : sig type 'a t = 'a or_null end
+|}]
+
+module Or_null_via_attr = struct
+  type ('a : value) t : value_or_null = 'a or_null =
+    | Null
+    | This of 'a
+  [@@or_null]
+end
+let n = Or_null_via_attr.Null
+let t v = Or_null_via_attr.This v
+[%%expect{|
+module Or_null_via_attr :
+  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null] end
+val n : 'a Or_null_via_attr.t = Or_null_via_attr.Null
+val t : 'a -> 'a Or_null_via_attr.t = <fun>
 |}]
 
 (* Omitting the type representation leaves constructors unexported. *)
@@ -71,9 +86,9 @@ Line 1, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The kind of 'a Or_null.t is value_or_null mod everything with 'a
+       The layout of 'a Or_null.t is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of 'a Or_null.t must be a subkind of value
+       But the layout of 'a Or_null.t must be a sublayout of value
          because of the definition of t at line 2, characters 2-79.
 |}]
 
@@ -92,9 +107,9 @@ Line 4, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The kind of 'a Or_null.t is value_or_null mod everything with 'a
+       The layout of 'a Or_null.t is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of 'a Or_null.t must be a subkind of value
+       But the layout of 'a Or_null.t must be a sublayout of value
          because of the definition of t at line 2, characters 2-45.
 |}]
 
@@ -106,9 +121,9 @@ type 'a t : value = 'a or_null [@@or_null_reexport]
 Line 1, characters 0-51:
 1 | type 'a t : value = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a or_null" is value_or_null mod everything with 'a
+Error: The layout of type "'a or_null" is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of type "'a or_null" must be a subkind of value
+       But the layout of type "'a or_null" must be a sublayout of value
          because of the definition of t at line 1, characters 0-51.
 |}]
 
@@ -118,7 +133,7 @@ type 'a t : float64 = 'a or_null [@@or_null_reexport]
 Line 1, characters 0-53:
 1 | type 'a t : float64 = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "'a or_null" is value
+Error: The layout of type "'a or_null" is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of type "'a or_null" must be a sublayout of float64
          because of the definition of t at line 1, characters 0-53.
@@ -131,10 +146,10 @@ Line 1, characters 24-26:
 1 | type ('a : float64) t = 'a or_null [@@or_null_reexport]
                             ^^
 Error: This type "('a : float64)" should be an instance of type
-         "('b : value_or_null mod non_null)"
+         "('b : value maybe_separable)"
        The layout of 'a is float64
          because of the annotation on 'a in the declaration of the type t.
-       But the layout of 'a must overlap with value
+       But the layout of 'a must be a value layout
          because the type argument of or_null has layout value.
 |}]
 
@@ -149,18 +164,17 @@ let fail = Or_null.This (Or_null.This 5)
 [%%expect{|
 module Or_null :
   sig
-    type ('a : value_or_null mod non_null) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
+    type ('a : value maybe_separable) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
   end
 Line 4, characters 24-40:
 4 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
-       but an expression was expected of type
-         "('b : value_or_null mod non_null)"
-       The kind of 'a Or_null.t is value_or_null mod everything with 'a
+       but an expression was expected of type "('b : value maybe_separable)"
+       The layout of 'a Or_null.t is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of 'a Or_null.t must be a subkind of
-           value_or_null mod non_null
+       But the layout of 'a Or_null.t must be a sublayout of
+           value maybe_separable
          because of the definition of t at line 2, characters 2-63.
 |}]
 
@@ -187,6 +201,16 @@ Line 1, characters 0-30:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Invalid reexport declaration.
        Type t must be defined equal to the primitive type or_null.
+|}]
+
+type 'a both_attrs = 'a or_null [@@or_null] [@@or_null_reexport]
+
+[%%expect{|
+Line 1, characters 0-64:
+1 | type 'a both_attrs = 'a or_null [@@or_null] [@@or_null_reexport]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Invalid [@or_null] declaration:
+       it cannot be both [@@or_null] and [@@or_null_reexport].
 |}]
 
 (* CR layouts v3: This would be nice to accept, but it's somewhat complicated

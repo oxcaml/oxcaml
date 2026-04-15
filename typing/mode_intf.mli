@@ -207,7 +207,7 @@ module type Axis = sig
 
   (** Compare two axes in implication order. If A implies B, then A is before B.
   *)
-  val compare : 'a t -> 'b t -> int
+  val compare : 'a t -> 'b t -> ('a, 'b) Misc.comparison
 
   type packed = P : 'a t -> packed
 
@@ -248,7 +248,38 @@ type 'd neg_hint_morph = 'd neg Mode_hint.morph constraint 'd = _ * _
 
 type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
 
+module type Total = sig
+  (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
+
+      If it's also finite, then the ordering can be represented as a monotone
+      injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
+
+  type t
+
+  val ord : t -> int
+
+  val min : t
+
+  val max : t
+end
+
 module type S = sig
+  module Lattices : sig
+    module Total : functor (L : Total) -> sig
+      val min : L.t
+
+      val max : L.t
+
+      val le : L.t -> L.t -> bool
+
+      val equal : L.t -> L.t -> bool
+
+      val join : L.t -> L.t -> L.t
+
+      val meet : L.t -> L.t -> L.t
+    end
+  end
+
   val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
 
   (* CR-someday zqian: find a better stroy to erase bounds (and hints) that incorporates
@@ -379,6 +410,7 @@ module type S = sig
       type t =
         | Portable
         | Shareable
+        | Corruptible
         | Nonportable
 
       include Const with type t := t
@@ -407,6 +439,7 @@ module type S = sig
     module Const : sig
       type t =
         | Uncontended
+        | Corrupted
         | Shared
         | Contended
 
@@ -452,7 +485,8 @@ module type S = sig
     module Const : sig
       type t =
         | Stateless
-        | Observing
+        | Writing
+        | Reading
         | Stateful
 
       include Const with type t := t
@@ -462,7 +496,9 @@ module type S = sig
 
     val stateless : lr
 
-    val observing : lr
+    val writing : lr
+
+    val reading : lr
 
     val stateful : lr
   end
@@ -472,6 +508,7 @@ module type S = sig
       type t =
         | Read_write
         | Read
+        | Write
         | Immutable
 
       include Const with type t := t
@@ -482,6 +519,8 @@ module type S = sig
     val immutable : lr
 
     val read : lr
+
+    val write : lr
 
     val read_write : lr
   end
@@ -530,7 +569,7 @@ module type S = sig
 
     val print : Fmt.formatter -> ('p, 'r) t -> unit
 
-    val eq : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
+    val equal : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
   end
 
   module type Mode := sig
@@ -580,8 +619,8 @@ module type S = sig
       (** Represents a mode axis in this product whose constant is ['a], and
           whose allowance is ['d1] given the product's allowance ['d0]. *)
       type 'a t =
-        | Monadic : 'a Monadic.Axis.t -> 'a t
         | Comonadic : 'a Comonadic.Axis.t -> 'a t
+        | Monadic : 'a Monadic.Axis.t -> 'a t
 
       include Axis with type 'a t := 'a t
     end

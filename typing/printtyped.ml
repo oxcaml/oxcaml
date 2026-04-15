@@ -148,14 +148,6 @@ let fmt_partiality f x =
   | Total -> ()
   | Partial -> fprintf f " (Partial)"
 
-let fmt_index_kind f = function
-  | Index_int -> fprintf f "Index_int"
-  | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
-  | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
-  | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
-  | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
-  | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
-
 let line i f s (*...*) =
   fprintf f "%s" (String.make (2*i) ' ');
   fprintf f s (*...*)
@@ -191,6 +183,9 @@ let arg_label i ppf = function
   | Optional s -> line i ppf "Optional \"%s\"\n" s
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
   | Position s -> line i ppf "Position \"%s\"\n" s
+
+let layout_var ppf {txt; _} =
+  fprintf ppf " %s" txt
 
 let typevar_no_jkind ~print_quote ppf v =
   let pptv =
@@ -415,6 +410,10 @@ let rec core_type i ppf x =
       line i ppf "Ttyp_repr%a\n"
         (fun ppf -> List.iter (typevar_no_jkind ~print_quote:true ppf)) lv;
       core_type i ppf ct
+  | Ttyp_newlayout (lv, ct) ->
+      line i ppf "Ttyp_newlayout%a\n"
+        (fun ppf -> List.iter (layout_var ppf)) lv;
+      core_type i ppf ct
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
@@ -525,6 +524,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_or\n";
       pattern i ppf p1;
       pattern i ppf p2;
+  | Tpat_fun_layout { id = s; sort; mode = m; _ } ->
+      line i ppf "Tpat_fun_layout \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" fmt_sort sort;
+      value_mode i ppf m
 
 and labeled_pattern : type k . _ -> _ -> string option * k general_pattern -> unit =
   fun i ppf (label, x) ->
@@ -648,6 +651,9 @@ and expression i ppf x =
   end;
   match x.exp_desc with
   | Texp_ident { path; _ } -> line i ppf "Texp_ident %a\n" fmt_path path;
+  | Texp_apply_layout (exp, args) ->
+      line i ppf "Texp_apply_layout (%d args)\n" (List.length args);
+      expression (i+1) ppf exp;
   | Texp_instvar (_, li,_) -> line i ppf "Texp_instvar %a\n" fmt_path li;
   | Texp_mutvar id -> line i ppf "Texp_mutvar %a\n" fmt_ident id.txt;
   | Texp_constant (c) -> line i ppf "Texp_constant %a\n" fmt_constant c;
@@ -855,9 +861,6 @@ and expression i ppf x =
   | Texp_antiquotation e ->
     line i ppf "Texp_antiquotation";
     expression i ppf e
-  | Texp_eval (typ, _) ->
-    line i ppf "Texp_eval";
-    core_type i ppf typ;
 
 and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_ident x.val_id fmt_location
@@ -1248,6 +1251,12 @@ and with_constraint i ppf x =
   | Twith_modtypesubst mty ->
       line i ppf "Twith_modtype\n";
       module_type (i+1) ppf mty
+  | Twith_jkind kd ->
+      line i ppf "Twith_jkind\n";
+      jkind_declaration (i+1) ppf kd;
+  | Twith_jkindsubst kd ->
+      line i ppf "Twith_jkindsubst\n";
+      jkind_declaration (i+1) ppf kd;
 
 and module_expr i ppf x =
   line i ppf "module_expr %a\n" fmt_location x.mod_loc;
@@ -1383,12 +1392,6 @@ and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ -> _ =
 and block_access i ppf = function
   | Baccess_field (li, _) ->
       line i ppf "Baccess_field %a\n" fmt_longident li
-  | Baccess_array
-        { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort } ->
-      line i ppf "Baccess_array %a %a %a\n"
-        fmt_mutable_flag mut fmt_index_kind index_kind
-        fmt_sort elt_sort;
-      expression i ppf index
   | Baccess_block (mut, index) ->
       line i ppf "Baccess_block %a\n"
         fmt_mutable_flag mut;

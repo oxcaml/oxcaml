@@ -26,8 +26,6 @@ open Translcore
 open Translclass
 open Debuginfo.Scoped_location
 
-module SL = Slambda
-
 let const_int i = Lambda.const_int i
 
 type unsafe_component =
@@ -980,6 +978,40 @@ and transl_include_functor ~generative ~input_repr modl params scopes loc =
 let _ =
   Translcore.transl_module := transl_module
 
+(* Introduce dependencies on modules referenced only by "external". *)
+
+let scan_used_globals lam =
+  let globals = ref Compilation_unit.Set.empty in
+  let rec scan lam =
+    Lambda.iter_head_constructor scan lam;
+    match lam with
+      Lprim ((Pgetglobal (cu, _)), _, _) ->
+        globals := Compilation_unit.Set.add cu !globals
+    | _ -> ()
+  in
+  scan lam; !globals
+
+let required_globals ~flambda body =
+  let globals = scan_used_globals body in
+  let add_global comp_unit req =
+    if not flambda && Compilation_unit.Set.mem comp_unit globals then
+      req
+    else
+      Compilation_unit.Set.add comp_unit req
+  in
+  let required =
+    List.fold_left
+      (fun acc cu -> add_global cu acc)
+      (if flambda then globals else Compilation_unit.Set.empty)
+      (Translprim.get_units_with_used_primitives ())
+  in
+  let required =
+    List.fold_right add_global (Env.get_required_globals ()) required
+  in
+  Env.reset_required_globals ();
+  Translprim.clear_used_primitives ();
+  required
+
 let add_arg_block_to_module_representation = function
     (* NB: this assumes [arg_block] has layout value *)
   | Module_value_only { field_count } ->
@@ -1109,10 +1141,11 @@ let transl_implementation compilation_unit impl ~loc =
         in
         body, format
   in
-  { SL.compilation_unit;
+  { compilation_unit;
     main_module_block_format;
     arg_block_idx;
-    code = SL.Quote body }
+    required_globals = required_globals ~flambda:true body;
+    code = body }
 
 
 (* Compile a toplevel phrase *)
@@ -1140,7 +1173,7 @@ let toploop_getvalue id =
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield (toploop_getvalue_pos, Pointer, Reads_agree),
-                  [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
+                  [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
       Const_string (toplevel_name id, Location.none, None)))];
@@ -1160,7 +1193,7 @@ let toploop_setvalue id lam =
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield (toploop_setvalue_pos, Pointer, Reads_agree),
-                  [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
+                  [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=
       [Lconst(Const_base(
@@ -1328,11 +1361,11 @@ let transl_toplevel_definition str =
 
 let get_component = function
     None -> Lconst const_unit
-  | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
+  | Some id -> Lprim(Pgetglobal (id, Dynamic), [], Loc_unknown)
 
 let () =
   match Jkind.Sort.Const.for_module with
-  | Base Value -> ()
+  | Base Scannable -> ()
   | _ -> Misc.fatal_error "Lambda.transl_package: expected modules to be values"
     (* If this assumption is broken, [transl_package] should return a
        module representation instead of a size *)
@@ -1363,21 +1396,26 @@ type runtime_arg =
   | Main_module_block of Compilation_unit.t
   | Unit
 
+let unit_of_runtime_arg arg =
+  match arg with
+  | Argument_block { ra_unit = cu; _ } | Main_module_block cu -> Some cu
+  | Unit -> None
+
 let transl_runtime_arg arg =
   match arg with
   | Argument_block { ra_unit; ra_field_idx; ra_main_repr } ->
       Lprim (mod_field ra_field_idx ra_main_repr,
-             [Lprim (Pgetglobal ra_unit, [], Loc_unknown)],
+             [Lprim (Pgetglobal (ra_unit, Dynamic), [], Loc_unknown)],
              Loc_unknown)
   | Main_module_block cu ->
-      Lprim (Pgetglobal cu, [], Loc_unknown)
+      Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)
   | Unit ->
       lambda_unit
 
 let transl_instance_impl
       compilation_unit ~runtime_args ~main_module_block_repr
       ~arg_block_idx
-    : SL.program =
+    : Lambda.program =
   let base_compilation_unit, _args =
     Compilation_unit.split_instance_exn compilation_unit
   in
@@ -1385,8 +1423,8 @@ let transl_instance_impl
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
     Lprim (mod_field 0 (Module_value_only { field_count = 1 }),
-           [Lprim (Pgetglobal base_compilation_unit, [], Loc_unknown)],
-           Loc_unknown)
+      [Lprim (Pgetglobal (base_compilation_unit, Dynamic), [], Loc_unknown)],
+      Loc_unknown)
   in
   let runtime_args_lam = List.map transl_runtime_arg runtime_args in
   let code =
@@ -1403,7 +1441,10 @@ let transl_instance_impl
       ap_probe = None;
     }
   in
-  let code = SL.Quote code in
+  let required_globals =
+    base_compilation_unit :: List.filter_map unit_of_runtime_arg runtime_args
+    |> Compilation_unit.Set.of_list
+  in
   let main_module_block_format =
     Mb_struct { mb_repr = main_module_block_repr }
   in
@@ -1411,6 +1452,7 @@ let transl_instance_impl
     compilation_unit;
     code;
     main_module_block_format;
+    required_globals;
     arg_block_idx;
   }
 

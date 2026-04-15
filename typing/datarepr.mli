@@ -35,6 +35,15 @@ val constructors_of_type:
 
 exception Constr_not_found
 
+type variant_with_null_payload =
+  {
+    payload_cstr: constructor_declaration;
+    payload_arg: constructor_argument;
+  }
+
+val find_variant_with_null_payload :
+  constructor_declaration list -> variant_with_null_payload option
+
 val find_constr_by_tag:
   constant:bool -> int -> ((constructor_description * 'a) * 'b) list ->
     constructor_description

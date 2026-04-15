@@ -39,13 +39,17 @@ module type Lattices = sig
 
   val le : 'a obj -> 'a elt -> 'a elt -> bool
 
+  val equal : 'a obj -> 'a elt -> 'a elt -> bool
+
   val join : 'a obj -> 'a elt -> 'a elt -> 'a elt
 
   val meet : 'a obj -> 'a elt -> 'a elt -> 'a elt
 
   val print : 'a obj -> Fmt.formatter -> 'a elt -> unit
 
-  val eq_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.eq option
+  (** Compares two objects. Used for deduplication only; it is sound (but not
+      recommended) to return a nonzero value for equal objects. *)
+  val compare_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.comparison
 
   val print_obj : Fmt.formatter -> 'a obj -> unit
 end
@@ -147,17 +151,13 @@ module type Lattices_mono = sig
   (** Apply morphism on constant *)
   val apply : 'b obj -> ('a, 'b, 'd) morph -> 'a -> 'b
 
-  (** Checks if two morphisms are equal. If so, returns [Some Refl]. Used for
-      deduplication only; it is fine (but not recommended) to return [None] for
-      equal morphisms.
-
-      While a [morph] must be acompanied by a destination [obj] to uniquely
-      identify a morphism, two [morph] sharing the same destination can be
-      compared on their own. *)
-  val eq_morph :
-    ('a0, 'b, 'l0 * 'r0) morph ->
-    ('a1, 'b, 'l1 * 'r1) morph ->
-    ('a0, 'a1) Misc.eq option
+  (** Compares two morphisms. Used for deduplication only; it is fine (but not
+      recommended) to return a nonzero value for equal morphisms. *)
+  val compare_morph :
+    'b obj ->
+    ('a0, 'b, 'd0) morph ->
+    ('a1, 'b, 'd1) morph ->
+    ('a0, 'a1) Misc.comparison
 
   (** Print morphism *)
   val print_morph : 'b obj -> Fmt.formatter -> ('a, 'b, 'd) morph -> unit
@@ -441,12 +441,6 @@ module type Hint = sig
 end
 
 module type S = sig
-  (** Takes a slow but type-correct [Equal] module and returns the magic
-      version, which is faster. NOTE: for this to be sound, the function in the
-      original module must be just %equal (up to runtime representation). *)
-  module Magic_equal (X : Equal) :
-    Equal with type ('a, 'b, 'c) t = ('a, 'b, 'c) X.t
-
   (** Solver that supports lattices with monotone morphisms between them. *)
   module Solver_mono (Hint : Hint) (C : Lattices_mono) :
     Solver_mono

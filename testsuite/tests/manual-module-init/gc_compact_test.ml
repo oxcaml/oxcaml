@@ -43,4 +43,4 @@ let test_gc () =
   Printf.printf "Gc_compact_test: all checks passed\n%!"
 
 (* Register the callback so C can call it *)
-let () = Callback.register "test_gc" test_gc [@@alert "-unsafe_multidomain"]
+let () = Callback.register "test_gc" test_gc

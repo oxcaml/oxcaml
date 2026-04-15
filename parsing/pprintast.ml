@@ -332,44 +332,6 @@ let string_loc ppf x = fprintf ppf "%s" x.txt
 
 let string_quot f x = pp f "`%a" ident_of_name x
 
-(* legacy modes and modalities *)
-let legacy_mode f { txt = Mode s; _ } =
-  let s =
-    match s with
-    | "local" -> "local_"
-    | s -> Misc.fatal_errorf "Unrecognized mode %s - should not parse" s
-  in
-  pp_print_string f s
-
-let legacy_modes f m =
-  pp_print_list ~pp_sep:(fun f () -> pp f " ") legacy_mode f m
-
-let optional_legacy_modes f m =
-  match m with
-  | [] -> ()
-  | m ->
-    legacy_modes f m;
-    pp_print_space f ()
-
-let legacy_modality f m =
-  let {txt; _} = (m : modality Location.loc) in
-  let s =
-    match txt with
-    | Modality "global" -> "global_"
-    | Modality s -> Misc.fatal_errorf "Unrecognized modality %s - should not parse" s
-  in
-  pp_print_string f s
-
-let legacy_modalities f m =
-  pp_print_list ~pp_sep:(fun f () -> pp f " ") legacy_modality f m
-
-let optional_legacy_modalities f m =
-  match m with
-  | [] -> ()
-  | m ->
-    legacy_modalities f m;
-    pp_print_space f ()
-
 (* new mode and modality syntax *)
 let mode f { txt = Mode s; _ } =
   pp_print_string f s
@@ -405,36 +367,11 @@ let optional_atat_modalities_newline f m =
   let pre f () = Format.fprintf f "%@%@@ " in
   optional_modalities ~pre ~post:pp_print_newline f m
 
-(** For a list of modes, we either print everything in old syntax (if they
-  are purely old modes), or everything in new syntax. *)
-let print_modes_in_old_syntax =
-  List.for_all (fun m ->
-    let Mode txt = m.txt in
-    match txt with
-    | "local" -> true
-    | _ -> false
-  )
-
-(** For a list of modalities, we either print all in old syntax (if they are
-  purely old modalities), or all in new syntax. *)
-let print_modality_in_old_syntax =
-  List.for_all (fun m ->
-    let Modality txt = m.txt in
-    match txt with
-    | "global" -> true
-    | _ -> false
-  )
-
 let modalities_type pty ctxt f pca =
   let m = pca.pca_modalities in
-  if print_modality_in_old_syntax m then
-    pp f "%a%a"
-      optional_legacy_modalities m
-      (pty ctxt) pca.pca_type
-  else
-    pp f "%a%a"
-      (pty ctxt) pca.pca_type
-      optional_space_atat_modalities m
+  pp f "%a%a"
+    (pty ctxt) pca.pca_type
+    optional_space_atat_modalities m
 
 let include_kind f = function
   | Functor -> pp f "@ functor"
@@ -447,26 +384,23 @@ let rec class_params_def f =  function
       pp f "[%a] " (* space *)
         (list type_param ~sep:",") l
 
-and core_type_with_optional_legacy_modes pty ctxt f (c, m) =
+and core_type1_with_optional_modes pty ctxt f (c, m) =
   match m with
   | [] -> pty ctxt f c
   | _ :: _ ->
-    if print_modes_in_old_syntax m then
-      pp f "%a%a" optional_legacy_modes m (core_type1 ctxt) c
-    else
-      pp f "%a%a" (core_type1 ctxt) c optional_at_modes m
+    pp f "%a%a" (core_type1 ctxt) c optional_at_modes m
 
 and type_with_label ctxt f (label, c, mode) =
   match label with
   | Nolabel    ->
-    core_type_with_optional_legacy_modes core_type1 ctxt f (c, mode)
+    core_type1_with_optional_modes core_type1 ctxt f (c, mode)
     (* otherwise parenthesize *)
   | Labelled s ->
     pp f "%a:%a" ident_of_name s
-      (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
+      (core_type1_with_optional_modes core_type1 ctxt) (c, mode)
   | Optional s ->
     pp f "?%a:%a" ident_of_name s
-      (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
+      (core_type1_with_optional_modes core_type1 ctxt) (c, mode)
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
   | Pjk_default -> pp f "_"
@@ -490,7 +424,7 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
         (core_type ctxt) ty
         optional_space_atat_modalities modalities;
     ) f (t, ty, modalities)
-  | Pjk_kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
+  | Pjk_kind_of ty -> pp f "(kind_of_ %a)" (core_type ctxt) ty
   | Pjk_product ts ->
     Misc.pp_parens_if nested (fun f ts ->
       pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
@@ -535,7 +469,7 @@ and core_type ctxt f x =
     | Ptyp_alias (ct, s, j) ->
         pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct
           tyvar_loc_option_jkind (s, j)
-    | Ptyp_poly ([], ct) | Ptyp_repr ([], ct) ->
+    | Ptyp_poly ([], ct) | Ptyp_repr ([], ct) | Ptyp_newlayout ([], ct) ->
         core_type ctxt f ct
     | Ptyp_poly (sl, ct) ->
         pp f "@[<2>%a%a@]"
@@ -557,6 +491,10 @@ and core_type ctxt f x =
                           (tyvar_loc_repr tyvar) ~sep:"@;")
                           l)
           lv (core_type ctxt) ct
+    | Ptyp_newlayout (lv, ct) ->
+        pp f "@[<2>layout_@;%a.@;%a@]"
+          (list string_loc ~sep:"@;") lv
+          (core_type ctxt) ct
     | Ptyp_of_kind jkind ->
       pp f "@[(type@ :@ %a)@]" (jkind_annotation reset_ctxt) jkind
     | _ -> pp f "@[<2>%a@]" (core_type1 ctxt) x
@@ -648,7 +586,7 @@ and core_type1 ctxt f x =
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_repr _
-      | Ptyp_of_kind _) ->
+      | Ptyp_newlayout _ | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x
 
 and core_type2 ctxt f x =
@@ -687,10 +625,10 @@ and labeled_core_type1 ctxt f (label, ty) =
 and return_type ctxt f (x, m) =
   let is_curry, ptyp_attributes = split_out_curry_attr x.ptyp_attributes in
   let x = {x with ptyp_attributes} in
-  if is_curry then core_type_with_optional_legacy_modes core_type1 ctxt f (x, m)
-  else core_type_with_optional_legacy_modes core_type ctxt f (x, m)
+  if is_curry then core_type1_with_optional_modes core_type1 ctxt f (x, m)
+  else core_type1_with_optional_modes core_type ctxt f (x, m)
 
-and core_type_with_optional_modes  ctxt f (ty, modes) =
+and core_type2_with_optional_modes  ctxt f (ty, modes) =
   match modes with
   | [] -> core_type ctxt f ty
   | _ :: _ -> pp f "%a%a" (core_type2 ctxt) ty optional_at_modes modes
@@ -854,21 +792,12 @@ and labeled_tuple_pattern ctxt f ~unboxed l closed =
 and pattern2 ctxt f p =
   match p.ppat_desc with
   | Ppat_constraint(p, ct, m) ->
-    begin match ct, print_modes_in_old_syntax m with
-    | Some ct, true ->
-        pp f "@[<2>%a%a@;:@;%a@]"
-        optional_legacy_modes m
-        (simple_pattern ctxt) p
-        (core_type ctxt) ct
-    | Some ct, false ->
+    begin match ct with
+    | Some ct ->
         pp f "@[<2>%a@;:@;%a@]"
         (simple_pattern ctxt) p
-        (core_type_with_optional_modes ctxt) (ct, m)
-    | None, true ->
-        pp f "@[<2>%a%a@]"
-        optional_legacy_modes m
-        (simple_pattern ctxt) p
-    | None, false ->
+        (core_type2_with_optional_modes ctxt) (ct, m)
+    | None ->
         pp f "@[<2>%a%a@]"
         (simple_pattern ctxt) p
         optional_at_modes m
@@ -1222,15 +1151,13 @@ and simple_expr ctxt f x =
     | Pexp_unboxed_tuple l ->
         labeled_tuple_expr ctxt f ~unboxed:true l
     | Pexp_constraint (e, ct, m) ->
-      begin match ct, print_modes_in_old_syntax m with
-      | None, true ->
-        pp f "(%a %a)" legacy_modes m (expression ctxt) e
-      | None, false ->
-        pp f "(%a : _%a)" (expression ctxt) e optional_at_modes m
-      | Some ct, _ ->
+      begin match ct with
+      | None ->
+        pp f "(%a : %@ %a)" (expression ctxt) e modes m
+      | Some ct ->
         pp f "(%a : %a)"
           (expression ctxt) e
-          (core_type_with_optional_modes ctxt) (ct, m)
+          (core_type2_with_optional_modes ctxt) (ct, m)
       end
     | Pexp_coerce (e, cto1, ct) ->
         pp f "(%a%a :> %a)" (expression ctxt) e
@@ -1502,13 +1429,17 @@ and sig_include ctxt f incl moda =
 
 and jkind_declaration ctxt f jd =
   begin match jd.pjkind_manifest with
-  | None -> pp f "@[<hov2>kind_@ %a@]" string_loc jd.pjkind_name
-  | Some jkind ->
-     pp f "@[<hov2>kind_@ %a@ =@ %a@]"
-       string_loc jd.pjkind_name
-       (jkind_annotation ctxt) jkind
-  end;
-  item_attributes ctxt f jd.pjkind_attributes
+  | None -> ()
+  | Some jkind -> pp f "@;%a" (jkind_annotation ctxt) jkind
+  end
+
+and jkind_def ctxt f jd =
+  let eq = if jd.pjkind_manifest = None then "" else " =" in
+  pp f "@[<2>kind_@ %a%s%a@]%a"
+    string_loc jd.pjkind_name
+    eq
+    (jkind_declaration ctxt) jd
+    (item_attributes ctxt) jd.pjkind_attributes
 
 and module_type_with_optional_modes ctxt f (mty, mm) =
   match mm with
@@ -1559,6 +1490,8 @@ and with_constraint ctxt f = function
       pp f "module %a =@ %a" longident_loc li longident_loc li2;
   | Pwith_modtype (li, mty) ->
       pp f "module type %a =@ %a" longident_loc li (module_type ctxt) mty;
+  | Pwith_jkind (li, jd) ->
+      pp f "kind_ %a =@ %a" longident_loc li (jkind_declaration ctxt) jd;
   | Pwith_typesubst (li, ({ptype_params=ls;_} as td)) ->
       pp f "type@ %a %a :=@ %a"
         type_params ls
@@ -1568,6 +1501,8 @@ and with_constraint ctxt f = function
       pp f "module %a :=@ %a" longident_loc li longident_loc li2
   | Pwith_modtypesubst (li, mty) ->
       pp f "module type %a :=@ %a" longident_loc li (module_type ctxt) mty;
+  | Pwith_jkindsubst (li, jd) ->
+      pp f "kind_ %a :=@ %a" longident_loc li (jkind_declaration ctxt) jd;
 
 
 and module_type1 ctxt f x =
@@ -1698,7 +1633,7 @@ and signature_item ctxt f x : unit =
       item_extension ctxt f e;
       item_attributes ctxt f a
   | Psig_jkind kd ->
-      jkind_declaration ctxt f kd
+      jkind_def ctxt f kd
 
 and module_expr ctxt f x =
   if x.pmod_attributes <> [] then
@@ -1794,7 +1729,7 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
   | Some (Pvc_constraint { locally_abstract_univars = []; typ }) ->
       pp f "%a@;:@;%a@;=@;%a"
         (simple_pattern ctxt) p
-        (core_type_with_optional_modes ctxt) (typ, modes)
+        (core_type2_with_optional_modes ctxt) (typ, modes)
         (expression ctxt) x
   | Some (Pvc_constraint { locally_abstract_univars = vars; typ }) ->
       pp f "%a@;: %a@;=@;%a"
@@ -1880,15 +1815,8 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
 and bindings ctxt f (mf,rf,l) =
   let binding kwd mf rf f x =
     (* The other modes are printed inside [binding] *)
-    let legacy, x =
-      if print_modes_in_old_syntax x.pvb_modes then
-        x.pvb_modes, {x with pvb_modes = []}
-      else
-        [], x
-    in
     let poly_str = if x.pvb_is_poly then "poly_ " else "" in
-    pp f "@[<2>%s %a%s%a%a%a@]%a" kwd mutable_flag mf poly_str rec_flag rf
-      optional_legacy_modes legacy
+    pp f "@[<2>%s %a%s%a%a@]%a" kwd mutable_flag mf poly_str rec_flag rf
       (binding ctxt) x
       (item_attributes ctxt) x.pvb_attributes
   in
@@ -2060,7 +1988,7 @@ and structure_item ctxt f x =
       item_extension ctxt f e;
       item_attributes ctxt f a
   | Pstr_jkind jd ->
-      jkind_declaration ctxt f jd
+      jkind_def ctxt f jd
 
 (* Don't just use [core_type] because we do not want parens around params
    with jkind annotations *)
@@ -2119,18 +2047,11 @@ and type_def_list ctxt f (rf, exported, l) =
 
 and record_declaration ctxt f ~unboxed lbls =
   let type_record_field f pld =
-    let legacy, m =
-      if print_modality_in_old_syntax pld.pld_modalities then
-        pld.pld_modalities, []
-      else
-        [], pld.pld_modalities
-    in
-    pp f "@[<2>%a%a%a:@;%a%a@;%a@]"
+    pp f "@[<2>%a%a:@;%a%a@;%a@]"
       mutable_flag pld.pld_mutable
-      optional_legacy_modalities legacy
       ident_of_name pld.pld_name.txt
       (core_type ctxt) pld.pld_type
-      optional_space_atat_modalities m
+      optional_space_atat_modalities pld.pld_modalities
       (attributes ctxt) pld.pld_attributes
   in
   let hash = if unboxed then "#" else "" in
@@ -2297,21 +2218,6 @@ and directive_argument f x =
 and block_access ctxt f = function
   | Baccess_field li ->
     pp f ".%a" longident_loc li
-  | Baccess_array (mut, index_kind, index) ->
-    let dotop =
-      match mut with
-      | Mutable -> "."
-      | Immutable -> ".:"
-    in
-    let suffix = match index_kind with
-      | Index_int -> ""
-      | Index_unboxed_int64 -> "L"
-      | Index_unboxed_int32 -> "l"
-      | Index_unboxed_int16 -> "S"
-      | Index_unboxed_int8 -> "s"
-      | Index_unboxed_nativeint -> "n"
-    in
-    pp f "%s%s(%a)" dotop suffix (expression ctxt) index
   | Baccess_block (mut, index) ->
     let s =
       match mut with
@@ -2395,7 +2301,7 @@ and function_constraint ctxt f x =
   | { ret_type_constraint = Some (Pconstraint ty); ret_mode_annotations; _ } ->
 
     pp f "@;:@;%a@;"
-      (core_type_with_optional_modes ctxt) (ty, ret_mode_annotations)
+      (core_type2_with_optional_modes ctxt) (ty, ret_mode_annotations)
   | { ret_type_constraint = Some (Pcoerce (ty1, ty2)); _ } ->
     pp f "@;%a:>@;%a"
       (option ~first:":@;" (core_type ctxt)) ty1

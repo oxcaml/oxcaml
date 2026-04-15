@@ -99,6 +99,7 @@ let builtin_attrs =
   ; "nolabels"
   ; "flambda_oclassic"
   ; "flambda_o3"
+  ; "flambda_o4"
   ; "afl_inst_ratio"
   ; "local_opt"
   ; "curry"; "extension.curry"
@@ -110,6 +111,7 @@ let builtin_attrs =
   ; "noalloc"
   ; "zero_alloc"
   ; "untagged"
+  ; "unpacked"
   ; "poll"
   ; "loop"
   ; "tail_mod_cons"
@@ -120,6 +122,7 @@ let builtin_attrs =
   ; "only_generative_effects"
   ; "error_message"
   ; "layout_poly"
+  ; "or_null"
   ; "or_null_reexport"
   ; "no_recursive_modalities"
   ; "jane.non_erasable.instances"
@@ -581,6 +584,11 @@ let flambda_o3_attribute attr =
     ~name:"flambda_o3"
     ~f:(fun () -> if Config.flambda || Config.flambda2 then Clflags.set_o3 ())
 
+let flambda_o4_attribute attr =
+  clflags_attribute_without_payload' attr
+    ~name:"flambda_o4"
+    ~f:(fun () -> if Config.flambda || Config.flambda2 then Clflags.set_o4 ())
+
 let llvm_backend_attribute attr =
   clflags_attribute_without_payload' attr
     ~name:"llvm_backend"
@@ -661,6 +669,7 @@ let parse_standard_implementation_attributes attr =
   inline_attribute attr;
   afl_inst_ratio_attribute attr;
   flambda_o3_attribute attr;
+  flambda_o4_attribute attr;
   flambda_oclassic_attribute attr;
   zero_alloc_attribute ~in_signature:false attr;
   unsafe_allow_any_mode_crossing_attribute attr;
@@ -677,6 +686,9 @@ let curry_attr_name = "extension.curry"
 let has_curry attrs =
   has_attribute curry_attr_name attrs
   || has_attribute "curry" attrs
+
+let has_or_null attrs =
+  has_attribute "or_null" attrs
 
 let has_or_null_reexport attrs =
   has_attribute "or_null_reexport" attrs
@@ -1162,10 +1174,5 @@ let get_tracing_probe_payload (payload : Parsetree.payload) =
     | _ -> Error ()
   in
   Ok { name; name_loc; enabled_at_init; arg }
-
-let get_eval_payload payload =
-  match payload with
-  | PTyp typ -> Ok typ
-  | _ -> Error ()
 
 let has_atomic attrs = has_attribute "atomic" attrs

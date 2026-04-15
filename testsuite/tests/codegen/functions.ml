@@ -1,8 +1,10 @@
 (* TEST
  flags += " -O3";
  flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  only-default-codegen;
  expect.opt;
 *)
@@ -34,24 +36,23 @@ let mutual_recursion n m =
 [%%expect_asm X86_64{|
 mutual_recursion:
   subq  $8, %rsp
-  movq  %rbx, %rdi
   subq  $56, %r15
   cmpq  (%r14), %r15
   jb    .L106
 .L108:
-  leaq  8(%r15), %rbx
-  movq  $6391, -8(%rbx)
+  leaq  8(%r15), %rdi
+  movq  $6391, -8(%rdi)
   movq  camlTOP3__g_6_9_code@GOTPCREL(%rip), %rsi
-  movq  %rsi, (%rbx)
+  movq  %rsi, (%rdi)
   movabsq $72057594037927949, %rsi
-  movq  %rsi, 8(%rbx)
-  movq  $3321, 16(%rbx)
+  movq  %rsi, 8(%rdi)
+  movq  $3321, 16(%rdi)
   movq  camlTOP3__f_5_8_code@GOTPCREL(%rip), %rsi
-  movq  %rsi, 24(%rbx)
+  movq  %rsi, 24(%rdi)
   movabsq $108086391056891911, %rsi
-  movq  %rsi, 32(%rbx)
-  movq  %rdi, 40(%rbx)
-  addq  $24, %rbx
+  movq  %rsi, 32(%rdi)
+  movq  %rbx, 40(%rdi)
+  leaq  24(%rdi), %rbx
   addq  $8, %rsp
   jmp   camlTOP3__f_5_8_code@PLT
 
@@ -61,8 +62,7 @@ mutual_recursion.f:
   jge   .L114
   ret
 .L114:
-  movq  %rdi, %rbx
-  addq  $-24, %rbx
+  leaq  -24(%rdi), %rbx
   movq  16(%rdi), %rdi
   subq  %rdi, %rax
   incq  %rax

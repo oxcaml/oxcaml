@@ -244,11 +244,11 @@ val foo : ('a : value mod portable contended). 'a option @ contended -> unit =
   <fun>
 |}]
 
-(* CR layouts v2.8: This should be accepted. Internal ticket 5111 *)
 let foo (t : ('a : value mod contended portable) option @ contended nonportable) =
   use_uncontended t;
   use_portable t
 
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 val foo : ('a : value mod portable contended). 'a option @ contended -> unit =
   <fun>
@@ -659,11 +659,11 @@ type t = Immutable.t
 module Value = F(struct type t end)
 type t : immutable_data = Value.t
 [%%expect {|
-module Value : sig type t : value mod non_float end
+module Value : sig type t : value non_float end
 Line 2, characters 0-33:
 2 | type t : immutable_data = Value.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "Value.t" is value mod non_float
+Error: The kind of type "Value.t" is value non_float
          because of the definition of t at line 2, characters 2-34.
        But the kind of type "Value.t" must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-33.

@@ -23,7 +23,7 @@ type t_imm : immediate
 type t_imm64 : immediate64
 type t_float64 : float64
 type t_void : void
-type t_any_mod_separable : any mod separable
+type t_any_mod_separable : any separable
 type t_value_or_null : value_or_null
 type void_variant = VV of t_void
 type void_record = { vr_void : t_void; vr_int : int; }
@@ -74,7 +74,8 @@ Line 4, characters 35-41:
 4 |   type 'a s = 'a -> int constraint 'a = t
                                        ^^^^^^
 Error: The type constraints are not consistent.
-       Type "('a : '_representable_layout_1)" is not compatible with type "t"
+       Type "('a : '_representable_layout_1 separable non_null)"
+       is not compatible with type "t"
        The layout of t is any
          because of the definition of t at line 2, characters 2-14.
        But the layout of t must be representable
@@ -91,7 +92,8 @@ Line 4, characters 35-41:
 4 |   type 'a s = int -> 'a constraint 'a = t
                                        ^^^^^^
 Error: The type constraints are not consistent.
-       Type "('a : '_representable_layout_2)" is not compatible with type "t"
+       Type "('a : '_representable_layout_2 separable non_null)"
+       is not compatible with type "t"
        The layout of t is any
          because of the definition of t at line 2, characters 2-14.
        But the layout of t must be representable
@@ -233,10 +235,13 @@ Line 1, characters 19-25:
 1 | let string_id (x : string imm_id) = x;;
                        ^^^^^^
 Error: This type "string" should be an instance of type "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of imm_id at line 1, characters 0-33.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}];;
 
 let id_for_imms (x : 'a imm_id) = x
@@ -256,10 +261,13 @@ Line 1, characters 33-46:
                                      ^^^^^^^^^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "'a imm_id" = "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of id_for_imms at line 1, characters 16-35.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (************************************)
@@ -272,10 +280,13 @@ Line 2, characters 9-15:
 2 | and s4 = string t4;;
              ^^^^^^
 Error: This type "string" should be an instance of type "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t4.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}];;
 
 type s4 = string t4
@@ -286,10 +297,13 @@ Line 1, characters 10-16:
 1 | type s4 = string t4
               ^^^^^^
 Error: This type "string" should be an instance of type "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t4.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 type s4 = int t4
@@ -319,10 +333,13 @@ Line 3, characters 0-15:
 3 | and s5 = string;;
     ^^^^^^^^^^^^^^^
 Error:
-       The kind of s5 is immutable_data
+       The layout of s5 is value non_float
          because it is the primitive type string.
-       But the kind of s5 must be a subkind of immediate
+       But the layout of s5 must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t4.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 type ('a : any) t4 = 'a
@@ -377,10 +394,11 @@ Line 1, characters 12-15:
 1 | let h5 (x : int void5) = f5 x
                 ^^^
 Error: This type "int" should be an instance of type "('a : void)"
-       The layout of int is value
+       The layout of int is value non_pointer
          because it is the primitive type int.
        But the layout of int must be a sublayout of void
          because of the definition of void5 at line 1, characters 0-37.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 let h5' (x : int) = Void5 x
@@ -390,10 +408,11 @@ Line 1, characters 26-27:
                               ^
 Error: This expression has type "int" but an expression was expected of type
          "('a : void)"
-       The layout of int is value
+       The layout of int is value non_pointer
          because it is the primitive type int.
        But the layout of int must be a sublayout of void
          because of the definition of void5 at line 1, characters 0-37.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* disallowed - tries to return void *)
@@ -427,10 +446,11 @@ Line 2, characters 2-32:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This definition has type "'b -> unit" which is less general than
          "'a. 'a -> unit"
-       The kind of 'a is value
+       The layout of 'a is value
          because it is or unifies with an unannotated universal variable.
-       But the kind of 'a must be a subkind of immediate
+       But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of t6_imm at line 1, characters 0-42.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 let o6 = object
@@ -443,10 +463,11 @@ Line 3, characters 4-34:
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This method has type "'b -> unit" which is less general than
          "'a. 'a -> unit"
-       The kind of 'a is value
+       The layout of 'a is value
          because it is or unifies with an unannotated universal variable.
-       But the kind of 'a must be a subkind of immediate
+       But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of t6_imm at line 1, characters 0-42.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* CR layouts v1.5: add more tests here once you can annotate these types with
@@ -465,20 +486,13 @@ Line 3, characters 12-21:
 3 | type t7' = (int * int) t7;;
                 ^^^^^^^^^
 Error: This type "int * int" should be an instance of type "('a : immediate)"
-       The kind of int * int is immutable_data
+       The layout of int * int is value non_float
          because it's a tuple type.
-       But the kind of int * int must be a subkind of immediate
+       But the layout of int * int must be a sublayout of value non_pointer
          because of the definition of t7 at line 1, characters 0-37.
-|}, Principal{|
-type ('a : immediate) t7 = Foo7 of 'a
-Line 3, characters 12-21:
-3 | type t7' = (int * int) t7;;
-                ^^^^^^^^^
-Error: This type "int * int" should be an instance of type "('a : immediate)"
-       The kind of int * int is immutable_data with int
-         because it's a tuple type.
-       But the kind of int * int must be a subkind of immediate
-         because of the definition of t7 at line 1, characters 0-37.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (**********************************************************)
@@ -496,7 +510,7 @@ Line 2, characters 40-46:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_void" is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a sublayout of value
+       But the layout of "t_void" must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -529,7 +543,7 @@ Line 4, characters 13-19:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because of the definition of t at line 2, characters 2-42.
 |}];;
 
@@ -544,7 +558,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "void_unboxed_record"
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a sublayout of value
+       But the layout of void_unboxed_record must be a value layout
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -559,7 +573,7 @@ Line 2, characters 17-23:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_void" is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a sublayout of value
+       But the layout of "t_void" must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -577,7 +591,7 @@ Line 2, characters 20-26:
 Error: Tuple element types must have layout value.
        The layout of "t_void" is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a sublayout of value
+       But the layout of "t_void" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -591,7 +605,7 @@ Line 2, characters 31-50:
 Error: Tuple element types must have layout value.
        The layout of "void_unboxed_record" is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of "void_unboxed_record" must be a sublayout of value
+       But the layout of "void_unboxed_record" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -611,7 +625,7 @@ Error: This expression has type "void_unboxed_record"
        but an expression was expected of type "('a : value_or_null)"
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a sublayout of value
+       But the layout of void_unboxed_record must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -629,7 +643,7 @@ Error: This pattern matches values of type "void_unboxed_record"
          "('a : value_or_null)"
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a sublayout of value
+       But the layout of void_unboxed_record must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -645,7 +659,7 @@ Line 4, characters 13-19:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because of the definition of t at line 2, characters 2-24.
 |}];;
 
@@ -660,7 +674,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "void_unboxed_record"
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a sublayout of value
+       But the layout of void_unboxed_record must be a value layout
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -675,7 +689,7 @@ Line 2, characters 16-22:
 Error: Tuple element types must have layout value.
        The layout of "t_void" is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a sublayout of value
+       But the layout of "t_void" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -694,7 +708,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -735,10 +749,13 @@ Error: Signature mismatch:
        is not included in
          val x : string
        The type "('a : immediate)" is not compatible with the type "string"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of x at line 8, characters 10-26.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}];;
 
 (* This hits the second linktype in moregen (requires expansion to see it's a
@@ -776,10 +793,13 @@ Error: Signature mismatch:
          val x : string
        The type "'a t" = "('a : immediate)" is not compatible with the type
          "string"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of x at line 8, characters 10-26.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (**************************************************************)
@@ -797,7 +817,7 @@ Line 5, characters 4-7:
 Error: Object types must have layout value.
        The layout of the type of this expression is void
          because of the definition of t at line 2, characters 2-42.
-       But the layout of the type of this expression must overlap with value
+       But the layout of the type of this expression must be a value layout
          because it's the type of an object.
 |}]
 
@@ -812,7 +832,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -839,7 +859,7 @@ Line 2, characters 12-22:
 Error: Object field types must have layout value.
        The layout of "t_void" is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a sublayout of value
+       But the layout of "t_void" must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -854,7 +874,7 @@ Line 3, characters 2-24:
 Error:
        The layout of 'a s is void
          because of the annotation on 'a in the declaration of the type s.
-       But the layout of 'a s must be a sublayout of value
+       But the layout of 'a s must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -869,7 +889,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -906,7 +926,7 @@ Line 4, characters 10-13:
 Error: Variables bound in a class must have layout value.
        The layout of bar is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of bar must be a sublayout of value
+       But the layout of bar must be a value layout
          because it's the type of a class field.
 |}];;
 
@@ -924,7 +944,7 @@ Line 4, characters 18-21:
 Error: Variables bound in a class must have layout value.
        The layout of bar is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of bar must be a sublayout of value
+       But the layout of bar must be a value layout
          because it's the type of a class field.
 |}];;
 
@@ -999,7 +1019,7 @@ Line 4, characters 6-22:
 Error: Variables bound in a class must have layout value.
        The layout of baz is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of baz must be a sublayout of value
+       But the layout of baz must be a value layout
          because it's the type of an instance variable.
 |}];;
 
@@ -1015,7 +1035,7 @@ Line 1, characters 11-17:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of Lazy.t has this layout.
 |}];;
 
@@ -1028,7 +1048,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of a lazy expression.
 |}];;
 
@@ -1043,7 +1063,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of a lazy expression.
 |}];;
 
@@ -1057,7 +1077,7 @@ Line 1, characters 11-17:
 Error: This type "t_void" should be an instance of type "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of option has layout value_or_null.
 |}];;
 
@@ -1070,7 +1090,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of option has layout value_or_null.
 |}];;
 
@@ -1086,7 +1106,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of option has layout value_or_null.
 |}];;
 
@@ -1100,7 +1120,7 @@ Line 1, characters 11-17:
 Error: This type "t_void" should be an instance of type "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1113,7 +1133,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1129,7 +1149,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1177,7 +1197,7 @@ Line 2, characters 0-18:
 Error:
        The layout of foo14 is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of foo14 must be a sublayout of value
+       But the layout of foo14 must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1315,7 +1335,7 @@ Error: This pattern matches values of type "(M.t_void, M.t_void) eq"
          "(M.t_void, M.t_imm) eq"
        The layout of M.t_void is void
          because of the definition of t_void at line 4, characters 2-20.
-       But the layout of M.t_void must overlap with value
+       But the layout of M.t_void must be a value layout
          because of the definition of t_imm at line 5, characters 2-24.
 |}]
 
@@ -1346,7 +1366,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of option has layout value_or_null.
 |}]
 
@@ -1574,7 +1594,7 @@ Error: This pattern matches values of type "t_void"
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -1597,7 +1617,7 @@ Error: This pattern matches values of type "t_float64"
          "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -1623,7 +1643,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because of the definition of eq at line 2, characters 2-43.
 |}]
 
@@ -1652,7 +1672,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because of the definition of f at line 3, characters 4-20.
 |}]
 
@@ -1671,7 +1691,7 @@ Error: Tuple element types must have layout value.
        The layout of "'a" is void
          because of the annotation on 'a in the declaration of the type
                                       poly_var.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -1693,7 +1713,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -1730,10 +1750,13 @@ Line 2, characters 19-31:
 2 | let f35 : 'a t35 = fun () -> ()
                        ^^^^^^^^^^^^
 Error:
-       The kind of 'a -> 'b is value mod aliased immutable non_float
+       The layout of 'a -> 'b is value non_float
          because it's a function type.
-       But the kind of 'a -> 'b must be a subkind of immediate
+       But the layout of 'a -> 'b must be a sublayout of value non_pointer
          because of the definition of t35 at line 1, characters 0-30.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (**************************************************)

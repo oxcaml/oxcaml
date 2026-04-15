@@ -84,6 +84,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
           type_arity = arity;
           type_kind = Type_record (lbls, rep, None);
           type_jkind = jkind;
+          type_ikind = Types.ikinds_todo "datarepr boxed record";
           type_private = priv;
           type_manifest = None;
           type_variance = Variance.unknown_signature ~injective:true ~arity;
@@ -101,12 +102,39 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       [
         {
           ca_type = newgenconstr path type_params;
-          ca_sort = Jkind_types.Sort.Const.value;
+          ca_sort = Jkind_types.Sort.Const.scannable;
           ca_modalities = Mode.Modality.Const.id;
           ca_loc = Location.none
         }
       ],
       Some tdecl
+
+type variant_with_null_payload =
+  {
+    payload_cstr: constructor_declaration;
+    payload_arg: constructor_argument;
+  }
+
+type variant_with_null_constructor =
+  | Variant_with_null_nullary
+  | Variant_with_null_payload of variant_with_null_payload
+
+let classify_variant_with_null_constructor payload_cstr =
+  match payload_cstr.cd_args with
+  | Cstr_tuple [] -> Variant_with_null_nullary
+  | Cstr_tuple [payload_arg] ->
+    Variant_with_null_payload
+      { payload_cstr; payload_arg }
+  | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
+    Misc.fatal_error "Invalid constructor for Variant_with_null"
+
+let find_variant_with_null_payload cstrs =
+  List.find_map
+    (fun cstr ->
+      match classify_variant_with_null_constructor cstr with
+      | Variant_with_null_nullary -> None
+      | Variant_with_null_payload payload -> Some payload)
+    cstrs
 
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
@@ -134,12 +162,14 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     | Variant_unboxed, ([] | _ :: _) ->
       Misc.fatal_error "Multiple or 0 constructors in [@@unboxed] variant"
     | Variant_with_null, _ ->
-      (* CR layouts v3.5: this hardcodes ['a or_null]. Fix when we allow
-         users to write their own null constructors. *)
-      (* CR layouts v3.3: generalize to [any]. *)
-      [| Constructor_uniform_value, [| |]
-       ; Constructor_uniform_value, [| Jkind_types.Sort.Const.value |] |],
-      false
+      let shape cstr =
+        match classify_variant_with_null_constructor cstr with
+        | Variant_with_null_nullary ->
+          Constructor_uniform_value, [| |]
+        | Variant_with_null_payload { payload_arg = { ca_sort = sort; _ }; _ }
+          -> Constructor_uniform_value, [| sort |]
+      in
+      Array.of_list (List.map shape cstrs), false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
@@ -169,9 +199,15 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       else nonconst_tag, const_tag, 1 + nonconst_tag
     in
     let cstr_tag =
-      match rep, cstr_constant with
-      | Variant_with_null, true -> Null
-      | _, _ ->  Ordinary {src_index; runtime_tag}
+      match rep with
+      | Variant_with_null ->
+        begin match classify_variant_with_null_constructor
+          { cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid }
+        with
+        | Variant_with_null_nullary -> Null
+        | Variant_with_null_payload _ -> Ordinary {src_index; runtime_tag}
+        end
+      | _ -> Ordinary {src_index; runtime_tag}
     in
     let cstr_existentials, cstr_args, cstr_inlined =
       (* This is the representation of the inner record, IF there is one *)

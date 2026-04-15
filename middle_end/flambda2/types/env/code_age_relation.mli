@@ -30,13 +30,16 @@ val add : t -> newer:Code_id.t -> older:Code_id.t -> t
 val get_older_version_of : t -> Code_id.t -> Code_id.t option
 
 (** [meet] calculates which of the given pieces of code is newer, or identifies
-    that the pieces of code are unrelated. *)
+    that the pieces of code are unrelated.
+
+    Returns [Unknown] if it was not possible to determine whether the pieces or
+    code are related, e.g. due to a missing cmx file. *)
 val meet :
   t ->
   resolver:(Compilation_unit.t -> t option) ->
   Code_id.t ->
   Code_id.t ->
-  Code_id.t Or_bottom.t
+  Code_id.t Or_unknown_or_bottom.t
 
 val meet_set :
   t ->

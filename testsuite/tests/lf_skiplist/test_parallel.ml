@@ -1,5 +1,4 @@
 (* TEST
- flags = "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  modules = "stubs.c";
  no-tsan;
  runtime5;

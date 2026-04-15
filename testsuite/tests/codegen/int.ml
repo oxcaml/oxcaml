@@ -1,8 +1,10 @@
 (* TEST
  flags += " -O3";
  flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
  only-default-codegen;
  expect.opt;
 *)
@@ -145,6 +147,27 @@ rem_2:
   ret
 |}]
 
+
+(* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/2187 *)
+let is_divisible_by_128 x = (x mod 128) = 0
+[%%expect_asm X86_64{|
+is_divisible_by_128:
+  sarq  $1, %rax
+  movq  $-128, %rdi
+  movq  %rax, %rbx
+  sarq  $6, %rbx
+  shrq  $57, %rbx
+  addq  %rax, %rbx
+  andq  %rdi, %rbx
+  subq  %rbx, %rax
+  leaq  1(%rax,%rax), %rax
+  cmpq  $1, %rax
+  sete  %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
 let succ x = x + 1
 [%%expect_asm X86_64{|
 succ:
@@ -245,7 +268,7 @@ shift_right_logical:
 |}]
 
 
-(* CR ttebbi: There is no need to repeat cmpq. *)
+(* CR ttebbi: We should sign-extend after the subtraction. *)
 let compare (x : int) (y : int) = compare x y
 [%%expect_asm X86_64{|
 compare:
@@ -253,7 +276,6 @@ compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax
@@ -282,7 +304,6 @@ equal_using_compare:
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
-  cmpq  %rbx, %rdi
   setg  %al
   movzbq %al, %rax
   subq  %rsi, %rax

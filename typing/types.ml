@@ -18,6 +18,79 @@
 open Allowance
 open Asttypes
 
+module Rigid_name = struct
+  type unknown_id = Shape.Uid.t
+
+  type t =
+    | Atom of
+        { constr : Path.t;
+          arg_index : int
+        }
+    | KAtom of Path.t
+    | Param of int
+    | Unknown of unknown_id
+
+  let compare a b =
+    if a == b
+    then 0
+    else
+      match a, b with
+      | Atom a1, Atom a2 ->
+        let h = Path.compare a1.constr a2.constr in
+        if h != 0 then h else Int.compare a1.arg_index a2.arg_index
+      | KAtom p1, KAtom p2 -> Path.compare p1 p2
+      | Param x, Param y -> Int.compare x y
+      | Atom _, _ -> -1
+      | _, Atom _ -> 1
+      | KAtom _, _ -> -1
+      | _, KAtom _ -> 1
+      | Unknown x, Unknown y -> Shape.Uid.compare x y
+      | Unknown _, _ -> 1
+      | _, Unknown _ -> -1
+
+  let to_string = function
+    | Atom { constr; arg_index } ->
+      let constr_s = Format_doc.asprintf "%a" Path.print constr in
+      Printf.sprintf "%s.%d" constr_s arg_index
+    | KAtom path ->
+      let path_s = Format_doc.asprintf "%a" Path.print path in
+      Printf.sprintf "katom[%s]" path_s
+    | Param i -> Printf.sprintf "param[%d]" i
+    | Unknown id ->
+      Format.asprintf "unknown[%a]" Shape.Uid.print id
+
+  let atomic constr arg_index = Atom { constr; arg_index }
+
+  let katom path = KAtom path
+
+  let param i = Param i
+
+  let unknown uid = Unknown uid
+end
+
+module Ldd = struct
+  module Name = Rigid_name
+
+  include (Ldd.Make (Rigid_name) :
+             Ldd_intf.S with module Name := Rigid_name)
+end
+
+type constructor_ikind =
+  { base : Ldd.node;
+    coeffs : Ldd.node array;
+  }
+
+type constructor_ikind_entry =
+  | Constructor_ikind of constructor_ikind
+  | No_constructor_ikind of string
+
+type type_ikind = constructor_ikind_entry
+
+let ikinds_todo (message : string) : type_ikind =
+  if !Clflags.ikinds_debug then
+    Format.eprintf "[ikinds-todo] %s@." message;
+  No_constructor_ikind message
+
 type atomic =
   | Nonatomic
   | Atomic
@@ -50,8 +123,6 @@ let mutable_mode m0 : _ Mode.Value.t =
 type mod_bounds =
   { crossing : Mode.Crossing.t;
     externality: Jkind_axis.Externality.t;
-    nullability: Jkind_axis.Nullability.t;
-    separability: Jkind_axis.Separability.t;
   }
 
 module With_bounds_type_info = struct
@@ -83,6 +154,7 @@ and type_desc =
   | Tfield of string * field_kind * type_expr * type_expr
   | Tquote of type_expr
   | Tsplice of type_expr
+  | Tquote_eval of type_expr
   | Tnil
   | Tlink of type_expr
   | Tsubst of type_expr * type_expr option
@@ -364,6 +436,7 @@ type type_declaration =
     type_arity: int;
     type_kind: type_decl_kind;
     type_jkind: jkind_l;
+    type_ikind: constructor_ikind_entry;
     type_private: private_flag;
     type_manifest: type_expr option;
     type_variance: Variance.t list;
@@ -406,7 +479,7 @@ and type_origin =
   | Existential of string
 
 and mixed_block_element =
-  | Value
+  | Scannable
   | Float_boxed
   | Float64
   | Float32
@@ -567,6 +640,26 @@ module type Wrap = sig
   type 'a t
 end
 
+module Lpoly = struct
+  type state =
+    | Pending of Location.t
+    | Determined of Jkind_types.Sort.var list
+
+  type t = state ref
+
+  let get_exn t = match !t with
+    | Pending _ -> Misc.fatal_error "layout is pending generalization"
+    | Determined l -> l
+
+  let determined l = ref (Determined l)
+  let pending ~loc = ref (Pending loc)
+
+  let generalize ~on_determined ~on_to_generalize t =
+    match !t with
+    | Pending loc -> t := Determined (on_to_generalize loc)
+    | Determined _ -> on_determined ()
+end
+
 module type Wrapped = sig
   type 'a wrapped
 
@@ -574,6 +667,7 @@ module type Wrapped = sig
     { val_type: type_expr wrapped;                (* Type of the value *)
       val_modalities : Mode.Modality.t;     (* Modalities on the value *)
       val_kind: value_kind;
+      val_lpoly: Lpoly.t;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
@@ -679,12 +773,13 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       | Unit -> To.Unit
       | Named (id,mty,mm) -> To.Named (id, module_type m mty,mm)
 
-  let value_description m {val_type; val_modalities; val_kind; val_zero_alloc;
-                           val_attributes; val_loc; val_uid} =
+  let value_description m {val_type; val_modalities; val_kind; val_lpoly;
+                           val_zero_alloc; val_attributes; val_loc; val_uid} =
     To.{
       val_type = m.map_type_expr m val_type;
       val_modalities;
       val_kind;
+      val_lpoly;
       val_zero_alloc;
       val_attributes;
       val_loc;
@@ -777,7 +872,8 @@ let compare_tag t1 t2 =
 
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Value, Value | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
+  | Scannable, Scannable
+  | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16
   | Bits32, Bits32 | Bits64, Bits64
@@ -786,14 +882,14 @@ let rec equal_mixed_block_element e1 e2 =
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Value | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
+  | ( Scannable | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
     | Product _ | Void ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Value, Value | Float_boxed, Float_boxed
+  | Scannable, Scannable | Float_boxed, Float_boxed
   | Float64, Float64 | Float32, Float32
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
@@ -802,8 +898,8 @@ let rec compare_mixed_block_element e1 e2 =
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
-  | Value, _ -> -1
-  | _, Value -> 1
+  | Scannable, _ -> -1
+  | _, Scannable -> 1
   | Float_boxed, _ -> -1
   | _, Float_boxed -> 1
   | Float64, _ -> -1
@@ -923,7 +1019,7 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
 
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
-  | Base Value -> Value
+  | Base Scannable -> Scannable
   | Base Bits8 -> Bits8
   | Base Bits16 -> Bits16
   | Base Bits32 -> Bits32
@@ -939,6 +1035,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Void
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
+  | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
 let find_unboxed_type decl =
   match decl.type_kind with
@@ -999,7 +1096,7 @@ let bound_value_identifiers_and_sorts sigs =
   List.filter_map signature_item_representation sigs
 
 let rec mixed_block_element_to_string = function
-  | Value -> "Value"
+  | Scannable -> "Scannable"
   | Float_boxed -> "Float_boxed"
   | Float32 -> "Float32"
   | Float64 -> "Float64"
@@ -1020,7 +1117,7 @@ let rec mixed_block_element_to_string = function
   | Void -> "Void"
 
 let mixed_block_element_to_lowercase_string = function
-  | Value -> "value"
+  | Scannable -> "value"
   | Float_boxed -> "float"
   | Float32 -> "float32"
   | Float64 -> "float64"
@@ -1267,6 +1364,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tarrow (_, _, _, _)
         | Tquote _
         | Tsplice _
+        | Tquote_eval _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in

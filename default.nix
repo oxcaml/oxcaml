@@ -29,6 +29,7 @@ let
     [
       "--cache-file=/dev/null"
       "--with-objcopy=${pkgs.llvm}/bin/llvm-objcopy"
+      "--enable-assembler-suitable-for-dissector=${pkgs.llvm}/bin/llvm-mc"
       (mkFlag addressSanitizer "address-sanitizer")
       (mkFlag dev "dev")
       (mkFlag flambdaInvariants "flambda-invariants")
@@ -72,6 +73,7 @@ let
   # Over time, we should probably define something like a "boot environment" and build
   # dune and the other dependencies with the patched system compiler.
   dune = pkgs.ocaml-ng.ocamlPackages_4_14.dune_3.overrideAttrs rec {
+    # This version should be the same as in tools/ci/local-opam/packages/oxcaml-ci-deps
     version = "3.20.2";
     src = pkgs.fetchurl {
       url = "https://github.com/ocaml/dune/releases/download/${version}/dune-${version}.tbz";
@@ -81,10 +83,10 @@ let
 
   ocamlformat = pkgs.ocaml-ng.ocamlPackages_4_14.ocamlformat.overrideAttrs (old: rec {
       name = "${old.pname}-${version}";
-      version = "0.28.1";
+      version = "0.29.0";
       src = pkgs.fetchurl {
         url = "https://github.com/ocaml-ppx/ocamlformat/releases/download/${version}/ocamlformat-${version}.tbz";
-        sha256 = "sha256-cL2gN9C+2WHtkb21GYsu7vVCREdQqLAV2AzLlLP/Qfs=";
+        sha256 = "sha256-2sd/CpV654K7S4abB7mAOocqNPjB6uiQG0LSG2I8nbU=";
       };
   });
 
@@ -205,7 +207,8 @@ stdenv.mkDerivation {
   OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
 
   enableParallelBuilding = true;
-  separateDebugInfo = !dev;
+  separateDebugInfo = false;
+  dontStrip = true;
 
   # Disable _multioutConfig hook which adds --libdir=$out/lib into
   # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure

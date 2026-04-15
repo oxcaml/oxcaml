@@ -152,10 +152,8 @@ module type Map = sig
   val merge :
     (key -> 'a option -> 'b option -> 'c option) -> 'a t -> 'b t -> 'c t
 
-  (* CR lmaurer: It's mentioned in [Stdlib.Map], but we really should be rid of
-     the option type here. Surely anything that doesn't always return [Some] is
-     niche enough that it can use [merge] (and we can generalize [merge] to
-     cover it efficiently). *)
+  (** When the function always returns [Some _], [union_total] has better
+      performance. *)
   val union : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
 
   (** [union_sharing f m1 m2] is a version of [union f m1 m2] that maximizes
@@ -166,6 +164,24 @@ module type Map = sig
       exploits sharing of [m1] and [m2] to avoid calling [f] when possible,
       assuming that [f x x = Some x] for all [x]s. *)
   val union_shared : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+
+  (** [union_total f m1 m2] is the same as
+      [union (fun k x y -> Some (f k x y)) m1 m2] *)
+  val union_total : (key -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+
+  (** [union_total_shared f m1 m2] is a version of [union_total f m1 m2] that
+      also exploits sharing of [m1] and [m2] to avoid calling [f] when possible,
+      assuming that [f k x x = x] for all keys [k] and values [x]. It also
+      maximises sharing with [m1]. *)
+  val union_total_shared : (key -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+
+  (** [union_left_biased m1 m2] is the same as
+      [union_total_shared (fun _ l _ -> l) m1 m2] *)
+  val union_left_biased : 'a t -> 'a t -> 'a t
+
+  (** [union_right_biased m1 m2] is the same as
+      [union_total_shared (fun _ _ r -> r) m1 m2] *)
+  val union_right_biased : 'a t -> 'a t -> 'a t
 
   val update_many :
     (key -> 'a option -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t

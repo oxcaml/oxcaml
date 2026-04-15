@@ -98,10 +98,24 @@ and strengthen_lazy_sig' ~aliasable sg p =
             let manif =
               Some(Btype.newgenty(Tconstr(path,
                                           decl.type_params, ref Mnil))) in
-            if Btype.type_kind_is_abstract decl then
-              { decl with type_private = Public; type_manifest = manif }
-            else
-              { decl with type_manifest = manif }
+            if Btype.type_kind_is_abstract decl then begin
+              { decl with
+                type_private = Public;
+                type_manifest = manif;
+                type_ikind =
+                  Types.ikinds_todo
+                    (Format_doc.asprintf "strengthen abstract path=%a"
+                       Path.print path)
+              }
+            end else begin
+              { decl with
+                type_manifest = manif;
+                type_ikind =
+                  Types.ikinds_todo
+                    (Format_doc.asprintf "strengthen manifest path=%a"
+                       Path.print path)
+              }
+            end
       in
       let path = Pdot(p, Ident.name id) in
       let new_unboxed_version =
@@ -594,14 +608,26 @@ let enrich_typedecl env p id decl =
                 Option.map
                   (fun d ->
                     let orig_ty_unboxed =
-                      Btype.newgenty(
-                        Tconstr
-                          (Path.unboxed_version p, decl.type_params, ref Mnil))
+                      Btype.newgenty
+                        (Tconstr
+                           (Path.unboxed_version p, decl.type_params, ref Mnil))
                     in
-                    { d with type_manifest = Some orig_ty_unboxed })
+                    { d with
+                      type_manifest = Some orig_ty_unboxed;
+                      type_ikind =
+                        Types.ikinds_todo
+                          (Format_doc.asprintf "enrich unboxed path=%a"
+                             Path.print (Path.unboxed_version p))
+                    })
                   decl.type_unboxed_version
               in
-              {decl with type_manifest = Some orig_ty; type_unboxed_version}
+              { decl with
+                type_manifest = Some orig_ty;
+                type_unboxed_version;
+                type_ikind =
+                  Types.ikinds_todo
+                    (Format_doc.asprintf "enrich manifest path=%a" Path.print p)
+              }
         end
 
 let rec enrich_modtype env p mty =
@@ -624,28 +650,36 @@ and enrich_item env p = function
                  priv)
   | item -> item
 
-let rec type_paths env p mty =
+let rec type_and_jkind_paths env p mty =
   match scrape env mty with
-    Mty_ident _ -> []
-  | Mty_alias _ -> []
-  | Mty_signature sg -> type_paths_sig env p sg
-  | Mty_functor _ -> []
-  | Mty_strengthen _ -> []
+  | Mty_ident _ | Mty_alias _ | Mty_functor _ | Mty_strengthen _ ->
+    ~types:[], ~jkinds:[]
+  | Mty_signature sg -> type_and_jkind_paths_sig env p sg
 
-and type_paths_sig env p sg =
+and type_and_jkind_paths_sig env p sg =
   match sg with
-    [] -> []
+  | [] -> ~types:[], ~jkinds:[]
   | Sig_type(id, _decl, _, _) :: rem ->
-      Pdot(p, Ident.name id) :: type_paths_sig env p rem
+    let ~types, ~jkinds = type_and_jkind_paths_sig env p rem in
+    ~types:(Pdot(p, Ident.name id) :: types), ~jkinds
+  | Sig_jkind(id, _decl, _) :: rem ->
+    let ~types, ~jkinds = type_and_jkind_paths_sig env p rem in
+    ~types, ~jkinds:(Pdot(p, Ident.name id) :: jkinds)
   | Sig_module(id, pres, md, _, _) :: rem ->
-      type_paths env (Pdot(p, Ident.name id)) md.md_type @
-      type_paths_sig (Env.add_module_declaration ~check:false id pres md env)
-        p rem
+    let ~types:nested_types, ~jkinds:nested_jkinds =
+      type_and_jkind_paths env (Pdot(p, Ident.name id)) md.md_type
+    in
+    let env =
+      Env.add_module_declaration ~check:false id pres md env
+    in
+    let ~types:rem_types, ~jkinds:rem_jkinds =
+      type_and_jkind_paths_sig env p rem
+    in
+    ~types:(nested_types @ rem_types), ~jkinds:(nested_jkinds @ rem_jkinds)
   | Sig_modtype(id, decl, _) :: rem ->
-      type_paths_sig (Env.add_modtype id decl env) p rem
-  | ( Sig_value _ | Sig_typext _ | Sig_class _ | Sig_class_type _
-    | Sig_jkind _ ) :: rem ->
-    type_paths_sig env p rem
+    type_and_jkind_paths_sig (Env.add_modtype id decl env) p rem
+  | (Sig_value _ | Sig_typext _ | Sig_class _ | Sig_class_type _) :: rem ->
+    type_and_jkind_paths_sig env p rem
 
 let rec no_code_needed_mod env pres mty =
   match pres with
@@ -778,26 +812,26 @@ let collect_arg_paths mty =
   (* let rt = Ident.create "Root" in
      and prefix = ref (Path.Pident rt) in *)
   with_type_mark begin fun mark ->
-  let super = type_iterators mark in
-  let it_path p = paths := Path.Set.union (get_arg_paths p) !paths
-  and it_signature_item it si =
-    super.it_signature_item it si;
-    match si with
-    | Sig_module (id, _, {md_type=Mty_alias p}, _, _) ->
-        bindings := Ident.add id p !bindings
-    | Sig_module (id, _, {md_type=Mty_signature sg}, _, _) ->
-        List.iter
-          (function Sig_module (id', _, _, _, _) ->
-              subst :=
-                Path.Map.add (Pdot (Pident id, Ident.name id')) id' !subst
-            | _ -> ())
-          sg
-    | _ -> ()
-  in
-  let it = {super with it_path; it_signature_item} in
-  it.it_module_type it mty;
-  Path.Set.fold (fun p -> Ident.Set.union (collect_ids !subst !bindings p))
-    !paths Ident.Set.empty
+    let super = type_iterators mark in
+    let it_path p = paths := Path.Set.union (get_arg_paths p) !paths
+    and it_signature_item it si =
+      super.it_signature_item it si;
+      match si with
+      | Sig_module (id, _, {md_type=Mty_alias p}, _, _) ->
+          bindings := Ident.add id p !bindings
+      | Sig_module (id, _, {md_type=Mty_signature sg}, _, _) ->
+          List.iter
+            (function Sig_module (id', _, _, _, _) ->
+                subst :=
+                  Path.Map.add (Pdot (Pident id, Ident.name id')) id' !subst
+              | _ -> ())
+            sg
+      | _ -> ()
+    in
+    let it = {super with it_path; it_signature_item} in
+    it.it_module_type it mty;
+    Path.Set.fold (fun p -> Ident.Set.union (collect_ids !subst !bindings p))
+      !paths Ident.Set.empty
   end
 
 type remove_alias_from =
@@ -886,15 +920,15 @@ let scrape_for_type_of ~remove_aliases env mty =
 let lower_nongen nglev mty =
   let open Btype in
   with_type_mark begin fun mark ->
-  let super = type_iterators mark in
-  let it_do_type_expr it ty =
-    match get_desc ty with
-      Tvar _ ->
-        let level = get_level ty in
-        if level < generic_level && level > nglev then set_level ty nglev
-    | _ ->
-        super.it_do_type_expr it ty
-  in
-  let it = {super with it_do_type_expr} in
-  it.it_module_type it mty
+    let super = type_iterators mark in
+    let it_do_type_expr it ty =
+      match get_desc ty with
+        Tvar _ ->
+          let level = get_level ty in
+          if level < generic_level && level > nglev then set_level ty nglev
+      | _ ->
+          super.it_do_type_expr it ty
+    in
+    let it = {super with it_do_type_expr} in
+    it.it_module_type it mty
   end

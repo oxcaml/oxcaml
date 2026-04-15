@@ -67,13 +67,18 @@ val k : Reg.t -> int
 
 module Spilling_heuristics : sig
   type t =
-    | Set_choose
     | Flat_uses
     | Hierarchical_uses
 
   val all : t list
 
   val to_string : t -> string
+
+  val value : t Lazy.t
+end
+
+module Interf_threshold : sig
+  type t = int option
 
   val value : t Lazy.t
 end

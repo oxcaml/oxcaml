@@ -65,6 +65,10 @@ val transl_jkind_decl:
   Env.t -> Parsetree.jkind_declaration ->
   Ident.t * Env.t * Typedtree.jkind_declaration
 
+val transl_jkind_constraint:
+  Ident.t -> Env.t -> Types.jkind_declaration -> Parsetree.jkind_declaration ->
+  Typedtree.jkind_declaration
+
 val abstract_type_decl:
   injective:bool ->
   jkind:jkind_l ->
@@ -74,8 +78,15 @@ val abstract_type_decl:
 val approx_type_decl:
     Env.t -> Parsetree.type_declaration list ->
     (Ident.t * type_declaration) list
+
+val approx_jkind_decl : Parsetree.jkind_declaration -> Types.jkind_declaration
+
 val check_recmod_typedecl:
     Env.t -> Location.t -> Ident.t list -> Path.t -> type_declaration -> unit
+
+val check_recmod_jkind_decl:
+    Env.t -> Location.t -> Ident.t list -> Path.t ->
+    Types.jkind_declaration -> unit
 
 (* Checks that constraints are respected in the [type_declaration] *)
 val check_coherence:
@@ -86,7 +97,7 @@ val is_fixed_type : Parsetree.type_declaration -> bool
 
 val mixed_block_element : Env.t -> type_expr -> _ jkind -> mixed_block_element
 
-type native_repr_kind = Unboxed | Untagged
+type native_repr_kind = Unboxed | Untagged | Unpacked
 
 (* Records reason for a jkind representability requirement in errors. *)
 type jkind_sort_loc =
@@ -98,10 +109,14 @@ type jkind_sort_loc =
   | External
   | External_with_layout_poly
 
-type reaching_type_path = reaching_type_step list
-and reaching_type_step =
-  | Expands_to of type_expr * type_expr
-  | Contains of type_expr * type_expr
+type ('a, 'b) reaching_path = ('a, 'b) reaching_path_step list
+and ('a, 'b) reaching_path_step =
+  | Expands_to of 'a * 'b
+  | Contains of 'b * 'a
+
+type reaching_type_path = (type_expr, type_expr) reaching_path
+type reaching_kind_path =
+  (Path.t, Types.jkind_const_desc_lr) reaching_path
 
 module Mixed_product_kind : sig
   type t =
@@ -190,6 +205,7 @@ type error =
   | Local_not_enabled
   | Unexpected_layout_any_in_primitive of string
   | Useless_layout_poly
+  | Bad_or_null_attribute of string
   | Zero_alloc_attr_unsupported of Builtin_attributes.zero_alloc_attribute
   | Zero_alloc_attr_non_function
   | Zero_alloc_attr_bad_user_arity
@@ -206,6 +222,7 @@ type error =
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
+  | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
 
 exception Error of Location.t * error
 

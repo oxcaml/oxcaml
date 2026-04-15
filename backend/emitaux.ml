@@ -379,6 +379,16 @@ let reset_debug_info () =
   file_pos_nums := [];
   file_pos_num_cnt := 1
 
+let with_snapshot ~f =
+  let saved_file_pos_nums = !file_pos_nums in
+  let saved_file_pos_num_cnt = !file_pos_num_cnt in
+  let saved_frame_descriptors = !frame_descriptors in
+  let result = f () in
+  file_pos_nums := saved_file_pos_nums;
+  file_pos_num_cnt := saved_file_pos_num_cnt;
+  frame_descriptors := saved_frame_descriptors;
+  result
+
 let get_file_num ~file_emitter file_name =
   try List.assoc file_name !file_pos_nums
   with Not_found ->
@@ -633,6 +643,74 @@ let emit_elf_note ~section ~owner ~typ ~emit_desc =
   emit_desc ();
   D.define_label d;
   D.align ~fill:Zero ~bytes
+
+type emit_data_item_actions =
+  { global_maybe_protected : Asm_targets.Asm_symbol.t -> unit;
+    symbol_defined : string -> unit;
+    symbol_used : string -> unit
+  }
+
+let symbol_of_cmm_symbol (s : Cmm.symbol) : Asm_targets.Asm_symbol.t =
+  let visibility : Asm_targets.Asm_symbol.visibility =
+    match s.sym_global with Cmm.Global -> Global | Cmm.Local -> Local
+  in
+  Asm_targets.Asm_symbol.create ~visibility s.sym_name
+
+let emit_data_item actions (d : Cmm.data_item) =
+  let module D = Asm_targets.Asm_directives in
+  let module L = Asm_targets.Asm_label in
+  match d with
+  | Cdefine_symbol s -> (
+    let sym = symbol_of_cmm_symbol s in
+    match s.sym_global with
+    | Local -> D.define_label (L.create_label_for_local_symbol Data sym)
+    | Global ->
+      actions.global_maybe_protected sym;
+      actions.symbol_defined s.sym_name;
+      D.define_joint_label_and_symbol ~section:Data sym)
+  | Cint8 n -> D.int8 (Numbers.Int8.of_int_exn n)
+  | Cint16 n -> D.int16 (Numbers.Int16.of_int_exn n)
+  | Cint32 n -> D.int32 (Numbers.Int64.to_int32_exn (Int64.of_nativeint n))
+  (* CR mshinwell: Add [Targetint.of_nativeint] *)
+  | Cint n -> D.targetint (Targetint.of_int64 (Int64.of_nativeint n))
+  | Csingle f -> D.float32 f
+  | Cdouble f -> D.float64 f
+  (* SIMD vectors respect little-endian byte order *)
+  | Cvec128 { word0; word1 } ->
+    D.float64_from_bits word0;
+    D.float64_from_bits word1
+  | Cvec256 { word0; word1; word2; word3 } ->
+    D.float64_from_bits word0;
+    D.float64_from_bits word1;
+    D.float64_from_bits word2;
+    D.float64_from_bits word3
+  | Cvec512 { word0; word1; word2; word3; word4; word5; word6; word7 } ->
+    D.float64_from_bits word0;
+    D.float64_from_bits word1;
+    D.float64_from_bits word2;
+    D.float64_from_bits word3;
+    D.float64_from_bits word4;
+    D.float64_from_bits word5;
+    D.float64_from_bits word6;
+    D.float64_from_bits word7
+  | Csymbol_address s -> (
+    actions.symbol_used s.sym_name;
+    let sym = symbol_of_cmm_symbol s in
+    match s.sym_global with
+    | Global -> D.symbol sym
+    | Local -> D.label (L.create_label_for_local_symbol Data sym))
+  | Csymbol_offset (s, o) -> (
+    actions.symbol_used s.sym_name;
+    let sym = symbol_of_cmm_symbol s in
+    match s.sym_global with
+    | Global ->
+      D.symbol_plus_offset ~offset_in_bytes:(Targetint.of_int_exn o) sym
+    | Local ->
+      D.label_plus_offset ~offset_in_bytes:(Targetint.of_int_exn o)
+        (L.create_label_for_local_symbol Data sym))
+  | Cstring s -> D.string s
+  | Cskip n -> D.space ~bytes:n
+  | Calign n -> D.align ~fill:Zero ~bytes:n
 
 let reset () =
   reset_debug_info ();

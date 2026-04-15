@@ -17,6 +17,8 @@ module Graph = Global_flow_graph
 
 type code_dep = Traverse_acc.code_dep
 
+(* CR bclement: This should be configurable using a command-line option rather
+   than always writing to `dep.dot`. *)
 let dep_graph_ppf =
   lazy
     (let filename = "dep.dot" in

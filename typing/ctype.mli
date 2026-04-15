@@ -74,6 +74,8 @@ val restore_global_level: int -> unit
 
 val create_scope : unit -> int
 
+val mark_toplevel_in_quotations : Env.t -> Env.t
+
 val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
 val newvar: ?name:string -> jkind_lr -> type_expr
@@ -136,6 +138,10 @@ val merge_row_fields:
 val filter_row_fields:
         bool -> (label * row_field) list -> (label * row_field) list
 
+val contains_toplevel_splice: int -> type_expr -> bool
+val iter_type_expr_with_stages:
+        (Env.t -> type_expr -> unit) -> Env.t -> type_expr -> unit
+
 val generalize: type_expr -> unit
         (* Generalize in-place the given type *)
 val lower_contravariant: Env.t -> type_expr -> unit
@@ -181,6 +187,9 @@ val instance_list: type_expr list -> type_expr list
 val new_local_type:
         ?loc:Location.t -> ?manifest_and_scope:(type_expr * int) ->
         type_origin -> (allowed * 'r) jkind -> type_declaration
+val new_local_jkind:
+        ?loc:Location.t -> ?manifest:jkind_const_desc_lr ->
+        unit -> jkind_declaration
 
 module Pattern_env : sig
   type t = private
@@ -189,8 +198,11 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       allow_recursive_equations : bool;
       (* true iff checking counter examples *)
+      is_lpoly : bool;
+      (* true iff the pattern is under let poly_ *)
     }
-  val make: Env.t -> equations_scope:int -> allow_recursive_equations:bool -> t
+  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+    -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
 end
@@ -251,6 +263,11 @@ val apply:
            New nodes default to generic level except if [use_current_level] is
            set to true.
            Exception [Cannot_apply] is raised in case of failure. *)
+
+val reduce_head: expand_eval:bool -> Env.t -> type_expr -> type_expr
+(** Exhaustively beta-reduce head-position quotes, splices and quote-evals.
+    If [expand_eval] is true, expands [Predef]'s [eval]s into [Tquote_eval]
+    enabling further reductions. *)
 
 val try_expand_once_opt: Env.t -> type_expr -> type_expr
 val try_expand_safe_opt: Env.t -> type_expr -> type_expr
@@ -336,8 +353,15 @@ val deep_occur_list: type_expr -> type_expr list -> bool
            a list of types. *)
 val deep_occur: type_expr -> type_expr -> bool
         (* Check whether a type occurs structurally within another. *)
-val moregeneral: Env.t -> bool -> type_expr -> type_expr -> unit
-        (* Check if the first type scheme is more general than the second. *)
+val moregeneral: Env.t -> bool ->
+  Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
+  type_expr -> type_expr -> Jkind_types.Sort.t option list
+        (* Check if the first type scheme is more general than the second.
+           The two [Sort.var list] arguments are the layout-polymorphic sort
+           variables of the pattern and subject respectively.
+           Returns, for each pattern sort variable (in order), the sort it was
+           constrained to during the check, or [None] if unconstrained. Sorts
+           in the result may contain subject sort variables. *)
 val is_moregeneral: Env.t -> bool -> type_expr -> type_expr -> bool
 val all_distinct_vars: Env.t -> type_expr list -> bool
         (* Check those types are all distinct type variables *)
@@ -589,7 +613,31 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
    types and [Tpoly]s *)
 type unwrapped_type_expr =
   { ty : type_expr
-  ; modality : Mode.Modality.Const.t }
+  ; modality : Mode.Modality.Const.t
+  ; or_null : (type_declaration * unwrapped_type_expr) option;
+    (* We store the declaration rather than a bool to avoid re-writing the
+       with-bounds of [or_null], and to be more robust for the future where we
+       have user-defined [or_null]-like types
+
+       Note [unwrapped_type_expr backtracking for or_null]:
+
+       We also store the previous unwrapped_type_expr, as reapplying or_null can
+       fail, in which case we fall back to the type that was unwrapped one time
+       fewer. In particular, it can fail for functions like the following:
+
+         let rec bad () : float# or_null = Null
+
+       Although this is ill-typed, we don't realize this when we typecheck it
+       with [type_approx], which we use for recursive functions. This gets us
+       into trouble when [type_approx] calls [type_jkind], which could then
+       unwrap and re-wrap an invalid application of [or_null] like the above.
+       So, to avoid needing to consider invalid applications of [or_null], we
+       use the previous [unwrapped_type_expr] as a fallback.
+
+       This hack should be removed when we refactor [type_jkind] and
+       [estimate_type_jkind] to fix another bug.
+    *)
+  }
 
 val get_unboxed_type_representation :
   Env.t ->
@@ -731,7 +779,7 @@ val check_type_separability :
 
    *)
 val check_and_update_generalized_ty_jkind :
-  ?name:Ident.t -> loc:Location.t -> Env.t -> type_expr -> unit
+  ?name:Ident.t -> loc:Location.t -> type_expr -> unit
 
 (* False if running in principal mode and the type is not principal.
    True otherwise. *)

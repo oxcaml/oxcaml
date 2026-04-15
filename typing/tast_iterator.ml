@@ -308,6 +308,7 @@ let pat
   | Tpat_or (p1, p2, _) ->
       sub.pat sub p1;
       sub.pat sub p2
+  | Tpat_fun_layout { name = s; _ } -> iter_loc sub s
 
 let extra sub = function
   | Texp_constraint (cty) -> sub.typ sub cty
@@ -367,10 +368,6 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   in
   let iter_block_access sub = function
     | Baccess_field (lid, _) -> iter_loc sub lid
-    | Baccess_array
-      { mut = _; index_kind = _; index; base_ty = _; elt_ty = _; elt_sort = _
-      } ->
-      sub.expr sub index
     | Baccess_block (_, idx) -> sub.expr sub idx
   in
   let iter_unboxed_access sub = function
@@ -378,6 +375,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   in
   match exp_desc with
   | Texp_ident { lid; _ } -> iter_loc sub lid
+  | Texp_apply_layout (exp, _) -> sub.expr sub exp
   | Texp_constant _ -> ()
   | Texp_let (rec_flag, list, exp) ->
       sub.value_bindings sub (rec_flag, list);
@@ -510,7 +508,6 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_hole _ -> ()
   | Texp_quotation exp -> sub.expr sub exp
   | Texp_antiquotation exp -> sub.expr sub exp
-  | Texp_eval (typ, _) -> sub.typ sub typ
 
 let package_type sub {pack_fields; pack_txt; _} =
   List.iter (fun (lid, p) -> iter_loc sub lid; sub.typ sub p) pack_fields;
@@ -592,6 +589,8 @@ let with_constraint sub = function
   | Twith_modsubst  (_, lid) -> iter_loc sub lid
   | Twith_modtype      mty -> sub.module_type sub mty
   | Twith_modtypesubst mty -> sub.module_type sub mty
+  | Twith_jkind      jd -> sub.jkind_declaration sub jd
+  | Twith_jkindsubst jd -> sub.jkind_declaration sub jd
 
 
 let open_description sub {open_loc; open_expr; open_env; open_attributes; _} =
@@ -751,6 +750,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   | Ttyp_quote t -> sub.typ sub t
   | Ttyp_splice t -> sub.typ sub t
   | Ttyp_repr (_, ct) -> sub.typ sub ct
+  | Ttyp_newlayout (_, ct) -> sub.typ sub ct
   | Ttyp_of_kind jkind -> sub.jkind_annotation sub jkind
   | Ttyp_call_pos -> ()
 
