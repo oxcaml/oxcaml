@@ -677,7 +677,10 @@ Error: Signature mismatch:
 |}]
 
 (* We only compare record representations up to scannable axes for the inclusion
-   check, to support type substitution edge cases *)
+   check, to support type substitution edge cases.
+   See also Note [Ignoring scannable axes in type declaration representations]
+   in typing/types.mli
+*)
 
 module M : sig
   type t
@@ -692,8 +695,8 @@ end
    precise representation, but we accept it as we only compare representations
    up to scannable axes.
 
-   This can lead to a missed [caml_modify] in some uncommon cases: see the test
-   with a "CR layouts-scannable" in
+   This can lead to a unnecessary [caml_modify] in some uncommon cases: see the
+   test with a "CR layouts-scannable" in
    testsuite/tests/typing-layouts-caml-modify/non_pointer.ml
 *)
 type r = M.r = { t : int ; i : int64# }

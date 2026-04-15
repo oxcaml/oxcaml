@@ -1269,14 +1269,16 @@ val may_equal_constr :
 
 (* Equality *)
 
-(* For record and variant representations to be compatible, they only need to be
+(* Note [Ignoring scannable axes in type declaration representations]:
+
+   For record and variant representations to be compatible, they only need to be
    equal *up to scannable axes.*
 
    This is safe because the only way that only the scannable axes can differ
    between type definitions whose kinds match is through type substitution (or
    perhaps other module typing tricks), which results in one representation
    being *overapproximate* wrt scannable axes - this result in worse codegen but
-   is still sound. *)
+   is still sound. See references to this note. *)
 
 val equal_record_representation_up_to_scannable_axes :
   record_representation -> record_representation -> bool

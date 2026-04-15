@@ -962,6 +962,8 @@ module Record_diffing = struct
   let find_mismatch_in_mixed_record_representations
       (s1 : mixed_product_shape) (s2 : mixed_product_shape)
     =
+    (* It's possible for [s1] to be higher than [s2] here: see
+       Note [Ignoring scannable axes in type declaration representations] *)
     if Types.equal_mixed_product_shape_up_to_scannable_axes s1 s2
     then None
     else
