@@ -272,7 +272,7 @@ let rec translate_bindings ~transl_exp ~scopes ~loc ~inner_body ~accumulator =
               mode = alloc_local
             } ]
         ~return:layout_any_value ~attr:default_function_attribute ~loc
-        ~mode:alloc_local ~ret_mode:alloc_local ~body:(add_bindings body)
+        ~mode:alloc_local ~ret_mode:maybe_alloc_stack ~body:(add_bindings body)
     in
     let result =
       Lambda_utils.apply ~loc ~mode:alloc_local (Lazy.force builder)

@@ -890,7 +890,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         region_close = pos;
                         inlined = Default_inlined;
                         probe = None;
-                        mode;
+                        mode = Lambda.return_mode_of_locality_mode mode;
                         region =
                           Option.map Env.Region_stack_element.region
                             current_region;
@@ -1380,7 +1380,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ({ kind; params; return; body; attr; loc; mode; ret_mode } : L.lfunction) :
     Function_decl.t =
   let contains_no_escaping_local_allocs =
-    match ret_mode with Alloc_heap -> true | Alloc_local -> false
+    match ret_mode with Not_alloc_stack -> true | Maybe_alloc_stack -> false
   in
   let first_complex_local_param =
     List.length params

@@ -58,6 +58,10 @@ include (struct
     | Alloc_heap
     | Alloc_local
 
+  type return_mode =
+    | Maybe_alloc_stack
+    | Not_alloc_stack
+
   type modify_mode =
     | Modify_heap
     | Modify_maybe_stack
@@ -67,6 +71,12 @@ include (struct
   let alloc_local =
     if Config.stack_allocation then Alloc_local
     else Alloc_heap
+
+  let not_alloc_stack = Not_alloc_stack
+
+  let maybe_alloc_stack : return_mode =
+    if Config.stack_allocation then Maybe_alloc_stack
+    else Not_alloc_stack
 
   let modify_heap = Modify_heap
 
@@ -84,12 +94,19 @@ end : sig
     | Alloc_heap
     | Alloc_local
 
+  type return_mode = private
+    | Maybe_alloc_stack
+    | Not_alloc_stack
+
   type modify_mode = private
     | Modify_heap
     | Modify_maybe_stack
 
   val alloc_heap : locality_mode
   val alloc_local : locality_mode
+
+  val not_alloc_stack : return_mode
+  val maybe_alloc_stack : return_mode
 
   val modify_heap : modify_mode
 
@@ -116,8 +133,31 @@ let eq_locality_mode a b =
   match a, b with
   | Alloc_heap, Alloc_heap -> true
   | Alloc_local, Alloc_local -> true
-  | Alloc_heap, Alloc_local -> false
-  | Alloc_local, Alloc_heap -> false
+  | (Alloc_heap | Alloc_local), _ -> false
+
+let is_maybe_alloc_stack = function
+  | Not_alloc_stack -> false
+  | Maybe_alloc_stack -> true
+
+let is_not_alloc_stack = function
+  | Not_alloc_stack -> true
+  | Maybe_alloc_stack -> false
+
+let return_mode_of_locality_mode = function
+  | Alloc_heap -> not_alloc_stack
+  | Alloc_local -> maybe_alloc_stack
+
+let eq_return_mode a b =
+  match a, b with
+  | Not_alloc_stack, Not_alloc_stack -> true
+  | Maybe_alloc_stack, Maybe_alloc_stack -> true
+  | (Not_alloc_stack | Maybe_alloc_stack), _ -> false
+
+let sub_return_mode a b =
+  match a, b with
+  | Not_alloc_stack, _ -> true
+  | _, Maybe_alloc_stack -> true
+  | Maybe_alloc_stack, Not_alloc_stack -> false
 
 type staticity =
   | Static
@@ -1019,7 +1059,7 @@ and lfunction =
     attr: function_attribute; (* specified with [@inline] attribute *)
     loc: scoped_location;
     mode: locality_mode;
-    ret_mode: locality_mode;
+    ret_mode: return_mode;
   }
 
 and lambda_while =
@@ -1042,7 +1082,7 @@ and lambda_apply =
     ap_args : lambda list;
     ap_result_layout : layout;
     ap_region_close : region_close;
-    ap_mode : locality_mode;
+    ap_mode : return_mode;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute;
@@ -1298,7 +1338,7 @@ let lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
      let nparams = List.length params in
      assert (0 <= nlocal);
      assert (nlocal <= nparams);
-     if is_local_mode ret_mode then assert (nlocal >= 1);
+     if is_maybe_alloc_stack ret_mode then assert (nlocal >= 1);
      if is_local_mode mode then assert (nlocal = nparams)
   end;
   { kind; params; return; body; attr; loc; mode; ret_mode }
@@ -3281,7 +3321,7 @@ let may_allocate_in_region lam =
     | Lfunction {mode=Alloc_heap} -> ()
     | Lfunction {mode=Alloc_local} -> raise Exit
 
-    | Lapply {ap_mode=Alloc_local}
+    | Lapply {ap_mode=Maybe_alloc_stack}
     | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->

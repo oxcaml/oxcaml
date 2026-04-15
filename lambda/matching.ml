@@ -2159,7 +2159,7 @@ let call_force_lazy_block ?(inlined = Default_inlined) varg loc ~pos =
       ap_args = [ Lprim (Popaque Lambda.layout_lazy, [ varg ], loc) ];
       ap_result_layout = Lambda.layout_lazy_contents;
       ap_region_close = pos;
-      ap_mode = alloc_heap;
+      ap_mode = not_alloc_stack;
       ap_inlined = inlined;
       ap_specialised = Default_specialise;
       ap_probe = None;
@@ -2245,7 +2245,7 @@ let inline_lazy_force arg pos loc =
         ap_args = [ Lconst (Const_base (Const_int 0)); arg ];
         ap_result_layout = Lambda.layout_lazy_contents;
         ap_region_close = pos;
-        ap_mode = alloc_heap;
+        ap_mode = not_alloc_stack;
         (* nroberts: To make sure this wasn't inlined:
              - Upstream changed [code_force_lazy] to a non-inlineable
                function when compiling with AFL support.
