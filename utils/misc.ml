@@ -1670,7 +1670,7 @@ module Bitmap = struct
 end
 
 module Magic_number = struct
-  type version = int
+  type version = string
 
   type kind =
     | Exec
@@ -1763,9 +1763,6 @@ module Magic_number = struct
     | Ast_intf -> "serialized interface AST"
 
   let kind_length = 9
-  let version_length = 3
-  let magic_length =
-    kind_length + version_length
 
   type parse_error =
     | Truncated of string
@@ -1780,40 +1777,42 @@ module Magic_number = struct
             | Truncated _ -> "is truncated"
             | Not_a_magic_number _ -> "has a different format")
 
+  (* Parse "ox<len>:<version>" suffix starting at [start] in [s]. *)
+  let parse_ox_version s start =
+    let suffix = String.sub s start (String.length s - start) in
+    match Scanf.sscanf_opt suffix "ox%d:%s%!" (fun len ver -> (len, ver))
+    with
+    | Some (len, ver) when len = String.length ver ->
+      Some ver
+    | _ -> None
+
   let parse s : (info, parse_error) result =
-    if String.length s = magic_length then begin
-      let raw_kind = String.sub s 0 kind_length in
-      let raw_version = String.sub s kind_length version_length in
-      match parse_kind raw_kind with
+    let len = String.length s in
+    if len >= kind_length then begin
+      let raw_kind_str = String.sub s 0 kind_length in
+      match parse_kind raw_kind_str with
       | None -> Error (Not_a_magic_number s)
       | Some kind ->
-          begin match int_of_string raw_version with
-          | exception _ -> Error (Truncated s)
-          | version -> Ok { kind; version }
-          end
+        match parse_ox_version s kind_length with
+        | Some version -> Ok { kind; version }
+        | None ->
+          if len > kind_length
+          then Error (Not_a_magic_number s)
+          else Error (Truncated s)
     end
     else begin
-      (* a header is "truncated" if it starts like a valid magic number,
-         that is if its longest segment of length at most [kind_length]
-         is a prefix of [raw_kind kind] for some kind [kind] *)
-      let sub_length = Int.min kind_length (String.length s) in
+      let sub_length = Int.min kind_length len in
       let starts_as kind =
-        String.sub s 0 sub_length = String.sub (raw_kind kind) 0 sub_length
+        String.sub s 0 sub_length
+        = String.sub (raw_kind kind) 0 sub_length
       in
       if List.exists starts_as all_kinds then Error (Truncated s)
       else Error (Not_a_magic_number s)
     end
 
-  let read_info ic =
-    let header = Buffer.create magic_length in
-    begin
-      try Buffer.add_channel header ic magic_length
-      with End_of_file -> ()
-    end;
-    parse (Buffer.contents header)
-
-  let raw { kind; version; } =
-    Printf.sprintf "%s%03d" (raw_kind kind) version
+  let raw { kind; version } =
+    Printf.sprintf "%sox%d:%s"
+      (raw_kind kind) (String.length version) version
 
   let current_raw kind =
     let open Config in
@@ -1830,14 +1829,35 @@ module Magic_number = struct
       | Ast_intf -> ast_intf_magic_number
       | Ast_impl -> ast_impl_magic_number
 
-  (* it would seem more direct to define current_version with the
-     correct numbers and current_raw on top of it, but for now we
-     consider the Config.foo values to be ground truth, and don't want
-     to trust the present module instead. *)
+  let magic_length = String.length (current_raw Exec)
+
+  let read_info ic =
+    let buf = Buffer.create 32 in
+    begin try
+      Buffer.add_string buf (really_input_string ic (kind_length + 2));
+      let c = ref (input_char ic) in
+      while !c <> ':' do
+        Buffer.add_char buf !c;
+        c := input_char ic
+      done;
+      Buffer.add_char buf ':';
+      let s = Buffer.contents buf in
+      let version_len =
+        int_of_string
+          (String.sub s (kind_length + 2)
+             (String.length s - kind_length - 3))
+      in
+      Buffer.add_string buf (really_input_string ic version_len)
+    with
+    | End_of_file -> ()
+    | Failure _ -> ()
+    end;
+    parse (Buffer.contents buf)
+
   let current_version kind =
-    let raw = current_raw kind in
-    try int_of_string (String.sub raw kind_length version_length)
-    with _ -> assert false
+    match parse (current_raw kind) with
+    | Ok { version; _ } -> version
+    | Error _ -> assert false
 
   type 'a unexpected = { expected : 'a; actual : 'a }
   type unexpected_error =
@@ -1849,10 +1869,10 @@ module Magic_number = struct
         Printf.sprintf "We expected a %s (%s) but got a %s (%s) instead."
           (human_name_of_kind expected) (string_of_kind expected)
           (human_name_of_kind actual) (string_of_kind actual)
-    | Version (kind, { actual; expected }) ->
-        Printf.sprintf "This seems to be a %s (%s) for %s version of OCaml."
+    | Version (kind, _) ->
+        Printf.sprintf
+          "This seems to be a %s (%s) for a different version of OCaml."
           (human_name_of_kind kind) (string_of_kind kind)
-          (if actual < expected then "an older" else "a newer")
 
   let check_current expected_kind { kind; version } : _ result =
     if kind <> expected_kind then begin

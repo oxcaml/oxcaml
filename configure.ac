@@ -296,26 +296,41 @@ AC_SUBST([OCAML_VERSION_MINOR], [OCAML__VERSION_MINOR])
 AC_SUBST([OCAML_VERSION_PATCHLEVEL], [OCAML__VERSION_PATCHLEVEL])
 AC_SUBST([OCAML_VERSION_EXTRA], [OCAML__VERSION_EXTRA])
 AC_SUBST([OCAML_VERSION_SHORT], [OCAML__VERSION_SHORT])
+AC_ARG_WITH([magic-number-version],
+  [AS_HELP_STRING([--with-magic-number-version=VERSION],
+    [magic number version for compiled file formats])])
+
+AS_IF([test -z "$with_magic_number_version"],
+  [magic_number_version="ox0:"],
+  [AS_CASE([$with_magic_number_version],
+    [*@<:@!a-zA-Z0-9._-@:>@*],
+    [AC_MSG_ERROR(
+      [--with-magic-number-version may only contain] \
+      [alphanumeric characters, dots, hyphens, and underscores])])
+   version_len=${#with_magic_number_version}
+   magic_number_version="ox${version_len}:${with_magic_number_version}"])
+
+magic_number_length=$(( 9 + ${#magic_number_version} ))
+
 AC_DEFINE([MAGIC_NUMBER_PREFIX], ["][MAGIC_NUMBER__PREFIX]["])
-AC_DEFINE([MAGIC_NUMBER_VERSION], ["][MAGIC_NUMBER__VERSION]["])
-AC_SUBST([MAGIC_NUMBER_LENGTH], [MAGIC_NUMBER__LENGTH])
-AC_DEFINE([EXEC_MAGIC_LENGTH], [MAGIC_NUMBER__LENGTH])
+AC_DEFINE_UNQUOTED([MAGIC_NUMBER_VERSION], ["$magic_number_version"])
+AC_DEFINE_UNQUOTED([EXEC_MAGIC_LENGTH], [$magic_number_length])
 AC_DEFINE([EXEC_FORMAT], ["][EXEC__FORMAT]["])
-AC_SUBST([EXEC_MAGIC_NUMBER], [EXEC__MAGIC_NUMBER])
-AC_SUBST([CMI_MAGIC_NUMBER], [CMI__MAGIC_NUMBER])
-AC_SUBST([CMO_MAGIC_NUMBER], [CMO__MAGIC_NUMBER])
-AC_SUBST([CMA_MAGIC_NUMBER], [CMA__MAGIC_NUMBER])
-AC_SUBST([CMX_MAGIC_NUMBER], [CMX__MAGIC_NUMBER])
-AC_SUBST([CMXA_MAGIC_NUMBER], [CMXA__MAGIC_NUMBER])
-AC_SUBST([AST_IMPL_MAGIC_NUMBER], [AST_IMPL__MAGIC_NUMBER])
-AC_SUBST([AST_INTF_MAGIC_NUMBER], [AST_INTF__MAGIC_NUMBER])
-AC_SUBST([CMXS_MAGIC_NUMBER], [CMXS__MAGIC_NUMBER])
-AC_SUBST([CMT_MAGIC_NUMBER], [CMT__MAGIC_NUMBER])
-AC_SUBST([CMS_MAGIC_NUMBER], [CMS__MAGIC_NUMBER])
-AC_SUBST([CMJ_MAGIC_NUMBER], [CMJ__MAGIC_NUMBER])
-AC_SUBST([CMJA_MAGIC_NUMBER], [CMJA__MAGIC_NUMBER])
-AC_SUBST([CFG_MAGIC_NUMBER], [CFG__MAGIC_NUMBER])
-AC_SUBST([LINEAR_MAGIC_NUMBER], [LINEAR__MAGIC_NUMBER])
+AC_SUBST([EXEC_MAGIC_NUMBER], [EXEC__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CMI_MAGIC_NUMBER], [CMI__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CMO_MAGIC_NUMBER], [CMO__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CMA_MAGIC_NUMBER], [CMA__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CMX_MAGIC_NUMBER], [CMX__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CMXA_MAGIC_NUMBER], [CMXA__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([AST_IMPL_MAGIC_NUMBER], [AST_IMPL__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([AST_INTF_MAGIC_NUMBER], [AST_INTF__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CMXS_MAGIC_NUMBER], [CMXS__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CMT_MAGIC_NUMBER], [CMT__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CMS_MAGIC_NUMBER], [CMS__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CMJ_MAGIC_NUMBER], [CMJ__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CMJA_MAGIC_NUMBER], [CMJA__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([CFG_MAGIC_NUMBER], [CFG__MAGIC_NUMBER$magic_number_version])
+AC_SUBST([LINEAR_MAGIC_NUMBER], [LINEAR__MAGIC_NUMBER$magic_number_version])
 AC_SUBST([CC])
 AC_SUBST([DIFF_FLAGS])
 AC_SUBST([CSC])

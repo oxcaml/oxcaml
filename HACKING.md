@@ -93,7 +93,15 @@ run directly after `configure`, there is no need to do a full `make` first.)
 
 ## Updating magic numbers
 
-We should be able to use `tools/bump-magic-numbers` going forward.
+Magic numbers use a length-prefixed version format:
+`Caml1999<kind>ox<len>:<version>`. The version is set at configure time via
+`--with-magic-number-version=VERSION`. When omitted, the version defaults to
+empty (`ox0:`). See [jane/doc/magic-numbers.md](jane/doc/magic-numbers.md) for
+full format documentation.
+
+In CI and production builds, the version is typically set to the opam build ID
+(`--with-magic-number-version=%{build-id}%`), ensuring that compiled artifacts
+from different builds are never accidentally mixed.
 
 ## Running tests
 
