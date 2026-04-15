@@ -74,7 +74,7 @@ module Lambda_utils = struct
         ap_func = func;
         ap_args = args;
         ap_region_close = region_close;
-        ap_mode = mode;
+        ap_mode = return_mode_of_locality_mode mode;
         (* CR-someday aspsmith: Make [ap_yielding] more precise *)
         ap_yielding = May_yield;
         ap_tailcall = tailcall;

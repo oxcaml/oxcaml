@@ -47,14 +47,21 @@ type locality_mode = private
   | Alloc_heap
   | Alloc_local
 
+type return_mode = private
+  | Maybe_alloc_stack
+  | Not_alloc_stack
+
 type modify_mode = private
   | Modify_heap
   | Modify_maybe_stack
 
 val alloc_heap : locality_mode
 
-(* Actually [Alloc_heap] if [Config.stack_allocation] is [false] *)
 val alloc_local : locality_mode
+
+val not_alloc_stack : return_mode
+
+val maybe_alloc_stack : return_mode
 
 val modify_heap : modify_mode
 
@@ -1043,7 +1050,7 @@ and lfunction = private
     attr: function_attribute; (* specified with [@inline] attribute *)
     loc : scoped_location;
     mode : locality_mode;     (* locality of the closure itself *)
-    ret_mode: locality_mode;
+    ret_mode: return_mode;
     (** alloc mode of the returned value. Also indicates if the function might
         allocate in the caller's region. *)
     yielding: yielding_kind;
@@ -1091,7 +1098,7 @@ and lambda_apply =
     ap_args : lambda list;
     ap_result_layout : layout;
     ap_region_close : region_close;
-    ap_mode : locality_mode;
+    ap_mode : return_mode;
     ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
@@ -1320,7 +1327,7 @@ val lfunction :
   attr:function_attribute -> (* specified with [@inline] attribute *)
   loc:scoped_location ->
   mode:locality_mode ->
-  ret_mode:locality_mode ->
+  ret_mode:return_mode ->
   lambda
 
 val lfunction' :
@@ -1331,7 +1338,7 @@ val lfunction' :
   attr:function_attribute -> (* specified with [@inline] attribute *)
   loc:scoped_location ->
   mode:locality_mode ->
-  ret_mode:locality_mode ->
+  ret_mode:return_mode ->
   lfunction
 
 (* Set the yielding mode of a closure (defaults to [May_yield] from the
@@ -1470,6 +1477,12 @@ val sub_locality_mode : locality_mode -> locality_mode -> bool
 val eq_locality_mode : locality_mode -> locality_mode -> bool
 val is_local_mode : locality_mode -> bool
 val is_heap_mode : locality_mode -> bool
+
+val is_maybe_alloc_stack : return_mode -> bool
+val is_not_alloc_stack : return_mode -> bool
+val return_mode_of_locality_mode : locality_mode -> return_mode
+val eq_return_mode : return_mode -> return_mode -> bool
+val sub_return_mode : return_mode -> return_mode -> bool
 
 val primitive_may_allocate : primitive -> locality_mode option
   (** Whether and where a primitive may allocate.
