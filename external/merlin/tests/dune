@@ -1,0 +1,28 @@
+(executable
+ (name revert_newlines))
+
+(rule
+ (target revert-newlines)
+ (deps   revert_newlines.exe)
+ (action (copy %{deps} %{target})))
+
+(env (_
+ (binaries merlin-wrapper ocamlc-wrapper revert-newlines)
+ (env-vars
+  (MERLIN merlin-wrapper)
+  (OCAMLC ocamlc-wrapper))))
+
+(cram
+ (package merlin)
+ (applies_to :whole_subtree)
+ (deps
+  %{bin:merlin-wrapper}
+  %{bin:ocamlc-wrapper}
+  %{bin:ocamlmerlin-server}
+  %{bin:ocamlmerlin}
+  %{bin:dot-merlin-reader}
+  %{bin:revert-newlines}))
+
+(cram
+ (applies_to with-ppx)
+ (deps (package ppxlib)))

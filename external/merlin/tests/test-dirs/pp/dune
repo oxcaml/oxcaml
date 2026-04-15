@@ -1,0 +1,11 @@
+(cram
+ (applies_to dot-pp-dot-ml-dune dot-pp-dot-ml simple-pp)
+ (enabled_if
+  (<> %{os_type} Win32)))
+
+; Jane Street disabled tests -- they use dune.
+; Revisit when dune can run the flambda-backend compiler.
+(cram
+  (enabled_if false)
+  (applies_to
+    dot-pp-dot-ml-dune))
