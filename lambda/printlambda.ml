@@ -1451,7 +1451,6 @@ and slam ppf = function
     fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]"
       slam sval_comptime lam sval_runtime
   | SLproj_comptime value -> fprintf ppf "%a.c" slam value
-  | SLproj_runtime value -> fprintf ppf "%a.r" slam value
   | SLtemplate func -> fprintf ppf "(template %a)" slambda_function func
   | SLinstantiate apply -> fprintf ppf "(%a)" slambda_apply apply
   | SLlet _ as slet ->

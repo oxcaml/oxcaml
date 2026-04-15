@@ -119,9 +119,7 @@ let rec fracture_lam lambda : slambda =
         { slet_name = def_id;
           slet_value = fdef;
           slet_body =
-            (let def_r =
-               Lsplice (try_to_find_location def, SLproj_runtime (SLvar def_id))
-             in
+            (let def_r = Lsplice (try_to_find_location def, SLvar def_id) in
              slet_local_slam "body" fbody body (fun body_c body_r ->
                  SLhalves
                    { sval_comptime = body_c;
@@ -477,8 +475,7 @@ and slet_local_slam name value value_lam body =
       { slet_name = name;
         slet_value = value;
         slet_body =
-          body (SLproj_comptime (SLvar name))
-            (Lsplice (loc, SLproj_runtime (SLvar name)))
+          body (SLproj_comptime (SLvar name)) (Lsplice (loc, SLvar name))
       }
 
 (** Helper function fracture [lambda] where we only need the dynamic part of the
@@ -486,7 +483,7 @@ and slet_local_slam name value value_lam body =
 and fracture_dynamic lam =
   match fracture_lam lam with
   | SLhalves { sval_comptime = _; sval_runtime } -> sval_runtime
-  | fractured -> Lsplice (try_to_find_location lam, SLproj_runtime fractured)
+  | fractured -> Lsplice (try_to_find_location lam, fractured)
 
 (** Helper function fracture a [('a * lambda) list] where we only need the
     dynamic part of the result. *)

@@ -202,7 +202,7 @@ let eval (expr : 'a expr) =
         -> 'b eval
      }] *)
   let lambda =
-    let { Lambda.sval_comptime = _; sval_runtime = raw_lambda } =
+    let { Slambda.slv_comptime = _; slv_runtime = raw_lambda } =
       Slambda.eval Fun.id tlambda_program.code
     in
     Simplif.simplify_lambda
