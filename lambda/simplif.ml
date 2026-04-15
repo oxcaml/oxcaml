@@ -621,7 +621,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
               attr=attr1; loc; ret_mode; mode} ->
       begin match outer_kind, ret_mode, simplif l with
         Curried {nlocal=0},
-        Alloc_heap,
+        Not_alloc_stack,
         Lfunction{kind=Curried _ as kind; params=params'; return=return2;
                   body; attr=attr2; loc; mode=inner_mode; ret_mode}
         when optimize &&
@@ -903,7 +903,7 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
             ap_result_layout = return;
             ap_loc = loc;
             ap_region_close = Rc_normal;
-            ap_mode = alloc_heap;
+            ap_mode = not_alloc_stack;
             ap_tailcall = Default_tailcall;
             ap_inlined = Default_inlined;
             ap_specialised = Default_specialise;
@@ -934,9 +934,9 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
     (* TODO: enable this optimisation even in the presence of local returns *)
     begin match kind, ret_mode with
     | Curried {nlocal}, _ when nlocal > 0 -> raise Exit
-    | Tupled, Alloc_local -> raise Exit
-    | _, Alloc_heap -> ()
-    | _, Alloc_local -> assert false
+    | Tupled, Maybe_alloc_stack -> raise Exit
+    | _, Not_alloc_stack -> ()
+    | _, Maybe_alloc_stack -> assert false
     end;
     let body, inner = aux [] false body in
     let attr = { default_stub_attribute with zero_alloc = attr.zero_alloc } in

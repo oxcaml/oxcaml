@@ -494,8 +494,9 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
      and refuse to compile the code. *)
   let env, my_region_var, my_ghost_region_var =
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap -> env, None, None
-    | Local { region = my_region; ghost_region = my_ghost_region } ->
+    | Not_alloc_stack -> env, None, None
+    | Maybe_alloc_stack { region = my_region; ghost_region = my_ghost_region }
+      ->
       let my_region_duid = Flambda_debug_uid.none in
       let env, region =
         Env.create_bound_parameter env (my_region, my_region_duid)

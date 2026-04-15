@@ -37,7 +37,8 @@ let layout_meth = layout_any_value
 let layout_tables = layout_any_value
 
 
-let lfunction ?(kind=Curried {nlocal=0}) ?(ret_mode=alloc_heap) return_layout params body =
+let lfunction ?(kind=Curried {nlocal=0})
+    ?(ret_mode=not_alloc_stack) return_layout params body =
   if params = [] then body else
   match kind, body with
   | Curried {nlocal=0},
@@ -80,7 +81,7 @@ let mkappl (func, args, layout) =
          ap_result_layout=layout;
          ap_args=args;
          ap_region_close=Rc_normal;
-         ap_mode=alloc_heap;
+         ap_mode=not_alloc_stack;
          ap_tailcall=Default_tailcall;
          ap_inlined=Default_inlined;
          ap_specialised=Default_specialise;
@@ -231,7 +232,7 @@ let rec build_object_init ~scopes cl_table obj params inh_init obj_init cl =
                    ~loc:(of_location ~scopes pat.pat_loc)
                    ~body
                    ~mode:alloc_heap
-                   ~ret_mode:alloc_heap
+                   ~ret_mode:not_alloc_stack
        in
        begin match obj_init with
          Lfunction {kind = Curried {nlocal=0}; params; body = rem} ->
@@ -536,7 +537,7 @@ let rec transl_class_rebind ~scopes obj_init cl vf =
                   ~loc:(of_location ~scopes pat.pat_loc)
                   ~body
                   ~mode:alloc_heap
-                  ~ret_mode:alloc_heap
+                  ~ret_mode:not_alloc_stack
       in
       (path, path_lam,
        match obj_init with
@@ -597,7 +598,7 @@ let transl_class_rebind ~scopes cl vf =
         ap_args=[Lvar self];
         ap_result_layout=layout_obj;
         ap_region_close=Rc_normal;
-        ap_mode=alloc_heap;
+        ap_mode=not_alloc_stack;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
@@ -926,7 +927,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
            ~loc:Loc_unknown
            ~return:layout_function
            ~mode:alloc_heap
-           ~ret_mode:alloc_heap
+           ~ret_mode:not_alloc_stack
            ~params:[lparam cla cla_duid layout_table]
            ~body:cl_init,
          Dynamic (* Placeholder, real kind is computed in [lbody] below *))
@@ -959,7 +960,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                           ~loc:Loc_unknown
                           ~return:layout_function
                           ~mode:alloc_heap
-                          ~ret_mode:alloc_heap
+                          ~ret_mode:not_alloc_stack
                           ~params:[lparam cla cla_duid layout_table]
                           ~body:cl_init;
            lambda_unit; lenvs],
@@ -1025,7 +1026,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                    ~attr:default_function_attribute
                    ~loc:Loc_unknown
                    ~mode:alloc_heap
-                   ~ret_mode:alloc_heap
+                   ~ret_mode:not_alloc_stack
                    ~body:(def_ids cla cl_init), lam)
   and lset cached i lam =
     Lprim(Psetfield(i, Pointer, Assignment modify_heap),
@@ -1044,7 +1045,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
          ~attr:default_function_attribute
          ~loc:Loc_unknown
          ~mode:alloc_heap
-         ~ret_mode:alloc_heap
+         ~ret_mode:not_alloc_stack
          ~return:layout_function
          ~params:[lparam cla cla_duid layout_table]
          ~body:(def_ids cla cl_init))
