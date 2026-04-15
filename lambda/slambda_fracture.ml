@@ -339,12 +339,26 @@ let rec fracture_lam lambda : slambda =
       ({ kind = _; params; return; body; attr; loc; mode; ret_mode }, free_vars)
     ->
     let free_vars = Ident.Map.to_list free_vars in
-    (* let free_vars_shape =
+    let free_vars_shape_locality_mode =
       List.map
         (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
         free_vars
       |> Array.of_list
-    in *)
+    in
+    let free_vars_shape_unit =
+      List.map
+        (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
+        free_vars
+      |> Array.of_list
+    in
+    let free_vars_is_uniform =
+      Lambda.is_uniform_block_shape (Shape free_vars_shape_unit)
+    in
+    let get_free_var_prim i =
+      match free_vars_is_uniform with
+      | true -> Pfield (i, Pointer, Reads_agree)
+      | false -> Pmixedfield ([i], free_vars_shape_locality_mode, Reads_agree)
+    in
     let templated_function_body =
       slet_local "body" body (fun body_c body_r ->
           let closure_id = Ident.create_local "closure" in
@@ -365,10 +379,7 @@ let rec fracture_lam lambda : slambda =
                       layout,
                       ident,
                       debug_uid_none,
-                      Lprim
-                        ( Pfield (i, Pointer, Reads_agree),
-                          [Lvar closure_id],
-                          loc ),
+                      Lprim (get_free_var_prim i, [Lvar closure_id], loc),
                       lam ) ))
               (0, body_r) free_vars
           in
@@ -387,12 +398,6 @@ let rec fracture_lam lambda : slambda =
                   ~ret_mode
             })
     in
-    let free_vars_shape =
-      List.map
-        (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
-        free_vars
-      |> Array.of_list
-    in
     let free_var_capture = List.map (fun (ident, _) -> Lvar ident) free_vars in
     let sfun_params =
       Misc.Stdlib.Array.of_list_map
@@ -404,7 +409,7 @@ let rec fracture_lam lambda : slambda =
           SLtemplate { sfun_params; sfun_body = templated_function_body };
         sval_runtime =
           Lprim
-            ( Pmakeblock (0, Immutable, Shape free_vars_shape, mode),
+            ( Pmakeblock (0, Immutable, Shape free_vars_shape_unit, mode),
               free_var_capture,
               loc )
       }

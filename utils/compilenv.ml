@@ -49,7 +49,8 @@ let exported_constants = Hashtbl.create 17
 
 let cached_zero_alloc_info = Zero_alloc_info.create ()
 
-let cache_zero_alloc_info c = Zero_alloc_info.merge c ~into:cached_zero_alloc_info
+let cache_zero_alloc_info c =
+  Zero_alloc_info.merge c ~into:cached_zero_alloc_info
 
 let current_unit  =
   { ui_unit = CU.dummy;
@@ -112,7 +113,9 @@ let read_unit_info filename =
     seek_in ic (first_section_offset + uir.uir_sections_length);
     let crc = Digest.input ic in
     (* This consumes the channel *)
-    let sections = File_sections.create uir.uir_section_toc filename ic ~first_section_offset in
+    let sections =
+      File_sections.create uir.uir_section_toc filename ic ~first_section_offset
+    in
     let ui = {
       ui_unit = uir.uir_unit;
       ui_defines = uir.uir_defines;
@@ -154,7 +157,9 @@ let equal_args arg1 arg2 =
 
 let equal_up_to_pack_prefix cu1 cu2 =
   CU.Name.equal (CU.name cu1) (CU.name cu2)
-  && List.equal equal_args (CU.instance_arguments cu1) (CU.instance_arguments cu2)
+  && List.equal equal_args
+      (CU.instance_arguments cu1)
+      (CU.instance_arguments cu2)
 
 let load_unit_infos ~warn_on_missing comp_unit =
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.ui_unit);
@@ -221,7 +226,8 @@ let get_cached_static_data comp_unit =
     match Infos_table.find global_infos_table name with
     | Some ui -> ui.ui_static_data
     | None | exception Not_found ->
-      Slambda_types.Or_missing.Missing, (Slambda_types.Templates.empty_templates ())
+      Slambda_types.Or_missing.Missing,
+        (Slambda_types.Templates.empty_templates ())
   end
 
 let get_cached_export_info comp_unit =

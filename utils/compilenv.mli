@@ -90,7 +90,9 @@ val try_load_unit : Compilation_unit.t -> unit
            missing .cmx just means there is no static data available. *)
 
 val get_cached_static_data:
-  Compilation_unit.t -> Slambda_types.value Slambda_types.Or_missing.t * Slambda_types.Templates.templates
+  Compilation_unit.t ->
+  Slambda_types.value Slambda_types.Or_missing.t
+    * Slambda_types.Templates.templates
 
 val get_cached_export_info : Compilation_unit.t -> Obj.t option
         (* Return the cached export info for a loaded compilation unit,

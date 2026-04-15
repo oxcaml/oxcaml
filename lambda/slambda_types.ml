@@ -72,9 +72,7 @@ end = struct
     | SLVlayout l -> fprintf ppf "⟪%a⟫" Printlambda.layout l
     | SLVrecord fields ->
       let print_fields ppf =
-        Array.iter
-          (fun v -> fprintf ppf "%a;@ " print_or_missing v)
-          fields
+        Array.iter (fun v -> fprintf ppf "%a;@ " print_or_missing v) fields
       in
       fprintf ppf "@[<hv 2>[@ %t]@]" print_fields
     | SLVclosure c -> Templates.print_id ppf c
@@ -89,9 +87,7 @@ end = struct
 
   and print_closure ppf { clo_params; clo_body; clo_env = _ } =
     let print_params ppf =
-      Array.iter
-        (fun id -> fprintf ppf "%a@ " Slambdaident.print id)
-        clo_params
+      Array.iter (fun id -> fprintf ppf "%a@ " Slambdaident.print id) clo_params
     in
     fprintf ppf "@[<2>(closure @[<2>%t->@]@ %a)@]" print_params
       Printlambda.slambda clo_body
@@ -135,7 +131,12 @@ and Templates : sig
 
   val empty_templates : unit -> templates
 
-  val add : t -> cu:Compilation_unit.t -> name:Slambdaident.t option -> Types.closure -> id
+  val add :
+    t ->
+    cu:Compilation_unit.t ->
+    name:Slambdaident.t option ->
+    Types.closure ->
+    id
 
   val add_foreign_templates : t -> templates -> unit
 
@@ -143,7 +144,7 @@ and Templates : sig
     t ->
     id ->
     Types.value array ->
-    (Types.closure -> Types.value array -> Types.value Or_missing.t) ->
+    (Types.closure -> Types.value array -> lambda) ->
     Types.value Or_missing.t
 
   val templates : t -> templates
@@ -166,10 +167,11 @@ end = struct
 
   let stamp = ref 0
 
-  let empty () = {
-    templates = Misc.Stdlib.String.Tbl.create 10;
-    foreign_templates = Misc.Stdlib.String.Tbl.create 10;
-    instantiations = Ident.Tbl.create 10 }
+  let empty () =
+    { templates = Misc.Stdlib.String.Tbl.create 10;
+      foreign_templates = Misc.Stdlib.String.Tbl.create 10;
+      instantiations = Ident.Tbl.create 10
+    }
 
   let empty_templates () = Misc.Stdlib.String.Tbl.create 0
 
@@ -177,8 +179,8 @@ end = struct
     let id =
       match name with
       | Some name ->
-        Format_doc.asprintf "%a_%s_%i"
-          Compilation_unit.print cu (Slambdaident.name name) !stamp
+        Format_doc.asprintf "%a_%s_%i" Compilation_unit.print cu
+          (Slambdaident.name name) !stamp
       | None -> Format_doc.asprintf "%a_%i" Compilation_unit.print cu !stamp
     in
     incr stamp;
@@ -186,14 +188,27 @@ end = struct
     id
 
   let add_foreign_templates t templates =
-    Misc.Stdlib.String.Tbl.add_seq
-      t.foreign_templates
+    Misc.Stdlib.String.Tbl.add_seq t.foreign_templates
       (Misc.Stdlib.String.Tbl.to_seq templates)
 
-  let rec symbol_arg_of_value_kind = function
+  let find_template t id =
+    try Misc.Stdlib.String.Tbl.find t.templates id
+    with Not_found -> (
+      try Misc.Stdlib.String.Tbl.find t.foreign_templates id
+      with Not_found -> Misc.fatal_error ("Template not found: " ^ id))
+
+  let symbol_arg_of_value_kind_non_null = function
     | Pintval -> "immediate"
-    | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _
-    | Parrayval _ | Pboxedvectorval _ -> "value"
+    | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _ | Parrayval _
+    | Pboxedvectorval _ ->
+      "value"
+
+  let rec symbol_arg_of_value_kind { raw_kind; nullable } =
+    let kind = symbol_arg_of_value_kind_non_null raw_kind in
+    let nullable =
+      match nullable with Nullable -> "_or_null" | Non_nullable -> ""
+    in
+    kind ^ nullable
 
   and symbol_arg_of_unboxed_float = function
     | Unboxed_float64 -> "float64"
@@ -214,28 +229,30 @@ end = struct
 
   and symbol_arg_of_unboxed_product layouts =
     (* CR layout poly: this should be synced up with unarize. *)
-    "(" ^ (String.concat "_" (List.map symbol_arg_of_layout layouts)) ^ ")"
+    "(" ^ String.concat "_" (List.map symbol_arg_of_layout layouts) ^ ")"
 
   and symbol_arg_of_layout = function
     | Pvalue vk -> symbol_arg_of_value_kind vk
-    | Punboxed_float uf -> symbol_arg_of_unboxed_Float uf
-    | Punboxed_or_untagged_integer ui -> symbol_arg_of_unboxed_integer ui
+    | Punboxed_float uf -> symbol_arg_of_unboxed_float uf
+    | Punboxed_or_untagged_integer ui ->
+      symbol_arg_of_unboxed_or_untagged_integer ui
     | Punboxed_vector uv -> symbol_arg_of_unboxed_vector uv
     | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
     | Ptop | Pbottom | Psplicevar _ ->
       Misc.fatal_error "Slambda_types.symbol_arg_of_layout: unexpected layout"
 
-  let symbol_arg_of_value = function
+  let symbol_arg_of_value (v : Types.value) =
+    match v with
     | SLVlayout l -> symbol_arg_of_layout l
     | SLVhalves _ | SLVrecord _ | SLVclosure _ ->
       Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected value"
 
-  let instantiate t closure_id args f =
-    let closure = Misc.Stdlib.String.Tbl.find t.templates closure_id in
-    let instantiation = f closure args in
-    let _arg_names = List.map symbol_arg_of_value args in
-    let _name = Ident.create_persistent (String.concat "_" (id :: arg_names)) in
-    instantiation
+  let instantiate t id args f : Types.value Or_missing.t =
+    let closure = find_template t id in
+    let arg_names = Array.map symbol_arg_of_value args |> Array.to_list in
+    let name = Ident.create_persistent (String.concat "_" (id :: arg_names)) in
+    let _ = Ident.Tbl.memoize t.instantiations (fun _ -> f closure args) name in
+    Present (SLVhalves { slv_comptime = Missing; slv_runtime = Lvar name })
 
   let templates t = t.templates
 
@@ -249,11 +266,11 @@ end = struct
       (fun id closure ->
         Format.fprintf ppf "@[<2>(%s@ %a)@]" id Types.print_closure closure)
       templates;
-    Format.fprintf ppf "@]";
-
+    Format.fprintf ppf "@]"
 end
 
 type template_id = Templates.id
+
 type env = Env.t
 
 include Types

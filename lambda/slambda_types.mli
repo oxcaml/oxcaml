@@ -7,11 +7,13 @@ module Or_missing : sig
 
   module Syntax : sig
     val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+
     val ( |>> ) : 'a t -> ('a -> 'b) -> 'b t
   end
 end
 
 type template_id
+
 type env
 
 type closure =
@@ -30,7 +32,6 @@ and value =
   | SLVlayout of layout
   | SLVrecord of value Or_missing.t array
   | SLVclosure of template_id
-
 
 val print_value : Format.formatter -> value -> unit
 
@@ -52,7 +53,6 @@ module Env : sig
   val find : t -> Slambdaident.t -> value Or_missing.t
 end
 
-
 module Templates : sig
   type id = template_id
 
@@ -64,7 +64,8 @@ module Templates : sig
 
   val empty_templates : unit -> templates
 
-  val add : t -> cu:Compilation_unit.t -> name:Slambdaident.t option -> closure -> id
+  val add :
+    t -> cu:Compilation_unit.t -> name:Slambdaident.t option -> closure -> id
 
   val add_foreign_templates : t -> templates -> unit
 
@@ -72,7 +73,7 @@ module Templates : sig
     t ->
     id ->
     value array ->
-    (closure -> value array -> value Or_missing.t) ->
+    (closure -> value array -> lambda) ->
     value Or_missing.t
 
   val templates : t -> templates

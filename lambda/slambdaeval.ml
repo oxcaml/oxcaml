@@ -120,7 +120,11 @@ let rec eval_slam store ?name env slam : value Or_missing.t =
         let env_body =
           Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
         in
-        eval_slam store env_body clo_body)
+        let { slv_comptime = _; slv_runtime } =
+          eval_slam store env_body clo_body
+          |> expect_not_missing |> expect Thalves
+        in
+        slv_runtime)
 
 and eval_var env id = Env.find env id
 
@@ -530,12 +534,19 @@ let rec assert_no_splices (lam : Lambda.lambda) =
 
 let do_eval slam =
   let store = Templates.empty () in
-  let halves =
+  let { slv_comptime; slv_runtime } =
     eval_slam store Env.empty slam
     |> expect_not_missing
     |> expect Thalves ~reason:"toplevel module"
   in
-  store, halves
+  let lambda =
+    List.fold_left
+      (fun lam (id, def) ->
+        Llet (Strict, layout_function, id, debug_uid_none, def, lam))
+      slv_runtime
+      (Templates.instantiations store)
+  in
+  store, { slv_comptime; slv_runtime = lambda }
 
 let eval slam =
   Profile.record_call "static_eval" (fun () ->
