@@ -4207,18 +4207,20 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
     else
       match decl.type_kind, decl'.type_kind with
       | Type_record (lst,r,umc), Type_record (lst',r',umc')
-        when equal_record_representation r r' ->
+        when equal_record_representation_up_to_scannable_axes r r' ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_record_description type_pairs env lst lst';
           mcomp_unsafe_mode_crossing type_pairs env umc umc'
       | Type_record_unboxed_product (lst,r,umc),
         Type_record_unboxed_product (lst',r',umc')
-        when equal_record_unboxed_product_representation r r' ->
+        when
+          equal_record_unboxed_product_representation_up_to_scannable_axes r r'
+        ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_record_description type_pairs env lst lst';
           mcomp_unsafe_mode_crossing type_pairs env umc umc'
       | Type_variant (v1,r,umc), Type_variant (v2,r',umc')
-        when equal_variant_representation r r' ->
+        when equal_variant_representation_up_to_scannable_axes r r' ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_variant_description type_pairs env v1 v2;
           mcomp_unsafe_mode_crossing type_pairs env umc umc'

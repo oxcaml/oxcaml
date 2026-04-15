@@ -666,9 +666,38 @@ Error: Signature mismatch:
        is not included in
          sig type r = { r : #(t * s); } and t : value non_pointer and s end
        Type declarations do not match:
-         type r = { r : #(t * s); }
+         type t
        is not included in
-         type r = { r : #(t * s); }
-       Their internal representations differ:
-       This is likely caused by a layout mismatch in a later definition.
+         type t : value non_pointer
+       The layout of the first is value
+         because of the definition of t at line 7, characters 2-7.
+       But the layout of the first must be a sublayout of value non_pointer
+         because of the definition of t at line 3, characters 2-27.
+       Note: The layout of immediate is value non_pointer.
+|}]
+
+(* We only compare record representations up to scannable axes for the inclusion
+   check, to support type substitution edge cases *)
+
+module M : sig
+  type t
+  (* Because [t := int] only via the substitution below, the compiler doesn't
+     realize that [t] is [non_pointer] when computing the type declaration *)
+  type r = { t : t; i : int64# }
+end with type t := int = struct
+  type r = { t : int ; i : int64# }
+end
+
+(* Then, for this check, the new record declaration technically has a more
+   precise representation, but we accept it as we only compare representations
+   up to scannable axes.
+
+   This can lead to a missed [caml_modify] in some uncommon cases: see the test
+   with a "CR layouts-scannable" in
+   testsuite/tests/typing-layouts-caml-modify/non_pointer.ml
+*)
+type r = M.r = { t : int ; i : int64# }
+[%%expect{|
+module M : sig type r = { t : int; i : int64#; } end
+type r = M.r = { t : int; i : int64#; }
 |}]

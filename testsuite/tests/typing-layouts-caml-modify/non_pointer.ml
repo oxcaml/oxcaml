@@ -233,3 +233,101 @@ let () =
       let outer = { x = M.t1 } in
       outer.x <- M.t2;
       ignore (Sys.opaque_identity outer))
+
+(* Interaction with substitution *)
+
+let () =
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let arr = [| (Mnpval.mk 1 "a") |] in
+      set arr 0 (Mnpval.mk 2 "b");
+      ignore (Sys.opaque_identity arr))
+
+let () =
+  let open struct
+    module M : sig
+      type t : value & value
+      type r = { mutable t : t; i : int64# }
+    end with type t := #(int * string) = struct
+      type r = { mutable t : #(int * string); i : int64# }
+    end
+  end in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let t = { M.t = #(1, "1"); M.i = #1L } in
+      t.t <- #(2, "2");
+      ignore (Sys.opaque_identity t))
+
+let () =
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let arr = [| (Mnpval.mk 1 "a") |] in
+      set arr 0 (Mnpval.mk 2 "b");
+      ignore (Sys.opaque_identity arr))
+
+(* CR layouts-scannable: Record representations can be stale after type
+   substitution, causing an unnecessary caml_modify *)
+let () =
+  let open struct
+    module IS : sig
+      type t : value non_pointer & value
+      val a : t
+      val b : t
+    end = struct
+      type t = #(int * string)
+      let a = #(1, "1")
+      let b = #(2, "2")
+    end
+
+    module M : sig
+      type r = { mutable t : IS.t }
+    end = struct
+      type r = { mutable t : IS.t }
+    end
+
+    module M_with_subst : sig
+      type t : value & value
+      (* When computing the record representation for [r], the compiler hasn't
+         yet seen the sustitution yet, and it doesn't update the record
+         representation upon substituting, so it thinks [r] is a mixed block
+         containing a [value & value]. *)
+      type r = { mutable t : t }
+    end with type t := IS.t = struct
+      type r = { mutable t : IS.t }
+    end
+  end in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let t = { M.t = IS.a } in
+      t.t <- IS.b;
+      ignore (Sys.opaque_identity t));
+  test ~expect_caml_modifies:2
+    (fun () ->
+      let t = { M_with_subst.t = IS.a } in
+      t.t <- IS.b;
+      ignore (Sys.opaque_identity t))
+
+(* CR layouts-scananble: Test this once abstract kinds can be substituted for
+   subkinds *)
+(*
+let () =
+  let open struct
+    module M : sig
+      kind_ k = value
+      type t : k
+      val x : t
+      val y : t
+      type r = { mutable t : t; i : int64# }
+    end with kind_ k := value non_pointer = struct
+      type t = int
+      type r = { mutable t : t; i : int64# }
+      let x = 1
+      let y = 2
+    end
+  end in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let t = { M.t = M.x; M.i = #1L } in
+      t.t <- M.y;
+      ignore (Sys.opaque_identity t))
+*)

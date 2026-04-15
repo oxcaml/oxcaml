@@ -1269,13 +1269,22 @@ val may_equal_constr :
 
 (* Equality *)
 
-val equal_record_representation :
+(* For record and variant representations to be compatible, they only need to be
+   equal *up to scannable axes.*
+
+   This is safe because the only way that only the scannable axes can differ
+   between type definitions whose kinds match is through type substitution (or
+   perhaps other module typing tricks), which results in one representation
+   being *overapproximate* wrt scannable axes - this result in worse codegen but
+   is still sound. *)
+
+val equal_record_representation_up_to_scannable_axes :
   record_representation -> record_representation -> bool
 
-val equal_record_unboxed_product_representation :
+val equal_record_unboxed_product_representation_up_to_scannable_axes :
   record_unboxed_product_representation -> record_unboxed_product_representation -> bool
 
-val equal_variant_representation :
+val equal_variant_representation_up_to_scannable_axes :
   variant_representation -> variant_representation -> bool
 
 type 'a gen_label_description =
@@ -1331,7 +1340,7 @@ val bound_value_identifiers_and_sorts :
 
 val signature_item_id : signature_item -> Ident.t
 
-val equal_mixed_block_element :
+val equal_mixed_block_element_up_to_scannable_axes :
   mixed_block_element -> mixed_block_element -> bool
 (* CR layouts: this appears to be dead code *)
 val compare_mixed_block_element :
@@ -1339,8 +1348,8 @@ val compare_mixed_block_element :
 val mixed_block_element_to_string : mixed_block_element -> string
 val mixed_block_element_to_lowercase_string : mixed_block_element -> string
 
-val mixed_product_shape_less_or_equal :
-  mixed_product_shape -> mixed_product_shape -> Misc.Le_result.t
+val equal_mixed_product_shape_up_to_scannable_axes :
+  mixed_product_shape -> mixed_product_shape -> bool
 
 val equal_unsafe_mode_crossing :
   type_equal:(type_expr -> type_expr -> bool) ->

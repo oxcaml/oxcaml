@@ -861,9 +861,9 @@ let compare_tag t1 t2 =
   | Extension _, Null -> -1
   | Null, Extension _ -> 1
 
-let rec equal_mixed_block_element e1 e2 =
+let rec equal_mixed_block_element_up_to_scannable_axes e1 e2 =
   match e1, e2 with
-  | Scannable sa1, Scannable sa2 -> Jkind_types.Scannable_axes.equal sa1 sa2
+  | Scannable _, Scannable _
   | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16
@@ -872,7 +872,8 @@ let rec equal_mixed_block_element e1 e2 =
   | Void, Void
     -> true
   | Product es1, Product es2
-    -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
+    -> Misc.Stdlib.Array.equal
+         equal_mixed_block_element_up_to_scannable_axes es1 es2
   | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
     | Product _ | Void ), _
@@ -923,21 +924,23 @@ let rec compare_mixed_block_element e1 e2 =
   | Void, _ -> -1
   | _, Void -> 1
 
-let equal_mixed_product_shape r1 r2 = r1 == r2 ||
-  Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
+let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
+  Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
 
-let equal_constructor_representation r1 r2 = r1 == r2 || match r1, r2 with
+let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
+  match r1, r2 with
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
-      equal_mixed_product_shape mx1 mx2
+      equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
   | (Constructor_mixed _ | Constructor_uniform_value), _ -> false
 
-let equal_variant_representation r1 r2 = r1 == r2 || match r1, r2 with
+let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
+  match r1, r2 with
   | Variant_unboxed, Variant_unboxed ->
       true
   | Variant_boxed cstrs_and_sorts1, Variant_boxed cstrs_and_sorts2 ->
       Misc.Stdlib.Array.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
-          equal_constructor_representation cstr1 cstr2
+          equal_constructor_representation_up_to_scannable_axes cstr1 cstr2
           && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
                sorts1 sorts2)
         cstrs_and_sorts1
@@ -948,7 +951,7 @@ let equal_variant_representation r1 r2 = r1 == r2 || match r1, r2 with
   | (Variant_unboxed | Variant_boxed _ | Variant_extensible | Variant_with_null), _ ->
       false
 
-let equal_record_representation r1 r2 = match r1, r2 with
+let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true
   | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
@@ -956,48 +959,23 @@ let equal_record_representation r1 r2 = match r1, r2 with
          constructor representation. *)
       ignore (cr1 : constructor_representation);
       ignore (cr2 : constructor_representation);
-      equal_tag tag1 tag2 && equal_variant_representation vr1 vr2
+      equal_tag tag1 tag2 &&
+        equal_variant_representation_up_to_scannable_axes vr1 vr2
   | Record_boxed sorts1, Record_boxed sorts2 ->
       Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal sorts1 sorts2
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->
       true
-  | Record_mixed mx1, Record_mixed mx2 -> equal_mixed_product_shape mx1 mx2
+  | Record_mixed mx1, Record_mixed mx2 ->
+      equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
   | (Record_unboxed | Record_inlined _ | Record_boxed _ | Record_float
     | Record_ufloat | Record_mixed _), _ ->
       false
 
-let equal_record_unboxed_product_representation r1 r2 = match r1, r2 with
+let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
+  match r1, r2 with
   | Record_unboxed_product, Record_unboxed_product -> true
-
-(* Returns [Less] when [e1] and [e2] are equal up to the stored scannable axes
-   on a [Scannable], which can be [Less]. *)
-let rec mixed_block_element_less_or_equal e1 e2 =
-  match e1, e2 with
-  | Scannable sa1, Scannable sa2 ->
-    Jkind_types.Scannable_axes.less_or_equal sa1 sa2
-  | Float_boxed, Float_boxed
-  | Float64, Float64 | Float32, Float32
-  | Word, Word | Untagged_immediate, Untagged_immediate
-  | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
-  | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
-  | Void, Void
-    -> Misc.Le_result.Equal
-  | Product es1, Product es2 -> mixed_product_shape_less_or_equal es1 es2
-  | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
-    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
-    | Product _ | Void ), _
-    -> Misc.Le_result.Not_le
-
-and mixed_product_shape_less_or_equal s1 s2 =
-  if Array.length s1 <> Array.length s2
-  then Misc.Le_result.Not_le
-  else
-    Misc.Stdlib.Array.fold_left2
-      (fun acc e1 e2 ->
-        Misc.Le_result.combine acc (mixed_block_element_less_or_equal e1 e2))
-      Misc.Le_result.Equal s1 s2
 
 let may_equal_constr c1 c2 =
   c1.cstr_arity = c2.cstr_arity
