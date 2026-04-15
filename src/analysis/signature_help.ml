@@ -6,7 +6,7 @@ type parameter_info =
   { label : Typedtree.arg_label;
     param_start : int;
     param_end : int;
-    argument : Typedtree.expression option
+    argument : Typedtree.apply_arg
   }
 
 type application_signature =
@@ -73,13 +73,21 @@ let pp_parameter env label ppf ty =
   | Position l -> Format.fprintf ppf "%s:[%%call_pos]" l
 
 (* record buffer offsets to be able to underline parameter types *)
-let print_parameter_offset ?arg:argument ppf buffer env label ty =
+let print_parameter_offset ~arg:argument ppf buffer env label ty =
   let param_start = Buffer.length buffer in
   Format.fprintf ppf "%a%!" (pp_parameter env label) ty;
   let param_end = Buffer.length buffer in
   Format.pp_print_string ppf " -> ";
   Format.pp_print_flush ppf ();
   { label; param_start; param_end; argument }
+
+let omitted : Typedtree.omitted_parameter =
+  let mode_closure = Mode.Alloc.disallow_left Mode.Alloc.legacy in
+  let mode_arg = Mode.Alloc.disallow_right Mode.Alloc.legacy in
+  let mode_ret = Mode.Alloc.disallow_right Mode.Alloc.legacy in
+  let sort_arg = Jkind.Sort.value in
+  let sort_ret = Jkind.Sort.value in
+  { mode_closure; mode_arg; mode_ret; sort_arg; sort_ret }
 
 (* This function preprocesses the signature and associate already assigned
    arguments to the corresponding parameter. (They should always be in the correct
@@ -91,17 +99,15 @@ let separate_function_signature ~args (e : Typedtree.expression) =
   let rec separate ?(parameters = []) args ty =
     match (args, Types.get_desc ty) with
     | (_l, arg) :: args, Tarrow ((label, _, _), ty1, ty2, _) ->
-      let arg =
-        match (arg : Typedtree.apply_arg) with
-        | Arg (arg, _) -> Some arg
-        | Omitted _ -> None
-      in
       let parameter =
-        print_parameter_offset ppf buffer e.exp_env label ty1 ?arg
+        print_parameter_offset ~arg ppf buffer e.exp_env label ty1
       in
       separate args ty2 ~parameters:(parameter :: parameters)
     | [], Tarrow ((label, _, _), ty1, ty2, _) ->
-      let parameter = print_parameter_offset ppf buffer e.exp_env label ty1 in
+      let parameter =
+        print_parameter_offset ~arg:(Omitted omitted) ppf buffer e.exp_env label
+          ty1
+      in
       separate args ty2 ~parameters:(parameter :: parameters)
     (* end of function type, print remaining type without recording offsets *)
     | _ ->
@@ -117,18 +123,19 @@ let separate_function_signature ~args (e : Typedtree.expression) =
 
 let active_parameter_by_arg ~arg params =
   let find_by_arg = function
-    | { argument = Some a; _ } when a == arg -> true
+    | { argument = Arg (a, _); _ } when a == arg -> true
     | _ -> false
   in
   try Some (List.index params ~f:find_by_arg) with Not_found -> None
 
 let first_unassigned_argument params =
   let positional = function
-    | { argument = None; label = Typedtree.Nolabel; _ } -> true
+    | { argument = Omitted _; label = Typedtree.Nolabel; _ } -> true
     | _ -> false
   in
   let labelled = function
-    | { argument = None; label = Typedtree.Labelled _ | Optional _; _ } -> true
+    | { argument = Omitted _; label = Typedtree.Labelled _ | Optional _; _ } ->
+      true
     | _ -> false
   in
   try Some (List.index params ~f:positional)
@@ -144,16 +151,21 @@ let active_parameter_by_prefix ~prefix params =
       Some (String.common_prefix_len (Btype.prefixed_label_name l) prefix)
     | _ -> None
   in
-
+  let is_omitted = function
+    | Typedtree.Omitted _ -> true
+    | _ -> false
+  in
   let rec find_by_prefix ?(i = 0) ?longest_len ?longest_i = function
     | [] -> longest_i
-    | p :: ps -> (
+    | p :: ps when is_omitted p.argument -> (
+      (* The search is performed only on the arguments not already given in the parameters. *)
       match (common p.label, longest_len) with
       | Some common_len, Some longest_len when common_len > longest_len ->
         find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
       | Some common_len, None ->
         find_by_prefix ps ~i:(succ i) ~longest_len:common_len ~longest_i:i
       | _ -> find_by_prefix ps ~i:(succ i) ?longest_len ?longest_i)
+    | _ :: ps -> find_by_prefix ps ~i:(succ i) ?longest_len ?longest_i
   in
   find_by_prefix params
 
