@@ -9,6 +9,13 @@ signature such that the inferred signature can be printed and inspected, and we
 never go to lambda. We should add the corresponding positive tests once they can
 go through lambda and middle-end. *)
 
+let poly_ id x = x
+[%%expect{|
+>> Fatal error: layout: unexpected genvar
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
 (* Simple let poly_ with a polymorphic function *)
 module _ : sig
   val id : int
