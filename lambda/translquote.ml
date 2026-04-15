@@ -245,7 +245,7 @@ end = struct
       ~params:[param_from_name id]
       ~return:(Pvalue { raw_kind = Pgenval; nullable = Non_nullable })
       ~attr:default_function_attribute ~body ~loc ~mode:alloc_heap
-      ~ret_mode:alloc_heap
+      ~ret_mode:not_alloc_stack
 
   let func ~loc arg_sort body_lam id body =
     func_ ~loc arg_sort id (body_lam body)
@@ -365,7 +365,7 @@ let apply modname field loc args =
          ap_result_layout =
            Pvalue { raw_kind = Pgenval; nullable = Non_nullable };
          ap_region_close = Rc_normal;
-         ap_mode = alloc_heap;
+         ap_mode = not_alloc_stack;
          ap_tailcall = Default_tailcall;
          ap_inlined = Default_inlined;
          ap_specialised = Default_specialise

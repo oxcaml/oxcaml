@@ -67,8 +67,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   in
   let denv =
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap -> denv
-    | Local { region = my_region; ghost_region = my_ghost_region } ->
+    | Not_alloc_stack -> denv
+    | Maybe_alloc_stack { region = my_region; ghost_region = my_ghost_region }
+      ->
       let my_region_duid = Flambda_debug_uid.none in
       let my_region =
         Bound_var.create my_region my_region_duid Name_mode.normal
@@ -189,8 +190,8 @@ let simplify_function_body context ~outer_dacc function_slot_opt
   let my_ghost_region_duid = Flambda_debug_uid.none in
   let region_params =
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap -> []
-    | Local { region; ghost_region } ->
+    | Not_alloc_stack -> []
+    | Maybe_alloc_stack { region; ghost_region } ->
       [ Bound_parameter.create region Flambda_kind.With_subkind.region
           my_region_duid;
         Bound_parameter.create ghost_region Flambda_kind.With_subkind.region

@@ -178,7 +178,7 @@ and apply_coercion_result loc strict funct params args cc_res =
                         may_fuse_arity = true; }
              ~loc
              ~mode:alloc_heap
-             ~ret_mode:alloc_heap
+             ~ret_mode:not_alloc_stack
              ~body:(apply_coercion
                    loc Strict cc_res
                    (Lapply{
@@ -187,7 +187,7 @@ and apply_coercion_result loc strict funct params args cc_res =
                       ap_args=List.rev args;
                       ap_result_layout=Lambda.layout_module;
                       ap_region_close=Rc_normal;
-                      ap_mode=alloc_heap;
+                      ap_mode=not_alloc_stack;
                       ap_tailcall=Default_tailcall;
                       ap_inlined=Default_inlined;
                       ap_specialised=Default_specialise;
@@ -454,7 +454,7 @@ let eval_rec_bindings bindings cont =
              ap_result_layout = Lambda.layout_module;
              ap_args=[loc; shape];
              ap_region_close=Rc_normal;
-             ap_mode=alloc_heap;
+             ap_mode=not_alloc_stack;
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;
@@ -484,7 +484,7 @@ let eval_rec_bindings bindings cont =
           ap_result_layout = Lambda.layout_unit;
           ap_args=[shape; Lvar id; rhs];
           ap_region_close=Rc_normal;
-          ap_mode=alloc_heap;
+          ap_mode=not_alloc_stack;
           ap_tailcall=Default_tailcall;
           ap_inlined=Default_inlined;
           ap_specialised=Default_specialise;
@@ -616,7 +616,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
     }
     ~loc
     ~mode:alloc_heap
-    ~ret_mode:alloc_heap
+    ~ret_mode:not_alloc_stack
     ~body
 
 (* Compile a module expression *)
@@ -656,7 +656,7 @@ and transl_apply ~scopes ~loc ~cc mod_env funct translated_arg =
        ap_args=[translated_arg];
        ap_result_layout = Lambda.layout_module;
        ap_region_close=Rc_normal;
-       ap_mode=alloc_heap;
+       ap_mode=not_alloc_stack;
        ap_tailcall=Default_tailcall;
        ap_inlined=inlined_attribute;
        ap_specialised=Default_specialise;
@@ -980,7 +980,7 @@ and transl_include_functor ~generative ~input_repr modl params scopes loc =
     ap_args = params;
     ap_result_layout = Lambda.layout_module;
     ap_region_close=Rc_normal;
-    ap_mode = alloc_heap;
+    ap_mode = not_alloc_stack;
     ap_tailcall = Default_tailcall;
     ap_inlined = inlined_attribute;
     ap_specialised = Default_specialise;
@@ -1084,7 +1084,7 @@ let add_runtime_parameters lam params =
     ~loc:Loc_unknown
     ~body:lam
     ~mode:alloc_heap
-    ~ret_mode:alloc_heap
+    ~ret_mode:not_alloc_stack
 
 let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
   let path = global_path module_id in
@@ -1191,7 +1191,7 @@ let toploop_getvalue id =
       Const_string (toplevel_name id, Location.none, None)))];
     ap_result_layout = Lambda.layout_any_value;
     ap_region_close=Rc_normal;
-    ap_mode=alloc_heap;
+    ap_mode=not_alloc_stack;
     ap_tailcall=Default_tailcall;
     ap_inlined=Default_inlined;
     ap_specialised=Default_specialise;
@@ -1213,7 +1213,7 @@ let toploop_setvalue id lam =
        lam];
     ap_result_layout = Lambda.layout_unit;
     ap_region_close=Rc_normal;
-    ap_mode=alloc_heap;
+    ap_mode=not_alloc_stack;
     ap_tailcall=Default_tailcall;
     ap_inlined=Default_inlined;
     ap_specialised=Default_specialise;
@@ -1448,7 +1448,7 @@ let transl_instance_impl
       ap_inlined = Always_inlined; (* Definitely inline!! *)
       ap_tailcall = Default_tailcall;
       ap_specialised = Default_specialise;
-      ap_mode = alloc_heap;
+      ap_mode = not_alloc_stack;
       ap_region_close = Rc_normal;
       ap_probe = None;
     }

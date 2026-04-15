@@ -574,10 +574,10 @@ let find_candidate = function
   | Lfunction lfun when lfun.attr.tmc_candidate ->
      (* TMC does not make sense for local-returning functions *)
      begin match lfun.ret_mode with
-     | Alloc_local ->
+     | Maybe_alloc_stack ->
        raise (Error (Debuginfo.Scoped_location.to_location lfun.loc,
                      Tmc_local_returning))
-     | Alloc_heap -> Some lfun
+     | Not_alloc_stack -> Some lfun
      end
   | _ -> None
 
@@ -731,7 +731,7 @@ let rec choice ctx t =
           in
           (* This application is in tail position of a region=true function
              (or Tmc_local_returning would have occurred), so it must be Heap *)
-          assert (Lambda.is_heap_mode apply.ap_mode);
+          assert (Lambda.is_not_alloc_stack apply.ap_mode);
           {
             Choice.dps = Dps.make (fun ~tail ~dst ->
               Lapply { apply with
