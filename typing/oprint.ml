@@ -338,12 +338,6 @@ let print_out_modes ppf l =
   | _ -> pp_print_string ppf " @ ");
   pp_print_list ~pp_sep:pp_print_space print_out_mode ppf l
 
-(* Labeled tuples with the first element labeled sometimes require parens. *)
-let is_initially_labeled_tuple ty =
-  match ty with
-  | Otyp_tuple ((Some _, _) :: _) -> true
-  | _ -> false
-
 let print_out_modality = pp_print_string
 
 let print_out_modalities ppf l =
@@ -398,19 +392,8 @@ let rec print_out_type_0 ppf =
   | ty ->
       print_out_type_1 ppf ty
 
-(* We must parenthesize a labeled tuple with the first element labeled when:
-   - It is an argument to a function ([~arg])
-   - Or, there is at least one mode to print.
- *)
 and print_out_type_mode ~arg mode ppf ty =
-  let parens =
-    is_initially_labeled_tuple ty && arg
-  in
-  if parens then
-    pp_print_char ppf '(';
-  print_out_type_2 ppf ty;
-  if parens then
-    pp_print_char ppf ')';
+  print_out_type_2 ~arg ppf ty;
   print_out_modes ppf mode
 
 and print_out_type_1 ppf =
@@ -422,7 +405,7 @@ and print_out_type_1 ppf =
       pp_print_space ppf ();
       print_out_ret ppf ty2;
       pp_close_box ppf ()
-  | ty -> print_out_type_2 ppf ty
+  | ty -> print_out_type_2 ~arg:false ppf ty
 
 and print_out_arg am ppf ty =
   print_out_type_mode ~arg:true am ppf ty
@@ -442,16 +425,25 @@ and print_out_ret ppf =
   | Otyp_ret (Orm_any rm, ty) -> print_out_type_mode ~arg:false rm ppf ty
   | _ -> assert false
 
-and print_out_type_2 ppf =
+and print_out_type_2 ~arg ppf =
   function
     Otyp_tuple tyl ->
+      (* Tuples require parens in argument function argument position (~arg)
+         when the first element has a label. *)
+      let parens =
+        match tyl with
+        | (Some _, _) :: _ -> arg
+        | _ -> false
+      in
+      if parens then pp_print_char ppf '(';
       let print_elem ppf (label, ty) =
         pp_open_box ppf 0;
         print_label_type ppf label;
         print_simple_out_type ppf ty;
         pp_close_box ppf ()
       in
-      fprintf ppf "@[<0>%a@]" (print_typlist print_elem " *") tyl
+      fprintf ppf "@[<0>%a@]" (print_typlist print_elem " *") tyl;
+      if parens then pp_print_char ppf ')'
   | ty -> print_simple_out_type ppf ty
 and print_simple_out_type ppf =
   function
@@ -763,7 +755,7 @@ let rec print_out_class_type ppf =
       in
       fprintf ppf "@[%a%a@]" pr_tyl tyl print_ident id
   | Octy_arrow (lab, ty, cty) ->
-      let print_type = print_out_type_mode ~arg:true [] in
+      let print_type = print_out_type_2 ~arg:true in
       fprintf ppf "@[%t ->@ %a@]"
         (fun ppf -> print_arg_label_and_out_type ppf lab ty ~print_type)
         print_out_class_type cty
