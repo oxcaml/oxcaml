@@ -235,10 +235,7 @@ let () =
     ~output:"test_inference.opt.output" ~extra_dep:(Some "test_inference.mli")
     ~extra_flags:"-zero-alloc-check all" ~exit_code:2 "test_inference";
   print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    ~extra_flags:
-      "-flambda2-expert-cont-lifting-budget 0 \
-       -flambda2-expert-cont-specialization-budget 0"
-    "test_remove_inferred_assume";
+    ~extra_flags:"-no-flambda2-match-in-match" "test_remove_inferred_assume";
   print_test "test_remove_inferred_assume_workaround.ml";
   print_test_expected_output ~extra_flags:"-zero-alloc-assert all"
     ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2 "fail27";

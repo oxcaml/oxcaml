@@ -244,7 +244,7 @@ let create ~round ~machine_width ~(resolver : resolver)
         Inlining_history.Tracker.empty (Compilation_unit.get_current_exn ());
       loopify_state = Loopify_state.do_not_loopify;
       replay_history = Replay_history.first_pass;
-      specialization_cost = Specialization_cost.can_specialize;
+      specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
       defined_variables_by_scope = [Lifted_cont_params.empty];
       lifted = Variable.Set.empty;
       cost_of_lifting_continuations_out_of_current_one = 0;
@@ -360,7 +360,7 @@ let enter_set_of_closures
     inlining_history_tracker;
     loopify_state = Loopify_state.do_not_loopify;
     replay_history = Replay_history.first_pass;
-    specialization_cost = Specialization_cost.can_specialize;
+    specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
     join_analysis = None;
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
@@ -717,7 +717,7 @@ let enter_continuation_handler lifted_params t =
        we reset the `has_seen_a_non_liftable_continuation` when we enter a new
        continuation handler *)
     has_seen_a_non_liftable_continuation = false;
-    specialization_cost = Specialization_cost.can_specialize
+    specialization_cost = Specialization_cost.can_specialize ()
   }
 
 let variables_defined_in_current_continuation t =

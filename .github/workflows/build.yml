@@ -219,12 +219,13 @@ jobs:
             disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml'
 
           # Same as for the reaper, some tests rely on being able to enable or disable
-          # lifting and specialization
+          # lifting and specialization, also it's pointless to test match-in-match withou O3 (or more)
+          # because it requires join points.
           - name: runtime5 match-in-match
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: 'flambda2-expert-cont-lifting-budget=1000,flambda2-expert-cont-spec-budget=100,_'
-            ocamlparam: 'flambda2-expert-cont-lifting-budget=1000,flambda2-expert-cont-spec-budget=100,_'
+            build_ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
+            ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
             disable_testcases: 'testsuite/tests/flambda2/n_way_join_preserves_null.ml'
 
     env:
