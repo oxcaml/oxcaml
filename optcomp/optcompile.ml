@@ -320,7 +320,8 @@ let native unix
     let set_load_path_for_eval () =
       List.iter
         (fun lib ->
-          Load_path.add_dir ~hidden:false
+          Load_path.add_dir
+            (Visible { cmx_guaranteed = true })
             (Misc.expand_directory Config.standard_library ("+" ^ lib)))
         extra_load_paths_for_eval
   end) : S)

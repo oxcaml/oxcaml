@@ -98,7 +98,7 @@ let compile_file ?output ?(opt="") ?stable_name name =
       (* DWARF compression is only configured for native code compilation.
          The dwarf_c_toolchain_flag is set in optmaindriver.ml and will be
          empty when compiling C files from bytecode tools like ocamlc. *)
-      let compression_flag = 
+      let compression_flag =
         if !Clflags.native_code then !Clflags.dwarf_c_toolchain_flag else ""
       in
       "-g" ^ compression_flag
@@ -128,7 +128,9 @@ let compile_file ?output ?(opt="") ?stable_name name =
          (quote_prefixed ~response_files:true "-I"
             (List.map (Misc.expand_directory Config.standard_library)
                (List.rev (  !Clflags.hidden_include_dirs
-                          @ !Clflags.include_dirs))))
+                          @ List.map
+                              (fun (e : Clflags.visible_include) -> e.path)
+                              !Clflags.include_dirs))))
          (Clflags.std_include_flag "-I")
          (Filename.quote name)
          (* cl tediously includes the name of the C file as the first thing it

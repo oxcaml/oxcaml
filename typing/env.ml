@@ -3259,7 +3259,10 @@ let save_signature_with_transform cmi_transform ~alerts sg modname kind
     |> cmi_transform in
   let filename = Unit_info.Artifact.filename cmi_info in
   let pers_sig =
-    Persistent_env.Persistent_signature.{ filename; cmi; visibility = Visible }
+    Persistent_env.Persistent_signature.{
+      filename; cmi;
+      visibility = Visible { cmx_guaranteed = false }
+    }
   in
   Persistent_env.save_cmi !persistent_env pers_sig;
   cmi

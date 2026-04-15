@@ -65,9 +65,14 @@ type gdwarf_fidelity =
   | Fidelity_high | Fidelity_very_high | Fidelity_ultra_high
   | Fidelity_unlimited
 
+type visible_include =
+  { path : string;
+    cmx_guaranteed : bool;
+  }
+
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
-and include_dirs = ref ([] : string list)  (* -I *)
+and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
