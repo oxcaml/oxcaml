@@ -65,10 +65,10 @@ for_loop_layout:
   movl  $1, %edi
 .L108:
   movq  %rdi, 16(%rsp)
-  movq  %rbx, 8(%rsp)
   movq  %rax, (%rsp)
   movl  $1, %eax
   movq  (%rbx), %rdi
+  movq  %rbx, 8(%rsp)
   call  *%rdi
 .L123:
   movq  (%rsp), %rax
