@@ -527,16 +527,16 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
      let ssa =
        Label.with_saved_counter @@ fun () -> Ssa_selection.emit_fundecl fd_cmm
      in
-     (try Ssa.validate ssa
+     (try Ssa_validate.validate ssa
       with exn ->
         let bt = Printexc.get_raw_backtrace () in
         Format.fprintf ppf_dump
           "*** SSA validation error for %s: %s@.*** CMM:@.%a@.*** SSA:@.%a@."
           fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
-          fd_cmm Ssa.print ssa;
+          fd_cmm Ssa_print.print ssa;
         Printexc.raise_with_backtrace exn bt);
      if !Oxcaml_flags.dump_cfg
-     then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa.print ssa;
+     then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
      let cfg_new =
        Label.with_saved_counter @@ fun () ->
        try Ssa_lowering.convert ~future_funcnames:funcnames ssa
@@ -545,7 +545,7 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
          Format.fprintf ppf_dump
            "*** SSA pipeline error for %s: %s@.*** CMM:@.%a@.*** SSA:@.%a@."
            fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
-           fd_cmm Ssa.print ssa;
+           fd_cmm Ssa_print.print ssa;
          Printexc.raise_with_backtrace exn bt
      in
      Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name ~fd_cmm ~ssa

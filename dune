@@ -693,6 +693,8 @@
   cfg_format
   ;; backend/ssa/
   ssa
+  ssa_print
+  ssa_validate
   ssa_of_cmm
   cfg_of_ssa
   ;; backend/debug/
