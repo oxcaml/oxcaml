@@ -281,7 +281,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Print_as of string (* can't print *)
 
     let print_sort : Jkind.Sort.Const.t -> _ = function
-      | Base Value -> Print_as_value
+      | Base Scannable -> Print_as_value
       | Base Void -> Print_as "<void>"
       | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
               Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->
@@ -487,10 +487,13 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                           constr_list
                       with
                       | Datarepr.Constr_not_found | Not_found ->
-                        (* If a [Variant_with_null] is not a [Null],
-                            it's guaranteed to be [This value]. *)
                         match rep with
-                        | Variant_with_null -> List.nth constr_list 1
+                        | Variant_with_null ->
+                          (match
+                             Datarepr.find_variant_with_null_payload constr_list
+                           with
+                           | Some { payload_cstr; _ } -> payload_cstr
+                           | None -> raise Datarepr.Constr_not_found)
                         | _ -> raise Datarepr.Constr_not_found
                     in
                     let type_params =
@@ -676,7 +679,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   | Outval_record_mixed_block shape ->
                       let fld =
                         match shape.(pos) with
-                        | Value -> `Continue (O.field obj pos)
+                        | Scannable -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
                         | Float32 | Bits8 | Bits16 | Untagged_immediate

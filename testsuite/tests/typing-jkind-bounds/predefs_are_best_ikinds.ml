@@ -5,7 +5,7 @@
 
 type t : immediate with string
 [%%expect {|
-type t : immutable_data
+type t : immutable_data non_pointer
 |}]
 
 module M : sig
@@ -30,7 +30,7 @@ type t : immediate
 |}]
 
 module M : sig
-  type t : immediate with string
+  type t : immediate non_float with string
 end = struct
   type t = int list
 end

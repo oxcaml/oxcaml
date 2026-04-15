@@ -38,12 +38,8 @@ val non_bot_axes : t -> int list
 (** Build a mask from a set of relevant axes. *)
 val of_axis_set : Jkind_axis.Axis_set.t -> t
 
-(** Mask that excludes the shallow axes (nullability and separability). *)
-val mask_shallow : t
-
 (** Relevant axes of a constant modality and the corresponding mask. *)
-val mask_of_modality :
-  relevant_for_shallow:[`Relevant | `Irrelevant] -> Mode.Modality.Const.t -> t
+val mask_of_modality : Mode.Modality.Const.t -> t
 
 val create :
   areality:Mode.Regionality.Const.t ->
@@ -57,8 +53,6 @@ val create :
   visibility:Mode.Visibility.Const.t ->
   staticity:Mode.Staticity.const ->
   externality:Jkind_axis.Externality.t ->
-  nullability:Jkind_axis.Nullability.t ->
-  separability:Jkind_axis.Separability.t ->
   t
 
 val areality : t -> Mode.Regionality.Const.t
@@ -82,10 +76,6 @@ val visibility : t -> Mode.Visibility.Const.t
 val staticity : t -> Mode.Staticity.const
 
 val externality : t -> Jkind_axis.Externality.t
-
-val nullability : t -> Jkind_axis.Nullability.t
-
-val separability : t -> Jkind_axis.Separability.t
 
 val to_mode_crossing : t -> Mode.Crossing.t
 

@@ -32,83 +32,151 @@ Error: A type declaration's layout can be given at most once.
    They are disabled by default because of the triple printing
    but enabled locally in this test file. Once this is fixed, adjust this! *)
 
-type t : value maybe_pointer
+type t : value separable
 [%%expect{|
-Line 1, characters 15-28:
-1 | type t : value maybe_pointer
-                   ^^^^^^^^^^^^^
+Line 1, characters 15-24:
+1 | type t : value separable
+                   ^^^^^^^^^
 Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value".
 
-Line 1, characters 15-28:
-1 | type t : value maybe_pointer
-                   ^^^^^^^^^^^^^
+Line 1, characters 15-24:
+1 | type t : value separable
+                   ^^^^^^^^^
 Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value".
 
-Line 1, characters 15-28:
-1 | type t : value maybe_pointer
-                   ^^^^^^^^^^^^^
+Line 1, characters 15-24:
+1 | type t : value separable
+                   ^^^^^^^^^
 Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value".
 
 type t
 |}]
 
-(* CR layouts-scannable: This should give a warning for a redundant annotation.
-   This logic will come in the _following_ PR! *)
-type t : immediate non_pointer
+type t : value_or_null maybe_null maybe_separable
 [%%expect{|
-type t : immediate non_pointer
+Line 1, characters 23-33:
+1 | type t : value_or_null maybe_null maybe_separable
+                           ^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value_or_null".
+
+Line 1, characters 34-49:
+1 | type t : value_or_null maybe_null maybe_separable
+                                      ^^^^^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value_or_null".
+
+Line 1, characters 23-33:
+1 | type t : value_or_null maybe_null maybe_separable
+                           ^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value_or_null".
+
+Line 1, characters 34-49:
+1 | type t : value_or_null maybe_null maybe_separable
+                                      ^^^^^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value_or_null".
+
+Line 1, characters 23-33:
+1 | type t : value_or_null maybe_null maybe_separable
+                           ^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value_or_null".
+
+Line 1, characters 34-49:
+1 | type t : value_or_null maybe_null maybe_separable
+                                      ^^^^^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value_or_null".
+
+type t : value_or_null
 |}]
 
-type t : value maybe_pointer non_pointer
+type t : immediate non_pointer
 [%%expect{|
-Line 1, characters 15-28:
-1 | type t : value maybe_pointer non_pointer
-                   ^^^^^^^^^^^^^
+Line 1, characters 19-30:
+1 | type t : immediate non_pointer
+                       ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "immediate".
+
+Line 1, characters 19-30:
+1 | type t : immediate non_pointer
+                       ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "immediate".
+
+Line 1, characters 19-30:
+1 | type t : immediate non_pointer
+                       ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "immediate".
+
+type t : immediate
+|}]
+
+type t : value non_null maybe_null
+[%%expect{|
+Line 1, characters 15-23:
+1 | type t : value non_null maybe_null
+                   ^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_null" later.
+
+Line 1, characters 15-23:
+1 | type t : value non_null maybe_null
+                   ^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_null" later.
+
+Line 1, characters 15-23:
+1 | type t : value non_null maybe_null
+                   ^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_null" later.
+
+type t : value maybe_null
+|}]
+
+type t : value maybe_separable non_pointer
+[%%expect{|
+Line 1, characters 15-30:
+1 | type t : value maybe_separable non_pointer
+                   ^^^^^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
 
-Line 1, characters 15-28:
-1 | type t : value maybe_pointer non_pointer
-                   ^^^^^^^^^^^^^
+Line 1, characters 15-30:
+1 | type t : value maybe_separable non_pointer
+                   ^^^^^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
 
-Line 1, characters 15-28:
-1 | type t : value maybe_pointer non_pointer
-                   ^^^^^^^^^^^^^
+Line 1, characters 15-30:
+1 | type t : value maybe_separable non_pointer
+                   ^^^^^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
 
 type t : value non_pointer
 |}]
 
-type t : value non_pointer maybe_pointer
+type t : value non_pointer separable
 [%%expect{|
 Line 1, characters 15-26:
-1 | type t : value non_pointer maybe_pointer
+1 | type t : value non_pointer separable
                    ^^^^^^^^^^^
-Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_pointer" later.
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "separable" later.
 
-Line 1, characters 27-40:
-1 | type t : value non_pointer maybe_pointer
-                               ^^^^^^^^^^^^^
+Line 1, characters 27-36:
+1 | type t : value non_pointer separable
+                               ^^^^^^^^^
 Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value".
 
 Line 1, characters 15-26:
-1 | type t : value non_pointer maybe_pointer
+1 | type t : value non_pointer separable
                    ^^^^^^^^^^^
-Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_pointer" later.
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "separable" later.
 
-Line 1, characters 27-40:
-1 | type t : value non_pointer maybe_pointer
-                               ^^^^^^^^^^^^^
+Line 1, characters 27-36:
+1 | type t : value non_pointer separable
+                               ^^^^^^^^^
 Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value".
 
 Line 1, characters 15-26:
-1 | type t : value non_pointer maybe_pointer
+1 | type t : value non_pointer separable
                    ^^^^^^^^^^^
-Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_pointer" later.
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "separable" later.
 
-Line 1, characters 27-40:
-1 | type t : value non_pointer maybe_pointer
-                               ^^^^^^^^^^^^^
+Line 1, characters 27-36:
+1 | type t : value non_pointer separable
+                               ^^^^^^^^^
 Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "value".
 
 type t
@@ -134,39 +202,74 @@ Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non
 type t : value non_pointer
 |}]
 
-type t : value non_pointer maybe_pointer non_pointer
+type t : value non_pointer maybe_separable non_pointer
 [%%expect{|
-Line 1, characters 27-40:
-1 | type t : value non_pointer maybe_pointer non_pointer
-                               ^^^^^^^^^^^^^
+Line 1, characters 27-42:
+1 | type t : value non_pointer maybe_separable non_pointer
+                               ^^^^^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
 
 Line 1, characters 15-26:
-1 | type t : value non_pointer maybe_pointer non_pointer
+1 | type t : value non_pointer maybe_separable non_pointer
                    ^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
 
-Line 1, characters 27-40:
-1 | type t : value non_pointer maybe_pointer non_pointer
-                               ^^^^^^^^^^^^^
+Line 1, characters 27-42:
+1 | type t : value non_pointer maybe_separable non_pointer
+                               ^^^^^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
 
 Line 1, characters 15-26:
-1 | type t : value non_pointer maybe_pointer non_pointer
+1 | type t : value non_pointer maybe_separable non_pointer
                    ^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
 
-Line 1, characters 27-40:
-1 | type t : value non_pointer maybe_pointer non_pointer
-                               ^^^^^^^^^^^^^
+Line 1, characters 27-42:
+1 | type t : value non_pointer maybe_separable non_pointer
+                               ^^^^^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
 
 Line 1, characters 15-26:
-1 | type t : value non_pointer maybe_pointer non_pointer
+1 | type t : value non_pointer maybe_separable non_pointer
                    ^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
 
 type t : value non_pointer
+|}]
+
+type t : value non_pointer maybe_null non_pointer maybe_null
+[%%expect{|
+Line 1, characters 27-37:
+1 | type t : value non_pointer maybe_null non_pointer maybe_null
+                               ^^^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_null" later.
+
+Line 1, characters 15-26:
+1 | type t : value non_pointer maybe_null non_pointer maybe_null
+                   ^^^^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
+
+Line 1, characters 27-37:
+1 | type t : value non_pointer maybe_null non_pointer maybe_null
+                               ^^^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_null" later.
+
+Line 1, characters 15-26:
+1 | type t : value non_pointer maybe_null non_pointer maybe_null
+                   ^^^^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
+
+Line 1, characters 27-37:
+1 | type t : value non_pointer maybe_null non_pointer maybe_null
+                               ^^^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_null" later.
+
+Line 1, characters 15-26:
+1 | type t : value non_pointer maybe_null non_pointer maybe_null
+                   ^^^^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
+
+type t : value_or_null non_pointer
 |}]
 
 type t : void non_pointer
@@ -189,37 +292,72 @@ Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no 
 type t : void
 |}]
 
-type t : void non_pointer maybe_pointer
+type t : void non_pointer non_null
 [%%expect{|
-Line 1, characters 14-25:
-1 | type t : void non_pointer maybe_pointer
-                  ^^^^^^^^^^^
-Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_pointer" later.
+Line 1, characters 9-34:
+1 | type t : void non_pointer non_null
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer non_null" have no effect on the kind "void".
 
-Line 1, characters 9-39:
-1 | type t : void non_pointer maybe_pointer
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer maybe_pointer" have no effect on the kind "void".
+Line 1, characters 9-34:
+1 | type t : void non_pointer non_null
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer non_null" have no effect on the kind "void".
 
-Line 1, characters 14-25:
-1 | type t : void non_pointer maybe_pointer
-                  ^^^^^^^^^^^
-Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_pointer" later.
-
-Line 1, characters 9-39:
-1 | type t : void non_pointer maybe_pointer
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer maybe_pointer" have no effect on the kind "void".
-
-Line 1, characters 14-25:
-1 | type t : void non_pointer maybe_pointer
-                  ^^^^^^^^^^^
-Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_pointer" later.
-
-Line 1, characters 9-39:
-1 | type t : void non_pointer maybe_pointer
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer maybe_pointer" have no effect on the kind "void".
+Line 1, characters 9-34:
+1 | type t : void non_pointer non_null
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer non_null" have no effect on the kind "void".
 
 type t : void
+|}]
+
+type t : void non_pointer maybe_separable
+[%%expect{|
+Line 1, characters 14-25:
+1 | type t : void non_pointer maybe_separable
+                  ^^^^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_separable" later.
+
+Line 1, characters 9-41:
+1 | type t : void non_pointer maybe_separable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer maybe_separable" have no effect on the kind "void".
+
+Line 1, characters 14-25:
+1 | type t : void non_pointer maybe_separable
+                  ^^^^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_separable" later.
+
+Line 1, characters 9-41:
+1 | type t : void non_pointer maybe_separable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer maybe_separable" have no effect on the kind "void".
+
+Line 1, characters 14-25:
+1 | type t : void non_pointer maybe_separable
+                  ^^^^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "maybe_separable" later.
+
+Line 1, characters 9-41:
+1 | type t : void non_pointer maybe_separable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer maybe_separable" have no effect on the kind "void".
+
+type t : void
+|}]
+
+type t : void non_pointer & value non_pointer non_pointer mod global with int
+[%%expect{|
+Line 1, characters 9-25:
+1 | type t : void non_pointer & value non_pointer non_pointer mod global with int
+             ^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "void".
+
+Line 1, characters 34-45:
+1 | type t : void non_pointer & value non_pointer non_pointer mod global with int
+                                      ^^^^^^^^^^^
+Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
+
+type t : void mod global & value non_pointer mod global
 |}]

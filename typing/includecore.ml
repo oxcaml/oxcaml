@@ -791,7 +791,7 @@ let report_type_mismatch first second decl env ppf err =
       pr "Their internal representations differ:@ %s %s %s."
          (choose ord first second) decl
          "has a constructor represented as a null pointer";
-      pr "@ Hint: add [%@%@or_null_reexport]."
+      pr "@ Hint: add [%@%@or_null] or [%@%@or_null_reexport]."
   | Jkind v ->
       Jkind.Violation.report_with_name ~name:first
         env ppf v

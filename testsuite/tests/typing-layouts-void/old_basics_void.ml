@@ -603,7 +603,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-33.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of the recursive variable v'.
 |}]
 (* CR layouts v5: This was the expected behavior before removing the handling of
@@ -640,7 +640,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-33.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of the recursive variable v1.
 |}]
 (* CR layouts v5: This was the expected behavior before removing the handling of

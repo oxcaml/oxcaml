@@ -837,6 +837,9 @@ type no_open_quotations_context =
   | Object_field_with_attribute_qt
   | Variant_tag_with_attribute_qt
   | Jkind_annotation_qt
+  | Layout_polymorphism_qt
+  | Tconst_pat_qt of Longident.t
+  | Class_type_qt
 
 let print_structure_components_reason ppf = function
   | Project -> Format_doc.fprintf ppf "have any components"
@@ -1292,11 +1295,12 @@ let parameters () = Persistent_env.parameters !persistent_env
 let read_pers_mod modname cmi =
   Persistent_env.read !persistent_env modname cmi
 
-let find_pers_mod name ~allow_excess_args =
-  Persistent_env.find !persistent_env read_sign_of_cmi name ~allow_excess_args
+let find_pers_mod ~allow_hidden name ~allow_excess_args =
+  Persistent_env.find ~allow_hidden !persistent_env read_sign_of_cmi name
+    ~allow_excess_args
 
-let check_pers_mod ~loc name =
-  Persistent_env.check !persistent_env read_sign_of_cmi ~loc name
+let check_pers_mod ~allow_hidden ~loc name =
+  Persistent_env.check ~allow_hidden !persistent_env read_sign_of_cmi ~loc name
 
 let crc_of_unit name =
   Persistent_env.crc_of_unit !persistent_env name
@@ -5004,6 +5008,13 @@ let print_unsupported_quotation ppf =
       fprintf ppf "Adding attributes on tags in polymorphic variant types"
   | Jkind_annotation_qt ->
       fprintf ppf "Annotating types with kinds"
+  | Layout_polymorphism_qt ->
+      fprintf ppf "Layout polymorphism"
+  | Tconst_pat_qt tconst ->
+      fprintf ppf "Adding type constraint patterns (here #%s)"
+        (Format.asprintf "%a" Pprintast.longident tconst)
+  | Class_type_qt ->
+      fprintf ppf "Using class type annotations"
 
 let print_unbound_in_quotation ppf =
   function

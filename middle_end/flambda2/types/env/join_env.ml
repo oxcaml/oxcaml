@@ -2051,9 +2051,7 @@ let prepare_nested_join ~meet_type ~joined_envs ~bindings extensions =
          we want maximum sharing with [diff] (see the computation of
          [previous_equations] below). *)
       let current_equations =
-        Name.Map.union_sharing
-          (fun _ diff_ty _previous_ty -> Some diff_ty)
-          diff_equations previous_equations
+        Name.Map.union_left_biased diff_equations previous_equations
       in
       (* Drop variables from the previous level if they get a more precise type
          in the current level (otherwise they would appear in both $Pi$ and $Δi$
@@ -2079,13 +2077,10 @@ let prepare_nested_join ~meet_type ~joined_envs ~bindings extensions =
           Bindings_in_target_env.definition_of_local_variables_in_one_joined_env
             bindings index
         in
-        Name.Map.union
-          (fun _ previous _defining_eqn ->
-            (* Sometimes we might have already added the defining equation of an
-               existential due to [replay_definition_of_aliases_in_target_env],
-               which is fine. *)
-            Some previous)
-          previous_equations
+        (* Sometimes we might have already added the defining equation of an
+           existential due to [replay_definition_of_aliases_in_target_env],
+           which is fine. *)
+        Name.Map.union_left_biased previous_equations
           (Name.var_map
              (defining_equations_of_existential_vars
                : Type_in_one_joined_env.t Variable_in_target_env.Map.t

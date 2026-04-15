@@ -14,8 +14,8 @@
 
 open Mode
 open Jkind_types
-open Jkind_axis
 open Types
+open Jkind_axis
 module Jkind0 = Btype.Jkind0
 module Fmt = Format_doc
 
@@ -70,35 +70,41 @@ end
 module Scannable_axes = struct
   include Jkind_types.Scannable_axes
 
-  let meet { pointerness = p1 } { pointerness = p2 } =
-    { pointerness = Pointerness.meet p1 p2 }
-
-  let less_or_equal { pointerness = p1 } { pointerness = p2 } =
-    Pointerness.less_or_equal p1 p2
+  let less_or_equal { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    Misc.Le_result.combine
+      (Nullability.less_or_equal n1 n2)
+      (Separability.less_or_equal s1 s2)
 
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
-  (*= let join { pointerness = p1 } { pointerness = p2 } =
-    { pointerness = Pointerness.join p1 p2 }
+  let meet { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    { nullability = Nullability.meet n1 n2;
+      separability = Separability.meet s1 s2
+    }
 
-  let print ppf { pointerness } = Pointerness.print ppf pointerness *)
-
-  let to_string_list_diff ~base:{ pointerness = p_against } { pointerness } =
-    if Pointerness.equal p_against pointerness
-    then []
-    else [Pointerness.to_string pointerness]
+  let to_string_list_diff
+      ~base:{ nullability = n_against; separability = s_against }
+      { nullability; separability } =
+    let diff = [] in
+    let diff =
+      if Nullability.equal n_against nullability
+      then diff
+      else Nullability.to_string nullability :: diff
+    in
+    let diff =
+      if Separability.equal s_against separability
+      then diff
+      else Separability.to_string separability :: diff
+    in
+    diff
 
   let to_string_list = to_string_list_diff ~base:max
 
-  let set_pointerness sa pointerness =
-    (* CR layouts-scannable: Once there are more axes, use [sa]! *)
-    ignore sa;
-    { pointerness }
-
-  (* CR layouts-scannable: When more axes get added, I think this should get
-     printed like [{ nullability: ...; ... }]. Could also have Caps versions
-     of the points on the axis; poke around to see precedent. *)
-  let debug_print ppf { pointerness } = Pointerness.print ppf pointerness
+  let debug_print ppf { nullability; separability } =
+    Fmt.fprintf ppf "@[{ nullability = %a;@ separability = %a }@]"
+      Nullability.print nullability Separability.print separability
 end
 
 (* A *layout* of a type describes the way values of that type are stored at
@@ -127,8 +133,8 @@ module Layout = struct
       | Genvar v -> Genvar v
 
     (* if so, scannable axis annotations should not trigger a warning *)
-    let is_value_or_any = function
-      | Any _ | Base (Value, _) -> true
+    let is_scannable_or_any = function
+      | Any _ | Base (Scannable, _) -> true
       | Base
           ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
             | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
@@ -152,31 +158,34 @@ module Layout = struct
       | Genvar v1, Genvar v2 -> v1 == v2
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
 
-    let set_root_pointerness t pointerness =
-      match t with
-      | Any sa -> Any (Scannable_axes.set_pointerness sa pointerness)
-      | Base (b, sa) ->
-        Static.of_base b (Scannable_axes.set_pointerness sa pointerness)
-      | Product _ -> t
-      | Genvar _ -> t
-      | Univar _ -> t
-
     (* Returns [None] if the root has no meaningful scannable axes. *)
     let get_root_scannable_axes t =
       match t with
       | Any sa -> Some sa
-      | Base (_, sa) -> if is_value_or_any t then Some sa else None
+      | Base (_, sa) -> if is_scannable_or_any t then Some sa else None
       | Product _ -> None
       | Univar _ -> None
       | Genvar _ -> None
 
-    let to_string t =
+    let set_root_scannable_axes t sa =
+      match t with
+      | Any _ -> Any sa
+      | Base (b, _) -> if is_scannable_or_any t then Base (b, sa) else t
+      | Product _ -> t
+      | Univar _ -> t
+      | Genvar _ -> t
+
+    let to_string t ~include_redundant_scannable_axes =
       let rec to_string nested (t : t) =
         match t with
         | Any sa -> String.concat " " ("any" :: Scannable_axes.to_string_list sa)
-        | Base (b, sa) when is_value_or_any t ->
-          String.concat " "
-            (Sort.to_string_base b :: Scannable_axes.to_string_list sa)
+        | Base (Scannable, sa) ->
+          let sa =
+            if include_redundant_scannable_axes
+            then Scannable_axes.to_string_list sa
+            else Scannable_axes.(to_string_list_diff ~base:value_axes) sa
+          in
+          String.concat " " ("value" :: sa)
         | Base (b, _) -> Sort.to_string_base b
         | Product ts ->
           String.concat ""
@@ -188,6 +197,17 @@ module Layout = struct
         | Genvar v -> Sort.to_string_genvar v
       in
       to_string false t
+
+    let to_string_verbose = to_string ~include_redundant_scannable_axes:true
+
+    let to_string = to_string ~include_redundant_scannable_axes:false
+
+    let rec has_component ~component t =
+      equal component t
+      ||
+      match t with
+      | Base _ | Any _ | Univar _ | Genvar _ -> false
+      | Product ts -> List.exists (has_component ~component) ts
 
     module Debug_printers = struct
       open Format
@@ -250,7 +270,7 @@ module Layout = struct
       sort_equal_result ~allow_mutation (Sort.equate_tracking_mutation s1 s2)
       &&
       if
-        Sort.is_possibly_scannable s1
+        Sort.is_scannable_or_var s1
         (* CR layouts-scannable: if [s1] and [s2] are both unfilled sort
             variables, and [sa1 <> sa2], then they should _not_ be equal,
             even though they would be in the case that the sort variables
@@ -271,6 +291,34 @@ module Layout = struct
     | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
     | (Any _ | Sort _ | Product _), _ -> false
 
+  let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
+    | Any sa -> Some sa
+    | Sort (b, sa) -> if Sort.is_scannable_or_var b then Some sa else None
+    | Product _ -> None
+
+  let is_scannable_or_var : _ t -> bool = function
+    | Any _ -> false
+    | Sort (b, _) -> Sort.is_scannable_or_var b
+    | Product _ -> false
+
+  let set_root_nullability t nullability =
+    match t with
+    | Any sa -> Any { sa with nullability }
+    | Sort (b, sa) ->
+      if Sort.is_scannable_or_var b
+      then Sort (b, { sa with nullability })
+      else t
+    | Product _ -> t
+
+  let set_root_separability t separability =
+    match t with
+    | Any sa -> Any { sa with separability }
+    | Sort (b, sa) ->
+      if Sort.is_scannable_or_var b
+      then Sort (b, { sa with separability })
+      else t
+    | Product _ -> t
+
   (* only meets at the root, meaning products are left unchanged. *)
   let meet_root_scannable_axes t sa =
     match t with
@@ -289,7 +337,7 @@ module Layout = struct
            filled in with anything other than [value]. Unifying [sort] with
            [value] could potentially yield better error messages. Another
            option could be to add to the [Layout_disagreement] type. *)
-        if Sort.is_possibly_scannable sort && not (Scannable_axes.le sa1 sa2)
+        if Sort.is_scannable_or_var sort && not (Scannable_axes.le sa1 sa2)
         then Not_le
         else Less
       | Product _, Any _ -> Less
@@ -297,7 +345,7 @@ module Layout = struct
       | Sort (s1, sa1), Sort (s2, sa2) ->
         if Sort.equate s1 s2
         then
-          if Sort.is_possibly_scannable s1
+          if Sort.is_scannable_or_var s1
           then Scannable_axes.less_or_equal sa1 sa2
           else Equal
         else Not_le
@@ -348,30 +396,32 @@ module Layout = struct
       | Some sorts ->
         products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts))
 
-  let rec default_to_value_and_get : _ Layout.t -> Const.t = function
+  let rec default_to_scannable_and_get : _ Layout.t -> Const.t = function
     | Any sa -> Any sa
-    | Sort (s, sa) -> Const.of_sort_const (Sort.default_to_value_and_get s) sa
-    | Product p -> Product (List.map default_to_value_and_get p)
+    | Sort (s, sa) ->
+      Const.of_sort_const (Sort.default_to_scannable_and_get s) sa
+    | Product p -> Product (List.map default_to_scannable_and_get p)
 
   let format ppf layout =
+    let pp_string_list ppf lst =
+      Fmt.pp_print_list
+        ~pp_sep:(fun f () -> Fmt.fprintf f " ")
+        Fmt.pp_print_string ppf lst
+    in
     let rec pp_element ~nested ppf : _ Layout.t -> unit = function
-      | Any sa ->
-        (Fmt.pp_print_list
-           ~pp_sep:(fun f () -> Fmt.fprintf f " ")
-           Fmt.pp_print_string)
-          ppf
-          ("any" :: Scannable_axes.to_string_list sa)
-      (* To ensure that scannable axes aren't printed on non-values, we
-         just check before printing. This is easier than maintaining the
-         invariant that [sa] = [Scannable_axes.max] in non-value cases. *)
-      | Sort (s, sa) when Sort.is_possibly_scannable s ->
-        let sort_str = Fmt.asprintf "%a" Sort.format s in
-        (Fmt.pp_print_list
-           ~pp_sep:(fun f () -> Fmt.fprintf f " ")
-           Fmt.pp_print_string)
-          ppf
-          (sort_str :: Scannable_axes.to_string_list sa)
-      | Sort (s, _) -> Fmt.fprintf ppf "%a" Sort.format s
+      | Any sa -> pp_string_list ppf ("any" :: Scannable_axes.to_string_list sa)
+      | Sort (s, sa) -> (
+        match Sort.get s with
+        | Base Scannable ->
+          let value_axes_diff =
+            Scannable_axes.(to_string_list_diff ~base:value_axes sa)
+          in
+          pp_string_list ppf ("value" :: value_axes_diff)
+        | Var _ ->
+          let sort_var_str = Fmt.asprintf "%a" Sort.format s in
+          pp_string_list ppf (sort_var_str :: Scannable_axes.to_string_list sa)
+        (* definitely never scannable *)
+        | Base _ | Product _ | Univar _ -> Fmt.fprintf ppf "%a" Sort.format s)
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
@@ -386,7 +436,6 @@ end
 
 module Externality = Externality
 module Nullability = Nullability
-module Separability = Jkind_axis.Separability
 
 module History = struct
   include Jkind_intf.History
@@ -424,6 +473,7 @@ module Error = struct
     | Unimplemented_syntax
     | With_on_right : (_ * allowed) History.annotation_context -> t
     | Abstract_kind_in_product
+    | Abstract_kind_with_kind_modifier
 
   exception User_error of Location.t * t
 end
@@ -462,24 +512,13 @@ module Mod_bounds = struct
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Visibility))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Staticity))
-    @@ Sub_result.combine
-         (axis_less_or_equal ~le:Externality.le
-            ~axis:(Pack (Nonmodal Externality)) (externality t1)
-            (externality t2))
-    @@ Sub_result.combine
-         (axis_less_or_equal ~le:Nullability.le
-            ~axis:(Pack (Nonmodal Nullability)) (nullability t1)
-            (nullability t2))
-    @@ axis_less_or_equal ~le:Separability.le
-         ~axis:(Pack (Nonmodal Separability)) (separability t1)
-         (separability t2)
+    @@ axis_less_or_equal ~le:Externality.le ~axis:(Pack (Nonmodal Externality))
+         (externality t1) (externality t2)
 
   let[@inline] get (type a) ~(axis : a Axis.t) t : a =
     match axis with
     | Modal ax -> t |> crossing |> (Crossing.proj [@inlined hint]) ax
     | Nonmodal Externality -> externality t
-    | Nonmodal Nullability -> nullability t
-    | Nonmodal Separability -> separability t
 
   (** Get all axes that are set to max *)
   let get_max_axes t =
@@ -508,12 +547,6 @@ module Mod_bounds = struct
     |> add_if
          (Externality.le Externality.max (externality t))
          (Nonmodal Externality)
-    |> add_if
-         (Nullability.le Nullability.max (nullability t))
-         (Nonmodal Nullability)
-    |> add_if
-         (Separability.le Separability.max (separability t))
-         (Nonmodal Separability)
 
   let to_mode_crossing t = crossing t
 end
@@ -542,23 +575,12 @@ module With_bounds = struct
       let relevant_axes =
         Axis_set.union explicit_relevant_axes implicit_relevant_axes
       in
-      let irrelevant_axes = Axis_set.complement relevant_axes in
-      (* nullability is always implicitly irrelevant since it isn't deep *)
-      let irrelevant_axes =
-        Axis_set.remove irrelevant_axes (Nonmodal Nullability)
-      in
-      (* same for separability *)
-      Axis_set.remove irrelevant_axes (Nonmodal Separability)
+      Axis_set.complement relevant_axes
   end
 
   let to_best_eff_map = function
     | No_with_bounds -> With_bounds_types.empty
     | With_bounds bounds -> bounds
-
-  let for_all (type l r) f (t : (l * r) t) =
-    match t with
-    | No_with_bounds -> true
-    | With_bounds tys -> With_bounds_types.for_all f tys
 
   let to_list : type d. d with_bounds -> _ = function
     | No_with_bounds -> []
@@ -1201,8 +1223,6 @@ module Base_and_axes = struct
               let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
               Mod_bounds.create crossing
                 ~externality:(value_for_axis ~axis:(Nonmodal Externality))
-                ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
-                ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
             let found_jkind_for_ty ctl b_upper_bounds b_with_bounds quality
                 skippable_axes :
@@ -1498,13 +1518,10 @@ module Jkind_desc = struct
         Misc.fatal_error
           "Jkind.sub_layout: [expand_until_comparable] spec wrong")
 
-  let of_new_sort_var ~level nullability_upper_bound separability_upper_bound =
-    let layout, sort = Layout.of_new_sort_var ~level in
+  let of_new_sort_var ~level sa =
+    let layout, sort = Layout.of_new_sort_var ~level sa in
     ( { base = Layout layout;
-        mod_bounds =
-          Mod_bounds.max
-          |> Mod_bounds.set_nullability nullability_upper_bound
-          |> Mod_bounds.set_separability separability_upper_bound;
+        mod_bounds = Mod_bounds.max;
         with_bounds = No_with_bounds
       },
       sort )
@@ -1512,10 +1529,7 @@ module Jkind_desc = struct
   let of_sort_univar univar =
     let layout = Layout.Sort (Sort.Univar univar, Scannable_axes.max) in
     { base = Layout layout;
-      mod_bounds =
-        Mod_bounds.max
-        |> Mod_bounds.set_nullability Maybe_null
-        |> Mod_bounds.set_separability Maybe_separable;
+      mod_bounds = Mod_bounds.max;
       with_bounds = No_with_bounds
     }
 
@@ -1651,25 +1665,7 @@ module Const = struct
           then Externality.max
           else Mod_bounds.externality actual
         in
-        let nullability =
-          if
-            Nullability.equal
-              (Mod_bounds.nullability base)
-              (Mod_bounds.nullability actual)
-          then Nullability.max
-          else Mod_bounds.nullability actual
-        in
-        let separability =
-          if
-            Separability.equal
-              (Mod_bounds.separability base)
-              (Mod_bounds.separability actual)
-          then Separability.max
-          else Mod_bounds.separability actual
-        in
-        Some
-          (Mod_bounds.create crossing_diff ~externality ~nullability
-             ~separability)
+        Some (Mod_bounds.create crossing_diff ~externality)
 
     let get_modal_bounds ~verbosity ~(base : Mod_bounds.t)
         (actual : Mod_bounds.t) =
@@ -1735,7 +1731,7 @@ module Const = struct
       let scannable_axes =
         match actual.base with
         | Layout l ->
-          if Layout.Const.is_value_or_any l
+          if Layout.Const.is_scannable_or_any l
           then
             match base_jkind.base with
             | Layout base_l -> get_scannable_axes_diff ~base:base_l l
@@ -1793,12 +1789,14 @@ module Const = struct
           }
       | false, _ | _, None -> None
 
-    (** Select the out_jkind_const with the least number of modal bounds to
-        print *)
+    (** Select the out_jkind_const with the least number of modal bounds and
+        scannable axes to print *)
     let rec select_simplest = function
       | a :: b :: tl ->
         let simpler =
-          if List.length a.modal_bounds < List.length b.modal_bounds
+          if
+            List.length a.modal_bounds + List.length a.scannable_axes
+            < List.length b.modal_bounds + List.length b.scannable_axes
           then a
           else b
         in
@@ -1834,33 +1832,37 @@ module Const = struct
              from a built-in abbreviation. For now, we just pretend that the
              layout name is a valid jkind abbreviation whose modal bounds are
              all max, even though this is a lie. Internal ticket 3284. *)
+          let layout_to_string =
+            match (verbosity : Format_verbosity.t) with
+            | Expanded_with_all_mod_bounds -> Layout.Const.to_string_verbose
+            | Not_verbose | Expanded -> Layout.Const.to_string
+          in
           let out_jkind_verbose =
             convert_with_base ~verbosity env
               ~base:
                 { jkind =
                     { base = jkind.base;
-                      mod_bounds =
-                        Mod_bounds.set_separability Separability.Separable
-                          (Mod_bounds.set_nullability Nullability.Non_null
-                             Mod_bounds.max);
+                      mod_bounds = Mod_bounds.max;
                       with_bounds = No_with_bounds
                     };
-                  name = Base.to_string Layout.Const.to_string jkind.base
+                  name = Base.to_string layout_to_string jkind.base
                 }
               jkind
           in
           match out_jkind_verbose with
           | Some out_jkind -> out_jkind
           | None ->
-            (* If we fail, try again with nullable/maybe-separable jkinds. *)
+            (* If we fail, try again with nullable/maybe-separable
+               jkinds. *)
+            let expanded = Base_and_axes.fully_expand_aliases_const env jkind in
             let layout_str =
-              match (jkind.base : Layout.Const.t jkind_base) with
-              | Layout (Base (Value, _)) ->
-                (* As a special case, we'd still like to print in terms of the
-                   value_or_null alias, even if we're printing an expanded
-                   jkind. *)
+              match (expanded.base : Layout.Const.t jkind_base) with
+              | Layout (Base (Scannable, _)) ->
+                (* As a special case, we'd still like to print in terms
+                   of the value_or_null alias, even if we're printing an
+                   expanded jkind. *)
                 "value_or_null"
-              | _ -> Base.to_string Layout.Const.to_string jkind.base
+              | _ -> Base.to_string layout_to_string expanded.base
             in
             let out_jkind_verbose =
               convert_with_base ~verbosity env
@@ -1874,8 +1876,8 @@ module Const = struct
                   }
                 jkind
             in
-            (* convert_with_base is guaranteed to succeed since the layout
-               matches and the modal bounds are all max *)
+            (* convert_with_base is guaranteed to succeed since the
+               layout matches and the modal bounds are all max *)
             Option.get out_jkind_verbose)
       in
       let base = Outcometree.Ojkind_const_abbreviation (base, scannable_axes) in
@@ -1902,33 +1904,52 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-  let set_pointerness ~abbrev env t = function
+  let apply_kind_modifier env t (modifier : 'a Location.loc option)
+      (f : Scannable_axes.t -> 'a -> Warnings.loc -> Scannable_axes.t) =
+    match modifier with
     | None -> t
-    | Some (new_ptrness, loc) ->
-      (* Expand Kconstr so we can access the underlying layout *)
-      let t =
-        match t.base with
-        | Kconstr _ -> Base_and_axes.fully_expand_aliases_const env t
-        | Layout _ -> t
-      in
-      (match t.base with
+    | Some { txt = modifier; loc } -> (
+      let t = Base_and_axes.fully_expand_aliases_const env t in
+      match t.base with
+      | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
       | Layout layout -> (
         match Layout.Const.get_root_scannable_axes layout with
-        | None -> ()
-        | Some { pointerness } ->
-          if new_ptrness = pointerness
-          then
-            Location.prerr_warning loc
-              (Warnings.Redundant_kind_modifier
-                 (Format.asprintf "%a" Pprintast.longident abbrev)))
-      | Kconstr _ -> ());
-      let new_layout =
-        match t.base with
-        | Layout layout ->
-          Layout (Layout.Const.set_root_pointerness layout new_ptrness)
-        | Kconstr _ -> t.base
-      in
-      { t with base = new_layout }
+        | None -> t
+        | Some sa ->
+          { t with
+            base =
+              Layout
+                (Layout.Const.set_root_scannable_axes layout (f sa modifier loc))
+          }))
+
+  let set_nullability ~abbrev env (nul : Nullability.t Location.loc option) t =
+    apply_kind_modifier env t nul (fun sa nullability loc ->
+        if nullability = sa.nullability
+        then
+          Location.prerr_warning loc
+            (Warnings.Redundant_kind_modifier
+               (Format.asprintf "%a" Pprintast.longident abbrev));
+        { sa with nullability })
+
+  let set_separability ~abbrev env (sep : Separability.t Location.loc option) t
+      =
+    apply_kind_modifier env t sep (fun sa separability loc ->
+        if separability = sa.separability
+        then
+          Location.prerr_warning loc
+            (Warnings.Redundant_kind_modifier
+               (Format.asprintf "%a" Pprintast.longident abbrev));
+        { sa with separability })
+
+  let meet_nullability env (nul : Nullability.t Location.loc option) t =
+    apply_kind_modifier env t nul (fun sa nullability _loc ->
+        { sa with nullability = Nullability.meet sa.nullability nullability })
+
+  let meet_separability env (sep : Separability.t Location.loc option) t =
+    apply_kind_modifier env t sep (fun sa separability _loc ->
+        { sa with
+          separability = Separability.meet sa.separability separability
+        })
 
   let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
       =
@@ -1957,31 +1978,49 @@ module Const = struct
     }
 
   let transl_scannable_axes sa_annots =
-    (* CR layouts-scannable: This should work for more axes as they're added.
-       The current implementation is quite specialized. The [to_string] call
-       seems avoidable if an additional string is accumulated; this may not be
-       the best though. Consider refactoring as more axes are added. *)
-    let set_or_warn ~loc ~to_ pointerness =
-      match pointerness with
-      | Some (overridden_by, _overriding_loc) ->
+    let set_or_warn ~loc ~to_ ~to_string cur_axis =
+      match cur_axis with
+      | Some overridden_by ->
         Location.prerr_warning loc
           (Warnings.Overridden_kind_modifier
-             (Pointerness.to_string overridden_by));
-        pointerness
-      | None -> Some (to_, loc)
+             (to_string (Location.get_txt overridden_by)));
+        cur_axis
+      | None -> Some (Location.mkloc to_ loc)
     in
     (* This will compute and report errors from right-to-left, which enables
        better error messages while traversing the list only once. It comes at
        the cost of warnings being reported in a slightly weirder order. *)
     List.fold_right
-      (fun ({ txt; loc } : string Location.loc) pointerness ->
+      (fun ({ txt; loc } : string Location.loc) (nullability, separability) ->
         match txt with
         | "non_pointer" ->
-          set_or_warn ~loc ~to_:Pointerness.Non_pointer pointerness
-        | "maybe_pointer" ->
-          set_or_warn ~loc ~to_:Pointerness.Maybe_pointer pointerness
+          ( nullability,
+            Separability.(
+              set_or_warn ~loc ~to_:Non_pointer ~to_string separability) )
+        | "non_pointer64" ->
+          ( nullability,
+            Separability.(
+              set_or_warn ~loc ~to_:Non_pointer64 ~to_string separability) )
+        | "non_float" ->
+          ( nullability,
+            Separability.(
+              set_or_warn ~loc ~to_:Non_float ~to_string separability) )
+        | "separable" ->
+          ( nullability,
+            Separability.(
+              set_or_warn ~loc ~to_:Separable ~to_string separability) )
+        | "maybe_separable" ->
+          ( nullability,
+            Separability.(
+              set_or_warn ~loc ~to_:Maybe_separable ~to_string separability) )
+        | "non_null" ->
+          ( Nullability.(set_or_warn ~loc ~to_:Non_null ~to_string nullability),
+            separability )
+        | "maybe_null" ->
+          ( Nullability.(set_or_warn ~loc ~to_:Maybe_null ~to_string nullability),
+            separability )
         | _ -> raise ~loc (Unknown_kind_modifier txt))
-      sa_annots None
+      sa_annots (None, None)
 
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
@@ -1995,36 +2034,36 @@ module Const = struct
     | Pjk_abbreviation (name, sa_annot) ->
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
       let jkind_without_sa = of_path p in
-      let pointerness = transl_scannable_axes sa_annot in
+      let nullability, separability = transl_scannable_axes sa_annot in
       if
         sa_annot <> []
         &&
         match get_layout_result env jkind_without_sa with
-        | Ok layout -> not (Layout.Const.is_value_or_any layout)
+        | Ok layout -> not (Layout.Const.is_scannable_or_any layout)
         | Error _ -> false
       then
         Location.prerr_warning jkind.pjka_loc
           (Warnings.Ignored_kind_modifier
              ( Format.asprintf "%a" Pprintast.longident name.txt,
                List.map Location.get_txt sa_annot ));
-      (* CR layouts-scannable: The correct behavior is to make a new jkind
-         that differs only in the layout by adding in the non-[None] scannable
-         axes. For inspiration, see [set_nullability_upper_bound].
-         This should emit a warning if the [jkind_without_sa] already has
-         the specified scannable axes. This is why the helper currently
-         returns an optional annotation (since none vs default matters). *)
-      set_pointerness ~abbrev:name.txt env jkind_without_sa pointerness
+      jkind_without_sa
+      |> set_nullability ~abbrev:name.txt env nullability
+      |> set_separability ~abbrev:name.txt env separability
       |> allow_left |> allow_right
     | Pjk_mod (base, modifiers) ->
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
           context base
       in
-      (* for each mode, lower the corresponding modal bound to be that mode *)
-      let mod_bounds =
-        Mod_bounds.meet base.mod_bounds (Typemode.transl_mod_bounds modifiers)
+      (* for each mode, lower the corresponding modal bound to be that
+         mode *)
+      let mod_bounds, (nullability, separability) =
+        Typemode.transl_mod_bounds modifiers
       in
+      let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
       { base = base.base; mod_bounds; with_bounds = No_with_bounds }
+      |> meet_nullability env nullability
+      |> meet_separability env separability
     | Pjk_product ts ->
       let jkinds =
         List.map
@@ -2046,10 +2085,7 @@ module Const = struct
           Typemode.transl_with_bound_modifiers modalities
         in
         let relevant_axes =
-          let axes =
-            Mod_bounds.relevant_axes_of_modality
-              ~relevant_for_shallow:`Irrelevant ~modality
-          in
+          let axes = Mod_bounds.relevant_axes_of_modality ~modality in
           match externality with
           | None -> axes
           | Some ext ->
@@ -2074,23 +2110,20 @@ module Const = struct
   let get_required_layouts_level (_context : 'd Context_with_transl.t)
       (jkind : 'd t) =
     let rec scan_layout (l : Layout.Const.t) : Language_extension.maturity =
-      match l, Mod_bounds.nullability jkind.mod_bounds with
-      | ( ( Base
-              ( ( Float64 | Float32 | Word | Bits8 | Bits16 | Bits32 | Bits64
-                | Vec128 | Vec256 | Vec512 | Untagged_immediate ),
-                _ )
-          | Any _ ),
-          _ )
-      | Base (Value, _), Non_null
-      | Base (Value, _), Maybe_null ->
+      match l with
+      | Base
+          ( ( Scannable | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
+            | Bits64 | Vec128 | Vec256 | Vec512 | Untagged_immediate ),
+            _ )
+      | Any _ ->
         Stable
-      | Univar _, _ -> Alpha
-      | Genvar _, _ -> Alpha
-      | Product layouts, _ ->
+      | Univar _ -> Alpha
+      | Genvar _ -> Alpha
+      | Product layouts ->
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
-      | Base (Void, _), _ -> Stable
+      | Base (Void, _) -> Stable
     in
     match jkind.base with
     | Kconstr _ -> Language_extension.Stable
@@ -2166,9 +2199,7 @@ let unsafely_set_bounds (type l r) env ~(from : (l * r) jkind) t =
 (* construction *)
 
 let of_new_sort_var ~why ~level =
-  let jkind, sort =
-    Jkind_desc.of_new_sort_var ~level Maybe_null Maybe_separable
-  in
+  let jkind, sort = Jkind_desc.of_new_sort_var ~level Scannable_axes.max in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
@@ -2186,11 +2217,16 @@ let instance jkind =
     { jkind with jkind = jkind_desc }
 
 let of_new_legacy_sort_var ~why ~level =
-  let jkind, sort = Jkind_desc.of_new_sort_var ~level Non_null Separable in
+  let jkind, sort =
+    Jkind_desc.of_new_sort_var ~level Scannable_axes.value_axes
+  in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_legacy_creation why), sort
 
 let of_new_non_float_sort_var ~why ~level =
-  let jkind, sort = Jkind_desc.of_new_sort_var ~level Maybe_null Non_float in
+  let jkind, sort =
+    Jkind_desc.of_new_sort_var ~level
+      { nullability = Maybe_null; separability = Non_float }
+  in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_legacy_sort ~why ~level = fst (of_new_legacy_sort_var ~why ~level)
@@ -2291,10 +2327,7 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
   let jkind = type_jkind_purely ty in
   let with_bounds_types =
-    let relevant_axes =
-      Mod_bounds.relevant_axes_of_modality ~relevant_for_shallow:`Relevant
-        ~modality
-    in
+    let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
     With_bounds_types.singleton ty { relevant_axes }
   in
   fresh_jkind_poly
@@ -2314,10 +2347,13 @@ let for_boxed_tuple elts =
 let for_open_boxed_row =
   let mod_bounds =
     Mod_bounds.create Crossing.max ~externality:Externality.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
-    { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
+    { base =
+        Layout
+          (Sort
+             ( Base Scannable,
+               { nullability = Non_null; separability = Non_float } ));
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -2359,7 +2395,11 @@ let for_boxed_row row =
 
 let for_arrow =
   fresh_jkind
-    { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
+    { base =
+        Layout
+          (Sort
+             ( Base Scannable,
+               { nullability = Non_null; separability = Non_float } ));
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
@@ -2383,17 +2423,21 @@ let for_object =
       ~staticity:(Crossing.Per_axis.max (Crossing.Axis.Monadic Staticity))
   in
   fresh_jkind
-    { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
+    { base =
+        Layout
+          (Sort
+             ( Base Scannable,
+               { nullability = Non_null; separability = Non_float } ));
       mod_bounds =
-        Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
-          ~nullability:Non_null ~separability:Separability.Non_float;
+        Mod_bounds.create { comonadic; monadic } ~externality:Externality.max;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)
 
 let for_array_element_sort ~level =
   let jkind_desc, sort =
-    Jkind_desc.of_new_sort_var ~level Maybe_null Separable
+    Jkind_desc.of_new_sort_var ~level
+      { nullability = Maybe_null; separability = Separable }
   in
   let jkind = { for_array_argument.jkind with base = jkind_desc.base } in
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
@@ -2439,17 +2483,17 @@ let extract_layout : 'l 'r. _ -> ('l * 'r) jkind -> _ =
 
 let extract_layout_opt env t = extract_layout env t |> Result.to_option
 
-let get_layout_defaulting_to_value env jkind =
-  extract_layout_opt env jkind |> Option.map Layout.default_to_value_and_get
+let get_layout_defaulting_to_scannable env jkind =
+  extract_layout_opt env jkind |> Option.map Layout.default_to_scannable_and_get
 
 let get_layout env jk : Layout.Const.t option =
   Option.bind (extract_layout_opt env jk) Layout.get_const
 
-let default_to_value t =
+let default_to_scannable t =
   (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
   match t.jkind.base with
   | Kconstr _ -> ()
-  | Layout l -> ignore (Layout.default_to_value_and_get l)
+  | Layout l -> ignore (Layout.default_to_scannable_and_get l)
 
 let generalize ~current_level t =
   (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
@@ -2524,41 +2568,43 @@ let set_externality_upper_bound jk externality_upper_bound =
       }
   }
 
-let all_except_nullability =
-  Axis_set.singleton (Nonmodal Nullability) |> Axis_set.complement
+let get_root_scannable_axes jk =
+  match jk.jkind.base with
+  | Layout l -> Layout.get_root_scannable_axes l
+  | Kconstr _ -> None
 
-let get_nullability ~context env jk =
-  (* Optimization: Usually, no with-bounds are relevant to nullability. If we
-     check for this case, we can avoid calling normalize. *)
-  let all_with_bounds_are_irrelevant =
-    jk.jkind.with_bounds
-    |> With_bounds.for_all
-         (fun _ ({ relevant_axes } : With_bounds_type_info.t) ->
-           not (Axis_set.mem relevant_axes (Nonmodal Nullability)))
+let get_nullability env jk =
+  let sa =
+    match get_root_scannable_axes jk with
+    | Some _ as sa -> sa
+    | None -> (
+      (* Expand abstract kinds (Kconstr) to access the layout *)
+      let expanded = Base_and_axes.fully_expand_aliases env jk.jkind in
+      match expanded.base with
+      | Layout l -> Layout.get_root_scannable_axes l
+      | Kconstr _ -> None)
   in
-  if all_with_bounds_are_irrelevant
-  then
-    let jkind = Base_and_axes.fully_expand_aliases env jk.jkind in
-    Mod_bounds.nullability jkind.mod_bounds
-  else
-    let mod_bounds =
-      get_mod_bounds ~context ~skip_axes:all_except_nullability env jk
-    in
-    Mod_bounds.get mod_bounds ~axis:(Nonmodal Nullability)
+  Option.map (fun ({ nullability; _ } : Scannable_axes.t) -> nullability) sa
 
-let set_nullability_upper_bound jk nullability_upper_bound =
-  let new_bounds =
-    Mod_bounds.set_nullability nullability_upper_bound jk.jkind.mod_bounds
-  in
-  { jk with jkind = { jk.jkind with mod_bounds = new_bounds } }
-
-let set_separability_upper_bound jk separability_upper_bound =
+let set_root_nullability jk nullability =
   { jk with
     jkind =
       { jk.jkind with
-        mod_bounds =
-          Mod_bounds.set_separability separability_upper_bound
-            jk.jkind.mod_bounds
+        base =
+          Base.map_layout
+            ~f:(fun l -> Layout.set_root_nullability l nullability)
+            jk.jkind.base
+      }
+  }
+
+let set_root_separability jk separability =
+  { jk with
+    jkind =
+      { jk.jkind with
+        base =
+          Base.map_layout
+            ~f:(fun l -> Layout.set_root_separability l separability)
+            jk.jkind.base
       }
   }
 
@@ -2566,10 +2612,7 @@ let set_layout jk layout =
   { jk with jkind = { jk.jkind with base = Layout layout } }
 
 let apply_modality_l modality jk =
-  let relevant_axes =
-    Mod_bounds.relevant_axes_of_modality ~modality
-      ~relevant_for_shallow:`Relevant
-  in
+  let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
   let mod_bounds =
     Mod_bounds.set_min_in_set jk.jkind.mod_bounds
       (Axis_set.complement relevant_axes)
@@ -2584,10 +2627,7 @@ let apply_modality_l modality jk =
   |> disallow_right
 
 let apply_modality_r modality jk =
-  let relevant_axes =
-    Mod_bounds.relevant_axes_of_modality ~modality
-      ~relevant_for_shallow:`Relevant
-  in
+  let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
   let mod_bounds =
     Mod_bounds.set_max_in_set jk.jkind.mod_bounds
       (Axis_set.complement relevant_axes)
@@ -2595,29 +2635,32 @@ let apply_modality_r modality jk =
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 let apply_or_null_l jkind =
-  match Mod_bounds.nullability jkind.jkind.mod_bounds with
-  | Non_null ->
-    let jkind = set_nullability_upper_bound jkind Maybe_null in
+  match get_root_scannable_axes jkind with
+  | Some { nullability = Non_null; separability } ->
+    let jkind = set_root_nullability jkind Maybe_null in
     let jkind =
-      match Mod_bounds.separability jkind.jkind.mod_bounds with
-      | Maybe_separable | Separable ->
-        set_separability_upper_bound jkind Maybe_separable
-      | Non_float -> jkind
+      match separability with
+      | Maybe_separable -> jkind
+      | Separable -> set_root_separability jkind Maybe_separable
+      | Non_float | Non_pointer64 | Non_pointer -> jkind
     in
     Ok jkind
-  | Maybe_null -> Error ()
+  | Some { nullability = Maybe_null; separability = _ } | None -> Error ()
 
 let apply_or_null_r jkind =
-  match Mod_bounds.nullability jkind.jkind.mod_bounds with
-  | Maybe_null ->
-    let jkind = set_nullability_upper_bound jkind Non_null in
+  match get_root_scannable_axes jkind with
+  | Some { nullability = Maybe_null; separability } ->
+    let jkind = set_root_nullability jkind Non_null in
     let jkind =
-      match Mod_bounds.separability jkind.jkind.mod_bounds with
+      match separability with
       | Maybe_separable -> jkind
-      | Separable | Non_float -> set_separability_upper_bound jkind Non_float
+      | Separable -> set_root_separability jkind Non_float
+      | Non_float | Non_pointer64 | Non_pointer -> jkind
     in
     Ok jkind
-  | Non_null -> Error ()
+  | Some { nullability = Non_null; separability = _ } -> Error ()
+  | None ->
+    Misc.fatal_error "or_null applied to a type without a scannable layout"
 
 let get_annotation jk = jk.annotation
 
@@ -3193,6 +3236,87 @@ module Violation = struct
               sub.jkind pp_bound super.jkind))
     | No_intersection _ -> ()
 
+  (* CR layouts-scannable: For now, this is special-cased to print out notes
+     iff the layout error message prints containing
+     [value non_pointer(64)] since [immediate(64)] is such a common jkind
+     abbreviation. There is probably room to print out better notes (maybe
+     by looking at the full jkinds?) *)
+  (* If [print_as_value_layout] is true, we refer to the second layout simply as
+     "a value layout" instead of printing its full scannable axes. *)
+  let report_layout_notes env ppf violation mismatch_type ~print_as_value_layout
+      =
+    match mismatch_type with
+    | Kind -> ()
+    | Layout ->
+      let immediate_layout =
+        match Const.Builtin.immediate.jkind.base with
+        | Layout l -> l
+        | Kconstr _ -> assert false
+      in
+      let immediate64_layout =
+        match Const.Builtin.immediate64.jkind.base with
+        | Layout l -> l
+        | Kconstr _ -> assert false
+      in
+      let non_float_abbrevs_layout =
+        match Const.Builtin.mutable_data.jkind.base with
+        | Layout l -> l
+        | Kconstr _ -> assert false
+      in
+      let check_has_component component jkind =
+        match get_layout env jkind with
+        | None -> false
+        | Some const -> Layout.Const.has_component ~component const
+      in
+      (* CR layouts-scannable: Whenever we print out "non_pointer",
+         "non_pointer64", or "non_float" in an error message, we also include
+         hints listing common kinds with that layout. We should revisit this and
+         print a history/hints based on what the user actually wrote - see
+         internal ticket 6933 *)
+      let check_both_jkinds jk1 jk2 =
+        let should_check_jk2 = not print_as_value_layout in
+        let should_note_immediate =
+          check_has_component immediate_layout jk1
+          || (should_check_jk2 && check_has_component immediate_layout jk2)
+        in
+        let should_note_immediate64 =
+          check_has_component immediate64_layout jk1
+          || (should_check_jk2 && check_has_component immediate64_layout jk2)
+        in
+        let should_note_non_float_abbrevs =
+          check_has_component non_float_abbrevs_layout jk1
+          || should_check_jk2
+             && check_has_component non_float_abbrevs_layout jk2
+        in
+        ( ~should_note_immediate,
+          ~should_note_immediate64,
+          ~should_note_non_float_abbrevs )
+      in
+      let ( ~should_note_immediate,
+            ~should_note_immediate64,
+            ~should_note_non_float_abbrevs ) =
+        match violation with
+        (* If we are printing the jkind on the right as a value layout, then
+           we should not look at it to determine whether to emit a note *)
+        (* Can't use an or-pattern since the jkinds have different
+           allowances *)
+        | Not_a_subjkind (jkind1, jkind2, _) -> check_both_jkinds jkind1 jkind2
+        | No_intersection (jkind1, jkind2) -> check_both_jkinds jkind1 jkind2
+      in
+      if should_note_immediate
+      then
+        fprintf ppf "@;@[Note: The layout of immediate is value non_pointer.@]";
+      if should_note_immediate64
+      then
+        fprintf ppf
+          "@;@[Note: The layout of immediate64 is value non_pointer64.@]";
+      if should_note_non_float_abbrevs
+      then
+        fprintf ppf
+          "@;\
+           @[Note: The kinds mutable_data, immutable_data, and sync_data have@ \
+           the layout value non_float.@]"
+
   let report_fuel ppf violation =
     let report_fuel_for_type which =
       fprintf ppf
@@ -3238,24 +3362,47 @@ module Violation = struct
         let base1, base2, cmis = expand k1 k2 in
         base1, base2, cmis
     in
-    let mismatch_type =
+    (* When we have a non-value layout but expected a value layout, e.g.
+       [float64 </= value non_pointer], we simplify the error message by eliding
+       the scannable axes of the right layout and instead refer to it as "a
+       value layout". *)
+    let mismatch_type, print_as_value_layout =
       match base1, base2 with
-      | Kconstr _, Kconstr _ -> Kind
+      | Kconstr _, Kconstr _ -> Kind, false
       | Layout l1, Layout l2 -> (
         match t.violation with
         | Not_a_subjkind _ ->
-          if Sub_result.is_le (Layout.sub l1 l2) then Kind else Layout
-        | No_intersection _ -> Layout)
-      | Kconstr _, Layout (Layout.Any _) -> Kind
+          if Sub_result.is_le (Layout.sub l1 l2)
+          then Kind, false
+          else
+            ( Layout,
+              (not (Layout.is_scannable_or_var l1))
+              && Layout.is_scannable_or_var l2 )
+        | No_intersection _ ->
+          ( Layout,
+            (not (Layout.is_scannable_or_var l1))
+            && Layout.is_scannable_or_var l2 ))
+      | Kconstr _, Layout (Layout.Any _) -> Kind, false
       | Kconstr _, Layout _ | Layout _, Kconstr _ -> (
         match t.violation with
-        | Not_a_subjkind _ -> Kind
-        | No_intersection _ -> Layout)
+        | Not_a_subjkind _ -> Kind, false
+        | No_intersection _ -> Layout, false)
     in
-    mismatch_type, missing_cmis
+    mismatch_type, print_as_value_layout, missing_cmis
 
+  (* CR layouts-scannable: When there is a layout violation and both are
+     value (scannable) layouts, a more useful error should be reported.
+     Specifically, the first mismatched axis should be reported as a reason,
+     like "because it is not non_pointer" for a value vs immediate error. *)
+  (* CR layouts-scannable: Also, better error messages should be reported for
+     products! For instance, an error message blaming an arity difference, or
+     an error message that drills down into two products to find the first
+     conflicing component. Note reporting should be adjusted
+     appropriately. *)
   let report_general env preamble pp_former former ppf t =
-    let mismatch_type, missing_cmis = categorize_mismatch env t in
+    let mismatch_type, print_as_value_layout, missing_cmis =
+      categorize_mismatch env t
+    in
     let layout_or_kind =
       match mismatch_type with Kind -> "kind" | Layout -> "layout"
     in
@@ -3269,10 +3416,8 @@ module Violation = struct
       | Kconstr _ -> false
       | Layout l -> has_sort_var_layout l
     in
+    let indent = pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "") in
     let format_base_or_kind (type l r) ppf (jkind : (l * r) jkind) =
-      let indent =
-        pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "")
-      in
       match mismatch_type with
       | Kind -> fprintf ppf "%t%a" indent (format env) jkind
       | Layout -> (
@@ -3284,6 +3429,10 @@ module Violation = struct
     let subjkind_format verb k2 =
       if has_sort_var (get k2).base
       then dprintf "%s representable" verb
+      else if print_as_value_layout
+      then
+        (* avoid printing "a sublayout of a value layout" *)
+        dprintf "%s@ a value layout" verb
       else
         dprintf "%s a sub%s of@ %a" verb layout_or_kind format_base_or_kind k2
     in
@@ -3314,21 +3463,30 @@ module Violation = struct
             Path.Set.add p missing_cmis ))
       | { violation = No_intersection (k1, k2); missing_cmi } ->
         assert (Option.is_none missing_cmi);
+        let fmt_k2 =
+          if print_as_value_layout
+          then dprintf "is not@ a value layout"
+          else dprintf "does not overlap with@ %a" format_base_or_kind k2
+        in
         ( Pack_jkind k1,
           Pack_jkind k2,
           dprintf "%s@ %a" layout_or_kind format_base_or_kind k1,
-          dprintf "does not overlap with@ %a" format_base_or_kind k2,
+          fmt_k2,
           missing_cmis )
     in
     if display_histories
     then
       let connective =
-        match t.violation, has_sort_var (get k2).base with
-        | Not_a_subjkind _, false ->
-          dprintf "be a sub%s of@ %a" layout_or_kind format_base_or_kind k2
-        | No_intersection _, false ->
-          dprintf "overlap with@ %a" format_base_or_kind k2
-        | _, true -> dprintf "be representable"
+        if has_sort_var (get k2).base
+        then dprintf "be representable"
+        else if print_as_value_layout
+        then dprintf "be@ a value layout"
+        else
+          match t.violation with
+          | Not_a_subjkind _ ->
+            dprintf "be a sub%s of@ %a" layout_or_kind format_base_or_kind k2
+          | No_intersection _ ->
+            dprintf "overlap with@ %a" format_base_or_kind k2
       in
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
@@ -3348,6 +3506,8 @@ module Violation = struct
         fmt_k1 fmt_k2;
     report_missing_cmis ppf missing_cmis;
     report_reason ppf t.violation;
+    (* otherwise, we get notes for layout abbreviations that get omitted. *)
+    report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
     report_fuel ppf t.violation
 
   let pp_t ppf x = fprintf ppf "%t" x
@@ -3982,6 +4142,9 @@ let report_error ~loc : Error.t -> _ = function
       Location.errorf ~loc "'with' syntax is not allowed on a right mode.")
   | Abstract_kind_in_product ->
     Location.errorf ~loc "Abstract kinds are not yet supported in products."
+  | Abstract_kind_with_kind_modifier ->
+    Location.errorf ~loc
+      "Abstract kinds with kind modifiers are not yet supported."
 
 let () =
   Location.register_error_of_exn (function

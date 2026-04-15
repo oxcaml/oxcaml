@@ -290,6 +290,7 @@
   printlambda
   runtimedef
   runtimetags
+  structured_mangling
   tmc
   simplif
   slambda_fracture

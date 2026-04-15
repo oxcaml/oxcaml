@@ -47,7 +47,7 @@ Line 1, characters 9-14:
 Error: Tuple element types must have layout value.
        The layout of "t_any" is any
          because of the definition of t_any at line 1, characters 0-18.
-       But the layout of "t_any" must be a sublayout of value
+       But the layout of "t_any" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -63,7 +63,7 @@ Line 1, characters 36-37:
 Error: Object types must have layout value.
        The layout of the type of this expression is void
          because of the annotation on the type variable 'a.
-       But the layout of the type of this expression must overlap with value
+       But the layout of the type of this expression must be a value layout
          because it's the type of an object.
 |}];;
 
@@ -81,7 +81,7 @@ Line 4, characters 6-22:
 Error: Variables bound in a class must have layout value.
        The layout of baz is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of baz must be a sublayout of value
+       But the layout of baz must be a value layout
          because it's the type of an instance variable.
 |}];;
 
@@ -95,7 +95,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -111,7 +111,7 @@ Line 3, characters 8-11:
 Error: Variables bound in a class must have layout value.
        The layout of bar is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of bar must be a sublayout of value
+       But the layout of bar must be a value layout
          because it's the type of a class field.
 |}];;
 
@@ -121,10 +121,12 @@ type r : void = {a:string}
 Line 1, characters 0-26:
 1 | type r : void = {a:string}
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r" is value
+Error: The layout of type "r" is value non_float
          because it's a boxed record type.
        But the layout of type "r" must be a sublayout of void
          because of the annotation on the declaration of the type r.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}];;
 
 (* Boxed_variant *)
@@ -133,10 +135,12 @@ type v : void = A of t_value
 Line 1, characters 0-28:
 1 | type v : void = A of t_value
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "v" is value
+Error: The layout of type "v" is value non_float
          because it's a boxed variant type.
        But the layout of type "v" must be a sublayout of void
          because of the annotation on the declaration of the type v.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}];;
 
 (* Extensible_variant *)
@@ -145,10 +149,12 @@ type attr : void = ..
 Line 1, characters 0-21:
 1 | type attr : void = ..
     ^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "attr" is value
+Error: The layout of type "attr" is value non_float
          because it's an extensible variant type.
        But the layout of type "attr" must be a sublayout of void
          because of the annotation on the declaration of the type attr.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* Primitive *)
@@ -159,10 +165,12 @@ Line 1, characters 40-45:
                                             ^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : void)"
-       The layout of string is value
+       The layout of string is value non_float
          because it is the primitive type string.
        But the layout of string must be a sublayout of void
          because of the annotation on the type variable 'a.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}];;
 
 (* Type_argument *)
@@ -175,7 +183,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -187,10 +195,12 @@ Line 1, characters 40-45:
                                             ^^^^^
 Error: This expression has type "'b * 'c"
        but an expression was expected of type "('a : void)"
-       The layout of 'a * 'b is value
+       The layout of 'a * 'b is value non_float
          because it's a tuple type.
        But the layout of 'a * 'b must be a sublayout of void
          because of the annotation on the type variable 'a.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}];;
 
 (* Row_variable *)
@@ -206,10 +216,12 @@ Line 2, characters 36-37:
                                         ^
 Error: This expression has type "[ `A of int | `B ]"
        but an expression was expected of type "'a t" = "('a : void)"
-       The layout of [ `A of int | `B ] is value
+       The layout of [ `A of int | `B ] is value non_float
          because it's a polymorphic variant type.
        But the layout of [ `A of int | `B ] must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* Arrow *)
@@ -222,10 +234,12 @@ Line 2, characters 31-32:
                                    ^
 Error: This expression has type "int -> int"
        but an expression was expected of type "'a t" = "('a : void)"
-       The layout of int -> int is value
+       The layout of int -> int is value non_float
          because it's a function type.
        But the layout of int -> int must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* Tfield *)
@@ -248,10 +262,12 @@ Line 4, characters 17-39:
                      ^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "(module X_int)"
        but an expression was expected of type "'a t" = "('a : void)"
-       The layout of (module X_int) is value
+       The layout of (module X_int) is value non_float
          because it's a first-class module type.
        But the layout of (module X_int) must be a sublayout of void
          because of the definition of t at line 1, characters 0-22.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* Separability_check *)
@@ -267,7 +283,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "('b : void)"
        The layout of 'b is void
          because of the annotation on the type variable 'b.
-       But the layout of 'b must overlap with value
+       But the layout of 'b must be a value layout
          because it is or unifies with an unannotated universal variable.
 |}];;
 
@@ -281,7 +297,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -292,10 +308,11 @@ Line 1, characters 49-54:
 1 | type ('a : immediate) t2 = {a: 'a} and t3 = t t2 and t
                                                      ^^^^^
 Error:
-       The kind of t is value
-         because an abstract type has the value kind by default.
-       But the kind of t must be a subkind of immediate
+       The layout of t is value
+         because an abstract type has the value layout by default.
+       But the layout of t must be a sublayout of value non_pointer
          because of the annotation on 'a in the declaration of the type t2.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* Float_record_field *)
@@ -315,7 +332,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a value layout
          because it's the element type of array comprehension.
 |}];;
 
@@ -329,7 +346,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a value layout
          because it's the type of a lazy expression.
 |}];;
 
@@ -364,7 +381,7 @@ Error: This pattern matches values of type "t_float64"
        but a pattern was expected which matches values of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a value layout
          because it's the type of a term-level argument to a class constructor.
 |}];;
 
@@ -390,7 +407,7 @@ Line 2, characters 20-22:
 Error: "m1" must have a type of layout value because it is captured by an object.
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a value layout
          because it's the type of a variable captured in an object.
 |}];;
 

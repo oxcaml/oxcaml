@@ -929,7 +929,9 @@ and directive already_consumed = parse
         match mode with
         | "quotations" ->
             Syntax_mode.quotations := toggle;
-            token lexbuf
+            let tok = token lexbuf in
+            enqueue_token_from_end_of_lexbuf_window lexbuf SEMISEMI ~len:0;
+            tok
         | _ ->
             directive_error lexbuf ("unknown syntax mode " ^ mode)
               ~already_consumed ~directive:"syntax"

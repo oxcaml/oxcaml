@@ -123,7 +123,7 @@ type t12 : bits64
 
 [%%expect{|
 type t1 : any
-type t2 : any mod separable
+type t2 : any separable
 type t3 : value_or_null
 type t4
 type t5 : void
@@ -182,6 +182,17 @@ module M :
   sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
   stateless
 val x : unit -> #('a M.t * string M.t) = <fun>
+|}]
+
+module Or_null_names = struct
+  type 'a t = Nope | Yep of 'a [@@or_null]
+end
+let y () = #( Or_null_names.Nope, Or_null_names.Yep "hi" )
+
+[%%expect{|
+module Or_null_names : sig type 'a t = Nope | Yep of 'a [@@or_null] end @@
+  stateless
+val y : unit -> #('a Or_null_names.t * string Or_null_names.t) = <fun>
 |}]
 
 external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
@@ -911,7 +922,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : ('a : value_or_null mod separable). 'a iarray -> 'a iarray = <fun>
+val f : ('a : value maybe_null). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)
@@ -1490,7 +1501,7 @@ Error: This expression has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because of the annotation on the wildcard _ at line 1, characters 22-33.
          need a value
 |}]

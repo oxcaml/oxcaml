@@ -390,14 +390,6 @@ val of_new_sort :
 (** Apply {!Sort.instance} to every sort variable in a jkind. *)
 val instance : 'd Types.jkind -> 'd Types.jkind
 
-(** Same as [of_new_sort_var], but the jkind is lowered to [Non_null] to mirror
-    "legacy" OCaml values. Defaulting the sort variable produces exactly
-    [value]. *)
-val of_new_legacy_sort_var :
-  why:History.concrete_legacy_creation_reason ->
-  level:int ->
-  'd Types.jkind * sort
-
 (** Same as [of_new_sort], but the jkind is lowered to [Non_null] to mirror
     "legacy" OCaml values. Defaulting the sort variable produces exactly
     [value]. *)
@@ -554,13 +546,15 @@ end
 (** Get a description of a jkind. *)
 val get : 'd Types.jkind -> 'd Desc.t
 
-(** [get_layout_defaulting_to_value] extracts a constant layout, defaulting any
-    sort variable to [value]. Returns [None] in the case of an abstract kind. *)
-val get_layout_defaulting_to_value :
+(** [get_layout_defaulting_to_scannable] extracts a constant layout, defaulting
+    any sort variable to [scannable]. Returns [None] in the case of an abstract
+    kind. *)
+val get_layout_defaulting_to_scannable :
   Env.t -> 'd Types.jkind -> Layout.Const.t option
 
-(** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
-val default_to_value : 'd Types.jkind -> unit
+(** [default_to_scannable t] is [ignore (get_layout_defaulting_to_scannable t)]
+*)
+val default_to_scannable : 'd Types.jkind -> unit
 (* CR layouts v5: When we have proper support for void, we'll want to change
    these three functions to default to void - it's the most efficient thing
    when we have a choice. *)
@@ -597,18 +591,17 @@ val get_externality_upper_bound :
 val set_externality_upper_bound :
   Types.jkind_r -> Jkind_axis.Externality.t -> Types.jkind_r
 
-(** Gets the nullability from a jkind. *)
-val get_nullability :
-  context:jkind_context -> Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t
+(** Gets the nullability from a jkind. Expands abstract kinds if needed. *)
+val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
 
-(** Computes a jkind that is the same as the input but with an updated maximum
-    mode for the nullability axis *)
-val set_nullability_upper_bound :
+(** Computes a jkind that is the same as the input but with an updated
+    nullability on the layout's scannable axis *)
+val set_root_nullability :
   Types.jkind_r -> Jkind_axis.Nullability.t -> Types.jkind_r
 
-(** Computes a jkind that is the same as the input but with an updated maximum
-    mode for the separability axis *)
-val set_separability_upper_bound :
+(** Computes a jkind that is the same as the input but with an updated
+    separability on the layout's scannable axis *)
+val set_root_separability :
   Types.jkind_r -> Jkind_axis.Separability.t -> Types.jkind_r
 
 (** Sets the layout in a jkind. *)

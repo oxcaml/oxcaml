@@ -38,10 +38,10 @@ type forbidden_modality_kind =
           [aliased]. Otherwise, borrowing would be unsound:
 
           {v
-      type 'a t = { x : 'a @@ global unique }
+          type 'a t = { x : 'a @@ global unique }
 
-      let clone (x @ unique) =
-        borrow {x} ~f:(fun (t @ local) -> t.x : 'a @ global) (* leak *)
+          let clone (x @ unique) =
+            borrow {x} ~f:(fun (t @ local) -> t.x : 'a @ global) (* leak *)
           v} *)
 
 type error =
@@ -124,14 +124,9 @@ module Modifier_axis_pair = struct
         P (Nonmodal ax, a)
       in
       match s with
-      | "maybe_null" -> nonmodal Nullability Maybe_null
-      | "non_null" -> nonmodal Nullability Non_null
       | "internal" -> nonmodal Externality Internal
       | "external64" -> nonmodal Externality External64
       | "external_" -> nonmodal Externality External
-      | "maybe_separable" -> nonmodal Separability Maybe_separable
-      | "separable" -> nonmodal Separability Separable
-      | "non_float" -> nonmodal Separability Non_float
       | _ -> raise Not_found)
 end
 
@@ -155,6 +150,8 @@ module Transled_modifiers = struct
       (* CR-soon zqian: Create a functor [Mode.Value.Const.Make] to generate
          different type operators applied on mode constants. *)
       externality : Jkind_axis.Externality.t Location.loc option;
+      (* CR layouts-scannable: This is a temporary hack to support the previous
+         syntax. The location is not being used for anything currently. *)
       nullability : Jkind_axis.Nullability.t Location.loc option;
       separability : Jkind_axis.Separability.t Location.loc option
     }
@@ -188,8 +185,6 @@ module Transled_modifiers = struct
     | Modal (Monadic Visibility) -> t.visibility
     | Modal (Monadic Staticity) -> t.staticity
     | Nonmodal Externality -> t.externality
-    | Nonmodal Nullability -> t.nullability
-    | Nonmodal Separability -> t.separability
 
   let set (type a) ~(axis : a Axis.t) (t : t) (value : a Location.loc option) :
       t =
@@ -205,8 +200,16 @@ module Transled_modifiers = struct
     | Modal (Monadic Visibility) -> { t with visibility = value }
     | Modal (Monadic Staticity) -> { t with staticity = value }
     | Nonmodal Externality -> { t with externality = value }
-    | Nonmodal Nullability -> { t with nullability = value }
-    | Nonmodal Separability -> { t with separability = value }
+
+  let meet_nullability t (nullability : Nullability.t loc) =
+    match t.nullability with
+    | Some existing when Nullability.le existing.txt nullability.txt -> t
+    | _ -> { t with nullability = Some nullability }
+
+  let meet_separability t separability =
+    match t.separability with
+    | Some existing when Separability.le existing.txt separability.txt -> t
+    | _ -> { t with separability = Some separability }
 end
 
 (* Since [unforkable yielding] is the default mode in presence of [local], the
@@ -284,6 +287,31 @@ let transl_mod_bounds annots =
       Transled_modifiers.set ~axis bounds_so_far (Some { txt = mode; loc })
     | exception Not_found -> (
       match txt with
+      (* CR layouts-scannable: This should be removed once the new syntax for
+         separability is adopted. There is no warning raised currently for dupes
+         because the warnings would be reported 3 times. If this is fixed before
+         the syntax is deprecated, dupes really should raise warnings! *)
+      | "non_pointer" ->
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Non_pointer; loc }
+      | "non_pointer64" ->
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Non_pointer64; loc }
+      | "non_float" ->
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Non_float; loc }
+      | "separable" ->
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Separable; loc }
+      | "maybe_separable" ->
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Maybe_separable; loc }
+      | "non_null" ->
+        Transled_modifiers.meet_nullability bounds_so_far
+          { txt = Non_null; loc }
+      | "maybe_null" ->
+        Transled_modifiers.meet_nullability bounds_so_far
+          { txt = Maybe_null; loc }
       | "everything" ->
         Transled_modifiers.
           { areality =
@@ -306,10 +334,8 @@ let transl_mod_bounds annots =
             visibility =
               Some { txt = Per_axis.min (Modal (Monadic Visibility)); loc };
             staticity = None;
-            nullability =
-              Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
-            separability =
-              Transled_modifiers.get ~axis:(Nonmodal Separability) bounds_so_far
+            nullability = bounds_so_far.nullability;
+            separability = bounds_so_far.separability
           }
       | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
   in
@@ -357,16 +383,9 @@ let transl_mod_bounds annots =
     Option.fold ~some:Location.get_txt ~none:Externality.max
       raw_modifiers.externality
   in
-  let nullability =
-    Option.fold ~some:Location.get_txt ~none:Nullability.max
-      raw_modifiers.nullability
-  in
-  let separability =
-    Option.fold ~some:Location.get_txt ~none:Separability.max
-      raw_modifiers.separability
-  in
   let crossing = Crossing.modality modality Crossing.max in
-  create crossing ~externality ~nullability ~separability
+  ( create crossing ~externality,
+    (raw_modifiers.nullability, raw_modifiers.separability) )
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]
@@ -563,8 +582,8 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
         { Location.txt = Parsetree.Mode s; loc = Location.none })
       least_modalities
   in
-  (* These mod-bounds are top ones, which are redundant to print. But we include
-     them when printing verbosely. *)
+  (* These mod-bounds are top ones, which are redundant to print. But we
+     include them when printing verbosely. *)
   let top_modality_annots () =
     List.filter_map
       (fun ax ->
@@ -594,9 +613,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
       ( { Location.txt = Parsetree.Mode s; loc = Location.none },
         only_when_verbose )
     in
-    [ mk_annot Externality.max Externality.print (externality bounds);
-      mk_annot Nullability.max Nullability.print (nullability bounds);
-      mk_annot Separability.max Separability.print (separability bounds) ]
+    [mk_annot Externality.max Externality.print (externality bounds)]
     |> List.partition_map (fun (annot, only_when_verbose) ->
         match only_when_verbose with false -> Left annot | true -> Right annot)
   in
@@ -696,8 +713,6 @@ let transl_with_bound_modifiers annots =
         | P (Modal _, _) -> annot :: modal_annots, externality
         | P (Nonmodal Externality, (value : Externality.t)) ->
           modal_annots, Some value
-        | P (Nonmodal (Nullability | Separability), _) ->
-          raise (Error (loc, Unrecognized_modifier (Modality, modality)))
         | exception Not_found ->
           raise (Error (loc, Unrecognized_modifier (Modality, modality))))
       ([], None) annots

@@ -83,10 +83,10 @@ let
 
   ocamlformat = pkgs.ocaml-ng.ocamlPackages_4_14.ocamlformat.overrideAttrs (old: rec {
       name = "${old.pname}-${version}";
-      version = "0.28.1";
+      version = "0.29.0";
       src = pkgs.fetchurl {
         url = "https://github.com/ocaml-ppx/ocamlformat/releases/download/${version}/ocamlformat-${version}.tbz";
-        sha256 = "sha256-cL2gN9C+2WHtkb21GYsu7vVCREdQqLAV2AzLlLP/Qfs=";
+        sha256 = "sha256-2sd/CpV654K7S4abB7mAOocqNPjB6uiQG0LSG2I8nbU=";
       };
   });
 

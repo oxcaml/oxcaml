@@ -1021,10 +1021,10 @@ and print_out_type_decl kwd ppf td =
   let print_unboxed ppf =
     if td.otype_unboxed then fprintf ppf " [%@%@unboxed]" else ()
   in
-  let print_or_null_reexport ppf =
-    if td.otype_or_null_reexport then
-      fprintf ppf " [%@%@or_null_reexport]"
-    else ()
+  let print_or_null_attr ppf =
+    match td.otype_or_null_attribute with
+    | None -> ()
+    | Some attr -> fprintf ppf " [%@@@%s]" attr
   in
   let print_out_tkind ppf = function
   | Otyp_abstract -> ()
@@ -1059,7 +1059,7 @@ and print_out_type_decl kwd ppf td =
     print_out_tkind ty
     print_constraints
     print_unboxed
-    print_or_null_reexport
+    print_or_null_attr
     print_out_attrs td.otype_attributes
 
 and print_simple_out_gf_type ppf (ty, gf) =
