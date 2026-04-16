@@ -21,5 +21,5 @@ val simplify_named :
   Bound_pattern.t ->
   Flambda.Named.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
-  (Simplify_named_result.t Or_invalid.t * Removed_operations.t)
+  (Simplify_named_result.t Or_invalid.t * Cost_metrics.t)
   Simplified_named.or_rewritten

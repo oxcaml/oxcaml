@@ -37,7 +37,7 @@ let keep_lifted_constant_only_if_used uacc acc lifted_constant =
   in
   if symbols_live || code_ids_live then LCS.add acc lifted_constant else acc
 
-let rebuild_let simplify_named_result removed_operations ~rewrite_id
+let rebuild_let simplify_named_result cost_metrics ~rewrite_id
     ~lifted_constants_from_defining_expr ~at_unit_toplevel
     ~(closure_info : Closure_info.t) ~body uacc ~after_rebuild =
   let lifted_constants_from_defining_expr =
@@ -73,7 +73,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
     no_constants_from_defining_expr && UA.no_lifted_constants uacc
   in
   let put_bindings_around_body uacc ~body =
-    let uacc = UA.notify_removed ~operation:removed_operations uacc in
+    let uacc = UA.add_cost_metrics cost_metrics uacc in
     let bindings =
       Simplify_named_result.bindings_to_place simplify_named_result
     in
@@ -386,7 +386,7 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
       ~simplify_function_body
   with
   | Rewritten f -> simplify_expr dacc (f ~body) ~down_to_up
-  | Simplified (simplify_named_result, removed_operations) -> (
+  | Simplified (simplify_named_result, cost_metrics) -> (
     (* We must make sure that if [Invalid] is going to be produced, [uacc]
        doesn't contain any extraneous data for e.g. lifted constants that will
        never be placed, since this can lead to errors when loading .cmx files or
@@ -394,7 +394,7 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
     match simplify_named_result with
     | Invalid ->
       down_to_up original_dacc ~rebuild:(fun uacc ~after_rebuild ->
-          let uacc = UA.notify_removed ~operation:removed_operations uacc in
+          let uacc = UA.add_cost_metrics cost_metrics uacc in
           EB.rebuild_invalid uacc
             (Defining_expr_of_let (bound_pattern, defining_expr))
             ~after_rebuild)
@@ -443,7 +443,7 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
       let down_to_up dacc ~rebuild:rebuild_body =
         let rebuild uacc ~after_rebuild =
           let after_rebuild body uacc =
-            rebuild_let simplify_named_result removed_operations
+            rebuild_let simplify_named_result cost_metrics
               ~lifted_constants_from_defining_expr ~at_unit_toplevel
               ~closure_info ~body uacc ~after_rebuild ~rewrite_id
           in

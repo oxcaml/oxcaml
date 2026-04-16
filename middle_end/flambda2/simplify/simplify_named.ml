@@ -245,7 +245,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
 
 let removed_operations ~min_name_mode ~(original : Named.t) dacc
     (result : _ Or_invalid.t) =
-  let zero = Removed_operations.zero in
+  let zero = Cost_metrics.zero in
   match result with
   | Invalid ->
     (* We're not removing any instructions that would actually have been
@@ -253,12 +253,14 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
     zero
   | Ok result -> (
     match original with
-    | Set_of_closures _ ->
-      if
-        Simplify_named_result.was_lifted_set_of_closures result
-        || Simplify_named_result.no_bindings result
-      then Removed_operations.alloc
-      else zero
+    | Set_of_closures _ -> (
+      match Simplify_named_result.was_lifted_set_of_closures result with
+      | Some cost_metrics -> cost_metrics
+      | None ->
+        if Simplify_named_result.no_bindings result
+        then
+          Cost_metrics.notify_removed ~operation:Removed_operations.alloc zero
+        else zero)
     | Static_consts _ ->
       (* There are no operations to remove in a [Static_consts] binding. *)
       zero
@@ -305,7 +307,10 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
               false)
           (Simplify_named_result.bindings_to_place result)
       then zero
-      else Removed_operations.prim original_prim
+      else
+        Cost_metrics.notify_removed
+          ~operation:(Removed_operations.prim original_prim)
+          zero
     | Rec_info _ -> zero)
 
 let simplify_named dacc bound_pattern named ~simplify_function_body :

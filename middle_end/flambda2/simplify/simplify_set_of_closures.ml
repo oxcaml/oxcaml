@@ -560,6 +560,17 @@ let simplify_function context ~outer_dacc function_slot code_id
   in
   code_id, outer_dacc, code_ids_to_never_delete_this_set
 
+let find_code_characteristics dacc code_id =
+  let env = Downwards_acc.denv dacc in
+  let code_metadata =
+    DE.find_code_exn env code_id |> Code_or_metadata.code_metadata
+  in
+  Cost_metrics.
+    { cost_metrics = Code_metadata.cost_metrics code_metadata;
+      params_arity =
+        Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
+    }
+
 type simplify_set_of_closures0_result =
   { set_of_closures : Flambda.Set_of_closures.t;
     dacc : Downwards_acc.t
@@ -780,8 +791,8 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
       ~f:(Specialization_cost.add_lifted_set_of_closures set_of_closures)
   in
   Simplify_named_result.create_have_lifted_set_of_closures
-    (DA.with_denv dacc denv) bindings
-    ~original_defining_expr:(Named.create_set_of_closures set_of_closures)
+    ~find_code_characteristics:(find_code_characteristics dacc)
+    (DA.with_denv dacc denv) bindings ~original_defining_expr:set_of_closures
 
 let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
     set_of_closures ~value_slots ~value_slot_types ~simplify_function_body =
@@ -846,20 +857,9 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
   in
   let defining_expr =
     let named = Named.create_set_of_closures set_of_closures in
-    let find_code_characteristics code_id =
-      let env = Downwards_acc.denv dacc in
-      let code_metadata =
-        DE.find_code_exn env code_id |> Code_or_metadata.code_metadata
-      in
-      Cost_metrics.
-        { cost_metrics = Code_metadata.cost_metrics code_metadata;
-          params_arity =
-            Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
-        }
-    in
     let machine_width = DE.machine_width (DA.denv dacc) in
     Simplified_named.create_with_known_free_names ~machine_width
-      ~find_code_characteristics
+      ~find_code_characteristics:(find_code_characteristics dacc)
       (Named.create_set_of_closures set_of_closures)
       ~free_names:(Named.free_names named)
   in

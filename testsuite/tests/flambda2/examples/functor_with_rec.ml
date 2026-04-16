@@ -9,4 +9,4 @@ end
 
 module F (X : S) = struct
   let rec foo x = if X.test x then x else foo (x + 1)
-end
+end [@@inline]

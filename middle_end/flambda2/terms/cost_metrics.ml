@@ -21,7 +21,9 @@
 
 type t =
   { size : Code_size.t;
-    removed : Removed_operations.t
+    removed : Removed_operations.t;
+    lifted_size : Code_size.t
+        (* The size of expressions that were lifted by the simplifier. *)
   }
 
 type code_characteristics =
@@ -29,17 +31,25 @@ type code_characteristics =
     params_arity : int
   }
 
-let zero = { size = Code_size.zero; removed = Removed_operations.zero }
+let zero =
+  { size = Code_size.zero;
+    removed = Removed_operations.zero;
+    lifted_size = Code_size.zero
+  }
 
 let size t = t.size
+
+let lifted_size t = t.size
 
 let removed t = t.removed
 
 let print ppf t =
-  Format.fprintf ppf "@[<hov 1>size: %a removed: {%a}@]" Code_size.print t.size
-    Removed_operations.print t.removed
+  Format.fprintf ppf "@[<hov 1>size: %a removed: {%a} lifted: %a@]"
+    Code_size.print t.size Removed_operations.print t.removed Code_size.print
+    t.lifted_size
 
-let from_size size = { size; removed = Removed_operations.zero }
+let from_size size =
+  { size; removed = Removed_operations.zero; lifted_size = Code_size.zero }
 
 let notify_added ~code_size t =
   { t with size = Code_size.( + ) t.size code_size }
@@ -47,9 +57,13 @@ let notify_added ~code_size t =
 let notify_removed ~operation t =
   { t with removed = Removed_operations.( + ) t.removed operation }
 
+let notify_lifted ~code_size t =
+  { t with lifted_size = Code_size.( + ) t.lifted_size code_size }
+
 let ( + ) a b =
   { size = Code_size.( + ) a.size b.size;
-    removed = Removed_operations.( + ) a.removed b.removed
+    removed = Removed_operations.( + ) a.removed b.removed;
+    lifted_size = Code_size.( + ) a.lifted_size b.lifted_size
   }
 
 (* The metrics for a set of closures are the sum of the metrics for each closure
@@ -89,6 +103,14 @@ let set_of_closures ~find_code_characteristics set_of_closures =
   in
   cost_metrics + from_size alloc_size
 
+let lifted_set_of_closures ~find_code_characteristics closures =
+  let cost_metrics = set_of_closures ~find_code_characteristics closures in
+  { size = Code_size.zero;
+    removed =
+      Removed_operations.( + ) cost_metrics.removed Removed_operations.alloc;
+    lifted_size = Code_size.( + ) cost_metrics.size cost_metrics.lifted_size
+  }
+
 let increase_due_to_let_expr ~is_phantom ~cost_metrics_of_defining_expr =
   if is_phantom then zero else cost_metrics_of_defining_expr
 
@@ -99,8 +121,12 @@ let increase_due_to_let_cont_recursive ~cost_metrics_of_handlers =
   cost_metrics_of_handlers
 
 let evaluate ~args (t : t) =
-  Code_size.evaluate ~args t.size -. Removed_operations.evaluate ~args t.removed
+  (* XXX is this the good way to take lifted_size into account? *)
+  Code_size.evaluate ~args (Code_size.( + ) t.size t.lifted_size)
+  -. Removed_operations.evaluate ~args t.removed
 
-let equal { size = size1; removed = removed1 }
-    { size = size2; removed = removed2 } =
-  Code_size.equal size1 size2 && Removed_operations.equal removed1 removed2
+let equal { size = size1; removed = removed1; lifted_size = lifted_size1 }
+    { size = size2; removed = removed2; lifted_size = lifted_size2 } =
+  Code_size.equal size1 size2
+  && Removed_operations.equal removed1 removed2
+  && Code_size.equal lifted_size1 lifted_size2

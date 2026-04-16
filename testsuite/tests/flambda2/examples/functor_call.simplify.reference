@@ -25,11 +25,11 @@ let code loopify(done) size(16) newer_version_of(foo_1_1)
            let int_add = %int_barith.add (x_1, 1) in
            cont self (int_add))
 in
-let $camlFunctor_call__foo_6 =
+let $camlFunctor_call__foo_5 =
   closure foo_1 @foo
   with { X = $camlFunctor_call__Pmakeblock129 }
 in
 let $camlFunctor_call =
-  Block 0 ($camlFunctor_call__Pmakeblock129, $camlFunctor_call__foo_6)
+  Block 0 ($camlFunctor_call__Pmakeblock129, $camlFunctor_call__foo_5)
 in
 cont done ($camlFunctor_call)
