@@ -557,6 +557,16 @@ let mode_morph f expected_mode =
   let tuple_modes = None in
   {expected_mode with mode; tuple_modes}
 
+(** Relax an [expected_mode] wrt a crossing. *)
+let mode_crossing crossing expected_mode =
+  let mode = Crossing.apply_right crossing expected_mode.mode in
+  let tuple_modes =
+    Option.map
+      (List.map (fun (m, loc) -> (Crossing.apply_right crossing m, loc)))
+      expected_mode.tuple_modes
+  in
+  { expected_mode with mode; tuple_modes }
+
 (** Similiar to [apply_is_contained_by] but for [expected_mode]. *)
 let mode_is_contained_by is_contained_by ?modalities expected_mode =
   as_single_mode expected_mode
@@ -5969,7 +5979,8 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
         Mode.Value.meet (List.map as_single_mode [exp_mode; env_mode])
       in
       Some env_alloc_mode, mode_default exp_mode
-    else None, exp_mode
+    else
+      None, mode_crossing mode_crossing_staticity exp_mode
   in
   attrs, pat_mode, env_alloc_mode, exp_mode, spat
 

@@ -5875,7 +5875,10 @@ let mode_crossing_structure_memaddr =
     ~forkable:true
     ~yielding:true
     ~statefulness:true
-    ~staticity:false
+    ~staticity:true
+    (* We don't care about a structure's staticity if it doesn't contain any
+      [lpoly] values. Hence, the memory block of the structure crosses
+      staticity. *)
 
 (** The mode crossing of a functor. *)
 let mode_crossing_functor =
@@ -5894,6 +5897,13 @@ let mode_crossing_functor =
 (** The mode crossing of any module. *)
 let mode_crossing_module = Mode.Crossing.max
 
+let mode_crossing_staticity =
+  Crossing.create
+    ~uniqueness:false ~contention:false ~visibility:false
+    ~regionality:false ~linearity:false ~portability:false
+    ~forkable:false ~yielding:false ~statefulness:false
+    ~staticity:true
+
 let zap_modalities_to_floor_if_at_least level =
   if Language_extension.(is_at_least Mode level)
     then Mode.Modality.zap_to_floor
@@ -5903,7 +5913,7 @@ let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
   Ikind.crossing_of_jkind ~context env jkind
 
-let crossing_of_ty env ?modalities ty =
+let crossing_of_ty env ?modalities ?val_lpoly ty =
   let principal = is_principal ty in
   let crossing =
     if not principal
@@ -5932,6 +5942,13 @@ let crossing_of_ty env ?modalities ty =
         ikind_crossing)
       else
         jkind_crossing ()
+  in
+  let crossing =
+    match val_lpoly with
+    | Some lpoly when List.is_empty (Types.Lpoly.get_exn lpoly) ->
+      let staticity_ax = Crossing.Axis.Monadic Staticity in
+      Crossing.set staticity_ax (Crossing.Per_axis.min staticity_ax) crossing
+    | _ -> crossing
   in
   match modalities with
   | None -> crossing
