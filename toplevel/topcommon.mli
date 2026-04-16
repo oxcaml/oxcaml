@@ -107,14 +107,16 @@ module MakeEvalPrinter (_ : EVAL_BASE) : sig
     (* Print an exception resulting from the evaluation of user code. *)
 
   val outval_of_value:
-    Env.t -> Printer.t -> Types.type_expr -> Outcometree.out_value
+    Env.t -> Printer.t -> Jkind_types.Sort.var list -> Types.type_expr ->
+    Outcometree.out_value
 
   type ('a, 'b) gen_printer =
     | Zero of 'b
     | Succ of ('a -> ('a, 'b) gen_printer)
 
   val install_printer :
-    Path.t -> Types.type_expr -> (formatter -> Printer.t -> unit) -> unit
+    Path.t -> Jkind_types.Sort.var list -> Types.type_expr ->
+    (formatter -> Printer.t -> unit) -> unit
   val install_generic_printer :
     Path.t -> Path.t ->
     (int -> (int -> Printer.t -> Outcometree.out_value,

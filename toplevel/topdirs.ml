@@ -196,9 +196,9 @@ let _ = add_directive "mark_toplevel_in_quotations"
 
 module Printer = struct
   type kind =
-    | Old of Types.type_expr
+    | Old of Jkind_types.Sort.var list * Types.type_expr
       (* 'a -> unit *)
-    | Simple of Types.type_expr
+    | Simple of Jkind_types.Sort.var list * Types.type_expr
       (* Format.formatter -> 'a -> unit *)
     | Generic of { ty_path: Path.t; arity: int; }
       (* (formatter -> 'a1 -> unit) ->
@@ -249,20 +249,25 @@ let match_simple_printer_type desc ~is_old_style =
     then Topprinters.printer_type_old
     else Topprinters.printer_type_new
   in
+  let lvars = Types.Lpoly.get_exn desc.val_lpoly in
   match
     Ctype.with_local_level ~post:Ctype.generalize begin fun () ->
       let ty_arg = Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument) in
+      let pat_sort_vars, val_type =
+        Jkind_types.Sort.instance_with ~level:(Ctype.get_current_level ())
+          lvars (fun () -> Ctype.instance desc.val_type)
+      in
       Ctype.unify !toplevel_env
         (make_printer_type ty_arg)
-        (Ctype.instance desc.val_type);
-      ty_arg
+        val_type;
+      (pat_sort_vars, ty_arg)
     end
   with
   | exception Ctype.Unify _ -> None
-  | ty_arg ->
+  | (pat_sort_vars, ty_arg) ->
       if is_old_style
-      then Some (Printer.Old ty_arg)
-      else Some (Printer.Simple ty_arg)
+      then Some (Printer.Old (pat_sort_vars, ty_arg))
+      else Some (Printer.Simple (pat_sort_vars, ty_arg))
 
 
 let match_generic_printer_type desc ty_path params =
@@ -324,11 +329,11 @@ let find_printer lid =
 let install_printer_by_kind path kind =
   let v = eval_value_path !toplevel_env path in
   match kind with
-  | Printer.Old ty_arg ->
-    install_printer path ty_arg
+  | Printer.Old (pat_sort_vars, ty_arg) ->
+    install_printer path pat_sort_vars ty_arg
       (fun _formatter repr -> Obj.obj v (Obj.obj repr))
-  | Printer.Simple ty_arg ->
-    install_printer path ty_arg
+  | Printer.Simple (pat_sort_vars, ty_arg) ->
+    install_printer path pat_sort_vars ty_arg
       (fun formatter repr -> Obj.obj v formatter (Obj.obj repr))
   | Printer.Generic { ty_path; arity } ->
      let rec build v = function
