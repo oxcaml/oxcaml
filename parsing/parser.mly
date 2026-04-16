@@ -2200,8 +2200,8 @@ module_declaration_body(module_type_with_optional_modal_expr):
   }
 ;
 %inline module_expr_alias:
-  id = mkrhs(mod_longident)
-    { Mty.alias ~loc:(make_loc $sloc) id }
+  id = mkrhs(mod_longident) attrs = attributes
+    { Mty.alias ~loc:(make_loc $loc(id)) ~attrs id }
 ;
 (* A module substitution (in a signature). *)
 module_subst:
