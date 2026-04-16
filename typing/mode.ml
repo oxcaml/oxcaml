@@ -2513,8 +2513,16 @@ module Report = struct
       ( (fun ppf Modality -> Fmt.fprintf ppf " (with some modality)"),
         (Location.none, Unknown : pinpoint) )
 
-  let print_contains :
-      fixpoint:bool -> contains -> ((Fmt.formatter -> unit) * pinpoint) option =
+  type print_morph_res =
+    | Nothing
+    | PrintMorph of (Fmt.formatter -> unit) * pinpoint
+    | PrintCrossing of (Fmt.formatter -> unit) * pinpoint
+
+  let option_to_print_morph = function
+    | None -> Nothing
+    | Some (a, b) -> PrintMorph (a, b)
+
+  let print_contains : fixpoint:bool -> contains -> print_morph_res =
    fun ~fixpoint { containing; contained } ->
     print_pinpoint contained
     |> Option.map (fun print_pp ->
@@ -2540,9 +2548,10 @@ module Report = struct
               maybe_modality moda print_pp
         in
         pr, contained)
+    |> option_to_print_morph
 
   let print_is_contained_by :
-      fixpoint:bool -> is_contained_by -> (Fmt.formatter -> unit) * pinpoint =
+      fixpoint:bool -> is_contained_by -> print_morph_res =
    fun ~fixpoint { containing; container } ->
     let maybe_modality, pp = modality_if_relevant ~fixpoint container in
     (* CR-someday zqian: Use the full [container] to improve the printing below.
@@ -2576,53 +2585,81 @@ module Report = struct
           (Location.Doc.loc ~capitalize_first:false)
           container
     in
-    pr, pp
+    PrintMorph (pr, pp)
+
+  let compare_mode : type a b.
+      a C.obj -> b C.obj -> a -> b -> (a, b) Misc.comparison =
+   fun a_obj b_obj a b ->
+    match C.compare_obj a_obj b_obj with
+    | Equal ->
+      if C.le a_obj a b
+      then
+        begin if C.le a_obj b a then Equal else Less_than
+        end
+      else Greater_than (* Misc.Le_result.equal ~le:(C.le a_obj) a b *)
+    | Less_than -> Less_than
+    | Greater_than -> Greater_than
+
+  let is_equal : type a b. (a, b) Misc.comparison -> bool =
+   fun comparison -> Misc.comparison_result comparison = 0
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and return the
       source pinpoint. The source pinpoint could be [Unknown], in which case the
       rest of the chain will not be printed. *)
-  let print_morph : type l r.
-      fixpoint:bool ->
+  let print_morph : type a b l r.
+      comparison:(a, b) Misc.comparison ->
       pinpoint ->
       (l * r) morph ->
-      ((Fmt.formatter -> unit) * pinpoint) option =
-   fun ~fixpoint pp -> function
+      print_morph_res =
+   fun ~comparison pp morph ->
+    let fixpoint = is_equal comparison in
+    match morph with
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
-    | Unknown -> None
+    | Unknown -> Nothing
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
           ( Fmt.dprintf "closes over %t"
               (print_pp ~definite:true ~capitalize:false),
             pp ))
+      |> option_to_print_morph
     | Close_over (Monadic, { closed = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
           ( Fmt.dprintf "contains a usage (of %t)"
               (print_pp ~definite:true ~capitalize:false),
             pp ))
+      |> option_to_print_morph
     | Is_closed_by (_, { closure = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
           ( Fmt.dprintf "is used inside %t"
               (print_pp ~definite:true ~capitalize:false),
             pp ))
+      |> option_to_print_morph
     | Captured_by_partial_application ->
-      Some
+      PrintMorph
         ( Fmt.dprintf "is captured by a partial application",
           (Location.none, Expression) )
     | Adj_captured_by_partial_application ->
-      Some
+      PrintMorph
         ( Fmt.dprintf "has a partial application capturing a value",
           (Location.none, Expression) )
-    | Crossing -> Some (Fmt.dprintf "crosses with something", pp)
-    | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
-    | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
+    | Crossing ->
+      begin match comparison with
+      | Equal ->
+        Misc.fatal_error
+          "Crossing is non-rigid and should have skipped in case of fixedpoint"
+      | Less_than -> PrintCrossing (Fmt.dprintf "must at most be ", pp)
+      | Greater_than -> PrintCrossing (Fmt.dprintf "must at least be ", pp)
+      end
+    | Allocation_r alloc -> PrintMorph (print_allocation_r alloc, pp)
+    | Allocation_l alloc -> PrintMorph (print_allocation_l alloc, pp)
     | Contains_l (_, contains) -> print_contains ~fixpoint contains
     | Contains_r (_, contains) -> print_contains ~fixpoint contains
     | Is_contained_by (_, is_contained_by) ->
-      Some (print_is_contained_by ~fixpoint is_contained_by)
+      print_is_contained_by ~fixpoint is_contained_by
 
   let print_mode : type a.
       [`Actual | `Expected] -> a C.obj -> Fmt.formatter -> a -> unit =
@@ -2683,12 +2720,6 @@ module Report = struct
       true
     | Allocation_r _ | Allocation_l _ | Skip | Crossing -> false
 
-  let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
-   fun a_obj b_obj a b ->
-    match C.compare_obj a_obj b_obj with
-    | Equal -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-    | Less_than | Greater_than -> false
-
   let rec print_ahint : type a l r.
       ?sub:bool ->
       [`Left | `Right] ->
@@ -2700,17 +2731,23 @@ module Report = struct
    fun ?(sub = false) side pp (obj : a C.obj) ppf (a, hint) ->
     match hint with
     | Apply (morph_hint, src, ahint) ->
-      let fixpoint = equal_mode obj src a (fst ahint) in
+      let comparison = compare_mode obj src a (fst ahint) in
+      let fixpoint = is_equal comparison in
       if (not (is_rigid morph_hint)) && fixpoint
       then print_ahint ~sub side pp src ppf ahint
       else (
         print_mode_with_side ~sub side obj ppf a;
-        match print_morph ~fixpoint pp morph_hint with
-        | None -> Some Mode
-        | Some (t, pp) ->
+        match print_morph ~comparison pp morph_hint with
+        | Nothing -> Some Mode
+        | PrintMorph (t, pp) ->
           Fmt.fprintf ppf "@ because it %t" t;
           if is_known_pinpoint pp
           then ignore (print_ahint ~sub:true side pp src ppf ahint);
+          Some Mode_with_hint
+        | PrintCrossing (t, pp) ->
+          Fmt.fprintf ppf "@ because it %t" t;
+          if is_known_pinpoint pp
+          then ignore (print_ahint ~sub:false side pp src ppf ahint);
           Some Mode_with_hint)
     | Const Unknown ->
       print_mode_with_side ~sub side obj ppf a;

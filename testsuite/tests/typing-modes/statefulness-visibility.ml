@@ -2259,8 +2259,7 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in
          val f : unit -> unit @@ stateless (* in a structure at stateful *)
-       The first is "stateful" because it crosses with something
-         which is "reading"
+       The first is "stateful" because it must at least be "reading"
          because it contains a usage (of the value "r" at line 5, characters 13-14)
          which is expected to be "read" or "read_write"
          because its mutable field "contents" is being read.
@@ -2299,8 +2298,7 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in
          val f : unit -> unit @@ stateless (* in a structure at stateful *)
-       The first is "stateful" because it crosses with something
-         which is "reading"
+       The first is "stateful" because it must at least be "reading"
          because it closes over the value "get" at line 7, characters 13-16
          which is "reading"
          because it contains a usage (of the value "r" at line 5, characters 15-16)

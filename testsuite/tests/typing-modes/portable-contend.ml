@@ -190,8 +190,7 @@ Error: Signature mismatch:
          val bar : unit -> unit (* in a structure at nonportable *)
        is not included in
          val bar : unit -> unit @@ portable (* in a structure at nonportable *)
-       The first is "nonportable" because it crosses with something
-         which is "shareable"
+       The first is "nonportable" because it must at least be "shareable"
          because it contains a usage (of the value "r" at line 5, characters 23-24)
          which is expected to be "shared" or "uncontended"
          because its mutable field "a" is being read.

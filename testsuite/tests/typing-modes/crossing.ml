@@ -219,8 +219,7 @@ let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
 Line 1, characters 64-65:
 1 | let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
                                                                     ^
-Error: This value is "corrupted" because it crosses with something
-         which is "contended".
+Error: This value is "corrupted" because it must at least be "contended".
        However, the highlighted expression is expected to be "shared" or "uncontended".
 |}]
 
@@ -234,8 +233,7 @@ let cross_corrupted2 (x : cross_corrupted @ contended) : _ @ corrupted = x
 Line 1, characters 73-74:
 1 | let cross_corrupted2 (x : cross_corrupted @ contended) : _ @ corrupted = x
                                                                              ^
-Error: This value is "shared" because it crosses with something
-         which is "contended".
+Error: This value is "shared" because it must at least be "contended".
        However, the highlighted expression is expected to be "corrupted" or "uncontended".
 |}]
 
