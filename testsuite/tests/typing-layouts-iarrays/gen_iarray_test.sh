@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Generates an iarray test from a mutable array test.
 #
 # Usage: ./gen_iarray_test.sh <mutable_test.ml> <output_iarray_test.ml>
