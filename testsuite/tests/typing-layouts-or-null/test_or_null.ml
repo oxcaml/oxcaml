@@ -123,7 +123,7 @@ let should_fail = This (This 5)
 Line 1, characters 23-31:
 1 | let should_fail = This (This 5)
                            ^^^^^^^^
-Error: This expression has type "'a t" = "'a or_null"
+Error: This constructor has type "'a t" = "'a or_null"
        but an expression was expected of type "('b : value)"
        The kind of 'a t is value_or_null mod everything with 'a
          because it is the primitive type or_null.
@@ -137,7 +137,7 @@ let should_also_fail = This Null
 Line 1, characters 28-32:
 1 | let should_also_fail = This Null
                                 ^^^^
-Error: This expression has type "'a t" = "'a or_null"
+Error: The constructor "Null" has type "'a t" = "'a or_null"
        but an expression was expected of type "('b : value)"
        The kind of 'a t is value_or_null mod everything with 'a
          because it is the primitive type or_null.
@@ -478,7 +478,7 @@ let should_fail_unboxed_gadt = This (Gadt Null)
 Line 1, characters 36-47:
 1 | let should_fail_unboxed_gadt = This (Gadt Null)
                                         ^^^^^^^^^^^
-Error: This expression has type "('a, 'a or_null) gadt"
+Error: This constructor has type "('a, 'a or_null) gadt"
        but an expression was expected of type "('b : value)"
        The kind of ('a, 'a or_null) gadt is
            value_or_null mod everything with 'a
