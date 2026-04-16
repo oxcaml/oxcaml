@@ -23,9 +23,9 @@ open Intrinsics
 let neg x = Int64_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -61,19 +61,18 @@ mul_3:
 let div x y = Int64_u.div x y
 [%%expect_asm X86_64{|
 div:
-  movq  %rax, %rdi
-  movq  %rbx, %rcx
-  testq %rcx, %rcx
+  testq %rbx, %rbx
   je    .L118
-  cmpq  $-1, %rcx
+  cmpq  $-1, %rbx
   je    .L111
-  movq  %rdi, %rax
+  movq  %rbx, %rcx
   cqto
   idivq %rcx
   ret
 .L111:
-  xorl  %eax, %eax
-  subq  %rdi, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 .L118:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
@@ -99,15 +98,14 @@ div_by_constant:
 let unsigned_div x y = Int64_u.unsigned_div x y
 [%%expect_asm X86_64{|
 unsigned_div:
-  movq  %rax, %rdi
-  movq  %rbx, %rcx
-  cmpq  $0, %rcx
+  movq  %rax, %r8
+  cmpq  $0, %rbx
   jge   .L115
   movabsq $-9223372036854775808, %rax
-  subq  %rax, %rcx
+  subq  %rax, %rbx
   movabsq $-9223372036854775808, %rax
-  subq  %rax, %rdi
-  cmpq  %rcx, %rdi
+  subq  %rax, %r8
+  cmpq  %rbx, %r8
   jge   .L109
   xorl  %eax, %eax
   ret
@@ -115,30 +113,31 @@ unsigned_div:
   movl  $1, %eax
   ret
 .L115:
-  testq %rcx, %rcx
+  testq %rbx, %rbx
   je    .L141
-  movq  %rdi, %rbx
-  shrq  $1, %rbx
-  cmpq  $-1, %rcx
+  movq  %r8, %rax
+  shrq  $1, %rax
+  cmpq  $-1, %rbx
   je    .L123
-  movq  %rbx, %rax
+  movq  %rbx, %rcx
   cqto
   idivq %rcx
   jmp   .L126
 .L123:
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  xorl  %edi, %edi
+  subq  %rax, %rdi
+  movq  %rdi, %rax
 .L126:
   salq  $1, %rax
   movabsq $-9223372036854775808, %rsi
-  movq  %rcx, %rbx
-  subq  %rsi, %rbx
+  movq  %rbx, %rdi
+  subq  %rsi, %rdi
   movabsq $-9223372036854775808, %rdx
   movq  %rax, %rsi
-  imulq %rcx, %rsi
-  subq  %rsi, %rdi
-  subq  %rdx, %rdi
-  cmpq  %rbx, %rdi
+  imulq %rbx, %rsi
+  subq  %rsi, %r8
+  subq  %rdx, %r8
+  cmpq  %rdi, %r8
   jge   .L134
   ret
 .L134:
@@ -179,51 +178,51 @@ rem:
 let unsigned_rem x y = Int64_u.unsigned_rem x y
 [%%expect_asm X86_64{|
 unsigned_rem:
-  movq  %rax, %rdi
-  movq  %rbx, %rcx
-  cmpq  $0, %rcx
+  movq  %rax, %rsi
+  cmpq  $0, %rbx
   jge   .L118
-  movabsq $-9223372036854775808, %rbx
-  movq  %rcx, %rax
-  subq  %rbx, %rax
-  movabsq $-9223372036854775808, %rsi
-  movq  %rdi, %rbx
-  subq  %rsi, %rbx
-  cmpq  %rax, %rbx
+  movabsq $-9223372036854775808, %rdi
+  movq  %rbx, %rax
+  subq  %rdi, %rax
+  movabsq $-9223372036854775808, %rdx
+  movq  %rsi, %rdi
+  subq  %rdx, %rdi
+  cmpq  %rax, %rdi
   jge   .L112
-  xorl  %ebx, %ebx
+  xorl  %edi, %edi
   jmp   .L148
 .L112:
-  movl  $1, %ebx
+  movl  $1, %edi
   jmp   .L148
 .L118:
-  testq %rcx, %rcx
+  testq %rbx, %rbx
   je    .L144
-  movq  %rdi, %rax
+  movq  %rsi, %rax
   shrq  $1, %rax
-  cmpq  $-1, %rcx
+  cmpq  $-1, %rbx
   je    .L126
+  movq  %rbx, %rcx
   cqto
   idivq %rcx
-  movq  %rax, %rbx
+  movq  %rax, %rdi
   jmp   .L129
 .L126:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
+  xorl  %edi, %edi
+  subq  %rax, %rdi
 .L129:
-  salq  $1, %rbx
-  movabsq $-9223372036854775808, %rsi
-  movq  %rcx, %rax
-  subq  %rsi, %rax
+  salq  $1, %rdi
+  movabsq $-9223372036854775808, %rax
+  movq  %rbx, %rdx
+  subq  %rax, %rdx
   movabsq $-9223372036854775808, %r8
-  movq  %rbx, %rsi
-  imulq %rcx, %rsi
-  movq  %rdi, %rdx
-  subq  %rsi, %rdx
-  subq  %r8, %rdx
-  cmpq  %rax, %rdx
+  movq  %rdi, %rcx
+  imulq %rbx, %rcx
+  movq  %rsi, %rax
+  subq  %rcx, %rax
+  subq  %r8, %rax
+  cmpq  %rdx, %rax
   jl    .L148
-  incq  %rbx
+  incq  %rdi
   jmp   .L148
 .L144:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
@@ -232,9 +231,9 @@ unsigned_rem:
   popq  %r11
   jmp   *%r11
 .L148:
-  imulq %rcx, %rbx
-  movq  %rdi, %rax
-  subq  %rbx, %rax
+  imulq %rbx, %rdi
+  movq  %rsi, %rax
+  subq  %rdi, %rax
   ret
 |}]
 
@@ -246,22 +245,22 @@ unsigned_rem_2:
   shrq  $1, %rbx
   movq  %rbx, %rdi
   shrq  $63, %rdi
-  addq  %rdi, %rbx
-  sarq  $1, %rbx
-  salq  $1, %rbx
+  addq  %rbx, %rdi
+  sarq  $1, %rdi
+  salq  $1, %rdi
   movabsq $-9223372036854775806, %rdx
   movabsq $-9223372036854775808, %rcx
-  movq  %rbx, %rdi
-  salq  $1, %rdi
+  movq  %rdi, %rbx
+  salq  $1, %rbx
   movq  %rax, %rsi
-  subq  %rdi, %rsi
+  subq  %rbx, %rsi
   subq  %rcx, %rsi
   cmpq  %rdx, %rsi
   jl    .L120
-  incq  %rbx
+  incq  %rdi
 .L120:
-  salq  $1, %rbx
-  subq  %rbx, %rax
+  salq  $1, %rdi
+  subq  %rdi, %rax
   ret
 |}]
 
@@ -283,14 +282,13 @@ pred:
 let abs x = Int64_u.abs x
 [%%expect_asm X86_64{|
 abs:
-  movq  %rax, %rbx
-  cmpq  $0, %rbx
+  cmpq  $0, %rax
   jl    .L105
-  movq  %rbx, %rax
   ret
 .L105:
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -372,21 +370,21 @@ int_roundtrip:
 let unsigned_to_int x = Int64_u.unsigned_to_int x
 [%%expect_asm X86_64{|
 unsigned_to_int:
-  movq  %rax, %rbx
-  cmpq  $0, %rbx
+  cmpq  $0, %rax
   jl    .L112
-  movabsq $4611686018427387903, %rax
-  cmpq  %rax, %rbx
+  movabsq $4611686018427387903, %rbx
+  cmpq  %rbx, %rax
   jg    .L112
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L115
 .L117:
-  leaq  8(%r15), %rax
-  movq  $1024, -8(%rax)
-  leaq  1(%rbx,%rbx), %rbx
-  movq  %rbx, (%rax)
+  leaq  8(%r15), %rbx
+  movq  $1024, -8(%rbx)
+  leaq  1(%rax,%rax), %rax
+  movq  %rax, (%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 .L112:
@@ -429,17 +427,17 @@ let to_int32 x = Int64_u.to_int32 x
 [%%expect_asm X86_64{|
 to_int32:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    .L106
 .L108:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movslq %ebx, %rbx
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movslq %eax, %rax
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -455,16 +453,16 @@ let to_nativeint x = Int64_u.to_nativeint x
 [%%expect_asm X86_64{|
 to_nativeint:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    .L104
 .L106:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -506,15 +504,15 @@ let float_of_bits x = Int64_u.float_of_bits x
 [%%expect_asm X86_64{|
 float_of_bits:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L105
 .L107:
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vmovq %rbx, %xmm0
-  vmovsd %xmm0, (%rax)
+  leaq  8(%r15), %rbx
+  movq  $1277, -8(%rbx)
+  vmovq %rax, %xmm0
+  vmovsd %xmm0, (%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -537,11 +535,11 @@ compare:
 let unsigned_compare x y = Int64_u.unsigned_compare x y
 [%%expect_asm X86_64{|
 unsigned_compare:
+  movabsq $-9223372036854775808, %rdi
+  subq  %rdi, %rbx
+  movabsq $-9223372036854775808, %rsi
   movq  %rax, %rdi
-  movabsq $-9223372036854775808, %rax
-  subq  %rax, %rbx
-  movabsq $-9223372036854775808, %rax
-  subq  %rax, %rdi
+  subq  %rsi, %rdi
   cmpq  %rbx, %rdi
   setl  %al
   movzbq %al, %rsi
@@ -585,13 +583,11 @@ equal_using_compare:
 let min x y = Int64_u.min x y
 [%%expect_asm X86_64{|
 min:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jg    .L105
-  movq  %rdi, %rax
   ret
 .L105:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -599,13 +595,11 @@ min:
 let max x y = Int64_u.max x y
 [%%expect_asm X86_64{|
 max:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jl    .L105
-  movq  %rdi, %rax
   ret
 .L105:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -613,16 +607,16 @@ let to_int64 x = Int64_u.to_int64 x
 [%%expect_asm X86_64{|
 to_int64:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    .L104
 .L106:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]

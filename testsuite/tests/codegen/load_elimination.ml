@@ -48,15 +48,15 @@ let mutable_load_branch r b =
   x + if b then !r else 7
 [%%expect_asm X86_64{|
 mutable_load_branch:
-  movq  (%rax), %rax
+  movq  (%rax), %rdi
   cmpq  $1, %rbx
   jne   .L109
-  movl  $15, %ebx
+  movl  $15, %eax
   jmp   .L113
 .L109:
-  movq  %rax, %rbx
+  movq  %rdi, %rax
 .L113:
-  leaq  -1(%rax,%rbx), %rax
+  leaq  -1(%rdi,%rax), %rax
   ret
 |}]
 
@@ -90,15 +90,15 @@ let mutable_load_loop r =
   foo 10 !r
 [%%expect_asm X86_64{|
 mutable_load_loop:
-  movq  %rax, %rbx
-  movq  (%rbx), %rax
+  movq  (%rax), %rbx
   movl  $21, %edi
   jmp   .L111
 .L109:
+  movq  %rbx, %rax
   ret
 .L111:
-  movq  (%rbx), %rsi
-  leaq  -1(%rax,%rsi), %rax
+  movq  (%rax), %rsi
+  leaq  -1(%rbx,%rsi), %rbx
   addq  $-2, %rdi
   cmpq  $1, %rdi
   jne   .L111

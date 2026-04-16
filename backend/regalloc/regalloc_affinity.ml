@@ -128,6 +128,12 @@ let compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t =
       priorities;
     { classes; affinity }
 
+let same_phi_class : t -> Reg.t -> Reg.t -> bool =
+ fun t left right ->
+  let left = Classes.find t.classes left in
+  let right = Classes.find t.classes right in
+  Reg.same left right
+
 type affinities =
   { mutable next_index : int;
     affinities : affinity array

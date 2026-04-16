@@ -89,17 +89,17 @@ let header x = get_header x
 [%%expect_asm X86_64{|
 header:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    .L105
 .L107:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  -8(%rbx), %rbx
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  -8(%rax), %rax
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -135,14 +135,14 @@ let make_ref x = ref x
 [%%expect_asm X86_64{|
 make_ref:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L104
 .L106:
-  leaq  8(%r15), %rax
-  movq  $1024, -8(%rax)
-  movq  %rbx, (%rax)
+  leaq  8(%r15), %rbx
+  movq  $1024, -8(%rbx)
+  movq  %rax, (%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -158,8 +158,8 @@ let assign r v = r := v
 [%%expect_asm X86_64{|
 assign:
   subq  $8, %rsp
-  movq  %rax, %rdi
   movq  %rbx, %rsi
+  movq  %rax, %rdi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp

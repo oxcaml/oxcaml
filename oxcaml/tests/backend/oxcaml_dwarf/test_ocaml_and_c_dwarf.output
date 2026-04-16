@@ -16,7 +16,7 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_blit_bytes(s1=<PTR> : value, ofs1=#1L : value, s2=<PTR> : value, ofs2=#1L : value, n=#21L : value)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_blit_bytes(s1=<PTR> : value, ofs1=#1L : value, s2=<PTR> : value, ofs2=#1L : value, n=#21L : value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_bytes_blit [inlined] Stdlib.Bytes.blit
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_bytes_blit(src=<unavailable>, dst=<unavailable>, len=<unavailable>)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_bytes_blit(src=<unavailable>, dst="yyyyyyyyyyyyyyyyyyyy" : bytes @ value, len=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlTest_ocaml_and_c_dwarf__entry
 === Testing OCaml/C boundary - GC minor ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_gc_minor(v=#1L : value)
