@@ -686,21 +686,15 @@ module Sort = struct
   (* Generalize sort variables when in sort generalization context.
      This is called from Ctype.generalize when processing let poly_ bindings.
      For each free sort variable, the level is set to Ident.highest_scope,
-     making it a generic sort variable (genvar), and the var is accumulated.
-     The level is also used to mark the variable as visited, avoiding infinite
-     loops when traversing sort variable graphs. *)
+     making it a generic sort variable (genvar), and the var is accumulated. *)
   let rec generalize_rec ~current_level ~vars_ref sort =
     match sort with
     | Var v ->
+      assert (Option.is_none v.contents);
       if v.level > current_level && v.level <> Ident.highest_scope
       then begin
-        (* If [v.contents] is [Some _], [v.level] is meaningless and only serves as a *)
         v.level <- Ident.highest_scope;
-        match v.contents with
-        | Some s -> generalize_rec ~current_level ~vars_ref s
-        | None ->
-          (* The var is now a genvar; accumulate it *)
-          vars_ref := v :: !vars_ref
+        vars_ref := v :: !vars_ref
       end
     | Product sorts -> List.iter (generalize_rec ~current_level ~vars_ref) sorts
     | Base _ | Univar _ -> ()
@@ -708,7 +702,7 @@ module Sort = struct
   let generalize ~current_level sort =
     match !in_sort_generalization_context with
     | None -> () (* Not in generalization context *)
-    | Some vars_ref -> generalize_rec ~current_level ~vars_ref sort
+    | Some vars_ref -> generalize_rec ~current_level ~vars_ref (get sort)
 
   (* Wrapper to run a function in sort generalization context. Returns the
      result of [f] and the vars generalized during [f]. *)
