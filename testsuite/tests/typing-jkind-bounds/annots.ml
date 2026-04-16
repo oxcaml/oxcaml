@@ -590,9 +590,9 @@ Line 1, characters 31-41:
                                    ^^^^^^^^^^
 Error: This definition has type "'b -> 'b" which is less general than
          "('a : any). 'a -> 'a"
-       The layout of 'a is any
+       The layout of 'c is any
          because of the annotation on the universal variable 'a.
-       But the layout of 'a must be representable
+       But the layout of 'c must be representable
          because we must know concretely how to pass a function argument.
 |}]
 (* CR layouts v2.9: This error message is not great. Check later if layout history
@@ -712,9 +712,9 @@ Line 2, characters 18-55:
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This field value has type "'b -> 'b" which is less general than
          "'a. 'a -> 'a"
-       The kind of 'a is value
+       The kind of 'c is value
          because of the definition of r_value at line 1, characters 0-39.
-       But the kind of 'a must be a subkind of immediate
+       But the kind of 'c must be a subkind of immediate
          because of the annotation on the abstract type declaration for a.
 |}]
 (* CR layouts v1.5: that's a pretty awful error message *)
@@ -726,9 +726,9 @@ Line 1, characters 18-62:
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This field value has type "'b -> 'b" which is less general than
          "'a. 'a -> 'a"
-       The kind of 'a is value
+       The kind of 'c is value
          because of the definition of r_value at line 1, characters 0-39.
-       But the kind of 'a must be a subkind of value mod global
+       But the kind of 'c must be a subkind of value mod global
          because of the annotation on the abstract type declaration for a.
 |}]
 (* CR layouts v1.5: that's a pretty awful error message *)
@@ -1676,9 +1676,9 @@ Line 1, characters 37-53:
                                          ^^^^^^^^^^^^^^^^
 Error: This definition has type "'b -> 'b" which is less general than
          "'a. 'a -> 'a"
-       The kind of 'a is value
+       The kind of 'c is value
          because of the annotation on the universal variable 'a.
-       But the kind of 'a must be a subkind of immediate
+       But the kind of 'c must be a subkind of immediate
          because of the definition of f_imm at line 1, characters 4-9.
 |}]
 
