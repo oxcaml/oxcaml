@@ -37,9 +37,9 @@ Line 1, characters 32-34:
                                     ^^
 Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "('a0 : void)"
-       The layout of 'a is void
+       The layout of 'a0 is void
          because of the definition of t at line 10, characters 2-20.
-       But the layout of 'a must overlap with value
+       But the layout of 'a0 must overlap with value
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;

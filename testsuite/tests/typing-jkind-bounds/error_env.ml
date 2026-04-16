@@ -16,7 +16,7 @@ Error: This expression has type "'a * 'b"
        but an expression was expected of type "('c : value mod portable)"
        The kind of 'a * 'b is immutable_data with 'a with 'b
          because it's a tuple type.
-       But the kind of 'a * 'b must be a subkind of value mod portable
+       But the kind of 'b * 'a must be a subkind of value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
 |}]
 
@@ -30,7 +30,7 @@ Error: This expression has type "'a * 'b * 'c * 'd * 'e"
        The kind of 'a * 'b * 'c * 'd * 'e is
            immutable_data with 'a with 'b with 'c with 'd with 'e
          because it's a tuple type.
-       But the kind of 'a * 'b * 'c * 'd * 'e must be a subkind of
+       But the kind of 'e * 'd * 'c * 'b * 'a must be a subkind of
            value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
 |}]
@@ -44,7 +44,7 @@ Error: This expression has type "'a * 'b"
        but an expression was expected of type "('c : value mod portable)"
        The kind of 'a * 'b is immutable_data with 'a with 'b
          because it's a tuple type.
-       But the kind of 'a * 'b must be a subkind of value mod portable
+       But the kind of 'b * 'a must be a subkind of value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
 |}]
 
@@ -59,7 +59,7 @@ Error: This expression has type "'a * 'b"
        but an expression was expected of type "('c : value mod portable)"
        The kind of 'a * 'b is immutable_data with 'a with 'b
          because it's a tuple type.
-       But the kind of 'a * 'b must be a subkind of value mod portable
+       But the kind of 'b * 'a must be a subkind of value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
 |}]
 
@@ -74,7 +74,7 @@ Error: This expression has type "'a * 'b"
        but an expression was expected of type "('c : value mod portable)"
        The kind of 'a * 'b is immutable_data with 'a with 'b
          because it's a tuple type.
-       But the kind of 'a * 'b must be a subkind of value mod portable
+       But the kind of 'b * 'a must be a subkind of value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
 |}]
 
@@ -87,7 +87,7 @@ Error: This expression has type "'a * 'b"
        but an expression was expected of type "('c : value mod portable)"
        The kind of 'a * 'b is immutable_data with 'a with 'b
          because it's a tuple type.
-       But the kind of 'a * 'b must be a subkind of value mod portable
+       But the kind of 'b * 'a must be a subkind of value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
 |}]
 

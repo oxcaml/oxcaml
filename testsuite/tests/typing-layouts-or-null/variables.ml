@@ -63,9 +63,9 @@ Error: Signature mismatch:
        is not included in
          val should_not_work : 'a -> unit
        The type "'a -> unit" is not compatible with the type "'b -> unit"
-       The kind of 'a is value_or_null
+       The kind of 'b is value_or_null
          because of the definition of should_not_work at line 6, characters 2-57.
-       But the kind of 'a must be a subkind of value
+       But the kind of 'b must be a subkind of value
          because of the definition of should_not_work at line 2, characters 2-34.
 |}]
 
@@ -164,9 +164,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is value_or_null
+       The kind of 'b is value_or_null
          because of the definition of f at line 2, characters 2-40.
-       But the kind of 'a must be a subkind of value
+       But the kind of 'b must be a subkind of value
          because of the definition of f at line 4, characters 8-28.
 |}]
 
@@ -191,9 +191,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is value_or_null
+       The kind of 'b is value_or_null
          because of the definition of f at line 2, characters 2-40.
-       But the kind of 'a must be a subkind of value
+       But the kind of 'b must be a subkind of value
          because of the definition of f at line 4, characters 6-7.
 |}]
 
@@ -219,9 +219,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is value_or_null
+       The kind of 'b is value_or_null
          because of the definition of f at line 2, characters 2-41.
-       But the kind of 'a must be a subkind of value
+       But the kind of 'b must be a subkind of value
          because of the definition of f at line 4, characters 6-7.
 |}]
 
@@ -247,9 +247,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is value_or_null
+       The kind of 'b is value_or_null
          because of the definition of f at line 2, characters 2-41.
-       But the kind of 'a must be a subkind of value
+       But the kind of 'b must be a subkind of value
          because of the definition of f at line 4, characters 6-7.
 |}]
 
@@ -276,9 +276,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is value_or_null
+       The kind of 'b is value_or_null
          because of the definition of f at line 2, characters 2-41.
-       But the kind of 'a must be a subkind of value
+       But the kind of 'b must be a subkind of value
          because of the definition of f at line 4, characters 6-7.
 |}]
 

@@ -574,10 +574,10 @@ Line 3, characters 17-21:
                      ^^^^
 Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "#('b * 'c)"
-       The layout of #('a * 'b) is
+       The layout of #('b * 'c) is
            '_representable_layout_7 & '_representable_layout_8
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('b * 'c) must be a sublayout of value
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -1704,10 +1704,10 @@ Line 2, characters 25-26:
                              ^
 Error: This expression has type "('a : value)"
        but an expression was expected of type "#('b * 'c)"
-       The layout of #('a * 'b) is
+       The layout of #('b * 'c) is
            '_representable_layout_15 & '_representable_layout_16
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('b * 'c) must be a sublayout of value
          because it's the type of a term-level argument to a class constructor.
 |}]
 

@@ -635,9 +635,9 @@ Line 2, characters 2-32:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This definition has type "'b -> unit" which is less general than
          "'a. 'a -> unit"
-       The kind of 'a is value
+       The kind of 'c is value
          because it is or unifies with an unannotated universal variable.
-       But the kind of 'a must be a subkind of immediate
+       But the kind of 'c must be a subkind of immediate
          because of the definition of t6_imm at line 1, characters 0-42.
 |}];;
 
@@ -651,9 +651,9 @@ Line 3, characters 4-34:
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This method has type "'b -> unit" which is less general than
          "'a. 'a -> unit"
-       The kind of 'a is value
+       The kind of 'c is value
          because it is or unifies with an unannotated universal variable.
-       But the kind of 'a must be a subkind of immediate
+       But the kind of 'c must be a subkind of immediate
          because of the definition of t6_imm at line 1, characters 0-42.
 |}];;
 
@@ -1003,9 +1003,9 @@ Line 4, characters 19-33:
                        ^^^^^^^^^^^^^^
 Error: This expression has type "('a : value)"
        but an expression was expected of type "'b t" = "('b : float64)"
-       The layout of 'a t is float64
+       The layout of 'b t is float64
          because of the definition of t at line 2, characters 2-28.
-       But the layout of 'a t must be a sublayout of value
+       But the layout of 'b t must be a sublayout of value
          because it's the type of an object field.
 |}];;
 
@@ -1966,9 +1966,9 @@ Error: Signature mismatch:
        is not included in
          val f : ('a : any). 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'a is any
+       The layout of 'b is any
          because of the definition of f at line 2, characters 2-30.
-       But the layout of 'a must be representable
+       But the layout of 'b must be representable
          because of the definition of f at line 4, characters 8-13.
 |}]
 
@@ -2022,9 +2022,9 @@ Error: Signature mismatch:
        is not included in
          val f : ('a : any). 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'a is any
+       The layout of 'b is any
          because of the definition of f at line 2, characters 2-30.
-       But the layout of 'a must be a sublayout of value
+       But the layout of 'b must be a sublayout of value
          because of the definition of f at line 6, characters 2-18.
 |}]
 
@@ -2044,9 +2044,9 @@ Error: Signature mismatch:
        is not included in
          val f : ('a : float64). 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'a is float64
+       The layout of 'b is float64
          because of the definition of f at line 10, characters 2-34.
-       But the layout of 'a must be a sublayout of value
+       But the layout of 'b must be a sublayout of value
          because of the definition of f at line 6, characters 2-18.
 |}]
 

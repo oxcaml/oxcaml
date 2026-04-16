@@ -187,9 +187,9 @@ Line 1, characters 40-45:
                                             ^^^^^
 Error: This expression has type "'b * 'c"
        but an expression was expected of type "('a : void)"
-       The layout of 'a * 'b is value
+       The layout of 'b * 'c is value
          because it's a tuple type.
-       But the layout of 'a * 'b must be a sublayout of void
+       But the layout of 'b * 'c must be a sublayout of void
          because of the annotation on the type variable 'a.
 |}];;
 
