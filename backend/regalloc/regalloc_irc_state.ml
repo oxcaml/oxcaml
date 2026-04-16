@@ -30,6 +30,14 @@ let instruction_set_of_instruction_work_list (iwl : InstructionWorkList.t) :
   InstructionWorkList.fold iwl ~init:Instruction.Set.empty ~f:(fun acc elem ->
       Instruction.Set.add elem acc)
 
+module PrioritizedWorkList = Priority_queue.Make (Int)
+
+let instruction_set_of_prioritized_work_list
+    (mwl : Instruction.t PrioritizedWorkList.t) : Instruction.Set.t =
+  PrioritizedWorkList.fold mwl ~init:Instruction.Set.empty
+    ~f:(fun acc { PrioritizedWorkList.priority = _; data = elem } ->
+      Instruction.Set.add elem acc)
+
 type t =
   { mutable initial : Reg.t Doubly_linked_list.t;
     simplify_work_list : RegWorkListSet.t;
@@ -42,7 +50,7 @@ type t =
     coalesced_moves : InstructionWorkList.t;
     constrained_moves : InstructionWorkList.t;
     frozen_moves : InstructionWorkList.t;
-    work_list_moves : InstructionWorkList.t;
+    work_list_moves : Instruction.t PrioritizedWorkList.t;
     active_moves : InstructionWorkList.t;
     graph : Regalloc_interf_graph.t;
     move_list : Instruction.Set.t Reg.Tbl.t;
@@ -55,6 +63,34 @@ type t =
     reg_alias : Reg.t option Reg.Tbl.t;
     instr_work_list : InstrWorkList.t InstructionId.Tbl.t
   }
+
+(* CR-someday xclerc for xclerc: the magic `8` value is the priority giving the
+   best results on the compiler distribution. *)
+let same_phi_class_prio = 8
+
+let priority_of_instruction : t -> Cfg.basic Cfg.instruction -> int =
+ fun state instr ->
+  match[@ocaml.warning "-fragile-match"] instr.desc with
+  | Cfg.Op Move ->
+    let src = instr.arg.(0) in
+    let dst = instr.res.(0) in
+    let affinity reg =
+      match
+        Regalloc_affinity.next (Regalloc_affinity.get state.affinity reg)
+      with
+      | Some value -> value.priority
+      | None -> 0
+    in
+    begin match src.loc, dst.loc with
+    | Unknown, Reg _ -> affinity src
+    | Reg _, Unknown -> affinity dst
+    | Unknown, Unknown ->
+      if Regalloc_affinity.same_phi_class state.affinity src dst
+      then same_phi_class_prio
+      else 0
+    | _ -> 0
+    end
+  | _ -> 0
 
 let[@inline] make ~initial ~stack_slots ~affinity () =
   let num_registers = List.length (Reg.all_relocatable_regs ()) in
@@ -93,7 +129,9 @@ let[@inline] make ~initial ~stack_slots ~affinity () =
   let coalesced_moves = InstructionWorkList.make ~original_capacity in
   let constrained_moves = InstructionWorkList.make ~original_capacity in
   let frozen_moves = InstructionWorkList.make ~original_capacity in
-  let work_list_moves = InstructionWorkList.make ~original_capacity in
+  let work_list_moves =
+    PrioritizedWorkList.make ~initial_capacity:original_capacity
+  in
   let active_moves = InstructionWorkList.make ~original_capacity in
   let move_list = Reg.Tbl.create 128 in
   let inst_temporaries = Reg.Set.empty in
@@ -183,7 +221,7 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   InstructionWorkList.clear state.coalesced_moves;
   InstructionWorkList.clear state.constrained_moves;
   InstructionWorkList.clear state.frozen_moves;
-  InstructionWorkList.clear state.work_list_moves;
+  PrioritizedWorkList.clear state.work_list_moves;
   InstructionWorkList.clear state.active_moves;
   Reg.Tbl.clear state.move_list;
   InstructionId.Tbl.clear state.instr_work_list
@@ -337,16 +375,20 @@ let[@inline] add_frozen_moves state (instr : Instruction.t) =
   InstructionWorkList.add state.frozen_moves instr
 
 let[@inline] is_empty_work_list_moves state =
-  InstructionWorkList.is_empty state.work_list_moves
+  PrioritizedWorkList.is_empty state.work_list_moves
 
 let[@inline] add_work_list_moves state (instr : Instruction.t) =
   set_instr_work_list state ~instruction_id:instr.id ~work_list:Work_list;
-  InstructionWorkList.add state.work_list_moves instr
+  let priority = priority_of_instruction state instr in
+  PrioritizedWorkList.add state.work_list_moves ~priority ~data:instr
 
 let[@inline] choose_and_remove_work_list_moves state =
-  match InstructionWorkList.choose_and_remove state.work_list_moves with
-  | None -> fatal "work_list_moves is empty"
-  | Some res ->
+  match PrioritizedWorkList.is_empty state.work_list_moves with
+  | true -> fatal "work_list_moves is empty"
+  | false ->
+    let { PrioritizedWorkList.priority = _; data = res } =
+      PrioritizedWorkList.get_and_remove state.work_list_moves
+    in
     set_instr_work_list state ~instruction_id:(res : Instruction.t).id
       ~work_list:Unknown_list;
     res
@@ -438,7 +480,8 @@ let[@inline] enable_moves_one state reg =
       | Active ->
         set_instr_work_list state ~instruction_id:m.id ~work_list:Work_list;
         InstructionWorkList.remove state.active_moves m;
-        InstructionWorkList.add state.work_list_moves m
+        let priority = priority_of_instruction state m in
+        PrioritizedWorkList.add state.work_list_moves ~priority ~data:m
       | Unknown_list | Coalesced | Constrained | Frozen | Work_list -> ())
 
 let[@inline] decr_degree state reg =
@@ -637,7 +680,7 @@ let[@inline] invariant state =
         ( "frozen_moves",
           instruction_set_of_instruction_work_list state.frozen_moves );
         ( "work_list_moves",
-          instruction_set_of_instruction_work_list state.work_list_moves );
+          instruction_set_of_prioritized_work_list state.work_list_moves );
         ( "active_moves",
           instruction_set_of_instruction_work_list state.active_moves ) ];
     List.iter
@@ -652,7 +695,7 @@ let[@inline] invariant state =
           instruction_set_of_instruction_work_list state.frozen_moves,
           InstrWorkList.Frozen );
         ( "work_list_moves",
-          instruction_set_of_instruction_work_list state.work_list_moves,
+          instruction_set_of_prioritized_work_list state.work_list_moves,
           InstrWorkList.Work_list );
         ( "active_moves",
           instruction_set_of_instruction_work_list state.active_moves,

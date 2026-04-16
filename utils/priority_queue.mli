@@ -34,7 +34,11 @@ module type Priority_queue = sig
 
   val get_and_remove : 'a t -> 'a element
 
+  val clear : 'a t -> unit
+
   val iter : 'a t -> f:('a element -> unit) -> unit
+
+  val fold : 'a t -> f:('acc -> 'a element -> 'acc) -> init:'acc -> 'acc
 end
 
 module Make (Priority : Order) : Priority_queue with type priority = Priority.t

@@ -16,6 +16,10 @@ type t
     number of times it moves from/to a given physical register. *)
 val compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t
 
+(** Returns [true] iff the two passed temporaries are in the same "phi" class,
+    i.e. are linked by phi moves. *)
+val same_phi_class : t -> Reg.t -> Reg.t -> bool
+
 type affinities
 
 (** Returns the affinities for the passed temporary in descending order (i.e.
