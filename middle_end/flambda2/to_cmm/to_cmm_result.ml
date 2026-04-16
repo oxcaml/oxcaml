@@ -79,7 +79,7 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
        (When using [Simplify], all inlined bodies are traversed and any
        referenced .cmx files will have been loaded.) *)
     if Flambda_features.classic_mode () && currently_in_inlined_body
-    then Compilenv.get_unit_export_info (Code_id.get_compilation_unit code_id)
+    then Compilenv_flambda.get_unit_export_info (Code_id.get_compilation_unit code_id)
     else None
   in
   let sym_global =

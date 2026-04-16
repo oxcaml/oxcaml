@@ -17,7 +17,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Compilation environments for compilation units *)
+(** Compilation environments for compilation units.
+
+    Export info fields use [Obj.t option] as an opaque representation;
+    the middle-end module [Compilenv_flambda] provides typed access
+    via [Flambda2_cmx.Flambda_cmx_format.t]. *)
 
 open Cmx_format
 
@@ -27,26 +31,15 @@ val reset : Unit_info.t -> unit
 
 val reset_info_tables: unit -> unit
 
-val current_unit_infos: unit -> unit unit_infos_gen
+val current_unit_infos: unit -> (unit, Obj.t option) unit_infos_gen
         (* Return the infos for the unit being compiled *)
 
-val get_global_export_info : Compilation_unit.t
-  -> Flambda2_cmx.Flambda_cmx_format.t option
-        (* Means of getting the export info found in the
-           .cmx file of the given unit. *)
-
-val get_unit_export_info
-  : Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option
-
-val set_export_info : Flambda2_cmx.Flambda_cmx_format.t -> unit
-        (* Set the export information for the current unit. *)
-
 val need_curry_fun:
-  Lambda.function_kind -> Cmm.machtype list -> Cmm.machtype -> unit
+  Lambda.function_kind -> machtype list -> machtype -> unit
 val need_apply_fun:
-  Cmm.machtype list -> Cmm.machtype -> Cmx_format.alloc_mode -> unit
+  machtype list -> machtype -> alloc_mode -> unit
 val need_send_fun:
-  Cmm.machtype list -> Cmm.machtype -> Cmx_format.alloc_mode -> unit
+  machtype list -> machtype -> alloc_mode -> unit
         (* Record the need of a currying (resp. application,
            message sending) function with the given arity *)
 
@@ -59,19 +52,39 @@ val cache_zero_alloc_info : Zero_alloc_info.t -> unit
 
 val new_const_symbol : unit -> string
 
-val read_unit_info: string -> unit_infos * Digest.t
-        (* Read infos and MD5 from a [.cmx] file. *)
-val write_unit_info: unit_infos -> string -> unit
+val read_unit_info:
+  string ->
+  (Lambda.main_module_block_format, Obj.t option) unit_infos_gen
+  * File_sections.t * Digest.t
+        (* Read infos and MD5 from a [.cmx] file.
+           Export info is returned as an opaque [Obj.t option] along
+           with the [File_sections.t] needed to interpret it. *)
+
+val write_unit_info:
+  (Lambda.main_module_block_format, Obj.t option) unit_infos_gen ->
+  export_info_sections:File_sections.t ->
+  string -> unit
         (* Save the given infos in the given file *)
+
 val save_unit_info:
   string -> main_module_block_format:Lambda.main_module_block_format ->
   arg_descr:Lambda.arg_descr option ->
   unit
         (* Save the infos for the current unit in the given file *)
-val cache_unit_info: unit_infos -> unit
+
+val cache_unit_info:
+  (Lambda.main_module_block_format, Obj.t option) unit_infos_gen -> unit
         (* Enter the given infos in the cache.  The infos will be
            honored by [symbol_for_global] and [global_approx]
            without looking at the corresponding .cmx file. *)
+
+val ensure_unit_loaded : Compilation_unit.t -> unit
+        (* Load the .cmx file for the given compilation unit if not
+           already cached, and record the import dependency. *)
+
+val get_cached_export_info : Compilation_unit.t -> Obj.t option
+        (* Return the cached export info for a loaded compilation unit,
+           or [None] if the unit is not cached or has no export info. *)
 
 val require_global: Compilation_unit.t -> unit
         (* Enforce a link dependency of the current compilation
