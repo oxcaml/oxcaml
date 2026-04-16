@@ -64,13 +64,16 @@ val unwrap_loc : 'a Fexpr.located -> 'a
     The complexity comes from the description of the parameters of the primitive
     variant itself, which can be arbitrary caml values.
 
-    As {!type:param} shows, there is three kinds of primitive parameter:
-    - Positional, written [.(value)]
-    - Flag, written [.flag]
-    - Labeled, written [.label(value)]
+    As {!type:param} shows, there is two kinds of primitive parameter:
+    - Tuples, written [.[val1, ..., valN]]
+    - Labeled, written [.label[val1, ..., valN]]. They can be without arguments
+      [.label] to denote flags.
 
-    Flags and labeled can appear in any order, at any positions. Positional and
-    labeled are provided with {!type:value_lens} to convert their payload.
+    Flags and labeled can appear in any order, at any positions. Both of them
+    can be nested, the dot separator is only for toplevel parameters.
+
+    The type {!type:value_lens} is used to describe conversions of custom types.
+    Label, flags and inner values are all treated the same.
 
     The constructors provide composable {!type:param_cons} values. They allow
     the construction of more complex types, such as tuples, list, options or
@@ -112,11 +115,14 @@ module Describe : sig
       cases. *)
   val todop : string -> 'p param_cons
 
+  (** Constructor from simple lens *)
+  val value : 'a value_lens -> 'a param_cons
+
   (** Syntactic positional parameter *)
-  val positional : 'a value_lens -> 'a param_cons
+  val positional : 'a param_cons -> 'a param_cons
 
   (** Syntactic labeled parameter *)
-  val labeled : string -> 'a value_lens -> 'a param_cons
+  val labeled : string -> 'a param_cons -> 'a param_cons
 
   (** Syntactic flag parameter. Flags have no values and the only information
       they carry is their presence. {!val:flag} has little reason to appear by
@@ -198,21 +204,17 @@ module Describe : sig
       Can be extended here. Or defined elsewhere for specific values. *)
 
   (** Raw value *)
-  val string : string Fexpr.located value_lens
+  val string : string Fexpr.located param_cons
 
   (** Parsed as integer. Fails if the string is not one. *)
-  val int : int value_lens
+  val int : int param_cons
 
   (** Parsed as boolean. Fails if the string is not one. *)
-  val bool : bool value_lens
+  val bool : bool param_cons
 
   (** Same as {!val:string}. With some tweaks to the parser, we could call
       actual parsing start-points in it. *)
-  val diy : string Fexpr.located value_lens
-
-  (** Similar to {!val:constructor_flag} but for payload. Exhaustivity not
-      enforced. *)
-  val constructor_value : (string * 'p) list -> 'p value_lens
+  val diy : string Fexpr.located param_cons
 end
 
 (** Fetch primitive conversion function from registered descriptions *)

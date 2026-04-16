@@ -368,16 +368,18 @@ let static_data ppf : static_data -> unit = function
 let static_data_binding ppf { symbol = s; defining_expr = sp } =
   Format.fprintf ppf "%a =@ %a" symbol s static_data sp
 
-let prim_param ppf = function
-  | Flag f -> Format.fprintf ppf ".%a" ident f
-  | Positional p -> Format.fprintf ppf ".[`%s`]" p.txt
-  | Labeled { label; value } ->
-    Format.fprintf ppf ".%a[`%s`]" ident label value.txt
+let rec prim_param ppf = function
+  | Labeled (f, []) -> Format.fprintf ppf "%a" ident f.txt
+  | Labeled (label, ps) ->
+    Format.fprintf ppf "%a[%a]" ident label.txt prim_sub_params ps
+  | Anonymous ps -> Format.fprintf ppf "[%a]" prim_sub_params ps
+
+and prim_sub_params ppf params = pp_comma_list prim_param ppf params
 
 let prim_params ppf params =
-  Format.fprintf ppf "%a"
-    (Format.pp_print_list ~pp_sep:(fun _ () -> ()) prim_param)
-    params
+  pp_list
+    (fun ppf -> Format.fprintf ppf ".%a" prim_param)
+    ~sep:empty_fmt ppf params
 
 let prim_op ppf ({ prim; params } : prim_op) =
   Format.fprintf ppf "@[<2>%s%a@]" prim prim_params params
