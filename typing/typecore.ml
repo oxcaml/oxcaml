@@ -560,7 +560,11 @@ let mode_morph f expected_mode =
 (** Relax an [expected_mode] wrt a crossing. *)
 let mode_crossing crossing expected_mode =
   let mode = Crossing.apply_right crossing expected_mode.mode in
-  let tuple_modes = Option.map (List.map (fun (m, loc) -> (Crossing.apply_right crossing m, loc))) expected_mode.tuple_modes in
+  let tuple_modes =
+    Option.map
+      (List.map (fun (m, loc) -> (Crossing.apply_right crossing m, loc)))
+      expected_mode.tuple_modes
+  in
   { expected_mode with mode; tuple_modes }
 
 (** Similiar to [apply_is_contained_by] but for [expected_mode]. *)
