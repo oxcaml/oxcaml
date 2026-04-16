@@ -144,7 +144,7 @@ module type LamF =
     type exp = exp0
     val eval : (string * exp) list -> exp -> exp
   end
-module rec LamF : LamF/2
+module rec LamF : LamF
 val e1 : LamF.exp = `Var "y"
 |}]
 
@@ -233,7 +233,7 @@ module type ExprF =
     type exp = exp0
     val eval : (string * exp) list -> exp -> exp
   end
-module rec ExprF : ExprF/2
+module rec ExprF : ExprF
 val e2 : ExprF.exp = `Add (`Num 6, `Var "x")
 |}]
 
@@ -330,6 +330,6 @@ module type LExprF =
     type exp = exp0
     val eval : (string * exp) list -> exp -> exp
   end
-module rec LExprF : LExprF/2
+module rec LExprF : LExprF
 val e3 : LExprF.exp = `Num 9
 |}]

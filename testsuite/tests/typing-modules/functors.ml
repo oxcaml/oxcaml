@@ -565,10 +565,10 @@ Error: This application of the functor "F" is ill-typed.
        do not match these parameters:
          (X : x) (B : b/2) (Y : y) -> ...
        1. Module $S1 matches the expected module type x
-       2. Modules do not match: P.B : b is not included in b/2
+       2. Modules do not match: P.B : b/1 is not included in b/2
        3. Modules do not match: $S3 : sig type w end is not included in y
 Line 5, characters 2-15:
-  Definition of module type "b"
+  Definition of module type "b/1"
 Line 2, characters 0-13:
   Definition of module type "b/2"
 |}]
@@ -588,7 +588,7 @@ Line 6, characters 13-17:
                  ^^^^
 Error: Modules do not match: a is not included in a/2
 Line 3, characters 2-15:
-  Definition of module type "a"
+  Definition of module type "a/1"
 Line 1, characters 0-13:
   Definition of module type "a/2"
 |}]
@@ -619,13 +619,13 @@ Error: Signature mismatch:
          sig module F : functor (X : a) (Y : a) -> sig end end
        In module "F":
        Modules do not match:
-         (X : aa) (Y : a) -> ...
+         (X : aa) (Y : a/1) -> ...
        is not included in
          (X : a/2) (Y : a/2) -> ...
        1. Module types aa and a/2 match
-       2. Module types do not match: a does not include a/2
+       2. Module types do not match: a/1 does not include a/2
 Line 4, characters 2-15:
-  Definition of module type "a"
+  Definition of module type "a/1"
 Line 1, characters 0-13:
   Definition of module type "a/2"
 |}]
@@ -1565,9 +1565,9 @@ Error: Signature mismatch:
             sig end
           The type "wrong" is required but not provided
        2. Module types $S2 and $T2 match
-       3. Module types X.T and X.T match
-       4. Module types X.T and X.T match
-       5. An extra argument is provided of module type X.T
+       3. Module types X/2.T and X/2.T match
+       4. Module types X/2.T and X/2.T match
+       5. An extra argument is provided of module type X/2.T
 |}]
 
 
@@ -1599,7 +1599,7 @@ Error: This application of the functor "F" is ill-typed.
        2. Modules do not match:
             $S2 : sig type t = int end
           is not included in
-            $T2 = sig type t = Y of X.t end
+            $T2 = sig type t = Y of X/2.t end
           Type declarations do not match:
             type t = int
           is not included in
@@ -1608,7 +1608,7 @@ Error: This application of the functor "F" is ill-typed.
        3. Modules do not match:
             Y : sig type t = Y.t = Y of int end
           is not included in
-            $T3 = sig type t = Z of X.t end
+            $T3 = sig type t = Z of X/2.t end
           Type declarations do not match:
             type t = Y/2.t = Y of int
           is not included in
@@ -2273,7 +2273,7 @@ Error: Signature mismatch:
        Module types do not match:
          $S1 = sig val f : t val g : Inner.t val h : int end
        does not include
-         $T1 = sig val f : t val g : Inner.t val h : float end
+         $T1 = sig val f : t/2 val g : Inner/2.t val h : float end
        Values do not match: val h : float is not included in val h : int
        The type "float" is not compatible with the type "int"
 |}]

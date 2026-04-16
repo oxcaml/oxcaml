@@ -166,7 +166,7 @@ end
 Line 4, characters 2-11:
 4 |   include S
       ^^^^^^^^^
-Error: Illegal shadowing of included module type "T/2" by "T".
+Error: Illegal shadowing of included module type "T/2" by "T/1".
 Line 2, characters 2-11:
 2 |   include S
       ^^^^^^^^^
