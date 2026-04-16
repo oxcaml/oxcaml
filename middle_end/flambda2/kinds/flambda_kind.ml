@@ -336,19 +336,24 @@ module Mixed_block_shape = struct
       Misc.Stdlib.Array.compare Flat_suffix_element0.compare flat_suffix1
         flat_suffix2
 
-  let from_mixed_block_shape (shape : _ Mixed_block_lambda_shape.t) : t =
-    let value_prefix_kinds =
-      Array.map (fun _ -> value) (Mixed_block_shape.value_prefix shape)
-    in
-    let flat_suffix =
-      Array.map Flat_suffix_element0.from_singleton_mixed_block_element
-        (Mixed_block_shape.flat_suffix shape)
-    in
-    let flat_suffix_kinds = Array.map Flat_suffix_element0.kind flat_suffix in
-    { flat_suffix;
-      value_prefix_size = Array.length value_prefix_kinds;
-      field_kinds = Array.concat [value_prefix_kinds; flat_suffix_kinds]
-    }
+  let from_mixed_block_shape (shape : _ Mixed_block_lambda_shape.t) : t option =
+    let lambda_flat_suffix = Mixed_block_shape.flat_suffix shape in
+    if Array.length lambda_flat_suffix = 0
+    then None
+    else
+      let value_prefix_kinds =
+        Array.map (fun _ -> value) (Mixed_block_shape.value_prefix shape)
+      in
+      let flat_suffix =
+        Array.map Flat_suffix_element0.from_singleton_mixed_block_element
+          lambda_flat_suffix
+      in
+      let flat_suffix_kinds = Array.map Flat_suffix_element0.kind flat_suffix in
+      Some
+        { flat_suffix;
+          value_prefix_size = Array.length value_prefix_kinds;
+          field_kinds = Array.concat [value_prefix_kinds; flat_suffix_kinds]
+        }
 end
 
 module Scannable_block_shape = struct
@@ -1015,9 +1020,6 @@ module With_subkind = struct
                         List.map (from_lambda_value_kind ~machine_width) fields
                       )
                     | Constructor_mixed mixed_block_shape ->
-                      let is_uniform =
-                        Mixed_product_bytes.shape_is_all_value mixed_block_shape
-                      in
                       let mixed_block_shape =
                         Mixed_block_lambda_shape.of_mixed_block_elements
                           ~print_locality:(fun ppf () ->
@@ -1052,14 +1054,15 @@ module With_subkind = struct
                           (Array.map from_mixed_block_element
                              flattened_reordered_shape)
                       in
-                      if is_uniform
-                      then Scannable Value_only, fields
-                      else
-                        let mixed_block_shape =
+                      let block_shape : Block_shape.t =
+                        match
                           Mixed_block_shape.from_mixed_block_shape
                             mixed_block_shape
-                        in
-                        Scannable (Mixed_record mixed_block_shape), fields
+                        with
+                        | None -> Scannable Value_only
+                        | Some s -> Scannable (Mixed_record s)
+                      in
+                      block_shape, fields
                   in
                   Tag.Scannable.Map.add tag shape_and_fields non_consts
                 | None ->
