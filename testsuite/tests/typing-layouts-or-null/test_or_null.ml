@@ -483,6 +483,6 @@ Error: This expression has type "('a, 'a or_null) gadt"
        The kind of ('a, 'a or_null) gadt is
            value_or_null mod everything with 'a
          because it is the primitive type or_null.
-       But the kind of ('b, 'b or_null) gadt must be a subkind of value
+       But the kind of ('a, 'a or_null) gadt must be a subkind of value
          because of the definition of t at line 1, characters 0-69.
 |}]

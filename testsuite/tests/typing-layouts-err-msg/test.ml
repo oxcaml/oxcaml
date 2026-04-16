@@ -193,9 +193,9 @@ Line 5, characters 20-44:
                         ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "'a t_vv" = "('a : void)"
        but an expression was expected of type "'b t_v" = "('b : value)"
-       The layout of 'b is value
+       The layout of 'a is value
          because of the definition of f2 at line 4, characters 9-10.
-       But the layout of 'b must overlap with void
+       But the layout of 'a must overlap with void
          because of the definition of t_vv at line 2, characters 0-26.
 |}]
 
@@ -216,9 +216,9 @@ Line 6, characters 19-43:
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "'a t_v2" = "('a : void)"
        but an expression was expected of type "'b t_v" = "('b : value)"
-       The layout of 'b is value
+       The layout of 'a is value
          because of the definition of f at line 4, characters 6-19.
-       But the layout of 'b must overlap with void
+       But the layout of 'a must overlap with void
          because of the definition of t_v2 at line 3, characters 0-22.
 |}]
 

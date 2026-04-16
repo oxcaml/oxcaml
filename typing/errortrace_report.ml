@@ -378,16 +378,18 @@ let explanation (type variety) intro prev env
         *)
     end
   | Errortrace.Bad_jkind (t,e) ->
-    add_type_to_preparation t;
     Some (doc_printf "@ @[<hov>%a@]"
             (Jkind.Violation.report_with_offender
-               ~offender:(fun ppf -> prepared_type_expr ppf t)
+               ~offender:(fun ppf ->
+                   prepare_for_printing [t];
+                   prepared_type_expr ppf t)
                ~level:(Ctype.get_current_level ())) e)
   | Errortrace.Bad_jkind_sort (t,e) ->
-    add_type_to_preparation t;
     Some (doc_printf "@ @[<hov>%a@]"
             (Jkind.Violation.report_with_offender_sort
-               ~offender:(fun ppf -> prepared_type_expr ppf t)
+               ~offender:(fun ppf ->
+                   prepare_for_printing [t];
+                   prepared_type_expr ppf t)
                ~level:(Ctype.get_current_level ())) e)
   | Errortrace.Unequal_var_jkinds (t1,k1,t2,k2) ->
     let fmt_history t k ppf =

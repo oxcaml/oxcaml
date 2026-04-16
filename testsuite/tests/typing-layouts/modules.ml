@@ -62,9 +62,9 @@ Line 1, characters 34-36:
                                       ^^
 Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "('a0 : float64)"
-       The layout of 'a0 is float64
+       The layout of 'a is float64
          because of the definition of t at line 2, characters 2-23.
-       But the layout of 'a0 must overlap with value
+       But the layout of 'a must overlap with value
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;

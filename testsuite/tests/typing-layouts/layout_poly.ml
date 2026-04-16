@@ -131,9 +131,9 @@ Error: Signature mismatch:
        is not included in
          external id : ('a : any). 'a s -> 'a s = "%identity"
        The type "'a s -> 'a s" is not compatible with the type "'b s -> 'b s"
-       The layout of 'b is any
+       The layout of 'a is any
          because of the definition of id at line 3, characters 2-54.
-       But the layout of 'b must be representable
+       But the layout of 'a must be representable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -333,9 +333,9 @@ Error: Signature mismatch:
        is not included in
          val id : ('a : any). 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'b is any
+       The layout of 'a is any
          because of the definition of id at line 2, characters 2-31.
-       But the layout of 'b must be representable
+       But the layout of 'a must be representable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
