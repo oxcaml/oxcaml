@@ -288,6 +288,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       match K.Mixed_block_shape.from_mixed_block_shape shape with
       | Some kind_shape -> Mixed_record kind_shape
       | None ->
+        (* See Note [Constant all-value mixed records] in translcore.ml *)
         Misc.fatal_error
           "Const_mixed_block: from_mixed_block_shape returned None"
     in
