@@ -4923,7 +4923,7 @@ let report_lookup_error_doc loc env = function
                boxed field must come from a record that didn't get an unboxed
                version. *)
             [ Location.msg
-                "Note that float- and [@@unboxed]- records don't get \
+                "Note that float- and [@@@@unboxed]- records don't get \
                   unboxed versions." ]
           | Legacy, Projection ->
             let print_projection ppf (op, lid) =
@@ -5098,7 +5098,7 @@ let report_lookup_error_doc loc env = function
         match decl.type_kind with
         | Type_record (_, Record_unboxed, _) ->
           [Location.msg
-             "@{<hint>Hint@}: [@@unboxed] records don't get unboxed \
+             "@{<hint>Hint@}: [@@@@unboxed] records don't get unboxed \
               versions."]
         | Type_record (_, (Record_float | Record_ufloat |
                            Record_mixed _), _) ->
@@ -5166,18 +5166,18 @@ let report_error_doc = function
   | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t err
   | Implicit_jkind_already_defined { name; defined_at; loc } ->
       Location.errorf ~loc
-        "<hov>The implicit kind for %a is already defined at %a."
+        "@[<hov>The implicit kind for %a is already defined at %a.@]"
         Style.inline_code name
         (Location.Doc.loc ~capitalize_first:false) defined_at
   | Incomplete_instantiation { unset_param } ->
       Location.errorf ~loc:Location.none
-        "<hov>Not enough instance arguments: the parameter@ %a@ is required."
+        "@[<hov>Not enough instance arguments: the parameter@ %a@ is required.@]"
         Global_module.Parameter_name.print unset_param
   | Toplevel_splice loc ->
       Location.errorf ~loc
-        "<hov>Splices ($) are not allowed in the initial stage,@ \
+        "@[<hov>Splices ($) are not allowed in the initial stage,@ \
          as encountered at %a.@,\
-         Did you forget to insert a quotation?"
+         Did you forget to insert a quotation?@]"
         (Location.Doc.loc ~capitalize_first:false) loc
   | Unsupported_inside_quotation (loc, context) ->
       Location.errorf ~loc

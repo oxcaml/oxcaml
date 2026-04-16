@@ -1851,7 +1851,7 @@ let report_error_doc loc env = function
            ~offender:(fun ppf -> pp_type ppf typ)
            ~level:(get_current_level ())) err
   | Bad_jkind_annot(ty, violation) ->
-    Location.errorf ~loc "<b 2>Bad layout annotation:@ %a"
+    Location.errorf ~loc "@[<b 2>Bad layout annotation:@ %a@]"
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf -> pp_type ppf ty)
          ~level:(get_current_level ())) violation
