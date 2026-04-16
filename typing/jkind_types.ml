@@ -621,6 +621,10 @@ module Sort = struct
       | None ->
         (* If the caller didn't set up layout instantiation, conservatively
            return a rigid variable (which is not equal to anything) *)
+        (* CR-someday zqian: explicitly distinguish among three cases:
+        - instantiating layouts properly
+        - knowingly instantiating to rigidvar conservatively
+        - unknown context, in which case we should crash *)
         Var (new_rigidvar ())
       end
     | None -> Var v
