@@ -1846,11 +1846,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Some kind_shape -> kind_shape
         | None ->
           Misc.fatal_error
-            "Pmakeblock: mixed_block_of_block_shape returned Some \
-             but from_mixed_block_shape returned None"
+            "Pmakeblock: mixed_block_of_block_shape returned Some but \
+             from_mixed_block_shape returned None"
       in
-      [Variadic
-         (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
+      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
   | Pmake_unboxed_product layouts, _ ->
     (* CR mshinwell: this should check the unarized lengths of [layouts] and

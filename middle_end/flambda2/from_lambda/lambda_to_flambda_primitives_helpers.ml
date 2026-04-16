@@ -527,9 +527,8 @@ let block_access_kind_of_mixed_field_element
       Values { tag = Unknown; size = Unknown; field_kind }
     | Flat_suffix _ ->
       Misc.fatal_error
-        "block_access_kind_of_mixed_field_element: \
-         flat element in uniform shape")
+        "block_access_kind_of_mixed_field_element: flat element in uniform \
+         shape")
   | Some kind_shape ->
     let field_kind = mixed_block_access_field_kind elt in
-    Mixed
-      { tag = Unknown; field_kind; shape = kind_shape; size = Unknown }
+    Mixed { tag = Unknown; field_kind; shape = kind_shape; size = Unknown }
