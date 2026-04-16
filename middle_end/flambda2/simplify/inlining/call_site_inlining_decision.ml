@@ -241,20 +241,20 @@ let get_rec_info dacc ~function_type =
 let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =
   let must_inline = DE.must_inline (DA.denv dacc) in
-  let fail_if_must_inline () =
+  let fail_if_must_inline (decision : Call_site_inlining_decision_type.t) =
     if must_inline
     then
       Misc.fatal_errorf
-        "Deciding not to inline an [Apply], but the replay_history says we \
-         should inline.@ Replay history:@ %a"
-        Replay_history.print
+        "Deciding not to inline an [Apply] (decision: %a), but the \
+         replay_history says we should inline.@ Replay history:@ %a"
+        Call_site_inlining_decision_type.print decision Replay_history.print
         (DE.replay_history (DA.denv dacc))
   in
   let rec_info = get_rec_info dacc ~function_type in
   let inlined = Apply.inlined apply in
   match inlined with
   | Never_inlined ->
-    fail_if_must_inline ();
+    fail_if_must_inline Never_inlined_attribute;
     Never_inlined_attribute
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
     let code_or_metadata =
@@ -262,7 +262,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     in
     if not (Code_or_metadata.code_present code_or_metadata)
     then (
-      fail_if_must_inline ();
+      fail_if_must_inline Missing_code;
       Missing_code)
     else
       (* The unrolling process is rather subtle, but it boils down to two steps:
@@ -284,7 +284,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
       in
       match unrolling_depth with
       | Some 0 ->
-        fail_if_must_inline ();
+        fail_if_must_inline Unrolling_depth_exceeded;
         Unrolling_depth_exceeded
       | Some _ -> Continue_unrolling
       | None -> (
@@ -308,7 +308,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
         in
         if Inlining_state.is_depth_exceeded apply_inlining_state
         then (
-          fail_if_must_inline ();
+          fail_if_must_inline Max_inlining_depth_exceeded;
           Max_inlining_depth_exceeded)
         else
           let policy =
@@ -336,7 +336,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
               Simplify_rec_info_expr.depth_may_exceed dacc rec_info
                 max_rec_depth
             then (
-              fail_if_must_inline ();
+              fail_if_must_inline Recursion_depth_exceeded;
               Recursion_depth_exceeded)
             else if must_inline
             then Replay_history_says_must_inline
@@ -351,7 +351,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
                  handled. *)
               Begin_unrolling unroll_to
             else (
-              fail_if_must_inline ();
+              fail_if_must_inline Unrolling_depth_exceeded;
               Unrolling_depth_exceeded)
           | `Always -> Attribute_always))
 
