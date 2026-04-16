@@ -45,19 +45,20 @@ let load_cmx_file_contents loader comp_unit =
         <- Imported_unit_map.add cmx_file None loader.imported_units;
       None
     | Some cmx ->
-      let typing_env, all_code =
-        Flambda_cmx_format.import_typing_env_and_code cmx
-      in
-      let newly_imported_names = TE.Serializable.name_domain typing_env in
-      loader.imported_names
-        <- Name.Set.union newly_imported_names loader.imported_names;
-      loader.imported_code <- EC.merge all_code loader.imported_code;
-      let offsets = Flambda_cmx_format.exported_offsets cmx in
-      Exported_offsets.import_offsets offsets;
-      loader.imported_units
-        <- Imported_unit_map.add cmx_file (Some typing_env)
-             loader.imported_units;
-      Some typing_env)
+      Profile.record_call ~accumulate:true "load_cmx" (fun () ->
+          let typing_env, all_code =
+            Flambda_cmx_format.import_typing_env_and_code cmx
+          in
+          let newly_imported_names = TE.Serializable.name_domain typing_env in
+          loader.imported_names
+            <- Name.Set.union newly_imported_names loader.imported_names;
+          loader.imported_code <- EC.merge all_code loader.imported_code;
+          let offsets = Flambda_cmx_format.exported_offsets cmx in
+          Exported_offsets.import_offsets offsets;
+          loader.imported_units
+            <- Imported_unit_map.add cmx_file (Some typing_env)
+                 loader.imported_units;
+          Some typing_env))
 
 let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
     =
