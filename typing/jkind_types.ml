@@ -592,6 +592,8 @@ module Sort = struct
 
   let new_genvar () = new_var_unsafe ~level:level_generic
 
+  let new_rigidvar () = new_var_unsafe ~level:level_rigid
+
   let instance_map : (var * var) list ref = ref []
 
   let instance_with ~level vars f =
@@ -617,8 +619,13 @@ module Sort = struct
       begin match List.assq_opt v !instance_map with
       | Some v' -> Var v'
       | None ->
-        Misc.fatal_error
-          "generic layout variables found in non-layout instantiation"
+        (* If the caller didn't set up layout instantiation, conservatively
+           return a rigid variable (which is not equal to anything) *)
+        (* CR-someday zqian: explicitly distinguish among three cases:
+        - instantiating layouts properly
+        - knowingly instantiating to rigidvar conservatively
+        - unknown context, in which case we should crash *)
+        Var (new_rigidvar ())
       end
     | None -> Var v
     | Some t -> instance t
@@ -725,6 +732,10 @@ module Sort = struct
   and var_default_to_scannable_and_get r : Const.t =
     match r.contents with
     | None when is_genvar r -> Genvar r
+    | None when is_rigidvar r ->
+      Misc.fatal_error
+        "Jkind_types.var_default_to_scannable_and_get: cannot default rigid \
+         variables"
     | None ->
       set r Static.T_option.scannable;
       Static.Const.scannable
