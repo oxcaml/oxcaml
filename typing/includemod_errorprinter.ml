@@ -801,6 +801,7 @@ let core env id x =
         (Printtyp.tree_of_value_description id diff.expected)
         mode2
         (Includecore.report_value_mismatch
+           ~pp:(diff.got.val_loc, Structure_item (Value, id))
            "the first" "the second" env) diff.symptom
         show_locs (diff.got.val_loc, diff.expected.val_loc)
         Printtyp.Conflicts.print_explanations
@@ -856,7 +857,9 @@ let core env id x =
       Fmt.dprintf
         "@[<hv 2>Class declarations %s do not match:@ @]@ %a%t"
         (Ident.name id)
-        (Includecore.report_mode_sub_error "first is" "second is") e
+        (Includecore.report_mode_sub_error
+           ~pp:(Location.none, Structure_item (Class, id))
+           "first is" "second is") e
         Printtyp.Conflicts.print_explanations
   | Err.Jkind_declarations diff ->
       Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a%t@]"
