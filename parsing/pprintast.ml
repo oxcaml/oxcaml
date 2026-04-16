@@ -1567,10 +1567,11 @@ and signature_item ctxt f x : unit =
               (list ~sep:"@," (class_description "and")) xs
       end
   | Psig_module ({pmd_type={pmty_desc=Pmty_alias alias;
-                            pmty_attributes=[]; _}; _} as pmd) ->
-      pp f "@[<hov>module@ %s@ =@ %a%a@]%a"
+                            pmty_attributes; _}; _} as pmd) ->
+      pp f "@[<hov>module@ %s@ =@ %a%a%a@]%a"
         (Option.value pmd.pmd_name.txt ~default:"_")
         longident_loc alias
+        (attributes ctxt) pmty_attributes
         optional_space_atat_modalities pmd.pmd_modalities
         (item_attributes ctxt) pmd.pmd_attributes
   | Psig_module pmd ->
