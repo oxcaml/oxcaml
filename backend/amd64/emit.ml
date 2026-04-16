@@ -266,9 +266,13 @@ let pop r =
 
 (* Symbols *)
 
-(* Convert Cmm.is_global to Asm_symbol.visibility *)
+(* Convert Cmm.is_global to Asm_symbol.visibility. [Weak] is folded into
+   [Global] here: at reference sites [Weak] and [Global] are indistinguishable
+   to the linker, and [Asm_symbol.visibility] is used primarily as an
+   informational tag. The COMDAT / [.weak] emission for [Weak] definitions is
+   handled separately, not through this visibility. *)
 let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
-  | Cmm.Global -> S.Global
+  | Cmm.Global | Cmm.Weak -> S.Global
   | Cmm.Local -> S.Local
 
 let emit_symbol s = S.encode (S.create_global s)
@@ -319,7 +323,7 @@ let label_name lbl =
 let rel_plt (s : Cmm.symbol) =
   match (s.sym_global : Cmm.is_global) with
   | Local -> sym (label_name (emit_symbol s.sym_name))
-  | Global ->
+  | Global | Weak ->
     if windows && !Clflags.dlcode
     then mem__imp s.sym_name
     else
@@ -337,7 +341,7 @@ let emit_cmm_symbol (s : Cmm.symbol) =
     S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
   in
   match (s.sym_global : Cmm.is_global) with
-  | Global -> `Symbol sym
+  | Global | Weak -> `Symbol sym
   (* This label is special in that it is not of the form "Lnumber". Instead, we
      take the symbol, encode it, and turn the resulting string into a label. The
      label will still be prefixed by ".L"/"L" when emitting. *)
@@ -353,7 +357,7 @@ let emit_cmm_symbol_str (s : Cmm.symbol) =
 let load_symbol_addr (s : Cmm.symbol) arg =
   match (s.sym_global : Cmm.is_global) with
   | Local -> I.lea (mem64_rip NONE (label_name (emit_symbol s.sym_name))) arg
-  | Global ->
+  | Global | Weak ->
     if !Clflags.dlcode
     then
       if windows
@@ -1049,6 +1053,28 @@ let global_maybe_protected (sym : S.t) =
          want them to be preempted as we're doing a lot of cross module
          inlining. *)
       D.protected sym
+
+(* Switch to a COMDAT text section for a weak function. The section name embeds
+   the symbol so each weak function gets its own group. Both the section and the
+   symbol use the [comdat] key, so the linker keeps exactly one copy across all
+   object files that contain this group. *)
+let emit_weak_text_section_for_symbol sym_name =
+  match[@ocaml.warning "-4"] system with
+  | S_macosx | S_win32 | S_win64 | S_mingw64 | S_cygwin ->
+    (* CR-soon: implement the macOS / Windows side (Mach-O uses
+       [.weak_definition] plus [.subsections_via_symbols]; PE-COFF has its own
+       selectany COMDAT syntax). For now, bail so we don't silently emit code
+       that the linker will refuse to deduplicate. *)
+    Misc.fatal_errorf
+      "COMDAT / weak function emission is not yet implemented on this target \
+       system (function %s)"
+      sym_name
+  | _ ->
+    let section_name = Printf.sprintf ".text.%s" (emit_symbol sym_name) in
+    D.switch_to_section_raw ~names:[section_name] ~flags:(Some "axG")
+      ~args:[Printf.sprintf "@progbits,%s,comdat" (emit_symbol sym_name)]
+      ~is_delayed:false;
+    D.unsafe_set_internal_section_ref Text
 
 (* CR sspies: The naming of these functions is confusing. *)
 let emit_global_label_for_symbol ~section lbl =
@@ -2637,17 +2663,31 @@ let fundecl fundecl =
   all_functions := fundecl :: !all_functions;
   current_basic_block_section
     := Option.value fundecl.fun_section_name ~default:"";
-  emit_function_or_basic_block_section_name ();
+  (match fundecl.fun_sym_global with
+  | Cmm.Weak ->
+    (* Place this function body in its own COMDAT group so the linker keeps
+       exactly one copy across all compilation units that instantiate the same
+       monomorphized layout-polymorphic function. This overrides the normal
+       [-function-sections] / [module_entry_functions_section] handling. *)
+    emit_weak_text_section_for_symbol fundecl.fun_name
+  | Global | Local -> emit_function_or_basic_block_section_name ());
   D.align ~fill:Nop ~bytes:16;
   add_def_symbol fundecl.fun_name;
   let fundecl_sym = S.create_global fundecl.fun_name in
-  if
-    is_macosx system
-    && (not !Clflags.output_c_object)
-    && is_generic_function fundecl.fun_name
-  then (* PR#4690 *)
-    D.private_extern fundecl_sym
-  else global_maybe_protected fundecl_sym;
+  (match fundecl.fun_sym_global with
+  | Cmm.Weak -> D.weak fundecl_sym
+  | Global | Local ->
+    (* Preserve the pre-existing behavior: historically all functions were
+       emitted as global symbols regardless of [fun_name.sym_global], so we keep
+       calling [global_maybe_protected] (or [private_extern] for the macOS
+       generic-function case) when the new [Weak] case does not apply. *)
+    if
+      is_macosx system
+      && (not !Clflags.output_c_object)
+      && is_generic_function fundecl.fun_name
+    then (* PR#4690 *)
+      D.private_extern fundecl_sym
+    else global_maybe_protected fundecl_sym);
   (*= Even if the function name is Local, still emit an actual linker symbol for
       it. This provides symbols for perf, gdb, and similar tools.
 
@@ -2701,10 +2741,59 @@ let emit_data_item_actions : Emitaux.emit_data_item_actions =
     symbol_used = add_used_symbol
   }
 
+(* Switch to a COMDAT read-only-data section for a weak data symbol. Used to
+   wrap static data associated with monomorphized layout-polymorphic instances
+   so the linker deduplicates the symbol and its bytes together.
+
+   CR-someday: we always use [.rodata] here since the current caller (weak
+   closure records / lifted constants) is effectively read-only code-adjacent
+   data. If mutable weak data is ever needed, this will need to become
+   [.data.rel.ro]. *)
+let emit_weak_data_section_for_symbol sym_name =
+  match[@ocaml.warning "-4"] system with
+  | S_macosx | S_win32 | S_win64 | S_mingw64 | S_cygwin ->
+    Misc.fatal_errorf
+      "COMDAT / weak data emission is not yet implemented on this target \
+       system (symbol %s)"
+      sym_name
+  | _ ->
+    let section_name = Printf.sprintf ".rodata.%s" (emit_symbol sym_name) in
+    D.switch_to_section_raw ~names:[section_name] ~flags:(Some "aG")
+      ~args:[Printf.sprintf "@progbits,%s,comdat" (emit_symbol sym_name)]
+      ~is_delayed:false;
+    D.unsafe_set_internal_section_ref Data
+
 let data l =
   D.data ();
   D.align ~fill:Zero ~bytes:8;
-  List.iter (Emitaux.emit_data_item emit_data_item_actions) l
+  (* Walk the data-item list, wrapping each weak [Cdefine_symbol] and the data
+     items that follow it in a dedicated COMDAT section. The run of items that
+     "belongs" to a weak symbol extends up to (but not including) the next
+     [Cdefine_symbol]. *)
+  let in_weak = ref false in
+  List.iter
+    (fun (item : Cmm.data_item) ->
+      (match[@ocaml.warning "-4"] item with
+      | Cdefine_symbol { sym_global; sym_name } -> (
+        if !in_weak
+        then (
+          (* End of the previous weak symbol's data region. *)
+          D.data ();
+          D.align ~fill:Zero ~bytes:8;
+          in_weak := false);
+        match sym_global with
+        | Cmm.Weak ->
+          emit_weak_data_section_for_symbol sym_name;
+          D.align ~fill:Zero ~bytes:8;
+          in_weak := true
+        | Cmm.Global | Cmm.Local -> ())
+      | _ -> ());
+      Emitaux.emit_data_item emit_data_item_actions item)
+    l;
+  if !in_weak
+  then (
+    D.data ();
+    in_weak := false)
 
 (* Beginning / end of an assembly file *)
 

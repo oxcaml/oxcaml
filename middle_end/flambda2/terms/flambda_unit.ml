@@ -21,18 +21,23 @@ type t =
     toplevel_my_ghost_region : Variable.t;
     body : Flambda.Expr.t;
     module_symbol : Symbol.t;
-    used_value_slots : Value_slot.Set.t Or_unknown.t
+    used_value_slots : Value_slot.Set.t Or_unknown.t;
+    weak_symbols : Symbol.Set.t;
+    weak_code_ids : Code_id.Set.t
   }
 
 let create ~return_continuation ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region ~body ~module_symbol ~used_value_slots =
+    ~toplevel_my_ghost_region ~body ~module_symbol ~used_value_slots
+    ~weak_symbols ~weak_code_ids =
   { return_continuation;
     exn_continuation;
     toplevel_my_region;
     toplevel_my_ghost_region;
     body;
     module_symbol;
-    used_value_slots
+    used_value_slots;
+    weak_symbols;
+    weak_code_ids
   }
 
 let return_continuation t = t.return_continuation
@@ -54,9 +59,14 @@ let with_used_value_slots t used_value_slots =
 
 let with_body t body = { t with body }
 
+let weak_symbols t = t.weak_symbols
+
+let weak_code_ids t = t.weak_code_ids
+
 let [@ocamlformat "disable"] print ppf
       { return_continuation; exn_continuation; toplevel_my_region;
         toplevel_my_ghost_region; body; module_symbol; used_value_slots;
+        weak_symbols; weak_code_ids;
       } =
   Format.fprintf ppf "@[<hov 1>(\
         @[<hov 1>(module_symbol@ %a)@]@ \
@@ -65,6 +75,8 @@ let [@ocamlformat "disable"] print ppf
         @[<hov 1>(toplevel_my_region@ %a)@]@ \
         @[<hov 1>(toplevel_my_ghost_region@ %a)@]@ \
         @[<hov 1>(used_value_slots@ %a)@]@ \
+        @[<hov 1>(weak_symbols@ %a)@]@ \
+        @[<hov 1>(weak_code_ids@ %a)@]@ \
         @[<hov 1>%a@]\
       )@]"
     Symbol.print module_symbol
@@ -73,4 +85,6 @@ let [@ocamlformat "disable"] print ppf
     Variable.print toplevel_my_region
     Variable.print toplevel_my_ghost_region
     (Or_unknown.print Value_slot.Set.print) used_value_slots
+    Symbol.Set.print weak_symbols
+    Code_id.Set.print weak_code_ids
     Flambda.Expr.print body

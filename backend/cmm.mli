@@ -394,11 +394,12 @@ val equal_alloc_dbginfo : alloc_dbginfo -> alloc_dbginfo -> bool
 type is_global =
   | Global
   | Local
+  | Weak
 
 val equal_is_global : is_global -> is_global -> bool
 
-(* Symbols are marked with whether they are local or global, at both definition
-   and use sites.
+(* Symbols are marked with whether they are local, global, or weak, at both
+   definition and use sites.
 
    Symbols defined as [Local] may only be referenced within the same file, and
    all such references must also be [Local].
@@ -406,6 +407,11 @@ val equal_is_global : is_global -> is_global -> bool
    Symbols defined as [Global] may be referenced from other files. References
    from other files must be [Global], but references from the same file may be
    [Local].
+
+   Symbols defined as [Weak] are like [Global] but are expected to have the same
+   definition in more than one compilation unit; the linker deduplicates them
+   (via COMDAT on ELF and [.weak_definition] on Mach-O). They are used for
+   monomorphized layout-polymorphic functions and their associated static data.
 
    (Marking symbols in this way speeds up linking, as many references can then
    be resolved early) *)

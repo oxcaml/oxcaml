@@ -88,6 +88,7 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
 type t =
   { blocks : basic_block Label.Tbl.t;
     fun_name : string;
+    fun_sym_global : Cmm.is_global;
     fun_args : Reg.t array;
     fun_codegen_options : codegen_option list;
     fun_dbg : Debuginfo.t;
@@ -102,10 +103,11 @@ type t =
     mutable register_locations_are_set : bool
   }
 
-let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
-    ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type
-    ~allowed_to_be_irreducible =
+let create ~fun_name ~fun_sym_global ~fun_args ~fun_codegen_options ~fun_dbg
+    ~fun_contains_calls ~fun_num_stack_slots ~fun_poll ~next_instruction_id
+    ~fun_ret_type ~allowed_to_be_irreducible =
   { fun_name;
+    fun_sym_global;
     fun_args;
     fun_codegen_options;
     fun_dbg;

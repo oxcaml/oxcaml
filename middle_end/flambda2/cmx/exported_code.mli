@@ -46,6 +46,9 @@ val find : t -> Code_id.t -> Code_or_metadata.t option
 
 val remove_unreachable : reachable_names:Name_occurrences.t -> t -> t
 
+(** Remove the specified code ids from the export. *)
+val remove_code_ids : t -> Code_id.Set.t -> t
+
 val remove_unused_value_slots_from_result_types_and_shortcut_aliases :
   used_value_slots:Value_slot.Set.t ->
   canonicalise:(Simple.t -> Simple.t) ->

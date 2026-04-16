@@ -103,6 +103,10 @@ val instr_cons :
 
 type fundecl =
   { fun_name : string;
+    fun_sym_global : Cmm.is_global;
+        (** Linkage of [fun_name] propagated from [Cmm.fundecl.fun_name]. The
+            emitter consults this to decide whether to emit the entry with
+            global, local, or weak (COMDAT) linkage. *)
     fun_args : Reg.Set.t;
     fun_body : instruction;
     fun_fast : bool;

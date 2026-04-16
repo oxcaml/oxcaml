@@ -95,6 +95,7 @@ let has_fallthrough = function
 
 type fundecl =
   { fun_name : string;
+    fun_sym_global : Cmm.is_global;
     fun_args : Reg.Set.t;
     fun_body : instruction;
     fun_fast : bool;

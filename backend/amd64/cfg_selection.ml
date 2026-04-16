@@ -273,7 +273,7 @@ let select_addressing' (_chunk : Cmm.memory_chunk) exp :
     match a with
     | Asymbol s ->
       let glob : Arch.sym_global =
-        match s.sym_global with Global -> Global | Local -> Local
+        match s.sym_global with Global | Weak -> Global | Local -> Local
       in
       Ibased (s.sym_name, glob, d), Ctuple []
     | Alinear e -> Iindexed d, e

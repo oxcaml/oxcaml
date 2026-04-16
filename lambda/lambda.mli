@@ -1107,6 +1107,16 @@ type program =
     required_globals : Compilation_unit.Set.t;
                                         (* Modules whose initializer side effects
                                            must occur before [code]. *)
+    template_instance_idents : Ident.Set.t;
+                                        (* [Ident.t]s bound by [Llet]s that
+                                           wrap the compilation unit body after
+                                           [Slambda] evaluation, corresponding
+                                           to instantiations of monomorphized
+                                           layout-polymorphic functions. These
+                                           idents are persistent and their
+                                           names are the canonical per-instance
+                                           linkage names used for cross-unit
+                                           deduplication. *)
     code : lambda }
 
 (* Lambda code for the middle-end. Here [mbf] is the value of the

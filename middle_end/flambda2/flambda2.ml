@@ -131,9 +131,17 @@ let build_run_result unit ~free_names ~final_typing_env ~all_code slot_offsets :
     in
     Slot_offsets.finalize_offsets slot_offsets ~get_code_metadata ~used_slots
   in
+  let code_for_cmx =
+    (* Weak code ids live in the [*extern*] pseudo-unit and are synthesised
+       afresh by every compilation unit that instantiates the same template, so
+       there is no need to share their definitions through the cmx file.
+       Including them would cause a metadata-merge failure in downstream units
+       that also generate the same weak code id. *)
+    Exported_code.remove_code_ids all_code (Flambda_unit.weak_code_ids unit)
+  in
   let reachable_names, cmx =
     Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
-      ~used_value_slots ~exported_offsets all_code
+      ~used_value_slots ~exported_offsets code_for_cmx
   in
   let unit = Flambda_unit.with_used_value_slots unit used_value_slots in
   { cmx; unit; all_code; exported_offsets; reachable_names }
@@ -271,6 +279,7 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   in
   let compilation_unit = program.compilation_unit in
   let module_initializer = program.code in
+  let template_instance_idents = program.template_instance_idents in
   (* Make sure -linscan is enabled in classic mode. Doing this here to be sure
      it happens exactly when -Oclassic is in effect, which we don't know at CLI
      processing time because there may be an [@@@flambda_oclassic] or
@@ -312,7 +321,7 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     Profile.record_call "lambda_to_flambda" (fun () ->
         Lambda_to_flambda.lambda_to_flambda ~mode ~machine_width
           ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
-          module_initializer)
+          ~template_instance_idents module_initializer)
   in
   flambda_to_flambda0 ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
     ~close_prog_metadata ~code_slot_offsets raw_flambda

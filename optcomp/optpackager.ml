@@ -144,7 +144,8 @@ end) : S = struct
             main_module_block_format;
             arg_block_idx;
             compilation_unit;
-            required_globals
+            required_globals;
+            template_instance_idents = Ident.Set.empty
           }
         in
         Backend.compile_implementation ~keep_symbol_tables:true

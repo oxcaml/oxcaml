@@ -151,6 +151,8 @@ and Templates : sig
 
   val instantiations : t -> (Ident.t * lambda) list
 
+  val instantiation_idents : t -> Ident.Set.t
+
   val print_id : Format.formatter -> id -> unit
 
   val print_templates : Format.formatter -> templates -> unit
@@ -257,6 +259,11 @@ end = struct
   let templates t = t.templates
 
   let instantiations t = Ident.Tbl.to_list t.instantiations
+
+  let instantiation_idents t =
+    Ident.Tbl.fold
+      (fun id _ acc -> Ident.Set.add id acc)
+      t.instantiations Ident.Set.empty
 
   let print_id = Format.pp_print_string
 

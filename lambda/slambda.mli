@@ -35,11 +35,12 @@ type value_halves = Slambda_types.halves =
 (** [eval inspect tlambda] fractures [tlambda] into [slambda], passes it through
     [inspect], then evaluates it. It returns a [value_halves] so that the caller
     can save/manipulate the compile-time part of the value represented by the
-    [tlambda].
+    [tlambda], plus the set of [Ident.t]s used for template instantiations (see
+    [Slambda_types.Templates.instantiation_idents]).
 
     [inspect] can arbitrarily modify the [slambda] but it's expected to be used
     by drivers to print the slambda if requested and return it unchanged. *)
 val eval :
   (slambda -> slambda) ->
   lambda ->
-  Slambda_types.Templates.templates * value_halves
+  Slambda_types.Templates.templates * Ident.Set.t * value_halves

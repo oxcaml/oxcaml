@@ -64,7 +64,24 @@ let manufacture_symbol acc proposed_name =
 let declare_symbol_for_function_slot env acc ident function_slot :
     Env.t * Acc.t * Symbol.t =
   let acc, symbol =
-    manufacture_symbol acc (Function_slot.to_string function_slot)
+    if Ident.Set.mem ident (Acc.template_instance_idents acc)
+    then
+      (* Template-instance functions must have a canonical cross-unit linkage
+         name (the same in every compilation unit that instantiates them), so
+         the linker can deduplicate the copies. We bypass [manufacture_symbol]
+         (which prefixes with the current compilation unit) and mint the symbol
+         in the *extern* pseudo-compilation-unit with the linkage name
+         ["caml__<ident_name>"]. The ["caml__"] prefix distinguishes these from
+         ordinary OCaml symbols (["caml<unit>__<ident>"]) and from C symbols.
+         The symbol is recorded in [Acc.weak_symbols] so that [to_cmm] emits it
+         with [Weak] linkage (COMDAT on ELF). *)
+      let linkage_name = Linkage_name.of_string ("caml__" ^ Ident.name ident) in
+      let symbol =
+        Symbol.create (Symbol.external_symbols_compilation_unit ()) linkage_name
+      in
+      let acc = Acc.add_weak_symbol symbol acc in
+      acc, symbol
+    else manufacture_symbol acc (Function_slot.to_string function_slot)
   in
   let env =
     Env.add_simple_to_substitute env ident (Simple.symbol symbol)
@@ -2978,18 +2995,42 @@ let close_functions acc external_env ~current_region function_declarations =
         Ident.Map.add id function_slot map)
       Ident.Map.empty func_decl_list
   in
-  let function_code_ids =
+  let acc, function_code_ids =
     List.fold_left
-      (fun map decl ->
+      (fun (acc, map) decl ->
         let function_slot = Function_decl.function_slot decl in
         let function_dbg = Debuginfo.from_location (Function_decl.loc decl) in
-        let code_id =
-          Code_id.create
-            ~name:(Function_slot.to_string function_slot)
-            ~debug:function_dbg compilation_unit
+        let let_rec_ident = Function_decl.let_rec_ident decl in
+        let acc, code_id =
+          if Ident.Set.mem let_rec_ident (Acc.template_instance_idents acc)
+          then
+            (* Template-instance functions must have a canonical cross-unit
+               linkage name for their code body so the linker can deduplicate
+               them via COMDAT. We mint the code id in the *extern*
+               pseudo-compilation-unit with linkage name
+               ["caml__<ident_name>_code"] (no [caml<CU>__] prefix) and record
+               it so [to_cmm] marks its function symbol as [Weak]. *)
+            let linkage_name =
+              Linkage_name.of_string
+                ("caml__" ^ Ident.name let_rec_ident ^ "_code")
+            in
+            let code_id =
+              Code_id.create_with_explicit_linkage_name
+                ~name:(Function_slot.to_string function_slot)
+                ~linkage_name ~debug:function_dbg
+            in
+            Acc.add_weak_code_id code_id acc, code_id
+          else
+            let code_id =
+              Code_id.create
+                ~name:(Function_slot.to_string function_slot)
+                ~debug:function_dbg compilation_unit
+            in
+            acc, code_id
         in
-        Function_slot.Map.add function_slot code_id map)
-      Function_slot.Map.empty func_decl_list
+        acc, Function_slot.Map.add function_slot code_id map)
+      (acc, Function_slot.Map.empty)
+      func_decl_list
   in
   let approx_map =
     List.fold_left
@@ -4003,7 +4044,8 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
     ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
     ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region : mode close_program_result =
+    ~toplevel_my_ghost_region ~template_instance_idents :
+    mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
     Symbol.create_wrapped
@@ -4018,7 +4060,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     Env.add_var_like env toplevel_my_ghost_region Not_user_visible
       Flambda_kind.With_subkind.region
   in
-  let acc = Acc.create ~cmx_loader ~machine_width in
+  let acc = Acc.create ~cmx_loader ~machine_width ~template_instance_idents in
   let acc, body =
     wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       ~return_cont ~module_symbol
@@ -4081,7 +4123,8 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
         ~toplevel_my_region ~toplevel_my_ghost_region ~body ~module_symbol
-        ~used_value_slots:Unknown
+        ~used_value_slots:Unknown ~weak_symbols:(Acc.weak_symbols acc)
+        ~weak_code_ids:(Acc.weak_code_ids acc)
     in
     { unit; code_slot_offsets; metadata = Normal }
   | Classic ->
@@ -4117,6 +4160,8 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
         ~toplevel_my_region ~toplevel_my_ghost_region ~body ~module_symbol
         ~used_value_slots:(Known used_value_slots)
+        ~weak_symbols:(Acc.weak_symbols acc)
+        ~weak_code_ids:(Acc.weak_code_ids acc)
     in
     { unit;
       code_slot_offsets;

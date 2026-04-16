@@ -41,9 +41,12 @@ val create :
   unit_toplevel_return_continuation:Continuation.t ->
   toplevel_my_region:Variable.t ->
   toplevel_my_ghost_region:Variable.t ->
+  weak_code_ids:Code_id.Set.t ->
   t
 
 val all_code : t -> Code.t Code_id.Map.t
+
+val weak_code_ids : t -> Code_id.Set.t
 
 val machine_width : t -> Target_system.Machine_width.t
 

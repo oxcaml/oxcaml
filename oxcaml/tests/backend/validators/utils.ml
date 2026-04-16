@@ -90,7 +90,8 @@ module Cfg_desc = struct
       ({ fun_args; blocks; fun_contains_calls; fun_ret_type } : t) :
       Cfg_with_infos.t =
     let cfg =
-      Cfg.create ~fun_name:"foo" ~fun_args:(Array.copy fun_args)
+      Cfg.create ~fun_name:"foo" ~fun_sym_global:Cmm.Global
+        ~fun_args:(Array.copy fun_args)
         ~fun_dbg:Debuginfo.none ~fun_codegen_options:[] ~fun_contains_calls
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
         ~fun_poll:Lambda.Default_poll

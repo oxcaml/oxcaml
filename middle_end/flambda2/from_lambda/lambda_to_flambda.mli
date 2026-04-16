@@ -23,5 +23,6 @@ val lambda_to_flambda :
   cmx_loader:Flambda_cmx.loader ->
   compilation_unit:Compilation_unit.t ->
   module_repr:Lambda.module_representation ->
+  template_instance_idents:Ident.Set.t ->
   Lambda.lambda ->
   'mode Closure_conversion.close_program_result

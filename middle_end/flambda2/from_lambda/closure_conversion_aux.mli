@@ -232,9 +232,29 @@ module Acc : sig
   val create :
     cmx_loader:Flambda_cmx.loader ->
     machine_width:Target_system.Machine_width.t ->
+    template_instance_idents:Ident.Set.t ->
     t
 
   val manufacture_symbol_short_name : t -> t * Linkage_name.t
+
+  (** [Ident.t]s for monomorphized layout-polymorphic instances; their names are
+      the canonical linkage names used for cross-unit deduplication. See
+      [Lambda.program.template_instance_idents]. *)
+  val template_instance_idents : t -> Ident.Set.t
+
+  (** Symbols that should be emitted with weak linkage (COMDAT on ELF). Grows
+      during closure conversion as template instance idents are seen. *)
+  val weak_symbols : t -> Symbol.Set.t
+
+  val add_weak_symbol : Symbol.t -> t -> t
+
+  (** Code ids whose corresponding machine-code body should be emitted with weak
+      linkage. Populated alongside [weak_symbols] when processing
+      template-instance functions: both the closure record and the function's
+      code body need canonical cross-unit names for deduplication to work. *)
+  val weak_code_ids : t -> Code_id.Set.t
+
+  val add_weak_code_id : Code_id.t -> t -> t
 
   val declared_symbols : t -> (Symbol.t * Static_const.t) list
 

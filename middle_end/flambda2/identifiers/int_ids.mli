@@ -235,6 +235,15 @@ module Code_id : sig
 
   val create : name:string -> debug:Debuginfo.t -> Compilation_unit.t -> t
 
+  (** [create_with_explicit_linkage_name] creates a code id in the [*extern*]
+      pseudo-compilation-unit, whose linkage name is used verbatim (no
+      [caml<CU>__] prefix is added). This is used for the code bodies of
+      monomorphized layout-polymorphic instances, whose linkage names must be
+      the same in every compilation unit that instantiates them so that the
+      linker can deduplicate them via COMDAT. *)
+  val create_with_explicit_linkage_name :
+    name:string -> linkage_name:Linkage_name.t -> debug:Debuginfo.t -> t
+
   val get_compilation_unit : t -> Compilation_unit.t
 
   val in_compilation_unit : t -> Compilation_unit.t -> bool

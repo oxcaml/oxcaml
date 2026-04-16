@@ -1145,6 +1145,7 @@ let transl_implementation compilation_unit impl ~loc =
     main_module_block_format;
     arg_block_idx;
     required_globals = required_globals ~flambda:true body;
+    template_instance_idents = Ident.Set.empty;
     code = body }
 
 
@@ -1453,6 +1454,7 @@ let transl_instance_impl
     code;
     main_module_block_format;
     required_globals;
+    template_instance_idents = Ident.Set.empty;
     arg_block_idx;
   }
 

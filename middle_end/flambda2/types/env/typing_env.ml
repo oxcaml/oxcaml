@@ -728,7 +728,11 @@ let add_symbol_definition t sym =
   (* CR-someday mshinwell: check for redefinition when invariants enabled? *)
   let comp_unit = Symbol.compilation_unit sym in
   let this_comp_unit = Compilation_unit.get_current_exn () in
-  if not (Compilation_unit.equal comp_unit this_comp_unit)
+  if
+    not
+      (Compilation_unit.equal comp_unit this_comp_unit
+      || Compilation_unit.equal comp_unit
+           (Symbol.external_symbols_compilation_unit ()))
   then
     Misc.fatal_errorf
       "Cannot define symbol %a that belongs to a different compilation unit@ \

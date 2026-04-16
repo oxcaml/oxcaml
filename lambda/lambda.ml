@@ -1179,6 +1179,7 @@ type program =
     main_module_block_format : main_module_block_format;
     arg_block_idx : int option;
     required_globals : Compilation_unit.Set.t;
+    template_instance_idents : Ident.Set.t;
     code : lambda }
 
 type arg_descr =

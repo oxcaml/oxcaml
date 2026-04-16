@@ -324,7 +324,8 @@ let default_load ppf (program : Lambda.program) =
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let _templates, { Slambda.slv_comptime = _; slv_runtime = rawlam } =
+  let _templates, _weak_symbols,
+      { Slambda.slv_comptime = _; slv_runtime = rawlam } =
     (* CR layout poly: If this toplevel value is static we should keep the
        comptime part in a separate table so we can use it in later expressions.
     *)
@@ -345,6 +346,7 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
       arg_block_idx = None;
       compilation_unit;
       required_globals;
+      template_instance_idents = Ident.Set.empty;
     }
   in
   match !jit with

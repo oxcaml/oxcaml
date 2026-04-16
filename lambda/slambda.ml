@@ -37,6 +37,9 @@ let eval inspect_slambda template_lam =
         |> inspect_slambda |> Slambdaeval.eval
       in
       let templates = Slambda_types.Templates.templates store in
+      let instantiation_idents =
+        Slambda_types.Templates.instantiation_idents store
+      in
       (* CR layout poly: We can keep this check in the future if
          [is_enabled Layout_poly] is replaced with whether template_lam contains
          any templates. (which is cheap to check if it's combined with
@@ -47,4 +50,4 @@ let eval inspect_slambda template_lam =
       then
         Misc.fatal_error
           "Slambda eval did something non-trivial but layout poly is disabled.";
-      templates, halves)
+      templates, instantiation_idents, halves)

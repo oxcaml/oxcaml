@@ -1483,6 +1483,7 @@ let prepare_fun_info t (cfg : Cfg.t) =
   let { Cfg.blocks = _;
         entry_label = _;
         fun_name;
+        fun_sym_global = _;
         fun_args;
         fun_codegen_options;
         fun_dbg;

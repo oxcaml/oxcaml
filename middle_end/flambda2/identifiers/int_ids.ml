@@ -857,6 +857,20 @@ module Code_id = struct
     in
     Table.add !grand_table_of_code_ids data
 
+  (* [create_with_explicit_linkage_name] is used for the code bodies of
+     monomorphized layout-polymorphic instances, whose linkage names must be
+     identical across every compilation unit that instantiates them so that the
+     linker can deduplicate them via COMDAT. The code id is placed in the
+     "*extern*" pseudo-compilation-unit and its linkage name is used verbatim,
+     so no [caml<CU>__] prefix is added. *)
+  let create_with_explicit_linkage_name ~name ~linkage_name
+      ~(debug : Debuginfo.t) =
+    let compilation_unit = Symbol.extern_syms in
+    let data : Code_id_data.t =
+      { compilation_unit; name; debug_info = debug; linkage_name }
+    in
+    Table.add !grand_table_of_code_ids data
+
   let rename t =
     create ~name:(name t) ~debug:(debug t) (Compilation_unit.get_current_exn ())
 

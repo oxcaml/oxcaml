@@ -410,9 +410,19 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
         let dacc =
           DA.map_denv dacc ~f:(fun denv -> DE.define_code denv ~code_id ~code)
         in
-        ( Bound_static.Pattern.code code_id :: bound_static,
-          static_const :: static_consts,
-          dacc ))
+        (* Weak code ids are never renamed by the simplifier (see
+           [compute_old_to_new_code_ids_all_sets]). When the enclosing set of
+           closures is simplified, the simplified body is introduced back under
+           the same [code_id] via [introduce_code]. Emitting the original code
+           here as well would cause a duplicate binding of [code_id] in the flow
+           analysis. *)
+        let weak_code_ids = DE.weak_code_ids (DA.denv dacc) in
+        if Code_id.Set.mem code_id weak_code_ids
+        then bound_static, static_consts, dacc
+        else
+          ( Bound_static.Pattern.code code_id :: bound_static,
+            static_const :: static_consts,
+            dacc ))
       ~deleted_code:(fun acc _code_id -> acc)
       ~set_of_closures:(fun acc ~closure_symbols:_ _ -> acc)
       ~block_like:(fun

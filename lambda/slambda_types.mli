@@ -80,5 +80,12 @@ module Templates : sig
 
   val instantiations : t -> (Ident.t * lambda) list
 
+  (** The set of idents bound to template instantiations in [instantiations].
+      These are the [Ident.t]s of the let-bindings that wrap a compilation
+      unit's body after [Slambdaeval]; they are persistent idents whose names
+      are the canonical per-instance linkage names used for cross-unit
+      deduplication of monomorphized layout-polymorphic functions. *)
+  val instantiation_idents : t -> Ident.Set.t
+
   val print_templates : Format.formatter -> templates -> unit
 end

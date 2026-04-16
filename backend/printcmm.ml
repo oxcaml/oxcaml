@@ -77,6 +77,7 @@ let extcall_signature ppf (ty_res, ty_args) =
 let is_global ppf = function
   | Global -> fprintf ppf "G"
   | Local -> fprintf ppf "L"
+  | Weak -> fprintf ppf "W"
 
 let symbol ppf s = fprintf ppf "%a:\"%s\"" is_global s.sym_global s.sym_name
 
@@ -513,6 +514,8 @@ let data_item ppf = function
     fprintf ppf "\"%s\":" sym_name
   | Cdefine_symbol { sym_name; sym_global = Global } ->
     fprintf ppf "global \"%s\":" sym_name
+  | Cdefine_symbol { sym_name; sym_global = Weak } ->
+    fprintf ppf "weak \"%s\":" sym_name
   | Cint8 n -> fprintf ppf "byte %i" n
   | Cint16 n -> fprintf ppf "int16 %i" n
   | Cint32 n -> fprintf ppf "int32 %s" (Nativeint.to_string n)
