@@ -245,6 +245,9 @@ val with_replay_history : (Replay_history.t * bool) option -> t -> t
 val record_inlining_decision :
   Call_site_inlining_decision_type.t -> dbg:Debuginfo.t -> t -> t
 
+val pop_inlining_decision :
+  t -> (Call_site_inlining_decision_type.t * Debuginfo.t * t) option
+
 val with_join_analysis :
   Apply_cont_rewrite_id.t Join_analysis.t option -> t -> t
 

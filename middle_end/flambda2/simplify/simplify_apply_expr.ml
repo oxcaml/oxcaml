@@ -226,9 +226,22 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
       (* No rec info available, prevent inlining to avoid problems *)
       Do_not_inline { erase_attribute = false }
     | Some function_type -> (
-      let decision =
-        Call_site_inlining_decision.make_decision dacc ~simplify_expr ~apply
-          ~function_type ~return_arity:result_arity
+      (* If we are replaying a previous downwards pass and the next recorded
+         action is an inlining decision for this [Apply], reuse that decision
+         rather than recomputing it. Recomputing during replay can yield a
+         different [was_inline_always] flag (e.g. a first-pass
+         [Definition_says_inline { was_inline_always = true }] becomes
+         [Replay_history_says_must_inline] during replay), which in turn
+         changes the depth increment applied when entering the inlined body
+         and can spuriously trip [Max_inlining_depth_exceeded] on subsequent
+         [Apply]s. *)
+      let dacc, decision =
+        match DE.pop_inlining_decision (DA.denv dacc) with
+        | Some (decision, _dbg, denv) -> DA.with_denv dacc denv, decision
+        | None ->
+          ( dacc,
+            Call_site_inlining_decision.make_decision dacc ~simplify_expr
+              ~apply ~function_type ~return_arity:result_arity )
       in
       let unrolling_depth =
         Simplify_rec_info_expr.known_remaining_unrolling_depth dacc

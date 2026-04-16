@@ -755,6 +755,12 @@ let record_inlining_decision decision ~dbg t =
       Replay_history.record_inlining_decision decision ~dbg t.replay_history
   }
 
+let pop_inlining_decision t =
+  match Replay_history.pop_inlining_decision t.replay_history with
+  | None -> None
+  | Some (decision, dbg, replay_history) ->
+    Some (decision, dbg, { t with replay_history })
+
 let map_specialization_cost ~f t =
   let specialization_cost = f t.specialization_cost in
   { t with specialization_cost }

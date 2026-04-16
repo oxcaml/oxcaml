@@ -74,6 +74,14 @@ val define_continuations : can_be_lifted:bool -> Continuation.t list -> t -> t
 val record_inlining_decision :
   Call_site_inlining_decision_type.t -> dbg:Debuginfo.t -> t -> t
 
+(** If the next action in the replay history is a recorded inlining decision,
+    pop it from the history and return the decision (along with an updated
+    history to store in the environment). Otherwise return [None] (this covers
+    both the first pass and the case where the next action in the history is
+    not an inlining decision). *)
+val pop_inlining_decision :
+  t -> (Call_site_inlining_decision_type.t * Debuginfo.t * t) option
+
 (** {2 Inspection API} *)
 
 (** Returns [true] is the replay history was created with the `always_inline`
