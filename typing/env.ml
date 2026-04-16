@@ -4927,7 +4927,7 @@ let report_lookup_error_doc loc env = function
                   unboxed versions." ]
           | Legacy, Projection ->
             let print_projection ppf (op, lid) =
-              fprintf ppf "%s%a" op quoted_longident lid
+              fprintf ppf "%s%a" op Pprintast.Doc.longident lid
             in
             [ Location.msg
                 "To project an unboxed record field, use %a instead of %a."
