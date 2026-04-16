@@ -51,8 +51,6 @@ module For_applications : sig
           ghost_region : Variable.t
         }  (** Allocation on the local allocation stack in the given region. *)
 
-  val print : Format.formatter -> t -> unit
-
   val compare : t -> t -> int
 
   val heap : t
@@ -71,6 +69,8 @@ module For_applications : sig
   include Contains_names.S with type t := t
 
   include Contains_ids.S with type t := t
+
+  include Bindable.S with type t := t
 end
 
 module For_allocations : sig
