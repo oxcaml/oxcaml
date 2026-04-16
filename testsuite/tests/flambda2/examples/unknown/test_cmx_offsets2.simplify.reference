@@ -1,0 +1,7 @@
+let x =
+  %project_value_slot.[`f`].[`x`]
+    ($Test_cmx_offsets1.camlTest_cmx_offsets1__f_1)
+in
+let int_add = %int_barith.add (x, 3) in
+let $camlTest_cmx_offsets2 = Block 0 (int_add) in
+cont done ($camlTest_cmx_offsets2)

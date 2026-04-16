@@ -208,7 +208,6 @@ rule token = parse
   | "~"  { TILDE }
   | "&"  { AMP }
   | "^"  { CARET }
-  | "===>" { BIGARROW }
   | identstart identchar* as ident
          { ident_or_keyword ident }
   | quoted_ident as ident

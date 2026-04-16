@@ -1,0 +1,36 @@
+(let
+  (f/275 =
+     (function {nlocal = 0} a/277[value<addrarray>]
+       : (consts (0)) (non_consts ([0: ?]))
+       (array.get[gen indexed by int] a/277 0)))
+  (makeblock 0 f/275))
+(data global "camlArray_kind__gc_roots": int 0)
+(data int 1792 global "camlArray_kind": addr G:"camlArray_kind__f_1")
+(data
+ int 3063
+ global "camlArray_kind__f_1":
+ addr G:"camlArray_kind__f_0_1_code"
+ int 108086391056891909)
+(data
+ int 2816
+ "camlArray_kind__block13":
+ addr G:"caml_exn_Invalid_argument"
+ addr L:"camlArray_kind__string11")
+(data
+ int 4092
+ "camlArray_kind__string11":
+ string "index out of bounds"
+ skip 4
+ byte 4)
+(function{array_kind.ml:27,6-59} camlArray_kind__f_0_1_code
+     (a/342: val) : val
+ (catch
+   (if (<u 1 (>>u (<< (load_mut int (+a a/342 -8)) 8) 17))
+     (load_mut val a/342) (exit 3))
+ with(3)(cold)
+   (raise_notrace{array_kind.ml:28,14-19} L:"camlArray_kind__block13")) )
+
+(function no_cse reduce_code_size linscan camlArray_kind__entry () : val
+ (catch (exit 2 G:"camlArray_kind") with(2 *ret*/340: val) 1) )
+
+(data)
