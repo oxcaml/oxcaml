@@ -6,8 +6,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 cd "$(git rev-parse --show-toplevel)"
 
 # Script arguments with their default values
-commitish=main
-repository=https://github.com/ocaml-flambda/flambda-backend
+commitish=HEAD
+repository=.
 subdirectory=.
 old_subdirectory=.
 
@@ -48,14 +48,18 @@ function sorted_files_at_committish() {
   git ls-tree -r --name-only "$1" "$2" | sed "s#^$2/##" | sort
 }
 
-git fetch "$repository" "$(cat external/merlin/upstream/ocaml_flambda/base-rev.txt)"
-git fetch "$repository" "$commitish"
-rev=$(git rev-parse FETCH_HEAD)
+if [ "$repository" != "." ]; then
+  git fetch "$repository" "$(cat external/merlin/upstream/ocaml_flambda/base-rev.txt)"
+  git fetch "$repository" "$commitish"
+  rev=$(git rev-parse FETCH_HEAD)
+else
+  rev=$(git rev-parse "$commitish")
+fi
 
-function files_new_at_fetch_head() {
+function new_files() {
   comm -13 \
     <(sorted_files_at_committish "$(cat external/merlin/upstream/ocaml_flambda/base-rev.txt)" "$old_subdirectory") \
-    <(sorted_files_at_committish FETCH_HEAD "$subdirectory")
+    <(sorted_files_at_committish "$rev" "$subdirectory")
 }
 
 function directories_from_previous_import() {
@@ -65,7 +69,7 @@ function directories_from_previous_import() {
   | xargs -n 1 printf "^%s\n"
 }
 
-files=$(files_new_at_fetch_head | grep -f <(directories_from_previous_import))
+files=$(new_files | grep -f <(directories_from_previous_import))
 
 echo "The script will attempt to import these files added to directories that had previously been imported:"
 echo "$files"
@@ -76,7 +80,7 @@ for file in $files; do
     y|Y|"" )
       echo "Importing $file"
       ocaml_flambda_file=external/merlin/upstream/ocaml_flambda/"${file}"
-      git show "FETCH_HEAD:$file" > "$ocaml_flambda_file"
+      git show "$rev:$file" > "$ocaml_flambda_file"
       cp "$ocaml_flambda_file" "external/merlin/src/ocaml/$file"
       ;;
     * )

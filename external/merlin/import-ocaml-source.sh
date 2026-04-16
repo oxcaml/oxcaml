@@ -3,20 +3,22 @@
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 # Script arguments with their default values
-repository=https://github.com/oxcaml/oxcaml
+commitish=HEAD
+repository=.
 subdirectory=.
 old_subdirectory=.
 
 function usage () {
   cat <<USAGE
-Usage: $0 COMMITISH [REPO [SUBDIRECTORY [OLD_SUBDIRECTORY]]]
+Usage: $0 [COMMITISH [REPO [SUBDIRECTORY [OLD_SUBDIRECTORY]]]]
 
 Fetch the new compiler sources and patch Merlin to keep Merlin's local copies of
-things in sync.  By default, this will pull the COMMITISH branch from
-<$repository> and look in "$subdirectory/" for the compiler source, but the
-branch can be overridden by any commitish (branch, tag, full (not abbreviated!)
-commit hash, etc.), the repository can be overridden by any URL, and the
-subdirectory can be overriden by any path (including ".").
+things in sync. By default, this will pull in compiler changes from the local
+repo at the current revision. But you may pass an arbitrary commitish (branch,
+tag, full (not abbreviated!) commit hash, etc.) to important changes from. You
+may also fetch from a remote repository by specifying a REPO, and the
+subdirectory of the repo that the compiler is located in can be overriden by any
+path (including ".").
 
 This attempts to import new files from the compiler by running the
 "import_added_ocaml_source_files.sh" script. If that doesn't work, you can also
@@ -47,14 +49,8 @@ case "$1" in
     ;;
 esac
 
-if [[ $# -gt 0 ]]; then
-  commitish="$1"
-else
-  usage >&2
-  exit 1
-fi
-
 if [[ $# -le 4 ]]; then
+  commitish="${1-$commitish}"
   repository="${2-$repository}"
   # Although the subdirectory arguments are probably no longer useful, it doesn't hurt
   # to keep them around in case they ever are of use.
@@ -65,10 +61,10 @@ else
   exit 1
 fi
 
-if ! git diff --quiet; then
+if ! [ -z "$(git status --porcelain)" ]; then
   echo "Working directory must be clean before using this script,"
   echo "but currently has the following changes:"
-  git diff --stat
+  git status
   exit 1
 fi
 
@@ -80,10 +76,13 @@ current_head="$(git symbolic-ref --short HEAD)"
 # First, add any files that have been added since the last import.
 ./import-added-ocaml-source-files.sh "$commitish" "$repository" "$subdirectory" "$old_subdirectory"
 
-# Then, fetch the new oxcaml sources (which include ocaml-jst) and
-# copy into upstream/ocaml_flambda
-git fetch "$repository" "$commitish"
-rev=$(git rev-parse FETCH_HEAD)
+# Then, get the new oxcaml sources and copy into upstream/ocaml_flambda
+if [ "$repository" != "." ]; then
+  git fetch "$repository" "$commitish"
+  rev=$(git rev-parse FETCH_HEAD)
+else
+  rev=$(git rev-parse "$commitish")
+fi
 cd upstream/ocaml_flambda
 echo $rev > base-rev.txt
 for file in $(git ls-tree --name-only -r HEAD | grep -v base-rev.txt); do
@@ -92,21 +91,19 @@ for file in $(git ls-tree --name-only -r HEAD | grep -v base-rev.txt); do
   else
     git_file="$subdirectory/$file"
   fi
-  git show "FETCH_HEAD:$git_file" > "$file"
+  git show "$rev:$git_file" > "$file"
 done
-git add -u .
+git add --intent-to-add .
 cd ../..
-git commit -m "Import ocaml sources for $(repository-commit "$(git describe --always $rev)")"
 
 # Annotations for diff3 regions; "@" would be more natural than ":" but confuses
 # smerge-mode's highlighting
-short_ocaml_repo="${repository#https://github.com/}"
-old_marker="janestreet/merlin-jst:$current_head"
-parent_marker="$short_ocaml_repo:$old_base_rev"
-new_marker="$short_ocaml_repo:$commitish"
+old_marker="Merlin:$current_head"
+parent_marker="Compiler:$old_base_rev"
+new_marker="Compiler:$commitish"
 
 # Then patch src/ocaml using the changes you just imported
-for file in $(git diff --no-ext-diff --name-only HEAD^ HEAD); do
+for file in $(git diff --no-ext-diff --name-only); do
   file=${file#external/merlin/}
   base=${file#upstream/ocaml_flambda/}
   case $base in
@@ -150,11 +147,9 @@ for file in $(git diff --no-ext-diff --name-only HEAD^ HEAD); do
   # Not all files are necessary
   if [ ! -e $tgt ]; then continue; fi
 
-  err=$(patch --merge=diff3 $tgt <(git diff --no-ext-diff HEAD^ HEAD -- $file))
+  err=$(patch --merge=diff3 $tgt <(git diff --no-ext-diff -- $file))
   # ignore patch output if it worked
-  if [ $? = 0 ]; then
-    git add -u $tgt
-  else
+  if [ $? != 0 ]; then
     sed -i \
         -e 's!^<<<<<<<$!& '"$old_marker"'!'    \
         -e 's!^|||||||$!& '"$parent_marker"'!' \
@@ -164,3 +159,6 @@ for file in $(git diff --no-ext-diff --name-only HEAD^ HEAD); do
   fi
   rm -f $tgt.orig
 done
+
+git add .
+git commit -m "Automated commit: Import compiler changes from $old_base_rev to $rev"
