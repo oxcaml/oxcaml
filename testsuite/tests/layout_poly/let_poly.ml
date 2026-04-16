@@ -11,9 +11,7 @@ go through lambda and middle-end. *)
 
 let poly_ id x = x
 [%%expect{|
->> Fatal error: layout: unexpected genvar
-Uncaught exception: Misc.Fatal_error
-
+val id : layout_ l. ('a : l). 'a -> 'a = <fun>
 |}]
 
 (* Simple let poly_ with a polymorphic function *)

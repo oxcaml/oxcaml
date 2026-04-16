@@ -15,7 +15,7 @@ let poly_ id x = x
             (function {nlocal = 0} x[$layout!2] : $layout!2 x))⟫ })
    ; r = ⟪(makeblock 0)⟫ })
   { c = (missing)
-  ; r = ⟪(let (id = $id.r) (apply (field_imm 1 (global Toploop!)) "id" id))⟫ })
+  ; r = ⟪(let (id = $id) (apply (field_imm 1 (global Toploop!)) "id" id))⟫ })
 val id : layout_ l. ('a : l). 'a -> 'a = <fun>
 |}]
 
@@ -47,7 +47,7 @@ let poly_ captures x y = if bool then #(x, foo) else #(y, 2)
         #body =
           (let (captures =
              { c =
-               (template layout!15 ->
+               (template layout!24 ->
                  { c = (missing)
                  ; r =
                    ⟪(function {nlocal = 0} closure
@@ -56,20 +56,20 @@ let poly_ captures x y = if bool then #(x, foo) else #(y, 2)
                            (mixedfield 1  (value<int>,value<int>) closure)
                          bool =a[value<int>]
                            (mixedfield 0  (value<int>,value<int>) closure))
-                        (function {nlocal = 0} x[$layout!15] y[$layout!15]
-                          : #($layout!15, ?)
+                        (function {nlocal = 0} x[$layout!24] y[$layout!24]
+                          : #($layout!24, ?)
                           (if bool
-                            (make_unboxed_product #($layout!15, value<int>) x
+                            (make_unboxed_product #($layout!24, value<int>) x
                               foo)
-                            (make_unboxed_product #($layout!15, value<int>) y
+                            (make_unboxed_product #($layout!24, value<int>) y
                               2)))))⟫ })
              ; r = ⟪(makeblock 0 (value<int>,value<int>) bool foo)⟫ })
             { c = (missing)
             ; r =
-              ⟪(let (captures = $captures.r)
+              ⟪(let (captures = $captures)
                  (apply (field_imm 1 (global Toploop!)) "captures" captures))⟫ }))
-       { c = #body.c; r = ⟪(let (bool =? $bool.r) $#body.r)⟫ }))
-  { c = #body.c; r = ⟪(let (foo =? $foo.r) $#body.r)⟫ })
+       { c = #body.c; r = ⟪(let (bool =? $bool) $#body)⟫ }))
+  { c = #body.c; r = ⟪(let (foo =? $foo) $#body)⟫ })
 val captures : layout_ l. ('a : l). 'a -> 'a -> #('a * int) = <fun>
 |}]
 
@@ -78,15 +78,15 @@ let poly_ f x y = #(x, y)
 [%%expect{|
 (let (f =
    { c =
-     (template layout!28 layout!29 ->
+     (template layout!46 layout!47 ->
        { c = (missing)
        ; r =
          ⟪(function {nlocal = 0} closure
-            (function {nlocal = 0} x[$layout!28] y[$layout!29]
-              : #($layout!28, $layout!29)
-              (make_unboxed_product #($layout!28, $layout!29) x y)))⟫ })
+            (function {nlocal = 0} x[$layout!46] y[$layout!47]
+              : #($layout!46, $layout!47)
+              (make_unboxed_product #($layout!46, $layout!47) x y)))⟫ })
    ; r = ⟪(makeblock 0)⟫ })
   { c = (missing)
-  ; r = ⟪(let (f = $f.r) (apply (field_imm 1 (global Toploop!)) "f" f))⟫ })
+  ; r = ⟪(let (f = $f) (apply (field_imm 1 (global Toploop!)) "f" f))⟫ })
 val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> #('a * 'b) = <fun>
 |}]
