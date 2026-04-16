@@ -91,3 +91,11 @@ val bind_recs :
 val mixed_block_access_field_kind :
   'a Mixed_block_shape.Singleton_mixed_block_element.t ->
   Flambda_primitive.Mixed_block_access_field_kind.t
+
+(** Returns the appropriate [Block_access_kind.t] for accessing a field of a
+    mixed block element. When [kind_shape] is [None] (all-value shape), returns
+    [Values]; when [Some], returns [Mixed]. *)
+val block_access_kind_of_mixed_field_element :
+  kind_shape:Flambda_kind.Mixed_block_shape.t option ->
+  'a Mixed_block_shape.Singleton_mixed_block_element.t ->
+  Flambda_primitive.Block_access_kind.t

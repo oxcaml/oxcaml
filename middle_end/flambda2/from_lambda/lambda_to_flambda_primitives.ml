@@ -2610,20 +2610,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         check_non_negative_imm imm "Pmixedfield";
         let mutability = convert_field_read_semantics sem in
         let field_elt = flattened_reordered_shape.(new_index) in
-        let block_access : P.Block_access_kind.t =
-          match kind_shape with
-          | None ->
-            let field_kind =
-              match H.mixed_block_access_field_kind field_elt with
-              | Value_prefix field_kind -> field_kind
-              | Flat_suffix _ ->
-                Misc.fatal_error "Pmixedfield: flat element in uniform shape"
-            in
-            Values { tag = Unknown; size = Unknown; field_kind }
-          | Some kind_shape ->
-            let field_kind = H.mixed_block_access_field_kind field_elt in
-            Mixed
-              { tag = Unknown; field_kind; shape = kind_shape; size = Unknown }
+        let block_access =
+          H.block_access_kind_of_mixed_field_element ~kind_shape field_elt
         in
         let prim : H.expr_primitive =
           Unary
@@ -2699,25 +2687,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           let imm = Target_ocaml_int.of_int machine_width new_index in
           check_non_negative_imm imm "Psetmixedfield";
           let field_elt = flattened_reordered_shape.(new_index) in
-          let block_access : P.Block_access_kind.t =
-            match kind_shape with
-            | None ->
-              let field_kind =
-                match H.mixed_block_access_field_kind field_elt with
-                | Value_prefix field_kind -> field_kind
-                | Flat_suffix _ ->
-                  Misc.fatal_error
-                    "Psetmixedfield: flat element in uniform shape"
-              in
-              Values { tag = Unknown; size = Unknown; field_kind }
-            | Some kind_shape ->
-              let field_kind = H.mixed_block_access_field_kind field_elt in
-              Mixed
-                { field_kind;
-                  shape = kind_shape;
-                  tag = Unknown;
-                  size = Unknown
-                }
+          let block_access =
+            H.block_access_kind_of_mixed_field_element ~kind_shape field_elt
           in
           let init_or_assign =
             convert_init_or_assign initialization_or_assignment
