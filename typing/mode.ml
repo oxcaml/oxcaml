@@ -2132,32 +2132,23 @@ module Report = struct
          source code such that the more recent hint is returned.
 
          nmatschke: Likewise for [x <> y] (middle modes of diamonds). *)
-      let le_y_x = C.le a_obj y x in
-      let le_x_y = C.le a_obj x y in
-      let parallel = (not le_y_x) && not le_x_y in
-      let choose_y =
-        match b with Join -> C.le a_obj x c | Meet -> C.le a_obj c x
-      in
-      let choose_x =
-        match b with Join -> C.le a_obj y c | Meet -> C.le a_obj c y
-      in
-      if parallel && choose_y
-      then begin
-        assert (not choose_x);
-        `Second
-      end
-      else if parallel && choose_x
-      then begin
-        assert (not choose_y);
-        `First
-      end
-      else
-        begin if
-          begin match b with Join -> le_y_x | Meet -> le_x_y
-          end
-        then `First
-        else `Second
+      match b with
+      | Meet ->
+        if C.le a_obj c x
+        then begin
+          assert (not (C.le a_obj c y));
+          `Second
         end
+        else begin
+          `First
+        end
+      | Join ->
+        if C.le a_obj x c
+        then begin
+          assert (not (C.le a_obj y c));
+          `Second
+        end
+        else `First
 
     type 'd sided =
       | Left : left_only sided
