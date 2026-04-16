@@ -521,25 +521,11 @@ let non_nullable raw_kind = { raw_kind; nullable = Non_nullable }
 
 let nullable raw_kind = { raw_kind; nullable = Nullable }
 
-(* CR layouts v3: This file has two approaches for checking
-   nullability. [representation_properties_type] does this by calling
-   [Ctype.check_type_nullability] (which is just [constrain_type_jkind] on [any
-   mod non_null]), while [add_nullability_from_scannable_jkind] just pulls it
-   out of a kind (and sometimes we compute a jkind with [estimate_type_jkind]
-   for that purpose).
-
-   The former is a bit more expensive (though quite cheap in the places where we
-   are doing it now, as the type has already been scraped) but will give a fully
-   accurate nullability. The later is conservative but cheaper when we already
-   have a jkind. We should pick one, or rationalize why there are two.
-*)
-
-let add_nullability_from_scannable_jkind env jkind raw_kind =
+let add_nullability_from_ty env ty raw_kind =
   let nullable =
-    match Jkind.get_nullability env jkind with
-    | Some Non_null -> Non_nullable
-    | Some Maybe_null -> Nullable
-    | None -> Misc.fatal_error "expected a layout of scannable"
+    match Ctype.check_type_nullability env ty Non_null with
+    | true -> Non_nullable
+    | false -> Nullable
   in
   { raw_kind; nullable }
 
@@ -678,7 +664,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       if cannot_proceed () then
         num_nodes_visited,
-        add_nullability_from_scannable_jkind env decl.type_jkind
+        add_nullability_from_ty env scty
           (value_kind_of_scannable_jkind env decl.type_jkind)
       else
         let visited = Numbers.Int.Set.add (get_id ty) visited in
@@ -711,7 +697,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
         | Type_abstract _ ->
           num_nodes_visited,
-          add_nullability_from_scannable_jkind env decl.type_jkind
+          add_nullability_from_ty env scty
             (value_kind_of_scannable_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
     end
@@ -744,8 +730,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     else non_nullable Pintval
   | _ ->
     num_nodes_visited,
-    add_nullability_from_scannable_jkind env
-      (Ctype.estimate_type_jkind env scty) Pgenval
+    add_nullability_from_ty env scty Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
