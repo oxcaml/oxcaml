@@ -3880,6 +3880,29 @@ let final_module_block_representation acc
       field_count,
       block_access,
       fun _ -> K.value )
+  | Module_mixed (shape, _)
+    when Mixed_product_bytes.shape_is_all_value shape ->
+    let shape =
+      K.Mixed_block_lambda_shape.of_mixed_block_elements shape
+        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+    in
+    let flattened_reordered_shape =
+      K.Mixed_block_lambda_shape.flattened_reordered_shape shape
+    in
+    let field_count = Array.length flattened_reordered_shape in
+    let block_access _pos : P.Block_access_kind.t =
+      Values
+        { tag = Known Tag.Scannable.zero;
+          size =
+            Known
+              (Target_ocaml_int.of_int (Acc.machine_width acc) field_count);
+          field_kind = Any_value
+        }
+    in
+    ( K.Scannable_block_shape.Value_only,
+      field_count,
+      block_access,
+      fun _ -> K.value )
   | Module_mixed (shape, _) ->
     let shape =
       K.Mixed_block_lambda_shape.of_mixed_block_elements shape
