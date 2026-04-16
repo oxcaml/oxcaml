@@ -326,11 +326,11 @@ Line 8, characters 32-36:
                                     ^^^^
 Error: This expression has type "float" but an expression was expected of type
          "('a : immediate)"
-       The layout of float is value
+       The kind of float is
+           value mod forkable unyielding many stateless immutable
          because it is the primitive type float.
-       But the layout of float must be a sublayout of value non_pointer
+       But the kind of float must be a subkind of immediate
          because of the definition of s6 at line 2, characters 0-35.
-       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (*****************************************************)
@@ -388,7 +388,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is void
            because of the definition of void_t at line 1, characters 0-23.
-         But the layout of 'a must be a value layout
+         But the layout of 'a must overlap with value
            because it instantiates an unannotated type parameter of t8_5,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to
@@ -409,12 +409,11 @@ Error: Layout mismatch in final type declaration consistency check.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The layout of 'a is value
+         The kind of 'a is value
            because it instantiates an unannotated type parameter of t10,
-           chosen to have layout value.
-         But the layout of 'a must be a sublayout of value non_pointer
+           chosen to have kind value.
+         But the kind of 'a must be a subkind of immediate
            because of the definition of imm_t at line 1, characters 0-27.
-         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]

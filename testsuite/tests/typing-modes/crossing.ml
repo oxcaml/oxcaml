@@ -102,7 +102,6 @@ type cross_aliased : value mod aliased
 type cross_unique : value mod unique
 type cross_contended : value mod contended
 type cross_shared : value mod shared
-type cross_corrupted : value mod corrupted
 type cross_uncontended : value mod uncontended
 [%%expect{|
 type cross_global : value mod global
@@ -117,7 +116,6 @@ type cross_aliased : value mod aliased
 type cross_unique
 type cross_contended : value mod contended
 type cross_shared : value mod shared
-type cross_corrupted : value mod corrupted
 type cross_uncontended
 |}]
 
@@ -198,17 +196,6 @@ val cross_contended2 :
   cross_contended @ contended -> cross_contended @ shared = <fun>
 |}]
 
-let cross_contended3 (x : cross_contended @ corrupted) : _ @ uncontended = x
-[%%expect{|
-val cross_contended3 : cross_contended @ corrupted -> cross_contended = <fun>
-|}]
-
-let cross_contended4 (x : cross_contended @ contended) : _ @ corrupted = x
-[%%expect{|
-val cross_contended4 :
-  cross_contended @ contended -> cross_contended @ corrupted = <fun>
-|}]
-
 let cross_shared1 (x : cross_shared @ shared) : _ @ uncontended = x
 [%%expect{|
 val cross_shared1 : cross_shared @ shared -> cross_shared = <fun>
@@ -219,24 +206,7 @@ let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
 Line 1, characters 64-65:
 1 | let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
                                                                     ^
-Error: This value is "corrupted" because it crosses with something
-         which is "contended".
-       However, the highlighted expression is expected to be "shared" or "uncontended".
-|}]
-
-let cross_corrupted1 (x : cross_corrupted @ corrupted) : _ @ uncontended = x
-[%%expect{|
-val cross_corrupted1 : cross_corrupted @ corrupted -> cross_corrupted = <fun>
-|}]
-
-let cross_corrupted2 (x : cross_corrupted @ contended) : _ @ corrupted = x
-[%%expect{|
-Line 1, characters 73-74:
-1 | let cross_corrupted2 (x : cross_corrupted @ contended) : _ @ corrupted = x
-                                                                             ^
-Error: This value is "shared" because it crosses with something
-         which is "contended".
-       However, the highlighted expression is expected to be "corrupted" or "uncontended".
+Error: This value is "contended" but is expected to be "shared" or "uncontended".
 |}]
 
 let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
@@ -253,23 +223,6 @@ Line 1, characters 74-75:
 1 | let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
                                                                               ^
 Error: This value is "contended" but is expected to be "shared" or "uncontended".
-|}]
-
-let cross_uncontended3 (x : cross_uncontended @ corrupted) : _ @ uncontended = x
-[%%expect{|
-Line 1, characters 79-80:
-1 | let cross_uncontended3 (x : cross_uncontended @ corrupted) : _ @ uncontended = x
-                                                                                   ^
-Error: This value is "corrupted" but is expected to be "uncontended".
-|}]
-
-let cross_uncontended4 (x : cross_uncontended @ contended) : _ @ corrupted = x
-[%%expect{|
-Line 1, characters 77-78:
-1 | let cross_uncontended4 (x : cross_uncontended @ contended) : _ @ corrupted = x
-                                                                                 ^
-Error: This value is "contended"
-       but is expected to be "corrupted" or "uncontended".
 |}]
 
 (* Check that all modalities cross modes *)
@@ -301,11 +254,9 @@ type s : value mod contended = { v : t @@ contended } [@@unboxed]
 type s = { v : t @@ contended; } [@@unboxed]
 |}]
 type s : value = { v : t @@ shared } [@@unboxed]
-type s : value = { v : t @@ corrupted } [@@unboxed]
-(* CR layouts: Ideally, these should have better jkinds than [value], but we
-   don't yet support the interaction between middle modes (like [shared] and
-   [poisoned]) and modal kinds. *)
+(* CR layouts: Ideally, this should have a better jkind than [value], but we
+   don't yet support the interaction between middle modes (like [shared]) and
+   modal kinds. *)
 [%%expect{|
 type s = { v : t @@ shared; } [@@unboxed]
-type s = { v : t @@ corrupted; } [@@unboxed]
 |}]

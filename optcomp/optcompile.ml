@@ -96,10 +96,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
         |> Slambda.eval
              (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-        |> fun { Slambda.slv_comptime = _; slv_runtime } ->
+        |> fun { Lambda.sval_comptime = _; sval_runtime } ->
         (* CR layout poly: Drop the comptime part until top-level modules can be
            static. *)
-        { program with Lambda.code = slv_runtime }
+        { program with Lambda.code = sval_runtime }
         |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
             Type_shape.print_debug_uid_tables ppf)
         |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
@@ -320,8 +320,7 @@ let native unix
     let set_load_path_for_eval () =
       List.iter
         (fun lib ->
-          Load_path.add_dir
-            (Visible { cmx_guaranteed = true })
+          Load_path.add_dir ~hidden:false
             (Misc.expand_directory Config.standard_library ("+" ^ lib)))
         extra_load_paths_for_eval
   end) : S)

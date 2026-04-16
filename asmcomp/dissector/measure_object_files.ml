@@ -192,7 +192,6 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
         []))
   in
   let result = List.concat_map (analyze_one ~indent:"") files in
-  Gc.compact ();
   Option.iter close_out out_channel;
   (* Log summary if -ddissector is enabled *)
   if !Clflags.ddissector

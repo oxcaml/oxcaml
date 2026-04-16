@@ -19,19 +19,19 @@
     term of the form:
 
     {v
-    let_cont k x =
-      let_cont k' y =
-        ...
-      in
-      ..
-      switch x with
-      | 0 -> k' 0
-      | 1 -> k' 1
+  let_cont k x =
+    let_cont k' y =
+      ...
     in
     ..
-    switch .. with
-    | 0 -> k 0
-    | 1 -> k 1
+    switch x with
+    | 0 -> k' 0
+    | 1 -> k' 1
+  in
+  ..
+  switch .. with
+  | 0 -> k 0
+  | 1 -> k 1
     v} *)
 
 (** The decision to specialize continuation k is made once Simplify has reached

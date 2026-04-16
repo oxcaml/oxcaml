@@ -89,16 +89,18 @@ val merge : t -> from_apply_expr:t -> t
     For example in:
 
     {[
-    let[@inline] f x = Sys.opaque_identity x + 1
+      let[@inline] f x = Sys.opaque_identity x + 1
 
-    let[@inline] g x = 2 * f x
+      let[@inline] g x = 2 * f x
 
-    let foo x = g x - f x
+      let foo x = g x - f x
     ]}
 
     we have the following in [f]:
 
-    {v Paddint/44N = ((+ Popaque/43N 1) example.ml:1,19--46) v}
+    {v
+    Paddint/44N = ((+ Popaque/43N 1) example.ml:1,19--46)
+    v}
 
     and the following in [g]:
 
@@ -144,9 +146,9 @@ val merge : t -> from_apply_expr:t -> t
     by inlining:
 
     {[
-    let[@inline] bar f x = f x
+      let[@inline] bar f x = f x
 
-    let baz x = bar foo x
+      let baz x = bar foo x
     ]}
 
     The term marked as "addition A" above now looks like this:

@@ -98,12 +98,23 @@ Line 1, characters 14-25:
 1 | type nested = int or_null or_null
                   ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
-         "('a : value maybe_separable)"
-       The layout of int or_null is value maybe_separable maybe_null
+         "('a : value_or_null mod non_null)"
+       The kind of int or_null is value_or_null mod everything
          because it is the primitive type or_null.
-       But the layout of int or_null must be a sublayout of
-           value maybe_separable
-         because the type argument of or_null has layout value.
+       But the kind of int or_null must be a subkind of
+           value_or_null mod non_null
+         because the type argument of or_null has kind value.
+|}, Principal{|
+Line 1, characters 14-25:
+1 | type nested = int or_null or_null
+                  ^^^^^^^^^^^
+Error: This type "int or_null" should be an instance of type
+         "('a : value_or_null mod non_null)"
+       The kind of int or_null is value_or_null mod everything with int
+         because it is the primitive type or_null.
+       But the kind of int or_null must be a subkind of
+           value_or_null mod non_null
+         because the type argument of or_null has kind value.
 |}]
 
 let should_fail = This (This 5)
@@ -114,9 +125,9 @@ Line 1, characters 23-31:
                            ^^^^^^^^
 Error: This expression has type "'a t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The layout of 'a t is value maybe_separable maybe_null
+       The kind of 'a t is value_or_null mod everything with 'a
          because it is the primitive type or_null.
-       But the layout of 'a t must be a sublayout of value
+       But the kind of 'a t must be a subkind of value
          because of the definition of t at line 1, characters 0-69.
 |}]
 
@@ -128,9 +139,9 @@ Line 1, characters 28-32:
                                 ^^^^
 Error: This expression has type "'a t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The layout of 'a t is value maybe_separable maybe_null
+       The kind of 'a t is value_or_null mod everything with 'a
          because it is the primitive type or_null.
-       But the layout of 'a t must be a sublayout of value
+       But the kind of 'a t must be a subkind of value
          because of the definition of t at line 1, characters 0-69.
 |}]
 
@@ -198,13 +209,12 @@ Line 1, characters 26-28:
 1 | let should_fail = [| This 5.; Null |]
                               ^^
 Error: This expression has type "float" but an expression was expected of type
-         "('a : value non_float)"
-       The layout of float is value
+         "('a : value mod non_float)"
+       The kind of float is
+           value mod forkable unyielding many stateless immutable
          because it is the primitive type float.
-       But the layout of float must be a sublayout of value non_float
+       But the kind of float must be a subkind of value mod non_float
          because it's the type of an array element.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 
 type should_work = string or_null array
@@ -220,10 +230,21 @@ Line 1, characters 19-32:
 1 | type should_fail = float or_null array
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
-         "('a : any separable)"
-       The layout of float or_null is value maybe_separable maybe_null
+         "('a : any mod separable)"
+       The kind of float or_null is
+           value_or_null mod forkable unyielding many stateless immutable
          because it is the primitive type or_null.
-       But the layout of float or_null must be a sublayout of any separable
+       But the kind of float or_null must be a subkind of any mod separable
+         because it's the type argument to the array type.
+|}, Principal{|
+Line 1, characters 19-32:
+1 | type should_fail = float or_null array
+                       ^^^^^^^^^^^^^
+Error: This type "float or_null" should be an instance of type
+         "('a : any mod separable)"
+       The kind of float or_null is value_or_null mod everything with float
+         because it is the primitive type or_null.
+       But the kind of float or_null must be a subkind of any mod separable
          because it's the type argument to the array type.
 |}]
 
@@ -255,13 +276,12 @@ Line 1, characters 32-34:
 1 | let should_fail = [: Null; This 5. :]
                                     ^^
 Error: This expression has type "float" but an expression was expected of type
-         "('a : value non_float)"
-       The layout of float is value
+         "('a : value mod non_float)"
+       The kind of float is
+           value mod forkable unyielding many stateless immutable
          because it is the primitive type float.
-       But the layout of float must be a sublayout of value non_float
+       But the kind of float must be a subkind of value mod non_float
          because it's the type of an array element.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 
 type should_work = exn or_null array
@@ -277,10 +297,21 @@ Line 1, characters 19-32:
 1 | type should_fail = float or_null array
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
-         "('a : any separable)"
-       The layout of float or_null is value maybe_separable maybe_null
+         "('a : any mod separable)"
+       The kind of float or_null is
+           value_or_null mod forkable unyielding many stateless immutable
          because it is the primitive type or_null.
-       But the layout of float or_null must be a sublayout of any separable
+       But the kind of float or_null must be a subkind of any mod separable
+         because it's the type argument to the array type.
+|}, Principal{|
+Line 1, characters 19-32:
+1 | type should_fail = float or_null array
+                       ^^^^^^^^^^^^^
+Error: This type "float or_null" should be an instance of type
+         "('a : any mod separable)"
+       The kind of float or_null is value_or_null mod everything with float
+         because it is the primitive type or_null.
+       But the kind of float or_null must be a subkind of any mod separable
          because it's the type argument to the array type.
 |}]
 
@@ -292,9 +323,18 @@ Line 1, characters 26-42:
 1 | type object_with_null = < x : int or_null; .. >
                               ^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The layout of "int or_null" is value maybe_separable maybe_null
+       The kind of "int or_null" is value_or_null mod everything
          because it is the primitive type or_null.
-       But the layout of "int or_null" must be a sublayout of value
+       But the kind of "int or_null" must be a subkind of value
+         because it's the type of an object field.
+|}, Principal{|
+Line 1, characters 26-42:
+1 | type object_with_null = < x : int or_null; .. >
+                              ^^^^^^^^^^^^^^^^
+Error: Object field types must have layout value.
+       The kind of "int or_null" is value_or_null mod everything with int
+         because it is the primitive type or_null.
+       But the kind of "int or_null" must be a subkind of value
          because it's the type of an object field.
 |}]
 
@@ -309,9 +349,9 @@ Line 3, characters 8-9:
 3 |     val x = Null
             ^
 Error: Variables bound in a class must have layout value.
-       The layout of x is value maybe_separable maybe_null
+       The kind of x is value_or_null mod everything with 'a
          because it is the primitive type or_null.
-       But the layout of x must be a sublayout of value
+       But the kind of x must be a subkind of value
          because it's the type of a class field.
 |}]
 
@@ -372,11 +412,11 @@ Line 1, characters 45-55:
 1 | type (_, _) fail = Fail : 'a or_null -> ('a, 'a or_null) fail [@@unboxed]
                                                  ^^^^^^^^^^
 Error: This type "'a or_null" should be an instance of type "('b : value)"
-       The layout of 'a or_null is value maybe_separable maybe_null
+       The kind of 'a or_null is value_or_null mod everything with 'a
          because it is the primitive type or_null.
-       But the layout of 'a or_null must be a sublayout of value
+       But the kind of 'a or_null must be a subkind of value
          because it instantiates an unannotated type parameter of fail,
-         chosen to have layout value.
+         chosen to have kind value.
 |}]
 
 type (_, _ : value_or_null) gadt = Gadt : 'a or_null -> ('a, 'a or_null) gadt [@@unboxed]
@@ -412,9 +452,9 @@ Line 1, characters 35-51:
                                        ^^^^^^^^^^^^^^^^
 Error: This expression has type "unboxed_rec"
        but an expression was expected of type "('a : value)"
-       The layout of unboxed_rec is value maybe_separable maybe_null
+       The kind of unboxed_rec is value_or_null mod everything
          because it is the primitive type or_null.
-       But the layout of unboxed_rec must be a sublayout of value
+       But the kind of unboxed_rec must be a subkind of value
          because of the definition of t at line 1, characters 0-69.
 |}]
 
@@ -426,9 +466,9 @@ Line 1, characters 35-46:
                                        ^^^^^^^^^^^
 Error: This expression has type "unboxed_var"
        but an expression was expected of type "('a : value)"
-       The layout of unboxed_var is value maybe_separable maybe_null
+       The kind of unboxed_var is value_or_null mod everything
          because it is the primitive type or_null.
-       But the layout of unboxed_var must be a sublayout of value
+       But the kind of unboxed_var must be a subkind of value
          because of the definition of t at line 1, characters 0-69.
 |}]
 
@@ -440,46 +480,9 @@ Line 1, characters 36-47:
                                         ^^^^^^^^^^^
 Error: This expression has type "('a, 'a or_null) gadt"
        but an expression was expected of type "('b : value)"
-       The layout of ('a, 'a or_null) gadt is
-           value maybe_separable maybe_null
+       The kind of ('a, 'a or_null) gadt is
+           value_or_null mod everything with 'a
          because it is the primitive type or_null.
-       But the layout of ('a, 'a or_null) gadt must be a sublayout of value
+       But the kind of ('a, 'a or_null) gadt must be a subkind of value
          because of the definition of t at line 1, characters 0-69.
-|}]
-
-type t : immediate_or_null & immediate = #(int or_null * int)
-[%%expect{|
-type t = #(int or_null * int)
-|}]
-
-type bad : immediate & immediate = #(int or_null * int)
-[%%expect{|
-Line 1, characters 0-55:
-1 | type bad : immediate & immediate = #(int or_null * int)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "#(int or_null * int)" is
-           value maybe_separable maybe_null & value non_pointer
-         because it is an unboxed tuple.
-       But the layout of type "#(int or_null * int)" must be a sublayout of
-           value non_pointer & value non_pointer
-         because of the definition of bad at line 1, characters 0-55.
-       Note: The layout of immediate is value non_pointer.
-|}]
-
-module M : sig
-  type t : immediate_or_null
-end = struct
-  type t = int or_null
-end
-[%%expect{|
-module M : sig type t : immediate_or_null end
-|}]
-
-module M : sig
-  type t : immediate_or_null & immediate
-end = struct
-  type t = #(int or_null * int)
-end
-[%%expect{|
-module M : sig type t : immediate_or_null & immediate end
 |}]

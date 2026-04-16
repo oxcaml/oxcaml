@@ -217,5 +217,4 @@ let extract_from_linked_partitions unix linked_partitions =
           acc)
       empty_accumulator linked_partitions
   in
-  Gc.compact ();
   finalize acc

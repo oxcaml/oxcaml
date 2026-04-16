@@ -24,12 +24,10 @@ Error: Signature mismatch:
          type 'a t
        is not included in
          type 'a t : immutable_data with 'a
-       The layout of the first is value
+       The kind of the first is value
          because of the definition of t at line 4, characters 2-11.
-       But the layout of the first must be a sublayout of value non_float
+       But the kind of the first must be a subkind of immutable_data with 'a
          because of the definition of t at line 2, characters 2-36.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 
 (* This appears sound to accept. But it isn't. See the following test. *)

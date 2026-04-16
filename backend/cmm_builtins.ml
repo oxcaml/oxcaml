@@ -67,9 +67,9 @@ let int_of_value arg dbg = Cop (Creinterpret_cast Int_of_value, [arg], dbg)
 
 let value_of_int arg dbg = Cop (Creinterpret_cast Value_of_int, [arg], dbg)
 
-let shift ~bits make_op arg count dbg =
+let shift32 make_op arg count dbg =
   assert (size_int = 8);
-  let mask = bits - 1 in
+  let mask = 32 - 1 in
   let count =
     match count with
     | Cconst_int (n, _) -> Cconst_int (n land mask, dbg)
@@ -1008,36 +1008,16 @@ let transl_builtin name args dbg typ_res =
         | Cexit (_, _, _)
         | Cinvalid _ ->
           Cop (op, [cond; ifso; ifnot], dbg))
-  | "caml_int8_shift_left_by_int8_untagged" ->
-    let arg, count = two_args name args in
-    shift ~bits:8 lsl_int arg count dbg
-  | "caml_int8_shift_right_by_int8_untagged" ->
-    let arg, count = two_args name args in
-    shift ~bits:8 asr_int arg count dbg
-  | "caml_int8_shift_right_logical_by_int8_untagged" ->
-    let arg, count = two_args name args in
-    let arg = zero_extend ~bits:8 ~dbg arg in
-    shift ~bits:8 lsr_int arg count dbg
-  | "caml_int16_shift_left_by_int16_untagged" ->
-    let arg, count = two_args name args in
-    shift ~bits:16 lsl_int arg count dbg
-  | "caml_int16_shift_right_by_int16_untagged" ->
-    let arg, count = two_args name args in
-    shift ~bits:16 asr_int arg count dbg
-  | "caml_int16_shift_right_logical_by_int16_untagged" ->
-    let arg, count = two_args name args in
-    let arg = zero_extend ~bits:16 ~dbg arg in
-    shift ~bits:16 lsr_int arg count dbg
   | "caml_int32_shift_left_by_int32_unboxed" ->
     let arg, count = two_args name args in
-    shift ~bits:32 lsl_int arg count dbg
+    shift32 lsl_int arg count dbg
   | "caml_int32_shift_right_by_int32_unboxed" ->
     let arg, count = two_args name args in
-    shift ~bits:32 asr_int arg count dbg
+    shift32 asr_int arg count dbg
   | "caml_int32_shift_right_logical_by_int32_unboxed" ->
     let arg, count = two_args name args in
     let arg = zero_extend ~bits:32 ~dbg arg in
-    shift ~bits:32 lsr_int arg count dbg
+    shift32 lsr_int arg count dbg
   | "caml_nativeint_shift_left_by_nativeint_unboxed"
   | "caml_int64_shift_left_by_int64_unboxed" ->
     let arg, count = two_args name args in
@@ -1284,15 +1264,13 @@ let builtin_even_if_not_annotated = function
   | _ -> false
 
 (* These builtins are lowered to Cmm operations guaranteed to produce
-   sign-extended 32/16/8-bit results. This means the caller can skip redundant
-   sign extensions. *)
+   sign-extended 32-bit results. This means the caller can skip redundant sign
+   extensions. *)
 let builtin_sign_extends = function
   | "caml_native_pointer_load_signed_int32"
   | "caml_native_pointer_load_unboxed_int32"
   | "caml_ext_pointer_load_signed_int32" | "caml_ext_pointer_load_unboxed_int32"
-  | "caml_int32_shift_right_by_int32_unboxed" | "caml_csel_int32_unboxed"
-  | "caml_int16_shift_right_by_int16_untagged"
-  | "caml_int8_shift_right_by_int8_untagged" ->
+  | "caml_int32_shift_right_by_int32_unboxed" | "caml_csel_int32_unboxed" ->
     true
   | _ -> false
 

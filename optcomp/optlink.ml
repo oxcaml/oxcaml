@@ -64,17 +64,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     then
       (* This is a cmx file. It must be linked in any case. Read the infos to
          see which modules it requires. *)
-      let info, crc =
-        Profile.record_call ~accumulate:true "link/scan/read_cmx" (fun () ->
-            read_unit_info file_name)
-      in
+      let info, crc = read_unit_info file_name in
       Unit (file_name, info, crc)
     else if Filename.check_suffix file_name Backend.ext_flambda_lib
     then
       let infos =
-        try
-          Profile.record_call ~accumulate:true "link/scan/read_cmxa" (fun () ->
-              read_library_info file_name)
+        try read_library_info file_name
         with Compilenv.Error (Not_a_unit_info filename) ->
           raise (Linkenv.Error (Not_an_object_file filename))
       in
@@ -116,11 +111,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       let object_file_name =
         Filename.chop_suffix file_name Backend.ext_flambda_obj ^ Backend.ext_obj
       in
-      Profile.record_call ~accumulate:true "link/scan/check_consistency"
-        (fun () ->
-          Linkenv.check_consistency linkenv ~unit
-            (Array.of_list info.ui_imports_cmi)
-            (Array.of_list info.ui_imports_cmx));
+      Linkenv.check_consistency linkenv ~unit
+        (Array.of_list info.ui_imports_cmi)
+        (Array.of_list info.ui_imports_cmx);
       let cached_genfns_imports =
         Generic_fns.Tbl.add ~imports:cached_genfns_imports genfns
           info.ui_generic_fns
@@ -273,8 +266,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         in
         let linkenv = Linkenv.create () in
         let full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
-          Profile.record_call "link/scan/user_files_pass1" (fun () ->
-              scan_user_supplied_files linkenv ~genfns ~objfiles)
+          scan_user_supplied_files linkenv ~genfns ~objfiles
         in
         let uses_eval = !Clflags.uses_metaprogramming in
         if uses_eval && not Backend.supports_metaprogramming
@@ -358,8 +350,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                 objfiles
             in
             let _full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
-              Profile.record_call "link/scan/user_files_pass2" (fun () ->
-                  scan_user_supplied_files linkenv ~genfns ~objfiles)
+              scan_user_supplied_files linkenv ~genfns ~objfiles
             in
             ( linkenv,
               _full_paths,
@@ -380,11 +371,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         let _full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
           (* This is just for any stdlib and eval support files which are
              needed. *)
-          Profile.record_call "link/scan/stdlib_and_eval_support" (fun () ->
-              List.fold_right
-                (scan_file linkenv ~shared:false genfns)
-                stdlib_and_support_files_for_eval
-                ([], ml_objfiles, units_tolink, cached_genfns_imports))
+          List.fold_right
+            (scan_file linkenv ~shared:false genfns)
+            stdlib_and_support_files_for_eval
+            ([], ml_objfiles, units_tolink, cached_genfns_imports)
         in
         (if not shared
          then

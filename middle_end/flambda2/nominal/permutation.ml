@@ -74,6 +74,10 @@ module Make (N : Container_types.S) = struct
     invariant t;
     t
 
+  (* CR-someday lmaurer: Define [N.Map.left_union] so we don't have this Some
+     silliness. *)
+  let left_union map1 map2 = N.Map.union (fun _k l _r -> Some l) map1 map2
+
   let compose ~second ~first =
     (* Find the triples [n1, n2, n3] where [first n1 = n2] and [second n2 =
        n3]. *)
@@ -83,7 +87,7 @@ module Make (N : Container_types.S) = struct
     (* Take the union of the forward directions, taking the first in case of a
        collision (since the first is the one that will actually act on the
        key) *)
-    let forwards = N.Map.union_left_biased first.forwards second.forwards in
+    let forwards = left_union first.forwards second.forwards in
     (* Add a correction for each chained triple [n1, n2, n3]. The above left
        union maps [n1] to [n2], and we need it to map to [n3] instead. One might
        worry that the left union also includes an erroneous binding from [n2] to
@@ -99,7 +103,7 @@ module Make (N : Container_types.S) = struct
     in
     (* Similarly, take the union of the backward directions, only now the second
        permutation wins because it acts first *)
-    let backwards = N.Map.union_left_biased second.backwards first.backwards in
+    let backwards = left_union second.backwards first.backwards in
     (* Again, correct for each chained triple *)
     let backwards =
       N.Map.fold (fun _ (n1, n3) -> add_to_map n3 n1) chained backwards

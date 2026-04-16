@@ -250,7 +250,7 @@ module Type_shape = struct
     let open Shape in
     let unknown_shape_any = Shape.unknown_type () in
     let unknown_shape_value =
-      Shape.at_layout (Shape.unknown_type ()) (Base Scannable)
+      Shape.at_layout (Shape.unknown_type ()) (Base Value)
     in
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
@@ -379,7 +379,7 @@ end
 
 module Type_decl_shape = struct
   let rec mixed_block_shape_to_layout = function
-    | Types.Scannable -> Layout.Base Scannable
+    | Types.Value -> Layout.Base Value
     | Types.Float_boxed ->
       Layout.Base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime,
@@ -453,7 +453,7 @@ module Type_decl_shape = struct
             (fun { Shape.field_name = _; field_value = _, ly } ->
               if
                 not
-                  (Layout.equal ly (Layout.Base Scannable)
+                  (Layout.equal ly (Layout.Base Value)
                   || Layout.equal ly (Layout.Base Void))
               then
                 if !Clflags.dwarf_pedantic
@@ -462,7 +462,7 @@ module Type_decl_shape = struct
                     "Type_shape: variant constructor with mismatched layout, \
                      has %a but expected value or void."
                     Layout.format ly
-                else Layout.Base Scannable
+                else Layout.Base Value
               else ly)
             args
         in

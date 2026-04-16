@@ -451,13 +451,13 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
   in
   build state cfg_with_infos;
   if round = 1
-  then
-    begin match Lazy.force Interf_threshold.value with
+  then begin
+    match Lazy.force Interf_threshold.value with
     | None -> ()
     | Some threshold ->
       if State.get_max_degree state > threshold
       then raise Function_is_too_complex
-    end;
+  end;
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   if debug
   then (

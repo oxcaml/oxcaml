@@ -303,18 +303,14 @@ let set_paths ?(auto_include=Compmisc.auto_include) () =
      but keep the directories that user code linked in with ocamlmktop
      may have added to load_path. *)
   let expand = Misc.expand_directory Config.standard_library in
-  let expand_entry (e : Clflags.visible_include) : Clflags.visible_include =
-    { path = expand e.path; cmx_guaranteed = e.cmx_guaranteed }
-  in
-  let include_no_cmx path = { Clflags.path ; cmx_guaranteed = false } in
   let Load_path.{ visible; hidden } = Load_path.get_paths () in
   let visible = List.concat [
-      [ include_no_cmx "" ];
-      List.map expand_entry (List.rev !Compenv.first_include_dirs);
-      List.map expand_entry (List.rev !Clflags.include_dirs);
-      List.map expand_entry (List.rev !Compenv.last_include_dirs);
+      [ "" ];
+      List.map expand (List.rev !Compenv.first_include_dirs);
+      List.map expand (List.rev !Clflags.include_dirs);
+      List.map expand (List.rev !Compenv.last_include_dirs);
       visible;
-      [ include_no_cmx (expand "+camlp4") ];
+      [expand "+camlp4"];
     ]
   in
   let hidden = List.concat [
@@ -323,20 +319,14 @@ let set_paths ?(auto_include=Compmisc.auto_include) () =
     ]
   in
   Load_path.init ~auto_include ~visible ~hidden;
-  let visible_dirs =
-    List.map (fun (e : Clflags.visible_include) -> e.path) visible
-  in
-  Dll.add_path (visible_dirs @ hidden)
+  Dll.add_path (visible @ hidden)
 
 let update_search_path_from_env () =
   let extra_paths =
     let env = Sys.getenv_opt "OCAMLTOP_INCLUDE_PATH" in
     Option.fold ~none:[] ~some:Misc.split_path_contents env
   in
-  let extra_entries =
-    List.map (fun path -> { Clflags.path; cmx_guaranteed = false }) extra_paths
-  in
-  Clflags.include_dirs := List.rev_append extra_entries !Clflags.include_dirs
+  Clflags.include_dirs := List.rev_append extra_paths !Clflags.include_dirs
 
 let initialize_toplevel_env () =
   toplevel_env := Compmisc.initial_env();

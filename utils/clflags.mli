@@ -59,10 +59,6 @@ type shape_format = Old_merlin | Debugging_shapes
 type gdwarf_fidelity =
   | Fidelity_low | Fidelity_medium | Fidelity_high
   | Fidelity_very_high | Fidelity_ultra_high | Fidelity_unlimited
-type visible_include =
-  { path : string;
-    cmx_guaranteed : bool;
-  }
 
 module Dwarf_config_defaults : sig
   val shape_reduce_depth : int option
@@ -81,7 +77,7 @@ val dllibs : string list ref
 val cmi_file : string option ref
 val compile_only : bool ref
 val output_name : string option ref
-val include_dirs : visible_include list ref
+val include_dirs : string list ref
 val hidden_include_dirs : string list ref
 val include_manifests : string list ref
 val hidden_include_manifests : string list ref
@@ -113,7 +109,6 @@ val uses_metaprogramming : bool ref
 val custom_runtime : bool ref
 val no_check_prims : bool ref
 val bytecode_compatible_32 : bool ref
-val thunkify_cu_init : bool ref
 val output_c_object : bool ref
 val output_complete_object : bool ref
 val output_complete_executable : bool ref
@@ -259,10 +254,6 @@ val emit_optimized_probes : bool ref
 val supports_optimized_probes : bool
 
 val llvm_backend : bool ref
-
-(* Dedicated flag to enable the ikinds kind checker. *)
-val ikinds : bool ref
-val ikinds_debug : bool ref
 
 val all_passes : string list ref
 val dumped_pass : string -> bool

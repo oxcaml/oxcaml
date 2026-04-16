@@ -140,7 +140,7 @@ let merge code_id t1 t2 =
   match t1, t2 with
   | Metadata_only cm1, Metadata_only cm2 ->
     if Code_metadata.approx_equal cm1 cm2
-    then t1
+    then Some t1
     else
       Misc.fatal_errorf
         "Code id %a is imported with different code metadata (%a and %a)"
@@ -152,7 +152,7 @@ let merge code_id t1 t2 =
   | (Code_present { code_status } as t), Metadata_only cm_imported ->
     let cm_present = code_status_metadata code_status in
     if Code_metadata.approx_equal cm_present cm_imported
-    then t
+    then Some t
     else
       Misc.fatal_errorf
         "Code_id %a is present with code metadata@ %abut imported with code \

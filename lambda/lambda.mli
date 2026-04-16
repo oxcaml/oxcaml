@@ -58,10 +58,6 @@ val modify_heap : modify_mode
 
 val modify_maybe_stack : modify_mode
 
-type staticity =
-  | Static
-  | Dynamic
-
 type initialization_or_assignment =
   (* [Assignment Alloc_local] is a mutation of a block that may be heap or local.
      [Assignment Alloc_heap] is a mutation of a block that's definitely heap. *)
@@ -127,7 +123,7 @@ type primitive =
   | Pbytes_of_string
   | Pignore
   (* Globals *)
-  | Pgetglobal of Compilation_unit.t * staticity
+  | Pgetglobal of Compilation_unit.t
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
@@ -937,6 +933,8 @@ and slambda =
   | SLhalves of slambda_halves
   | SLproj_comptime of slambda
     (** Project out the compiletime half of a [slambda_halves] *)
+  | SLproj_runtime of slambda
+    (** Project out the runtime half of a [slambda_halves] *)
   | SLtemplate of slambda_function
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
@@ -1409,7 +1407,7 @@ val mod_field:
 
 val structured_constant_layout : structured_constant -> layout
 
-val mixed_block_element_of_layout : layout -> 'a mixed_block_element
+val mixed_block_element_of_layout : layout -> unit mixed_block_element
 
 (** Returns the element at the given path in a mixed block shape.
     The path is a list of field indices for navigating into nested products. *)

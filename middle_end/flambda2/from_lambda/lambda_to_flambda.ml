@@ -46,10 +46,8 @@ let print_compact_location ppf (loc : Location.t) =
     if startchar >= 0 then Format.fprintf ppf ",%i--%i" startchar endchar
 
 let name_for_function (func : Lambda.lfunction) =
-  (* Name anonymous functions by their source location, if known, when using the
-     Flat name-mangling scheme. *)
   let mangling_scheme_locates_anonymous_functions =
-    match Config.name_mangling_scheme with Flat -> false | Structured -> true
+    match Config.name_mangling_scheme with Flat -> false
   in
   match func.loc with
   | Loc_unknown -> "fn"

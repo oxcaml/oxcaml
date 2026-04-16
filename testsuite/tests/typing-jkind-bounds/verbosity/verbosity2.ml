@@ -15,7 +15,7 @@ type t
 type t : immutable_data
 [%%expect {|
 type t
-  : value non_float non_null
+  : value
       mod forkable
           unyielding
           many
@@ -23,6 +23,8 @@ type t
           immutable
           portable
           contended
+          non_null
+          non_float
           local
           unique
           static
@@ -32,7 +34,7 @@ type t
 type t : immediate
 [%%expect {|
 type t
-  : value non_pointer non_null
+  : value
       mod global
           many
           stateless
@@ -43,6 +45,8 @@ type t
           portable
           contended
           external_
+          non_null
+          non_float
           static
 |}]
 
@@ -51,6 +55,8 @@ type t : float64
 type t
   : float64
       mod external_
+          non_null
+          non_float
           local
           unforkable
           yielding
@@ -78,13 +84,17 @@ type t
           uncontended
           static
           internal
+          maybe_null
+          maybe_separable
 |}]
 
 type t : value mod portable
 [%%expect {|
 type t
-  : value separable non_null
+  : value
       mod portable
+          non_null
+          separable
           local
           unforkable
           yielding
@@ -100,9 +110,11 @@ type t
 type t : value mod stateless
 [%%expect {|
 type t
-  : value separable non_null
+  : value
       mod stateless
           portable
+          non_null
+          separable
           local
           unforkable
           yielding
@@ -117,7 +129,7 @@ type t
 type 'a t : immutable_data with 'a
 [%%expect {|
 type 'a t
-  : value non_float non_null
+  : value
       mod forkable
           unyielding
           many
@@ -125,6 +137,8 @@ type 'a t
           immutable
           portable
           contended
+          non_null
+          non_float
           local
           unique
           static
@@ -135,7 +149,7 @@ type 'a t
 type ('a : immutable_data) t
 [%%expect {|
 type ('a
-     : value non_float non_null
+     : value
          mod forkable
              unyielding
              many
@@ -143,6 +157,8 @@ type ('a
              immutable
              portable
              contended
+             non_null
+             non_float
              local
              unique
              static
@@ -153,9 +169,11 @@ type ('a
 type ('a : value mod stateless) t
 [%%expect {|
 type ('a
-     : value separable non_null
+     : value
          mod stateless
              portable
+             non_null
+             separable
              local
              unforkable
              yielding
@@ -171,9 +189,11 @@ type ('a
 type 'a t : value mod portable external_ with 'a @@ external_
 [%%expect {|
 type 'a t
-  : value separable non_null
+  : value
       mod portable
           external_
+          non_null
+          separable
           local
           unforkable
           yielding
@@ -189,8 +209,10 @@ type 'a t
 type 'a t : value mod external_ with 'a @@ external_
 [%%expect {|
 type 'a t
-  : value separable non_null
+  : value
       mod external_
+          non_null
+          separable
           local
           unforkable
           yielding
@@ -206,7 +228,7 @@ type 'a t
 type 'a t : immutable_data with 'a @@ external_
 [%%expect {|
 type 'a t
-  : value non_float non_null
+  : value
       mod forkable
           unyielding
           many
@@ -214,6 +236,8 @@ type 'a t
           immutable
           portable
           contended
+          non_null
+          non_float
           local
           unique
           static

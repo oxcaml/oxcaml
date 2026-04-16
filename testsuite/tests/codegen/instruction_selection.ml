@@ -11,7 +11,6 @@
  flags += " -x86-peephole-optimize";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
  expect.opt;
 *)
 
@@ -75,23 +74,6 @@ do_intersect:
 |}]
 
 
-(* CR ttebbi: We could merge the and and cmp instructions *)
-let logand_branch x y f = if x land (1 lsl 4) <> 0 then f()
-[%%expect_asm X86_64{|
-logand_branch:
-  movq  %rdi, %rbx
-  andl  $33, %eax
-  cmpq  $1, %rax
-  je    .L108
-  movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
-.L108:
-  movl  $1, %eax
-  ret
-|}]
-
-
 (* CR ttebbi: We materialize comparison result bits despite
    only using them for a single branch. Also, the `_ -> 0`
    case is duplicated for no good reason. *)
@@ -109,37 +91,16 @@ combine_comparisons:
   cmpq  $11, %rbx
   jle   .L114
   testq %rax, %rax
-  je    .L114
+  je    .L111
   movq  %rbx, %rax
+  ret
+.L111:
+  movl  $1, %eax
   ret
 .L114:
   movl  $1, %eax
   ret
 |}]
-
-(* CR ttebbi: We branch twice on the same comparison, even though we realise
-   it is the same one. *)
-let repeat_comparisons r _f =
-  let a = !r > 5 in
-  let b = !r > 5 in
-  if a && b then 1 else 2
-[%%expect_asm X86_64{|
-repeat_comparisons:
-  movq  (%rax), %rbx
-  cmpq  $11, %rbx
-  setg  %al
-  movzbq %al, %rax
-  cmpq  $11, %rbx
-  jle   .L113
-  testq %rax, %rax
-  je    .L113
-  movl  $3, %eax
-  ret
-.L113:
-  movl  $5, %eax
-  ret
-|}]
-
 
 (* CR ttebbi: We materialize the boolean needlessly. *)
 let branch_and_return o =
@@ -196,12 +157,14 @@ let constant_folding (x : int) =
 [%%expect_asm X86_64{|
 constant_folding:
   cmpq  %rax, %rax
-  jl    .L109
+  jge   .L105
+  movl  $7, %eax
+  ret
+.L105:
   subq  %rax, %rax
   incq  %rax
   cmpq  $1, %rax
   jne   .L111
-.L109:
   movl  $7, %eax
   ret
 .L111:
@@ -316,7 +279,7 @@ opaque_int:
 
 (* Tag test for variant discrimination *)
 
-let is_int (x : 'a) = Obj.is_int (Obj.repr x)
+let is_int (x : 'a) = obj_is_int x
 [%%expect_asm X86_64{|
 is_int:
   andl  $1, %eax
@@ -324,18 +287,7 @@ is_int:
   ret
 |}]
 
-(* CR ttebbi: We should constant-fold this. *)
-let is_int_constant () : bool =
-   Obj.repr (Some 3) |> Obj.is_int
-[%%expect_asm X86_64{|
-is_int_constant:
-  movq  camlTOP25__const_block785@GOTPCREL(%rip), %rax
-  andl  $1, %eax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
-
-let is_int_branch (x : 'a) f = if Obj.is_int(Obj.repr x) then f()
+let is_int_branch (x : 'a) f = if obj_is_int x then f()
 [%%expect_asm X86_64{|
 is_int_branch:
   testb $1, %al
@@ -350,7 +302,7 @@ is_int_branch:
 
 
 (* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/2521 *)
-let is_block_branch (x : 'a) f = if not(Obj.is_int(Obj.repr x)) then f()
+let is_block_branch (x : 'a) f = if not(obj_is_int x) then f()
 [%%expect_asm X86_64{|
 is_block_branch:
   testb $1, %al
@@ -376,13 +328,13 @@ let branch_or_tailcall x =
 branch_or_tailcall:
   cmpq  $5, %rax
   jbe   .L105
-  movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
+  movq  camlTOP25__Pmakeblock786@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
 .L105:
-  movq  camlTOP28__switch_block919@GOTPCREL(%rip), %rbx
+  movq  camlTOP25__switch_block787@GOTPCREL(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]

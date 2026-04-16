@@ -76,8 +76,8 @@ module Persistent_signature = struct
     match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
     | filename, visibility when allow_hidden ->
       Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | filename, (Visible _ as visibility) ->
-      Some { filename; cmi = read_cmi_lazy filename; visibility}
+    | filename, Visible ->
+      Some { filename; cmi = read_cmi_lazy filename; visibility = Visible}
     | _, Hidden
     | exception Not_found -> None)
 end
@@ -400,16 +400,11 @@ let read_import penv ~check modname cmi =
   let filename = Unit_info.Artifact.filename cmi in
   add_import penv modname;
   let cmi = read_cmi_lazy filename in
-  let pers_sig =
-    { Persistent_signature.filename; cmi;
-      visibility = Visible { cmx_guaranteed = false } }
-  in
+  let pers_sig = { Persistent_signature.filename; cmi; visibility = Visible } in
   acknowledge_import penv ~check modname pers_sig
 
 let check_visibility ~allow_hidden imp =
-  match imp.imp_visibility with
-  | Hidden when not allow_hidden -> raise Not_found
-  | Hidden | Visible _ -> ()
+  if not allow_hidden && imp.imp_visibility = Load_path.Hidden then raise Not_found
 
 let find_import ~allow_hidden penv ~check modname =
   let {imports; _} = penv in

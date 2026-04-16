@@ -119,10 +119,6 @@ let eq_locality_mode a b =
   | Alloc_heap, Alloc_local -> false
   | Alloc_local, Alloc_heap -> false
 
-type staticity =
-  | Static
-  | Dynamic
-
 type initialization_or_assignment =
   | Assignment of modify_mode
   | Heap_initialization
@@ -150,7 +146,7 @@ type primitive =
   | Pbytes_of_string
   | Pignore
     (* Globals *)
-  | Pgetglobal of Compilation_unit.t * staticity
+  | Pgetglobal of Compilation_unit.t
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
@@ -980,6 +976,7 @@ and slambda =
   | SLfield of slambda * int
   | SLhalves of slambda_halves
   | SLproj_comptime of slambda
+  | SLproj_runtime of slambda
   | SLtemplate of slambda_function
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
@@ -1755,7 +1752,7 @@ let rec patch_guarded patch = function
 
 let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   match elt with
-  | Scannable -> Value generic_value
+  | Value -> Value generic_value
   | Float_boxed -> Float_boxed ()
   | Float64 -> Float64
   | Float32 -> Float32
@@ -1781,7 +1778,7 @@ and transl_mixed_product_shape shape =
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
-    | Scannable -> Value (get_value_kind i)
+    | Value -> Value (get_value_kind i)
     | Float_boxed -> Float_boxed (get_mode i)
     | Float64 -> Float64
     | Float32 -> Float32
@@ -1821,7 +1818,7 @@ let transl_module_representation repr =
   in
   let is_value (elt : Types.mixed_block_element) =
     match elt with
-    | Scannable -> true
+    | Value -> true
     | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
     | Product _ | Void -> false
@@ -1840,7 +1837,7 @@ let transl_module_representation repr =
 (* Translate an access path *)
 
 let rec transl_address loc = function
-  | Env.Aunit cu -> Lprim(Pgetglobal (cu, Dynamic), [], loc)
+  | Env.Aunit cu -> Lprim(Pgetglobal cu, [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
@@ -2097,189 +2094,91 @@ let duplicate_function =
      ~freshen_bound_variables:true
      Ident.Map.empty).subst_lfunction
 
-let map_lfunction f ({ kind; params; return; body = old_body; attr; loc;
-                      mode; ret_mode } as lfunction) =
-  let new_body = f old_body in
-  if old_body == new_body
-  then lfunction
-  else { kind; params; return; body = new_body; attr; loc; mode; ret_mode }
+let map_lfunction f { kind; params; return; body; attr; loc;
+                      mode; ret_mode } =
+  let body = f body in
+  { kind; params; return; body; attr; loc; mode; ret_mode }
 
-let shallow_map ~tail ~non_tail:f lam =
-  match lam with
+let shallow_map ~tail ~non_tail:f = function
   | Lvar _
   | Lmutvar _
   | Lconst _
-  | Lsplice _ -> lam
-  | Lapply { ap_func = old_func; ap_args = old_args; ap_result_layout;
-             ap_region_close; ap_mode; ap_loc; ap_tailcall; ap_inlined;
-             ap_specialised; ap_probe } ->
-      let new_func = f old_func in
-      let new_args = Misc.Stdlib.List.map_sharing f old_args in
-      if old_func == new_func && old_args == new_args
-      then lam
-      else
-        Lapply {
-          ap_func = new_func;
-          ap_args = new_args;
-          ap_result_layout;
-          ap_region_close;
-          ap_mode;
-          ap_loc;
-          ap_tailcall;
-          ap_inlined;
-          ap_specialised;
-          ap_probe;
-        }
-  | Lfunction old_lfun ->
-      let new_lfun = map_lfunction f old_lfun in
-      if old_lfun == new_lfun then lam else Lfunction new_lfun
-  | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
-      let new_e1 = f old_e1 in
-      let new_e2 = tail old_e2 in
-      if old_e1 == new_e1 && old_e2 == new_e2
-      then lam
-      else Llet (str, layout, v, v_duid, new_e1, new_e2)
-  | Lmutlet (layout, v, v_duid, old_e1, old_e2) ->
-      let new_e1 = f old_e1 in
-      let new_e2 = tail old_e2 in
-      if old_e1 == new_e1 && old_e2 == new_e2
-      then lam
-      else Lmutlet (layout, v, v_duid, new_e1, new_e2)
-  | Lletrec (old_idel, old_e2) ->
-      let new_idel =
-        Misc.Stdlib.List.map_sharing
-          (fun rb ->
-            let new_def = map_lfunction f rb.def in
-            if rb.def == new_def then rb else { rb with def = new_def })
-          old_idel
-      in
-      let new_e2 = tail old_e2 in
-      if old_idel == new_idel && old_e2 == new_e2
-      then lam
-      else Lletrec (new_idel, new_e2)
-  | Lprim (Psequand as p, [old_l1; old_l2], loc)
-  | Lprim (Psequor as p, [old_l1; old_l2], loc) ->
-      let new_l1 = f old_l1 in
-      let new_l2 = tail old_l2 in
-      if old_l1 == new_l1 && old_l2 == new_l2
-      then lam
-      else Lprim (p, [new_l1; new_l2], loc)
-  | Lprim (p, old_el, loc) ->
-      let new_el = Misc.Stdlib.List.map_sharing f old_el in
-      if old_el == new_el then lam else Lprim (p, new_el, loc)
-  | Lswitch (old_e, old_sw, loc, layout) ->
-      let new_e = f old_e in
-      let map_cases cases =
-        Misc.Stdlib.List.map_sharing
-          (fun ((n, old_e) as case) ->
-            let new_e = tail old_e in
-            if old_e == new_e then case else (n, new_e))
-          cases
-      in
-      let new_consts = map_cases old_sw.sw_consts in
-      let new_blocks = map_cases old_sw.sw_blocks in
-      let new_failaction =
-        Misc.Stdlib.Option.map_sharing tail old_sw.sw_failaction
-      in
-      if old_e == new_e
-         && old_sw.sw_consts == new_consts
-         && old_sw.sw_blocks == new_blocks
-         && old_sw.sw_failaction == new_failaction
-      then lam
-      else
-        Lswitch (new_e,
-                 { sw_numconsts = old_sw.sw_numconsts;
-                   sw_consts = new_consts;
-                   sw_numblocks = old_sw.sw_numblocks;
-                   sw_blocks = new_blocks;
-                   sw_failaction = new_failaction;
-                 },
-                 loc, layout)
-  | Lstringswitch (old_e, old_sw, old_default, loc, layout) ->
-      let new_e = f old_e in
-      let new_sw =
-        Misc.Stdlib.List.map_sharing
-          (fun ((s, old_e) as case) ->
-            let new_e = tail old_e in
-            if old_e == new_e then case else (s, new_e))
-          old_sw
-      in
-      let new_default =
-        Misc.Stdlib.Option.map_sharing tail old_default
-      in
-      if old_e == new_e && old_sw == new_sw
-         && old_default == new_default
-      then lam
-      else Lstringswitch (new_e, new_sw, new_default, loc, layout)
-  | Lstaticraise (i, old_args) ->
-      let new_args = Misc.Stdlib.List.map_sharing f old_args in
-      if old_args == new_args then lam
-      else Lstaticraise (i, new_args)
-  | Lstaticcatch (old_body, id, old_handler, r, layout) ->
-      let new_body = tail old_body in
-      let new_handler = tail old_handler in
-      if old_body == new_body && old_handler == new_handler
-      then lam
-      else Lstaticcatch (new_body, id, new_handler, r, layout)
-  | Ltrywith (old_e1, v, duid, old_e2, layout) ->
-      let new_e1 = f old_e1 in
-      let new_e2 = tail old_e2 in
-      if old_e1 == new_e1 && old_e2 == new_e2
-      then lam
-      else Ltrywith (new_e1, v, duid, new_e2, layout)
-  | Lifthenelse (old_e1, old_e2, old_e3, layout) ->
-      let new_e1 = f old_e1 in
-      let new_e2 = tail old_e2 in
-      let new_e3 = tail old_e3 in
-      if old_e1 == new_e1 && old_e2 == new_e2 && old_e3 == new_e3
-      then lam
-      else Lifthenelse (new_e1, new_e2, new_e3, layout)
-  | Lsequence (old_e1, old_e2) ->
-      let new_e1 = f old_e1 in
-      let new_e2 = tail old_e2 in
-      if old_e1 == new_e1 && old_e2 == new_e2
-      then lam
-      else Lsequence (new_e1, new_e2)
-  | Lwhile old_lw ->
-      let new_cond = f old_lw.wh_cond in
-      let new_body = f old_lw.wh_body in
-      if old_lw.wh_cond == new_cond && old_lw.wh_body == new_body
-      then lam
-      else Lwhile { wh_cond = new_cond; wh_body = new_body }
-  | Lfor old_lf ->
-      let new_from = f old_lf.for_from in
-      let new_to = f old_lf.for_to in
-      let new_body = f old_lf.for_body in
-      if old_lf.for_from == new_from
-         && old_lf.for_to == new_to
-         && old_lf.for_body == new_body
-      then lam
-      else
-        Lfor { old_lf with for_from = new_from;
-                            for_to = new_to;
-                            for_body = new_body }
-  | Lassign (v, old_e) ->
-      let new_e = f old_e in
-      if old_e == new_e then lam else Lassign (v, new_e)
-  | Lsend (k, old_m, old_o, old_el, pos, mode, loc, layout) ->
-      let new_m = f old_m in
-      let new_o = f old_o in
-      let new_el = Misc.Stdlib.List.map_sharing f old_el in
-      if old_m == new_m && old_o == new_o && old_el == new_el
-      then lam
-      else Lsend (k, new_m, new_o, new_el, pos, mode, loc, layout)
-  | Levent (old_l, ev) ->
-      let new_l = tail old_l in
-      if old_l == new_l then lam else Levent (new_l, ev)
-  | Lifused (v, old_e) ->
-      let new_e = tail old_e in
-      if old_e == new_e then lam else Lifused (v, new_e)
-  | Lregion (old_e, layout) ->
-      let new_e = f old_e in
-      if old_e == new_e then lam else Lregion (new_e, layout)
-  | Lexclave old_e ->
-      let new_e = tail old_e in
-      if old_e == new_e then lam else Lexclave new_e
+  | Lsplice _ as lam -> lam
+  | Lapply { ap_func; ap_args; ap_result_layout; ap_region_close; ap_mode; ap_loc; ap_tailcall;
+             ap_inlined; ap_specialised; ap_probe } ->
+      Lapply {
+        ap_func = f ap_func;
+        ap_args = List.map f ap_args;
+        ap_result_layout;
+        ap_region_close;
+        ap_mode;
+        ap_loc;
+        ap_tailcall;
+        ap_inlined;
+        ap_specialised;
+        ap_probe;
+      }
+  | Lfunction lfun ->
+      Lfunction (map_lfunction f lfun)
+  | Llet (str, layout, v, v_duid, e1, e2) ->
+      Llet (str, layout, v, v_duid, f e1, tail e2)
+  | Lmutlet (layout, v, v_duid, e1, e2) ->
+      Lmutlet (layout, v, v_duid, f e1, tail e2)
+  | Lletrec (idel, e2) ->
+      Lletrec
+        (List.map (fun rb ->
+             { rb with def = map_lfunction f rb.def })
+            idel,
+         tail e2)
+  | Lprim (Psequand as p, [l1; l2], loc)
+  | Lprim (Psequor as p, [l1; l2], loc) ->
+      Lprim(p, [f l1; tail l2], loc)
+  | Lprim (p, el, loc) ->
+      Lprim (p, List.map f el, loc)
+  | Lswitch (e, sw, loc, layout) ->
+      Lswitch (f e,
+               { sw_numconsts = sw.sw_numconsts;
+                 sw_consts = List.map (fun (n, e) -> (n, tail e)) sw.sw_consts;
+                 sw_numblocks = sw.sw_numblocks;
+                 sw_blocks = List.map (fun (n, e) -> (n, tail e)) sw.sw_blocks;
+                 sw_failaction = Option.map tail sw.sw_failaction;
+               },
+               loc, layout)
+  | Lstringswitch (e, sw, default, loc, layout) ->
+      Lstringswitch (
+        f e,
+        List.map (fun (s, e) -> (s, tail e)) sw,
+        Option.map tail default,
+        loc, layout)
+  | Lstaticraise (i, args) ->
+      Lstaticraise (i, List.map f args)
+  | Lstaticcatch (body, id, handler, r, layout) ->
+      Lstaticcatch (tail body, id, tail handler, r, layout)
+  | Ltrywith (e1, v, duid, e2, layout) ->
+      Ltrywith (f e1, v, duid, tail e2, layout)
+  | Lifthenelse (e1, e2, e3, layout) ->
+      Lifthenelse (f e1, tail e2, tail e3, layout)
+  | Lsequence (e1, e2) ->
+      Lsequence (f e1, tail e2)
+  | Lwhile lw ->
+      Lwhile { wh_cond = f lw.wh_cond;
+               wh_body = f lw.wh_body }
+  | Lfor lf ->
+      Lfor { lf with for_from = f lf.for_from;
+                     for_to = f lf.for_to;
+                     for_body = f lf.for_body }
+  | Lassign (v, e) ->
+      Lassign (v, f e)
+  | Lsend (k, m, o, el, pos, mode, loc, layout) ->
+      Lsend (k, f m, f o, List.map f el, pos, mode, loc, layout)
+  | Levent (l, ev) ->
+      Levent (tail l, ev)
+  | Lifused (v, e) ->
+      Lifused (v, tail e)
+  | Lregion (e, layout) ->
+      Lregion (f e, layout)
+  | Lexclave e ->
+      Lexclave (tail e)
 
 let map f =
   let rec g lam = f (shallow_map ~tail:g ~non_tail:g lam) in
@@ -2791,7 +2690,7 @@ let structured_constant_layout = function
 
 let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   match c with
-  | Base Scannable -> layout_any_value
+  | Base Value -> layout_any_value
   | Base Float64 -> layout_unboxed_float Unboxed_float64
   | Base Float32 -> layout_unboxed_float Unboxed_float32
   | Base Word -> layout_unboxed_nativeint
@@ -2898,7 +2797,7 @@ let layout_of_module_field repr pos =
     layout_of_mixed_block_element shape.(pos)
 
 let rec mixed_block_element_of_layout (layout : layout) :
-    _ mixed_block_element =
+    unit mixed_block_element =
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
@@ -3303,9 +3202,8 @@ let simple_prim_on_values ~name ~arity ~alloc =
     ~native_name:""
     ~native_repr_args:
       (Primitive.make_prim_repr_args arity
-        (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.scannable))
-    ~native_repr_res:
-      (Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.scannable)
+        (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.value))
+    ~native_repr_res:(Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.value)
     ~is_layout_poly:false
 
 (* The "count_initializers_*" functions count the number of individual

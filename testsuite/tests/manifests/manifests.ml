@@ -27,9 +27,7 @@ let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(files_
           (String.sub path (String.length cwd) (String.length path - String.length cwd)))
       else path in
       let visibility = match visibility with
-        | Load_path.Visible { cmx_guaranteed = true } ->
-          "visible, cmx_guaranteed"
-        | Load_path.Visible { cmx_guaranteed = false } -> "visible"
+        | Load_path.Visible -> "visible"
         | Hidden -> "hidden"
       in
       Format.sprintf "%s (%s)" path visibility
@@ -97,28 +95,4 @@ let () =
 foo.cmi -> $PWD/manifests/00/foo (visible)
 bar.cmi -> $PWD/manifests/01/bar (visible)
 baz.cmi -> $PWD/manifests/04-baz (hidden)
-|}]
-
-(* Test file_x entries in manifests: qux.cmi is cmx_guaranteed,
-   quux.cmi is not *)
-let () =
-  run_test ~include_manifests:[
-    "04/04-manifest.txt";
-  ] ~files_to_check:["qux.cmi"; "quux.cmi"] ()
-
-[%%expect{|
-qux.cmi -> $PWD/manifests/04/qux (visible, cmx_guaranteed)
-quux.cmi -> $PWD/manifests/04/quux (visible)
-|}]
-
-(* You can write `file_x` in a hidden includes manifest, but it's just the same
-   as writing `file`. *)
-let () =
-  run_test ~hidden_include_manifests:[
-    "04/04-manifest.txt";
-  ] ~files_to_check:["qux.cmi"; "quux.cmi"] ()
-
-[%%expect{|
-qux.cmi -> $PWD/manifests/04/qux (hidden)
-quux.cmi -> $PWD/manifests/04/quux (hidden)
 |}]

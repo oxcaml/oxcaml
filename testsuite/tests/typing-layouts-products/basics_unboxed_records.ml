@@ -250,10 +250,7 @@ Error:
          because of the definition of t1 at line 1, characters 0-38.
 |}]
 
-(* CR layouts-scannable: The annotation on ['a] is temporarily necessary while
-   inference for mutual recursive types + scannable axes is broken. See tests
-   in [typing-layouts-scannable/mutual_recursion.ml] for more examples. *)
-type 'a t = #{ a : 'a ; a' : 'a } constraint ('a : immediate & float64) = r
+type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r
 and r = #{ i : int ; f : float# }
 [%%expect{|
 type 'a t = #{ a : 'a; a' : 'a; } constraint 'a = r
@@ -335,12 +332,10 @@ Error: Signature mismatch:
          type t = #{ s : string; r : string; }
        is not included in
          type t
-       The layout of the first is value non_float & value non_float
+       The layout of the first is value & value
          because of the definition of t at line 4, characters 2-36.
-       But the layout of the first must be a value layout
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-8.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 
 module M : sig
@@ -437,7 +432,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is float64
            because of the definition of t_float64_id at line 1, characters 0-37.
-         But the layout of 'a must be a value layout
+         But the layout of 'a must overlap with value
            because it instantiates an unannotated type parameter of t,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to
@@ -771,8 +766,8 @@ Line 1, characters 0-61:
 1 | type q : any mod portable = #{ x : int -> int; y : int -> q }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "q" is
-           value non_float mod aliased immutable
-           & value non_float mod aliased immutable
+           value mod aliased immutable non_float
+           & value mod aliased immutable non_float
          because it is an unboxed record.
        But the kind of type "q" must be a subkind of
            value_or_null mod portable & value_or_null mod portable

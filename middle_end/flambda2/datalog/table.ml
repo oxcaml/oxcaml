@@ -181,13 +181,13 @@ module Map = struct
   let is_empty = Int.Map.is_empty
 
   let concat ~earlier:tables1 ~later:tables2 =
-    Int.Map.union_total
+    Int.Map.union
       (fun _ (Binding (id1, table1)) (Binding (id2, table2)) ->
         let table =
           concat (Id.is_trie id1) ~earlier:table1
             ~later:(Id.cast_exn id2 id1 table2)
         in
-        Binding (id1, table))
+        Some (Binding (id1, table)))
       tables1 tables2
 
   let fold ~f m ~init = Int.Map.fold (fun _ binding acc -> f binding acc) m init

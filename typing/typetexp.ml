@@ -974,7 +974,6 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let ty, fields = transl_fields env ~policy ~row_context o fields in
       ctyp (Ttyp_object (fields, o)) (newobj ty)
   | Ptyp_class(lid, stl) ->
-      Env.check_no_open_quotations loc env Class_type_qt;
       let (path, decl) =
         match Env.lookup_cltype ~loc:lid.loc lid.txt env with
         | (path, decl) -> (path, decl.clty_hash_type)
@@ -1160,7 +1159,6 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   | Ptyp_repr(vars, st) ->
       Language_extension.assert_enabled ~loc Layout_poly
         Language_extension.Alpha;
-      Env.check_no_open_quotations loc env Layout_polymorphism_qt;
       let desc, typ =
         transl_type_repr env ~policy ~row_context mode styp.ptyp_loc
           vars st
@@ -1169,7 +1167,6 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   | Ptyp_newlayout _ ->
       Language_extension.assert_enabled ~loc Layout_poly
         Language_extension.Alpha;
-      Env.check_no_open_quotations loc env Layout_polymorphism_qt;
       raise (Error (loc, env, Lpoly_unsupported))
   | Ptyp_package (p, l) ->
     (* CR layouts: right now we're doing a real gross hack where we demand
@@ -1213,7 +1210,6 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_open (path, mod_ident, cty)) cty.ctyp_type
   | Ptyp_of_kind jkind ->
-      Env.check_no_open_quotations loc env Jkind_annotation_qt;
       let tjkind =
         jkind_of_annotation env (Type_of_kind loc) styp.ptyp_attributes jkind
       in
@@ -1676,8 +1672,7 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
             (match v_opt with
             | Some v ->
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
-                = Layout (Sort (Var v, {separability = Maybe_separable;
-                                        nullability = Maybe_null})) in
+                = Layout (Sort (Var v, {pointerness = Maybe_pointer})) in
               let desc = {desc with base} in
               let jkind = {jkind with jkind = desc} in
               Types.set_var_jkind t jkind
@@ -1917,8 +1912,7 @@ let report_error_doc env ppf =
       Env.print_with_quote_promote (name, intro_stage, usage_stage)
   | Lpoly_unsupported ->
       fprintf ppf
-        "@[Layout polymorphism is not supported in term-level type \
-         annotations@]"
+        "@[Layout polymorphism is not supported in this context@]"
 
 let () =
   Location.register_error_of_exn

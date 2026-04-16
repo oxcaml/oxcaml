@@ -45,20 +45,8 @@ let () =
  include systhreads;
  hassysthreads;
  {
-   runtime4;
-   reference = "${test_source_directory}/backtrace_systhreads.r4.reference";
-   {
-     bytecode;
-   }{
-     native;
-   }
+   bytecode;
  }{
-   runtime5;
-   reference = "${test_source_directory}/backtrace_systhreads.r5.reference";
-   {
-     bytecode;
-   }{
-     native;
-   }
+   native;
  }
 *)

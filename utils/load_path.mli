@@ -25,9 +25,7 @@
 (* CR aodintsov/mshinwell: merge the remaining oxcaml changes
    upstream *)
 
-type visibility = Visible of { cmx_guaranteed : bool } | Hidden
-
-val add_dir : visibility -> string -> unit
+val add_dir : hidden:bool -> string -> unit
 (** Add a directory to the end of the load path (i.e. at lowest priority.) *)
 
 val remove_dir : string -> unit
@@ -40,7 +38,7 @@ module Dir : sig
   type t
   (** Represent one directory in the load path. *)
 
-  val create : visibility -> string -> t
+  val create : hidden:bool -> string -> t
 
   val basenames : t -> string list
   (** All the files in that directory. This doesn't include files in
@@ -56,8 +54,7 @@ val no_auto_include : auto_include_callback
     as normal. *)
 
 val init :
-  auto_include:auto_include_callback ->
-  visible:Clflags.visible_include list ->
+  auto_include:auto_include_callback -> visible:string list ->
   hidden:string list -> unit
 (** [init ~visible ~hidden] is the same as
     [reset ();
@@ -74,7 +71,7 @@ val get_path_list : unit -> string list
 (** Return the list of directories passed to [add_dir] so far. *)
 
 type paths =
-  { visible : Clflags.visible_include list;
+  { visible : string list;
     hidden : string list }
 
 val get_paths : unit -> paths
@@ -90,6 +87,8 @@ val find_normalized : string -> string
 (** Same as [find], but search also for normalized unit name (see
     {!Misc.normalized_unit_filename}), i.e. if name is [Foo.ml], allow
     [/path/Foo.ml] and [/path/foo.ml] to match. *)
+
+type visibility = Visible | Hidden
 
 val find_normalized_with_visibility : string -> string * visibility
 (** Same as [find_normalized], but also reports whether the cmi was found in a

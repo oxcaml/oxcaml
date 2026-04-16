@@ -1,4 +1,5 @@
 # Please make a pull request to change this file.
+disable=false
 # There is an .ocamlformat-enable file in this directory.
 # Keep the remainder of this file in sync with other .ocamlformat files in this repo.
 assignment-operator=begin-line
@@ -13,4 +14,4 @@ space-around-lists=false
 space-around-variants=false
 type-decl=sparse
 wrap-comments=true
-version=0.29.0
+version=0.28.1

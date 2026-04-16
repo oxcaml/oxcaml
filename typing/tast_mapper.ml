@@ -518,8 +518,6 @@ let expr sub x =
     match x.exp_desc with
     | Texp_ident r ->
         Texp_ident { r with lid = map_loc sub r.lid }
-    | Texp_apply_layout (exp, args) ->
-        Texp_apply_layout (sub.expr sub exp, args)
     | Texp_constant _ as d -> d
     | Texp_let (rec_flag, list, exp) ->
         let (rec_flag, list) = sub.value_bindings sub (rec_flag, list) in
@@ -821,8 +819,6 @@ let with_constraint sub = function
   | Twith_modtypesubst mty -> Twith_modtypesubst (sub.module_type sub mty)
   | Twith_module (path, lid) -> Twith_module (path, map_loc sub lid)
   | Twith_modsubst (path, lid) -> Twith_modsubst (path, map_loc sub lid)
-  | Twith_jkind      jd -> Twith_jkind (sub.jkind_declaration sub jd)
-  | Twith_jkindsubst jd -> Twith_jkindsubst (sub.jkind_declaration sub jd)
 
 let open_description sub od =
   {od with open_loc = sub.location sub od.open_loc;

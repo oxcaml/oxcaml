@@ -368,16 +368,12 @@ module MT = struct
         Pwith_module (map_loc sub lid, map_loc sub lid2)
     | Pwith_modtype (lid, mty) ->
         Pwith_modtype (map_loc sub lid, sub.module_type sub mty)
-    | Pwith_jkind (lid, d) ->
-        Pwith_jkind (map_loc sub lid, sub.jkind_declaration sub d)
     | Pwith_typesubst (lid, d) ->
         Pwith_typesubst (map_loc sub lid, sub.type_declaration sub d)
     | Pwith_modsubst (s, lid) ->
         Pwith_modsubst (map_loc sub s, map_loc sub lid)
     | Pwith_modtypesubst (lid, mty) ->
         Pwith_modtypesubst (map_loc sub lid, sub.module_type sub mty)
-    | Pwith_jkindsubst (lid, d) ->
-        Pwith_jkindsubst (map_loc sub lid, sub.jkind_declaration sub d)
 
   let map_signature_item sub {psig_desc = desc; psig_loc = loc} =
     let open Sig in
@@ -1103,25 +1099,15 @@ module PpxContext = struct
 
   let make ~tool_name () =
     let Load_path.{ visible; hidden } = Load_path.get_paths () in
-    let visible_load_dir_pairs dirs =
-      List.map
-        (fun (e : Clflags.visible_include) -> (e.path, e.cmx_guaranteed))
-        dirs
-    in
     let fields =
       [
         lid "tool_name",    make_string tool_name;
-        lid "include_dirs",
-          make_list
-            (make_pair make_string make_bool)
-            (visible_load_dir_pairs !Clflags.include_dirs);
+        lid "include_dirs", make_list make_string (!Clflags.include_dirs);
         lid "hidden_include_dirs",
           make_list make_string (!Clflags.hidden_include_dirs);
         lid "load_path",
-          make_pair
-            (make_list (make_pair make_string make_bool))
-            (make_list make_string)
-            (visible_load_dir_pairs visible, hidden);
+          make_pair (make_list make_string) (make_list make_string)
+            (visible, hidden);
         lid "open_modules", make_list make_string !Clflags.open_modules;
         lid "for_package",  make_option make_string !Clflags.for_package;
         lid "debug",        make_bool !Clflags.debug;
@@ -1189,10 +1175,7 @@ module PpxContext = struct
       | "tool_name" ->
           tool_name_ref := get_string payload
       | "include_dirs" ->
-          Clflags.include_dirs :=
-            List.map
-              (fun (path, cmx_guaranteed) -> { Clflags.path; cmx_guaranteed })
-              (get_list (get_pair get_string get_bool) payload)
+          Clflags.include_dirs := get_list get_string payload
       | "hidden_include_dirs" ->
           Clflags.hidden_include_dirs := get_list get_string payload
       | "load_path" ->
@@ -1206,16 +1189,7 @@ module PpxContext = struct
               Load_path.auto_include_otherlibs alert find_in_dir fn
           in
           let visible, hidden =
-            get_pair
-              (get_list (get_pair get_string get_bool))
-              (get_list get_string)
-              payload
-          in
-          let visible =
-            List.map
-              (fun (path, cmx_guaranteed) : Clflags.visible_include ->
-                 { path; cmx_guaranteed })
-              visible
+            get_pair (get_list get_string) (get_list get_string) payload
           in
           Load_path.init ~auto_include ~visible ~hidden
       | "open_modules" ->

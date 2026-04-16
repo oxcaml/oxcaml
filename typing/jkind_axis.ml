@@ -17,8 +17,6 @@ module Fmt = Format_doc
 module type Axis_ops = sig
   include Mode_intf.Lattice
 
-  val to_string : t -> string
-
   val less_or_equal : t -> t -> Misc.Le_result.t
 
   val equal : t -> t -> bool
@@ -30,25 +28,49 @@ module Externality = struct
     | External64
     | Internal
 
-  include Mode.Lattices.Total (struct
-    type nonrec t = t
+  let max = Internal
 
-    let min = External
+  let min = External
 
-    let max = Internal
+  let equal e1 e2 =
+    match e1, e2 with
+    | External, External -> true
+    | External64, External64 -> true
+    | Internal, Internal -> true
+    | (External | External64 | Internal), _ -> false
 
-    let ord = function External -> 0 | External64 -> 1 | Internal -> 2
-  end)
+  let less_or_equal t1 t2 : Misc.Le_result.t =
+    match t1, t2 with
+    | External, External -> Equal
+    | External, (External64 | Internal) -> Less
+    | External64, External -> Not_le
+    | External64, External64 -> Equal
+    | External64, Internal -> Less
+    | Internal, (External | External64) -> Not_le
+    | Internal, Internal -> Equal
 
-  let less_or_equal s1 s2 : Misc.Le_result.t =
-    if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
+  let le t1 t2 = Misc.Le_result.is_le (less_or_equal t1 t2)
 
-  let to_string = function
-    | External -> "external_"
-    | External64 -> "external64"
-    | Internal -> "internal"
+  let meet t1 t2 =
+    match t1, t2 with
+    | External, (External | External64 | Internal)
+    | (External64 | Internal), External ->
+      External
+    | External64, (External64 | Internal) | Internal, External64 -> External64
+    | Internal, Internal -> Internal
 
-  let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
+  let join t1 t2 =
+    match t1, t2 with
+    | Internal, (Internal | External64 | External)
+    | (External64 | External), Internal ->
+      Internal
+    | External64, (External64 | External) | External, External64 -> External64
+    | External, External -> External
+
+  let print ppf = function
+    | External -> Fmt.fprintf ppf "external_"
+    | External64 -> Fmt.fprintf ppf "external64"
+    | Internal -> Fmt.fprintf ppf "internal"
 
   let upper_bound_if_is_always_gc_ignorable () =
     (* We check that we're compiling to (64-bit) native code before counting
@@ -62,63 +84,144 @@ module Nullability = struct
     | Non_null
     | Maybe_null
 
-  include Mode.Lattices.Total (struct
-    type nonrec t = t
+  let max = Maybe_null
 
-    let min = Non_null
+  let min = Non_null
 
-    let max = Maybe_null
+  let equal n1 n2 =
+    match n1, n2 with
+    | Non_null, Non_null -> true
+    | Maybe_null, Maybe_null -> true
+    | (Non_null | Maybe_null), _ -> false
 
-    let ord = function Non_null -> 0 | Maybe_null -> 1
-  end)
+  let less_or_equal n1 n2 : Misc.Le_result.t =
+    match n1, n2 with
+    | Non_null, Non_null -> Equal
+    | Non_null, Maybe_null -> Less
+    | Maybe_null, Non_null -> Not_le
+    | Maybe_null, Maybe_null -> Equal
 
-  let less_or_equal s1 s2 : Misc.Le_result.t =
-    if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
+  let le n1 n2 = Misc.Le_result.is_le (less_or_equal n1 n2)
 
-  let to_string = function Non_null -> "non_null" | Maybe_null -> "maybe_null"
+  let meet n1 n2 =
+    match n1, n2 with
+    | Non_null, (Non_null | Maybe_null) | Maybe_null, Non_null -> Non_null
+    | Maybe_null, Maybe_null -> Maybe_null
 
-  let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
+  let join n1 n2 =
+    match n1, n2 with
+    | Maybe_null, (Maybe_null | Non_null) | Non_null, Maybe_null -> Maybe_null
+    | Non_null, Non_null -> Non_null
+
+  let print ppf = function
+    | Non_null -> Fmt.fprintf ppf "non_null"
+    | Maybe_null -> Fmt.fprintf ppf "maybe_null"
 end
 
 module Separability = struct
   type t =
-    | Non_pointer
-    | Non_pointer64
     | Non_float
     | Separable
     | Maybe_separable
 
-  include Mode.Lattices.Total (struct
-    type nonrec t = t
+  let max = Maybe_separable
 
-    let min = Non_pointer
+  let min = Non_float
 
-    let max = Maybe_separable
-
-    let ord = function
-      | Non_pointer -> 0
-      | Non_pointer64 -> 1
-      | Non_float -> 2
-      | Separable -> 3
-      | Maybe_separable -> 4
-  end)
+  let equal s1 s2 =
+    match s1, s2 with
+    | Non_float, Non_float -> true
+    | Separable, Separable -> true
+    | Maybe_separable, Maybe_separable -> true
+    | (Non_float | Separable | Maybe_separable), _ -> false
 
   let less_or_equal s1 s2 : Misc.Le_result.t =
-    if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
+    match s1, s2 with
+    | Non_float, Non_float -> Equal
+    | Non_float, (Separable | Maybe_separable) -> Less
+    | Separable, Non_float -> Not_le
+    | Separable, Separable -> Equal
+    | Separable, Maybe_separable -> Less
+    | Maybe_separable, (Non_float | Separable) -> Not_le
+    | Maybe_separable, Maybe_separable -> Equal
+
+  let le s1 s2 = Misc.Le_result.is_le (less_or_equal s1 s2)
+
+  let meet s1 s2 =
+    match s1, s2 with
+    | Non_float, (Non_float | Separable | Maybe_separable)
+    | (Separable | Maybe_separable), Non_float ->
+      Non_float
+    | Separable, (Separable | Maybe_separable) | Maybe_separable, Separable ->
+      Separable
+    | Maybe_separable, Maybe_separable -> Maybe_separable
+
+  let join s1 s2 =
+    match s1, s2 with
+    | Maybe_separable, (Maybe_separable | Separable | Non_float)
+    | (Separable | Non_float), Maybe_separable ->
+      Maybe_separable
+    | Separable, (Separable | Non_float) | Non_float, Separable -> Separable
+    | Non_float, Non_float -> Non_float
+
+  let print ppf = function
+    | Non_float -> Fmt.fprintf ppf "non_float"
+    | Separable -> Fmt.fprintf ppf "separable"
+    | Maybe_separable -> Fmt.fprintf ppf "maybe_separable"
+end
+
+module Pointerness = struct
+  type t =
+    | Non_pointer
+    | Maybe_pointer
+
+  let max = Maybe_pointer
+
+  let min = Non_pointer
+
+  let equal p1 p2 =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> true
+    | Maybe_pointer, Maybe_pointer -> true
+    | (Non_pointer | Maybe_pointer), _ -> false
+
+  let less_or_equal p1 p2 : Misc.Le_result.t =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> Equal
+    | Non_pointer, Maybe_pointer -> Less
+    | Maybe_pointer, Non_pointer -> Not_le
+    | Maybe_pointer, Maybe_pointer -> Equal
+
+  let le p1 p2 = Misc.Le_result.is_le (less_or_equal p1 p2)
+
+  let meet p1 p2 =
+    match p1, p2 with
+    | Non_pointer, (Non_pointer | Maybe_pointer) | Maybe_pointer, Non_pointer ->
+      Non_pointer
+    | Maybe_pointer, Maybe_pointer -> Maybe_pointer
+
+  let join p1 p2 =
+    match p1, p2 with
+    | Maybe_pointer, (Maybe_pointer | Non_pointer) | Non_pointer, Maybe_pointer
+      ->
+      Maybe_pointer
+    | Non_pointer, Non_pointer -> Non_pointer
 
   let to_string = function
     | Non_pointer -> "non_pointer"
-    | Non_pointer64 -> "non_pointer64"
-    | Non_float -> "non_float"
-    | Separable -> "separable"
-    | Maybe_separable -> "maybe_separable"
+    | Maybe_pointer -> "maybe_pointer"
 
   let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
+
+  let is_max p = equal p max
 end
 
 module Axis = struct
   module Nonmodal = struct
-    type 'a t = Externality : Externality.t t
+    type 'a t =
+      | Externality : Externality.t t
+      | Nullability : Nullability.t t
+      | Separability : Separability.t t
   end
 
   type 'a t =
@@ -139,7 +242,9 @@ module Axis = struct
       Pack (Modal (Monadic Visibility));
       Pack (Modal (Monadic Staticity));
       (* CR-soon zqian: call [Mode.Crossing.Axis.all] for modal axes *)
-      Pack (Nonmodal Externality) ]
+      Pack (Nonmodal Externality);
+      Pack (Nonmodal Nullability);
+      Pack (Nonmodal Separability) ]
 
   let name (type a) : a t -> string = function
     | Modal ax ->
@@ -148,6 +253,8 @@ module Axis = struct
       in
       Fmt.asprintf "%a" Mode.Value.Axis.print ax
     | Nonmodal Externality -> "externality"
+    | Nonmodal Nullability -> "nullability"
+    | Nonmodal Separability -> "separability"
 end
 
 module Per_axis = struct
@@ -156,27 +263,67 @@ module Per_axis = struct
   module Nonmodal = struct
     open Axis.Nonmodal
 
-    let min : type a. a t -> a = function Externality -> Externality.min
+    let min : type a. a t -> a = function
+      | Externality -> Externality.min
+      | Nullability -> Nullability.min
+      | Separability -> Separability.min
 
-    let max : type a. a t -> a = function Externality -> Externality.max
+    let max : type a. a t -> a = function
+      | Externality -> Externality.max
+      | Nullability -> Nullability.max
+      | Separability -> Separability.max
 
     let le : type a. a t -> a -> a -> bool =
-     fun ax a b -> match ax with Externality -> Externality.le a b
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.le a b
+      | Nullability -> Nullability.le a b
+      | Separability -> Separability.le a b
 
     let equal : type a. a t -> a -> a -> bool =
-     fun ax a b -> match ax with Externality -> Externality.equal a b
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.equal a b
+      | Nullability -> Nullability.equal a b
+      | Separability -> Separability.equal a b
 
     let meet : type a. a t -> a -> a -> a =
-     fun ax a b -> match ax with Externality -> Externality.meet a b
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.meet a b
+      | Nullability -> Nullability.meet a b
+      | Separability -> Separability.meet a b
 
     let join : type a. a t -> a -> a -> a =
-     fun ax a b -> match ax with Externality -> Externality.join a b
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.join a b
+      | Nullability -> Nullability.join a b
+      | Separability -> Separability.join a b
 
     let print : type a. a t -> Fmt.formatter -> a -> unit = function
       | Externality -> Externality.print
+      | Nullability -> Nullability.print
+      | Separability -> Separability.print
+
+    let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
+     fun a b ->
+      match a, b with
+      | Externality, Externality -> Some Refl
+      | Nullability, Nullability -> Some Refl
+      | Separability, Separability -> Some Refl
+      | _ -> None
 
     let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
-     fun a b -> match a, b with Externality, Externality -> Equal
+     fun a b ->
+      match a, b with
+      | Externality, Externality -> Equal
+      | Externality, _ -> Less_than
+      | _, Externality -> Greater_than
+      | Nullability, Nullability -> Equal
+      | Nullability, _ -> Less_than
+      | _, Nullability -> Greater_than
+      | Separability, Separability -> Equal
   end
 
   let min : type a. a t -> a = function[@inline available]
@@ -215,6 +362,13 @@ module Per_axis = struct
     | Modal ax -> Mode.Crossing.Per_axis.print ax
     | Nonmodal ax -> Nonmodal.print ax
 
+  let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
+   fun a b ->
+    match a, b with
+    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.equal_obj ax0 ax1
+    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.equal_obj ax0 ax1
+    | _ -> None
+
   let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
    fun a b ->
     match a, b with
@@ -236,10 +390,10 @@ module Axis_set = struct
 
   let[@inline] axis_index (type a) : a Axis.t -> _ = function
     | Modal (Comonadic Areality) -> 0
-    | Modal (Monadic Uniqueness) -> 1
-    | Modal (Comonadic Linearity) -> 2
-    | Modal (Monadic Contention) -> 3
-    | Modal (Comonadic Portability) -> 4
+    | Modal (Comonadic Linearity) -> 1
+    | Modal (Monadic Uniqueness) -> 2
+    | Modal (Comonadic Portability) -> 3
+    | Modal (Monadic Contention) -> 4
     | Modal (Comonadic Forkable) -> 5
     | Modal (Comonadic Yielding) -> 6
     | Modal (Comonadic Statefulness) -> 7
@@ -247,6 +401,8 @@ module Axis_set = struct
     | Modal (Monadic Staticity) -> 9
     (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
     | Nonmodal Externality -> 10
+    | Nonmodal Nullability -> 11
+    | Nonmodal Separability -> 12
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 
@@ -267,16 +423,18 @@ module Axis_set = struct
     in
     0
     |> set_axis (Modal (Comonadic Areality))
-    |> set_axis (Modal (Monadic Uniqueness))
     |> set_axis (Modal (Comonadic Linearity))
-    |> set_axis (Modal (Monadic Contention))
+    |> set_axis (Modal (Monadic Uniqueness))
     |> set_axis (Modal (Comonadic Portability))
+    |> set_axis (Modal (Monadic Contention))
     |> set_axis (Modal (Comonadic Forkable))
     |> set_axis (Modal (Comonadic Yielding))
     |> set_axis (Modal (Comonadic Statefulness))
     |> set_axis (Modal (Monadic Visibility))
     |> set_axis (Modal (Monadic Staticity))
     |> set_axis (Nonmodal Externality)
+    |> set_axis (Nonmodal Nullability)
+    |> set_axis (Nonmodal Separability)
 
   let all = create ~f:(fun ~axis:_ -> true)
 

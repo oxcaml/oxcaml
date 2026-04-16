@@ -81,7 +81,9 @@ let remove_useless_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
     v}
 
     to:
-    {v <op1> (const1 <op2> const2), r v}
+    {v
+    <op1> (const1 <op2> const2), r
+    v}
 
     where const1 and const2 are immediate values, and <op1> and <op2> are
     associative binary operators such that either <op1> is the same as <op2>, or

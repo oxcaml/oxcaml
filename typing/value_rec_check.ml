@@ -146,7 +146,6 @@ let classify_expression : Typedtree.expression -> sd =
   *)
   let rec classify_expression env e : sd =
     match e.exp_desc with
-    | Texp_apply_layout (exp, _) -> classify_expression env exp
     (* binding and variable cases *)
     | Texp_let (rec_flag, vb, e) ->
         let env = classify_value_bindings rec_flag env vb in
@@ -643,7 +642,6 @@ let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
 *)
 let rec expression : Typedtree.expression -> term_judg =
   fun exp -> match exp.exp_desc with
-    | Texp_apply_layout (exp, _) -> expression exp
     | Texp_ident { path = pth; _ } ->
       path pth
     | Texp_let (rec_flag, bindings, body) ->
@@ -785,7 +783,7 @@ let rec expression : Typedtree.expression -> term_judg =
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->
                 (match mixed_shape.(i) with
-                 | Scannable | Float_boxed -> Guard
+                 | Value | Float_boxed -> Guard
                  | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
                  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
                  | Void | Product _ ->
@@ -813,7 +811,7 @@ let rec expression : Typedtree.expression -> term_judg =
           | Record_inlined (_, Constructor_mixed mixed_shape, _)
           | Record_mixed mixed_shape ->
             (match mixed_shape.(i) with
-             | Scannable | Float_boxed -> Guard
+             | Value | Float_boxed -> Guard
              | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
              | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
              | Void | Product _ ->

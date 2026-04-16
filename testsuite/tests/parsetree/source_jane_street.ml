@@ -108,6 +108,21 @@ type t = ..
 type t += K : ('a : float64). 'a ignore -> t
 |}]
 
+(* CR layouts v2.8: re-enable this. Internal ticket 5118. *)
+(*
+module M : sig
+  kind_abbrev_ k = immediate
+end = struct
+  kind_abbrev_ k = immediate
+end
+
+[%%expect{|
+>> Fatal error: kind_abbrev not supported!
+Uncaught exception: Misc.Fatal_error
+
+|}]
+*)
+
 type t1 : any
 type t2 : any mod separable
 type t3 : value_or_null
@@ -123,7 +138,7 @@ type t12 : bits64
 
 [%%expect{|
 type t1 : any
-type t2 : any separable
+type t2 : any mod separable
 type t3 : value_or_null
 type t4
 type t5 : void
@@ -182,17 +197,6 @@ module M :
   sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
   stateless
 val x : unit -> #('a M.t * string M.t) = <fun>
-|}]
-
-module Or_null_names = struct
-  type 'a t = Nope | Yep of 'a [@@or_null]
-end
-let y () = #( Or_null_names.Nope, Or_null_names.Yep "hi" )
-
-[%%expect{|
-module Or_null_names : sig type 'a t = Nope | Yep of 'a [@@or_null] end @@
-  stateless
-val y : unit -> #('a Or_null_names.t * string Or_null_names.t) = <fun>
 |}]
 
 external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
@@ -922,7 +926,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : ('a : value maybe_null). 'a iarray -> 'a iarray = <fun>
+val f : ('a : value_or_null mod separable). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)
@@ -1308,8 +1312,8 @@ Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 
-(*************************************)
-(* Modal kinds and kind declarations *)
+(***************)
+(* Modal kinds *)
 
 (* supported *)
 type 'a list : immutable_data with 'a
@@ -1355,15 +1359,6 @@ module M :
     kind_ data = value mod many
     kind_ abstract
   end @@ stateless
-|}]
-
-module type S = sig kind_ k end
-module type S1 = S with kind_ k = value mod portable
-module type S2 = S with kind_ k := value mod global
-[%%expect{|
-module type S = sig kind_ k end
-module type S1 = sig kind_ k = value mod portable end
-module type S2 = sig end
 |}]
 
 (* not yet supported *)
@@ -1501,7 +1496,7 @@ Error: This expression has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
+       But the layout of float# must be a sublayout of value
          because of the annotation on the wildcard _ at line 1, characters 22-33.
          need a value
 |}]
@@ -1567,8 +1562,7 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
->> Fatal error: Location.todo_overwrite_not_implemented
-Uncaught exception: Misc.Fatal_error
+Uncaught exception: File "parsing/location.ml", line 1137, characters 2-8: Assertion failed
 
 |}]
 

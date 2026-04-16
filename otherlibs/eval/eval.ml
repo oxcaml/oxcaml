@@ -174,7 +174,7 @@ let eval (expr : 'a expr) =
                 { Persistent_env.Persistent_signature.filename =
                     Compilation_unit.Name.to_string unit_name;
                   cmi;
-                  visibility = Visible { cmx_guaranteed = false }
+                  visibility = Visible
                 })
               (Compilation_unit.Name.Map.find_opt unit_name !cmis));
   let env = Compmisc.initial_env () in
@@ -202,7 +202,7 @@ let eval (expr : 'a expr) =
         -> 'b eval
      }] *)
   let lambda =
-    let { Slambda.slv_comptime = _; slv_runtime = raw_lambda } =
+    let { Lambda.sval_comptime = _; sval_runtime = raw_lambda } =
       Slambda.eval Fun.id tlambda_program.code
     in
     Simplif.simplify_lambda
@@ -234,7 +234,6 @@ let eval (expr : 'a expr) =
 let compile_mutex = Mutex.create ()
 
 let eval code =
-  let code = Obj.magic_many code in
   Mutex.protect compile_mutex (fun () ->
       (* TODO: Consider if some warnings are important enough to show. *)
       try Warnings.without_warnings (fun () -> eval code)

@@ -734,7 +734,7 @@ Lines 1-2, characters 0-28:
 1 | type 'a not_always_portable : any mod portable
 2 |   = #{ a : 'a t; u : unit# }
 Error: The kind of type "not_always_portable" is
-           immediate separable with 'a t & void mod everything with 'a t
+           immediate with 'a t & void mod everything with 'a t
          because it is an unboxed record.
        But the kind of type "not_always_portable" must be a subkind of
            value_or_null mod portable & void mod portable

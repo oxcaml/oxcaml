@@ -130,15 +130,13 @@ let find_unique_index : 'a array -> f:('a -> bool) -> int option =
   let rec find arr idx f acc =
     if idx < 0
     then acc
-    else
-      begin if f (Array.unsafe_get arr idx)
-      then
-        begin match acc with
-        | None -> find arr (idx - 1) f None
-        | Some _ -> None
-        end
-      else find arr (idx - 1) f acc
+    else begin
+      if f (Array.unsafe_get arr idx)
+      then begin
+        match acc with None -> find arr (idx - 1) f None | Some _ -> None
       end
+      else find arr (idx - 1) f acc
+    end
   in
   find arr (Array.length arr - 1) f None
 

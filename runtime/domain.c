@@ -28,7 +28,6 @@
 #include <pthread.h>
 #include <string.h>
 #include <assert.h>
-#include <errno.h>
 #ifdef HAS_GNU_GETAFFINITY_NP
 #include <sched.h>
 #ifdef HAS_PTHREAD_NP_H
@@ -40,13 +39,6 @@
 #include <sys/cpuset.h>
 typedef cpuset_t cpu_set_t;
 #endif
-#if defined(HAS_SYS_EPOLL_H) && defined(HAS_SYS_TIMERFD_H) \
-    && defined(HAS_SYS_EVENTFD_H)
-#include <sys/epoll.h>
-#include <sys/timerfd.h>
-#include <sys/eventfd.h>
-#define HAS_INTERRUPTIBLE_TICK
-#endif
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -56,7 +48,6 @@ typedef cpuset_t cpu_set_t;
 #include "caml/backtrace.h"
 #include "caml/backtrace_prim.h"
 #include "caml/callback.h"
-#include "caml/camlatomic.h"
 #include "caml/debugger.h"
 #include "caml/domain.h"
 #include "caml/domain_state.h"
@@ -80,7 +71,6 @@ typedef cpuset_t cpu_set_t;
 #include "caml/startup_aux.h"
 #include "caml/sync.h"
 #include "caml/weak.h"
-#include "sync_posix.h"
 
 /* Check that the domain_state structure was laid out without padding,
    since the runtime assumes this in computing offsets */
@@ -190,10 +180,6 @@ struct dom_internal {
   caml_plat_mutex backup_thread_lock;
   caml_plat_cond backup_thread_cond;
 
-  /* Requested tick interval in us. If 0, this domain does not want any
-     ticks. */
-  atomic_uintnat tick_interval_usec;
-
   /* default domain lock (only used if systhreads is not loaded) */
   caml_plat_mutex default_domain_lock;
 
@@ -210,33 +196,6 @@ Caml_inline void domain_set_handled(dom_internal *d)
 { atomic_store_release(&d->pending, 0); }
 Caml_inline void domain_set_pending(dom_internal *d)
 { atomic_store_release(&d->pending, 1); }
-
-uintnat caml_tick_use_usleep = 0;
-static struct {
-  /* This mutex protects mutation of `thread_id` and `running` */
-  caml_plat_mutex mutex;
-  pthread_t thread_id;
-  bool running;
-
-  atomic_bool enabled;
-  atomic_bool stop;
-
-#ifdef HAS_INTERRUPTIBLE_TICK
-  /* File descriptors for interruptible wait. -1 when not initialized. */
-  int epoll_fd;
-  int timer_fd;
-  int interrupt_fd;
-#endif
-} tick_thread = {
-  CAML_PLAT_MUTEX_INITIALIZER,
-  0,
-  false,
-  true,
-  false,
-#ifdef HAS_INTERRUPTIBLE_TICK
-  -1, -1, -1
-#endif
-};
 
 static struct {
   /* enter barrier for STW sections, participating domains arrive into
@@ -327,9 +286,8 @@ static void add_next_to_stw_domains(void)
   stw_domains.participating_domains++;
 #ifdef DEBUG
   /* Enforce here the invariant for early-exit in
-     [caml_interrupt_all_signal_safe] (which is also depended on by
-     [caml_tick]), because the former must be async-signal-safe and one cannot
-     CAMLassert inside it. */
+     [caml_interrupt_all_signal_safe], because the latter must be
+     async-signal-safe and one cannot CAMLassert inside it. */
   bool prev_has_interrupt_word = true;
   for (int i = 0; i < caml_params->max_domains; i++) {
     bool has_interrupt_word = all_domains[i].interrupt_word != NULL;
@@ -675,9 +633,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
      - But currently there is no orphaning process for allocation stats,
        we just reuse the previous stats from the previous domain
        with the same index.
-
-     Reusing the slot also allows us to avoid synchronization for domain
-     termination in [caml_tick].
   */
   bool fresh_state = d->state == NULL;
   if (fresh_state) {
@@ -714,11 +669,13 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->young_limit = 0;
   domain_state->unique_id = d->unique_id;
-  atomic_store_relaxed(&domain_state->requested_tick, false);
+  domain_state->requested_external_interrupt = 0;
 
-  /* Synchronized with [caml_interrupt_all_signal_safe], so that the
-     initializing writes of young_limit and [requested_tick] happen before any
-     interrupt. */
+  /* Synchronized with [caml_interrupt_all_signal_safe] and
+     [caml_external_interrupt_all_signal_safe], so that the
+     initializing writes of young_limit and requested_external_interrupt happen
+     before any interrupt.
+  */
   atomic_store_explicit(&d->interrupt_word, &domain_state->young_limit,
                         memory_order_release);
 
@@ -1083,12 +1040,6 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
     caml_plat_cond_init(&dom->backup_thread_cond);
     dom->backup_thread_running = 0;
     dom->backup_thread_msg = BT_INIT;
-
-    /* Start out with the tick interval at 0, because we start out not ticking.
-
-       [caml_domain_set_tick_interval_usec] will start the tick thread as soon
-       as this is changed to a nonzero value by any domain. */
-    dom->tick_interval_usec = 0;
   }
 
   domain_create(minor_heap_wsz, NULL);
@@ -1254,7 +1205,7 @@ static void caml_domain_stop_default(void)
   return;
 }
 
-static void caml_domain_tick_hook_default(void)
+static void caml_domain_external_interrupt_hook_default(void)
 {
   return;
 }
@@ -1276,8 +1227,8 @@ CAMLexport void (*caml_domain_unlock_hook)(void) =
 CAMLexport void (*caml_domain_stop_hook)(void) =
    caml_domain_stop_default;
 
-CAMLexport void (*caml_domain_tick_hook)(void) =
-   caml_domain_tick_hook_default;
+CAMLexport void (*caml_domain_external_interrupt_hook)(void) =
+   caml_domain_external_interrupt_hook_default;
 
 CAMLexport void (*caml_domain_send_interrupt_hook)(caml_domain_state*) =
    caml_domain_send_interrupt_hook_default;
@@ -1885,6 +1836,19 @@ void caml_interrupt_all_signal_safe(void)
   }
 }
 
+void caml_external_interrupt_all_signal_safe(uintnat flags)
+{
+  for (dom_internal *d = all_domains;
+       d < &all_domains[caml_params->max_domains];
+       d++) {
+    atomic_uintnat * interrupt_word =
+      atomic_load_acquire(&d->interrupt_word);
+    if (interrupt_word == NULL) return;
+    atomic_fetch_or(&d->state->requested_external_interrupt, flags);
+    interrupt_domain(d);
+  }
+}
+
 /* To avoid any risk of forgetting an action through a race,
    [caml_reset_young_limit] is the only way (apart from setting
    young_limit to -1 for immediate interruption) through which
@@ -1914,17 +1878,19 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
       || dom_st->major_slice_epoch < atomic_load (&caml_major_slice_epoch)) {
     interrupt_domain_local(dom_st);
   }
-  /* We might be here due to a recently-recorded signal or tick, so we need to
-     remember that we must run signal handlers or tick handlers. In addition, in
-     the case of long-running C code (that may regularly poll with
-     caml_process_pending_actions), we want to force a query of all callbacks at
-     every minor collection or major slice (similarly to the OCaml behaviour).
+  /* We might be here due to a recently-recorded signal or forced
+     systhread switching, so we need to remember that we must run
+     signal handlers or systhread's yield. In addition, in the case of
+     long-running C code (that may regularly poll with
+     caml_process_pending_actions), we want to force a query of all
+     callbacks at every minor collection or major slice (similarly to
+     the OCaml behaviour).
 
      We don't need to check for internally triggered pending actions
      (internal Memprof and finalisers), because they will already have set
      action_pending if needed. */
   if (caml_check_pending_signals() ||
-      atomic_load_relaxed(&Caml_state->requested_tick) ||
+      Caml_state->requested_external_interrupt ||
       caml_memprof_pending_external_interrupt(dom_st))
     caml_set_action_pending(dom_st);
 }
@@ -2034,385 +2000,13 @@ void caml_handle_gc_interrupt(void)
   caml_poll_gc_work();
 }
 
-/* Tick thread
-   ===========
-
-   Every process runs up to one "tick thread", which periodically interrupts all
-   running domains, providing them the ability to react by running "tick hooks"
-   (and, in the future, tick handlers on fibers). The interval at which the tick
-   thread ticks is configured dynamically, at runtime - each domain has a
-   configured "tick request" interval, and the tick thread ticks at the minimum
-   tick request across all domains.
-
-   Changing the tick interval
-   --------------------------
-
-   When the tick interval might have been changed (due to a domain calling
-   [caml_domain_set_tick_interval_usec]), on supported platforms (currently just
-   linux via epoll+timerfd+eventfd, though this could be extended to MacOS using
-   kqueue in the future), we interrupt the ticker thread's sleep, causing it to
-   recompute the tick interval. This provides prompt changes to the tick
-   interval; otherwise we'd have to wait for the longer tick to expire before
-   reducing the tick interval.
-
-   Disabling the tick thread
-   -------------------------
-
-   The tick thread can be disabled, by calling [caml_enable_tick_thread] with a
-   [false] argument. In this case, all tick requests will be ignored.
- */
-
-#ifdef HAS_INTERRUPTIBLE_TICK
-
-/* Interruptible wait helpers for the tick thread.
-
-   On Linux we use epoll + timerfd + eventfd.
-   On other platforms we fall back to (uninterruptible) usleep.
-*/
-/* CR-someday aspsmith: Consider using kqueue on MacOS */
-
-static void tick_thread_close_fd(int *fd)
+/* Preemptive systhread switching */
+void caml_process_external_interrupt(void)
 {
-  if (*fd != -1) { close(*fd); *fd = -1; }
-}
-
-static void tick_thread_close_fds(void)
-{
-  tick_thread_close_fd(&tick_thread.epoll_fd);
-  tick_thread_close_fd(&tick_thread.timer_fd);
-  tick_thread_close_fd(&tick_thread.interrupt_fd);
-}
-
-/* Returns -1 on failure */
-static int tick_thread_open_fds(void)
-{
-  int timer_fd = -1, event_fd = -1, epoll_fd = -1;
-
-  timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
-  if (timer_fd == -1) goto fail;
-
-  event_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-  if (event_fd == -1) goto fail;
-
-  epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-  if (epoll_fd == -1) goto fail;
-
-  struct epoll_event ev;
-  ev.events = EPOLLIN;
-  ev.data.fd = timer_fd;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, timer_fd, &ev) == -1) {
-    goto fail;
-  }
-  ev.data.fd = event_fd;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event_fd, &ev) == -1) {
-    goto fail;
-  }
-
-  tick_thread.epoll_fd = epoll_fd;
-  tick_thread.timer_fd = timer_fd;
-  tick_thread.interrupt_fd = event_fd;
-  return 0;
-
-fail:
-  if (timer_fd != -1) close(timer_fd);
-  if (event_fd != -1) close(event_fd);
-  if (epoll_fd != -1) close(epoll_fd);
-  return -1;
-}
-
-static void tick_thread_arm_timer(uintnat interval_usec)
-{
-  struct itimerspec its;
-  /* CR-someday aspsmith: We ostensibly could get better behavior / performance
-     by using a recurring interval timer rather than a one-shot timer, but
-     currently we tick infrequently enough that it doesn't seem like this is
-     worth it. But we should at least measure and see. */
-  its.it_interval.tv_sec = 0;
-  its.it_interval.tv_nsec = 0;
-  its.it_value.tv_sec = (time_t)(interval_usec / 1000000);
-  its.it_value.tv_nsec = (long)(interval_usec % 1000000) * 1000;
-  timerfd_settime(tick_thread.timer_fd, 0, &its, NULL);
-}
-
-static void tick_thread_wake(void)
-{
-  if (tick_thread.interrupt_fd == -1) return;
-
-  uint64_t val = 1;
-  /* We don't care about signals here since the eventfd is O_NONBLOCK, so the
-     write completes immediately and hence cannot be interrupted */
-  ssize_t ret = write(tick_thread.interrupt_fd, &val, sizeof(val));
-  (void)ret;
-}
-
-/* Returns true if the timer expired, false if interrupted. */
-static bool tick_thread_wait(void)
-{
-  /* Note we don't need to worry about signals here because signals are masked
-     in the tick thread. */
-
-  struct epoll_event events[2];
-  int n = epoll_wait(tick_thread.epoll_fd, events, 2, -1);
-  if (n <= 0) {
-    caml_plat_fatal_error("tick_thread_wait", errno);
-  }
-
-  bool timer_fired = false;
-  for (int i = 0; i < n; i++) {
-    if (events[i].data.fd == tick_thread.timer_fd) {
-      /* Note: we read to clear the state of the timerfd, but don't actually use
-         the number of expirations at all */
-      uint64_t expirations;
-      ssize_t r = read(tick_thread.timer_fd, &expirations,
-                       sizeof(expirations));
-      (void)r;
-      timer_fired = true;
-    } else if (events[i].data.fd == tick_thread.interrupt_fd) {
-      /* Note: we read to clear the state of the timerfd, but don't actually use
-         the value at all */
-      uint64_t val;
-      ssize_t r = read(tick_thread.interrupt_fd, &val, sizeof(val));
-      (void)r;
-    }
-  }
-  return timer_fired;
-}
-
-#else /* !HAS_INTERRUPTIBLE_TICK */
-
-static int tick_thread_open_fds(void) { return 0; }
-static int tick_thread_close_fds(void) { return 0; }
-static void tick_thread_wake(void) {}
-
-#endif
-
-void caml_process_tick(void)
-{
-  if (atomic_exchange(&Caml_state->requested_tick, false)) {
-    caml_domain_tick_hook();
+  if (atomic_load_acquire(&Caml_state->requested_external_interrupt)) {
+    caml_domain_external_interrupt_hook();
   }
 }
-
-CAMLextern void caml_stop_tick_thread(void)
-{
-  caml_plat_lock_blocking(&tick_thread.mutex);
-  if (tick_thread.running) {
-    tick_thread.running = false;
-    atomic_store_release(&tick_thread.stop, true);
-    tick_thread_wake();
-    pthread_t thread = tick_thread.thread_id;
-    CAMLassert(thread);
-    pthread_join(thread, NULL);
-    tick_thread_close_fds();
-    atomic_store_release(&tick_thread.stop, false);
-  }
-  caml_plat_unlock(&tick_thread.mutex);
-}
-
-static void tick_thread_reset(void)
-{
-  /* Reset the state of the tick thread in the child process after fork().
-
-     See comment in caml_reset_domain_lock; this really is best-effort, and is
-     probably just UB. But there are tests in lib-systhreads that Unix.fork ()
-     works for multithreaded processes, so we must keep it working. */
-  caml_plat_mutex_init(&tick_thread.mutex);
-  tick_thread.thread_id = 0;
-  bool was_running = tick_thread.running;
-  tick_thread.running = false;
-  atomic_store_relaxed(&tick_thread.stop, false);
-  tick_thread_close_fds();
-  if (was_running) {
-    /* nb: this respects tick_thread.enabled */
-    caml_start_tick_thread();
-  }
-}
-
-/* Compute the interval at which the tick thread will tick. */
-CAMLextern uintnat caml_effective_tick_interval_usec(void) {
-  if (!atomic_load_relaxed(&tick_thread.enabled)) {
-    return 0;
-  }
-
-  uintnat res = 0;
-
-  /* See [caml_interrupt_all_signal_safe] for why reading from this array can
-     be done without any synchronization */
-  for (dom_internal *d = all_domains;
-       d < &all_domains[caml_params->max_domains];
-       d++) {
-    /* Early exit: if the current domain was never initialized, then
-       neither have been any of the remaining ones. */
-    if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
-
-    uintnat dom_tick_interval =
-      atomic_load_relaxed(&d->tick_interval_usec);
-    if (dom_tick_interval == 0) { continue; }
-    else if (res == 0 || dom_tick_interval < res) {
-      res = dom_tick_interval;
-    }
-  }
-
-  return res;
-}
-
-CAMLprim value caml_effective_tick_interval_usec_bytecode(value v_unit) {
-  return Val_long(caml_effective_tick_interval_usec());
-}
-
-static void caml_do_tick_all_domains(void)
-{
-  /* See [caml_interrupt_all_signal_safe] for why reading from this array can
-     be done without any synchronization */
-  for (dom_internal *d = all_domains;
-       d < &all_domains[caml_params->max_domains]; d++) {
-    /* Early exit: if the current domain was never initialized, then
-       neither have been any of the remaining ones. */
-    if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
-    /* Note that even if the domain whose state we're writing to has
-       terminated by the time we got here, we won't run into issues, because
-       caml_state isn't freed or otherwise invalidated on domain
-       termination. */
-    atomic_store_release(&d->state->requested_tick, true);
-    interrupt_domain(d);
-  }
-}
-
-static void* caml_tick(void *arg)
-{
-  (void)arg;
-  while (!atomic_load_acquire(&tick_thread.stop)) {
-    /* We re-calculate the interval each iteration of the loop so that the
-       per-domain tick interval can be changed. We use the (quite loose)
-       heuristic of always ticking at the minimum requested interval, allowing
-       domains which want coarser ticks to round up to a multiple of that
-       interval. */
-    uintnat interval = caml_effective_tick_interval_usec();
-
-#ifdef HAS_INTERRUPTIBLE_TICK
-    if (caml_tick_use_usleep) {
-      if (interval > 0) {
-        usleep(interval);
-        caml_do_tick_all_domains();
-      } else {
-        usleep(Tick_poll_interval_usec);
-      }
-    } else if (interval == 0) {
-      /* No domain wants ticks; sleep until woken by the eventfd. */
-      tick_thread_wait();
-    } else {
-      tick_thread_arm_timer(interval);
-      if (tick_thread_wait()) {
-        caml_do_tick_all_domains();
-      }
-
-      /* If we were interrupted (rather than the timer going off), we loop back
-         to recalculate the interval and re-arm the timer. */
-    }
-#else
-    if (interval > 0) {
-      /* Note: we don't need to handle signals here because signals are masked
-         when we start the tick thread */
-      usleep(interval);
-      caml_do_tick_all_domains();
-    } else {
-      /* No interruptible wait and no tick requests; poll up to the previous
-         systhreads default of 50ms. */
-      usleep(Tick_poll_interval_usec);
-    }
-#endif
-  }
-
-  return NULL;
-}
-
-CAMLextern int caml_start_tick_thread(void)
-{
-  caml_plat_lock_non_blocking(&tick_thread.mutex);
-  if (!atomic_load_acquire(&tick_thread.enabled)) {
-    caml_plat_unlock(&tick_thread.mutex);
-    return 0;
-  }
-
-  if (tick_thread.running) {
-    caml_plat_unlock(&tick_thread.mutex);
-    return 0;
-  }
-
-  if (tick_thread_open_fds() == -1) {
-    caml_plat_unlock(&tick_thread.mutex);
-    return errno;
-  }
-
-#ifdef POSIX_SIGNALS
-  sigset_t mask, old_mask;
-
-  /* Block all signals, so that we do not try to execute a C signal
-     handler in the new tick thread. */
-  sigfillset(&mask);
-  pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
-#endif
-  pthread_t thread;
-  int err = pthread_create(&thread, /* attr=*/NULL, caml_tick, (void *)NULL);
-
-#ifdef POSIX_SIGNALS
-  /* Reset the mask after starting the thread */
-  pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
-#endif
-
-  if (err != 0) {
-    tick_thread_close_fds();
-    caml_plat_unlock(&tick_thread.mutex);
-    return err;
-  }
-
-  tick_thread.running = true;
-  tick_thread.thread_id = thread;
-
-  caml_plat_unlock(&tick_thread.mutex);
-
-  return 0;
-}
-
-CAMLprim value caml_enable_tick_thread(value v_enable)
-{
-  bool enable = Long_val(v_enable) ? 1 : 0;
-  bool was_enabled = atomic_exchange_explicit(&tick_thread.enabled, enable,
-                                              memory_order_acq_rel);
-
-  if (enable && !was_enabled) {
-    int err = caml_start_tick_thread();
-    sync_check_error(err, "caml_enable_tick_thread");
-  } else {
-    caml_stop_tick_thread();
-  }
-
-  return Val_unit;
-}
-
-/* Set the requested tick interval for the current domain
-
-   If argument is 0, the current domain no longer wants ticks */
-CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
-{
-  atomic_store_relaxed(&domain_self->tick_interval_usec, interval_usec);
-  if (interval_usec != 0) {
-    caml_start_tick_thread();
-  }
-  /* NOTE: We don't worry too much about spurious wakes here, since we assume
-     changing the tick interval is uncommon */
-  tick_thread_wake();
-
-  return 0;
-}
-
-CAMLprim value caml_domain_set_tick_interval_usec_bytecode(value v_interval_usec) {
-  CAMLparam1(v_interval_usec);
-  caml_domain_set_tick_interval_usec(Long_val(v_interval_usec));
-  CAMLreturn(Val_unit);
-}
-
-/* Backup thread */
 
 CAMLexport int caml_bt_is_in_blocking_section(void)
 {
@@ -2487,7 +2081,6 @@ static void caml_atfork_default(void)
 {
   caml_reset_domain_lock();
   caml_acquire_domain_lock();
-  tick_thread_reset();
   /* FIXME: For best portability, the IO channel locks should be
      reinitialised as well. (See comment in
      caml_reset_domain_lock.) */
@@ -2522,9 +2115,6 @@ static void domain_terminate (void)
      this. */
   caml_domain_stop_hook();
   call_timing_hook(&caml_domain_terminated_hook);
-
-  /* Reset the tick interval back to 0, since we no longer want ticks */
-  caml_domain_set_tick_interval_usec(0);
 
   while (!finished) {
     caml_finish_sweeping();

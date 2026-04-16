@@ -15,20 +15,19 @@
 
 open! Flambda.Import
 open! Rev_expr
+open! Traverse_acc.Env
 module Acc = Traverse_acc
-module Env = Traverse_env
 module Dot = Dot_printer
-module K = Flambda_kind
-module KS = Flambda_kind.With_subkind
 
-type denv = Env.t
+type denv = Acc.Env.t
 
 type acc = Acc.t
 
 let apply_cont_deps denv acc apply_cont =
   let cont = Apply_cont_expr.continuation apply_cont in
   let args = Apply_cont_expr.args apply_cont in
-  let (Normal params) = Env.find_cont denv cont in
+  let params = Continuation.Map.find cont denv.conts in
+  let (Normal params) = params in
   List.iter2
     (fun param dep ->
       Acc.add_alias acc
@@ -36,23 +35,35 @@ let apply_cont_deps denv acc apply_cont =
         ~from:(Acc.simple_to_node acc ~denv dep))
     params args
 
+let reaper_test_opaque = Sys.getenv_opt "REAPEROPAQUE" <> None
+
 let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   let return =
     List.mapi
       (fun i kind ->
         Variable.create
           (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
-          (KS.kind kind))
+          (Flambda_kind.With_subkind.kind kind))
       (Flambda_arity.unarized_components (Code.result_arity code))
   in
-  let exn = Variable.create "function_exn" K.value in
-  let my_closure = Variable.create "my_closure" K.value in
+  let exn = Variable.create "function_exn" Flambda_kind.value in
+  let my_closure = Variable.create "my_closure" Flambda_kind.value in
   let arity = Code.params_arity code in
   let params =
     List.mapi
       (fun i kind ->
-        Variable.create (Printf.sprintf "function_param_%i" i) (KS.kind kind))
+        Variable.create
+          (Printf.sprintf "function_param_%i" i)
+          (Flambda_kind.With_subkind.kind kind))
       (Flambda_arity.unarize arity)
+  in
+  let has_unsafe_result_type =
+    false
+    &&
+    match Code.result_types code with
+    | Unknown -> false
+    | Bottom -> false
+    | Ok _ -> true
   in
   let never_delete =
     match Code.zero_alloc_attribute code with
@@ -83,7 +94,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     }
   in
   Acc.add_any_source acc (Code_id_or_name.code_id code_id);
-  if never_delete
+  if has_unsafe_result_type || never_delete
   then (
     List.iter
       (fun var -> Acc.add_any_usage acc (Code_id_or_name.var var))
@@ -95,7 +106,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
         Acc.add_any_source acc param)
       params);
   if never_delete then Acc.add_any_usage acc (Code_id_or_name.code_id code_id);
-  Acc.add_code acc code_id code_dep
+  Acc.add_code code_id code_dep acc
 
 let record_set_of_closures_deps denv names_and_function_slots set_of_closures
     acc : unit =
@@ -107,7 +118,7 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
   in
   Function_slot.Lmap.iter
     (fun function_slot name ->
-      Acc.kind acc name K.value;
+      Acc.kind name Flambda_kind.value acc;
       let code_id =
         (Function_slot.Map.find function_slot funs
           : Function_declarations.code_id_in_function_declaration)
@@ -115,7 +126,7 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
       match code_id with
       | Deleted _ -> ()
       | Code_id { code_id; only_full_applications } ->
-        Acc.add_set_of_closures_dep acc name code_id ~only_full_applications)
+        Acc.add_set_of_closures_dep name code_id ~only_full_applications acc)
     names_and_function_slots;
   Function_slot.Lmap.iter
     (fun _function_slot function_slot_name ->
@@ -136,26 +147,133 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
         names_and_function_slots)
     names_and_function_slots
 
-let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
+let rec traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
+  match Expr.descr expr with
+  | Let let_expr -> traverse_let denv acc let_expr
+  | Let_cont let_cont -> traverse_let_cont denv acc let_cont
+  | Apply apply -> traverse_apply denv acc apply
+  | Apply_cont apply_cont -> traverse_apply_cont denv acc apply_cont
+  | Switch switch -> traverse_switch denv acc switch
+  | Invalid { message } -> traverse_invalid denv acc ~message
+
+and traverse_let denv acc let_expr : rev_expr =
+  let bound_pattern, body =
+    Let.pattern_match let_expr ~f:(fun bound_pattern ~body ->
+        bound_pattern, body)
+  in
+  let defining_expr = Let.defining_expr let_expr in
+  let default_bp addf =
+    let bound_to = Bound_pattern.free_names bound_pattern in
+    Name_occurrences.fold_names bound_to
+      ~f:(fun () bound_to -> addf (Code_id_or_name.name bound_to))
+      ~init:()
+  in
+  let default acc =
+    Name_occurrences.fold_names
+      ~f:(fun () free_name ->
+        default_bp (fun to_ ->
+            Acc.add_use_dep acc ~to_ ~from:(Code_id_or_name.name free_name)))
+      ~init:()
+      (Named.free_names defining_expr)
+  in
+  (match defining_expr with
+  | Set_of_closures set_of_closures ->
+    traverse_set_of_closures denv acc ~bound_pattern set_of_closures
+  | Static_consts group -> traverse_static_consts denv acc ~bound_pattern group
+  | Prim (prim, _dbg) ->
+    traverse_prim denv acc ~bound_pattern prim ~default ~default_bp
+  | Simple s ->
+    Acc.alias_kind
+      (Name.var (Bound_var.var (Bound_pattern.must_be_singleton bound_pattern)))
+      s acc;
+    default_bp (fun to_ ->
+        Acc.add_alias acc ~to_ ~from:(Acc.simple_to_node acc ~denv s))
+  | Rec_info _ -> default acc);
+  let make_set_of_closures set_of_closures =
+    let function_decls = Set_of_closures.function_decls set_of_closures in
+    let value_slots = Set_of_closures.value_slots set_of_closures in
+    let alloc_mode = Set_of_closures.alloc_mode set_of_closures in
+    { function_decls; value_slots; alloc_mode }
+  in
+  let named : rev_named =
+    match defining_expr with
+    | Set_of_closures set_of_closures ->
+      Set_of_closures (make_set_of_closures set_of_closures)
+    | Static_consts group ->
+      let bound_static =
+        match bound_pattern with
+        | Static b -> b
+        | Singleton _ | Set_of_closures _ ->
+          Misc.fatal_errorf
+            "Expected [Static] bound pattern for [Static_consts], got %a"
+            Bound_pattern.print bound_pattern
+      in
+      let rev_group =
+        Static_const_group.match_against_bound_static group bound_static
+          ~init:[]
+          ~code:(fun rev_group code_id code ->
+            let code =
+              traverse_code acc code_id code
+                ~le_monde_exterieur:denv.le_monde_exterieur
+                ~all_constants:denv.all_constants
+            in
+            Code code :: rev_group)
+          ~deleted_code:(fun rev_group _ -> Deleted_code :: rev_group)
+          ~set_of_closures:(fun rev_group ~closure_symbols:_ set_of_closures ->
+            Static_const
+              (Set_of_closures (make_set_of_closures set_of_closures))
+            :: rev_group)
+          ~block_like:(fun rev_group _symbol static_const ->
+            Static_const (Other static_const) :: rev_group)
+      in
+      let group = List.rev rev_group in
+      Static_consts group
+    | Prim _ -> Named defining_expr
+    | Simple _ -> Named defining_expr
+    | Rec_info _ as defining_expr -> Named defining_expr
+  in
+  let let_acc =
+    Let { bound_pattern; defining_expr = named; parent = denv.parent }
+  in
+  traverse
+    { parent = let_acc;
+      conts = denv.conts;
+      current_code_id = denv.current_code_id;
+      should_preserve_direct_calls = denv.should_preserve_direct_calls;
+      le_monde_exterieur = denv.le_monde_exterieur;
+      all_constants = denv.all_constants
+    }
+    acc body
+
+and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     ~(default_bp : (Code_id_or_name.t -> unit) -> unit) =
-  Acc.kind acc
-    (Bound_var.name (Bound_pattern.must_be_singleton bound_pattern))
-    (Flambda_primitive.result_kind' prim);
-  match prim with
+  let () =
+    let kind = Flambda_primitive.result_kind' prim in
+    let name =
+      Name.var (Bound_var.var (Bound_pattern.must_be_singleton bound_pattern))
+    in
+    Acc.kind name kind acc
+  in
+  match[@ocaml.warning "-4"] prim with
   | Variadic (Make_block (block_kind, _mutability, _), fields) ->
     let _tag, block_shape = Flambda_primitive.Block_kind.to_shape block_kind in
     List.iteri
       (fun i field ->
-        let kind = K.Block_shape.element_kind block_shape i in
+        let kind = Flambda_kind.Block_shape.element_kind block_shape i in
         let from = Acc.simple_to_node acc ~denv field in
         default_bp (fun base ->
             Acc.add_constructor_dep acc ~base (Field.block i kind) ~from))
       fields;
     default_bp (fun base ->
         Acc.add_constructor_dep acc ~base Field.is_int
-          ~from:(Code_id_or_name.name (Env.all_constants denv));
+          ~from:(Code_id_or_name.name denv.all_constants);
         Acc.add_constructor_dep acc ~base Field.get_tag
-          ~from:(Code_id_or_name.name (Env.all_constants denv)))
+          ~from:(Code_id_or_name.name denv.all_constants))
+  | Unary (Opaque_identity { middle_end_only = true; _ }, arg)
+    when reaper_test_opaque ->
+    (* XXX TO REMOVE !!! *)
+    let from = Acc.simple_to_node acc ~denv arg in
+    default_bp (fun to_ -> Acc.add_alias acc ~to_ ~from)
   | Unary (Project_function_slot { move_from = _; move_to }, block) ->
     let block = Acc.simple_to_node acc ~denv block in
     default_bp (fun to_ ->
@@ -166,10 +284,9 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         Acc.add_accessor_dep acc ~to_ (Field.value_slot value_slot) ~base:block)
   | Unary (Block_load { kind; mut; field }, block) -> (
     (* Loads from mutable blocks are also tracked here. This is ok because
-       stores automatically cause the block to escape. *)
-    (* CR ncourant: think about whether we can make stores only cause the
-       corresponding fields of the block to escape instead of the whole block.
-    *)
+       stores automatically escape the block. CR ncourant: think about whether
+       we can make stores only escape the corresponding fields of the block
+       instead of the whole block. *)
     let kind = Flambda_primitive.Block_access_kind.element_kind_for_load kind in
     let block = Acc.simple_to_node acc ~denv block in
     default_bp (fun to_ ->
@@ -181,7 +298,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     | Mutable ->
       default_bp (fun to_ ->
           Acc.add_alias acc ~to_
-            ~from:(Code_id_or_name.name (Env.le_monde_exterieur denv))))
+            ~from:(Code_id_or_name.name denv.le_monde_exterieur)))
   | Unary (Is_int { variant_only = true }, arg) ->
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
@@ -190,41 +307,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
         Acc.add_accessor_dep acc ~to_ Field.get_tag ~base:name)
-  | Nullary
-      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax )
-  | Unary
-      ( ( Duplicate_block _ | Duplicate_array _
-        | Is_int { variant_only = false }
-        | Is_null | Array_length _ | Bigarray_length _ | String_length _
-        | Int_as_pointer _ | Opaque_identity _ | Int_arith _ | Float_arith _
-        | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
-        | Reinterpret_boxed_vector | Unbox_number _ | Box_number _
-        | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
-        | End_region _ | End_try_region _ | Obj_dup | Get_header | Peek _
-        | Make_lazy _ ),
-        _ )
-  | Binary
-      ( ( Block_set _ | Array_load _ | String_or_bigstring_load _
-        | Bigarray_load _ | Phys_equal _ | Int_arith _ | Int_shift _
-        | Int_comp _ | Float_arith _ | Float_comp _ | Bigarray_get_alignment _
-        | Atomic_load_field _ | Poke _ | Read_offset _ ),
-        _,
-        _ )
-  | Ternary
-      ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
-        | Atomic_field_int_arith _ | Atomic_set_field _
-        | Atomic_exchange_field _ | Write_offset _ ),
-        _,
-        _,
-        _ )
-  | Quaternary
-      ( (Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _),
-        _,
-        _,
-        _,
-        _ )
-  | Variadic ((Begin_region _ | Begin_try_region _ | Make_array _), _) ->
+  | prim ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with
       | Arbitrary_effects, _, _, _ ->
@@ -233,15 +316,15 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
           ~f:(fun () bound_to ->
             Acc.add_cond_any_usage acc ~denv (Simple.name bound_to))
           ~init:()
-      | (No_effects | Only_generative_effects _), _, _, _ -> ()
+      | _ -> ()
     in
     default_bp (fun to_ ->
         Acc.add_use_dep acc
-          ~from:(Code_id_or_name.name (Env.le_monde_exterieur denv))
+          ~from:(Code_id_or_name.name denv.le_monde_exterieur)
           ~to_);
     default acc
 
-let traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
+and traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
     set_of_closures =
   let names_and_function_slots =
     let bound_vars =
@@ -266,46 +349,7 @@ let traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
   in
   record_set_of_closures_deps denv names_and_function_slots set_of_closures acc
 
-let traverse_static_set_of_closures denv acc ~closure_symbols set_of_closures =
-  let names_and_function_slots =
-    Function_slot.Lmap.map Name.symbol closure_symbols
-  in
-  record_set_of_closures_deps denv names_and_function_slots set_of_closures acc
-
-let traverse_block_like_static_const denv acc symbol
-    (static_const : Static_const.t) =
-  let name = Name.symbol symbol |> Code_id_or_name.name in
-  match static_const with
-  | Block (_, _, _, fields) | Immutable_value_array fields ->
-    List.iteri
-      (fun i (field : Simple.With_debuginfo.t) ->
-        let kind = Static_const.block_field_kind static_const i in
-        let from =
-          Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field)
-        in
-        Acc.add_constructor_dep acc ~base:name (Field.block i kind) ~from)
-      fields;
-    Acc.add_constructor_dep acc ~base:name Field.is_int
-      ~from:(Code_id_or_name.name (Env.all_constants denv));
-    Acc.add_constructor_dep acc ~base:name Field.get_tag
-      ~from:(Code_id_or_name.name (Env.all_constants denv))
-  | Set_of_closures _ ->
-    Misc.fatal_errorf
-      "Unexpected [Set_of_closures] in block_like static const traversal for \
-       symbol %a"
-      Symbol.print symbol
-  | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
-  | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-  | Immutable_float_block _ | Immutable_float_array _
-  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
-  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
-  | Immutable_nativeint_array _ | Immutable_vec128_array _
-  | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
-  | Mutable_string _ | Immutable_string _ ->
-    Acc.add_alias acc ~to_:name
-      ~from:(Code_id_or_name.name (Env.all_constants denv))
-
-let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
+and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
   let bound_static =
     match bound_pattern with
     | Static b -> b
@@ -323,113 +367,206 @@ let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
     ~code:(fun () _code_id _code -> ())
     ~deleted_code:(fun () _ -> ())
     ~set_of_closures:(fun () ~closure_symbols set_of_closures ->
-      traverse_static_set_of_closures denv acc ~closure_symbols set_of_closures)
-    ~block_like:(fun () symbol static_const ->
-      traverse_block_like_static_const denv acc symbol static_const)
-
-let must_have_callee apply =
-  match Apply.callee apply with
-  | Some callee -> callee
-  | None ->
-    Misc.fatal_errorf "Callee is unexpectedly [None] in [Apply]:@ %a"
-      Apply.print apply
-
-let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
-  match Apply.call_kind apply with
-  | Function { function_call = Direct code_id; _ } -> (
-    (* CR ncourant: think about cross-module propagation *)
-    let call_widget =
-      Acc.make_known_arity_apply_widget acc ~denv apply ~returns:return_args
-        ~exn:exn_arg
-    in
-    let callee = Apply.callee apply in
-    let is_external =
-      not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
-    in
-    let[@local] add_apply acc ~only_if_closure_any_source =
-      let callee, call_widget =
-        if only_if_closure_any_source
-        then (
-          let callee = Acc.simple_to_node acc ~denv (must_have_callee apply) in
-          let callee_if_any_source =
-            Variable.create "callee_if_any_source" K.value
-          in
-          let widget_if_any_source =
-            Code_id_or_name.var
-              (Variable.create "widget_if_any_source" K.rec_info)
-          in
-          Acc.add_alias_if_any_source_dep acc ~if_any_source:callee ~from:callee
-            ~to_:(Code_id_or_name.var callee_if_any_source);
-          Acc.add_alias_if_any_source_dep acc ~if_any_source:callee
-            ~from:widget_if_any_source ~to_:call_widget;
-          Some (Simple.var callee_if_any_source), widget_if_any_source)
-        else callee, call_widget
+      let names_and_function_slots =
+        Function_slot.Lmap.map Name.symbol closure_symbols
       in
-      if is_external
-      then (
-        Acc.add_cond_any_source acc ~denv call_widget;
-        match callee with
-        | None -> ()
-        | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
-      else
-        let apply_dep =
-          { Traverse_acc.function_containing_apply_expr =
-              Env.current_code_id denv;
-            apply_code_id = code_id;
-            apply_closure = callee;
-            apply_call_witness = call_widget
-          }
-        in
-        Acc.add_apply acc apply_dep
-    in
-    match callee with
-    | None -> add_apply acc ~only_if_closure_any_source:false
-    | Some callee -> (
-      let closure = Acc.simple_to_node acc ~denv callee in
-      Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
-        ~base:closure;
-      match Env.should_preserve_direct_calls denv with
-      | Yes -> add_apply acc ~only_if_closure_any_source:false
-      | Auto -> add_apply acc ~only_if_closure_any_source:true
-      | No ->
-        if is_external
-        then
-          (* External call. We always want to mark everything as escaping here,
-             as we will not be able to recover the code_id from the sources of
-             the closure, and the call is indeed very likely to be a call to
-             that code_id. *)
-          add_apply acc ~only_if_closure_any_source:false))
-  | Function { function_call = Indirect_known_arity _; _ } ->
-    let call_widget =
-      Acc.make_known_arity_apply_widget acc ~denv apply ~returns:return_args
-        ~exn:exn_arg
-    in
-    let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
-    Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
-      ~base:closure
-  | Function { function_call = Indirect_unknown_arity; _ } ->
-    let call_widget =
-      Acc.make_unknown_arity_apply_widget acc ~denv apply ~returns:return_args
-        ~exn:exn_arg
-    in
-    let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
-    Acc.add_accessor_dep acc ~to_:call_widget Field.unknown_arity_call_witness
-      ~base:closure
-  | Method _ | C_call _ | Effect _ -> default_acc acc
+      record_set_of_closures_deps denv names_and_function_slots set_of_closures
+        acc)
+    ~block_like:(fun () symbol static_const ->
+      let name = Name.symbol symbol in
+      let[@inline always] block_field_kind i =
+        match[@ocaml.warning "-4"] static_const with
+        | Block (_, _, shape, _) ->
+          Flambda_kind.Scannable_block_shape.element_kind shape i
+        | Immutable_value_array _ -> Flambda_kind.value
+        | _ ->
+          Misc.fatal_errorf
+            "Unexpected static const %a in [block_field_kind] for symbol %a"
+            Static_const.print static_const Symbol.print symbol
+      in
+      match[@ocaml.warning "-4"] static_const with
+      | Block (_, _, _, fields) | Immutable_value_array fields ->
+        List.iteri
+          (fun i (field : Simple.With_debuginfo.t) ->
+            let kind = block_field_kind i in
+            let from =
+              Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field)
+            in
+            Acc.add_constructor_dep acc
+              ~base:(Code_id_or_name.name name)
+              (Field.block i kind) ~from)
+          fields;
+        Acc.add_constructor_dep acc
+          ~base:(Code_id_or_name.name name)
+          Field.is_int
+          ~from:(Code_id_or_name.name denv.all_constants);
+        Acc.add_constructor_dep acc
+          ~base:(Code_id_or_name.name name)
+          Field.get_tag
+          ~from:(Code_id_or_name.name denv.all_constants)
+      | Set_of_closures _ ->
+        Misc.fatal_errorf
+          "Unexpected [Set_of_closures] in block_like static const traversal \
+           for symbol %a"
+          Symbol.print symbol
+      | _ ->
+        Acc.add_alias acc
+          ~to_:(Code_id_or_name.name name)
+          ~from:(Code_id_or_name.name denv.all_constants))
 
-let traverse_apply denv acc apply : rev_expr =
+and traverse_let_cont denv acc (let_cont : Let_cont.t) : rev_expr =
+  match let_cont with
+  | Non_recursive
+      { handler;
+        num_free_occurrences = _;
+        is_applied_with_traps = _;
+        can_be_lifted = _
+      } ->
+    Non_recursive_let_cont_handler.pattern_match handler ~f:(fun cont ~body ->
+        traverse_let_cont_non_recursive denv acc cont ~body handler)
+  | Recursive handlers ->
+    Recursive_let_cont_handlers.pattern_match handlers
+      ~f:(fun ~invariant_params ~body handlers ->
+        traverse_let_cont_recursive denv acc ~invariant_params ~body handlers)
+
+and traverse_let_cont_non_recursive denv acc cont ~body handler =
+  let cont_handler = Non_recursive_let_cont_handler.handler handler in
+  let traverse handler acc =
+    let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
+    let params = Bound_parameters.vars handler.bound_parameters in
+    Acc.continuation_info acc cont
+      { params;
+        arity =
+          Flambda_arity.unarize
+            (Bound_parameters.arity handler.bound_parameters);
+        is_exn_handler
+      };
+    if is_exn_handler
+    then (
+      (* The exception parameter of any exception handler is assumed to have any
+         possible source. This makes sure that we do not unbox the exception
+         parameter of exception handlers, which is incorrect when used in
+         functions (for instance, if they raise async exceptions), and would
+         also probably put incorrect backtrace information. *)
+      Acc.add_any_source acc (Code_id_or_name.var (List.hd params));
+      (* It is also assumed to have any possible use, to make sure it is never
+         deleted, as the runtime can look at it. *)
+      (* CR ncourant: the runtime should not look at it if the raise was a
+         [raise_notrace], could we avoid setting it to [any_usage] in that
+         case? *)
+      Acc.add_cond_any_usage acc ~denv (Simple.var (List.hd params)));
+    let conts = Continuation.Map.add cont (Normal params) denv.conts in
+    let denv =
+      { parent = Let_cont { cont; handler; parent = denv.parent };
+        conts;
+        should_preserve_direct_calls = denv.should_preserve_direct_calls;
+        current_code_id = denv.current_code_id;
+        le_monde_exterieur = denv.le_monde_exterieur;
+        all_constants = denv.all_constants
+      }
+    in
+    traverse denv acc body
+  in
+  traverse_cont_handler
+    { parent = Hole;
+      conts = denv.conts;
+      should_preserve_direct_calls = denv.should_preserve_direct_calls;
+      current_code_id = denv.current_code_id;
+      le_monde_exterieur = denv.le_monde_exterieur;
+      all_constants = denv.all_constants
+    }
+    acc cont_handler traverse
+
+and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
+  let invariant_params_vars = Bound_parameters.vars invariant_params in
+  let invariant_params_arity =
+    Flambda_arity.unarize (Bound_parameters.arity invariant_params)
+  in
+  let handlers =
+    Continuation.Lmap.map
+      (fun cont_handler ->
+        Continuation_handler.pattern_match cont_handler
+          ~f:(fun bound_parameters ~handler ->
+            cont_handler, bound_parameters, handler))
+      (Continuation_handlers.to_map handlers)
+  in
+  let conts =
+    Continuation.Lmap.fold
+      (fun cont (_, bp, _) conts ->
+        let params = invariant_params_vars @ Bound_parameters.vars bp in
+        let arity =
+          invariant_params_arity
+          @ Flambda_arity.unarize (Bound_parameters.arity bp)
+        in
+        Acc.continuation_info acc cont { params; is_exn_handler = false; arity };
+        Continuation.Map.add cont (Normal params) conts)
+      handlers denv.conts
+  in
+  (* Record kinds of bound parameters *)
+  Bound_parameters.iter
+    (fun bp -> Acc.bound_parameter_kind bp acc)
+    invariant_params;
+  Continuation.Lmap.iter
+    (fun _ (_, bp, _) ->
+      Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind bp acc) bp)
+    handlers;
+  let handlers =
+    Continuation.Lmap.map
+      (fun (cont_handler, bound_parameters, handler) ->
+        let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
+        let is_cold = Continuation_handler.is_cold cont_handler in
+        let expr =
+          traverse
+            { parent = Hole;
+              conts;
+              should_preserve_direct_calls = denv.should_preserve_direct_calls;
+              current_code_id = denv.current_code_id;
+              le_monde_exterieur = denv.le_monde_exterieur;
+              all_constants = denv.all_constants
+            }
+            acc handler
+        in
+        let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
+        handler)
+      handlers
+  in
+  let denv =
+    { parent = Let_cont_rec { invariant_params; handlers; parent = denv.parent };
+      conts;
+      should_preserve_direct_calls = denv.should_preserve_direct_calls;
+      current_code_id = denv.current_code_id;
+      le_monde_exterieur = denv.le_monde_exterieur;
+      all_constants = denv.all_constants
+    }
+  in
+  traverse denv acc body
+
+and traverse_cont_handler : type a.
+    denv -> acc -> Continuation_handler.t -> (cont_handler -> acc -> a) -> a =
+ fun denv acc cont_handler k ->
+  let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
+  let is_cold = Continuation_handler.is_cold cont_handler in
+  Continuation_handler.pattern_match cont_handler
+    ~f:(fun bound_parameters ~handler ->
+      Bound_parameters.iter
+        (fun bp -> Acc.bound_parameter_kind bp acc)
+        bound_parameters;
+      let expr = traverse denv acc handler in
+      let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
+      k handler acc)
+
+and traverse_apply denv acc apply : rev_expr =
   let return_args =
     match Apply.continuation apply with
     | Never_returns -> []
-    | Return cont ->
-      let (Normal params) = Env.find_cont denv cont in
-      params
+    | Return cont -> (
+      match Continuation.Map.find cont denv.conts with Normal params -> params)
   in
   let exn_arg =
     let exn = Apply.exn_continuation apply in
     let extra_args = Exn_continuation.extra_args exn in
     let (Normal exn_params) =
-      Env.find_cont denv (Exn_continuation.exn_handler exn)
+      Continuation.Map.find (Exn_continuation.exn_handler exn) denv.conts
     in
     match exn_params with
     | [] ->
@@ -464,230 +601,134 @@ let traverse_apply denv acc apply : rev_expr =
     | C_call _ -> ()
     | Effect (Perform { eff }) -> Acc.add_cond_any_usage acc ~denv eff
     | Effect (Reperform { eff; cont; last_fiber }) ->
-      List.iter (Acc.add_cond_any_usage acc ~denv) [eff; cont; last_fiber]
+      Acc.add_cond_any_usage acc ~denv eff;
+      Acc.add_cond_any_usage acc ~denv cont;
+      Acc.add_cond_any_usage acc ~denv last_fiber
     | Effect (With_stack { valuec; exnc; effc; f; arg }) ->
-      List.iter (Acc.add_cond_any_usage acc ~denv) [valuec; exnc; effc; f; arg]
+      Acc.add_cond_any_usage acc ~denv valuec;
+      Acc.add_cond_any_usage acc ~denv exnc;
+      Acc.add_cond_any_usage acc ~denv effc;
+      Acc.add_cond_any_usage acc ~denv f;
+      Acc.add_cond_any_usage acc ~denv arg
     | Effect (With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }) ->
-      List.iter
-        (Acc.add_cond_any_usage acc ~denv)
-        [valuec; exnc; effc; dyn; bind; f; arg]
+      Acc.add_cond_any_usage acc ~denv valuec;
+      Acc.add_cond_any_usage acc ~denv exnc;
+      Acc.add_cond_any_usage acc ~denv effc;
+      Acc.add_cond_any_usage acc ~denv dyn;
+      Acc.add_cond_any_usage acc ~denv bind;
+      Acc.add_cond_any_usage acc ~denv f;
+      Acc.add_cond_any_usage acc ~denv arg
     | Effect (Resume { cont; f; arg }) ->
-      List.iter (Acc.add_cond_any_usage acc ~denv) [cont; f; arg]
+      Acc.add_cond_any_usage acc ~denv cont;
+      Acc.add_cond_any_usage acc ~denv f;
+      Acc.add_cond_any_usage acc ~denv arg
   in
   traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc;
   let expr = Apply apply in
-  { expr; holed_expr = Env.parent denv }
+  { expr; holed_expr = denv.parent }
 
-let traverse_apply_cont denv acc apply_cont : rev_expr =
+and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
+  match Apply.call_kind apply with
+  | Function { function_call = Direct code_id; _ } -> (
+    (* CR ncourant: think about cross-module propagation *)
+    let call_widget =
+      Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
+        ~returns:return_args ~exn:exn_arg
+    in
+    let callee = Apply.callee apply in
+    let is_external =
+      not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
+    in
+    let[@local] add_apply acc ~only_if_closure_any_source =
+      let callee, call_widget =
+        if only_if_closure_any_source
+        then (
+          let callee = Acc.simple_to_node acc ~denv (Option.get callee) in
+          let callee_if_any_source =
+            Variable.create "callee_if_any_source" Flambda_kind.value
+          in
+          let widget_if_any_source =
+            Code_id_or_name.var
+              (Variable.create "widget_if_any_source" Flambda_kind.rec_info)
+          in
+          Acc.add_alias_if_any_source_dep acc ~if_any_source:callee ~from:callee
+            ~to_:(Code_id_or_name.var callee_if_any_source);
+          Acc.add_alias_if_any_source_dep acc ~if_any_source:callee
+            ~from:widget_if_any_source ~to_:call_widget;
+          Some (Simple.var callee_if_any_source), widget_if_any_source)
+        else callee, call_widget
+      in
+      if is_external
+      then (
+        Acc.add_cond_any_source acc ~denv call_widget;
+        match callee with
+        | None -> ()
+        | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
+      else
+        let apply_dep =
+          { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
+            apply_code_id = code_id;
+            apply_closure = callee;
+            apply_call_witness = call_widget
+          }
+        in
+        Acc.add_apply apply_dep acc
+    in
+    match callee with
+    | None -> add_apply acc ~only_if_closure_any_source:false
+    | Some callee -> (
+      let closure = Acc.simple_to_node acc ~denv callee in
+      Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
+        ~base:closure;
+      match denv.should_preserve_direct_calls with
+      | Yes -> add_apply acc ~only_if_closure_any_source:false
+      | Auto -> add_apply acc ~only_if_closure_any_source:true
+      | No ->
+        if is_external
+        then
+          (* External call. We always want to escape everything here, as we will
+             not be able to recover the code_id from the sources of the closure,
+             and the call is very likely to indeed be a call to that code_id. *)
+          add_apply acc ~only_if_closure_any_source:false))
+  | Function { function_call = Indirect_known_arity _; _ } ->
+    let call_widget =
+      Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
+        ~returns:return_args ~exn:exn_arg
+    in
+    let closure =
+      Acc.simple_to_node acc ~denv (Option.get (Apply.callee apply))
+    in
+    Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
+      ~base:closure
+  | Function { function_call = Indirect_unknown_arity; _ } ->
+    let call_widget =
+      Acc.make_unknown_arity_apply_widget acc ~denv
+        ~arity:(Apply.args_arity apply) ~params:(Apply.args apply)
+        ~returns:return_args ~exn:exn_arg
+    in
+    let closure =
+      Acc.simple_to_node acc ~denv (Option.get (Apply.callee apply))
+    in
+    Acc.add_accessor_dep acc ~to_:call_widget Field.unknown_arity_call_witness
+      ~base:closure
+  | Method _ | C_call _ | Effect _ -> default_acc acc
+
+and traverse_apply_cont denv acc apply_cont : rev_expr =
   let expr = Apply_cont apply_cont in
   apply_cont_deps denv acc apply_cont;
-  { expr; holed_expr = Env.parent denv }
+  { expr; holed_expr = denv.parent }
 
-let traverse_switch denv acc switch : rev_expr =
+and traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
   Acc.add_cond_any_usage acc ~denv (Switch_expr.scrutinee switch);
   Target_ocaml_int.Map.iter
     (fun _ apply_cont -> apply_cont_deps denv acc apply_cont)
     (Switch_expr.arms switch);
-  { expr; holed_expr = Env.parent denv }
+  { expr; holed_expr = denv.parent }
 
-let traverse_invalid denv _acc ~message =
+and traverse_invalid denv _acc ~message =
   let expr = Invalid { message } in
-  { expr; holed_expr = Env.parent denv }
-
-let rec traverse_let denv acc let_expr : rev_expr =
-  let bound_pattern, body =
-    Let.pattern_match let_expr ~f:(fun bound_pattern ~body ->
-        bound_pattern, body)
-  in
-  let defining_expr = Let.defining_expr let_expr in
-  let default_bp addf =
-    let bound_to = Bound_pattern.free_names bound_pattern in
-    Name_occurrences.fold_names bound_to
-      ~f:(fun () bound_to -> addf (Code_id_or_name.name bound_to))
-      ~init:()
-  in
-  let default acc =
-    Name_occurrences.fold_names
-      ~f:(fun () free_name ->
-        default_bp (fun to_ ->
-            Acc.add_use_dep acc ~to_ ~from:(Code_id_or_name.name free_name)))
-      ~init:()
-      (Named.free_names defining_expr)
-  in
-  (match defining_expr with
-  | Set_of_closures set_of_closures ->
-    traverse_set_of_closures denv acc ~bound_pattern set_of_closures
-  | Static_consts group -> traverse_static_consts denv acc ~bound_pattern group
-  | Prim (prim, _dbg) ->
-    traverse_prim denv acc ~bound_pattern prim ~default ~default_bp
-  | Simple s ->
-    Acc.alias_kind acc
-      (Name.var (Bound_var.var (Bound_pattern.must_be_singleton bound_pattern)))
-      s;
-    default_bp (fun to_ ->
-        Acc.add_alias acc ~to_ ~from:(Acc.simple_to_node acc ~denv s))
-  | Rec_info _ -> default acc);
-  let make_set_of_closures set_of_closures =
-    let function_decls = Set_of_closures.function_decls set_of_closures in
-    let value_slots = Set_of_closures.value_slots set_of_closures in
-    let alloc_mode = Set_of_closures.alloc_mode set_of_closures in
-    { function_decls; value_slots; alloc_mode }
-  in
-  let named : rev_named =
-    match defining_expr with
-    | Set_of_closures set_of_closures ->
-      Set_of_closures (make_set_of_closures set_of_closures)
-    | Static_consts group ->
-      let bound_static =
-        match bound_pattern with
-        | Static b -> b
-        | Singleton _ | Set_of_closures _ ->
-          Misc.fatal_errorf
-            "Expected [Static] bound pattern for [Static_consts], got %a"
-            Bound_pattern.print bound_pattern
-      in
-      let rev_group =
-        Static_const_group.match_against_bound_static group bound_static
-          ~init:[]
-          ~code:(fun rev_group code_id code ->
-            let code =
-              traverse_code acc code_id code
-                ~le_monde_exterieur:(Env.le_monde_exterieur denv)
-                ~all_constants:(Env.all_constants denv)
-            in
-            Code code :: rev_group)
-          ~deleted_code:(fun rev_group _ -> Deleted_code :: rev_group)
-          ~set_of_closures:(fun rev_group ~closure_symbols:_ set_of_closures ->
-            Static_const
-              (Set_of_closures (make_set_of_closures set_of_closures))
-            :: rev_group)
-          ~block_like:(fun rev_group _symbol static_const ->
-            Static_const (Other static_const) :: rev_group)
-      in
-      let group = List.rev rev_group in
-      Static_consts group
-    | Prim _ -> Named defining_expr
-    | Simple _ -> Named defining_expr
-    | Rec_info _ as defining_expr -> Named defining_expr
-  in
-  let let_acc =
-    Let { bound_pattern; defining_expr = named; parent = Env.parent denv }
-  in
-  let denv = Env.with_parent denv let_acc in
-  traverse denv acc body
-
-and traverse_let_cont denv acc (let_cont : Let_cont.t) : rev_expr =
-  match let_cont with
-  | Non_recursive
-      { handler;
-        num_free_occurrences = _;
-        is_applied_with_traps = _;
-        can_be_lifted = _
-      } ->
-    Non_recursive_let_cont_handler.pattern_match handler ~f:(fun cont ~body ->
-        traverse_let_cont_non_recursive denv acc cont ~body handler)
-  | Recursive handlers ->
-    Recursive_let_cont_handlers.pattern_match handlers
-      ~f:(fun ~invariant_params ~body handlers ->
-        traverse_let_cont_recursive denv acc ~invariant_params ~body handlers)
-
-and traverse_let_cont_non_recursive denv acc cont ~body handler =
-  let cont_handler = Non_recursive_let_cont_handler.handler handler in
-  let traverse_handler handler acc =
-    let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
-    let params = Bound_parameters.vars handler.bound_parameters in
-    Acc.continuation_info acc cont ~params
-      ~arity:
-        (Flambda_arity.unarize
-           (Bound_parameters.arity handler.bound_parameters))
-      ~is_exn_handler;
-    if is_exn_handler
-    then (
-      (* The exception parameter of any exception handler is assumed to have any
-         possible source. This makes sure that we do not unbox the exception
-         parameter of exception handlers, which is incorrect when used in
-         functions (for instance, if they raise async exceptions), and would
-         also probably yield incorrect backtrace information. *)
-      Acc.add_any_source acc (Code_id_or_name.var (List.hd params));
-      (* It is also assumed to have any possible use, to make sure it is never
-         deleted, as the runtime can look at it. *)
-      (* CR ncourant: the runtime should not look at it if the raise was a
-         [raise_notrace], could we avoid setting it to [any_usage] in that
-         case? *)
-      Acc.add_cond_any_usage acc ~denv (Simple.var (List.hd params)));
-    let denv =
-      Env.with_parent denv
-        (Let_cont { cont; handler; parent = Env.parent denv })
-    in
-    let denv = Env.add_cont denv cont (Normal params) in
-    traverse denv acc body
-  in
-  traverse_cont_handler
-    (Env.with_parent denv Hole)
-    acc cont_handler traverse_handler
-
-and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
-  let invariant_params_vars = Bound_parameters.vars invariant_params in
-  let invariant_params_arity =
-    Flambda_arity.unarize (Bound_parameters.arity invariant_params)
-  in
-  let handlers =
-    Continuation.Lmap.map
-      (fun cont_handler ->
-        Continuation_handler.pattern_match cont_handler
-          ~f:(fun bound_parameters ~handler ->
-            cont_handler, bound_parameters, handler))
-      (Continuation_handlers.to_map handlers)
-  in
-  let denv =
-    Continuation.Lmap.fold
-      (fun cont (_, bp, _) denv ->
-        let params = invariant_params_vars @ Bound_parameters.vars bp in
-        let arity =
-          invariant_params_arity
-          @ Flambda_arity.unarize (Bound_parameters.arity bp)
-        in
-        Acc.continuation_info acc cont ~params ~arity ~is_exn_handler:false;
-        Env.add_cont denv cont (Normal params))
-      handlers denv
-  in
-  Bound_parameters.iter
-    (fun bp -> Acc.bound_parameter_kind acc bp)
-    invariant_params;
-  Continuation.Lmap.iter
-    (fun _ (_, bp, _) ->
-      Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind acc bp) bp)
-    handlers;
-  let handlers =
-    Continuation.Lmap.map
-      (fun (cont_handler, bound_parameters, handler) ->
-        let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
-        let is_cold = Continuation_handler.is_cold cont_handler in
-        let expr = traverse (Env.with_parent denv Hole) acc handler in
-        let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
-        handler)
-      handlers
-  in
-  let denv =
-    Env.with_parent denv
-      (Let_cont_rec { invariant_params; handlers; parent = Env.parent denv })
-  in
-  traverse denv acc body
-
-and traverse_cont_handler : type a.
-    denv -> acc -> Continuation_handler.t -> (cont_handler -> acc -> a) -> a =
- fun denv acc cont_handler k ->
-  let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
-  let is_cold = Continuation_handler.is_cold cont_handler in
-  Continuation_handler.pattern_match cont_handler
-    ~f:(fun bound_parameters ~handler ->
-      Bound_parameters.iter
-        (fun bp -> Acc.bound_parameter_kind acc bp)
-        bound_parameters;
-      let expr = traverse denv acc handler in
-      let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
-      k handler acc)
+  { expr; holed_expr = denv.parent }
 
 and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
     ~le_monde_exterieur ~all_constants : rev_code =
@@ -714,9 +755,9 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     ~le_monde_exterieur ~all_constants ~my_depth : rev_code =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
-  (* Note: this significantly degrades the analysis on code being checked by the
-     zero alloc checker. However, it is highly unclear what should be done for
-     such code, so we simply mark the code as escaping. *)
+  (* Note: this significately degrades the analysis on zero_alloc code. However,
+     it is highly unclear what should be done for zero_alloc code, so we simply
+     mark the code as escaping. *)
   let is_opaque = Code_metadata.is_opaque code_metadata in
   let check_zero_alloc =
     match Code.zero_alloc_attribute code with
@@ -727,30 +768,30 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     | Assume _ -> false
     | Check _ -> true
   in
-  let code_dep =
-    match Acc.find_code acc code_id with
-    | Some code_dep -> code_dep
-    | None -> Misc.fatal_errorf "No code dep found for %a" Code_id.print code_id
-  in
+  let code_dep = Acc.find_code acc code_id in
   Acc.add_code_id_my_closure acc code_id my_closure;
   let maybe_opaque var = if is_opaque then Variable.rename var else var in
   let return = List.map maybe_opaque code_dep.return in
   let exn = maybe_opaque code_dep.exn in
   let conts =
     Continuation.Map.of_list
-      [ return_continuation, Env.Normal return;
-        exn_continuation, Env.Normal [exn] ]
+      [return_continuation, Normal return; exn_continuation, Normal [exn]]
   in
-  Acc.continuation_info acc return_continuation ~is_exn_handler:false
-    ~params:return
-    ~arity:
-      (Flambda_arity.unarized_components
-         (Code_metadata.result_arity code_metadata));
-  Acc.continuation_info acc exn_continuation ~is_exn_handler:true ~params:[exn]
-    ~arity:[KS.any_value];
+  Acc.continuation_info acc return_continuation
+    { is_exn_handler = false;
+      params = return;
+      arity =
+        Flambda_arity.unarized_components
+          (Code_metadata.result_arity code_metadata)
+    };
+  Acc.continuation_info acc exn_continuation
+    { is_exn_handler = true;
+      params = [exn];
+      arity = [Flambda_kind.With_subkind.any_value]
+    };
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
-  let should_preserve_direct_calls : Env.should_preserve_direct_calls =
+  let should_preserve_direct_calls =
     match Flambda_features.reaper_preserve_direct_calls () with
     | Never -> No
     | Always -> Yes
@@ -758,25 +799,25 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     | Auto -> Auto
   in
   let denv =
-    Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
-      ~current_code_id:(Some code_id) ~le_monde_exterieur ~all_constants
+    { parent = Hole;
+      conts;
+      should_preserve_direct_calls;
+      current_code_id = Some code_id;
+      le_monde_exterieur;
+      all_constants
+    }
   in
-  Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind acc bp) params;
-  Acc.kind acc (Name.var my_closure) K.value;
-  Option.iter (fun region -> Acc.kind acc (Name.var region) K.region) my_region;
+  Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind bp acc) params;
+  Acc.kind (Name.var my_closure) Flambda_kind.value acc;
   Option.iter
-    (fun region -> Acc.kind acc (Name.var region) K.region)
+    (fun region -> Acc.kind (Name.var region) Flambda_kind.region acc)
+    my_region;
+  Option.iter
+    (fun region -> Acc.kind (Name.var region) Flambda_kind.region acc)
     my_ghost_region;
-  Acc.kind acc (Name.var my_depth) K.rec_info;
-  if not is_opaque
+  Acc.kind (Name.var my_depth) Flambda_kind.rec_info acc;
+  if is_opaque
   then (
-    List.iter2
-      (fun param arg ->
-        Acc.add_alias_vars acc ~to_:(Bound_parameter.var param) ~from:arg)
-      (Bound_parameters.to_list params)
-      code_dep.params;
-    Acc.add_alias_vars acc ~to_:my_closure ~from:code_dep.my_closure)
-  else (
     List.iter
       (fun arg -> Acc.add_cond_any_usage acc ~denv (Simple.var arg))
       code_dep.params;
@@ -793,8 +834,21 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     any_source my_depth;
     Option.iter any_source my_region;
     Option.iter any_source my_ghost_region;
-    List.iter any_source (code_dep.exn :: code_dep.return);
-    Acc.add_cond_any_usage acc ~denv (Simple.var code_dep.my_closure));
+    List.iter any_source (code_dep.exn :: code_dep.return))
+  else
+    List.iter2
+      (fun param arg ->
+        Acc.add_alias acc
+          ~to_:(Code_id_or_name.var (Bound_parameter.var param))
+          ~from:(Code_id_or_name.var arg))
+      (Bound_parameters.to_list params)
+      code_dep.params;
+  if is_opaque
+  then Acc.add_cond_any_usage acc ~denv (Simple.var code_dep.my_closure)
+  else
+    Acc.add_alias acc
+      ~to_:(Code_id_or_name.var my_closure)
+      ~from:(Code_id_or_name.var code_dep.my_closure);
   let body = traverse denv acc body in
   let params_and_body =
     { return_continuation;
@@ -809,76 +863,83 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   in
   { params_and_body; code_metadata; free_names_of_params_and_body }
 
-and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
-  match Expr.descr expr with
-  | Let let_expr -> traverse_let denv acc let_expr
-  | Let_cont let_cont -> traverse_let_cont denv acc let_cont
-  | Apply apply -> traverse_apply denv acc apply
-  | Apply_cont apply_cont -> traverse_apply_cont denv acc apply_cont
-  | Switch switch -> traverse_switch denv acc switch
-  | Invalid { message } -> traverse_invalid denv acc ~message
-
 type result =
   { holed : Rev_expr.t;
     deps : Global_flow_graph.graph;
-    kinds : K.t Name.Map.t;
+    kinds : Flambda_kind.t Name.Map.t;
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t
   }
 
-let create_symbol_and_add_any_source acc name =
-  let cu = Compilation_unit.get_current_exn () in
-  let sym = Symbol.create cu (Linkage_name.of_string name) in
-  Acc.add_any_source acc (Code_id_or_name.symbol sym);
-  sym
-
-let run0 unit acc ~all_constants () =
-  let le_monde_exterieur =
-    create_symbol_and_add_any_source acc "le_monde_extérieur"
-  in
-  let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
-  let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
-  Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
-  Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
-  let return_continuation = Flambda_unit.return_continuation unit in
-  let exn_continuation = Flambda_unit.exn_continuation unit in
-  let conts =
-    Continuation.Map.of_list
-      [ return_continuation, Env.Normal [dummy_toplevel_return];
-        exn_continuation, Env.Normal [dummy_toplevel_exn] ]
-  in
-  Acc.continuation_info acc return_continuation ~is_exn_handler:false
-    ~params:[dummy_toplevel_return] ~arity:[KS.any_value];
-  Acc.continuation_info acc exn_continuation ~is_exn_handler:true
-    ~params:[dummy_toplevel_exn] ~arity:[KS.any_value];
-  Acc.fixed_arity_continuation acc return_continuation;
-  Acc.fixed_arity_continuation acc exn_continuation;
-  let should_preserve_direct_calls : Env.should_preserve_direct_calls =
-    match Flambda_features.reaper_preserve_direct_calls () with
-    | Never | Zero_alloc -> No
-    | Always -> Yes
-    | Auto -> Auto
-  in
-  traverse
-    (Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
-       ~current_code_id:None
-       ~le_monde_exterieur:(Name.symbol le_monde_exterieur)
-       ~all_constants:(Name.symbol all_constants))
-    acc (Flambda_unit.body unit)
-
 let run (unit : Flambda_unit.t) =
   let acc = Acc.create () in
-  let all_constants = create_symbol_and_add_any_source acc "all_constants" in
-  let holed =
-    Profile.record_call ~accumulate:false "down" (run0 unit acc ~all_constants)
+  let le_monde_exterieur =
+    Symbol.create
+      (Compilation_unit.get_current_exn ())
+      (Linkage_name.of_string "le_monde_extérieur")
   in
+  Acc.add_any_source acc (Code_id_or_name.symbol le_monde_exterieur);
+  let all_constants =
+    Symbol.create
+      (Compilation_unit.get_current_exn ())
+      (Linkage_name.of_string "all_constants")
+  in
+  Acc.add_any_source acc (Code_id_or_name.symbol all_constants);
+  let create_holed () =
+    let dummy_toplevel_return =
+      Variable.create "dummy_toplevel_return" Flambda_kind.value
+    in
+    let dummy_toplevel_exn =
+      Variable.create "dummy_toplevel_exn" Flambda_kind.value
+    in
+    Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
+    Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
+    let return_continuation = Flambda_unit.return_continuation unit in
+    let exn_continuation = Flambda_unit.exn_continuation unit in
+    let conts =
+      Continuation.Map.of_list
+        [ return_continuation, Normal [dummy_toplevel_return];
+          exn_continuation, Normal [dummy_toplevel_exn] ]
+    in
+    Acc.continuation_info acc return_continuation
+      { is_exn_handler = false;
+        params = [dummy_toplevel_return];
+        arity = [Flambda_kind.With_subkind.any_value]
+      };
+    Acc.continuation_info acc exn_continuation
+      { is_exn_handler = true;
+        params = [dummy_toplevel_exn];
+        arity = [Flambda_kind.With_subkind.any_value]
+      };
+    Acc.fixed_arity_continuation acc return_continuation;
+    Acc.fixed_arity_continuation acc exn_continuation;
+    let should_preserve_direct_calls =
+      match Flambda_features.reaper_preserve_direct_calls () with
+      | Never | Zero_alloc -> No
+      | Always -> Yes
+      | Auto -> Auto
+    in
+    traverse
+      { parent = Hole;
+        conts;
+        should_preserve_direct_calls;
+        current_code_id = None;
+        le_monde_exterieur = Name.symbol le_monde_exterieur;
+        all_constants = Name.symbol all_constants
+      }
+      acc (Flambda_unit.body unit)
+  in
+  let holed = Profile.record_call ~accumulate:false "down" create_holed in
   let deps = Acc.deps ~all_constants:(Name.symbol all_constants) acc in
   let kinds = Acc.kinds acc in
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
   let continuation_info = Acc.get_continuation_info acc in
   let code_deps = Acc.code_deps acc in
-  if Flambda_features.debug_reaper "print-raw" then Dot.print_dep deps;
+  let () =
+    let debug_print = Flambda_features.dump_reaper () in
+    if false && debug_print then Dot.print_dep deps
+  in
   { holed;
     deps;
     kinds;

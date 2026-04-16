@@ -203,9 +203,6 @@ module Describe : sig
   (** Parsed as integer. Fails if the string is not one. *)
   val int : int value_lens
 
-  (** Parsed as boolean. Fails if the string is not one. *)
-  val bool : bool value_lens
-
   (** Same as {!val:string}. With some tweaks to the parser, we could call
       actual parsing start-points in it. *)
   val diy : string Fexpr.located value_lens

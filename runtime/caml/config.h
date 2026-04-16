@@ -292,11 +292,6 @@ typedef uint64_t uintnat;
 /* Default size of runtime_events ringbuffers, in words, in powers of two */
 #define Default_runtime_events_log_wsize 16
 
-/* How often the tick thread should poll for new ticks on platforms that do not
-   have interruptible timer support (currently only via epoll+timerfd+eventfd on
-   linux), in microseconds */
-#define Tick_poll_interval_usec 50000
-
 /* Assumed size of cache line. This value can be bigger than the actual L1
    cache line size. Atomics allocated with aligned constructor are
    memory-aligned this value to avoid false sharing of cache line. */

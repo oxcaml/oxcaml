@@ -24,12 +24,6 @@ let eqi x y = if x <> y then Printf.printf "%d <> %d\n" x y
 
 let eq64 x y = if x <> y then Printf.printf "%Ld <> %Ld\n" x y
 
-let eq32 x y = if x <> y then Printf.printf "%ld <> %ld\n" x y
-
-let eq16 x y = eqi (Stdlib_stable.Int16.to_int x) (Stdlib_stable.Int16.to_int y)
-
-let eq8 x y = eqi (Stdlib_stable.Int8.to_int x) (Stdlib_stable.Int8.to_int y)
-
 let eqf x y =
   if Float.is_nan x && Float.is_nan y
   then ()
@@ -126,23 +120,7 @@ module Int64 = struct
     = "caml_vec128_unreachable" "caml_int64_popcnt_unboxed_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external shift_left :
-    (int64[@unboxed]) -> (int64[@unboxed]) -> (int64[@unboxed])
-    = "caml_vec128_unreachable" "caml_int64_shift_left_by_int64_unboxed"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  external shift_right :
-    (int64[@unboxed]) -> (int64[@unboxed]) -> (int64[@unboxed])
-    = "caml_vec128_unreachable" "caml_int64_shift_right_by_int64_unboxed"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  external shift_right_logical :
-    (int64[@unboxed]) -> (int64[@unboxed]) -> (int64[@unboxed])
-    = "caml_vec128_unreachable"
-      "caml_int64_shift_right_logical_by_int64_unboxed"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  let check' ~eq ?nonzero ?(trials = 100_000) f g =
+  let check' ~eq ?nonzero f g =
     let nz = Option.value ~default:false nonzero in
     let open Stdlib.Int64 in
     Random.set_state (Random.State.make [| 1234567890 |]);
@@ -151,20 +129,13 @@ module Int64 = struct
     eq (f minus_one) (g minus_one);
     eq (f max_int) (g max_int);
     eq (f min_int) (g min_int);
-    for _ = 1 to trials do
+    for _ = 0 to 100_000 do
       let i = Random.int64 max_int in
       let i = if Random.bool () then i else neg i in
       if (not nz) || i <> 0L then eq (f i) (g i)
     done
 
   let check ?nonzero f g = check' ~eq:eqi ?nonzero f g
-
-  let check_shift f g =
-    for i = 0 to 63 do
-      check' ~trials:1_000 ~eq:eq64
-        (fun x -> f x (Int64.of_int i))
-        (fun x -> g x i)
-    done
 
   let rec clz i =
     if i = 0L
@@ -190,10 +161,7 @@ module Int64 = struct
     check ~nonzero:true count_leading_zeros_nonzero_arg clz;
     check count_trailing_zeros ctz;
     check ~nonzero:true count_trailing_zeros_nonzero_arg ctz;
-    check count_set_bits popcnt;
-    check_shift shift_left Int64.shift_left;
-    check_shift shift_right Int64.shift_right;
-    check_shift shift_right_logical Int64.shift_right_logical
+    check count_set_bits popcnt
 end
 
 module Int32 = struct
@@ -222,44 +190,19 @@ module Int32 = struct
     = "caml_vec128_unreachable" "caml_int32_popcnt_unboxed_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external shift_left :
-    (int32[@unboxed]) -> (int32[@unboxed]) -> (int32[@unboxed])
-    = "caml_vec128_unreachable" "caml_int32_shift_left_by_int32_unboxed"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  external shift_right :
-    (int32[@unboxed]) -> (int32[@unboxed]) -> (int32[@unboxed])
-    = "caml_vec128_unreachable" "caml_int32_shift_right_by_int32_unboxed"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  external shift_right_logical :
-    (int32[@unboxed]) -> (int32[@unboxed]) -> (int32[@unboxed])
-    = "caml_vec128_unreachable"
-      "caml_int32_shift_right_logical_by_int32_unboxed"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  let check' ~eq ?nonzero ?(trials = 100_000) f g =
+  let check ?nonzero f g =
     let nz = Option.value ~default:false nonzero in
     let open Stdlib.Int32 in
     Random.set_state (Random.State.make [| 1234567890 |]);
-    if not nz then eq (f zero) (g zero);
-    eq (f one) (g one);
-    eq (f minus_one) (g minus_one);
-    eq (f max_int) (g max_int);
-    eq (f min_int) (g min_int);
-    for _ = 1 to trials do
+    if not nz then eqi (f zero) (g zero);
+    eqi (f one) (g one);
+    eqi (f minus_one) (g minus_one);
+    eqi (f max_int) (g max_int);
+    eqi (f min_int) (g min_int);
+    for _ = 0 to 100_000 do
       let i = Random.int32 max_int in
       let i = if Random.bool () then i else neg i in
-      if (not nz) || i <> 0l then eq (f i) (g i)
-    done
-
-  let check ?nonzero f g = check' ~eq:eqi ?nonzero f g
-
-  let check_shift f g =
-    for i = 0 to 31 do
-      check' ~trials:1_000 ~eq:eq32
-        (fun x -> f x (Int32.of_int i))
-        (fun x -> g x i)
+      if (not nz) || i <> 0l then eqi (f i) (g i)
     done
 
   let rec clz i =
@@ -286,10 +229,7 @@ module Int32 = struct
     check ~nonzero:true count_leading_zeros_nonzero_arg clz;
     check count_trailing_zeros ctz;
     check ~nonzero:true count_trailing_zeros_nonzero_arg ctz;
-    check count_set_bits popcnt;
-    check_shift shift_left Int32.shift_left;
-    check_shift shift_right Int32.shift_right;
-    check_shift shift_right_logical Int32.shift_right_logical
+    check count_set_bits popcnt
 end
 
 module Int16 = struct
@@ -318,44 +258,19 @@ module Int16 = struct
     = "caml_vec128_unreachable" "caml_int16_popcnt_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external shift_left :
-    (int16[@untagged]) -> (int16[@untagged]) -> (int16[@untagged])
-    = "caml_vec128_unreachable" "caml_int16_shift_left_by_int16_untagged"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  external shift_right :
-    (int16[@untagged]) -> (int16[@untagged]) -> (int16[@untagged])
-    = "caml_vec128_unreachable" "caml_int16_shift_right_by_int16_untagged"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  external shift_right_logical :
-    (int16[@untagged]) -> (int16[@untagged]) -> (int16[@untagged])
-    = "caml_vec128_unreachable"
-      "caml_int16_shift_right_logical_by_int16_untagged"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  let check' ~eq ?nonzero ?(trials = 100_000) f g =
+  let check ?nonzero f g =
     let nz = Option.value ~default:false nonzero in
     let open Stdlib_stable.Int16 in
     Random.set_state (Random.State.make [| 1234567890 |]);
-    if not nz then eq (f zero) (g zero);
-    eq (f one) (g one);
-    eq (f minus_one) (g minus_one);
-    eq (f max_int) (g max_int);
-    eq (f min_int) (g min_int);
-    for _ = 1 to trials do
+    if not nz then eqi (f zero) (g zero);
+    eqi (f one) (g one);
+    eqi (f minus_one) (g minus_one);
+    eqi (f max_int) (g max_int);
+    eqi (f min_int) (g min_int);
+    for _ = 0 to 100_000 do
       let i = Random.int (to_int max_int) |> of_int in
       let i = if Random.bool () then i else neg i in
-      if (not nz) || i <> 0S then eq (f i) (g i)
-    done
-
-  let check ?nonzero f g = check' ~eq:eqi ?nonzero f g
-
-  let check_shift f g =
-    for i = 0 to 15 do
-      check' ~trials:1_000 ~eq:eq16
-        (fun x -> f x (Stdlib_stable.Int16.of_int i))
-        (fun x -> g x i)
+      if (not nz) || i <> 0S then eqi (f i) (g i)
     done
 
   let rec clz i =
@@ -384,10 +299,7 @@ module Int16 = struct
     check ~nonzero:true count_leading_zeros_nonzero_arg clz;
     check count_trailing_zeros ctz;
     check ~nonzero:true count_trailing_zeros_nonzero_arg ctz;
-    check count_set_bits popcnt;
-    check_shift shift_left Stdlib_stable.Int16.shift_left;
-    check_shift shift_right Stdlib_stable.Int16.shift_right;
-    check_shift shift_right_logical Stdlib_stable.Int16.shift_right_logical
+    check count_set_bits popcnt
 end
 
 module Int8 = struct
@@ -416,43 +328,19 @@ module Int8 = struct
     = "caml_vec128_unreachable" "caml_int8_popcnt_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external shift_left :
-    (int8[@untagged]) -> (int8[@untagged]) -> (int8[@untagged])
-    = "caml_vec128_unreachable" "caml_int8_shift_left_by_int8_untagged"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  external shift_right :
-    (int8[@untagged]) -> (int8[@untagged]) -> (int8[@untagged])
-    = "caml_vec128_unreachable" "caml_int8_shift_right_by_int8_untagged"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  external shift_right_logical :
-    (int8[@untagged]) -> (int8[@untagged]) -> (int8[@untagged])
-    = "caml_vec128_unreachable" "caml_int8_shift_right_logical_by_int8_untagged"
-  [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
-  let check' ~eq ?nonzero ?(trials = 100_000) f g =
+  let check ?nonzero f g =
     let nz = Option.value ~default:false nonzero in
     let open Stdlib_stable.Int8 in
     Random.set_state (Random.State.make [| 1234567890 |]);
-    if not nz then eq (f zero) (g zero);
-    eq (f one) (g one);
-    eq (f minus_one) (g minus_one);
-    eq (f max_int) (g max_int);
-    eq (f min_int) (g min_int);
-    for _ = 1 to trials do
+    if not nz then eqi (f zero) (g zero);
+    eqi (f one) (g one);
+    eqi (f minus_one) (g minus_one);
+    eqi (f max_int) (g max_int);
+    eqi (f min_int) (g min_int);
+    for _ = 0 to 100_000 do
       let i = Random.int (to_int max_int) |> of_int in
       let i = if Random.bool () then i else neg i in
-      if (not nz) || i <> 0s then eq (f i) (g i)
-    done
-
-  let check ?nonzero f g = check' ~eq:eqi ?nonzero f g
-
-  let check_shift f g =
-    for i = 0 to 7 do
-      check' ~trials:1_000 ~eq:eq8
-        (fun x -> f x (Stdlib_stable.Int8.of_int i))
-        (fun x -> g x i)
+      if (not nz) || i <> 0s then eqi (f i) (g i)
     done
 
   let rec clz i =
@@ -481,10 +369,7 @@ module Int8 = struct
     check ~nonzero:true count_leading_zeros_nonzero_arg clz;
     check count_trailing_zeros ctz;
     check ~nonzero:true count_trailing_zeros_nonzero_arg ctz;
-    check count_set_bits popcnt;
-    check_shift shift_left Stdlib_stable.Int8.shift_left;
-    check_shift shift_right Stdlib_stable.Int8.shift_right;
-    check_shift shift_right_logical Stdlib_stable.Int8.shift_right_logical
+    check count_set_bits popcnt
 end
 
 module Float = struct

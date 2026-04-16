@@ -22,7 +22,7 @@ type source_file =
   | Text_file of string
 
 (** The include_dirs in the OCaml compiler. *)
-val include_dirs : Clflags.visible_include list ref
+val include_dirs : string list ref
 
 (** The hidden_include_dirs in the OCaml compiler. *)
 val hidden_include_dirs : string list ref

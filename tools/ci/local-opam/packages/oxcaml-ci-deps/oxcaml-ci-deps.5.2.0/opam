@@ -1,0 +1,23 @@
+opam-version: "2.0"
+synopsis: "OxCaml 5.2.0 CI dependencies meta-package"
+maintainer: "oxcaml-team"
+license: "MIT"
+authors: "oxcaml-team"
+homepage: "https://github.com/ocaml-flambda/flambda-backend"
+bug-reports: "https://github.com/ocaml-flambda/flambda-backend/issues"
+dev-repo: "git+https://github.com/ocaml-flambda/flambda-backend"
+depends: [
+  "ocaml-base-compiler" {= "4.14.2+oxcaml"}
+  "menhir" {= "20231231"}
+  "ocamlformat" {= "0.24.1"}
+  "re" {>= "1.10.0"}
+  # js_of_ocaml-compiler dependencies
+  "ppxlib" {>= "0.15"}
+  "cmdliner" {>= "1.1.0"}
+  "sedlex" {>= "3.3"}
+  "menhirLib"
+  "menhirSdk"
+  "yojson" {>= "2.1"}
+]
+build: []
+install: []

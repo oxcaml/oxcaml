@@ -449,13 +449,11 @@ let read_one_param ppf position name v =
 
   | "intf-suffix" -> Config.interface_suffix := v
 
-  | "I" | "Ix" ->
-    let cmx_guaranteed = String.equal name "Ix" in
-    let entry : Clflags.visible_include = { path = v; cmx_guaranteed } in
-    begin match position with
-    | Before_args -> first_include_dirs := entry :: !first_include_dirs
-    | Before_link | Before_compile _ ->
-      last_include_dirs := entry :: !last_include_dirs
+  | "I" -> begin
+      match position with
+      | Before_args -> first_include_dirs := v :: !first_include_dirs
+      | Before_link | Before_compile _ ->
+        last_include_dirs := v :: !last_include_dirs
     end
 
   | "cclib" ->
@@ -547,8 +545,6 @@ let read_one_param ppf position name v =
     |> Option.iter (fun path -> Clflags.profile_output_name := Some path)
 
   | "extension" -> Language_extension.enable_of_string_exn v
-  | "ikinds" -> set "ikinds" [ Clflags.ikinds ] v
-  | "ikinds-debug" -> set "ikinds-debug" [ Clflags.ikinds_debug ] v
   | "disable-all-extensions" ->
     if check_bool ppf name v then
       Language_extension.set_universe_and_enable_all No_extensions

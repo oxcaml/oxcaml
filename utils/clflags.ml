@@ -65,14 +65,9 @@ type gdwarf_fidelity =
   | Fidelity_high | Fidelity_very_high | Fidelity_ultra_high
   | Fidelity_unlimited
 
-type visible_include =
-  { path : string;
-    cmx_guaranteed : bool;
-  }
-
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
-and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
+and include_dirs = ref ([] : string list)  (* -I *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
@@ -119,8 +114,6 @@ and uses_metaprogramming = ref false    (* -uses-metaprogramming *)
 and custom_runtime = ref false          (* -custom *)
 and no_check_prims = ref false          (* -no-check-prims *)
 and bytecode_compatible_32 = ref false  (* -compat-32 *)
-and thunkify_cu_init = ref false
-  (* -thunkify-compilation-unit-initialization *)
 and output_c_object = ref false         (* -output-obj *)
 and output_complete_object = ref false  (* -output-complete-obj *)
 and output_complete_executable = ref false  (* -output-complete-exe *)
@@ -204,8 +197,6 @@ let dump_linear = ref false             (* -dlinear *)
 let keep_startup_file = ref false       (* -dstartup *)
 let debug_ocaml = ref false             (* -debug-ocaml *)
 let llvm_backend = ref false            (* -llvm-backend *)
-let ikinds = ref false                  (* -ikinds *)
-let ikinds_debug = ref false            (* -ikinds-debug *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)

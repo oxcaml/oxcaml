@@ -84,8 +84,7 @@ module Dune_manifests_reader : sig
 
   val iter_manifest
     :  t
-    -> f:(filename:string -> location:Path.Cwd_relative.t ->
-          cmx_guaranteed:bool -> unit)
+    -> f:(filename:string -> location:Path.Cwd_relative.t -> unit)
     -> manifest_path:Path.Load_root_relative.t
     -> unit
 end = struct
@@ -191,7 +190,6 @@ end = struct
       | File of
           { filename : string
           ; location : Path.Load_root_relative.t
-          ; cmx_guaranteed : bool
           }
       | Manifest of Path.Load_root_relative.t
   end
@@ -200,10 +198,7 @@ end = struct
     match split_and_unescape ~buffer line with
     | [ "file"; filename; location ] ->
       let location = Path.Load_root_relative.of_string location in
-      Some (Entry.File { filename; location; cmx_guaranteed = false })
-    | [ "file_x"; filename; location ] ->
-      let location = Path.Load_root_relative.of_string location in
-      Some (Entry.File { filename; location; cmx_guaranteed = true })
+      Some (Entry.File { filename; location })
     | [ "manifest"; _; location ] ->
       (* [filename] is included in "manifest" entry only for human
          readability, so we discard them here. *)
@@ -219,9 +214,8 @@ end = struct
       iter_lines manifest_path ~f:(fun line ->
         match parse_line ~buffer line with
         | None -> ()
-        | Some (Entry.File { filename; location; cmx_guaranteed }) ->
-          visit t location ~f:(fun location ->
-            f ~filename ~location ~cmx_guaranteed)
+        | Some (Entry.File { filename; location }) ->
+          visit t location ~f:(fun location -> f ~filename ~location)
         | Some (Manifest manifest_path) -> iter_manifest t ~f ~manifest_path))
   ;;
 end
@@ -235,8 +229,6 @@ module For_testing = struct
     Dune_manifests_reader.Path.For_testing.root_override := path
 end
 
-type visibility = Visible of { cmx_guaranteed : bool } | Hidden
-
 module Dir : sig
   type entry = {
     basename : string;
@@ -248,9 +240,9 @@ module Dir : sig
   val path : t -> string
   val files : t -> entry list
   val basenames : t -> string list
-  val visibility : t -> visibility
+  val hidden : t -> bool
 
-  val create : visibility -> string -> t
+  val create : hidden:bool -> string -> t
 
   val find : t -> string -> string option
   val find_normalized : t -> string -> string option
@@ -263,13 +255,13 @@ end = struct
   type t = {
     path : string;
     files : entry list;
-    visibility : visibility;
+    hidden : bool
   }
 
   let path t = t.path
   let files t = t.files
   let basenames t = List.map (fun { basename; _ } -> basename) t.files
-  let visibility t = t.visibility
+  let hidden t = t.hidden
 
   let find t fn =
     List.find_map (fun { basename; path } ->
@@ -297,12 +289,14 @@ end = struct
     with Sys_error _ ->
       [||]
 
-  let create visibility path =
+  let create ~hidden path =
     let files = Array.to_list (readdir_compat path)
       |> List.map (
         fun basename -> { basename; path = Filename.concat path basename }) in
-    { path; files; visibility }
+    { path; files; hidden }
 end
+
+type visibility = Visible | Hidden
 
 (** Stores cached paths to files *)
 module Path_cache : sig
@@ -320,23 +314,21 @@ module Path_cache : sig
   val add : Dir.t -> unit
 
   (* Like [prepent_add], but only adds a single file to the cache. *)
-  val prepend_add_single : hidden:bool -> cmx_guaranteed:bool ->
-    string -> string -> unit
+  val prepend_add_single : hidden:bool -> string -> string -> unit
 
   (* Search for a basename in cache. Ignore case if [uncap] is true *)
   val find : uncap:bool -> string -> string * visibility
 end = struct
   module STbl = Misc.Stdlib.String.Tbl
 
-  (* Mappings from basenames to full filenames *)
-  type visible_registry = Clflags.visible_include STbl.t
-  type hidden_registry = string STbl.t
+  (* Mapping from basenames to full filenames *)
+  type registry = string STbl.t
 
-  let visible_files : visible_registry ref = s_table STbl.create 42
-  let visible_files_uncap : visible_registry ref = s_table STbl.create 42
+  let visible_files : registry ref = s_table STbl.create 42
+  let visible_files_uncap : registry ref = s_table STbl.create 42
 
-  let hidden_files : hidden_registry ref = s_table STbl.create 42
-  let hidden_files_uncap : hidden_registry ref = s_table STbl.create 42
+  let hidden_files : registry ref = s_table STbl.create 42
+  let hidden_files_uncap : registry ref = s_table STbl.create 42
 
   let reset () =
     STbl.clear !hidden_files;
@@ -344,36 +336,27 @@ end = struct
     STbl.clear !visible_files;
     STbl.clear !visible_files_uncap
 
-  let prepend_add_single ~hidden ~cmx_guaranteed base fn =
+  let prepend_add_single ~hidden base fn =
     if hidden then begin
       STbl.replace !hidden_files base fn;
       STbl.replace !hidden_files_uncap (Misc.normalized_unit_filename base) fn
     end else begin
-      STbl.replace !visible_files base { Clflags.path = fn; cmx_guaranteed };
-      STbl.replace !visible_files_uncap (String.uncapitalize_ascii base)
-        { Clflags.path = fn; cmx_guaranteed }
+      STbl.replace !visible_files base fn;
+      STbl.replace !visible_files_uncap (String.uncapitalize_ascii base) fn
     end
 
   let prepend_add dir =
-    let hidden, cmx_guaranteed =
-      match Dir.visibility dir with
-      | Hidden -> true, false
-      | Visible { cmx_guaranteed } -> false, cmx_guaranteed
-    in
     List.iter
       (fun ({ basename; path } : Dir.entry) ->
-        prepend_add_single ~hidden ~cmx_guaranteed basename path)
+        prepend_add_single ~hidden:(Dir.hidden dir) basename path)
       (Dir.files dir)
 
   let add dir =
     let update base fn visible_files hidden_files =
-      match Dir.visibility dir with
-      | Hidden ->
-        if not (STbl.mem !hidden_files base) then
-          STbl.replace !hidden_files base fn
-      | Visible { cmx_guaranteed } ->
-        if not (STbl.mem !visible_files base) then
-          STbl.replace !visible_files base { Clflags.path = fn; cmx_guaranteed }
+      if (Dir.hidden dir) && not (STbl.mem !hidden_files base) then
+        STbl.replace !hidden_files base fn
+      else if not (STbl.mem !visible_files base) then
+        STbl.replace !visible_files base fn
     in
     List.iter
       (fun ({ basename = base; path = fn } : Dir.entry) ->
@@ -383,10 +366,7 @@ end = struct
       (Dir.files dir)
 
   let find fn visible_files hidden_files =
-    try
-      let { Clflags.path; cmx_guaranteed } = STbl.find !visible_files fn in
-      (path, Visible { cmx_guaranteed })
-    with
+    try (STbl.find !visible_files fn, Visible) with
     | Not_found -> (STbl.find !hidden_files fn, Hidden)
 
   let find ~uncap fn =
@@ -428,20 +408,15 @@ let get_path_list () =
   Misc.rev_map_end Dir.path !visible_dirs (List.rev_map Dir.path !hidden_dirs)
 
 type paths =
-  { visible : Clflags.visible_include list;
+  { visible : string list;
     hidden : string list }
 
 let get_paths () =
-  let visible_dir_to_include dir : Clflags.visible_include =
-    let cmx_guaranteed =
-      match Dir.visibility dir with
-      | Hidden -> Misc.fatal_error "Load_path.get_paths"
-      | Visible { cmx_guaranteed } -> cmx_guaranteed
-    in
-    { path = Dir.path dir; cmx_guaranteed }
-  in
-  { visible = List.rev_map visible_dir_to_include !visible_dirs;
+  { visible = List.rev_map Dir.path !visible_dirs;
     hidden = List.rev_map Dir.path !hidden_dirs }
+
+let get_visible_path_list () = List.rev_map Dir.path !visible_dirs
+let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
 
 let init_manifests () =
   let manifests_reader = Dune_manifests_reader.create () in
@@ -451,12 +426,11 @@ let init_manifests () =
     Dune_manifests_reader.iter_manifest
       manifests_reader
       ~manifest_path
-      ~f:(fun ~filename ~location ~cmx_guaranteed ->
+      ~f:(fun ~filename ~location ->
           let basename = Filename.basename filename in
           basenames := basename :: !basenames;
           Path_cache.prepend_add_single
             ~hidden
-            ~cmx_guaranteed
             basename
             (Dune_manifests_reader.Path.Cwd_relative.to_string location))
   in
@@ -469,12 +443,8 @@ let init_manifests () =
 
 let init ~auto_include ~visible ~hidden =
   reset ();
-  visible_dirs :=
-    List.rev_map
-      (fun ({ path; cmx_guaranteed } : Clflags.visible_include) ->
-        Dir.create (Visible { cmx_guaranteed }) path)
-      visible;
-  hidden_dirs := List.rev_map (Dir.create Hidden) hidden;
+  visible_dirs := List.rev_map (Dir.create ~hidden:false) visible;
+  hidden_dirs := List.rev_map (Dir.create ~hidden:true) hidden;
   List.iter Path_cache.prepend_add !hidden_dirs;
   List.iter Path_cache.prepend_add !visible_dirs;
   init_manifests ();
@@ -499,22 +469,24 @@ let remove_dir dir =
 let add (dir : Dir.t) =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.add dir;
-  match Dir.visibility dir with
-  | Hidden -> hidden_dirs := dir :: !hidden_dirs
-  | Visible _ -> visible_dirs := dir :: !visible_dirs
+  if (Dir.hidden dir) then
+    hidden_dirs := dir :: !hidden_dirs
+  else
+    visible_dirs := dir :: !visible_dirs
 
 let append_dir = add
 
-let add_dir visibility dir = add (Dir.create visibility dir)
+let add_dir ~hidden dir = add (Dir.create ~hidden dir)
 
 (* Add the directory at the start of load path - so basenames are
    unconditionally added. *)
 let prepend_dir (dir : Dir.t) =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.prepend_add dir;
-  match Dir.visibility dir with
-  | Hidden -> hidden_dirs := !hidden_dirs @ [dir]
-  | Visible _ -> visible_dirs := !visible_dirs @ [dir]
+  if (Dir.hidden dir) then
+    hidden_dirs := !hidden_dirs @ [dir]
+  else
+    visible_dirs := !visible_dirs @ [dir]
 
 let is_basename fn = Filename.basename fn = fn
 
@@ -536,9 +508,7 @@ let auto_include_otherlibs =
   (* Ensure directories are only ever scanned once *)
   let expand = Misc.expand_directory Config.standard_library in
   let otherlibs =
-    let read_lib lib =
-      lazy (Dir.create (Visible { cmx_guaranteed = true }) (expand ("+" ^ lib)))
-    in
+    let read_lib lib = lazy (Dir.create ~hidden:false (expand ("+" ^ lib))) in
     List.map (fun lib -> (lib, read_lib lib)) ["dynlink"; "str"; "unix"] in
   auto_include_libs otherlibs
 
@@ -552,29 +522,19 @@ let find fn =
   with Not_found ->
     !auto_include_callback Dir.find fn
 
-let search_dirs dirs fn =
-  List.find_map
-    (fun dir ->
-      Option.map
-        (fun path -> (path, Dir.visibility dir))
-        (Dir.find_normalized dir fn))
-    dirs
-
 let find_normalized_with_visibility fn =
   assert (not Config.merlin || Local_store.is_bound ());
   try
     if is_basename fn && not !Sys.interactive then
       Path_cache.find ~uncap:true fn
     else
-      match search_dirs (List.rev !visible_dirs) fn with
-      | Some result -> result
-      | None ->
-        match search_dirs (List.rev !hidden_dirs) fn with
-        | Some result -> result
-        | None -> raise Not_found
+      try
+        (Misc.find_in_path_normalized (get_visible_path_list ()) fn, Visible)
+      with
+      | Not_found ->
+        (Misc.find_in_path_normalized (get_hidden_path_list ()) fn, Hidden)
   with Not_found ->
     let fn_uncap = String.uncapitalize_ascii fn in
-    (!auto_include_callback Dir.find_normalized fn_uncap,
-     Visible { cmx_guaranteed = false })
+    (!auto_include_callback Dir.find_normalized fn_uncap, Visible)
 
 let find_normalized fn = fst (find_normalized_with_visibility fn)

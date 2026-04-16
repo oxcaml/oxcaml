@@ -59,12 +59,7 @@ module Expr = struct
 
 end
 
-let duplicate e =
-  let e = Obj.magic_many e in
-  e, e
-
 let print fmt e =
   Format.fprintf fmt "%a" Exp.print (Code.to_exp (Obj.magic e : Code.t))
 
-let string_of_expr e =
-  e |> Obj.magic_many |> Format.asprintf "%a" print
+let string_of_expr e = Format.asprintf "%a" print e

@@ -26,8 +26,8 @@ val fatal : string -> 'a
 
 val first_ccopts : string list ref
 val first_ppx : string list ref
-val first_include_dirs : Clflags.visible_include list ref
-val last_include_dirs : Clflags.visible_include list ref
+val first_include_dirs : string list ref
+val last_include_dirs : string list ref
 
 (* return the list of objfiles, after OCAMLPARAM and List.rev *)
 val get_objfiles : with_ocamlparam:bool -> string list

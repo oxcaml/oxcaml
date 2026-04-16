@@ -377,35 +377,6 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
        it is introduced at line 1, characters 0-13, outside any quotations.
 |}];;
 
-type 'a t_param_well_staged = A of 'a expr
-[%%expect {|
-type 'a t_param_well_staged = A of 'a expr
-|}];;
-
-type 'a t_param_ill_staged = A of <['a]> expr
-[%%expect {|
-Line 1, characters 36-38:
-1 | type 'a t_param_ill_staged = A of <['a]> expr
-                                        ^^
-Error: Type variable "'a" is used inside a quotation (<[ ... ]>),
-       it already occurs outside any quotations.
-       Hint: Consider using "$'a".
-|}];;
-
-type _ t_param_well_staged_gadt =
-  | A : 'a expr -> <[$('a) * $('a)]> t_param_well_staged_gadt
-[%%expect {|
-type _ t_param_well_staged_gadt =
-    A : 'a expr -> <[$('a) * $('a)]> t_param_well_staged_gadt
-|}];;
-
-type _ t_param_re_staged_gadt =
-  | B : <['b]> expr -> <['b * 'b]> t_param_re_staged_gadt
-[%%expect {|
-type _ t_param_re_staged_gadt =
-    B : 'b expr -> <[$('b) * $('b)]> t_param_re_staged_gadt
-|}];;
-
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
 [%%expect {|
 - : <[$('a) -> $('b) -> $('a) * $('b)]> expr =
@@ -456,7 +427,7 @@ Error: This expression has type "<[int -> int]>"
 
 let mk_pair x = <[$x, $x]>;;
 [%%expect {|
-val mk_pair : 'a expr -> <[$('a) * $('a)]> expr @ once = <fun>
+val mk_pair : 'a expr -> <[$('a) * $('a)]> expr = <fun>
 |}];;
 
 mk_pair <[123]>;;
@@ -517,12 +488,12 @@ Error: Type variable "'a" is used outside any quotations,
 
 let eta (type a) (x : a expr) : a expr = <[ $x ]>
 [%%expect {|
-val eta : 'a expr -> 'a expr @ once = <fun>
+val eta : 'a expr -> 'a expr = <fun>
 |}]
 
 let eta1 (type a) = <[ fun (x : $a expr) : $a expr -> <[ $x ]> ]>
 [%%expect {|
-val eta1 : <[$('a) expr -> $('a) expr @ once]> expr =
+val eta1 : <[$('a) expr -> $('a) expr]> expr =
   <[fun (x : _ expr) -> (<[$x]> : _ expr)]>
 |}]
 
@@ -536,13 +507,13 @@ val eta1' : <[$('a) -> $('a)]> expr = <[fun (type a) (x : a) -> (x : a)]>
 let app (type a b) (f : <[$a -> $b]> expr) (x : a expr) =
   <[ $f $x ]>
 [%%expect {|
-val app : <[$('a) -> $('b)]> expr -> 'a expr -> 'b expr @ once = <fun>
+val app : <[$('a) -> $('b)]> expr -> 'a expr -> 'b expr = <fun>
 |}]
 
 let both (type a b) (p : a expr * b expr) : <[$a * $b]> expr =
   let (x, y) = p in <[ $x, $y ]>
 [%%expect {|
-val both : 'a expr * 'b expr -> <[$('a) * $('b)]> expr @ once = <fun>
+val both : 'a expr * 'b expr -> <[$('a) * $('b)]> expr = <fun>
 |}]
 
 (* Non-value-kinded expressions *)

@@ -159,7 +159,7 @@ AC_ARG_ENABLE([runtime5],
   [AS_HELP_STRING([--enable-runtime5],
     [Use the OCaml 5 runtime])],
   [],
-  [enable_runtime5=yes])
+  [enable_runtime5=no])
 
 AC_ARG_ENABLE([coverage],
   [AS_HELP_STRING([--enable-coverage],
@@ -686,12 +686,11 @@ AC_ARG_ENABLE([cpp-mangling],
 
 AC_ARG_ENABLE([name-mangling],
   [AS_HELP_STRING([--enable-name-mangling=SCHEME],
-    [specify name mangling scheme: flat or structured [default=flat]])],
+    [specify name mangling scheme [default=flat]])],
   [AS_CASE([$enable_name_mangling],
     [flat], [name_mangling_scheme=flat],
-    [structured], [name_mangling_scheme=structured],
     [*], [AC_MSG_ERROR(m4_normalize([Invalid or missing name mangling scheme:
-      must be 'flat' or 'structured']))])],
+      must be 'flat']))])],
   [name_mangling_scheme=flat])
 
 AC_ARG_ENABLE([naked-pointers], [],
@@ -1385,10 +1384,6 @@ AC_CHECK_HEADER([sys/mman.h], [AC_DEFINE([HAS_SYS_MMAN_H])])
 AS_CASE([$host],
   [*-*-linux*],
     [AC_CHECK_HEADER([linux/futex.h], [AC_DEFINE([HAS_LINUX_FUTEX_H])])])
-
-AC_CHECK_HEADER([sys/epoll.h], [AC_DEFINE([HAS_SYS_EPOLL_H])])
-AC_CHECK_HEADER([sys/timerfd.h], [AC_DEFINE([HAS_SYS_TIMERFD_H])])
-AC_CHECK_HEADER([sys/eventfd.h], [AC_DEFINE([HAS_SYS_EVENTFD_H])])
 
 # Checks for types
 
@@ -2902,8 +2897,7 @@ AS_IF([test x"$enable_cpp_mangling" = "xyes"],
 ## Name mangling scheme
 
 AS_CASE([$name_mangling_scheme],
-  [flat], [AC_DEFINE([NAME_MANGLING_FLAT])],
-  [structured], [AC_DEFINE([NAME_MANGLING_STRUCTURED])])
+  [flat], [AC_DEFINE([NAME_MANGLING_FLAT])])
 
 ## Check for mmap support for huge pages and contiguous heap
 OCAML_MMAP_SUPPORTS_HUGE_PAGES

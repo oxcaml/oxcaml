@@ -71,7 +71,7 @@ Line 1, characters 0-27:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "<[int64#]>" is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of type "<[int64#]>" must be a value layout
+       But the layout of type "<[int64#]>" must be a sublayout of value
          because of the definition of t at line 1, characters 0-27.
 |}]
 
@@ -94,7 +94,7 @@ Line 1, characters 0-30:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "int64#" is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of type "int64#" must be a value layout
+       But the layout of type "int64#" must be a sublayout of value
          because of the definition of t at line 1, characters 0-30.
 |}]
 
@@ -125,6 +125,6 @@ Line 1, characters 0-25:
     ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "i64 eval" is bits64
          because of the definition of i64 at line 3, characters 0-17.
-       But the layout of type "i64 eval" must be a value layout
+       But the layout of type "i64 eval" must be a sublayout of value
          because of the definition of t at line 1, characters 0-25.
 |}]

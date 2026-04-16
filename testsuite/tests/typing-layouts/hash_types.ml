@@ -478,35 +478,32 @@ and r = { x : int; y : float#; }
 and u = r#
 |}]
 
-(* CR layouts-scannable: improve this error message (internal ticket 6111) *)
+(* CR layouts v7.2: improve this error message *)
 type s_bad = r# t
 and r = {x:int; y:bool}
 [%%expect{|
 Line 2, characters 0-23:
 2 | and r = {x:int; y:bool}
     ^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r#" is value non_pointer & value non_pointer
+Error:
+       The kind of r# is value_or_null & float64
          because it is an unboxed record.
-       But the layout of type "r#" must be a sublayout of
-           value maybe_separable maybe_null & float64
-         because it is an unboxed record.
-       Note: The layout of immediate is value non_pointer.
+       But the kind of r# must be a subkind of value & float64
+         because of the definition of t at line 1, characters 0-29.
 |}]
 
-(* CR layouts-scannable: improve this error message (internal ticket 6111) *)
 type s_bad = q t
 and r = {x:int; y:bool}
 and q = r#
 [%%expect{|
-Line 2, characters 0-23:
-2 | and r = {x:int; y:bool}
-    ^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r#" is value non_pointer & value non_pointer
+Line 3, characters 0-10:
+3 | and q = r#
+    ^^^^^^^^^^
+Error:
+       The kind of q is value_or_null & float64
          because it is an unboxed record.
-       But the layout of type "r#" must be a sublayout of
-           value maybe_separable maybe_null & float64
-         because it is an unboxed record.
-       Note: The layout of immediate is value non_pointer.
+       But the kind of q must be a subkind of value & float64
+         because of the definition of t at line 1, characters 0-29.
 |}]
 
 module rec M : sig
@@ -750,7 +747,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t
        The layout of the first is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of the first must be a value layout
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-8.
 |}]
 

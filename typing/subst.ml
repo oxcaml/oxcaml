@@ -33,10 +33,6 @@ type type_replacement =
   | Path of Path.t
   | Type_function of { params : type_expr list; body : type_expr }
 
-type kind_replacement =
-  | Jkind_path of Path.t
-  | Jkind_const of jkind_const_desc_lr
-
 type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
@@ -57,7 +53,7 @@ type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
     modtypes: module_type Path.Map.t;
-    jkinds: kind_replacement Path.Map.t;
+    jkinds: Path.t Path.Map.t;
 
     additional_action: additional_action;
 
@@ -70,17 +66,6 @@ type safe = [`Safe]
 type unsafe = [`Unsafe]
 type t = safe subst
 exception Module_type_path_substituted_away of Path.t * Types.module_type
-
-module Ikind_substitution = struct
-  type lookup_result =
-    | Lookup_identity
-    | Lookup_path of Path.t
-    | Lookup_type_fun of type_expr list * type_expr
-
-  let substitute_decl_ikind_with_lookup :
-      (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref =
-    ref (fun ~lookup:_ ikind_entry -> ikind_entry)
-end
 
 let identity =
   { types = Path.Map.empty;
@@ -132,8 +117,7 @@ let add_modtype_path p p' s = add_modtype_gen p (Mty_ident p') s
 let add_modtype id p s = add_modtype_path (Pident id) p s
 
 let add_jkind_path id p s =
-  { s with jkinds = Path.Map.add id (Jkind_path p) s.jkinds;
-           last_compose = None }
+  { s with jkinds = Path.Map.add id p s.jkinds; last_compose = None }
 let add_jkind id p s = add_jkind_path (Pident id) p s
 
 type additional_action_config =
@@ -359,10 +343,8 @@ let modtype_path s path =
          | Pident _ -> path
 
 let jkind_path s path =
-  match Path.Map.find path s.jkinds with
-  | Jkind_path p -> p
-  | Jkind_const _ -> fatal_error "Subst.jkind_path: kind_const"
-  | exception Not_found ->
+  try Path.Map.find path s.jkinds
+  with Not_found ->
     match path with
     | Pident _ -> path
     | Pdot(p, n) ->
@@ -484,42 +466,6 @@ let apply_type_function params args body =
     in
     copy body)
 
-
-let jkind_desc s jkind =
-  match jkind.base with
-  | Kconstr p ->
-    begin match Path.Map.find p s.jkinds with
-    | exception Not_found ->
-      let p' = jkind_path s p in
-      if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr p' }
-    | Jkind_path p -> { jkind with base = Kconstr p }
-    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
-      let const =
-        { base;
-          mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
-          with_bounds = jkind.with_bounds }
-      in
-      Jkind.Base_and_axes.map_layout Jkind_types.Layout.of_const const
-    end
-  | Layout _ -> jkind
-
-let jkind_const_desc s
-      ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
-  match jkind.base with
-  | Kconstr p ->
-    begin match Path.Map.find p s.jkinds with
-    | exception Not_found ->
-      let p' = jkind_path s p in
-      if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr p' }
-    | Jkind_path p -> { jkind with base = Kconstr p }
-    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
-      { base;
-        mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
-        with_bounds = jkind.with_bounds }
-    end
-  | Layout _ -> jkind
 
 (* Similar to [Ctype.nondep_type_rec]. *)
 let rec typexp copy_scope s ty =
@@ -667,9 +613,14 @@ let rec typexp copy_scope s ty =
 and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
   fun copy_scope s jkind ->
   let jkind =
-    let jkind_desc = jkind_desc s jkind.jkind in
-    if jkind_desc == jkind.jkind then jkind
-    else { jkind with jkind = jkind_desc }
+    match jkind.jkind.base with
+    | Kconstr p ->
+      let p' = jkind_path s p in
+      if Path.compare p p' = 0 then
+        jkind
+      else
+        { jkind with jkind = { jkind.jkind with base = Kconstr p'} }
+    | Layout _ -> jkind
   in
   let jkind = Jkind.map_type_expr (typexp copy_scope s) jkind in
   match s.additional_action with
@@ -742,10 +693,21 @@ let unsafe_mode_crossing copy_scope s loc
       Jkind.With_bounds.map_type_expr (typexp copy_scope s loc)
         unsafe_with_bounds }
 
+let jkind_const s
+      ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
+  let jkind =
+    match jkind.base with
+    | Kconstr p ->
+      let base = Kconstr (jkind_path s p) in
+      { jkind with base }
+    | Layout _ -> jkind
+  in
+  jkind
+
 let jkind_declaration s decl =
   { jkind_loc = loc s decl.jkind_loc;
     jkind_uid = decl.jkind_uid;
-    jkind_manifest = Option.map (jkind_const_desc s) decl.jkind_manifest;
+    jkind_manifest = Option.map (jkind_const s) decl.jkind_manifest;
     jkind_attributes = attrs s decl.jkind_attributes;
   }
 
@@ -780,26 +742,6 @@ let rec type_declaration' copy_scope s decl =
         | Some ty -> Some(typexp copy_scope s decl.type_loc ty)
       end;
     type_jkind = jkind copy_scope s decl.type_loc decl.type_jkind;
-    type_ikind = (
-      (* Preserve constructor ikinds via [s.types] (path rename or identity-env
-         inlined type functions), avoiding Env. *)
-      let lookup (path : Path.t) : Ikind_substitution.lookup_result =
-        match Path.Map.find_opt path s.types with
-        | Some (Path p) -> Lookup_path p
-        | Some (Type_function { params; body }) ->
-          let body = apply_type_function params params body in
-          Lookup_type_fun (params, body)
-        | None -> (
-          (* Mirror [type_path]: even without an explicit replacement, rename
-             via module path rewriting if the path changes. *)
-          let path' = type_path s path in
-          if Path.same path path'
-          then Lookup_identity
-          else Lookup_path path')
-      in
-      !Ikind_substitution.substitute_decl_ikind_with_lookup
-        ~lookup decl.type_ikind
-    );
     type_private = decl.type_private;
     type_variance = decl.type_variance;
     type_separability = decl.type_separability;
@@ -929,10 +871,6 @@ let type_replacement s = function
      let body = typexp copy_scope s loc body in
      Type_function { params; body })
 
-let jkind_replacement s = function
-  | Jkind_path p -> Jkind_path (jkind_path s p)
-  | Jkind_const jk -> Jkind_const (jkind_const_desc s jk)
-
 type scoping =
   | Keep
   | Make_local
@@ -1049,19 +987,7 @@ let to_lazy =
     lazy (List.map (To_lazy.signature_item m) sg) |> Wrap.of_lazy
   in
   let map_type_expr _ = Wrap.of_value in
-  let map_value_description _ (vd : Types.value_description) =
-    Lazy_types.{
-      val_type = Wrap.of_value vd.val_type;
-      val_lpoly = Wrap.of_value vd.val_lpoly;
-      val_modalities = vd.val_modalities;
-      val_kind = vd.val_kind;
-      val_zero_alloc = vd.val_zero_alloc;
-      val_attributes = vd.val_attributes;
-      val_loc = vd.val_loc;
-      val_uid = vd.val_uid;
-    }
-  in
-  To_lazy.{map_signature; map_type_expr; map_value_description}
+  To_lazy.{map_signature; map_type_expr}
 
 let lazy_value_description = To_lazy.value_description to_lazy
 let lazy_module_decl = To_lazy.module_declaration to_lazy
@@ -1075,8 +1001,6 @@ module From_lazy = Types.Map_wrapped(Lazy_types)(Types)
 let force_type_expr ty = Wrap.force (fun _ s ty ->
   let loc = Option.value s.loc ~default:Location.none in
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)) ty
-
-let force_lpoly lpoly = Wrap.force (fun _ _ x -> x) lpoly
 
 let rec subst_lazy_value_description s descr =
   let val_modalities =
@@ -1207,7 +1131,7 @@ and compose s1 s2 =
         { types = merge_type_path_maps (type_replacement s2) s1.types s2.types;
           modules = merge_path_maps (module_path s2) s1.modules s2.modules;
           modtypes = merge_path_maps (modtype Keep s2) s1.modtypes s2.modtypes;
-          jkinds = merge_path_maps (jkind_replacement s2) s1.jkinds s2.jkinds;
+          jkinds = merge_path_maps (jkind_path s2) s1.jkinds s2.jkinds;
           additional_action = begin
             match s1.additional_action, s2.additional_action with
             | action, No_action | No_action, action -> action
@@ -1240,19 +1164,7 @@ and from_lazy =
     List.map (From_lazy.signature_item m) items
   in
   let map_type_expr _ = force_type_expr in
-  let map_value_description _ (vd : Lazy_types.value_description) =
-    Types.{
-      val_type = force_type_expr vd.val_type;
-      val_lpoly = force_lpoly vd.val_lpoly;
-      val_modalities = vd.val_modalities;
-      val_kind = vd.val_kind;
-      val_zero_alloc = vd.val_zero_alloc;
-      val_attributes = vd.val_attributes;
-      val_loc = vd.val_loc;
-      val_uid = vd.val_uid;
-    }
-  in
-  From_lazy.{map_signature; map_type_expr; map_value_description}
+  From_lazy.{map_signature; map_type_expr}
 
 and force_value_description vd = From_lazy.value_description from_lazy vd
 and force_module_decl d = From_lazy.module_declaration from_lazy d
@@ -1297,7 +1209,6 @@ module Lazy = struct
   let force_functor_parameter = force_functor_parameter
   let force_value_description = force_value_description
   let force_type_expr = force_type_expr
-  let force_lpoly = force_lpoly
 end
 
 let signature sc s sg =
@@ -1328,12 +1239,6 @@ module Unsafe = struct
     { s with types; last_compose = None }
   let add_module_path id p s =
     { s with modules = Path.Map.add id p s.modules; last_compose = None }
-  let add_jkind_path id p s =
-    { s with jkinds = Path.Map.add id (Jkind_path p) s.jkinds;
-             last_compose = None }
-  let add_jkind id jk s =
-    { s with jkinds = Path.Map.add id (Jkind_const jk) s.jkinds;
-             last_compose = None }
 
   let wrap f : _ result = match f () with
     | x -> Ok x

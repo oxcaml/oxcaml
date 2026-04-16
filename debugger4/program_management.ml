@@ -129,12 +129,7 @@ let initialize_loading () =
   Symbols.clear_symbols ();
   Symbols.read_symbols Debugcom.main_frag !program_name;
   let Load_path.{visible; hidden} = Load_path.get_paths () in
-  let visible =
-    visible
-    @ List.map
-        (fun path : Clflags.visible_include -> { path; cmx_guaranteed = false })
-        !Symbols.program_source_dirs
-  in
+  let visible = visible @ !Symbols.program_source_dirs in
   Load_path.init ~auto_include:Compmisc.auto_include ~visible ~hidden;
   Envaux.reset_cache ~preserve_persistent_env:false;
   if !debug_loading then

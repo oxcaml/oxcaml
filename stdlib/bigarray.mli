@@ -293,8 +293,7 @@ module Genarray :
 
   external create
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b) kind -> 'c layout -> (int array[@local_opt])
-      -> ('a, 'b, 'c) t @ unique
+      ('a, 'b) kind -> 'c layout -> (int array[@local_opt]) -> ('a, 'b, 'c) t
     @@ portable
     = "caml_ba_create"
   (** [Genarray.create kind layout dimensions] returns a new Bigarray
@@ -321,7 +320,7 @@ module Genarray :
   val init
     : ('a : value_or_null) ('b : any) ('c : any).
       ('a, 'b) kind -> 'c layout -> int array @ local ->
-      (int array -> 'a) @ local -> ('a, 'b, 'c) t @ unique
+      (int array -> 'a) @ local -> ('a, 'b, 'c) t
   (** [Genarray.init kind layout dimensions f] returns a new Bigarray [b]
       whose element kind is determined by the parameter [kind] (one of
       [float32], [float64], [int8_signed], etc) and whose layout is
@@ -569,14 +568,14 @@ module Array0 : sig
 
   val create
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b) kind -> 'c layout -> ('a, 'b, 'c) t @ unique
+      ('a, 'b) kind -> 'c layout -> ('a, 'b, 'c) t
   (** [Array0.create kind layout] returns a new Bigarray of zero dimension.
      [kind] and [layout] determine the array element kind and the array
      layout as described for {!Genarray.create}. *)
 
   val init
     : ('a : value_or_null) ('b : any) ('c : any).
-      ('a, 'b) kind -> 'c layout -> 'a @ local -> ('a, 'b, 'c) t @ unique
+      ('a, 'b) kind -> 'c layout -> 'a @ local -> ('a, 'b, 'c) t
   (** [Array0.init kind layout v] behaves like [Array0.create kind layout]
      except that the element is additionally initialized to the value [v].
 
@@ -637,7 +636,7 @@ module Array0 : sig
 
   val of_value
     : ('a : value_or_null) ('b : any) ('c : any).
-      ('a, 'b) kind -> 'c layout -> 'a @ local -> ('a, 'b, 'c) t @ unique
+      ('a, 'b) kind -> 'c layout -> 'a @ local -> ('a, 'b, 'c) t
   (** Build a zero-dimensional Bigarray initialized from the
      given value.  *)
 end
@@ -658,7 +657,7 @@ module Array1 : sig
 
   val create
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b) kind -> 'c layout -> int -> ('a, 'b, 'c) t @ unique
+      ('a, 'b) kind -> 'c layout -> int -> ('a, 'b, 'c) t
   (** [Array1.create kind layout dim] returns a new Bigarray of
      one dimension, whose size is [dim].  [kind] and [layout]
      determine the array element kind and the array layout
@@ -666,8 +665,7 @@ module Array1 : sig
 
   val init
     : ('a : value_or_null) ('b : any) ('c : any).
-      ('a, 'b) kind -> 'c layout -> int -> (int -> 'a) @ local
-      -> ('a, 'b, 'c) t @ unique
+      ('a, 'b) kind -> 'c layout -> int -> (int -> 'a) @ local -> ('a, 'b, 'c) t
   (** [Array1.init kind layout dim f] returns a new Bigarray [b]
      of one dimension, whose size is [dim].  [kind] and [layout]
      determine the array element kind and the array layout
@@ -775,7 +773,7 @@ module Array1 : sig
 
   val of_array
     : ('a : value_or_null mod separable) ('b : any) ('c : any).
-      ('a, 'b) kind -> 'c layout -> 'a array @ local -> ('a, 'b, 'c) t @ unique
+      ('a, 'b) kind -> 'c layout -> 'a array @ local -> ('a, 'b, 'c) t
   (** Build a one-dimensional Bigarray initialized from the
      given array.  *)
 
@@ -809,7 +807,7 @@ module Array2 :
 
   val create
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b) kind ->  'c layout -> int -> int -> ('a, 'b, 'c) t @ unique
+      ('a, 'b) kind ->  'c layout -> int -> int -> ('a, 'b, 'c) t
   (** [Array2.create kind layout dim1 dim2] returns a new Bigarray of
      two dimensions, whose size is [dim1] in the first dimension
      and [dim2] in the second dimension.  [kind] and [layout]
@@ -819,7 +817,7 @@ module Array2 :
   val init
     : ('a : value_or_null) ('b : any) ('c : any).
       ('a, 'b) kind ->  'c layout -> int -> int -> (int -> int -> 'a) @ local
-      -> ('a, 'b, 'c) t @ unique
+      -> ('a, 'b, 'c) t
   (** [Array2.init kind layout dim1 dim2 f] returns a new Bigarray [b]
      of two dimensions, whose size is [dim2] in the first dimension
      and [dim2] in the second dimension.  [kind] and [layout]
@@ -952,8 +950,7 @@ module Array2 :
 
   val of_array
     : ('a : value_or_null mod separable) ('b : any) ('c : any).
-      ('a, 'b) kind -> 'c layout -> 'a array array @ local
-      -> ('a, 'b, 'c) t @ unique
+      ('a, 'b) kind -> 'c layout -> 'a array array @ local -> ('a, 'b, 'c) t
   (** Build a two-dimensional Bigarray initialized from the
      given array of arrays.  *)
 
@@ -985,7 +982,7 @@ module Array3 :
 
   val create
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b) kind -> 'c layout -> int -> int -> int -> ('a, 'b, 'c) t @ unique
+      ('a, 'b) kind -> 'c layout -> int -> int -> int -> ('a, 'b, 'c) t
   (** [Array3.create kind layout dim1 dim2 dim3] returns a new Bigarray of
      three dimensions, whose size is [dim1] in the first dimension,
      [dim2] in the second dimension, and [dim3] in the third.
@@ -995,7 +992,7 @@ module Array3 :
   val init
     : ('a : value_or_null) ('b : any) ('c : any).
       ('a, 'b) kind ->  'c layout -> int -> int -> int
-      -> (int -> int -> int -> 'a) @ local -> ('a, 'b, 'c) t @ unique
+      -> (int -> int -> int -> 'a) @ local -> ('a, 'b, 'c) t
   (** [Array3.init kind layout dim1 dim2 dim3 f] returns a new Bigarray [b]
      of three dimensions, whose size is [dim1] in the first dimension,
      [dim2] in the second dimension, and [dim3] in the third.
@@ -1160,7 +1157,7 @@ module Array3 :
   val of_array
     : ('a : value_or_null mod separable) ('b : any) ('c : any).
       ('a, 'b) kind -> 'c layout -> 'a array array array @ local
-      -> ('a, 'b, 'c) t @ unique
+      -> ('a, 'b, 'c) t
   (** Build a three-dimensional Bigarray initialized from the
      given array of arrays of arrays.  *)
 

@@ -10,8 +10,7 @@ let split_live_ranges : bool Lazy.t =
 let split_more_destruction_points : bool Lazy.t =
   bool_of_param "SPLIT_MORE_DESTR_POINTS"
 
-let split_around_loops : bool Lazy.t =
-  bool_of_param "SPLIT_AROUND_LOOPS" ~default:true
+let split_around_loops : bool Lazy.t = bool_of_param "SPLIT_AROUND_LOOPS"
 
 let log_function = lazy (make_log_function ~label:"split")
 

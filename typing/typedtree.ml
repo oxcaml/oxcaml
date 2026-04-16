@@ -273,7 +273,6 @@ and expression_desc =
         kind : ident_kind;
         unique_use : unique_use;
         mode : Mode.Value.l }
-  | Texp_apply_layout of expression * Jkind_types.Sort.var list
   | Texp_constant of constant
   | Texp_let of rec_flag * value_binding list * expression
   | Texp_letmutable of value_binding * expression
@@ -792,11 +791,9 @@ and with_constraint =
     Twith_type of type_declaration
   | Twith_module of Path.t * Longident.t loc
   | Twith_modtype of module_type
-  | Twith_jkind of jkind_declaration
   | Twith_typesubst of type_declaration
   | Twith_modsubst of Path.t * Longident.t loc
   | Twith_modtypesubst of module_type
-  | Twith_jkindsubst of jkind_declaration
 
 
 and core_type =
@@ -1503,7 +1500,6 @@ let rec fold_antiquote_exp f  acc exp =
   match exp.exp_desc with
   | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit | Texp_unboxed_bool _ ->
       acc
-  | Texp_apply_layout (exp, _) -> fold_antiquote_exp f acc exp
   | Texp_let (_, vbs, exp) ->
       let acc = fold_antiquote_value_bindings f acc vbs in
       fold_antiquote_exp f acc exp

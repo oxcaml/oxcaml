@@ -468,8 +468,7 @@ Line 2, characters 2-35:
 2 |   overwrite_ r with { x = Some "" }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
->> Fatal error: Location.todo_overwrite_not_implemented
-Uncaught exception: Misc.Fatal_error
+Uncaught exception: File "parsing/location.ml", line 1137, characters 2-8: Assertion failed
 
 |}]
 
@@ -480,8 +479,7 @@ Line 2, characters 2-35:
 2 |   overwrite_ r with { x = Some "" }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
->> Fatal error: Location.todo_overwrite_not_implemented
-Uncaught exception: Misc.Fatal_error
+Uncaught exception: File "parsing/location.ml", line 1137, characters 2-8: Assertion failed
 
 |}]
 
@@ -502,8 +500,7 @@ Line 2, characters 10-41:
 2 |   let x = overwrite_ r with { x = "foo" } in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
->> Fatal error: Location.todo_overwrite_not_implemented
-Uncaught exception: Misc.Fatal_error
+Uncaught exception: File "parsing/location.ml", line 1137, characters 2-8: Assertion failed
 
 |}]
 
@@ -515,7 +512,6 @@ Line 2, characters 10-41:
 2 |   let x = overwrite_ r with { y = "foo" } in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
->> Fatal error: Location.todo_overwrite_not_implemented
-Uncaught exception: Misc.Fatal_error
+Uncaught exception: File "parsing/location.ml", line 1137, characters 2-8: Assertion failed
 
 |}]

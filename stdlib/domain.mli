@@ -209,33 +209,8 @@ module TLS : sig
     end
 end
 
-module Tick : sig @@ portable
-  (** A handle to a request that the tick thread tick at a given interval
-
-      In between calling [acquire] and calling [release], the tick thread will
-      tick {i at least as frequently} as the provided [interval_usec]. *)
-  type t : mutable_data mod external_ global
-
-  (** Request that the tick thread tick at least as frequently as
-      [tick_interval] until [release] is called on the returned handle. *)
-  val acquire : interval_usec:int -> t @ unique
-
-  (** Release a handle to a tick request.
-
-     It is unsound to call this on a domain other than the one that called
-     [acquire] (though it is fine to call it on a different thread on the same
-     domain).
-  *)
-  val release : t @ unique -> unit
-
-  (** Returns the interval at which the tick thread will tick, or [Null]
-      if no domain has any active tick requests. This is the global minimum
-      across all domains of live tick requests. *)
-  val effective_interval_usec : unit -> int or_null
-end
-
-(** Submodule containing non-backwards-compatible functions which enforce thread
-    safety via modes. *)
+(** Submodule containing non-backwards-compatible functions which enforce thread safety
+    via modes. *)
 module Safe : sig @@ portable
 
   (** Like {!DLS}, but uses modes to enforce properties necessary for data-race

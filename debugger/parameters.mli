@@ -19,7 +19,7 @@
 val program_name : string ref
 val socket_name : string ref
 val arguments : string ref
-val default_load_path : Clflags.visible_include list ref
+val default_load_path : string list ref
 val breakpoint : bool ref
 val prompt : bool ref
 val time : bool ref

@@ -133,7 +133,6 @@ module Error: sig
     | In_Module_type_substitution of
         Ident.t * (Types.module_type,module_type_declaration_symptom) diff
     | In_Type_declaration of Ident.t * core_sigitem_symptom
-    | In_Jkind_declaration of Ident.t * core_sigitem_symptom
     | In_Expansion of core_module_type_symptom
 end
 type explanation = Env.t * Error.all
@@ -227,10 +226,6 @@ val compunit_as_argument:
 val type_declarations:
   loc:Location.t -> Env.t -> mark:bool ->
   Ident.t -> type_declaration -> type_declaration -> unit
-
-val jkind_declarations:
-  loc:Location.t -> Env.t -> mark:bool ->
-  Ident.t -> jkind_declaration -> jkind_declaration -> unit
 
 val print_coercion: Format.formatter -> module_coercion -> unit
 

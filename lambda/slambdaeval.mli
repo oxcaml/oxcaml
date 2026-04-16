@@ -27,23 +27,4 @@
 
 open Lambda
 
-module Or_missing : sig
-  type 'a t =
-    | Present of 'a
-    | Missing
-end
-
-type closure
-
-type halves =
-  { slv_comptime : value Or_missing.t;
-    slv_runtime : lambda
-  }
-
-and value =
-  | SLVhalves of halves
-  | SLVlayout of layout
-  | SLVrecord of value Or_missing.t array
-  | SLVclosure of closure
-
-val eval : slambda -> halves
+val eval : slambda -> slambda_halves

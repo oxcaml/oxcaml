@@ -339,7 +339,7 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
       ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
       ~native_name:name
       ~native_repr_args:
-        ([Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable)]
+        ([Primitive.Prim_global, L.Same_as_ocaml_repr (Base Value)]
         @
         match init with
         | None -> []
@@ -349,7 +349,7 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
         ( (match mode with
           | Alloc_heap -> Prim_global
           | Alloc_local -> Prim_local),
-          L.Same_as_ocaml_repr (Base Scannable) )
+          L.Same_as_ocaml_repr (Base Value) )
       ~is_layout_poly:false
   in
   L.Lprim
@@ -377,12 +377,12 @@ let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.locality_mode) =
     ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
     ~native_name:name
     ~native_repr_args:
-      [ Prim_global, L.Same_as_ocaml_repr (Base Scannable);
-        Prim_local, L.Same_as_ocaml_repr (Base Scannable);
-        Prim_global, L.Same_as_ocaml_repr (Base Scannable) ]
+      [ Prim_global, L.Same_as_ocaml_repr (Base Value);
+        Prim_local, L.Same_as_ocaml_repr (Base Value);
+        Prim_global, L.Same_as_ocaml_repr (Base Value) ]
     ~native_repr_res:
       ( (match mode with Alloc_heap -> Prim_global | Alloc_local -> Prim_local),
-        L.Same_as_ocaml_repr (Base Scannable) )
+        L.Same_as_ocaml_repr (Base Value) )
     ~is_layout_poly:false
 
 let makearray_dynamic_non_scannable_unboxed_product env
@@ -544,7 +544,7 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
     ( env,
       Transformed
         (makearray_dynamic_singleton "" mode ~length
-           ~init:(Some (Same_as_ocaml_repr (Base Scannable), L.Lvar init))
+           ~init:(Some (Same_as_ocaml_repr (Base Value), L.Lvar init))
            loc) )
   | Punboxedfloatarray Unboxed_float32 ->
     makearray_dynamic_singleton_uninitialized "unboxed_float32" ~length mode loc
@@ -798,12 +798,12 @@ let arrayblit_runtime env args loc =
       ~coeffects:Has_coeffects ~native_name:name
       ~native_repr_args:
         [ (* The arrays might be local *)
-          Primitive.Prim_local, L.Same_as_ocaml_repr (Base Scannable);
-          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable);
-          Primitive.Prim_local, L.Same_as_ocaml_repr (Base Scannable);
-          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable);
-          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable) ]
-      ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Scannable))
+          Primitive.Prim_local, L.Same_as_ocaml_repr (Base Value);
+          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Value);
+          Primitive.Prim_local, L.Same_as_ocaml_repr (Base Value);
+          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Value);
+          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Value) ]
+      ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Value))
       ~is_layout_poly:false
   in
   env, Primitive (L.Pccall external_call_desc, args, loc)
@@ -1009,7 +1009,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
   | Pignore, [arg] ->
     let result = L.Lconst (Const_base (Const_int 0)) in
     Transformed (L.Lsequence (arg, result))
-  | Pfield _, [L.Lprim (Pgetglobal (cu, _), [], _)]
+  | Pfield _, [L.Lprim (Pgetglobal cu, [], _)]
     when Compilation_unit.equal cu (Env.current_unit env) ->
     Misc.fatal_error
       "[Pfield (Pgetglobal ...)] for the current compilation unit is forbidden \

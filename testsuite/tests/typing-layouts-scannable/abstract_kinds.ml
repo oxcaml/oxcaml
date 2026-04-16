@@ -25,8 +25,13 @@ type t : k non_pointer
 type check = t require_non_pointer
 [%%expect{|
 kind_ k
-Line 2, characters 11-22:
-2 | type t : k non_pointer
-               ^^^^^^^^^^^
-Error: Abstract kinds with kind modifiers are not yet supported.
+type t : k
+Line 3, characters 13-14:
+3 | type check = t require_non_pointer
+                 ^
+Error: This type "t" should be an instance of type "('a : any non_pointer)"
+       The kind of t is k
+         because of the definition of t at line 2, characters 0-22.
+       But the kind of t must be a subkind of any non_pointer
+         because of the definition of require_non_pointer at line 1, characters 0-47.
 |}]

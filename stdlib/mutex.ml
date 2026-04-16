@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t : sync_data
+type t : value mod portable contended
 external create: unit -> t @@ portable = "caml_ml_mutex_new"
 external lock: t @ local -> unit @@ portable = "caml_ml_mutex_lock"
 external try_lock: t @ local -> bool @@ portable = "caml_ml_mutex_try_lock"
@@ -22,16 +22,13 @@ external unlock: t @ local -> unit @@ portable = "caml_ml_mutex_unlock"
 (* private re-export *)
 external reraise : exn -> 'a @@ portable = "%reraise"
 
-type nothing = |
-
 (* cannot inline, otherwise flambda might move code around. *)
 let[@inline never] protect m f =
   lock m;
-  match f () with
+  match f() with
   | x ->
     unlock m; x
   | exception e ->
     (* NOTE: [unlock] does not poll for asynchronous exceptions *)
     unlock m;
-    match (reraise e) with
-    | (_ : nothing) -> .
+    reraise e

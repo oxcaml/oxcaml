@@ -42,13 +42,15 @@ module Map_to_canonical = struct
       map1 map2
 
   let union map1 map2 =
-    Name.Map.union_total_shared
+    Name.Map.union
       (fun elt coercion1 coercion2 ->
-        if Coercion.equal coercion1 coercion2
-        then coercion1
-        else
-          fatal_inconsistent ~func_name:"Aliases.Map_to_canonical.union" elt
-            coercion1 coercion2)
+        match coercion1, coercion2 with
+        | coercion1, coercion2 ->
+          if Coercion.equal coercion1 coercion2
+          then Some coercion1
+          else
+            fatal_inconsistent ~func_name:"Aliases.Map_to_canonical.union" elt
+              coercion1 coercion2)
       map1 map2
 
   let ids_for_export t =
@@ -118,7 +120,7 @@ end = struct
       let aliases_union : Map_to_canonical.t =
         Name_mode.Map.fold
           (fun _name_mode map acc ->
-            Name.Map.union_total
+            Name.Map.union
               (fun elt _coercion1 _coercion2 ->
                 Misc.fatal_errorf
                   "[Aliases_of_canonical_element.invariant]: element %a \
@@ -182,8 +184,8 @@ end = struct
 
   let union t1 t2 =
     let aliases : Map_to_canonical.t Name_mode.Map.t =
-      Name_mode.Map.union_total_shared
-        (fun _order elts1 elts2 -> Map_to_canonical.union elts1 elts2)
+      Name_mode.Map.union
+        (fun _order elts1 elts2 -> Some (Map_to_canonical.union elts1 elts2))
         t1.aliases t2.aliases
     in
     let t = { aliases; all = Map_to_canonical.union t1.all t2.all } in

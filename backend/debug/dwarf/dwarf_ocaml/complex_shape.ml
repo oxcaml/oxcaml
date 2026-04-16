@@ -206,7 +206,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   match ly with
   | Base base -> (
     match base with
-    | Scannable -> Scannable
+    | Value -> Value
     | Float64 -> Float64
     (* This is a case, where we potentially have mapped [Float_boxed] to
        [Float64], but that is fine, because they are reordered like other mixed
@@ -417,11 +417,11 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   match type_shape.desc, type_layout with
   | Leaf, _ -> unknown_shape_exn ()
   | Unknown_type, _ -> unknown_shape_exn ()
-  | Tuple args, (None | Some (Base Scannable)) -> (
+  | Tuple args, (None | Some (Base Value)) -> (
     let args =
       List.map
         (fun sh ->
-          type_shape_to_complex_shape ~cache ~rec_env sh (Layout.Base Scannable))
+          type_shape_to_complex_shape ~cache ~rec_env sh (Layout.Base Value))
         (* CR sspies: In the future, we cannot assume that these are always
            values. This means we may need to use
            [type_shape_to_complex_shape_exn] and catch the exception on the
@@ -504,7 +504,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     | (Some None | None), None -> raise Layout_missing)
   | Alias sh, type_layout ->
     type_shape_to_complex_shape_exn ~cache ~rec_env sh type_layout
-  | Arrow, (None | Some (Base Scannable)) -> runtime RS.func
+  | Arrow, (None | Some (Base Value)) -> runtime RS.func
   | Arrow, Some type_layout ->
     err_or_unknown_exn (fun f ->
         f "function must have value layout, but got: %a" pp_layout type_layout)
@@ -527,7 +527,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           "unboxed tuple layout length mismatch: expected a product layout of \
            length %d, but got: %a"
           (List.length fields) pp_layout type_layout)
-  | Variant constructors, (None | Some (Base Scannable)) -> (
+  | Variant constructors, (None | Some (Base Value)) -> (
     try
       let constructors =
         List.map
@@ -570,7 +570,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | Variant _, Some ((Product _ | Base _) as ly) ->
     err_or_unknown_exn (fun f ->
         f "variant must have value layout, but got: %a" pp_layout ly)
-  | Poly_variant constructors, (None | Some (Base Scannable)) -> (
+  | Poly_variant constructors, (None | Some (Base Value)) -> (
     try
       let constructors =
         List.map
@@ -580,7 +580,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
                 (fun arg ->
                   ( None,
                     type_shape_to_complex_shape ~cache ~rec_env arg
-                      (Layout.Base Scannable) ))
+                      (Layout.Base Value) ))
                 pv_constr_args
             in
             (* Currently, all arguments here are values, but sooner or later
@@ -629,10 +629,9 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     err_or_unknown_exn (fun f ->
         f "unboxed record expected to be of layout %a, but got: %a" pp_layout
           layout_from_shapes pp_layout ly)
-  | Record { fields; kind = Record_boxed }, (None | Some (Base Scannable))
-  | Record { fields; kind = Record_floats }, (None | Some (Base Scannable))
-  | Record { fields; kind = Record_mixed _ }, (None | Some (Base Scannable))
-    -> (
+  | Record { fields; kind = Record_boxed }, (None | Some (Base Value))
+  | Record { fields; kind = Record_floats }, (None | Some (Base Value))
+  | Record { fields; kind = Record_mixed _ }, (None | Some (Base Value)) -> (
     try
       let source_level_fields =
         List.map
@@ -768,7 +767,7 @@ and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
   | Lazy_t, [elem_shape] ->
     let elem_shape =
       type_shape_to_complex_shape_exn ~cache ~rec_env elem_shape
-        (Some (Layout.Base Scannable))
+        (Some (Layout.Base Value))
     in
     let elem_shape =
       match runtime_shape elem_shape with

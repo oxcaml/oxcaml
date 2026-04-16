@@ -41,6 +41,5 @@ module Expr : sig
   val string : string -> <[string]> expr
 end
 
-val duplicate : 'a expr @ once -> 'a expr * 'a expr @ once
 val print : Format.formatter -> 'a expr -> unit
-val string_of_expr : 'a expr @ once -> string
+val string_of_expr : 'a expr -> string

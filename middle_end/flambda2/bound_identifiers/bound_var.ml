@@ -34,8 +34,6 @@ let create var debug_uid name_mode =
 
 let var t = t.var
 
-let name t = Name.var (var t)
-
 let debug_uid t = t.debug_uid
 
 let name_mode t = t.name_mode

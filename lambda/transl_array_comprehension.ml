@@ -83,35 +83,35 @@ open Lambda_utils.Primitive
     ]}
     This translates to the (Lambda equivalent of) the following:
     {[
-    (* Allocate the (resizable) array *)
-    let array_size = ref 8 in
-    let array = ref [| 0; 0; 0; 0; 0; 0; 0; 0 |] in
-    (* Next element to be generated *)
-    let index = ref 0 in
-    (* for x = 1 to 3 *)
-    let start = 1 in
-    let stop = 3 in
-    for x = start to stop do
-      (* when x <> 2 *)
-      if x <> 2
-      then
-        (* for y in [|10*x; 100*x|] *)
-        let iter_arr = [| 10 * x; 100 * x |] in
-        for iter_ix = 0 to Array.length iter_arr - 1 do
-          let y = iter_arr.(iter_ix) in
-          (* Resize the array if necessary *)
-          if not (!index < !array_size)
-          then begin
-            array_size := 2 * !array_size;
-            array := Array.append !array !array
-          end;
-          (* The body: x + y *)
-          !array.(!index) <- x + y;
-          index := !index + 1
-        done
-    done;
-    (* Cut the array back down to size *)
-    Array.sub !array 0 !index
+      (* Allocate the (resizable) array *)
+      let array_size = ref 8 in
+      let array = ref [| 0; 0; 0; 0; 0; 0; 0; 0 |] in
+      (* Next element to be generated *)
+      let index = ref 0 in
+      (* for x = 1 to 3 *)
+      let start = 1 in
+      let stop = 3 in
+      for x = start to stop do
+        (* when x <> 2 *)
+        if x <> 2
+        then
+          (* for y in [|10*x; 100*x|] *)
+          let iter_arr = [| 10 * x; 100 * x |] in
+          for iter_ix = 0 to Array.length iter_arr - 1 do
+            let y = iter_arr.(iter_ix) in
+            (* Resize the array if necessary *)
+            if not (!index < !array_size)
+            then begin
+              array_size := 2 * !array_size;
+              array := Array.append !array !array
+            end;
+            (* The body: x + y *)
+            !array.(!index) <- x + y;
+            index := !index + 1
+          done
+      done;
+      (* Cut the array back down to size *)
+      Array.sub !array 0 !index
     ]}
     On the other hand, consider this array comprehension, which is subject to
     the fixed-size array comprehension optimization:
@@ -122,71 +122,71 @@ open Lambda_utils.Primitive
     This translates to the (Lambda equivalent of) the following rather different
     OCaml:
     {[
-    (* ... = 1 to 3 *)
-    let start_x = 1 in
-    let stop_x = 3 in
-    (* ... = 10 downto 8 *)
-    let start_y = 10 in
-    let stop_y = 8 in
-    (* Check if any iterators are empty *)
-    if start_x > stop_x || start_y < stop_y
-    then
-      (* If so, return the empty array *)
-      [||]
-    else
-      (* Precompute the array size *)
-      let array_size =
-        (* Compute the size of the range [1 to 3], failing on overflow (the
+      (* ... = 1 to 3 *)
+      let start_x = 1 in
+      let stop_x = 3 in
+      (* ... = 10 downto 8 *)
+      let start_y = 10 in
+      let stop_y = 8 in
+      (* Check if any iterators are empty *)
+      if start_x > stop_x || start_y < stop_y
+      then
+        (* If so, return the empty array *)
+        [||]
+      else
+        (* Precompute the array size *)
+        let array_size =
+          (* Compute the size of the range [1 to 3], failing on overflow (the
              case where the range is correctly size 0 is handled by the
              emptiness check) *)
-        let x_size =
-          let range_size = stop_x - start_x + 1 in
-          if range_size > 0
-          then range_size
-          else
-            raise
-              (Invalid_argument
-                 "integer overflow when precomputing the size of an array \
-                  comprehension")
-        in
-        (* Compute the size of the range [10 downto 8], failing on overflow
+          let x_size =
+            let range_size = stop_x - start_x + 1 in
+            if range_size > 0
+            then range_size
+            else
+              raise
+                (Invalid_argument
+                   "integer overflow when precomputing the size of an array \
+                    comprehension")
+          in
+          (* Compute the size of the range [10 downto 8], failing on overflow
              (the case where the range is correctly size 0 is handled by the
              emptiness check) *)
-        let y_size =
-          let range_size = start_y - stop_y + 1 in
-          if range_size > 0
-          then range_size
+          let y_size =
+            let range_size = start_y - stop_y + 1 in
+            if range_size > 0
+            then range_size
+            else
+              raise
+                (Invalid_argument
+                   "integer overflow when precomputing the size of an array \
+                    comprehension")
+          in
+          (* Multiplication that checks for overflow ([y_size] can't be [0]
+             because we checked that above *)
+          let product = x_size * y_size in
+          if product / y_size = x_size
+          then product
           else
             raise
               (Invalid_argument
                  "integer overflow when precomputing the size of an array \
                   comprehension")
         in
-        (* Multiplication that checks for overflow ([y_size] can't be [0]
-             because we checked that above *)
-        let product = x_size * y_size in
-        if product / y_size = x_size
-        then product
-        else
-          raise
-            (Invalid_argument
-               "integer overflow when precomputing the size of an array \
-                comprehension")
-      in
-      (* Allocate the (nonresizable) array *)
-      let array = Array.make array_size 0 in
-      (* Next element to be generated *)
-      let index = ref 0 in
-      (* for x = 1 to 3 *)
-      for x = start_x to stop_x do
-        (* for y = 10 downto 8 *)
-        for y = start_y downto stop_y do
-          (* The body: x*y *)
-          array.(!index) <- x * y;
-          index := !index + 1
-        done
-      done;
-      array
+        (* Allocate the (nonresizable) array *)
+        let array = Array.make array_size 0 in
+        (* Next element to be generated *)
+        let index = ref 0 in
+        (* for x = 1 to 3 *)
+        for x = start_x to stop_x do
+          (* for y = 10 downto 8 *)
+          for y = start_y downto stop_y do
+            (* The body: x*y *)
+            array.(!index) <- x * y;
+            index := !index + 1
+          done
+        done;
+        array
     ]}
     You can see that the loop body is tighter, but there's more up-front size
     checking work to be done. *)
@@ -463,7 +463,7 @@ let iterator ~transl_exp ~scopes ~loc :
       { ident; ident_debug_uid; pattern = _; start; stop; direction } ->
     let bound name debug_uid value =
       Let_binding.make (Immutable Strict) layout_int name debug_uid
-        (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable value)
+        (transl_exp ~scopes Jkind.Sort.Const.for_predef_value value)
     in
     let start = bound "start" Lambda.debug_uid_none start in
     let stop = bound "stop" Lambda.debug_uid_none stop in
@@ -483,7 +483,7 @@ let iterator ~transl_exp ~scopes ~loc :
     let iter_arr =
       Let_binding.make (Immutable Strict) layout_any_value "iter_arr"
         Lambda.debug_uid_none
-        (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable iter_arr_exp)
+        (transl_exp ~scopes Jkind.Sort.Const.for_predef_value iter_arr_exp)
     in
     let iter_arr_kind =
       (* CR layouts v4: [~elt_sort:None] here is not ideal and
@@ -575,7 +575,7 @@ let clause ~transl_exp ~scopes ~loc = function
   | Texp_comp_when cond ->
     fun body ->
       Lifthenelse
-        ( transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
+        ( transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
           body,
           lambda_unit,
           layout_unit )

@@ -2109,16 +2109,60 @@ let fundecl fundecl =
 
 (* Emission of data *)
 
-let emit_data_item_actions : Emitaux.emit_data_item_actions =
-  { global_maybe_protected;
-    symbol_defined = (fun _ -> ());
-    symbol_used = (fun _ -> ())
-  }
+let nativeint_to_int32 n =
+  if
+    Nativeint.compare n (Nativeint.of_int32 Int32.min_int) < 0
+    || Nativeint.compare n (Nativeint.of_int32 Int32.max_int) > 0
+  then Misc.fatal_errorf "nativeint_to_int32: value %nd out of int32 range" n;
+  Nativeint.to_int32 n
+
+(* CR sspies: Share the [emit_item] code with the x86 backend in emitaux. *)
+let emit_item (d : Cmm.data_item) =
+  match d with
+  | Cdefine_symbol s -> (
+    let sym = symbol_of_cmm_symbol s in
+    match s.sym_global with
+    | Local ->
+      (* Use a label rather than a linker symbol for local definitions. This
+         avoids visibility issues on ELF (symbols that "may bind externally"
+         can't use PC-relative relocations in shared objects). *)
+      D.define_label (L.create_string_unchecked Data (S.encode sym))
+    | Global ->
+      global_maybe_protected sym;
+      (* Define both a label and a linker symbol, so the symbol can be
+         referenced either way. This matches amd64 behaviour. *)
+      D.define_joint_label_and_symbol ~section:Data sym)
+  | Cint8 n -> D.int8 (Numbers.Int8.of_int_exn n)
+  | Cint16 n -> D.int16 (Numbers.Int16.of_int_exn n)
+  | Cint32 n -> D.int32 (nativeint_to_int32 n)
+  (* CR mshinwell: Add [Targetint.of_nativeint] *)
+  | Cint n -> D.targetint (Targetint.of_int64 (Int64.of_nativeint n))
+  | Csingle f -> D.float32 f
+  | Cdouble f -> D.float64 f
+  | Cvec128 { word0; word1 } ->
+    D.float64_from_bits word1;
+    D.float64_from_bits word0
+  | Cvec256 _ | Cvec512 _ -> Misc.fatal_error "arm64: got 256/512 bit vector"
+  | Csymbol_address s -> (
+    let sym = symbol_of_cmm_symbol s in
+    match s.sym_global with
+    | Global -> D.symbol sym
+    | Local -> D.label (L.create_string_unchecked Data (S.encode sym)))
+  | Csymbol_offset (s, o) -> (
+    let sym = symbol_of_cmm_symbol s in
+    match s.sym_global with
+    | Global -> D.symbol_plus_offset ~offset_in_bytes:(Targetint.of_int o) sym
+    | Local ->
+      D.label_plus_offset ~offset_in_bytes:(Targetint.of_int o)
+        (L.create_string_unchecked Data (S.encode sym)))
+  | Cstring s -> D.string s
+  | Cskip n -> D.space ~bytes:n
+  | Calign n -> D.align ~fill:Zero ~bytes:n
 
 let data l =
   D.data ();
   D.align ~fill:Zero ~bytes:8;
-  List.iter (Emitaux.emit_data_item emit_data_item_actions) l
+  List.iter emit_item l
 
 let file_emitter ~file_num ~file_name =
   D.file ~file_num:(Some file_num) ~file_name

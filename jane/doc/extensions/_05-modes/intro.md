@@ -110,27 +110,24 @@ allocation](../../stack-allocation/intro).
 
 ## Past modes: Contention
 
-|----------------------|
-| contended            |
-| `|`                  |
-| corrupted `|` shared |
-| `|`                  |
-| **uncontended**      |
+|-----------------|
+| contended       |
+| `|`             |
+| shared          |
+| `|`             |
+| **uncontended** |
 {: .table }
 
 Contention is a past axis that tracks whether a value has been shared between
-threads. A value is *contended* if another thread can both read and write to it,
-*shared* if multiple threads have read-only access to it, *corrupted* if multiple
-threads have write-only access to it, and *uncontended* otherwise. Note that *corrupted*
-and *shared* are incomparable: neither is a submode of the other.
+threads. A value is *contended* if another thread can write to it, *shared* if
+multiple threads have read-only access to it, and *uncontended* otherwise.
 
 To enforce data race freedom, the typechecker does not permit reading or writing
 unprotected mutable portions of contended values. (Types like `Atomic.t` protect
 mutable values from data races and allow contended values to still retain
 mutable components.) The unprotected mutable portions of shared values
-may be read, but not written to. The unprotected mutable portions of corrupted
-values may be written to, but not read from. Uncontended values may be accessed
-and mutated freely.
+may be read, but not written to. Uncontended values may be accessed and mutated
+freely.
 
 Contention is irrelevant for types that are deeply immutable. Values of such
 types *mode cross* on the contention axis; they may be used as uncontended even
@@ -138,28 +135,26 @@ when they are contended.
 
 ## Future modes: Portability
 
-|---------------------------|
-| **nonportable**           |
-| `|`                       |
-| shareable `|` corruptible |
-| `|`                       |
-| portable                  |
+|-----------------|
+| **nonportable** |
+| `|`             |
+| shareable       |
+| `|`             |
+| portable        |
 {: .table }
 
 Portability is a future axis that tracks whether a value is allowed to move across
 thread boundaries. Functions that capture uncontended state are *nonportable*,
 so cannot escape the current thread. Functions that capture shared state are
-*shareable*, so may be executed in parallel. Functions that only close over
-corrupted values are *corruptible*. Functions that capture all values at
-contended are *portable*, so may execute concurrently. Note that *shareable* and
-*corruptible* are incomparable: neither is a submode of the other.
+*shareable*, so may be executed in parallel. Functions that capture all values at
+contended are *portable*, so may execute concurrently.
 
 Notably, it is generally safe to send mutable data *itself* to other threads,
 because it will then be *contended*, so the mutable portions will be
 inaccessible. What is scary is to send a function that *captures* uncontended
 mutable data to another thread, because the captured data would remain
 uncontended even when the function is shared. When the second thread runs the
-function, both threads would be accessing the same uncontended mutable state (a
+funtion, both threads would be accessing the same uncontended mutable state (a
 data race!).
 
 Portability is irrelevant for types that do not contain functions. Values of

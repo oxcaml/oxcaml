@@ -50,10 +50,10 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
        |> Slambda.eval
             (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-       |> fun { Slambda.slv_comptime = _; slv_runtime } ->
+       |> fun { Lambda.sval_comptime = _; sval_runtime } ->
           (* CR layout poly: Drop the comptime part until top-level modules can
              be static. *)
-          slv_runtime
+          sval_runtime
        |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
           (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda

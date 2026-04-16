@@ -19,14 +19,6 @@ open Types
 open Misc
 module Jkind = Btype.Jkind0
 
-type stage = private int
-
-module StagedPath : sig
-    type t = { stage : stage; path : Path.t }
-
-    module Map : Map.S with type key = t
-end
-
 type value_unbound_reason =
   | Val_unbound_instance_variable
   | Val_unbound_self
@@ -55,7 +47,7 @@ type summary =
   (** The string set argument of [Env_open] represents a list of module names
       to skip, i.e. that won't be imported in the toplevel namespace. *)
   | Env_functor_arg of summary * Ident.t
-  | Env_constraints of summary * type_declaration StagedPath.Map.t
+  | Env_constraints of summary * type_declaration Path.Map.t
   | Env_copy_types of summary
   | Env_persistent of summary * Ident.t
   | Env_value_unbound of summary * string * value_unbound_reason
@@ -69,6 +61,8 @@ type address = Persistent_env.address =
   | Adot of address * Jkind_types.Sort.t array * int
 
 type t
+
+type stage
 
 val empty: t
 
@@ -234,9 +228,6 @@ type no_open_quotations_context =
   | Object_field_with_attribute_qt
   | Variant_tag_with_attribute_qt
   | Jkind_annotation_qt
-  | Layout_polymorphism_qt
-  | Tconst_pat_qt of Longident.t
-  | Class_type_qt
 
 type none_in_quotations_context =
   | Constructor
@@ -453,7 +444,7 @@ val add_modtype_lazy: update_summary:bool ->
    Ident.t -> Subst.Lazy.modtype_declaration -> t -> t
 val add_class: Ident.t -> class_declaration -> t -> t
 val add_cltype: Ident.t -> class_type_declaration -> t -> t
-val add_local_constraint: stage:stage -> Path.t -> type_declaration -> t -> t
+val add_local_constraint: Path.t -> type_declaration -> t -> t
 val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
 val clear_implicit_jkinds : t -> t
 val add_jkind:
@@ -558,10 +549,6 @@ val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t
-
-(** Set the environment's stage to a fixed one in the far future.
-    Should only be used in cases where the stage is unknown. *)
-val enter_future : t -> t
 
 val check_no_open_quotations :
   Location.t -> t -> no_open_quotations_context -> unit

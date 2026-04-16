@@ -35,6 +35,8 @@ type constructor_usage_warning =
   | Only_exported_private
 
 type upstream_compat_warning =
+  | Immediate_erasure of string (* example: annotation in
+      [type ('a : immediate) t = int] can't be erased. *)
   | Non_value_sort of string (* example: abstract type
       [t : float64] is marked as unboxed. *)
   | Unboxed_attribute of string (* example: unboxed attribute
@@ -600,17 +602,17 @@ let descriptions = [
     since = since 5 1 };
   { number = 183;
     names = ["redundant-kind-modifier"];
-    (* CR layouts-scannable: As more axes are added, this description (and
+    (* CR layouts-scannable: as more axes are added, this description (and
        the following description) should be updated in tandem. *)
-    description = "A nullability or separability axis annotation appears on \
-                   a kind that already implies the annotation.";
+    description = "A pointerness axis annotation appears on a kind that \
+                   already implies the annotation.";
     since = since 5 2 };
   { number = 184;
     names = ["ignored-kind-modifier"];
-    (* CR layouts-scannable: As more axes are added, this description (and
+    (* CR layouts-scannable: as more axes are added, this description (and
        the following description) should be updated in tandem. *)
-    description = "A nullability or separability axis annotation appears on \
-                   a non-value, non-any layout.";
+    description = "A pointerness axis annotation appears on a non-value, \
+                   non-any layout.";
     since = since 5 2 };
   { number = 185;
     names = ["overridden-kind-modifier"];
@@ -1299,6 +1301,11 @@ let message = function
   | Overridden_kind_modifier overridden_by ->
       "This kind modifier is overridden by \"" ^ overridden_by ^ "\" later."
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
+  | Incompatible_with_upstream (Immediate_erasure id)  ->
+      Printf.sprintf
+      "Usage of layout immediate/immediate64 in %s \n\
+       can't be erased for compatibility with upstream OCaml."
+      id
   | Incompatible_with_upstream (Non_value_sort layout) ->
       Printf.sprintf
       "External declaration here is not upstream compatible. \n\

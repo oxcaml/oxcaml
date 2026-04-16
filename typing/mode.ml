@@ -185,10 +185,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lazy_forced -> Lazy_forced
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
-        | Quoted_computation -> Quoted_computation
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
-        | Lpoly_inst -> Lpoly_inst
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -231,8 +229,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
-        | Quoted_computation -> Quoted_computation
-        | Lpoly_inst -> Lpoly_inst
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
 
@@ -257,8 +253,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
         | Escape_region x -> Escape_region x
-        | Lpoly_inst -> Lpoly_inst
-        | Quoted_computation -> Quoted_computation
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
     end)
@@ -294,6 +288,21 @@ end
 (* Even though our lattices are all bi-heyting algebras, that knowledge is
    internal to this module. Externally they are seen as normal lattices. *)
 module Lattices = struct
+  module type Total = sig
+    (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
+
+        If it's also finite, then the ordering can be represented as a monotone
+        injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
+
+    type t
+
+    val ord : t -> int
+
+    val min : t
+
+    val max : t
+  end
+
   module Total (L : Total) = struct
     let min = L.min
 
@@ -511,23 +520,19 @@ module Lattices = struct
   end
 
   module Portability = struct
-    (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
-      | Portable (* 0b00 *)
-      | Shareable (* 0b01 *)
-      | Corruptible (* 0b10 *)
-      | Nonportable (* 0b11 *)
+      | Portable
+      | Shareable
+      | Nonportable
 
-    include Diamond (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Portable
 
-      let fst = Shareable
-
-      let snd = Corruptible
-
       let max = Nonportable
+
+      let ord = function Portable -> 0 | Shareable -> 1 | Nonportable -> 2
     end)
 
     let legacy = Nonportable
@@ -535,35 +540,29 @@ module Lattices = struct
     let print ppf = function
       | Portable -> Fmt.fprintf ppf "portable"
       | Shareable -> Fmt.fprintf ppf "shareable"
-      | Corruptible -> Fmt.fprintf ppf "corruptible"
       | Nonportable -> Fmt.fprintf ppf "nonportable"
   end
 
   module Contention = struct
-    (* Changes to this type must consider the implementation of [Diamond]. *)
     type t =
-      | Uncontended (* 0b00 *)
-      | Corrupted (* 0b01 *)
-      | Shared (* 0b10 *)
-      | Contended (* 0b11 *)
+      | Uncontended
+      | Shared
+      | Contended
 
-    include Diamond (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Uncontended
 
-      let fst = Corrupted
-
-      let snd = Shared
-
       let max = Contended
+
+      let ord = function Uncontended -> 0 | Shared -> 1 | Contended -> 2
     end)
 
     let legacy = Uncontended
 
     let print ppf = function
       | Contended -> Fmt.fprintf ppf "contended"
-      | Corrupted -> Fmt.fprintf ppf "corrupted"
       | Shared -> Fmt.fprintf ppf "shared"
       | Uncontended -> Fmt.fprintf ppf "uncontended"
   end
@@ -1061,14 +1060,6 @@ module Lattices = struct
     | Comonadic_with_locality -> Comonadic_with_locality.le a b
     | Comonadic_with_regionality -> Comonadic_with_regionality.le a b
 
-  let compare : type a. a obj -> a -> a -> (a, a) Misc.comparison =
-   fun obj c1 c2 ->
-    if le obj c1 c2
-    then
-      begin if le obj c2 c1 then Equal else Less_than
-      end
-    else Greater_than
-
   let equal : type a. a obj -> a -> a -> bool =
    fun obj a b ->
     match obj with
@@ -1157,6 +1148,30 @@ module Lattices = struct
     | Monadic_op -> Monadic_op.print
     | Comonadic_with_locality -> Comonadic_with_locality.print
     | Comonadic_with_regionality -> Comonadic_with_regionality.print
+
+  let equal_obj : type a b. a obj -> b obj -> (a, b) Misc.eq option =
+   fun a b ->
+    match a, b with
+    | Locality, Locality -> Some Refl
+    | Regionality, Regionality -> Some Refl
+    | Uniqueness_op, Uniqueness_op -> Some Refl
+    | Contention_op, Contention_op -> Some Refl
+    | Visibility_op, Visibility_op -> Some Refl
+    | Linearity, Linearity -> Some Refl
+    | Portability, Portability -> Some Refl
+    | Forkable, Forkable -> Some Refl
+    | Yielding, Yielding -> Some Refl
+    | Statefulness, Statefulness -> Some Refl
+    | Staticity_op, Staticity_op -> Some Refl
+    | Monadic_op, Monadic_op -> Some Refl
+    | Comonadic_with_locality, Comonadic_with_locality -> Some Refl
+    | Comonadic_with_regionality, Comonadic_with_regionality -> Some Refl
+    | ( ( Locality | Regionality | Uniqueness_op | Contention_op | Visibility_op
+        | Linearity | Portability | Forkable | Yielding | Statefulness
+        | Staticity_op | Monadic_op | Comonadic_with_locality
+        | Comonadic_with_regionality ),
+        _ ) ->
+      None
 
   let compare_obj : type a b. a obj -> b obj -> (a, b) Misc.comparison =
    fun a b ->
@@ -1522,6 +1537,66 @@ module Lattices_mono = struct
       let src0 = src dst0 f in
       comonadic_with_obj src0
 
+  let rec equal_morph : type a1 l1 r1 a2 b l2 r2.
+      b obj ->
+      (a1, b, l1 * r1) morph ->
+      (a2, b, l2 * r2) morph ->
+      (a1, a2) Misc.eq option =
+   fun _dst f1 f2 ->
+    match f1, f2 with
+    | Id, Id -> Some Refl
+    | Proj (src1, ax1), Proj (src2, ax2) -> (
+      match equal_obj src1 src2 with
+      | Some Refl -> (
+        match Axis.equal ax1 ax2 with None -> None | Some Refl -> Some Refl)
+      | None -> None)
+    | Max_with ax1, Max_with ax2 -> (
+      match Axis.equal ax1 ax2 with Some Refl -> Some Refl | None -> None)
+    | Min_with ax1, Min_with ax2 -> (
+      match Axis.equal ax1 ax2 with Some Refl -> Some Refl | None -> None)
+    | Meet_const c1, Meet_const c2 ->
+      (* This polymorphic equality is correct only if runtime representation
+         uniquely identifies a constant, which could be false. For example,
+         the lattice of rational number would be represented as the tuple of
+         numerator and denominator, and (9,4) and (18, 8) means the same
+         thing. However, even in that case, it's not unsound, as [equal_morph] is
+         not requird to be complete: i.e., it's allowed to return [None] when
+         it should return [Some Refl]. It would cause duplication but not error. *)
+      if c1 = c2 then Some Refl else None
+    | Imply_const c1, Imply_const c2 -> if c1 = c2 then Some Refl else None
+    | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Some Refl
+    | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 -> begin
+      match equal_obj a1 a2 with None -> None | Some Refl -> Some Refl
+    end
+    | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Some Refl
+    | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 -> begin
+      match equal_obj a1 a2 with None -> None | Some Refl -> Some Refl
+    end
+    | Local_to_regional, Local_to_regional -> Some Refl
+    | Locality_as_regionality, Locality_as_regionality -> Some Refl
+    | Global_to_regional, Global_to_regional -> Some Refl
+    | Regional_to_local, Regional_to_local -> Some Refl
+    | Regional_to_global, Regional_to_global -> Some Refl
+    | Compose (f1, g1), Compose (f2, g2) -> (
+      match equal_morph _dst f1 f2 with
+      | None -> None
+      | Some Refl -> (
+        match equal_morph (src _dst f1) g1 g2 with
+        | None -> None
+        | Some Refl -> Some Refl))
+    | Map_comonadic f, Map_comonadic g -> (
+      match equal_morph (proj_obj Areality _dst) f g with
+      | Some Refl -> Some Refl
+      | None -> None)
+    | ( ( Id | Proj _ | Max_with _ | Min_with _ | Meet_const _
+        | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
+        | Monadic_to_comonadic_max | Comonadic_to_monadic_max _
+        | Local_to_regional | Locality_as_regionality | Global_to_regional
+        | Regional_to_local | Regional_to_global | Compose _ | Map_comonadic _
+        | Imply_const _ ),
+        _ ) ->
+      None
+
   let rec compare_morph : type a1 l1 r1 a2 b l2 r2.
       b obj ->
       (a1, b, l1 * r1) morph ->
@@ -1557,10 +1632,12 @@ module Lattices_mono = struct
       | Equal -> Equal)
     | Min_with _, _ -> Less_than
     | _, Min_with _ -> Greater_than
-    | Meet_const c1, Meet_const c2 -> compare dst c1 c2
+    | Meet_const c1, Meet_const c2 ->
+      if c1 = c2 then Equal else if c1 < c2 then Less_than else Greater_than
     | Meet_const _, _ -> Less_than
     | _, Meet_const _ -> Greater_than
-    | Imply_const c1, Imply_const c2 -> compare dst c1 c2
+    | Imply_const c1, Imply_const c2 ->
+      if c1 = c2 then Equal else if c1 < c2 then Less_than else Greater_than
     | Imply_const _, _ -> Less_than
     | _, Imply_const _ -> Greater_than
     | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
@@ -1653,13 +1730,11 @@ module Lattices_mono = struct
   let portable_to_contended = function
     | Portability.Portable -> Contention.Contended
     | Portability.Shareable -> Contention.Shared
-    | Portability.Corruptible -> Contention.Corrupted
     | Portability.Nonportable -> Contention.Uncontended
 
   let contended_to_portable = function
     | Contention.Contended -> Portability.Portable
     | Contention.Shared -> Portability.Shareable
-    | Contention.Corrupted -> Portability.Corruptible
     | Contention.Uncontended -> Portability.Nonportable
 
   let local_to_regional = function
@@ -2129,7 +2204,7 @@ module Report = struct
          nmatschke: Likewise for [x <> y] (middle modes of diamonds). *)
       if
         begin match b with Join -> C.le a_obj y x | Meet -> C.le a_obj x y
-        end
+      end
       then `First
       else `Second
 
@@ -2384,10 +2459,6 @@ module Report = struct
     | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
     | Escape_region reg ->
       Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
-    | Quoted_computation -> Fmt.fprintf ppf "it is the quote of a computation"
-    | Lpoly_inst ->
-      Fmt.pp_print_string ppf
-        "it is layout-polymorphic and being instantiated here"
     | Spliced _ -> Fmt.fprintf ppf "it is spliced"
 
   let print_allocation_l : allocation -> Fmt.formatter -> unit =
@@ -2566,9 +2637,6 @@ module Report = struct
          uncontended is expected. *)
       Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
         C.Contention.Uncontended
-    | `Expected, Contention_op, Corrupted ->
-      Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Corrupted
-        mode_printer C.Contention.Uncontended
     | `Expected, Visibility_op, Read ->
       Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
         C.Visibility.Read_write
@@ -2614,9 +2682,9 @@ module Report = struct
 
   let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
-    match C.compare_obj a_obj b_obj with
-    | Equal -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-    | Less_than | Greater_than -> false
+    match C.equal_obj a_obj b_obj with
+    | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
+    | None -> false
 
   let rec print_ahint : type a l r.
       ?sub:bool ->
@@ -3369,6 +3437,11 @@ module Comonadic_with (Areality : Areality) = struct
         let obj = (proj_obj [@inlined hint]) ax in
         (C.min [@inlined hint]) obj
 
+      let equal_obj ax1 ax2 =
+        let obj1 = proj_obj ax1 in
+        let obj2 = proj_obj ax2 in
+        C.equal_obj obj1 obj2
+
       let compare_obj ax1 ax2 =
         let obj1 = proj_obj ax1 in
         let obj2 = proj_obj ax2 in
@@ -3509,6 +3582,11 @@ module Monadic = struct
       let min ax =
         let obj = (proj_obj [@inlined hint]) ax in
         (C.max [@inlined hint]) obj
+
+      let equal_obj ax1 ax2 =
+        let obj1 = proj_obj ax1 in
+        let obj2 = proj_obj ax2 in
+        C.equal_obj obj1 obj2
 
       let compare_obj ax1 ax2 =
         let obj1 = proj_obj ax1 in
@@ -5098,23 +5176,32 @@ module Crossing = struct
       | P (Monadic ax) -> P (Monadic ax)
       | P (Comonadic ax) -> P (Comonadic ax)
 
+    let equal : type a b. a t -> b t -> (a, b) Misc.eq option =
+     fun ax1 ax2 ->
+      match ax1, ax2 with
+      | Monadic ax1, Monadic ax2 -> (
+        match Axis.equal ax1 ax2 with Some Refl -> Some Refl | None -> None)
+      | Comonadic ax1, Comonadic ax2 -> (
+        match Axis.equal ax1 ax2 with Some Refl -> Some Refl | None -> None)
+      | Monadic _, Comonadic _ | Comonadic _, Monadic _ -> None
+
     let compare : type a b. a t -> b t -> (a, b) Misc.comparison =
      fun ax1 ax2 ->
       match ax1, ax2 with
-      | Monadic ax1, Monadic ax2 ->
-        begin match Axis.compare ax1 ax2 with
+      | Monadic ax1, Monadic ax2 -> begin
+        match Axis.compare ax1 ax2 with
         | Less_than -> Less_than
         | Equal -> Equal
         | Greater_than -> Greater_than
-        end
+      end
       | Monadic _, _ -> Less_than
       | _, Monadic _ -> Greater_than
-      | Comonadic ax1, Comonadic ax2 ->
-        begin match Axis.compare ax1 ax2 with
+      | Comonadic ax1, Comonadic ax2 -> begin
+        match Axis.compare ax1 ax2 with
         | Less_than -> Less_than
         | Equal -> Equal
         | Greater_than -> Greater_than
-        end
+      end
 
     let print : type a. Fmt.formatter -> a t -> unit =
      fun ppf -> function
@@ -5162,6 +5249,8 @@ module Crossing = struct
       | Comonadic ax -> Comonadic.Atom.print ax
 
     let print_obj = Axis.print
+
+    let equal_obj = Axis.equal
 
     let compare_obj = Axis.compare
   end

@@ -476,9 +476,7 @@ let main (module Toplevel : Toplevel) fname =
            [Compenv.last_include_dirs] to make sure that the stdlib
            directory is the last one. *)
         Clflags.no_std_include := true;
-        Compenv.last_include_dirs :=
-          [{ Clflags.path = Filename.concat dir "stdlib";
-             cmx_guaranteed = true }]
+        Compenv.last_include_dirs := [Filename.concat dir "stdlib"]
   end;
   Compmisc.init_path ~auto_include:Load_path.no_auto_include ();
   Toplevel.initialize_toplevel_env ();

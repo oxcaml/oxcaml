@@ -526,7 +526,6 @@ let expression sub exp =
   let desc =
     match exp.exp_desc with
       Texp_ident { lid; _ } -> Pexp_ident (map_loc sub lid)
-    | Texp_apply_layout (exp, _) -> (sub.expr sub exp).pexp_desc
     | Texp_constant cst -> Pexp_constant (constant cst)
     | Texp_let (rec_flag, list, exp) ->
         Pexp_let (Immutable, rec_flag,
@@ -949,8 +948,6 @@ let with_constraint sub (_path, lid, cstr) =
   | Twith_modtype mty ->
       let mty = sub.module_type sub mty in
       Pwith_modtype (map_loc sub lid,mty)
-  | Twith_jkind jd ->
-      Pwith_jkind (map_loc sub lid, sub.jkind_declaration sub jd)
   | Twith_typesubst decl ->
      Pwith_typesubst (map_loc sub lid, sub.type_declaration sub decl)
   | Twith_modsubst (_path, lid2) ->
@@ -958,8 +955,6 @@ let with_constraint sub (_path, lid, cstr) =
   | Twith_modtypesubst mty ->
       let mty = sub.module_type sub mty in
       Pwith_modtypesubst (map_loc sub lid, mty)
-  | Twith_jkindsubst jd ->
-     Pwith_jkindsubst (map_loc sub lid, sub.jkind_declaration sub jd)
 
 let module_expr (sub : mapper) mexpr =
   let loc = sub.location sub mexpr.mod_loc in

@@ -123,15 +123,7 @@ module Layout : sig
 end
 
 module Mod_bounds : sig
-  type t = Types.mod_bounds
-
-  val to_axis_lattice : t -> Axis_lattice.t
-
-  val of_axis_lattice : Axis_lattice.t -> t
-
-  val to_mode_crossing : t -> Mode.Crossing.t
-
-  val debug_print : Format.formatter -> t -> unit
+  val debug_print : Format.formatter -> Types.mod_bounds -> unit
 end
 
 module With_bounds : sig
@@ -145,10 +137,6 @@ module With_bounds : sig
     ('l * 'r) Types.with_bounds
 
   val format : Format_doc.formatter -> ('l * 'r) Types.with_bounds -> unit
-
-  val to_seq :
-    ('l * 'r) Types.with_bounds ->
-    (Types.type_expr * Types.With_bounds_type_info.t) Seq.t
 end
 
 module Base_and_axes : sig
@@ -204,11 +192,8 @@ end
 (** Context for jkind operations. *)
 type jkind_context =
   { jkind_of_type : Types.type_expr -> Types.jkind_l option;
-    is_abstract : Path.t -> bool;
+    is_abstract : Path.t -> bool
         (* Check if a type path refers to an abstract type *)
-    lookup_type : Path.t -> Types.type_declaration option
-        (* Lookup a type in the environment. Returns the full
-           [Types.type_declaration] if found, or [None] otherwise. *)
   }
 
 (******************************)
@@ -390,6 +375,14 @@ val of_new_sort :
 (** Apply {!Sort.instance} to every sort variable in a jkind. *)
 val instance : 'd Types.jkind -> 'd Types.jkind
 
+(** Same as [of_new_sort_var], but the jkind is lowered to [Non_null] to mirror
+    "legacy" OCaml values. Defaulting the sort variable produces exactly
+    [value]. *)
+val of_new_legacy_sort_var :
+  why:History.concrete_legacy_creation_reason ->
+  level:int ->
+  'd Types.jkind * sort
+
 (** Same as [of_new_sort], but the jkind is lowered to [Non_null] to mirror
     "legacy" OCaml values. Defaulting the sort variable produces exactly
     [value]. *)
@@ -470,9 +463,9 @@ val for_unboxed_record :
     [decl_params] is the parameters in the head of the type declaration.
     [type_apply] should be [Ctype.apply] partially applied to an [env].
 
-    [get_free_vars] is a function that, given a list of [Types.type_expr]s that
-    are used in the boxed variant, returns all type variables that are free
-    within the [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good
+    [free_vars] is a function that, given a list of [Types.type_expr]s that are
+    used in the boxed variant, returns all type variables that are free within
+    the [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good
     candidate for implementing this function. *)
 val for_boxed_variant :
   loc:Location.t ->
@@ -482,7 +475,7 @@ val for_boxed_variant :
     Types.type_expr ->
     Types.type_expr list ->
     Types.type_expr) ->
-  get_free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
+  free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
   Types.constructor_declaration list ->
   Types.jkind_l
 
@@ -546,15 +539,13 @@ end
 (** Get a description of a jkind. *)
 val get : 'd Types.jkind -> 'd Desc.t
 
-(** [get_layout_defaulting_to_scannable] extracts a constant layout, defaulting
-    any sort variable to [scannable]. Returns [None] in the case of an abstract
-    kind. *)
-val get_layout_defaulting_to_scannable :
+(** [get_layout_defaulting_to_value] extracts a constant layout, defaulting any
+    sort variable to [value]. Returns [None] in the case of an abstract kind. *)
+val get_layout_defaulting_to_value :
   Env.t -> 'd Types.jkind -> Layout.Const.t option
 
-(** [default_to_scannable t] is [ignore (get_layout_defaulting_to_scannable t)]
-*)
-val default_to_scannable : 'd Types.jkind -> unit
+(** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
+val default_to_value : 'd Types.jkind -> unit
 (* CR layouts v5: When we have proper support for void, we'll want to change
    these three functions to default to void - it's the most efficient thing
    when we have a choice. *)
@@ -591,17 +582,18 @@ val get_externality_upper_bound :
 val set_externality_upper_bound :
   Types.jkind_r -> Jkind_axis.Externality.t -> Types.jkind_r
 
-(** Gets the nullability from a jkind. Expands abstract kinds if needed. *)
-val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
+(** Gets the nullability from a jkind. *)
+val get_nullability :
+  context:jkind_context -> Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t
 
-(** Computes a jkind that is the same as the input but with an updated
-    nullability on the layout's scannable axis *)
-val set_root_nullability :
+(** Computes a jkind that is the same as the input but with an updated maximum
+    mode for the nullability axis *)
+val set_nullability_upper_bound :
   Types.jkind_r -> Jkind_axis.Nullability.t -> Types.jkind_r
 
-(** Computes a jkind that is the same as the input but with an updated
-    separability on the layout's scannable axis *)
-val set_root_separability :
+(** Computes a jkind that is the same as the input but with an updated maximum
+    mode for the separability axis *)
+val set_separability_upper_bound :
   Types.jkind_r -> Jkind_axis.Separability.t -> Types.jkind_r
 
 (** Sets the layout in a jkind. *)
@@ -786,8 +778,8 @@ val sub :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
   Env.t ->
-  (allowed * 'r) Types.jkind ->
-  ('l * allowed) Types.jkind ->
+  Types.jkind_l ->
+  Types.jkind_r ->
   bool
 
 type sub_or_intersect =
@@ -824,8 +816,8 @@ val sub_or_error :
 val sub_layout_or_error :
   context:jkind_context ->
   Env.t ->
-  (allowed * 'r1) Types.jkind ->
-  ('l2 * 'r2) Types.jkind ->
+  Types.jkind_l ->
+  Types.jkind_l ->
   (unit, Violation.t) result
 
 (** Like [sub], but compares a left jkind against another left jkind.

@@ -30,7 +30,7 @@ esac
 # float32 primitives contain macros in their definitions, so we preprocess
 # first.  Of course, we must ensure that CAMLprim does not get preprocessed
 # away, hence -DCAML_NO_DEFINE_CAMLprim below.
-CC=$(cat ../Makefile.config | grep '^CC *=' | cut -d= -f2-)
+CC=$(cat ../Makefile.config | grep '^CC *=' | cut -d= -f2)
 OCAMLC_CFLAGS=$(cat ../Makefile.config | grep '^OCAMLC_CFLAGS *=' | cut -d= -f2-)
 
 cat <<'EOF'

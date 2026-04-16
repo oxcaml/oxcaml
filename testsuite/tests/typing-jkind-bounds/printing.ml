@@ -10,13 +10,10 @@ type t : immediate = A of int
 Line 1, characters 0-29:
 1 | type t : immediate = A of int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t" is value non_float
+Error: The kind of type "t" is immutable_data
          because it's a boxed variant type.
-       But the layout of type "t" must be a sublayout of value non_pointer
+       But the kind of type "t" must be a subkind of immediate
          because of the annotation on the declaration of the type t.
-       Note: The layout of immediate is value non_pointer.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 
 type 'a t : immutable_data = A of 'a
@@ -156,12 +153,10 @@ Line 3, characters 11-12:
 3 | let f () : a t = failwith ""
                ^
 Error: This type "a" should be an instance of type "('a : immutable_data)"
-       The layout of a is value
+       The kind of a is value
          because of the definition of a at line 1, characters 0-6.
-       But the layout of a must be a sublayout of value non_float
+       But the kind of a must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 
 type a = int ref
@@ -208,7 +203,7 @@ Line 3, characters 11-25:
                ^^^^^^^^^^^^^^
 Error: This type "(int -> int) u" should be an instance of type
          "('a : immutable_data)"
-       The kind of (int -> int) u is value non_float mod portable immutable
+       The kind of (int -> int) u is value mod portable immutable non_float
          because of the definition of u at line 1, characters 0-33.
        But the kind of (int -> int) u must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.

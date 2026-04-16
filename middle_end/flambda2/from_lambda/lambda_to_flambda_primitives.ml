@@ -698,10 +698,10 @@ let convert_index_to_tagged_int ~index ~(index_kind : Lambda.array_index_kind) =
              },
            index ))
 
-let convert_index_to_naked_nativeint ~index
-    ~(index_kind : Lambda.array_index_kind) =
+let convert_index_to_untagged_int ~index ~(index_kind : Lambda.array_index_kind)
+    =
   let src = convert_lambda_index_to_standard_int_or_float index_kind in
-  H.Prim (Unary (Num_conv { src; dst = Naked_nativeint }, index))
+  H.Prim (Unary (Num_conv { src; dst = Naked_immediate }, index))
 
 let convert_index_to_naked_int64 ~index ~(index_kind : Lambda.array_index_kind)
     =
@@ -879,7 +879,7 @@ let string_like_load ~dbg ~checks
     (kind : P.string_like_value) mode ~boxed_or_tagged string ~index_kind index
     ~current_region =
   let unsafe_load =
-    let index = convert_index_to_naked_nativeint ~index ~index_kind in
+    let index = convert_index_to_untagged_int ~index ~index_kind in
     let wrap =
       match access_size, mode with
       | (Eight | Sixteen), None ->
@@ -933,7 +933,7 @@ let bytes_like_set ~dbg ~checks
     (kind : P.bytes_like_value) ~boxed_or_tagged bytes ~index_kind index
     new_value =
   let unsafe_set =
-    let index = convert_index_to_naked_nativeint ~index ~index_kind in
+    let index = convert_index_to_untagged_int ~index ~index_kind in
     let wrap =
       match access_size with
       | Eight | Eight_signed -> if boxed_or_tagged then untag_int8 else Fun.id

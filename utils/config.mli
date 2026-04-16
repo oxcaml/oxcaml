@@ -211,7 +211,6 @@ val with_cpp_mangling : bool
 
 type name_mangling_scheme =
   | Flat
-  | Structured
 
 exception Invalid_name_mangling_scheme of string
 

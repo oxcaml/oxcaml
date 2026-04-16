@@ -98,12 +98,7 @@ let () =
     | exception Not_found -> []
     | s -> Misc.split_path_contents s
   in
-  let extra_entries =
-    List.map
-      (fun path -> { Clflags.path; cmx_guaranteed = false })
-      extra_paths
-  in
-  Clflags.include_dirs := List.rev_append extra_entries !Clflags.include_dirs
+  Clflags.include_dirs := List.rev_append extra_paths !Clflags.include_dirs
 
 let main () =
   Clflags.native_code := true;

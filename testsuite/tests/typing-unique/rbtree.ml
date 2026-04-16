@@ -512,7 +512,6 @@ Line 110, characters 16-52:
 110 |     | Node _ -> overwrite_ t with Node { color = c }
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
->> Fatal error: Location.todo_overwrite_not_implemented
-Uncaught exception: Misc.Fatal_error
+Uncaught exception: File "parsing/location.ml", line 1137, characters 2-8: Assertion failed
 
 |}]

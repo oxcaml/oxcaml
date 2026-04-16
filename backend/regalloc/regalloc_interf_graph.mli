@@ -149,12 +149,12 @@ val iter_adjacent : t -> Reg.t -> f:(Reg.t -> unit) -> unit
 
     Example:
     {[
-    iter_adjacent_if graph reg
-      ~should_visit:(fun r ->
-        match State.reg_work_list state r with
-        | Select_stack | Coalesced -> false
-        | _ -> true)
-      ~f:(fun adj -> process adj)
+      iter_adjacent_if graph reg
+        ~should_visit:(fun r ->
+          match State.reg_work_list state r with
+          | Select_stack | Coalesced -> false
+          | _ -> true)
+        ~f:(fun adj -> process adj)
     ]}
 
     This is the primary mechanism for IRC-specific filtering. *)

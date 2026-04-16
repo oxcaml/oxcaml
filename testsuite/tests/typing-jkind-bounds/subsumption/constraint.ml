@@ -40,13 +40,10 @@ Error: Signature mismatch:
          type 'a t = Foo of 'a constraint 'a = int
        is not included in
          type 'a t : immediate constraint 'a = int
-       The layout of the first is value non_float
+       The kind of the first is immutable_data
          because of the definition of t at line 4, characters 2-43.
-       But the layout of the first must be a sublayout of value non_pointer
+       But the kind of the first must be a subkind of immediate
          because of the definition of t at line 2, characters 2-43.
-       Note: The layout of immediate is value non_pointer.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 
 module M : sig
