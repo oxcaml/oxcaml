@@ -30,7 +30,7 @@
  ******************************************************************************)
 
 open! Flambda.Import
-module DS = Dep_solver
+module Unboxed_fields = Unboxing_analysis.Unboxed_fields
 module Float = Numeric_types.Float_by_bit_pattern
 module Float32 = Numeric_types.Float32_by_bit_pattern
 module K = Flambda_kind
@@ -43,11 +43,11 @@ module SC = Static_const
 type param_decision =
   | Keep of Variable.t * KS.t
   | Delete
-  | Unbox of Variable.t DS.unboxed_fields Field.Map.t
+  | Unbox of Variable.t Unboxed_fields.t
 
 type my_closure_param_decision =
   | Keep_my_closure
-  | Unbox_my_closure of Variable.t DS.unboxed_fields Field.Map.t
+  | Unbox_my_closure of Variable.t Unboxed_fields.t
 
 (* CR sspies: Throughout this file, we create bound paramters and variables
    without corresponding debugging uids. Does it make sense to properly
@@ -59,9 +59,7 @@ let print_param_decision ppf param_decision =
     Format.fprintf ppf "Keep (%a, %a)" Variable.print v KS.print kind
   | Delete -> Format.fprintf ppf "Delete"
   | Unbox fields ->
-    Format.fprintf ppf "Unbox %a"
-      (Field.Map.print (DS.print_unboxed_fields Variable.print))
-      fields
+    Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
 
 type should_preserve_direct_calls =
   | Yes
@@ -70,7 +68,7 @@ type should_preserve_direct_calls =
 
 type env =
   { machine_width : Target_system.Machine_width.t;
-    uses : DS.result;
+    uses : Unboxing_analysis.result;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
@@ -98,12 +96,9 @@ let freshen_decisions = function
   | Delete -> Delete
   | Keep (v, kind) -> Keep (Variable.rename v, kind)
   | Unbox fields ->
-    Unbox
-      (Field.Map.map
-         (DS.map_unboxed_fields (fun v -> Variable.rename v))
-         fields)
+    Unbox (Unboxed_fields.map (fun v -> Variable.rename v) fields)
 
-let is_used (env : env) cn = DS.has_use env.uses cn
+let is_used (env : env) cn = Analysis.has_use env.uses cn
 
 let is_code_id_used (env : env) code_id =
   is_used env (Code_id_or_name.code_id code_id)
@@ -115,7 +110,7 @@ let is_symbol_used (env : env) symbol =
 let raw_is_var_used uses var kind =
   match (kind : K.t) with
   | Region | Rec_info -> true
-  | Value | Naked_number _ -> DS.has_use uses (Code_id_or_name.var var)
+  | Value | Naked_number _ -> Analysis.has_use uses (Code_id_or_name.var var)
 
 let is_var_used (env : env) var =
   raw_is_var_used env.uses var (Name.Map.find (Name.var var) env.kinds)
@@ -129,52 +124,12 @@ let poison_value = 0 (* 123456789 *)
 let poison ~machine_width kind =
   Simple.const_int_of_kind ~machine_width kind poison_value
 
-(* This is not symmetrical!! [fields1] must define a subset of [fields2], but
-   does not have to define all of them. *)
-let rec fold2_unboxed_subset (f : 'a -> 'b -> 'c -> 'c)
-    (fields1 : 'a DS.unboxed_fields) (fields2 : 'b DS.unboxed_fields) acc =
-  match fields1, fields2 with
-  | Not_unboxed x1, Not_unboxed x2 -> f x1 x2 acc
-  | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ ->
-    Misc.fatal_errorf "[fold2_unboxed_subset]"
-  | Unboxed fields1, Unboxed fields2 ->
-    Field.Map.fold
-      (fun field f1 acc ->
-        match Field.Map.find field fields2 with
-        | exception Not_found ->
-          Misc.fatal_errorf "@[<v 2>@[%a@]:@ @[%a@]@]@." Format.pp_print_text
-            "Expected a subset of unboxed fields, but the following field is \
-             not in the superset"
-            Field.print field
-        | f2 -> fold2_unboxed_subset f f1 f2 acc)
-      fields1 acc
-
-let rec fold2_unboxed_subset_with_kind (f : K.t -> 'a -> 'b -> 'c -> 'c)
-    (fields1 : 'a DS.unboxed_fields Field.Map.t)
-    (fields2 : 'b DS.unboxed_fields Field.Map.t) acc =
-  Field.Map.fold
-    (fun field f1 acc ->
-      match Field.Map.find field fields2 with
-      | exception Not_found ->
-        Misc.fatal_errorf "@[<v 2>@[%a@]:@ @[%a@]@]@." Format.pp_print_text
-          "Expected a subset of unboxed fields, but the following field is not \
-           in the superset"
-          Field.print field
-      | f2 -> (
-        match (f1, f2 : _ DS.unboxed_fields * _ DS.unboxed_fields) with
-        | Not_unboxed x1, Not_unboxed x2 -> f (Field.kind field) x1 x2 acc
-        | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ ->
-          Misc.fatal_errorf "[fold2_unboxed_subset]"
-        | Unboxed fields1, Unboxed fields2 ->
-          fold2_unboxed_subset_with_kind f fields1 fields2 acc))
-    fields1 acc
-
 let simple_is_unboxable env simple =
   Simple.pattern_match
     ~const:(fun _ -> false)
     ~name:(fun name ~coercion:_ ->
       Option.is_some
-        (DS.get_unboxed_fields env.uses (Code_id_or_name.name name)))
+        (Analysis.get_unboxed_fields env.uses (Code_id_or_name.name name)))
     simple
 
 let get_simple_unboxable env simple =
@@ -184,7 +139,9 @@ let get_simple_unboxable env simple =
         "Expected unboxable name in [get_simple_unboxable], got constant %a"
         Reg_width_const.print const)
     ~name:(fun name ~coercion:_ ->
-      match DS.get_unboxed_fields env.uses (Code_id_or_name.name name) with
+      match
+        Analysis.get_unboxed_fields env.uses (Code_id_or_name.name name)
+      with
       | Some unboxing -> unboxing
       | None ->
         Misc.fatal_errorf
@@ -197,7 +154,8 @@ let simple_changed_repr env simple =
     ~const:(fun _ -> false)
     ~name:(fun name ~coercion:_ ->
       Option.is_some
-        (DS.get_changed_representation env.uses (Code_id_or_name.name name)))
+        (Analysis.get_changed_representation env.uses
+           (Code_id_or_name.name name)))
     simple
 
 let get_simple_changed_repr env simple =
@@ -209,7 +167,8 @@ let get_simple_changed_repr env simple =
         Reg_width_const.print const)
     ~name:(fun name ~coercion:_ ->
       Option.get
-        (DS.get_changed_representation env.uses (Code_id_or_name.name name)))
+        (Analysis.get_changed_representation env.uses
+           (Code_id_or_name.name name)))
     simple
 
 let get_parameters params_decisions =
@@ -220,7 +179,7 @@ let get_parameters params_decisions =
       | Keep (var, kind) ->
         Bound_parameter.create var kind Flambda_debug_uid.none :: acc
       | Unbox fields ->
-        DS.fold_unboxed_with_kind
+        Unboxed_fields.fold_with_kind
           (fun kind v acc ->
             Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
             :: acc)
@@ -236,7 +195,7 @@ let get_parameters_and_modes params_decisions modes =
       | Keep (var, kind) ->
         (Bound_parameter.create var kind Flambda_debug_uid.none, mode) :: acc
       | Unbox fields ->
-        DS.fold_unboxed_with_kind
+        Unboxed_fields.fold_with_kind
           (fun kind v acc ->
             ( Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none,
               mode )
@@ -254,7 +213,7 @@ let get_arity params_decisions =
         | Delete -> acc
         | Keep (_, kind) -> kind :: acc
         | Unbox fields ->
-          DS.fold_unboxed_with_kind
+          Unboxed_fields.fold_with_kind
             (fun kind _ acc -> KS.anything kind :: acc)
             fields acc)
       [] params_decisions
@@ -270,13 +229,13 @@ let is_dead_var env v =
   match kind with
   | Region | Rec_info -> false
   | Value | Naked_number _ ->
-    not (DS.has_source env.uses (Code_id_or_name.var v))
+    not (Analysis.has_source env.uses (Code_id_or_name.var v))
 
 let simple_is_dead env simple =
   Simple.pattern_match' simple
     ~var:(fun v ~coercion:_ -> is_dead_var env v)
     ~symbol:(fun sym ~coercion:_ ->
-      not (DS.has_source env.uses (Code_id_or_name.symbol sym)))
+      not (Analysis.has_source env.uses (Code_id_or_name.symbol sym)))
     ~const:(fun _ -> false)
 
 type change_calling_convention =
@@ -284,7 +243,7 @@ type change_calling_convention =
   | Changing_calling_convention of Code_id.t
 
 let bind_fields fields arg_fields hole =
-  fold2_unboxed_subset
+  Unboxed_fields.fold2_subset_u
     (fun var arg hole ->
       let bp =
         Bound_pattern.singleton
@@ -298,7 +257,7 @@ let bound_vars_will_be_unboxed env bvs =
   List.exists
     (fun bv ->
       Option.is_some
-        (DS.get_unboxed_fields env.uses
+        (Analysis.get_unboxed_fields env.uses
            (Code_id_or_name.var (Bound_var.var bv))))
     bvs
 
@@ -306,7 +265,7 @@ let bound_vars_will_have_their_representation_changed env bvs =
   List.exists
     (fun bv ->
       Option.is_some
-        (DS.get_changed_representation env.uses
+        (Analysis.get_changed_representation env.uses
            (Code_id_or_name.var (Bound_var.var bv))))
     bvs
 
@@ -370,7 +329,7 @@ let rewrite_simple (env : env) simple =
       if
         not
           (Option.is_none
-             (DS.get_unboxed_fields env.uses (Code_id_or_name.name name)))
+             (Analysis.get_unboxed_fields env.uses (Code_id_or_name.name name)))
       then simple (* XXX Misc.fatal_errorf "UNBOXED?? %a@." Name.print name; *)
       else if is_name_used env name
       then simple
@@ -393,7 +352,7 @@ let get_args env params_decisions args =
       | Keep _ -> rewrite_simple env arg :: acc
       | Unbox fields ->
         let arg_fields = get_simple_unboxable env arg in
-        fold2_unboxed_subset_with_kind
+        Unboxed_fields.fold2_subset_with_kind
           (fun _kind _param arg_field acc -> Simple.var arg_field :: acc)
           fields arg_fields acc)
     [] args params_decisions
@@ -407,7 +366,7 @@ let get_args_with_kinds env params_decisions args =
       | Keep (_, kind) -> (rewrite_simple env arg, kind) :: acc
       | Unbox fields ->
         let arg_fields = get_simple_unboxable env arg in
-        fold2_unboxed_subset_with_kind
+        Unboxed_fields.fold2_subset_with_kind
           (fun kind _param arg_field acc ->
             (Simple.var arg_field, KS.anything kind) :: acc)
           fields arg_fields acc)
@@ -438,21 +397,21 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
   let slot_is_used slot =
     List.exists
       (fun bound_name ->
-        DS.field_used env.uses (Code_id_or_name.name bound_name) slot)
+        Analysis.field_used env.uses (Code_id_or_name.name bound_name) slot)
       bound
   in
   let code_is_used bound_name =
-    DS.field_used env.uses
+    Analysis.field_used env.uses
       (Code_id_or_name.name bound_name)
       Field.known_arity_call_witness
-    || DS.field_used env.uses
+    || Analysis.field_used env.uses
          (Code_id_or_name.name bound_name)
          Field.unknown_arity_call_witness
   in
   let new_repr =
     match bound with
     | bound :: _ ->
-      DS.get_changed_representation env.uses (Code_id_or_name.name bound)
+      Analysis.get_changed_representation env.uses (Code_id_or_name.name bound)
     | [] -> Misc.fatal_error "Empty set of closures"
   in
   let value_slots, function_slot_rewrites =
@@ -484,7 +443,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
       let existing_value_slots = value_slots in
       let value_slots =
         Field.Map.fold
-          (fun field (uf : _ DS.unboxed_fields) value_slots ->
+          (fun field (uf : _ Unboxed_fields.u) value_slots ->
             match Field.view field with
             | Is_int | Get_tag | Block _ ->
               Misc.fatal_errorf
@@ -517,7 +476,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
               let arg = Value_slot.Map.find value_slot existing_value_slots in
               if simple_is_unboxable env arg
               then
-                fold2_unboxed_subset
+                Unboxed_fields.fold2_subset_u
                   (fun ff var value_slots ->
                     Value_slot.Map.add ff (Simple.var var) value_slots)
                   uf
@@ -543,7 +502,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
             if code_is_used bound_name
             then
               let changed_calling_convention =
-                not (DS.cannot_change_calling_convention env.uses code_id)
+                not (Analysis.cannot_change_calling_convention env.uses code_id)
               in
               Code_id
                 { code_id;
@@ -627,7 +586,7 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
         (fun i field ->
           let kind = K.Scannable_block_shape.element_kind shape i in
           let f = Field.block i kind in
-          if DS.field_used env.uses bound_name f
+          if Analysis.field_used env.uses bound_name f
           then rewrite_simple_with_debuginfo env field
           else
             Simple.With_debuginfo.create
@@ -713,7 +672,7 @@ let rebuild_named_default_case env (named : Named.t) =
   in
   let[@local] rewrite_field_access_chg_repr ?(mut : Mutability.t = Immutable)
       arg field dbg =
-    let[@inline] get_field ~f (arg_fields : _ DS.unboxed_fields Field.Map.t) =
+    let[@inline] get_field ~f (arg_fields : _ Unboxed_fields.t) =
       match Field.Map.find field arg_fields with
       | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
       | Not_unboxed r -> f r
@@ -806,7 +765,7 @@ let rewrite_apply_cont_expr env ac =
       (fun arg ->
         Simple.pattern_match arg
           ~name:(fun name ~coercion:_ ->
-            not (DS.has_source env.uses (Code_id_or_name.name name)))
+            not (Analysis.has_source env.uses (Code_id_or_name.name name)))
           ~const:(fun _ -> false))
       args
   then None
@@ -870,7 +829,7 @@ let make_apply_wrapper env
                  Indirect_unknown_arity; _ } | C_call _ | Method _ | Effect _ ->
                  GFG.Unknown_arity_code_pointer in let field = GFG.Field.Apply
                  (direct_or_indirect, GFG.Field.Normal i) in let has_any_source
-                 = DS.not_local_field_has_source env.uses (Simple.pattern_match
+                 = Analysis.not_local_field_has_source env.uses (Simple.pattern_match
                  (Option.get (Apply.callee apply)) ~name:(fun name ~coercion:_
                  -> Code_id_or_name.name name) ~const:(fun _ -> assert false))
                  field in *)
@@ -887,8 +846,8 @@ let make_apply_wrapper env
             | Unbox fields_apply, Unbox fields_func ->
               Ok
                 ( i + 1,
-                  fold2_unboxed_subset_with_kind
-                    (fun _kind _var_apply var_func rev_args ->
+                  Unboxed_fields.fold2_subset
+                    (fun _var_apply var_func rev_args ->
                       Simple.var var_func :: rev_args)
                     fields_apply fields_func rev_args )))
         (Or_invalid.Ok (0, []))
@@ -1036,7 +995,7 @@ let decide_whether_apply_needs_calling_convention_change env apply =
         Simple.pattern_match c
           ~const:(fun _ -> Or_unknown.Unknown)
           ~name:(fun name ~coercion:_ ->
-            DS.code_id_actually_directly_called env.uses name)
+            Analysis.code_id_actually_directly_called env.uses name)
       in
       match code_ids with
       | Unknown -> None, call_kind_if_unknown
@@ -1100,7 +1059,7 @@ let decide_whether_apply_needs_calling_convention_change env apply =
     | None -> Not_changing_calling_convention, call_kind
     | Some _ ->
       let cannot_change_calling_convention =
-        DS.cannot_change_calling_convention env.uses code_id
+        Analysis.cannot_change_calling_convention env.uses code_id
       in
       if cannot_change_calling_convention
       then Not_changing_calling_convention, call_kind
@@ -1211,7 +1170,7 @@ let rebuild_apply env apply =
           | None -> List.map (rewrite_simple env) (Apply.args apply)
           | Some (callee, known_arity) ->
             let keep_or_poison (arg, to_keep) =
-              match (to_keep : DS.keep_or_delete) with
+              match (to_keep : Points_to_analysis.keep_or_delete) with
               | Keep -> arg
               | Delete ->
                 Simple.pattern_match arg
@@ -1221,7 +1180,7 @@ let rebuild_apply env apply =
             let args_and_keep =
               if known_arity
               then
-                DS.arguments_used_by_known_arity_call env.uses callee
+                Analysis.arguments_used_by_known_arity_call env.uses callee
                   (Apply.args apply)
               else
                 let grouped_args =
@@ -1229,7 +1188,7 @@ let rebuild_apply env apply =
                     (Apply.args apply)
                 in
                 List.flatten
-                  (DS.arguments_used_by_unknown_arity_call env.uses callee
+                  (Analysis.arguments_used_by_unknown_arity_call env.uses callee
                      grouped_args)
             in
             List.map keep_or_poison args_and_keep
@@ -1290,7 +1249,7 @@ let rebuild_apply env apply =
               "Callee is not unboxable in apply %a with unboxed closure"
               Apply.print apply;
           let callee_fields = get_simple_unboxable env callee in
-          ( fold2_unboxed_subset_with_kind
+          ( Unboxed_fields.fold2_subset_with_kind
               (fun kind _param callee_field acc ->
                 (Simple.var callee_field, KS.anything kind) :: acc)
               fields callee_fields [],
@@ -1399,7 +1358,7 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
       ~name:(fun name ~coercion:_ -> name)
   in
   let arg = Code_id_or_name.name arg in
-  match DS.get_unboxed_fields env.uses arg with
+  match Analysis.get_unboxed_fields env.uses arg with
   | Some arg -> (
     match Field.Map.find field arg with
     | exception Not_found ->
@@ -1409,14 +1368,14 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
         Format.pp_print_text "but it was not tracked."
     | f -> bind_fields (Unboxed to_bind) f hole)
   | None -> (
-    if Option.is_none (DS.get_changed_representation env.uses arg)
+    if Option.is_none (Analysis.get_changed_representation env.uses arg)
     then
       Misc.fatal_errorf
         "Loading unboxed from variable %a that is not unboxed nor changed \
          representation (has_source: %b)@."
         Code_id_or_name.print arg
-        (DS.has_source env.uses arg);
-    let arg = Option.get (DS.get_changed_representation env.uses arg) in
+        (Analysis.has_source env.uses arg);
+    let arg = Option.get (Analysis.get_changed_representation env.uses arg) in
     match arg with
     | Block_representation (arg_fields, _size) -> (
       match Field.Map.find field arg_fields with
@@ -1426,7 +1385,7 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
           Format.pp_print_text "from block with changed representation:"
           Simple.print oarg Format.pp_print_text "but it was not tracked."
       | arg ->
-        fold2_unboxed_subset
+        Unboxed_fields.fold2_subset_u
           (fun var (field, kind) hole ->
             let bp =
               Bound_pattern.singleton
@@ -1455,7 +1414,7 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
           Format.pp_print_text "from closure with changed representation:"
           Simple.print oarg Format.pp_print_text "but it was not tracked."
       | arg ->
-        fold2_unboxed_subset
+        Unboxed_fields.fold2_subset_u
           (fun var value_slot hole ->
             let bp =
               Bound_pattern.singleton
@@ -1481,12 +1440,13 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
     ~(defining_expr : Named.t) ~hole =
   let to_bind =
     Option.get
-      (DS.get_unboxed_fields env.uses (Code_id_or_name.var (Bound_var.var bv)))
+      (Analysis.get_unboxed_fields env.uses
+         (Code_id_or_name.var (Bound_var.var bv)))
   in
   match[@ocaml.warning "-fragile-match"] defining_expr with
   | Prim (Variadic (Make_block (kind, _, _), args), _dbg) ->
     Field.Map.fold
-      (fun field (var : _ DS.unboxed_fields) hole ->
+      (fun field (var : _ Unboxed_fields.u) hole ->
         let arg : _ Either.t =
           match Field.view field with
           | Block (nth, field_kind) ->
@@ -1529,9 +1489,6 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
           RE.create_let bp (Named.create_simple simple) ~body:hole
         | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
       to_bind hole
-  (* | Prim ( Unary (Opaque_identity { middle_end_only = true; _ }, arg), _dbg )
-     -> (* XXX TO REMOVE *) bind_fields (DS.Unboxed to_bind) (DS.Unboxed
-     (get_simple_unboxable env arg)) hole *)
   | Prim (Unary (Block_load { field; kind; _ }, arg), dbg) ->
     let field =
       Field.block
@@ -1558,24 +1515,26 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
   assert (
     List.for_all
       (fun bv ->
-        (not (DS.has_use env.uses (Code_id_or_name.var (Bound_var.var bv))))
+        (not
+           (Analysis.has_use env.uses (Code_id_or_name.var (Bound_var.var bv))))
         || Option.is_some
-             (DS.get_unboxed_fields env.uses
+             (Analysis.get_unboxed_fields env.uses
                 (Code_id_or_name.var (Bound_var.var bv))))
       bvs);
   List.fold_left
     (fun hole bv ->
-      if not (DS.has_use env.uses (Code_id_or_name.var (Bound_var.var bv)))
+      if
+        not (Analysis.has_use env.uses (Code_id_or_name.var (Bound_var.var bv)))
       then hole
       else
         let to_bind =
           Option.get
-            (DS.get_unboxed_fields env.uses
+            (Analysis.get_unboxed_fields env.uses
                (Code_id_or_name.var (Bound_var.var bv)))
         in
         let value_slots = set_of_closures.value_slots in
         Field.Map.fold
-          (fun field (var : _ DS.unboxed_fields) hole ->
+          (fun field (var : _ Unboxed_fields.u) hole ->
             match Field.view field with
             | Value_slot value_slot ->
               let arg = Value_slot.Map.find value_slot value_slots in
@@ -1612,7 +1571,7 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
   | Prim (Unary (Project_function_slot { move_from; move_to }, arg), dbg) ->
     let fields =
       Option.get
-        (DS.get_changed_representation env.uses
+        (Analysis.get_changed_representation env.uses
            (Code_id_or_name.var (Bound_var.var bv)))
     in
     let fss =
@@ -1638,7 +1597,7 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
   | Prim (Variadic (Make_block (kind, _mut, alloc_mode), args), dbg) ->
     let fields =
       Option.get
-        (DS.get_changed_representation env.uses
+        (Analysis.get_changed_representation env.uses
            (Code_id_or_name.var (Bound_var.var bv)))
     in
     let fields, size =
@@ -1652,13 +1611,13 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     in
     let mp =
       Field.Map.fold
-        (fun f (uf : _ DS.unboxed_fields) mp ->
+        (fun f (uf : _ Unboxed_fields.u) mp ->
           match Field.view f with
           | Block (i, _kind) -> (
             let arg = List.nth args i in
             if simple_is_unboxable env arg
             then
-              fold2_unboxed_subset
+              Unboxed_fields.fold2_subset_u
                 (fun (ff, _) var mp -> Int.Map.add ff (Simple.var var) mp)
                 uf
                 (Unboxed (get_simple_unboxable env arg))
@@ -1753,7 +1712,9 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
              })
           Non_nullable
       in
-      let ks = DS.rewrite_kind_with_subkind env.uses bound_name ks in
+      let ks =
+        Types_rewriter.rewrite_kind_with_subkind env.uses bound_name ks
+      in
       let[@local] with_subkinds subkinds =
         P.Block_kind.Values (tag, subkinds)
       in
@@ -1773,7 +1734,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
       (fun i field ->
         let kind = K.Block_shape.element_kind block_shape i in
         let f = Field.block i kind in
-        if DS.field_used env.uses bound_name f
+        if Analysis.field_used env.uses bound_name f
         then rewrite_simple env field
         else poison ~machine_width:env.machine_width kind)
       fields
@@ -1866,7 +1827,7 @@ let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
             Function_slot.Lmap.exists
               (fun _ sym ->
                 Option.is_some
-                  (DS.get_changed_representation env.uses
+                  (Analysis.get_changed_representation env.uses
                      (Code_id_or_name.symbol sym)))
               m
           then
@@ -1876,15 +1837,15 @@ let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
                    (fun (fs, sym) ->
                      let repr =
                        Option.get
-                         (DS.get_changed_representation env.uses
+                         (Analysis.get_changed_representation env.uses
                             (Code_id_or_name.symbol sym))
                      in
                      match repr with
-                     | DS.Block_representation _ ->
+                     | Block_representation _ ->
                        Misc.fatal_errorf
                          "Block representation for set of closures %a"
                          Symbol.print sym
-                     | DS.Closure_representation (_, fs_map, cur_fs) ->
+                     | Closure_representation (_, fs_map, cur_fs) ->
                        assert (Function_slot.equal fs cur_fs);
                        Function_slot.Map.find fs fs_map, sym)
                    (Function_slot.Lmap.bindings m))
@@ -2116,7 +2077,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
         Code_id.print code_id
     | Some code_dep ->
       let cannot_change_calling_convention =
-        DS.cannot_change_calling_convention env.uses code_id
+        Analysis.cannot_change_calling_convention env.uses code_id
       in
       ( (if cannot_change_calling_convention
          then Not_changing_calling_convention
@@ -2166,8 +2127,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
             let params_vars_and_keep, results_vars_and_keep =
               match updating_calling_convention with
               | Not_changing_calling_convention ->
-                ( List.map (fun p -> p, DS.Keep) params_vars,
-                  List.map (fun p -> p, DS.Keep) results_vars )
+                ( List.map (fun p -> p, Points_to_analysis.Keep) params_vars,
+                  List.map (fun p -> p, Points_to_analysis.Keep) results_vars )
               | Changing_calling_convention code_id ->
                 let return_decisions =
                   Code_id.Map.find code_id env.function_return_decision
@@ -2177,15 +2138,17 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                 in
                 ( List.map2
                     (fun p -> function
-                      | Keep _ | Unbox _ -> p, DS.Keep | Delete -> p, DS.Delete)
+                      | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
+                      | Delete -> p, Points_to_analysis.Delete)
                     params_vars params_decision,
                   List.map2
                     (fun p -> function
-                      | Keep _ | Unbox _ -> p, DS.Keep | Delete -> p, DS.Delete)
+                      | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
+                      | Delete -> p, Points_to_analysis.Delete)
                     results_vars return_decisions )
             in
             Or_unknown_or_bottom.Ok
-              (Dep_solver.rewrite_result_types env.uses ~old_typing_env
+              (Types_rewriter.rewrite_result_types env.uses ~old_typing_env
                  ~my_closure ~params:params_vars_and_keep
                  ~results:results_vars_and_keep result_types)
       in
@@ -2221,7 +2184,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
           | Unbox _ ->
             Unbox
               (Option.get
-                 (DS.get_unboxed_fields env.uses
+                 (Analysis.get_unboxed_fields env.uses
                     (Code_id_or_name.var (Bound_parameter.var param))))
           | Keep (_, kind) -> Keep (Bound_parameter.var param, kind))
         params_decision
@@ -2246,11 +2209,11 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       match
         (* TODO move that in the decisions There should be a single record field
            with all the decisions for return params and closure *)
-        DS.get_unboxed_fields env.uses (Code_id_or_name.var my_closure)
+        Analysis.get_unboxed_fields env.uses (Code_id_or_name.var my_closure)
       with
       | None -> [], code_metadata
       | Some fields ->
-        ( DS.fold_unboxed_with_kind
+        ( Unboxed_fields.fold_with_kind
             (fun kind v acc ->
               Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
               :: acc)
@@ -2364,22 +2327,24 @@ type result =
 
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
-    ~fixed_arity_continuations ~final_typing_env kinds (solved_dep : DS.result)
-    get_code_metadata holed =
+    ~fixed_arity_continuations ~final_typing_env kinds
+    (solved_dep : Analysis.result) get_code_metadata holed =
   let should_keep_function_param code_id =
     let cannot_change_calling_convention =
-      DS.cannot_change_calling_convention solved_dep code_id
+      Analysis.cannot_change_calling_convention solved_dep code_id
     in
     if cannot_change_calling_convention
     then (
       fun var kind ->
         assert (
           Option.is_none
-            (DS.get_unboxed_fields solved_dep (Code_id_or_name.var var)));
+            (Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var var)));
         Keep (var, kind))
     else
       fun param kind ->
-        match DS.get_unboxed_fields solved_dep (Code_id_or_name.var param) with
+        match
+          Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var param)
+        with
         | None ->
           let is_var_used =
             raw_is_var_used solved_dep param (K.With_subkind.kind kind)
@@ -2398,13 +2363,13 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     Code_id.Map.mapi
       (fun code_id (code_dep : Traverse_acc.code_dep) ->
         let unboxed_fields =
-          DS.get_unboxed_fields solved_dep
+          Analysis.get_unboxed_fields solved_dep
             (Code_id_or_name.var code_dep.my_closure)
         in
         match unboxed_fields with
         | None -> Keep_my_closure
         | Some unboxed_fields ->
-          if DS.cannot_change_calling_convention solved_dep code_id
+          if Analysis.cannot_change_calling_convention solved_dep code_id
           then
             Misc.fatal_errorf
               "For code_id %a, we cannot change calling convention but closure \
@@ -2422,7 +2387,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     Code_id.Map.mapi
       (fun code_id (code_dep : Traverse_acc.code_dep) ->
         let cannot_change_calling_convention =
-          DS.cannot_change_calling_convention solved_dep code_id
+          Analysis.cannot_change_calling_convention solved_dep code_id
         in
         let metadata = get_code_metadata code_id in
         let result_kinds =
@@ -2437,14 +2402,15 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
           List.map2
             (fun v kind ->
               match
-                DS.get_unboxed_fields solved_dep (Code_id_or_name.var v)
+                Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var v)
               with
               | None ->
                 let is_var_used =
                   raw_is_var_used solved_dep v (K.With_subkind.kind kind)
                 in
                 let kind =
-                  DS.rewrite_kind_with_subkind solved_dep (Name.var v) kind
+                  Types_rewriter.rewrite_kind_with_subkind solved_dep
+                    (Name.var v) kind
                 in
                 (* TODO: fix this, needs the mapping between code ids of
                    functions and their return continuations *)
@@ -2457,7 +2423,9 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     let keep_all_parameters =
       Continuation.Set.mem cont fixed_arity_continuations
     in
-    match DS.get_unboxed_fields solved_dep (Code_id_or_name.var param) with
+    match
+      Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var param)
+    with
     | None ->
       if
         keep_all_parameters
@@ -2471,7 +2439,9 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
         info.is_exn_handler && Variable.equal param (List.hd info.params)
       then
         Keep
-          (param, DS.rewrite_kind_with_subkind solved_dep (Name.var param) kind)
+          ( param,
+            Types_rewriter.rewrite_kind_with_subkind solved_dep (Name.var param)
+              kind )
       else Delete
     | Some fields -> Unbox fields
   in

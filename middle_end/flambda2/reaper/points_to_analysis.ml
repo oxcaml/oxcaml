@@ -194,6 +194,10 @@ open! Datalog_helpers.Syntax
 open Datalog_helpers
 
 module Relations = struct
+  type 'a atom = [> `Atom of Datalog.atom] as 'a
+
+  type 'a term = 'a Datalog.Term.t
+
   (** [usages] and [sources] are dual. They build the same relation from
       [accessor] and [rev_constructor]. [any_usage] and [any_source] are the
       tops. *)
@@ -297,6 +301,13 @@ module Relations = struct
 
   let field_of_constructor_is_used_as =
     rel3 "field_of_constructor_is_used_as" Cols.[n; f; n]
+
+  let multiple_allocation_points = rel1 "multiple_allocations_points" Cols.[n]
+
+  let dominated_by_allocation_point =
+    rel2 "dominated_by_allocation_point" Cols.[n; n]
+
+  let allocation_point_dominator = rel2 "allocation_point_dominator" Cols.[n; n]
 end
 
 open! Relations
@@ -754,10 +765,6 @@ let has_usage_query =
   let^? [x], [] = ["x"], [] in
   [has_usage x]
 
-(* CR pchambart: should rename: mutiple potential top is_used_as_top (should be
-   obviously different from has use) *)
-let is_top db x = any_usage_query [x] db
-
 let has_use db x = has_usage_query [x] db
 
 (* CR pchambart: field_used should rename to mean that this is the specific
@@ -784,7 +791,7 @@ let not_local_field_has_source =
   in
   fun db x field -> any_source_query [x] db || field_source_query [x; field] db
 
-let field_of_constructor_is_used_rules =
+let post_processing_rules =
   saturate_in_order
     [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
        [ constructor ~base relation ~from;
@@ -852,7 +859,7 @@ let field_of_constructor_is_used_rules =
          any_usage v ]
        ==> and_
              [ field_of_constructor_is_used base relation;
-               field_of_constructor_is_used_top base relation ])
+               field_of_constructor_is_used_top base relation ]);
       (* CR ncourant: this marks any [Apply] field as
          [field_of_constructor_is_used], as long as the function is called.
          Shouldn't that be gated behind a [cannot_change_calling_convetion]? *)
@@ -864,6 +871,231 @@ let field_of_constructor_is_used_rules =
       (* CR ncourant: should this be reenabled? I think this is no longer
          necessary because we remove unused arguments of continuations,
          including return continuations. *)
+      (let$ [x] = ["x"] in
+       [any_source x] ==> multiple_allocation_points x);
+      (let$ [x; y; z] = ["x"; "y"; "z"] in
+       [ sources x y;
+         has_source y;
+         sources x z;
+         has_source z;
+         distinct Cols.n y z ]
+       ==> multiple_allocation_points x);
+      (* [allocation_point_dominator x y] is the same as
+         [dominated_by_allocation_point y x], which is that [y] is the
+         allocation point dominator of [x]. *)
+      (let$ [x; y] = ["x"; "y"] in
+       [sources x y; has_source y; ~~(multiple_allocation_points x)]
+       ==> and_
+             [allocation_point_dominator x y; dominated_by_allocation_point y x])
     ]
 
 let has_source_query db x = has_source_query [x] db
+
+let perform_analysis db ~stats =
+  let db =
+    Profile.record_call ~accumulate:true "analysis" (fun () ->
+        Datalog.Schedule.run ~stats datalog_schedule db)
+  in
+  let db =
+    Profile.record_call ~accumulate:true "compute_field_usages" (fun () ->
+        List.fold_left
+          (fun db rule -> Datalog.Schedule.run ~stats rule db)
+          db post_processing_rules)
+  in
+  db
+
+type keep_or_delete =
+  | Keep
+  | Delete
+
+let unknown_code_id_actually_directly_called_query =
+  let^? [closure], [known_arity_call_witness] =
+    ["closure"], ["known_arity_call_witness"]
+  in
+  [ rev_accessor ~base:closure
+      !!Field.known_arity_call_witness
+      ~to_:known_arity_call_witness;
+    any_source known_arity_call_witness ]
+
+let code_id_actually_directly_called_query =
+  query
+    (let^$ [closure], [apply_widget; call_witness; codeid] =
+       ["closure"], ["apply_widget"; "call_witness"; "codeid"]
+     in
+     [ rev_accessor ~base:closure
+         !!Field.known_arity_call_witness
+         ~to_:apply_widget;
+       sources apply_widget call_witness;
+       has_source call_witness;
+       constructor ~base:call_witness
+         !!Field.code_id_of_call_witness
+         ~from:codeid ]
+     =>? [codeid])
+
+let code_id_actually_directly_called db closure =
+  let closure = Code_id_or_name.name closure in
+  if unknown_code_id_actually_directly_called_query [closure] db
+  then Or_unknown.Unknown
+  else
+    Or_unknown.Known
+      (Datalog.Cursor.fold_with_parameters
+         code_id_actually_directly_called_query [closure] db
+         ~init:Code_id.Set.empty ~f:(fun [codeid] acc ->
+           let codeid =
+             Code_id_or_name.pattern_match' codeid
+               ~code_id:(fun code_id -> code_id)
+               ~name:(fun name ->
+                 Misc.fatal_errorf
+                   "code_id_actually_directly_called found a name: %a"
+                   Name.print name)
+           in
+           Code_id.Set.add codeid acc))
+
+type sources =
+  | Any_source
+  | Sources of unit Code_id_or_name.Map.t
+
+let get_direct_sources :
+    Datalog.database -> unit Code_id_or_name.Map.t -> sources =
+  let open! Fixit in
+  run
+    (let@ in_ = param "in_" Cols.[n] in
+     let+ [any; out] =
+       let@ [any; out] = fix' [empty One.cols; empty Cols.[n]] in
+       [ (let$ [x] = ["x"] in
+          [in_ % [x]; any_source x] ==> One.flag any);
+         (let$ [x; y] = ["x"; "y"] in
+          [~~(One.flag any); in_ % [x]; sources x y; has_source y] ==> out % [y])
+       ]
+     in
+     if One.to_bool any then Any_source else Sources out)
+
+let get_field_sources :
+    Datalog.database -> unit Code_id_or_name.Map.t -> Field.t -> sources =
+  let open! Fixit in
+  run
+    (let@ in_ = param "in_" Cols.[n] in
+     let@ in_field = param1s "in_field" Cols.f in
+     let+ [any; out] =
+       let@ [any; out] = fix' [empty One.cols; empty Cols.[n]] in
+       [ (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ ~~(One.flag any);
+            in_ % [x];
+            in_field % [field];
+            constructor ~base:x field ~from:y;
+            any_source y ]
+          ==> One.flag any);
+         (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+          [ ~~(One.flag any);
+            in_ % [x];
+            in_field % [field];
+            constructor ~base:x field ~from:y;
+            sources y z;
+            has_source z ]
+          ==> out % [z]) ]
+     in
+     if One.to_bool any then Any_source else Sources out)
+
+let cofield_has_use :
+    Datalog.database -> unit Code_id_or_name.Map.t -> Cofield.t -> bool =
+  let open! Fixit in
+  run
+    (let@ in_ = param "in_" Cols.[n] in
+     let@ in_field = param1s "in_field" Cols.cf in
+     let+ out =
+       let@ out = fix1' (empty One.cols) in
+       [ (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ in_ % [x];
+            in_field % [field];
+            parameter ~base:x field ~to_:y;
+            has_usage y ]
+          ==> One.flag out) ]
+     in
+     One.to_bool out)
+
+let rec arguments_used_by_call db ep callee_sources grouped_args =
+  match grouped_args with
+  | [] -> []
+  | first_arg_group :: grouped_args_rest -> (
+    match callee_sources with
+    | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
+    | Sources callee_sources -> (
+      let witness_sources =
+        get_field_sources db callee_sources (Field.call_witness ep)
+      in
+      match witness_sources with
+      | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
+      | Sources witness_sources ->
+        let first_arg_group =
+          List.mapi
+            (fun i x ->
+              ( x,
+                if cofield_has_use db witness_sources (Cofield.param i)
+                then Keep
+                else Delete ))
+            first_arg_group
+        in
+        let grouped_args_rest =
+          match grouped_args_rest with
+          | [] -> [] (* Avoid computing sources of result if no more args *)
+          | _ :: _ ->
+            arguments_used_by_call db ep
+              (get_field_sources db witness_sources
+                 (Field.normal_return_of_call 0))
+              grouped_args_rest
+        in
+        first_arg_group :: grouped_args_rest))
+
+let arguments_used_by_known_arity_call db callee args =
+  List.flatten
+    (arguments_used_by_call db Field.Known_arity_code_pointer
+       (get_direct_sources db (Code_id_or_name.Map.singleton callee ()))
+       [args])
+
+let arguments_used_by_unknown_arity_call db callee args =
+  arguments_used_by_call db Field.Unknown_arity_code_pointer
+    (get_direct_sources db (Code_id_or_name.Map.singleton callee ()))
+    args
+
+type single_field_source =
+  | No_source
+  | One of Code_id_or_name.t
+  | Many
+
+let get_single_field_source =
+  let q_any_source =
+    let^? [block; field], [source] = ["block"; "field"], ["source"] in
+    [constructor ~base:block field ~from:source; any_source source]
+  in
+  let q_source =
+    query
+      (let^$ [block; field], [field_source; source] =
+         ["block"; "field"], ["field_source"; "source"]
+       in
+       [ constructor ~base:block field ~from:field_source;
+         sources field_source source;
+         has_source source ]
+       =>? [source])
+  in
+  fun db block field ->
+    if q_any_source [block; field] db
+    then Many
+    else
+      Cursor.fold_with_parameters q_source [block; field] db ~init:No_source
+        ~f:(fun [source] acc ->
+          match acc with No_source -> One source | One _ | Many -> Many)
+
+let get_allocation_point =
+  let dom =
+    query
+      (let^$ [x], [y] = ["x"], ["y"] in
+       [allocation_point_dominator x y] =>? [y])
+  in
+  fun db x ->
+    Cursor.fold_with_parameters dom [x] db ~init:None ~f:(fun [y] acc ->
+        assert (Option.is_none acc);
+        Some y)
+
+let any_usage db x = any_usage_query [x] db
+
+let any_source db x = any_source_query [x] db
