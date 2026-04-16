@@ -52,10 +52,8 @@ let poly_ captures x y = if bool then #(x, foo) else #(y, 2)
                  ; r =
                    ⟪(function {nlocal = 0} closure
                       (let
-                        (foo =a[value<int>]
-                           (mixedfield 1  (value<int>,value<int>) closure)
-                         bool =a[value<int>]
-                           (mixedfield 0  (value<int>,value<int>) closure))
+                        (foo =a[value<int>] (field_imm 1 closure)
+                         bool =a[value<int>] (field_imm 0 closure))
                         (function {nlocal = 0} x[$layout!24] y[$layout!24]
                           : #($layout!24, ?)
                           (if bool

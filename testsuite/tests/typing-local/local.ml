@@ -1756,17 +1756,7 @@ let foo p (local_ x) y z =
   let _, _ = pr in
   escape b;;
 [%%expect{|
-Line 6, characters 9-10:
-6 |   escape b;;
-             ^
-Error: This value is "local"
-         because it is an element of the tuple at line 3, characters 14-18
-         which is "local"
-         because it is allocated at line 3, characters 14-18 containing data
-         which is "local" to the parent region
-         because it is a tuple that contains the expression at line 3, characters 14-15
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "global".
+val foo : bool -> 'a @ local -> 'b -> 'a * 'b -> unit = <fun>
 |}]
 
 let foo p (local_ x) y (local_ z) =
@@ -1778,12 +1768,8 @@ let foo p (local_ x) y (local_ z) =
 Line 5, characters 9-10:
 5 |   escape b;;
              ^
-Error: This value is "local"
-         because it is an element of the tuple at line 3, characters 14-18
-         which is "local"
-         because it is allocated at line 3, characters 14-18 containing data
-         which is "local" to the parent region
-         because it is a tuple that contains the expression at line 3, characters 14-15
+Error: This value is "local" to the parent region
+         because it is an element of the tuple at line 3, characters 24-25
          which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -1797,14 +1783,7 @@ let foo p (local_ x) y z =
 Line 5, characters 9-10:
 5 |   escape a;;
              ^
-Error: This value is "local"
-         because it is an element of the tuple at line 3, characters 14-18
-         which is "local"
-         because it is allocated at line 3, characters 14-18 containing data
-         which is "local" to the parent region
-         because it is a tuple that contains the expression at line 3, characters 14-15
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo p (local_ x) y z =
@@ -2172,10 +2151,6 @@ Line 2, characters 12-13:
                 ^
 Error: The expression is "local"
          because it is contained (via constructor "Some") in the value at line 2, characters 30-36
-         which is "local"
-         because it is an element of the tuple at line 3, characters 26-74
-         which is "local"
-         because it is a tuple that contains the expression at line 3, characters 41-64
          which is "local".
        However, the expression highlighted is expected to be "global"
          because it is the value "z" in the structure at lines 2-3, characters 2-74
@@ -2192,11 +2167,7 @@ Line 2, characters 12-13:
 2 |   let (Some z, _, _) | (None, Some z, _)
                 ^
 Error: The expression is "local"
-         because it is contained (via constructor "Some") in the value at line 2, characters 30-36
-         which is "local"
-         because it is an element of the tuple at line 3, characters 26-74
-         which is "local"
-         because it is a tuple that contains the expression at line 3, characters 27-48
+         because it is contained (via constructor "Some") in the value at line 2, characters 7-13
          which is "local".
        However, the expression highlighted is expected to be "global"
          because it is the value "z" in the structure at lines 2-3, characters 2-74
