@@ -33,7 +33,7 @@ let code loopify(never) size(20) newer_version_of(g_3)
       let int_add = %int_barith.add (s, int_mul) in
       cont k (int_add)
 in
-let code loopify(never) size(39) newer_version_of(h_4)
+let code rec loopify(never) size(39) newer_version_of(h_4)
       h_4_1 (x : imm tagged, y : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1
@@ -118,7 +118,7 @@ apply direct(partial_apply1_44) inlined(never) inlining_state(depth(11))
            closure g_3_2 @g
          and $camlOffset__h_9 =
            closure h_4_2 @h
-         and code loopify(never) size(6) newer_version_of(h_4_1)
+         and code rec loopify(never) size(6) newer_version_of(h_4_1)
                h_4_2 (x : imm tagged, y : imm tagged)
                  my_closure _region _ghost_region my_depth
                  -> k * k1

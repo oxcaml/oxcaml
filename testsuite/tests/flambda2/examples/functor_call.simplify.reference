@@ -10,7 +10,7 @@ let code inline(always) loopify(never) size(5) newer_version_of(test_3)
 in
 let $camlFunctor_call__test_4 = closure test_3_1 @test in
 let $camlFunctor_call__Pmakeblock129 = Block 0 ($camlFunctor_call__test_4) in
-let code rec loopify(done) size(16) newer_version_of(foo_1_1)
+let code loopify(done) size(16) newer_version_of(foo_1_1)
       foo_1 (x : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1

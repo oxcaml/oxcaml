@@ -57,7 +57,7 @@ let code loopify(never) size(50) newer_version_of(emit_instr_1)
           -> k * k1
 in
 let $camlEmitcode_repro__emit_instr_4 = closure emit_instr_1_1 @emit_instr in
-let code rec loopify(done) size(121) newer_version_of(emit_2)
+let code loopify(done) size(121) newer_version_of(emit_2)
       emit_2_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure _region _ghost_region my_depth
         -> k * k1

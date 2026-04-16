@@ -19,7 +19,7 @@ and set_of_closures
       closure aux_1_1 @aux
       with { env_1 = env_1 }
     end
-and code rec loopify(done) size(15) newer_version_of(aux_1)
+and code loopify(done) size(15) newer_version_of(aux_1)
       aux_1_1 (param : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1

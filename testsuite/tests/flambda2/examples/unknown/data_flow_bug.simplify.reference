@@ -102,7 +102,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring19) in
                                                where k2 =
                                                  let prim =
                                                    %string_load.[`8`]
-                                                     (Popaque, 0i)
+                                                     (Popaque, 0n)
                                                  in
                                                  let Pstringrefs =
                                                    %tag_imm (prim)

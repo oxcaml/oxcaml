@@ -42,7 +42,7 @@ let code inline(always) loopify(never) size(40) newer_version_of(char_of_string_
           | 0 -> k2
           | 1 -> k3)
          where k3 =
-           let prim_2 = %string_load.[`8`] (s, 0i) in
+           let prim_2 = %string_load.[`8`] (s, 0n) in
            let Pstringrefs = %tag_imm (prim_2) in
            cont k (Pstringrefs)
          where k2 =
@@ -90,7 +90,7 @@ let code inline(always) loopify(never) size(20) newer_version_of(test_3)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring64, 0i)
+  let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring64, 0n)
   in
   let Pstringrefs = %tag_imm (prim) in
   let prim_1 = %phys_eq (Pstringrefs, 99) in
@@ -110,7 +110,7 @@ let code loopify(never) size(30) newer_version_of(top_5)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  (let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring64, 0i)
+  (let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring64, 0n)
    in
    let Pstringrefs = %tag_imm (prim) in
    let prim_1 = %phys_eq (Pstringrefs, 99) in

@@ -146,7 +146,7 @@ apply direct(length_2_1)
             where k =
               let `unit` = %end_region (`region`) in
               let unit_1 = %end_ghost_region (ghost_region) in
-              let code rec loopify(done) size(22) newer_version_of(rev_app_4)
+              let code loopify(done) size(22) newer_version_of(rev_app_4)
                     rev_app_4_1
                       (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
                        l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])

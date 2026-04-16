@@ -3,7 +3,7 @@ let code `fn[protect_refs.ml:28,24--50]_2` deleted in
 let code `fn[protect_refs.ml:29,2--43]_3` deleted in
 let code set_mode_pattern_4 deleted in
 let code `fn[protect_refs.ml:41,26--40]_5` deleted in
-let code rec loopify(done) size(22) newer_version_of(iter_0)
+let code loopify(done) size(22) newer_version_of(iter_0)
       iter_0_1 (f : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure _region _ghost_region my_depth
         -> k * k1

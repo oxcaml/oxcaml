@@ -24,7 +24,7 @@ let code inline(never) loopify(never) size(9) newer_version_of(bal_0)
   cont k (Pmakeblock)
 in
 let $camlMap_remove__bal_5 = closure bal_0_1 @bal in
-let code rec loopify(done) size(26) newer_version_of(min_binding_1)
+let code loopify(done) size(26) newer_version_of(min_binding_1)
       min_binding_1_1
         (param :
            [ 0

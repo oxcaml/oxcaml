@@ -1,5 +1,5 @@
 let code f_0 deleted in
-let code loopify(never) size(42) newer_version_of(f_0)
+let code loopify(never) size(41) newer_version_of(f_0)
       f_0_1 (n : imm tagged, x : float boxed)
         my_closure _region _ghost_region my_depth
         -> k * k1
@@ -12,18 +12,22 @@ let code loopify(never) size(42) newer_version_of(f_0)
        let unboxed_float = %unbox_num.`float` (x) in
        cont k2 (unboxed_float)
      where k3 =
+       let prim_1 = %untag_imm (n) in
+       let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim_1) in
        ((let unboxed_float = %unbox_num.`float` (x) in
-         cont k3 (0, unboxed_float))
-          where rec k3 (i : imm tagged, unboxed_float : float) =
-            let prim_1 = %unbox_num.`float` (x) in
-            let prim_2 = %bfloat_arith.add (unboxed_float, prim_1) in
-            let prim_3 = %int_comp.ne (i, n) in
-            (switch prim_3
-               | 0 -> k2 (prim_2)
-               | 1 -> k4
-               where k4 =
-                 let int_succ = %int_barith.add (i, 1) in
-                 cont k3 (int_succ, prim_2))))
+         cont k3 (0L, unboxed_float))
+          where rec k3 (for_counter_naked : int64, unboxed_float : float) =
+            let prim_2 = %unbox_num.`float` (x) in
+            let prim_3 = %bfloat_arith.add (unboxed_float, prim_2) in
+            let for_next_naked =
+              %int_barith.`int64`.add (for_counter_naked, 1L)
+            in
+            let prim_4 =
+              %int_comp.`int64`.le (for_next_naked, for_stop_naked)
+            in
+            switch prim_4
+              | 0 -> k2 (prim_3)
+              | 1 -> k3 (for_next_naked, prim_3)))
     where k2 (unboxed_float : float) =
       let prim = %bfloat_arith.add (unboxed_float, 0x0p+0) in
       let float_add = %box_num.`float` (prim) in

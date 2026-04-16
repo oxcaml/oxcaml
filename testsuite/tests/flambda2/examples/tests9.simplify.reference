@@ -14,7 +14,7 @@ let code rev_sort_8 deleted and code sort_7 deleted in
 let code sort_uniq_4 deleted in
 let code rev_sort_11 deleted and code sort_10 deleted in
 let code foo_9 deleted in
-let code rec loopify(done) size(16) newer_version_of(length_aux_0)
+let code loopify(done) size(16) newer_version_of(length_aux_0)
       length_aux_0_1
         (len : imm tagged, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure _region _ghost_region my_depth
@@ -43,7 +43,7 @@ let code loopify(never) size(4) newer_version_of(length_1)
     ($camlTests9__length_aux_12 : _ -> imm tagged) (0, l) -> k * k1
 in
 let $camlTests9__length_13 = closure length_1_1 @length in
-let code rec loopify(done) size(22) newer_version_of(rev_append_2)
+let code loopify(done) size(22) newer_version_of(rev_append_2)
       rev_append_2_1
         (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
          l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
@@ -65,7 +65,7 @@ let code rec loopify(done) size(22) newer_version_of(rev_append_2)
            cont self (Pfield_1, Pmakeblock))
 in
 let $camlTests9__rev_append_14 = closure rev_append_2_1 @rev_append in
-let code rec loopify(done) size(28) newer_version_of(chop_3)
+let code loopify(done) size(28) newer_version_of(chop_3)
       chop_3_1
         (k : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure _region _ghost_region my_depth
@@ -90,7 +90,7 @@ let code rec loopify(done) size(28) newer_version_of(chop_3)
                 cont self (int_sub, Pfield)))
 in
 let $camlTests9__chop_15 = closure chop_3_1 @chop in
-let code rec loopify(done) size(90) newer_version_of(rev_merge_5)
+let code loopify(done) size(90) newer_version_of(rev_merge_5)
       rev_merge_5_1
         (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
          l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
@@ -151,7 +151,7 @@ let code rec loopify(done) size(90) newer_version_of(rev_merge_5)
                                let Pmakeblock = %block.[`0`] (h2, accu_1) in
                                cont self (l1_1, t2, Pmakeblock))))))
 in
-let code rec loopify(done) size(90) newer_version_of(rev_merge_rev_6)
+let code loopify(done) size(90) newer_version_of(rev_merge_rev_6)
       rev_merge_rev_6_1
         (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
          l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
