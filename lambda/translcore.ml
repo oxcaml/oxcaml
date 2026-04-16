@@ -550,7 +550,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               match cstr.cstr_shape with
               | Constructor_mixed shape
                 when Mixed_product_bytes.types_shape_is_all_value shape ->
-                  Some (Const_block(runtime_tag, constants))
+                  (* Note [Constant all-value mixed records]:
+                     Currently unreachable: mixed constructors with all-value
+                     shapes require void or product fields, which don't have
+                     constant representations, so [extract_constant] raises
+                     [Not_constant] first. *)
+                  (* Some (Const_block(runtime_tag, constants)) *)
+                  None
               | Constructor_mixed shape ->
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
@@ -2227,7 +2233,10 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lconst(Const_float_block(List.map extract_float cl))
         | Record_mixed shape
           when Mixed_product_bytes.types_shape_is_all_value shape ->
-            Lconst(Const_block(0, cl))
+            (* Currently unreachable; see Note [Constant all-value
+               mixed records]. *)
+            (* Lconst(Const_block(0, cl)) *)
+            raise Not_constant
         | Record_mixed shape ->
             if !Clflags.native_code then
               let shape = Lambda.transl_mixed_product_shape shape in
@@ -2238,10 +2247,13 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
               *)
               raise Not_constant
         | Record_inlined
-            (Ordinary { runtime_tag; _ }, Constructor_mixed shape,
+            (Ordinary { runtime_tag = _; _ }, Constructor_mixed shape,
              Variant_boxed _)
           when Mixed_product_bytes.types_shape_is_all_value shape ->
-            Lconst(Const_block(runtime_tag, cl))
+            (* Currently unreachable; see Note [Constant all-value
+               mixed records]. *)
+            (* Lconst(Const_block(runtime_tag, cl)) *)
+            raise Not_constant
         | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
         | Record_ufloat ->
             (* CR layouts v5.1: We should support structured constants for
