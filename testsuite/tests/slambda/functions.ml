@@ -10,9 +10,7 @@ let poly_ id x = x
    { c =
      (template layout!2 ->
        { c = (missing)
-       ; r =
-         ⟪(function {nlocal = 0} closure
-            (function {nlocal = 0} x[$layout!2] : $layout!2 x))⟫ })
+       ; r = ⟪(function {nlocal = 0} closure x[$layout!2] : $layout!2 x)⟫ })
    ; r = ⟪(makeblock 0)⟫ })
   { c = (missing)
   ; r = ⟪(let (id = $id) (apply (field_imm 1 (global Toploop!)) "id" id))⟫ })
@@ -50,17 +48,16 @@ let poly_ captures x y = if bool then #(x, foo) else #(y, 2)
                (template layout!24 ->
                  { c = (missing)
                  ; r =
-                   ⟪(function {nlocal = 0} closure
+                   ⟪(function {nlocal = 0} closure x[$layout!24]
+                      y[$layout!24] : #($layout!24, ?)
                       (let
                         (foo =a[value<int>] (field_imm 1 closure)
                          bool =a[value<int>] (field_imm 0 closure))
-                        (function {nlocal = 0} x[$layout!24] y[$layout!24]
-                          : #($layout!24, ?)
-                          (if bool
-                            (make_unboxed_product #($layout!24, value<int>) x
-                              foo)
-                            (make_unboxed_product #($layout!24, value<int>) y
-                              2)))))⟫ })
+                        (if bool
+                          (make_unboxed_product #($layout!24, value<int>) x
+                            foo)
+                          (make_unboxed_product #($layout!24, value<int>) y
+                            2))))⟫ })
              ; r = ⟪(makeblock 0 (value<int>,value<int>) bool foo)⟫ })
             { c = (missing)
             ; r =
@@ -79,10 +76,9 @@ let poly_ f x y = #(x, y)
      (template layout!46 layout!47 ->
        { c = (missing)
        ; r =
-         ⟪(function {nlocal = 0} closure
-            (function {nlocal = 0} x[$layout!46] y[$layout!47]
-              : #($layout!46, $layout!47)
-              (make_unboxed_product #($layout!46, $layout!47) x y)))⟫ })
+         ⟪(function {nlocal = 0} closure x[$layout!46] y[$layout!47]
+            : #($layout!46, $layout!47)
+            (make_unboxed_product #($layout!46, $layout!47) x y))⟫ })
    ; r = ⟪(makeblock 0)⟫ })
   { c = (missing)
   ; r = ⟪(let (f = $f) (apply (field_imm 1 (global Toploop!)) "f" f))⟫ })

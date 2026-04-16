@@ -370,32 +370,79 @@ let rec fracture_lam lambda : slambda =
               mode
             }
           in
-          let _, body =
-            List.fold_left
-              (fun (i, lam) (ident, layout) ->
-                ( i + 1,
-                  Llet
-                    ( Alias,
-                      layout,
-                      ident,
-                      debug_uid_none,
-                      Lprim (get_free_var_prim i, [Lvar closure_id], loc),
-                      lam ) ))
-              (0, body_r) free_vars
+          let wrap_body body =
+            let _, body =
+              List.fold_left
+                (fun (i, lam) (ident, layout) ->
+                  ( i + 1,
+                    Llet
+                      ( Alias,
+                        layout,
+                        ident,
+                        debug_uid_none,
+                        Lprim (get_free_var_prim i, [Lvar closure_id], loc),
+                        lam ) ))
+                (0, body) free_vars
+            in
+            body
+          in
+          let unmerged () =
+            let body = wrap_body body_r in
+            lfunction ~kind:
+              (Curried
+                 { nlocal =
+                     (match mode with
+                      | Alloc_heap -> 0
+                      | Alloc_local -> 1)
+                 })
+              ~params:[closure_param] ~return ~body ~attr ~loc ~mode
+              ~ret_mode
+          in
+          let sval_runtime =
+            match body_r with
+            | Lfunction { kind; params; return; body; attr; loc;
+                          mode=mode_inner; ret_mode } ->
+              let do_merge =
+                (* XXX The None cases here are mostly just cases where I wasn't
+                   sure what to do without thinking harder, and I'm skipping
+                   that thinking for the purposes of the demo. We should actually
+                   move this whole thing earlier, merging these functions in
+                   typechecking, so that we don't have to do this merge. *)
+                match kind, mode, mode_inner with
+                | Tupled, _, _ ->
+                  if mode = mode_inner then Some (Tupled, mode) else None
+                | Curried {nlocal}, Alloc_heap, Alloc_heap
+                | Curried {nlocal}, Alloc_local, Alloc_local ->
+                  if nlocal = 1 + List.length params then
+                    let nlocal =
+                      match mode with
+                      | Alloc_heap -> nlocal
+                      | Alloc_local -> nlocal + 1
+                    in
+                    Some (Curried {nlocal}, mode)
+                  else
+                    begin match mode with
+                    | Alloc_local -> None
+                    | Alloc_heap -> Some (Curried {nlocal}, mode)
+                    end
+                | Curried _,  Alloc_heap, Alloc_local
+                | Curried _, Alloc_local, Alloc_heap -> None
+              in
+              begin match do_merge with
+              | None -> unmerged ()
+              | Some (kind, mode) ->
+                let body = wrap_body body in
+                lfunction ~kind ~params:(closure_param :: params) ~return ~body
+                  ~attr ~loc ~mode ~ret_mode
+              end
+            | _ ->
+              (* XXX probably just replace this with fatal error for now if we
+                 can't write a test that reaches it. *)
+              unmerged ()
           in
           SLhalves
             { sval_comptime = body_c;
-              sval_runtime =
-                lfunction
-                  ~kind:
-                    (Curried
-                       { nlocal =
-                           (match mode with
-                           | Alloc_heap -> 0
-                           | Alloc_local -> 1)
-                       })
-                  ~params:[closure_param] ~return ~body ~attr ~loc ~mode
-                  ~ret_mode
+              sval_runtime = sval_runtime
             })
     in
     let free_var_capture = List.map (fun (ident, _) -> Lvar ident) free_vars in
