@@ -71,7 +71,8 @@ val define_variable : Variable.t -> t -> t
 val define_continuations : can_be_lifted:bool -> Continuation.t list -> t -> t
 
 (** Record an inlining decision that resulted in the callee being inlined. *)
-val record_inlining_decision : Call_site_inlining_decision_type.t -> t -> t
+val record_inlining_decision :
+  Call_site_inlining_decision_type.t -> dbg:Debuginfo.t -> t -> t
 
 (** {2 Inspection API} *)
 

@@ -250,7 +250,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
       | Inline { unroll_to; was_inline_always } ->
         let dacc =
           DA.map_denv dacc ~f:(fun denv ->
-              DE.record_inlining_decision decision denv)
+              DE.record_inlining_decision decision ~dbg:(Apply.dbg apply) denv)
         in
         let dacc, inlined =
           Inlining_transforms.inline dacc ~apply ~unroll_to ~was_inline_always

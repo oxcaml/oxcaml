@@ -22,15 +22,19 @@ module Action = struct
   type t =
     | Bound_variable of Variable.t
     | Bound_continuations of Continuation.t list
-    | Inlining_decision of Call_site_inlining_decision_type.t
+    | Inlining_decision of Call_site_inlining_decision_type.t * Debuginfo.t
 
   let[@ocamlformat "disable"] print ppf = function
     | Bound_variable v -> Variable.print ppf v
     | Bound_continuations l ->
         Format.pp_print_list ~pp_sep:Format.pp_print_space Continuation.print ppf l
-    | Inlining_decision decision ->
-        Format.fprintf ppf "@[<hov 1>(inlining_decision@ %a)@]"
+    | Inlining_decision (decision, dbg) ->
+        Format.fprintf ppf "@[<hov 1>(inlining_decision@ \
+          @[<hov 1>(decision@ %a)@]@ \
+          @[<hov 1>(dbg@ %a)@]\
+          )@]"
           Call_site_inlining_decision_type.print decision
+          Debuginfo.print_compact dbg
 end
 
 (* Type def *)
@@ -172,8 +176,8 @@ let define_continuations ~can_be_lifted conts replay =
         error_mismatched_action replay prev_bound action)
     | [] -> error_empty_history replay action)
 
-let record_inlining_decision decision replay =
-  let action : Action.t = Inlining_decision decision in
+let record_inlining_decision decision ~dbg replay =
+  let action : Action.t = Inlining_decision (decision, dbg) in
   match replay with
   | First_pass { history } -> First_pass { history = action :: history }
   | Replaying _ -> replay
