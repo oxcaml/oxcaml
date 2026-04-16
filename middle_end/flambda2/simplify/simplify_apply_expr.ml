@@ -248,6 +248,10 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
       | Do_not_inline { erase_attribute_if_ignored } ->
         Do_not_inline { erase_attribute = erase_attribute_if_ignored }
       | Inline { unroll_to; was_inline_always } ->
+        let dacc =
+          DA.map_denv dacc ~f:(fun denv ->
+              DE.record_inlining_decision decision denv)
+        in
         let dacc, inlined =
           Inlining_transforms.inline dacc ~apply ~unroll_to ~was_inline_always
             function_type

@@ -22,11 +22,15 @@ module Action = struct
   type t =
     | Bound_variable of Variable.t
     | Bound_continuations of Continuation.t list
+    | Inlining_decision of Call_site_inlining_decision_type.t
 
   let[@ocamlformat "disable"] print ppf = function
     | Bound_variable v -> Variable.print ppf v
     | Bound_continuations l ->
         Format.pp_print_list ~pp_sep:Format.pp_print_space Continuation.print ppf l
+    | Inlining_decision decision ->
+        Format.fprintf ppf "@[<hov 1>(inlining_decision@ %a)@]"
+          Call_site_inlining_decision_type.print decision
 end
 
 (* Type def *)
@@ -109,57 +113,70 @@ let error_not_renamed_version_of replay old_action new_action =
      action: %a@ new action: %a@ replay: %a"
     Action.print old_action Action.print new_action print replay
 
+let rec skip_inlining_decisions = function
+  | Action.Inlining_decision _ :: rest -> skip_inlining_decisions rest
+  | (Action.Bound_variable _ | Action.Bound_continuations _) :: _ as history ->
+    history
+  | [] -> []
+
 let define_variable var replay =
   let action : Action.t = Bound_variable var in
   match replay with
   | First_pass { history } -> First_pass { history = action :: history }
   | Replaying
-      { previous_history = prev_bound :: previous_history;
-        variables;
-        continuations;
-        always_inline
-      } -> (
-    match prev_bound with
-    | Bound_variable prev_var ->
-      if not (Variable.is_renamed_version_of prev_var var)
-      then error_not_renamed_version_of replay prev_bound action
-      else
-        let variables = Variable.Map.add var prev_var variables in
-        Replaying { previous_history; variables; continuations; always_inline }
-    | Bound_continuations _ -> error_mismatched_action replay prev_bound action)
-  | Replaying { previous_history = []; _ } -> error_empty_history replay action
+      { previous_history; variables; continuations; always_inline } -> (
+    match skip_inlining_decisions previous_history with
+    | prev_bound :: previous_history -> (
+      match prev_bound with
+      | Bound_variable prev_var ->
+        if not (Variable.is_renamed_version_of prev_var var)
+        then error_not_renamed_version_of replay prev_bound action
+        else
+          let variables = Variable.Map.add var prev_var variables in
+          Replaying
+            { previous_history; variables; continuations; always_inline }
+      | Bound_continuations _ | Inlining_decision _ ->
+        error_mismatched_action replay prev_bound action)
+    | [] -> error_empty_history replay action)
 
 let define_continuations ~can_be_lifted conts replay =
   let action : Action.t = Bound_continuations conts in
   match replay with
   | First_pass { history } -> First_pass { history = action :: history }
   | Replaying
-      { previous_history = prev_bound :: previous_history;
-        variables;
-        continuations;
-        always_inline
-      } -> (
-    match prev_bound with
-    | Bound_continuations prev_conts ->
-      (* Continuations that are created during the downwards pass (e.g. wrapper
-         continuations for over-applications) cannot be renamed versions of each
-         other, so the check does not make sense. *)
-      if
-        can_be_lifted
-        && not
-             (List.compare_lengths prev_conts conts = 0
-             && Misc.Stdlib.List.equal Continuation.is_renamed_version_of
-                  prev_conts conts)
-      then error_not_renamed_version_of replay prev_bound action
-      else
-        let continuations =
-          List.fold_left2
-            (fun acc prev_cont cont -> Continuation.Map.add cont prev_cont acc)
-            continuations prev_conts conts
-        in
-        Replaying { previous_history; variables; continuations; always_inline }
-    | Bound_variable _ -> error_mismatched_action replay prev_bound action)
-  | Replaying { previous_history = []; _ } -> error_empty_history replay action
+      { previous_history; variables; continuations; always_inline } -> (
+    match skip_inlining_decisions previous_history with
+    | prev_bound :: previous_history -> (
+      match prev_bound with
+      | Bound_continuations prev_conts ->
+        (* Continuations that are created during the downwards pass (e.g.
+           wrapper continuations for over-applications) cannot be renamed
+           versions of each other, so the check does not make sense. *)
+        if
+          can_be_lifted
+          && not
+               (List.compare_lengths prev_conts conts = 0
+               && Misc.Stdlib.List.equal Continuation.is_renamed_version_of
+                    prev_conts conts)
+        then error_not_renamed_version_of replay prev_bound action
+        else
+          let continuations =
+            List.fold_left2
+              (fun acc prev_cont cont ->
+                Continuation.Map.add cont prev_cont acc)
+              continuations prev_conts conts
+          in
+          Replaying
+            { previous_history; variables; continuations; always_inline }
+      | Bound_variable _ | Inlining_decision _ ->
+        error_mismatched_action replay prev_bound action)
+    | [] -> error_empty_history replay action)
+
+let record_inlining_decision decision replay =
+  let action : Action.t = Inlining_decision decision in
+  match replay with
+  | First_pass { history } -> First_pass { history = action :: history }
+  | Replaying _ -> replay
 
 (* Inspection API *)
 (* ************** *)

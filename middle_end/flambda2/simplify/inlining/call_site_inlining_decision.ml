@@ -246,7 +246,9 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     then
       Misc.fatal_errorf
         "Deciding not to inline an [Apply], but the replay_history says we \
-         should inline"
+         should inline.@ Replay history:@ %a"
+        Replay_history.print
+        (DE.replay_history (DA.denv dacc))
   in
   let rec_info = get_rec_info dacc ~function_type in
   let inlined = Apply.inlined apply in

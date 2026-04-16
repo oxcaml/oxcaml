@@ -749,6 +749,12 @@ let must_inline t = Replay_history.must_inline t.replay_history
 
 let replay_history t = t.replay_history
 
+let record_inlining_decision decision t =
+  { t with
+    replay_history =
+      Replay_history.record_inlining_decision decision t.replay_history
+  }
+
 let map_specialization_cost ~f t =
   let specialization_cost = f t.specialization_cost in
   { t with specialization_cost }
