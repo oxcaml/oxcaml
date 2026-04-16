@@ -156,10 +156,9 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
     ~return_arity : Call_site_inlining_decision_type.t =
   let denv = DA.denv dacc in
   let disable_inlining = DE.disable_inlining denv in
-  let decision =
-    Code_or_metadata.code_metadata code_or_metadata
-    |> Code_metadata.inlining_decision
-  in
+  let code_metadata = Code_or_metadata.code_metadata code_or_metadata in
+  let decision = Code_metadata.inlining_decision code_metadata in
+  let is_a_functor = Code_metadata.is_a_functor code_metadata in
   let in_a_stub, doing_speculative_inlining =
     match disable_inlining with
     | Disable_inlining Stub -> true, false
@@ -227,9 +226,12 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
             Float.compare evaluated_to threshold <= 0
           in
           if is_under_inline_threshold
-          then Speculatively_inline { cost_metrics; evaluated_to; threshold }
+          then
+            Speculatively_inline
+              { cost_metrics; evaluated_to; threshold; is_a_functor }
           else
-            Speculatively_not_inline { cost_metrics; evaluated_to; threshold })
+            Speculatively_not_inline
+              { cost_metrics; evaluated_to; threshold; is_a_functor })
 
 let get_rec_info dacc ~function_type =
   let rec_info = FT.rec_info function_type in

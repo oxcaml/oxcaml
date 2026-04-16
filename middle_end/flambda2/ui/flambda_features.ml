@@ -251,6 +251,16 @@ module Inlining = struct
     | Round round -> IH.get ~key:round !I.large_function_size
     | Default opt_level -> (default_for_opt_level opt_level).large_function_size
 
+  let small_functor_size round_or_default =
+    match round_or_default with
+    | Round round -> IH.get ~key:round !I.small_functor_size
+    | Default opt_level -> (default_for_opt_level opt_level).small_functor_size
+
+  let large_functor_size round_or_default =
+    match round_or_default with
+    | Round round -> IH.get ~key:round !I.large_functor_size
+    | Default opt_level -> (default_for_opt_level opt_level).large_functor_size
+
   let threshold round_or_default =
     match round_or_default with
     | Round round -> FH.get ~key:round !I.threshold

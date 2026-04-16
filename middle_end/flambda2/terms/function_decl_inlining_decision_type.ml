@@ -18,18 +18,27 @@ type t =
   | Not_yet_decided
   | Never_inline_attribute
   | Function_body_too_large of Code_size.t
+  | Functor_body_too_large of Code_size.t
   | Stub
   | Attribute_inline
   | Small_function of
       { size : Code_size.t;
         small_function_size : Code_size.t
       }
+  | Small_functor of
+      { size : Code_size.t;
+        small_functor_size : Code_size.t
+      }
   | Speculatively_inlinable of
       { size : Code_size.t;
         small_function_size : Code_size.t;
         large_function_size : Code_size.t
       }
-  | Functor of { size : Code_size.t }
+  | Speculatively_inlinable_functor of
+      { size : Code_size.t;
+        small_functor_size : Code_size.t;
+        large_functor_size : Code_size.t
+      }
   | Recursive
   | Jsir_inlining_disabled
 
@@ -42,6 +51,10 @@ let [@ocamlformat "disable"] print ppf t =
     Format.fprintf ppf
       "@[<hov 1>(Function_body_too_large@ %a)@]"
       Code_size.print large_function_size
+  | Functor_body_too_large large_functor_size ->
+    Format.fprintf ppf
+      "@[<hov 1>(Functor_body_too_large@ %a)@]"
+      Code_size.print large_functor_size
   | Stub ->
     Format.fprintf ppf "Stub"
   | Attribute_inline ->
@@ -54,6 +67,14 @@ let [@ocamlformat "disable"] print ppf t =
         )@]"
       Code_size.print size
       Code_size.print small_function_size
+  | Small_functor {size; small_functor_size} ->
+    Format.fprintf ppf
+      "@[<hov 1>(Small_functor@ \
+        @[<hov 1>(size@ %a)@]@ \
+        @[<hov 1>(small_functor_size@ %a)@]\
+        )@]"
+      Code_size.print size
+      Code_size.print small_functor_size
   | Speculatively_inlinable {size;
                               small_function_size;
                               large_function_size} ->
@@ -66,12 +87,17 @@ let [@ocamlformat "disable"] print ppf t =
       Code_size.print size
       Code_size.print small_function_size
       Code_size.print large_function_size
-  | Functor { size } ->
+  | Speculatively_inlinable_functor
+      { size; small_functor_size; large_functor_size } ->
     Format.fprintf ppf
-      "@[<hov 1>(Functor@ \
-        @[<hov 1>(size@ %a)@]\
+      "@[<hov 1>(Speculatively_inlinable_functor@ \
+        @[<hov 1>(size@ %a)@]@ \
+        @[<hov 1>(small_functor_size@ %a)@]@ \
+        @[<hov 1>(large_functor_size@ %a)@]\
         )@]"
       Code_size.print size
+      Code_size.print small_functor_size
+      Code_size.print large_functor_size
   | Recursive ->
     Format.fprintf ppf "Recursive"
   | Jsir_inlining_disabled ->
@@ -88,6 +114,11 @@ let report_decision ppf t =
       "the@ function's@ body@ is@ too@ large,@ more@ specifically,@ it@ is@ \
        larger@ than@ the@ large@ function@ size:@ %a"
       Code_size.print large_function_size
+  | Functor_body_too_large large_functor_size ->
+    Format.fprintf ppf
+      "the@ functor's@ body@ is@ too@ large,@ more@ specifically,@ it@ is@ \
+       larger@ than@ the@ large@ functor@ size:@ %a"
+      Code_size.print large_functor_size
   | Stub -> Format.fprintf ppf "the@ function@ is@ a@ stub"
   | Attribute_inline ->
     Format.fprintf ppf
@@ -97,6 +128,11 @@ let report_decision ppf t =
       "the@ function's@ body@ is@ smaller@ than@ the@ threshold@ size@ for@ \
        small@ functions: size=%a <= large@ function@ size=%a"
       Code_size.print size Code_size.print small_function_size
+  | Small_functor { size; small_functor_size } ->
+    Format.fprintf ppf
+      "the@ functor's@ body@ is@ smaller@ than@ the@ threshold@ size@ for@ \
+       small@ functors: size=%a <= small@ functor@ size=%a"
+      Code_size.print size Code_size.print small_functor_size
   | Speculatively_inlinable { size; small_function_size; large_function_size }
     ->
     Format.fprintf ppf
@@ -105,10 +141,14 @@ let report_decision ppf t =
        function@ size=%a < size=%a < large@ function@ size=%a"
       Code_size.print small_function_size Code_size.print size Code_size.print
       large_function_size
-  | Functor _ ->
+  | Speculatively_inlinable_functor
+      { size; small_functor_size; large_functor_size } ->
     Format.fprintf ppf
-      "this@ function@ is@ a@ functor@ (so@ the@ large@ function@ threshold@ \
-       was@ not@ applied)"
+      "the@ functor's@ body@ is@ between@ the@ threshold@ size@ for@ small@ \
+       functors and the@ threshold@ size@ for@ large@ functors: small@ \
+       functor@ size=%a < size=%a < large@ functor@ size=%a"
+      Code_size.print small_functor_size Code_size.print size Code_size.print
+      large_functor_size
   | Recursive -> Format.fprintf ppf "this@ function@ is@ recursive"
   | Jsir_inlining_disabled ->
     Format.fprintf ppf
@@ -122,10 +162,12 @@ type inlining_behaviour =
 let behaviour t =
   match t with
   | Not_yet_decided | Never_inline_attribute | Function_body_too_large _
-  | Recursive | Jsir_inlining_disabled ->
+  | Functor_body_too_large _ | Recursive | Jsir_inlining_disabled ->
     Cannot_be_inlined
-  | Stub | Attribute_inline | Small_function _ -> Must_be_inlined
-  | Functor _ | Speculatively_inlinable _ -> Could_possibly_be_inlined
+  | Stub | Attribute_inline | Small_function _ | Small_functor _ ->
+    Must_be_inlined
+  | Speculatively_inlinable_functor _ | Speculatively_inlinable _ ->
+    Could_possibly_be_inlined
 
 let report fmt t =
   Format.fprintf fmt
@@ -144,8 +186,9 @@ let must_be_inlined t =
 let has_attribute_inline t =
   match t with
   | Attribute_inline -> true
-  | Not_yet_decided | Never_inline_attribute | Function_body_too_large _ | Stub
-  | Small_function _ | Speculatively_inlinable _ | Functor _ | Recursive
+  | Not_yet_decided | Never_inline_attribute | Function_body_too_large _
+  | Functor_body_too_large _ | Stub | Small_function _ | Small_functor _
+  | Speculatively_inlinable _ | Speculatively_inlinable_functor _ | Recursive
   | Jsir_inlining_disabled ->
     false
 
@@ -163,11 +206,18 @@ let equal t1 t2 =
     true
   | Function_body_too_large size1, Function_body_too_large size2 ->
     Code_size.equal size1 size2
+  | Functor_body_too_large size1, Functor_body_too_large size2 ->
+    Code_size.equal size1 size2
   | ( Small_function { size = size1; small_function_size = small_function_size1 },
       Small_function
         { size = size2; small_function_size = small_function_size2 } ) ->
     Code_size.equal size1 size2
     && Code_size.equal small_function_size1 small_function_size2
+  | ( Small_functor { size = size1; small_functor_size = small_functor_size1 },
+      Small_functor { size = size2; small_functor_size = small_functor_size2 } )
+    ->
+    Code_size.equal size1 size2
+    && Code_size.equal small_functor_size1 small_functor_size2
   | ( Speculatively_inlinable
         { size = size1;
           small_function_size = small_function_size1;
@@ -181,12 +231,25 @@ let equal t1 t2 =
     Code_size.equal size1 size2
     && Code_size.equal small_function_size1 small_function_size2
     && Code_size.equal large_function_size1 large_function_size2
-  | Functor { size = size1 }, Functor { size = size2 } ->
+  | ( Speculatively_inlinable_functor
+        { size = size1;
+          small_functor_size = small_functor_size1;
+          large_functor_size = large_functor_size1
+        },
+      Speculatively_inlinable_functor
+        { size = size2;
+          small_functor_size = small_functor_size2;
+          large_functor_size = large_functor_size2
+        } ) ->
     Code_size.equal size1 size2
+    && Code_size.equal small_functor_size1 small_functor_size2
+    && Code_size.equal large_functor_size1 large_functor_size2
   | Recursive, Recursive -> true
   | Jsir_inlining_disabled, Jsir_inlining_disabled -> true
   | ( ( Not_yet_decided | Never_inline_attribute | Function_body_too_large _
-      | Stub | Attribute_inline | Small_function _ | Speculatively_inlinable _
-      | Functor _ | Recursive | Jsir_inlining_disabled ),
+      | Functor_body_too_large _ | Stub | Attribute_inline | Small_function _
+      | Small_functor _ | Speculatively_inlinable _
+      | Speculatively_inlinable_functor _ | Recursive | Jsir_inlining_disabled
+        ),
       _ ) ->
     false
