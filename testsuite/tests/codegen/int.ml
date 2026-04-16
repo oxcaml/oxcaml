@@ -14,9 +14,9 @@
 let neg x = -x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  movl  $2, %eax
-  subq  %rbx, %rax
+  movl  $2, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -55,9 +55,9 @@ mul_3:
 let div x y = x / y
 [%%expect_asm X86_64{|
 div:
-  movq  %rbx, %rcx
-  cmpq  $1, %rcx
+  cmpq  $1, %rbx
   je    .L115
+  movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
@@ -108,9 +108,9 @@ div_2:
 let rem x y = x mod y
 [%%expect_asm X86_64{|
 rem:
-  movq  %rbx, %rcx
-  cmpq  $1, %rcx
+  cmpq  $1, %rbx
   je    .L115
+  movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
@@ -187,14 +187,13 @@ pred:
 let abs x = abs x
 [%%expect_asm X86_64{|
 abs:
-  movq  %rax, %rbx
-  cmpq  $1, %rbx
+  cmpq  $1, %rax
   jl    .L105
-  movq  %rbx, %rax
   ret
 .L105:
-  movl  $2, %eax
-  subq  %rbx, %rax
+  movl  $2, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -320,13 +319,11 @@ equal_using_compare:
 let min (x : int) (y : int) = min x y
 [%%expect_asm X86_64{|
 min:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jg    .L105
-  movq  %rdi, %rax
   ret
 .L105:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -334,13 +331,11 @@ min:
 let max (x : int) (y : int) = max x y
 [%%expect_asm X86_64{|
 max:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jl    .L105
-  movq  %rdi, %rax
   ret
 .L105:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -368,8 +363,9 @@ let collatz n =
 ;;
 [%%expect_asm X86_64{|
 collatz:
+  movl  $1, %edi
   movq  %rax, %rbx
-  movl  $1, %eax
+  movq  %rdi, %rax
   cmpq  $3, %rbx
   jg    .L110
 .L108:

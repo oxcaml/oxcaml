@@ -299,13 +299,11 @@ let min_unchecked (a : Float_u.t) (b : Float_u.t) =
 ;;
 [%%expect_asm X86_64{|
 min_unchecked:
-  vmovapd %xmm0, %xmm2
-  vmovapd %xmm1, %xmm0
-  vcomisd %xmm2, %xmm0
+  vcomisd %xmm0, %xmm1
   jbe   .L105
-  vmovapd %xmm2, %xmm0
   ret
 .L105:
+  vmovapd %xmm1, %xmm0
   ret
 |}]
 
@@ -355,19 +353,19 @@ let compare (x : Float_u.t) (y : Float_u.t) : int =
 [%%expect_asm X86_64{|
 compare:
   vcmpsd $0, %xmm1, %xmm1, %xmm2
-  vmovq %xmm2, %rbx
-  neg   %rbx
-  vcmpsd $0, %xmm0, %xmm0, %xmm2
   vmovq %xmm2, %rax
   neg   %rax
-  subq  %rbx, %rax
+  vcmpsd $0, %xmm0, %xmm0, %xmm2
+  vmovq %xmm2, %rbx
+  neg   %rbx
+  subq  %rax, %rbx
   vcmpsd $1, %xmm1, %xmm0, %xmm2
   vmovq %xmm2, %rdi
   neg   %rdi
   vcmpsd $1, %xmm0, %xmm1, %xmm0
-  vmovq %xmm0, %rbx
-  neg   %rbx
-  subq  %rdi, %rbx
+  vmovq %xmm0, %rax
+  neg   %rax
+  subq  %rdi, %rax
   addq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -382,19 +380,19 @@ let compare_equal (x : Float_u.t) (y : Float_u.t) : bool =
 [%%expect_asm X86_64{|
 compare_equal:
   vcmpsd $0, %xmm1, %xmm1, %xmm2
-  vmovq %xmm2, %rbx
-  neg   %rbx
-  vcmpsd $0, %xmm0, %xmm0, %xmm2
   vmovq %xmm2, %rax
   neg   %rax
-  subq  %rbx, %rax
+  vcmpsd $0, %xmm0, %xmm0, %xmm2
+  vmovq %xmm2, %rbx
+  neg   %rbx
+  subq  %rax, %rbx
   vcmpsd $1, %xmm1, %xmm0, %xmm2
   vmovq %xmm2, %rdi
   neg   %rdi
   vcmpsd $1, %xmm0, %xmm1, %xmm0
-  vmovq %xmm0, %rbx
-  neg   %rbx
-  subq  %rdi, %rbx
+  vmovq %xmm0, %rax
+  neg   %rax
+  subq  %rdi, %rax
   addq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
   cmpq  $1, %rax

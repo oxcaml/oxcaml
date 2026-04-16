@@ -39,19 +39,19 @@ val compare : Intrinsics.Float_u.t -> Intrinsics.Float_u.t -> int = <fun>
 [%%expect_asm X86_64{|
 compare:
   vcmpsd $0, %xmm1, %xmm1, %xmm2
-  vmovq %xmm2, %rbx
-  neg   %rbx
-  vcmpsd $0, %xmm0, %xmm0, %xmm2
   vmovq %xmm2, %rax
   neg   %rax
-  subq  %rbx, %rax
+  vcmpsd $0, %xmm0, %xmm0, %xmm2
+  vmovq %xmm2, %rbx
+  neg   %rbx
+  subq  %rax, %rbx
   vcmpsd $1, %xmm1, %xmm0, %xmm2
   vmovq %xmm2, %rdi
   neg   %rdi
   vcmpsd $1, %xmm0, %xmm1, %xmm0
-  vmovq %xmm0, %rbx
-  neg   %rbx
-  subq  %rdi, %rbx
+  vmovq %xmm0, %rax
+  neg   %rax
+  subq  %rdi, %rax
   addq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
   ret

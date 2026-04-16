@@ -32,13 +32,11 @@ add:
 let min x y = Int32_u.min x y
 [%%expect_asm X86_64{|
 min:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jg    .L105
-  movq  %rdi, %rax
   ret
 .L105:
+  movq  %rbx, %rax
   ret
 |}]
 

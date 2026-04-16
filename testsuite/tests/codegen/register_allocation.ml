@@ -167,46 +167,48 @@ let spill_unspill_loop_movement not_used_in_loop read_in_loop =
 [%%expect_asm X86_64{|
 spill_unspill_loop_movement:
   subq  $40, %rsp
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  $3, %rax
+  cmpq  $3, %rbx
   jl    .L135
-  movq  %rax, (%rsp)
-  movq  %rdi, 24(%rsp)
-  movq  %rax, %rbx
-  sarq  $1, %rbx
-  movq  %rbx, 8(%rsp)
-  movl  $1, %edi
+  movq  %rbx, (%rsp)
+  movq  %rax, 24(%rsp)
+  movq  %rbx, %rsi
+  sarq  $1, %rsi
+  movq  %rsi, 8(%rsp)
+  movl  $1, %edx
 .L112:
-  movq  %rdi, 16(%rsp)
+  movq  %rdx, 16(%rsp)
+  movq  %rbx, %rax
   call  camlTOP9__f_20_23_code@PLT
 .L145:
-  movq  %rax, %rsi
-  movq  16(%rsp), %rdi
-  movq  %rdi, %rdx
-  salq  $1, %rdx
+  movq  %rax, %rdi
+  movq  16(%rsp), %rdx
+  movq  %rdx, %rbx
+  salq  $1, %rbx
   movq  (%rsp), %rax
-  movq  8(%rsp), %rbx
-  cmpq  $11, %rdx
-  jle   .L125
-  movq  %rsi, 32(%rsp)
-  movq  %rdi, 16(%rsp)
+  movq  8(%rsp), %rsi
+  cmpq  $11, %rbx
+  jg    .L119
+  movq  %rax, %rbx
+  jmp   .L125
+.L119:
+  movq  %rdi, 32(%rsp)
+  movq  %rdx, 16(%rsp)
   call  camlTOP9__f_20_23_code@PLT
 .L146:
-  movq  (%rsp), %rax
-  movq  8(%rsp), %rbx
-  movq  16(%rsp), %rdi
-  movq  32(%rsp), %rsi
+  movq  (%rsp), %rbx
+  movq  8(%rsp), %rsi
+  movq  16(%rsp), %rdx
+  movq  32(%rsp), %rdi
 .L125:
-  incq  %rdi
-  cmpq  %rbx, %rdi
+  incq  %rdx
+  cmpq  %rsi, %rdx
   jle   .L112
-  movq  24(%rsp), %rdi
+  movq  24(%rsp), %rax
   jmp   .L138
 .L135:
-  movl  $1, %esi
+  movl  $1, %edi
 .L138:
-  leaq  -1(%rdi,%rsi), %rax
+  leaq  -1(%rax,%rdi), %rax
   addq  $40, %rsp
   ret
 
@@ -276,27 +278,26 @@ let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
 ;;
 [%%expect_asm X86_64{|
 unnecessary_moves:
-  movq  %rax, %rcx
-  movq  %rbx, %r8
+  movq  %rbx, %rcx
   movq  %rdx, %rbx
-  leaq  -1(%rcx,%r8), %rax
-  cmpq  %r8, %rcx
+  leaq  -1(%rax,%rcx), %rdx
+  cmpq  %rcx, %rax
   jge   .L106
-  movq  %rcx, %rax
   ret
 .L106:
   cmpq  %rsi, %rdi
   jge   .L112
   subq  $8, %rsp
-  movq  %rax, (%rsp)
+  movq  %rdx, (%rsp)
   movq  (%rbx), %rdi
-  movq  %r8, %rax
+  movq  %rcx, %rax
   call  *%rdi
 .L117:
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
 .L112:
+  movq  %rdx, %rax
   ret
 |}]
 
@@ -341,18 +342,18 @@ let double_loop_no_definition_at_beginning array n list =
 [%%expect_asm X86_64{|
 double_loop_no_definition_at_beginning:
   subq  $72, %rsp
-  movq  %rbx, %rsi
-  movq  64(%r14), %rbx
-  cmpq  $1, %rsi
+  movq  64(%r14), %rsi
+  cmpq  $1, %rbx
   jl    .L149
-  movq  %rbx, 16(%rsp)
+  movq  %rsi, 16(%rsp)
   movq  %rdi, 32(%rsp)
   movq  %rax, 24(%rsp)
-  sarq  $1, %rsi
-  movq  %rsi, 40(%rsp)
-  xorl  %edx, %edx
+  movq  %rbx, %rdx
+  sarq  $1, %rdx
+  movq  %rdx, 40(%rsp)
+  xorl  %esi, %esi
 .L113:
-  movq  %rdx, (%rsp)
+  movq  %rsi, (%rsp)
   movq  64(%r14), %rbx
   movq  %rbx, 8(%rsp)
   movq  64(%r14), %rbx
@@ -368,36 +369,36 @@ double_loop_no_definition_at_beginning:
   movq  %rcx, (%rbx)
   movabsq $108086391056891911, %rcx
   movq  %rcx, 8(%rbx)
-  leaq  1(%rdx,%rdx), %rdx
-  movq  %rdx, 16(%rbx)
+  leaq  1(%rsi,%rsi), %rsi
+  movq  %rsi, 16(%rbx)
   movq  %rax, 24(%rbx)
   movq  %rbx, 48(%rsp)
-  movq  %rdi, %rdx
-  testb $1, %dl
+  movq  %rdi, %rsi
+  testb $1, %sil
   jne   .L135
 .L128:
-  movq  %rdx, 56(%rsp)
-  movq  (%rdx), %rax
+  movq  %rsi, 56(%rsp)
+  movq  (%rsi), %rax
   call  camlTOP15__f_33_37_code@PLT
 .L158:
-  movq  56(%rsp), %rdx
-  movq  8(%rdx), %rdx
+  movq  56(%rsp), %rsi
+  movq  8(%rsi), %rsi
   movq  24(%rsp), %rax
   movq  32(%rsp), %rdi
-  movq  40(%rsp), %rsi
+  movq  40(%rsp), %rdx
   movq  48(%rsp), %rbx
-  testb $1, %dl
+  testb $1, %sil
   je    .L128
 .L135:
   movq  8(%rsp), %rbx
   movq  %rbx, 64(%r14)
-  movq  (%rsp), %rdx
-  incq  %rdx
-  cmpq  %rsi, %rdx
+  movq  (%rsp), %rsi
+  incq  %rsi
+  cmpq  %rdx, %rsi
   jle   .L113
-  movq  16(%rsp), %rbx
+  movq  16(%rsp), %rsi
 .L149:
-  movq  %rbx, 64(%r14)
+  movq  %rsi, 64(%r14)
   movl  $1, %eax
   addq  $72, %rsp
   ret
@@ -455,14 +456,14 @@ spilled_phi_merge:
   movq  48(%rsp), %rbx
   call  *%rdi
 .L120:
-  movq  (%rsp), %rax
+  movq  (%rsp), %rdi
   movq  8(%rsp), %rbp
   movq  16(%rsp), %rbx
-  movq  24(%rsp), %rdi
+  movq  24(%rsp), %rax
   movq  32(%rsp), %r8
   movq  40(%rsp), %r9
-  movq  %rax, (%rsp)
-  movq  %rdi, 24(%rsp)
+  movq  %rdi, (%rsp)
+  movq  %rax, 24(%rsp)
   movq  %r8, %r12
   movq  %r9, %r13
 .L114:
@@ -561,9 +562,9 @@ let f ~(s: int64#) (t : int64#) =
   Int64_u.sub t (Int64_u.mul t s)
 [%%expect_asm X86_64{|
 f:
-  movq  %rax, %rdi
+  movq  %rbx, %rdi
+  imulq %rax, %rdi
   movq  %rbx, %rax
-  imulq %rdi, %rbx
-  subq  %rbx, %rax
+  subq  %rdi, %rax
   ret
 |}]

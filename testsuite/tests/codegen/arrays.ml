@@ -123,23 +123,23 @@ let poly_unsafe_get (a : 'a array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 poly_unsafe_get:
-  movq  %rax, %rdi
-  movzbq -8(%rdi), %rax
-  cmpq  $254, %rax
+  movzbq -8(%rax), %rdi
+  cmpq  $254, %rdi
   jne   .L108
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L112
 .L114:
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vmovsd -4(%rdi,%rbx,4), %xmm0
-  vmovsd %xmm0, (%rax)
+  leaq  8(%r15), %rdi
+  movq  $1277, -8(%rdi)
+  vmovsd -4(%rax,%rbx,4), %xmm0
+  vmovsd %xmm0, (%rdi)
+  movq  %rdi, %rax
   addq  $8, %rsp
   ret
 .L108:
-  movq  -4(%rdi,%rbx,4), %rax
+  movq  -4(%rax,%rbx,4), %rax
   ret
 |}]
 
@@ -473,28 +473,28 @@ let poly_safe_get (a : 'a array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 poly_safe_get:
-  movq  %rax, %rdi
-  movq  -8(%rdi), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
-  cmpq  %rax, %rbx
+  movq  -8(%rax), %rdi
+  salq  $8, %rdi
+  shrq  $17, %rdi
+  cmpq  %rdi, %rbx
   jae   .L123
-  movzbq -8(%rdi), %rax
-  cmpq  $254, %rax
+  movzbq -8(%rax), %rdi
+  cmpq  $254, %rdi
   jne   .L116
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L126
 .L128:
-  leaq  8(%r15), %rax
-  movq  $1277, -8(%rax)
-  vmovsd -4(%rdi,%rbx,4), %xmm0
-  vmovsd %xmm0, (%rax)
+  leaq  8(%r15), %rdi
+  movq  $1277, -8(%rdi)
+  vmovsd -4(%rax,%rbx,4), %xmm0
+  vmovsd %xmm0, (%rdi)
+  movq  %rdi, %rax
   addq  $8, %rsp
   ret
 .L116:
-  movq  -4(%rdi,%rbx,4), %rax
+  movq  -4(%rax,%rbx,4), %rax
   ret
 .L123:
   subq  $8, %rsp
@@ -601,15 +601,15 @@ let int32_safe_get (a : int32# array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 int32_safe_get:
-  movzbq -8(%rax), %rdi
-  andl  $1, %edi
-  movq  -8(%rax), %rsi
-  salq  $8, %rsi
-  shrq  $18, %rsi
-  salq  $1, %rsi
-  subq  %rdi, %rsi
-  salq  $1, %rsi
-  cmpq  %rsi, %rbx
+  movzbq -8(%rax), %rsi
+  andl  $1, %esi
+  movq  -8(%rax), %rdi
+  salq  $8, %rdi
+  shrq  $18, %rdi
+  salq  $1, %rdi
+  subq  %rsi, %rdi
+  salq  $1, %rdi
+  cmpq  %rdi, %rbx
   jae   .L120
   movslq -2(%rax,%rbx,2), %rax
   ret

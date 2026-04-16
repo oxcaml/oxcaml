@@ -79,13 +79,13 @@ do_intersect:
 let logand_branch x y f = if x land (1 lsl 4) <> 0 then f()
 [%%expect_asm X86_64{|
 logand_branch:
-  movq  %rdi, %rbx
   andl  $33, %eax
   cmpq  $1, %rax
   je    .L108
   movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  jmp   *%rsi
 .L108:
   movl  $1, %eax
   ret
@@ -105,12 +105,12 @@ combine_comparisons:
   movq  (%rax), %rbx
   cmpq  $41, %rbx
   setl  %al
-  movzbq %al, %rax
-  cmpq  $11, %rbx
-  jle   .L114
-  testq %rax, %rax
-  je    .L114
+  movzbq %al, %rdi
   movq  %rbx, %rax
+  cmpq  $11, %rax
+  jle   .L114
+  testq %rdi, %rdi
+  je    .L114
   ret
 .L114:
   movl  $1, %eax
@@ -169,20 +169,20 @@ let two_element_list x = [x; x]
 [%%expect_asm X86_64{|
 two_element_list:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $48, %r15
   cmpq  (%r14), %r15
   jb    .L105
 .L107:
-  leaq  8(%r15), %rdi
-  addq  $24, %rdi
+  leaq  8(%r15), %rbx
+  addq  $24, %rbx
+  movq  $2048, -8(%rbx)
+  movq  %rax, (%rbx)
+  movq  $1, 8(%rbx)
+  leaq  -24(%rbx), %rdi
   movq  $2048, -8(%rdi)
-  movq  %rbx, (%rdi)
-  movq  $1, 8(%rdi)
-  leaq  -24(%rdi), %rax
-  movq  $2048, -8(%rax)
-  movq  %rbx, (%rax)
-  movq  %rdi, 8(%rax)
+  movq  %rax, (%rdi)
+  movq  %rbx, 8(%rdi)
+  movq  %rdi, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -224,9 +224,9 @@ let int32_box_unbox_after_call (a : ptr) (b : ptr) =
 [%%expect_asm X86_64{|
 int32_box_unbox_after_call:
   subq  $8, %rsp
+  movl  $5, %edx
   movq  %rax, %rdi
   movq  %rbx, %rsi
-  movl  $5, %edx
   call  memcmp@PLT
   movslq %eax, %rax
   movslq %eax, %rax
@@ -396,9 +396,9 @@ let shift_of_logand (a : int64#) =
 ;;
 [%%expect_asm X86_64{|
 shift_of_logand:
+  movl  $1, %ebx
   movq  %rax, %rcx
-  movl  $1, %eax
-  andq  %rax, %rcx
+  andq  %rbx, %rcx
   movl  $3, %eax
   shrq  %cl, %rax
   orq   $1, %rax

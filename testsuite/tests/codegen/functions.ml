@@ -57,15 +57,15 @@ mutual_recursion:
   jmp   camlTOP3__f_5_8_code@PLT
 
 mutual_recursion.f:
-  movq  %rbx, %rdi
   cmpq  $1, %rax
   jge   .L114
   ret
 .L114:
-  leaq  -24(%rdi), %rbx
-  movq  16(%rdi), %rdi
-  subq  %rdi, %rax
+  leaq  -24(%rbx), %rdi
+  movq  16(%rbx), %rbx
+  subq  %rbx, %rax
   incq  %rax
+  movq  %rdi, %rbx
   jmp   camlTOP3__g_6_9_code@PLT
 
 mutual_recursion.g:

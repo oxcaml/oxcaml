@@ -45,26 +45,26 @@ let arr_sum arr =
 ;;
 [%%expect_asm X86_64{|
 arr_sum:
-  movq  %rax, %rbx
-  movq  -8(%rbx), %rdi
+  movq  -8(%rax), %rdi
   salq  $8, %rdi
   shrq  $17, %rdi
   orq   $1, %rdi
-  leaq  -2(%rdi), %rsi
-  cmpq  $1, %rsi
+  leaq  -2(%rdi), %rdx
+  cmpq  $1, %rdx
   jl    .L137
-  sarq  $1, %rsi
-  movl  $1, %eax
-  xorl  %edx, %edx
+  sarq  $1, %rdx
+  movl  $1, %esi
+  xorl  %ebx, %ebx
 .L114:
-  leaq  1(%rdx,%rdx), %rcx
+  leaq  1(%rbx,%rbx), %rcx
   cmpq  %rdi, %rcx
   jae   .L133
-  movq  -4(%rbx,%rcx,4), %rcx
-  leaq  -1(%rax,%rcx), %rax
-  incq  %rdx
-  cmpq  %rsi, %rdx
+  movq  -4(%rax,%rcx,4), %rcx
+  leaq  -1(%rsi,%rcx), %rsi
+  incq  %rbx
+  cmpq  %rdx, %rbx
   jle   .L114
+  movq  %rsi, %rax
   ret
 .L133:
   movq  camlTOP2__block101@GOTPCREL(%rip), %rax
@@ -97,31 +97,29 @@ search:
   movq  %rax, %rdi
   testb $1, %bl
   je    .L116
+  jmp   .L114
+.L112:
+  testb $1, %bl
+  je    .L116
 .L114:
-  xorl  %esi, %esi
-  movq  %rbx, %rax
+  xorl  %eax, %eax
   jmp   .L131
 .L116:
   movq  (%rbx), %rax
   cmpq  %rax, %rdi
   setl  %al
-  movzbq %al, %rsi
-  testq %rsi, %rsi
-  je    .L123
-  movq  8(%rbx), %rax
-  testq %rsi, %rsi
-  jne   .L129
+  movzbq %al, %rax
+  testq %rax, %rax
+  je    .L127
+  movq  8(%rbx), %rbx
+  testq %rax, %rax
+  jne   .L112
   jmp   .L131
-.L123:
-  movq  %rbx, %rax
-  testq %rsi, %rsi
-  je    .L131
-.L129:
-  movq  %rax, %rbx
-  testb $1, %bl
-  je    .L116
-  jmp   .L114
+.L127:
+  testq %rax, %rax
+  jne   .L112
 .L131:
+  movq  %rbx, %rax
   ret
 |}]
 
