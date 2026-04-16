@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Generate expected output for owee archive test using system tools
 # This produces the same output format as test_archive.ml
 #
