@@ -13,7 +13,7 @@ jobs:
       - name: Checkout tree
         uses: actions/checkout@v4
       - name: Set-up OCaml
-        uses: ocaml/setup-ocaml@v3
+        uses: ocaml/setup-ocaml@2ad498936c68917567ff6266a0fe8dbfa84d9fb4
         with:
           ocaml-compiler: "5.2"
       - name: Set-up Binaryen
@@ -31,7 +31,7 @@ jobs:
       - name: Checkout tree
         uses: actions/checkout@v4
       - name: Set-up OCaml
-        uses: ocaml/setup-ocaml@v3
+        uses: ocaml/setup-ocaml@2ad498936c68917567ff6266a0fe8dbfa84d9fb4
         with:
           ocaml-compiler: "5.2"
       - uses: ocaml/setup-ocaml/lint-fmt@v3

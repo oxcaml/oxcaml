@@ -30,7 +30,7 @@ jobs:
         # makes setup-ocaml skip apt-get, which is slow on first invocation
 
       - name: Set up Opam
-        uses: ocaml/setup-ocaml@v3
+        uses: ocaml/setup-ocaml@2ad498936c68917567ff6266a0fe8dbfa84d9fb4
         with:
           ocaml-compiler: oxcaml-ci-deps.5.2.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
           opam-repositories: |
