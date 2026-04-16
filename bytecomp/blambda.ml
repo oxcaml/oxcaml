@@ -38,6 +38,7 @@ type structured_constant = Lambda.structured_constant =
   | Const_immstring of string
   | Const_float_block of string list
   | Const_null
+  | Const_layout of Lambda.layout
 
 type direction_flag = Asttypes.direction_flag =
   | Upto

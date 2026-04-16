@@ -4321,7 +4321,8 @@ let rec map_return f = function
           loc, k )
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
-    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ ) as l ->
+    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Ltemplate _ | Linstantiate _ )
+    as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
@@ -4391,8 +4392,71 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
+  | Tpat_fun_layout { id; uid = duid; lpoly; env_alloc_mode; _ }
+      when not (List.is_empty (Lpoly.get_exn lpoly)) ->
+    assert (mutable_flag == Asttypes.Immutable);
+    let k = Typeopt.layout pat.pat_env pat.pat_loc arg_sort pat.pat_type in
+    let params =
+      List.map
+        (fun var ->
+          let id = (Jkind_types.Sort.Var.get_id var :> int) in
+          let name = Ident.create_sort_var id in
+          { name;
+            debug_uid = debug_uid_none;
+            layout = layout_unboxed_unit;
+            attributes = default_param_attribute;
+            mode = alloc_heap
+          })
+        (Lpoly.get_exn lpoly)
+    in
+    let env_alloc_mode = Translmode.transl_alloc_mode env_alloc_mode in
+    let kind =
+      Curried
+        { nlocal =
+            (match env_alloc_mode with
+            | Alloc_heap -> 0
+            | Alloc_local -> List.length params)
+        }
+    in
+    let f =
+      lfunction' ~kind ~params ~return:k ~body:param
+        ~attr:default_function_attribute
+        ~loc:(Scoped_location.of_location ~scopes loc)
+        ~mode:env_alloc_mode ~ret_mode:env_alloc_mode
+    in
+    let free_vars =
+      Lambda.free_variables param
+      |> Ident.Set.to_list
+      |> List.filter_map (fun ident ->
+          let path = Path.Pident ident in
+          match Env.find_module path pat.pat_env with
+          | _ -> Some (ident, layout_any_value)
+          | exception Not_found ->
+            let value_desc =
+              try Env.find_value path pat.pat_env
+              with Not_found ->
+                Misc.fatal_errorf "Failed to find value_desc for %a in@ %a"
+                  Ident.print ident Printlambda.lambda param
+            in
+            let { val_type; val_kind; val_loc; _ } =
+              Subst.Lazy.force_value_description value_desc
+            in
+            match val_kind with
+            | Val_reg sort | Val_mut (_, sort) ->
+              let const_sort = Jkind.Sort.default_for_transl_and_get sort in
+              let layout =
+                Typeopt.layout pat.pat_env val_loc const_sort val_type
+              in
+              Some (ident, layout)
+            | Val_prim _ -> None
+            | Val_ivar _ | Val_self _ | Val_anc _ ->
+              Some (ident, layout_any_value))
+      |> Ident.Map.of_list
+    in
+    Llet (Strict, k, id, duid, Ltemplate (f, free_vars), body)
   | Tpat_var { id; uid = duid; _ }
-  | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ } ->
+  | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ }
+  | Tpat_fun_layout { id; uid = duid; _ } ->
       (* Fast path, and keep track of simple bindings to unboxable numbers.
 
          Note: the (Tpat_alias (Tpat_any, id)) case needs to be

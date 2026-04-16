@@ -32,8 +32,7 @@ end @ static = struct
   let h = M.f
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, value])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -88,8 +87,7 @@ module F (M : S @ static) = struct
     M.f y x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [float64, value])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -101,8 +99,7 @@ end @ static) = struct
   let apply_int_to_float (f : int -> float#) (x : int) = M.map f x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, float64])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -113,8 +110,7 @@ module F (M :S @ static) = struct
   let h (x : float#)= g x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, float64])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -154,10 +150,10 @@ end = struct
   let poly_ g x = M.f 42 x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, <genvar>])
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor
+    (M : sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end)
+    -> sig val g : layout_ l. ('b : l). 'b -> unit end
 |}]
 
 (* don't work without eta-expansion *)
@@ -204,8 +200,7 @@ end @ static) = struct
   let _ = M.f
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -217,8 +212,7 @@ end @ static) = struct
   let f : int -> int = M.id
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]

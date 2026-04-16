@@ -754,6 +754,7 @@ type structured_constant =
   | Const_immstring of string
   | Const_float_block of string list
   | Const_null
+  | Const_layout of layout
 
 type tailcall_attribute =
   | Tailcall_expectation of bool
@@ -970,6 +971,8 @@ type lambda =
   | Lregion of lambda * layout
   | Lexclave of lambda
   | Lsplice of scoped_location * slambda
+  | Ltemplate of lfunction * layout Ident.Map.t
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -996,7 +999,7 @@ and slambda_function =
 
 and slambda_apply =
   { sapp_func: slambda;
-    sapp_arguments: slambda array
+    sapp_args: slambda array
   }
 
 and slambda_let =
@@ -1075,8 +1078,10 @@ let rec try_to_find_location lam =
   match lam with
   | Lprim (_, _, loc)
   | Lfunction { loc; _ }
+  | Ltemplate ({ loc; _ }, _)
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
+  | Linstantiate { ap_loc = loc; _ }
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
@@ -1138,6 +1143,8 @@ let fatal_error_invalid_constructor lambda =
     | Lregion _ -> "Lregion"
     | Lexclave _ -> "Lexclave"
     | Lsplice _ -> "Lsplice"
+    | Ltemplate _ -> "Ltemplate"
+    | Linstantiate _ -> "Linstantiate"
   in
   Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
     name Location.print_loc loc
@@ -1481,7 +1488,7 @@ let make_key e =
         (* Mutable constants are not shared *)
         raise Not_simple
     | Lconst _ -> e
-    | Lapply ap ->
+    | Lapply ap | Linstantiate ap ->
         Lapply {ap with ap_func = tr_rec env ap.ap_func;
                         ap_args = tr_recs env ap.ap_args;
                         ap_loc = Loc_unknown}
@@ -1526,7 +1533,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _
+    | Lletrec _|Lfunction _ | Ltemplate _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1635,6 +1642,10 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
+  | Ltemplate ({body},_) ->
+      f body
+  | Linstantiate { ap_func; ap_args } ->
+      f ap_func; List.iter f ap_args
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1724,6 +1735,9 @@ let rec free_variables = function
   | Lexclave e ->
       free_variables e
   | Lsplice _ as l -> fatal_error_invalid_constructor l
+  | Ltemplate (_, free_vars) -> Ident.Map.keys free_vars
+  | Linstantiate{ap_func = fn; ap_args = args} ->
+      free_variables_list (free_variables fn) args
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -1970,8 +1984,13 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lapply ap ->
         Lapply{ap with ap_func = subst s l ap.ap_func;
                       ap_args = subst_list s l ap.ap_args}
+    | Linstantiate ap ->
+        Linstantiate { ap with ap_func = subst s l ap.ap_func;
+                              ap_args = subst_list s l ap.ap_args }
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
+    | Ltemplate (_lf, _free_vars) ->
+        Misc.fatal_error "I've got no idea what to do here"
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -2130,9 +2149,32 @@ let shallow_map ~tail ~non_tail:f lam =
           ap_specialised;
           ap_probe;
         }
+  | Linstantiate { ap_func = old_func; ap_args = old_args; ap_result_layout;
+             ap_region_close; ap_mode; ap_loc; ap_tailcall; ap_inlined;
+             ap_specialised; ap_probe } ->
+      let new_func = f old_func in
+      let new_args = Misc.Stdlib.List.map_sharing f old_args in
+      if old_func == new_func && old_args == new_args
+      then lam
+      else
+        Linstantiate {
+          ap_func = new_func;
+          ap_args = new_args;
+          ap_result_layout;
+          ap_region_close;
+          ap_mode;
+          ap_loc;
+          ap_tailcall;
+          ap_inlined;
+          ap_specialised;
+          ap_probe;
+        }
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
+  | Ltemplate (old_lfun, vars) ->
+      let new_lfun = map_lfunction f old_lfun in
+      if old_lfun == new_lfun then lam else Ltemplate (new_lfun, vars)
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
       let new_e1 = f old_e1 in
       let new_e2 = tail old_e2 in
@@ -2788,6 +2830,7 @@ let structured_constant_layout = function
   | Const_float_array _ | Const_float_block _ ->
     non_null_value (Parrayval Pfloatarray)
   | Const_null -> nullable_value Pgenval
+  | Const_layout _ -> layout_unboxed_unit
 
 let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   match c with
@@ -3257,10 +3300,12 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} -> ()
-    | Lfunction {mode=Alloc_local} -> raise Exit
+    | Lfunction {mode=Alloc_heap} | Ltemplate ({mode=Alloc_heap}, _) -> ()
+    | Lfunction {mode=Alloc_local} | Ltemplate ({mode=Alloc_local}, _) ->
+      raise Exit
 
     | Lapply {ap_mode=Alloc_local}
+    | Linstantiate {ap_mode=Alloc_local}
     | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
@@ -3280,8 +3325,8 @@ let may_allocate_in_region lam =
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
     | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
-      | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
+    | ( Lapply _  | Linstantiate _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _
+      | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
       | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
       | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam

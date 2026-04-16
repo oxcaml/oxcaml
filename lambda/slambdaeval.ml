@@ -173,12 +173,12 @@ let rec eval_slam env slam : value Or_missing.t =
     Present
       (SLVclosure
          { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
-  | SLinstantiate { sapp_func; sapp_arguments } ->
+  | SLinstantiate { sapp_func; sapp_args } ->
     let closure =
       eval_slam env sapp_func |> expect_not_missing |> expect Tclosure
     in
     let eval_arg arg = eval_slam env arg |> expect_not_missing in
-    let args = Array.map eval_arg sapp_arguments in
+    let args = Array.map eval_arg sapp_args in
     let { clo_params; clo_body; clo_env } = closure in
     let env_body =
       Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
@@ -291,6 +291,10 @@ and eval_lam_shallow env lam =
   | Lsplice (_loc, slam) ->
     let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
     halves.slv_runtime
+  | Ltemplate _ | Linstantiate _ ->
+    (* These constructors only exist in tlambda, fracturing has removed them
+       (and replaced them with SLtemplate and SLinstantiate). *)
+    Lambda.fatal_error_invalid_constructor lam
   | Lvar _ | Lmutvar _
   | Lstaticraise (_, _)
   | Lsequence (_, _)
@@ -325,6 +329,9 @@ and eval_structured_const env const =
       Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
     in
     if new_consts == old_consts then const else Const_block (n, new_consts)
+  | Const_layout old_layout ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then const else Const_layout new_layout
   | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
   | Const_null ->
     const
@@ -578,7 +585,8 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
-  | Lsplice _ -> raise Found_a_splice);
+  | Lsplice _ -> raise Found_a_splice
+  | Ltemplate _ | Linstantiate _ -> Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
 let do_eval slam =
