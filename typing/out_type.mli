@@ -99,6 +99,9 @@ val tree_of_typexp: type_or_scheme -> type_expr -> out_type
 
 val tree_of_type_scheme: type_expr -> out_type
 
+val tree_of_modalities:
+  Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list
+
 
 val prepared_type_scheme: type_expr printer
 val prepared_type_expr: type_expr printer

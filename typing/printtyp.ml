@@ -63,6 +63,7 @@ module Doc = struct
     !Oprint.out_ident ppf (tree_of_path p)
 
   let () = Env.print_path := path
+  let () = Env.print_type_expr := type_expr
 
   let type_path ppf p = !Oprint.out_ident ppf (tree_of_type_path p)
 
@@ -185,3 +186,9 @@ let string_of_label : Types.arg_label -> string = function
 
 let () = Jkind.set_printtyp_path Doc.path
 let () = Mode.print_longident := Doc.longident
+let () =
+  Jkind.set_outcometrees_of_types (fun tys ->
+    prepare_for_printing tys;
+    List.map (tree_of_typexp Type) tys);
+  Jkind.set_outcometree_of_modalities tree_of_modalities;
+  Jkind.set_print_type_expr Doc.type_expr
