@@ -50,6 +50,62 @@ let is_tagged_immediate t =
   | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Null ->
     None
 
+let is_naked_float t =
+  match descr t with
+  | Naked_float f -> Some f
+  | Naked_immediate _ | Tagged_immediate _ | Naked_float32 _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Null ->
+    None
+
+let is_naked_float32 t =
+  match descr t with
+  | Naked_float32 f -> Some f
+  | Naked_immediate _ | Tagged_immediate _ | Naked_float _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Null ->
+    None
+
+let is_naked_int8 t =
+  match descr t with
+  | Naked_int8 i -> Some i
+  | Naked_immediate _ | Tagged_immediate _ | Naked_float _ | Naked_float32 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Null ->
+    None
+
+let is_naked_int16 t =
+  match descr t with
+  | Naked_int16 i -> Some i
+  | Naked_immediate _ | Tagged_immediate _ | Naked_float _ | Naked_float32 _
+  | Naked_int8 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Null ->
+    None
+
+let is_naked_int32 t =
+  match descr t with
+  | Naked_int32 i -> Some i
+  | Naked_immediate _ | Tagged_immediate _ | Naked_float _ | Naked_float32 _
+  | Naked_int8 _ | Naked_int16 _ | Naked_int64 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Null ->
+    None
+
+let is_naked_int64 t =
+  match descr t with
+  | Naked_int64 i -> Some i
+  | Naked_immediate _ | Tagged_immediate _ | Naked_float _ | Naked_float32 _
+  | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Null ->
+    None
+
+let is_naked_nativeint t =
+  match descr t with
+  | Naked_nativeint i -> Some i
+  | Naked_immediate _ | Tagged_immediate _ | Naked_float _ | Naked_float32 _
+  | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Null ->
+    None
+
 let kind t =
   match descr t with
   | Tagged_immediate _ | Null -> Flambda_kind.value
