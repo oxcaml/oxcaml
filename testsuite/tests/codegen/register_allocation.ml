@@ -135,7 +135,6 @@ loop_readonly_use_spilled_var:
   subq  $8, %rsp
   movq  %rax, %rbx
   movq  %rbx, (%rsp)
-  movq  %rbx, %rax
   cmpq  $1, %rax
   jge   .L111
 .L108:
@@ -171,9 +170,9 @@ spill_unspill_loop_movement:
   movq  %rbx, %rax
   cmpq  $3, %rax
   jl    .L135
-  movq  %rax, (%rsp)
   movq  %rdi, 24(%rsp)
   movq  %rax, %rbx
+  movq  %rax, (%rsp)
   sarq  $1, %rbx
   movq  %rbx, 8(%rsp)
   movl  $1, %edi
@@ -352,7 +351,6 @@ double_loop_no_definition_at_beginning:
   movq  %rsi, 40(%rsp)
   xorl  %edx, %edx
 .L113:
-  movq  %rdx, (%rsp)
   movq  64(%r14), %rbx
   movq  %rbx, 8(%rsp)
   movq  64(%r14), %rbx
@@ -368,16 +366,17 @@ double_loop_no_definition_at_beginning:
   movq  %rcx, (%rbx)
   movabsq $108086391056891911, %rcx
   movq  %rcx, 8(%rbx)
-  leaq  1(%rdx,%rdx), %rdx
-  movq  %rdx, 16(%rbx)
+  leaq  1(%rdx,%rdx), %rcx
+  movq  %rdx, (%rsp)
+  movq  %rcx, 16(%rbx)
   movq  %rax, 24(%rbx)
   movq  %rbx, 48(%rsp)
   movq  %rdi, %rdx
   testb $1, %dl
   jne   .L135
 .L128:
-  movq  %rdx, 56(%rsp)
   movq  (%rdx), %rax
+  movq  %rdx, 56(%rsp)
   call  camlTOP15__f_33_37_code@PLT
 .L158:
   movq  56(%rsp), %rdx
