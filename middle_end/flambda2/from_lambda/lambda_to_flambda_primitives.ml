@@ -1841,8 +1841,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             | Float_boxed _ -> unbox_float arg)
           args
       in
-      let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
-      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
+      let kind_shape =
+        match K.Mixed_block_shape.from_mixed_block_shape shape with
+        | Some kind_shape -> kind_shape
+        | None ->
+          Misc.fatal_error
+            "Pmakeblock: mixed_block_of_block_shape returned Some \
+             but from_mixed_block_shape returned None"
+      in
+      [Variadic
+         (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
   | Pmake_unboxed_product layouts, _ ->
     (* CR mshinwell: this should check the unarized lengths of [layouts] and
@@ -2094,9 +2102,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         Naked_floats
           { length = Target_ocaml_int.of_int machine_width num_fields }
       | Record_inlined
-          ( Ordinary { runtime_tag; _ },
-            Constructor_mixed shape,
-            Variant_boxed _ )
+          (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
         when Mixed_product_bytes.types_shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
@@ -2587,7 +2593,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pmixedfield (field_path, shape, sem), [[arg]] ->
     if List.length field_path < 1
     then Misc.fatal_error "Pmixedfield: field_path must be non-empty";
-    let is_uniform = Mixed_product_bytes.shape_is_all_value shape in
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
         ~print_locality:Printlambda.locality_mode
@@ -2605,22 +2610,20 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         check_non_negative_imm imm "Pmixedfield";
         let mutability = convert_field_read_semantics sem in
         let field_elt = flattened_reordered_shape.(new_index) in
-        let mixed_field_kind = H.mixed_block_access_field_kind field_elt in
         let block_access : P.Block_access_kind.t =
-          if is_uniform
-          then
-            match mixed_field_kind with
-            | Value_prefix field_kind ->
-              Values { tag = Unknown; size = Unknown; field_kind }
-            | Flat_suffix _ ->
-              Misc.fatal_error "Pmixedfield: flat element in uniform shape"
-          else
+          match kind_shape with
+          | None ->
+            let field_kind =
+              match H.mixed_block_access_field_kind field_elt with
+              | Value_prefix field_kind -> field_kind
+              | Flat_suffix _ ->
+                Misc.fatal_error "Pmixedfield: flat element in uniform shape"
+            in
+            Values { tag = Unknown; size = Unknown; field_kind }
+          | Some kind_shape ->
+            let field_kind = H.mixed_block_access_field_kind field_elt in
             Mixed
-              { tag = Unknown;
-                field_kind = mixed_field_kind;
-                shape = kind_shape;
-                size = Unknown
-              }
+              { tag = Unknown; field_kind; shape = kind_shape; size = Unknown }
         in
         let prim : H.expr_primitive =
           Unary
@@ -2673,7 +2676,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[block]; values] ) ->
     if List.length field_path < 1
     then Misc.fatal_error "Psetmixedfield: field_path must be non-empty";
-    let is_uniform = Mixed_product_bytes.shape_is_all_value shape in
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
         ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
@@ -2697,18 +2699,21 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           let imm = Target_ocaml_int.of_int machine_width new_index in
           check_non_negative_imm imm "Psetmixedfield";
           let field_elt = flattened_reordered_shape.(new_index) in
-          let mixed_field_kind = H.mixed_block_access_field_kind field_elt in
           let block_access : P.Block_access_kind.t =
-            if is_uniform
-            then
-              match mixed_field_kind with
-              | Value_prefix field_kind ->
-                Values { tag = Unknown; size = Unknown; field_kind }
-              | Flat_suffix _ ->
-                Misc.fatal_error "Psetmixedfield: flat element in uniform shape"
-            else
+            match kind_shape with
+            | None ->
+              let field_kind =
+                match H.mixed_block_access_field_kind field_elt with
+                | Value_prefix field_kind -> field_kind
+                | Flat_suffix _ ->
+                  Misc.fatal_error
+                    "Psetmixedfield: flat element in uniform shape"
+              in
+              Values { tag = Unknown; size = Unknown; field_kind }
+            | Some kind_shape ->
+              let field_kind = H.mixed_block_access_field_kind field_elt in
               Mixed
-                { field_kind = mixed_field_kind;
+                { field_kind;
                   shape = kind_shape;
                   tag = Unknown;
                   size = Unknown

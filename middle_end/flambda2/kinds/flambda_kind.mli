@@ -107,7 +107,9 @@ module Mixed_block_lambda_shape = Mixed_block_shape
 module Mixed_block_shape : sig
   type t
 
-  val from_mixed_block_shape : _ Mixed_block_lambda_shape.t -> t
+  (** Returns [None] if the shape is all-value (no flat suffix), meaning callers
+      should use [Scannable_block_shape.Value_only] instead. *)
+  val from_mixed_block_shape : _ Mixed_block_lambda_shape.t -> t option
 
   val field_kinds : t -> kind array
 
