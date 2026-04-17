@@ -32,8 +32,7 @@ end @ static = struct
   let h = M.f
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, value])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -88,8 +87,7 @@ module F (M : S @ static) = struct
     M.f y x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [float64, value])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -101,8 +99,7 @@ end @ static) = struct
   let apply_int_to_float (f : int -> float#) (x : int) = M.map f x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, float64])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -113,8 +110,7 @@ module F (M :S @ static) = struct
   let h (x : float#)= g x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, float64])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -154,10 +150,10 @@ end = struct
   let poly_ g x = M.f 42 x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, <genvar>])
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor
+    (M : sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end)
+    -> sig val g : layout_ l. ('b : l). 'b -> unit end
 |}]
 
 (* don't work without eta-expansion *)
@@ -169,26 +165,10 @@ end = struct
   let poly_ g = M.f 42
 end
 [%%expect{|
-Line 6, characters 12-13:
+Line 6, characters 2-22:
 6 |   let poly_ g = M.f 42
-                ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
-
-Lines 5-7, characters 6-3:
-5 | ......struct
-6 |   let poly_ g = M.f 42
-7 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val g : '_weak2 -> unit end
-       is not included in
-         sig val g : layout_ l. ('b : l). 'b -> unit end
-       Values do not match:
-         val g : '_weak2 -> unit
-       is not included in
-         val g : layout_ l. ('b : l). 'b -> unit
-       The type "'_weak2 -> unit" is not compatible with the type "'a -> unit"
-       Type "'_weak2" is not compatible with type "'a"
+      ^^^^^^^^^^^^^^^^^^^^
+Error: The right-hand side of a "let poly_" binding must be a syntactic value.
 |}]
 
 
@@ -220,8 +200,7 @@ end @ static) = struct
   let _ = M.f
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -233,8 +212,7 @@ end @ static) = struct
   let f : int -> int = M.id
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value])
+>> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]

@@ -301,27 +301,29 @@ module Pattern_env : sig
     { mutable env : Env.t;
       equations_scope : int;
       allow_recursive_equations : bool;
-      is_lpoly : bool; }
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+      mutable env_alloc_mode : Mode.Alloc.r option; }
+  val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
     -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
+  val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
 end = struct
   type t =
     { mutable env : Env.t;
       equations_scope : int;
       allow_recursive_equations : bool;
-      is_lpoly : bool; }
-  let make ?(is_lpoly=false) env ~equations_scope ~allow_recursive_equations =
+      mutable env_alloc_mode : Mode.Alloc.r option; }
+  let make ?env_alloc_mode env ~equations_scope ~allow_recursive_equations =
     { env;
       equations_scope;
       allow_recursive_equations;
-      is_lpoly; }
+      env_alloc_mode; }
   let copy ?equations_scope penv =
     let equations_scope =
       match equations_scope with None -> penv.equations_scope | Some s -> s in
     { penv with equations_scope }
   let set_env penv env = penv.env <- env
+  let set_env_alloc_mode penv m = penv.env_alloc_mode <- m
 end
 
 (**** unification mode ****)
@@ -5873,7 +5875,10 @@ let mode_crossing_structure_memaddr =
     ~forkable:true
     ~yielding:true
     ~statefulness:true
-    ~staticity:false
+    ~staticity:true
+    (* We don't care about a structure's staticity if it doesn't contain any
+      [lpoly] values. Hence, the memory block of the structure crosses
+      staticity. *)
 
 (** The mode crossing of a functor. *)
 let mode_crossing_functor =
@@ -5887,10 +5892,19 @@ let mode_crossing_functor =
     ~forkable:false
     ~yielding:false
     ~statefulness:false
-    ~staticity:false
+    ~staticity:true
+    (* CR-soon zqian: need to revert this once we support static functor
+       application. *)
 
 (** The mode crossing of any module. *)
 let mode_crossing_module = Mode.Crossing.max
+
+let mode_crossing_staticity =
+  Crossing.create
+    ~uniqueness:false ~contention:false ~visibility:false
+    ~regionality:false ~linearity:false ~portability:false
+    ~forkable:false ~yielding:false ~statefulness:false
+    ~staticity:true
 
 let zap_modalities_to_floor_if_at_least level =
   if Language_extension.(is_at_least Mode level)
@@ -5901,7 +5915,7 @@ let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
   Ikind.crossing_of_jkind ~context env jkind
 
-let crossing_of_ty env ?modalities ty =
+let crossing_of_ty env ?modalities ?val_lpoly ty =
   let principal = is_principal ty in
   let crossing =
     if not principal
@@ -5930,6 +5944,13 @@ let crossing_of_ty env ?modalities ty =
         ikind_crossing)
       else
         jkind_crossing ()
+  in
+  let crossing =
+    match val_lpoly with
+    | Some lpoly when List.is_empty (Types.Lpoly.get_exn lpoly) ->
+      let staticity_ax = Crossing.Axis.Monadic Staticity in
+      Crossing.set staticity_ax (Crossing.Per_axis.min staticity_ax) crossing
+    | _ -> crossing
   in
   match modalities with
   | None -> crossing
@@ -7888,7 +7909,7 @@ let clear_hash ()   =
    [jkind_const_desc]s. *)
 let rec nondep_jkind_desc_base env ids ~desc_of_const jkind_desc =
   match jkind_desc.base with
-  | Kconstr p -> begin
+  | Kconstr (p, _sa) -> begin
       match Path.find_free_opt ids p with
       | None -> jkind_desc
       | Some id ->

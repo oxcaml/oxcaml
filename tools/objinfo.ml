@@ -355,6 +355,11 @@ let print_cmx_infos (uir, sections, crc) =
     (fun f -> Array.iter f uir.uir_imports_cmi)
     (fun f -> Array.iter f uir.uir_imports_cmx)
     (fun f -> Array.iter f uir.uir_quoted_globals);
+  printf "Static data:\n";
+  flush stdout;
+  let static_value, templates = uir.uir_static_data in
+  Format.printf "%a@." Slambda_types.print_or_missing static_value;
+  Format.printf "%a@." Slambda_types.Templates.print_templates templates;
   begin
     match uir.uir_export_info with
     | None ->
@@ -514,12 +519,12 @@ let dump_obj_by_kind filename ic obj_kind =
       let cms = Cms_format.read filename in
       print_cms_infos cms
     | Cmx ->
-       let uir = (input_value ic : unit_infos_raw) in
+       let uir = (input_value ic : Compilenv_flambda.unit_infos_raw) in
        let first_section_offset = pos_in ic in
        seek_in ic (first_section_offset + uir.uir_sections_length);
        let crc = Digest.input ic in
        (* This consumes ic *)
-       let sections = Oxcaml_utils.File_sections.create
+       let sections = File_sections.create
              uir.uir_section_toc filename ic ~first_section_offset in
        print_cmx_infos (uir, sections, crc)
     | Cmxa ->

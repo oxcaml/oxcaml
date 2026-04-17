@@ -27,8 +27,8 @@
 
 open Lambda
 
-type value_halves = Slambdaeval.halves =
-  { slv_comptime : Slambdaeval.value Slambdaeval.Or_missing.t;
+type value_halves = Slambda_types.halves =
+  { slv_comptime : Slambda_types.value Slambda_types.Or_missing.t;
     slv_runtime : lambda
   }
 
@@ -39,4 +39,7 @@ type value_halves = Slambdaeval.halves =
 
     [inspect] can arbitrarily modify the [slambda] but it's expected to be used
     by drivers to print the slambda if requested and return it unchanged. *)
-val eval : (slambda -> slambda) -> lambda -> value_halves
+val eval :
+  (slambda -> slambda) ->
+  lambda ->
+  Slambda_types.Templates.templates * value_halves

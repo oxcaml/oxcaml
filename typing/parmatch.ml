@@ -2503,7 +2503,7 @@ let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
     match (Patterns.General.view p).pat_desc with
     | `Alias (p,x,_,_,_,_,_) ->
       simpl (Ident.Set.add x head_bound_variables) varsets p ps k
-    | `Var (x, _, _, _, _) | `Fun_layout (x, _, _, _, _, _) ->
+    | `Var (x, _, _, _, _) | `Fun_layout (x, _, _, _, _, _, _) ->
       simpl (Ident.Set.add x head_bound_variables) varsets Patterns.omega ps k
     | `Or (p1,p2,_) ->
       simpl head_bound_variables varsets p1 ps

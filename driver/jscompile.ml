@@ -47,7 +47,7 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
          |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
          |> Slambda.eval
               (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-         |> fun { Slambda.slv_comptime = _; slv_runtime } ->
+         |> fun (templates, { Slambda.slv_comptime; slv_runtime }) ->
          (* CR layout poly: Drop the comptime part until top-level modules can
              be static. *)
          slv_runtime
@@ -79,7 +79,10 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
                     (fun _ _ -> "")
                     jsir.program)
          in
-         (jsir, program.main_module_block_format, arg_descr))
+         ( jsir,
+           program.main_module_block_format,
+           arg_descr,
+           (slv_comptime, templates) ))
 
 let emit_jsir i
     ({ program; imported_compilation_units } :
@@ -114,12 +117,12 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     |> Profile.(record transl)
          (Translmod.transl_implementation ~loc i.module_name)
   in
-  let jsir, main_module_block_format, arg_descr =
+  let jsir, main_module_block_format, arg_descr, static_data =
     tlambda_to_jsir i tlambda ~as_arg_for
   in
   Compilenv.save_unit_info
     (Unit_info.Artifact.filename (Unit_info.cmjx i.target))
-    ~main_module_block_format ~arg_descr;
+    ~main_module_block_format ~arg_descr ~static_data;
   jsir
 
 type starting_point =
@@ -176,7 +179,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
         Translmod.transl_instance info.module_name ~runtime_args
           ~main_module_block_repr ~arg_block_idx
       in
-      let jsir, main_module_block_format, arg_descr_computed =
+      let jsir, main_module_block_format, arg_descr_computed, static_data =
         tlambda_to_jsir info impl ~as_arg_for
       in
       emit_jsir info jsir;
@@ -187,6 +190,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
           (match arg_descr with
           | None -> arg_descr_computed
           | Some _ -> arg_descr)
+        ~static_data
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
   let start_from = start_from |> starting_point_of_compiler_pass in

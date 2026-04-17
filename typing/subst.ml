@@ -53,6 +53,17 @@ type additional_action =
   | Duplicate_variables
   | No_action
 
+(* These represent maps from variable ids to the corresponding sort vars.
+   The reason for their existence is ensuring that the same variable id maps
+   to the same physical variable being saved to a cmi or loaded from a cmi. *)
+type sort_map =
+  | Saving of (Jkind_types.Sort.Var.id, Jkind_types.Sort.var) Hashtbl.t
+    (* saving to a cmi *)
+  | Loading of (Jkind_types.Sort.Var.id, Jkind_types.Sort.var) Hashtbl.t
+    (* loading from a cmi *)
+  | Nothing
+    (* substitution has nothing to do with cmi operations *)
+
 type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
@@ -60,6 +71,7 @@ type s =
     jkinds: kind_replacement Path.Map.t;
 
     additional_action: additional_action;
+    sort_var_mapping: sort_map;
 
     loc: Location.t option;
     mutable last_compose: (s * s) option  (* Memoized composition *)
@@ -88,9 +100,13 @@ let identity =
     modtypes = Path.Map.empty;
     jkinds = Path.Map.empty;
     additional_action = No_action;
+    sort_var_mapping = Nothing;
     loc = None;
     last_compose = None;
   }
+
+let for_loading_cmi () =
+  { identity with sort_var_mapping = Loading (Hashtbl.create 17) }
 
 (* Add a replacement for both a path and its unboxed version, even if that
    unboxed version doesn't exist (as we can't tell here whether it exists).
@@ -249,9 +265,9 @@ let with_additional_action =
      We'll need to revisit the Note [Preparing_for_saving always the same]
      once we do this tailoring.
   *)
-  let additional_action : additional_action =
+  let (additional_action, sort_var_mapping) : additional_action * sort_map =
     match config with
-    | Duplicate_variables -> Duplicate_variables
+    | Duplicate_variables -> Duplicate_variables, Nothing
     | Prepare_for_saving ->
         let prepare_jkind (type l r) loc (jkind : (l * r) jkind) =
           match Jkind.get_const jkind with
@@ -284,9 +300,14 @@ let with_additional_action =
         let prepare_modality modality =
           Mode.Modality.(modality |> to_const_exn|> of_const)
         in
-        Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality }
+        Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality },
+        Saving (Hashtbl.create 17)
   in
-  { s with additional_action; last_compose = None }
+  { s with
+    additional_action;
+    sort_var_mapping;
+    last_compose = None;
+  }
 
 let change_locs s loc = { s with loc = Some loc; last_compose = None }
 
@@ -402,13 +423,15 @@ let to_subst_by_type_function s p =
 
 (* Special type ids for saved signatures *)
 
-let new_id = s_ref (-1)
-let reset_additional_action_type_id () = new_id := -1
+let new_type_id = s_ref (-1)
+let reset_additional_action_type_id () =
+  new_type_id := -1;
+  Jkind_types.Sort.reset_cmi_sort_id ()
 
 let newpersty desc =
-  decr new_id;
+  decr new_type_id;
   create_expr
-    desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_id
+    desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_type_id
 
 (* CR layouts: remove this. While we're still developing, though, it might
    be nice to get the location of this kind of error. *)
@@ -485,37 +508,105 @@ let apply_type_function params args body =
     copy body)
 
 
+let sort_var s var =
+  let open Jkind_types.Sort in
+  let assert_generic var =
+    if not (is_genvar var) then
+      fatal_errorf "sort_var: not generic"
+  in
+  let lookup_sort_map_or_create ~post_condition ~create sort_map var =
+    assert (not (post_condition var));
+    let id = Var.get_id var in
+    match Hashtbl.find_opt sort_map id with
+    | Some var -> var
+    | None ->
+      assert_generic var;
+      let var = create () in
+      assert (post_condition var);
+      Hashtbl.add sort_map id var;
+      var
+  in
+  match s.sort_var_mapping with
+  | Nothing -> var
+  | Saving m ->
+    lookup_sort_map_or_create
+      ~post_condition:Var.is_cmi_var
+      ~create:new_genvar_for_cmi
+      m var
+  | Loading m ->
+    lookup_sort_map_or_create
+      ~post_condition:(Fun.negate Var.is_cmi_var)
+      ~create:new_genvar
+      m var
+
+let rec sort s srt =
+  let open Jkind_types.Sort in
+  match srt with
+  | Base _ | Univar _ -> srt
+  | Product sorts -> Product (List.map (sort s) sorts)
+  | Var var ->
+    let var' = sort_var s var in
+    if var == var' then srt
+    else Var var'
+
+let rec layout s l =
+  let open Jkind_types.Layout in
+  match l with
+  | Any _ -> l
+  | Product sorts -> Product (List.map (layout s) sorts)
+  | Sort (sort_l, ax) ->
+    let sort_l' = sort s sort_l in
+    if sort_l == sort_l' then l
+    else Sort (sort_l', ax)
+
 let jkind_desc s jkind =
   match jkind.base with
-  | Kconstr p ->
+  | Kconstr (p, sa) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr p' }
-    | Jkind_path p -> { jkind with base = Kconstr p }
+        { jkind with base = Kconstr (p', sa) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+      let new_base =
+        match base with
+        | Kconstr (p', sa') ->
+          Kconstr (p', Jkind_types.Scannable_axes.meet sa sa')
+        | Layout l ->
+          Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
+      in
       let const =
-        { base;
+        { base = new_base;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
           with_bounds = jkind.with_bounds }
       in
       Jkind.Base_and_axes.map_layout Jkind_types.Layout.of_const const
     end
-  | Layout _ -> jkind
+  | Layout l ->
+    let l' = layout s l in
+    if l == l' then jkind
+    else { jkind with base = Layout l' }
 
 let jkind_const_desc s
       ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
   match jkind.base with
-  | Kconstr p ->
+  | Kconstr (p, sa) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr p' }
-    | Jkind_path p -> { jkind with base = Kconstr p }
+        { jkind with base = Kconstr (p', sa) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
-      { base;
+      let new_base =
+        match base with
+        | Kconstr (p', sa') ->
+          Kconstr (p', Jkind_types.Scannable_axes.meet sa sa')
+        | Layout l ->
+          Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
+      in
+      { base = new_base;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
         with_bounds = jkind.with_bounds }
     end
@@ -667,15 +758,16 @@ let rec typexp copy_scope s ty =
 and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
   fun copy_scope s jkind ->
   let jkind =
-    let jkind_desc = jkind_desc s jkind.jkind in
-    if jkind_desc == jkind.jkind then jkind
-    else { jkind with jkind = jkind_desc }
+    match s.additional_action with
+    | Prepare_for_saving { prepare_jkind; _ } ->
+      prepare_jkind !location_for_jkind_check_errors jkind
+    | Duplicate_variables | No_action -> jkind
   in
+  (* CR-soon layouts aivaskovic: get rid of map_type_expr *)
   let jkind = Jkind.map_type_expr (typexp copy_scope s) jkind in
-  match s.additional_action with
-  | Prepare_for_saving { prepare_jkind; _ } ->
-    prepare_jkind !location_for_jkind_check_errors jkind
-  | Duplicate_variables | No_action -> jkind
+  let jkind_desc = jkind_desc s jkind.jkind in
+  if jkind_desc == jkind.jkind then jkind
+  else { jkind with jkind = jkind_desc }
 
 (* [loc] is different than [s.loc]:
      - [s.loc] is a way for the external client of the module to indicate the
@@ -1076,7 +1168,11 @@ let force_type_expr ty = Wrap.force (fun _ s ty ->
   let loc = Option.value s.loc ~default:Location.none in
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)) ty
 
-let force_lpoly lpoly = Wrap.force (fun _ _ x -> x) lpoly
+let force_lpoly lpoly = Wrap.force (fun _ s lpoly ->
+  (* CR-someday zqian: maybe subst should work for [pending] as well. *)
+  let vars = Types.Lpoly.get_exn lpoly in
+  let vars = List.map (sort_var s) vars in
+  Types.Lpoly.determined vars) lpoly
 
 let rec subst_lazy_value_description s descr =
   let val_modalities =
@@ -1088,7 +1184,7 @@ let rec subst_lazy_value_description s descr =
   { val_type = Wrap.substitute ~compose Keep s descr.val_type;
     val_modalities;
     val_kind = descr.val_kind;
-    val_lpoly = descr.val_lpoly;
+    val_lpoly = Wrap.substitute ~compose Keep s descr.val_lpoly;
     val_loc = loc s descr.val_loc;
     val_zero_alloc =
       (* When saving a cmi file, we replace zero_alloc variables with constants.
@@ -1227,6 +1323,15 @@ and compose s1 s2 =
             *)
             | (Prepare_for_saving _ as prepare1), Prepare_for_saving _
                 -> prepare1
+          end;
+          sort_var_mapping = begin
+            match s1.sort_var_mapping, s2.sort_var_mapping with
+            | action, Nothing | Nothing, action -> action
+            | (Loading _ as s), Loading _ -> s
+            | (Saving _ as s), Saving _ -> s
+            | Saving _, Loading _
+            | Loading _, Saving _ ->
+              fatal_error "compose: composing Saving and Loading"
           end;
           loc = keep_latest_loc s1.loc s2.loc;
           last_compose = None

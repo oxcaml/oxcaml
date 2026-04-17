@@ -165,8 +165,11 @@ module type Sort = sig
     type id = private int
     (* the [private int] allows the debugger to print it *)
 
-    (** Extract the unique id for a [var]; this should be used only for
-        debugging or printing, not for decision making *)
+    (** Checks whether a [var] satisfies the properties that hold for variables
+        saved to a cmi. *)
+    val is_cmi_var : var -> bool
+
+    (** Extract the unique id for a [var]. *)
     val get_id : var -> id
 
     (** Get the number of an [id], useful for printing. These numbers get
@@ -232,8 +235,15 @@ module type Sort = sig
   *)
   val new_genvar : unit -> var
 
-  (** Returns [true] iff the variable was created by {!new_genvar}. *)
+  (** Create a polymorphic sort variable (level = [Ident.highest_scope]),
+      intended for saving to a cmi. *)
+  val new_genvar_for_cmi : unit -> var
+
+  (** Returns [true] iff the variable was created by {!new_genvar} or
+      {!new_genvar_for_cmi}. *)
   val is_genvar : var -> bool
+
+  val reset_cmi_sort_id : unit -> unit
 
   (** Get the concrete content of a variable. The returned sort must be
       representable (including rigid sorts). *)

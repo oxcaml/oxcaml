@@ -6,10 +6,10 @@
       (makeblock 0 x)))
   (let
     (A =
-       (apply (field_imm 0 (global CamlinternalMod!))
+       (apply (field_imm 0 (global static CamlinternalMod!))
          [0: "anonymous.ml" 25 6] [0: [0]])
      B =
-       (apply (field_imm 0 (global CamlinternalMod!))
+       (apply (field_imm 0 (global static CamlinternalMod!))
          [0: "anonymous.ml" 35 6] [0: [0]]))
     (seq
       (ignore
@@ -17,8 +17,8 @@
           (x =[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
              [0: 4 2])
           (makeblock 0 x)))
-      (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] A A)
-      (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] B
+      (apply (field_imm 1 (global static CamlinternalMod!)) [0: [0]] A A)
+      (apply (field_imm 1 (global static CamlinternalMod!)) [0: [0]] B
         (let
           (x =[value<(consts ()) (non_consts ([0: *, *]))>] [0: "foo" "bar"])
           (makeblock 0)))
