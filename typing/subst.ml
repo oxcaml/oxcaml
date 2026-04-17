@@ -64,11 +64,6 @@ type sort_map =
   | Nothing
     (* substitution has nothing to do with cmi operations *)
 
-let find_in_sort_map_opt ~id =
-  function
-  | Nothing -> None
-  | Saving m | Loading m -> Hashtbl.find_opt m id
-
 type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
@@ -438,9 +433,6 @@ let newpersty desc =
   create_expr
     desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_type_id
 
-let newsortvar () =
-  Jkind_types.Sort.new_genvar_for_cmi ()
-
 (* CR layouts: remove this. While we're still developing, though, it might
    be nice to get the location of this kind of error. *)
 (* We use a ref instead of passing [loc] as an argument to [typexp]
@@ -516,43 +508,46 @@ let apply_type_function params args body =
     copy body)
 
 
-let sort_var s srt var =
+let sort_var s var =
   let open Jkind_types.Sort in
   let assert_generic var =
     if not (is_genvar var) then
       fatal_errorf "sort_var: not generic"
   in
-  let id = Var.get_id var in
-  let var' =
-    match find_in_sort_map_opt ~id s.sort_var_mapping with
+  let lookup_sort_map_or_create ~post_condition ~create sort_map var =
+    assert (not (post_condition var));
+    let id = Var.get_id var in
+    match Hashtbl.find_opt sort_map id with
     | Some var -> var
     | None ->
-      match s.sort_var_mapping with
-      | Saving m ->
-        assert (not (Var.is_cmi_var var));
-        assert_generic var;
-        let var = newsortvar () in
-        assert (Var.is_cmi_var var);
-        Hashtbl.add m id var;
-        var
-      | Loading m ->
-        assert (Var.is_cmi_var var);
-        assert_generic var;
-        let var = new_genvar () in
-        assert (not (Var.is_cmi_var var));
-        Hashtbl.add m id var;
-        var
-      | Nothing -> var
+      assert_generic var;
+      let var = create () in
+      assert (post_condition var);
+      Hashtbl.add sort_map id var;
+      var
   in
-  if var == var' then srt
-  else Var var'
+  match s.sort_var_mapping with
+  | Nothing -> var
+  | Saving m ->
+    lookup_sort_map_or_create
+      ~post_condition:Var.is_cmi_var
+      ~create:new_genvar_for_cmi
+      m var
+  | Loading m ->
+    lookup_sort_map_or_create
+      ~post_condition:(Fun.negate Var.is_cmi_var)
+      ~create:new_genvar
+      m var
 
 let rec sort s srt =
   let open Jkind_types.Sort in
   match srt with
   | Base _ | Univar _ -> srt
   | Product sorts -> Product (List.map (sort s) sorts)
-  | Var var -> sort_var s srt var
+  | Var var ->
+    let var' = sort_var s var in
+    if var == var' then srt
+    else Var var'
 
 let rec layout s l =
   let open Jkind_types.Layout in
@@ -754,6 +749,7 @@ and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
       prepare_jkind !location_for_jkind_check_errors jkind
     | Duplicate_variables | No_action -> jkind
   in
+  (* CR-soon layouts aivaskovic: get rid of map_type_expr *)
   let jkind = Jkind.map_type_expr (typexp copy_scope s) jkind in
   let jkind_desc = jkind_desc s jkind.jkind in
   if jkind_desc == jkind.jkind then jkind
