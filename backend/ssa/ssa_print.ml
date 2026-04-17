@@ -12,10 +12,10 @@ let rec print_instruction ppf (i : Ssa.instruction) =
     Format.fprintf ppf "%a.%d" print_block_id block index
   | Proj { index; src } ->
     Format.fprintf ppf "proj(%d, %a)" index print_instr_ref src
-  | Pushtrap { handler } ->
-    Format.fprintf ppf "pushtrap %a" print_block_id handler
-  | Poptrap { handler } ->
-    Format.fprintf ppf "poptrap %a" print_block_id handler
+  | Push_trap { handler } ->
+    Format.fprintf ppf "push_trap %a" print_block_id handler
+  | Pop_trap { handler } ->
+    Format.fprintf ppf "pop_trap %a" print_block_id handler
   | Stack_check { max_frame_size_bytes } ->
     Format.fprintf ppf "stack_check %d" max_frame_size_bytes
   | Name_for_debugger { ident; _ } ->
@@ -28,7 +28,7 @@ and print_instr_ref ppf (i : Ssa.instruction) =
     Format.fprintf ppf "%a.%d" print_block_id block index
   | Proj { index; src } ->
     Format.fprintf ppf "proj(%d, %a)" index print_instr_ref src
-  | Pushtrap _ | Poptrap _ | Stack_check _ | Name_for_debugger _ ->
+  | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ ->
     print_instruction ppf i
 
 and print_args ppf args =
@@ -47,16 +47,12 @@ let print_instr_array ppf arr =
 
 let print_terminator ppf (t : Ssa.terminator) =
   match t with
-  | Never -> Format.fprintf ppf "never"
+  | Pending_construction -> Format.fprintf ppf "pending_construction"
   | Goto { goto; args } ->
     Format.fprintf ppf "goto %a(%a)" print_block_id goto print_instr_array args
-  | Branch { conditions; else_goto } ->
-    Array.iter
-      (fun (cond, target) ->
-        Format.fprintf ppf "if %a then goto %a; " print_instr_ref cond
-          print_block_id target)
-      conditions;
-    Format.fprintf ppf "else goto %a" print_block_id else_goto
+  | Branch { cond; ifso; ifnot } ->
+    Format.fprintf ppf "if %a then goto %a else goto %a" print_instr_ref cond
+      print_block_id ifso print_block_id ifnot
   | Switch (targets, arg) ->
     Format.fprintf ppf "switch(%a) [%a]" print_instr_array arg
       (Format.pp_print_array
@@ -110,12 +106,18 @@ let print_block_desc ppf (desc : Ssa.block_desc) =
   match desc with
   | Merge { predecessors } ->
     Format.fprintf ppf "merge %a" print_preds predecessors
-  | BranchTarget { predecessor } ->
+  | Loop { predecessors; backedges } ->
+    Format.fprintf ppf "loop %a backedges=[%a]" print_preds predecessors
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+         print_block_id)
+      backedges
+  | Branch_target { predecessor } ->
     Format.fprintf ppf "branch_target pred=%a" print_block_id predecessor
-  | FunctionStart -> Format.fprintf ppf "function_start"
-  | CallContinuation { predecessor } ->
+  | Function_start -> Format.fprintf ppf "function_start"
+  | Call_continuation { predecessor } ->
     Format.fprintf ppf "call_cont pred=%a" print_block_id predecessor
-  | TrapHandler { predecessors } ->
+  | Trap_handler { predecessors } ->
     Format.fprintf ppf "trap_handler %a" print_preds predecessors
 
 let print_block ppf (blk : Ssa.block) =

@@ -1,6 +1,7 @@
 (* TEST
  readonly_files = "main.c";
  arguments = "-DINT_INT -DFUN=catch_multiple main.c";
+ flags = "-no-use-ssa";
  asmgen;
 *)
 
