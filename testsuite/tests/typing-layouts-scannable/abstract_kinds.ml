@@ -80,6 +80,71 @@ Error: The universal type variable 'a was declared to have kind k mod separable.
 |}]
 
 (* Substitution *)
+module type S_float64 = S with kind_ k = float64
+[%%expect{|
+module type S_float64 =
+  sig
+    kind_ k = float64
+    type (_ : any separable) a
+    type (_ : float64) b
+    type ('a : float64) ab = 'a a * 'a b
+    val f : ('a : float64). 'a a -> 'a b
+  end
+|}]
+
+module type S_value = S with kind_ k = value
+[%%expect{|
+module type S_value =
+  sig
+    kind_ k = value
+    type (_ : any separable) a
+    type _ b
+    type 'a ab = 'a a * 'a b
+    val f : 'a a -> 'a b
+  end
+|}]
+
+module type S_any = S with kind_ k = any
+[%%expect{|
+module type S_any =
+  sig
+    kind_ k = any
+    type (_ : any separable) a
+    type (_ : any) b
+    type ('a : any separable) ab = 'a a * 'a b
+    val f : ('a : any separable). 'a a -> 'a b
+  end
+|}]
+
+kind_ k2
+module type S_k2 = S with kind_ k = k2
+[%%expect{|
+kind_ k2
+module type S_k2 =
+  sig
+    kind_ k = k2
+    type (_ : any separable) a
+    type (_ : k) b
+    type ('a : k mod separable) ab = 'a a * 'a b
+    val f : ('a : k mod separable). 'a a -> 'a b
+  end
+|}]
+
+kind_ k2 = value non_float
+module type S_k2 = S with kind_ k = k2
+[%%expect{|
+kind_ k2 = value non_float
+module type S_k2 =
+  sig
+    kind_ k = value non_float
+    type (_ : any separable) a
+    type (_ : value non_float) b
+    type ('a : value non_float) ab = 'a a * 'a b
+    val f : ('a : value non_float). 'a a -> 'a b
+  end
+|}]
+
+(* Destructive substitution *)
 module type S_float64 = S with kind_ k := float64
 [%%expect{|
 module type S_float64 =
