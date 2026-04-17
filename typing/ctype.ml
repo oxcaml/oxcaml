@@ -5892,7 +5892,8 @@ let mode_crossing_functor =
     ~forkable:false
     ~yielding:false
     ~statefulness:false
-    ~staticity:false
+    ~staticity:true
+    (* CR-soon zqian: need to revert this once we support static functor application. *)
 
 (** The mode crossing of any module. *)
 let mode_crossing_module = Mode.Crossing.max
