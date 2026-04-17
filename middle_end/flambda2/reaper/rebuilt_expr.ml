@@ -43,7 +43,11 @@ let create_let bound_pattern defining_expr ~size_of_defining_expr ~body =
     Flambda.Let_expr.create bound_pattern defining_expr ~body:body.expr
       ~free_names_of_body:(Known body.free_names)
   in
-  let code_size = Code_size.( + ) body.code_size size_of_defining_expr in
+  let code_size =
+    if Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
+    then body.code_size
+    else Code_size.( + ) body.code_size size_of_defining_expr
+  in
   let expr = Flambda.Expr.create_let let_expr in
   { expr; free_names; code_size }
 
