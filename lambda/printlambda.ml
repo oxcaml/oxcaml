@@ -96,6 +96,7 @@ let array_kind = function
     "scannableproduct " ^ scannable_product_element_kinds kinds
   | Pgcignorableproductarray kinds ->
     "ignorableproduct " ^ ignorable_product_element_kinds kinds
+  | Ptemplatedarray -> "lpoly"
 
 let array_mut = function
   | Mutable -> "array"

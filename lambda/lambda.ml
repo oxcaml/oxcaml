@@ -492,6 +492,7 @@ and array_kind =
   | Punboxedvectorarray of unboxed_vector
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
+  | Ptemplatedarray
 
 and array_ref_kind =
   | Pgenarray_ref of locality_mode
@@ -504,6 +505,7 @@ and array_ref_kind =
   | Punboxedvectorarray_ref of unboxed_vector
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
+  | Ptemplatedarray_ref
 
 and array_set_kind =
   | Pgenarray_set of modify_mode
@@ -517,6 +519,7 @@ and array_set_kind =
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
+  | Ptemplatedarray_set
 
 and ignorable_product_element_kind =
   | Pint_ignorable

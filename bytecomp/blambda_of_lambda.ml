@@ -445,7 +445,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | [] -> block
           | _ :: _ ->
             (* for the floatarray hack *)
-            Prim (Ccall "caml_array_of_uniform_array", [block])))
+            Prim (Ccall "caml_array_of_uniform_array", [block]))
+        | Ptemplatedarray ->
+            Misc.fatal_error "Blambda_of_lambda.comp_expr: lpoly array")
     | Presume -> context_switch Resume ~arity:3
     | Pwith_stack -> context_switch With_stack ~arity:5
     | Pwith_stack_bind -> context_switch With_stack_bind ~arity:7
@@ -461,6 +463,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               "Array kind %s should have been ruled out by the frontend for \
                %%makearray_dynamic_uninit"
               (Printlambda.array_kind kind)
+          | Ptemplatedarray ->
+            Misc.fatal_error "Blambda_of_lambda.comp_expr: lpoly array"
           | Punboxedfloatarray Unboxed_float32 ->
             Lconst (Const_base (Const_float32 "0.0"))
           | Punboxedfloatarray Unboxed_float64 ->
@@ -707,6 +711,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           Ptagged_int_index,
           _ ) ->
       binary (Ccall "caml_array_get_addr")
+    | Parrayrefs (Ptemplatedarray_ref, _, _) ->
+        Misc.fatal_error "Blambda_of_lambda.comp_expr: lpoly array refs"
     | Parraysets (Pgenarray_set _, index_kind)
     | Parraysets
         ( ( Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set
@@ -727,6 +733,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
           Ptagged_int_index ) ->
       ternary (Ccall "caml_array_set_addr")
+    | Parraysets (Ptemplatedarray_set, _) ->
+        Misc.fatal_error "Blambda_of_lambda.comp_expr: lpoly array sets"
     | Parrayrefu (Pgenarray_ref _, index_kind, _)
     | Parrayrefu
         ( ( Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
@@ -750,6 +758,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           Ptagged_int_index,
           _ ) ->
       binary Getvectitem
+    | Parrayrefu (Ptemplatedarray_ref, _, _) ->
+        Misc.fatal_error "Blambda_of_lambda.comp_expr: lpoly array refu"
     | Parraysetu (Pgenarray_set _, index_kind)
     | Parraysetu
         ( ( Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set
@@ -770,6 +780,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
           Ptagged_int_index ) ->
       ternary Setvectitem
+    | Parraysetu (Ptemplatedarray_set, _) ->
+        Misc.fatal_error "Blambda_of_lambda.comp_expr: lpoly array setu"
     | Parrayrefs (Punboxedvectorarray_ref _, _, _)
     | Parraysets (Punboxedvectorarray_set _, _)
     | Parrayrefu (Punboxedvectorarray_ref _, _, _)
@@ -881,7 +893,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ -> (
         match locality with
         | Alloc_heap -> binary (Ccall "caml_array_make")
-        | Alloc_local -> binary (Ccall "caml_array_make_local")))
+        | Alloc_local -> binary (Ccall "caml_array_make_local"))
+      | Ptemplatedarray ->
+        Misc.fatal_error "Blambda_of_lambda.comp_expr: lpoly array")
     | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
       match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()
@@ -889,7 +903,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Pgcignorableaddrarray_set | Punboxedoruntaggedintarray_set _
       | Pfloatarray_set | Punboxedfloatarray_set _
       | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
-        n_ary (Ccall "caml_array_blit") ~arity:5)
+        n_ary (Ccall "caml_array_blit") ~arity:5
+      | Ptemplatedarray_set ->
+        Misc.fatal_error "Blambda_of_lambda.comp_expr: lpoly array")
     | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ | Pget_ptr _ | Pset_ptr _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive

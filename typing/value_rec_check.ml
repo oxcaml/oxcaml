@@ -635,6 +635,8 @@ let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
   | Lambda.Punboxedvectorarray _
   | Lambda.Pgcscannableproductarray _ | Lambda.Pgcignorableproductarray _ ->
     Dereference
+  | Lambda.Ptemplatedarray ->
+    Misc.fatal_error "Value_rec_check.array_mode: templated array"
 
 (* Expression judgment:
      G |- e : m

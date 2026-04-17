@@ -362,7 +362,8 @@ module Sort = struct
       | None -> fprintf ppf "None"
 
     and var ppf v =
-      fprintf ppf "{@[@ contents = %a;@ uid = %d@ @]}" opt_t v.contents v.uid
+      fprintf ppf "{@[@ contents = %a;@ level = %d; uid = %d@ @]}" opt_t
+        v.contents v.level v.uid
   end
 
   (* To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
