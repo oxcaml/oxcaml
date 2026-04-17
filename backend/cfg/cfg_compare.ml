@@ -380,7 +380,16 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
          pairs *)
       let eqs =
         let n = Array.length old_i.res in
-        assert (n = Array.length new_i.res);
+        if n <> Array.length new_i.res
+        then (
+          Format.fprintf ppf_m
+            "Result register count mismatch at old=%a(id:%a) new=%a(id:%a): \
+             old has %d res, new has %d res@."
+            Label.format ol InstructionId.print old_i.id Label.format nl
+            InstructionId.print new_i.id n
+            (Array.length new_i.res);
+          eqs)
+        else
         let eqs = ref eqs in
         for i = 0 to n - 1 do
           let old_r = old_i.res.(i) in

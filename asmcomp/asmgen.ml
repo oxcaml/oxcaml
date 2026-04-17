@@ -507,8 +507,6 @@ let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
 
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
-  let module Ssa_selection = Ssa_of_cmm.Make (Cfg_selection) in
-  let module Ssa_lowering = Cfg_of_ssa.Make (Cfg_selection) in
   let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
   Reg.clear_relocatable_regs ();
   fd_cmm
@@ -524,9 +522,7 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
        InstructionId.restore Sub_cfg.instr_id saved_instr_id;
        result
      in
-     let ssa =
-       Label.with_saved_counter @@ fun () -> Ssa_selection.emit_fundecl fd_cmm
-     in
+     let ssa = Ssa_of_cmm.convert fd_cmm in
      (try Ssa_validate.validate ssa
       with exn ->
         let bt = Printexc.get_raw_backtrace () in
@@ -539,7 +535,9 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
      then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
      let cfg_new =
        Label.with_saved_counter @@ fun () ->
-       try Ssa_lowering.convert ~future_funcnames:funcnames ssa
+       try
+         Cfg_of_ssa.convert ~keep_unused_ops:true ~future_funcnames:funcnames
+           ssa
        with exn ->
          let bt = Printexc.get_raw_backtrace () in
          Format.fprintf ppf_dump

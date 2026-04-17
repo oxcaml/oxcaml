@@ -17,6 +17,8 @@ open Clflags
 let write_asm_file = ref false
 
 let compile_file filename =
+  Printf.eprintf "%s\n" (if !Oxcaml_flags.cfg_stack_checks then "stack_checks" else "no_stack_checks");
+  Oxcaml_flags.cfg_invariants := true;
   if !write_asm_file then begin
     let out_name = Filename.chop_extension filename ^ ".s" in
     Emitaux.output_channel := open_out out_name
@@ -65,6 +67,7 @@ let main() =
      "-dcmm", Arg.Set dump_cmm, "";
      "-dcse", Arg.Set dump_cse, "";
      "-dlinear", Arg.Set dump_linear, "";
+     "-no-use-ssa", Arg.Clear Oxcaml_flags.use_ssa, "";
      "-dtimings", Arg.Unit (fun () -> profile_columns := [ `Time ]), "";
      "-dcounters", Arg.Unit (fun () -> profile_columns := [ `Counters ]), "";
      ( "-dgranularity",
