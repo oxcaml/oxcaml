@@ -306,7 +306,6 @@ let size_vec128 = 16
 let size_vec256 = 32
 let size_vec512 = 64
 
-
 let allow_unaligned_access = true
 
 (* Whether Ocaml provides shift operations where the shift amount is interpreted
