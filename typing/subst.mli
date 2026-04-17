@@ -45,6 +45,7 @@ type t = safe subst
 (** Standard substitution*)
 
 val identity: 'a subst
+val for_loading_cmi : unit -> t
 val unsafe: t -> unsafe subst
 
 val add_type: Ident.t -> Path.t -> 'k subst -> 'k subst
@@ -70,11 +71,11 @@ type additional_action_config =
 *)
 val with_additional_action: additional_action_config -> t -> t
 
-(* Any of the additional actions involve copying type variables. Calling
-   [reset_additional_action_type_id] resets the id counter used when the copying
-   of type variables needs to mint new type variable ids.
+(* Any of the additional actions involve copying type and sort variables.
+   Calling [reset_additional_action_id] resets the id counters used when saving
+   needs to mint new ids for copied type variables or sort variables.
 *)
-val reset_additional_action_type_id: unit -> unit
+val reset_additional_action_id: unit -> unit
 
 val change_locs: 'k subst -> Location.t -> 'k subst
 

@@ -162,12 +162,16 @@ module type Sort = sig
   end
 
   module Var : sig
-    type id = private int
-    (* the [private int] allows the debugger to print it *)
+    type id = int
 
-    (** Extract the unique id for a [var]; this should be used only for
-        debugging or printing, not for decision making *)
+    (** Extract the unique id for a [var]. *)
     val get_id : var -> id
+
+    (** Extract the variable contents. *)
+    val get_contents : var -> t option
+
+    (** Extract the variable level. *)
+    val get_level : var -> int
 
     (** Get the number of an [id], useful for printing. These numbers get
         allocated only when an [id] gets printed, and so they are less brittle
@@ -232,8 +236,15 @@ module type Sort = sig
   *)
   val new_genvar : unit -> var
 
-  (** Returns [true] iff the variable was created by {!new_genvar}. *)
+  (** Create a polymorphic sort variable (level = [Ident.highest_scope]),
+      intended for saving to a cmi. *)
+  val new_genvar_for_cmi : unit -> var
+
+  (** Returns [true] iff the variable was created by {!new_genvar} or
+      {!new_genvar_for_cmi}. *)
   val is_genvar : var -> bool
+
+  val reset_cmi_sort_id : unit -> unit
 
   (** Get the concrete content of a variable. The returned sort must be
       representable (including rigid sorts). *)

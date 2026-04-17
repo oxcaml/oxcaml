@@ -53,6 +53,27 @@ type additional_action =
   | Duplicate_variables
   | No_action
 
+type sort_map =
+  | Saving of (int, Jkind_types.Sort.var) Hashtbl.t
+  | Loading of (int, Jkind_types.Sort.var) Hashtbl.t
+  | Nothing
+
+let find_in_sort_map_opt ~id =
+  function
+  | Nothing -> None
+  | Saving m | Loading m -> Hashtbl.find_opt m id
+
+let add_to_sort_map ~id ~data =
+  let open Jkind_types.Sort in
+  function
+  | Nothing -> fatal_error "subst: add_to_sort_map"
+  | Saving m ->
+    assert (Var.get_id data < 0);
+    Hashtbl.add m id data
+  | Loading m ->
+    assert (Var.get_id data > 0);
+    Hashtbl.add m id data
+
 type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
@@ -60,6 +81,7 @@ type s =
     jkinds: kind_replacement Path.Map.t;
 
     additional_action: additional_action;
+    sort_var_mapping: sort_map;
 
     loc: Location.t option;
     mutable last_compose: (s * s) option  (* Memoized composition *)
@@ -88,9 +110,13 @@ let identity =
     modtypes = Path.Map.empty;
     jkinds = Path.Map.empty;
     additional_action = No_action;
+    sort_var_mapping = Nothing;
     loc = None;
     last_compose = None;
   }
+
+let for_loading_cmi () =
+  { identity with sort_var_mapping = Loading (Hashtbl.create 17) }
 
 (* Add a replacement for both a path and its unboxed version, even if that
    unboxed version doesn't exist (as we can't tell here whether it exists).
@@ -249,9 +275,9 @@ let with_additional_action =
      We'll need to revisit the Note [Preparing_for_saving always the same]
      once we do this tailoring.
   *)
-  let additional_action : additional_action =
+  let (additional_action, sort_var_mapping) : additional_action * sort_map =
     match config with
-    | Duplicate_variables -> Duplicate_variables
+    | Duplicate_variables -> Duplicate_variables, Nothing
     | Prepare_for_saving ->
         let prepare_jkind (type l r) loc (jkind : (l * r) jkind) =
           match Jkind.get_const jkind with
@@ -284,9 +310,14 @@ let with_additional_action =
         let prepare_modality modality =
           Mode.Modality.(modality |> to_const_exn|> of_const)
         in
-        Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality }
+        Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality },
+        Saving (Hashtbl.create 17)
   in
-  { s with additional_action; last_compose = None }
+  { s with
+    additional_action;
+    sort_var_mapping;
+    last_compose = None;
+  }
 
 let change_locs s loc = { s with loc = Some loc; last_compose = None }
 
@@ -400,15 +431,20 @@ let to_subst_by_type_function s p =
   | Type_function _ -> true
   | exception Not_found -> false
 
-(* Special type ids for saved signatures *)
+(* Special type and sort ids for saved signatures *)
 
-let new_id = s_ref (-1)
-let reset_additional_action_type_id () = new_id := -1
+let new_type_id = s_ref (-1)
+let reset_additional_action_id () =
+  new_type_id := -1;
+  Jkind_types.Sort.reset_cmi_sort_id ()
 
 let newpersty desc =
-  decr new_id;
+  decr new_type_id;
   create_expr
-    desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_id
+    desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_type_id
+
+let newsortvar () =
+  Jkind_types.Sort.new_genvar_for_cmi ()
 
 (* CR layouts: remove this. While we're still developing, though, it might
    be nice to get the location of this kind of error. *)
@@ -485,6 +521,50 @@ let apply_type_function params args body =
     copy body)
 
 
+let sort_var s srt var =
+  let open Jkind_types.Sort in
+  let assert_generic var =
+    if Var.get_level var <> generic_level then
+      fatal_errorf "sort_var: not generic, level is %d" (Var.get_level var);
+  in
+  let id = Var.get_id var in
+  let var' =
+    match find_in_sort_map_opt ~id s.sort_var_mapping with
+    | Some var -> var
+    | None ->
+      match s.sort_var_mapping with
+      | Saving _ ->
+        assert_generic var;
+        let var = newsortvar () in
+        add_to_sort_map ~id ~data:var s.sort_var_mapping;
+        var
+      | Loading _ ->
+        assert_generic var;
+        let var = new_genvar () in
+        add_to_sort_map ~id ~data:var s.sort_var_mapping;
+        var
+      | Nothing -> var
+  in
+  if var == var' then srt
+  else Var var'
+
+let rec sort s srt =
+  let open Jkind_types.Sort in
+  match srt with
+  | Base _ | Univar _ -> srt
+  | Product sorts -> Product (List.map (sort s) sorts)
+  | Var var -> sort_var s srt var
+
+let rec layout s l =
+  let open Jkind_types.Layout in
+  match l with
+  | Any _ -> l
+  | Product sorts -> Product (List.map (layout s) sorts)
+  | Sort (sort_l, ax) ->
+    let sort_l' = sort s sort_l in
+    if sort_l == sort_l' then l
+    else Sort (sort_l', ax)
+
 let jkind_desc s jkind =
   match jkind.base with
   | Kconstr p ->
@@ -502,7 +582,10 @@ let jkind_desc s jkind =
       in
       Jkind.Base_and_axes.map_layout Jkind_types.Layout.of_const const
     end
-  | Layout _ -> jkind
+  | Layout l ->
+    let l' = layout s l in
+    if l == l' then jkind
+    else { jkind with base = Layout l' }
 
 let jkind_const_desc s
       ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
@@ -667,15 +750,15 @@ let rec typexp copy_scope s ty =
 and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
   fun copy_scope s jkind ->
   let jkind =
-    let jkind_desc = jkind_desc s jkind.jkind in
-    if jkind_desc == jkind.jkind then jkind
-    else { jkind with jkind = jkind_desc }
+    match s.additional_action with
+    | Prepare_for_saving { prepare_jkind; _ } ->
+      prepare_jkind !location_for_jkind_check_errors jkind
+    | Duplicate_variables | No_action -> jkind
   in
   let jkind = Jkind.map_type_expr (typexp copy_scope s) jkind in
-  match s.additional_action with
-  | Prepare_for_saving { prepare_jkind; _ } ->
-    prepare_jkind !location_for_jkind_check_errors jkind
-  | Duplicate_variables | No_action -> jkind
+  let jkind_desc = jkind_desc s jkind.jkind in
+  if jkind_desc == jkind.jkind then jkind
+  else { jkind with jkind = jkind_desc }
 
 (* [loc] is different than [s.loc]:
      - [s.loc] is a way for the external client of the module to indicate the
@@ -1227,6 +1310,14 @@ and compose s1 s2 =
             *)
             | (Prepare_for_saving _ as prepare1), Prepare_for_saving _
                 -> prepare1
+          end;
+          sort_var_mapping = begin
+            match s1.sort_var_mapping, s2.sort_var_mapping with
+            | action, Nothing | Nothing, action -> action
+            | (Loading _ as s), Loading _ -> s
+            | (Saving _ as s), Saving _ -> s
+            | (Saving _ as s), Loading _
+            | Loading _, (Saving _ as s) -> s
           end;
           loc = keep_latest_loc s1.loc s2.loc;
           last_compose = None

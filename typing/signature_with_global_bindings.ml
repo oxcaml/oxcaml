@@ -8,7 +8,7 @@ type t = {
 let read_from_cmi (cmi : Cmi_format.cmi_infos_lazy) =
   let sign =
     (* Freshen identifiers bound by signature *)
-    Subst.Lazy.signature Make_local Subst.identity cmi.cmi_sign in
+    Subst.Lazy.signature Make_local (Subst.for_loading_cmi ()) cmi.cmi_sign in
   let bound_globals = cmi.cmi_globals in
   { sign; bound_globals }
 
