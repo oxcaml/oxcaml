@@ -166,12 +166,17 @@ let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
             let extra = List.length pat_refs - i + 1 in
             raise (Dont_match (Layout_poly_coercion (Extra_lhs { extra })))
         in
-        (match r with
+        (match Option.map Jkind_types.Sort.get r with
         | Some (Jkind_types.Sort.Var v') when v' == v -> ()
         | Some (Jkind_types.Sort.Var v') ->
-          let j = List.assq v' subj_index in
-          raise (Dont_match (Layout_poly_coercion
-            (Instantiate_lhs_to_rhs { index_lhs = i; index_rhs = j })))
+          begin match List.assq_opt v' subj_index with
+          | Some j ->
+              raise (Dont_match (Layout_poly_coercion
+                (Instantiate_lhs_to_rhs { index_lhs = i; index_rhs = j })))
+          | None ->
+              raise (Dont_match (Layout_poly_coercion
+                (Instantiate_lhs { index_lhs = i; arg = r })));
+          end
         | _ ->
           raise (Dont_match (Layout_poly_coercion
             (Instantiate_lhs { index_lhs = i; arg = r }))));
