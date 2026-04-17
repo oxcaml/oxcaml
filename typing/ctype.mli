@@ -800,6 +800,7 @@ val crossing_of_jkind : Env.t -> 'd Types.jkind -> Mode.Crossing.t
 val crossing_of_ty :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
+  ?val_lpoly:Types.Lpoly.t ->
   Types.type_expr ->
   Mode.Crossing.t
 
@@ -852,6 +853,8 @@ val mode_crossing_functor : Mode.Crossing.t
 
 (** The mode crossing of any module. *)
 val mode_crossing_module : Mode.Crossing.t
+
+val mode_crossing_staticity : Mode.Crossing.t
 
 (** Zap a modality to floor if maturity allows, zap to id otherwise. *)
 val zap_modalities_to_floor_if_at_least :
