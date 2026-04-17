@@ -44,47 +44,26 @@ module Section_index = struct
   let needs_extended t = t >= shn_loreserve
 end
 
-(* x86-64 relocation types *)
-module Reloc_type = struct
-  type t = int64
-
-  let equal = Int64.equal
-  let to_int64 t = t
-  let of_int64 t = t
-
-  let plt32 = 4L
-  let rex_gotpcrelx = 42L
-  let r64 = 1L
-  let pc32 = 2L
-
-  let name t =
-    if Int64.equal t plt32 then "PLT32"
-    else if Int64.equal t rex_gotpcrelx then "REX_GOTPCRELX"
-    else if Int64.equal t pc32 then "PC32"
-    else if Int64.equal t r64 then "64"
-    else Printf.sprintf "type=%Ld" t
-end
-
 (* Size of an Elf64_Rela entry in bytes *)
 let rela_entry_size = 24
 
 (* Size of an Elf64_Sym entry in bytes *)
 let sym_entry_size = 24
 
-type rela_entry =
-  { r_offset : int64;
-    r_sym : int;
-    r_type : Reloc_type.t;
-    r_addend : int64
-  }
-
 (* Extract symbol index from r_info (upper 32 bits) *)
-let r_sym_of_info r_info = Int64.to_int (Int64.shift_right_logical r_info 32)
+let r_sym_of_info r_info =
+  Int64.to_int (Int64.shift_right_logical r_info 32)
 
 (* Extract relocation type from r_info (lower 32 bits) *)
-let r_type_of_info r_info = Int64.logand r_info 0xFFFFFFFFL
+let r_type_of_info r_info =
+  Int64.to_int (Int64.logand r_info 0xFFFFFFFFL)
 
-let iter_rela_entries ~rela_body ~f =
+(* Construct r_info from symbol index and relocation type *)
+let make_r_info ~sym ~typ =
+  Int64.logor (Int64.shift_left (Int64.of_int sym) 32) (Int64.of_int typ)
+
+(* Shared internal iterator over raw RELA entries *)
+let iter_rela_entries_raw ~rela_body ~f =
   let size = Owee_buf.size rela_body in
   if size mod rela_entry_size <> 0
   then
@@ -98,15 +77,126 @@ let iter_rela_entries ~rela_body ~f =
     let r_offset = Owee_buf.Read.u64 cursor in
     let r_info = Owee_buf.Read.u64 cursor in
     let r_addend = Owee_buf.Read.u64 cursor in
-    let entry =
-      { r_offset;
-        r_sym = r_sym_of_info r_info;
-        r_type = r_type_of_info r_info;
-        r_addend
-      }
-    in
-    f entry
+    f ~r_offset ~r_sym:(r_sym_of_info r_info)
+      ~r_type:(r_type_of_info r_info) ~r_addend
   done
+
+module X86_64 = struct
+  (* x86-64 relocation types (ELF ABI, psABI Table 4.9) *)
+  module Reloc_type = struct
+    type t =
+      | R_X86_64_64
+      | R_X86_64_PC32
+      | R_X86_64_PLT32
+      | R_X86_64_REX_GOTPCRELX
+
+    let to_int = function
+      | R_X86_64_64 -> 1
+      | R_X86_64_PC32 -> 2
+      | R_X86_64_PLT32 -> 4
+      | R_X86_64_REX_GOTPCRELX -> 42
+
+    let of_int = function
+      | 1 -> R_X86_64_64
+      | 2 -> R_X86_64_PC32
+      | 4 -> R_X86_64_PLT32
+      | 42 -> R_X86_64_REX_GOTPCRELX
+      | n -> failwith (Printf.sprintf "unknown x86-64 relocation type: %d" n)
+
+    let equal = (=)
+
+    let name = function
+      | R_X86_64_64 -> "R_X86_64_64"
+      | R_X86_64_PC32 -> "R_X86_64_PC32"
+      | R_X86_64_PLT32 -> "R_X86_64_PLT32"
+      | R_X86_64_REX_GOTPCRELX -> "R_X86_64_REX_GOTPCRELX"
+  end
+
+  type rela_entry =
+    { r_offset : int64;
+      r_sym : int;
+      r_type : Reloc_type.t;
+      r_addend : int64
+    }
+
+  let iter_rela_entries ~rela_body ~f =
+    iter_rela_entries_raw ~rela_body
+      ~f:(fun ~r_offset ~r_sym ~r_type ~r_addend ->
+        f { r_offset; r_sym; r_type = Reloc_type.of_int r_type; r_addend })
+
+  let write_rela_entry ~cursor entry =
+    Owee_buf.Write.u64 cursor entry.r_offset;
+    Owee_buf.Write.u64 cursor
+      (make_r_info ~sym:entry.r_sym ~typ:(Reloc_type.to_int entry.r_type));
+    Owee_buf.Write.u64 cursor entry.r_addend
+end
+
+module Aarch64 = struct
+  (* AArch64 relocation types (ELF ABI, IHI0056) *)
+  module Reloc_type = struct
+    type t =
+      | R_AARCH64_ABS64
+      | R_AARCH64_ADR_PREL_PG_HI21
+      | R_AARCH64_ADD_ABS_LO12_NC
+      | R_AARCH64_JUMP26
+      | R_AARCH64_CALL26
+      | R_AARCH64_LDST64_ABS_LO12_NC
+      | R_AARCH64_ADR_GOT_PAGE
+      | R_AARCH64_LD64_GOT_LO12_NC
+
+    let to_int = function
+      | R_AARCH64_ABS64 -> 257
+      | R_AARCH64_ADR_PREL_PG_HI21 -> 275
+      | R_AARCH64_ADD_ABS_LO12_NC -> 277
+      | R_AARCH64_JUMP26 -> 282
+      | R_AARCH64_CALL26 -> 283
+      | R_AARCH64_LDST64_ABS_LO12_NC -> 286
+      | R_AARCH64_ADR_GOT_PAGE -> 311
+      | R_AARCH64_LD64_GOT_LO12_NC -> 312
+
+    let of_int = function
+      | 257 -> R_AARCH64_ABS64
+      | 275 -> R_AARCH64_ADR_PREL_PG_HI21
+      | 277 -> R_AARCH64_ADD_ABS_LO12_NC
+      | 282 -> R_AARCH64_JUMP26
+      | 283 -> R_AARCH64_CALL26
+      | 286 -> R_AARCH64_LDST64_ABS_LO12_NC
+      | 311 -> R_AARCH64_ADR_GOT_PAGE
+      | 312 -> R_AARCH64_LD64_GOT_LO12_NC
+      | n ->
+        failwith (Printf.sprintf "unknown AArch64 relocation type: %d" n)
+
+    let equal = (=)
+
+    let name = function
+      | R_AARCH64_ABS64 -> "R_AARCH64_ABS64"
+      | R_AARCH64_ADR_PREL_PG_HI21 -> "R_AARCH64_ADR_PREL_PG_HI21"
+      | R_AARCH64_ADD_ABS_LO12_NC -> "R_AARCH64_ADD_ABS_LO12_NC"
+      | R_AARCH64_JUMP26 -> "R_AARCH64_JUMP26"
+      | R_AARCH64_CALL26 -> "R_AARCH64_CALL26"
+      | R_AARCH64_LDST64_ABS_LO12_NC -> "R_AARCH64_LDST64_ABS_LO12_NC"
+      | R_AARCH64_ADR_GOT_PAGE -> "R_AARCH64_ADR_GOT_PAGE"
+      | R_AARCH64_LD64_GOT_LO12_NC -> "R_AARCH64_LD64_GOT_LO12_NC"
+  end
+
+  type rela_entry =
+    { r_offset : int64;
+      r_sym : int;
+      r_type : Reloc_type.t;
+      r_addend : int64
+    }
+
+  let iter_rela_entries ~rela_body ~f =
+    iter_rela_entries_raw ~rela_body
+      ~f:(fun ~r_offset ~r_sym ~r_type ~r_addend ->
+        f { r_offset; r_sym; r_type = Reloc_type.of_int r_type; r_addend })
+
+  let write_rela_entry ~cursor entry =
+    Owee_buf.Write.u64 cursor entry.r_offset;
+    Owee_buf.Write.u64 cursor
+      (make_r_info ~sym:entry.r_sym ~typ:(Reloc_type.to_int entry.r_type));
+    Owee_buf.Write.u64 cursor entry.r_addend
+end
 
 (* Elf64_Sym layout:
    st_name  (4 bytes, offset 0)  - index into string table
@@ -138,15 +228,6 @@ let read_symbol_shndx ~symtab_body ~sym_index =
     (* st_shndx is at offset 6 within the symbol entry *)
     let cursor = Owee_buf.cursor symtab_body ~at:(sym_offset + 6) in
     Some (Section_index.of_int (Owee_buf.Read.u16 cursor))
-
-(* Construct r_info from symbol index and relocation type *)
-let make_r_info ~sym ~typ =
-  Int64.logor (Int64.shift_left (Int64.of_int sym) 32) (Reloc_type.to_int64 typ)
-
-let write_rela_entry ~cursor entry =
-  Owee_buf.Write.u64 cursor entry.r_offset;
-  Owee_buf.Write.u64 cursor (make_r_info ~sym:entry.r_sym ~typ:entry.r_type);
-  Owee_buf.Write.u64 cursor entry.r_addend
 
 (* Symbol binding attributes *)
 module Symbol_binding = struct

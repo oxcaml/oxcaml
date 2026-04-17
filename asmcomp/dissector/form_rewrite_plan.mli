@@ -109,8 +109,9 @@ module Rewritten_rela_section : sig
   (** Original file offset of this section. *)
   val section_offset : t -> int64
 
-  (** The rewritten relocation entries. *)
-  val entries : t -> Compiler_owee.Owee_elf_relocation.rela_entry list
+  (** [write_entries t ~cursor] writes all rewritten relocation entries for this
+      section at the current cursor position. *)
+  val write_entries : t -> cursor:Compiler_owee.Owee_buf.cursor -> unit
 end
 
 (** A rewrite plan for an ELF file. *)

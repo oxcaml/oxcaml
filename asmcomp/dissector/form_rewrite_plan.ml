@@ -110,14 +110,21 @@ end
 
 (* Rewritten relocation entries for a single .rela.text* section *)
 module Rewritten_rela_section = struct
+  type entries =
+    | X86_64 of Rela.X86_64.rela_entry list
+    | Aarch64 of Rela.Aarch64.rela_entry list
+
   type t =
     { section_offset : int64; (* Original file offset of this section *)
-      entries : Rela.rela_entry list
+      entries : entries
     }
 
   let section_offset t = t.section_offset
 
-  let entries t = t.entries
+  let write_entries t ~cursor =
+    match t.entries with
+    | X86_64 es -> List.iter (Rela.X86_64.write_rela_entry ~cursor) es
+    | Aarch64 es -> List.iter (Rela.Aarch64.write_rela_entry ~cursor) es
 end
 
 type t =
@@ -266,50 +273,91 @@ let build_symbol_rewrite_map ~igot_and_iplt ~relocations =
     (Extract_relocations.convert_to_got relocations);
   plt_map, got_map
 
-(* Rewrite a single .rela.text* section. Looks up each relocation's target
-   symbol and rewrites PLT32/GOTPCRELX relocations to PC32 relocations targeting
-   the synthetic IPLT/IGOT symbols.
-
-   - PLT32: function calls -> PC32 to IPLT entry - GOTPCRELX: GOT references ->
-   PC32 to IGOT entry *)
-let rewrite_rela_section ~rela_body ~symtab_body ~strtab_body ~symbol_to_index
-    ~plt_rewrite_map ~got_rewrite_map =
+(* Rewrite a .rela.text* section for x86-64. Rewrites PLT32/REX_GOTPCRELX
+   relocations to PC32 targeting synthetic IPLT/IGOT symbols. *)
+let rewrite_rela_section_x86_64 ~rela_body ~symtab_body ~strtab_body
+    ~symbol_to_index ~plt_rewrite_map ~got_rewrite_map =
+  let open Rela.X86_64 in
+  let open Reloc_type in
   let entries = ref [] in
-  Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
+  iter_rela_entries ~rela_body ~f:(fun entry ->
       let new_entry =
-        (* Look up the original symbol name for this relocation *)
         let sym_name_opt =
           Rela.read_symbol_name ~symtab_body ~strtab_body ~sym_index:entry.r_sym
         in
         match sym_name_opt with
         | None -> entry
         | Some sym_name -> (
-          (* Check if this relocation type/symbol should be rewritten *)
           let rewrite_to =
-            if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-            then String.Tbl.find_opt plt_rewrite_map sym_name
-            else if
-              Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
-            then String.Tbl.find_opt got_rewrite_map sym_name
-            else None
+            match entry.r_type with
+            | R_X86_64_PLT32 -> String.Tbl.find_opt plt_rewrite_map sym_name
+            | R_X86_64_REX_GOTPCRELX ->
+              String.Tbl.find_opt got_rewrite_map sym_name
+            | R_X86_64_64 | R_X86_64_PC32 -> None
           in
           match rewrite_to with
           | Some new_sym_name -> (
             match String.Tbl.find_opt symbol_to_index new_sym_name with
             | Some idx ->
               log_verbose "  rewrite reloc at 0x%Lx: %s %s -> PC32 to %s"
-                entry.r_offset
-                (Rela.Reloc_type.name entry.r_type)
-                sym_name new_sym_name;
-              { entry with r_sym = idx; r_type = Rela.Reloc_type.pc32 }
+                entry.r_offset (name entry.r_type) sym_name new_sym_name;
+              { entry with r_sym = idx; r_type = R_X86_64_PC32 }
             | None ->
               log_verbose
                 "  rewrite reloc at 0x%Lx: %s -> %s NOT FOUND in symtab"
-                entry.r_offset
-                (Rela.Reloc_type.name entry.r_type)
-                new_sym_name;
+                entry.r_offset (name entry.r_type) new_sym_name;
               entry)
           | None -> entry)
+      in
+      entries := new_entry :: !entries);
+  List.rev !entries
+
+(* Rewrite a .rela.text* section for AArch64. Rewrites ADR_GOT_PAGE to
+   ADR_PREL_PG_HI21 and LD64_GOT_LO12_NC to LDST64_ABS_LO12_NC, both targeting
+   the IGOT symbol. CALL26/JUMP26 are left alone. *)
+let rewrite_rela_section_aarch64 ~rela_body ~symtab_body ~strtab_body
+    ~symbol_to_index ~got_rewrite_map =
+  let open Rela.Aarch64.Reloc_type in
+  let entries = ref [] in
+  Rela.Aarch64.iter_rela_entries ~rela_body ~f:(fun entry ->
+      let new_entry =
+        let sym_name_opt =
+          Rela.read_symbol_name ~symtab_body ~strtab_body ~sym_index:entry.r_sym
+        in
+        match sym_name_opt with
+        | None -> entry
+        | Some sym_name -> (
+          let new_type_opt =
+            match entry.r_type with
+            | R_AARCH64_ADR_GOT_PAGE -> Some R_AARCH64_ADR_PREL_PG_HI21
+            | R_AARCH64_LD64_GOT_LO12_NC -> Some R_AARCH64_LDST64_ABS_LO12_NC
+            | R_AARCH64_ABS64 | R_AARCH64_ADR_PREL_PG_HI21
+            | R_AARCH64_ADD_ABS_LO12_NC | R_AARCH64_LDST64_ABS_LO12_NC
+            | R_AARCH64_JUMP26 | R_AARCH64_CALL26 ->
+              None
+          in
+          match new_type_opt with
+          | None -> entry
+          | Some new_type -> (
+            match String.Tbl.find_opt got_rewrite_map sym_name with
+            | None -> entry
+            | Some new_sym_name -> (
+              match String.Tbl.find_opt symbol_to_index new_sym_name with
+              | Some idx ->
+                log_verbose "  rewrite reloc at 0x%Lx: %s %s -> %s to %s"
+                  entry.r_offset
+                  (Rela.Aarch64.Reloc_type.name entry.r_type)
+                  sym_name
+                  (Rela.Aarch64.Reloc_type.name new_type)
+                  new_sym_name;
+                { entry with r_sym = idx; r_type = new_type }
+              | None ->
+                log_verbose
+                  "  rewrite reloc at 0x%Lx: %s -> %s NOT FOUND in symtab"
+                  entry.r_offset
+                  (Rela.Aarch64.Reloc_type.name entry.r_type)
+                  new_sym_name;
+                entry)))
       in
       entries := new_entry :: !entries);
   List.rev !entries
@@ -417,8 +465,17 @@ let compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
       (fun (section, rela_body) ->
         log_verbose "  rewriting section %s" section.Elf.sh_name_str;
         let entries =
-          rewrite_rela_section ~rela_body ~symtab_body ~strtab_body
-            ~symbol_to_index ~plt_rewrite_map ~got_rewrite_map
+          match Target_system.architecture () with
+          | X86_64 ->
+            Rewritten_rela_section.X86_64
+              (rewrite_rela_section_x86_64 ~rela_body ~symtab_body ~strtab_body
+                 ~symbol_to_index ~plt_rewrite_map ~got_rewrite_map)
+          | AArch64 ->
+            Rewritten_rela_section.Aarch64
+              (rewrite_rela_section_aarch64 ~rela_body ~symtab_body ~strtab_body
+                 ~symbol_to_index ~got_rewrite_map)
+          | IA32 | ARM | POWER | Z | Riscv ->
+            Misc.fatal_error "Dissector: unsupported architecture"
         in
         { Rewritten_rela_section.section_offset = section.Elf.sh_offset;
           entries
