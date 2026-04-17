@@ -2648,9 +2648,10 @@ and transl_handler ~scopes ~return_sort ~body_sort e body
         let val_cases = transl_cases ~scopes return_sort val_caselist in
         let param, param_duid = Typecore.name_cases "param" val_caselist in
         let body =
-          Matching.for_function ~scopes
-            ~arg_sort:body_sort ~arg_layout:body_layout ~return_layout
-            e.exp_loc None (Lvar param) val_cases partial
+          maybe_region_layout return_layout
+            (Matching.for_function ~scopes
+              ~arg_sort:body_sort ~arg_layout:body_layout ~return_layout
+              e.exp_loc None (Lvar param) val_cases partial)
         in
         lfunction ~kind:(Curried {nlocal=0})
           ~params:[mk_param param param_duid body_layout]
@@ -2661,8 +2662,9 @@ and transl_handler ~scopes ~return_sort ~body_sort e body
     let exn_cases = transl_cases ~scopes return_sort exn_caselist in
     let param, param_duid = Typecore.name_cases "exn" exn_caselist in
     let body =
-      Matching.for_trywith ~scopes ~return_layout e.exp_loc
-        (Lvar param) exn_cases
+      maybe_region_layout return_layout
+        (Matching.for_trywith ~scopes ~return_layout e.exp_loc
+          (Lvar param) exn_cases)
     in
     lfunction ~kind:(Curried {nlocal=0})
       ~params:[mk_param param param_duid layout_exception] ~return:return_layout
@@ -2675,8 +2677,9 @@ and transl_handler ~scopes ~return_sort ~body_sort e body
     let cont_tail = Ident.create_local "ktail" in
     let eff_cases = transl_cases ~scopes ~cont return_sort eff_caselist in
     let body =
-      Matching.for_handler ~scopes ~return_layout e.exp_loc (Lvar param)
-        (Lvar cont) (Lvar cont_tail) eff_cases
+      maybe_region_layout return_layout
+        (Matching.for_handler ~scopes ~return_layout e.exp_loc (Lvar param)
+          (Lvar cont) (Lvar cont_tail) eff_cases)
     in
     lfunction ~kind:(Curried {nlocal=0})
       ~params:[mk_param param param_duid Lambda.layout_block;
@@ -2689,7 +2692,9 @@ and transl_handler ~scopes ~return_sort ~body_sort e body
      the thunk. We always use the thunk path because we cannot verify that the
      arg has layout [value] from [Lapply]. *)
   let (body_fun, arg) =
-    let body = transl_exp ~scopes body_sort body in
+    let body =
+      maybe_region_layout body_layout (transl_exp ~scopes body_sort body)
+    in
     let param = Ident.create_local "param" in
     (lfunction ~kind:(Curried {nlocal=0})
        ~params:[mk_param param Lambda.debug_uid_none Lambda.layout_int]
