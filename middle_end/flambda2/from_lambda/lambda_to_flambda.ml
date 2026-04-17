@@ -1734,9 +1734,33 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
                 Flambda_kind.With_subkind.tagged_immediate ) ]
             Not_user_visible (Get_tag scrutinee) ~body
         in
-        if switch.sw_numblocks = 0
+        (* [sw_numblocks] and [sw_numconsts] count the number of block and
+           constant constructors in the _type definition_ of the switch, i.e.
+           one more than the largest possible block / constant tag (this is used
+           by the bytecode compiler).
+
+           If some of these have been eliminated by GADT reasoning, we can end
+           up in a situation where for instance:
+
+           - [sw_numconsts] is non-zero, because there are constant constructors
+           in the type declaration ;
+
+           - [consts] is empty, because all constant constructors are impossible
+           for the current match due to GADT reasoning ;
+
+           - There is no [failaction] (the pattern is exhaustive), because all
+           missing cases have been eliminated by GADT reasoning).
+
+           In this situation, we don't want to introduce the const/block switch
+           on %is_int, as one of the branches is already known to be
+           impossible. *)
+        if
+          switch.sw_numblocks = 0
+          || (Option.is_none failaction && List.is_empty blocks)
         then const_switch, wrappers
-        else if switch.sw_numconsts = 0
+        else if
+          switch.sw_numconsts = 0
+          || (Option.is_none failaction && List.is_empty consts)
         then block_switch, wrappers
         else
           let const_cont = Continuation.create () in
