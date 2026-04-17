@@ -175,7 +175,8 @@ module type Sort = sig
         saved to a cmi. *)
     val is_cmi_var : var -> bool
 
-    (** Extract the unique id for a [var]. *)
+    (** Extract the unique id for a [var]. Outside of a cmi, equal [id]s imply
+        physical equality of [var]s. *)
     val get_id : var -> id
 
     (** Get the number of an [id], useful for printing. These numbers get
