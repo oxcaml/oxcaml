@@ -135,6 +135,36 @@ map_to_constants:
   ret
 |}]
 
+(* CR ttebbi: This should load from a static array like [map_to_constants].
+   This is actually a deficiency in the middle end (simplify_switch_expr.ml),
+   but it's easier to demonstrate with expect_asm. *)
+let map_to_float_constants (t : t) : float# =
+  match t with
+  | A -> #5.0
+  | B -> #10.0
+  | C -> #2.0
+  | D -> #7.0
+[%%expect_asm X86_64{|
+map_to_float_constants:
+  sarq  $1, %rax
+  leaq  .L113(%rip), %rdx
+  movslq (%rdx,%rax,4), %rax
+  addq  %rax, %rdx
+  jmp   *%rdx
+.L104:
+  vmovsd .L114(%rip), %xmm0
+  ret
+.L106:
+  vmovsd .L115(%rip), %xmm0
+  ret
+.L108:
+  vmovsd .L116(%rip), %xmm0
+  ret
+.L110:
+  vmovsd .L117(%rip), %xmm0
+  ret
+|}]
+
 type t =
   | C of int
   | D of int
@@ -197,25 +227,25 @@ unnecessary_match:
   addq  %rax, %rdx
   jmp   *%rdx
 .L104:
-  movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
+  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
 .L109:
-  movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
+  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $3, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
 .L114:
-  movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
+  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $5, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
 .L119:
-  movq  camlTOP14__unnecessary_match_19@GOTPCREL(%rip), %rax
+  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
   movq  16(%rax), %rbx
   movl  $7, %eax
   movq  (%rbx), %rdi
