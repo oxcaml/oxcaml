@@ -35,21 +35,21 @@ type 'a block_or_closure_fields =
         fields : (Flambda_kind.t * 'a) option list
       }
   | Closure_fields of 'a Value_slot.Map.t * 'a Function_slot.Map.t
-  | Could_not_classify
+  | Block_and_closure_fields
 
 let classify_field_map fields =
   let r =
     Field.Map.fold
       (fun field x acc ->
         match acc with
-        | `Could_not_classify -> `Could_not_classify
+        | `Block_and_closure_fields -> `Block_and_closure_fields
         | (`Block_fields _ | `Closure_fields _ | `Empty) as acc -> (
           let[@inline] block_fields k =
             let[@local] k is_int get_tag fields =
               (k [@inlined hint]) ~is_int ~get_tag ~fields
             in
             match acc with
-            | `Closure_fields _ -> `Could_not_classify
+            | `Closure_fields _ -> `Block_and_closure_fields
             | `Block_fields (is_int, get_tag, fields) -> k is_int get_tag fields
             | `Empty -> k None None Numeric_types.Int.Map.empty
           in
@@ -60,12 +60,12 @@ let classify_field_map fields =
             match acc with
             | `Closure_fields (value_slots, function_slots) ->
               k value_slots function_slots
-            | `Block_fields _ -> `Could_not_classify
+            | `Block_fields _ -> `Block_and_closure_fields
             | `Empty -> k Value_slot.Map.empty Function_slot.Map.empty
           in
           match Field.view field with
           | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
-            `Could_not_classify
+            `Block_and_closure_fields
           | Value_slot vs ->
             closure_fields (fun ~value_slots ~function_slots ->
                 `Closure_fields
@@ -85,7 +85,7 @@ let classify_field_map fields =
           | Block (i, kind) ->
             block_fields (fun ~is_int ~get_tag ~fields ->
                 if Numeric_types.Int.Map.mem i fields
-                then `Could_not_classify
+                then `Block_and_closure_fields
                 else
                   `Block_fields
                     ( is_int,
@@ -95,7 +95,7 @@ let classify_field_map fields =
   in
   match r with
   | `Empty -> Empty
-  | `Could_not_classify -> Could_not_classify
+  | `Block_and_closure_fields -> Block_and_closure_fields
   | `Closure_fields (vs, fs) -> Closure_fields (vs, fs)
   | `Block_fields (is_int, get_tag, fields) ->
     let n =
@@ -134,11 +134,10 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
     (* For all these subkinds, we don't track fields (for now). Thus, being in
        this case without being top or bottom means that we never use this
        particular value, but that it syntactically looks like it could be used.
-       We probably could keep the subkind info, but as this value should not be
-       used, it is best to delete it. *)
+       We could keep the subkind info, but as this value should not be used, it
+       is best to delete it. *)
     erase kind
   | Variant { consts; non_consts } ->
-    (* CR ncourant: we should make sure poison is in the consts! *)
     (* We don't need to follow indirect code pointers for usage, since functions
        never appear in value_kinds *)
     let usages =
@@ -181,7 +180,7 @@ let rewrite_kind_with_subkind uses var kind =
       (Code_id_or_name.Map.singleton var ())
       kind
 
-let forget_all_types = Sys.getenv_opt "FORGETALL" <> None
+let forget_all_types = lazy (Flambda_features.debug_reaper "forget-types")
 
 let debug_types = lazy (Flambda_features.debug_reaper "types")
 
@@ -191,7 +190,7 @@ module Rewriter = struct
     | Single_source of Code_id_or_name.t
     | Many_sources_any_usage
     | Many_sources_usages of unit Code_id_or_name.Map.t
-    | No_usages
+    | At_least_one_source_no_usages
 
   type t = UA.result * t0
 
@@ -203,25 +202,31 @@ module Rewriter = struct
     | Many_sources_any_usage, Many_sources_any_usage -> 0
     | Many_sources_usages usages1, Many_sources_usages usages2 ->
       Code_id_or_name.Map.compare Unit.compare usages1 usages2
-    | No_usages, No_usages -> 0
+    | At_least_one_source_no_usages, At_least_one_source_no_usages -> 0
     | ( No_source,
         ( Single_source _ | Many_sources_any_usage | Many_sources_usages _
-        | No_usages ) ) ->
+        | At_least_one_source_no_usages ) ) ->
       -1
     | ( ( Single_source _ | Many_sources_any_usage | Many_sources_usages _
-        | No_usages ),
+        | At_least_one_source_no_usages ),
         No_source ) ->
       1
     | ( Single_source _,
-        (Many_sources_any_usage | Many_sources_usages _ | No_usages) ) ->
+        ( Many_sources_any_usage | Many_sources_usages _
+        | At_least_one_source_no_usages ) ) ->
       -1
-    | ( (Many_sources_any_usage | Many_sources_usages _ | No_usages),
+    | ( ( Many_sources_any_usage | Many_sources_usages _
+        | At_least_one_source_no_usages ),
         Single_source _ ) ->
       1
-    | Many_sources_any_usage, (Many_sources_usages _ | No_usages) -> -1
-    | (Many_sources_usages _ | No_usages), Many_sources_any_usage -> 1
-    | Many_sources_usages _, No_usages -> -1
-    | No_usages, Many_sources_usages _ -> 1
+    | ( Many_sources_any_usage,
+        (Many_sources_usages _ | At_least_one_source_no_usages) ) ->
+      -1
+    | ( (Many_sources_usages _ | At_least_one_source_no_usages),
+        Many_sources_any_usage ) ->
+      1
+    | Many_sources_usages _, At_least_one_source_no_usages -> -1
+    | At_least_one_source_no_usages, Many_sources_usages _ -> 1
 
   let compare (_result1, t1) (_result2, t2) = compare_t0 t1 t2
 
@@ -234,7 +239,8 @@ module Rewriter = struct
     | Many_sources_usages usages ->
       Format.fprintf ff "(Many_sources_usages %a)" Code_id_or_name.Set.print
         (Code_id_or_name.Map.keys usages)
-    | No_usages -> Format.fprintf ff "No_usages"
+    | At_least_one_source_no_usages ->
+      Format.fprintf ff "At_least_one_source_no_usages"
 
   let print ppf (_, t) = print_t0 ppf t
 
@@ -332,7 +338,7 @@ module Rewriter = struct
       if CNMSet.cardinal r = 1
       then (
         let set_of_closures = CNMSet.min_elt r in
-        let one_closure, () = Code_id_or_name.Map.min_binding set_of_closures in
+        let one_closure, () = Code_id_or_name.Map.choose set_of_closures in
         let by_function_slot =
           identify_function_slots_of_closure db one_closure
         in
@@ -527,10 +533,10 @@ module Rewriter = struct
           "Unexpected [No_source] usages in [uses_for_set_of_closures] for \
            function slot %a"
           Function_slot.print current_function_slot
-      | No_usages ->
+      | At_least_one_source_no_usages ->
         Misc.fatal_errorf
-          "Unexpected [No_usages] usages in [uses_for_set_of_closures] for \
-           function slot %a"
+          "Unexpected [At_least_one_source_no_usages] usages in \
+           [uses_for_set_of_closures] for function slot %a"
           Function_slot.print current_function_slot
       | Many_sources_any_usage -> any ()
       | Many_sources_usages s ->
@@ -558,8 +564,8 @@ module Rewriter = struct
             uses_of_function_slots_for_set_of_closures db function_slot_sources
           ))
 
-  let rec patterns_for_unboxed_fields ~machine_width ~bind_function_slots db
-      ~var fields unboxed_fields unboxed_block =
+  let rec patterns_for_unboxed_fields ~machine_width
+      ~patterns_for_function_slots db ~var fields unboxed_fields unboxed_block =
     let open Flambda2_types.Rewriter in
     let combined =
       Field.Map.merge
@@ -571,9 +577,22 @@ module Rewriter = struct
                [patterns_for_unboxed_fields]"
               Field.print field
           | Some _, None ->
+            (match Field.view field with
+            | Call_witness _ | Code_id_of_call_witness | Return_of_call _ ->
+              (* Virtual fields *) ()
+            | Function_slot _ -> (* Shortcut *) ()
+            | Block _ | Value_slot _ | Is_int | Get_tag -> (
+              let field_source =
+                PTA.get_single_field_source db unboxed_block field
+              in
+              match field_source with
+              | No_source -> ()
+              | One _ | Many ->
+                Misc.fatal_errorf
+                  "Field %a appeared in [fields] but not [unboxed_fields] in \
+                   [patterns_for_unboxed_fields]"
+                  Field.print field));
             None
-            (* This should only happen for fields like [Call_witness _], which
-               are ignored when creating unboxed fields. TODO: check this? *)
           | None, Some _ ->
             (* This should not happen if we only start
                [patterns_for_unboxed_fields] on the same name we started
@@ -619,7 +638,7 @@ module Rewriter = struct
             in
             let vars, patterns =
               patterns_for_unboxed_fields ~machine_width
-                ~bind_function_slots:None db ~var fields unboxed_fields
+                ~patterns_for_function_slots:None db ~var fields unboxed_fields
                 field_source
             in
             Unboxed_fields.Unboxed vars, patterns))
@@ -635,18 +654,20 @@ module Rewriter = struct
           Field.Map.empty value_slots
       in
       let pats =
-        match bind_function_slots with None -> pats | Some p -> p @ pats
+        match patterns_for_function_slots with
+        | None -> pats
+        | Some p -> p @ pats
       in
       vars, Pattern.closure pats
     in
     match classify_field_map combined with
-    | Empty when Option.is_some bind_function_slots ->
+    | Empty when Option.is_some patterns_for_function_slots ->
       closure Value_slot.Map.empty
-    | Empty | Could_not_classify ->
+    | Empty | Block_and_closure_fields ->
       ( Field.Map.map (fun (_, unboxed_fields) -> forget unboxed_fields) combined,
         Pattern.any )
     | Block_fields { is_int; get_tag; fields } ->
-      if Option.is_some bind_function_slots
+      if Option.is_some patterns_for_function_slots
       then
         Misc.fatal_errorf
           "[patterns_for_unboxed_fields] sees a block but needs to bind \
@@ -695,21 +716,25 @@ module Rewriter = struct
       | Used_as_vars vs ->
         let usages = PTA.get_direct_usages result.UA.db vs in
         if Code_id_or_name.Map.is_empty usages
-        then No_usages
+        then At_least_one_source_no_usages
         else Many_sources_usages usages
     in
     match t with
     | No_source ->
       Misc.fatal_errorf "Unexpected [No_source] in [follow_field] for field %a"
         Field.print field
-    | No_usages ->
-      Misc.fatal_errorf "Unexpected [No_usages] in [follow_field] for field %a"
+    | At_least_one_source_no_usages ->
+      Misc.fatal_errorf
+        "Unexpected [At_least_one_source_no_usages] in [follow_field] for \
+         field %a"
         Field.print field
     | Many_sources_any_usage -> Many_sources_any_usage
     | Many_sources_usages usages -> for_usages usages
     | Single_source source -> (
       if not (PTA.field_used result.UA.db source field)
-      then No_usages (* The field has been deleted when building the value *)
+      then
+        At_least_one_source_no_usages
+        (* The field has been deleted when building the value *)
       else
         match PTA.get_single_field_source result.UA.db source field with
         | No_source -> No_source
@@ -728,7 +753,7 @@ module Rewriter = struct
       Function_slot.Map.for_all
         (fun _ closure -> not (PTA.field_used result.UA.db closure field))
         set_of_closures
-    then No_usages
+    then At_least_one_source_no_usages
     else
       let sources =
         Function_slot.Map.map
@@ -736,7 +761,7 @@ module Rewriter = struct
             PTA.get_single_field_source result.UA.db closure field)
           set_of_closures
       in
-      let _, source = Function_slot.Map.min_binding sources in
+      let _, source = Function_slot.Map.choose sources in
       let () =
         assert (
           Function_slot.Map.for_all
@@ -761,7 +786,7 @@ module Rewriter = struct
         | Used_as_vars vs ->
           let usages = PTA.get_direct_usages result.db vs in
           if Code_id_or_name.Map.is_empty usages
-          then No_usages
+          then At_least_one_source_no_usages
           else Many_sources_usages usages)
 
   let rewrite (result, usages) typing_env flambda_type =
@@ -771,20 +796,15 @@ module Rewriter = struct
       (* CR ncourant: we should preserve the nullability of the type here. *)
       if
         Lazy.force debug_types
-        && (not (Flambda2_types.is_unknown typing_env flambda_type))
-        && not
-             (List.mem
-                (Flambda_colours.without_colours ~f:(fun () ->
-                     Format.asprintf "%a" Flambda2_types.print flambda_type))
-                ["(Val? ⊤)"; "(Val! ⊤)"])
+        && not (Flambda2_types.is_unknown_maybe_null typing_env flambda_type)
       then
         Format.eprintf "Forgetting: %a@.Usages = %a@." Flambda2_types.print
           flambda_type print_t0 usages;
       Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
     in
     match usages with
-    | _ when forget_all_types -> forget_type ()
-    | No_usages -> forget_type ()
+    | _ when Lazy.force forget_all_types -> forget_type ()
+    | At_least_one_source_no_usages -> forget_type ()
     | Many_sources_usages m when Code_id_or_name.Map.is_empty m ->
       forget_type ()
     | No_source ->
@@ -872,11 +892,11 @@ module Rewriter = struct
                 Function_slot.Map.add new_function_slot (Expr.var v) m)
               usages_of_function_slots Function_slot.Map.empty
           in
-          let bind_function_slots = Some !patterns in
+          let patterns_for_function_slots = Some !patterns in
           let bound, pat =
             patterns_for_unboxed_fields
               ~machine_width:(Typing_env.machine_width typing_env)
-              ~bind_function_slots db
+              ~patterns_for_function_slots db
               ~var:(fun _ (field_source : PTA.single_field_source) field_use ->
                 let metadata =
                   match field_source, field_use with
@@ -916,7 +936,7 @@ module Rewriter = struct
             Value_slot.Map.filter_map
               (fun value_slot metadata ->
                 match metadata with
-                | No_usages -> None
+                | At_least_one_source_no_usages -> None
                 | No_source -> raise Exit
                 | Single_source _ | Many_sources_any_usage
                 | Many_sources_usages _ ->
@@ -970,8 +990,8 @@ module Rewriter = struct
                 (fun _ (use, _) ->
                   match use with
                   | Single_source _ -> true
-                  | No_source | No_usages | Many_sources_usages _
-                  | Many_sources_any_usage ->
+                  | No_source | At_least_one_source_no_usages
+                  | Many_sources_usages _ | Many_sources_any_usage ->
                     false)
                 function_slots_metadata_and_uses
             in
@@ -1278,7 +1298,7 @@ let rewrite_typing_env result ~unit_symbol:_ typing_env =
       if not (PTA.has_source_query db sym)
       then result, Rewriter.No_source
       else if not (PTA.has_use db sym)
-      then result, Rewriter.No_usages
+      then result, Rewriter.At_least_one_source_no_usages
       else
         match PTA.get_allocation_point db sym with
         | Some alloc_point -> result, Rewriter.Single_source alloc_point
@@ -1319,6 +1339,15 @@ let rewrite_result_types result ~old_typing_env ~my_closure:func_my_closure
       then
         Misc.fatal_errorf "In [rewrite_result_types], var %a is unboxed but top"
           Code_id_or_name.print var;
+      let allocation_point =
+        match PTA.get_allocation_point db var with
+        | None ->
+          Misc.fatal_errorf
+            "In [rewrite_result_types], var %a is unboxed but could not get \
+             its allocation point"
+            Code_id_or_name.print var
+        | Some allocation_point -> allocation_point
+      in
       let fields =
         PTA.get_fields db
           (PTA.get_all_usages ~follow_known_arity_calls:true db
@@ -1327,7 +1356,7 @@ let rewrite_result_types result ~old_typing_env ~my_closure:func_my_closure
       let bound, pat =
         Rewriter.patterns_for_unboxed_fields
           ~machine_width:(Typing_env.machine_width old_typing_env)
-          ~bind_function_slots:None db
+          ~patterns_for_function_slots:None db
           ~var:(fun v field_source field_use ->
             let metadata =
               match field_source, field_use with
@@ -1339,19 +1368,18 @@ let rewrite_result_types result ~old_typing_env ~my_closure:func_my_closure
                 Rewriter.Many_sources_usages usages
             in
             Variable.name v, (result, metadata))
-          fields unboxed_fields
-          (Option.get (PTA.get_allocation_point db var))
+          fields unboxed_fields allocation_point
       in
       let all_vars =
         Unboxed_fields.fold_with_kind
           (fun _kind (pattern_var, v) acc ->
-            if Option.is_none pattern_var
-            then
-              Format.eprintf
+            match pattern_var with
+            | None ->
+              Misc.fatal_errorf
                 "In [rewrite_result_types], could not get a pattern variable \
                  for unboxed var %a@."
-                Variable.print v;
-            Option.get pattern_var :: acc)
+                Variable.print v
+            | Some pattern_var -> pattern_var :: acc)
           bound []
       in
       (pat, kind), all_vars)
@@ -1363,7 +1391,7 @@ let rewrite_result_types result ~old_typing_env ~my_closure:func_my_closure
           if not (PTA.has_source_query db var)
           then result, Rewriter.No_source
           else if not (PTA.has_use db var)
-          then result, Rewriter.No_usages
+          then result, Rewriter.At_least_one_source_no_usages
           else
             match PTA.get_allocation_point db var with
             | Some alloc_point -> result, Rewriter.Single_source alloc_point

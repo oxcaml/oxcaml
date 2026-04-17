@@ -159,9 +159,9 @@ end
 type unboxed = Variable.t Unboxed_fields.t
 
 type changed_representation =
-  (* CR ncourant: this is currently never produced, because we need to rewrite
-     the value_kinds to account for changed representations before enabling
-     this *)
+  (* CR ncourant: [Block_representation] is currently never produced, because we
+     need to rewrite the value_kinds to account for changed representations
+     before enabling it *)
   | Block_representation of
       (int * Flambda_primitive.Block_access_kind.t) Unboxed_fields.t * int
   | Closure_representation of
