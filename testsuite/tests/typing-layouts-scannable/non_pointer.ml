@@ -412,6 +412,15 @@ Error: This expression has type "a or_null"
 |}]
 
 module M : sig
+  type t : immediate_or_null
+end = struct
+  type t = int or_null
+end
+[%%expect{|
+module M : sig type t : immediate_or_null end
+|}]
+
+module M : sig
   type t : immediate_or_null & float64
 end = struct
   type t = #(int or_null * float#)
@@ -603,4 +612,95 @@ type check = non_pointer require_non_pointer
 [%%expect{|
 type non_pointer : value non_pointer
 type check = non_pointer require_non_pointer
+|}]
+
+(* Mixed records and mutual recursion edge cases *)
+
+module Equal_layout : sig
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end = struct
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end
+[%%expect{|
+module Equal_layout :
+  sig type t : value non_pointer type s type r = { r : #(t * s); } end
+|}]
+
+module Less_layout : sig
+  type t : value non_pointer
+  type s
+  type r = { r : #(t * s) }
+end = struct
+  type t : value non_pointer
+  type s : value non_pointer
+  type r = { r : #(t * s) }
+end
+[%%expect{|
+module Less_layout :
+  sig type t : value non_pointer type s type r = { r : #(t * s); } end
+|}]
+
+module Not_le_layout : sig
+  type r = { r : #(t * s) }
+  and t : value non_pointer
+  and s
+end = struct
+  type r = { r : #(t * s) }
+  and t
+  and s
+end
+[%%expect{|
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type r = { r : #(t * s) }
+7 |   and t
+8 |   and s
+9 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type r = { r : #(t * s); } and t and s end
+       is not included in
+         sig type r = { r : #(t * s); } and t : value non_pointer and s end
+       Type declarations do not match:
+         type t
+       is not included in
+         type t : value non_pointer
+       The layout of the first is value
+         because of the definition of t at line 7, characters 2-7.
+       But the layout of the first must be a sublayout of value non_pointer
+         because of the definition of t at line 3, characters 2-27.
+       Note: The layout of immediate is value non_pointer.
+|}]
+
+(* We only compare record representations up to scannable axes for the inclusion
+   check, to support type substitution edge cases.
+   See also Note [Ignoring scannable axes in type declaration representations]
+   in typing/types.mli
+*)
+
+module M : sig
+  type t
+  (* Because [t := int] only via the substitution below, the compiler doesn't
+     realize that [t] is [non_pointer] when computing the type declaration *)
+  type r = { t : t; i : int64# }
+end with type t := int = struct
+  type r = { t : int ; i : int64# }
+end
+
+(* Then, for this check, the new record declaration technically has a more
+   precise representation, but we accept it as we only compare representations
+   up to scannable axes.
+
+   This can lead to a unnecessary [caml_modify] in some uncommon cases: see the
+   test with a "CR layouts-scannable" in
+   testsuite/tests/typing-layouts-caml-modify/non_pointer.ml
+*)
+type r = M.r = { t : int ; i : int64# }
+[%%expect{|
+module M : sig type r = { t : int; i : int64#; } end
+type r = M.r = { t : int; i : int64#; }
 |}]

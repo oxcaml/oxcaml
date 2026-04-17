@@ -310,6 +310,8 @@ module Builtin : sig
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
 
+  val scannable : why:History.scannable_creation_reason -> 'd Types.jkind
+
   val value_or_null :
     why:History.value_or_null_creation_reason -> 'd Types.jkind
 

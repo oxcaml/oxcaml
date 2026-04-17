@@ -479,7 +479,7 @@ and type_origin =
   | Existential of string
 
 and mixed_block_element =
-  | Scannable
+  | Scannable of Jkind_types.Scannable_axes.t
   | Float_boxed
   | Float64
   | Float32
@@ -861,9 +861,9 @@ let compare_tag t1 t2 =
   | Extension _, Null -> -1
   | Null, Extension _ -> 1
 
-let rec equal_mixed_block_element e1 e2 =
+let rec equal_mixed_block_element_up_to_scannable_axes e1 e2 =
   match e1, e2 with
-  | Scannable, Scannable
+  | Scannable _, Scannable _
   | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16
@@ -872,15 +872,21 @@ let rec equal_mixed_block_element e1 e2 =
   | Void, Void
     -> true
   | Product es1, Product es2
-    -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Scannable | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
+    -> Misc.Stdlib.Array.equal
+         equal_mixed_block_element_up_to_scannable_axes es1 es2
+  | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
     | Product _ | Void ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Scannable, Scannable | Float_boxed, Float_boxed
+  | Scannable sa1, Scannable sa2 -> (
+    match Jkind_types.Scannable_axes.less_or_equal sa1 sa2 with
+    | Less -> -1
+    | Equal -> 0
+    | Not_le -> 1)
+  | Float_boxed, Float_boxed
   | Float64, Float64 | Float32, Float32
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
@@ -889,8 +895,8 @@ let rec compare_mixed_block_element e1 e2 =
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
-  | Scannable, _ -> -1
-  | _, Scannable -> 1
+  | Scannable _, _ -> -1
+  | _, Scannable _ -> 1
   | Float_boxed, _ -> -1
   | _, Float_boxed -> 1
   | Float64, _ -> -1
@@ -918,21 +924,23 @@ let rec compare_mixed_block_element e1 e2 =
   | Void, _ -> -1
   | _, Void -> 1
 
-let equal_mixed_product_shape r1 r2 = r1 == r2 ||
-  Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
+let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
+  Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
 
-let equal_constructor_representation r1 r2 = r1 == r2 || match r1, r2 with
+let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
+  match r1, r2 with
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
-      equal_mixed_product_shape mx1 mx2
+      equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
   | (Constructor_mixed _ | Constructor_uniform_value), _ -> false
 
-let equal_variant_representation r1 r2 = r1 == r2 || match r1, r2 with
+let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
+  match r1, r2 with
   | Variant_unboxed, Variant_unboxed ->
       true
   | Variant_boxed cstrs_and_sorts1, Variant_boxed cstrs_and_sorts2 ->
       Misc.Stdlib.Array.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
-          equal_constructor_representation cstr1 cstr2
+          equal_constructor_representation_up_to_scannable_axes cstr1 cstr2
           && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
                sorts1 sorts2)
         cstrs_and_sorts1
@@ -943,7 +951,7 @@ let equal_variant_representation r1 r2 = r1 == r2 || match r1, r2 with
   | (Variant_unboxed | Variant_boxed _ | Variant_extensible | Variant_with_null), _ ->
       false
 
-let equal_record_representation r1 r2 = match r1, r2 with
+let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true
   | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
@@ -951,19 +959,22 @@ let equal_record_representation r1 r2 = match r1, r2 with
          constructor representation. *)
       ignore (cr1 : constructor_representation);
       ignore (cr2 : constructor_representation);
-      equal_tag tag1 tag2 && equal_variant_representation vr1 vr2
+      equal_tag tag1 tag2 &&
+        equal_variant_representation_up_to_scannable_axes vr1 vr2
   | Record_boxed sorts1, Record_boxed sorts2 ->
       Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal sorts1 sorts2
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->
       true
-  | Record_mixed mx1, Record_mixed mx2 -> equal_mixed_product_shape mx1 mx2
+  | Record_mixed mx1, Record_mixed mx2 ->
+      equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
   | (Record_unboxed | Record_inlined _ | Record_boxed _ | Record_float
     | Record_ufloat | Record_mixed _), _ ->
       false
 
-let equal_record_unboxed_product_representation r1 r2 = match r1, r2 with
+let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
+  match r1, r2 with
   | Record_unboxed_product, Record_unboxed_product -> true
 
 let may_equal_constr c1 c2 =
@@ -1008,9 +1019,14 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
   | Legacy -> "record"
   | Unboxed_product -> "unboxed record"
 
+(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
-  | Base Scannable -> Scannable
+  (* CR layouts-scannable: since sorts do not store scannable axis information,
+     we are forced to default to max. It would be good to store the scannable
+     axis information, but doing so takes a sizable refactor. See the comment
+     on [Sort] in [jkind_intf.ml] *)
+  | Base Scannable -> Scannable Jkind_types.Scannable_axes.max
   | Base Bits8 -> Bits8
   | Base Bits16 -> Bits16
   | Base Bits32 -> Bits32
@@ -1087,7 +1103,7 @@ let bound_value_identifiers_and_sorts sigs =
   List.filter_map signature_item_representation sigs
 
 let rec mixed_block_element_to_string = function
-  | Scannable -> "Scannable"
+  | Scannable _ -> "Scannable"
   | Float_boxed -> "Float_boxed"
   | Float32 -> "Float32"
   | Float64 -> "Float64"
@@ -1108,7 +1124,7 @@ let rec mixed_block_element_to_string = function
   | Void -> "Void"
 
 let mixed_block_element_to_lowercase_string = function
-  | Scannable -> "value"
+  | Scannable _ -> "scannable"
   | Float_boxed -> "float"
   | Float32 -> "float32"
   | Float64 -> "float64"
