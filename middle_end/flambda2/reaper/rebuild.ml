@@ -2425,6 +2425,7 @@ type result =
   }
 
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
+    ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
     ~fixed_arity_continuations ~final_typing_env kinds
     (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
@@ -2581,32 +2582,12 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
   in
   let rebuilt_expr, { all_slot_offsets; all_code; code_ids_to_remember } =
     Profile.record_call ~accumulate:true "up" (fun () ->
-        (* Invariant: if a code with code_id [f] contains a set of closures with
-           code_id [g], the size of the code with code_id [f] is larger than the
-           size of the code with code_id [g] before the reaper. Since the reaper
-           never puts code_ids in sets of closures that weren't there before,
-           rebuilding code in increasing order of code size is enough to ensure
-           that when we rebuild a set of closures, we have already rebuilt the
-           code of the mentionned code_ids. *)
-        let code = Code_id.Map.bindings code in
-        let code =
-          List.stable_sort
-            (fun (_, rev_code1) (_, rev_code2) ->
-              let meta1 = rev_code1.Rev_expr.code_metadata in
-              let meta2 = rev_code2.Rev_expr.code_metadata in
-              let size1 =
-                Cost_metrics.size (Code_metadata.cost_metrics meta1)
-              in
-              let size2 =
-                Cost_metrics.size (Code_metadata.cost_metrics meta2)
-              in
-              Int.compare (Code_size.to_int size1) (Code_size.to_int size2))
-            code
-        in
         let res =
-          List.fold_left
-            (fun res (_, rev_code) -> rebuild_code env res rev_code)
-            res code
+          Array.fold_left
+            (fun res code_id ->
+              let rev_code = Code_id.Map.find code_id code in
+              rebuild_code env res rev_code)
+            res ordered_code_ids
         in
         rebuild_expr env res toplevel_expr)
   in

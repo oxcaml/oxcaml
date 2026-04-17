@@ -115,7 +115,8 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
       match code_id with
       | Deleted _ -> ()
       | Code_id { code_id; only_full_applications } ->
-        Acc.add_set_of_closures_dep acc name code_id ~only_full_applications)
+        Acc.add_set_of_closures_dep acc name ~closure_code_id:code_id
+          ~only_full_applications ~defined_in_code_id:(Env.current_code_id denv))
     names_and_function_slots;
   Function_slot.Lmap.iter
     (fun _function_slot function_slot_name ->
@@ -824,6 +825,7 @@ and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
 type result =
   { toplevel_expr : Rev_expr.t;
     code : Rev_expr.rev_code Code_id.Map.t;
+    ordered_code_ids : Code_id.t array;
     deps : Global_flow_graph.graph;
     kinds : K.t Name.Map.t;
     fixed_arity_continuations : Continuation.Set.t;
@@ -885,6 +887,7 @@ let run (unit : Flambda_unit.t) =
   if Flambda_features.debug_reaper "print-raw" then Dot.print_dep deps;
   { toplevel_expr = holed;
     code = Acc.get_all_code acc;
+    ordered_code_ids = Acc.sort_code_ids acc;
     deps;
     kinds;
     fixed_arity_continuations;
