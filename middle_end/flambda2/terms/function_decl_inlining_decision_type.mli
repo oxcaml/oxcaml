@@ -21,6 +21,8 @@ type t =
   | Functor_body_too_large of Code_size.t
   | Stub
   | Attribute_inline
+  (* CR mshinwell/bclement: we could consider combining Small_function and
+     Small_functor in the future, with a flag for functors *)
   | Small_function of
       { size : Code_size.t;
         small_function_size : Code_size.t
