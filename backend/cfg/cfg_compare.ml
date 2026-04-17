@@ -386,27 +386,26 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
             "Result register count mismatch at old=%a(id:%a) new=%a(id:%a): \
              old has %d res, new has %d res@."
             Label.format ol InstructionId.print old_i.id Label.format nl
-            InstructionId.print new_i.id n
-            (Array.length new_i.res);
+            InstructionId.print new_i.id n (Array.length new_i.res);
           eqs)
         else
-        let eqs = ref eqs in
-        for i = 0 to n - 1 do
-          let old_r = old_i.res.(i) in
-          let new_r = new_i.res.(i) in
-          if old_r.Reg.loc <> Reg.Unknown && new_r.Reg.loc <> Reg.Unknown
-          then (
-            if not (Reg.same_loc old_r new_r)
-            then
-              Format.fprintf ppf_m
-                "Physical result reg mismatch at old=%a(id:%a) new=%a(id:%a): \
-                 %a vs %a@."
-                Label.format ol InstructionId.print old_i.id Label.format nl
-                InstructionId.print new_i.id Printreg.reg old_r Printreg.reg
-                new_r)
-          else eqs := Equations.remove_pair !eqs ~old_r ~new_r
-        done;
-        !eqs
+          let eqs = ref eqs in
+          for i = 0 to n - 1 do
+            let old_r = old_i.res.(i) in
+            let new_r = new_i.res.(i) in
+            if old_r.Reg.loc <> Reg.Unknown && new_r.Reg.loc <> Reg.Unknown
+            then (
+              if not (Reg.same_loc old_r new_r)
+              then
+                Format.fprintf ppf_m
+                  "Physical result reg mismatch at old=%a(id:%a) \
+                   new=%a(id:%a): %a vs %a@."
+                  Label.format ol InstructionId.print old_i.id Label.format nl
+                  InstructionId.print new_i.id Printreg.reg old_r Printreg.reg
+                  new_r)
+            else eqs := Equations.remove_pair !eqs ~old_r ~new_r
+          done;
+          !eqs
       in
       (* Check for residual output equations *)
       let check_side res ~find =

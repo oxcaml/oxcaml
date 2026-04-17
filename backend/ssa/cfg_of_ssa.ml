@@ -99,21 +99,17 @@ let fuse_comparison (cond : Ssa.instruction) ~true_label ~false_label :
 (* Decrement usage counts of comparisons that will be fused into branch
    terminators. Must run before block conversion so the body emission pass sees
    the post-fusion counts. After fusion, the branch terminator uses the
-   comparison's args directly, so we pre-increment their use counts to keep
-   them alive across the (potentially recursive) decrement. *)
+   comparison's args directly, so we pre-increment their use counts to keep them
+   alive across the (potentially recursive) decrement. *)
 let decrement_fused_branch_conditions (ssa : Ssa.t) =
   List.iter
     (fun (block : Ssa.block) ->
       match[@warning "-fragile-match"] block.terminator with
-      | Branch { cond; _ }
-        when Option.is_some
-               (fuse_comparison cond ~true_label:Label.none
-                  ~false_label:Label.none) -> (
-        match[@warning "-fragile-match"] cond with
-        | Op { args; _ } ->
-          Array.iter Ssa.increment_use args;
-          Ssa.decrement_use cond
-        | _ -> ())
+      | Branch { cond; _ } ->
+        fuse_comparison cond ~true_label:Label.none ~false_label:Label.none
+        |> Option.iter (fun (_, args) ->
+            Array.iter Ssa.increment_use args;
+            Ssa.decrement_use cond)
       | _ -> ())
     ssa.blocks
 
@@ -125,9 +121,9 @@ let bump_unused_op_counts (ssa : Ssa.t) =
   List.iter
     (fun (block : Ssa.block) ->
       Array.iter
-        (fun (i : Ssa.instruction) ->
-          match i with
-          | Op r when r.usage_count = 0 -> Ssa.increment_use i
+        (fun (instr : Ssa.instruction) ->
+          match instr with
+          | Op r when r.usage_count = 0 -> Ssa.increment_use instr
           | Op _ | Block_param _ | Proj _ | Push_trap _ | Pop_trap _
           | Stack_check _ | Name_for_debugger _ ->
             ())
