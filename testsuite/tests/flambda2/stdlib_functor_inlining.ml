@@ -41,12 +41,13 @@ module S1 = (Set.Make [@inlined]) (Ord_key)
 module S2 = (Set.MakePortable [@inlined]) (Ord_key)
 
 (* Use something from each resulting module to prevent them being discarded
-   entirely. *)
-let _ = H1.create 0
-let _ = H2.create 0
-let _ = H3.create 0
-let _ = H4.create 0
-let _ = M1.empty
-let _ = M2.empty
-let _ = S1.empty
-let _ = S2.empty
+   entirely. [Sys.opaque_identity] is used to stop the optimizer removing the
+   allocations/uses. *)
+let _ = Sys.opaque_identity (H1.create 0 : int H1.t)
+let _ = Sys.opaque_identity (H2.create 0 : int H2.t)
+let _ = Sys.opaque_identity (H3.create 0 : int H3.t)
+let _ = Sys.opaque_identity (H4.create 0 : int H4.t)
+let _ = Sys.opaque_identity (M1.empty : int M1.t)
+let _ = Sys.opaque_identity (M2.empty : int M2.t)
+let _ = Sys.opaque_identity (S1.empty : S1.t)
+let _ = Sys.opaque_identity (S2.empty : S2.t)
