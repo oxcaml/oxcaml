@@ -533,3 +533,17 @@ let () = Printf.printf "%.1f\n" (to_float (f 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 Uncaught exception: Misc.Fatal_error
 
 |}]
+
+external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity"
+external to_float : float# -> float = "%box_float" [@@warning "-187"]
+let x =
+  let[@inline never] poly_ f x = id x in
+  let a = f 2 in
+  let b = f #3.0 |> to_float in
+  (a, b)
+
+[%%expect{|
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+external to_float : float# -> float = "%box_float"
+val x : int * float = (2, 3.)
+|}]
