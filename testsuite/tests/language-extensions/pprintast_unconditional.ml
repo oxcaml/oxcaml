@@ -25,6 +25,7 @@ module Example = struct
   end
 
   let longident        = parse longident "No.Longidents.Require.extensions"
+  let constr           = longident
   let expression       = parse expression "[x for x = 1 to 10]"
   let pattern          = parse pattern "[:_:]"
   let core_type        = parse core_type "local_ ('a : value) -> unit"
@@ -153,6 +154,7 @@ end = struct
   ;;
 
   let longident = test "longident" longident Example.longident
+  let constr = test "constr" constr Example.constr
   let expression = test "expression" expression Example.expression
   let pattern = test "pattern" pattern Example.pattern
   let core_type = test "core_type" core_type Example.core_type
@@ -185,8 +187,10 @@ end = struct
 
   module Doc = struct
     let longident = Doc.longident
+    let constr = Doc.constr
     let tyvar = Doc.tyvar
     let jkind_annotation = Doc.jkind_annotation
+    let nominal_exp = Doc.nominal_exp
   end
 end
 
