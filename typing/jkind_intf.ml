@@ -168,16 +168,15 @@ module type Sort = sig
   end
 
   module Var : sig
-    type id = int
+    type id = private int
+    (* the [private int] allows the debugger to print it *)
+
+    (** Checks whether a [var] satisfies the properties that hold for variables
+        saved to a cmi. *)
+    val is_cmi_var : var -> bool
 
     (** Extract the unique id for a [var]. *)
     val get_id : var -> id
-
-    (** Extract the variable contents. *)
-    val get_contents : var -> t option
-
-    (** Extract the variable level. *)
-    val get_level : var -> int
 
     (** Get the number of an [id], useful for printing. These numbers get
         allocated only when an [id] gets printed, and so they are less brittle
