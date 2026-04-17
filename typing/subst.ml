@@ -431,10 +431,10 @@ let to_subst_by_type_function s p =
   | Type_function _ -> true
   | exception Not_found -> false
 
-(* Special type and sort ids for saved signatures *)
+(* Special type ids for saved signatures *)
 
 let new_type_id = s_ref (-1)
-let reset_additional_action_id () =
+let reset_additional_action_type_id () =
   new_type_id := -1;
   Jkind_types.Sort.reset_cmi_sort_id ()
 
@@ -524,8 +524,8 @@ let apply_type_function params args body =
 let sort_var s srt var =
   let open Jkind_types.Sort in
   let assert_generic var =
-    if Var.get_level var <> generic_level then
-      fatal_errorf "sort_var: not generic, level is %d" (Var.get_level var);
+    if not (is_genvar var) then
+      fatal_errorf "sort_var: not generic"
   in
   let id = Var.get_id var in
   let var' =
