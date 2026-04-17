@@ -168,6 +168,8 @@ module Layout : sig
         [Base Float64], [Product], [Univar], [Genvar]). *)
     val get_root_scannable_axes : t -> Scannable_axes.t option
 
+    (** Updates the scannable axes at the root of [t] (changes nothing when
+        [get_root_scannable_axes] would return [None]). *)
     val set_root_scannable_axes : t -> Scannable_axes.t -> t
 
     (** Meets [sa] into [t]'s root scannable axes (if [t] has meaningful ones;
