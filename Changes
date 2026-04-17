@@ -21,6 +21,7 @@ OCaml 5.4.1
 - #14667: enable application related warnings for module-dependent functions
   (Florian Angeletti, review by Gabriel Scherer)
 
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 
@@ -516,6 +517,9 @@ OCaml 5.4.0 (9 October 2025)
 
 - #14512: Improve check for warning 16 (unerasable-optional-argument)
   (Alistair O'Brien, review by Florian Angeletti, Gabriel Scherer)
+
+- #14719, #14721: compute arity correctly for module-dependent function
+  (Florian Angeletti, report by Jeremy Yallop, review by Stefan Muenzel)
 
 - #13539, #13776: Use nanosleep instead of usleep or select, if available.
   (Antonin Décimo, review by Miod Vallat and Gabriel Scherer)

@@ -6363,6 +6363,74 @@ type type_function_result_param =
     has_poly : bool;
   }
 
+(* Require that the n-ary function is known to have at least n arrows in
+   the type. This prevents GADT equations introduced by the parameters from
+   hiding arrows from the resulting type. *)
+let enforce_syntactic_arity ~loc env exp_type ~syntactic_arity result_params
+    body =
+  (* Assert that [ty] is a function, and return its return type. *)
+  let filter_ty_ret_exn arg_label ~param_hole (env, ty) =
+    match filter_arity env ty arg_label ~param_hole with
+    | Ok (env, ty_ret) -> env, ty_ret
+    | Error error ->
+        let trace =
+          match error with
+          | Unification_error trace -> trace
+          | Not_a_function ->
+              let tarrow =
+                let new_ty_var why =
+                  newvar
+                    (Jkind.of_new_sort ~why
+                       ~level:(Ctype.get_current_level ()))
+                in
+                let new_mode_var () = Mode.Alloc.newvar () in
+                (newty
+                   (Tarrow
+                      ( (arg_label, new_mode_var (), new_mode_var ())
+                      , newmono (new_ty_var Function_argument)
+                      , new_ty_var Function_result
+                      , commu_ok )));
+              in
+              (* We go to some trouble to try to generate a unification
+                 error to help the error printing code's heuristic to
+                 identify the type equation at fault.
+              *)
+              (try
+                 unify env tarrow ty;
+                 fatal_error "unification unexpectedly succeeded"
+               with Unify trace -> trace)
+          | Label_mismatch _ ->
+              fatal_error
+                "Label_mismatch not expected as this point; this should \
+                 have been caught when the function was typechecked."
+          | Jkind_error _ ->
+              fatal_error
+                "Jkind_error not expected as this point; this should \
+                 have been caught when the function was typechecked."
+        in
+        let err =
+          Function_arity_type_clash
+            { syntactic_arity;
+              type_constraint = exp_type;
+              trace;
+            }
+        in
+        raise (Error (loc, env, err))
+  in
+  let env_ret_ty =
+    List.fold_left (fun env_ret_ty {param; has_poly} ->
+        filter_ty_ret_exn param.fp_arg_label ~param_hole:has_poly env_ret_ty
+      )
+      (env, exp_type)
+      result_params
+  in
+  match body with
+  | Tfunction_body _ -> ()
+  | Tfunction_cases _ ->
+      ignore
+        (filter_ty_ret_exn Nolabel ~param_hole:false env_ret_ty
+         : Env.t * type_expr)
+
 (* The result of calling [type_function]. For the outer call to
    [type_function], it's the result of typechecking the entire function;
    for recursive calls to [type_function], it's the result of typechecking
@@ -11840,67 +11908,8 @@ and type_n_ary_function
     begin match contains_gadt with
     | No_gadt -> ()
     | Contains_gadt ->
-        (* Assert that [ty] is a function, and return its return type. *)
-        let filter_ty_ret_exn ty arg_label ~param_hole =
-          match filter_arrow env ~in_apply:false ty arg_label ~param_hole with
-          | Ok { ty_ret; _ } -> ty_ret
-          | Error error ->
-              let trace =
-                match error with
-                | Unification_error trace -> trace
-                | Not_a_function ->
-                    let tarrow =
-                      let new_ty_var why =
-                        newvar
-                          (Jkind.of_new_sort ~why
-                             ~level:(Ctype.get_current_level ()))
-                      in
-                      let new_mode_var () = Mode.Alloc.newvar () in
-                      (newty
-                         (Tarrow
-                            ( (arg_label, new_mode_var (), new_mode_var ())
-                            , newmono (new_ty_var Function_argument)
-                            , new_ty_var Function_result
-                            , commu_ok )));
-                    in
-                    (* We go to some trouble to try to generate a unification
-                       error to help the error printing code's heuristic to
-                       identify the type equation at fault.
-                    *)
-                    (try
-                       unify env tarrow ty;
-                       fatal_error "unification unexpectedly succeeded"
-                     with Unify trace -> trace)
-                | Label_mismatch _ ->
-                    fatal_error
-                      "Label_mismatch not expected as this point; this should \
-                       have been caught when the function was typechecked."
-                | Jkind_error _ ->
-                    fatal_error
-                      "Jkind_error not expected as this point; this should \
-                       have been caught when the function was typechecked."
-              in
-              let err =
-                Function_arity_type_clash
-                  { syntactic_arity;
-                    type_constraint = exp_type;
-                    trace;
-                  }
-              in
-              raise (Error (loc, env, err))
-        in
-        let ret_ty =
-          List.fold_left (fun ret_ty { param; has_poly } ->
-              filter_ty_ret_exn ret_ty param.fp_arg_label
-                ~param_hole:has_poly)
-            exp_type
-            result_params
-        in
-        match body with
-        | Tfunction_body _ -> ()
-        | Tfunction_cases _ ->
-            ignore
-              (filter_ty_ret_exn ret_ty Nolabel ~param_hole:false : type_expr)
+        enforce_syntactic_arity ~loc env exp_type ~syntactic_arity
+          result_params body
     end;
     let zero_alloc =
       Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
