@@ -33,11 +33,12 @@ define dune_boot_context
       ("OC_CFLAGS_SEXP" "boot_oc_cflags.sexp"))))))
 endef
 
-ifneq ($(origin BUILD_OCAMLPARAM), undefined)
-ENV_VARS := (env-vars ("OCAMLPARAM" "$(BUILD_OCAMLPARAM)"))
+ifneq ($(strip $(BUILD_OCAMLPARAM)),)
+WORKSPACE_OCAMLPARAM = $(BUILD_OCAMLPARAM),ikinds=1
 else
-ENV_VARS :=
+WORKSPACE_OCAMLPARAM = _,ikinds=1
 endif
+ENV_VARS := (env-vars ("OCAMLPARAM" "$(WORKSPACE_OCAMLPARAM)"))
 
 define dune_runtime_stdlib_context
 (lang dune 2.8)
@@ -159,7 +160,7 @@ runtest-dwarf: compiler
 duneconf/boot.ws: export contents = $(dune_boot_context)
 duneconf/runtime_stdlib.ws: export contents = $(dune_runtime_stdlib_context)
 duneconf/main.ws: export contents = $(dune_main_context)
-duneconf/%.ws:
+duneconf/%.ws: Makefile.common-ox
 	echo "$$contents" > $@
 
 # We need to disable ocaml/otherlibs when compiling with coverage, because we
