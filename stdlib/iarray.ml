@@ -46,22 +46,58 @@ open! Stdlib
      4. Sorting is implemented in-place and this allows us to reuse it.
 *)
 
+[@@@ocaml.flambda_o3]
+
 (* An alias for the type of immutable arrays. *)
-type +'a t = 'a iarray
+type (+'a : any mod separable) t = 'a iarray
 
 (* Array operations *)
 
-external length : 'a iarray -> int = "%array_length"
-external get : 'a iarray -> int -> 'a = "%array_safe_get"
-external unsafe_get : 'a iarray -> int -> 'a = "%array_unsafe_get"
-external concat : 'a iarray list -> 'a iarray = "caml_array_concat"
+external length : ('a : any mod separable). local_ 'a iarray -> int @@ portable
+  = "%array_length"
+[@@layout_poly]
+external get :
+  ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
+  @@ portable = "%array_safe_get"
+[@@layout_poly]
+external unsafe_get :
+  ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
+  @@ portable = "%array_unsafe_get"
+[@@layout_poly]
+external concat : ('a : any mod separable). 'a iarray list -> 'a iarray
+  @@ portable = "caml_array_concat"
 
-external append_prim : 'a iarray -> 'a iarray -> 'a iarray = "caml_array_append"
-external unsafe_sub : 'a iarray -> int -> int -> 'a iarray = "caml_array_sub"
-external unsafe_of_array : 'a array -> 'a iarray = "%opaque"
-external unsafe_to_array : 'a iarray -> 'a array = "%opaque"
+external append_prim :
+  ('a : any mod separable). 'a iarray -> 'a iarray -> 'a iarray @@ portable
+  = "caml_array_append"
+external unsafe_sub :
+  ('a : any mod separable). 'a iarray -> int -> int -> 'a iarray @@ portable
+  = "caml_array_sub"
+external unsafe_of_array : ('a : any mod separable). 'a array -> 'a iarray
+  @@ portable = "%array_to_iarray"
+external unsafe_to_array : ('a : any mod separable). 'a iarray -> 'a array
+  @@ portable = "%array_of_iarray"
 
-let init l f = unsafe_of_array (Array.init l f)
+(* Used only to reimplement [init] *)
+external unsafe_set_mutable :
+  ('a : any mod separable). 'a array -> int -> 'a -> unit @@ portable
+  = "%array_unsafe_set"
+[@@layout_poly]
+
+
+(* The implementation is copied from [Array] so that [f] can be [local_] *)
+let init l (local_ f) =
+  if l = 0 then unsafe_of_array [||] else
+  if l < 0 then invalid_arg "Iarray.init"
+  (* See #6575. We could also check for maximum array size, but this depends
+     on whether we create a float array or a regular one... *)
+  else
+   let res = Array.make l (f 0) in
+   for i = 1 to pred l do
+     unsafe_set_mutable res i (f i)
+   done;
+   unsafe_of_array res
+
 
 let append a1 a2 =
   if length a1 = 0 then a2 (* Safe because they're immutable *)
@@ -143,7 +179,7 @@ let fold_left f x a =
 
 let fold_left_map f acc input_array =
   let len = length input_array in
-  let acc, output_array = if len = 0 then (acc, [||]) else begin
+  if len = 0 then (acc, unsafe_of_array [||]) else begin
     let acc, elt = f acc (unsafe_get input_array 0) in
     let output_array = Array.make len elt in
     let acc = ref acc in
@@ -152,9 +188,8 @@ let fold_left_map f acc input_array =
       acc := acc';
       Array.unsafe_set output_array i elt;
     done;
-    !acc, output_array
-  end in
-  acc, unsafe_of_array output_array
+    !acc, unsafe_of_array output_array
+  end
 
 let fold_right f a x =
   let r = ref x in
@@ -169,7 +204,7 @@ let exists p a =
     if i = n then false
     else if p (unsafe_get a i) then true
     else loop (succ i) in
-  loop 0
+  loop 0 [@nontail]
 
 let for_all p a =
   let n = length a in
@@ -177,7 +212,7 @@ let for_all p a =
     if i = n then true
     else if p (unsafe_get a i) then loop (succ i)
     else false in
-  loop 0
+  loop 0 [@nontail]
 
 let for_all2 p l1 l2 =
   let n1 = length l1
@@ -187,7 +222,7 @@ let for_all2 p l1 l2 =
     if i = n1 then true
     else if p (unsafe_get l1 i) (unsafe_get l2 i) then loop (succ i)
     else false in
-  loop 0
+  loop 0 [@nontail]
 
 let exists2 p l1 l2 =
   let n1 = length l1
@@ -197,7 +232,7 @@ let exists2 p l1 l2 =
     if i = n1 then false
     else if p (unsafe_get l1 i) (unsafe_get l2 i) then true
     else loop (succ i) in
-  loop 0
+  loop 0 [@nontail]
 
 let equal eq a1 a2 =
   length a1 = length a2 && for_all2 eq a1 a2
@@ -212,7 +247,7 @@ let compare cmp a1 a2 =
         if c <> 0 then c
         else loop (i + 1)
     in
-    loop 0
+    loop 0 [@nontail]
   )
 
 let mem x a =
@@ -221,7 +256,7 @@ let mem x a =
     if i = n then false
     else if Stdlib.compare (unsafe_get a i) x = 0 then true
     else loop (succ i) in
-  loop 0
+  loop 0 [@nontail]
 
 let memq x a =
   let n = length a in
@@ -229,7 +264,7 @@ let memq x a =
     if i = n then false
     else if x == (unsafe_get a i) then true
     else loop (succ i) in
-  loop 0
+  loop 0 [@nontail]
 
 let find_opt p a =
   let n = length a in
@@ -240,7 +275,7 @@ let find_opt p a =
       if p x then Some x
       else loop (succ i)
   in
-  loop 0
+  loop 0 [@nontail]
 
 let find_index p a =
   let n = length a in
@@ -248,7 +283,7 @@ let find_index p a =
     if i = n then None
     else if p (unsafe_get a i) then Some i
     else loop (succ i) in
-  loop 0
+  loop 0 [@nontail]
 
 let find_map f a =
   let n = length a in
@@ -259,7 +294,7 @@ let find_map f a =
       | None -> loop (succ i)
       | Some _ as r -> r
   in
-  loop 0
+  loop 0 [@nontail]
 
 let find_mapi f a =
   let n = length a in
@@ -270,7 +305,7 @@ let find_mapi f a =
       | None -> loop (succ i)
       | Some _ as r -> r
   in
-  loop 0
+  loop 0 [@nontail]
 
 let split x =
   if equal (=) (* unused *) x [||] then ([||], [||] : _ iarray * _ iarray)

@@ -22,7 +22,7 @@
    2. Correctness: They actually create arrays on the stack (by testing that no
       GCed allocation happens). *)
 
-module Iarray = Stdlib_stable.Iarray
+module Iarray = Stdlib_stable.IarrayLabels
 
 external opaque_local : local_ 'a -> local_ 'a = "%opaque"
 
@@ -51,13 +51,13 @@ let run name f x = exclave_
 
 (* Testing functions *)
 
-let test_init n = exclave_ Iarray.init_local n local_some
+let test_init n = exclave_ Iarray.init_local n ~f:local_some
 
 let test_append (a1, a2) = exclave_ Iarray.append_local a1 a2
 
 let test_concat = Iarray.concat_local
 
-let test_sub a = exclave_ Iarray.sub_local a 0 3
+let test_sub a = exclave_ Iarray.sub_local a ~pos:0 ~len:3
 
 let test_to_list = Iarray.to_list_local
 
@@ -65,21 +65,21 @@ let test_of_list = Iarray.of_list_local
 
 let test_map a = exclave_
   Iarray.map_local
-    (function Some x -> exclave_ Some (-x) | None -> exclave_ Some 0)
+    ~f:(function Some x -> exclave_ Some (-x) | None -> exclave_ Some 0)
     a
 
-let test_mapi a = exclave_ Iarray.mapi_local (fun i x -> exclave_ i, x) a
+let test_mapi a = exclave_ Iarray.mapi_local ~f:(fun i x -> exclave_ i, x) a
 
 let test_fold_left a = exclave_
-  Iarray.fold_left_local (fun l x -> exclave_ x :: l) [] a
+  Iarray.fold_left_local ~f:(fun l x -> exclave_ x :: l) ~init:[] a
 
 let test_fold_left_map a = exclave_
-  Iarray.fold_left_map_local (fun l x -> exclave_ x :: l, Some x) [] a
+  Iarray.fold_left_map_local ~f:(fun l x -> exclave_ x :: l, Some x) ~init:[] a
 
 let test_fold_right a = exclave_
-  Iarray.fold_right_local (fun x l -> exclave_ x :: l) a []
+  Iarray.fold_right_local ~f:(fun x l -> exclave_ x :: l) a ~init:[]
 
-let test_map2 (a1, a2) = exclave_ Iarray.map2_local (fun x y -> exclave_ x, y) a1 a2
+let test_map2 (a1, a2) = exclave_ Iarray.map2_local ~f:(fun x y -> exclave_ x, y) a1 a2
 
 let test_split = Iarray.split_local
 
@@ -93,53 +93,53 @@ let () =
   in
   let local_ r1 = run "append_local"
     test_append
-    (Iarray.init_local 42 local_some, [:None; Some (-1); Some (-2):])
+    (Iarray.init_local 42 ~f:local_some, [:None; Some (-1); Some (-2):])
   in
   let local_ r2 = run "concat_local"
     test_concat
-    [Iarray.init_local 42 local_some; [:None; Some (-1); Some (-2):]]
+    [Iarray.init_local 42 ~f:local_some; [:None; Some (-1); Some (-2):]]
   in
   let local_ r3 = run "sub_local"
     test_sub
-    (Iarray.init_local 42 local_some)
+    (Iarray.init_local 42 ~f:local_some)
   in
   let local_ r4 = run "to_list_local"
-    test_to_list (Iarray.init_local 42 local_some)
+    test_to_list (Iarray.init_local 42 ~f:local_some)
   in
   let local_ r5 = run "of_list_local"
     test_of_list [Some 0; Some 1; Some 2; Some 3; Some 4; Some 5]
   in
   let local_ r6 = run "map_local"
     test_map
-    (Iarray.init_local 42 local_some)
+    (Iarray.init_local 42 ~f:local_some)
   in
   let local_ r7 = run "mapi_local"
     test_mapi
-    (Iarray.init_local 42 local_some)
+    (Iarray.init_local 42 ~f:local_some)
   in
   let local_ r8 = run "fold_left_local"
     test_fold_left
-    (Iarray.init_local 42 local_some)
+    (Iarray.init_local 42 ~f:local_some)
   in
   let local_ r9 = run "fold_left_map_local"
     test_fold_left_map
-    (Iarray.init_local 42 local_some)
+    (Iarray.init_local 42 ~f:local_some)
   in
   let local_ rA = run "fold_right_local"
     test_fold_right
-    (Iarray.init_local 42 local_some)
+    (Iarray.init_local 42 ~f:local_some)
   in
   let local_ rB = run "map2_local"
     test_map2
-    (Iarray.init_local 3 local_some, [:None; Some (-1); Some (-2):])
+    (Iarray.init_local 3 ~f:local_some, [:None; Some (-1); Some (-2):])
   in
   let local_ rC = run "split_local"
     test_split
-    (Iarray.init_local 42 (fun i -> exclave_ Some i, Some (-i)))
+    (Iarray.init_local 42 ~f:(fun i -> exclave_ Some i, Some (-i)))
   in
   let local_ rD = run "combine_local"
     test_combine
-    (Iarray.init_local 3 local_some, [:None; Some (-1); Some (-2):])
+    (Iarray.init_local 3 ~f:local_some, [:None; Some (-1); Some (-2):])
   in
   (* In debug mode, Gc.minor () checks for backwards local pointers and minor
      heap->local pointers (though we're more concerned about the former) *)
