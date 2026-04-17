@@ -447,6 +447,7 @@ and array_kind =
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Ptemplatedarray of Ident.t
 
 (** When accessing a flat float array, we need to know the mode which we should
     box the resulting float at. *)
@@ -462,6 +463,7 @@ and array_ref_kind =
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Ptemplatedarray_ref of Ident.t * locality_mode
 
 (** When updating an array that might contain pointers, we need to know what
     mode they're at; otherwise, access is uniform. *)
@@ -478,6 +480,7 @@ and array_set_kind =
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Ptemplatedarray_set of Ident.t * modify_mode
 
 and ignorable_product_element_kind =
   | Pint_ignorable
@@ -667,6 +670,7 @@ type structured_constant =
   | Const_immstring of string
   | Const_float_block of string list
   | Const_null
+  | Const_layout of layout
 
 type tailcall_attribute =
   | Tailcall_expectation of bool
@@ -926,6 +930,10 @@ type lambda =
   | Lexclave of lambda
   (* [Lsplice] should only exist in the slambda stage. *)
   | Lsplice of scoped_location * slambda
+  (* [Ltemplate] should only exist in the tlambda stage. *)
+  | Ltemplate of lfunction * layout Ident.Map.t
+  (* [Linstantiate] should only exist in the tlambda stage. *)
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -953,7 +961,7 @@ and slambda_function =
 
 and slambda_apply =
   { sapp_func: slambda;
-    sapp_arguments: slambda array
+    sapp_args: slambda array
   }
 
 and slambda_let =
@@ -1102,6 +1110,16 @@ type program =
     required_globals : Compilation_unit.Set.t;
                                         (* Modules whose initializer side effects
                                            must occur before [code]. *)
+    template_instance_idents : Ident.Set.t;
+                                        (* [Ident.t]s bound by [Llet]s that
+                                           wrap the compilation unit body after
+                                           [Slambda] evaluation, corresponding
+                                           to instantiations of monomorphized
+                                           layout-polymorphic functions. These
+                                           idents are persistent and their
+                                           names are the canonical per-instance
+                                           linkage names used for cross-unit
+                                           deduplication. *)
     code : lambda }
 
 (* Lambda code for the middle-end. Here [mbf] is the value of the

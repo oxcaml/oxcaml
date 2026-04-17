@@ -84,6 +84,11 @@ let remove_unreachable ~reachable_names t =
       Name_occurrences.mem_code_id reachable_names code_id)
     t
 
+let remove_code_ids t code_ids =
+  Code_id.Map.filter
+    (fun code_id _code_or_metadata -> not (Code_id.Set.mem code_id code_ids))
+    t
+
 let remove_unused_value_slots_from_result_types_and_shortcut_aliases
     ~used_value_slots ~canonicalise t =
   Code_id.Map.map

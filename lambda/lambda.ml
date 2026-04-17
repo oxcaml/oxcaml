@@ -492,6 +492,7 @@ and array_kind =
   | Punboxedvectorarray of unboxed_vector
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
+  | Ptemplatedarray of Ident.t
 
 and array_ref_kind =
   | Pgenarray_ref of locality_mode
@@ -504,6 +505,7 @@ and array_ref_kind =
   | Punboxedvectorarray_ref of unboxed_vector
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
+  | Ptemplatedarray_ref of Ident.t * locality_mode
 
 and array_set_kind =
   | Pgenarray_set of modify_mode
@@ -517,6 +519,7 @@ and array_set_kind =
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
+  | Ptemplatedarray_set of Ident.t * modify_mode
 
 and ignorable_product_element_kind =
   | Pint_ignorable
@@ -754,6 +757,7 @@ type structured_constant =
   | Const_immstring of string
   | Const_float_block of string list
   | Const_null
+  | Const_layout of layout
 
 type tailcall_attribute =
   | Tailcall_expectation of bool
@@ -970,6 +974,8 @@ type lambda =
   | Lregion of lambda * layout
   | Lexclave of lambda
   | Lsplice of scoped_location * slambda
+  | Ltemplate of lfunction * layout Ident.Map.t
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -996,7 +1002,7 @@ and slambda_function =
 
 and slambda_apply =
   { sapp_func: slambda;
-    sapp_arguments: slambda array
+    sapp_args: slambda array
   }
 
 and slambda_let =
@@ -1075,8 +1081,10 @@ let rec try_to_find_location lam =
   match lam with
   | Lprim (_, _, loc)
   | Lfunction { loc; _ }
+  | Ltemplate ({ loc; _ }, _)
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
+  | Linstantiate { ap_loc = loc; _ }
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
@@ -1138,6 +1146,8 @@ let fatal_error_invalid_constructor lambda =
     | Lregion _ -> "Lregion"
     | Lexclave _ -> "Lexclave"
     | Lsplice _ -> "Lsplice"
+    | Ltemplate _ -> "Ltemplate"
+    | Linstantiate _ -> "Linstantiate"
   in
   Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
     name Location.print_loc loc
@@ -1172,6 +1182,7 @@ type program =
     main_module_block_format : main_module_block_format;
     arg_block_idx : int option;
     required_globals : Compilation_unit.Set.t;
+    template_instance_idents : Ident.Set.t;
     code : lambda }
 
 type arg_descr =
@@ -1481,7 +1492,7 @@ let make_key e =
         (* Mutable constants are not shared *)
         raise Not_simple
     | Lconst _ -> e
-    | Lapply ap ->
+    | Lapply ap | Linstantiate ap ->
         Lapply {ap with ap_func = tr_rec env ap.ap_func;
                         ap_args = tr_recs env ap.ap_args;
                         ap_loc = Loc_unknown}
@@ -1526,7 +1537,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _
+    | Lletrec _|Lfunction _ | Ltemplate _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1635,6 +1646,10 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
+  | Ltemplate ({body},_) ->
+      f body
+  | Linstantiate { ap_func; ap_args } ->
+      f ap_func; List.iter f ap_args
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1724,6 +1739,9 @@ let rec free_variables = function
   | Lexclave e ->
       free_variables e
   | Lsplice _ as l -> fatal_error_invalid_constructor l
+  | Ltemplate (_, free_vars) -> Ident.Map.keys free_vars
+  | Linstantiate{ap_func = fn; ap_args = args} ->
+      free_variables_list (free_variables fn) args
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -1840,7 +1858,7 @@ let transl_module_representation repr =
 (* Translate an access path *)
 
 let rec transl_address loc = function
-  | Env.Aunit cu -> Lprim(Pgetglobal (cu, Dynamic), [], loc)
+  | Env.Aunit cu -> Lprim(Pgetglobal (cu, Static), [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
@@ -1970,8 +1988,13 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lapply ap ->
         Lapply{ap with ap_func = subst s l ap.ap_func;
                       ap_args = subst_list s l ap.ap_args}
+    | Linstantiate ap ->
+        Linstantiate { ap with ap_func = subst s l ap.ap_func;
+                              ap_args = subst_list s l ap.ap_args }
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
+    | Ltemplate (_lf, _free_vars) ->
+        Misc.fatal_error "I've got no idea what to do here"
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -2130,9 +2153,32 @@ let shallow_map ~tail ~non_tail:f lam =
           ap_specialised;
           ap_probe;
         }
+  | Linstantiate { ap_func = old_func; ap_args = old_args; ap_result_layout;
+             ap_region_close; ap_mode; ap_loc; ap_tailcall; ap_inlined;
+             ap_specialised; ap_probe } ->
+      let new_func = f old_func in
+      let new_args = Misc.Stdlib.List.map_sharing f old_args in
+      if old_func == new_func && old_args == new_args
+      then lam
+      else
+        Linstantiate {
+          ap_func = new_func;
+          ap_args = new_args;
+          ap_result_layout;
+          ap_region_close;
+          ap_mode;
+          ap_loc;
+          ap_tailcall;
+          ap_inlined;
+          ap_specialised;
+          ap_probe;
+        }
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
+  | Ltemplate (old_lfun, vars) ->
+      let new_lfun = map_lfunction f old_lfun in
+      if old_lfun == new_lfun then lam else Ltemplate (new_lfun, vars)
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
       let new_e1 = f old_e1 in
       let new_e2 = tail old_e2 in
@@ -2468,8 +2514,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
       | Punboxedvectorarray_ref _
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _) -> None
-  | Parrayrefu ((Pgenarray_ref m | Pfloatarray_ref m), _, _)
-  | Parrayrefs ((Pgenarray_ref m | Pfloatarray_ref m), _, _) -> Some m
+  | Parrayrefu
+      ((Pgenarray_ref m | Pfloatarray_ref m | Ptemplatedarray_ref (_, m)), _, _)
+  | Parrayrefs
+      ((Pgenarray_ref m | Pfloatarray_ref m | Ptemplatedarray_ref (_, m)), _, _)
+      ->
+    Some m
   | Pisint _ | Pisnull | Pisout -> None
   | Pbigarrayset _ | Pbigarraydim _ -> None
   | Pbigarrayref (_, _, _, _) ->
@@ -2788,6 +2838,7 @@ let structured_constant_layout = function
   | Const_float_array _ | Const_float_block _ ->
     non_null_value (Parrayval Pfloatarray)
   | Const_null -> nullable_value Pgenval
+  | Const_layout _ -> layout_unboxed_unit
 
 let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   match c with
@@ -2808,8 +2859,8 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
     layout_unboxed_product (List.map layout_of_const_sort sorts)
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
-  | Genvar _ ->
-    Misc.fatal_error "layout_of_const_sort: unexpected genvar"
+  | Genvar var ->
+    Psplicevar (Ident.create_sort_var (Jkind_types.Sort.Var.get_id var :> int))
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
@@ -2865,6 +2916,7 @@ let array_ref_kind_result_layout = function
   | Punboxedvectorarray_ref bv -> layout_unboxed_vector bv
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
   | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
+  | Ptemplatedarray_ref (ident, _) -> Psplicevar ident
 
 let rec layout_of_mixed_block_element element =
   match element with
@@ -3217,6 +3269,7 @@ let array_ref_kind mode = function
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_ref vec_kind
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_ref kinds
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_ref kinds
+  | Ptemplatedarray ident -> Ptemplatedarray_ref (ident, mode)
 
 let array_set_kind mode = function
   | Pgenarray -> Pgenarray_set mode
@@ -3230,6 +3283,7 @@ let array_set_kind mode = function
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_set vec_kind
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_set (mode, kinds)
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_set kinds
+  | Ptemplatedarray ident -> Ptemplatedarray_set (ident, mode)
 
 let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
       : array_ref_kind =
@@ -3246,6 +3300,7 @@ let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
   | Paddrarray_set _ -> Paddrarray_ref
   | Pgcignorableaddrarray_set -> Pgcignorableaddrarray_ref
   | Pfloatarray_set -> Pfloatarray_ref mode
+  | Ptemplatedarray_set (ident, _) -> Ptemplatedarray_ref (ident, mode)
 
 let may_allocate_in_region lam =
   (* loop_region raises, if the lambda might allocate in parent region *)
@@ -3257,10 +3312,12 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} -> ()
-    | Lfunction {mode=Alloc_local} -> raise Exit
+    | Lfunction {mode=Alloc_heap} | Ltemplate ({mode=Alloc_heap}, _) -> ()
+    | Lfunction {mode=Alloc_local} | Ltemplate ({mode=Alloc_local}, _) ->
+      raise Exit
 
     | Lapply {ap_mode=Alloc_local}
+    | Linstantiate {ap_mode=Alloc_local}
     | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
@@ -3280,8 +3337,8 @@ let may_allocate_in_region lam =
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
     | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
-      | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
+    | ( Lapply _  | Linstantiate _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _
+      | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
       | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
       | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
@@ -3352,6 +3409,7 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
     List.fold_left
       (fun acc ignorable -> acc + count_initializers_ignorable ignorable)
       0 ignorables
+  | Ptemplatedarray ident -> fatal_error_unevaluated_splice_var ident
 
 (* CR mshinwell: This function might need revisiting for JSIR and any
    Flambda 2 -> WASM backend *)
@@ -3381,6 +3439,7 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     (* All elements of unboxed product arrays are currently 8 bytes wide. *)
     count_initializers_array_kind array_kind * 8
+  | Ptemplatedarray ident -> fatal_error_unevaluated_splice_var ident
 
 let element_layout_of_array_kind ak =
   (* [alloc_heap] is ignored by [array_ref_kind_result_layout]. *)

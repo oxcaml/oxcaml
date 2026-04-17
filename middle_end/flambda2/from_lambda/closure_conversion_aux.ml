@@ -376,7 +376,10 @@ module Acc = struct
       slot_offsets : Slot_offsets.t;
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
       closure_infos : closure_info list;
-      symbol_short_name_counter : int
+      symbol_short_name_counter : int;
+      template_instance_idents : Ident.Set.t;
+      weak_symbols : Symbol.Set.t;
+      weak_code_ids : Code_id.Set.t
     }
 
   let manufacture_symbol_short_name t =
@@ -384,6 +387,18 @@ module Acc = struct
     let t = { t with symbol_short_name_counter = counter + 1 } in
     let name = Linkage_name.of_string ("s" ^ string_of_int counter) in
     t, name
+
+  let template_instance_idents t = t.template_instance_idents
+
+  let weak_symbols t = t.weak_symbols
+
+  let add_weak_symbol symbol t =
+    { t with weak_symbols = Symbol.Set.add symbol t.weak_symbols }
+
+  let weak_code_ids t = t.weak_code_ids
+
+  let add_weak_code_id code_id t =
+    { t with weak_code_ids = Code_id.Set.add code_id t.weak_code_ids }
 
   let cost_metrics t = t.cost_metrics
 
@@ -454,7 +469,7 @@ module Acc = struct
         externals := Symbol.Map.add symbol approx !externals;
         approx
 
-  let create ~cmx_loader ~machine_width =
+  let create ~cmx_loader ~machine_width ~template_instance_idents =
     { machine_width;
       declared_symbols = [];
       lifted_sets_of_closures = [];
@@ -473,7 +488,10 @@ module Acc = struct
       slot_offsets = Slot_offsets.empty;
       code_slot_offsets = Code_id.Map.empty;
       closure_infos = [];
-      symbol_short_name_counter = 0
+      symbol_short_name_counter = 0;
+      template_instance_idents;
+      weak_symbols = Symbol.Set.empty;
+      weak_code_ids = Code_id.Set.empty
     }
 
   let declared_symbols t = t.declared_symbols

@@ -39,7 +39,7 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
       ~propagating_float_consts:(Flambda_features.float_const_prop ())
       ~unit_toplevel_return_continuation:return_continuation
       ~unit_toplevel_exn_continuation:exn_continuation ~toplevel_my_region
-      ~toplevel_my_ghost_region
+      ~toplevel_my_ghost_region ~weak_code_ids:(FU.weak_code_ids unit)
   in
   (* CR gbury: only compute closure offsets if this is the last round. (same
      remark for the cmx contents) *)
@@ -81,9 +81,16 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
       Misc.fatal_error "Slot offsets must be computed and cannot be unknown"
     | Known slot_offsets -> slot_offsets
   in
+  (* [name_occurrences] records only free names; weak symbols and weak code ids
+     are typically bound by [Let_symbol] in the rebuilt body, so filtering by
+     [name_occurrences] would drop them unconditionally. Pass them through
+     unchanged — any truly unreferenced entries are harmless for [to_cmm]. *)
+  let weak_symbols = FU.weak_symbols unit in
+  let weak_code_ids = FU.weak_code_ids unit in
   let unit =
     FU.create ~return_continuation ~exn_continuation ~toplevel_my_region
       ~toplevel_my_ghost_region ~module_symbol ~body ~used_value_slots:Unknown
+      ~weak_symbols ~weak_code_ids
   in
   { unit;
     free_names = name_occurrences;

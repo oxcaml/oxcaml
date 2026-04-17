@@ -362,7 +362,8 @@ module Sort = struct
       | None -> fprintf ppf "None"
 
     and var ppf v =
-      fprintf ppf "{@[@ contents = %a;@ uid = %d@ @]}" opt_t v.contents v.uid
+      fprintf ppf "{@[@ contents = %a;@ level = %d; uid = %d@ @]}" opt_t
+        v.contents v.level v.uid
   end
 
   (* To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
@@ -592,6 +593,8 @@ module Sort = struct
 
   let new_genvar () = new_var_unsafe ~level:level_generic
 
+  let new_rigidvar () = new_var_unsafe ~level:level_rigid
+
   let instance_map : (var * var) list ref = ref []
 
   let instance_with ~level vars f =
@@ -617,8 +620,13 @@ module Sort = struct
       begin match List.assq_opt v !instance_map with
       | Some v' -> Var v'
       | None ->
-        Misc.fatal_error
-          "generic layout variables found in non-layout instantiation"
+        (* If the caller didn't set up layout instantiation, conservatively
+           return a rigid variable (which is not equal to anything) *)
+        (* CR-someday zqian: explicitly distinguish among three cases:
+        - instantiating layouts properly
+        - knowingly instantiating to rigidvar conservatively
+        - unknown context, in which case we should crash *)
+        Var (new_rigidvar ())
       end
     | None -> Var v
     | Some t -> instance t
@@ -725,6 +733,10 @@ module Sort = struct
   and var_default_to_scannable_and_get r : Const.t =
     match r.contents with
     | None when is_genvar r -> Genvar r
+    | None when is_rigidvar r ->
+      Misc.fatal_error
+        "Jkind_types.var_default_to_scannable_and_get: cannot default rigid \
+         variables"
     | None ->
       set r Static.T_option.scannable;
       Static.Const.scannable
@@ -922,6 +934,12 @@ module Scannable_axes = struct
   let equal { nullability = n1; separability = s1 }
       { nullability = n2; separability = s2 } =
     Nullability.equal n1 n2 && Separability.equal s1 s2
+
+  let meet { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    { nullability = Nullability.meet n1 n2;
+      separability = Separability.meet s1 s2
+    }
 end
 
 module Layout = struct
@@ -962,6 +980,38 @@ module Layout = struct
           (Misc.Stdlib.List.map_option get_sort ts)
       | Univar uv -> Some (Sort.Const.Univar uv)
       | Genvar v -> Some (Sort.Const.Genvar v)
+
+    let is_scannable_or_any = function
+      | Any _ | Base (Scannable, _) -> true
+      | Base
+          ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+            | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
+            _ ) ->
+        false
+      | Product _ -> false
+      | Univar _ -> false
+      | Genvar _ -> false
+
+    let get_root_scannable_axes t =
+      match t with
+      | Any sa -> Some sa
+      | Base (_, sa) -> if is_scannable_or_any t then Some sa else None
+      | Product _ -> None
+      | Univar _ -> None
+      | Genvar _ -> None
+
+    let set_root_scannable_axes t sa =
+      match t with
+      | Any _ -> Any sa
+      | Base (b, _) -> if is_scannable_or_any t then Base (b, sa) else t
+      | Product _ -> t
+      | Univar _ -> t
+      | Genvar _ -> t
+
+    let meet_root_scannable_axes t sa =
+      match get_root_scannable_axes t with
+      | None -> t
+      | Some sa' -> set_root_scannable_axes t (Scannable_axes.meet sa sa')
 
     module Static = struct
       let scannable_non_null_non_pointer =

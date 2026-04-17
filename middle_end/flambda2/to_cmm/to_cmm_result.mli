@@ -26,8 +26,17 @@ type t
 (** Create a result structure.
 
     [reachable_names] specifies which names are reachable from outside the
-    compilation unit (same terminology as used in [Flambda_cmx]). *)
-val create : module_symbol:Symbol.t -> reachable_names:Name_occurrences.t -> t
+    compilation unit (same terminology as used in [Flambda_cmx]).
+
+    [weak_symbols] and [weak_code_ids] are the sets of symbols and code ids
+    (respectively) that should receive weak linkage (COMDAT on ELF), for
+    cross-unit deduplication of monomorphized layout-polymorphic instances. *)
+val create :
+  module_symbol:Symbol.t ->
+  reachable_names:Name_occurrences.t ->
+  weak_symbols:Symbol.Set.t ->
+  weak_code_ids:Code_id.Set.t ->
+  t
 
 (** Translate an existing [Symbol.t] to a Cmm symbol. *)
 val symbol : t -> Symbol.t -> Cmm.symbol

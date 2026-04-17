@@ -203,6 +203,7 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
         Unboxed_product (List.map convert_kind kinds)
     in
     Array_kind (Unboxed_product (List.map convert_kind kinds))
+  | Ptemplatedarray ident -> Lambda.fatal_error_unevaluated_splice_var ident
 
 let convert_array_kind_for_length kind : P.Array_kind_for_length.t =
   match convert_array_kind kind with
@@ -309,6 +310,8 @@ let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
     in
     Array_ref_kind
       (No_float_array_opt (Unboxed_product (List.map convert_kind kinds)))
+  | Ptemplatedarray_ref (ident, _) ->
+    Lambda.fatal_error_unevaluated_splice_var ident
 
 let rec convert_unboxed_product_array_ref_kind
     (kind : Array_ref_kind.no_float_array_opt) : P.Array_kind.t =
@@ -479,6 +482,8 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
     in
     Array_set_kind
       (No_float_array_opt (Unboxed_product (List.map convert_kind kinds)))
+  | Ptemplatedarray_set (ident, _) ->
+    Lambda.fatal_error_unevaluated_splice_var ident
 
 let rec convert_unboxed_product_array_set_kind
     (kind : Array_set_kind.no_float_array_opt) : P.Array_kind.t =
@@ -588,6 +593,7 @@ let convert_array_kind_to_duplicate_array_kind (kind : L.array_kind) :
     Misc.fatal_error
       "Lambda_to_flambda_primitives.convert_array_kind_to_duplicate_array_kind: \
        unimplemented"
+  | Ptemplatedarray ident -> Lambda.fatal_error_unevaluated_splice_var ident
 
 let convert_field_read_semantics (sem : L.field_read_semantics) : Mutability.t =
   match sem with Reads_agree -> Immutable | Reads_vary -> Mutable
@@ -2049,6 +2055,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
           args
         | Pfloatarray -> List.map unbox_float args
+        | Ptemplatedarray ident ->
+          Lambda.fatal_error_unevaluated_splice_var ident
       in
       [Variadic (Make_array (array_kind, mutability, mode), args)]
     | Float_array_opt_dynamic -> (
@@ -3245,14 +3253,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
+            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+            | Ptemplatedarray_ref _ ),
             _,
             _ )
       | Parrayrefs
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
+            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+            | Ptemplatedarray_ref _ ),
             _,
             _ )
       | Patomic_load_field _ | Ppoke _ | Pphys_equal _
@@ -3272,13 +3282,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
+            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+            | Ptemplatedarray_set _ ),
             _ )
       | Parraysets
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
+            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+            | Ptemplatedarray_set _ ),
             _ )
       | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
       | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_set_8 _

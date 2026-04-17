@@ -93,7 +93,9 @@ let effects_of (expr : Cmm.expression) :
 
 let asm_symbol_of_cmm (s : Cmm.symbol) =
   let visibility : Asm_targets.Asm_symbol.visibility =
-    match s.sym_global with Cmm.Global -> Global | Cmm.Local -> Local
+    match s.sym_global with
+    | Cmm.Global | Cmm.Weak -> Global
+    | Cmm.Local -> Local
   in
   Asm_targets.Asm_symbol.create ~visibility s.sym_name
 

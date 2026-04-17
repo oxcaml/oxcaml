@@ -119,14 +119,14 @@ let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
                 let new_code_id =
                   (* The types of the functions involved should reference the
                      _new_ code IDs (where such exist), so that direct recursive
-                     calls can be compiled straight to the new code. *)
-                  if
-                    Code_or_metadata.code_present code_or_metadata
-                    && not
-                         (Code_metadata.stub
-                            (Code_or_metadata.code_metadata code_or_metadata))
-                  then Code_id.Map.find old_code_id old_to_new_code_ids_all_sets
-                  else old_code_id
+                     calls can be compiled straight to the new code. Weak code
+                     ids are never renamed, so they map to themselves. *)
+                  match
+                    Code_id.Map.find_opt old_code_id
+                      old_to_new_code_ids_all_sets
+                  with
+                  | Some new_code_id -> new_code_id
+                  | None -> old_code_id
                 in
                 let rec_info =
                   (* From inside their own bodies, every function in the set
@@ -227,7 +227,14 @@ let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
             in
             if
               Code_or_metadata.code_present code
-              && not (Code_metadata.stub (Code_or_metadata.code_metadata code))
+              && (not
+                    (Code_metadata.stub (Code_or_metadata.code_metadata code)))
+              && not (Code_id.Set.mem old_code_id (DE.weak_code_ids denv))
+              (* Weak code ids carry a canonical cross-unit linkage name that
+                 must be preserved verbatim through simplification so the linker
+                 can deduplicate them via COMDAT. [Code_id.rename] would
+                 reassign them to the current compilation unit and drop the
+                 explicit linkage name. *)
             then
               let new_code_id = Code_id.rename old_code_id in
               Code_id.Map.add old_code_id new_code_id old_to_new_code_ids

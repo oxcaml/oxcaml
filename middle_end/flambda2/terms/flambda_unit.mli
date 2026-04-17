@@ -28,6 +28,8 @@ val create :
   body:Flambda.Expr.t ->
   module_symbol:Symbol.t ->
   used_value_slots:Value_slot.Set.t Or_unknown.t ->
+  weak_symbols:Symbol.Set.t ->
+  weak_code_ids:Code_id.Set.t ->
   t
 
 val return_continuation : t -> Continuation.t
@@ -47,3 +49,14 @@ val with_used_value_slots : t -> Value_slot.Set.t -> t
 val body : t -> Flambda.Expr.t
 
 val with_body : t -> Flambda.Expr.t -> t
+
+(** Symbols that should receive weak linkage (COMDAT on ELF) because they are
+    monomorphized layout-polymorphic instances expected to appear in more than
+    one compilation unit with the same definition. The simplifier threads this
+    set through unchanged; [to_cmm] uses it to mark symbols as [Cmm.Weak]. *)
+val weak_symbols : t -> Symbol.Set.t
+
+(** Code ids whose machine-code bodies should receive weak linkage, paired with
+    [weak_symbols] so that both the closure record and its code body are
+    deduplicated together. *)
+val weak_code_ids : t -> Code_id.Set.t

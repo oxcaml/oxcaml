@@ -110,4 +110,5 @@ val close_program :
   exn_continuation:Continuation.t ->
   toplevel_my_region:Ident.t ->
   toplevel_my_ghost_region:Ident.t ->
+  template_instance_idents:Ident.Set.t ->
   'mode close_program_result

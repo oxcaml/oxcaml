@@ -777,6 +777,9 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       (* The above cases are not actually allowed/tested yet. *)
       Misc.fatal_error
         "Comprehensions on arrays of unboxed vectors are not yet supported."
+    | (Fixed_size | Dynamic_size), Ptemplatedarray _ ->
+      Misc.fatal_error
+        "Transl_array_comprehension.initial_array:  unsupported lpoly"
     | _, (Pgcscannableproductarray _ | Pgcignorableproductarray _) ->
       Misc.fatal_error
         "Transl_array_comprehension.initial_array: unboxed product array"
@@ -872,6 +875,8 @@ let body ~loc ~array_kind ~array_size ~array_sizing ~array ~index ~body =
       set_element_in_bounds body
     | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
       Misc.fatal_error "Transl_array_comprehension.body: unboxed product array"
+    | Ptemplatedarray _ ->
+      Misc.fatal_error "Transl_array_comprehension.body:  unsupported lpoly"
   in
   Lsequence
     (set_element_known_kind_in_bounds, Lassign (index.id, index.var + l1))
@@ -896,7 +901,10 @@ let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
         (Printlambda.array_kind array_kind)
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     Misc.fatal_error
-      "Transl_array_comprehension.comprehension: unboxed product array");
+      "Transl_array_comprehension.comprehension: unboxed product array"
+  | Ptemplatedarray _ ->
+    Misc.fatal_error
+      "Transl_array_comprehension.comprehension:  unsupported lpoly");
   let { array_sizing_info; array_size; make_comprehension } =
     clauses ~transl_exp ~scopes ~loc comp_clauses
   in

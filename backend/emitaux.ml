@@ -652,7 +652,13 @@ type emit_data_item_actions =
 
 let symbol_of_cmm_symbol (s : Cmm.symbol) : Asm_targets.Asm_symbol.t =
   let visibility : Asm_targets.Asm_symbol.visibility =
-    match s.sym_global with Cmm.Global -> Global | Cmm.Local -> Local
+    (* [Weak] is treated as [Global] in [Asm_symbol.visibility]: at reference
+       sites the linker does not distinguish them, and [Asm_symbol.visibility]
+       is only used as an informational tag. [.weak] / COMDAT emission for
+       [Weak] definitions is handled separately. *)
+    match s.sym_global with
+    | Cmm.Global | Cmm.Weak -> Global
+    | Cmm.Local -> Local
   in
   Asm_targets.Asm_symbol.create ~visibility s.sym_name
 
@@ -666,6 +672,15 @@ let emit_data_item actions (d : Cmm.data_item) =
     | Local -> D.define_label (L.create_label_for_local_symbol Data sym)
     | Global ->
       actions.global_maybe_protected sym;
+      actions.symbol_defined s.sym_name;
+      D.define_joint_label_and_symbol ~section:Data sym
+    | Weak ->
+      (* The section switch into a COMDAT group (and the matching switch back to
+         [.data]) is handled by the arch-specific [data] driver, which scans the
+         data-item list and wraps each weak symbol's items in a dedicated
+         section. Here we just emit the [.weak] directive and the label/symbol
+         definition itself. *)
+      D.weak sym;
       actions.symbol_defined s.sym_name;
       D.define_joint_label_and_symbol ~section:Data sym)
   | Cint8 n -> D.int8 (Numbers.Int8.of_int_exn n)
@@ -697,13 +712,13 @@ let emit_data_item actions (d : Cmm.data_item) =
     actions.symbol_used s.sym_name;
     let sym = symbol_of_cmm_symbol s in
     match s.sym_global with
-    | Global -> D.symbol sym
+    | Global | Weak -> D.symbol sym
     | Local -> D.label (L.create_label_for_local_symbol Data sym))
   | Csymbol_offset (s, o) -> (
     actions.symbol_used s.sym_name;
     let sym = symbol_of_cmm_symbol s in
     match s.sym_global with
-    | Global ->
+    | Global | Weak ->
       D.symbol_plus_offset ~offset_in_bytes:(Targetint.of_int_exn o) sym
     | Local ->
       D.label_plus_offset ~offset_in_bytes:(Targetint.of_int_exn o)

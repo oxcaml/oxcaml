@@ -500,6 +500,7 @@ let makearray_dynamic_scannable_unboxed_product env
       Misc.fatal_errorf
         "%s: should have been sent to [makearray_dynamic_singleton]"
         (Printlambda.array_kind lambda_array_kind)
+    | Ptemplatedarray ident -> Lambda.fatal_error_unevaluated_splice_var ident
   in
   if must_be_scanned
   then
@@ -536,7 +537,9 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
           "Cannot compile Pmakearray_dynamic at layout %s without an \
            initializer:@ %a"
           (Printlambda.array_kind lambda_array_kind)
-          Debuginfo.print_compact dbg)
+          Debuginfo.print_compact dbg
+      | Ptemplatedarray ident -> Lambda.fatal_error_unevaluated_splice_var ident
+      )
   in
   match lambda_array_kind with
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
@@ -628,6 +631,7 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
     in
     makearray_dynamic_non_scannable_unboxed_product env lambda_array_kind mode
       ~length ~init loc
+  | Ptemplatedarray ident -> Lambda.fatal_error_unevaluated_splice_var ident
 
 let makearray_dynamic env (lambda_array_kind : L.array_kind)
     (mode : L.locality_mode) (has_init : L.has_initializer) args loc :
@@ -818,6 +822,8 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
   | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
   | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
     arrayblit_expanded env ~src_mutability ~dst_array_set_kind args loc
+  | Ptemplatedarray_set (ident, _) ->
+    Lambda.fatal_error_unevaluated_splice_var ident
 
 (* Only used on amd64. *)
 let cast_vec128_to_vec256 =

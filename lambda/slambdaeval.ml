@@ -26,79 +26,8 @@
  ******************************************************************************)
 
 open Lambda
-
-module Or_missing = struct
-  type 'a t =
-    | Present of 'a
-    | Missing
-
-  let of_option = function Some a -> Present a | None -> Missing
-
-  let[@inline] map t ~f =
-    match t with
-    | Present a -> Present ((f [@inlined hint]) a)
-    | Missing -> Missing
-
-  let[@inline] bind t ~f =
-    match t with Present a -> (f [@inlined hint]) a | Missing -> Missing
-
-  module Syntax = struct
-    let[@inline] ( let* ) t f = bind t ~f
-
-    let[@inline] ( |>> ) t f = map t ~f
-  end
-end
-
-open Or_missing.Syntax
-
-module rec Types : sig
-  type closure =
-    { clo_params : Slambdaident.t array;
-      clo_body : slambda;
-      clo_env : Env.t
-    }
-
-  type halves =
-    { slv_comptime : value Or_missing.t;
-      slv_runtime : lambda
-    }
-
-  and value =
-    | SLVhalves of halves
-    | SLVlayout of layout
-    | SLVrecord of value Or_missing.t array
-    | SLVclosure of closure
-end =
-  Types
-
-and Env : sig
-  type t
-
-  val empty : t
-
-  val add : t -> Slambdaident.t -> Types.value Or_missing.t -> t
-
-  val add_present : t -> Slambdaident.t -> Types.value -> t
-
-  val find : t -> Slambdaident.t -> Types.value Or_missing.t
-end = struct
-  module Map = Slambdaident.Map
-
-  type t = Types.value Map.t
-
-  let empty = Map.empty
-
-  let add t id v =
-    match (v : Types.value Or_missing.t) with
-    | Present v -> Map.add id v t
-    | Missing -> (* Possibly unnecessary but be safe anyway *) Map.remove id t
-
-  let add_present t id v = add t id (Present v)
-
-  let find t id = Map.find_opt id t |> Or_missing.of_option
-end
-
-include Types
+open Slambda_types
+open Slambda_types.Or_missing.Syntax
 
 let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
@@ -106,7 +35,7 @@ type _ value_type =
   | Thalves : halves value_type
   | Tlayout : layout value_type
   | Trecord : value Or_missing.t array value_type
-  | Tclosure : closure value_type
+  | Tclosure : Templates.id value_type
 
 let describe_value_type (type a) : a value_type -> string = function
   | Thalves -> "program"
@@ -146,50 +75,62 @@ let expect (type a) ?reason (vty : a value_type) (v : value) : a =
 let expect_not_missing (a : 'a Or_missing.t) : 'a =
   match a with Present a -> a | Missing -> errf "unexpected missing value"
 
-let rec eval_slam env slam : value Or_missing.t =
+let rec eval_slam store ?name env slam : value Or_missing.t =
   match slam with
   | SLhalves { sval_comptime; sval_runtime } ->
-    let slv_comptime = eval_slam env sval_comptime in
-    let slv_runtime = eval_lam env sval_runtime in
+    let slv_comptime = eval_slam store env sval_comptime in
+    let slv_runtime = eval_lam store env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
   | SLlayout layout -> Present (SLVlayout layout)
-  | SLglobal _ -> errf "cross-module eval not implemented"
+  | SLglobal cu ->
+    Compilenv.try_load_unit cu;
+    let module_data, templates = Compilenv.get_cached_static_data cu in
+    Templates.add_foreign_templates store templates;
+    module_data
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
-    let value = eval_slam env slet_value in
+    let value = eval_slam store ~name:slet_name env slet_value in
     let env_body = Env.add env slet_name value in
-    eval_slam env_body slet_body
+    eval_slam store env_body slet_body
   | SLmissing -> Missing
   | SLrecord slams ->
-    let values = Array.map (eval_slam env) (Array.of_list slams) in
+    let values = Array.map (eval_slam store env) (Array.of_list slams) in
     Present (SLVrecord values)
   | SLfield (slam, i) ->
-    let* fields = eval_slam env slam |>> expect Trecord in
+    let* fields = eval_slam store env slam |>> expect Trecord in
     fields.(i)
   | SLproj_comptime slam ->
-    let* halves = eval_slam env slam |>> expect Thalves in
+    let* halves = eval_slam store env slam |>> expect Thalves in
     halves.slv_comptime
   | SLtemplate { sfun_params; sfun_body } ->
-    Present
-      (SLVclosure
-         { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
-  | SLinstantiate { sapp_func; sapp_arguments } ->
     let closure =
-      eval_slam env sapp_func |> expect_not_missing |> expect Tclosure
+      { clo_params = sfun_params; clo_body = sfun_body; clo_env = env }
     in
-    let eval_arg arg = eval_slam env arg |> expect_not_missing in
-    let args = Array.map eval_arg sapp_arguments in
-    let { clo_params; clo_body; clo_env } = closure in
-    let env_body =
-      Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+    let cu = (Compilenv.current_unit_infos ()).ui_unit in
+    let closure_id = Templates.add store ~cu ~name closure in
+    Present (SLVclosure closure_id)
+  | SLinstantiate { sapp_func; sapp_args } ->
+    let closure =
+      eval_slam store env sapp_func |> expect_not_missing |> expect Tclosure
     in
-    eval_slam env_body clo_body
+    let eval_arg arg = eval_slam store env arg |> expect_not_missing in
+    let args = Array.map eval_arg sapp_args in
+    Templates.instantiate store closure args
+      (fun { clo_params; clo_body; clo_env } args ->
+        let env_body =
+          Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+        in
+        let { slv_comptime = _; slv_runtime } =
+          eval_slam store env_body clo_body
+          |> expect_not_missing |> expect Thalves
+        in
+        slv_runtime)
 
 and eval_var env id = Env.find env id
 
-and eval_lam env lam = Lambda.map (eval_lam_shallow env) lam
+and eval_lam store env lam = Lambda.map (eval_lam_shallow store env) lam
 
-and eval_lam_shallow env lam =
+and eval_lam_shallow store env lam =
   match lam with
   | Lconst old_const ->
     let new_const = eval_structured_const env old_const in
@@ -289,8 +230,14 @@ and eval_lam_shallow env lam =
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then lam else Lregion (body, new_layout)
   | Lsplice (_loc, slam) ->
-    let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
+    let halves =
+      eval_slam store env slam |> expect_not_missing |> expect Thalves
+    in
     halves.slv_runtime
+  | Ltemplate _ | Linstantiate _ ->
+    (* These constructors only exist in tlambda, fracturing has removed them
+       (and replaced them with SLtemplate and SLinstantiate). *)
+    Lambda.fatal_error_invalid_constructor lam
   | Lvar _ | Lmutvar _
   | Lstaticraise (_, _)
   | Lsequence (_, _)
@@ -325,6 +272,9 @@ and eval_structured_const env const =
       Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
     in
     if new_consts == old_consts then const else Const_block (n, new_consts)
+  | Const_layout old_layout ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then const else Const_layout new_layout
   | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
   | Const_null ->
     const
@@ -370,6 +320,47 @@ and eval_layout env layout =
   | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
   | Punboxed_vector _ | Pbottom ->
     layout
+
+and eval_array_kind env kind : array_kind =
+  match kind with
+  | Ptemplatedarray id ->
+    let layout =
+      eval_var env (id |> Slambdaident.of_ident)
+      |> expect_not_missing |> expect Tlayout
+    in
+    layout
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
+  | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+  | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+    kind
+
+and eval_array_ref_kind env kind : array_ref_kind =
+  match kind with
+  | Ptemplatedarray_ref (id, mode) ->
+    let layout =
+      eval_var env (id |> Slambdaident.of_ident)
+      |> expect_not_missing |> expect Tlayout
+    in
+    layout
+  | Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
+  | Pfloatarray_ref _ | Punboxedfloatarray_ref _
+  | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
+  | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ->
+    kind
+
+and eval_array_set_kind env kind : array_set_kind =
+  match kind with
+  | Ptemplatedarray_set (id, mode) ->
+    let layout =
+      eval_var env (id |> Slambdaident.of_ident)
+      |> expect_not_missing |> expect Tlayout
+    in
+    layout
+  | Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
+  | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
+  | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
+  | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
+    kind
 
 and eval_lfunction_shallow env
     ({ kind;
@@ -423,16 +414,51 @@ and eval_prim env prim =
     if new_layouts == old_layouts
     then prim
     else Punboxed_product_field (i, new_layouts)
+  | Parray_element_size_in_bytes old_kind ->
+    let new_kind = eval_array_kind env old_kind in
+    if new_kind == old_kind then prim else Parray_element_size_in_bytes new_kind
   | Pmake_idx_mixed_field (old_shape, i, path) ->
     let new_shape = eval_mixed_block_shape env old_shape in
     if new_shape == old_shape
     then prim
     else Pmake_idx_mixed_field (new_shape, i, path)
-  | Pmake_idx_array (kind, index_kind, old_element, path) ->
+  | Pmake_idx_array (old_kind, index_kind, old_element, path) ->
+    let new_kind = eval_array_kind env old_kind in
     let new_element = eval_mixed_block_element env old_element in
     if new_element == old_element
     then prim
-    else Pmake_idx_array (kind, index_kind, new_element, path)
+    else Pmake_idx_array (new_kind, index_kind, new_element, path)
+  | Pmakearray (old_array_kind, mut, mode) ->
+    let new_kind = eval_array_kind env old_array_kind in
+    if new_kind == old_array_kind then prim else Pmakearray (new_kind, mut, mode)
+  | Pmakearray_dynamic (old_array_kind, mode, has_init) ->
+    let new_kind = eval_array_kind env old_array_kind in
+    if new_kind == old_array_kind
+    then prim
+    else Pmakearray_dynamic (new_kind, mode, has_init)
+  | Pduparray (old_array_kind, mut) ->
+    let new_kind = eval_array_kind env old_array_kind in
+    if new_kind == old_array_kind then prim else Pduparray (new_kind, mut)
+  | Parrayblit { src_mutability; dst_array_set_kind = old_kind } ->
+    let new_kind = eval_array_set_kind env old_kind in
+    if new_kind == old_kind
+    then prim
+    else Parrayblit { src_mutability; dst_array_set_kind = new_kind }
+  | Parraylength old_kind ->
+    let new_kind = eval_array_kind env old_kind in
+    if new_kind == old_kind then prim else Parraylength new_kind
+  | Parrayrefu (old_kind, index_kind, mut) ->
+    let new_kind = eval_array_ref_kind env old_kind in
+    if new_kind == old_kind then prim else Parrayrefu (new_kind, index_kind, mut)
+  | Parraysetu (old_kind, index_kind) ->
+    let new_kind = eval_array_set_kind env old_kind in
+    if new_kind == old_kind then prim else Parraysetu (new_kind, index_kind)
+  | Parrayrefs (old_kind, index_kind, mut) ->
+    let new_kind = eval_array_ref_kind env old_kind in
+    if new_kind == old_kind then prim else Parrayrefs (new_kind, index_kind, mut)
+  | Parraysets (old_kind, index_kind) ->
+    let new_kind = eval_array_set_kind env old_kind in
+    if new_kind == old_kind then prim else Parraysets (new_kind, index_kind)
   | Pidx_deepen (old_element, path) ->
     let new_element = eval_mixed_block_element env old_element in
     if new_element == old_element then prim else Pidx_deepen (new_element, path)
@@ -458,29 +484,27 @@ and eval_prim env prim =
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
   | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
-  | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
-  | Pwith_stack_bind | Pperform | Presume | Preperform | Pccall _ | Praise _
-  | Psequand | Psequor | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _
-  | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
-  | Pbytessetu | Pbytesrefs | Pbytessets | Pmakearray _ | Pmakearray_dynamic _
-  | Pduparray _ | Parrayblit _ | Parraylength _ | Parrayrefu _ | Parraysetu _
-  | Parrayrefs _ | Parraysets _ | Pisint _ | Pisnull | Pisout | Pbigarrayref _
-  | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_i8 _ | Pstring_load_i16 _
-  | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
-  | Pstring_load_64 _ | Pstring_load_vec _ | Pbytes_load_i8 _
-  | Pbytes_load_i16 _ | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-  | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_8 _ | Pbytes_set_16 _
-  | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
-  | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
-  | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-  | Pbigstring_load_vec _ | Pbigstring_set_8 _ | Pbigstring_set_16 _
-  | Pbigstring_set_32 _ | Pbigstring_set_f32 _ | Pbigstring_set_64 _
-  | Pbigstring_set_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
-  | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-  | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
-  | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
-  | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pmake_idx_field _ | Pwith_stack | Pwith_stack_bind | Pperform | Presume
+  | Preperform | Pccall _ | Praise _ | Psequand | Psequor | Pnot | Pphys_equal _
+  | Pscalar _ | Poffsetref _ | Pstringlength | Pstringrefu | Pstringrefs
+  | Pbyteslength | Pbytesrefu | Pbytessetu | Pbytesrefs | Pbytessets | Pisint _
+  | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
+  | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+  | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
+  | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _
+  | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
+  | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
+  | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_load_i8 _
+  | Pbigstring_load_i16 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
+  | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
+  | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+  | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+  | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+  | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
+  | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+  | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
+  | Pfloat_array_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
   | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
@@ -578,18 +602,31 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
-  | Lsplice _ -> raise Found_a_splice);
+  | Lsplice _ -> raise Found_a_splice
+  | Ltemplate _ | Linstantiate _ -> Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
 let do_eval slam =
-  eval_slam Env.empty slam |> expect_not_missing
-  |> expect Thalves ~reason:"toplevel module"
+  let store = Templates.empty () in
+  let { slv_comptime; slv_runtime } =
+    eval_slam store Env.empty slam
+    |> expect_not_missing
+    |> expect Thalves ~reason:"toplevel module"
+  in
+  let lambda =
+    List.fold_left
+      (fun lam (id, def) ->
+        Llet (Strict, layout_function, id, debug_uid_none, def, lam))
+      slv_runtime
+      (Templates.instantiations store)
+  in
+  store, { slv_comptime; slv_runtime = lambda }
 
 let eval slam =
   Profile.record_call "static_eval" (fun () ->
-      let halves = do_eval slam in
+      let store, halves = do_eval slam in
       (try assert_no_splices halves.slv_runtime
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
-      halves)
+      store, halves)

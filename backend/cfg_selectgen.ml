@@ -1520,7 +1520,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
          proper value below, after possibly removing the prologue poll
          instruction. It is not very satisfactory, but as noted in the CR below,
          we should revisit the way we handle polling points. *)
-      Cfg.create ~fun_name:f.Cmm.fun_name.sym_name ~fun_args:loc_arg
+      Cfg.create ~fun_name:f.Cmm.fun_name.sym_name
+        ~fun_sym_global:f.Cmm.fun_name.sym_global ~fun_args:loc_arg
         ~fun_codegen_options:
           (Cfg.of_cmm_codegen_option f.Cmm.fun_codegen_options)
         ~fun_dbg:f.Cmm.fun_dbg ~fun_contains_calls:true

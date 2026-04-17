@@ -43,7 +43,7 @@ end) : S = struct
 
   type pack_member_kind =
     | PM_intf
-    | PM_impl of unit_infos
+    | PM_impl of Compilenv_flambda.unit_infos
 
   type pack_member =
     { pm_file : string;
@@ -59,13 +59,13 @@ end) : S = struct
       if Unit_info.is_cmi unit_info
       then PM_intf
       else
-        let info, crc = Compilenv.read_unit_info file in
+        let info, crc = Compilenv_flambda.read_unit_info file in
         if not (CU.Name.equal (CU.name info.ui_unit) name)
         then raise (Error (Illegal_renaming (name, file, CU.name info.ui_unit)));
         if not (CU.is_parent pack_path ~child:info.ui_unit)
         then raise (Error (Wrong_for_pack (file, pack_path)));
         Backend.check_consistency linkenv file info crc;
-        Compilenv.cache_unit_info info;
+        Compilenv_flambda.cache_unit_info info;
         PM_impl info
     in
     { pm_file = file; pm_name = name; pm_kind = kind }
@@ -144,7 +144,8 @@ end) : S = struct
             main_module_block_format;
             arg_block_idx;
             compilation_unit;
-            required_globals
+            required_globals;
+            template_instance_idents = Ident.Set.empty
           }
         in
         Backend.compile_implementation ~keep_symbol_tables:true
@@ -183,11 +184,14 @@ end) : S = struct
         members []
     in
     let ui = Compilenv.current_unit_infos () in
+    let current_export_info =
+      Option.map Compilenv_flambda.unpack_export_info ui.ui_export_info
+    in
     let ui_export_info =
       List.fold_left
         (fun acc info ->
           Flambda2_cmx.Flambda_cmx_format.merge info.ui_export_info acc)
-        ui.ui_export_info units
+        current_export_info units
     in
     let ui_zero_alloc_info = Zero_alloc_info.create () in
     List.iter
@@ -227,10 +231,11 @@ end) : S = struct
         ui_export_info;
         ui_zero_alloc_info;
         ui_external_symbols =
-          union (List.map (fun info -> info.ui_external_symbols) units)
+          union (List.map (fun info -> info.ui_external_symbols) units);
+        ui_static_data = Missing, Slambda_types.Templates.empty_templates ()
       }
     in
-    Compilenv.write_unit_info pkg_infos cmxfile
+    Compilenv_flambda.write_unit_info pkg_infos cmxfile
 
   let package_object_files ~ppf_dump files target targetcmx coercion =
     let pack_path = Unit_info.Artifact.modname target in

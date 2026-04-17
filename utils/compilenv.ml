@@ -24,8 +24,6 @@
 open Config
 open Cmx_format
 
-module File_sections = Oxcaml_utils.File_sections
-
 module CU = Compilation_unit
 
 type error =
@@ -38,7 +36,9 @@ exception Error of error
 module Infos_table = Global_module.Name.Tbl
 
 let global_infos_table =
-  (Infos_table.create 17 : unit_infos option Infos_table.t)
+  (Infos_table.create 17
+   : (Lambda.main_module_block_format, Obj.t option) unit_infos_gen
+     option Infos_table.t)
 
 let reset_info_tables () =
   Infos_table.reset global_infos_table
@@ -49,9 +49,10 @@ let exported_constants = Hashtbl.create 17
 
 let cached_zero_alloc_info = Zero_alloc_info.create ()
 
-let cache_zero_alloc_info c = Zero_alloc_info.merge c ~into:cached_zero_alloc_info
+let cache_zero_alloc_info c =
+  Zero_alloc_info.merge c ~into:cached_zero_alloc_info
 
-let current_unit =
+let current_unit  =
   { ui_unit = CU.dummy;
     ui_defines = [];
     ui_arg_descr = None;
@@ -65,6 +66,7 @@ let current_unit =
     ui_zero_alloc_info = Zero_alloc_info.create ();
     ui_export_info = None;
     ui_external_symbols = [];
+    ui_static_data = Missing, (Slambda_types.Templates.empty_templates ());
   }
 
 let reset unit_info =
@@ -106,15 +108,13 @@ let read_unit_info filename =
       close_in ic;
       raise(Error(Not_a_unit_info filename))
     end;
-    let uir = (input_value ic : unit_infos_raw) in
+    let uir = (input_value ic : Obj.t option unit_infos_raw) in
     let first_section_offset = pos_in ic in
     seek_in ic (first_section_offset + uir.uir_sections_length);
     let crc = Digest.input ic in
     (* This consumes the channel *)
-    let sections = File_sections.create uir.uir_section_toc filename ic ~first_section_offset in
-    let export_info =
-      Option.map (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
-        uir.uir_export_info
+    let sections =
+      File_sections.create uir.uir_section_toc filename ic ~first_section_offset
     in
     let ui = {
       ui_unit = uir.uir_unit;
@@ -125,14 +125,15 @@ let read_unit_info filename =
       ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
       ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
       ui_generic_fns = uir.uir_generic_fns;
-      ui_export_info = export_info;
+      ui_export_info = uir.uir_export_info;
       ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
       ui_force_link = uir.uir_force_link;
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+      ui_static_data = uir.uir_static_data;
     }
     in
-    (ui, crc)
+    (ui, sections, crc)
   with End_of_file | Failure _ ->
     close_in ic;
     raise(Error(Corrupted_unit_info(filename)))
@@ -156,24 +157,18 @@ let equal_args arg1 arg2 =
 
 let equal_up_to_pack_prefix cu1 cu2 =
   CU.Name.equal (CU.name cu1) (CU.name cu2)
-  && List.equal equal_args (CU.instance_arguments cu1) (CU.instance_arguments cu2)
+  && List.equal equal_args
+      (CU.instance_arguments cu1)
+      (CU.instance_arguments cu2)
 
-let get_unit_export_info comp_unit =
-  (* If this fails, it likely means that someone didn't call
-     [CU.which_cmx_file]. *)
+let load_unit_infos ~warn_on_missing comp_unit =
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.ui_unit);
-  (* CR lmaurer: Surely this should just compare [comp_unit] to
-     [current_unit.ui_unit], but doing so seems to break Closure. We should fix
-     that. *)
   if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
   then
-    current_unit.ui_export_info
+    ()
   else begin
     let name = CU.to_global_name_without_prefix comp_unit in
-    try
-      let ui = Infos_table.find global_infos_table name in
-      Option.bind ui (fun ui -> ui.ui_export_info)
-    with Not_found ->
+    if not (Infos_table.mem global_infos_table name) then begin
       let (infos, crc) =
         if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
         else begin
@@ -186,42 +181,74 @@ let get_unit_export_info comp_unit =
             let filename =
               Load_path.find_normalized
                 (CU.base_filename comp_unit ^ "." ^ missing_extension) in
-            let (ui, crc) = read_unit_info filename in
+            let (ui, sections, crc) = read_unit_info filename in
             if not (CU.equal ui.ui_unit comp_unit) then
               raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
             cache_zero_alloc_info ui.ui_zero_alloc_info;
+            (* Pair raw export info with its sections so the
+               middle-end can interpret them later. *)
+            let ui = { ui with ui_export_info =
+              Option.map
+                (fun raw_ei -> Obj.repr (raw_ei, sections))
+                ui.ui_export_info }
+            in
             (Some ui, Some crc)
           with Not_found ->
-            let warn =
-              Warnings.No_cmx_file
-                { missing_extension
-                ; module_name = Global_module.Name.to_string name }
-            in
-            Location.prerr_warning Location.none warn;
+            if warn_on_missing then begin
+              let warn =
+                Warnings.No_cmx_file
+                  { missing_extension
+                  ; module_name = Global_module.Name.to_string name }
+              in
+              Location.prerr_warning Location.none warn
+            end;
             (None, None)
           end
       in
       let import = Import_info.create_normal comp_unit ~crc in
       current_unit.ui_imports_cmx <- import :: current_unit.ui_imports_cmx;
-      Infos_table.add global_infos_table name infos;
-      Option.bind infos (fun ui -> ui.ui_export_info)
+      Infos_table.add global_infos_table name infos
+    end
+  end
+
+let ensure_unit_loaded comp_unit =
+  load_unit_infos ~warn_on_missing:true comp_unit
+
+let try_load_unit comp_unit =
+  load_unit_infos ~warn_on_missing:false comp_unit
+
+let get_cached_static_data comp_unit =
+  if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
+  then
+    current_unit.ui_static_data
+  else begin
+    let name = CU.to_global_name_without_prefix comp_unit in
+    match Infos_table.find global_infos_table name with
+    | Some ui -> ui.ui_static_data
+    | None | exception Not_found ->
+      Slambda_types.Or_missing.Missing,
+        (Slambda_types.Templates.empty_templates ())
+  end
+
+let get_cached_export_info comp_unit =
+  if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
+  then
+    current_unit.ui_export_info
+  else begin
+    let name = CU.to_global_name_without_prefix comp_unit in
+    try
+      let ui = Infos_table.find global_infos_table name in
+      Option.bind ui (fun ui -> ui.ui_export_info)
+    with Not_found -> None
   end
 
 let which_cmx_file comp_unit =
   CU.which_cmx_file comp_unit ~accessed_by:(CU.get_current_exn ())
 
-let get_global_export_info comp_unit =
-  get_unit_export_info (which_cmx_file comp_unit)
-
 let cache_unit_info ui =
   cache_zero_alloc_info ui.ui_zero_alloc_info;
   Infos_table.add global_infos_table
     (ui.ui_unit |> CU.to_global_name_without_prefix) (Some ui)
-
-(* Exporting cross-module information *)
-
-let set_export_info export_info =
-  current_unit.ui_export_info <- Some export_info
 
 (* Record that a currying function or application function is needed *)
 
@@ -268,15 +295,10 @@ let ensure_sharing_between_cmi_and_cmx_imports cmi_imports cmx_imports =
     cmx_imports
 *)
 
-let write_unit_info info filename =
-  let raw_export_info, sections =
-    match info.ui_export_info with
-    | None -> None, File_sections.empty
-    | Some info ->
-      let info, sections = Flambda2_cmx.Flambda_cmx_format.to_raw info in
-      Some info, sections
+let write_unit_info info ~export_info_sections filename =
+  let serialized_sections, toc, total_length =
+    File_sections.serialize export_info_sections
   in
-  let serialized_sections, toc, total_length = File_sections.serialize sections in
   let raw_info = {
     uir_unit = info.ui_unit;
     uir_defines = info.ui_defines;
@@ -286,13 +308,14 @@ let write_unit_info info filename =
     uir_quoted_globals = Array.of_list info.ui_quoted_globals;
     uir_format = info.ui_format;
     uir_generic_fns = info.ui_generic_fns;
-    uir_export_info = raw_export_info;
+    uir_export_info = info.ui_export_info;
     uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
     uir_force_link = info.ui_force_link;
     uir_requires_metaprogramming = info.ui_requires_metaprogramming;
     uir_section_toc = toc;
     uir_sections_length = total_length;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
+    uir_static_data = info.ui_static_data;
   } in
   Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
@@ -302,17 +325,26 @@ let write_unit_info info filename =
   let crc = Digest.file filename in
   Digest.output oc crc)
 
-let save_unit_info filename ~main_module_block_format ~arg_descr =
+let save_unit_info filename ~main_module_block_format ~arg_descr ~static_data =
   current_unit.ui_imports_cmi <- Env.imports();
   current_unit.ui_quoted_globals <- Env.quoted_globals();
-  (* We could have [set_main_module_block_format] and [set_arg_descr] instead
-     of passing these in as arguments but, unlike most of the state that this
-     module keeps track of, they're not values that get accumulated over time,
-     they just get computed once. (Arguably we should remove [set_export_info]
-     by the same reasoning.) *)
   current_unit.ui_arg_descr <- arg_descr;
+  current_unit.ui_static_data <- static_data;
+  let export_info, export_info_sections =
+    match current_unit.ui_export_info with
+    | None -> None, File_sections.empty
+    | Some packed ->
+      let (raw_ei, sections) =
+        (Obj.obj packed : Obj.t * File_sections.t)
+      in
+      Some raw_ei, sections
+  in
   write_unit_info
-    { current_unit with ui_format = main_module_block_format } filename
+    { current_unit with
+      ui_format = main_module_block_format;
+      ui_export_info = export_info }
+    ~export_info_sections
+    filename
 
 let new_const_symbol () =
   Symbol.for_new_const_in_current_unit ()
@@ -320,9 +352,7 @@ let new_const_symbol () =
   |> Linkage_name.to_string
 
 let require_global global_ident =
-  ignore
-    (get_global_export_info global_ident
-     : Flambda2_cmx.Flambda_cmx_format.t option)
+  ensure_unit_loaded (which_cmx_file global_ident)
 
 (* Error report *)
 

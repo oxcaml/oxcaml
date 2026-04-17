@@ -1398,4 +1398,6 @@ let flambda_units u1 u2 =
       let module_symbol = Flambda_unit.module_symbol u1 in
       Flambda_unit.create ~return_continuation:ret_cont
         ~exn_continuation:exn_cont ~body ~module_symbol
-        ~used_value_slots:Unknown ~toplevel_my_region ~toplevel_my_ghost_region)
+        ~used_value_slots:Unknown ~toplevel_my_region ~toplevel_my_ghost_region
+        ~weak_symbols:(Flambda_unit.weak_symbols u1)
+        ~weak_code_ids:(Flambda_unit.weak_code_ids u1))

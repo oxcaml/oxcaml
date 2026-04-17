@@ -75,7 +75,7 @@ let cmx_bundle ~quoted_globals =
           try Load_path.find_normalized (CU.Name.to_string global ^ ".cmx")
           with Not_found -> raise (Error (Missing_impl_for_quote global))
         in
-        let unit_info, _crc = Compilenv.read_unit_info path in
+        let unit_info, _crc = Compilenv_flambda.read_unit_info path in
         let missing_globals =
           List.fold_left
             (fun missing_globals import ->
@@ -89,18 +89,18 @@ let cmx_bundle ~quoted_globals =
     loop CU.Name.Map.empty (CU.Name.Set.elements quoted_globals)
   in
   ListLabels.map (CU.Name.Map.data unit_infos)
-    ~f:(fun (info : Cmx_format.unit_infos) ->
+    ~f:(fun (info : Compilenv_flambda.unit_infos) ->
       let raw_export_info, sections =
         match info.ui_export_info with
-        | None -> None, Oxcaml_utils.File_sections.empty
+        | None -> None, File_sections.empty
         | Some info ->
           let info, sections = Flambda2_cmx.Flambda_cmx_format.to_raw info in
           Some info, sections
       in
       let serialized_sections, toc, total_length =
-        Oxcaml_utils.File_sections.serialize sections
+        File_sections.serialize sections
       in
-      let raw_info : Cmx_format.unit_infos_raw =
+      let raw_info : Compilenv_flambda.unit_infos_raw =
         { uir_unit = info.ui_unit;
           uir_defines = info.ui_defines;
           uir_arg_descr = info.ui_arg_descr;
@@ -115,7 +115,8 @@ let cmx_bundle ~quoted_globals =
           uir_requires_metaprogramming = info.ui_requires_metaprogramming;
           uir_section_toc = toc;
           uir_sections_length = total_length;
-          uir_external_symbols = Array.of_list info.ui_external_symbols
+          uir_external_symbols = Array.of_list info.ui_external_symbols;
+          uir_static_data = info.ui_static_data
         }
       in
       raw_info, serialized_sections)

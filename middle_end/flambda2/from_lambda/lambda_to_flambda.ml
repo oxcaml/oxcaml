@@ -1192,7 +1192,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lsplice _ -> Lambda.fatal_error_invalid_constructor lam
+  | Lsplice _ | Ltemplate _ | Linstantiate _ ->
+    Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
     Acc.t ->
@@ -1689,7 +1690,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lsplice _ -> Lambda.fatal_error_invalid_constructor action)
+        | Lsplice _ | Ltemplate _ | Linstantiate _ ->
+          Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in
   cps_non_tail_var "scrutinee" acc env ccenv scrutinee
@@ -1796,7 +1798,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
 (* CR pchambart: define a record `target_config` to hold things like
    `big_endian` *)
 let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
-    ~compilation_unit ~module_repr (lam : Lambda.lambda) =
+    ~compilation_unit ~module_repr ~template_instance_idents
+    (lam : Lambda.lambda) =
   let return_continuation = Continuation.create ~sort:Define_root_symbol () in
   let exn_continuation = Continuation.create () in
   let toplevel_my_region = Ident.create_local "toplevel_my_region" in
@@ -1813,4 +1816,4 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
   CC.close_program ~mode ~machine_width ~big_endian ~cmx_loader
     ~compilation_unit ~module_repr ~program
     ~prog_return_cont:return_continuation ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region
+    ~toplevel_my_ghost_region ~template_instance_idents

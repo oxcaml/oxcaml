@@ -888,5 +888,6 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
       ~toplevel_my_ghost_region:
         (Variable.create "my_ghost_region" Flambda_kind.region)
       ~body ~module_symbol ~used_value_slots:Unknown
+      ~weak_symbols:Symbol.Set.empty ~weak_code_ids:Code_id.Set.empty
   in
   { unit; code_slot_offsets }

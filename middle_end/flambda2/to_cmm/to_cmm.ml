@@ -98,6 +98,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   let r =
     R.create ~reachable_names
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
+      ~weak_symbols:(Flambda_unit.weak_symbols flambda_unit)
+      ~weak_code_ids:(Flambda_unit.weak_code_ids flambda_unit)
   in
   let body, body_free_vars, body_symbol_inits, res =
     To_cmm_expr.expr env r (Flambda_unit.body flambda_unit)

@@ -679,14 +679,35 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
     ~closure_bound_vars set_of_closures ~value_slots ~symbol_projections
     ~simplify_function_body =
   let function_decls = Set_of_closures.function_decls set_of_closures in
+  let weak_code_ids = DE.weak_code_ids (DA.denv dacc) in
   let closure_symbols =
     Function_slot.Lmap.mapi
-      (fun function_slot _func_decl ->
-        let name =
-          function_slot |> Function_slot.rename |> Function_slot.to_string
-          |> Linkage_name.of_string
+      (fun function_slot
+           (fd : Function_declarations.code_id_in_function_declaration) ->
+        let is_weak =
+          match fd with
+          | Deleted _ -> false
+          | Code_id { code_id; _ } -> Code_id.Set.mem code_id weak_code_ids
         in
-        Symbol.create (Compilation_unit.get_current_exn ()) name)
+        if is_weak
+        then
+          (* Closure records for monomorphized layout-polymorphic instances
+             share a canonical cross-unit linkage name so the linker can
+             deduplicate them via COMDAT, mirroring the treatment of the code
+             body. Mint in the [*extern*] pseudo-unit under the name
+             [caml__<function_slot_name>], and the [to_cmm] weak-symbol
+             detection (based on the [*extern*] unit) will emit the appropriate
+             [.weak] linkage. *)
+          let name =
+            Linkage_name.of_string ("caml__" ^ Function_slot.name function_slot)
+          in
+          Symbol.create (Symbol.external_symbols_compilation_unit ()) name
+        else
+          let name =
+            function_slot |> Function_slot.rename |> Function_slot.to_string
+            |> Linkage_name.of_string
+          in
+          Symbol.create (Compilation_unit.get_current_exn ()) name)
       (Function_declarations.funs_in_order function_decls)
   in
   let closure_symbols_map =

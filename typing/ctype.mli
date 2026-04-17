@@ -198,13 +198,15 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       allow_recursive_equations : bool;
       (* true iff checking counter examples *)
-      is_lpoly : bool;
-      (* true iff the pattern is under let poly_ *)
+      mutable env_alloc_mode : Mode.Alloc.r option;
+      (** [Some m] if the pattern is under [let poly_], where [m] is the
+         allocation mode of the captured environment *)
     }
-  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+  val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
     -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
+  val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
 end
 
 type existential_treatment =
@@ -798,6 +800,7 @@ val crossing_of_jkind : Env.t -> 'd Types.jkind -> Mode.Crossing.t
 val crossing_of_ty :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
+  ?val_lpoly:Types.Lpoly.t ->
   Types.type_expr ->
   Mode.Crossing.t
 
@@ -850,6 +853,8 @@ val mode_crossing_functor : Mode.Crossing.t
 
 (** The mode crossing of any module. *)
 val mode_crossing_module : Mode.Crossing.t
+
+val mode_crossing_staticity : Mode.Crossing.t
 
 (** Zap a modality to floor if maturity allows, zap to id otherwise. *)
 val zap_modalities_to_floor_if_at_least :

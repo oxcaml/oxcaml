@@ -68,6 +68,11 @@ type t =
     closure_info : Closure_info.t;
     get_imported_code : unit -> Exported_code.t;
     all_code : Code.t Code_id.Map.t;
+    weak_code_ids : Code_id.Set.t;
+    (* Code ids whose bodies carry a canonical cross-unit linkage name and are
+       intended to be deduplicated at link time (COMDAT). These are allowed to
+       be defined here even though they do not live in the current compilation
+       unit, and the simplifier must not rename them. *)
     inlining_history_tracker : Inlining_history.Tracker.t;
     loopify_state : Loopify_state.t;
     replay_history : Replay_history.t;
@@ -110,7 +115,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 at_unit_toplevel; unit_toplevel_exn_continuation;
                 variables_defined_at_toplevel; cse; comparison_results;
                 are_rebuilding_terms; closure_info;
-                unit_toplevel_return_continuation; all_code;
+                unit_toplevel_return_continuation; all_code; weak_code_ids = _;
                 get_imported_code = _; inlining_history_tracker = _;
                 loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
                 lifted = _; cost_of_lifting_continuations_out_of_current_one;
@@ -220,7 +225,7 @@ let create ~round ~machine_width ~(resolver : resolver)
     ~(get_imported_names : get_imported_names)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation
-    ~toplevel_my_region ~toplevel_my_ghost_region =
+    ~toplevel_my_region ~toplevel_my_ghost_region ~weak_code_ids =
   let typing_env = TE.create ~machine_width ~resolver ~get_imported_names in
   let t =
     { round;
@@ -239,6 +244,7 @@ let create ~round ~machine_width ~(resolver : resolver)
       are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
       closure_info = Closure_info.not_in_a_closure;
       all_code = Code_id.Map.empty;
+      weak_code_ids;
       get_imported_code;
       inlining_history_tracker =
         Inlining_history.Tracker.empty (Compilation_unit.get_current_exn ());
@@ -263,6 +269,8 @@ let create ~round ~machine_width ~(resolver : resolver)
     K.region
 
 let all_code t = t.all_code
+
+let weak_code_ids t = t.weak_code_ids
 
 let machine_width t = t.machine_width
 
@@ -327,6 +335,7 @@ let enter_set_of_closures
       closure_info = _;
       get_imported_code;
       all_code;
+      weak_code_ids;
       inlining_history_tracker;
       loopify_state = _;
       replay_history = _;
@@ -357,6 +366,7 @@ let enter_set_of_closures
     closure_info = Closure_info.in_a_set_of_closures;
     get_imported_code;
     all_code;
+    weak_code_ids;
     inlining_history_tracker;
     loopify_state = Loopify_state.do_not_loopify;
     replay_history = Replay_history.first_pass;
@@ -540,8 +550,8 @@ let find_code_exn t id =
 let define_code t ~code_id ~code =
   if
     not
-      (Code_id.in_compilation_unit code_id
-         (Compilation_unit.get_current_exn ()))
+      (Code_id.in_compilation_unit code_id (Compilation_unit.get_current_exn ())
+      || Code_id.Set.mem code_id t.weak_code_ids)
   then
     Misc.fatal_errorf "Cannot define code ID %a as it is from another unit:@ %a"
       Code_id.print code_id Code.print code;
@@ -773,6 +783,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     inlining_history_tracker = denv.inlining_history_tracker;
     (* denv_for_join *)
     all_code = denv_for_join.all_code;
+    weak_code_ids = denv_for_join.weak_code_ids;
     typing_env = denv_for_join.typing_env;
     at_unit_toplevel = denv_for_join.at_unit_toplevel;
     variables_defined_at_toplevel = denv_for_join.variables_defined_at_toplevel;

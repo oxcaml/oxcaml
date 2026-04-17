@@ -380,7 +380,7 @@ module (M @ static) = struct
     let x = Random.bool ()
 end
 [%%expect{|
-module M : sig val x : bool @@ dynamic end
+module M : sig val x : bool end
 |}]
 
 let x = Random.bool ()
@@ -398,7 +398,7 @@ module (M @ static) = struct
     let (Foo x) = Foo (Random.bool ())
 end
 [%%expect{|
-module M : sig val x : bool @@ dynamic end
+module M : sig val x : bool end
 |}]
 
 (* or pattern makes [x] dynamic, even though the RHS is static. *)
@@ -431,14 +431,10 @@ Line 3, characters 22-35:
 Error: The module is "dynamic" but is expected to be "static".
 |}]
 
-(* persistent modules are currently dynamic. *)
-(* CR-soon zqian: remove this restriction *)
+(* persistent modules are always static. *)
 module (L @ static) = List
 [%%expect{|
-Line 1, characters 22-26:
-1 | module (L @ static) = List
-                          ^^^^
-Error: The module is "dynamic" but is expected to be "static".
+module L = List
 |}]
 
 (* primitives are always static, unless you override *)

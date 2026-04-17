@@ -96,6 +96,10 @@ val of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list
 type t =
   { blocks : basic_block Label.Tbl.t;  (** Map from labels to blocks *)
     fun_name : string;  (** Function name, used for printing messages *)
+    fun_sym_global : Cmm.is_global;
+        (** Linkage of the function's entry symbol (its [Cmm.fundecl.fun_name]
+            visibility). Propagated unchanged through the backend so weak /
+            COMDAT emission can consult it at the emitter. *)
     fun_args : Reg.t array;
         (** Function arguments. When Cfg is constructed from Linear, this
             information is not needed (Linear.fundecl does not have fun_args
@@ -124,6 +128,7 @@ type t =
 
 val create :
   fun_name:string ->
+  fun_sym_global:Cmm.is_global ->
   fun_args:Reg.t array ->
   fun_codegen_options:codegen_option list ->
   fun_dbg:Debuginfo.t ->

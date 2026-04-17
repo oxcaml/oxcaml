@@ -1690,16 +1690,13 @@ Line 1, characters 10-12:
 1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
               ^^
 Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
 
+val id : 'a -> 'a = <fun>
 |}]
 
 let poly_ id = fun x -> x
 [%%expect{|
->> Fatal error: layout: unexpected genvar
-Uncaught exception: Misc.Fatal_error
-
+val id : layout_ l. ('a : l). 'a -> 'a = <fun>
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
@@ -1708,9 +1705,8 @@ Line 1, characters 10-15:
 1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
               ^^^^^
 Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
 
+val const : 'a -> 'b -> 'a = <fun>
 |}]
 
 module type S_poly = sig
@@ -1736,9 +1732,9 @@ Line 1, characters 10-11:
 1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
               ^
 Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
 
+val f : 'a -> 'a = <fun>
+val g : 'a -> 'b -> 'a = <fun>
 |}]
 
 (* Mixed poly and non-poly in mutually recursive bindings *)

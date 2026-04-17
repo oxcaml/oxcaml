@@ -365,8 +365,9 @@ let pat
         Tpat_alias { pattern = sub.pat sub pattern; id;
                      name = map_loc sub name; uid;
                      sort; mode; type_expr }
-    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly } ->
-        Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode; lpoly }
+    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly; env_alloc_mode } ->
+        Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode;
+                          lpoly; env_alloc_mode }
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc

@@ -6,6 +6,8 @@ mixed_product_bytes.ml
 mixed_product_bytes.mli
 slambda_fracture.ml
 slambda_fracture.mli
+slambda_types.ml
+slambda_types.mli
 slambda.ml
 slambda.mli
 slambdaeval.ml

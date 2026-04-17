@@ -246,9 +246,11 @@ end
 (* CR mshinwell: maybe the following two functions should move to a new
    Cmm.Symbol module, which would include Cmm.symbol as the type "t"? *)
 
-(* Convert Cmm.is_global to Asm_symbol.visibility *)
+(* Convert Cmm.is_global to Asm_symbol.visibility. See the matching comment in
+   [backend/amd64/emit.ml]: [Weak] is folded into [Global] here; proper [.weak]
+   / COMDAT emission for weak definitions is handled separately. *)
 let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
-  | Cmm.Global -> S.Global
+  | Cmm.Global | Cmm.Weak -> S.Global
   | Cmm.Local -> S.Local
 
 (* Create symbol from Cmm.symbol, preserving visibility *)
@@ -1177,6 +1179,26 @@ let emit_named_text_section func_name =
     D.unsafe_set_internal_section_ref Text)
   else D.text ()
 
+(* Switch to a COMDAT text section for a weak function. Mirrors the amd64
+   emitter; arm64 GAS uses [%progbits] instead of [@progbits]. *)
+let emit_weak_text_section_for_symbol sym_name =
+  if macosx
+  then
+    (* CR-soon: implement the macOS side using [.weak_definition] plus the
+       default [.subsections_via_symbols] mode. For now, bail so we don't
+       silently emit code the linker will refuse to deduplicate. *)
+    Misc.fatal_errorf
+      "COMDAT / weak function emission is not yet implemented on macOS \
+       (function %s)"
+      sym_name
+  else
+    let encoded = S.encode (S.create_global sym_name) in
+    let section_name = Printf.sprintf ".text.%s" encoded in
+    D.switch_to_section_raw ~names:[section_name] ~flags:(Some "axG")
+      ~args:[Printf.sprintf "%%progbits,%s,comdat" encoded]
+      ~is_delayed:false;
+    D.unsafe_set_internal_section_ref Text
+
 (* Emit code to load an emitted literal *)
 
 let emit_load_literal dst lbl =
@@ -2073,10 +2095,18 @@ let fundecl fundecl =
            (label_to_asm_label ~section:Text)
            fundecl.fun_tailrec_entry_point_label)
   in
-  emit_named_text_section (Env.function_name env);
+  (match fundecl.fun_sym_global with
+  | Cmm.Weak -> emit_weak_text_section_for_symbol fundecl.fun_name
+  | Global | Local -> emit_named_text_section (Env.function_name env));
   let fun_sym = S.create_global fundecl.fun_name in
   D.align ~fill:Nop ~bytes:8;
-  global_maybe_protected fun_sym;
+  (match fundecl.fun_sym_global with
+  | Cmm.Weak -> D.weak fun_sym
+  | Global | Local ->
+    (* Historically all functions were emitted as global symbols regardless of
+       [fun_name.sym_global]; keep that behavior when the new [Weak] case does
+       not apply. *)
+    global_maybe_protected fun_sym);
   D.type_symbol ~ty:Function fun_sym;
   (* Define both a symbol and a label so the function can be referenced either
      way. Local references use the label form to avoid ELF visibility issues. *)
@@ -2115,10 +2145,50 @@ let emit_data_item_actions : Emitaux.emit_data_item_actions =
     symbol_used = (fun _ -> ())
   }
 
+(* Switch to a COMDAT read-only-data section for a weak data symbol. Mirrors the
+   amd64 emitter; arm64 GAS uses [%progbits] instead of [@progbits]. *)
+let emit_weak_data_section_for_symbol sym_name =
+  if macosx
+  then
+    Misc.fatal_errorf
+      "COMDAT / weak data emission is not yet implemented on macOS (symbol %s)"
+      sym_name
+  else
+    let encoded = S.encode (S.create_global sym_name) in
+    let section_name = Printf.sprintf ".rodata.%s" encoded in
+    D.switch_to_section_raw ~names:[section_name] ~flags:(Some "aG")
+      ~args:[Printf.sprintf "%%progbits,%s,comdat" encoded]
+      ~is_delayed:false;
+    D.unsafe_set_internal_section_ref Data
+
 let data l =
   D.data ();
   D.align ~fill:Zero ~bytes:8;
-  List.iter (Emitaux.emit_data_item emit_data_item_actions) l
+  (* See the matching comment in [backend/amd64/emit.ml]: wrap each run of items
+     that starts with a weak [Cdefine_symbol] in its own COMDAT section. *)
+  let in_weak = ref false in
+  List.iter
+    (fun (item : Cmm.data_item) ->
+      (match[@ocaml.warning "-4"] item with
+      | Cdefine_symbol { sym_global; sym_name } -> (
+        if !in_weak
+        then (
+          D.data ();
+          D.align ~fill:Zero ~bytes:8;
+          in_weak := false);
+        match sym_global with
+        | Cmm.Weak ->
+          emit_weak_data_section_for_symbol sym_name;
+          D.align ~fill:Zero ~bytes:8;
+          in_weak := true
+        | Cmm.Global | Cmm.Local -> ())
+      | _ -> ());
+      Emitaux.emit_data_item emit_data_item_actions item)
+    l;
+  if !in_weak
+  then (
+    D.data ();
+    in_weak := false)
 
 let file_emitter ~file_num ~file_name =
   D.file ~file_num:(Some file_num) ~file_name

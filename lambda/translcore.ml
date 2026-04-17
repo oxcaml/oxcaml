@@ -36,6 +36,7 @@ type error =
   | Void_sort of type_expr
   | Unboxed_vector_in_array_comprehension
   | Unboxed_product_in_array_comprehension
+  | Layout_poly_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible
 
@@ -388,15 +389,24 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
-  | Texp_apply_layout (_, args) ->
-      let sorts = List.map Jkind.Sort.var_default_to_scannable_and_get args in
-      Misc.fatal_errorf
-        "Translcore: translation of layout-polymorphic instantiation is not \
-         yet supported@ (layout args: [%a])"
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
-           (Format_doc.compat Jkind.Sort.Const.format))
-        sorts
+  | Texp_apply_layout (func, args) ->
+      Linstantiate {
+        ap_func = (transl_exp ~scopes Jkind.Sort.Const.for_function func);
+        ap_args = List.map
+          (fun var ->
+            let layout = Jkind.Sort.var_default_to_scannable_and_get var in
+            let layout = Typeopt.layout_of_sort e.exp_loc layout in
+            Lconst (Const_layout layout))
+          args;
+        ap_result_layout = Lambda.layout_function;
+        ap_region_close = Rc_normal;
+        ap_mode = alloc_local;
+        ap_loc = (of_location ~scopes e.exp_loc);
+        ap_tailcall = Default_tailcall;
+        ap_inlined = Default_inlined;
+        ap_specialised = Default_specialise;
+        ap_probe = None;
+      }
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
       let return_layout = layout_exp sort body in
@@ -897,7 +907,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   raise Not_constant    (* can this really happen? *)
                 | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                 | Punboxedvectorarray _
-                | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+                | Pgcscannableproductarray _ | Pgcignorableproductarray _
+                | Ptemplatedarray _ ->
                   Misc.fatal_error "Use flambda2 for unboxed arrays"
             in
             if Types.is_mutable amut then duparray_to_mutable const else const
@@ -925,6 +936,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
         raise (Error(e.exp_loc, Unboxed_product_in_array_comprehension))
+      | Ptemplatedarray _ ->
+        raise (Error(e.exp_loc, Layout_poly_in_array_comprehension))
       end;
       Transl_array_comprehension.comprehension
         ~transl_exp ~scopes ~loc ~array_kind comp
@@ -2041,7 +2054,10 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       let idlist =
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
-              Tpat_var { id; uid; _ } -> id, uid
+            | Tpat_var { id; uid; _ } -> id, uid
+            | Tpat_fun_layout { id; uid; lpoly }
+                when List.is_empty (Lpoly.get_exn lpoly) ->
+              id, uid
             | _ -> Misc.fatal_error "Translcore.transl_let")
         pat_expr_list in
       let transl_case
@@ -2726,6 +2742,10 @@ let report_error_doc ppf = function
       fprintf ppf
         "Array comprehensions are not yet supported for arrays of unboxed \
          products."
+  | Layout_poly_in_array_comprehension ->
+      fprintf ppf
+        "Array comprehensions are not yet supported for arrays with \
+         layout polymorphic elements."
   | Unboxed_product_in_let_mutable ->
       fprintf ppf
         "Mutable lets are not yet supported with unboxed products."

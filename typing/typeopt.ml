@@ -1101,7 +1101,8 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
-  | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
+  | Genvar var ->
+    Psplicevar (Ident.create_sort_var (Jkind_types.Sort.Var.get_id var :> int))
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort

@@ -11,7 +11,12 @@ let reset t = t.zero_alloc <- String.Map.empty
 
 let merge src ~into:dst =
   let join key b1 b2 =
-    Misc.fatal_errorf "Unexpected merge %s %d %d" key b1 b2
+    (* A weak (COMDAT) symbol may be defined in multiple compilation units
+       with identical zero-alloc properties; tolerate duplicate entries so
+       long as they agree. *)
+    if Int.equal b1 b2
+    then Some b1
+    else Misc.fatal_errorf "Unexpected merge %s %d %d" key b1 b2
   in
   dst.zero_alloc <- String.Map.union join dst.zero_alloc src.zero_alloc
 

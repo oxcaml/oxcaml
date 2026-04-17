@@ -25,16 +25,20 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type value_halves = Slambdaeval.halves =
-  { slv_comptime : Slambdaeval.value Slambdaeval.Or_missing.t;
+type value_halves = Slambda_types.halves =
+  { slv_comptime : Slambda_types.value Slambda_types.Or_missing.t;
     slv_runtime : Lambda.lambda
   }
 
 let eval inspect_slambda template_lam =
   Profile.record_call "slambda_eval" (fun () ->
-      let halves =
+      let store, halves =
         Slambda_fracture.fracture template_lam
         |> inspect_slambda |> Slambdaeval.eval
+      in
+      let templates = Slambda_types.Templates.templates store in
+      let instantiation_idents =
+        Slambda_types.Templates.instantiation_idents store
       in
       (* CR layout poly: We can keep this check in the future if
          [is_enabled Layout_poly] is replaced with whether template_lam contains
@@ -46,4 +50,4 @@ let eval inspect_slambda template_lam =
       then
         Misc.fatal_error
           "Slambda eval did something non-trivial but layout poly is disabled.";
-      halves)
+      templates, instantiation_idents, halves)

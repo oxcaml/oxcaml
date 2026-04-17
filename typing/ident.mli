@@ -37,6 +37,7 @@ val create_persistent: string -> t
 val create_predef: string -> t (* CR-someday layouts: should take a sort *)
 val create_instance: string -> Global_module.Name.argument list -> t
 val create_global: Global_module.Name.t -> t
+val create_sort_var: int -> t
 
 val create_local_binding_for_global: Global_module.Name.t -> t
         (** Creates a local identifier intended to bind the value of a global

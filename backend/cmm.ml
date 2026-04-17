@@ -502,11 +502,12 @@ let equal_alloc_dbginfo left right =
 type is_global =
   | Global
   | Local
+  | Weak
 
 let equal_is_global g g' =
   match g, g' with
-  | Local, Local | Global, Global -> true
-  | Local, Global | Global, Local -> false
+  | Local, Local | Global, Global | Weak, Weak -> true
+  | (Local | Global | Weak), _ -> false
 
 type symbol =
   { sym_name : string;

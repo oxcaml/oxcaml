@@ -53,7 +53,8 @@ let unboxed_product_uninitialized_array_check loc array_kind =
   | Punboxedvectorarray _ ->
     ()
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
-  | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+  | Pgcscannableproductarray _ | Pgcignorableproductarray _ | Ptemplatedarray _
+    ->
     raise (Error (loc, Invalid_array_kind_for_uninitialized_makearray_dynamic))
 
 (* Insertion of debugging events *)
@@ -2463,9 +2464,10 @@ let lambda_primitive_needs_event_after = function
     can_raise || may_allocate
   | Pduprecord _ | Pccall _
   | Pstringrefs | Pbytesrefs
-  | Pbytessets | Pmakearray (Pgenarray, _, _) | Pduparray _
-  | Pmakearray_dynamic (Pgenarray, _, _)
-  | Parrayrefu ((Pgenarray_ref _ | Pfloatarray_ref _), _, _)
+  | Pbytessets | Pmakearray ((Pgenarray | Ptemplatedarray _), _, _)
+  | Pduparray _ | Pmakearray_dynamic ((Pgenarray | Ptemplatedarray _), _, _)
+  | Parrayrefu
+      ((Pgenarray_ref _ | Pfloatarray_ref _ | Ptemplatedarray_ref _), _, _)
   | Parrayrefs _ | Parraysets _
   | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
   | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
