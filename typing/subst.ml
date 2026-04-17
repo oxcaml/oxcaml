@@ -487,16 +487,23 @@ let apply_type_function params args body =
 
 let jkind_desc s jkind =
   match jkind.base with
-  | Kconstr p ->
+  | Kconstr (p, sa) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr p' }
-    | Jkind_path p -> { jkind with base = Kconstr p }
+        { jkind with base = Kconstr (p', sa) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+      let new_base =
+        match base with
+        | Kconstr (p', sa') ->
+          Kconstr (p', Jkind_types.Scannable_axes.meet sa sa')
+        | Layout l ->
+          Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
+      in
       let const =
-        { base;
+        { base = new_base;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
           with_bounds = jkind.with_bounds }
       in
@@ -507,15 +514,22 @@ let jkind_desc s jkind =
 let jkind_const_desc s
       ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
   match jkind.base with
-  | Kconstr p ->
+  | Kconstr (p, sa) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr p' }
-    | Jkind_path p -> { jkind with base = Kconstr p }
+        { jkind with base = Kconstr (p', sa) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
-      { base;
+      let new_base =
+        match base with
+        | Kconstr (p', sa') ->
+          Kconstr (p', Jkind_types.Scannable_axes.meet sa sa')
+        | Layout l ->
+          Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
+      in
+      { base = new_base;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
         with_bounds = jkind.with_bounds }
     end
