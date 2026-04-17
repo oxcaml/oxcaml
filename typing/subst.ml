@@ -53,26 +53,21 @@ type additional_action =
   | Duplicate_variables
   | No_action
 
+(* These represent maps from variable ids to the corresponding sort vars.
+   The reason for their existence is ensuring that the same variable id maps
+   to the same physical variable being saved to a cmi or loaded from a cmi. *)
 type sort_map =
-  | Saving of (int, Jkind_types.Sort.var) Hashtbl.t
-  | Loading of (int, Jkind_types.Sort.var) Hashtbl.t
+  | Saving of (Jkind_types.Sort.Var.id, Jkind_types.Sort.var) Hashtbl.t
+    (* saving to a cmi *)
+  | Loading of (Jkind_types.Sort.Var.id, Jkind_types.Sort.var) Hashtbl.t
+    (* loading from a cmi *)
   | Nothing
+    (* substitution has nothing to do with cmi operations *)
 
 let find_in_sort_map_opt ~id =
   function
   | Nothing -> None
   | Saving m | Loading m -> Hashtbl.find_opt m id
-
-let add_to_sort_map ~id ~data =
-  let open Jkind_types.Sort in
-  function
-  | Nothing -> fatal_error "subst: add_to_sort_map"
-  | Saving m ->
-    assert (Var.get_id data < 0);
-    Hashtbl.add m id data
-  | Loading m ->
-    assert (Var.get_id data > 0);
-    Hashtbl.add m id data
 
 type s =
   { types: type_replacement Path.Map.t;
@@ -533,15 +528,19 @@ let sort_var s srt var =
     | Some var -> var
     | None ->
       match s.sort_var_mapping with
-      | Saving _ ->
+      | Saving m ->
+        assert (not (Var.is_cmi_var var));
         assert_generic var;
         let var = newsortvar () in
-        add_to_sort_map ~id ~data:var s.sort_var_mapping;
+        assert (Var.is_cmi_var var);
+        Hashtbl.add m id var;
         var
-      | Loading _ ->
+      | Loading m ->
+        assert (Var.is_cmi_var var);
         assert_generic var;
         let var = new_genvar () in
-        add_to_sort_map ~id ~data:var s.sort_var_mapping;
+        assert (not (Var.is_cmi_var var));
+        Hashtbl.add m id var;
         var
       | Nothing -> var
   in
@@ -1316,8 +1315,9 @@ and compose s1 s2 =
             | action, Nothing | Nothing, action -> action
             | (Loading _ as s), Loading _ -> s
             | (Saving _ as s), Saving _ -> s
-            | (Saving _ as s), Loading _
-            | Loading _, (Saving _ as s) -> s
+            | Saving _, Loading _
+            | Loading _, Saving _ ->
+              fatal_error "compose: composing Saving and Loading"
           end;
           loc = keep_latest_loc s1.loc s2.loc;
           last_compose = None

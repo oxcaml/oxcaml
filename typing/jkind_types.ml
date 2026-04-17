@@ -167,7 +167,7 @@ module Sort = struct
       | Base b1, Base b2 -> equal_base b1 b2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
-      | Genvar v1, Genvar v2 -> v1.id == v2.id
+      | Genvar v1, Genvar v2 -> v1.id = v2.id
       | (Base _ | Product _ | Univar _ | Genvar _), _ -> false
 
     let format ppf c =
@@ -308,9 +308,7 @@ module Sort = struct
 
     let get_id { id; _ } = id
 
-    let get_contents { contents; _ } = contents
-
-    let get_level { level; _ } = level
+    let is_cmi_var { id; _ } = id < 0
 
     (* Map var ids to smaller numbers for more consistent printing. *)
     let next_id = ref 1
@@ -832,7 +830,7 @@ module Sort = struct
     | Univar uv2 -> equate_var_univar v1 uv2
 
   and equate_var_var v1 v2 =
-    if v1.id == v2.id (* equal id means physical equality *)
+    if v1.id = v2.id (* equal id means physical equality *)
     then Equal_no_mutation
     else
       match v1.contents, v2.contents with
@@ -972,7 +970,7 @@ module Layout = struct
       | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
-      | Genvar v1, Genvar v2 -> v1.id == v2.id
+      | Genvar v1, Genvar v2 -> v1.id = v2.id
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
 
     let rec get_sort : t -> Sort.Const.t option = function
