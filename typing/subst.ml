@@ -1154,7 +1154,11 @@ let force_type_expr ty = Wrap.force (fun _ s ty ->
   let loc = Option.value s.loc ~default:Location.none in
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)) ty
 
-let force_lpoly lpoly = Wrap.force (fun _ _ x -> x) lpoly
+let force_lpoly lpoly = Wrap.force (fun _ s lpoly ->
+  (* CR-someday zqian: maybe subst should work for [pending] as well. *)
+  let vars = Types.Lpoly.get_exn lpoly in
+  let vars = List.map (sort_var s) vars in
+  Types.Lpoly.determined vars) lpoly
 
 let rec subst_lazy_value_description s descr =
   let val_modalities =
