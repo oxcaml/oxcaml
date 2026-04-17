@@ -271,7 +271,7 @@ let compute_static_size lam =
         | Punboxedvectorarray _ | Pgcscannableproductarray _
         | Pgcignorableproductarray _ ->
             Misc.fatal_error "size_of_primitive"
-        | Ptemplatedarray ->
+        | Ptemplatedarray _ ->
             Misc.fatal_error "Value_rec_compiler.size_of_primitive: lpoly"
         end
     | Pmakearray_dynamic _ -> Misc.fatal_error "size_of_primitive"

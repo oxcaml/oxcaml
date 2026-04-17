@@ -36,6 +36,7 @@ type error =
   | Void_sort of type_expr
   | Unboxed_vector_in_array_comprehension
   | Unboxed_product_in_array_comprehension
+  | Layout_poly_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible
 
@@ -906,7 +907,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   raise Not_constant    (* can this really happen? *)
                 | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                 | Punboxedvectorarray _
-                | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+                | Pgcscannableproductarray _ | Pgcignorableproductarray _
+                | Ptemplatedarray _ ->
                   Misc.fatal_error "Use flambda2 for unboxed arrays"
             in
             if Types.is_mutable amut then duparray_to_mutable const else const
@@ -934,6 +936,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
         raise (Error(e.exp_loc, Unboxed_product_in_array_comprehension))
+      | Ptemplatedarray _ ->
+        raise (Error(e.exp_loc, Layout_poly_in_array_comprehension))
       end;
       Transl_array_comprehension.comprehension
         ~transl_exp ~scopes ~loc ~array_kind comp
@@ -2738,6 +2742,10 @@ let report_error_doc ppf = function
       fprintf ppf
         "Array comprehensions are not yet supported for arrays of unboxed \
          products."
+  | Layout_poly_in_array_comprehension ->
+      fprintf ppf
+        "Array comprehensions are not yet supported for arrays with \
+         layout polymorphic elements."
   | Unboxed_product_in_let_mutable ->
       fprintf ppf
         "Mutable lets are not yet supported with unboxed products."

@@ -1085,6 +1085,8 @@ module With_subkind = struct
       | Parrayval (Punboxedvectorarray Unboxed_vec512) -> Unboxed_vec512_array
       | Parrayval (Pgcscannableproductarray _ | Pgcignorableproductarray _) ->
         Unboxed_product_array
+      | Parrayval (Ptemplatedarray ident) ->
+        Lambda.fatal_error_unevaluated_splice_var ident
     in
     let nullable : Nullable.t =
       match vk.nullable with

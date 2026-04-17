@@ -54,6 +54,7 @@ type error =
   | Void_sort of Types.type_expr
   | Unboxed_vector_in_array_comprehension
   | Unboxed_product_in_array_comprehension
+  | Layout_poly_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible
 

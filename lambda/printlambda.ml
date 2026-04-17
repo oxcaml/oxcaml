@@ -96,7 +96,7 @@ let array_kind = function
     "scannableproduct " ^ scannable_product_element_kinds kinds
   | Pgcignorableproductarray kinds ->
     "ignorableproduct " ^ ignorable_product_element_kinds kinds
-  | Ptemplatedarray -> "lpoly"
+  | Ptemplatedarray ident -> asprintf "%a" Ident.print ident
 
 let array_mut = function
   | Mutable -> "array"
@@ -123,6 +123,8 @@ let array_ref_kind ppf k =
     fprintf ppf "scannableproduct %s" (scannable_product_element_kinds kinds)
   | Pgcignorableproductarray_ref kinds ->
     fprintf ppf "ignorableproduct %s" (ignorable_product_element_kinds kinds)
+  | Ptemplatedarray_ref (ident, mode) ->
+    fprintf ppf "%a%a" Ident.print ident pp_mode mode
 
 let array_index_kind ppf k =
   match k with
@@ -152,6 +154,8 @@ let array_set_kind ppf k =
       (scannable_product_element_kinds kinds)
   | Pgcignorableproductarray_set kinds ->
     fprintf ppf "ignorableproduct %s" (ignorable_product_element_kinds kinds)
+  | Ptemplatedarray_set (ident, mode) ->
+    fprintf ppf "%a%a" Ident.print ident pp_mode mode
 
 let locality_mode_if_local = function
   | Alloc_heap -> ""

@@ -321,6 +321,47 @@ and eval_layout env layout =
   | Punboxed_vector _ | Pbottom ->
     layout
 
+and eval_array_kind env kind : array_kind =
+  match kind with
+  | Ptemplatedarray id ->
+    let layout =
+      eval_var env (id |> Slambdaident.of_ident)
+      |> expect_not_missing |> expect Tlayout
+    in
+    layout
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
+  | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+  | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+    kind
+
+and eval_array_ref_kind env kind : array_ref_kind =
+  match kind with
+  | Ptemplatedarray_ref (id, mode) ->
+    let layout =
+      eval_var env (id |> Slambdaident.of_ident)
+      |> expect_not_missing |> expect Tlayout
+    in
+    layout
+  | Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
+  | Pfloatarray_ref _ | Punboxedfloatarray_ref _
+  | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
+  | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ->
+    kind
+
+and eval_array_set_kind env kind : array_set_kind =
+  match kind with
+  | Ptemplatedarray_set (id, mode) ->
+    let layout =
+      eval_var env (id |> Slambdaident.of_ident)
+      |> expect_not_missing |> expect Tlayout
+    in
+    layout
+  | Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
+  | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
+  | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
+  | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
+    kind
+
 and eval_lfunction_shallow env
     ({ kind;
        params = old_params;
@@ -373,16 +414,51 @@ and eval_prim env prim =
     if new_layouts == old_layouts
     then prim
     else Punboxed_product_field (i, new_layouts)
+  | Parray_element_size_in_bytes old_kind ->
+    let new_kind = eval_array_kind env old_kind in
+    if new_kind == old_kind then prim else Parray_element_size_in_bytes new_kind
   | Pmake_idx_mixed_field (old_shape, i, path) ->
     let new_shape = eval_mixed_block_shape env old_shape in
     if new_shape == old_shape
     then prim
     else Pmake_idx_mixed_field (new_shape, i, path)
-  | Pmake_idx_array (kind, index_kind, old_element, path) ->
+  | Pmake_idx_array (old_kind, index_kind, old_element, path) ->
+    let new_kind = eval_array_kind env old_kind in
     let new_element = eval_mixed_block_element env old_element in
     if new_element == old_element
     then prim
-    else Pmake_idx_array (kind, index_kind, new_element, path)
+    else Pmake_idx_array (new_kind, index_kind, new_element, path)
+  | Pmakearray (old_array_kind, mut, mode) ->
+    let new_kind = eval_array_kind env old_array_kind in
+    if new_kind == old_array_kind then prim else Pmakearray (new_kind, mut, mode)
+  | Pmakearray_dynamic (old_array_kind, mode, has_init) ->
+    let new_kind = eval_array_kind env old_array_kind in
+    if new_kind == old_array_kind
+    then prim
+    else Pmakearray_dynamic (new_kind, mode, has_init)
+  | Pduparray (old_array_kind, mut) ->
+    let new_kind = eval_array_kind env old_array_kind in
+    if new_kind == old_array_kind then prim else Pduparray (new_kind, mut)
+  | Parrayblit { src_mutability; dst_array_set_kind = old_kind } ->
+    let new_kind = eval_array_set_kind env old_kind in
+    if new_kind == old_kind
+    then prim
+    else Parrayblit { src_mutability; dst_array_set_kind = new_kind }
+  | Parraylength old_kind ->
+    let new_kind = eval_array_kind env old_kind in
+    if new_kind == old_kind then prim else Parraylength new_kind
+  | Parrayrefu (old_kind, index_kind, mut) ->
+    let new_kind = eval_array_ref_kind env old_kind in
+    if new_kind == old_kind then prim else Parrayrefu (new_kind, index_kind, mut)
+  | Parraysetu (old_kind, index_kind) ->
+    let new_kind = eval_array_set_kind env old_kind in
+    if new_kind == old_kind then prim else Parraysetu (new_kind, index_kind)
+  | Parrayrefs (old_kind, index_kind, mut) ->
+    let new_kind = eval_array_ref_kind env old_kind in
+    if new_kind == old_kind then prim else Parrayrefs (new_kind, index_kind, mut)
+  | Parraysets (old_kind, index_kind) ->
+    let new_kind = eval_array_set_kind env old_kind in
+    if new_kind == old_kind then prim else Parraysets (new_kind, index_kind)
   | Pidx_deepen (old_element, path) ->
     let new_element = eval_mixed_block_element env old_element in
     if new_element == old_element then prim else Pidx_deepen (new_element, path)
@@ -408,29 +484,27 @@ and eval_prim env prim =
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
   | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
-  | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
-  | Pwith_stack_bind | Pperform | Presume | Preperform | Pccall _ | Praise _
-  | Psequand | Psequor | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _
-  | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
-  | Pbytessetu | Pbytesrefs | Pbytessets | Pmakearray _ | Pmakearray_dynamic _
-  | Pduparray _ | Parrayblit _ | Parraylength _ | Parrayrefu _ | Parraysetu _
-  | Parrayrefs _ | Parraysets _ | Pisint _ | Pisnull | Pisout | Pbigarrayref _
-  | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_i8 _ | Pstring_load_i16 _
-  | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
-  | Pstring_load_64 _ | Pstring_load_vec _ | Pbytes_load_i8 _
-  | Pbytes_load_i16 _ | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-  | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_8 _ | Pbytes_set_16 _
-  | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
-  | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
-  | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-  | Pbigstring_load_vec _ | Pbigstring_set_8 _ | Pbigstring_set_16 _
-  | Pbigstring_set_32 _ | Pbigstring_set_f32 _ | Pbigstring_set_64 _
-  | Pbigstring_set_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
-  | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-  | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
-  | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
-  | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pmake_idx_field _ | Pwith_stack | Pwith_stack_bind | Pperform | Presume
+  | Preperform | Pccall _ | Praise _ | Psequand | Psequor | Pnot | Pphys_equal _
+  | Pscalar _ | Poffsetref _ | Pstringlength | Pstringrefu | Pstringrefs
+  | Pbyteslength | Pbytesrefu | Pbytessetu | Pbytesrefs | Pbytessets | Pisint _
+  | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
+  | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+  | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
+  | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _
+  | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
+  | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
+  | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_load_i8 _
+  | Pbigstring_load_i16 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
+  | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
+  | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+  | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+  | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+  | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
+  | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+  | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
+  | Pfloat_array_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
   | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
