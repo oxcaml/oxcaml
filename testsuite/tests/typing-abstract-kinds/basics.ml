@@ -785,32 +785,25 @@ Error: This type "t1" should be an instance of type "('a : any separable)"
          because it's the type argument to the array type.
 |}]
 
-(* CR layouts-scannable: support scannable axes on abstract kinds *)
 type t2 : k mod separable
 type s2 = t2 array
 [%%expect{|
-Line 1, characters 16-25:
-1 | type t2 : k mod separable
-                    ^^^^^^^^^
-Error: Abstract kinds with kind modifiers are not yet supported.
+type t2 : k mod separable
+type s2 = t2 array
 |}]
 
 type ('a : k mod separable) s3 = 'a array
 [%%expect{|
-Line 1, characters 17-26:
-1 | type ('a : k mod separable) s3 = 'a array
-                     ^^^^^^^^^
-Error: Abstract kinds with kind modifiers are not yet supported.
+type ('a : k mod separable) s3 = 'a array
 |}]
 
 kind_ k' = k mod separable
 type t4 : k'
 type s4 = t4 array
 [%%expect{|
-Line 1, characters 17-26:
-1 | kind_ k' = k mod separable
-                     ^^^^^^^^^
-Error: Abstract kinds with kind modifiers are not yet supported.
+kind_ k' = k mod separable
+type t4 : k mod separable
+type s4 = t4 array
 |}]
 
 (******************************)
