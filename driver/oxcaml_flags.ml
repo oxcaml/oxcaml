@@ -494,11 +494,12 @@ module Flambda2 = struct
       poly_compare_cost = 3.0 *. Default.default_arguments.poly_compare_cost;
       small_function_size = 10 * Default.default_arguments.small_function_size;
       large_function_size = 50 * Default.default_arguments.large_function_size;
-      small_functor_size = 10 * Default.default_arguments.small_function_size;
+      small_functor_size = 10 * Default.default_arguments.small_functor_size;
       (* This allows functors 50% larger than those in [Stdlib.Map] and
          [Stdlib.Set] to be eligible for speculative inlining. *)
       large_functor_size =
-        15 * 50 * Default.default_arguments.large_function_size;
+        (* 7.5 * 50 * ... *)
+        15 * 25 * Default.default_arguments.large_functor_size;
       threshold = 100.;
     }
 
