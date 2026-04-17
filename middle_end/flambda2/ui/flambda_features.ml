@@ -357,6 +357,10 @@ module Expert = struct
   let cont_spec_threshold () =
     !Oxcaml_flags.Flambda2.Expert.cont_spec_threshold
     |> with_default ~f:(fun d -> d.cont_spec_threshold)
+
+  let symbol_check () =
+    !Oxcaml_flags.Flambda2.Expert.symbol_check
+    |> with_default ~f:(fun d -> d.symbol_check)
 end
 
 let stack_allocation_enabled () = Config.stack_allocation

@@ -61,6 +61,8 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   then
     Misc.fatal_errorf "Lifted constants accumulator should be empty:@ %a"
       UA.print uacc;
+  if Flambda_features.Expert.symbol_check () then
+    Symbol_check.check body;
   let final_typing_env =
     let cont_uses_env = DA.continuation_uses_env (UA.creation_dacc uacc) in
     Continuation_uses_env.get_typing_env_no_more_than_one_use cont_uses_env

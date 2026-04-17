@@ -197,6 +197,8 @@ module Expert : sig
   val cont_lifting_budget : unit -> int
 
   val cont_spec_threshold : unit -> float
+
+  val symbol_check : unit -> bool
 end
 
 val stack_allocation_enabled : unit -> bool

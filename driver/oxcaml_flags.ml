@@ -339,6 +339,7 @@ module Flambda2 = struct
       let shorten_symbol_names = false
       let cont_lifting_budget = 0
       let cont_spec_threshold = -1.
+      let symbol_check = false
     end
 
     type flags = {
@@ -353,6 +354,7 @@ module Flambda2 = struct
       shorten_symbol_names : bool;
       cont_lifting_budget : int;
       cont_spec_threshold : float;
+      symbol_check : bool;
     }
 
     let default = {
@@ -367,6 +369,7 @@ module Flambda2 = struct
       shorten_symbol_names = Default.shorten_symbol_names;
       cont_lifting_budget = Default.cont_lifting_budget;
       cont_spec_threshold = Default.cont_spec_threshold;
+      symbol_check = Default.symbol_check;
     }
 
     let oclassic = {
@@ -409,6 +412,7 @@ module Flambda2 = struct
     let shorten_symbol_names = ref Default
     let cont_lifting_budget = ref Default
     let cont_spec_threshold = ref Default
+    let symbol_check = ref Default
   end
 
   module Debug = struct
