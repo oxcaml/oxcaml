@@ -37,7 +37,8 @@ type t =
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
         evaluated_to : float;
-        threshold : float
+        threshold : float;
+        is_a_functor : bool
       }
   | Attribute_always
   | Replay_history_says_must_inline
@@ -47,7 +48,8 @@ type t =
   | Speculatively_inline of
       { cost_metrics : Cost_metrics.t;
         evaluated_to : float;
-        threshold : float
+        threshold : float;
+        is_a_functor : bool
       }
   | Jsir_inlining_disabled
 
@@ -87,26 +89,32 @@ let [@ocamlformat "disable"] print ppf t =
       unroll_to
   | Continue_unrolling ->
     Format.fprintf ppf "Continue_unrolling"
-  | Speculatively_not_inline { cost_metrics; threshold; evaluated_to; } ->
+  | Speculatively_not_inline { cost_metrics; threshold; evaluated_to;
+                                is_a_functor; } ->
     Format.fprintf ppf
       "@[<hov 1>(Speculatively_not_inline@ \
         @[<hov 1>(cost_metrics@ %a)@]@ \
         @[<hov 1>(evaluated_to@ %f)@]@ \
-        @[<hov 1>(threshold@ %f)@]\
+        @[<hov 1>(threshold@ %f)@]@ \
+        @[<hov 1>(is_a_functor@ %b)@]\
         )@]"
       Cost_metrics.print cost_metrics
       evaluated_to
       threshold
-  | Speculatively_inline { cost_metrics; threshold; evaluated_to; } ->
+      is_a_functor
+  | Speculatively_inline { cost_metrics; threshold; evaluated_to;
+                            is_a_functor; } ->
     Format.fprintf ppf
       "@[<hov 1>(Speculatively_inline@ \
         @[<hov 1>(cost_metrics@ %a)@]@ \
         @[<hov 1>(evaluated_to@ %f)@]@ \
-        @[<hov 1>(threshold@ %f)@]\
+        @[<hov 1>(threshold@ %f)@]@ \
+        @[<hov 1>(is_a_functor@ %b)@]\
         )@]"
       Cost_metrics.print cost_metrics
       evaluated_to
       threshold
+      is_a_functor
   | Jsir_inlining_disabled -> Format.fprintf ppf "Jsir_inlining_disabled"
 
 type can_inline =
@@ -198,15 +206,19 @@ let report_reason fmt t =
       "this@ function@ was@ decided@ to@ be@ always@ inlined@ at@ its@ \
        definition@ site (annotated@ by@ [@inlined always]@ or@ determined@ to@ \
        be@ small@ enough)"
-  | Speculatively_not_inline { cost_metrics; evaluated_to; threshold } ->
+  | Speculatively_not_inline
+      { cost_metrics; evaluated_to; threshold; is_a_functor } ->
     Format.fprintf fmt
-      "the@ function@ was@ not@ inlined@ after@ speculation@ as@ its@ cost@ \
-       metrics were=%a,@ which@ was@ evaluated@ to@ %f > threshold %f"
+      "the@ %s@ was@ not@ inlined@ after@ speculation@ as@ its@ cost@ metrics \
+       were=%a,@ which@ was@ evaluated@ to@ %f > threshold %f"
+      (if is_a_functor then "functor" else "function")
       Cost_metrics.print cost_metrics evaluated_to threshold
-  | Speculatively_inline { cost_metrics; evaluated_to; threshold } ->
+  | Speculatively_inline { cost_metrics; evaluated_to; threshold; is_a_functor }
+    ->
     Format.fprintf fmt
-      "the@ function@ was@ inlined@ after@ speculation@ as@ its@ cost@ metrics \
+      "the@ %s@ was@ inlined@ after@ speculation@ as@ its@ cost@ metrics \
        were=%a,@ which@ was@ evaluated@ to@ %f <= threshold %f"
+      (if is_a_functor then "functor" else "function")
       Cost_metrics.print cost_metrics evaluated_to threshold
   | Jsir_inlining_disabled ->
     Format.fprintf fmt

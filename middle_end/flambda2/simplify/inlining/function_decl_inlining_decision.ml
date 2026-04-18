@@ -26,15 +26,18 @@ let make_decision0 ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
     if stub
     then Stub
     else
-      let large_function_size =
-        Inlining_arguments.large_function_size args |> Code_size.of_int
-      in
-      let small_function_size =
-        Inlining_arguments.small_function_size args |> Code_size.of_int
+      let large_size, small_size =
+        if is_a_functor
+        then
+          ( Inlining_arguments.large_functor_size args |> Code_size.of_int,
+            Inlining_arguments.small_functor_size args |> Code_size.of_int )
+        else
+          ( Inlining_arguments.large_function_size args |> Code_size.of_int,
+            Inlining_arguments.small_function_size args |> Code_size.of_int )
       in
       let size = Cost_metrics.size metrics in
-      let is_small = Code_size.( <= ) size small_function_size in
-      let is_large = Code_size.( <= ) large_function_size size in
+      let is_small = Code_size.( <= ) size small_size in
+      let is_large = Code_size.( <= ) large_size size in
       let is_recursive =
         match recursive with Recursive -> true | Non_recursive -> false
       in
@@ -47,17 +50,26 @@ let make_decision0 ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
         && not can_inline_recursive_functions
       then Recursive
       else if is_a_functor
-      then Functor { size }
-      else if is_large && not (Inline_attribute.equal inline Available_inline)
-      then Function_body_too_large large_function_size
-      else if is_small
       then
-        Small_function { size = Cost_metrics.size metrics; small_function_size }
+        if is_large && not (Inline_attribute.equal inline Available_inline)
+        then Functor_body_too_large large_size
+        else if is_small
+        then Small_functor { size; small_functor_size = small_size }
+        else
+          Speculatively_inlinable_functor
+            { size;
+              small_functor_size = small_size;
+              large_functor_size = large_size
+            }
+      else if is_large && not (Inline_attribute.equal inline Available_inline)
+      then Function_body_too_large large_size
+      else if is_small
+      then Small_function { size; small_function_size = small_size }
       else
         Speculatively_inlinable
-          { size = Cost_metrics.size metrics;
-            small_function_size;
-            large_function_size
+          { size;
+            small_function_size = small_size;
+            large_function_size = large_size
           }
 
 let make_decision ~inlining_arguments ~inline ~stub ~cost_metrics ~is_a_functor

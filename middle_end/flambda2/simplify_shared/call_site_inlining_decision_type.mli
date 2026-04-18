@@ -30,7 +30,8 @@ type t =
   | Speculatively_not_inline of
       { cost_metrics : Cost_metrics.t;
         evaluated_to : float;
-        threshold : float
+        threshold : float;
+        is_a_functor : bool
       }
   | Attribute_always
   | Replay_history_says_must_inline
@@ -40,7 +41,8 @@ type t =
   | Speculatively_inline of
       { cost_metrics : Cost_metrics.t;
         evaluated_to : float;
-        threshold : float
+        threshold : float;
+        is_a_functor : bool
       }
   | Jsir_inlining_disabled
 

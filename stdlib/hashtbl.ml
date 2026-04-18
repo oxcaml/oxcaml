@@ -65,10 +65,10 @@ let is_randomized () = Atomic.get randomized
 module Rng : sig
   val bits : unit -> int
 end = struct
-  (* This is safe since [bits] is a C call that cannot be preempted, 
+  (* This is safe since [bits] is a C call that cannot be preempted,
      we do not yield, and we do not borrow the state. *)
   let key = Domain.Safe.DLS.new_key Random.State.make_self_init
-  let[@inline] bits () = 
+  let[@inline] bits () =
     Random.State.bits (Obj.magic_uncontended (Domain.Safe.DLS.get key))
 end
 
@@ -490,7 +490,7 @@ module MakeSeeded(H: SeededHashedType): (SeededS with type key = H.t) =
     let to_seq = to_seq
     let to_seq_keys = to_seq_keys
     let to_seq_values = to_seq_values
-  end
+  end [@@inline available]
 
 module Make(H: HashedType): (S with type key = H.t) =
   struct
@@ -504,7 +504,7 @@ module Make(H: HashedType): (S with type key = H.t) =
       let tbl = create 16 in
       replace_seq tbl i;
       tbl
-  end
+  end [@@inline available]
 
 module MakeSeededPortable(H: sig @@ portable include SeededHashedType end)
   : sig @@ portable include SeededS with type key = H.t end =
@@ -639,7 +639,7 @@ module MakeSeededPortable(H: sig @@ portable include SeededHashedType end)
     let to_seq = to_seq
     let to_seq_keys = to_seq_keys
     let to_seq_values = to_seq_values
-  end
+  end [@@inline available]
 
 module MakePortable(H: sig @@ portable include HashedType end)
   : sig @@ portable include S with type key = H.t end =
@@ -654,7 +654,7 @@ module MakePortable(H: sig @@ portable include HashedType end)
       let tbl = create 16 in
       replace_seq tbl i;
       tbl
-  end
+  end [@@inline available]
 
 (* Polymorphic hash function-based tables *)
 (* Code included below the functorial interface to guard against accidental
