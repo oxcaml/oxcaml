@@ -193,6 +193,10 @@ module Context = struct
             `Int (Inlining_arguments.large_function_size args);
             `String "branch cost";
             `Float (Inlining_arguments.branch_cost args) ];
+          [ `String "small functor size";
+            `Int (Inlining_arguments.small_functor_size args);
+            `String "large functor size";
+            `Int (Inlining_arguments.large_functor_size args) ];
           [ `String "threshold";
             `Float (Inlining_arguments.threshold args);
             `String "indirect call cost";

@@ -25,6 +25,8 @@ module Args = struct
       poly_compare_cost : float;
       small_function_size : int;
       large_function_size : int;
+      small_functor_size : int;
+      large_functor_size : int;
       threshold : float
     }
 
@@ -39,6 +41,8 @@ module Args = struct
         poly_compare_cost;
         small_function_size;
         large_function_size;
+        small_functor_size;
+        large_functor_size;
         threshold
       } opt_level =
     let module I = Flambda_features.Inlining in
@@ -53,6 +57,8 @@ module Args = struct
     && Float.equal poly_compare_cost (I.poly_compare_cost round_or_default)
     && Int.equal small_function_size (I.small_function_size round_or_default)
     && Int.equal large_function_size (I.large_function_size round_or_default)
+    && Int.equal small_functor_size (I.small_functor_size round_or_default)
+    && Int.equal large_functor_size (I.large_functor_size round_or_default)
     && Float.equal threshold (I.threshold round_or_default)
 
   let[@ocamlformat "disable"] print ppf t =
@@ -60,6 +66,7 @@ module Args = struct
           call_cost; alloc_cost; prim_cost; branch_cost;
           indirect_call_cost; poly_compare_cost;
           small_function_size; large_function_size;
+          small_functor_size; large_functor_size;
           threshold;
         } = t
     in
@@ -83,6 +90,8 @@ module Args = struct
          @[<hov 1>(poly_compare_cost@ %f)@]@ \
          @[<hov 1>(small_function_size@ %d)@]@ \
          @[<hov 1>(large_function_size@ %d)@]@ \
+         @[<hov 1>(small_functor_size@ %d)@]@ \
+         @[<hov 1>(large_functor_size@ %d)@]@ \
          @[<hov 1>(threshold@ %f)@]\
          )@]"
         max_inlining_depth
@@ -95,6 +104,8 @@ module Args = struct
         poly_compare_cost
         small_function_size
         large_function_size
+        small_functor_size
+        large_functor_size
         threshold
 
   let equal t1 t2 =
@@ -108,6 +119,8 @@ module Args = struct
           poly_compare_cost = t1_poly_compare_cost;
           small_function_size = t1_small_function_size;
           large_function_size = t1_large_function_size;
+          small_functor_size = t1_small_functor_size;
+          large_functor_size = t1_large_functor_size;
           threshold = t1_threshold
         } =
       t1
@@ -122,6 +135,8 @@ module Args = struct
           poly_compare_cost = t2_poly_compare_cost;
           small_function_size = t2_small_function_size;
           large_function_size = t2_large_function_size;
+          small_functor_size = t2_small_functor_size;
+          large_functor_size = t2_large_functor_size;
           threshold = t2_threshold
         } =
       t2
@@ -136,6 +151,8 @@ module Args = struct
     && Float.compare t1_poly_compare_cost t2_poly_compare_cost = 0
     && t1_small_function_size = t2_small_function_size
     && t1_large_function_size = t2_large_function_size
+    && t1_small_functor_size = t2_small_functor_size
+    && t1_large_functor_size = t2_large_functor_size
     && Float.compare t1_threshold t2_threshold = 0
 
   let ( <= ) t1 t2 =
@@ -157,6 +174,8 @@ module Args = struct
           poly_compare_cost = t1_poly_compare_cost;
           small_function_size = t1_small_function_size;
           large_function_size = t1_large_function_size;
+          small_functor_size = t1_small_functor_size;
+          large_functor_size = t1_large_functor_size;
           threshold = t1_threshold
         } =
       t1
@@ -171,6 +190,8 @@ module Args = struct
           poly_compare_cost = t2_poly_compare_cost;
           small_function_size = t2_small_function_size;
           large_function_size = t2_large_function_size;
+          small_functor_size = t2_small_functor_size;
+          large_functor_size = t2_large_functor_size;
           threshold = t2_threshold
         } =
       t2
@@ -185,6 +206,8 @@ module Args = struct
     && Float.compare t1_poly_compare_cost t2_poly_compare_cost <= 0
     && t1_small_function_size <= t2_small_function_size
     && t1_large_function_size <= t2_large_function_size
+    && t1_small_functor_size <= t2_small_functor_size
+    && t1_large_functor_size <= t2_large_functor_size
     && Float.compare t1_threshold t2_threshold <= 0
 
   let meet t1 t2 =
@@ -198,6 +221,8 @@ module Args = struct
           poly_compare_cost = t1_poly_compare_cost;
           small_function_size = t1_small_function_size;
           large_function_size = t1_large_function_size;
+          small_functor_size = t1_small_functor_size;
+          large_functor_size = t1_large_functor_size;
           threshold = t1_threshold
         } =
       t1
@@ -212,6 +237,8 @@ module Args = struct
           poly_compare_cost = t2_poly_compare_cost;
           small_function_size = t2_small_function_size;
           large_function_size = t2_large_function_size;
+          small_functor_size = t2_small_functor_size;
+          large_functor_size = t2_large_functor_size;
           threshold = t2_threshold
         } =
       t2
@@ -226,6 +253,8 @@ module Args = struct
       poly_compare_cost = Float.min t1_poly_compare_cost t2_poly_compare_cost;
       small_function_size = min t1_small_function_size t2_small_function_size;
       large_function_size = min t1_large_function_size t2_large_function_size;
+      small_functor_size = min t1_small_functor_size t2_small_functor_size;
+      large_functor_size = min t1_large_functor_size t2_large_functor_size;
       threshold = Float.min t1_threshold t2_threshold
     }
 
@@ -241,6 +270,8 @@ module Args = struct
       poly_compare_cost = I.poly_compare_cost (Round round);
       small_function_size = I.small_function_size (Round round);
       large_function_size = I.large_function_size (Round round);
+      small_functor_size = I.small_functor_size (Round round);
+      large_functor_size = I.large_functor_size (Round round);
       threshold = I.threshold (Round round)
     }
 end
@@ -266,6 +297,10 @@ let poly_compare_cost t = t.Args.poly_compare_cost
 let small_function_size t = t.Args.small_function_size
 
 let large_function_size t = t.Args.large_function_size
+
+let small_functor_size t = t.Args.small_functor_size
+
+let large_functor_size t = t.Args.large_functor_size
 
 let threshold t = t.Args.threshold
 
