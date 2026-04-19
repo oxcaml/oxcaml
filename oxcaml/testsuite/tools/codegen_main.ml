@@ -17,8 +17,6 @@ open Clflags
 let write_asm_file = ref false
 
 let compile_file filename =
-  Printf.eprintf "%s\n" (if !Oxcaml_flags.cfg_stack_checks then "stack_checks" else "no_stack_checks");
-  Oxcaml_flags.cfg_invariants := true;
   if !write_asm_file then begin
     let out_name = Filename.chop_extension filename ^ ".s" in
     Emitaux.output_channel := open_out out_name
