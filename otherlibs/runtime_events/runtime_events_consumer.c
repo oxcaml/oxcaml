@@ -43,7 +43,7 @@
 #include <sys/mman.h>
 #endif
 
-#if defined(__linux__) && (defined(__x86_64__) || defined(__i386__))
+#if defined(__linux__) && defined(__x86_64__)
 #define PERF_COUNTERS
 #endif
 

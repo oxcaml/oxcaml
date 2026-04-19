@@ -331,7 +331,7 @@ val resume : unit -> unit
 val perf_counters_active : unit -> bool
 (** [perf_counters_active ()] returns [true] if hardware performance counters
    are currently being sampled alongside runtime and user span events. This
-   requires a build with Linux x86 PMC support (see
+   requires a build with Linux x86-64 PMC support (see
    {!Config.perf_counters_supported}), a valid
    [OCAML_RUNTIME_EVENTS_PERF_COUNTERS] configuration, and a successful
    [perf_event_open]/rdpmc setup by the runtime. Returns [false]

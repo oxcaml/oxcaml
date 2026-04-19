@@ -343,7 +343,13 @@ CAMLextern void caml_runtime_events_thread_stop(void);
 
 #define RUNTIME_EVENTS_MAX_PERF_EVENTS 20
 
-#if defined(__linux__) && (defined(__x86_64__) || defined(__i386__))
+/* The per-event header stores the counter count in 6 bits (bits 30-35);
+   see RUNTIME_EVENTS_HEADER / RUNTIME_EVENTS_ITEM_PERF_COUNTERS above. */
+_Static_assert(RUNTIME_EVENTS_MAX_PERF_EVENTS <= 63,
+               "RUNTIME_EVENTS_MAX_PERF_EVENTS exceeds the 6-bit "
+               "perf_counters field in the event header");
+
+#if defined(__linux__) && defined(__x86_64__)
 #define PERF_COUNTERS
 #endif
 
