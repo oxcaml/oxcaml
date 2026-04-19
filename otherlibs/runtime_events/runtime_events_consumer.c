@@ -758,8 +758,7 @@ struct callbacks_exception_holder {
 
 /* Extract perf counter data from a ring buffer message into an unboxed
    product array of #{ config: int64#; value: int64# }. Returns an
-   allocated (possibly empty) array. Must be called within a CAMLparam
-   context and the result must be registered as a local root. */
+   allocated (possibly empty) array in the caller's local region. */
 static value extract_perf_data(uint64_t header, uint64_t *buf, int buf_len) {
   value perf_data;
 
@@ -782,39 +781,95 @@ static value extract_perf_data(uint64_t header, uint64_t *buf, int buf_len) {
   return perf_data;
 }
 
+/* Invoke a single consumer callback whose last argument is a local_
+   perf_sample array. Snapshots local_sp, allocates the array in the
+   caller's local region, invokes the callback, then rewinds local_sp
+   to reclaim the array - mirrors the pattern used by callback*_global
+   in runtime/callback.c.
+
+   [params] must already be rooted by the caller (e.g. via CAMLlocalN).
+   The slot at [perf_arg_index] is written by this helper; the caller
+   should leave it uninitialised. Returns 1 on success, 0 if the
+   callback raised (exception stored in holder->exception). */
+static int call_with_perf_samples(
+    value callback,
+    value *params, int params_arity, int perf_arg_index,
+    uint64_t header, uint64_t *buf, int buf_len,
+    struct callbacks_exception_holder *holder)
+{
+  CAMLparam1(callback);
+  intnat local_sp = Caml_state->local_sp;
+  params[perf_arg_index] = extract_perf_data(header, buf, buf_len);
+
+  value res = caml_callbackN_exn(callback, params_arity, params);
+
+  if (Is_exception_result(res)) {
+    res = Extract_exception(res);
+    /* Defensive: OCaml exceptions are heap-allocated today. If that
+       ever changes, the local_sp reset below would free the exception
+       value before the caller's caml_raise reads it. */
+    CAMLassert(!caml_is_stack(res));
+    *holder->exception = res;
+    Caml_state->local_sp = local_sp;
+    CAMLreturnT(int, 0);
+  }
+  /* Callbacks return unit; returning a local value would be a bug. */
+  CAMLassert(!caml_is_stack(res));
+  Caml_state->local_sp = local_sp;
+  CAMLreturnT(int, 1);
+}
+
+/* Like [call_with_perf_samples], but invokes every callback in a list
+   with the same perf_sample array. Stops on the first exception. */
+static int call_list_with_perf_samples(
+    value callback_list,
+    value *params, int params_arity, int perf_arg_index,
+    uint64_t header, uint64_t *buf, int buf_len,
+    struct callbacks_exception_holder *holder)
+{
+  CAMLparam1(callback_list);
+  CAMLlocal1(callback);
+  intnat local_sp = Caml_state->local_sp;
+  params[perf_arg_index] = extract_perf_data(header, buf, buf_len);
+
+  while (Is_block(callback_list)) {
+    /* two indirections as callback is a list item wrapped in a gadt */
+    callback = Field(Field(callback_list, 0), 0);
+    value res = caml_callbackN_exn(callback, params_arity, params);
+
+    if (Is_exception_result(res)) {
+      res = Extract_exception(res);
+      CAMLassert(!caml_is_stack(res));
+      *holder->exception = res;
+      Caml_state->local_sp = local_sp;
+      CAMLreturnT(int, 0);
+    }
+    CAMLassert(!caml_is_stack(res));
+    callback_list = Field(callback_list, 1);
+  }
+
+  Caml_state->local_sp = local_sp;
+  CAMLreturnT(int, 1);
+}
+
 static int ml_runtime_begin(int domain_id, void *callback_data,
                              uint64_t timestamp, ev_runtime_phase phase,
                              uint64_t header, uint64_t *buf, int buf_len) {
   CAMLparam0();
-  CAMLlocal4(tmp_callback, callbacks_root, res, perf_data);
+  CAMLlocal2(tmp_callback, callbacks_root);
   CAMLlocalN(params, 4);
 
-  perf_data = Val_unit;
-
   struct callbacks_exception_holder* holder = callback_data;
-
   callbacks_root = *holder->callbacks_val;
 
   tmp_callback = Field(callbacks_root, 0); /* ev_runtime_begin */
   if (Is_some(tmp_callback)) {
-    /* Save local_sp so that the local_ perf_data array allocated by
-       extract_perf_data is freed after the callback returns. Without
-       this, each callback invocation in a read_poll loop would
-       accumulate local arrays until the enclosing OCaml region ends. */
-    intnat local_sp = Caml_state->local_sp;
-    perf_data = extract_perf_data(header, buf, buf_len);
-
     params[0] = Val_long(domain_id);
     params[1] = caml_copy_int64(timestamp);
     params[2] = Val_long(phase);
-    params[3] = perf_data;
-
-    res = caml_callbackN_exn(Some_val(tmp_callback), 4, params);
-    Caml_state->local_sp = local_sp;
-
-    if( Is_exception_result(res) ) {
-      res = Extract_exception(res);
-      *holder->exception = res;
+    /* params[3] is filled in by call_with_perf_samples */
+    if (!call_with_perf_samples(Some_val(tmp_callback), params, 4, 3,
+                                 header, buf, buf_len, holder)) {
       CAMLreturnT(int, 0);
     }
   }
@@ -826,31 +881,20 @@ static int ml_runtime_end(int domain_id, void *callback_data,
                            uint64_t timestamp, ev_runtime_phase phase,
                            uint64_t header, uint64_t *buf, int buf_len) {
   CAMLparam0();
-  CAMLlocal4(tmp_callback, callbacks_root, res, perf_data);
+  CAMLlocal2(tmp_callback, callbacks_root);
   CAMLlocalN(params, 4);
 
-  perf_data = Val_unit;
-
   struct callbacks_exception_holder* holder = callback_data;
-
   callbacks_root = *holder->callbacks_val;
 
   tmp_callback = Field(callbacks_root, 1); /* ev_runtime_end */
   if (Is_some(tmp_callback)) {
-    intnat local_sp = Caml_state->local_sp;
-    perf_data = extract_perf_data(header, buf, buf_len);
-
     params[0] = Val_long(domain_id);
     params[1] = caml_copy_int64(timestamp);
     params[2] = Val_long(phase);
-    params[3] = perf_data;
-
-    res = caml_callbackN_exn(Some_val(tmp_callback), 4, params);
-    Caml_state->local_sp = local_sp;
-
-    if( Is_exception_result(res) ) {
-      res = Extract_exception(res);
-      *holder->exception = res;
+    /* params[3] is filled in by call_with_perf_samples */
+    if (!call_with_perf_samples(Some_val(tmp_callback), params, 4, 3,
+                                 header, buf, buf_len, holder)) {
       CAMLreturnT(int, 0);
     }
   }
@@ -1016,30 +1060,6 @@ static value user_events_find_callback_list_for_event_type(value callbacks_root,
   CAMLreturn(Field(tmp_callback_array, event_index));
 }
 
-static int user_events_call_callback_list(
-  struct callbacks_exception_holder* holder, value callback_list,
-  value params[5]) {
-  CAMLparam1(callback_list);
-  CAMLxparamN(params, 5);
-  CAMLlocal2(callback, res);
-
-  while (Is_block(callback_list)) {
-      // two indirections as callback is a list item wrapped in a gadt
-    callback = Field(Field(callback_list, 0), 0);
-    res = caml_callbackN_exn(callback, 5, params);
-
-    if( Is_exception_result(res) ) {
-      res = Extract_exception(res);
-      *holder->exception = res;
-      CAMLreturnT(int, 0);
-    }
-
-    callback_list = Field(callback_list, 1);
-  }
-
-  CAMLreturnT(int, 1);
-}
-
 static value caml_runtime_events_user_resolve_cached(
   value wrapper_root, uintnat event_id, char* event_name,
   ev_user_ml_type event_type)
@@ -1109,11 +1129,9 @@ static int ml_user_unit(int domain_id, void *callback_data, int64_t timestamp,
                            uintnat event_id, char* event_name,
                            uint64_t header, uint64_t *buf, int buf_len) {
   CAMLparam0();
-  CAMLlocal4(callback_list, event, callbacks_root, perf_data);
+  CAMLlocal3(callback_list, event, callbacks_root);
   CAMLlocalN(params, 5);
   CAMLlocal1(wrapper_root);
-
-  perf_data = Val_unit;
 
   struct callbacks_exception_holder* holder = callback_data;
   callbacks_root = *holder->callbacks_val;
@@ -1127,18 +1145,13 @@ static int ml_user_unit(int domain_id, void *callback_data, int64_t timestamp,
                                                                 event);
 
   if (Is_block(callback_list)) {
-    intnat local_sp = Caml_state->local_sp;
-    perf_data = extract_perf_data(header, buf, buf_len);
-
     params[0] = Val_long(domain_id);
     params[1] = caml_copy_int64(timestamp);
     params[2] = event;
     params[3] = Val_unit;
-    params[4] = perf_data;
-
-    int ret = user_events_call_callback_list(holder, callback_list, params);
-    Caml_state->local_sp = local_sp;
-    if (ret == 0) {
+    /* params[4] is filled in by call_list_with_perf_samples */
+    if (!call_list_with_perf_samples(callback_list, params, 5, 4,
+                                      header, buf, buf_len, holder)) {
       CAMLreturnT(int, 0);
     }
   }
@@ -1152,11 +1165,9 @@ static int ml_user_span(int domain_id, void *callback_data, int64_t timestamp,
                            uint64_t header, uint64_t *buf, int buf_len)
 {
   CAMLparam0();
-  CAMLlocal4(callback_list, event, callbacks_root, perf_data);
+  CAMLlocal3(callback_list, event, callbacks_root);
   CAMLlocalN(params, 5);
   CAMLlocal1(wrapper_root);
-
-  perf_data = Val_unit;
 
   struct callbacks_exception_holder* holder = callback_data;
   callbacks_root = *holder->callbacks_val;
@@ -1170,18 +1181,13 @@ static int ml_user_span(int domain_id, void *callback_data, int64_t timestamp,
                                                                 event);
 
   if (Is_block(callback_list)) {
-    intnat local_sp = Caml_state->local_sp;
-    perf_data = extract_perf_data(header, buf, buf_len);
-
     params[0] = Val_long(domain_id);
     params[1] = caml_copy_int64(timestamp);
     params[2] = event;
     params[3] = Val_int(span);
-    params[4] = perf_data;
-
-    int ret = user_events_call_callback_list(holder, callback_list, params);
-    Caml_state->local_sp = local_sp;
-    if (ret == 0) {
+    /* params[4] is filled in by call_list_with_perf_samples */
+    if (!call_list_with_perf_samples(callback_list, params, 5, 4,
+                                      header, buf, buf_len, holder)) {
       CAMLreturnT(int, 0);
     }
   }
@@ -1194,11 +1200,9 @@ static int ml_user_int(int domain_id, void *callback_data,
                            char* event_name, uint64_t val,
                            uint64_t header, uint64_t *buf, int buf_len) {
   CAMLparam0();
-  CAMLlocal4(callback_list, event, callbacks_root, perf_data);
+  CAMLlocal3(callback_list, event, callbacks_root);
   CAMLlocalN(params, 5);
   CAMLlocal1(wrapper_root);
-
-  perf_data = Val_unit;
 
   struct callbacks_exception_holder* holder = callback_data;
   callbacks_root = *holder->callbacks_val;
@@ -1212,18 +1216,13 @@ static int ml_user_int(int domain_id, void *callback_data,
                                                                 event);
 
   if (Is_block(callback_list)) {
-    intnat local_sp = Caml_state->local_sp;
-    perf_data = extract_perf_data(header, buf, buf_len);
-
     params[0] = Val_long(domain_id);
     params[1] = caml_copy_int64(timestamp);
     params[2] = event;
     params[3] = Val_int(val);
-    params[4] = perf_data;
-
-    int ret = user_events_call_callback_list(holder, callback_list, params);
-    Caml_state->local_sp = local_sp;
-    if (ret == 0) {
+    /* params[4] is filled in by call_list_with_perf_samples */
+    if (!call_list_with_perf_samples(callback_list, params, 5, 4,
+                                      header, buf, buf_len, holder)) {
       CAMLreturnT(int, 0);
     }
   }
@@ -1240,9 +1239,7 @@ static int ml_user_custom(int domain_id, void *callback_data, int64_t timestamp,
   CAMLlocal4(callback_list, event, callbacks_root, event_type);
   CAMLlocalN(params, 5);
   CAMLlocal2(wrapper_root, read_buffer);
-  CAMLlocal4(data, record, deserializer, perf_data);
-
-  perf_data = Val_unit;
+  CAMLlocal3(data, record, deserializer);
 
   struct callbacks_exception_holder* holder = callback_data;
   callbacks_root = *holder->callbacks_val;
@@ -1290,18 +1287,13 @@ static int ml_user_custom(int domain_id, void *callback_data, int64_t timestamp,
 
     data = caml_callback2(deserializer, read_buffer, Val_int(caml_string_len));
 
-    intnat local_sp = Caml_state->local_sp;
-    perf_data = extract_perf_data(header, buf, buf_len);
-
     params[0] = Val_long(domain_id);
     params[1] = caml_copy_int64(timestamp);
     params[2] = event;
     params[3] = data;
-    params[4] = perf_data;
-
-    int ret = user_events_call_callback_list(holder, callback_list, params);
-    Caml_state->local_sp = local_sp;
-    if (ret == 0) {
+    /* params[4] is filled in by call_list_with_perf_samples */
+    if (!call_list_with_perf_samples(callback_list, params, 5, 4,
+                                      header, buf, buf_len, holder)) {
       CAMLreturnT(int, 0);
     }
   }
