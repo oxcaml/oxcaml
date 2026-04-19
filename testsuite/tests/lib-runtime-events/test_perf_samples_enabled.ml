@@ -3,26 +3,18 @@
    include runtime_events;
    set OCAML_RUNTIME_EVENTS_PERF_COUNTERS = "r3c";
    runtime5;
-   { bytecode; }
-   { native; }
+   native;
  }
 *)
 
 (* Tests the PMC-enabled end-to-end path: when
-   OCAML_RUNTIME_EVENTS_PERF_COUNTERS is set and PMC setup succeeds, runtime
-   and user-span callbacks are invoked and at least one callback observes a
-   non-empty perf_sample array. Exercises parse_perf_config_string,
+   OCAML_RUNTIME_EVENTS_PERF_COUNTERS is set and PMC setup succeeds, every
+   runtime and user-span callback receives a perf_sample array of length 1
+   (one counter configured). Exercises parse_perf_config_string,
    perf_events_setup, the header perf-counter bitfield, write_to_ring, and
    extract_perf_data. If PMC is unavailable at runtime (non-Linux, non-x86,
    sandboxed CI, RDPMC-unavailable kernel, etc.) the test exits cleanly as a
-   no-op success.
-
-   Note: we intentionally do not assert on the exact value of array_length
-   here. Native and bytecode unbox unboxed-product arrays differently, so
-   `array_length` on a `local_ perf_sample array` returns the element count
-   in native and the wosize (= element_count * number_of_components) in
-   bytecode. We only check "non-empty" (length > 0), which is consistent
-   across both modes. *)
+   no-op success. *)
 
 open Runtime_events
 
@@ -47,22 +39,22 @@ let () =
   let end_seen = ref 0 in
   let user_begin_seen = ref 0 in
   let user_end_seen = ref 0 in
-  let any_nonempty = ref false in
+  let bad_length = ref 0 in
 
-  let mark_nonempty (local_ samples : perf_sample array) =
-    if array_length samples > 0 then any_nonempty := true
+  let check_length (local_ samples : perf_sample array) =
+    if array_length samples <> 1 then incr bad_length
   in
 
   let runtime_begin _domain_id _ts _phase
       (local_ samples : perf_sample array) =
     incr begin_seen;
-    mark_nonempty samples
+    check_length samples
   in
 
   let runtime_end _domain_id _ts _phase
       (local_ samples : perf_sample array) =
     incr end_seen;
-    mark_nonempty samples
+    check_length samples
   in
 
   let user_span_handler _domain_id _ts _ev v
@@ -70,7 +62,7 @@ let () =
     (match v with
      | Type.Begin -> incr user_begin_seen
      | Type.End -> incr user_end_seen);
-    mark_nonempty samples
+    check_length samples
   in
 
   let cursor = create_cursor None in
@@ -94,5 +86,5 @@ let () =
   assert (!end_seen > 0);
   assert (!user_begin_seen > 0);
   assert (!user_end_seen > 0);
-  assert !any_nonempty;
+  assert (!bad_length = 0);
   done_line ()
