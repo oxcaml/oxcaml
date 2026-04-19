@@ -15,6 +15,9 @@
 external runtime_events_are_active : unit -> bool
   = "caml_ml_runtime_events_are_active" [@@noalloc]
 
+external perf_counters_active : unit -> bool
+  = "caml_ml_runtime_events_perf_counters_active" [@@noalloc]
+
 type runtime_counter =
 | EV_C_FORCE_MINOR_ALLOC_SMALL
 | EV_C_FORCE_MINOR_MAKE_VECT

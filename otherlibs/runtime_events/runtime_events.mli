@@ -328,6 +328,15 @@ val resume : unit -> unit
    the OCAML_RUNTIME_EVENTS_START environment variable has been set.
 *)
 
+val perf_counters_active : unit -> bool
+(** [perf_counters_active ()] returns [true] if hardware performance counters
+   are currently being sampled alongside runtime and user span events. This
+   requires a build with Linux x86 PMC support (see
+   {!Config.perf_counters_supported}), a valid
+   [OCAML_RUNTIME_EVENTS_PERF_COUNTERS] configuration, and a successful
+   [perf_event_open]/rdpmc setup by the runtime. Returns [false]
+   otherwise. *)
+
 val create_cursor : (string * int) option -> cursor
 (** [create_cursor path_pid] creates a cursor to read from an runtime_events.
    Cursors can be created for runtime_events in and out of process. A

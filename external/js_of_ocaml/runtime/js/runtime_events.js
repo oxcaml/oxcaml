@@ -52,6 +52,12 @@ function caml_ml_runtime_events_are_active() {
   return 0;
 }
 
+//Provides: caml_ml_runtime_events_perf_counters_active
+//Version: >= 5.2
+function caml_ml_runtime_events_perf_counters_active() {
+  return 0;
+}
+
 //Provides: caml_runtime_events_resume
 //Version: >=5.0, < 5.2
 function caml_runtime_events_resume() {

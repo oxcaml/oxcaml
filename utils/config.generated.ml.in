@@ -138,6 +138,8 @@ let has_f16c = "@has_f16c@" = "yes"
 
 let has_fma = "@has_fma@" = "yes"
 
+let perf_counters_supported = "@perf_counters_supported@" = "yes"
+
 let as_compress_debug_sections_flag = {@QS@|@as_compress_debug_sections_flag@|@QS@}
 let cc_compress_debug_sections_flag = {@QS@|@cc_compress_debug_sections_flag@|@QS@}
 let objcopy_compress_debug_sections_flag = {@QS@|@objcopy_compress_debug_sections_flag@|@QS@}

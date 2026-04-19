@@ -809,6 +809,22 @@ CAMLprim value caml_ml_runtime_events_are_active(void) {
   return Val_bool(caml_runtime_events_are_active());
 }
 
+CAMLprim value caml_ml_runtime_events_perf_counters_active(value vunit) {
+  (void)vunit;
+#ifdef PERF_COUNTERS
+  /* Force the lazy per-thread setup so the answer reflects whether PMC will
+     actually be sampled rather than whether it has been attempted yet. */
+  if (num_perf_configs > 0
+      && !atomic_load(&perf_counters_globally_disabled)) {
+    get_thread_counters();
+  }
+  return Val_bool(num_perf_configs > 0
+                  && !atomic_load(&perf_counters_globally_disabled));
+#else
+  return Val_false;
+#endif
+}
+
 
 static struct runtime_events_buffer_header *get_ring_buffer_by_domain_id
                                                               (int domain_id) {
