@@ -186,63 +186,51 @@ static void stw_teardown_runtime_events(
    single graceful-degradation path; there is no retry.
 */
 
-/* Process-static config. Populated exactly once by parse_perf_config_string
-   from inside caml_runtime_events_start (STW-protected), cleared by
-   caml_runtime_events_destroy. Read (without atomics) from the event-emit
-   paths, which cannot overlap with start/destroy. */
+/* Process-static config. Populated once by parse_perf_config_string under
+   the start/destroy STW, cleared by destroy. Read without atomics from the
+   event-emit paths, which can't overlap with start/destroy. */
 static uint64_t perf_counter_configs[RUNTIME_EVENTS_MAX_PERF_EVENTS];
 static int num_perf_configs = 0;
 
-/* Cached fields derived from the kernel's perf_event_mmap_page, used on
-   every sample to avoid re-parsing the page. [offset] is the accumulated
-   count from previous scheduling slices; [index] is the RDPMC counter
-   number (as passed to the _rdpmc intrinsic); [width] is the counter bit
-   width used to sign-extend the RDPMC result. */
+/* Cached offset/index/width from the kernel's perf_event_mmap_page, read
+   on every sample to avoid re-parsing the page. */
 struct perf_counter_rdpmc_info {
   uint64_t offset;
   uint32_t index;
   uint16_t width;
 };
 
-/* Per-thread PMC state. Allocated on first sample by get_thread_counters,
-   freed by cleanup_thread_counters. Only the owning thread reads or
-   writes it. */
+/* Per-thread PMC state. Owned exclusively by the thread that allocated it. */
 struct perf_counters {
-  int ncounters;  /* number of counters actually set up; <= num_perf_configs */
+  int ncounters;
   void* mmap_pages[RUNTIME_EVENTS_MAX_PERF_EVENTS];
-
-  /* Pointer into the leader's mmap'd page. All counters in a group share
-     a schedule, so the leader's lock is sufficient to detect re-scheduling
-     of any counter in the group. */
+  /* All counters in a group share a schedule, so the leader's seqlock is
+     sufficient to detect re-scheduling of any counter in the group. */
   uint32_t* leader_seq_lock;
   uint32_t last_seq;
   struct perf_counter_rdpmc_info rdpmc_info[RUNTIME_EVENTS_MAX_PERF_EVENTS];
 };
 
-/* Bumped by caml_runtime_events_destroy. Threads notice the mismatch
-   against their cached thread_counter_generation on their next call to
-   get_thread_counters and tear their state down. Prevents stale
-   mmap_pages surviving a destroy+start cycle. */
+/* Bumped by destroy. Threads see the mismatch on their next call to
+   get_thread_counters and tear down their state so stale mmap_pages don't
+   survive a destroy+start cycle. */
 static _Atomic uint64_t perf_counter_generation = 0;
 
 static CAMLthread_local struct perf_counters* thread_counters = NULL;
 static CAMLthread_local uint64_t thread_counter_generation = 0;
 
-/* Circuit breaker. Flipped to true on the first setup failure seen by
-   any thread; never flipped back within a given start/destroy epoch.
-   Makes subsequent perf_counters_active() return false and subsequent
-   get_thread_counters() return NULL. */
+/* Circuit breaker: flipped on the first setup failure seen by any thread,
+   reset only on destroy. All subsequent get_thread_counters calls return
+   NULL until the next destroy+start. */
 static atomic_bool perf_counters_globally_disabled = false;
 
-/* Compiler-only memory barrier; sufficient on x86 where loads/stores to
-   the kernel's mmap page are not reordered by hardware. Used between the
-   seqlock snapshot, the payload read/write, and the seqlock re-check. */
+/* Compiler-only memory barrier: sufficient on x86 where loads/stores to
+   the kernel's mmap page are not reordered by hardware. */
 #define seqlock_barrier() asm volatile("" ::: "memory")
 
-/* Parse a comma-separated list of hex raw perf event codes, each prefixed
-   with 'r' (e.g. "r3c,r3d"). Populates perf_counter_configs[] and sets
-   num_perf_configs. Returns NULL on success, or a pointer to a static
-   error string on malformed input or too many events. */
+/* Parse a comma-separated list of hex raw perf event codes each prefixed
+   with 'r' (e.g. "r3c,r3d") into perf_counter_configs[]. Returns NULL on
+   success, or a pointer to a static error string on failure. */
 static const char* parse_perf_config_string(const char* format)
 {
   static char err[256];
@@ -287,15 +275,15 @@ static void perf_events_teardown(struct perf_counters* counters)
 }
 
 
-/* Re-populate each counter's rdpmc_info (offset, index, width) from its
-   kernel-mapped metadata page under the page's seqlock. Called once per
-   counter set during setup, and again from perf_events_sample whenever
-   the leader's seqlock has changed (indicating the kernel re-scheduled
-   the counter and the cached info is stale).
+/* Refresh each counter's rdpmc_info from the kernel's metadata page under
+   a seqlock. Called once per counter set during setup, and again from
+   perf_events_sample whenever the leader's seqlock has changed.
 
-   Returns 0 on success, or 1 if the kernel reports the counter cannot
-   be read via RDPMC (cap_user_rdpmc cleared or index == 0, which happens
-   e.g. when too many events contend for hardware counter slots). */
+   Warning: counters->mmap_pages[0..ncounters) must already be populated.
+
+   Returns 0 on success, or 1 if the kernel reports the counter isn't
+   RDPMC-readable (cap_user_rdpmc cleared or index == 0, e.g. when too
+   many events contend for hardware counter slots). */
 static int perf_events_setup_rdpmc(struct perf_counters* counters)
 {
   uint32_t seqs[RUNTIME_EVENTS_MAX_PERF_EVENTS];
@@ -332,19 +320,10 @@ static int perf_events_setup_rdpmc(struct perf_counters* counters)
 }
 
 /* Open the kernel-side perf events for the calling thread, one per
-   configured counter. The first counter is the group leader and is
-   pinned to hardware (.pinned = 1); the rest attach to the leader so
-   they're scheduled and unscheduled together.
-
-   For each counter we:
-     - perf_event_open(2) with the raw event code from the env var;
-     - mmap the metadata page (PROT_READ, one 4K page);
-     - verify RDPMC actually works for this counter by probing it under
-       the seqlock.
-
-   On any failure partway through we record the error in [err] and break;
-   the caller (get_thread_counters) will call perf_events_teardown on
-   the partially-initialised struct and flip the global-disable flag. */
+   configured counter. The first is the pinned group leader; the rest
+   attach to it so the whole group is scheduled together. On failure
+   we record the reason in [err] and break; the caller tears down the
+   partially-initialised struct and flips the global-disable flag. */
 static int perf_events_setup(struct perf_counters* counters,
                              char* err, size_t err_len)
 {
@@ -362,9 +341,7 @@ static int perf_events_setup(struct perf_counters* counters,
       .config = config,
       .sample_type = PERF_SAMPLE_READ,
       .exclude_kernel = 0,
-      /* Pin the leader so the whole group is always scheduled on
-         hardware; if it can't be, the group fails cleanly. */
-      .pinned = (i == 0)
+      .pinned = (i == 0)  /* leader is pinned; group fails cleanly if not */
     };
     int fd =
       syscall(SYS_perf_event_open,
@@ -387,9 +364,8 @@ static int perf_events_setup(struct perf_counters* counters,
     }
     counters->mmap_pages[i] = page;
 
-    /* Probe RDPMC under the seqlock: the kernel may claim
-       cap_user_rdpmc but revoke it while we're executing the
-       instruction, so we retry until we see a consistent snapshot. */
+    /* Reminder: cap_user_rdpmc can be revoked by the kernel mid-read,
+       so probe under the seqlock and retry on a mismatched snapshot. */
     int rdpmc_ok;
     uint32_t seq;
     do {
@@ -429,20 +405,13 @@ static int perf_events_setup(struct perf_counters* counters,
   }
 }
 
-/* Read the current value of each configured counter via userspace RDPMC
-   and write them into [samples] (which must be at least counters->ncounters
-   words). This is the hot path: called once per sampled event from
-   write_to_ring.
+/* Read each configured counter via userspace RDPMC into [samples]. Hot
+   path: called once per sampled event from write_to_ring. The two
+   seqlock checks detect kernel re-scheduling between samples; on a
+   mismatch we refresh rdpmc_info and retry.
 
-   Two seqlock checks protect against the kernel re-scheduling a counter
-   mid-sample:
-     - Before the loop, if the leader's seqlock has advanced since the
-       last sample then our cached rdpmc_info is stale and we must refresh.
-     - After the loop, if the seqlock has advanced during the reads then
-       one or more samples are inconsistent and we retry.
-   The RDPMC result is already a raw counter value; we mask to the
-   hardware counter width to get an unsigned count, then add the kernel's
-   recorded offset to recover the total accumulated count. */
+   Warning: counters must be a fully set-up struct from perf_events_setup,
+   and [samples] must have space for at least counters->ncounters words. */
 static void perf_events_sample(struct perf_counters* counters,
                                uint64_t* samples)
 {
@@ -466,20 +435,15 @@ retry:
 
 static void cleanup_thread_counters(void);
 
-/* Return the calling thread's struct perf_counters, setting it up lazily
-   on first call. Returns NULL (and does no setup) if PMC has been globally
-   disabled by an earlier failure, or if no counters are configured.
-
-   A bumped perf_counter_generation (from caml_runtime_events_destroy)
-   invalidates any existing state for this thread; we tear it down before
-   rebuilding so a destroy+start cycle starts from clean state. */
+/* Return the calling thread's struct perf_counters, allocating and
+   setting it up lazily on first call. Returns NULL if PMC has been
+   globally disabled or no counters are configured. */
 static struct perf_counters* get_thread_counters(void)
 {
   if (atomic_load(&perf_counters_globally_disabled))
     return NULL;
 
-  /* If we were set up in a previous start/destroy epoch, tear down the
-     stale state before (re)building. */
+  /* Tear down state from a previous start/destroy epoch. */
   uint64_t current_gen = atomic_load(&perf_counter_generation);
   if (thread_counters != NULL
       && thread_counter_generation != current_gen) {
@@ -491,8 +455,6 @@ static struct perf_counters* get_thread_counters(void)
     memset(thread_counters, 0, sizeof(struct perf_counters));
     char err[256];
     if (perf_events_setup(thread_counters, err, sizeof err) != 0) {
-      /* First setup failure for any thread in this process trips the
-         global circuit breaker; from now on PMC is off until destroy. */
       caml_gc_log("perf_events setup failed, disabling globally: %s", err);
       atomic_store(&perf_counters_globally_disabled, true);
       caml_stat_free(thread_counters);
@@ -504,9 +466,7 @@ static struct perf_counters* get_thread_counters(void)
   return thread_counters;
 }
 
-/* Tear down the calling thread's PMC state. Called from the domain/thread
-   stop lifecycle hooks, from get_thread_counters when the generation has
-   advanced, and from caml_runtime_events_destroy for the last domain. */
+/* Tear down the calling thread's PMC state. */
 static void cleanup_thread_counters(void)
 {
   if (thread_counters != NULL) {
@@ -981,10 +941,9 @@ static void write_to_ring(ev_category category, ev_message_type type,
   uint64_t length_with_header_ts = event_length + 2;
 
   #ifdef PERF_COUNTERS
-  /* PMC samples are only attached to events that represent a span edge:
-     runtime-phase BEGIN/EXIT and user-span Begin/End. Lifecycle events,
-     counter events, and alloc events don't carry samples. Consumers reading
-     the header's perf-counter field will see 0 for those. */
+  /* Only span-edge events carry PMC samples (runtime BEGIN/EXIT and
+     user-span Begin/End); everything else writes a 0 in the header's
+     perf-counter field. */
   struct perf_counters* counters = get_thread_counters();
   int sample_counters = (counters != NULL && counters->ncounters > 0 &&
                          ((category == EV_RUNTIME &&
@@ -995,8 +954,7 @@ static void write_to_ring(ev_category category, ev_message_type type,
                             type.user == EV_USER_MSG_TYPE_SPAN_END))));
 
   if (sample_counters) {
-    /* Each counter contributes two words to the ring entry: its config
-       id (so the reader knows which event it is) and its sampled value. */
+    /* Two words per counter: config id and sampled value. */
     length_with_header_ts += counters->ncounters * 2;
   }
   #endif
