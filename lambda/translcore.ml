@@ -536,7 +536,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         let inlined = Translattribute.get_inlined_attribute funct in
         let specialised = Translattribute.get_specialised_attribute funct in
         let position = transl_apply_position pos in
-        let mode = transl_locality_mode_l ap_mode in
+        let mode = transl_return_mode_l ap_mode in
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised
              ~assume_zero_alloc
@@ -550,7 +550,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let inlined = Translattribute.get_inlined_attribute funct in
       let specialised = Translattribute.get_specialised_attribute funct in
       let position = transl_apply_position position in
-      let mode = transl_locality_mode_l ap_mode in
+      let mode = transl_return_mode_l ap_mode in
       let yielding = transl_yielding_mode_l ap_yielding in
       let assume_zero_alloc =
         zero_alloc_of_application ~num_args:(List.length oargs) zero_alloc funct
@@ -1168,7 +1168,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_send(expr, met, pos) ->
       let lam =
         let pos = transl_apply_position pos in
-        let mode = Lambda.alloc_heap in
+        let mode = Lambda.not_alloc_stack in
         let loc = of_location ~scopes e.exp_loc in
         match met with
         | Tmeth_val id ->
@@ -1185,7 +1185,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     ap_func = Lvar meth;
                     ap_args = [self];
                     ap_result_layout = layout;
-                    ap_mode = return_mode_of_locality_mode mode;
+                    ap_mode = mode;
                     (* Object code can never close over a yielding value, so
                        calling an ancestor method cannot yield *)
                     ap_yielding = Unyielding;
@@ -1641,7 +1641,7 @@ and transl_apply ~scopes
       ?(specialised = Default_specialise)
       ?(assume_zero_alloc = Zero_alloc_utils.Assume_info.none)
       ?(position=Rc_normal)
-      ?(mode=alloc_heap)
+      ?(mode=not_alloc_stack)
       ?(yielding=May_yield)
       ~result_layout
       lam sargs loc
@@ -1679,7 +1679,7 @@ and transl_apply ~scopes
         Lapply
           {ap with ap_args = ap.ap_args @ args; ap_loc = loc;
                    ap_region_close = pos;
-                   ap_mode = return_mode_of_locality_mode mode;
+                   ap_mode = mode;
                    ap_yielding = join_yielding_kind ap.ap_yielding yielding;
 
                    ap_result_layout = result_layout }
@@ -1701,7 +1701,7 @@ and transl_apply ~scopes
           ap_args=args;
           ap_result_layout=result_layout;
           ap_region_close=pos;
-          ap_mode=return_mode_of_locality_mode mode;
+          ap_mode=mode;
           ap_yielding=yielding;
           ap_tailcall=tailcall;
           ap_inlined=inlined;
@@ -1756,23 +1756,22 @@ and transl_apply ~scopes
           let loc = map_scopes enter_partial_or_eta_wrapper loc in
           let mode = transl_alloc_mode_r mode_closure in
           let arg_mode = transl_alloc_mode_l mode_arg in
-          let ret_locality = transl_alloc_mode_l mode_ret in
+          let ret_mode = transl_ret_mode mode_ret in
           let sort_arg = Jkind.Sort.default_for_transl_and_get sort_arg in
           let sort_ret = Jkind.Sort.default_for_transl_and_get sort_ret in
           let result_layout = layout_of_sort (to_location loc) sort_ret in
           let body =
-            build_apply handle [Lvar id_arg] loc Rc_normal ret_locality
+            build_apply handle [Lvar id_arg] loc Rc_normal ret_mode
               result_layout l
           in
           let nlocal =
             match
-              join_locality_mode mode
-                (join_locality_mode arg_mode ret_locality)
+              (join_locality_mode mode arg_mode), ret_mode
             with
-            | Alloc_local -> 1
-            | Alloc_heap -> 0
+            | Alloc_local, _ -> 1
+            | _, Maybe_alloc_stack -> 1
+            | Alloc_heap, Not_alloc_stack -> 0
           in
-          let ret_mode = return_mode_of_locality_mode ret_locality in
           let layout_arg = layout_of_sort (to_location loc) sort_arg in
           let params = [{
               name = id_arg;

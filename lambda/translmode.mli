@@ -18,6 +18,8 @@ val transl_locality_mode_l : (allowed * 'r) Locality.t -> Lambda.locality_mode
 
 val transl_yielding_mode_l : (allowed * 'r) Yielding.t -> Lambda.yielding_kind
 
+val transl_return_mode_l : (allowed * 'r) Locality.t -> Lambda.return_mode
+
 val transl_alloc_mode_l : (allowed * 'r) Alloc.t -> Lambda.locality_mode
 
 val transl_alloc_mode_r : ('l * allowed) Alloc.t -> Lambda.locality_mode
