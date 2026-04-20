@@ -53,6 +53,7 @@ type summary =
   | Env_persistent of summary * Ident.t
   | Env_value_unbound of summary * string * value_unbound_reason
   | Env_module_unbound of summary * string * module_unbound_reason
+  | Env_jkind of summary * Ident.t * jkind_declaration
   (* CR zqian: track [add_lock] as well *)
 
 type address = Persistent_env.address =
@@ -111,6 +112,7 @@ val find_modtype_lazy: Path.t -> t -> Subst.Lazy.modtype_declaration
 val find_modtype: Path.t -> t -> modtype_declaration
 val find_class: Path.t -> t -> class_declaration
 val find_cltype: Path.t -> t -> class_type_declaration
+val find_jkind: Path.t -> t -> jkind_declaration
 
 val find_ident_constructor: Ident.t -> t -> constructor_description
 val find_ident_label: 'rcd record_form -> Ident.t -> t -> 'rcd gen_label_description
@@ -123,6 +125,7 @@ val find_type_expansion_opt:
    of the compiler's type-based optimisations. *)
 val find_modtype_expansion: Path.t -> t -> module_type
 val find_modtype_expansion_lazy: Path.t -> t -> Subst.Lazy.module_type
+val find_jkind_expansion : Path.t -> t -> jkind_const_desc_lr
 
 val find_hash_type: Path.t -> t -> type_declaration
 (* Find the "#t" type given the path for "t" *)
@@ -179,6 +182,7 @@ val has_local_constraints: t -> bool
 val mark_value_used: Uid.t -> unit
 val mark_module_used: Uid.t -> unit
 val mark_type_used: Uid.t -> unit
+val mark_jkind_used: Uid.t -> unit
 
 (* Mark mutable variable as mutated *)
 val mark_value_mutated: Uid.t -> unit
@@ -238,6 +242,7 @@ type lookup_error =
   | Unbound_class of Longident.t
   | Unbound_modtype of Longident.t
   | Unbound_cltype of Longident.t
+  | Unbound_jkind of Longident.t
   | Unbound_settable_variable of string
   | Not_a_settable_variable of string
   | Masked_instance_variable of Longident.t
@@ -307,6 +312,9 @@ val lookup_class:
 val lookup_cltype:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * class_type_declaration
+val lookup_jkind :
+  ?use:bool -> loc:Location.t -> Longident.t -> t ->
+  Path.t * jkind_declaration
 
 (* When locks are returned instead of walked for modules, the mode remains as
   defined (always legacy), and thus not returned. *)
@@ -364,6 +372,8 @@ val find_class_by_name:
   Longident.t -> t -> Path.t * class_declaration
 val find_cltype_by_name:
   Longident.t -> t -> Path.t * class_type_declaration
+val find_jkind_by_name:
+  Longident.t -> t -> Path.t * jkind_declaration
 
 val find_constructor_by_name:
   Longident.t -> t -> constructor_description
@@ -437,6 +447,8 @@ val add_cltype: Ident.t -> class_type_declaration -> t -> t
 val add_local_constraint: Path.t -> type_declaration -> t -> t
 val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
 val clear_implicit_jkinds : t -> t
+val add_jkind:
+  check:bool -> ?shape:Shape.t -> Ident.t -> jkind_declaration -> t -> t
 
 (* Insertion of persistent signatures *)
 
@@ -684,8 +696,8 @@ val print_path: Path.t Format_doc.printer ref
 val print_type_expr: Types.type_expr Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Jkind. *)
 val report_jkind_violation_with_offender:
-  (offender:(Format_doc.formatter -> unit) ->
-   level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit) ref
+  (offender:(Format_doc.formatter -> unit) -> level:int -> t ->
+   Format_doc.formatter -> Jkind.Violation.t -> unit) ref
 
 
 (** Folds *)

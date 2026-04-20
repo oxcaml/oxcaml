@@ -159,7 +159,9 @@ let string_accessor_width =
         match i with
         | "f32" -> Single
         | "8" -> Eight
+        | "8s" -> Eight_signed
         | "16" -> Sixteen
+        | "16s" -> Sixteen_signed
         | "32" -> Thirty_two
         | "64" -> Sixty_four
         | "128a" -> One_twenty_eight { aligned = true }
@@ -174,9 +176,9 @@ let string_accessor_width =
         let s =
           match (saw : P.string_accessor_width) with
           | Eight -> "8"
-          | Eight_signed -> "i8"
+          | Eight_signed -> "8s"
           | Sixteen -> "16"
-          | Sixteen_signed -> "i16"
+          | Sixteen_signed -> "16s"
           | Thirty_two -> "32"
           | Single -> "f32"
           | Sixty_four -> "64"
@@ -346,8 +348,8 @@ let probe_is_enabled =
 
 let enter_inlined_apply =
   D.(
-    nullary "%inlined_apply" ~params:(todop "dbginfo") (fun _env dbg ->
-        P.Enter_inlined_apply { dbg }))
+    nullary "%inlined_apply" ~params:param0 (fun _env () ->
+        P.Enter_inlined_apply { dbg = Inlined_debuginfo.none }))
 
 let domain_index =
   D.(nullary "%domain_index" ~params:param0 (fun _env () -> P.Domain_index))
@@ -799,7 +801,7 @@ module OfFlambda = struct
     | Optimised_out kind -> optimised_out env kind
     | Probe_is_enabled { name; enabled_at_init } ->
       probe_is_enabled env (name, enabled_at_init)
-    | Enter_inlined_apply { dbg } -> enter_inlined_apply env dbg
+    | Enter_inlined_apply { dbg = _ } -> enter_inlined_apply env ()
     | Domain_index -> domain_index env ()
     | Dls_get -> dls_get env ()
     | Tls_get -> tls_get env ()
@@ -842,9 +844,8 @@ module OfFlambda = struct
     | Tag_immediate -> tag_immediate env ()
     | Duplicate_block _ | Obj_dup | Get_header | Peek _
     | Reinterpret_boxed_vector ->
-      todo
-        (Format.asprintf "%a" P.Without_args.print (P.Without_args.Unary op))
-        env ()
+      Misc.fatal_errorf "TODO: Unary primitive: %a" P.Without_args.print
+        (P.Without_args.Unary op)
 
   let binop env (op : P.binary_primitive) =
     match op with
@@ -876,18 +877,15 @@ module OfFlambda = struct
     | Bytes_or_bigstring_set (blv, saw) -> bytes_or_bigstring_set env (blv, saw)
     | Bigarray_set (d, k, l) -> bigarray_set env (d, k, l)
     | Write_offset _ ->
-      todo
-        (Format.asprintf "%a" P.Without_args.print (P.Without_args.Ternary op))
-        env ()
+      Misc.fatal_errorf "TODO: Ternary primitive: %a" P.Without_args.print
+        (P.Without_args.Ternary op)
 
   let quaternop env (op : P.quaternary_primitive) =
     match op with
     | Atomic_compare_and_set_field a -> atomic_compare_and_set_field env a
     | Atomic_compare_exchange_field _ ->
-      todo
-        (Format.asprintf "%a" P.Without_args.print
-           (P.Without_args.Quaternary op))
-        env ()
+      Misc.fatal_errorf "TODO: Quaternary primitive: %a" P.Without_args.print
+        (P.Without_args.Quaternary op)
 
   let varop env (op : P.variadic_primitive) =
     match op with
@@ -900,9 +898,8 @@ module OfFlambda = struct
     | Make_array (kind, mutability, alloc) ->
       make_array env (kind, mutability, alloc)
     | Make_block ((Naked_floats | Mixed (_, _)), _, _) ->
-      todo
-        (Format.asprintf "%a" P.Without_args.print (P.Without_args.Variadic op))
-        env ()
+      Misc.fatal_errorf "TODO: Variadic primitive: %a" P.Without_args.print
+        (P.Without_args.Variadic op)
 
   let prim env (p : P.t) : t * Simple.t list =
     match p with

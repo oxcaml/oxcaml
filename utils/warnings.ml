@@ -141,6 +141,7 @@ type t =
   | Unerasable_position_argument            (* 188 *)
   (* 189 was [Unnecessarily_partial_tuple_pattern], now upstream as 75 *)
   | Probe_name_too_long of string           (* 190 *)
+  | Unused_kind_declaration of string       (* 191 *)
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
@@ -241,6 +242,7 @@ let number = function
   | Unerasable_position_argument -> 188
   (* 189 was [Unnecessarily_partial_tuple_pattern], now upstream as 75 *)
   | Probe_name_too_long _ -> 190
+  | Unused_kind_declaration _ -> 191
   | Zero_alloc_all_hidden_arrow _ -> 198
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
@@ -623,6 +625,10 @@ let descriptions = [
     names = ["probe-name-too-long"];
     description = "Probe name must be at most 100 characters long.";
     since = since 4 14 };
+  { number = 191;
+    names = ["unused-kind-declaration"];
+    description = "Unused kind declaration.";
+    since = since 5 2 };
   { number = 198;
     names = ["zero-alloc-all-hidden-arrow"];
     description = "A declaration whose type is an alias of a function type \
@@ -1402,9 +1408,21 @@ let message = function
   | Unerasable_position_argument ->
       msg "this position argument cannot be erased."
   | Probe_name_too_long name ->
+<<<<<<< HEAD
       msg "This probe name is too long: %a.@ \
            Probe names must be at most 100 characters long."
         Style.inline_code name
+||||||| f8c6716f8c
+      Printf.sprintf
+        "This probe name is too long: `%s'. \
+         Probe names must be at most 100 characters long." name
+=======
+      Printf.sprintf
+        "This probe name is too long: `%s'. \
+         Probe names must be at most 100 characters long." name
+  | Unused_kind_declaration s ->
+      "unused kind " ^ s ^ "."
+>>>>>>> 5.2.0minus-31
   | Zero_alloc_all_hidden_arrow s ->
       msg "The type of this item is an@ alias of a function type,@ \
            but the %a attribute for@ this signature does not apply to it@ \

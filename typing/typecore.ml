@@ -310,6 +310,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
+  | Let_poly_not_yet_implemented
 
 
 let not_principal fmt =
@@ -1921,6 +1922,7 @@ let solve_constructor_annotation
       (fun (name, jkind_annot_opt) ->
         let jkind =
           Jkind.of_annotation_option_default
+            !!penv
             ~context:(Existential_unpack name.txt)
             ~default:(Jkind.Builtin.value ~why:Existential_type_variable)
             jkind_annot_opt
@@ -4974,6 +4976,7 @@ and is_nonexpansive_mod mexp =
                 te.tyext_constructors
           | Tstr_class _ -> false (* could be more precise *)
           | Tstr_attribute _ -> true
+          | Tstr_jkind _ -> true
         )
         str.str_items
   | Tmod_apply _ | Tmod_apply_unit _ -> false
@@ -5922,7 +5925,13 @@ let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=
       List.fold_right mk_newtype locally_abstract_univars expr
 
 let vb_pat_constraint
-      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; _ } as vb) =
+      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; pvb_is_poly;
+        pvb_loc; _ } as vb) =
+  if pvb_is_poly then begin
+    Language_extension.assert_enabled ~loc:pvb_loc Layout_poly
+      Language_extension.Alpha;
+    raise (Error (pvb_loc, Env.empty, Let_poly_not_yet_implemented))
+  end;
   let spat =
     let open Ast_helper in
     let loc =
@@ -8512,7 +8521,7 @@ and type_ident env ?(recarg=Rejected) lid =
   let val_type, kind =
     match desc.val_kind with
     | Val_prim prim ->
-       let ty, mode, _, sort = instance_prim prim desc.val_type in
+       let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
        begin match prim.prim_native_repr_res, mode with
        (* if the locality of returned value of the primitive is poly
@@ -10359,6 +10368,144 @@ and map_half_typed_cases
   (* Ensure that existential types do not escape *)
   ~post:(fun ty_res' -> enforce_current_level env ty_res')
 
+<<<<<<< HEAD
+||||||| f8c6716f8c
+(** Typecheck the body of a newtype. The "body" of a newtype may be:
+    - an expression
+    - a suffix of function parameters together with a function body
+      That's why this function is polymorphic over the body.
+
+      @param type_body A function that produces a type for the body given the
+      environment. When typechecking an expression, this is [type_exp].
+      @return The type returned by [type_body] but with the Tconstr
+      nodes for the newtype properly linked, and the jkind annotation written
+      by the user.
+*)
+and type_newtype
+  : type a. _ -> _ -> _ -> (Env.t -> a * type_expr)
+    -> a * type_expr * Ident.t * Uid.t =
+  fun env name jkind_annot_opt type_body  ->
+  let { txt = name; loc = name_loc } : _ Location.loc = name in
+  let jkind =
+    Jkind.of_annotation_option_default ~context:(Newtype_declaration name)
+      ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
+  in
+  let ty =
+    if Typetexp.valid_tyvar_name name then
+      newvar ~name jkind
+    else
+      newvar jkind
+  in
+  (* Use [with_local_level] just for scoping *)
+  with_local_level begin fun () ->
+    (* Create a fake abstract type declaration for name. *)
+    let decl = new_local_type ~loc:name_loc Definition jkind in
+    let scope = create_scope () in
+    let (id, new_env) = Env.enter_type ~scope name decl env in
+
+    let result, exp_type = type_body new_env in
+    (* Replace every instance of this type constructor in the resulting
+       type. *)
+    let seen = Hashtbl.create 8 in
+    let rec replace t =
+      if Hashtbl.mem seen (get_id t) then ()
+      else begin
+        Hashtbl.add seen (get_id t) ();
+        match get_desc t with
+        | Tconstr (Path.Pident id', _, _) when id == id' -> link_type t ty
+        | _ -> Btype.iter_type_expr replace t
+      end
+    in
+    let ety = Subst.type_expr Subst.identity exp_type in
+    replace ety;
+    let uid = decl.type_uid in
+    (result, ety, id, uid)
+  end
+
+(** [type_newtype] where the "body" is just an expression. *)
+and type_newtype_expr
+    ~loc ~env ~expected_mode ~rue ~attributes name jkind_annot_opt sbody =
+  let body, ety, id, uid =
+    type_newtype env name jkind_annot_opt (fun env ->
+      let expr = type_exp env expected_mode sbody in
+      expr, expr.exp_type)
+  in
+  (* non-expansive if the body is non-expansive, so we don't introduce
+     any new extra node in the typed AST. *)
+  rue { body with exp_loc = loc; exp_type = ety;
+        exp_extra =
+        (Texp_newtype (id, name, jkind_annot_opt, uid),
+         loc, attributes) :: body.exp_extra }
+
+=======
+(** Typecheck the body of a newtype. The "body" of a newtype may be:
+    - an expression
+    - a suffix of function parameters together with a function body
+      That's why this function is polymorphic over the body.
+
+      @param type_body A function that produces a type for the body given the
+      environment. When typechecking an expression, this is [type_exp].
+      @return The type returned by [type_body] but with the Tconstr
+      nodes for the newtype properly linked, and the jkind annotation written
+      by the user.
+*)
+and type_newtype
+  : type a. _ -> _ -> _ -> (Env.t -> a * type_expr)
+    -> a * type_expr * Ident.t * Uid.t =
+  fun env name jkind_annot_opt type_body  ->
+  let { txt = name; loc = name_loc } : _ Location.loc = name in
+  let jkind =
+    Jkind.of_annotation_option_default env ~context:(Newtype_declaration name)
+      ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
+  in
+  let ty =
+    if Typetexp.valid_tyvar_name name then
+      newvar ~name jkind
+    else
+      newvar jkind
+  in
+  (* Use [with_local_level] just for scoping *)
+  with_local_level begin fun () ->
+    (* Create a fake abstract type declaration for name. *)
+    let decl = new_local_type ~loc:name_loc Definition jkind in
+    let scope = create_scope () in
+    let (id, new_env) = Env.enter_type ~scope name decl env in
+
+    let result, exp_type = type_body new_env in
+    (* Replace every instance of this type constructor in the resulting
+       type. *)
+    let seen = Hashtbl.create 8 in
+    let rec replace t =
+      if Hashtbl.mem seen (get_id t) then ()
+      else begin
+        Hashtbl.add seen (get_id t) ();
+        match get_desc t with
+        | Tconstr (Path.Pident id', _, _) when id == id' -> link_type t ty
+        | _ -> Btype.iter_type_expr replace t
+      end
+    in
+    let ety = Subst.type_expr Subst.identity exp_type in
+    replace ety;
+    let uid = decl.type_uid in
+    (result, ety, id, uid)
+  end
+
+(** [type_newtype] where the "body" is just an expression. *)
+and type_newtype_expr
+    ~loc ~env ~expected_mode ~rue ~attributes name jkind_annot_opt sbody =
+  let body, ety, id, uid =
+    type_newtype env name jkind_annot_opt (fun env ->
+      let expr = type_exp env expected_mode sbody in
+      expr, expr.exp_type)
+  in
+  (* non-expansive if the body is non-expansive, so we don't introduce
+     any new extra node in the typed AST. *)
+  rue { body with exp_loc = loc; exp_type = ety;
+        exp_extra =
+        (Texp_newtype (id, name, jkind_annot_opt, uid),
+         loc, attributes) :: body.exp_extra }
+
+>>>>>>> 5.2.0minus-31
 (* Typing of match cases *)
 and type_cases
     : type k . k pattern_category ->
@@ -12002,15 +12149,15 @@ let report_error ~loc env =
     Location.error_of_printer ~loc (fun ppf () ->
       fprintf ppf "Object types must have layout value.@ %a%a"
         (Jkind.Violation.report_with_name ~name:"the type of this expression"
-           ~level:(Ctype.get_current_level ())) err
-        pp_doc (report_type_expected_explanation_opt explanation))
+           ~level:(Ctype.get_current_level ()) env) err
+      pp_doc (report_type_expected_explanation_opt explanation))
       ()
   | Non_value_let_rec (err, ty) ->
     Location.error_of_printer ~loc (fun ppf () ->
       fprintf ppf "Variables bound in a \"let rec\" must have layout value.@ %a"
         (fun v -> Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) v)
+           ~level:(Ctype.get_current_level ()) env v)
         err)
       ()
   | Undefined_method (ty, me, valid_methods) ->
@@ -12060,6 +12207,7 @@ let report_error ~loc env =
         "The instance variable %a is overridden several times"
         Style.inline_code v
   | Coercion_failure (ty_exp, err, b) ->
+<<<<<<< HEAD
      let intro =
        let ty_exp = Out_type.prepare_expansion ty_exp in
        doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
@@ -12068,6 +12216,35 @@ let report_error ~loc env =
      in
       Location.errorf ~loc "%t" (fun ppf ->
         Errortrace_report.unification ppf env err
+||||||| f8c6716f8c
+      Location.error_of_printer ~loc (fun ppf () ->
+          (* Use deprecated_printer to defer prepare_expansion until after
+             reset() is called inside report_unification_error. This ensures
+             consistent type variable naming between the intro and trace. *)
+          let intro =
+            doc_printf "%t" (fun fmt_doc ->
+              deprecated_printer (fun fmt ->
+                let ty_exp = Printtyp.prepare_expansion ty_exp in
+                Format.fprintf fmt
+                  "This expression cannot be coerced to type@;<1 2>%a;@ \
+                   it has type"
+                  (Fmt.compat
+                     (Style.as_inline_code @@ Printtyp.type_expansion Type))
+                  ty_exp
+              ) fmt_doc
+            )
+          in
+        Printtyp.report_unification_error ppf env err
+=======
+    let intro =
+      let ty_exp = Printtyp.prepare_expansion ty_exp in
+      doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
+                  it has type"
+        (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
+    in
+    Location.error_of_printer ~loc (fun ppf () ->
+        Printtyp.report_unification_error ppf env err
+>>>>>>> 5.2.0minus-31
           intro
           (Fmt.Doc.msg "but is here used with type")
         )
@@ -12596,25 +12773,25 @@ let report_error ~loc env =
         "@[Function arguments and returns must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Record_projection_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Records being projected from must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Record_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Record expressions must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Mutable_var_not_rep (ty, violation) ->
       Location.errorf ~loc
         "@[Mutable variables must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Invalid_label_for_src_pos arg_label ->
       Location.errorf ~loc
         "A position argument must not be %s."
@@ -12646,8 +12823,8 @@ let report_error ~loc env =
          be the kind of a function.@ \
          (Functions always have kind %a.)%t@]"
         (Style.as_inline_code Printtyp.type_expr) ty_fun
-        (Style.as_inline_code Jkind.format) jkind
-        (Style.as_inline_code Jkind.format) Jkind.for_arrow
+        (Style.as_inline_code (Jkind.format env)) jkind
+        (Style.as_inline_code (Jkind.format env)) Jkind.for_arrow
         hint
   | Overwrite_of_invalid_term ->
       Location.errorf ~loc
@@ -12660,6 +12837,10 @@ let report_error ~loc env =
         "The eval extension takes a single type as its argument, for \
          example %a."
         Style.inline_code "[%eval: int]"
+  | Let_poly_not_yet_implemented ->
+      Location.errorf ~loc
+        "The %a annotation is not yet implemented."
+        Style.inline_code "let poly_"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

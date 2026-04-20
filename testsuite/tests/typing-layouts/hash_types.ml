@@ -148,6 +148,10 @@ Line 1, characters 11-14:
 1 | type bad = int t#
                ^^^
 Error: This type "int" should be an instance of type "float/1" = "float/2"
+       Line 1, characters 0-20:
+         Definition of type "float/1"
+       File "_none_", line 1:
+         Definition of type "float/2"
 |}]
 
 type 'a t = float as 'a

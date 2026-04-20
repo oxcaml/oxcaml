@@ -4406,6 +4406,127 @@ let global_table namelist =
     ((Cdefine_symbol (global_symbol "caml_globals") :: List.map mksym namelist)
     @ [cint_zero])
 
+(* Generate the unit dependency table for shared objects / complete objects.
+ *
+ * Table layout (all words are native-sized):
+ *   num_units : intnat
+ *   entries[num_units] : array of {
+ *     unit_name : char*       -- pointer to null-terminated string
+ *     entry_fn : value        -- entry function (OCaml closure)
+ *     gc_roots : value *      -- pointer to gc_roots (module block)
+ *     frametable : intnat *   -- pointer to frametable
+ *     num_deps : intnat       -- number of dependencies
+ *     dep_indices : intnat *  -- pointer to array of indices into entries[]
+ *     init_state : value      -- Val_int 0 = not init, 1 = initializing,
+ *                                2 = done, 3 = failed
+ *     raised_exn : value      -- stored exception if failed, Val_unit otherwise
+ *   }
+ *
+ *  Entries are sorted by unit_name for binary search lookup.
+ *  Dependencies reference other entries by index, avoiding name lookups.
+ *)
+(* CR-someday xclerc: Consider merging the multiple traversals of
+   [sorted_units] (index_map, name_symbols, dep_arrays, table_entries) into
+   fewer passes, and avoiding the duplicate dep filtering between the
+   dep_arrays and table_entries passes. See #5395. *)
+let unit_deps_table units =
+  let module CU = Compilation_unit in
+  let module StringMap = Misc.Stdlib.String.Map in
+  let unit_name cu = CU.full_path_as_string cu in
+  (* Sort units by name for binary search *)
+  let sorted_units =
+    List.sort
+      (fun (cu1, _) (cu2, _) -> String.compare (unit_name cu1) (unit_name cu2))
+      units
+  in
+  (* Build map from unit name to sorted index *)
+  let index_map =
+    List.fold_left
+      (fun (acc, i) (cu, _) -> StringMap.add (unit_name cu) i acc, i + 1)
+      (StringMap.empty, 0) sorted_units
+    |> fst
+  in
+  (* Emit unit name strings *)
+  let name_symbols =
+    List.fold_left
+      (fun acc (cu, _) ->
+        let sym_name = Compilenv.new_const_symbol () in
+        StringMap.add (unit_name cu) { sym_name; sym_global = Local } acc)
+      StringMap.empty sorted_units
+  in
+  let string_data =
+    StringMap.fold
+      (fun name sym acc ->
+        Cdefine_symbol sym :: Cstring (name ^ "\000") :: Calign size_int :: acc)
+      name_symbols []
+  in
+  (* Emit dependency index arrays *)
+  let dep_arrays, dep_array_symbols =
+    List.fold_left
+      (fun (data_acc, sym_acc) (cu, deps) ->
+        if deps = []
+        then data_acc, StringMap.add (unit_name cu) None sym_acc
+        else
+          let arr_sym_name = Compilenv.new_const_symbol () in
+          let arr_sym = { sym_name = arr_sym_name; sym_global = Local } in
+          let arr_data =
+            Cdefine_symbol arr_sym
+            :: List.filter_map
+                 (fun import ->
+                   let dep_name = unit_name (Import_info.cu import) in
+                   match StringMap.find_opt dep_name index_map with
+                   | Some idx -> Some (Cint (Nativeint.of_int idx))
+                   | None -> None)
+                 deps
+          in
+          ( arr_data @ data_acc,
+            StringMap.add (unit_name cu) (Some arr_sym) sym_acc ))
+      ([], StringMap.empty) sorted_units
+  in
+  (* Emit main table *)
+  let table_sym = global_symbol "caml_unit_deps_table" in
+  let num_units = List.length sorted_units in
+  let table_header =
+    [Cdefine_symbol table_sym; Cint (Nativeint.of_int num_units)]
+  in
+  let table_entries =
+    List.concat_map
+      (fun (cu, deps) ->
+        let name = unit_name cu in
+        let name_sym = StringMap.find name name_symbols in
+        let entry_sym =
+          global_symbol (make_symbol ~compilation_unit:cu "entry")
+        in
+        let gc_roots_sym =
+          global_symbol (make_symbol ~compilation_unit:cu "gc_roots")
+        in
+        let frametable_sym =
+          global_symbol (make_symbol ~compilation_unit:cu "frametable")
+        in
+        let num_deps =
+          List.length
+            (List.filter
+               (fun import ->
+                 StringMap.mem (unit_name (Import_info.cu import)) index_map)
+               deps)
+        in
+        let deps_sym_item =
+          match StringMap.find name dep_array_symbols with
+          | None -> cint_zero
+          | Some arr_sym -> Csymbol_address arr_sym
+        in
+        [ Csymbol_address name_sym;
+          Csymbol_address entry_sym;
+          Csymbol_address gc_roots_sym;
+          Csymbol_address frametable_sym;
+          Cint (Nativeint.of_int num_deps);
+          deps_sym_item;
+          Cint 1n (* init_state: INIT_STATE_NOT_INITIALIZED = Val_int(0) *);
+          Cint 1n (* raised_exn: Val_unit (no exception yet) *) ])
+      sorted_units
+  in
+  Cdata (string_data @ dep_arrays @ table_header @ table_entries)
+
 let reference_symbols namelist =
   let mksym name = Csymbol_address name in
   Cdata (List.map mksym namelist)

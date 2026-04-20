@@ -1,5 +1,3 @@
-
-After simplify:
 let code f_0 deleted in
 let code g_1 deleted in
 let code loopify(never) size(27) newer_version_of(f_0)
@@ -35,4 +33,3 @@ let $camlRemoved_operations_of_switch =
            $camlRemoved_operations_of_switch__g_3)
 in
 cont done ($camlRemoved_operations_of_switch)
-

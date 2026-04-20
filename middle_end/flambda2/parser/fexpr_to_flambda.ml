@@ -742,7 +742,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     in
     let apply =
       Flambda.Apply.create
-        ~callee:(Some (simple env func))
+        ~callee:(Option.map (simple env) func)
         ~continuation exn_continuation
         ~args:((List.map (simple env)) args)
         ~args_arity ~return_arity ~call_kind ~alloc_mode Debuginfo.none ~inlined

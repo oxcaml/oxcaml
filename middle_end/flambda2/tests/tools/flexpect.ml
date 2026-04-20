@@ -32,11 +32,21 @@ module Test_outcome = struct
     | Fail of { corrected : Fexpr.expect_test_spec }
 end
 
-let run_expect_test ~get_module_info ~extension ~filename
+let run_expect_test ~get_module_info ~extension:_ ~filename
     ({ before; after = expected } : Fexpr.expect_test_spec) : Test_outcome.t =
+<<<<<<< HEAD
   let comp_unit = Parse_flambda.make_compilation_unit ~extension ~filename () in
   let unit_info = Unit_info.make_dummy ~input_name:filename comp_unit in
   Env.set_current_unit (Some unit_info);
+||||||| f8c6716f8c
+  let comp_unit = Parse_flambda.make_compilation_unit ~extension ~filename () in
+  let unit_info = Unit_info.make_dummy ~input_name:filename comp_unit in
+  Env.set_unit_name (Some unit_info);
+=======
+  let unit_info = Parse_flambda.make_unit_info ~filename in
+  let comp_unit = Unit_info.modname unit_info in
+  Env.set_unit_name (Some unit_info);
+>>>>>>> 5.2.0minus-31
   let before_fl = Fexpr_to_flambda.conv comp_unit before in
   check_invariants before_fl;
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in

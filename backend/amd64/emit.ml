@@ -50,6 +50,48 @@ let function_name = ref ""
    data. *)
 let current_basic_block_section = ref ""
 
+(* These callbacks are just instrumentation for expect_asm tests. *)
+let expect_asm_callbacks = ref []
+
+let asm_collected_for_expect_asm = ref []
+
+let register_expect_asm_callback f =
+  (* Reset label counter to make assembly more predictable. *)
+  Label.reset ();
+  expect_asm_callbacks := f :: !expect_asm_callbacks
+
+let invoke_expect_asm_callbacks () =
+  let output =
+    "\n" ^ String.concat "\n" (List.rev !asm_collected_for_expect_asm)
+  in
+  let callbacks = !expect_asm_callbacks in
+  expect_asm_callbacks := [];
+  asm_collected_for_expect_asm := [];
+  List.iter (fun f -> f output) callbacks
+
+let record_for_expect_asm ~name ~debug_info ~asm_start =
+  if
+    (not (List.is_empty !expect_asm_callbacks))
+    && not (String.ends_with ~suffix:"__entry" name)
+  then
+    let name =
+      match Debuginfo.to_items debug_info with
+      | item :: _ ->
+        (* CR-someday ttebbi: We could assign disambiguating names for multiple
+           anonymous functions *)
+        Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
+          item.dinfo_scopes
+        (* Remove the module name introduced by the toplevel eval loop. *)
+        |> String.split_first_exn ~split_on:'.'
+        |> snd
+      | _ -> name
+    in
+    let output =
+      X86_gas.format_asm_for_expect_asm ~name
+        ~body:(X86_proc.output_from asm_start)
+    in
+    asm_collected_for_expect_asm := output :: !asm_collected_for_expect_asm
+
 module I = struct
   include I
 
@@ -2556,7 +2598,10 @@ let fundecl fundecl =
     && (not Config.no_stack_checks)
     && String.equal !Clflags.runtime_variant "d"
   then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
+  let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
+  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
+    ~asm_start:fun_body_start;
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
   emit_call_safety_errors ();
@@ -3065,6 +3110,7 @@ let end_assembly () =
   in
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
+  invoke_expect_asm_callbacks ();
   X86_proc.generate_code asm;
   (* The internal assembler does not work if reset_all is called here *)
   if not !Oxcaml_flags.internal_assembler then reset_all ()

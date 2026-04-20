@@ -20,12 +20,12 @@
               jkind (parsing_ambiguous_product.ml[12,327+10]..[12,327+28])
               Pjk_mod
                 jkind (parsing_ambiguous_product.ml[12,327+11]..[12,327+16])
-                Pjk_abbreviation "value"
+                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[12,327+11]..[12,327+16])
                 mode "global" (parsing_ambiguous_product.ml[12,327+21]..[12,327+27])
               jkind (parsing_ambiguous_product.ml[12,327+31]..[12,327+49])
               Pjk_mod
                 jkind (parsing_ambiguous_product.ml[12,327+32]..[12,327+37])
-                Pjk_abbreviation "value"
+                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[12,327+32]..[12,327+37])
                 mode "global" (parsing_ambiguous_product.ml[12,327+42]..[12,327+48])
             ]
     ]
@@ -52,10 +52,10 @@
                 jkind (parsing_ambiguous_product.ml[14,380+10]..[14,380+26])
                 Pjk_mod
                   jkind (parsing_ambiguous_product.ml[14,380+10]..[14,380+15])
-                  Pjk_abbreviation "value"
+                  Pjk_abbreviation "value" (parsing_ambiguous_product.ml[14,380+10]..[14,380+15])
                   mode "global" (parsing_ambiguous_product.ml[14,380+20]..[14,380+26])
                 jkind (parsing_ambiguous_product.ml[14,380+29]..[14,380+34])
-                Pjk_abbreviation "value"
+                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[14,380+29]..[14,380+34])
               ]
               mode "global" (parsing_ambiguous_product.ml[14,380+39]..[14,380+45])
     ]
@@ -82,10 +82,10 @@
                 jkind (parsing_ambiguous_product.ml[16,429+11]..[16,429+27])
                 Pjk_mod
                   jkind (parsing_ambiguous_product.ml[16,429+11]..[16,429+16])
-                  Pjk_abbreviation "value"
+                  Pjk_abbreviation "value" (parsing_ambiguous_product.ml[16,429+11]..[16,429+16])
                   mode "global" (parsing_ambiguous_product.ml[16,429+21]..[16,429+27])
                 jkind (parsing_ambiguous_product.ml[16,429+30]..[16,429+35])
-                Pjk_abbreviation "value"
+                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[16,429+30]..[16,429+35])
               ]
               mode "global" (parsing_ambiguous_product.ml[16,429+41]..[16,429+47])
     ]
