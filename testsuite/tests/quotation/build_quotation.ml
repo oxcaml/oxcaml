@@ -841,9 +841,23 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 |}];;
 
 <[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
+(* CR metaprogramming jbachurski: Eliminating the duplicate type constraint
+   to make the printer output nicer is tracked by internal ticket 7290. *)
 [%%expect {|
 - : <[(module Hashtbl.S) -> int -> unit]> expr =
-<[fun ((module M) : (module Stdlib.Hashtbl.S)) x -> M.clear (M.create x)]>
+<[
+  fun (((module M) : (module Stdlib.Hashtbl.S)) : (module Stdlib.Hashtbl.S))
+    x -> M.clear (M.create x)
+]>
+|}];;
+
+<[fun (module M : Hashtbl.S) -> (module M : Hashtbl.S)]>;;
+[%%expect {|
+- : <[(module Hashtbl.S) -> (module Hashtbl.S)]> expr =
+<[
+  fun (((module M) : (module Stdlib.Hashtbl.S)) : (module Stdlib.Hashtbl.S))
+    -> ((module M) : (module Stdlib.Hashtbl.S))
+]>
 |}];;
 
 <[ fun (module _ : S) x -> 42 ]>;;
@@ -1689,7 +1703,7 @@ exception E
 <[ fun (module M : T) -> let open M in foo + 1 ]>
 [%%expect {|
 - : <[(module T) -> int]> expr =
-<[fun (module M : T) -> let open! M in M.foo + 1]>
+<[fun (((module M) : (module T)) : (module T)) -> let open! M in M.foo + 1]>
 |}];;
 
 (* Cross-stage open *)

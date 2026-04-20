@@ -1545,10 +1545,10 @@ module Ast = struct
     match pat with
     | PatConstant c when is_negative_const c ->
       pp fmt "(@[%a@])" (print_pat env) pat
-    | PatAny | PatVar _ | PatConstraint _ | PatConstant _ | PatTuple _
-    | PatUnboxedUnit | PatUnboxedBool _ | PatUnboxedTuple _
-    | PatConstruct (_, None) | PatVariant (_, None)
-    | PatRecord _ | PatUnboxedRecord _ | PatArray _ ->
+    | PatAny | PatVar _ | PatConstant _ | PatTuple _ | PatUnboxedUnit
+    | PatUnboxedBool _ | PatUnboxedTuple _ | PatVariant (_, None)
+    | PatConstruct (_, None) | PatRecord _ | PatUnboxedRecord _ | PatArray _
+    | PatConstraint _ ->
       print_pat env fmt pat
     | _ -> pp fmt "(@[%a@])" (print_pat env) pat
 
