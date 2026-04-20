@@ -391,11 +391,11 @@ type type_mismatch =
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
-module Printtyp = Printtyp.Doc
-
 type jkind_mismatch =
   | Manifest_missing
   | Manifest_mismatch
+
+module Printtyp = Printtyp.Doc
 
 let report_modality_sub_error first second ppf e =
   let Modality.Error (ax, {left; right}) = e in
