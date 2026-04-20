@@ -62,6 +62,12 @@ jobs:
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
+          - name: runtime5 flambda2-experimental (x86_64-linux)
+            config: --enable-runtime5 --enable-flambda-invariants
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: ''
+            ocamlparam: '_,O3=1,flambda2-expert-cont-lifting-budget=200,flambda2-join-algorithm=n-way'
+
           - name: runtime5 debug (x86_64-linux)
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
