@@ -132,7 +132,9 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   let passthrough_files = ccobjs @ runtime_libs in
   (* Measure file sizes for partitioning *)
   let file_sizes =
-    try MOF.measure_files unix ~files:files_to_measure
+    try
+      Profile.record_call "dissector/measure" (fun () ->
+          MOF.measure_files unix ~files:files_to_measure)
     with MOF.Error err -> raise (Error (Measure_error err))
   in
   (* Dump sizes if requested *)
@@ -159,12 +161,16 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   log "%d passthrough file(s) (will bypass partial linking)"
     (List.length passthrough_files);
   let linked_partitions =
-    try Partial_link.link_partitions ~temp_dir partitions
+    try
+      Profile.record_call "dissector/partial_link" (fun () ->
+          Partial_link.link_partitions ~temp_dir partitions)
     with Partial_link.Error err -> raise (Error (Partial_link_error err))
   in
   log "partially linked %d partition(s)" (List.length linked_partitions);
   let relocations =
-    Extract_relocations.extract_from_linked_partitions unix linked_partitions
+    Profile.record_call "dissector/extract_relocations" (fun () ->
+        Extract_relocations.extract_from_linked_partitions unix
+          linked_partitions)
   in
   log "found %d PLT relocations and %d GOT relocations"
     (List.length (Extract_relocations.convert_to_plt relocations))
@@ -180,8 +186,9 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
         prefix;
       let input_file = Partition.Linked.linked_object linked in
       let output_file = input_file ^ ".rewritten" in
-      Rewrite_sections.rewrite unix ~input_file ~output_file
-        ~partition_kind:kind ~igot_and_iplt ~relocations;
+      Profile.record_call ~accumulate:true "dissector/rewrite" (fun () ->
+          Rewrite_sections.rewrite unix ~input_file ~output_file
+            ~partition_kind:kind ~igot_and_iplt ~relocations);
       log "rewrote %s -> %s" input_file output_file)
     linked_partitions;
   let existing_script = extract_linker_script_from_ccopts !Clflags.all_ccopts in
