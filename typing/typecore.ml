@@ -8418,7 +8418,7 @@ and type_newtype
     -> a * type_expr * Ident.t * Uid.t =
   fun env { txt = name; loc = name_loc } jkind_annot_opt type_body  ->
   let jkind =
-    Jkind.of_annotation_option_default ~context:(Newtype_declaration name)
+    Jkind.of_annotation_option_default env ~context:(Newtype_declaration name)
       ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
   in
   let ty =
@@ -10368,144 +10368,6 @@ and map_half_typed_cases
   (* Ensure that existential types do not escape *)
   ~post:(fun ty_res' -> enforce_current_level env ty_res')
 
-<<<<<<< HEAD
-||||||| f8c6716f8c
-(** Typecheck the body of a newtype. The "body" of a newtype may be:
-    - an expression
-    - a suffix of function parameters together with a function body
-      That's why this function is polymorphic over the body.
-
-      @param type_body A function that produces a type for the body given the
-      environment. When typechecking an expression, this is [type_exp].
-      @return The type returned by [type_body] but with the Tconstr
-      nodes for the newtype properly linked, and the jkind annotation written
-      by the user.
-*)
-and type_newtype
-  : type a. _ -> _ -> _ -> (Env.t -> a * type_expr)
-    -> a * type_expr * Ident.t * Uid.t =
-  fun env name jkind_annot_opt type_body  ->
-  let { txt = name; loc = name_loc } : _ Location.loc = name in
-  let jkind =
-    Jkind.of_annotation_option_default ~context:(Newtype_declaration name)
-      ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
-  in
-  let ty =
-    if Typetexp.valid_tyvar_name name then
-      newvar ~name jkind
-    else
-      newvar jkind
-  in
-  (* Use [with_local_level] just for scoping *)
-  with_local_level begin fun () ->
-    (* Create a fake abstract type declaration for name. *)
-    let decl = new_local_type ~loc:name_loc Definition jkind in
-    let scope = create_scope () in
-    let (id, new_env) = Env.enter_type ~scope name decl env in
-
-    let result, exp_type = type_body new_env in
-    (* Replace every instance of this type constructor in the resulting
-       type. *)
-    let seen = Hashtbl.create 8 in
-    let rec replace t =
-      if Hashtbl.mem seen (get_id t) then ()
-      else begin
-        Hashtbl.add seen (get_id t) ();
-        match get_desc t with
-        | Tconstr (Path.Pident id', _, _) when id == id' -> link_type t ty
-        | _ -> Btype.iter_type_expr replace t
-      end
-    in
-    let ety = Subst.type_expr Subst.identity exp_type in
-    replace ety;
-    let uid = decl.type_uid in
-    (result, ety, id, uid)
-  end
-
-(** [type_newtype] where the "body" is just an expression. *)
-and type_newtype_expr
-    ~loc ~env ~expected_mode ~rue ~attributes name jkind_annot_opt sbody =
-  let body, ety, id, uid =
-    type_newtype env name jkind_annot_opt (fun env ->
-      let expr = type_exp env expected_mode sbody in
-      expr, expr.exp_type)
-  in
-  (* non-expansive if the body is non-expansive, so we don't introduce
-     any new extra node in the typed AST. *)
-  rue { body with exp_loc = loc; exp_type = ety;
-        exp_extra =
-        (Texp_newtype (id, name, jkind_annot_opt, uid),
-         loc, attributes) :: body.exp_extra }
-
-=======
-(** Typecheck the body of a newtype. The "body" of a newtype may be:
-    - an expression
-    - a suffix of function parameters together with a function body
-      That's why this function is polymorphic over the body.
-
-      @param type_body A function that produces a type for the body given the
-      environment. When typechecking an expression, this is [type_exp].
-      @return The type returned by [type_body] but with the Tconstr
-      nodes for the newtype properly linked, and the jkind annotation written
-      by the user.
-*)
-and type_newtype
-  : type a. _ -> _ -> _ -> (Env.t -> a * type_expr)
-    -> a * type_expr * Ident.t * Uid.t =
-  fun env name jkind_annot_opt type_body  ->
-  let { txt = name; loc = name_loc } : _ Location.loc = name in
-  let jkind =
-    Jkind.of_annotation_option_default env ~context:(Newtype_declaration name)
-      ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
-  in
-  let ty =
-    if Typetexp.valid_tyvar_name name then
-      newvar ~name jkind
-    else
-      newvar jkind
-  in
-  (* Use [with_local_level] just for scoping *)
-  with_local_level begin fun () ->
-    (* Create a fake abstract type declaration for name. *)
-    let decl = new_local_type ~loc:name_loc Definition jkind in
-    let scope = create_scope () in
-    let (id, new_env) = Env.enter_type ~scope name decl env in
-
-    let result, exp_type = type_body new_env in
-    (* Replace every instance of this type constructor in the resulting
-       type. *)
-    let seen = Hashtbl.create 8 in
-    let rec replace t =
-      if Hashtbl.mem seen (get_id t) then ()
-      else begin
-        Hashtbl.add seen (get_id t) ();
-        match get_desc t with
-        | Tconstr (Path.Pident id', _, _) when id == id' -> link_type t ty
-        | _ -> Btype.iter_type_expr replace t
-      end
-    in
-    let ety = Subst.type_expr Subst.identity exp_type in
-    replace ety;
-    let uid = decl.type_uid in
-    (result, ety, id, uid)
-  end
-
-(** [type_newtype] where the "body" is just an expression. *)
-and type_newtype_expr
-    ~loc ~env ~expected_mode ~rue ~attributes name jkind_annot_opt sbody =
-  let body, ety, id, uid =
-    type_newtype env name jkind_annot_opt (fun env ->
-      let expr = type_exp env expected_mode sbody in
-      expr, expr.exp_type)
-  in
-  (* non-expansive if the body is non-expansive, so we don't introduce
-     any new extra node in the typed AST. *)
-  rue { body with exp_loc = loc; exp_type = ety;
-        exp_extra =
-        (Texp_newtype (id, name, jkind_annot_opt, uid),
-         loc, attributes) :: body.exp_extra }
-
->>>>>>> 5.2.0minus-31
 (* Typing of match cases *)
 and type_cases
     : type k . k pattern_category ->
@@ -12207,44 +12069,14 @@ let report_error ~loc env =
         "The instance variable %a is overridden several times"
         Style.inline_code v
   | Coercion_failure (ty_exp, err, b) ->
-<<<<<<< HEAD
-     let intro =
-       let ty_exp = Out_type.prepare_expansion ty_exp in
-       doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
-                   it has type"
-         (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
-     in
+      let intro =
+        let ty_exp = Out_type.prepare_expansion ty_exp in
+        doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
+                    it has type"
+          (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
+      in
       Location.errorf ~loc "%t" (fun ppf ->
         Errortrace_report.unification ppf env err
-||||||| f8c6716f8c
-      Location.error_of_printer ~loc (fun ppf () ->
-          (* Use deprecated_printer to defer prepare_expansion until after
-             reset() is called inside report_unification_error. This ensures
-             consistent type variable naming between the intro and trace. *)
-          let intro =
-            doc_printf "%t" (fun fmt_doc ->
-              deprecated_printer (fun fmt ->
-                let ty_exp = Printtyp.prepare_expansion ty_exp in
-                Format.fprintf fmt
-                  "This expression cannot be coerced to type@;<1 2>%a;@ \
-                   it has type"
-                  (Fmt.compat
-                     (Style.as_inline_code @@ Printtyp.type_expansion Type))
-                  ty_exp
-              ) fmt_doc
-            )
-          in
-        Printtyp.report_unification_error ppf env err
-=======
-    let intro =
-      let ty_exp = Printtyp.prepare_expansion ty_exp in
-      doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
-                  it has type"
-        (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
-    in
-    Location.error_of_printer ~loc (fun ppf () ->
-        Printtyp.report_unification_error ppf env err
->>>>>>> 5.2.0minus-31
           intro
           (Fmt.Doc.msg "but is here used with type")
         )

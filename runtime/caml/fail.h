@@ -120,7 +120,6 @@ CAMLnoret CAMLextern void caml_array_align_error (void);
 
 CAMLnoret CAMLextern void caml_raise_sys_blocked_io (void);
 
-<<<<<<< HEAD
 /* Non-raising variants of the above functions. The exception is
    returned as a normal value, which can be raised with [caml_raise],
    or returned as a value of type [caml_result] using
@@ -179,11 +178,6 @@ Caml_inline value caml_result_get_encoded_exception(
     return result.data;
 }
 #endif /* CAML_INTERNALS */
-||||||| f8c6716f8c
-=======
-/* Exception constructors */
-CAMLextern value caml_failure_exn (value msg);
->>>>>>> 5.2.0minus-31
 
 #ifdef __cplusplus
 }

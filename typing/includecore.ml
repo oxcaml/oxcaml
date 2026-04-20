@@ -158,9 +158,9 @@ let value_descriptions_consistency env vd1 vd2 =
       List.iter (fun loc ->
        List.iter (fun fork ->
         List.iter (fun yield ->
-          let ty1, _, _, _ = Ctype.instance_prim p1 vd1.val_type in
+          let ty1, _, _, _ = Ctype.instance_prim env p1 vd1.val_type in
           let ty2, mode_l2, mode_fy2, _ =
-            Ctype.instance_prim p2 vd2.val_type
+            Ctype.instance_prim env p2 vd2.val_type
           in
           let mode_f2 = Option.map fst mode_fy2 in
           let mode_y2 = Option.map snd mode_fy2 in
@@ -180,7 +180,7 @@ let value_descriptions_consistency env vd1 vd2 =
     end
   | (Val_prim p, _) ->
       let _ty, mode_l, _mode_fy, sort =
-        Ctype.instance_prim p vd1.val_type
+        Ctype.instance_prim env p vd1.val_type
       in
       let pc =
         { pc_desc = p; pc_type = vd2.Types.val_type;
@@ -248,15 +248,9 @@ let value_descriptions ~loc env name
          | Some err -> raise (Dont_match (Primitive_mismatch err))
        end
      | _ ->
-<<<<<<< HEAD
         let ty1, mode_l1, _, sort1 =
-          Ctype.instance_prim p1 vd1.val_type
+          Ctype.instance_prim env p1 vd1.val_type
         in
-||||||| f8c6716f8c
-        let ty1, mode_l1, _, sort1 = Ctype.instance_prim p1 vd1.val_type in
-=======
-        let ty1, mode_l1, _, sort1 = Ctype.instance_prim env p1 vd1.val_type in
->>>>>>> 5.2.0minus-31
         (try Ctype.moregeneral env true ty1 vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
         let pc =
@@ -397,14 +391,11 @@ type type_mismatch =
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
-<<<<<<< HEAD
-module Printtyp = Printtyp.Doc
-||||||| f8c6716f8c
-=======
 type jkind_mismatch =
   | Manifest_missing
   | Manifest_mismatch
->>>>>>> 5.2.0minus-31
+
+module Printtyp = Printtyp.Doc
 
 let report_modality_sub_error first second ppf e =
   let Modality.Error (ax, {left; right}) = e in

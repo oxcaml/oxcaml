@@ -382,25 +382,26 @@ let explanation (type variety) intro prev env
     Some (doc_printf "@ @[<hov>%a@]"
             (Jkind.Violation.report_with_offender
                ~offender:(fun ppf -> prepared_type_expr ppf t)
-               ~level:(Ctype.get_current_level ())) e)
+               ~level:(Ctype.get_current_level ()) env) e)
   | Errortrace.Bad_jkind_sort (t,e) ->
     add_type_to_preparation t;
     Some (doc_printf "@ @[<hov>%a@]"
             (Jkind.Violation.report_with_offender_sort
                ~offender:(fun ppf -> prepared_type_expr ppf t)
-               ~level:(Ctype.get_current_level ())) e)
+               ~level:(Ctype.get_current_level ()) env) e)
   | Errortrace.Unequal_var_jkinds (t1,k1,t2,k2) ->
     let fmt_history t k ppf =
-      Jkind.(format_history ~intro:(
-        dprintf "The layout of %a is %a" prepared_type_expr t format k) ppf k)
+      Jkind.(format_history env ~intro:(
+        dprintf "The layout of %a is %a" prepared_type_expr t
+          (format env) k) ppf k)
     in
     Some (doc_printf "@ because the layouts of their variables are different.\
                       @ @[<v>%t@;%t@]"
             (fmt_history t1 k1) (fmt_history t2 k2))
   | Errortrace.Unequal_tof_kind_jkinds (k1, k2) ->
     let fmt_history which k ppf =
-      Jkind.(format_history ~intro:(
-        dprintf "The kind of %s is %a" which format k) ppf k)
+      Jkind.(format_history env ~intro:(
+        dprintf "The kind of %s is %a" which (format env) k) ppf k)
     in
     Some (doc_printf "@ because their kinds are different.\
                       @ @[<v>%t@;%t@]"

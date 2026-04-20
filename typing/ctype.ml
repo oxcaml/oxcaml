@@ -3177,10 +3177,9 @@ let unify_univar env t1 t2 jkind1 jkind2 pairs =
 
 (* The same as [unify_univar], but raises the appropriate exception instead of
    [Cannot_unify_universal_variables] *)
-<<<<<<< HEAD
-let unify_univar_for (type a) (tr_exn : a trace_exn) t1 t2 jkind1 jkind2
+let unify_univar_for (type a) (tr_exn : a trace_exn) env t1 t2 jkind1 jkind2
       univar_pairs =
-  try unify_univar t1 t2 jkind1 jkind2 univar_pairs with
+  try unify_univar env t1 t2 jkind1 jkind2 univar_pairs with
   | Cannot_unify_universal_variables -> raise_unexplained_for tr_exn
   | Out_of_scope_universal_variable ->
       (* Allow unscoped univars when checking for equality, since one
@@ -3189,15 +3188,6 @@ let unify_univar_for (type a) (tr_exn : a trace_exn) t1 t2 jkind1 jkind2
       match tr_exn with
       | Equality -> raise_unexplained_for tr_exn
       | _ -> fatal_error "Ctype.unify_univar_for: univar not in scope"
-||||||| f8c6716f8c
-let unify_univar_for tr_exn t1 t2 jkind1 jkind2 univar_pairs =
-  try unify_univar t1 t2 jkind1 jkind2 univar_pairs
-  with Cannot_unify_universal_variables -> raise_unexplained_for tr_exn
-=======
-let unify_univar_for tr_exn env t1 t2 jkind1 jkind2 univar_pairs =
-  try unify_univar env t1 t2 jkind1 jkind2 univar_pairs
-  with Cannot_unify_universal_variables -> raise_unexplained_for tr_exn
->>>>>>> 5.2.0minus-31
 
 (* Test the occurrence of free univars in a type *)
 (* That's way too expensive. Must do some kind of caching *)
@@ -3681,18 +3671,10 @@ let rec mcomp type_pairs env t1 t2 =
                 (fun () -> mcomp type_pairs env t1 t2)
             with Invalid_argument _ -> raise Incompatible)
         | (Tunivar {jkind=jkind1}, Tunivar {jkind=jkind2}, _, _) ->
-<<<<<<< HEAD
-            begin try unify_univar t1' t2' jkind1 jkind2 !univar_pairs with
+            begin try unify_univar env t1' t2' jkind1 jkind2 !univar_pairs with
             | Cannot_unify_universal_variables -> raise Incompatible
             | Out_of_scope_universal_variable -> ()
             end
-||||||| f8c6716f8c
-            (try unify_univar t1' t2' jkind1 jkind2 !univar_pairs
-             with Cannot_unify_universal_variables -> raise Incompatible)
-=======
-            (try unify_univar env t1' t2' jkind1 jkind2 !univar_pairs
-             with Cannot_unify_universal_variables -> raise Incompatible)
->>>>>>> 5.2.0minus-31
         | (Tquote t1, Tquote t2, _, _) ->
             mcomp type_pairs env t1 t2
         | (Tsplice t1, Tsplice t2, _, _) ->

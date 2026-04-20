@@ -97,10 +97,12 @@ and raw_row_desc ppf row =
        match name with None -> fprintf ppf "None"
                      | Some(p,tl) ->
                        fprintf ppf "Some(@,%a,@,%a)" path p raw_type_list tl)
-and raw_type_desc ppf = function
+and raw_type_desc ppf ty =
+  let env = Env.empty in
+  match ty with
     Tvar { name; jkind } ->
       fprintf ppf "Tvar (@,%a,@,%a)"
-        print_name name (Format_doc.compat Jkind.format) jkind
+        print_name name (Format_doc.compat (Jkind.format env)) jkind
   | Tarrow((l,arg,ret),t1,t2,c) ->
       fprintf ppf "@[<hov1>Tarrow((\"%s\",%a,%a),@,%a,@,%a,@,%s)@]"
         (string_of_label l)
@@ -137,7 +139,7 @@ and raw_type_desc ppf = function
       fprintf ppf "@[<1>Tsubst@,(%a,@ Some%a)@]" raw_type t raw_type t'
   | Tunivar { name; jkind } ->
       fprintf ppf "Tunivar (@,%a,@,%a)"
-        print_name name (Format_doc.compat Jkind.format) jkind
+        print_name name (Format_doc.compat (Jkind.format env)) jkind
   | Tpoly (t, tl) ->
       fprintf ppf "@[<hov1>Tpoly(@,%a,@,%a)@]"
         raw_type t
@@ -159,7 +161,7 @@ and raw_type_desc ppf = function
       path pack.pack_path
       raw_lid_type_list pack.pack_cstrs
   | Tof_kind jkind ->
-    fprintf ppf "(type@ :@ %a)" (Format_doc.compat Jkind.format) jkind
+    fprintf ppf "(type@ :@ %a)" (Format_doc.compat (Jkind.format env)) jkind
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"

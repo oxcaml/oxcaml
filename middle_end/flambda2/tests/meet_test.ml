@@ -437,7 +437,7 @@ let test_meet_bottom_after_alias () =
 let () =
   let comp_unit = "Meet_test" |> Compilation_unit.of_string in
   let unit_info = Unit_info.make_dummy ~input_name:"meet_test" comp_unit in
-  Env.set_current_unit (Some unit_info);
+  Env.set_current_unit unit_info;
   Format.eprintf "MEET CHAINS WITH TWO VARS@\n@.";
   test_meet_chains_two_vars ();
   Format.eprintf "@.MEET CHAINS WITH THREE VARS@\n@.";

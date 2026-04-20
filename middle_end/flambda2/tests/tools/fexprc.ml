@@ -13,7 +13,7 @@ let parse_flambda filename =
   | Ok unit ->
     let unit_info = Parse_flambda.make_unit_info ~filename in
     let comp_unit = Unit_info.modname unit_info in
-    Env.set_unit_name (Some unit_info);
+    Env.set_current_unit unit_info;
     let fl2 = Fexpr_to_flambda.conv comp_unit unit in
     check_invariants fl2;
     (* CR gbury/lmaurer/bclement: add a proper traversal to compute the actual

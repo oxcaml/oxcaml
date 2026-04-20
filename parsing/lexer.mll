@@ -42,7 +42,6 @@ exception Error of error * Location.t
 
 (* The table of keywords *)
 
-<<<<<<< HEAD
 let all_keywords =
   let v5_3 = Some (5,3) in
   let v1_0 = Some (1,0) in
@@ -78,7 +77,7 @@ let all_keywords =
     "include", INCLUDE, always;
     "inherit", INHERIT, v1_0;
     "initializer", INITIALIZER, v1_0;
-    "kind_abbrev_", KIND_ABBREV, oxcaml;
+    "kind_", KIND, oxcaml;
     "kind_of_", KIND_OF, oxcaml;
     "lazy", LAZY, v1_6;
     "let", LET, always;
@@ -96,101 +95,8 @@ let all_keywords =
     "open", OPEN, always;
     "or", OR, always;
     "overwrite_", OVERWRITE, oxcaml;
-||||||| f8c6716f8c
-let keyword_table =
-  create_hashtable 149 [
-    "and", AND;
-    "as", AS;
-    "assert", ASSERT;
-    "begin", BEGIN;
-    "class", CLASS;
-    "constraint", CONSTRAINT;
-    "do", DO;
-    "done", DONE;
-    "downto", DOWNTO;
-    "else", ELSE;
-    "end", END;
-    "exception", EXCEPTION;
-    "exclave_", EXCLAVE;
-    "external", EXTERNAL;
-    "false", FALSE;
-    "for", FOR;
-    "fun", FUN;
-    "function", FUNCTION;
-    "functor", FUNCTOR;
-    "global_", GLOBAL;
-    "if", IF;
-    "in", IN;
-    "include", INCLUDE;
-    "inherit", INHERIT;
-    "initializer", INITIALIZER;
-    "kind_abbrev_", KIND_ABBREV;
-    "kind_of_", KIND_OF;
-    "lazy", LAZY;
-    "let", LET;
-    "local_", LOCAL;
-    "match", MATCH;
-    "method", METHOD;
-    "mod", MOD;
-    "module", MODULE;
-    "mutable", MUTABLE;
-    "new", NEW;
-    "nonrec", NONREC;
-    "object", OBJECT;
-    "of", OF;
-    "once_", ONCE;
-    "open", OPEN;
-    "or", OR;
-    "overwrite_", OVERWRITE;
-=======
-let keyword_table =
-  create_hashtable 149 [
-    "and", AND;
-    "as", AS;
-    "assert", ASSERT;
-    "begin", BEGIN;
-    "class", CLASS;
-    "constraint", CONSTRAINT;
-    "do", DO;
-    "done", DONE;
-    "downto", DOWNTO;
-    "else", ELSE;
-    "end", END;
-    "exception", EXCEPTION;
-    "exclave_", EXCLAVE;
-    "external", EXTERNAL;
-    "false", FALSE;
-    "for", FOR;
-    "fun", FUN;
-    "function", FUNCTION;
-    "functor", FUNCTOR;
-    "global_", GLOBAL;
-    "if", IF;
-    "in", IN;
-    "include", INCLUDE;
-    "inherit", INHERIT;
-    "initializer", INITIALIZER;
-    "kind_", KIND;
-    "kind_of_", KIND_OF;
-    "lazy", LAZY;
-    "let", LET;
-    "local_", LOCAL;
-    "match", MATCH;
-    "method", METHOD;
-    "mod", MOD;
-    "module", MODULE;
-    "mutable", MUTABLE;
-    "new", NEW;
-    "nonrec", NONREC;
-    "object", OBJECT;
-    "of", OF;
-    "once_", ONCE;
-    "open", OPEN;
-    "or", OR;
-    "overwrite_", OVERWRITE;
->>>>>>> 5.2.0minus-31
 (*  "parser", PARSER; *)
-<<<<<<< HEAD
+    "poly_", POLY, oxcaml;
     "private", PRIVATE, v1_0;
     "rec", REC, always;
     "repr_", REPR, oxcaml;
@@ -208,46 +114,6 @@ let keyword_table =
     "when", WHEN, always;
     "while", WHILE, always;
     "with", WITH, always;
-||||||| f8c6716f8c
-    "private", PRIVATE;
-    "rec", REC;
-    "repr_", REPR;
-    "sig", SIG;
-    "stack_", STACK;
-    "borrow_", BORROW;
-    "struct", STRUCT;
-    "then", THEN;
-    "to", TO;
-    "true", TRUE;
-    "try", TRY;
-    "type", TYPE;
-    "unique_", UNIQUE;
-    "val", VAL;
-    "virtual", VIRTUAL;
-    "when", WHEN;
-    "while", WHILE;
-    "with", WITH;
-=======
-    "poly_", POLY;
-    "private", PRIVATE;
-    "rec", REC;
-    "repr_", REPR;
-    "sig", SIG;
-    "stack_", STACK;
-    "borrow_", BORROW;
-    "struct", STRUCT;
-    "then", THEN;
-    "to", TO;
-    "true", TRUE;
-    "try", TRY;
-    "type", TYPE;
-    "unique_", UNIQUE;
-    "val", VAL;
-    "virtual", VIRTUAL;
-    "when", WHEN;
-    "while", WHILE;
-    "with", WITH;
->>>>>>> 5.2.0minus-31
 
     "lor", INFIXOP3("lor"), always; (* Should be INFIXOP2 *)
     "lxor", INFIXOP3("lxor"), always; (* Should be INFIXOP2 *)

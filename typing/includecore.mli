@@ -189,7 +189,11 @@ val extension_constructors:
   extension_constructor -> extension_constructor ->
   extension_constructor_mismatch option
 
-<<<<<<< HEAD
+val jkind_declarations:
+  loc:Location.t -> Env.t -> string ->
+  jkind_declaration -> jkind_declaration ->
+  jkind_mismatch option
+
 (** The functions [value_descriptions_consistency] and
     [type_declarations_consistency] check if two declaration are consistent.
     Declarations are consistent when there exists an environment such that the
@@ -204,13 +208,6 @@ val value_descriptions_consistency:
 val type_declarations_consistency:
   Env.t -> type_declaration -> type_declaration -> type_mismatch option
 
-||||||| f8c6716f8c
-=======
-val jkind_declarations:
-  loc:Location.t -> Env.t -> string ->
-  jkind_declaration -> jkind_declaration ->
-  jkind_mismatch option
->>>>>>> 5.2.0minus-31
 (*
 val class_types:
         Env.t -> class_type -> class_type -> bool

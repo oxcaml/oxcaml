@@ -84,7 +84,7 @@ let match_expect_extension (ext : Parsetree.extension) =
     (* Parse a single element: either {|...|} or Filter{|...|} *)
     let parse_element (e : Parsetree.expression) =
       match e.pexp_desc with
-      | Pexp_constant (Pconst_string _) ->
+      | Pexp_constant {pconst_desc = Pconst_string _; _} ->
         (* Bare string constant - no filter *)
         (None, string_constant e)
       | Pexp_construct ({ txt = Lident name; }, Some arg) -> (
@@ -137,24 +137,6 @@ let match_expect_extension (ext : Parsetree.extension) =
       | PStr [{ pstr_desc = Pstr_eval (e, _attrs) }] ->
         let expected_output =
           match e.pexp_desc with
-<<<<<<< HEAD
-          | Pexp_tuple
-              [ None, a
-              ; None,
-                { pexp_desc = Pexp_construct
-                                ({ txt = Lident "Principal"; _ }, Some b) }
-              ] ->
-            (string_constant a, string_constant b)
-          | _ -> let s = string_constant e in (s, s)
-||||||| f8c6716f8c
-          | Pexp_tuple
-              [ None, a
-              ; None, { pexp_desc = Pexp_construct
-                                ({ txt = Lident "Principal"; _ }, Some b) }
-              ] ->
-            (string_constant a, string_constant b)
-          | _ -> let s = string_constant e in (s, s)
-=======
           | Pexp_tuple elements ->
             (* Multiple elements *)
             List.map ~f:(fun (_, elem) -> parse_element elem) elements
@@ -166,7 +148,6 @@ let match_expect_extension (ext : Parsetree.extension) =
           match kind with
           | Expect_toplevel -> validate_expect_toplevel expected_output
           | Expect_asm -> validate_expect_asm expected_output
->>>>>>> 5.2.0minus-31
         in
         { extid_loc
         ; payload_loc = e.pexp_loc

@@ -166,6 +166,9 @@ val tree_of_class_declaration:
 val tree_of_cltype_declaration:
     Ident.t -> class_type_declaration -> rec_status -> out_sig_item
 
+val tree_of_jkind_declaration:
+    Ident.t -> jkind_declaration -> out_sig_item
+
 (** {1 Module types }*)
 
 val tree_of_module:

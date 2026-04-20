@@ -205,14 +205,6 @@ expr:
   | IDENT       { find_ident $1 }
   | LBRACKET RBRACKET { Ctuple [] }
   | LPAREN LET letdef sequence RPAREN { make_letdef $3 $4 }
-<<<<<<< oxcaml
-||||||| upstream-base
-  | LPAREN LETMUT letmutdef sequence RPAREN { make_letmutdef $3 $4 }
-  | LPAREN ASSIGN IDENT expr RPAREN { Cassign(find_ident $3, $4) }
-=======
-  | LPAREN LETMUT letmutdef sequence RPAREN { make_letmutdef $3 $4 }
-  | LPAREN ASSIGN IDENT expr RPAREN { Cassign(find_mut_ident $3, $4) }
->>>>>>> upstream-incoming
   | LPAREN APPLY location expr exprlist machtype RPAREN
                 { Cop(Capply ($6, Lambda.Rc_normal),
                       $4 :: List.rev $5, debuginfo ?loc:$3 ()) }
