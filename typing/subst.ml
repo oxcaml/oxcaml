@@ -542,7 +542,10 @@ let rec sort s srt =
   let open Jkind_types.Sort in
   match srt with
   | Base _ | Univar _ -> srt
-  | Product sorts -> Product (List.map (sort s) sorts)
+  | Product sorts ->
+    let sorts' = Misc.Stdlib.List.map_sharing (sort s) sorts in
+    if sorts == sorts' then srt
+    else Product sorts'
   | Var var ->
     let var' = sort_var s var in
     if var == var' then srt
@@ -552,7 +555,10 @@ let rec layout s l =
   let open Jkind_types.Layout in
   match l with
   | Any _ -> l
-  | Product sorts -> Product (List.map (layout s) sorts)
+  | Product sorts ->
+    let sorts' = Misc.Stdlib.List.map_sharing (layout s) sorts in
+    if sorts == sorts' then l
+    else Product sorts'
   | Sort (sort_l, ax) ->
     let sort_l' = sort s sort_l in
     if sort_l == sort_l' then l
