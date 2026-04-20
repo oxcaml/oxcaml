@@ -1394,6 +1394,11 @@ val locality_mode_of_primitive_description :
   external_call_description -> locality_mode option
   (** Like [primitive_may_allocate], for [external] calls. *)
 
+val return_mode_of_primitive_description :
+  external_call_description -> return_mode option
+  (** Like [locality_mode_of_primitive_description], but computes
+      a [return_mode] *)
+
 (***********************)
 (* For static failures *)
 (***********************)

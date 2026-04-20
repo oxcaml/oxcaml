@@ -2387,9 +2387,13 @@ let find_exact_application kind ~arity args =
 let reset () =
   Static_label.reset static_label_sequence
 
-let locality_mode_of_primitive_description (p : external_call_description) =
+type alloc_mode =
+| Stack
+| Heap
+
+let alloc_mode_of_primitive_description (p : external_call_description) =
   if not Config.stack_allocation then
-    if p.prim_alloc then Some alloc_heap else None
+    if p.prim_alloc then Some Heap else None
   else
     match p.prim_native_repr_res with
     | Prim_local, _ ->
@@ -2397,7 +2401,7 @@ let locality_mode_of_primitive_description (p : external_call_description) =
          whether [caml_c_call] is required, without telling us anything
          about local allocation.  (However if [p.prim_alloc = false] we
          do actually know that the primitive does not allocate on the heap.) *)
-      Some alloc_local
+      Some Stack
     | (Prim_global | Prim_poly), _ ->
       (* For primitives that definitely do not allocate locally,
          [p.prim_alloc = false] actually tells us that the primitive does
@@ -2405,7 +2409,19 @@ let locality_mode_of_primitive_description (p : external_call_description) =
 
          No external call that is [Prim_poly] may allocate locally.
       *)
-      if p.prim_alloc then Some alloc_heap else None
+      if p.prim_alloc then Some Heap else None
+
+let locality_mode_of_primitive_description (p : external_call_description) =
+  match alloc_mode_of_primitive_description p with
+  | Some Stack -> Some alloc_local
+  | Some Heap -> Some alloc_heap
+  | None -> None
+
+let return_mode_of_primitive_description (p : external_call_description) =
+  match alloc_mode_of_primitive_description p with
+  | Some Stack -> Some maybe_alloc_stack
+  | Some Heap -> Some not_alloc_stack
+  | None -> None
 
 let project_from_mixed_block_shape
     : 'a. 'a mixed_block_element array -> path:int list

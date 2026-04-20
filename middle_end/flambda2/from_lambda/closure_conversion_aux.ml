@@ -781,7 +781,10 @@ module Function_decls = struct
     type calling_convention =
       | Normal_calling_convention
       | Unboxed_calling_convention of
-          unboxing_kind option list * unboxing_kind option * Function_slot.t
+          unboxing_kind option list
+          * unboxing_kind option
+          * Function_slot.t
+          * Lambda.locality_mode
 
     type t =
       { let_rec_ident : Ident.t;
