@@ -890,7 +890,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         region_close = pos;
                         inlined = Default_inlined;
                         probe = None;
-                        mode = Lambda.return_mode_of_locality_mode mode;
+                        mode;
                         region =
                           Option.map Env.Region_stack_element.region
                             current_region;
