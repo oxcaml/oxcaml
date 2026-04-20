@@ -8418,8 +8418,8 @@ and type_newtype
     -> a * type_expr * Ident.t * Uid.t =
   fun env { txt = name; loc = name_loc } jkind_annot_opt type_body  ->
   let jkind =
-    Jkind.of_annotation_option_default ~context:(Newtype_declaration name)
-      ~default:(Jkind.Builtin.value ~why:Univar) env jkind_annot_opt
+    Jkind.of_annotation_option_default env ~context:(Newtype_declaration name)
+      ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
   in
   let ty =
     if Typetexp.valid_tyvar_name name then
@@ -12069,13 +12069,13 @@ let report_error ~loc env =
         "The instance variable %a is overridden several times"
         Style.inline_code v
   | Coercion_failure (ty_exp, err, b) ->
-    let intro =
-      let ty_exp = Out_type.prepare_expansion ty_exp in
-      doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
-                  it has type"
-        (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
-    in
-    Location.error_of_printer ~loc (fun ppf () ->
+      let intro =
+        let ty_exp = Out_type.prepare_expansion ty_exp in
+        doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
+                    it has type"
+          (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
+      in
+      Location.errorf ~loc "%t" (fun ppf ->
         Errortrace_report.unification ppf env err
           intro
           (Fmt.Doc.msg "but is here used with type")
@@ -12088,7 +12088,7 @@ let report_error ~loc env =
                   of the form: %a"
                  Style.inline_code "(foo : ty1 :> ty2)"
              ]
-         ) ()
+         )
   | Not_a_function (ty, explanation) ->
       Location.errorf ~loc
         "This expression should not be a function,@ \

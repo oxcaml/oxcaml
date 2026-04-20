@@ -695,7 +695,6 @@ val print_path: Path.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_type_expr: Types.type_expr Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Jkind. *)
-val printing_env : t ref
 val report_jkind_violation_with_offender:
   (offender:(Format_doc.formatter -> unit) -> level:int -> t ->
    Format_doc.formatter -> Jkind.Violation.t -> unit) ref

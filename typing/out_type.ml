@@ -696,7 +696,6 @@ let same_printing_env env =
 
 let set_printing_env env =
   printing_env := env;
-  Env.printing_env := env;
   if !Clflags.real_paths ||
      !printing_env == Env.empty ||
      same_printing_env env then
@@ -2461,13 +2460,13 @@ let dummy =
 
 let ident_sigitem = function
   | Types.Sig_type(ident,_,_,_) ->  {hide=true;ident}
+  | Types.Sig_jkind (ident,_,_)
   | Types.Sig_class(ident,_,_,_)
   | Types.Sig_class_type (ident,_,_,_)
   | Types.Sig_module(ident,_, _,_,_)
   | Types.Sig_value (ident,_,_)
   | Types.Sig_modtype (ident,_,_)
-  | Types.Sig_typext (ident,_,_,_)
-  | Types.Sig_jkind (ident,_,_)   ->  {hide=false; ident }
+  | Types.Sig_typext (ident,_,_,_)   ->  {hide=false; ident }
 
 let hide ids env =
   let hide_id id env =

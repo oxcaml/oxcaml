@@ -4703,9 +4703,10 @@ let report_error ~loc = function
         )
       end
   | Jkind_mismatch_due_to_bad_inference (env, ty, violation, jkind_loc) ->
-      Location.errorf ~loc "%t" (fun ppf ->
-        report_jkind_mismatch_due_to_bad_inference ppf env ty violation
-          jkind_loc)
+      Location.errorf ~loc "%t"
+        (fun ppf ->
+           report_jkind_mismatch_due_to_bad_inference ppf env ty violation
+             jkind_loc)
   | Non_regular { definition; used_as; defined_as; reaching_path } ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Out_type.prepare_for_printing [used_as; defined_as];
@@ -4956,8 +4957,8 @@ let report_error ~loc = function
   | Bad_unboxed_attribute msg ->
       Location.errorf ~loc "This type cannot be unboxed because@ %s." msg
   | Poly_not_yet_implemented ->
-    Location.errorf ~loc "@[The %a annotation is not yet implemented.@]"
-      Style.inline_code "val poly_"
+      Location.errorf ~loc "The %a annotation is not yet implemented."
+        Style.inline_code "val poly_"
   | Separability (Typedecl_separability.Non_separable_evar evar) ->
       let pp_evar ppf = function
         | None ->

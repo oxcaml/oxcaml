@@ -296,7 +296,7 @@ module Core_inclusion = struct
 
   (* Inclusion between jkind declarations *)
 
-  let jkind_declarations ~loc env ~direction subst id decl1 decl2 =
+  let jkind_declarations ~loc env ~direction subst id ~mmodes:_ decl1 decl2 =
     let mark = Directionality.mark_as_used direction in
     if mark then
       Env.mark_jkind_used decl1.jkind_uid;
@@ -621,6 +621,7 @@ type core_relation = {
   extension_constructors: Types.extension_constructor core_incl;
   class_declarations: Types.class_declaration core_incl;
   class_type_declarations: Types.class_type_declaration core_incl;
+  jkind_declarations: Types.jkind_declaration core_incl;
 }
 
 (* Quickly compare module types without expanding them, succeeding only if mty1
@@ -1069,8 +1070,8 @@ and signature_components :
             id1, item, (info1.clty_uid, info2.clty_uid), shape_map, false
         | Sig_jkind (id1, jd1, _), Sig_jkind (_id2, jd2, _) ->
            let item =
-             Core_inclusion.jkind_declarations
-                ~loc env ~direction subst id1 jd1 jd2
+             core.jkind_declarations ~loc env ~direction subst id1 ~mmodes jd1
+               jd2
            in
            let item = mark_error_as_unrecoverable item in
            let shape_map = Shape.Map.add_jkind_proj shape_map id1 orig_shape in
@@ -1238,6 +1239,7 @@ let core_inclusion = Core_inclusion.{
   extension_constructors;
   class_type_declarations;
   class_declarations;
+  jkind_declarations;
 }
 
 let core_consistency =
@@ -1261,6 +1263,7 @@ let core_consistency =
     class_declarations=accept;
     class_type_declarations=accept;
     extension_constructors=accept;
+    jkind_declarations=accept;
   }
 
 type explanation = Env.t * Error.all
