@@ -1,0 +1,28 @@
+let code h_2 deleted in
+let code g_1 deleted in
+let code f_0 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(h_2)
+      h_2_1 (Pmakeblock_into_u_field_0)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  cont k (Pmakeblock_into_u_field_0)
+in
+let $camlCode_size__h_4 = closure h_2_1 @h in
+let code loopify(never) size(6) newer_version_of(g_1)
+      g_1_1 (y) my_closure _region _ghost_region my_depth -> k * k1 =
+  let x = %project_value_slot.[`g`].[`unboxed_field_x`] (my_closure) in
+  (let Pmakeblock_into_Pmakeblock_field_0 = x in
+   apply direct(h_2_1)
+     $camlCode_size__h_4 (Pmakeblock_into_Pmakeblock_field_0) -> k2 * k1)
+    where k2 (`Pmakeblock_into_*match*_field_0`) =
+      let Pfield = `Pmakeblock_into_*match*_field_0` in
+      cont k (Pfield)
+in
+let code loopify(never) size(15) newer_version_of(f_0)
+      f_0_1 (x) my_closure _region _ghost_region my_depth -> k * k1 : val =
+  let g = closure g_1_1 @g with { unboxed_field_x = x } in
+  cont k (g)
+in
+let $camlCode_size__f_3 = closure f_0_1 @f in
+let $camlCode_size = Block 0 ($camlCode_size__f_3) in
+cont done ($camlCode_size)

@@ -14,7 +14,9 @@
 (**************************************************************************)
 
 type result =
-  { holed : Rev_expr.t;
+  { toplevel_expr : Rev_expr.t;
+    code : Rev_expr.rev_code Code_id.Map.t;
+    ordered_code_ids : Code_id.t array;
     deps : Global_flow_graph.graph;
     kinds : Flambda_kind.t Name.Map.t;
     fixed_arity_continuations : Continuation.Set.t;

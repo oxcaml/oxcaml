@@ -40,6 +40,7 @@ type result = private
 val rebuild :
   machine_width:Target_system.Machine_width.t ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
+  ordered_code_ids:Code_id.t array ->
   continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
   fixed_arity_continuations:Continuation.Set.t ->
   final_typing_env:Typing_env.t option ->
@@ -47,4 +48,5 @@ val rebuild :
   Unboxing_analysis.result ->
   (Code_id.t -> Code_metadata.t) ->
   Rev_expr.t ->
+  Rev_expr.rev_code Code_id.Map.t ->
   result
