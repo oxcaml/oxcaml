@@ -259,7 +259,7 @@ let return_kind ppf (mode, kind) =
   let smode =
     match mode with
     | Not_alloc_stack -> ""
-    | Maybe_alloc_stack -> "local"
+    | Maybe_alloc_stack -> "stack"
   in
   match kind with
   | Pvalue { raw_kind; nullable } -> begin
