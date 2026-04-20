@@ -143,21 +143,17 @@ let is_not_alloc_stack = function
   | Not_alloc_stack -> true
   | Maybe_alloc_stack -> false
 
-let return_mode_of_locality_mode = function
-  | Alloc_heap -> not_alloc_stack
-  | Alloc_local -> maybe_alloc_stack
-
 let eq_return_mode a b =
   match a, b with
   | Not_alloc_stack, Not_alloc_stack -> true
   | Maybe_alloc_stack, Maybe_alloc_stack -> true
   | (Not_alloc_stack | Maybe_alloc_stack), _ -> false
 
-let sub_return_mode a b =
+let locality_return_compat a b =
   match a, b with
-  | Not_alloc_stack, _ -> true
+  | Alloc_heap, _ -> true
   | _, Maybe_alloc_stack -> true
-  | Maybe_alloc_stack, Not_alloc_stack -> false
+  | Alloc_local, Not_alloc_stack -> false
 
 type staticity =
   | Static

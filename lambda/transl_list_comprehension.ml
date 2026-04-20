@@ -275,7 +275,7 @@ let rec translate_bindings ~transl_exp ~scopes ~loc ~inner_body ~accumulator =
         ~mode:alloc_local ~ret_mode:maybe_alloc_stack ~body:(add_bindings body)
     in
     let result =
-      Lambda_utils.apply ~loc ~mode:alloc_local (Lazy.force builder)
+      Lambda_utils.apply ~loc ~mode:maybe_alloc_stack (Lazy.force builder)
         (List.map (fun Let_binding.{ id; _ } -> Lvar id) arg_lets
         @ [body_func; accumulator])
         ~result_layout:layout_any_value
@@ -320,6 +320,6 @@ let comprehension ~transl_exp ~scopes ~loc { comp_body; comp_clauses } =
           ~last:(transl_exp ~scopes Jkind.Sort.Const.for_list_element comp_body))
       ~accumulator:rev_list_nil comp_clauses
   in
-  Lambda_utils.apply ~loc ~mode:alloc_heap
+  Lambda_utils.apply ~loc ~mode:not_alloc_stack
     (Lazy.force rev_list_to_list)
     [rev_comprehension] ~result_layout:layout_any_value
