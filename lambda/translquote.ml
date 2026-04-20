@@ -2416,6 +2416,9 @@ let quote_arg_label loc = function
       Location.print_loc (to_location loc)
 
 let rec module_for_path loc = function
+  (* CR metaprogramming jrickard: I think this should probably use
+     [Env.find_module_address] at least it should do to register the globals
+     that will be needed. *)
   | Path.Pident id ->
     (match Hashtbl.find_opt vars_env.env_mod id with
       | Some m -> Identifier.Module.var loc m (quote_loc loc)
@@ -2746,24 +2749,6 @@ let assert_no_jkinds jkind =
            position."
           Location.print_loc pjka_loc)
     jkind
-
-let rec quote_module_path loc = function
-  (* CR metaprogramming jrickard: I think this should probably use
-     [Env.find_module_address] at least it should do to register the globals
-     that will be needed. *)
-  | Path.Pident s -> (
-    match Ident.to_global s with
-    | Some global ->
-      Identifier.Module.global_module loc global |> Identifier.Module.wrap
-    | None ->
-      fatal_errorf "Translquote [at %a]: non-global module %a"
-        Location.print_loc (to_location loc) Ident.print s)
-  | Path.Pdot (p, s) ->
-    Identifier.Module.dot loc (quote_module_path loc p) s
-    |> Identifier.Module.wrap
-  | _ ->
-    fatal_errorf "Translquote [at %a]: no support for Papply in quoting modules"
-      Location.print_loc (to_location loc)
 
 (* Approximate the [core_type] for type annotation from a given [type_expr].
    Used for annotating polymorphic applications with higher-rank types. *)
@@ -3430,7 +3415,7 @@ and quote_function ~scopes ~transl stage loc fn extras =
 and quote_module_exp ~transl stage loc mod_exp =
   match mod_exp.mod_desc with
   | Tmod_ident (path, _) ->
-    let m = quote_module_path loc path in
+    let m = module_for_path loc path in
     Module.ident loc m |> Module.wrap
   | Tmod_apply (funct, arg, _) ->
     let transl_funct = quote_module_exp ~transl stage loc funct in
