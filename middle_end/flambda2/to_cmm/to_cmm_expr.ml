@@ -335,7 +335,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           Apply.print apply
     in
     ( C.indirect_call ~dbg return_ty pos
-        (C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply))
+        (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
       env,
@@ -397,7 +397,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let free_vars = Backend_var.Set.union free_vars obj_free_vars in
     let kind = Call_kind.Method_kind.to_lambda kind in
     let alloc_mode =
-      C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply)
+      C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply)
     in
     ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
         dbg,

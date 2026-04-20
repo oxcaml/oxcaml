@@ -603,7 +603,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   in
   let args = List.map (simple env) (Apply_expr.args app) in
   let alloc_mode =
-    alloc_mode_for_applications env (Apply_expr.alloc_mode app)
+    alloc_mode_for_applications env (Apply_expr.return_mode app)
   in
   let call_kind : Fexpr.call_kind =
     match Apply_expr.call_kind app with
