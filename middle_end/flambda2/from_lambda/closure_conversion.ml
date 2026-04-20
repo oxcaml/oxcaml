@@ -750,7 +750,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         k acc (List.map (fun (v, _) -> Named.create_var v) let_bound_vars))
   in
   let alloc_mode_app =
-    match Lambda.locality_mode_of_primitive_description prim_desc with
+    match Lambda.return_mode_of_primitive_description prim_desc with
     | None ->
       (* This happens when stack allocation is disabled. *)
       Alloc_mode.For_applications.not_alloc_stack
@@ -1809,7 +1809,7 @@ let close_exact_or_unknown_apply acc env
         convert_region region, convert_region ghost_region
       | Some (region, ghost_region) -> Some region, Some ghost_region
     in
-    Alloc_mode.For_applications.from_lambda_return_mode mode
+    Alloc_mode.For_applications.from_lambda mode
       ~current_alloc_region:(fst (Env.find_var env alloc_region))
       ~current_region ~current_ghost_region
   in
@@ -2290,7 +2290,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     contains_no_escaping_local_allocs cost_metrics dbg is_tupled
     inlining_decision absolute_history relative_history main_code
     by_function_slot function_code_ids unboxed_function_slot unboxed_params
-    unboxed_return =
+    unboxed_return ~alloc_mode =
   (* The outside caller gave us the function slot and code ID meant for the
      boxed function, which will be a wrapper. So in this branch everything
      starting with 'main_' refers to the version with unboxed return/params. *)
@@ -2383,7 +2383,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         ~args ~args_arity ~return_arity:result_arity_main_code
         ~call_kind:(Call_kind.direct_function_call main_code_id)
         ~alloc_mode:
-          (Alloc_mode.For_applications.from_lambda_return_mode
+          (Alloc_mode.For_applications.from_lambda
              (Function_decl.result_mode decl)
              ~current_alloc_region:my_alloc_region ~current_region:my_region
              ~current_ghost_region:my_ghost_region)
@@ -2479,8 +2479,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
            ~continuation:cont) )
   in
   let alloc_mode =
-    Alloc_mode.For_allocations.from_lambda_return_mode
-      (Function_decl.result_mode decl)
+    Alloc_mode.For_allocations.from_lambda alloc_mode
       ~current_alloc_region:my_alloc_region ~current_region:my_region
   in
   let body, free_names_of_body =
@@ -2489,7 +2488,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     | Some k -> make_return_wrapper (boxing_primitive k alloc_mode)
   in
   let my_alloc_mode =
-    Alloc_mode.For_applications.from_lambda_return_mode
+    Alloc_mode.For_applications.from_lambda
       (Function_decl.result_mode decl)
       ~current_alloc_region:my_alloc_region ~current_region:my_region
       ~current_ghost_region:my_ghost_region
@@ -2848,7 +2847,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         return_continuation,
         my_closure )
     | Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot) ->
+        (unboxed_params, unboxed_return, unboxed_function_slot, _) ->
       compute_body_of_unboxed_function acc my_region alloc_region my_closure
         ~unarized_params params_arity ~unarized_param_modes function_slot
         compute_body return return_continuation unboxed_params unboxed_return
@@ -2964,14 +2963,17 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     | Normal_calling_convention ->
       main_code, by_function_slot, function_code_ids, acc
     | Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot) ->
+        ( unboxed_params,
+          unboxed_return,
+          unboxed_function_slot,
+          unboxed_alloc_mode ) ->
       make_unboxed_function_wrapper acc function_slot ~unarized_params
         params_arity ~unarized_param_modes return result_arity_main_code code_id
         main_code_id decl loc external_env recursive
         contains_no_escaping_local_allocs cost_metrics dbg is_tupled
         inlining_decision absolute_history relative_history main_code
         by_function_slot function_code_ids unboxed_function_slot unboxed_params
-        unboxed_return
+        unboxed_return ~alloc_mode:unboxed_alloc_mode
   in
   let approx =
     let code = Code_or_metadata.create code in
@@ -3569,7 +3571,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       | Rc_nontail -> Apply.Position.Nontail
     in
     let alloc_mode =
-      Alloc_mode.For_applications.from_lambda_return_mode apply.mode
+      Alloc_mode.For_applications.from_lambda apply.mode
         ~current_alloc_region:apply_alloc_region ~current_region:apply_region
         ~current_ghost_region:apply_ghost_region
     in
