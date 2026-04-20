@@ -1119,29 +1119,20 @@ let of_path ~find_shape ~namespace path =
     Path of label of inline record:
       M.t.C.lbl [Pextra_ty(Pextra_ty("M.t", "C"), "lbl")]
     Path of label of implicit unboxed record:
-      M.t#.lbl *)
+      M.t#.lbl [Pextra_ty(Pextra_ty("M.t", Punboxed_ty), "lbl")] *)
   let rec aux : Sig_component_kind.t -> Path.t -> t = fun ns -> function
     | Pident id -> find_shape ns id
-    | Pdot (Pextra_ty (path, Punboxed_ty), name) ->
-      (match ns with
-       Unboxed_label -> ()
-       | _ -> Misc.fatal_error "Shape.of_path");
-      proj (aux Type path) (name, Label)
-    | Pdot (path, name) ->
-      let namespace :  Sig_component_kind.t =
-        match (ns : Sig_component_kind.t) with
-        | Constructor -> Type
-        | Label -> Type
-        | Unboxed_label -> Type
-        | _ -> Module
-      in
-      proj (aux namespace path) (name, ns)
+    | Pdot (path, name) -> proj (aux Module path) (name, ns)
     | Papply (p1, p2) -> app (aux Module p1) ~arg:(aux Module p2)
     | Pextra_ty (path, extra) -> begin
         match extra, ns, path with
         | Pcstr_ty name, Label, Pextra_ty _ ->
             (* Handle the M.t.C.lbl case *)
             proj (aux Constructor path) (name, ns)
+        | Pcstr_ty name, Unboxed_label, Pextra_ty (path', Punboxed_ty) ->
+            (* Implicit-unboxed view of a boxed record: labels are stored in
+               the underlying boxed type's shape under the Label namespace. *)
+            proj (aux Type path') (name, Label)
         | Pcstr_ty name, _, _ -> proj (aux Type path) (name, ns)
         | Pext_ty, _, _ -> aux Extension_constructor path
         | Punboxed_ty, _, _ -> aux ns path
