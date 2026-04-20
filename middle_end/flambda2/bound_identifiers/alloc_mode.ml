@@ -98,22 +98,7 @@ module For_applications = struct
     | Not_alloc_stack -> Heap
     | Maybe_alloc_stack _ -> Heap_or_local
 
-  let from_lambda (mode : Lambda.locality_mode) ~current_region
-      ~current_ghost_region =
-    if not (Flambda_features.stack_allocation_enabled ())
-    then Not_alloc_stack
-    else
-      match mode with
-      | Alloc_heap -> Not_alloc_stack
-      | Alloc_local -> (
-        match current_region, current_ghost_region with
-        | Some current_region, Some current_ghost_region ->
-          Maybe_alloc_stack
-            { region = current_region; ghost_region = current_ghost_region }
-        | None, _ | _, None ->
-          Misc.fatal_error "Local application without a region")
-
-  let from_lambda_return_mode (mode : Lambda.return_mode) ~current_region
+  let from_lambda (mode : Lambda.return_mode) ~current_region
       ~current_ghost_region =
     if not (Flambda_features.stack_allocation_enabled ())
     then Not_alloc_stack
@@ -227,17 +212,6 @@ module For_allocations = struct
       match mode with
       | Alloc_heap -> Heap
       | Alloc_local -> (
-        match current_region with
-        | Some region -> Local { region }
-        | None -> Misc.fatal_error "Local allocation without a region")
-
-  let from_lambda_return_mode (mode : Lambda.return_mode) ~current_region =
-    if not (Flambda_features.stack_allocation_enabled ())
-    then Heap
-    else
-      match mode with
-      | Not_alloc_stack -> Heap
-      | Maybe_alloc_stack -> (
         match current_region with
         | Some region -> Local { region }
         | None -> Misc.fatal_error "Local allocation without a region")
