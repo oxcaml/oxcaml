@@ -17,40 +17,40 @@ module C = Char
 module C' :
   sig
     type t = char
-    external code : char -> int = "%identity"
-    val chr : int -> char
-    val escaped : char -> string
-    val compare : t -> t -> int
-    val equal : t -> t -> bool
+    external code : char -> int @@ portable = "%identity"
+    val chr : int -> char @@ portable
+    val escaped : char -> string @@ portable
+    val compare : t -> t -> int @@ portable
+    val equal : t -> t -> bool @@ portable
     module Ascii :
       sig
-        val min : char
-        val max : char
-        val is_valid : char -> bool
-        val is_upper : char -> bool
-        val is_lower : char -> bool
-        val is_letter : char -> bool
-        val is_alphanum : char -> bool
-        val is_white : char -> bool
-        val is_blank : char -> bool
-        val is_graphic : char -> bool
-        val is_print : char -> bool
-        val is_control : char -> bool
-        val is_digit : char -> bool
-        val digit_to_int : char -> int
-        val digit_of_int : int -> char
-        val is_hex_digit : char -> bool
-        val hex_digit_to_int : char -> int
-        val lower_hex_digit_of_int : int -> char
-        val upper_hex_digit_of_int : int -> char
-        val uppercase : char -> char
-        val lowercase : char -> char
+        val min : char @@ portable
+        val max : char @@ portable
+        val is_valid : char -> bool @@ portable
+        val is_upper : char -> bool @@ portable
+        val is_lower : char -> bool @@ portable
+        val is_letter : char -> bool @@ portable
+        val is_alphanum : char -> bool @@ portable
+        val is_white : char -> bool @@ portable
+        val is_blank : char -> bool @@ portable
+        val is_graphic : char -> bool @@ portable
+        val is_print : char -> bool @@ portable
+        val is_control : char -> bool @@ portable
+        val is_digit : char -> bool @@ portable
+        val digit_to_int : char -> int @@ portable
+        val digit_of_int : int -> char @@ portable
+        val is_hex_digit : char -> bool @@ portable
+        val hex_digit_to_int : char -> int @@ portable
+        val lower_hex_digit_of_int : int -> char @@ portable
+        val upper_hex_digit_of_int : int -> char @@ portable
+        val uppercase : char -> char @@ portable
+        val lowercase : char -> char @@ portable
       end
-    val lowercase_ascii : char -> char
-    val uppercase_ascii : char -> char
-    val seeded_hash : int -> t -> int
-    val hash : t -> int
-    external unsafe_chr : int -> char = "%identity"
+    val lowercase_ascii : char -> char @@ portable
+    val uppercase_ascii : char -> char @@ portable
+    val seeded_hash : int -> t -> int @@ portable
+    val hash : t -> int @@ portable
+    external unsafe_chr : int -> char @@ portable = "%identity"
   end
 - : char = 'B'
 module C3 :
@@ -83,35 +83,35 @@ module C4 = F(struct end);;
 C4.chr 66;;
 [%%expect{|
 module F :
-  (X : sig end) ->
+  functor (X : sig end) ->
     sig
       type t = char
-      external code : char -> int = "%identity"
-      val chr : int -> char
-      val escaped : char -> string
-      val compare : t -> t -> int
-      val equal : t -> t -> bool
+      external code : char -> int @@ portable = "%identity"
+      val chr : int -> char @@ portable
+      val escaped : char -> string @@ portable
+      val compare : t -> t -> int @@ portable
+      val equal : t -> t -> bool @@ portable
       module Ascii = Char.Ascii
-      val lowercase_ascii : char -> char
-      val uppercase_ascii : char -> char
-      val seeded_hash : int -> t -> int
-      val hash : t -> int
-      external unsafe_chr : int -> char = "%identity"
+      val lowercase_ascii : char -> char @@ portable
+      val uppercase_ascii : char -> char @@ portable
+      val seeded_hash : int -> t -> int @@ portable
+      val hash : t -> int @@ portable
+      external unsafe_chr : int -> char @@ portable = "%identity"
     end
 module C4 :
   sig
     type t = char
-    external code : char -> int = "%identity"
-    val chr : int -> char
-    val escaped : char -> string
-    val compare : t -> t -> int
-    val equal : t -> t -> bool
+    external code : char -> int @@ portable = "%identity"
+    val chr : int -> char @@ portable
+    val escaped : char -> string @@ portable
+    val compare : t -> t -> int @@ portable
+    val equal : t -> t -> bool @@ portable
     module Ascii = Char.Ascii
-    val lowercase_ascii : char -> char
-    val uppercase_ascii : char -> char
-    val seeded_hash : int -> t -> int
-    val hash : t -> int
-    external unsafe_chr : int -> char = "%identity"
+    val lowercase_ascii : char -> char @@ portable
+    val uppercase_ascii : char -> char @@ portable
+    val seeded_hash : int -> t -> int @@ portable
+    val hash : t -> int @@ portable
+    external unsafe_chr : int -> char @@ portable = "%identity"
   end
 - : char = 'B'
 |}];;

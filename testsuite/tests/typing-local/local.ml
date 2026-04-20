@@ -1455,7 +1455,7 @@ let foo y =
 [%%expect{|
 val foo : 'a -> 'a = <fun>
 |}, Principal{|
-val foo : '_weak1 -> '_weak1 = <fun>
+val foo : 'a -> 'a = <fun>
 |}]
 let foo (local_ #{ gbl }) = gbl
 [%%expect{|
@@ -1467,7 +1467,7 @@ let foo y =
 [%%expect{|
 val foo : 'a -> 'a = <fun>
 |}, Principal{|
-val foo : '_weak2 -> '_weak2 = <fun>
+val foo : 'a -> 'a = <fun>
 |}]
 
 let foo (local_ imm) =
@@ -1558,7 +1558,7 @@ let foo y =
 [%%expect{|
 val foo : 'a -> 'a = <fun>
 |}, Principal{|
-val foo : '_weak3 -> '_weak3 = <fun>
+val foo : 'a -> 'a = <fun>
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in
