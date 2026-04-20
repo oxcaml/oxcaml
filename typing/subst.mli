@@ -72,11 +72,11 @@ type additional_action_config =
 val with_additional_action: additional_action_config -> t -> t
 
 (* Any of the additional actions involve copying type variables. Calling
-   [reset_additional_action_type_id] resets the id counter used when the copying
+   [reset_additional_action_id] resets the id counter used when the copying
    of type variables needs to mint new type variable ids.
    The function additionally reset the counter used for sort ids.
 *)
-val reset_additional_action_type_id: unit -> unit
+val reset_additional_action_id: unit -> unit
 
 val change_locs: 'k subst -> Location.t -> 'k subst
 

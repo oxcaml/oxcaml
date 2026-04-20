@@ -424,7 +424,7 @@ let to_subst_by_type_function s p =
 (* Special type ids for saved signatures *)
 
 let new_type_id = s_ref (-1)
-let reset_additional_action_type_id () =
+let reset_additional_action_id () =
   new_type_id := -1;
   Jkind_types.Sort.reset_cmi_sort_id ()
 
@@ -514,15 +514,14 @@ let sort_var s var =
     if not (is_genvar var) then
       fatal_errorf "sort_var: not generic"
   in
-  let lookup_sort_map_or_create ~post_condition ~create sort_map var =
-    assert (not (post_condition var));
+  let lookup_sort_map_or_create ~pre_condition ~create sort_map var =
+    assert (pre_condition var);
     let id = Var.get_id var in
     match Hashtbl.find_opt sort_map id with
     | Some var -> var
     | None ->
       assert_generic var;
       let var = create () in
-      assert (post_condition var);
       Hashtbl.add sort_map id var;
       var
   in
@@ -530,12 +529,12 @@ let sort_var s var =
   | Nothing -> var
   | Saving m ->
     lookup_sort_map_or_create
-      ~post_condition:Var.is_cmi_var
+      ~pre_condition:(Fun.negate Var.is_cmi_var)
       ~create:new_genvar_for_cmi
       m var
   | Loading m ->
     lookup_sort_map_or_create
-      ~post_condition:(Fun.negate Var.is_cmi_var)
+      ~pre_condition:Var.is_cmi_var
       ~create:new_genvar
       m var
 
@@ -1313,8 +1312,10 @@ and compose s1 s2 =
           sort_var_mapping = begin
             match s1.sort_var_mapping, s2.sort_var_mapping with
             | action, Nothing | Nothing, action -> action
-            | (Loading _ as s), Loading _ -> s
-            | (Saving _ as s), Saving _ -> s
+            | Loading _, Loading _ ->
+              fatal_error "compose: composing Loading and Loading"
+            | Saving _ , Saving _ ->
+              fatal_error "compose: composing Saving and Saving"
             | Saving _, Loading _
             | Loading _, Saving _ ->
               fatal_error "compose: composing Saving and Loading"

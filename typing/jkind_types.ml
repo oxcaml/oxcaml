@@ -584,7 +584,6 @@ module Sort = struct
 
   let new_var_unsafe ~level =
     incr last_var_id;
-    assert (!last_var_id > 0);
     { contents = None; level; id = !last_var_id }
 
   let new_var ~level =
@@ -601,7 +600,6 @@ module Sort = struct
 
   let new_genvar_for_cmi () =
     decr last_var_cmi_id;
-    assert (!last_var_cmi_id < 0);
     { contents = None; level = level_generic; id = !last_var_cmi_id }
 
   let new_rigidvar () = new_var_unsafe ~level:level_rigid
@@ -613,9 +611,9 @@ module Sort = struct
       List.map
         (fun v ->
           assert (is_genvar v);
+          (* ensure the variable is not a CMI serialised variable *)
           assert (v.id > 0);
           let v' = new_var_unsafe ~level in
-          assert (v'.id > 0);
           v, v')
         vars
     in
