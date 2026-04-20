@@ -301,7 +301,9 @@ module Core_inclusion = struct
     if mark then
       Env.mark_jkind_used decl1.jkind_uid;
     let decl2 = Subst.jkind_declaration subst decl2 in
-    match Includecore.jkind_declarations ~loc env (Ident.name id) decl1 decl2 with
+    match
+      Includecore.jkind_declarations ~loc env (Ident.name id) decl1 decl2
+    with
     | None -> Ok Tcoerce_none
     | Some err ->
       Error Error.(Core(Jkind_declarations (diff decl1 decl2 err)))
