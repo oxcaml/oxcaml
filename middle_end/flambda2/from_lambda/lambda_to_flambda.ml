@@ -1500,13 +1500,13 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
              params unarized_per_param)
       in
       Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot)
+        (unboxed_params, unboxed_return, unboxed_function_slot, mode)
   in
   let body_cont =
     match calling_convention with
-    | Normal_calling_convention | Unboxed_calling_convention (_, None, _) ->
+    | Normal_calling_convention | Unboxed_calling_convention (_, None, _, _) ->
       Continuation.create ~sort:Return ()
-    | Unboxed_calling_convention (_, Some _, _) ->
+    | Unboxed_calling_convention (_, Some _, _, _) ->
       Continuation.create ~sort:Normal_or_exn ~name:"boxed_return" ()
   in
   let body_exn_cont = Continuation.create () in
