@@ -23,7 +23,7 @@ end
 Line 3, characters 14-21:
 3 |   and t2 = #{ a : int }
                   ^^^^^^^
-Warning 30 [duplicate-definitions]: the unboxed record label a is defined in both types t and t2.
+Warning 30 [duplicate-definitions]: the unboxed record label "a" is defined in both types "t" and "t2".
 
 module Duplicate_label_definitions2 :
   sig type t = #{ a : int; } and t2 = #{ a : int; } end
@@ -59,31 +59,31 @@ end;;
 Line 3, characters 20-21:
 3 |   let f1 (r:t) = r.#x (* ok *)
                         ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 4, characters 38-39:
 4 |   let f2 r = ignore_product (r:t); r.#x (* non principal *)
                                           ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 7, characters 19-20:
 7 |     match r with #{x; y} -> y + y (* ok *)
                        ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 7, characters 22-23:
 7 |     match r with #{x; y} -> y + y (* ok *)
                           ^
-Warning 42 [disambiguated-name]: this use of y relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "y" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 7, characters 19-20:
 7 |     match r with #{x; y} -> y + y (* ok *)
                        ^
-Warning 27 [unused-var-strict]: unused variable x.
+Warning 27 [unused-var-strict]: unused variable "x".
 
 module OK :
   sig val f1 : M1.t -> int val f2 : M1.t -> int val f3 : M1.t -> int end
@@ -91,36 +91,37 @@ module OK :
 Line 3, characters 20-21:
 3 |   let f1 (r:t) = r.#x (* ok *)
                         ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 4, characters 38-39:
 4 |   let f2 r = ignore_product (r:t); r.#x (* non principal *)
                                           ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 Line 4, characters 38-39:
 4 |   let f2 r = ignore_product (r:t); r.#x (* non principal *)
                                           ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 7, characters 19-20:
 7 |     match r with #{x; y} -> y + y (* ok *)
                        ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 7, characters 22-23:
 7 |     match r with #{x; y} -> y + y (* ok *)
                           ^
-Warning 42 [disambiguated-name]: this use of y relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "y" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 7, characters 19-20:
 7 |     match r with #{x; y} -> y + y (* ok *)
                        ^
-Warning 27 [unused-var-strict]: unused variable x.
+Warning 27 [unused-var-strict]: unused variable "x".
 
 module OK :
   sig val f1 : M1.t -> int val f2 : M1.t -> int val f3 : M1.t -> int end
@@ -134,14 +135,14 @@ end;; (* fails *)
 Line 3, characters 25-32:
 3 |   let f r = match r with #{x; y} -> y + y
                              ^^^^^^^
-Warning 41 [ambiguous-name]: these field labels belong to several types: M1.u M1.t
-The first one was selected. Please disambiguate if this is wrong.
+Warning 41 [ambiguous-name]: these field labels belong to several types:
+    "M1.u" "M1.t".
+  The first one was selected. Please disambiguate if this is wrong.
 
 Line 3, characters 36-37:
 3 |   let f r = match r with #{x; y} -> y + y
                                         ^
-Error: This expression has type "bool" but an expression was expected of type
-         "int"
+Error: The value "y" has type "bool" but an expression was expected of type "int"
 |}]
 
 module F2 = struct
@@ -155,43 +156,44 @@ end;; (* fails for -principal *)
 Line 6, characters 9-10:
 6 |        #{x; y} -> y + y
              ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 6, characters 12-13:
 6 |        #{x; y} -> y + y
                 ^
-Warning 42 [disambiguated-name]: this use of y relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "y" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 6, characters 9-10:
 6 |        #{x; y} -> y + y
              ^
-Warning 27 [unused-var-strict]: unused variable x.
+Warning 27 [unused-var-strict]: unused variable "x".
 
 module F2 : sig val f : M1.t -> int end
 |}, Principal{|
 Line 6, characters 9-10:
 6 |        #{x; y} -> y + y
              ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 6, characters 12-13:
 6 |        #{x; y} -> y + y
                 ^
-Warning 42 [disambiguated-name]: this use of y relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "y" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 6, characters 7-14:
 6 |        #{x; y} -> y + y
            ^^^^^^^
-Warning 18 [not-principal]: this type-based unboxed record disambiguation is not principal.
+Warning 18 [not-principal]: this type-based unboxed record disambiguation is
+  not principal.
 
 Line 6, characters 9-10:
 6 |        #{x; y} -> y + y
              ^
-Warning 27 [unused-var-strict]: unused variable x.
+Warning 27 [unused-var-strict]: unused variable "x".
 
 module F2 : sig val f : M1.t -> int end
 |}]
@@ -209,8 +211,8 @@ let f (r:M.t) = r.#M.x;; (* ok *)
 Line 1, characters 19-22:
 1 | let f (r:M.t) = r.#M.x;; (* ok *)
                        ^^^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 val f : M.t -> int = <fun>
 |}]
@@ -219,15 +221,15 @@ let f (r:M.t) = r.#x;; (* warning *)
 Line 1, characters 19-20:
 1 | let f (r:M.t) = r.#x;; (* warning *)
                        ^
-Warning 40 [name-out-of-scope]: x was selected from type M.t.
-It is not visible in the current scope, and will not
-be selected if the type becomes unknown.
+Warning 40 [name-out-of-scope]: "x" was selected from type "M.t".
+  It is not visible in the current scope, and will not be selected
+  if the type becomes unknown.
 
 Line 1, characters 19-20:
 1 | let f (r:M.t) = r.#x;; (* warning *)
                        ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 val f : M.t -> int = <fun>
 |}]
@@ -236,15 +238,15 @@ let f (#{x}:M.t) = x;; (* warning *)
 Line 1, characters 9-10:
 1 | let f (#{x}:M.t) = x;; (* warning *)
              ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 1, characters 7-11:
 1 | let f (#{x}:M.t) = x;; (* warning *)
            ^^^^
-Warning 40 [name-out-of-scope]: this unboxed record of type M.t contains fields that are
-not visible in the current scope: x.
-They will not be selected if the type becomes unknown.
+Warning 40 [name-out-of-scope]: this unboxed record of type "M.t" contains
+  fields that are not visible in the current scope: "x".
+  They will not be selected if the type becomes unknown.
 
 val f : M.t -> int = <fun>
 |}]
@@ -270,13 +272,13 @@ end;;
 Line 4, characters 21-22:
 4 |   let f (r:M.t) = r.#x
                          ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 3, characters 2-8:
 3 |   open N
       ^^^^^^
-Warning 33 [unused-open]: unused open N.
+Warning 33 [unused-open]: unused open "N".
 
 module OK : sig val f : M.t -> int end
 |}]
@@ -322,15 +324,15 @@ end;; (* ok *)
 Line 3, characters 10-11:
 3 |   let f #{x;z} = x,z
               ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 3, characters 8-14:
 3 |   let f #{x;z} = x,z
             ^^^^^^
-Warning 9 [missing-record-field-pattern]: the following labels are not bound in this unboxed record pattern:
-y
-Either bind these labels explicitly or add '; _' to the pattern.
+Warning 9 [missing-record-field-pattern]: the following labels are not bound
+  in this unboxed record pattern: "y".
+  Either bind these labels explicitly or add "; _" to the pattern.
 
 module OK : sig val f : M.u -> bool * char end
 |}]
@@ -342,8 +344,8 @@ end;; (* fail for missing label *)
 Line 3, characters 12-13:
 3 |   let r = #{x=true;z='z'}
                 ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 3, characters 10-25:
 3 |   let r = #{x=true;z='z'}
@@ -360,14 +362,14 @@ end;; (* ok *)
 Line 4, characters 15-16:
 4 |   let r () = #{x=3; y=true}
                    ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 4, characters 20-21:
 4 |   let r () = #{x=3; y=true}
                         ^
-Warning 42 [disambiguated-name]: this use of y relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "y" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 module OK :
   sig
@@ -428,14 +430,14 @@ let r = #{MN.x = 3; NM.y = 4};; (* error: type would change with order *)
 Line 1, characters 8-29:
 1 | let r = #{MN.x = 3; NM.y = 4};; (* error: type would change with order *)
             ^^^^^^^^^^^^^^^^^^^^^
-Warning 41 [ambiguous-name]: x belongs to several types: MN.bar MN.foo
-The first one was selected. Please disambiguate if this is wrong.
+Warning 41 [ambiguous-name]: "x" belongs to several types: "MN.bar" "MN.foo".
+  The first one was selected. Please disambiguate if this is wrong.
 
 Line 1, characters 8-29:
 1 | let r = #{MN.x = 3; NM.y = 4};; (* error: type would change with order *)
             ^^^^^^^^^^^^^^^^^^^^^
-Warning 41 [ambiguous-name]: y belongs to several types: NM.foo NM.bar
-The first one was selected. Please disambiguate if this is wrong.
+Warning 41 [ambiguous-name]: "y" belongs to several types: "NM.foo" "NM.bar".
+  The first one was selected. Please disambiguate if this is wrong.
 
 Line 1, characters 20-24:
 1 | let r = #{MN.x = 3; NM.y = 4};; (* error: type would change with order *)
@@ -465,8 +467,8 @@ end;;
 Line 3, characters 46-47:
 3 |   let f r = ignore_product (r: foo); #{r with x = 2; z = 3}
                                                   ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 3, characters 53-54:
 3 |   let f r = ignore_product (r: foo); #{r with x = 2; z = 3}
@@ -494,8 +496,8 @@ end;;
 Line 3, characters 47-48:
 3 |   let f r = ignore_product (r: foo); #{ r with x = 3; a = 4 }
                                                    ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 3, characters 54-55:
 3 |   let f r = ignore_product (r: foo); #{ r with x = 3; a = 4 }
@@ -512,14 +514,14 @@ end;;
 Line 3, characters 15-16:
 3 |   let r () = #{x=1; y=2}
                    ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 3, characters 20-21:
 3 |   let r () = #{x=1; y=2}
                         ^
-Warning 42 [disambiguated-name]: this use of y relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "y" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 4, characters 23-24:
 4 |   let r () : other = #{x=1; y=2}
@@ -556,7 +558,7 @@ Line 3, characters 20-23:
                         ^^^
 Error: This unboxed record expression is expected to have type "t"
        There is no unboxed record field "yyz" within type "t"
-Hint: Did you mean "yyy"?
+Hint:                      Did you mean "yyy"?
 |}]
 
 (* PR#6004 *)
@@ -577,8 +579,8 @@ class f (_ : 'a) (_ : 'a) = object end;;
 Line 1, characters 12-13:
 1 | class g = f A;; (* ok *)
                 ^
-Warning 42 [disambiguated-name]: this use of A relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "A" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 class g : f
 class f : 'a -> 'a -> object  end
@@ -588,33 +590,34 @@ class g = f (A : t) A;; (* warn with -principal *)
 Line 1, characters 13-14:
 1 | class g = f (A : t) A;; (* warn with -principal *)
                  ^
-Warning 42 [disambiguated-name]: this use of A relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "A" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 1, characters 20-21:
 1 | class g = f (A : t) A;; (* warn with -principal *)
                         ^
-Warning 42 [disambiguated-name]: this use of A relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "A" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 class g : f
 |}, Principal{|
 Line 1, characters 13-14:
 1 | class g = f (A : t) A;; (* warn with -principal *)
                  ^
-Warning 42 [disambiguated-name]: this use of A relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "A" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 1, characters 20-21:
 1 | class g = f (A : t) A;; (* warn with -principal *)
                         ^
-Warning 18 [not-principal]: this type-based constructor disambiguation is not principal.
+Warning 18 [not-principal]: this type-based constructor disambiguation is not
+  principal.
 
 Line 1, characters 20-21:
 1 | class g = f (A : t) A;; (* warn with -principal *)
                         ^
-Warning 42 [disambiguated-name]: this use of A relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "A" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 class g : f
 |}]
@@ -634,13 +637,13 @@ end;;
 Line 7, characters 16-17:
 7 |   let y : t = #{x = 0}
                     ^
-Warning 42 [disambiguated-name]: this use of x relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "x" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 6, characters 2-8:
 6 |   open M  (* this open is unused, it isn't reported as shadowing 'x' *)
       ^^^^^^
-Warning 33 [unused-open]: unused open M.
+Warning 33 [unused-open]: unused open "M".
 
 module Shadow1 :
   sig
@@ -661,13 +664,15 @@ end;;
 Line 6, characters 2-8:
 6 |   open M  (* this open shadows label 'x' *)
       ^^^^^^
-Warning 44 [open-shadow-identifier]: this open statement shadows the unboxed label identifier x (which is later used)
+Warning 44 [open-shadow-identifier]: this open statement shadows the
+  unboxed label identifier "x" (which is later used)
 
 Line 7, characters 10-19:
 7 |   let y = #{x = ""}
               ^^^^^^^^^
-Warning 41 [ambiguous-name]: these field labels belong to several types: M.s t
-The first one was selected. Please disambiguate if this is wrong.
+Warning 41 [ambiguous-name]: these field labels belong to several types:
+    "M.s" "t".
+  The first one was selected. Please disambiguate if this is wrong.
 
 module Shadow2 :
   sig
@@ -689,8 +694,8 @@ end;;
 Line 5, characters 38-41:
 5 |   let f (u : u) = match u with `Key #{loc} -> loc
                                           ^^^
-Warning 42 [disambiguated-name]: this use of loc relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "loc" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 module P6235 :
   sig
@@ -715,8 +720,8 @@ end;;
 Line 7, characters 12-15:
 7 |     |`Key #{loc} -> loc
                 ^^^
-Warning 42 [disambiguated-name]: this use of loc relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "loc" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 module P6235' :
   sig
@@ -729,13 +734,14 @@ module P6235' :
 Line 7, characters 12-15:
 7 |     |`Key #{loc} -> loc
                 ^^^
-Warning 42 [disambiguated-name]: this use of loc relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "loc" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 7, characters 10-16:
 7 |     |`Key #{loc} -> loc
               ^^^^^^
-Warning 18 [not-principal]: this type-based unboxed record disambiguation is not principal.
+Warning 18 [not-principal]: this type-based unboxed record disambiguation is
+  not principal.
 
 module P6235' :
   sig
@@ -776,56 +782,56 @@ module M : sig type t = #{ x : int; y : char; } end
 Line 2, characters 31-32:
 2 | let f (x : M.t) () = #{ x with y = 'a' }
                                    ^
-Warning 42 [disambiguated-name]: this use of y relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "y" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 2, characters 21-40:
 2 | let f (x : M.t) () = #{ x with y = 'a' }
                          ^^^^^^^^^^^^^^^^^^^
-Warning 40 [name-out-of-scope]: this unboxed record of type M.t contains fields that are
-not visible in the current scope: y.
-They will not be selected if the type becomes unknown.
+Warning 40 [name-out-of-scope]: this unboxed record of type "M.t" contains
+  fields that are not visible in the current scope: "y".
+  They will not be selected if the type becomes unknown.
 
 val f : M.t -> unit -> M.t = <fun>
 Line 3, characters 33-34:
 3 | let g (x : M.t) () = #(#{ x with y = 'a' }, [])
                                      ^
-Warning 42 [disambiguated-name]: this use of y relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "y" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 3, characters 23-42:
 3 | let g (x : M.t) () = #(#{ x with y = 'a' }, [])
                            ^^^^^^^^^^^^^^^^^^^
-Warning 40 [name-out-of-scope]: this unboxed record of type M.t contains fields that are
-not visible in the current scope: y.
-They will not be selected if the type becomes unknown.
+Warning 40 [name-out-of-scope]: this unboxed record of type "M.t" contains
+  fields that are not visible in the current scope: "y".
+  They will not be selected if the type becomes unknown.
 
 val g : M.t -> unit -> #(M.t * 'a list) = <fun>
 Line 4, characters 33-34:
 4 | let h (x : M.t) () = #(#{ x with y = 'a' }, #(#{ x with y = 'b' }, []));;
                                      ^
-Warning 42 [disambiguated-name]: this use of y relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "y" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 4, characters 23-42:
 4 | let h (x : M.t) () = #(#{ x with y = 'a' }, #(#{ x with y = 'b' }, []));;
                            ^^^^^^^^^^^^^^^^^^^
-Warning 40 [name-out-of-scope]: this unboxed record of type M.t contains fields that are
-not visible in the current scope: y.
-They will not be selected if the type becomes unknown.
+Warning 40 [name-out-of-scope]: this unboxed record of type "M.t" contains
+  fields that are not visible in the current scope: "y".
+  They will not be selected if the type becomes unknown.
 
 Line 4, characters 56-57:
 4 | let h (x : M.t) () = #(#{ x with y = 'a' }, #(#{ x with y = 'b' }, []));;
                                                             ^
-Warning 42 [disambiguated-name]: this use of y relies on type-directed disambiguation,
-it will not compile with OCaml 4.00 or earlier.
+Warning 42 [disambiguated-name]: this use of "y" relies on type-directed
+  disambiguation, it will not compile with OCaml 4.00 or earlier.
 
 Line 4, characters 46-65:
 4 | let h (x : M.t) () = #(#{ x with y = 'a' }, #(#{ x with y = 'b' }, []));;
                                                   ^^^^^^^^^^^^^^^^^^^
-Warning 40 [name-out-of-scope]: this unboxed record of type M.t contains fields that are
-not visible in the current scope: y.
-They will not be selected if the type becomes unknown.
+Warning 40 [name-out-of-scope]: this unboxed record of type "M.t" contains
+  fields that are not visible in the current scope: "y".
+  They will not be selected if the type becomes unknown.
 
 val h : M.t -> unit -> #(M.t * #(M.t * 'a list)) = <fun>
 |}]

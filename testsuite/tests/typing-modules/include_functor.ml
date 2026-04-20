@@ -417,7 +417,7 @@ end = struct
 end;;
 [%%expect{|
 module type S13 = sig val foo : int end
-module type F13 = functor S -> S13
+module type F13 = S -> S13
 Line 8, characters 2-21:
 8 |   include functor F13
       ^^^^^^^^^^^^^^^^^^^
@@ -522,7 +522,7 @@ Line 10, characters 29-30:
 Warning 67 [unused-functor-parameter]: unused functor parameter "X".
 
 module type F16_1 = functor (X : S16) -> S16'
-module type F16_2 = functor S16 -> S16'
+module type F16_2 = S16 -> S16'
 module type G16_1 = sig type t val x : t type s end
 module type G16_2 = sig type t val x : t type s end
 |}];;
@@ -702,7 +702,7 @@ end;;
 [%%expect{|
 module M21 :
   sig
-    module F : functor sig end -> sig module type S = sig end end
+    module F : sig end -> sig module type S = sig end end
     module P : sig module Make : functor (M : sig end) -> F(M).S end
   end
 |}];;

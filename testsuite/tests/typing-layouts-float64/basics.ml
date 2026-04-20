@@ -95,8 +95,8 @@ let f4_1 (x : t_float64) = x, false;;
 Line 1, characters 27-28:
 1 | let f4_1 (x : t_float64) = x, false;;
                                ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 1, characters 0-24.
        But the layout of t_float64 must be a sublayout of value
@@ -108,7 +108,7 @@ let f4_2 (x : 'a t_float64_id) = x, false;;
 Line 1, characters 33-34:
 1 | let f4_2 (x : 'a t_float64_id) = x, false;;
                                      ^
-Error: This expression has type "'a t_float64_id" = "('a : float64)"
+Error: The value "x" has type "'a t_float64_id" = "('a : float64)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_float64_id is float64
          because of the definition of t_float64_id at line 2, characters 0-37.
@@ -121,7 +121,7 @@ let f4_3 (x : float#) = x, false;;
 Line 1, characters 24-25:
 1 | let f4_3 (x : float#) = x, false;;
                             ^
-Error: This expression has type "float#" but an expression was expected of type
+Error: The value "x" has type "float#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
@@ -297,8 +297,8 @@ let f7_1 (x : t_float64) = `A x;;
 Line 1, characters 30-31:
 1 | let f7_1 (x : t_float64) = `A x;;
                                   ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 1, characters 0-24.
        But the layout of t_float64 must be a sublayout of value
@@ -310,7 +310,7 @@ let f7_2 (x : 'a t_float64_id) = `A x;;
 Line 1, characters 36-37:
 1 | let f7_2 (x : 'a t_float64_id) = `A x;;
                                         ^
-Error: This expression has type "'a t_float64_id" = "('a : float64)"
+Error: The value "x" has type "'a t_float64_id" = "('a : float64)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_float64_id is float64
          because of the definition of t_float64_id at line 2, characters 0-37.
@@ -323,7 +323,7 @@ let f7_3 (x : float#) = `A x;;
 Line 1, characters 27-28:
 1 | let f7_3 (x : float#) = `A x;;
                                ^
-Error: This expression has type "float#" but an expression was expected of type
+Error: The value "x" has type "float#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
@@ -706,7 +706,7 @@ end;;
 Line 3, characters 17-19:
 3 |     let _ = f1_1 m1 in
                      ^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "m1" has type "('a : value_or_null)"
        but an expression was expected of type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 1, characters 0-24.
@@ -742,8 +742,8 @@ let f13_1 (x : t_float64) = x = x;;
 Line 1, characters 28-29:
 1 | let f13_1 (x : t_float64) = x = x;;
                                 ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 1, characters 0-24.
        But the layout of t_float64 must be a sublayout of value.
@@ -754,8 +754,8 @@ let f13_2 (x : t_float64) = compare x x;;
 Line 1, characters 36-37:
 1 | let f13_2 (x : t_float64) = compare x x;;
                                         ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 1, characters 0-24.
        But the layout of t_float64 must be a sublayout of value.
@@ -766,8 +766,8 @@ let f13_3 (x : t_float64) = Marshal.to_bytes x;;
 Line 1, characters 45-46:
 1 | let f13_3 (x : t_float64) = Marshal.to_bytes x;;
                                                  ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 1, characters 0-24.
        But the layout of t_float64 must be a sublayout of value.
@@ -778,8 +778,8 @@ let f13_4 (x : t_float64) = Hashtbl.hash x;;
 Line 1, characters 41-42:
 1 | let f13_4 (x : t_float64) = Hashtbl.hash x;;
                                              ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 1, characters 0-24.
        But the layout of t_float64 must be a sublayout of value.

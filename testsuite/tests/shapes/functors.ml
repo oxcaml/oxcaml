@@ -67,7 +67,7 @@ end
         "x"[value] -> <.13>;
         });
  }
-module Fignore : functor S -> sig type t = Fresh val x : t end
+module Fignore : S -> sig type t = Fresh val x : t end
 |}]
 
 module Arg : S = struct

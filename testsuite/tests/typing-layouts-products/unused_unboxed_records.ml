@@ -14,12 +14,12 @@ end;;
 Line 2, characters 14-22:
 2 |   type t = #{ a : int; b : int }
                   ^^^^^^^^
-Warning 69 [unused-field]: unused unboxed record field a.
+Warning 69 [unused-field]: unused unboxed record field "a".
 
 Line 2, characters 23-30:
 2 |   type t = #{ a : int; b : int }
                            ^^^^^^^
-Warning 69 [unused-field]: unused unboxed record field b.
+Warning 69 [unused-field]: unused unboxed record field "b".
 
 module Unused_record : sig end
 |}]
@@ -33,8 +33,8 @@ end;;
 Line 2, characters 14-21:
 2 |   type t = #{ a : int }
                   ^^^^^^^
-Warning 69 [unused-field]: unboxed record field a is never read.
-(However, this field is used to build or mutate values.)
+Warning 69 [unused-field]: unboxed record field "a" is never read.
+  (However, this field is used to build or mutate values.)
 
 module Unused_field : sig end
 |}]
@@ -50,8 +50,8 @@ end;;
 Line 2, characters 23-31:
 2 |   type t = #{ a : int; b : int; c : int }
                            ^^^^^^^^
-Warning 69 [unused-field]: unboxed record field b is never read.
-(However, this field is used to build or mutate values.)
+Warning 69 [unused-field]: unboxed record field "b" is never read.
+  (However, this field is used to build or mutate values.)
 
 module Unused_field : sig end
 |}]
@@ -84,7 +84,7 @@ end;;
 Line 3, characters 2-57:
 3 |   type t = #{ a: int; b:int } [@@warning "-unused-field"]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 34 [unused-type-declaration]: unused type t.
+Warning 34 [unused-type-declaration]: unused type "t".
 
 module Unused_field_disable_warning : sig end
 |}]
@@ -97,12 +97,12 @@ end;;
 Line 3, characters 2-56:
 3 |   type t = #{ a: int [@warning "-unused-field"]; b:int }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 34 [unused-type-declaration]: unused type t.
+Warning 34 [unused-type-declaration]: unused type "t".
 
 Line 3, characters 49-54:
 3 |   type t = #{ a: int [@warning "-unused-field"]; b:int }
                                                      ^^^^^
-Warning 69 [unused-field]: unused unboxed record field b.
+Warning 69 [unused-field]: unused unboxed record field "b".
 
 module Unused_field_disable_one_warning : sig end
 |}]
@@ -119,8 +119,8 @@ end;;
 Line 2, characters 13-20:
 2 |   type t = { a : int }
                  ^^^^^^^
-Warning 69 [unused-field]: record field a is never read.
-(However, this field is used to build or mutate values.)
+Warning 69 [unused-field]: record field "a" is never read.
+  (However, this field is used to build or mutate values.)
 
 module Unused_field : sig end
 |}]
@@ -136,8 +136,8 @@ end;;
 Line 2, characters 22-30:
 2 |   type t = { a : int; b : int; c : int }
                           ^^^^^^^^
-Warning 69 [unused-field]: record field b is never read.
-(However, this field is used to build or mutate values.)
+Warning 69 [unused-field]: record field "b" is never read.
+  (However, this field is used to build or mutate values.)
 
 module Unused_field : sig end
 |}]

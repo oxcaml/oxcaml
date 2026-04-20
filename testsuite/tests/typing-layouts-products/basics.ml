@@ -572,7 +572,7 @@ end;;
 Line 3, characters 17-21:
 3 |     let #(x,y) = utup in
                      ^^^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "utup" has type "('a : value_or_null)"
        but an expression was expected of type "#('b * 'c)"
        The layout of #('a * 'b) is
            '_representable_layout_7 & '_representable_layout_8
@@ -737,7 +737,7 @@ type capture_record = #{ x : int; y : int; }
 Line 4, characters 20-24:
 4 |     let #{ x; y } = utup in
                         ^^^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "utup" has type "('a : value_or_null)"
        but an expression was expected of type "capture_record"
        The layout of capture_record is value & value
          because of the definition of capture_record at line 1, characters 0-43.
@@ -1702,7 +1702,7 @@ class product_instance_variable x =
 Line 2, characters 25-26:
 2 |   let sum = let #(a,b) = x in a + b in
                              ^
-Error: This expression has type "('a : value)"
+Error: The value "x" has type "('a : value)"
        but an expression was expected of type "#('b * 'c)"
        The layout of #('a * 'b) is
            '_representable_layout_15 & '_representable_layout_16
@@ -1722,7 +1722,7 @@ type class_arg_record = #{ a : int; b : int; }
 Line 3, characters 28-29:
 3 |   let sum = let #{ a; b } = x in a + b in
                                 ^
-Error: This expression has type "('a : value)"
+Error: The value "x" has type "('a : value)"
        but an expression was expected of type "class_arg_record"
        The layout of class_arg_record is value & value
          because of the definition of class_arg_record at line 1, characters 0-45.
@@ -2055,7 +2055,7 @@ val f :
 Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^
-Error: This expression has type "a" but an expression was expected of type
+Error: The value "x" has type "a" but an expression was expected of type
          "('a : '_representable_layout_21 & value_or_null mod separable)"
        The layout of a is value
          because it is or unifies with an unannotated universal variable.

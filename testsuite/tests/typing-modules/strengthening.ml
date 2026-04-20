@@ -198,11 +198,12 @@ module Expand_destructive_with :
         module N : sig type t = M.t val foo : t -> t end
       end
     module F :
-      functor (X : sig
-                     module type T = sig type t val foo : t -> t end
-                     module M : sig val foo : int -> int end
-                     module N : sig type t = int val foo : t -> t end
-                   end)
+      functor
+        (X : sig
+               module type T = sig type t val foo : t -> t end
+               module M : sig val foo : int -> int end
+               module N : sig type t = int val foo : t -> t end
+             end)
         -> sig val bar : X.N.t end
   end
 |}]
@@ -315,11 +316,12 @@ module Remove_aliases :
           module type U =
             sig module M : X.S module N : sig module O = M end end
           module G :
-            functor (Y : sig
-                           module M : X.S
-                           module N :
-                             sig module O : (X.S with M [@unaliasable]) end
-                         end)
+            functor
+              (Y : sig
+                     module M : X.S
+                     module N :
+                       sig module O : (X.S with M [@unaliasable]) end
+                   end)
               -> sig module P : sig module O : (X.S with Y.M) end end
         end
     module A : sig module type S = sig module Q : sig end end end
@@ -328,11 +330,11 @@ module Remove_aliases :
         module type U =
           sig module M : A.S module N : sig module O = M end end
         module G :
-          functor (Y : sig
-                         module M : A.S
-                         module N :
-                           sig module O : sig module Q : sig end end end
-                       end)
+          functor
+            (Y : sig
+                   module M : A.S
+                   module N : sig module O : sig module Q : sig end end end
+                 end)
             ->
             sig module P : sig module O : sig module Q : sig end end end end
       end

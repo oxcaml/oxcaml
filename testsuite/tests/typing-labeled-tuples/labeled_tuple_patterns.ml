@@ -171,8 +171,7 @@ let f (~(x:float),y) = x + y
 Line 1, characters 23-24:
 1 | let f (~(x:float),y) = x + y
                            ^
-Error: This expression has type "float" but an expression was expected of type
-         "int"
+Error: The value "x" has type "float" but an expression was expected of type "int"
 |}]
 (* Reordering in functions *)
 type xy = (x:int * y:int)
@@ -209,6 +208,7 @@ Line 1, characters 21-27:
                          ^^^^^^
 Error: This expression has type "x:'a * y:'b"
        but an expression was expected of type "yx" = "y:int * x:int"
+       Labels "x" and "y" do not match
 |}]
 
 let swap (pt : xy) : yx = pt
@@ -216,8 +216,9 @@ let swap (pt : xy) : yx = pt
 Line 1, characters 26-28:
 1 | let swap (pt : xy) : yx = pt
                               ^^
-Error: This expression has type "xy" = "x:int * y:int"
+Error: The value "pt" has type "xy" = "x:int * y:int"
        but an expression was expected of type "yx" = "y:int * x:int"
+       Labels "x" and "y" do not match
 |}]
 
 let swap : xy -> yx = Fun.id
@@ -225,9 +226,10 @@ let swap : xy -> yx = Fun.id
 Line 1, characters 22-28:
 1 | let swap : xy -> yx = Fun.id
                           ^^^^^^
-Error: This expression has type "xy -> xy"
+Error: The value "Fun.id" has type "xy -> xy"
        but an expression was expected of type "xy -> yx"
        Type "xy" = "x:int * y:int" is not compatible with type "yx" = "y:int * x:int"
+       Labels "x" and "y" do not match
 |}]
 
 let swap : xy -> yx = xy_id
@@ -235,9 +237,10 @@ let swap : xy -> yx = xy_id
 Line 1, characters 22-27:
 1 | let swap : xy -> yx = xy_id
                           ^^^^^
-Error: This expression has type "(y:int * x:int) -> xy"
+Error: The value "xy_id" has type "(y:int * x:int) -> xy"
        but an expression was expected of type "xy -> yx"
        Type "y:int * x:int" is not compatible with type "xy" = "x:int * y:int"
+       Labels "y" and "x" do not match
 |}]
 
 let swap : xy -> yx = yx_id
@@ -245,9 +248,10 @@ let swap : xy -> yx = yx_id
 Line 1, characters 22-27:
 1 | let swap : xy -> yx = yx_id
                           ^^^^^
-Error: This expression has type "yx -> yx"
+Error: The value "yx_id" has type "yx -> yx"
        but an expression was expected of type "xy -> yx"
        Type "yx" = "y:int * x:int" is not compatible with type "xy" = "x:int * y:int"
+       Labels "y" and "x" do not match
 |}]
 
 (* CR dallsopp: again, repeated labels not supported upstream *)
@@ -548,6 +552,7 @@ Line 4, characters 21-27:
                          ^^^^^^
 Error: This pattern matches values of type "y:'a * x:'b"
        but a pattern was expected which matches values of type "x:int * y:int"
+       Labels "y" and "x" do not match
 |}]
 
 let f = function ~x, ~y -> x + y
@@ -559,8 +564,9 @@ val f : (x:int * y:int) -> int = <fun>
 Line 4, characters 34-35:
 4 |   match z with ~y, ~x -> x + y, f z
                                       ^
-Error: This expression has type "y:int * x:int"
+Error: The value "z" has type "y:int * x:int"
        but an expression was expected of type "x:int * y:int"
+       Labels "y" and "x" do not match
 |}]
 
 (* More re-ordering stress tests *)

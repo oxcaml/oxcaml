@@ -207,7 +207,7 @@ end
 module type Iobuf_packet =
   sig
     module Make :
-      (Header : Header) () ->
+      functor (Header : Header) () ->
         sig
           module Packet_type : sig type t = Header.Packet_type.t end
           module Header :

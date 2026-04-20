@@ -927,7 +927,7 @@ let fails = make_vect 3 (This 5.)
 Line 1, characters 30-32:
 1 | let fails = make_vect 3 (This 5.)
                                   ^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "5." has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is
            value mod forkable unyielding many stateless immutable

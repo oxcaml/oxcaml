@@ -159,7 +159,7 @@ let xs = [2;7;18;28] in
 Line 1, characters 7-8:
 1 | [x for x in ["one"; "two"; "three"] for x in [10; 20; 30]];;
            ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 - : int list = [10; 20; 30; 10; 20; 30; 10; 20; 30]
 |}];;
@@ -181,7 +181,7 @@ Warning 26 [unused-var]: unused variable x.
 Line 1, characters 7-8:
 1 | [a for a in [0] for a in [1]];;
            ^
-Warning 26 [unused-var]: unused variable a.
+Warning 26 [unused-var]: unused variable "a".
 
 - : int list = [1]
 |}];;
@@ -244,7 +244,7 @@ Warning 26 [unused-var]: unused variable a.
 Line 1, characters 12-15:
 1 | [x for x in 100];;
                 ^^^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "100" has type "int" but an expression was expected of type
          "'a list"
        because it is in a for-in iterator in a list comprehension
 |}];;
@@ -269,7 +269,7 @@ let empty = [||] in
 Line 2, characters 12-17:
 2 | [x for x in empty];;
                 ^^^^^
-Error: This expression has type "'a array"
+Error: The value "empty" has type "'a array"
        but an expression was expected of type "'b list"
        because it is in a for-in iterator in a list comprehension
 |}];;
@@ -290,7 +290,7 @@ Error: This expression has type "'a list"
 Line 1, characters 11-14:
 1 | [x for x = 1.5 to 4.2];;
                ^^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "1.5" has type "float" but an expression was expected of type
          "int"
        because it is in a range-based for iterator start index in a comprehension
 |}];;
@@ -300,7 +300,7 @@ Error: This expression has type "float" but an expression was expected of type
 Line 1, characters 11-14:
 1 | [x for x = 4.2 downto 1.5];;
                ^^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "4.2" has type "float" but an expression was expected of type
          "int"
        because it is in a range-based for iterator start index in a comprehension
 |}];;
@@ -407,7 +407,7 @@ Line 1, characters 25-30:
 1 | [outer,inner for outer = inner to 3 for inner = 1 to 3];;
                              ^^^^^
 Error: Unbound value "inner"
-Hint: Did you mean "incr"?
+Hint:   Did you mean "incr"?
 |}];;
 
 (* The element type is handled correctly *)
@@ -417,8 +417,7 @@ true :: [i for i = 0 to 10];;
 Line 1, characters 9-10:
 1 | true :: [i for i = 0 to 10];;
              ^
-Error: This expression has type "int" but an expression was expected of type
-         "bool"
+Error: The value "i" has type "int" but an expression was expected of type "bool"
 |}];;
 
 (******************************************************************************)
@@ -452,7 +451,8 @@ M.B :: [A for _ = 1 to 3];;
 Line 1, characters 8-9:
 1 | M.B :: [A for _ = 1 to 3];;
             ^
-Warning 18 [not-principal]: this type-based constructor disambiguation is not principal.
+Warning 18 [not-principal]: this type-based constructor disambiguation is not
+  principal.
 
 - : M.t list = [M.B; M.A; M.A; M.A]
 |}];;

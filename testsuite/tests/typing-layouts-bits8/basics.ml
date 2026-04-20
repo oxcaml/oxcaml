@@ -91,8 +91,8 @@ let f4_1 (x : t_bits8) = x, false;;
 Line 1, characters 25-26:
 1 | let f4_1 (x : t_bits8) = x, false;;
                              ^
-Error: This expression has type "t_bits8"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits8" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
        But the layout of t_bits8 must be a sublayout of value
@@ -104,7 +104,7 @@ let f4_2 (x : 'a t_bits8_id) = x, false;;
 Line 1, characters 31-32:
 1 | let f4_2 (x : 'a t_bits8_id) = x, false;;
                                    ^
-Error: This expression has type "'a t_bits8_id" = "('a : bits8)"
+Error: The value "x" has type "'a t_bits8_id" = "('a : bits8)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits8_id is bits8
          because of the definition of t_bits8_id at line 2, characters 0-33.
@@ -117,7 +117,7 @@ let f4_3 (x : int8#) = x, false;;
 Line 1, characters 23-24:
 1 | let f4_3 (x : int8#) = x, false;;
                            ^
-Error: This expression has type "int8#" but an expression was expected of type
+Error: The value "x" has type "int8#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
@@ -261,8 +261,8 @@ let f7_1 (x : t_bits8) = `A x;;
 Line 1, characters 28-29:
 1 | let f7_1 (x : t_bits8) = `A x;;
                                 ^
-Error: This expression has type "t_bits8"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits8" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
        But the layout of t_bits8 must be a sublayout of value
@@ -274,7 +274,7 @@ let f7_2 (x : 'a t_bits8_id) = `A x;;
 Line 1, characters 34-35:
 1 | let f7_2 (x : 'a t_bits8_id) = `A x;;
                                       ^
-Error: This expression has type "'a t_bits8_id" = "('a : bits8)"
+Error: The value "x" has type "'a t_bits8_id" = "('a : bits8)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits8_id is bits8
          because of the definition of t_bits8_id at line 2, characters 0-33.
@@ -287,7 +287,7 @@ let f7_3 (x : int8#) = `A x;;
 Line 1, characters 26-27:
 1 | let f7_3 (x : int8#) = `A x;;
                               ^
-Error: This expression has type "int8#" but an expression was expected of type
+Error: The value "x" has type "int8#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
@@ -640,7 +640,7 @@ end;;
 Line 3, characters 17-19:
 3 |     let _ = f1_1 m1 in
                      ^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "m1" has type "('a : value_or_null)"
        but an expression was expected of type "t_bits8"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
@@ -676,8 +676,8 @@ let f13_1 (x : t_bits8) = x = x;;
 Line 1, characters 26-27:
 1 | let f13_1 (x : t_bits8) = x = x;;
                               ^
-Error: This expression has type "t_bits8"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits8" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
        But the layout of t_bits8 must be a sublayout of value.
@@ -688,8 +688,8 @@ let f13_2 (x : t_bits8) = compare x x;;
 Line 1, characters 34-35:
 1 | let f13_2 (x : t_bits8) = compare x x;;
                                       ^
-Error: This expression has type "t_bits8"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits8" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
        But the layout of t_bits8 must be a sublayout of value.
@@ -700,8 +700,8 @@ let f13_3 (x : t_bits8) = Marshal.to_bytes x;;
 Line 1, characters 43-44:
 1 | let f13_3 (x : t_bits8) = Marshal.to_bytes x;;
                                                ^
-Error: This expression has type "t_bits8"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits8" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
        But the layout of t_bits8 must be a sublayout of value.
@@ -712,8 +712,8 @@ let f13_4 (x : t_bits8) = Hashtbl.hash x;;
 Line 1, characters 39-40:
 1 | let f13_4 (x : t_bits8) = Hashtbl.hash x;;
                                            ^
-Error: This expression has type "t_bits8"
-       but an expression was expected of type "('a : value)"
+Error: The value "x" has type "t_bits8" but an expression was expected of type
+         "('a : value)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
        But the layout of t_bits8 must be a sublayout of value.

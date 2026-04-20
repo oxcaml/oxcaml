@@ -95,7 +95,7 @@ let f4_1 (x : t_word) = x, false;;
 Line 1, characters 24-25:
 1 | let f4_1 (x : t_word) = x, false;;
                             ^
-Error: This expression has type "t_word" but an expression was expected of type
+Error: The value "x" has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
@@ -108,7 +108,7 @@ let f4_2 (x : 'a t_word_id) = x, false;;
 Line 1, characters 30-31:
 1 | let f4_2 (x : 'a t_word_id) = x, false;;
                                   ^
-Error: This expression has type "'a t_word_id" = "('a : word)"
+Error: The value "x" has type "'a t_word_id" = "('a : word)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_word_id is word
          because of the definition of t_word_id at line 2, characters 0-31.
@@ -121,8 +121,8 @@ let f4_3 (x : nativeint#) = x, false;;
 Line 1, characters 28-29:
 1 | let f4_3 (x : nativeint#) = x, false;;
                                 ^
-Error: This expression has type "nativeint#"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "nativeint#" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
        But the layout of nativeint# must be a sublayout of value
@@ -259,7 +259,7 @@ let f7_1 (x : t_word) = `A x;;
 Line 1, characters 27-28:
 1 | let f7_1 (x : t_word) = `A x;;
                                ^
-Error: This expression has type "t_word" but an expression was expected of type
+Error: The value "x" has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
@@ -272,7 +272,7 @@ let f7_2 (x : 'a t_word_id) = `A x;;
 Line 1, characters 33-34:
 1 | let f7_2 (x : 'a t_word_id) = `A x;;
                                      ^
-Error: This expression has type "'a t_word_id" = "('a : word)"
+Error: The value "x" has type "'a t_word_id" = "('a : word)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_word_id is word
          because of the definition of t_word_id at line 2, characters 0-31.
@@ -285,8 +285,8 @@ let f7_3 (x : nativeint#) = `A x;;
 Line 1, characters 31-32:
 1 | let f7_3 (x : nativeint#) = `A x;;
                                    ^
-Error: This expression has type "nativeint#"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "nativeint#" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
        But the layout of nativeint# must be a sublayout of value
@@ -639,7 +639,7 @@ end;;
 Line 3, characters 17-19:
 3 |     let _ = f1_1 m1 in
                      ^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "m1" has type "('a : value_or_null)"
        but an expression was expected of type "t_word"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
@@ -675,7 +675,7 @@ let f13_1 (x : t_word) = x = x;;
 Line 1, characters 25-26:
 1 | let f13_1 (x : t_word) = x = x;;
                              ^
-Error: This expression has type "t_word" but an expression was expected of type
+Error: The value "x" has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
@@ -687,7 +687,7 @@ let f13_2 (x : t_word) = compare x x;;
 Line 1, characters 33-34:
 1 | let f13_2 (x : t_word) = compare x x;;
                                      ^
-Error: This expression has type "t_word" but an expression was expected of type
+Error: The value "x" has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
@@ -699,7 +699,7 @@ let f13_3 (x : t_word) = Marshal.to_bytes x;;
 Line 1, characters 42-43:
 1 | let f13_3 (x : t_word) = Marshal.to_bytes x;;
                                               ^
-Error: This expression has type "t_word" but an expression was expected of type
+Error: The value "x" has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
@@ -711,7 +711,7 @@ let f13_4 (x : t_word) = Hashtbl.hash x;;
 Line 1, characters 38-39:
 1 | let f13_4 (x : t_word) = Hashtbl.hash x;;
                                           ^
-Error: This expression has type "t_word" but an expression was expected of type
+Error: The value "x" has type "t_word" but an expression was expected of type
          "('a : value)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.

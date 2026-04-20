@@ -7,7 +7,7 @@ module type S = sig type t [@@immediate] end;;
 module F (M : S) : S = M;;
 [%%expect{|
 module type S = sig type t [@@immediate] end
-module F : (M : S) -> S
+module F : functor (M : S) -> S
 |}];;
 
 (* VALID DECLARATIONS *)

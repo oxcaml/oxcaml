@@ -48,8 +48,8 @@ let bad_annot_4 () =
 Line 2, characters 9-24:
 2 |   nop () [@tail ajsdiof];
              ^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'tail'.
-Only 'hint' is supported
+Warning 47 [attribute-payload]: illegal payload for attribute "tail".
+  Only 'hint' is supported
 
 val bad_annot_4 : unit -> unit = <fun>
 |}]

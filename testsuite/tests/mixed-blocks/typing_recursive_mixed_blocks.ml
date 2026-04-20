@@ -26,7 +26,7 @@ let rec x2 = let _ = { t = rec_t; x2 } in #4.0;;
 Line 1, characters 34-36:
 1 | let rec x2 = let _ = { t = rec_t; x2 } in #4.0;;
                                       ^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "x2" has type "('a : value_or_null)"
        but an expression was expected of type "float#"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
@@ -61,7 +61,7 @@ let rec bad_flat = let _ = A (rec_cstr, bad_flat) in #4.0;;
 Line 1, characters 40-48:
 1 | let rec bad_flat = let _ = A (rec_cstr, bad_flat) in #4.0;;
                                             ^^^^^^^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "bad_flat" has type "('a : value_or_null)"
        but an expression was expected of type "float#"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
@@ -96,7 +96,7 @@ let rec bad_flat = let _ = A { cstr = rec_cstr; flt = bad_flat } in #4.0;;
 Line 1, characters 54-62:
 1 | let rec bad_flat = let _ = A { cstr = rec_cstr; flt = bad_flat } in #4.0;;
                                                           ^^^^^^^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "bad_flat" has type "('a : value_or_null)"
        but an expression was expected of type "float#"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.

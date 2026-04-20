@@ -515,14 +515,15 @@ module Ignore = Force(Choose)
 module type T = sig type t end
 module Int : sig type t = int end
 module type S = sig module Choice : T val r : Choice.t list ref ref end
-module Force : (X : () -> S) -> sig end
-module Choose : () -> sig module Choice : T val r : '_weak1 list ref ref end
+module Force : functor (X : functor () -> S) -> sig end
+module Choose :
+  functor () -> sig module Choice : T val r : '_weak1 list ref ref end
 Line 17, characters 16-29:
 17 | module Ignore = Force(Choose)
                      ^^^^^^^^^^^^^
 Error: Modules do not match:
-       () -> sig module Choice : T val r : '_weak1 list ref ref end
-     is not included in () -> S
+       functor () -> sig module Choice : T val r : '_weak1 list ref ref end
+     is not included in functor () -> S
      Modules do not match:
        sig module Choice : T val r : '_weak1 list ref ref end
      is not included in
@@ -562,7 +563,7 @@ Error: Signature mismatch:
          val f : (module s/2) -> unit
        The type "(module s/1) -> unit" is not compatible with the type
          "(module s/2) -> unit"
-       Modules do not match: s is not included in s/2
+       Modules do not match: s/1 is not included in s/2
        Line 6, characters 4-17:
          Definition of module type "s/1"
        Line 2, characters 2-15:

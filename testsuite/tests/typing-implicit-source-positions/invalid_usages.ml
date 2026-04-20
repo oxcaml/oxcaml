@@ -42,9 +42,10 @@ let _ = apply g ;;
 Line 1, characters 14-15:
 1 | let _ = apply g ;;
                   ^
-Error: This expression has type "call_pos:[%call_pos] -> unit -> unit"
+Error: The value "g" has type "call_pos:[%call_pos] -> unit -> unit"
        but an expression was expected of type
          "call_pos:Lexing.position -> unit -> 'a"
+       Labels "call_pos" and "call_pos" do not match
 |}]
 
 let h ?(call_pos:[%call_pos]) () = ()

@@ -96,7 +96,7 @@ let t = Middle.r.Middle.x
 Line 1, characters 8-16:
 1 | let t = Middle.r.Middle.x
             ^^^^^^^^
-Error: This expression has type "Original.r"
+Error: The value "Middle.r" has type "Original.r"
        but an expression was expected of type "('a : '_representable_layout_1)"
        The layout of Original.r is any
          because the .cmi file for Original.r is missing.

@@ -31,7 +31,7 @@ end
                   });
  }
 module Pair :
-  (X : Stringable) (Y : Stringable) ->
+  functor (X : Stringable) (Y : Stringable) ->
     sig type t = X.t * Y.t val to_string : X.t * Y.t -> string end
 |}]
 

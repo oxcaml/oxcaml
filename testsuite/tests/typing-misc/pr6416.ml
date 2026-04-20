@@ -81,17 +81,17 @@ Lines 4-7, characters 4-7:
 7 |     end
 Error: Signature mismatch:
        Modules do not match:
-         sig module type s module A : (X : s) -> sig end end
+         sig module type s module A : functor (X : s) -> sig end end
        is not included in
-         sig module A : (X : s) -> sig end end
+         sig module A : functor (X : s) -> sig end end
        In module "A":
        Modules do not match:
-         (X : s) -> ...
+         (X : s/1) -> ...
        is not included in
          (X : s/2) -> ...
-       Module types do not match: s does not include s/2
+       Module types do not match: s/1 does not include s/2
 Line 5, characters 6-19:
-  Definition of module type "s"
+  Definition of module type "s/1"
 Line 2, characters 2-15:
   Definition of module type "s/2"
 |}]
@@ -152,7 +152,7 @@ Error: Signature mismatch:
          val f : (module s/2) -> t/2 -> t/2
        The type "(module s/1) -> t/2 -> t/1" is not compatible with the type
          "(module s/2) -> t/2 -> t/2"
-       Modules do not match: s is not included in s/2
+       Modules do not match: s/1 is not included in s/2
        Line 5, characters 23-33:
          Definition of type "t/1"
        Line 3, characters 2-12:
@@ -220,7 +220,7 @@ Error: Signature mismatch:
        The public method c cannot be hidden
        The first class type has no method m
 Line 5, characters 4-74:
-  Definition of class type "a"
+  Definition of class type "a/1"
 Line 2, characters 2-36:
   Definition of class type "a/2"
 |}]
@@ -251,7 +251,7 @@ Error: Signature mismatch:
          class type b = a/2
        The first class type has no method m
 Line 5, characters 4-29:
-  Definition of class type "a"
+  Definition of class type "a/1"
 Line 2, characters 2-42:
   Definition of class type "a/2"
 |}]

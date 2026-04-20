@@ -45,13 +45,10 @@ module type ENDO_2 = ENDO with module type Inner.T = ENDO
 module type ENDO_2' = ENDO with module type Inner.T := ENDO
 [%%expect {|
 module type ENDO =
-  sig module Inner : sig module type T module F : functor T -> T end end
+  sig module Inner : sig module type T module F : T -> T end end
 module type ENDO_2 =
-  sig
-    module Inner : sig module type T = ENDO module F : functor T -> T end
-  end
-module type ENDO_2' =
-  sig module Inner : sig module F : functor ENDO -> ENDO end end
+  sig module Inner : sig module type T = ENDO module F : T -> T end end
+module type ENDO_2' = sig module Inner : sig module F : ENDO -> ENDO end end
 |}]
 
 
