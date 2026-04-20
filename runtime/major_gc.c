@@ -540,7 +540,6 @@ static intnat ephe_sweep (caml_domain_state* domain_state, intnat budget)
 
     if (is_unmarked(ephe)) {
       /* The whole array is dead, drop this ephemeron */
-      budget -= 1;
     } else {
       caml_ephe_clean(ephe);
       /* Move to live list */
