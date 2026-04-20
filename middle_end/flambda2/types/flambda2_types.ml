@@ -19,10 +19,11 @@ module Typing_env = struct
   open Meet_env
 
   let add_equation t name ty =
-    add_equation t name ty ~meet_type:(Meet.meet_type ())
+    add_equation t name ty ~meet_expanded_head:(Meet.meet_expanded_head ())
 
   let add_equation_on_simple t simple ty =
-    add_equation_on_simple t simple ty ~meet_type:(Meet.meet_type ())
+    add_equation_on_simple t simple ty
+      ~meet_expanded_head:(Meet.meet_expanded_head ())
 
   let add_is_null_relation t name ~scrutinee =
     use_meet_env t ~f:(fun t ->
@@ -89,16 +90,17 @@ module Typing_env = struct
   let add_equations_on_params t ~params ~param_types =
     use_meet_env t ~f:(fun t ->
         add_equations_on_params t ~params ~param_types
-          ~meet_type:(Meet.meet_type ()))
+          ~meet_expanded_head:(Meet.meet_expanded_head ()))
 
   let add_env_extension t extension =
     use_meet_env t ~f:(fun t ->
-        add_env_extension t extension ~meet_type:(Meet.meet_type ()))
+        add_env_extension t extension
+          ~meet_expanded_head:(Meet.meet_expanded_head ()))
 
   let add_env_extension_with_extra_variables t extension =
     use_meet_env t ~f:(fun t ->
         add_env_extension_with_extra_variables t extension
-          ~meet_type:(Meet.meet_type ()))
+          ~meet_expanded_head:(Meet.meet_expanded_head ()))
 
   module Alias_set = Aliases.Alias_set
 end
@@ -146,11 +148,14 @@ let remove_outermost_alias env ty =
 
 module Equal_types_for_debug = struct
   let equal_type env t1 t2 =
-    Equal_types_for_debug.equal_type ~meet_type:(Meet.meet_type ()) env t1 t2
+    Equal_types_for_debug.equal_type
+      ~meet_expanded_head:(Meet.meet_expanded_head ())
+      env t1 t2
 
   let equal_env_extension env ext1 ext2 =
-    Equal_types_for_debug.equal_env_extension ~meet_type:(Meet.meet_type ()) env
-      ext1 ext2
+    Equal_types_for_debug.equal_env_extension
+      ~meet_expanded_head:(Meet.meet_expanded_head ())
+      env ext1 ext2
 end
 
 module Rewriter = Traversals

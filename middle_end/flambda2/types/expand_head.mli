@@ -20,6 +20,8 @@
 module Expanded_type : sig
   type t
 
+  val of_non_alias_type : ?coercion:Coercion.t -> Type_grammar.t -> t
+
   val create_const : Reg_width_const.t -> t
 
   val create_value : Type_grammar.head_of_kind_value -> t
