@@ -680,8 +680,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               | Vec128 -> Onetwentyeight_unaligned
               | Vec256 -> Twofiftysix_unaligned
               | Vec512 -> Fivetwelve_unaligned
-              | Val | Addr | Tagged_int | Int64 | Int32 | Int16 | Int8 ->
-                Word_val
+              | Val | Addr | Tagged_int
+              | Naked_int (Int64 | Int32 | Int16 | Int8) -> Word_val
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
             insert_debug env sub_cfg
@@ -1197,8 +1197,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             match reg.Reg.typ with
             | Addr -> assert false
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            | Val | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Vec128
-            | Vec256 | Vec512 | Float32 ->
+            | Val | Tagged_int
+            | Naked_int (Int64 | Int32 | Int16 | Int8)
+            | Float | Vec128 | Vec256 | Vec512 | Float32 ->
               ())
           src;
         SU.insert_moves env sub_cfg src tmp_regs;

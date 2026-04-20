@@ -93,11 +93,11 @@ let rec select_addr exp =
 
 exception Use_default_exn
 
-let rax = phys_reg Int64 (P RAX)
+let rax = phys_reg (Naked_int Int64) (P RAX)
 
-let rcx = phys_reg Int64 (P RCX)
+let rcx = phys_reg (Naked_int Int64) (P RCX)
 
-let rdx = phys_reg Int64 (P RDX)
+let rdx = phys_reg (Naked_int Int64) (P RDX)
 
 let select_locality (l : Cmm.prefetch_temporal_locality_hint) :
     Arch.prefetch_temporal_locality_hint =

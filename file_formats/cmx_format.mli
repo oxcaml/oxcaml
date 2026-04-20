@@ -32,8 +32,9 @@ open Misc
    of these infos *)
 
 (* Declare machtype here to avoid depending on [Cmm]. *)
+type int_width = Int64 | Int32 | Int16 | Int8
 type machtype_component =
-    Val | Addr | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float
+    Val | Addr | Tagged_int | Naked_int of int_width | Float
   | Vec128 | Vec256 | Vec512 | Float32 | Valx2
 
 type machtype = machtype_component array

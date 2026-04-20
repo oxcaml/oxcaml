@@ -1632,7 +1632,7 @@ let array_indexing ?typ log2size ptr ofs dbg =
   let add =
     match typ with
     | None | Some Addr -> Cadda
-    | Some Int64 -> Caddi
+    | Some (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8)) -> Caddi
     | _ -> assert false
   in
   match ofs with
@@ -2135,7 +2135,7 @@ module Extended_machtype_component = struct
     match component with
     | Val -> Val
     | Addr -> Addr
-    | Tagged_int | Int64 | Int32 | Int16 | Int8 -> Any_int
+    | Tagged_int | Naked_int _ -> Any_int
     | Float -> Float
     | Vec128 -> Vec128
     | Vec256 -> Vec256
@@ -2147,7 +2147,7 @@ module Extended_machtype_component = struct
     match t with
     | Val -> Val
     | Addr -> Addr
-    | Val_and_int | Any_int -> Int64
+    | Val_and_int | Any_int -> Naked_int Int64
     | Float -> Float
     | Vec128 -> Vec128
     | Vec256 -> Vec256
@@ -2228,10 +2228,10 @@ let machtype_identifier t =
     match component with
     | Val -> 'V'
     | Tagged_int -> 'I'
-    | Int64 -> 'Q'
-    | Int32 -> 'D'
-    | Int16 -> 'W'
-    | Int8 -> 'B'
+    | Naked_int Int64 -> 'Q'
+    | Naked_int Int32 -> 'D'
+    | Naked_int Int16 -> 'W'
+    | Naked_int Int8 -> 'B'
     | Float -> 'F'
     | Vec128 -> 'X'
     | Vec256 -> 'Y'
@@ -3806,7 +3806,7 @@ let machtype_stored_size t =
       match (c : machtype_component) with
       | Addr -> Misc.fatal_error "[Addr] cannot be stored"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-      | Val | Tagged_int | Int64 | Int32 | Int16 | Int8 -> cur + 1
+      | Val | Tagged_int | Naked_int _ -> cur + 1
       | Float -> cur + ints_per_float
       | Float32 ->
         (* Float32 slots still take up a full word *)
@@ -3823,7 +3823,7 @@ let machtype_non_scanned_size t =
       | Addr -> Misc.fatal_error "[Addr] cannot be stored"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
       | Val -> cur
-      | Tagged_int | Int64 | Int32 | Int16 | Int8 -> cur + 1
+      | Tagged_int | Naked_int _ -> cur + 1
       | Float -> cur + ints_per_float
       | Float32 ->
         (* Float32 slots still take up a full word *)
@@ -3843,8 +3843,8 @@ let value_slot_given_machtype vs =
     List.partition
       (fun (_, c) ->
         match (c : machtype_component) with
-        | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Float32 | Vec128
-        | Vec256 | Vec512 ->
+        | Tagged_int | Naked_int _ | Float | Float32 | Vec128 | Vec256 | Vec512
+          ->
           true
         | Val -> false
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
@@ -3861,7 +3861,7 @@ let read_from_closure_given_machtype t clos base_offset dbg =
     List.fold_left_map
       (fun (non_scanned_pos, scanned_pos) c ->
         match (c : machtype_component) with
-        | Tagged_int | Int64 | Int32 | Int16 | Int8 ->
+        | Tagged_int | Naked_int _ ->
           (non_scanned_pos + 1, scanned_pos), load Word_int non_scanned_pos
         | Float ->
           ( (non_scanned_pos + ints_per_float, scanned_pos),

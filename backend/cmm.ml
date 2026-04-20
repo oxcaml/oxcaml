@@ -17,14 +17,17 @@
 
 open! Int_replace_polymorphic_compare [@@warning "-66"]
 
-type machtype_component = Cmx_format.machtype_component =
-  | Val
-  | Addr
-  | Tagged_int
+type int_width = Cmx_format.int_width =
   | Int64
   | Int32
   | Int16
   | Int8
+
+type machtype_component = Cmx_format.machtype_component =
+  | Val
+  | Addr
+  | Tagged_int
+  | Naked_int of int_width
   | Float
   | Vec128
   | Vec256
@@ -46,13 +49,13 @@ let typ_addr = [| Addr |]
 
 let typ_tagged_int = [| Tagged_int |]
 
-let typ_int64 = [| Int64 |]
+let typ_int64 = [| Naked_int Int64 |]
 
-let typ_int32 = [| Int32 |]
+let typ_int32 = [| Naked_int Int32 |]
 
-let typ_int16 = [| Int16 |]
+let typ_int16 = [| Naked_int Int16 |]
 
-let typ_int8 = [| Int8 |]
+let typ_int8 = [| Naked_int Int8 |]
 
 let typ_float = [| Float |]
 
@@ -64,7 +67,7 @@ let typ_vec256 = [| Vec256 |]
 
 let typ_vec512 = [| Vec512 |]
 
-let typ_int128 = [| Int64; Int64 |]
+let typ_int128 = [| Naked_int Int64; Naked_int Int64 |]
 
 (** [machtype_component]s are partially ordered as follows:
 
@@ -103,15 +106,16 @@ let lub_component comp1 comp2 =
   | Vec128, Vec128 -> Vec128
   | Vec256, Vec256 -> Vec256
   | Vec512, Vec512 -> Vec512
-  | Int64, Int64 -> Int64
-  | Int32, Int32 -> Int32
-  | Int16, Int16 -> Int16
-  | Int8, Int8 -> Int8
-  | ( (Tagged_int | Int64 | Int32 | Int16 | Int8 | Addr | Val),
-      (Float | Float32 | Vec128 | Vec256 | Vec512 | Int64 | Int32 | Int16 | Int8)
-    )
-  | ( (Float | Float32 | Vec128 | Vec256 | Vec512 | Int64 | Int32 | Int16 | Int8),
-      (Tagged_int | Int64 | Int32 | Int16 | Int8 | Addr | Val) )
+  | Naked_int Int64, Naked_int Int64 -> Naked_int Int64
+  | Naked_int Int32, Naked_int Int32 -> Naked_int Int32
+  | Naked_int Int16, Naked_int Int16 -> Naked_int Int16
+  | Naked_int Int8, Naked_int Int8 -> Naked_int Int8
+  | ( (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8) | Addr | Val),
+      ( Float | Float32 | Vec128 | Vec256 | Vec512
+      | Naked_int (Int64 | Int32 | Int16 | Int8) ) )
+  | ( ( Float | Float32 | Vec128 | Vec256 | Vec512
+      | Naked_int (Int64 | Int32 | Int16 | Int8) ),
+      (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8) | Addr | Val) )
   | (Float | Float32 | Vec256 | Vec512), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
   | Float32, Float
@@ -133,20 +137,21 @@ let ge_component comp1 comp2 =
   | Addr, Tagged_int -> true
   | Addr, Addr -> true
   | Addr, Val -> true
-  | Int64, Int64 -> true
-  | Int32, Int32 -> true
-  | Int16, Int16 -> true
-  | Int8, Int8 -> true
+  | Naked_int Int64, Naked_int Int64 -> true
+  | Naked_int Int32, Naked_int Int32 -> true
+  | Naked_int Int16, Naked_int Int16 -> true
+  | Naked_int Int8, Naked_int Int8 -> true
   | Float, Float -> true
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
   | Vec256, Vec256 -> true
   | Vec512, Vec512 -> true
-  | ( (Tagged_int | Int64 | Int32 | Int16 | Int8 | Addr | Val),
-      (Float | Float32 | Vec128 | Vec256 | Vec512 | Int64 | Int32 | Int16 | Int8)
-    )
-  | ( (Float | Float32 | Vec128 | Vec256 | Vec512 | Int64 | Int32 | Int16 | Int8),
-      (Tagged_int | Int64 | Int32 | Int16 | Int8 | Addr | Val) )
+  | ( (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8) | Addr | Val),
+      ( Float | Float32 | Vec128 | Vec256 | Vec512
+      | Naked_int (Int64 | Int32 | Int16 | Int8) ) )
+  | ( ( Float | Float32 | Vec128 | Vec256 | Vec512
+      | Naked_int (Int64 | Int32 | Int16 | Int8) ),
+      (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8) | Addr | Val) )
   | (Float | Float32 | Vec256 | Vec512), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
   | Float32, Float
@@ -912,20 +917,20 @@ let rank_machtype_component : machtype_component -> int = function
   | Vec512 -> 6
   | Float32 -> 7
   | Valx2 -> 8
-  | Int64 -> 9
-  | Int32 -> 10
-  | Int16 -> 11
-  | Int8 -> 12
+  | Naked_int Int64 -> 9
+  | Naked_int Int32 -> 10
+  | Naked_int Int16 -> 11
+  | Naked_int Int8 -> 12
 
 let compare_machtype_component
-    (( Val | Addr | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Vec128
-     | Vec256 | Vec512 | Float32 | Valx2 ) as left :
+    (( Val | Addr | Tagged_int | Naked_int _ | Float | Vec128 | Vec256 | Vec512
+     | Float32 | Valx2 ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left - rank_machtype_component right
 
 let equal_machtype_component
-    (( Val | Addr | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Vec128
-     | Vec256 | Vec512 | Float32 | Valx2 ) as left :
+    (( Val | Addr | Tagged_int | Naked_int _ | Float | Vec128 | Vec256 | Vec512
+     | Float32 | Valx2 ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left = rank_machtype_component right
 
@@ -1173,22 +1178,22 @@ let caml_flambda2_invalid = "caml_flambda2_invalid"
 let is_val (m : machtype_component) =
   match m with
   | Val -> true
-  | Addr | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Vec128 | Vec256
-  | Vec512 | Float32 | Valx2 ->
+  | Addr | Tagged_int | Naked_int _ | Float | Vec128 | Vec256 | Vec512 | Float32
+  | Valx2 ->
     false
 
 let is_tagged_int (m : machtype_component) =
   match m with
   | Tagged_int -> true
-  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 | Int64
-  | Int32 | Int16 | Int8 ->
+  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2
+  | Naked_int _ ->
     false
 
 let is_addr (m : machtype_component) =
   match m with
   | Addr -> true
-  | Val | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Vec128 | Vec256
-  | Vec512 | Float32 | Valx2 ->
+  | Val | Tagged_int | Naked_int _ | Float | Vec128 | Vec256 | Vec512 | Float32
+  | Valx2 ->
     false
 
 let is_exn_handler (flag : ccatch_flag) =

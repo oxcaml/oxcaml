@@ -129,18 +129,18 @@ let vectorizable_machtypes (r1 : Reg.t) (r2 : Reg.t) =
        vectorize [Addr]. *)
     false
   | ( (Vec128 | Vec256 | Vec512 | Valx2),
-      ( Val | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Float32
-      | Vec128 | Vec256 | Vec512 | Valx2 ) )
-  | ( (Val | Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Float32),
+      ( Val | Tagged_int | Naked_int _ | Float | Float32 | Vec128 | Vec256
+      | Vec512 | Valx2 ) )
+  | ( (Val | Tagged_int | Naked_int _ | Float | Float32),
       (Vec128 | Vec256 | Vec512 | Valx2) ) ->
     Misc.fatal_errorf "Unexpected vector machtype: %a %a" Printreg.reg r1
       Printreg.reg r2
   | Val, Val -> true
-  | Val, (Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Float32)
-  | (Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Float32), Val ->
+  | Val, (Tagged_int | Naked_int _ | Float | Float32)
+  | (Tagged_int | Naked_int _ | Float | Float32), Val ->
     false
-  | ( (Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Float32),
-      (Tagged_int | Int64 | Int32 | Int16 | Int8 | Float | Float32) ) ->
+  | ( (Tagged_int | Naked_int _ | Float | Float32),
+      (Tagged_int | Naked_int _ | Float | Float32) ) ->
     (* It is safe to mix Float32, Float, and Ints for the purpose of GC, because
        they are not scannable. It may not be possible to vectorize the
        operation. *)
@@ -158,7 +158,7 @@ let vectorize_machtypes (pack : Reg.t list) : Cmm.machtype_component =
     match hd.typ, List.length pack with
     | Addr, _ -> Misc.fatal_errorf "Unexpected machtype for %a" Printreg.reg hd
     | Float, 2 | Float32, 4 -> Vec128
-    | (Tagged_int | Int64 | Int32 | Int16 | Int8), _ -> Vec128
+    | (Tagged_int | Naked_int _), _ -> Vec128
     | Val, 2 -> Valx2
     | (Val | Float | Float32), n ->
       Misc.fatal_errorf "Unexpected pack size %d for %a" n Printreg.reglist pack

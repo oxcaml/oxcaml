@@ -17,14 +17,17 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
-type machtype_component = Cmx_format.machtype_component =
-  | Val
-  | Addr
-  | Tagged_int
+type int_width = Cmx_format.int_width =
   | Int64
   | Int32
   | Int16
   | Int8
+
+type machtype_component = Cmx_format.machtype_component =
+  | Val
+  | Addr
+  | Tagged_int
+  | Naked_int of int_width
   | Float
   | Vec128
   | Vec256
