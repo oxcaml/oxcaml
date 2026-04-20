@@ -302,7 +302,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
               ~arg_types:
                 (T.unknown_types_from_arity result_arity
                    ~alloc_mode:
-                     (Apply.alloc_mode apply
+                     (Apply.return_mode apply
                     |> Alloc_mode.For_applications.as_type)
                    ~machine_width:(DE.machine_width (DA.denv dacc)))
           in
@@ -357,7 +357,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
                       (VB.create result_var result_uid NM.in_types)
                       (T.unknown_with_subkind kind
                          ~alloc_mode:
-                           (Apply.alloc_mode apply
+                           (Apply.return_mode apply
                           |> Alloc_mode.For_applications.as_type)
                          ~machine_width:(DE.machine_width denv)))
                   denv result_arity results
@@ -487,7 +487,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
          application must have a closure allocated on the heap as well, even
          though it was with a local alloc_mode. *)
       let alloc_region =
-        match Apply_expr.alloc_mode apply with
+        match Apply_expr.return_mode apply with
         | Not_alloc_stack { alloc_region }
         | Maybe_alloc_stack { alloc_region; _ } ->
           alloc_region
@@ -496,7 +496,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         ( Alloc_mode.For_applications.not_alloc_stack ~alloc_region,
           First_complex_local_param.Index (index - num_non_unarized_args) )
     | Index _ -> (
-      match Apply_expr.alloc_mode apply with
+      match Apply_expr.return_mode apply with
       | Not_alloc_stack _ ->
         (* This can happen in dead GADT match cases. *) Bottom
       | Maybe_alloc_stack _ as apply_alloc_mode ->
@@ -1056,7 +1056,7 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
           ~arg_types:
             (T.unknown_types_from_arity (Apply.return_arity apply)
                ~alloc_mode:
-                 (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+                 (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
                ~machine_width:(DE.machine_width denv))
       in
       dacc, Some use_id
@@ -1251,7 +1251,7 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         (Apply.exn_continuation apply)
         ~args ~args_arity:(Apply.args_arity apply)
         ~return_arity:(Apply.return_arity apply)
-        ~call_kind:(Apply.call_kind apply) ~alloc_mode:(Apply.alloc_mode apply)
+        ~call_kind:(Apply.call_kind apply) ~alloc_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
         ~inlined:(Apply.inlined apply) ~inlining_state
         ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -1295,7 +1295,7 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
       ~arg_types:
         (T.unknown_types_from_arity (Apply.return_arity apply)
            ~alloc_mode:
-             (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+             (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
            ~machine_width:(DE.machine_width denv))
   in
   let dacc, exn_cont_use_id =
@@ -1347,7 +1347,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
           let from_arity =
             T.unknown_types_from_arity return_arity
               ~alloc_mode:
-                (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+                (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
               ~machine_width:(DE.machine_width (DA.denv dacc))
           in
           match return_types with
@@ -1427,7 +1427,7 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
           ~arg_types:
             (T.unknown_types_from_arity (Apply.return_arity apply)
                ~alloc_mode:
-                 (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+                 (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
                ~machine_width:(DE.machine_width denv))
       in
       dacc, Some use_id
