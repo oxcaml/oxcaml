@@ -1,0 +1,108 @@
+Stdlib.ignore
+  ((fun x -> x) (fun ((module M) : (module Pack_types.S)) -> M.i) : (module
+  Pack_types.S) -> int)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun ((module M) : (module Pack_types.S)) -> ((module M) : (module
+        Pack_types.S)))
+  : (module Pack_types.S) -> (module Pack_types.S))
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun (type a) (((module M) : (module Pack_types.S with type t = a)) :
+        (module Pack_types.S with type t = a)) -> M.x)
+  : (module Pack_types.S with type t = 'a) -> 'a)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun (((module M) : (module Pack_types.S with type t = string)) :
+        (module Pack_types.S with type t = string)) -> ((module M) : (module
+        Pack_types.S with type t = string)))
+  : (module Pack_types.S with type t = string) -> (module
+  Pack_types.S with type t = string))
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun (type a) (((module M) : (module Pack_types.S with type t = a)) :
+        (module Pack_types.S with type t = a)) -> (((module M) : (module
+        Pack_types.S with type t = M.t)) : (module
+        Pack_types.S with type t = a)))
+  : (module Pack_types.S with type t = 'a) -> (module
+  Pack_types.S with type t = 'a))
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun
+        (Pack_types.W
+         (((module M) : (module Pack_types.S with type t = string))))
+        -> M.i)
+  : Pack_types.w -> int)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun
+        (Pack_types.W
+         (((module M) : (module Pack_types.S with type t = string))))
+        -> M.x)
+  : Pack_types.w -> string)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun
+        (Pack_types.W
+         (((module M) : (module Pack_types.S with type t = string))))
+        ->
+        Pack_types.W ((module M) : (module Pack_types.S with type t = M.t)))
+  : Pack_types.w -> Pack_types.w)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun
+        (Pack_types.V
+         (((module M) : (module Pack_types.S with type t = int * string))))
+        -> M.i)
+  : Pack_types.v -> int)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun
+        (Pack_types.V
+         (((module M) : (module Pack_types.S with type t = int * string))))
+        -> Stdlib.snd M.x)
+  : Pack_types.v -> string)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun
+        (Pack_types.V
+         (((module M) : (module Pack_types.S with type t = int * string))))
+        ->
+        Pack_types.V ((module M) : (module Pack_types.S with type t = M.t)))
+  : Pack_types.v -> Pack_types.v)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun
+        (Pack_types.U
+         (((module M) : (module Pack_types.S with type t = int * string))))
+        -> M.i)
+  : (int, string) Pack_types.u -> int)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun
+        (Pack_types.U
+         (((module M) : (module Pack_types.S with type t = int * string))))
+        -> Stdlib.snd M.x)
+  : (int, string) Pack_types.u -> string)
+
+Stdlib.ignore
+  ((fun x -> x)
+     (fun
+        (Pack_types.U
+         (((module M) : (module Pack_types.S with type t = int * string))))
+        ->
+        Pack_types.U ((module M) : (module Pack_types.S with type t = M.t)))
+  : (int, string) Pack_types.u -> (int, string) Pack_types.u)
+
