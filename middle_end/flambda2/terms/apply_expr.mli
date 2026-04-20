@@ -86,7 +86,7 @@ val return_arity : t -> [`Unarized] Flambda_arity.t
     method call, etc). *)
 val call_kind : t -> Call_kind.t
 
-val alloc_mode : t -> Alloc_mode.For_applications.t
+val return_mode : t -> Alloc_mode.For_applications.t
 
 (** Where to send the result of the application. *)
 val continuation : t -> Result_continuation.t
