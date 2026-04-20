@@ -1004,7 +1004,7 @@ type lambda =
   | Lassign of Ident.t * lambda
   | Lsend of
       meth_kind * lambda * lambda * lambda list
-      * region_close * locality_mode * scoped_location * layout
+      * region_close * return_mode * scoped_location * layout
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
@@ -3322,7 +3322,7 @@ let may_allocate_in_region lam =
     | Lfunction {mode=Alloc_local} -> raise Exit
 
     | Lapply {ap_mode=Maybe_alloc_stack}
-    | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
+    | Lsend (_,_,_,_,_,Maybe_alloc_stack,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
        begin match primitive_may_allocate prim with

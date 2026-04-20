@@ -2228,15 +2228,16 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
-      Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)
+      Lsend(Public, meth, obj, [], pos, not_alloc_stack, loc, layout)
   | Send_self (pos, layout), [obj; meth] ->
-      Lsend(Self, meth, obj, [], pos, alloc_heap, loc, layout)
+      Lsend(Self, meth, obj, [], pos, not_alloc_stack, loc, layout)
   | Send_cache (apos, layout), [obj; meth; cache; pos] ->
       (* Cached mode only works in the native backend *)
       if !Clflags.native_code then
-        Lsend(Cached, meth, obj, [cache; pos], apos, alloc_heap, loc, layout)
+        Lsend(Cached, meth, obj, [cache; pos], apos,
+              not_alloc_stack, loc, layout)
       else
-        Lsend(Public, meth, obj, [], apos, alloc_heap, loc, layout)
+        Lsend(Public, meth, obj, [], apos, not_alloc_stack, loc, layout)
   | Frame_pointers, [] ->
      (of_bool (!Clflags.native_code && Config.with_frame_pointers))
   | Identity, [arg] -> arg
