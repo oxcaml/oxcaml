@@ -239,8 +239,7 @@ let number = function
   | Incompatible_with_upstream _ -> 187
   | Degraded_to_partial_match -> 74
   | Unnecessarily_partial_tuple_pattern -> 75
-  | Unerasable_position_argument -> 188
-  (* 189 was [Unnecessarily_partial_tuple_pattern], now upstream as 75 *)
+  | Unerasable_position_argument -> 188 (* 189 is now upstream as 75 *)
   | Probe_name_too_long _ -> 190
   | Unused_kind_declaration _ -> 191
   | Zero_alloc_all_hidden_arrow _ -> 198
