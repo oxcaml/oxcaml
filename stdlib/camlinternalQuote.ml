@@ -1573,21 +1573,12 @@ module Ast = struct
       pp fmt "%a@ |@ %a" (print_pat env) pat1 (print_pat env) pat2
     | PatConstraint (pat, ty, modes) ->
       maybe_parens with_parens fmt (fun fmt () ->
-        let print_type =
-          match pat, ty with
-          | PatUnpack _, TypePackage pty ->
-            (* Package types should not be preceded by "module"
-               inside unpack patterns, so we have a separate case *)
-            fun fmt () -> print_package_type env fmt pty
-          | _ ->
-            fun fmt () -> print_core_type env fmt ty
-        in
         pp fmt "%a@ :@ %a%a"
-          (print_pat env) pat print_type ()
+          (print_pat env) pat (print_core_type env) ty
           print_mode_constraint modes)
     | PatLazy pat -> pp fmt "lazy@ (%a)" (print_pat env) pat
     | PatAnyModule -> pp fmt "module _"
-    | PatUnpack v -> pp fmt "module@ %a" (Var.Module.print env) v
+    | PatUnpack v -> pp fmt "(module@ %a)" (Var.Module.print env) v
     | PatException pat -> pp fmt "(exception@ %a)" (print_pat env) pat
 
   and print_mode_constraint fmt = function
