@@ -624,6 +624,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let reset_addressing () =
       (* Use a temporary to store the address [!base + !byte_offset]. *)
+      (* CR jrayman: should registers have a machtype of tagged int? *)
       let tmp = Reg.createv Cmm.typ_tagged_int in
       (* CR-someday xclerc: Now that this code in the "generic" part, it is
          maybe a bit unexpected to assume there is no better sequence to emit x

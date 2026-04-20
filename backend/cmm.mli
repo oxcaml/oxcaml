@@ -56,6 +56,8 @@ tracked by the GC:
      because they don't point after a well-formed block header of the
      kind that the GC needs.  However, the GC may move the block pointed
      into, invalidating the value of the [Addr] variable.
+
+CR jrayman
 *)
 
 type machtype = machtype_component array

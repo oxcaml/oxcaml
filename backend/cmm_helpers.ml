@@ -1626,13 +1626,13 @@ let addr_array_length_shifted hdr dbg = lsr_const hdr wordsize_shift dbg
    The optional ?typ argument is the C-- type of the result. By default, it is
    Addr, meaning we are constructing a derived pointer into the heap. If we know
    the pointer is outside the heap (this is the case for bigarray indexing), we
-   give type Int instead. *)
+   give type Int64 instead. *)
 
 let array_indexing ?typ log2size ptr ofs dbg =
   let add =
     match typ with
     | None | Some Addr -> Cadda
-    | Some (Tagged_int | Int64 | Int32 | Int16 | Int8) -> Caddi
+    | Some Int64 -> Caddi
     | _ -> assert false
   in
   match ofs with
