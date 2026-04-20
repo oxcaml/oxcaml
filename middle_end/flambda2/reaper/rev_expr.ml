@@ -43,7 +43,7 @@ and rev_named =
   | Static_consts of rev_static_const_or_code list
 
 and rev_static_const_or_code =
-  | Code of rev_code
+  | Code
   | Deleted_code
   | Static_const of rev_static_const
 

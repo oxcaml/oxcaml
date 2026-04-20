@@ -249,6 +249,8 @@ let with_is_tupled is_tupled t = { t with is_tupled }
 
 let with_result_types result_types t = { t with result_types }
 
+let with_inlining_decision inlining_decision t = { t with inlining_decision }
+
 module Option = struct
   include Option
 

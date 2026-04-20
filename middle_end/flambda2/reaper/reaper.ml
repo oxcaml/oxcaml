@@ -23,7 +23,9 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
       | None -> Exported_code.find_exn (load_code ()) code_id)
   in
   let Traverse.
-        { holed;
+        { toplevel_expr;
+          code;
+          ordered_code_ids;
           deps;
           kinds;
           fixed_arity_continuations;
@@ -44,9 +46,9 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   in
   let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }
       =
-    Rebuild.rebuild ~machine_width ~code_deps ~fixed_arity_continuations
-      ~continuation_info ~final_typing_env kinds solved_dep get_code_metadata
-      holed
+    Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
+      ~fixed_arity_continuations ~continuation_info ~final_typing_env kinds
+      solved_dep get_code_metadata toplevel_expr code
   in
   let all_code =
     Exported_code.add_code

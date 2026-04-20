@@ -17,7 +17,7 @@ let code inline(never) loopify(never) size(11) newer_version_of(large_2)
   cont k (int_add_2)
 in
 let $camlLarge_no_unbox__large_5 = closure large_2_1 @large in
-let code inline(never) loopify(never) size(8) newer_version_of(small_1)
+let code inline(never) loopify(never) size(5) newer_version_of(small_1)
       small_1_1
         (Pmakeblock_into_param_field_0,
          Pmakeblock_into_param_field_1,
@@ -33,7 +33,7 @@ let code inline(never) loopify(never) size(8) newer_version_of(small_1)
   cont k (int_add_1)
 in
 let $camlLarge_no_unbox__small_4 = closure small_1_1 @small in
-let code loopify(never) size(47) newer_version_of(f_0)
+let code loopify(never) size(36) newer_version_of(f_0)
       f_0_1 (x : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1

@@ -91,14 +91,18 @@ val get_continuation_info : t -> continuation_info Continuation.Map.t
 
 (** Register a [code_dep] for a code id, recording the function's parameters,
     returns, and call witnesses in the accumulator. *)
-val add_code : t -> Code_id.t -> code_dep -> unit
+val add_code_dep : t -> Code_id.t -> code_dep -> unit
 
 (** Look up the [code_dep] for a code id. Returns [None] if the code id has not
     been registered (e.g. it belongs to another compilation unit). *)
-val find_code : t -> Code_id.t -> code_dep option
+val find_code_dep : t -> Code_id.t -> code_dep option
 
 (** Return the map of all registered code deps. *)
 val code_deps : t -> code_dep Code_id.Map.t
+
+val add_code : t -> Code_id.t -> Rev_expr.rev_code -> unit
+
+val get_all_code : t -> Rev_expr.rev_code Code_id.Map.t
 
 (** Add a (directed) alias edge: [from] flows into [to_], meaning that every
     usage of [to_] is a usage of [from]; and every source of [from] is a source
@@ -230,8 +234,15 @@ val make_unknown_arity_apply_widget :
     resolved later by [deps] to connect closures to their function code in the
     graph. *)
 val add_set_of_closures_dep :
-  t -> Name.t -> Code_id.t -> only_full_applications:bool -> unit
+  t ->
+  Name.t ->
+  closure_code_id:Code_id.t ->
+  only_full_applications:bool ->
+  defined_in_code_id:Code_id.t option ->
+  unit
 
 (** Finalize the graph by resolving all deferred apply and set-of-closures
     dependencies, and return the completed dependency graph. *)
 val deps : t -> all_constants:Name.t -> Graph.graph
+
+val sort_code_ids : t -> Code_id.t array

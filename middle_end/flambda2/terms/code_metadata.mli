@@ -144,6 +144,8 @@ val with_is_tupled : bool -> t -> t
 
 val with_result_types : Result_types.t Or_unknown_or_bottom.t -> t -> t
 
+val with_inlining_decision : Function_decl_inlining_decision_type.t -> t -> t
+
 val print : Format.formatter -> t -> unit
 
 (** [free_names] does not return occurrences of value slots inside the

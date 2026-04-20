@@ -50,25 +50,29 @@ type closure_dep =
   }
 
 type t =
-  { mutable code : code_dep Code_id.Map.t;
+  { mutable code_deps : code_dep Code_id.Map.t;
+    mutable code : Rev_expr.rev_code Code_id.Map.t;
     mutable apply_deps : apply_dep list;
     mutable set_of_closures_deps : closure_dep list;
     deps : Graph.graph;
     mutable kinds : K.t Name.Map.t;
     mutable fixed_arity_conts : Continuation.Set.t;
-    mutable continuation_info : continuation_info Continuation.Map.t
+    mutable continuation_info : continuation_info Continuation.Map.t;
+    mutable set_of_closures_graph : Code_id.Set.t Code_id.Map.t
   }
 
-let code_deps t = t.code
+let code_deps t = t.code_deps
 
 let create () =
-  { code = Code_id.Map.empty;
+  { code_deps = Code_id.Map.empty;
+    code = Code_id.Map.empty;
     apply_deps = [];
     set_of_closures_deps = [];
     deps = Graph.create ();
     kinds = Name.Map.empty;
     fixed_arity_conts = Continuation.Set.empty;
-    continuation_info = Continuation.Map.empty
+    continuation_info = Continuation.Map.empty;
+    set_of_closures_graph = Code_id.Map.empty
   }
 
 let kinds t = t.kinds
@@ -108,9 +112,19 @@ let alias_kind t name simple =
   in
   t.kinds <- Name.Map.add name kind t.kinds
 
-let add_code t code_id dep = t.code <- Code_id.Map.add code_id dep t.code
+let add_code_dep t code_id dep =
+  t.code_deps <- Code_id.Map.add code_id dep t.code_deps
 
-let find_code t code_id = Code_id.Map.find_opt code_id t.code
+let find_code_dep t code_id = Code_id.Map.find_opt code_id t.code_deps
+
+let add_code t code_id code =
+  t.code <- Code_id.Map.add code_id code t.code;
+  t.set_of_closures_graph
+    <- Code_id.Map.update code_id
+         (function None -> Some Code_id.Set.empty | Some s -> Some s)
+         t.set_of_closures_graph
+
+let get_all_code t = t.code
 
 let add_alias t ~to_ ~from = Graph.add_alias t.deps ~to_ ~from
 
@@ -183,14 +197,26 @@ let get_continuation_info t = t.continuation_info
 
 let add_apply t apply = t.apply_deps <- apply :: t.apply_deps
 
-let add_set_of_closures_dep t let_bound_name_of_the_closure closure_code_id
-    ~only_full_applications =
+let add_set_of_closures_dep t let_bound_name_of_the_closure ~closure_code_id
+    ~only_full_applications ~defined_in_code_id =
   t.set_of_closures_deps
     <- { let_bound_name_of_the_closure;
          closure_code_id;
          only_full_applications
        }
-       :: t.set_of_closures_deps
+       :: t.set_of_closures_deps;
+  match defined_in_code_id with
+  | None -> ()
+  | Some defined_in_code_id ->
+    if
+      Compilation_unit.is_current (Code_id.get_compilation_unit closure_code_id)
+    then
+      t.set_of_closures_graph
+        <- Code_id.Map.update closure_code_id
+             (function
+               | None -> Some (Code_id.Set.singleton defined_in_code_id)
+               | Some s -> Some (Code_id.Set.add defined_in_code_id s))
+             t.set_of_closures_graph
 
 (*= Encoding of sets of closures and apply
 
@@ -423,7 +449,7 @@ let record_set_of_closures_deps_one_closure t
   let name = Code_id_or_name.name name in
   (* CR ncourant: use only_full_applications; not done here to avoid conflicts
      in code that will be rewritten for unbox-fv-closures anyway. *)
-  match find_code t code_id with
+  match find_code_dep t code_id with
   | None ->
     assert (
       not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id)));
@@ -464,7 +490,7 @@ let deps t ~all_constants =
            apply_call_witness
          } ->
       let code_dep =
-        match Code_id.Map.find_opt apply_code_id t.code with
+        match Code_id.Map.find_opt apply_code_id t.code_deps with
         | Some code_dep -> code_dep
         | None ->
           Misc.fatal_errorf
@@ -495,3 +521,17 @@ let deps t ~all_constants =
 
 let simple_to_node t ~denv s =
   simple_to_node t ~all_constants:(Env.all_constants denv) s
+
+module SCC = Strongly_connected_components.Make (Code_id)
+
+let sort_code_ids t =
+  let graph = t.set_of_closures_graph in
+  let r = SCC.connected_components_sorted_from_roots_to_leaf graph in
+  Array.map
+    (function
+      | SCC.No_loop code_id -> code_id
+      | SCC.Has_loop code_ids ->
+        Misc.fatal_errorf "Loop in code_id graph: %a"
+          (Format.pp_print_list Code_id.print)
+          code_ids)
+    r
