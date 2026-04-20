@@ -2751,7 +2751,7 @@ let assert_no_jkinds jkind =
     jkind
 
 (* Approximate the [core_type] for type annotation from a given [type_expr].
-   Used for annotating polymorphic applications with higher-rank types. *)
+   Used for annotating the results of type inspections in quotes. *)
 let type_for_annotation ~env ~loc typ =
   let unwrap_univar ty =
     match get_desc ty with
@@ -2903,6 +2903,12 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
   | Tpat_inspected_type (Polymorphic_parameter (Param ty)) ->
     Pat.constraint_ loc pat_lam
       (type_for_annotation ~env ~loc:(to_location loc) ty
+      |> quote_core_type ~scopes)
+      (Modes.wrap Modes.legacy)
+    |> Pat.wrap
+  | Tpat_inspected_type (Module_pack pty) ->
+    Pat.constraint_ loc pat_lam
+      (type_for_annotation ~env ~loc:(to_location loc) pty
       |> quote_core_type ~scopes)
       (Modes.wrap Modes.legacy)
     |> Pat.wrap
@@ -3608,6 +3614,14 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
          (Modes.wrap Modes.legacy)
       |> Type_constraint.wrap)
     |> Exp_desc.wrap
+  | Texp_inspected_type (Module_pack pty) ->
+    Exp_desc.constraint_ loc (mk_exp_noattr loc lambda)
+      (Type_constraint.constraint_ loc
+         (type_for_annotation ~env ~loc:(to_location loc) pty
+         |> quote_core_type ~scopes)
+         (Modes.wrap Modes.legacy)
+      |> Type_constraint.wrap)
+    |> Exp_desc.wrap
   | Texp_ghost_region -> lambda
   | Texp_borrowed ->
     Exp_desc.borrow loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
@@ -3621,8 +3635,7 @@ and update_env_with_extra ~loc extra =
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
   | Texp_mode _ -> ()
-  | Texp_inspected_type (Label_disambiguation _) -> ()
-  | Texp_inspected_type (Polymorphic_parameter _) -> ()
+  | Texp_inspected_type _ -> ()
   | Texp_ghost_region -> ()
   | Texp_borrowed -> ()
 
@@ -3635,8 +3648,7 @@ and update_env_without_extra ~loc extra =
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
   | Texp_mode _ -> ()
-  | Texp_inspected_type (Label_disambiguation _) -> ()
-  | Texp_inspected_type (Polymorphic_parameter _) -> ()
+  | Texp_inspected_type _ -> ()
   | Texp_ghost_region -> ()
   | Texp_borrowed -> ()
 

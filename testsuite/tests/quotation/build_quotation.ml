@@ -807,7 +807,10 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 <[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
 [%%expect {|
 - : <[(module Hashtbl.S) -> int -> unit]> expr =
-<[fun ((module M) : (module Stdlib.Hashtbl.S)) x -> M.clear (M.create x)]>
+<[
+  fun (((module M) : (module Stdlib.Hashtbl.S)) : (module Stdlib.Hashtbl.S))
+    x -> M.clear (M.create x)
+]>
 |}];;
 
 <[ fun (module _ : S) x -> 42 ]>;;
