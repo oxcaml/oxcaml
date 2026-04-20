@@ -3404,11 +3404,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     then Lambda.alloc_heap, first_complex_local_param - num_provided
     else Lambda.alloc_local, 0
   in
-  if
-    not
-      (Lambda.sub_return_mode
-         (Lambda.return_mode_of_locality_mode closure_alloc_mode)
-         apply.IR.mode)
+  if not (Lambda.locality_return_compat closure_alloc_mode apply.IR.mode)
   then
     (* This can happen in a dead GADT match case. *)
     ( acc,

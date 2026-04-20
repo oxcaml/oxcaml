@@ -1374,9 +1374,8 @@ val is_heap_mode : locality_mode -> bool
 
 val is_maybe_alloc_stack : return_mode -> bool
 val is_not_alloc_stack : return_mode -> bool
-val return_mode_of_locality_mode : locality_mode -> return_mode
 val eq_return_mode : return_mode -> return_mode -> bool
-val sub_return_mode : return_mode -> return_mode -> bool
+val locality_return_compat : locality_mode -> return_mode -> bool
 
 val primitive_may_allocate : primitive -> locality_mode option
   (** Whether and where a primitive may allocate.
