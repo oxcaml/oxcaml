@@ -63,7 +63,7 @@ module M :
   end
 module type S =
   sig
-    module F : (X : T) -> T
+    module F : functor (X : T) -> T @@ stateless
     module rec Fixed : sig type t = F(Fixed).t end
   end
 module Id : functor (X : T) -> sig type t = X.t end
@@ -122,8 +122,8 @@ module Foo (F : T -> T) = struct
 module M = Foo(Id);;
 M.f 5;;
 [%%expect{|
-module Foo : (F : T -> T) -> sig val f : Fix(F).Fixed.t -> Fix(F).Fixed.t end
-module M : sig val f : Fix(Id).Fixed.t -> Fix(Id).Fixed.t end
+module Foo :
+  functor (F : T -> T) -> sig val f : Fix(F).Fixed.t -> Fix(F).Fixed.t end
 Line 1:
 Error: In the signature of Fix(Id):
        The definition of "Fixed.t" contains a cycle:

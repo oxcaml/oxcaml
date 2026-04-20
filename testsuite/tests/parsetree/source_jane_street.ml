@@ -1014,9 +1014,10 @@ let matches =
 
 [%%expect{|
 type xy = x:int * y:int
-val lt : x:int * y:int * x:int * int = (~x:1, ~y:2, ~x:3, 4)
-val matches : int = 1
-val matches : int * int = (1, 2)
+Line 4, characters 9-30:
+4 | let lt = (~x:1, ~y:2, ~x:3, 4)
+             ^^^^^^^^^^^^^^^^^^^^^
+Error: This tuple expression has two labels named "x"
 |}]
 
 (********************)

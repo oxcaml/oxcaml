@@ -624,7 +624,7 @@ Line 1, characters 11-12:
                ^
 Error: Unbound unboxed record field "b"
 Hint: There is a boxed record field with this name.
-      Note that float- and [@@unboxed]- records don't get unboxed versions.
+Note that float- and [@@unboxed]- records don't get unboxed versions.
 |}]
 
 let _ = { u = #5.0 }
@@ -643,7 +643,7 @@ Line 1, characters 22-23:
                           ^
 Error: Unbound record field "u"
 Hint: There is an unboxed record field with this name.
-      To project an unboxed record field, use ".#u" instead of ".u".
+To project an unboxed record field, use ".#u" instead of ".u".
 |}]
 
 let bad_get t = t.#b
@@ -653,7 +653,7 @@ Line 1, characters 19-20:
                        ^
 Error: Unbound unboxed record field "b"
 Hint: There is a boxed record field with this name.
-      Note that float- and [@@unboxed]- records don't get unboxed versions.
+Note that float- and [@@unboxed]- records don't get unboxed versions.
 |}]
 
 (*****************************************************************************)

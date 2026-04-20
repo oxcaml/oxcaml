@@ -81,11 +81,12 @@ module type WEAPON_LIB =
     module T :
       sig type t = t val eq : t -> t -> bool val to_string : t -> string end
     module Make :
-      (TV : sig
-              type combined
-              type t = t/2
-              val map : (combined -> t) * (t -> combined)
-            end)
+      functor
+        (TV : sig
+                type combined
+                type t = t
+                val map : (combined -> t) * (t -> combined)
+              end)
         -> USERCODE(TV).F
   end
 module type X = functor (X : CORE) -> BARECODE
