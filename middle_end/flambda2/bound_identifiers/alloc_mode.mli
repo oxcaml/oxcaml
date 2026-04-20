@@ -64,13 +64,6 @@ module For_applications : sig
   val as_type : t -> For_types.t
 
   val from_lambda :
-    Lambda.locality_mode ->
-    current_alloc_region:Variable.t ->
-    current_region:Variable.t option ->
-    current_ghost_region:Variable.t option ->
-    t
-
-  val from_lambda_return_mode :
     Lambda.return_mode ->
     current_alloc_region:Variable.t ->
     current_region:Variable.t option ->
@@ -109,12 +102,6 @@ module For_allocations : sig
 
   val from_lambda :
     Lambda.locality_mode ->
-    current_alloc_region:Variable.t ->
-    current_region:Variable.t option ->
-    t
-
-  val from_lambda_return_mode :
-    Lambda.return_mode ->
     current_alloc_region:Variable.t ->
     current_region:Variable.t option ->
     t
