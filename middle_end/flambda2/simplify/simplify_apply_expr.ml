@@ -466,7 +466,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         ( Alloc_mode.For_applications.not_alloc_stack,
           first_complex_local_param - num_non_unarized_args )
     else
-      match Apply_expr.alloc_mode apply with
+      match Apply_expr.return_mode apply with
       | Not_alloc_stack ->
         (* This can happen in dead GADT match cases. *) Bottom
       | Maybe_alloc_stack _ as apply_alloc_mode -> Ok (apply_alloc_mode, 0)
@@ -1203,7 +1203,7 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         (Apply.exn_continuation apply)
         ~args ~args_arity:(Apply.args_arity apply)
         ~return_arity:(Apply.return_arity apply)
-        ~call_kind:(Apply.call_kind apply) ~alloc_mode:(Apply.alloc_mode apply)
+        ~call_kind:(Apply.call_kind apply) ~alloc_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
         ~inlined:(Apply.inlined apply) ~inlining_state
         ~probe:(Apply.probe apply) ~position:(Apply.position apply)

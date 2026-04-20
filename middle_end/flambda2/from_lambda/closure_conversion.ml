@@ -505,7 +505,7 @@ module Inlining = struct
           "Trying to call [Closure_conversion.Inlining.inline] on a non-OCaml \
            function call."
     in
-    let region_inlined_into = Apply.alloc_mode apply in
+    let region_inlined_into = Apply.return_mode apply in
     let args = Apply.args apply in
     let apply_return_continuation = Apply.continuation apply in
     let apply_exn_continuation = Apply.exn_continuation apply in
