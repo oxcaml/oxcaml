@@ -8,11 +8,7 @@ module T = Flambda2_types
 module TE = Flambda2_types.Typing_env
 
 let _test_recursive_meet () =
-  let env =
-    TE.create
-      ~resolver:(fun _ -> None)
-      ~machine_width:Sixty_four
-  in
+  let env = TE.create ~resolver:(fun _ -> None) ~machine_width:Sixty_four in
   let var_x = Variable.create "x" Flambda_kind.value in
   let var_y = Variable.create "y" Flambda_kind.value in
   let var_z = Variable.create "z" Flambda_kind.value in
@@ -60,11 +56,7 @@ let _test_recursive_meet () =
   | Bottom -> Format.eprintf "Bottom@."
 
 let _test_bottom_detection () =
-  let env =
-    TE.create
-      ~resolver:(fun _ -> None)
-      ~machine_width:Sixty_four
-  in
+  let env = TE.create ~resolver:(fun _ -> None) ~machine_width:Sixty_four in
   let var_x = Variable.create "x" Flambda_kind.value in
   let n_x = Name.var var_x in
   let nb_x = Bound_name.create n_x Name_mode.normal in
@@ -95,11 +87,7 @@ let _test_bottom_detection () =
   | Bottom -> Format.eprintf "Bottom@."
 
 let _test_bottom_recursive () =
-  let env =
-    TE.create
-      ~resolver:(fun _ -> None)
-      ~machine_width:Sixty_four
-  in
+  let env = TE.create ~resolver:(fun _ -> None) ~machine_width:Sixty_four in
   let var_x = Variable.create "x" Flambda_kind.value in
   let n_x = Name.var var_x in
   let nb_x = Bound_name.create n_x Name_mode.normal in
@@ -140,11 +128,7 @@ let _test_bottom_recursive () =
     Format.eprintf "Bottom@."
 
 let test_double_recursion () =
-  let env =
-    TE.create
-      ~resolver:(fun _ -> None)
-      ~machine_width:Sixty_four
-  in
+  let env = TE.create ~resolver:(fun _ -> None) ~machine_width:Sixty_four in
   let var_x = Variable.create "x" Flambda_kind.value in
   let var_y = Variable.create "y" Flambda_kind.value in
   let var_z = Variable.create "z" Flambda_kind.value in

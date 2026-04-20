@@ -767,8 +767,7 @@ let invariant_for_new_equation (t : t) name ty =
   then (
     invariant_for_alias t name ty;
     let defined_names =
-      Name_occurrences.create_names (name_domain t)
-        Name_mode.in_types
+      Name_occurrences.create_names (name_domain t) Name_mode.in_types
     in
     let free_names = Name_occurrences.with_only_names (TG.free_names ty) in
     if not (Name_occurrences.subset_domain free_names defined_names)
@@ -777,12 +776,16 @@ let invariant_for_new_equation (t : t) name ty =
         Name_occurrences.diff free_names ~without:defined_names
       in
       let has_local_unbound_name =
-        Name_occurrences.fold_names unbound_names ~init:false ~f:(fun acc name ->
+        Name_occurrences.fold_names unbound_names ~init:false
+          ~f:(fun acc name ->
             acc || Compilation_unit.is_current (Name.compilation_unit name))
       in
-      if has_local_unbound_name then
-      Misc.fatal_errorf "New equation@ %a@ =@ %a@ has unbound local names@ (%a):@ %a"
-        Name.print name TG.print ty Name_occurrences.print unbound_names print t)
+      if has_local_unbound_name
+      then
+        Misc.fatal_errorf
+          "New equation@ %a@ =@ %a@ has unbound local names@ (%a):@ %a"
+          Name.print name TG.print ty Name_occurrences.print unbound_names print
+          t)
 
 let replace_equation (t : t) name ty =
   (if Flambda_features.Debug.concrete_types_only_on_canonicals ()
