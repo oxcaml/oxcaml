@@ -31,10 +31,9 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   let toplevel_my_ghost_region = FU.toplevel_my_ghost_region unit in
   let module_symbol = FU.module_symbol unit in
   let resolver = Flambda_cmx.load_cmx_file_contents cmx_loader in
-  let get_imported_names = Flambda_cmx.get_imported_names cmx_loader in
   let get_imported_code = Flambda_cmx.get_imported_code cmx_loader in
   let denv =
-    DE.create ~round ~machine_width ~resolver ~get_imported_names
+    DE.create ~round ~machine_width ~resolver
       ~get_imported_code
       ~propagating_float_consts:(Flambda_features.float_const_prop ())
       ~unit_toplevel_return_continuation:return_continuation

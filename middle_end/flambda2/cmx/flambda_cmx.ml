@@ -21,7 +21,6 @@ module Imported_unit_map = Global_module.Name.Map
 
 type loader =
   { get_module_info : Compilation_unit.t -> Flambda_cmx_format.t option;
-    mutable imported_names : Name.Set.t;
     mutable imported_code : Exported_code.t;
     mutable imported_units : TE.Serializable.t option Imported_unit_map.t
   }
@@ -49,9 +48,6 @@ let load_cmx_file_contents loader comp_unit =
           let typing_env, all_code =
             Flambda_cmx_format.import_typing_env_and_code cmx
           in
-          let newly_imported_names = TE.Serializable.name_domain typing_env in
-          loader.imported_names
-            <- Name.Set.union newly_imported_names loader.imported_names;
           loader.imported_code <- EC.merge all_code loader.imported_code;
           let offsets = Flambda_cmx_format.exported_offsets cmx in
           Exported_offsets.import_offsets offsets;
@@ -98,7 +94,6 @@ let predefined_exception_typing_env () =
 let create_loader ~get_module_info =
   let loader =
     { get_module_info;
-      imported_names = Name.Set.empty;
       imported_code = Exported_code.empty;
       imported_units = Imported_unit_map.empty
     }
@@ -108,11 +103,7 @@ let create_loader ~get_module_info =
     <- Imported_unit_map.singleton
          (Compilation_unit.Name.to_global_name Compilation_unit.Name.predef_exn)
          (Some predefined_exception_typing_env);
-  loader.imported_names
-    <- TE.Serializable.name_domain predefined_exception_typing_env;
   loader
-
-let get_imported_names loader () = loader.imported_names
 
 let get_imported_code loader () = loader.imported_code
 

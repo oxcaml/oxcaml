@@ -11,7 +11,6 @@ let _test_recursive_meet () =
   let env =
     TE.create
       ~resolver:(fun _ -> None)
-      ~get_imported_names:(fun () -> Name.Set.empty)
       ~machine_width:Sixty_four
   in
   let var_x = Variable.create "x" Flambda_kind.value in
@@ -64,7 +63,6 @@ let _test_bottom_detection () =
   let env =
     TE.create
       ~resolver:(fun _ -> None)
-      ~get_imported_names:(fun () -> Name.Set.empty)
       ~machine_width:Sixty_four
   in
   let var_x = Variable.create "x" Flambda_kind.value in
@@ -100,7 +98,6 @@ let _test_bottom_recursive () =
   let env =
     TE.create
       ~resolver:(fun _ -> None)
-      ~get_imported_names:(fun () -> Name.Set.empty)
       ~machine_width:Sixty_four
   in
   let var_x = Variable.create "x" Flambda_kind.value in
@@ -146,7 +143,6 @@ let test_double_recursion () =
   let env =
     TE.create
       ~resolver:(fun _ -> None)
-      ~get_imported_names:(fun () -> Name.Set.empty)
       ~machine_width:Sixty_four
   in
   let var_x = Variable.create "x" Flambda_kind.value in

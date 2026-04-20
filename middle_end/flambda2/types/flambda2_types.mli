@@ -159,7 +159,6 @@ module Typing_env : sig
   val create :
     machine_width:Target_system.Machine_width.t ->
     resolver:(Compilation_unit.t -> Serializable.t option) ->
-    get_imported_names:(unit -> Name.Set.t) ->
     t
 
   val machine_width : t -> Target_system.Machine_width.t

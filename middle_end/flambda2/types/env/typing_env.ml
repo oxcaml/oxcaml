@@ -107,7 +107,6 @@ type t =
   { machine_width : Target_system.Machine_width.t;
     resolver : Compilation_unit.t -> serializable option;
     binding_time_resolver : Name.t -> Binding_time.With_name_mode.t;
-    get_imported_names : unit -> Name.Set.t;
     defined_symbols : Symbol.Set.t;
     code_age_relation : Code_age_relation.t;
     prev_levels : One_level.t list;
@@ -142,7 +141,7 @@ let aliases t =
 
 (* CR-someday mshinwell: Should print name occurrence kinds *)
 let [@ocamlformat "disable"] print ppf
-      ({ resolver = _; binding_time_resolver = _;get_imported_names = _;
+      ({ resolver = _; binding_time_resolver = _;
          prev_levels; current_level; next_binding_time = _;
          defined_symbols; code_age_relation; min_binding_time;
          is_bottom; machine_width = _
@@ -341,8 +340,6 @@ let binding_time_resolver resolver name =
 
 let resolver t = t.resolver
 
-let get_imported_names t = t.get_imported_names
-
 let code_age_relation_resolver t comp_unit =
   match t.resolver comp_unit with
   | None -> None
@@ -350,11 +347,10 @@ let code_age_relation_resolver t comp_unit =
 
 let current_scope t = One_level.scope t.current_level
 
-let create ~machine_width ~resolver ~get_imported_names =
+let create ~machine_width ~resolver =
   { machine_width;
     resolver;
     binding_time_resolver = binding_time_resolver resolver;
-    get_imported_names;
     prev_levels = [];
     (* Since [Scope.prev] may be used in the simplifier on this scope, in order
        to allow an efficient implementation of [cut] (see below), we always
@@ -551,36 +547,15 @@ let binding_time_and_mode_of_simple t simple =
     ~const:(fun _ -> Binding_time.With_name_mode.consts)
     ~name:(fun name ~coercion:_ -> binding_time_and_mode t name)
 
-let variable_definitely_not_in_scope t var =
-  (* If we have an equation, we might be in scope.
-
-     If we have no equation, and we are from the current compilation unit, we
-     are definitely not in scope (we add an equation with an unknown type and
-     the binding time when defining a variable).
-
-     If we have no equation, but we are defined in another compilation unit, we
-     are either in scope (defined in the other compilation unit), or there is a
-     inconsistency. We ignore that last possibility and simply say that
-     variables defined in another compilation unit might be in scope. *)
-  (not (Name.Map.mem (Name.var var) (names_to_types t)))
-  && Compilation_unit.is_current (Variable.compilation_unit var)
-
 let mem ?min_name_mode t name =
-  (* CR bclement: Consider checking the compilation unit instead of the
-     [get_imported_names] map so that we treat variables from missing cmxes as
-     being in the environment (see also the comment in
-     [variable_definitely_not_in_scope]).
-
-     If we do this, we can get rid of [variable_definitely_not_in_scope] and use
-     [mem] directly instead. *)
   Name.pattern_match name
     ~var:(fun _var ->
       let name_mode =
         match Name.Map.find name (names_to_types t) with
         | exception Not_found ->
-          if Name.Set.mem name (t.get_imported_names ())
-          then Some Name_mode.in_types
-          else None
+          if Compilation_unit.is_current (Name.compilation_unit name)
+          then None
+          else Some Name_mode.in_types
         | _ty, binding_time_and_mode ->
           let scoped_name_mode =
             Binding_time.With_name_mode.scoped_name_mode binding_time_and_mode
@@ -596,10 +571,8 @@ let mem ?min_name_mode t name =
         | None -> false
         | Some c -> c <= 0))
     ~symbol:(fun sym ->
-      (* CR mshinwell: This might not take account of symbols in missing .cmx
-         files *)
       Symbol.Set.mem sym t.defined_symbols
-      || Name.Set.mem name (t.get_imported_names ()))
+      || not (Compilation_unit.is_current (Name.compilation_unit name)))
 
 let mem_simple ?min_name_mode t simple =
   Simple.pattern_match simple
@@ -794,8 +767,7 @@ let invariant_for_new_equation (t : t) name ty =
   then (
     invariant_for_alias t name ty;
     let defined_names =
-      Name_occurrences.create_names
-        (Name.Set.union (name_domain t) (t.get_imported_names ()))
+      Name_occurrences.create_names (name_domain t)
         Name_mode.in_types
     in
     let free_names = Name_occurrences.with_only_names (TG.free_names ty) in
@@ -804,7 +776,12 @@ let invariant_for_new_equation (t : t) name ty =
       let unbound_names =
         Name_occurrences.diff free_names ~without:defined_names
       in
-      Misc.fatal_errorf "New equation@ %a@ =@ %a@ has unbound names@ (%a):@ %a"
+      let has_local_unbound_name =
+        Name_occurrences.fold_names unbound_names ~init:false ~f:(fun acc name ->
+            acc || Compilation_unit.is_current (Name.compilation_unit name))
+      in
+      if has_local_unbound_name then
+      Misc.fatal_errorf "New equation@ %a@ =@ %a@ has unbound local names@ (%a):@ %a"
         Name.print name TG.print ty Name_occurrences.print unbound_names print t)
 
 let replace_equation (t : t) name ty =
