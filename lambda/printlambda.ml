@@ -1205,15 +1205,6 @@ let apply_kind name pos mode =
     | Rc_nontail -> name ^ "nontail"
     | Rc_close_at_apply -> name ^ "tail"
   in
-  name ^ locality_kind mode
-
-let apply_kind_ret name pos mode =
-  let name =
-    match pos with
-    | Rc_normal -> name
-    | Rc_nontail -> name ^ "nontail"
-    | Rc_close_at_apply -> name ^ "tail"
-  in
   name ^ return_mode_kind mode
 
 let debug_uid ppf duid =
@@ -1289,7 +1280,7 @@ let rec lam ppf = function
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
       let form =
-        apply_kind_ret "apply" ap.ap_region_close ap.ap_mode
+        apply_kind "apply" ap.ap_region_close ap.ap_mode
       in
       fprintf ppf "@[<2>(%s@ %a%a%a%a%a%a)@]" form
         lam ap.ap_func lams ap.ap_args
