@@ -33,22 +33,15 @@ in
 let $camlTests14__needs_try_region_6 =
   closure needs_try_region_2_1 @needs_try_region
 in
-let code loopify(never) size(23) newer_version_of(gadt_match_3)
+let code loopify(never) size(12) newer_version_of(gadt_match_3)
       gadt_match_3_1 (x : [ 0 |1 | 0 of imm tagged ], n : val)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : val =
-  (let prim = %is_int (x) in
-   switch prim
-     | 0 -> k3
-     | 1 -> k4)
-    where k4 =
-      let untagged = %untag_imm (x) in
-      switch untagged
-        | 0 -> k (n)
-        | 1 -> k2
-    where k3 =
-      invalid "Zero_switch_arms"
+  (let untagged = %untag_imm (x) in
+   switch untagged
+     | 0 -> k (n)
+     | 1 -> k2)
     where k2 =
       let Popaque = %opaque (n) in
       cont k (Popaque)
