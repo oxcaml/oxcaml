@@ -20,8 +20,8 @@ For example, consider the identity function:
 let id : 'a. 'a -> 'a = fun x -> x
 ```
 
-In upstream OCaml, this is about as polymorphic as you can get! I can call `id x` on any
-value `x`, regardless of its type, and get the same value back out.
+In stock OCaml, this is about as polymorphic as you can get! I can call `id x`
+on any value `x`, regardless of its type, and get the same value back out.
 
 But in OxCaml, things are more complex. If my value is stack-allocated, then it will be at 
 mode `local`, so my identity function had better not do anything funny like stick it in a 
@@ -218,4 +218,3 @@ val%template min_inan : t @ m -> t @ m -> t @ m
 val%template max_inan : t @ m -> t @ m -> t @ m
 [@@mode m = (global, local)]
 ```
-

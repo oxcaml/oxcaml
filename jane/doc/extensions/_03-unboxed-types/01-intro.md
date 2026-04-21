@@ -600,11 +600,11 @@ OxCaml provides mechanisms to assert your code depends on the current
 representation. The mechanism depends on whether you are writing C bindings
 or (unsafe) OCaml code.
 
-Note also that, while unboxed types are generally considered an "upstream
-compatible" (because they can be erased while preserving behavior), depending on
-the exact representation of mixed blocks is not. Thus, use of these mechanisms is
-also a sign that your code may need a custom mechanism if it is intended to work
-both in OxCaml and upstream OCaml.
+Note also that, while unboxed types are generally considered compatible with
+stock OCaml (because they can be erased while preserving behavior), depending on
+the exact representation of mixed blocks is not. Thus, use of these mechanisms
+is also a sign that your code may need a custom mechanism if it is intended to
+work both with OxCaml and with stock OCaml.
 
 ### In C bindings
 
