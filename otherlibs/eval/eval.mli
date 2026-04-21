@@ -27,10 +27,3 @@
 
 (** Evaluate a quoted OCaml expression at runtime. *)
 val eval : 'a expr @ once -> 'a eval
-
-(** Disallow the reading of bundles from the current executable. Instead, fetch
-    them via the normal mechanisms used by compilerlibs. This should only be
-    used if the compilerlibs state in the process is already set up with the
-    correct [Load_path] information for .cmi and .cmx resolution (as is the case
-    in mdx, for example). *)
-val use_existing_compilerlibs_state_for_artifacts : unit -> unit

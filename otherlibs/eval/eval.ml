@@ -100,10 +100,8 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
   cmis := new_cmis;
   cmxs := new_cmxs
 
-let use_existing_compilerlibs_state_for_artifacts = ref false
-
 let read_bundles_from_exe () =
-  assert (not !use_existing_compilerlibs_state_for_artifacts);
+  assert (not (Opttoploop.using_existing_compilerlibs_state_for_artifacts ()));
   let marshalled_cmi_bundle =
     find_bundle_in_exe ~ext:"cmi" bundled_cmis_this_exe
   in
@@ -121,7 +119,9 @@ let eval (expr : 'a expr) =
   (* TODO: assert the JIT is supported *)
   let id = !counter in
   incr counter;
-  if id = 0 && not !use_existing_compilerlibs_state_for_artifacts
+  if
+    id = 0
+    && not (Opttoploop.using_existing_compilerlibs_state_for_artifacts ())
   then read_bundles_from_exe ();
   (* TODO: reset all the things *)
   (* TODO: these flags should maybe be snapshotted and restored *)
@@ -165,7 +165,7 @@ let eval (expr : 'a expr) =
         true)
       !cmxs
   in
-  (if not !use_existing_compilerlibs_state_for_artifacts
+  (if not (Opttoploop.using_existing_compilerlibs_state_for_artifacts ())
    then
      Persistent_env.Persistent_signature.load
        := fun ~allow_hidden:_ ~unit_name ->
@@ -242,6 +242,3 @@ let eval code =
         let backtrace = Printexc.get_raw_backtrace () in
         Location.report_exception Format.std_formatter exn;
         Printexc.raise_with_backtrace exn backtrace)
-
-let use_existing_compilerlibs_state_for_artifacts () =
-  use_existing_compilerlibs_state_for_artifacts := true
