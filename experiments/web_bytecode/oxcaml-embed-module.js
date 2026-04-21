@@ -4,7 +4,7 @@ import {
   ready,
   runString,
   utopString,
-} from "./backend.js";
+} from "./backend.js?v=20260421-utop-output";
 import {
   EditorState,
   RangeSetBuilder,
