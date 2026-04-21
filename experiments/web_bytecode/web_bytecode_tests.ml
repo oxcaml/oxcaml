@@ -38,6 +38,13 @@ let () =
       ~source:"let x = 1\n"
   in
   expect_equal "check_ok" "" check_ok;
+  let interface_ok =
+    Web_bytecode_native.interface_string
+      ~filename:"interface_ok.ml"
+      ~source:"let x = 1\nlet square n = n * n\n"
+  in
+  expect_contains "interface_ok_x" "val x : int" interface_ok;
+  expect_contains "interface_ok_square" "val square : int -> int" interface_ok;
   let check_syntax_error =
     Web_bytecode_native.check_string
       ~filename:"check_syntax_error.ml"
@@ -56,6 +63,13 @@ let () =
       ~source:"print_endline \"hi\";;\n"
   in
   expect_equal "run_ok" "hi\n" run_ok;
+  let utop_ok =
+    Web_bytecode_native.utop_string
+      ~filename:"utop_ok.ml"
+      ~source:"let x = 3;;\nlet y = x + 4;;\n"
+  in
+  expect_contains "utop_ok_x" "val x : int = 3" utop_ok;
+  expect_contains "utop_ok_y" "val y : int = 7" utop_ok;
   let run_error =
     Web_bytecode_native.run_string
       ~filename:"run_error.ml"

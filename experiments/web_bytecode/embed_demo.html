@@ -94,15 +94,15 @@
         <p>
           OCaml programs are built from expressions. A <code>let</code> binding
           names the result of an expression, and the compiler infers the type.
-          Change the strings or arithmetic below and the output will update.
+          This first editor is in utop mode, so each phrase ending in
+          <code>;;</code> prints the value and inferred type as you edit.
         </p>
 
-        <oxcaml>
-          let language = "OCaml"
-          let year = 1996 + 1
-
-          let () =
-            Printf.printf "%s has had type inference since %d.\n" language year
+        <oxcaml utop>
+          let language = "OCaml";;
+          let year = 1996 + 1;;
+          let message =
+            Printf.sprintf "%s has had type inference since %d." language year;;
         </oxcaml>
       </section>
 

@@ -1,7 +1,9 @@
 import {
   addBackendStatusListener,
+  interfaceString,
   ready,
   runString,
+  utopString,
 } from "./backend.js";
 import {
   EditorState,
@@ -31,12 +33,29 @@ import {
 } from "https://esm.sh/@codemirror/commands@6.8.1?deps=@codemirror/state@6.5.2,@codemirror/view@6.38.6,@codemirror/language@6.11.3";
 
 const autoRunDelayMs = 360;
+const storagePrefix = "oxcaml-editor:v1";
 const mountedEditors = new Set();
 const setDiagnosticsEffect = StateEffect.define();
 const setSyntaxDecorationsEffect = StateEffect.define();
 
 const oxcamlIdentifierNames = new Set(["local_", "stack_", "exclave_"]);
 const packageModuleNames = new Set(["Base", "Core", "Stdlib_stable"]);
+const primitiveTypeNames = new Set([
+  "array",
+  "bool",
+  "bytes",
+  "char",
+  "exn",
+  "float",
+  "int",
+  "list",
+  "nativeint",
+  "option",
+  "ref",
+  "result",
+  "string",
+  "unit",
+]);
 const keywordTokens = new Set([
   "and", "as", "assert", "begin", "class", "constraint", "do", "done",
   "downto", "else", "end", "exception", "external", "false", "for", "fun",
@@ -72,6 +91,54 @@ function dedent(source) {
     .map((line) => /^ */.exec(line)?.[0].length ?? 0);
   const minIndent = indents.length ? Math.min(...indents) : 0;
   return lines.map((line) => line.slice(minIndent)).join("\n");
+}
+
+function pageStorageScope() {
+  try {
+    const url = new URL(window.location.href);
+    url.hash = "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
+function stableHash(text) {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function storageKeyForSource(source, duplicateIndex = 0) {
+  const duplicateSuffix = duplicateIndex > 0 ? `:${duplicateIndex}` : "";
+  return `${storagePrefix}:${pageStorageScope()}:${source.length}:${stableHash(source)}${duplicateSuffix}`;
+}
+
+function readStoredSource(storageKey) {
+  try {
+    return window.localStorage.getItem(storageKey);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSource(storageKey, source) {
+  try {
+    window.localStorage.setItem(storageKey, source);
+  } catch {
+    // Storage can be unavailable or full; the editor should still run normally.
+  }
+}
+
+function removeStoredSource(storageKey) {
+  try {
+    window.localStorage.removeItem(storageKey);
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
 function markerDocRange(doc, marker) {
@@ -416,6 +483,8 @@ function classifySyntaxToken(tokens, index, source) {
             ? "tok-module"
             : "tok-constructor",
         );
+      } else if (primitiveTypeNames.has(token.text)) {
+        classes.push("tok-type");
       } else if (parameterIntroducers.has(prev?.text ?? "")) {
         classes.push("tok-parameter");
       } else if (declarationIntroducers.has(prev?.text ?? "")) {
@@ -452,8 +521,99 @@ function buildSyntaxDecorations(source) {
   return builder.finish();
 }
 
+function highlightedSyntaxHtml(source) {
+  const tokens = tokenizeSyntax(source);
+  let cursor = 0;
+  let html = "";
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    const className = classifySyntaxToken(tokens, index, source);
+    if (!className) {
+      continue;
+    }
+    html += escapeHtml(source.slice(cursor, token.from));
+    html += `<span class="${className}">${escapeHtml(source.slice(token.from, token.to))}</span>`;
+    cursor = token.to;
+  }
+  html += escapeHtml(source.slice(cursor));
+  return html;
+}
+
+function isOutcomeLine(line) {
+  return /^\s*(val|type|module|module type|exception|external|class|class type)\b/.test(line);
+}
+
+function splitOutcomeTypeAndValue(text) {
+  const separator = " = ";
+  const index = text.indexOf(separator);
+  if (index === -1) {
+    return { typeText: text, valueText: null };
+  }
+  return {
+    typeText: text.slice(0, index),
+    valueText: text.slice(index + separator.length),
+  };
+}
+
+function highlightedOutcomeHtml(line) {
+  const leadingMatch = /^(\s*)/.exec(line);
+  const leading = leadingMatch ? leadingMatch[1] : "";
+  const body = line.slice(leading.length);
+  const valueMatch = /^(val)\s+([A-Za-z_][A-Za-z0-9_']*)\s*:\s*(.+)$/.exec(body);
+  if (!valueMatch) {
+    return escapeHtml(leading) + highlightedSyntaxHtml(body || " ");
+  }
+  const { typeText, valueText } = splitOutcomeTypeAndValue(valueMatch[3]);
+  const valueHtml = valueText === null
+    ? ""
+    : ` <span class="utop-outcome__equals">=</span> <span class="utop-outcome__value">${highlightedSyntaxHtml(valueText)}</span>`;
+  return (
+    `${escapeHtml(leading)}<span class="utop-outcome__keyword">${escapeHtml(valueMatch[1])}</span> ` +
+    `<span class="utop-outcome__name">${escapeHtml(valueMatch[2])}</span>` +
+    ` <span class="utop-outcome__punctuation">:</span> ` +
+    `<span class="utop-outcome__type">${highlightedSyntaxHtml(typeText.trim())}</span>` +
+    valueHtml
+  );
+}
+
 function sourceText(editor) {
   return editor.view ? editor.view.state.doc.toString() : "";
+}
+
+function updateResetState(editor) {
+  if (!editor.resetButtonEl) {
+    return;
+  }
+  const isModified = sourceText(editor) !== editor.originalSource;
+  editor.resetButtonEl.hidden = !isModified;
+  editor.root.dataset.modified = isModified ? "true" : "false";
+}
+
+function persistEditorSource(editor) {
+  const source = sourceText(editor);
+  if (source === editor.originalSource) {
+    removeStoredSource(editor.storageKey);
+  } else {
+    writeStoredSource(editor.storageKey, source);
+  }
+  updateResetState(editor);
+}
+
+function replaceEditorSource(editor, source) {
+  if (!editor.view) {
+    return;
+  }
+  editor.suppressEditorChanges = true;
+  editor.view.dispatch({
+    changes: {
+      from: 0,
+      to: editor.view.state.doc.length,
+      insert: source,
+    },
+    effects: setDiagnosticsEffect.of([]),
+  });
+  editor.suppressEditorChanges = false;
+  scheduleSyntaxRefresh(editor);
 }
 
 function scheduleSyntaxRefresh(editor) {
@@ -614,7 +774,18 @@ function buildTranscript(editor, text, { emptyPlaceholder = null, forceDiagnosti
           ? ""
           : ` data-marker-index="${markerIndex}" tabindex="0" role="button"`;
       const clickableClass = markerIndex === undefined ? "" : " clickable";
-      return `<span class="transcript-line ${info.cls}${clickableClass}"${attrs}>${escapeHtml(line || " ")}\n</span>`;
+      let lineHtml = escapeHtml(line || " ");
+      if (info.cls === "code") {
+        const match = /^(\d+\s+\|\s?)(.*)$/.exec(line);
+        if (match) {
+          lineHtml =
+            `<span class="diagnostic-code-prefix">${escapeHtml(match[1])}</span>` +
+            highlightedSyntaxHtml(match[2]);
+        }
+      } else if (info.cls === "stream" && isOutcomeLine(line)) {
+        lineHtml = highlightedOutcomeHtml(line || " ");
+      }
+      return `<span class="transcript-line ${info.cls}${clickableClass}"${attrs}>${lineHtml}\n</span>`;
     })
     .join("");
 
@@ -626,6 +797,21 @@ function buildTranscript(editor, text, { emptyPlaceholder = null, forceDiagnosti
     tone: hasError ? "error" : hasWarning ? "warning" : "output",
     html: `<pre class="transcript">${body}</pre>`,
   };
+}
+
+function buildInterfaceHtml(text) {
+  const trimmed = text.replace(/\r\n/g, "\n").trim();
+  const body = trimmed === ""
+    ? '<pre class="interface-output__body placeholder">(no exported values)</pre>'
+    : `<pre class="interface-output__body">${highlightedSyntaxHtml(trimmed)}</pre>`;
+  return `<div class="interface-output"><div class="interface-output__label">Inferred types</div>${body}</div>`;
+}
+
+function modeForElement(element, options = {}) {
+  if (options.mode !== undefined) {
+    return options.mode === "utop" ? "utop" : "run";
+  }
+  return element.hasAttribute("utop") ? "utop" : "run";
 }
 
 function injectStyles() {
@@ -674,6 +860,35 @@ function injectStyles() {
       white-space: nowrap;
     }
 
+    .oxcaml-embed__reset {
+      position: absolute;
+      right: 0.7rem;
+      top: 0.62rem;
+      z-index: 5;
+      min-height: 1.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      background: rgba(18, 22, 29, 0.78);
+      color: #d8e3f2;
+      cursor: pointer;
+      font: 650 0.72rem/1 Avenir Next, Segoe UI, system-ui, sans-serif;
+      padding: 0.32rem 0.5rem;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(8px);
+    }
+
+    .oxcaml-embed__reset:hover,
+    .oxcaml-embed__reset:focus-visible {
+      background: rgba(28, 35, 47, 0.94);
+      border-color: rgba(255, 181, 126, 0.48);
+      color: #ffcfb4;
+      outline: none;
+    }
+
+    .oxcaml-embed__reset[hidden] {
+      display: none;
+    }
+
     .oxcaml-embed[data-state="running"] .oxcaml-embed__status,
     .oxcaml-embed[data-state="loading"] .oxcaml-embed__status {
       color: var(--oxcaml-accent);
@@ -692,6 +907,7 @@ function injectStyles() {
     }
 
     .oxcaml-embed__editor-host {
+      position: relative;
       background: var(--oxcaml-editor);
     }
 
@@ -722,7 +938,7 @@ function injectStyles() {
 
     .oxcaml-embed__editor-host .cm-content {
       caret-color: #ffffff;
-      padding: 0.85rem 0.95rem;
+      padding: 0.85rem 5.9rem 0.85rem 0.95rem;
     }
 
     .oxcaml-embed__editor-host .cm-line {
@@ -866,10 +1082,81 @@ function injectStyles() {
       color: #2e4053;
     }
 
+    .diagnostic-code-prefix {
+      color: #718095;
+    }
+
     .transcript-line.detail,
     .transcript-line.trace {
       color: #526274;
     }
+
+    .utop-outcome__keyword {
+      color: #98521a;
+      font-weight: 750;
+    }
+
+    .utop-outcome__name {
+      color: #0b638a;
+      font-weight: 700;
+    }
+
+    .utop-outcome__punctuation,
+    .utop-outcome__equals {
+      color: #718095;
+    }
+
+    .utop-outcome__type {
+      color: var(--oxcaml-ok);
+    }
+
+    .utop-outcome__value {
+      color: #263341;
+    }
+
+    .interface-output {
+      margin: 0 5.5rem 0.85rem 0.95rem;
+      border: 1px solid rgba(15, 123, 95, 0.18);
+      border-left: 4px solid var(--oxcaml-ok);
+      border-radius: 7px;
+      background: rgba(224, 245, 238, 0.62);
+      padding: 0.68rem 0.8rem 0.75rem;
+    }
+
+    .interface-output__label {
+      margin-bottom: 0.45rem;
+      color: var(--oxcaml-ok);
+      font: 700 0.68rem/1 Avenir Next, Segoe UI, system-ui, sans-serif;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .interface-output__body {
+      margin: 0;
+      color: #173829;
+      font: 0.84rem/1.48 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    .interface-output__body.placeholder {
+      color: var(--oxcaml-muted);
+    }
+
+    .oxcaml-embed__output .tok-keyword { color: #98521a; font-weight: 650; }
+    .oxcaml-embed__output .tok-module { color: #0d638c; }
+    .oxcaml-embed__output .tok-string { color: #276a3f; }
+    .oxcaml-embed__output .tok-comment { color: #6d7988; }
+    .oxcaml-embed__output .tok-number { color: #846000; }
+    .oxcaml-embed__output .tok-operator { color: #4f5c6b; }
+    .oxcaml-embed__output .tok-function { color: #0d638c; }
+    .oxcaml-embed__output .tok-parameter { color: #805514; }
+    .oxcaml-embed__output .tok-type { color: #0d638c; }
+    .oxcaml-embed__output .tok-constructor { color: #8a5a00; }
+    .oxcaml-embed__output .tok-oxcaml { color: #b8462b; font-weight: 700; }
+    .oxcaml-embed__output .tok-annotation { color: #8c5f16; font-style: italic; }
+    .oxcaml-embed__output .tok-package { color: #007260; font-weight: 700; }
+    .oxcaml-embed__output .tok-package-open { color: #475fa5; }
+    .oxcaml-embed__output .tok-label { color: #8b3aa8; }
   `;
   document.head.appendChild(style);
 }
@@ -886,7 +1173,8 @@ function setOutputBusy(editor, isBusy) {
 function renderTranscript(editor, text, options) {
   const transcript = buildTranscript(editor, text, options);
   setOutputBusy(editor, false);
-  editor.transcriptEl.innerHTML = transcript.html;
+  editor.transcriptEl.innerHTML =
+    transcript.html + (options?.interfaceText === undefined ? "" : buildInterfaceHtml(options.interfaceText));
   return transcript;
 }
 
@@ -922,6 +1210,16 @@ function clearPendingWork(editor) {
   }
 }
 
+function resetEditor(editor) {
+  removeStoredSource(editor.storageKey);
+  clearPendingWork(editor);
+  editor.markers = [];
+  editor.revision += 1;
+  replaceEditorSource(editor, editor.originalSource);
+  updateResetState(editor);
+  scheduleRun(editor);
+}
+
 function scheduleRun(editor) {
   clearPendingWork(editor);
   editor.revision += 1;
@@ -941,12 +1239,29 @@ async function runEditor(editor, revision = editor.revision) {
     if (revision !== editor.revision) {
       return;
     }
-    const output = await runString(editor.filename, sourceText(editor));
+    const source = sourceText(editor);
+    const output =
+      editor.mode === "utop"
+        ? await utopString(editor.filename, source)
+        : await runString(editor.filename, source);
     if (revision !== editor.revision) {
       return;
     }
     updateEditorMarkers(editor, output);
-    const transcript = renderTranscript(editor, output, { emptyPlaceholder: "(no output)" });
+    const transcriptPreview = buildTranscript(editor, output, { emptyPlaceholder: "(no output)" });
+    const showInterface =
+      editor.mode !== "utop" &&
+      !transcriptPreview.hasException && !transcriptPreview.hasCompilerError;
+    const interfaceOutput = showInterface
+      ? await interfaceString(editor.filename, source)
+      : undefined;
+    if (revision !== editor.revision) {
+      return;
+    }
+    const transcript = renderTranscript(editor, output, {
+      emptyPlaceholder: "(no output)",
+      interfaceText: interfaceOutput,
+    });
     if (transcript.hasException) {
       setStatus(editor, "error", "exception");
     } else if (transcript.hasCompilerError) {
@@ -999,6 +1314,7 @@ function createEditorView(editor, source) {
           scheduleSyntaxRefresh(editor);
           editor.markers = [];
           editor.revision += 1;
+          persistEditorSource(editor);
           scheduleRun(editor);
         }),
       ],
@@ -1015,6 +1331,13 @@ function createEditorElement() {
   statusEl.className = "oxcaml-embed__status";
   statusEl.textContent = "loading";
 
+  const resetButtonEl = document.createElement("button");
+  resetButtonEl.type = "button";
+  resetButtonEl.className = "oxcaml-embed__reset";
+  resetButtonEl.textContent = "Reset";
+  resetButtonEl.title = "Reset to the original source";
+  resetButtonEl.hidden = true;
+
   const editorHostEl = document.createElement("div");
   editorHostEl.className = "oxcaml-embed__editor-host";
 
@@ -1026,12 +1349,14 @@ function createEditorElement() {
   transcriptEl.innerHTML =
     '<pre class="transcript"><span class="transcript-line stream placeholder">loading</span></pre>';
 
+  editorHostEl.append(resetButtonEl);
   outputEl.append(transcriptEl, statusEl);
   root.append(editorHostEl, outputEl);
 
   return {
     root,
     statusEl,
+    resetButtonEl,
     editorHostEl,
     outputEl,
     transcriptEl,
@@ -1040,18 +1365,26 @@ function createEditorElement() {
 
 export function mount(element, options = {}) {
   injectStyles();
-  const source = options.source ?? dedent(element.textContent ?? "");
+  const originalSource = options.source ?? dedent(element.textContent ?? "");
+  const storageKey =
+    options.storageKey ??
+    storageKeyForSource(originalSource, options.duplicateIndex ?? 0);
+  const source = readStoredSource(storageKey) ?? originalSource;
   const explicitFilename =
     options.filename ??
     element.getAttribute("filename") ??
     element.getAttribute("data-filename");
   const filename = explicitFilename ?? `snippet_${mountedEditors.size + 1}.ml`;
+  const mode = modeForElement(element, options);
   const editor = {
     ...createEditorElement(),
     filename,
     markers: [],
+    mode,
+    originalSource,
     pendingTimer: null,
     revision: 0,
+    storageKey,
     suppressEditorChanges: false,
     view: null,
   };
@@ -1060,6 +1393,12 @@ export function mount(element, options = {}) {
   editor.view = createEditorView(editor, source);
   mountedEditors.add(editor);
   scheduleSyntaxRefresh(editor);
+  updateResetState(editor);
+
+  editor.resetButtonEl.addEventListener("click", () => {
+    resetEditor(editor);
+    editor.view?.focus();
+  });
 
   editor.outputEl.addEventListener("click", (event) => {
     const target = event.target instanceof Element
@@ -1099,7 +1438,22 @@ export function mount(element, options = {}) {
 }
 
 export function processOxcamlTags(root = document) {
-  return Array.from(root.querySelectorAll("oxcaml")).map((element) => mount(element));
+  const elements = Array.from(root.querySelectorAll("oxcaml"));
+  const sources = elements.map((element) => dedent(element.textContent ?? ""));
+  const sourceCounts = new Map();
+  for (const source of sources) {
+    sourceCounts.set(source, (sourceCounts.get(source) ?? 0) + 1);
+  }
+  const seenCounts = new Map();
+  return elements.map((element, index) => {
+    const source = sources[index];
+    const seen = (seenCounts.get(source) ?? 0) + 1;
+    seenCounts.set(source, seen);
+    return mount(element, {
+      source,
+      duplicateIndex: sourceCounts.get(source) > 1 ? seen : 0,
+    });
+  });
 }
 
 addBackendStatusListener(({ state, text }) => {
@@ -1126,6 +1480,8 @@ window.OxCamlPlayground = {
   ...(existingApi && typeof existingApi === "object" ? existingApi : {}),
   mount,
   processOxcamlTags,
+  interfaceString,
   ready,
   runString,
+  utopString,
 };

@@ -58,11 +58,36 @@ let check_string filename source =
   with
   | Browser_switch_common.Missing_cmi filename -> missing_cmi_result filename
 
+let interface_string filename source =
+  try
+    ok_result
+      (Browser_switch_interface.interface_string
+         ~browser:true
+         ~filename:(string_of_js_string filename)
+         ~source:(string_of_js_string source))
+  with
+  | Browser_switch_common.Missing_cmi filename -> missing_cmi_result filename
+
 let run_string filename source =
   try
     let output, diagnostics =
       with_output_capture (fun () ->
           Browser_switch_run.run_string
+            ~browser:true
+            ~filename:(string_of_js_string filename)
+            ~source:(string_of_js_string source))
+    in
+    if String.equal diagnostics ""
+    then ok_result output
+    else ok_result (output ^ diagnostics)
+  with
+  | Browser_switch_common.Missing_cmi filename -> missing_cmi_result filename
+
+let utop_string filename source =
+  try
+    let output, diagnostics =
+      with_output_capture (fun () ->
+          Browser_switch_run.utop_string
             ~browser:true
             ~filename:(string_of_js_string filename)
             ~source:(string_of_js_string source))
@@ -80,5 +105,7 @@ let export name value =
 let () =
   let obj : js_object = pure_js_expr "({})" in
   js_set obj (js_string "checkString") (wrap_callback check_string);
+  js_set obj (js_string "interfaceString") (wrap_callback interface_string);
   js_set obj (js_string "runString") (wrap_callback run_string);
+  js_set obj (js_string "utopString") (wrap_callback utop_string);
   export "WebBytecodeJs" obj

@@ -142,6 +142,10 @@ compile "$experiment_dir/browser_switch_check.ml" \
   "$tmpdir/browser_switch_check.cmo" \
   -I "$tmpdir"
 
+compile "$experiment_dir/browser_switch_interface.ml" \
+  "$tmpdir/browser_switch_interface.cmo" \
+  -I "$tmpdir"
+
 compile "$experiment_dir/browser_switch_run.ml" \
   "$tmpdir/browser_switch_run.cmo" \
   -I "$tmpdir"
@@ -154,6 +158,7 @@ run_tool ocamlfind ocamlc -g -no-check-prims -linkall -package "$js_packages" -l
   "$tmpdir/browser_switch_package_manifest.cmo" \
   "$tmpdir/browser_switch_common.cmo" \
   "$tmpdir/browser_switch_check.cmo" \
+  "$tmpdir/browser_switch_interface.cmo" \
   "$tmpdir/browser_switch_run.cmo" \
   "$tmpdir/browser_switch_js.cmo" \
   -o "$build_dir/web_bytecode_js.bc"
