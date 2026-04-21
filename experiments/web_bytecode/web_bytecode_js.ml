@@ -37,6 +37,13 @@ let check_string filename source =
     ~source:(Js.to_string source)
   |> Js.string
 
+let interface_string filename source =
+  Web_bytecode_interface.interface_string
+    ~browser:true
+    ~filename:(Js.to_string filename)
+    ~source:(Js.to_string source)
+  |> Js.string
+
 let run_string filename source =
   let output, result =
     with_output_capture (fun () ->
@@ -56,11 +63,34 @@ let run_string filename source =
       else Js.string (output ^ diagnostics)
   | `Exception exn -> Js.string (output ^ Printexc.to_string exn)
 
+let utop_string filename source =
+  let output, result =
+    with_output_capture (fun () ->
+        try
+          ensure_toplevel_initialized ();
+          `Diagnostics
+            (Web_bytecode_run.utop_string
+               ~browser:true
+               ~filename:(Js.to_string filename)
+               ~source:(Js.to_string source))
+        with exn -> `Exception exn)
+  in
+  match result with
+  | `Diagnostics diagnostics ->
+      if String.equal diagnostics ""
+      then Js.string output
+      else Js.string (output ^ diagnostics)
+  | `Exception exn -> Js.string (output ^ Printexc.to_string exn)
+
 let () =
   Js.export
     "WebBytecodeJs"
     (Js.Unsafe.obj
        [| "checkString",
           Js.Unsafe.inject (Js.wrap_callback check_string);
+          "interfaceString",
+          Js.Unsafe.inject (Js.wrap_callback interface_string);
           "runString",
-          Js.Unsafe.inject (Js.wrap_callback run_string) |])
+          Js.Unsafe.inject (Js.wrap_callback run_string);
+          "utopString",
+          Js.Unsafe.inject (Js.wrap_callback utop_string) |])

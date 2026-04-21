@@ -92,6 +92,10 @@ let check_string ~filename ~source =
   Web_bytecode_native_packages.ensure_initialized ();
   Web_bytecode_check.check_string ~browser:false ~filename ~source
 
+let interface_string ~filename ~source =
+  Web_bytecode_native_packages.ensure_initialized ();
+  Web_bytecode_interface.interface_string ~browser:false ~filename ~source
+
 let run_string ~filename ~source =
   Web_bytecode_native_packages.ensure_initialized ();
   let suffix = "_" ^ Filename.basename filename in
@@ -119,4 +123,12 @@ let run_string ~filename ~source =
                 cleanup_build_artifacts ~source_path ~output_prefix)))
   in
   let diagnostics = replace_all ~pattern:source_path ~with_:filename diagnostics in
+  if String.equal diagnostics "" then output else output ^ diagnostics
+
+let utop_string ~filename ~source =
+  Web_bytecode_native_packages.ensure_initialized ();
+  let output, diagnostics =
+    capture_output (fun () ->
+        Web_bytecode_run.utop_string ~browser:false ~filename ~source)
+  in
   if String.equal diagnostics "" then output else output ^ diagnostics

@@ -13,6 +13,12 @@
  (libraries web_bytecode_common))
 
 (library
+ (name web_bytecode_interface)
+ (wrapped false)
+ (modules web_bytecode_interface)
+ (libraries web_bytecode_common))
+
+(library
  (name web_bytecode_run)
  (wrapped false)
  (modules web_bytecode_run)
@@ -29,6 +35,7 @@
   findlib
   findlib.top
   web_bytecode_check
+  web_bytecode_interface
   web_bytecode_run))
 
 (executable
@@ -72,6 +79,7 @@
   js_of_ocaml
   js_of_ocaml-toplevel
   web_bytecode_check
+  web_bytecode_interface
   web_bytecode_run)
  (flags
   (:standard -linkall))

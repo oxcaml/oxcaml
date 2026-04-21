@@ -7,6 +7,7 @@ The browser-facing API is:
 
 - `check_string(filename, source) -> string`
 - `run_string(filename, source) -> string`
+- `utop_string(filename, source) -> string`
 
 The current working path is JS-first:
 
