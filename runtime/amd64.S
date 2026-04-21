@@ -1336,8 +1336,18 @@ LBL(do_perform):
 LBL(112):
     /* Switch back to original performer before raising Effect.Unhandled
        (no-op unless this is a reperform) */
-        movq    0(%rbx), %r10  /* load performer stack from continuation */
-        subq    $1, %r10       /* r10 := Ptr_val(r10) */
+        movq    %rbx, C_ARG_1
+        SWITCH_OCAML_TO_C
+    /* Save %rax (effect, needed later by caml_raise_unhandled_effect)
+       across the C call. Reserve 16 bytes to keep %rsp 16-byte aligned. */
+        subq    $16, %rsp; CFI_ADJUST(16)
+        movq    %rax, 0(%rsp)
+        C_call  (GCALL(caml_continuation_use_noexc)) /* %rax := stack */
+        movq    %rax, %r10
+        movq    0(%rsp), %rax
+        addq    $16, %rsp; CFI_ADJUST(-16)
+        SWITCH_C_TO_OCAML
+        subq    $1, %r10                /* r10 := Ptr_val(r10) */
         movq    Caml_state(current_stack), %rsi
         SWITCH_OCAML_STACKS
     /* No parent stack. Raise Effect.Unhandled. */
