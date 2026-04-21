@@ -539,8 +539,9 @@ function highlightedSyntaxHtml(source) {
   return html;
 }
 
-function isOutcomeLine(line) {
-  return /^\s*(val|type|module|module type|exception|external|class|class type)\b/.test(line);
+function outcomeStartIndex(line) {
+  const match = /(?:val\s+[A-Za-z_][A-Za-z0-9_']*\s*:|-\s*:|type\b|module(?:\s+type)?\b|exception\b|external\b|class(?:\s+type)?\b)/.exec(line);
+  return match ? match.index : -1;
 }
 
 function splitOutcomeTypeAndValue(text) {
@@ -560,19 +561,56 @@ function highlightedOutcomeHtml(line) {
   const leading = leadingMatch ? leadingMatch[1] : "";
   const body = line.slice(leading.length);
   const valueMatch = /^(val)\s+([A-Za-z_][A-Za-z0-9_']*)\s*:\s*(.+)$/.exec(body);
-  if (!valueMatch) {
+  const expressionMatch = /^(-)\s*:\s*(.+)$/.exec(body);
+  if (!valueMatch && !expressionMatch) {
     return escapeHtml(leading) + highlightedSyntaxHtml(body || " ");
   }
-  const { typeText, valueText } = splitOutcomeTypeAndValue(valueMatch[3]);
+  const keyword = valueMatch ? valueMatch[1] : expressionMatch[1];
+  const name = valueMatch ? valueMatch[2] : null;
+  const rest = valueMatch ? valueMatch[3] : expressionMatch[2];
+  const { typeText, valueText } = splitOutcomeTypeAndValue(rest);
   const valueHtml = valueText === null
     ? ""
     : ` <span class="utop-outcome__equals">=</span> <span class="utop-outcome__value">${highlightedSyntaxHtml(valueText)}</span>`;
   return (
-    `${escapeHtml(leading)}<span class="utop-outcome__keyword">${escapeHtml(valueMatch[1])}</span> ` +
-    `<span class="utop-outcome__name">${escapeHtml(valueMatch[2])}</span>` +
+    `${escapeHtml(leading)}<span class="utop-outcome__keyword">${escapeHtml(keyword)}</span>` +
+    (name === null ? "" : ` <span class="utop-outcome__name">${escapeHtml(name)}</span>`) +
     ` <span class="utop-outcome__punctuation">:</span> ` +
     `<span class="utop-outcome__type">${highlightedSyntaxHtml(typeText.trim())}</span>` +
     valueHtml
+  );
+}
+
+function transcriptLineHtml(cls, clickableClass, attrs, lineHtml) {
+  return `<span class="transcript-line ${cls}${clickableClass}"${attrs}>${lineHtml}\n</span>`;
+}
+
+function streamLineHtml(line, cls, clickableClass, attrs, { utopMode = false } = {}) {
+  if (!utopMode) {
+    return transcriptLineHtml(cls, clickableClass, attrs, escapeHtml(line || " "));
+  }
+  const index = outcomeStartIndex(line);
+  if (index === 0) {
+    return transcriptLineHtml(
+      `${cls} utop-outcome-line`,
+      clickableClass,
+      attrs,
+      highlightedOutcomeHtml(line || " "),
+    );
+  }
+  if (index > 0) {
+    const stdoutHtml = `<span class="utop-stdout">${escapeHtml(line.slice(0, index))}</span>`;
+    const outcomeHtml = highlightedOutcomeHtml(line.slice(index));
+    return (
+      transcriptLineHtml(cls, clickableClass, attrs, stdoutHtml) +
+      transcriptLineHtml(`${cls} utop-outcome-line`, "", "", outcomeHtml)
+    );
+  }
+  return transcriptLineHtml(
+    `${cls} utop-stdout-line`,
+    clickableClass,
+    attrs,
+    `<span class="utop-stdout">${escapeHtml(line || " ")}</span>`,
   );
 }
 
@@ -740,7 +778,7 @@ function classifyTranscriptLine(line, inDiagnosticBlock, forceDiagnostics) {
   };
 }
 
-function buildTranscript(editor, text, { emptyPlaceholder = null, forceDiagnostics = false } = {}) {
+function buildTranscript(editor, text, { emptyPlaceholder = null, forceDiagnostics = false, utopMode = false } = {}) {
   const normalized = text.replace(/\r\n/g, "\n");
   if (normalized === "" && emptyPlaceholder !== null) {
     return {
@@ -782,10 +820,10 @@ function buildTranscript(editor, text, { emptyPlaceholder = null, forceDiagnosti
             `<span class="diagnostic-code-prefix">${escapeHtml(match[1])}</span>` +
             highlightedSyntaxHtml(match[2]);
         }
-      } else if (info.cls === "stream" && isOutcomeLine(line)) {
-        lineHtml = highlightedOutcomeHtml(line || " ");
+      } else if (info.cls === "stream") {
+        return streamLineHtml(line, info.cls, clickableClass, attrs, { utopMode });
       }
-      return `<span class="transcript-line ${info.cls}${clickableClass}"${attrs}>${lineHtml}\n</span>`;
+      return transcriptLineHtml(info.cls, clickableClass, attrs, lineHtml);
     })
     .join("");
 
@@ -1114,6 +1152,10 @@ function injectStyles() {
       color: #263341;
     }
 
+    .utop-stdout {
+      color: #334155;
+    }
+
     .interface-output {
       margin: 0 5.5rem 0.85rem 0.95rem;
       border: 1px solid rgba(15, 123, 95, 0.18);
@@ -1248,7 +1290,10 @@ async function runEditor(editor, revision = editor.revision) {
       return;
     }
     updateEditorMarkers(editor, output);
-    const transcriptPreview = buildTranscript(editor, output, { emptyPlaceholder: "(no output)" });
+    const transcriptPreview = buildTranscript(editor, output, {
+      emptyPlaceholder: "(no output)",
+      utopMode: editor.mode === "utop",
+    });
     const showInterface =
       editor.mode !== "utop" &&
       !transcriptPreview.hasException && !transcriptPreview.hasCompilerError;
@@ -1261,6 +1306,7 @@ async function runEditor(editor, revision = editor.revision) {
     const transcript = renderTranscript(editor, output, {
       emptyPlaceholder: "(no output)",
       interfaceText: interfaceOutput,
+      utopMode: editor.mode === "utop",
     });
     if (transcript.hasException) {
       setStatus(editor, "error", "exception");
