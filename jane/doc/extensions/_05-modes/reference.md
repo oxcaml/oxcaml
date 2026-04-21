@@ -13,7 +13,7 @@ The mode system in the compiler tracks various properties of values, so that cer
 performance-enhancing operations can be performed safely. For example:
 - Locality tracks escaping. See [the local allocations
   reference](../../stack-allocation/reference)
-- Uniqueness and linearity tracks aliasing. See [the uniqueness reference](../../uniqueness/reference)
+- Uniqueness and linearity track aliasing. See [the uniqueness reference](../../uniqueness/reference)
 - Portability and contention tracks inter-thread sharing.
     <!-- CR zqian: reference for portability and contention -->
 
@@ -21,7 +21,7 @@ performance-enhancing operations can be performed safely. For example:
 `lazy e` contains a thunk that evaluates `e`, as well as a mutable cell to store the
 result of `e`. Upon construction, the mode of `lazy e` cannot be stronger than `e`. For
 example, if `e` is `nonportable`, then `lazy e` cannot be `portable`. Upon destruction
-(forcing a lazy value), the result cannot be stronger than the mode of lazy value. For
+(forcing a lazy value), the result cannot be stronger than the mode of the lazy value. For
 example, forcing a `nonportable` lazy value cannot give a `portable` result. Additionally,
 forcing a lazy value involves accessing the mutable cell and thus requires the lazy value
 to be `uncontended`.
@@ -127,7 +127,7 @@ let () = bar foo (* prints "foo" *)
 Exceptions also cross statefulness and visibility with identical restrictions.
 
 # Modalities
-Modalities, as described in the [syntax](../syntax) section, can be though of as functions
+Modalities, as described in the [syntax](../syntax) section, can be thought of as functions
 from mode to mode. For example, let's imagine one defines a record type with some modality
 `m`:
 

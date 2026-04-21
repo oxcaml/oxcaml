@@ -222,7 +222,7 @@ don't want to restrict the normal `list` type to work only on a subset of
 
 The solution to this problem is the with-bounds: a with-bound in a kind of a
 type makes that type not mode-cross whenever the with-bound also does not
-mode-cross. Add a bound to the `mod` section always *lowers* a kind, while
+mode-cross. Adding a bound to the `mod` section always *lowers* a kind, while
 adding a with-bound always *raises* a kind.
 
 Here is the full kind of `'a list`:

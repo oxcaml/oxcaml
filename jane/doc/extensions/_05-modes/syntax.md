@@ -20,7 +20,7 @@ portability ::= `portable` | `corruptible` | `shareable` | `nonportable`
 contention ::= `uncontended` | `shared` | `corrupted` | `contended`
 yield ::= `unyielding` | `yielding`
 fork ::= `forkable` | `unforkable`
-statefulness ::= `stateless` | `writing` | `reading | `stateful`
+statefulness ::= `stateless` | `writing` | `reading` | `stateful`
 visibility ::= `read_write` | `read` | `write` | `immutable`
 
 modes ::= mode
@@ -40,7 +40,7 @@ names.
 It is an error to specify more than one mode along the same axis in one mode
 expression.
 
-To write a mode expression in program, it has to be prefixed by an `@` symbol.
+To write a mode expression in a program, it has to be prefixed by an `@` symbol.
 It can appear in several places in a program as described below.
 
 ## Arrow types
