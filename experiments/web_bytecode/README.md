@@ -66,6 +66,120 @@ Then open:
 http://127.0.0.1:8124/experiments/web_bytecode/
 ```
 
+## Embed on another site
+
+The playground editor can also be embedded into an ordinary static HTML page.
+Put one or more `oxcaml` tags in the page and load `oxcaml-embed.js` after
+them:
+
+```html
+<p>This is normal page content.</p>
+
+<oxcaml utop>
+let language = "OCaml";;
+let year = 1996 + 1;;
+</oxcaml>
+
+<oxcaml>
+let square x = x * x
+
+let () =
+  Printf.printf "square = %d\n" (square 7)
+</oxcaml>
+
+<script src="./oxcaml-embed.js"></script>
+```
+
+Supported tag forms:
+
+- `<oxcaml>...</oxcaml>` compiles and runs the whole snippet as a program. It
+  also shows inferred types when the snippet typechecks.
+- `<oxcaml utop>...</oxcaml>` runs the snippet like a toplevel. Phrases ending
+  in `;;` print their inferred type and value, similar to utop.
+
+The embedded editor persists user edits in `localStorage`, keyed by the page
+URL, the original tag contents, and the tag's duplicate index when a page has
+multiple identical examples. Each editor includes a reset button that restores
+the original tag contents and clears that stored edit.
+
+### Files to deploy
+
+Host these files together in one static directory:
+
+- `oxcaml-embed.js`
+- `oxcaml-embed-module.js`
+- `backend.js`
+- `runtime_shims.js`
+- `build/web_bytecode_js.bc.js`
+- `build/browser_fs_manifest.json`
+- `build/browser_fs/**`
+
+The full playground page also needs:
+
+- `index.html`
+- `app.js`
+- `sample_catalog.js`
+- `unsupported_samples.js`
+
+The demo page also needs:
+
+- `embed_demo.html`
+
+`deploy_pages.sh` copies this complete static bundle to the configured GitHub
+Pages repository. It is specific to the default target
+`~/git/julesjacobs.github.io/misc/oxcaml/playground`, but it is a useful
+reference for deploying elsewhere:
+
+```sh
+PAGES_REPO=/path/to/site \
+PUBLISH=0 \
+SKIP_BUILD=1 \
+./experiments/web_bytecode/deploy_pages.sh
+```
+
+With `PUBLISH=0`, the script only syncs files locally. With `PUBLISH=1`, it
+commits and pushes the changed `misc/oxcaml/playground` directory in the Pages
+repository.
+
+### Hosting requirements
+
+Static hosting is enough; no API server is required. The files should normally
+be served from the same origin and directory as the page that uses them. If the
+embed files are served from a different origin, that origin must allow browser
+module imports and `fetch` requests for `backend.js`, `runtime_shims.js`,
+`build/web_bytecode_js.bc.js`, `build/browser_fs_manifest.json`, and every file
+under `build/browser_fs/`.
+
+The wrapper script resolves `oxcaml-embed-module.js` relative to
+`oxcaml-embed.js`, and the module resolves `backend.js` and the build assets
+relative to itself. For a custom layout, pass an explicit module URL:
+
+```html
+<script
+  src="https://example.com/oxcaml/oxcaml-embed.js"
+  data-module-src="https://example.com/oxcaml/oxcaml-embed-module.js">
+</script>
+```
+
+Keep `backend.js`, `runtime_shims.js`, and the `build/` directory at the
+locations expected by `oxcaml-embed-module.js` and `backend.js`, or update their
+relative asset paths before publishing.
+
+### Caching
+
+`oxcaml-embed.js` includes a version query when it imports
+`oxcaml-embed-module.js`, and `oxcaml-embed-module.js` includes a version query
+when it imports `backend.js`. If the outer script is cached aggressively by the
+embedding site or CDN, version the script URL in the page as well:
+
+```html
+<script src="./oxcaml-embed.js?v=20260421-int-overflow-guard"></script>
+```
+
+When publishing a new bundle, keep the static assets in sync. Mixing a new
+`oxcaml-embed-module.js` with an old `backend.js` or old `build/` directory can
+leave the editor unable to load the compiler.
+
 ## Verified Static Browser Cases
 
 Validated in-browser through the static host and direct API probes:
