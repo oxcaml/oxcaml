@@ -694,7 +694,7 @@ val send :
   expression list ->
   Extended_machtype.t list ->
   Extended_machtype.t ->
-  Lambda.region_close * Cmx_format.alloc_mode ->
+  Lambda.region_close * Cmx_format.return_mode ->
   Debuginfo.t ->
   expression
 
@@ -1041,7 +1041,7 @@ val indirect_call :
   dbg:Debuginfo.t ->
   Extended_machtype.t ->
   Lambda.region_close ->
-  Cmx_format.alloc_mode ->
+  Cmx_format.return_mode ->
   expression ->
   Extended_machtype.t list ->
   expression list ->
@@ -1164,10 +1164,10 @@ val curry_function :
   Lambda.function_kind * Cmm.machtype list * Cmm.machtype -> Cmm.phrase list
 
 val send_function :
-  Cmm.machtype list * Cmm.machtype * Cmx_format.alloc_mode -> Cmm.phrase
+  Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
 
 val apply_function :
-  Cmm.machtype list * Cmm.machtype * Cmx_format.alloc_mode -> Cmm.phrase
+  Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
 
 val fail_if_called_indirectly_function : unit -> Cmm.phrase list
 
