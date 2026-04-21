@@ -228,7 +228,9 @@ let check_terminator_arity t label block =
        alloc checking is enabled it returns an [int] (so there is a successor
        and one result register), otherwise it never returns. *)
     let ty_res =
-      match label_after with None -> Cmm.typ_void | Some _ -> Cmm.typ_int
+      match label_after with
+      | None -> Cmm.typ_void
+      | Some _ -> Cmm.typ_tagged_int
     in
     check_external ~ty_args:[Cmm.XInt] ~ty_res
 
