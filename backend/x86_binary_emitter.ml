@@ -1714,10 +1714,15 @@ let assemble_line b loc ins =
             target_symbol;
             addend = 4L;
             offset = C.Sub (C.This, C.Signed_int 4L)
-          })
-      when String.Tbl.mem local_labels (Asm_symbol.encode target_symbol) ->
+          }) ->
+      (* Emit an R_X86_64_PLT32 relocation on the preceding 4 bytes, matching
+         what llvm-mc would produce from the equivalent [.reloc . - 4,
+         R_X86_64_PLT32, target - 4] directive. The REL32 handler subtracts 4
+         from the supplied addend to get the final ELF addend, so pass 0L here
+         to obtain an ELF addend of -4. *)
       let sym = Asm_symbol.encode target_symbol in
-      record_local_reloc b ~offset:(-4) (RelocCall sym)
+      record_reloc b (Buffer.length b.buf - 4)
+        (Relocation.Kind.REL32 (sym, 0L))
     | Directive (D.Uleb128 { constant; _ }) -> (
       match eval_const b (Buffer.length b.buf) constant with
       | Rint n -> D.emit_uleb128 b.buf n
