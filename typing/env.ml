@@ -5171,7 +5171,8 @@ let report_error_doc = function
         (Location.Doc.loc ~capitalize_first:false) defined_at
   | Incomplete_instantiation { unset_param } ->
       Location.errorf ~loc:Location.none
-        "@[<hov>Not enough instance arguments: the parameter@ %a@ is required.@]"
+        "@[<hov>Not enough instance arguments: \
+           the parameter@ %a@ is required.@]"
         Global_module.Parameter_name.print unset_param
   | Toplevel_splice loc ->
       Location.errorf ~loc
