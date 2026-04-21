@@ -77,10 +77,6 @@ struct caml_exception_context {
 
 int caml_is_special_exception(value exn);
 
-CAMLnoreturn_start
-CAMLextern void caml_raise_async(value res)
-CAMLnoreturn_end;
-
 /* from runtime/sync.c */
 CAMLextern void caml_check_error(int err, char const * msg);
 
@@ -89,6 +85,10 @@ CAMLextern void caml_check_error(int err, char const * msg);
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+CAMLnoreturn_start
+CAMLextern void caml_raise_async(value res)
+CAMLnoreturn_end;
 
 /* The following functions raise immediately into OCaml.
 
@@ -148,9 +148,24 @@ CAMLextern value caml_exception_sys_blocked_io (void);
 
 extern void caml_check_async(caml_result res, const char *msg);
 
-/* This function replaced [caml_raise_if_exception] in 5.3. */
-CAMLextern value caml_get_value_or_raise (caml_result result);
-CAMLextern value caml_get_value_or_raise_async (caml_result result, const char *where);
+/* Returns the value of a [caml_result] or raises the exception.
+   This function replaced [caml_raise_if_exception] in 5.3. */
+Caml_inline value caml_get_value_or_raise (caml_result result)
+{
+  if (caml_result_is_exception(result))
+    caml_raise(result.data);
+  else
+    return result.data;
+}
+
+Caml_inline value caml_get_value_or_raise_async (caml_result result, const char *where)
+{
+  if (caml_result_is_exception(result)) {
+    caml_check_async(result, where);
+    caml_raise_async(result.data);
+  } else
+    return result.data;
+}
 
 #ifdef CAML_INTERNALS
 /* internals only, provided for backward-compatibility */
