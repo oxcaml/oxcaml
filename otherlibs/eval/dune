@@ -34,7 +34,8 @@
   ; If you edit this list make sure to change
   ; extra_libraries_for_eval in optcompile.ml.
   jit
-  ocamlcommon)
+  ocamlcommon
+  ocamlopttoplevel)
  (flags
   (:standard
    -extension=runtime_metaprogramming

@@ -286,6 +286,14 @@ let run_hooks hook = List.iter (fun f -> f hook) !hooks
 let phrase_seqid = ref 0
 let phrase_name = ref "TOP"
 
+let use_existing_compilerlibs_state_for_artifacts_flag = ref false
+
+let use_existing_compilerlibs_state_for_artifacts () =
+  use_existing_compilerlibs_state_for_artifacts_flag := true
+
+let using_existing_compilerlibs_state_for_artifacts () =
+  !use_existing_compilerlibs_state_for_artifacts_flag
+
 let default_load ppf (program : Lambda.program) =
   let dll =
     if !Clflags.keep_asm_file then !phrase_name ^ ext_dll

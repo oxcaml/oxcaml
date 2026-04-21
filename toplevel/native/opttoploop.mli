@@ -185,3 +185,14 @@ val default_lookup : string -> Obj.t option
 val need_symbol : string -> bool
 
 val phrase_name : string ref
+
+(** Disallow the reading of bundles from the current executable. Instead, fetch
+    them via the normal mechanisms used by compilerlibs. This should only be
+    used if the compilerlibs state in the process is already set up with the
+    correct [Load_path] information for .cmi and .cmx resolution (as is the case
+    in mdx, for example). *)
+val use_existing_compilerlibs_state_for_artifacts : unit -> unit
+
+(** Returns [true] iff [use_existing_compilerlibs_state_for_artifacts] has been
+    called. *)
+val using_existing_compilerlibs_state_for_artifacts : unit -> bool
