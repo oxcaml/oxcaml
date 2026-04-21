@@ -190,7 +190,7 @@ Error: Signature mismatch:
          val bar : unit -> unit (* in a structure at nonportable *)
        is not included in
          val bar : unit -> unit @@ portable (* in a structure at nonportable *)
-       The first is "nonportable" because it must at least be "corruptible"
+       The first is "corruptible"
          because it contains a usage (of the value "r" at line 5, characters 30-31)
          which is expected to be "corrupted" or "uncontended"
          because its mutable field "a" is being written.
