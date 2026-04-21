@@ -165,12 +165,8 @@ let find_symtab_section sections =
       Elf.Section_type.(equal (of_u32 section.sh_type) sht_symtab))
     sections
 
-(* Internal version that adds to an accumulator *)
-let extract_into_accumulator (unix : (module Compiler_owee.Unix_intf.S))
-    ~filename acc =
-  let module Unix = (val unix) in
-  log_verbose "extracting relocations from %s" filename;
-  let buf = Compiler_owee.Owee_buf.map_binary (module Unix) filename in
+(* Internal version operating on an already-mapped buffer *)
+let extract_buf_into_accumulator buf acc =
   let _header, sections = Elf.read_elf buf in
   (* Find all .rela.text* sections (handles function sections: .rela.text,
      .rela.text.foo, .rela.text.bar, etc.) *)
@@ -204,6 +200,15 @@ let extract_into_accumulator (unix : (module Compiler_owee.Unix_intf.S))
             in
             accumulate acc result)
           acc rela_text_sections)
+
+let extract_from_buf buf =
+  finalize (extract_buf_into_accumulator buf empty_accumulator)
+
+let extract_into_accumulator (unix : (module Compiler_owee.Unix_intf.S))
+    ~filename acc =
+  log_verbose "extracting relocations from %s" filename;
+  Compiler_owee.Owee_buf.with_map_binary unix filename (fun buf ->
+      extract_buf_into_accumulator buf acc)
 
 let extract unix ~filename =
   finalize (extract_into_accumulator unix ~filename empty_accumulator)
