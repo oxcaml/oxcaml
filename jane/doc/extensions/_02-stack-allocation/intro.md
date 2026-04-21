@@ -20,9 +20,9 @@ zero-alloc.
 Because of these advantages, values are allocated on a stack whenever
 possible. Not all values can be allocated on a stack: a value that is
 used beyond the scope of its introduction must be on the heap. Accordingly,
-the compiler uses the _locality_ of a value to determine where it will be
-allocated: _local_ values go on the stack, while _global_ ones must go on the
-heap.
+the compiler uses the _locality_ of a value to determine where stack allocation
+is safe: stack-allocated values have mode `@ local`, while values that must be
+used beyond their scope must be _global_ and live on the heap.
 
 Though type inference will infer where stack allocation is possible, it is
 often wise to annotate places where you wish to enforce locality and stack

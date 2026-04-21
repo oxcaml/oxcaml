@@ -78,8 +78,8 @@ compile-time by the type checker as follows.
 A function body defines a _region_: a contiguous stretch of code, all of whose
 stack allocations go into the same stack frame.
 A stack-allocated value lives in the region it's allocated in. We say
-the value is _local_ to the region it lives in. A heap-allocated value is
-_global_.
+the value has mode `@ local` in the region it lives in. A heap-allocated value
+is _global_.
 
 We say that a value _escapes_ a region if it is still referenced beyond the end
 of that region. The type-checker guarantees that local values do not escape
@@ -745,7 +745,7 @@ a local string. Like all two-argument functions, it may be partially applied to
 a single argument yielding a closure that accepts the second. However, since
 this closure closes over the first local argument, it must necessarily be local
 itself. Thus, if applied to a single argument, this function in fact returns
-a _local_ closure, making its type equal to the following:
+a closure with mode `@ local`, making its type equal to the following:
 
 ```ocaml
 string @ local -> (string -> string) @ local
