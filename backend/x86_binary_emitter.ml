@@ -690,8 +690,15 @@ let emit_MOV b dst src =
       Format.printf "src = %a@." print_old_arg src;
       assert false
 
+let emit_vex2 buf ~rexr ~vex_v ~vex_l ~vex_p =
+  buf_int8 buf 0xC5;
+  buf_int8 buf (((rexr lxor 1) lsl 7) lor
+                ((vex_v lxor 15) lsl 3) lor
+                (vex_l lsl 2) lor
+                vex_p)
+
 let emit_vex3 buf ~rexr ~rexx ~rexb ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p =
-  buf_int8 buf 0xC4; (* We only emit 3-byte VEX instructions. *)
+  buf_int8 buf 0xC4;
   buf_int8 buf (((rexr lxor 1) lsl 7) lor
                 ((rexx lxor 1) lsl 6) lor
                 ((rexb lxor 1) lsl 5) lor
@@ -700,6 +707,12 @@ let emit_vex3 buf ~rexr ~rexx ~rexb ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p =
                 ((vex_v lxor 15) lsl 3) lor
                 (vex_l lsl 2) lor
                 vex_p)
+
+let emit_vex buf ~rexr ~rexx ~rexb ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p =
+  if rexx = 0 && rexb = 0 && vex_m = 1 && vex_w = 0 then
+    emit_vex2 buf ~rexr ~vex_v ~vex_l ~vex_p
+  else
+    emit_vex3 buf ~rexr ~rexx ~rexb ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p
 
 let vex_prefix_adaptor f =
   fun b ~rex:_ ~rexr ~rexb ~rexx ->
@@ -711,7 +724,7 @@ let vex_prefix_adaptor f =
 let emit_vex_rm_reg b ops rm reg ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p =
   let vex_w, vex_l = Bool.to_int vex_w, Bool.to_int vex_l in
   emit_prefix_modrm b ops rm reg ~prefix:(vex_prefix_adaptor (fun b ~rexr ~rexx ~rexb ->
-    emit_vex3 b ~rexr ~rexx ~rexb ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p))
+    emit_vex b ~rexr ~rexx ~rexb ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p))
 
 let rd_of_reg = function
   | Regf reg -> rd_of_regf reg
