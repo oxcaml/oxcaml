@@ -33,6 +33,7 @@ import {
 const autoRunDelayMs = 360;
 const maxCheckedSourceLength = 100000;
 const maxCheckedNumericLiteralLength = 80;
+const maxBrowserDecimalIntLiteral = "2147483648";
 const buildBase = "../../_build/default/experiments/web_bytecode";
 const storagePrefix = "oxcaml-playground:v1";
 
@@ -716,7 +717,21 @@ function sourceDiagnostic(filename, line, start, end, message) {
   return `File "${filename}", line ${line + 1}, characters ${start}-${Math.max(end, start + 1)}:\nError: ${message}`;
 }
 
-function findOversizedNumericLiteral(source) {
+function unsafeBrowserIntLiteral(token) {
+  if (!/^[0-9][0-9_]*$/.test(token)) {
+    return false;
+  }
+  const digits = token.replace(/_/g, "");
+  if (digits.length > maxBrowserDecimalIntLiteral.length) {
+    return true;
+  }
+  return (
+    digits.length === maxBrowserDecimalIntLiteral.length &&
+    digits > maxBrowserDecimalIntLiteral
+  );
+}
+
+function findNumericLiteralPreflight(source) {
   let index = 0;
   let line = 0;
   let lineStart = 0;
@@ -779,9 +794,19 @@ function findOversizedNumericLiteral(source) {
       while (index < source.length && /[A-Za-z0-9_'.]/.test(source[index])) {
         index += 1;
       }
+      const token = source.slice(start, index);
       const length = index - start;
+      if (unsafeBrowserIntLiteral(token)) {
+        return {
+          kind: "int_overflow",
+          line: startLine,
+          start: startCharacter,
+          end: startCharacter + length,
+        };
+      }
       if (length > maxCheckedNumericLiteralLength) {
         return {
+          kind: "oversized",
           line: startLine,
           start: startCharacter,
           end: startCharacter + Math.min(length, maxCheckedNumericLiteralLength),
@@ -806,8 +831,17 @@ function sourcePreflightDiagnostic(filename, source) {
       `This playground snippet is too large to check as you type. Keep snippets under ${maxCheckedSourceLength.toLocaleString()} characters.`,
     );
   }
-  const numericLiteral = findOversizedNumericLiteral(source);
+  const numericLiteral = findNumericLiteralPreflight(source);
   if (numericLiteral) {
+    if (numericLiteral.kind === "int_overflow") {
+      return sourceDiagnostic(
+        filename,
+        numericLiteral.line,
+        numericLiteral.start,
+        numericLiteral.end,
+        "Integer literal exceeds the range of representable integers of type int",
+      );
+    }
     return sourceDiagnostic(
       filename,
       numericLiteral.line,
