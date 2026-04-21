@@ -58,7 +58,9 @@ type t =
     mutable kinds : K.t Name.Map.t;
     mutable fixed_arity_conts : Continuation.Set.t;
     mutable continuation_info : continuation_info Continuation.Map.t;
-    mutable set_of_closures_graph : Code_id.Set.t Code_id.Map.t
+    mutable set_of_closures_graph : Code_id.Set.t Code_id.Map.t;
+    mutable all_sets_of_closures :
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
   }
 
 let code_deps t = t.code_deps
@@ -72,7 +74,8 @@ let create () =
     kinds = Name.Map.empty;
     fixed_arity_conts = Continuation.Set.empty;
     continuation_info = Continuation.Map.empty;
-    set_of_closures_graph = Code_id.Map.empty
+    set_of_closures_graph = Code_id.Map.empty;
+    all_sets_of_closures = []
   }
 
 let kinds t = t.kinds
@@ -482,6 +485,9 @@ let record_set_of_closures_deps_one_closure t
 let record_set_of_closures_deps t =
   List.iter (record_set_of_closures_deps_one_closure t) t.set_of_closures_deps
 
+let add_set_of_closures t set_of_closures =
+  t.all_sets_of_closures <- set_of_closures :: t.all_sets_of_closures
+
 let deps t ~all_constants =
   List.iter
     (fun { function_containing_apply_expr;
@@ -535,3 +541,5 @@ let sort_code_ids t =
           (Format.pp_print_list Code_id.print)
           code_ids)
     r
+
+let get_all_sets_of_closures t = t.all_sets_of_closures

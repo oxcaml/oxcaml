@@ -21,7 +21,9 @@ type result =
     kinds : Flambda_kind.t Name.Map.t;
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Traverse_acc.continuation_info Continuation.Map.t;
-    code_deps : Traverse_acc.code_dep Code_id.Map.t
+    code_deps : Traverse_acc.code_dep Code_id.Map.t;
+    all_sets_of_closures :
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
   }
 
 val run : Flambda_unit.t -> result

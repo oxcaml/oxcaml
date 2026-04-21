@@ -105,19 +105,27 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
   let funs =
     Function_declarations.funs (Set_of_closures.function_decls set_of_closures)
   in
-  Function_slot.Lmap.iter
-    (fun function_slot name ->
-      Acc.kind acc name K.value;
-      let code_id =
-        (Function_slot.Map.find function_slot funs
-          : Function_declarations.code_id_in_function_declaration)
-      in
-      match code_id with
-      | Deleted _ -> ()
-      | Code_id { code_id; only_full_applications } ->
-        Acc.add_set_of_closures_dep acc name ~closure_code_id:code_id
-          ~only_full_applications ~defined_in_code_id:(Env.current_code_id denv))
-    names_and_function_slots;
+  let names_and_code_ids =
+    Function_slot.Lmap.mapi
+      (fun function_slot name ->
+        Acc.kind acc name K.value;
+        let code_id =
+          (Function_slot.Map.find function_slot funs
+            : Function_declarations.code_id_in_function_declaration)
+        in
+        let code_id =
+          match code_id with
+          | Deleted _ -> Or_unknown.Unknown
+          | Code_id { code_id; only_full_applications } ->
+            Acc.add_set_of_closures_dep acc name ~closure_code_id:code_id
+              ~only_full_applications
+              ~defined_in_code_id:(Env.current_code_id denv);
+            Or_unknown.Known code_id
+        in
+        name, code_id)
+      names_and_function_slots
+  in
+  Acc.add_set_of_closures acc names_and_code_ids;
   Function_slot.Lmap.iter
     (fun _function_slot function_slot_name ->
       Value_slot.Map.iter
@@ -830,7 +838,9 @@ type result =
     kinds : K.t Name.Map.t;
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Acc.continuation_info Continuation.Map.t;
-    code_deps : Traverse_acc.code_dep Code_id.Map.t
+    code_deps : Traverse_acc.code_dep Code_id.Map.t;
+    all_sets_of_closures :
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
   }
 
 let create_symbol_and_add_any_source acc name =
@@ -892,5 +902,6 @@ let run (unit : Flambda_unit.t) =
     kinds;
     fixed_arity_continuations;
     continuation_info;
-    code_deps
+    code_deps;
+    all_sets_of_closures = Acc.get_all_sets_of_closures acc
   }
