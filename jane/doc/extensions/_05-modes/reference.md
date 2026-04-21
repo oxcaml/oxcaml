@@ -29,9 +29,10 @@ to be `uncontended`.
 Currently, the above rules don't apply to the locality axis, because both the result and
 the lazy value are heap-allocated, so they are always `global`.
 
-Additionally, upon construction, the comonadic fragment of `lazy e` cannot be stronger
-than the thunk. The thunk is checked as `fun () -> e`, potentially closing over variables,
-which weakens its comonadic fragment. This rule doesn't apply to several axes:
+Additionally, upon construction, the relevant mode axes of `lazy e` cannot be
+stronger than the thunk. The thunk is checked as `fun () -> e`, potentially
+closing over variables, which can weaken the thunk on those axes. This rule
+doesn't apply to several axes:
 - The thunk is always heap-allocated so always `global`.
 - Since the thunk is only evaluated if the lazy value is `uncontended`, one can construct
 a lazy value at `portable` even if the thunk is `nonportable` (e.g., closing over
