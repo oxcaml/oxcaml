@@ -1842,12 +1842,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           args
       in
       let kind_shape =
-        match K.Mixed_block_shape.from_mixed_block_shape shape with
-        | Some kind_shape -> kind_shape
-        | None ->
+        match K.Scannable_block_shape.from_mixed_block_shape shape with
+        | Mixed_record kind_shape -> kind_shape
+        | Value_only ->
           Misc.fatal_error
             "Pmakeblock: mixed_block_of_block_shape returned Some but \
-             from_mixed_block_shape returned None"
+             from_mixed_block_shape returned Value_only"
       in
       [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
@@ -2599,7 +2599,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape
     in
-    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+    let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
     let new_indexes =
       Mixed_block_shape.lookup_path_producing_new_indexes shape field_path
     in
@@ -2670,7 +2670,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape
     in
-    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+    let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
     let new_indexes =
       Mixed_block_shape.lookup_path_producing_new_indexes shape field_path
     in

@@ -517,11 +517,11 @@ let mixed_block_access_field_kind
   | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float
 
 let block_access_kind_of_mixed_field_element
-    ~(kind_shape : K.Mixed_block_shape.t option)
+    ~(kind_shape : K.Scannable_block_shape.t)
     (elt : 'a Mixed_block_shape.Singleton_mixed_block_element.t) :
     P.Block_access_kind.t =
   match kind_shape with
-  | None -> (
+  | Value_only -> (
     match mixed_block_access_field_kind elt with
     | Value_prefix field_kind ->
       Values { tag = Unknown; size = Unknown; field_kind }
@@ -529,6 +529,6 @@ let block_access_kind_of_mixed_field_element
       Misc.fatal_error
         "block_access_kind_of_mixed_field_element: flat element in uniform \
          shape")
-  | Some kind_shape ->
+  | Mixed_record kind_shape ->
     let field_kind = mixed_block_access_field_kind elt in
     Mixed { tag = Unknown; field_kind; shape = kind_shape; size = Unknown }

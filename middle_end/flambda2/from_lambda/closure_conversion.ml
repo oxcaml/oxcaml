@@ -285,12 +285,12 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
         args
     in
     let block_shape : K.Scannable_block_shape.t =
-      match K.Mixed_block_shape.from_mixed_block_shape shape with
-      | Some kind_shape -> Mixed_record kind_shape
-      | None ->
+      match K.Scannable_block_shape.from_mixed_block_shape shape with
+      | Value_only ->
         (* See Note [Constant all-value mixed records] in translcore.ml *)
         Misc.fatal_error
-          "Const_mixed_block: from_mixed_block_shape returned None"
+          "Const_mixed_block: from_mixed_block_shape returned Value_only"
+      | Mixed_record _ as block_shape -> block_shape
     in
     let acc, fields =
       List.fold_left_map
@@ -3894,8 +3894,8 @@ let final_module_block_representation acc
       K.Mixed_block_lambda_shape.flattened_reordered_shape shape
     in
     let field_count = Array.length flattened_reordered_shape in
-    match K.Mixed_block_shape.from_mixed_block_shape shape with
-    | None ->
+    match K.Scannable_block_shape.from_mixed_block_shape shape with
+    | Value_only ->
       let block_access _pos : P.Block_access_kind.t =
         Values
           { tag = Known Tag.Scannable.zero;
@@ -3909,7 +3909,7 @@ let final_module_block_representation acc
         field_count,
         block_access,
         fun _ -> K.value )
-    | Some kind_shape ->
+    | Mixed_record kind_shape ->
       let field_kinds = K.Mixed_block_shape.field_kinds kind_shape in
       let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
       let block_access pos : P.Block_access_kind.t =

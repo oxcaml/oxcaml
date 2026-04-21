@@ -335,25 +335,6 @@ module Mixed_block_shape = struct
     else
       Misc.Stdlib.Array.compare Flat_suffix_element0.compare flat_suffix1
         flat_suffix2
-
-  let from_mixed_block_shape (shape : _ Mixed_block_lambda_shape.t) : t option =
-    let lambda_flat_suffix = Mixed_block_shape.flat_suffix shape in
-    if Array.length lambda_flat_suffix = 0
-    then None
-    else
-      let value_prefix_kinds =
-        Array.map (fun _ -> value) (Mixed_block_shape.value_prefix shape)
-      in
-      let flat_suffix =
-        Array.map Flat_suffix_element0.from_singleton_mixed_block_element
-          lambda_flat_suffix
-      in
-      let flat_suffix_kinds = Array.map Flat_suffix_element0.kind flat_suffix in
-      Some
-        { flat_suffix;
-          value_prefix_size = Array.length value_prefix_kinds;
-          field_kinds = Array.concat [value_prefix_kinds; flat_suffix_kinds]
-        }
 end
 
 module Scannable_block_shape = struct
@@ -386,6 +367,25 @@ module Scannable_block_shape = struct
     match t with
     | Value_only -> Value
     | Mixed_record t -> (Mixed_block_shape.field_kinds t).(index)
+
+  let from_mixed_block_shape (shape : _ Mixed_block_lambda_shape.t) : t =
+    let lambda_flat_suffix = Mixed_block_lambda_shape.flat_suffix shape in
+    if Array.length lambda_flat_suffix = 0
+    then Value_only
+    else
+      let value_prefix_kinds =
+        Array.map (fun _ -> value) (Mixed_block_lambda_shape.value_prefix shape)
+      in
+      let flat_suffix =
+        Array.map Flat_suffix_element0.from_singleton_mixed_block_element
+          lambda_flat_suffix
+      in
+      let flat_suffix_kinds = Array.map Flat_suffix_element0.kind flat_suffix in
+      Mixed_record
+        { flat_suffix;
+          value_prefix_size = Array.length value_prefix_kinds;
+          field_kinds = Array.concat [value_prefix_kinds; flat_suffix_kinds]
+        }
 end
 
 module Block_shape = struct
@@ -1055,12 +1055,9 @@ module With_subkind = struct
                              flattened_reordered_shape)
                       in
                       let block_shape : Block_shape.t =
-                        match
-                          Mixed_block_shape.from_mixed_block_shape
-                            mixed_block_shape
-                        with
-                        | None -> Scannable Value_only
-                        | Some s -> Scannable (Mixed_record s)
+                        Scannable
+                          (Scannable_block_shape.from_mixed_block_shape
+                             mixed_block_shape)
                       in
                       block_shape, fields
                   in
