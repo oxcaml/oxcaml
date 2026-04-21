@@ -91,11 +91,11 @@ module Tbl0 = struct
           unit )
         Hashtbl.t;
       apply :
-        ( Cmm.machtype list * Cmm.machtype * Cmx_format.alloc_mode,
+        ( Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode,
           unit )
         Hashtbl.t;
       send :
-        ( Cmm.machtype list * Cmm.machtype * Cmx_format.alloc_mode,
+        ( Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode,
           unit )
         Hashtbl.t
     }
@@ -132,12 +132,12 @@ module Cache = struct
   type send =
     Cmm.machtype_component array list
     * Cmm.machtype_component array
-    * Cmx_format.alloc_mode
+    * Cmx_format.return_mode
 
   type apply =
     Cmm.machtype_component array list
     * Cmm.machtype_component array
-    * Cmx_format.alloc_mode
+    * Cmx_format.return_mode
 
   type curry =
     Lambda.function_kind
@@ -190,8 +190,8 @@ module Cache = struct
     then false
     else
       match alloc with
-      | Cmx_format.Alloc_local -> len_arity arity = 0
-      | Cmx_format.Alloc_heap -> len_arity arity <= max_send
+      | Cmx_format.Maybe_alloc_stack -> len_arity arity = 0
+      | Cmx_format.Not_alloc_stack -> len_arity arity <= max_send
 
   let mem_apply (arity, result, alloc) =
     (* For now we don't cache generic functions involving unboxed types *)
@@ -199,10 +199,10 @@ module Cache = struct
     then false
     else
       match alloc with
-      | Cmx_format.Alloc_local ->
+      | Cmx_format.Maybe_alloc_stack ->
         let l = len_arity arity in
         2 <= l && l <= considered_as_small_threshold
-      | Cmx_format.Alloc_heap ->
+      | Cmx_format.Not_alloc_stack ->
         let l = len_arity arity in
         2 <= l && l <= Lambda.max_arity ()
 
@@ -239,8 +239,8 @@ module Cache = struct
     let send =
       Seq.init (max_send + 1) (fun n ->
           Seq.cons
-            (arity n, result, Cmx_format.Alloc_local)
-            (Seq.return (arity n, result, Cmx_format.Alloc_heap)))
+            (arity n, result, Cmx_format.Maybe_alloc_stack)
+            (Seq.return (arity n, result, Cmx_format.Not_alloc_stack)))
       |> Seq.concat
     in
     Seq.filter mem_send send
@@ -255,8 +255,8 @@ module Cache = struct
         (Lambda.max_arity () + 1)
         (fun n ->
           Seq.cons
-            (arity n, result, Cmx_format.Alloc_local)
-            (Seq.return (arity n, result, Cmx_format.Alloc_heap)))
+            (arity n, result, Cmx_format.Maybe_alloc_stack)
+            (Seq.return (arity n, result, Cmx_format.Not_alloc_stack)))
       |> Seq.concat
     in
     Seq.filter mem_apply apply
@@ -344,10 +344,10 @@ let default_generic_fns : Cmx_format.generic_fns =
   let open Cmm in
   { curry_fun = [];
     apply_fun =
-      [ [typ_val; typ_val], typ_val, Cmx_format.Alloc_heap;
-        [typ_val; typ_val], typ_val, Cmx_format.Alloc_local;
-        [typ_val; typ_val; typ_val], typ_val, Cmx_format.Alloc_heap;
-        [typ_val; typ_val; typ_val], typ_val, Cmx_format.Alloc_local ];
+      [ [typ_val; typ_val], typ_val, Cmx_format.Not_alloc_stack;
+        [typ_val; typ_val], typ_val, Cmx_format.Maybe_alloc_stack;
+        [typ_val; typ_val; typ_val], typ_val, Cmx_format.Not_alloc_stack;
+        [typ_val; typ_val; typ_val], typ_val, Cmx_format.Maybe_alloc_stack ];
     send_fun = []
   }
 
