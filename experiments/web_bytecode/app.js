@@ -31,6 +31,8 @@ import {
 } from "@codemirror/commands";
 
 const autoRunDelayMs = 360;
+const maxCheckedSourceLength = 100000;
+const maxCheckedNumericLiteralLength = 80;
 const buildBase = "../../_build/default/experiments/web_bytecode";
 const storagePrefix = "oxcaml-playground:v1";
 
@@ -701,6 +703,120 @@ function createEditor() {
 
 function sourceText() {
   return editorView ? editorView.state.doc.toString() : "";
+}
+
+function sourcePosition(source, offset) {
+  const prefix = source.slice(0, offset);
+  const line = (prefix.match(/\n/g) || []).length;
+  const lineStart = prefix.lastIndexOf("\n") + 1;
+  return { line, character: offset - lineStart };
+}
+
+function sourceDiagnostic(filename, line, start, end, message) {
+  return `File "${filename}", line ${line + 1}, characters ${start}-${Math.max(end, start + 1)}:\nError: ${message}`;
+}
+
+function findOversizedNumericLiteral(source) {
+  let index = 0;
+  let line = 0;
+  let lineStart = 0;
+  while (index < source.length) {
+    const char = source[index];
+    if (char === "\n") {
+      index += 1;
+      line += 1;
+      lineStart = index;
+      continue;
+    }
+    if (isWhitespace(char)) {
+      index += 1;
+      continue;
+    }
+    if (char === "(" && source[index + 1] === "*") {
+      index += 2;
+      let depth = 1;
+      while (index < source.length && depth > 0) {
+        if (source[index] === "\n") {
+          index += 1;
+          line += 1;
+          lineStart = index;
+        } else if (source[index] === "(" && source[index + 1] === "*") {
+          depth += 1;
+          index += 2;
+        } else if (source[index] === "*" && source[index + 1] === ")") {
+          depth -= 1;
+          index += 2;
+        } else {
+          index += 1;
+        }
+      }
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      const quote = char;
+      index += 1;
+      while (index < source.length) {
+        if (source[index] === "\n") {
+          index += 1;
+          line += 1;
+          lineStart = index;
+        } else if (source[index] === "\\") {
+          index += 2;
+        } else if (source[index] === quote) {
+          index += 1;
+          break;
+        } else {
+          index += 1;
+        }
+      }
+      continue;
+    }
+    if (/[0-9]/.test(char)) {
+      const start = index;
+      const startLine = line;
+      const startCharacter = index - lineStart;
+      index += 1;
+      while (index < source.length && /[A-Za-z0-9_'.]/.test(source[index])) {
+        index += 1;
+      }
+      const length = index - start;
+      if (length > maxCheckedNumericLiteralLength) {
+        return {
+          line: startLine,
+          start: startCharacter,
+          end: startCharacter + Math.min(length, maxCheckedNumericLiteralLength),
+          length,
+        };
+      }
+      continue;
+    }
+    index += 1;
+  }
+  return null;
+}
+
+function sourcePreflightDiagnostic(filename, source) {
+  if (source.length > maxCheckedSourceLength) {
+    const position = sourcePosition(source, maxCheckedSourceLength);
+    return sourceDiagnostic(
+      filename,
+      position.line,
+      position.character,
+      position.character + 1,
+      `This playground snippet is too large to check as you type. Keep snippets under ${maxCheckedSourceLength.toLocaleString()} characters.`,
+    );
+  }
+  const numericLiteral = findOversizedNumericLiteral(source);
+  if (numericLiteral) {
+    return sourceDiagnostic(
+      filename,
+      numericLiteral.line,
+      numericLiteral.start,
+      numericLiteral.end,
+      `This numeric literal has ${numericLiteral.length.toLocaleString()} characters, which is too large for browser auto-checking. Shorten it or put the digits in a string.`,
+    );
+  }
+  return null;
 }
 
 function updateResetState() {
@@ -1512,11 +1628,18 @@ function schedulePipeline() {
 async function runCurrentSource({ revision = currentSourceRevision() } = {}) {
   try {
     setStatus("running", "running");
+    const source = sourceText();
+    const preflightDiagnostic = sourcePreflightDiagnostic(currentFilename, source);
+    if (preflightDiagnostic) {
+      updateEditorMarkers(source, preflightDiagnostic);
+      const transcript = renderTranscript(preflightDiagnostic, { forceDiagnostics: true });
+      setStatus(transcript.hasWarning ? "warning" : "error", "error");
+      return;
+    }
     await ready;
     if (revision !== currentSourceRevision()) {
       return;
     }
-    const source = sourceText();
     const output = await runString(currentFilename, source);
     if (revision !== currentSourceRevision()) {
       return;
