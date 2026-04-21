@@ -2214,7 +2214,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         let tmty = {tmty with mty_type} in
         let pres =
           match tmty.mty_type with
-          | Mty_alias _ -> Mp_absent
+          | Mty_alias p ->
+              if Env.is_functor_arg p env then
+                raise (Error (pmd.pmd_loc, env, Cannot_alias p));
+              Mp_absent
           | _ -> Mp_present
         in
         let md = {
