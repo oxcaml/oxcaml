@@ -268,7 +268,8 @@ let sub ~context za1 za2 =
   with
   | Error e -> Result.Error e
 
-let check_payload_to_string ?(apparent_arity = -1) ({strict; opt; arity; _} : check) =
+let check_payload_to_string ?(apparent_arity = -1)
+    ({strict; opt; arity; _} : check) =
   String.concat ""
     [ if strict then " strict" else "";
       if opt then " opt" else "";

@@ -901,9 +901,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               | Check {arity; _} when arity = 0 || default_arity = 0 ->
                 raise (Error (loc, env, Zero_alloc_attr_non_function))
               | Check {arity; _} when arity <> default_arity ->
-                raise (Error (loc, env, Zero_alloc_arity_mismatch (arity, default_arity)))
+                raise (Error (loc, env,
+                  Zero_alloc_arity_mismatch (arity, default_arity)))
               | Check za -> Some za
-              | Assume _ -> raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
+              | Assume _ ->
+                raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
               | Ignore_assert_all | Default_zero_alloc -> None
           in
           let ret_cty = loop acc_mode rest in
@@ -1198,9 +1200,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         begin
           let open Builtin_attributes in
           match zero_alloc with
-          | Assume _ ->  raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
+          | Assume _ ->
+            raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
           | Default_zero_alloc | Ignore_assert_all -> None
-          (* arity=0 means no explicit arity; will be inferred in transl_type_poly *)
+          (* arity=0 means no explicit arity; will be inferred in
+             transl_type_poly *)
           | Check check -> Some check
         end
       in
@@ -1214,8 +1218,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         Language_extension.Alpha;
       Env.check_no_open_quotations loc env Layout_polymorphism_qt;
       let desc, typ =
-        transl_type_repr env ~policy ~row_context ~zero_alloc:None mode styp.ptyp_loc
-          vars st
+        transl_type_repr env ~policy ~row_context ~zero_alloc:None
+          mode styp.ptyp_loc vars st
       in
       ctyp desc typ
   | Ptyp_newlayout _ ->
@@ -1350,7 +1354,8 @@ and transl_type_poly env ~policy ~row_context ~zero_alloc mode loc vars st =
     if arity = 0 then
       raise (Error (err_loc, env, Zero_alloc_attr_non_function))
     else if arity <> default_arity then
-      raise (Error (err_loc, env, Zero_alloc_arity_mismatch (arity, default_arity)))
+      raise (Error (err_loc, env,
+        Zero_alloc_arity_mismatch (arity, default_arity)))
     else
       Some { check with arity }
   in
