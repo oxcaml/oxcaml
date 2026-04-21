@@ -2455,12 +2455,12 @@ let update_decls_jkind env decls =
          let has_flatten_floats =
            Builtin_attributes.has_flatten_floats decl.type_attributes
          in
-         let is_mixed_float_float_sharp =
+         let is_mixed_float_float64 =
            match new_decl.type_kind with
            | Type_record (_, rep, _) -> record_has_float_boxed rep
            | _ -> false
          in
-         begin match has_flatten_floats, is_mixed_float_float_sharp with
+         begin match has_flatten_floats, is_mixed_float_float64 with
          | false, true ->
            raise (Error (decl.type_loc, Missing_flatten_floats))
          | true, false ->
