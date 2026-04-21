@@ -643,10 +643,10 @@ let emit_MOV b dst src =
       buf_int8 b 0x66;
       emit_mod_rm_reg b no_rex [ 0x8B ] rm (rd_of_reg64 reg)
   (* movl *)
-  | Reg32 reg32, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm) ->
+  | Reg32 reg32, ((Mem _ | Mem64_RIP _) as rm) ->
       let reg = rd_of_reg64 reg32 in
       emit_mod_rm_reg b 0 [ 0x8B ] rm reg
-  | ((Mem _ | Mem64_RIP _) as rm), Reg32 reg32 ->
+  | ((Reg32 _ | Mem _ | Mem64_RIP _) as rm), Reg32 reg32 ->
       let reg = rd_of_reg64 reg32 in
       emit_mod_rm_reg b 0 [ 0x89 ] rm reg
   | (Mem { typ = DWORD } as rm), ((Imm _ | Sym _) as n) ->
@@ -669,9 +669,9 @@ let emit_MOV b dst src =
       buf_int8 b (0xB8 lor reg7 reg);
       buf_int32_imm b n
   (* movq *)
-  | Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm) ->
+  | Reg64 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       emit_mod_rm_reg b rexw [ 0x8B ] rm (rd_of_reg64 reg)
-  | ((Mem _ | Mem64_RIP _) as rm), Reg64 reg ->
+  | ((Reg64 _ | Mem _ | Mem64_RIP _) as rm), Reg64 reg ->
       emit_mod_rm_reg b rexw [ 0x89 ] rm (rd_of_reg64 reg)
   | Reg64 r64, Imm n when not (is_imm32L n) ->
       (* MOVNoneQ *)
