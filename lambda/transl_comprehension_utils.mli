@@ -83,7 +83,7 @@ module Lambda_utils : sig
       other information needed by [Lapply] is set to some default value. *)
   val apply :
     loc:scoped_location ->
-    mode:return_mode ->
+    return_mode:return_mode ->
     lambda ->
     lambda list ->
     result_layout:layout ->
