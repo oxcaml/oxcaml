@@ -245,6 +245,10 @@ mode-cross would be wrong: the elements would cross along with the list! We thus
 state in the with-bounds that `'a list` contains `'a` -- that's the intuition
 behind the `with` syntax.
 
+For mode-crossing purposes, `k with ty @@ modality` behaves as if the type had
+a record field of type `ty @@ modality`. Plain `k with ty` is the same idea
+with a field of type `ty`, without a modality.
+
 Looking at examples of `list`, we would have `int list : immutable_data`
 (because `int` mode-crosses everything) but `(int -> int) ref list : value`,
 because `(int -> int) ref` mode-crosses nothing.
