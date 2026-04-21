@@ -61,7 +61,7 @@ module Lambda_utils = struct
     let string ~loc s = Lconst (Const_base (Const_string (s, loc, None)))
   end
 
-  let apply ~loc ~mode func args ~result_layout =
+  let apply ~loc ~return_mode func args ~result_layout =
     (* These defaultscould be promoted to optional arguments if they were more
        widely used *)
     let region_close = Rc_normal in
@@ -74,7 +74,7 @@ module Lambda_utils = struct
         ap_func = func;
         ap_args = args;
         ap_region_close = region_close;
-        ap_mode = mode;
+        ap_mode = return_mode;
         ap_tailcall = tailcall;
         ap_inlined = inlined;
         ap_specialised = specialised;
