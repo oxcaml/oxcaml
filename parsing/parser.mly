@@ -3113,12 +3113,6 @@ block_access:
       { Pexp_ident ($1) }
   | mkrhs(constr_longident) %prec prec_constant_constructor
       { Pexp_construct($1, None) }
-  | HASHLPAREN RPAREN
-      { Pexp_unboxed_unit }
-  | HASHFALSE
-      { Pexp_unboxed_bool false }
-  | HASHTRUE
-      { Pexp_unboxed_bool true }
   | name_tag %prec prec_constant_constructor
       { Pexp_variant($1, None) }
   | op(PREFIXOP) simple_expr
@@ -3793,12 +3787,6 @@ simple_pattern_not_ident:
       { Ppat_interval ($1, $3) }
   | mkrhs(constr_longident)
       { Ppat_construct($1, None) }
-  | HASHLPAREN RPAREN
-      { Ppat_unboxed_unit }
-  | HASHFALSE
-      { Ppat_unboxed_bool false }
-  | HASHTRUE
-      { Ppat_unboxed_bool true }
   | name_tag
       { Ppat_variant($1, None) }
   | hash mkrhs(type_longident)
@@ -5076,6 +5064,9 @@ unboxed_constant:
   | HASH_INT          { unboxed_int $sloc $sloc Positive $1 }
   | HASH_FLOAT        { unboxed_float Positive $1 }
   | HASH_CHAR         { Pconst_untagged_char $1 }
+  | HASHLPAREN RPAREN { Pconst_unboxed_unit }
+  | HASHFALSE         { Pconst_unboxed_bool false }
+  | HASHTRUE          { Pconst_unboxed_bool true }
 ;
 constant:
     value_constant    { $1 }

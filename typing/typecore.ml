@@ -963,6 +963,11 @@ let constant : Parsetree.constant -> (Typedtree.constant, error) result =
       | Error Unknown_constant_literal suffix ->
           Error (Unknown_literal (Misc.format_as_unboxed_literal i, suffix))
       end
+  | Pconst_unboxed_unit
+  | Pconst_unboxed_bool _ ->
+      (* CR-soon lmaurer: Add these to `Typedtree.constant` so they can be
+         handled here. *)
+      Misc.fatal_error "Typecore.constant: unsupported"
 
 let constant_or_raise env loc cst =
   match constant cst with
@@ -2770,14 +2775,25 @@ let split_half_typed_cases env zipped_cases =
       | vp, ep -> add_case vals htc data vp, add_case exns htc data ep
     ) zipped_cases ([], [])
 
+let is_literal_constant c =
+  match c with
+  | Pconst_unboxed_unit
+  | Pconst_unboxed_bool _ -> false
+  | Pconst_integer _
+  | Pconst_unboxed_integer _
+  | Pconst_char _
+  | Pconst_untagged_char _
+  | Pconst_string _
+  | Pconst_float _
+  | Pconst_unboxed_float _ -> true
+
 let rec has_literal_pattern p =
   match p.ppat_desc with
-  | Ppat_constant _
+  | Ppat_constant c ->
+     is_literal_constant c
   | Ppat_interval _ ->
      true
   | Ppat_any
-  | Ppat_unboxed_unit
-  | Ppat_unboxed_bool _
   | Ppat_variant (_, None)
   | Ppat_construct (_, None)
   | Ppat_type _
@@ -3188,7 +3204,8 @@ and type_pat_aux
             pat_attributes = sp.ppat_attributes;
             pat_env = !!penv;
             pat_unique_barrier = Unique_barrier.not_computed () }
-  | Ppat_unboxed_unit ->
+  | Ppat_constant Pconst_unboxed_unit ->
+      (* CR-soon lmaurer: Fold into [Ppat_constant] case *)
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       rvp @@ solve_expected {
         pat_desc = Tpat_unboxed_unit;
@@ -3197,7 +3214,8 @@ and type_pat_aux
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
-  | Ppat_unboxed_bool b ->
+  | Ppat_constant (Pconst_unboxed_bool b) ->
+      (* CR-soon lmaurer: Fold into [Ppat_constant] case *)
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       rvp @@ solve_expected {
         pat_desc = Tpat_unboxed_bool b;
@@ -3691,7 +3709,7 @@ let rec pat_tuple_arity spat =
   | Ppat_unboxed_tuple (args,_c) ->
       Local_tuple (List.map (fun (_, {ppat_loc; _}) -> ppat_loc) args)
   | Ppat_any | Ppat_exception _ | Ppat_var _ -> Maybe_local_tuple
-  | Ppat_constant _ | Ppat_unboxed_unit | Ppat_unboxed_bool _
+  | Ppat_constant _
   | Ppat_interval _ | Ppat_construct _ | Ppat_variant _
   | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_array _ | Ppat_type _
   | Ppat_lazy _ | Ppat_unpack _ | Ppat_extension _ -> Not_local_tuple
@@ -5371,8 +5389,6 @@ let shallow_iter_ppat_labeled_tuple f lst = List.iter (fun (_,p) -> f p) lst
 let shallow_iter_ppat f p =
   match p.ppat_desc with
   | Ppat_any | Ppat_var _ | Ppat_constant _ | Ppat_interval _
-  | Ppat_unboxed_unit
-  | Ppat_unboxed_bool _
   | Ppat_construct (_, None)
   | Ppat_extension _
   | Ppat_type _ | Ppat_unpack _ -> ()
@@ -6378,7 +6394,8 @@ and type_expect_
           exp_attributes = sexp.pexp_attributes;
           exp_env = env }
   )
-  | Pexp_unboxed_unit ->
+  | Pexp_constant Pconst_unboxed_unit ->
+      (* CR-soon lmaurer: Fold into [Pexp_constant] case *)
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       rue {
         exp_desc = Texp_unboxed_unit;
@@ -6386,7 +6403,8 @@ and type_expect_
         exp_type = instance Predef.type_unboxed_unit;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-  | Pexp_unboxed_bool b ->
+  | Pexp_constant (Pconst_unboxed_bool b) ->
+      (* CR-soon lmaurer: Fold into [Pexp_constant] case *)
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       rue {
         exp_desc = Texp_unboxed_bool b;
