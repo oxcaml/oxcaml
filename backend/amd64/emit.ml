@@ -1107,6 +1107,21 @@ let movsd src dst =
   | true, false, true -> I.simd vmovsd_m64_X [| src; dst |]
   | true, true, false -> I.simd vmovsd_X_m64 [| src; dst |]
 
+(* For an XMM-to-XMM register move, prefer the "load" form (reg operand is the
+   destination) when only the destination is a high register (R8-R15). The load
+   form encodes the high register in the VEX-compatible REX.R bit, allowing a
+   2-byte VEX prefix; the store form would need REX.B and force a 3-byte VEX.
+   Both forms are semantically identical for reg-reg moves. *)
+let regf_index = function X86_ast.XMM n | X86_ast.YMM n | X86_ast.ZMM n -> n
+
+let prefer_load_form (src : X86_ast.arg) (dst : X86_ast.arg) =
+  match src, dst with
+  | Regf s, Regf d -> regf_index d > 7 && regf_index s <= 7
+  | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+      | Mem _ | Mem64_RIP _ ),
+      _ ) ->
+    false
+
 let movpd ~unaligned src dst =
   let open Simd_instrs in
   match Arch.Extension.enabled AVX, is_mem src, unaligned with
@@ -1114,8 +1129,14 @@ let movpd ~unaligned src dst =
   | false, true, true -> I.simd movupd_X_Xm128 [| src; dst |]
   | false, false, false -> I.simd movapd_Xm128_X [| src; dst |]
   | false, false, true -> I.simd movupd_Xm128_X [| src; dst |]
-  | true, false, false -> I.simd vmovapd_Xm128_X [| src; dst |]
-  | true, false, true -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, false, false ->
+    if prefer_load_form src dst
+    then I.simd vmovapd_X_Xm128 [| src; dst |]
+    else I.simd vmovapd_Xm128_X [| src; dst |]
+  | true, false, true ->
+    if prefer_load_form src dst
+    then I.simd vmovupd_X_Xm128 [| src; dst |]
+    else I.simd vmovupd_Xm128_X [| src; dst |]
   | true, true, false -> I.simd vmovapd_X_Xm128 [| src; dst |]
   | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
 
