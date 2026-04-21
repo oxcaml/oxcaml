@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>A Small Introduction to OCaml</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f7f3ec;
+        --ink: #1c2733;
+        --muted: #687586;
+        --rule: rgba(24, 37, 52, 0.14);
+        --accent: #bf4f2d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family: Avenir Next, Segoe UI, system-ui, sans-serif;
+        line-height: 1.65;
+      }
+
+      main {
+        width: min(780px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 48px 0 64px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--rule);
+        margin-bottom: 34px;
+        padding-bottom: 28px;
+      }
+
+      h1,
+      h2 {
+        line-height: 1.1;
+      }
+
+      h1 {
+        margin: 0 0 14px;
+        font-size: clamp(2.2rem, 8vw, 4.2rem);
+        font-weight: 720;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 2.2rem 0 0.7rem;
+        font-size: 1.45rem;
+      }
+
+      p {
+        margin: 0.75rem 0;
+      }
+
+      .lede {
+        color: var(--muted);
+        font-size: 1.08rem;
+        max-width: 62ch;
+      }
+
+      code {
+        background: rgba(24, 37, 52, 0.08);
+        border-radius: 4px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.95em;
+        padding: 0.1em 0.28em;
+      }
+
+      a {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>A Small Introduction to OCaml</h1>
+        <p class="lede">
+          This page is ordinary HTML. Each runnable example below starts as an
+          <code>&lt;oxcaml&gt;</code> tag and is turned into a typecheck-and-run
+          editor by one script at the bottom of the page.
+        </p>
+      </header>
+
+      <section>
+        <h2>Expressions and Values</h2>
+        <p>
+          OCaml programs are built from expressions. A <code>let</code> binding
+          names the result of an expression, and the compiler infers the type.
+          Change the strings or arithmetic below and the output will update.
+        </p>
+
+        <oxcaml>
+          let language = "OCaml"
+          let year = 1996 + 1
+
+          let () =
+            Printf.printf "%s has had type inference since %d.\n" language year
+        </oxcaml>
+      </section>
+
+      <section>
+        <h2>Functions</h2>
+        <p>
+          Functions are values too. This function has no type annotation, but
+          OCaml still knows that <code>square</code> takes an integer and
+          returns an integer.
+        </p>
+
+        <oxcaml>
+          let square x = x * x
+
+          let () =
+            List.iter
+              (fun x -> Printf.printf "%d squared is %d\n" x (square x))
+              [1; 2; 3; 4; 5]
+        </oxcaml>
+      </section>
+
+      <section>
+        <h2>Lists and Recursion</h2>
+        <p>
+          Lists are immutable. Recursive functions consume them one case at a
+          time: the empty list, or a head element followed by the rest of the
+          list.
+        </p>
+
+        <oxcaml>
+          let rec sum numbers =
+            match numbers with
+            | [] -> 0
+            | first :: rest -> first + sum rest
+
+          let () =
+            Printf.printf "sum = %d\n" (sum [3; 1; 4; 1; 5; 9])
+        </oxcaml>
+      </section>
+
+      <section>
+        <h2>Variants and Pattern Matching</h2>
+        <p>
+          Variants let you define a small language of cases. Pattern matching
+          makes the compiler check that you handled the cases you said exist.
+        </p>
+
+        <oxcaml>
+          type shape =
+            | Circle of float
+            | Rectangle of float * float
+
+          let area shape =
+            match shape with
+            | Circle radius -> Float.pi *. radius *. radius
+            | Rectangle (width, height) -> width *. height
+
+          let () =
+            Printf.printf "area = %.2f\n" (area (Rectangle (3.0, 4.0)))
+        </oxcaml>
+      </section>
+
+      <section>
+        <h2>Types Catch Mistakes Early</h2>
+        <p>
+          The editor also shows compiler errors as you type. The example below
+          tries to put an integer where a string was promised. Fix it by
+          changing <code>42</code> to a string literal.
+        </p>
+
+        <oxcaml>
+          let message : string = 42
+
+          let () =
+            print_endline message
+        </oxcaml>
+      </section>
+    </main>
+
+    <script src="./oxcaml-embed.js"></script>
+  </body>
+</html>
