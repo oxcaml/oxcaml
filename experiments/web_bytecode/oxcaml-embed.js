@@ -1,5 +1,5 @@
 (function () {
-  const assetVersion = "20260421-utop-output";
+  const assetVersion = "20260421-input-guard";
   const script = document.currentScript;
   const moduleUrl = script?.dataset.moduleSrc
     ? new URL(script.dataset.moduleSrc, script.src || document.baseURI).href
