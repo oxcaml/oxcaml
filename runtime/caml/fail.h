@@ -77,10 +77,6 @@ struct caml_exception_context {
 
 int caml_is_special_exception(value exn);
 
-CAMLnoreturn_start
-CAMLextern void caml_raise_async(value res)
-CAMLnoreturn_end;
-
 /* from runtime/sync.c */
 CAMLextern void caml_check_error(int err, char const * msg);
 
@@ -89,6 +85,10 @@ CAMLextern void caml_check_error(int err, char const * msg);
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+CAMLnoreturn_start
+CAMLextern void caml_raise_async(value res)
+CAMLnoreturn_end;
 
 /* The following functions raise immediately into OCaml.
 
@@ -162,7 +162,7 @@ Caml_inline value caml_get_value_or_raise_async (caml_result result, const char 
 {
   if (caml_result_is_exception(result)) {
     caml_check_async(result, where);
-    caml_raise(result.data);
+    caml_raise_async(result.data);
   } else
     return result.data;
 }
