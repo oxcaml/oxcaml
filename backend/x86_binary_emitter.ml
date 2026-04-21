@@ -33,6 +33,8 @@ type section = {
   mutable sec_instrs : asm_line array;
 }
 
+let section_is_text sec = String.starts_with ~prefix:".text" sec.sec_name
+
 type data_size = B8 | B16 | B32 | B64
 
 module IntSet = Set.Make (Int)
@@ -1600,6 +1602,45 @@ let[@warning "+4"] constant b cst
     record_local_reloc b (RelocConstant (cst, B64));
     buf_int64L b 0L
 
+let emit_single_nop b n =
+  match n with
+  | 0 -> ()
+  | 1 -> buf_int8 b 0x90
+  | 2 -> buf_opcodes b [ 0x66; 0x90 ]
+  | 3 -> buf_opcodes b [ 0x0f; 0x1f; 0x00 ]
+  | 4 -> buf_opcodes b [ 0x0f; 0x1f; 0x40; 0x00 ]
+  | 5 -> buf_opcodes b [ 0x0f; 0x1f; 0x44; 0x00; 0x00 ]
+  | 6 ->
+      buf_opcodes b [ 0x66; 0x0f; 0x1f; 0x44 ];
+      buf_int16L b 0L
+  | 7 ->
+      buf_opcodes b [ 0x0f; 0x1f; 0x80 ];
+      buf_int32L b 0L
+  | 8 ->
+      buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
+      buf_int32L b 0L
+  | 9 ->
+      buf_int8 b 0x66;
+      buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
+      buf_int32L b 0L
+  | n when n >= 10 && n <= 15 ->
+      for _ = 10 to n do
+        buf_int8 b 0x66
+      done;
+      buf_int8 b 0x2e;
+      buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
+      buf_int32L b 0L
+  | _ ->
+      invalid_arg
+        (Printf.sprintf "emit_single_nop: unsupported length %d" n)
+
+let emit_nop b n =
+  if n < 0 then invalid_arg (Printf.sprintf "emit_nop: negative length %d" n);
+  for _ = 1 to n / 15 do
+    emit_single_nop b 15
+  done;
+  emit_single_nop b (n mod 15)
+
 let assemble_line b loc ins =
   try
     match ins with
@@ -1655,34 +1696,20 @@ let assemble_line b loc ins =
           let n = n - current in
           match data with
           | Asm_targets.Asm_directives.Zero ->
-            for _ = 1 to n do
-              buf_int8 b 0x00
-            done
-          | Asm_targets.Asm_directives.Nop ->
-            match n with
-            | 0 -> ()
-            | 1 -> buf_int8 b 0x90
-            | 2 -> buf_opcodes b [ 0x66; 0x90 ]
-            | 3 -> buf_opcodes b [ 0x0f; 0x1f; 0x00 ]
-            | 4 -> buf_opcodes b [ 0x0f; 0x1f; 0x40; 0x00 ]
-            | 5 -> buf_opcodes b [ 0x0f; 0x1f; 0x44; 0x00; 0x00 ]
-            | 6 ->
-                buf_opcodes b [ 0x66; 0x0f; 0x1f; 0x44 ];
-                buf_int16L b 0L
-            | 7 ->
-                buf_opcodes b [ 0x0f; 0x1f; 0x80 ];
-                buf_int32L b 0L
-            | _ ->
-                for _ = 9 to n do
-                  buf_int8 b 0x66
-                done;
-                buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
-                buf_int32L b 0L)
+            if section_is_text b.sec then
+              emit_nop b n
+            else
+              for _ = 1 to n do
+                buf_int8 b 0x00
+              done
+          | Asm_targets.Asm_directives.Nop -> emit_nop b n)
     | Directive (D.Space { bytes = n }) ->
-        (* TODO: in text section, should be NOP *)
-        for _ = 1 to n do
-          buf_int8 b 0
-        done
+        if section_is_text b.sec then
+          emit_nop b n
+        else
+          for _ = 1 to n do
+            buf_int8 b 0
+          done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
     | Directive
         (D.Reloc
