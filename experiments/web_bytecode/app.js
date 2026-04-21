@@ -1424,10 +1424,13 @@ function buildTranscript(text, { emptyPlaceholder = null, forceDiagnostics = fal
 
 function buildInterfaceHtml(text) {
   const trimmed = text.replace(/\r\n/g, "\n").trim();
-  const body = trimmed === ""
-    ? '<pre class="interface-output__body placeholder">(no exported values)</pre>'
-    : `<pre class="interface-output__body">${highlightedSyntaxHtml(trimmed)}</pre>`;
-  return `<div class="interface-output"><div class="interface-output__label">Inferred types</div>${body}</div>`;
+  if (trimmed === "") {
+    return "";
+  }
+  return (
+    '<div class="interface-output"><div class="interface-output__label">Inferred types</div>' +
+    `<pre class="interface-output__body">${highlightedSyntaxHtml(trimmed)}</pre></div>`
+  );
 }
 
 function renderTranscript(text, options) {

@@ -839,10 +839,13 @@ function buildTranscript(editor, text, { emptyPlaceholder = null, forceDiagnosti
 
 function buildInterfaceHtml(text) {
   const trimmed = text.replace(/\r\n/g, "\n").trim();
-  const body = trimmed === ""
-    ? '<pre class="interface-output__body placeholder">(no exported values)</pre>'
-    : `<pre class="interface-output__body">${highlightedSyntaxHtml(trimmed)}</pre>`;
-  return `<div class="interface-output"><div class="interface-output__label">Inferred types</div>${body}</div>`;
+  if (trimmed === "") {
+    return "";
+  }
+  return (
+    '<div class="interface-output"><div class="interface-output__label">Inferred types</div>' +
+    `<pre class="interface-output__body">${highlightedSyntaxHtml(trimmed)}</pre></div>`
+  );
 }
 
 function modeForElement(element, options = {}) {
@@ -1178,10 +1181,6 @@ function injectStyles() {
       color: #173829;
       font: 0.84rem/1.48 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       white-space: pre-wrap;
-    }
-
-    .interface-output__body.placeholder {
-      color: var(--oxcaml-muted);
     }
 
     .oxcaml-embed__output .tok-keyword { color: #98521a; font-weight: 650; }
