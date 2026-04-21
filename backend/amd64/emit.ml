@@ -1074,8 +1074,18 @@ let movq src dst =
   match Arch.Extension.enabled AVX, is_regf src with
   | false, false -> I.simd movq_X_r64m64 [| src; dst |]
   | false, true -> I.simd movq_r64m64_X [| src; dst |]
-  | true, false -> I.simd vmovq_X_r64m64 [| src; dst |]
-  | true, true -> I.simd vmovq_r64m64_X [| src; dst |]
+  | true, false ->
+    (* Prefer the shorter XMM/m64 form when the source is memory: it allows the
+       2-byte VEX prefix (VEX.W=0, F3.0F.7E) instead of forcing the 3-byte form
+       (VEX.W=1, 66.0F.6E). *)
+    if is_mem src
+    then I.simd vmovq_X_Xm64 [| src; dst |]
+    else I.simd vmovq_X_r64m64 [| src; dst |]
+  | true, true ->
+    (* Symmetric shortening for stores to memory. *)
+    if is_mem dst
+    then I.simd vmovq_Xm64_X [| src; dst |]
+    else I.simd vmovq_r64m64_X [| src; dst |]
 
 let movss src dst =
   let open Simd_instrs in
