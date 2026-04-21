@@ -32,6 +32,7 @@ import {
 
 const autoRunDelayMs = 360;
 const buildBase = "../../_build/default/experiments/web_bytecode";
+const storagePrefix = "oxcaml-playground:v1";
 
 const editorHostEl = document.getElementById("editor");
 const outputEl = document.getElementById("output");
@@ -40,6 +41,7 @@ const outputPanelEl = document.getElementById("output-panel");
 const statusEl = document.getElementById("status");
 const statusTextEl = statusEl?.querySelector(".status-text") ?? null;
 const samplePickerEl = document.getElementById("sample-picker");
+const resetButtonEl = document.getElementById("reset-source");
 const fullUi = Boolean(
   editorHostEl &&
   outputLabelEl &&
@@ -48,7 +50,9 @@ const fullUi = Boolean(
 );
 
 let currentFilename = "snippet.ml";
+let currentOriginalSource = "";
 let currentSampleId = null;
+let currentStorageKey = null;
 let pendingRunTimer = null;
 let currentRevision = 0;
 let editorMarkers = [];
@@ -71,8 +75,71 @@ let bootStatusActive = false;
 const setDiagnosticsEffect = StateEffect.define();
 const setSyntaxDecorationsEffect = StateEffect.define();
 
+function pageStorageScope() {
+  try {
+    const url = new URL(window.location.href);
+    url.hash = "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
+function stableHash(text) {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function storageKeyForSource(source) {
+  return `${storagePrefix}:${pageStorageScope()}:${source.length}:${stableHash(source)}`;
+}
+
+function readStoredSource(storageKey) {
+  try {
+    return window.localStorage.getItem(storageKey);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSource(storageKey, source) {
+  try {
+    window.localStorage.setItem(storageKey, source);
+  } catch {
+    // Storage can be unavailable or full; the playground should still run normally.
+  }
+}
+
+function removeStoredSource(storageKey) {
+  try {
+    window.localStorage.removeItem(storageKey);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
 const oxcamlIdentifierNames = new Set(["local_", "stack_", "exclave_"]);
 const packageModuleNames = new Set(["Base", "Core", "Stdlib_stable"]);
+const primitiveTypeNames = new Set([
+  "array",
+  "bool",
+  "bytes",
+  "char",
+  "exn",
+  "float",
+  "int",
+  "list",
+  "nativeint",
+  "option",
+  "ref",
+  "result",
+  "string",
+  "unit",
+]);
 const keywordTokens = new Set([
   "and",
   "as",
@@ -435,6 +502,8 @@ function classifySyntaxToken(tokens, index, source) {
             ? "tok-module"
             : "tok-constructor",
         );
+      } else if (primitiveTypeNames.has(token.text)) {
+        classes.push("tok-type");
       } else if (parameterIntroducers.has(prev?.text ?? "")) {
         classes.push("tok-parameter");
       } else if (declarationIntroducers.has(prev?.text ?? "")) {
@@ -470,6 +539,61 @@ function buildSyntaxDecorations(source) {
     builder.add(from, to, Decoration.mark({ class: className }));
   }
   return builder.finish();
+}
+
+function highlightedSyntaxHtml(source) {
+  const tokens = tokenizeSyntax(source);
+  let cursor = 0;
+  let html = "";
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    const className = classifySyntaxToken(tokens, index, source);
+    if (!className) {
+      continue;
+    }
+    html += escapeHtml(source.slice(cursor, token.from));
+    html += `<span class="${className}">${escapeHtml(source.slice(token.from, token.to))}</span>`;
+    cursor = token.to;
+  }
+  html += escapeHtml(source.slice(cursor));
+  return html;
+}
+
+function isOutcomeLine(line) {
+  return /^\s*(val|type|module|module type|exception|external|class|class type)\b/.test(line);
+}
+
+function splitOutcomeTypeAndValue(text) {
+  const separator = " = ";
+  const index = text.indexOf(separator);
+  if (index === -1) {
+    return { typeText: text, valueText: null };
+  }
+  return {
+    typeText: text.slice(0, index),
+    valueText: text.slice(index + separator.length),
+  };
+}
+
+function highlightedOutcomeHtml(line) {
+  const leadingMatch = /^(\s*)/.exec(line);
+  const leading = leadingMatch ? leadingMatch[1] : "";
+  const body = line.slice(leading.length);
+  const valueMatch = /^(val)\s+([A-Za-z_][A-Za-z0-9_']*)\s*:\s*(.+)$/.exec(body);
+  if (!valueMatch) {
+    return escapeHtml(leading) + highlightedSyntaxHtml(body || " ");
+  }
+  const { typeText, valueText } = splitOutcomeTypeAndValue(valueMatch[3]);
+  const valueHtml = valueText === null
+    ? ""
+    : ` <span class="utop-outcome__equals">=</span> <span class="utop-outcome__value">${highlightedSyntaxHtml(valueText)}</span>`;
+  return (
+    `${escapeHtml(leading)}<span class="utop-outcome__keyword">${escapeHtml(valueMatch[1])}</span> ` +
+    `<span class="utop-outcome__name">${escapeHtml(valueMatch[2])}</span>` +
+    ` <span class="utop-outcome__punctuation">:</span> ` +
+    `<span class="utop-outcome__type">${highlightedSyntaxHtml(typeText.trim())}</span>` +
+    valueHtml
+  );
 }
 
 function scheduleSyntaxRefresh() {
@@ -529,6 +653,7 @@ function createEditor() {
           scheduleSyntaxRefresh();
           currentRevision += 1;
           editorMarkers = [];
+          persistCurrentSource();
           schedulePipeline();
         }),
       ],
@@ -538,6 +663,26 @@ function createEditor() {
 
 function sourceText() {
   return editorView ? editorView.state.doc.toString() : "";
+}
+
+function updateResetState() {
+  if (!resetButtonEl) {
+    return;
+  }
+  resetButtonEl.hidden = sourceText() === currentOriginalSource;
+}
+
+function persistCurrentSource() {
+  if (!currentStorageKey) {
+    return;
+  }
+  const source = sourceText();
+  if (source === currentOriginalSource) {
+    removeStoredSource(currentStorageKey);
+  } else {
+    writeStoredSource(currentStorageKey, source);
+  }
+  updateResetState();
 }
 
 function replaceEditorSource(source) {
@@ -555,6 +700,7 @@ function replaceEditorSource(source) {
   });
   suppressEditorChanges = false;
   scheduleSyntaxRefresh();
+  updateResetState();
 }
 
 function loadScript(url) {
@@ -930,7 +1076,8 @@ const ready = (async () => {
   if (
     !backend ||
     typeof backend.checkString !== "function" ||
-    typeof backend.runString !== "function"
+    typeof backend.runString !== "function" ||
+    typeof backend.utopString !== "function"
   ) {
     throw new Error("static OxCaml backend failed to initialize");
   }
@@ -941,8 +1088,20 @@ export async function checkString(filename, source) {
   return runBackendWithLazyFs("checkString", filename, source);
 }
 
+export async function interfaceString(filename, source) {
+  const backend = await ready;
+  if (typeof backend.interfaceString !== "function") {
+    return undefined;
+  }
+  return runBackendWithLazyFs("interfaceString", filename, source);
+}
+
 export async function runString(filename, source) {
   return runBackendWithLazyFs("runString", filename, source);
+}
+
+export async function utopString(filename, source) {
+  return runBackendWithLazyFs("utopString", filename, source);
 }
 
 export async function checkFile(file) {
@@ -955,7 +1114,14 @@ export async function runFile(file) {
   return runString(file.name, source);
 }
 
-window.webBytecode = { checkString, runString, checkFile, runFile };
+window.webBytecode = {
+  checkString,
+  interfaceString,
+  runString,
+  utopString,
+  checkFile,
+  runFile,
+};
 
 function escapeHtml(text) {
   return text.replace(/[&<>"]/g, (char) => ({
@@ -1193,7 +1359,18 @@ function buildTranscript(text, { emptyPlaceholder = null, forceDiagnostics = fal
           ? ""
           : ` data-marker-index="${markerIndex}" tabindex="0" role="button"`;
       const clickableClass = markerIndex === undefined ? "" : " clickable";
-      return `<span class="transcript-line ${info.cls}${clickableClass}"${attrs}>${escapeHtml(line || " ")}\n</span>`;
+      let lineHtml = escapeHtml(line || " ");
+      if (info.cls === "code") {
+        const match = /^(\d+\s+\|\s?)(.*)$/.exec(line);
+        if (match) {
+          lineHtml =
+            `<span class="diagnostic-code-prefix">${escapeHtml(match[1])}</span>` +
+            highlightedSyntaxHtml(match[2]);
+        }
+      } else if (info.cls === "stream" && isOutcomeLine(line)) {
+        lineHtml = highlightedOutcomeHtml(line || " ");
+      }
+      return `<span class="transcript-line ${info.cls}${clickableClass}"${attrs}>${lineHtml}\n</span>`;
     })
     .join("");
 
@@ -1207,6 +1384,14 @@ function buildTranscript(text, { emptyPlaceholder = null, forceDiagnostics = fal
   };
 }
 
+function buildInterfaceHtml(text) {
+  const trimmed = text.replace(/\r\n/g, "\n").trim();
+  const body = trimmed === ""
+    ? '<pre class="interface-output__body placeholder">(no exported values)</pre>'
+    : `<pre class="interface-output__body">${highlightedSyntaxHtml(trimmed)}</pre>`;
+  return `<div class="interface-output"><div class="interface-output__label">Inferred types</div>${body}</div>`;
+}
+
 function renderTranscript(text, options) {
   if (!fullUi || !outputEl) {
     return { hasWarning: false, hasError: false, tone: "idle", html: "" };
@@ -1214,7 +1399,8 @@ function renderTranscript(text, options) {
   const transcript = buildTranscript(text, options);
   setOutputBusy(false);
   setOutputState(transcript.tone);
-  outputEl.innerHTML = transcript.html;
+  outputEl.innerHTML =
+    transcript.html + (options?.interfaceText === undefined ? "" : buildInterfaceHtml(options.interfaceText));
   return transcript;
 }
 
@@ -1237,14 +1423,31 @@ function setSource(source, filename, sampleId = null) {
     return;
   }
   currentFilename = filename;
+  currentOriginalSource = source;
   currentSampleId = sampleId;
+  currentStorageKey = storageKeyForSource(source);
   currentRevision += 1;
   clearEditorMarkers();
-  replaceEditorSource(source);
+  replaceEditorSource(readStoredSource(currentStorageKey) ?? source);
   if (samplePickerEl.value !== (sampleId || "")) {
     samplePickerEl.value = sampleId || "";
   }
+  updateResetState();
   schedulePipeline();
+}
+
+function resetCurrentSource() {
+  if (!currentStorageKey) {
+    return;
+  }
+  removeStoredSource(currentStorageKey);
+  clearPendingWork();
+  currentRevision += 1;
+  clearEditorMarkers();
+  replaceEditorSource(currentOriginalSource);
+  updateResetState();
+  schedulePipeline();
+  editorView?.focus();
 }
 
 function clearPendingWork() {
@@ -1272,12 +1475,25 @@ async function runCurrentSource({ revision = currentSourceRevision() } = {}) {
     if (revision !== currentSourceRevision()) {
       return;
     }
-    const output = await runString(currentFilename, sourceText());
+    const source = sourceText();
+    const output = await runString(currentFilename, source);
     if (revision !== currentSourceRevision()) {
       return;
     }
-    updateEditorMarkers(sourceText(), output);
-    const transcript = renderTranscript(output, { emptyPlaceholder: "(no output)" });
+    updateEditorMarkers(source, output);
+    const transcriptPreview = buildTranscript(output, { emptyPlaceholder: "(no output)" });
+    const showInterface =
+      !transcriptPreview.hasException && !transcriptPreview.hasCompilerError;
+    const interfaceOutput = showInterface
+      ? await interfaceString(currentFilename, source)
+      : undefined;
+    if (revision !== currentSourceRevision()) {
+      return;
+    }
+    const transcript = renderTranscript(output, {
+      emptyPlaceholder: "(no output)",
+      interfaceText: interfaceOutput,
+    });
     if (transcript.hasException) {
       setStatus("error", "exception");
     } else if (transcript.hasCompilerError) {
@@ -1318,6 +1534,8 @@ if (fullUi) {
     }
     setSource(sample.source, sample.filename, sample.id);
   });
+
+  resetButtonEl?.addEventListener("click", resetCurrentSource);
 
   outputEl?.addEventListener("click", (event) => {
     const target = event.target instanceof Element

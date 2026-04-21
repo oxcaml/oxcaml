@@ -43,3 +43,38 @@ let run_string ~browser ~filename ~source =
           ~finally:(fun () ->
             Browser_switch_common.cleanup_build_artifacts ~source_path ~output_prefix)))
   |> Browser_switch_common.replace_all ~pattern:source_path ~with_:filename
+
+let initialize_toplevel_for_environment environment =
+  match environment with
+  | Browser_switch_common.Native -> Toploop.initialize_toplevel_env ()
+  | Browser_switch_common.Browser ->
+    ensure_browser_toplevel_initialized ();
+    Toploop.initialize_toplevel_env ();
+    Topdirs.dir_directory Browser_switch_common.browser_cmis_dir;
+    List.iter
+      Topdirs.dir_directory
+      Browser_switch_package_manifest.browser_package_include_dirs
+
+let utop_string ~browser ~filename ~source =
+  let environment =
+    if browser then Browser_switch_common.Browser
+    else Browser_switch_common.Native
+  in
+  Browser_switch_common.with_missing_cmi_detection environment (fun () ->
+      Browser_switch_common.prepare_compiler environment ~filename;
+      initialize_toplevel_for_environment environment;
+      Toploop.override_sys_argv [| filename |];
+      Toploop.input_name := filename;
+      Sys.interactive := false;
+      let lexbuf = Browser_switch_common.prepare_lexbuf ~filename source in
+      let phrases = !Toploop.parse_use_file lexbuf in
+      List.for_all
+        (fun phrase ->
+          Warnings.reset_fatal ();
+          let phrase = Toploop.preprocess_phrase Format.std_formatter phrase in
+          Env.reset_cache_toplevel ();
+          Toploop.execute_phrase true Format.std_formatter phrase)
+        phrases
+      |> ignore;
+      Format.pp_print_flush Format.std_formatter ();
+      "")
