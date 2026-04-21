@@ -497,7 +497,8 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
         (trace false (incompatibility_phrase trace_format)) tr
         (pp_print_option pp_doc) mis;
       if env <> Env.empty && not jkind_error
-       (* the jkinds mechanism has its own way of reporting missing cmis *)
+       (* the jkinds mechanism has its own way of reporting missing cmis
+          CR jkinds: streamline these *)
       then warn_on_missing_defs env ppf head;
        Internal_names.print_explanations env ppf;
        Ident_conflicts.err_print ppf
