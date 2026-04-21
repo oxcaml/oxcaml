@@ -114,9 +114,7 @@ let prepare_lexbuf ~filename source =
 
 let missing_cmi_filename unit_name =
   let requested = Compilation_unit.Name.to_string unit_name ^ ".cmi" in
-  match Misc.normalized_unit_filename requested with
-  | Ok normalized -> normalized
-  | Error _ -> requested
+  Misc.normalized_unit_filename requested
 
 let reset_flags environment =
   Clflags.annotations := false;

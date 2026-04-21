@@ -4,7 +4,7 @@ let read_source path =
   else In_channel.with_open_bin path In_channel.input_all
 
 let usage () =
-  prerr_endline "usage: web_bytecode_cli (check|run) <file|-> [logical-filename]";
+  prerr_endline "usage: web_bytecode_cli (check|interface|run|utop) <file|-> [logical-filename]";
   exit 2
 
 let () =
@@ -20,7 +20,9 @@ let () =
   let output =
     match mode with
     | "check" -> Web_bytecode_native.check_string ~filename ~source
+    | "interface" -> Web_bytecode_native.interface_string ~filename ~source
     | "run" -> Web_bytecode_native.run_string ~filename ~source
+    | "utop" -> Web_bytecode_native.utop_string ~filename ~source
     | _ -> usage ()
   in
   output_string stdout output;

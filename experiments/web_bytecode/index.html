@@ -81,6 +81,35 @@
         pointer-events: none;
       }
 
+      .reset-button {
+        position: absolute;
+        right: 14px;
+        top: 14px;
+        z-index: 5;
+        height: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 9px;
+        background: rgba(18, 22, 29, 0.78);
+        color: #d8e3f2;
+        cursor: pointer;
+        font: 650 0.82rem/1 "Avenir Next", "Segoe UI", sans-serif;
+        padding: 0 12px;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+        backdrop-filter: blur(8px);
+      }
+
+      .reset-button:hover,
+      .reset-button:focus-visible {
+        border-color: rgba(255, 181, 126, 0.48);
+        background: rgba(28, 35, 47, 0.94);
+        color: #ffcfb4;
+        outline: none;
+      }
+
+      .reset-button[hidden] {
+        display: none;
+      }
+
       .status {
         position: relative;
         min-width: 78px;
@@ -222,7 +251,7 @@
       }
 
       .editor-frame .cm-content {
-        padding: 22px 24px 28px 18px;
+        padding: 22px 104px 28px 18px;
         min-height: 100%;
         caret-color: #ffd28f;
       }
@@ -417,10 +446,80 @@
         color: #233040;
       }
 
+      .diagnostic-code-prefix {
+        color: #7a8695;
+      }
+
       .transcript-line.detail,
       .transcript-line.trace {
         color: #4f5c6b;
       }
+
+      .utop-outcome__keyword {
+        color: #98521a;
+        font-weight: 750;
+      }
+
+      .utop-outcome__name {
+        color: #0b638a;
+        font-weight: 700;
+      }
+
+      .utop-outcome__punctuation,
+      .utop-outcome__equals {
+        color: #7a8695;
+      }
+
+      .utop-outcome__type {
+        color: #0f6f57;
+      }
+
+      .utop-outcome__value {
+        color: #263341;
+      }
+
+      .interface-output {
+        margin-top: 18px;
+        border: 1px solid rgba(15, 123, 95, 0.2);
+        border-left: 4px solid #0f7b5f;
+        border-radius: 8px;
+        background: rgba(224, 245, 238, 0.55);
+        padding: 12px 14px 13px;
+      }
+
+      .interface-output__label {
+        margin-bottom: 8px;
+        color: #0f6f57;
+        font: 700 0.72rem/1 "Avenir Next", "Segoe UI", sans-serif;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .interface-output__body {
+        margin: 0;
+        color: #173829;
+        white-space: pre-wrap;
+      }
+
+      .interface-output__body.placeholder {
+        color: var(--muted);
+      }
+
+      .output-body .tok-keyword { color: #98521a; font-weight: 650; }
+      .output-body .tok-module { color: #0d638c; }
+      .output-body .tok-string { color: #276a3f; }
+      .output-body .tok-comment { color: #6d7988; }
+      .output-body .tok-number { color: #846000; }
+      .output-body .tok-operator { color: #4f5c6b; }
+      .output-body .tok-function { color: #0d638c; }
+      .output-body .tok-parameter { color: #805514; }
+      .output-body .tok-type { color: #0d638c; }
+      .output-body .tok-constructor { color: #8a5a00; }
+      .output-body .tok-oxcaml { color: #b8462b; font-weight: 700; }
+      .output-body .tok-annotation { color: #8c5f16; font-style: italic; }
+      .output-body .tok-package { color: #007260; font-weight: 700; }
+      .output-body .tok-package-open { color: #475fa5; }
+      .output-body .tok-label { color: #8b3aa8; }
 
       @media (max-width: 1180px) {
         main {
@@ -448,15 +547,20 @@
         <section class="surface">
           <div class="surface-head editor-head">
             <div class="surface-label">Editor</div>
-            <div class="header-tools">
-              <div class="picker">
-                <select id="sample-picker" aria-label="Sample">
-                  <option value="">Sample</option>
+              <div class="header-tools">
+                <div class="picker">
+                  <select id="sample-picker" aria-label="Sample">
+                    <option value="">Sample</option>
                 </select>
               </div>
             </div>
           </div>
           <div class="editor-frame">
+            <button
+              id="reset-source"
+              class="reset-button"
+              type="button"
+              hidden>Reset</button>
             <div id="editor" class="editor-host" aria-label="Source code"></div>
           </div>
         </section>
