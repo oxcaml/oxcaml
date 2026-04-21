@@ -2250,9 +2250,11 @@ let unique_arity_identifier (arity : Cmm.machtype list) =
 let result_layout_suffix result =
   match result with [| Val |] -> "" | _ -> "_R" ^ machtype_identifier result
 
-let send_function_name arity result (mode : Cmx_format.alloc_mode) =
+let send_function_name arity result (mode : Cmx_format.return_mode) =
   let res = result_layout_suffix result in
-  let suff = match mode with Alloc_heap -> "" | Alloc_local -> "L" in
+  let suff =
+    match mode with Not_alloc_stack -> "" | Maybe_alloc_stack -> "L"
+  in
   global_symbol ("caml_send" ^ unique_arity_identifier arity ^ res ^ suff)
 
 let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
@@ -2449,12 +2451,12 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
 
 (* Record application and currying functions *)
 
-let apply_function_name arity result (mode : Cmx_format.alloc_mode) =
+let apply_function_name arity result (mode : Cmx_format.return_mode) =
   let res = result_layout_suffix result in
   let suff =
     match mode with
-    | Cmx_format.Alloc_heap -> ""
-    | Cmx_format.Alloc_local -> "L"
+    | Cmx_format.Not_alloc_stack -> ""
+    | Cmx_format.Maybe_alloc_stack -> "L"
   in
   "caml_apply" ^ unique_arity_identifier arity ^ res ^ suff
 
@@ -3366,13 +3368,13 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
           (apply_or_call_caml_apply result arity mut clos args pos mode dbg)
         ~body_nontail:
           (apply_or_call_caml_apply result arity mut clos args Rc_normal
-             Cmx_format.Alloc_local dbg)
+             Cmx_format.Maybe_alloc_stack dbg)
         old_region)
   | (arity, args), Some (arity', args') -> (
     let body old_region =
       bind "result"
         (call_caml_apply [| Val |] arity mut clos args Rc_normal
-           Cmx_format.Alloc_local dbg) (fun clos ->
+           Cmx_format.Maybe_alloc_stack dbg) (fun clos ->
           might_split_call_caml_apply ?old_region result arity' mut clos args'
             pos mode dbg)
     in
@@ -3386,7 +3388,7 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
        so, we close the region ourselves afterwards, as is already done inside
        [caml_apply]. *)
     match old_region, mode with
-    | None, Cmx_format.Alloc_heap when Config.stack_allocation ->
+    | None, Cmx_format.Not_alloc_stack when Config.stack_allocation ->
       let dbg = placeholder_dbg in
       bind "region"
         (Cop (Cbeginregion, [], dbg ()))
@@ -3544,7 +3546,7 @@ let placeholder_fun_dbg ~human_name:_ = Debuginfo.none
  *        (app closN-1.code aN closN-1))))
  *)
 
-let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
+let apply_function_body arity result (mode : Cmx_format.return_mode) =
   let dbg = placeholder_dbg in
   let args = List.map (fun _ -> V.create_local "arg") arity in
   let clos = V.create_local "clos" in
@@ -3555,8 +3557,8 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
     then None
     else
       match mode with
-      | Cmx_format.Alloc_heap -> Some (V.create_local "region")
-      | Cmx_format.Alloc_local -> None
+      | Cmx_format.Not_alloc_stack -> Some (V.create_local "region")
+      | Cmx_format.Maybe_alloc_stack -> None
   in
   let rec app_fun clos args =
     match args with
