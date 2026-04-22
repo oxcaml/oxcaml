@@ -154,6 +154,8 @@ type error =
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
+  | Missing_flatten_floats
+  | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
 
 open Typedtree
@@ -1268,21 +1270,25 @@ let transl_declaration env sdecl (id, uid) =
    also have unboxed versions, but these aren't stored in
    [type_unboxed_version].
 *)
+let rec shape_has_float_boxed shape =
+  Array.exists
+    (fun (kind : mixed_block_element) ->
+      match kind with
+      | Scannable _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void -> false
+      | Float_boxed -> true
+      | Product shape -> shape_has_float_boxed shape)
+    shape
+
+let record_has_float_boxed = function
+  | Record_mixed shape -> shape_has_float_boxed shape
+  | Record_unboxed | Record_inlined _ | Record_boxed _
+  | Record_float | Record_ufloat -> false
+
 let record_gets_unboxed_version = function
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
   | Record_boxed _ -> true
-  | Record_mixed shape ->
-    let rec shape_has_float_boxed shape =
-      Array.exists
-        (fun (kind : mixed_block_element) ->
-          match kind with
-          | Scannable _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void -> false
-          | Float_boxed -> true
-          | Product shape -> shape_has_float_boxed shape)
-        shape
-    in
-    not (shape_has_float_boxed shape)
+  | Record_mixed shape -> not (shape_has_float_boxed shape)
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
   match decl.type_kind with
@@ -2445,8 +2451,23 @@ let update_decls_jkind env decls =
            | _ -> ()
          end;
 
-         (id, decl, allow_any_crossing,
-          update_decl_jkind env (Pident id) decl)))
+         let new_decl = update_decl_jkind env (Pident id) decl in
+         let has_flatten_floats =
+           Builtin_attributes.has_flatten_floats decl.type_attributes
+         in
+         let is_mixed_float_float64 =
+           match new_decl.type_kind with
+           | Type_record (_, rep, _) -> record_has_float_boxed rep
+           | _ -> false
+         in
+         begin match has_flatten_floats, is_mixed_float_float64 with
+         | false, true ->
+           raise (Error (decl.type_loc, Missing_flatten_floats))
+         | true, false ->
+           raise (Error (decl.type_loc, Misplaced_flatten_floats))
+         | true, true | false, false -> ()
+         end;
+         (id, decl, allow_any_crossing, new_decl)))
     decls
 
 (* See Note [Typechecking unboxed versions of types]. *)
@@ -5395,6 +5416,19 @@ let report_error_doc ppf = function
   | Layout_poly_unsupported ->
     fprintf ppf
       "@[Layout polymorphism is unsupported in this context.@]"
+  | Missing_flatten_floats ->
+    fprintf ppf
+      "@[This record type mixes boxed and unboxed float fields,@ \
+       which causes the flat float record optimization.@ \
+       You must annotate it with %a.@]"
+      Style.inline_code "[@@flatten_floats]"
+  | Misplaced_flatten_floats ->
+    fprintf ppf
+      "@[The %a attribute is only allowed on record types@ \
+       that mix boxed %a and unboxed %a fields.@]"
+      Style.inline_code "[@@flatten_floats]"
+      Style.inline_code "float"
+      Style.inline_code "float#"
   | Recursive_jkind_definition (path, env, reaching_path) ->
     Printtyp.wrap_printing_env ~error:true env @@ fun () ->
     fprintf ppf "@[<v>The kind %a is cyclic%a@]"
