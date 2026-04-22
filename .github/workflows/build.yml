@@ -261,7 +261,11 @@ jobs:
 
       - name: Install autoconf and bash and parallel (macOS)
         if: runner.os == 'macOS'
-        run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf bash parallel
+        run: |
+          # Pin autoconf to 2.71. autoconf (2.72+) probes for C23 and sets
+          # CC="gcc -std=gnu23", which breaks the runtime4 aarch64-darwin build.
+          HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf@2.71 bash parallel
+          echo "$(brew --prefix autoconf@2.71)/bin" >> "$GITHUB_PATH"
         # bash >=4 is needed for tools/gen_ocamlj_rules.sh
 
       - name: Pretend we're running in a container (makes setup-ocaml go faster)
