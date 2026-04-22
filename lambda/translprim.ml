@@ -1379,6 +1379,8 @@ let glb_array_type loc t1 t2 =
   | Pintarray, Pgcignorableaddrarray -> Pintarray
   | Pintarray, Pintarray -> Pintarray
   | Pfloatarray, Pfloatarray -> Pfloatarray
+  | Ptemplatedarray _, _ | _, Ptemplatedarray _ ->
+    Misc.fatal_error "unexpected templated array kind in glb"
 
 let glb_array_ref_type loc t1 t2 =
   match t1, t2 with
@@ -1483,6 +1485,8 @@ let glb_array_ref_type loc t1 t2 =
 
   (* Pfloatarray is a minimum *)
   | (Pfloatarray_ref _ as x), Pfloatarray -> x
+  | Ptemplatedarray_ref _, _ | _, Ptemplatedarray _ ->
+    Misc.fatal_error "unexpected templated array kind in glb"
 
 let glb_array_set_type loc t1 t2 =
   match t1, t2 with
@@ -1588,6 +1592,8 @@ let glb_array_set_type loc t1 t2 =
 
   (* Pfloatarray is a minimum *)
   | Pfloatarray_set, Pfloatarray -> Pfloatarray_set
+  | Ptemplatedarray_set _, _ | _, Ptemplatedarray _ ->
+    Misc.fatal_error "unexpected templated array kind in glb"
 
 let peek_or_poke_layout_from_type ~prim_name error_loc env ty
       : Lambda.peek_or_poke option =

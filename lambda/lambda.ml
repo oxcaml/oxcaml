@@ -3445,6 +3445,55 @@ let element_layout_of_array_kind ak =
   (* [alloc_heap] is ignored by [array_ref_kind_result_layout]. *)
   array_ref_kind_result_layout (array_ref_kind alloc_heap ak)
 
+let array_kind_of_element_layout layout =
+  let rec scannable_element_kind = function
+    | Ptop -> Misc.fatal_error "array_kind_of_element_layout: Ptop"
+    | Pbottom -> Misc.fatal_error "array_kind_of_element_layout: Pbottom"
+    | Pvalue { raw_kind = Pintval; nullable = Non_nullable} ->
+      Some Pint_scannable
+    | Pvalue { raw_kind = _; nullable = _ } -> Some Paddr_scannable
+    | Punboxed_product elements ->
+      Misc.Stdlib.List.map_option scannable_element_kind elements
+      |> Option.map (fun elements -> Pproduct_scannable elements)
+    | Punboxed_float _ | Punboxed_or_untagged_integer _ | Punboxed_vector _ ->
+      None
+    | Psplicevar ident -> fatal_error_unevaluated_splice_var ident
+  in
+  let rec ignorable_element_kind = function
+    | Ptop -> Misc.fatal_error "array_kind_of_element_layout: Ptop"
+    | Pbottom -> Misc.fatal_error "array_kind_of_element_layout: Pbottom"
+    | Punboxed_float unboxed_float -> Some (Punboxedfloat_ignorable unboxed_float)
+    | Punboxed_or_untagged_integer int_kind -> Some (Punboxedoruntaggedint_ignorable int_kind)
+    | Punboxed_vector unboxed_vector -> Some (Punboxedvector_ignorable unboxed_vector)
+    | Punboxed_product elements ->
+      Misc.Stdlib.List.map_option ignorable_element_kind elements
+      |> Option.map (fun elements -> Pproduct_ignorable elements)
+    | Pvalue _ -> None
+    | Psplicevar ident -> fatal_error_unevaluated_splice_var ident
+  in
+  match layout with
+  | Ptop -> Misc.fatal_error "array_kind_of_element_layout: Ptop"
+  | Pbottom -> Misc.fatal_error "array_kind_of_element_layout: Pbottom"
+  | Pvalue { raw_kind = Pgenval; nullable = _} -> Pgenarray
+  | Pvalue { raw_kind = Pintval; nullable = Nullable } -> Pgcignorableaddrarray
+  | Pvalue { raw_kind = Pintval; nullable = Non_nullable } -> Pintarray
+  | Pvalue { raw_kind = Pboxedfloatval Boxed_float64; nullable = Non_nullable} -> Pfloatarray
+  | Pvalue { raw_kind = Pboxedfloatval Boxed_float64; nullable = Nullable } ->
+    Misc.fatal_error "array_kind_of_element_layout: nullable float is not separable"
+  | Pvalue { raw_kind = Pboxedfloatval Boxed_float32 | Pboxedintval _ | Pvariant _ | Parrayval _ | Pboxedvectorval _; nullable = _ } -> Paddrarray
+  | Punboxed_float unboxed_float -> Punboxedfloatarray unboxed_float
+  | Punboxed_or_untagged_integer int_kind  -> Punboxedoruntaggedintarray int_kind
+  | Punboxed_vector unboxed_vector -> Punboxedvectorarray unboxed_vector
+  | Punboxed_product elements -> begin
+    match Misc.Stdlib.List.map_option ignorable_element_kind elements with
+    | Some ignorable_elements -> Pgcignorableproductarray ignorable_elements
+    | None ->
+      match Misc.Stdlib.List.map_option scannable_element_kind elements with
+      | Some scannable_elements -> Pgcscannableproductarray scannable_elements
+      | None -> Misc.fatal_error "array_kind_of_element_layout: mixed block"
+    end
+  | Psplicevar ident -> fatal_error_unevaluated_splice_var ident
+
 let rec ignorable_product_element_kind_involves_int
     (kind : ignorable_product_element_kind) =
   match kind with

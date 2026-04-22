@@ -328,7 +328,7 @@ and eval_array_kind env kind : array_kind =
       eval_var env (id |> Slambdaident.of_ident)
       |> expect_not_missing |> expect Tlayout
     in
-    layout
+    Lambda.array_kind_of_element_layout layout
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
@@ -341,7 +341,8 @@ and eval_array_ref_kind env kind : array_ref_kind =
       eval_var env (id |> Slambdaident.of_ident)
       |> expect_not_missing |> expect Tlayout
     in
-    layout
+    let array_kind = Lambda.array_kind_of_element_layout layout in
+    Lambda.array_ref_kind mode array_kind
   | Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
   | Pfloatarray_ref _ | Punboxedfloatarray_ref _
   | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
@@ -355,7 +356,8 @@ and eval_array_set_kind env kind : array_set_kind =
       eval_var env (id |> Slambdaident.of_ident)
       |> expect_not_missing |> expect Tlayout
     in
-    layout
+    let array_kind = Lambda.array_kind_of_element_layout layout in
+    Lambda.array_set_kind mode array_kind
   | Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
   | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
   | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
