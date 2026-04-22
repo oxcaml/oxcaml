@@ -1,58 +1,41 @@
-(* Test that YMM (256-bit) registers are correctly saved and restored during
-   native runtime preemption via effects. *)
+(* Test that YMM registers are correctly saved and restored during preemption *)
 
 open Effect
 open Effect.Deep
 
 external preempt_self : unit -> unit = "caml_domain_preempt_self" [@@noalloc]
 
-external int64x4_of_int64s : int64 -> int64 -> int64 -> int64 -> int64x4
+external int64x4_of_int64s : int64 -> int64 -> int64 -> int64 -> int64x4#
   = "" "vec256_of_int64s"
 [@@noalloc] [@@unboxed]
 
-external int64x4_first_int64 : int64x4 -> int64 = "" "vec256_first_int64"
+external int64x4_second_int64 : int64x4# -> int64 = "" "vec256_second_int64"
 [@@noalloc] [@@unboxed]
 
-external int64x4_second_int64 : int64x4 -> int64 = "" "vec256_second_int64"
+external int64x4_third_int64 : int64x4# -> int64 = "" "vec256_third_int64"
 [@@noalloc] [@@unboxed]
 
-external int64x4_third_int64 : int64x4 -> int64 = "" "vec256_third_int64"
+external int64x4_fourth_int64 : int64x4# -> int64 = "" "vec256_fourth_int64"
 [@@noalloc] [@@unboxed]
 
-external int64x4_fourth_int64 : int64x4 -> int64 = "" "vec256_fourth_int64"
-[@@noalloc] [@@unboxed]
+(* SIMD integer add: [@@builtin] compiles to vpaddq, not a C call, so it does
+   not clobber YMM registers. This lets us keep 16 accumulators live in
+   ymm0..ymm15 across the loop back edge where the poll point sits. *)
+external int64x4_add : int64x4# -> int64x4# -> int64x4#
+  = "caml_vec256_unreachable" "caml_avx2_int64x4_add"
+[@@noalloc] [@@unboxed] [@@builtin]
 
-(* This function takes 16 YMM arguments, forcing them all to be in registers *)
-external lots_of_vectors :
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 ->
-  int64x4 = "" "lots_of_vectors256"
-[@@noalloc] [@@unboxed]
-
-let[@inline never] check_ymm name v a b c d =
-  let v1 = int64x4_first_int64 v in
+(* Ignores the low lane, which our accumulators use as an iteration counter
+   (unpredictable value after preemption). *)
+let[@inline never] check_ymm_upper_3 name v b c d =
   let v2 = int64x4_second_int64 v in
   let v3 = int64x4_third_int64 v in
   let v4 = int64x4_fourth_int64 v in
-  if v1 <> a || v2 <> b || v3 <> c || v4 <> d
+  if v2 <> b || v3 <> c || v4 <> d
   then begin
     Printf.printf
-      "%s: got (%Ld, %Ld, %Ld, %Ld), expected (%Ld, %Ld, %Ld, %Ld)\n" name v1 v2
-      v3 v4 a b c d;
+      "%s upper lanes: got (_, %Ld, %Ld, %Ld), expected (_, %Ld, %Ld, %Ld)\n"
+      name v2 v3 v4 b c d;
     exit 1
   end
 
@@ -81,99 +64,101 @@ let run_with_tick_handler ?(interval = 0.1) ?(repeating = false)
               | _ -> None)
         })
 
-(* Test: YMM preservation across preemption with all 16 registers live. The key
-   is using lots_of_vectors which takes 16 YMM arguments, forcing them all to be
-   in registers at the call site. *)
+(* Spins 16 unboxed int64x4 accumulators in a tail-recursive loop, then checks
+   their upper lanes. The whole thing is one function because int64x4# can't
+   flow out through a normal (boxed) tuple.
+
+   At the back-edge poll point the accumulators are live in YMM registers:
+   the tail call is a direct jump with unboxed args, the body is 16 vpaddq
+   ([@@builtin], no call), and the loop condition is a single scalar load
+   of [!stop]. Nothing in the hot path clobbers YMMs. We have 17 SIMD values
+   live (16 accumulators + [one]) against 16 YMM regs so one accumulator does
+   get spilled to stack, but ~15 flow through the poll directly in YMMs.
+
+   [one] increments only the low lane. The upper three lanes of each
+   accumulator are therefore loop-invariant, so if preemption corrupts a
+   YMM we'll see it in the upper-lane check.
+
+   [max_iters] is a safety net: if preemption fails to fire we exit rather
+   than hanging. *)
+let[@inline never] spin_and_check stop max_iters
+    a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 =
+  let one = int64x4_of_int64s 1L 0L 0L 0L in
+  let rec loop n a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 =
+    if !stop || n = 0
+    then begin
+      if not !stop
+      then
+        failwith
+          (Printf.sprintf "Stop condition never fired after %d iters!"
+             (max_iters - n));
+      check_ymm_upper_3 "a0" a0 2L 3L 4L;
+      check_ymm_upper_3 "a1" a1 6L 7L 8L;
+      check_ymm_upper_3 "a2" a2 10L 11L 12L;
+      check_ymm_upper_3 "a3" a3 14L 15L 16L;
+      check_ymm_upper_3 "a4" a4 18L 19L 20L;
+      check_ymm_upper_3 "a5" a5 22L 23L 24L;
+      check_ymm_upper_3 "a6" a6 26L 27L 28L;
+      check_ymm_upper_3 "a7" a7 30L 31L 32L;
+      check_ymm_upper_3 "a8" a8 34L 35L 36L;
+      check_ymm_upper_3 "a9" a9 38L 39L 40L;
+      check_ymm_upper_3 "a10" a10 42L 43L 44L;
+      check_ymm_upper_3 "a11" a11 46L 47L 48L;
+      check_ymm_upper_3 "a12" a12 50L 51L 52L;
+      check_ymm_upper_3 "a13" a13 54L 55L 56L;
+      check_ymm_upper_3 "a14" a14 58L 59L 60L;
+      check_ymm_upper_3 "a15" a15 62L 63L 64L
+    end
+    else
+      loop (n - 1)
+        (int64x4_add a0 one) (int64x4_add a1 one)
+        (int64x4_add a2 one) (int64x4_add a3 one)
+        (int64x4_add a4 one) (int64x4_add a5 one)
+        (int64x4_add a6 one) (int64x4_add a7 one)
+        (int64x4_add a8 one) (int64x4_add a9 one)
+        (int64x4_add a10 one) (int64x4_add a11 one)
+        (int64x4_add a12 one) (int64x4_add a13 one)
+        (int64x4_add a14 one) (int64x4_add a15 one)
+  in
+  loop max_iters a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15
+
+let run_spin_and_check stop =
+  spin_and_check stop 1_000_000_000
+    (int64x4_of_int64s 1L 2L 3L 4L)
+    (int64x4_of_int64s 5L 6L 7L 8L)
+    (int64x4_of_int64s 9L 10L 11L 12L)
+    (int64x4_of_int64s 13L 14L 15L 16L)
+    (int64x4_of_int64s 17L 18L 19L 20L)
+    (int64x4_of_int64s 21L 22L 23L 24L)
+    (int64x4_of_int64s 25L 26L 27L 28L)
+    (int64x4_of_int64s 29L 30L 31L 32L)
+    (int64x4_of_int64s 33L 34L 35L 36L)
+    (int64x4_of_int64s 37L 38L 39L 40L)
+    (int64x4_of_int64s 41L 42L 43L 44L)
+    (int64x4_of_int64s 45L 46L 47L 48L)
+    (int64x4_of_int64s 49L 50L 51L 52L)
+    (int64x4_of_int64s 53L 54L 55L 56L)
+    (int64x4_of_int64s 57L 58L 59L 60L)
+    (int64x4_of_int64s 61L 62L 63L 64L)
+
 let test_ymm_preservation () =
   let preempted = ref false in
-  let sum = ref (int64x4_of_int64s 0L 0L 0L 0L) in
   run_with_tick_handler
     ~on_tick:(fun () -> preempted := true)
-    (fun () ->
-      let v0 = int64x4_of_int64s 1L 2L 3L 4L in
-      let v1 = int64x4_of_int64s 5L 6L 7L 8L in
-      let v2 = int64x4_of_int64s 9L 10L 11L 12L in
-      let v3 = int64x4_of_int64s 13L 14L 15L 16L in
-      let v4 = int64x4_of_int64s 17L 18L 19L 20L in
-      let v5 = int64x4_of_int64s 21L 22L 23L 24L in
-      let v6 = int64x4_of_int64s 25L 26L 27L 28L in
-      let v7 = int64x4_of_int64s 29L 30L 31L 32L in
-      let v8 = int64x4_of_int64s 33L 34L 35L 36L in
-      let v9 = int64x4_of_int64s 37L 38L 39L 40L in
-      let v10 = int64x4_of_int64s 41L 42L 43L 44L in
-      let v11 = int64x4_of_int64s 45L 46L 47L 48L in
-      let v12 = int64x4_of_int64s 49L 50L 51L 52L in
-      let v13 = int64x4_of_int64s 53L 54L 55L 56L in
-      let v14 = int64x4_of_int64s 57L 58L 59L 60L in
-      let v15 = int64x4_of_int64s 61L 62L 63L 64L in
-      let start_at = Sys.time () in
-      while not !preempted do
-        if Sys.time () -. start_at > 5.
-        then failwith "Didn't get preempted after 5s!";
-        (* Call lots_of_vectors to force all 16 YMM values into registers. This
-           creates a poll point with live YMM registers. *)
-        sum
-          := lots_of_vectors v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14
-               v15
-      done;
-      (* After preemption, verify the sum is correct. Expected sum: each
-         component is sum of (1..64 step 4) = 496, 512, 528, 544 *)
-      check_ymm "sum" !sum 496L 512L 528L 544L;
-      (* Also verify individual vectors are preserved *)
-      check_ymm "v0" v0 1L 2L 3L 4L;
-      check_ymm "v1" v1 5L 6L 7L 8L;
-      check_ymm "v2" v2 9L 10L 11L 12L;
-      check_ymm "v3" v3 13L 14L 15L 16L;
-      check_ymm "v4" v4 17L 18L 19L 20L;
-      check_ymm "v5" v5 21L 22L 23L 24L;
-      check_ymm "v6" v6 25L 26L 27L 28L;
-      check_ymm "v7" v7 29L 30L 31L 32L;
-      check_ymm "v8" v8 33L 34L 35L 36L;
-      check_ymm "v9" v9 37L 38L 39L 40L;
-      check_ymm "v10" v10 41L 42L 43L 44L;
-      check_ymm "v11" v11 45L 46L 47L 48L;
-      check_ymm "v12" v12 49L 50L 51L 52L;
-      check_ymm "v13" v13 53L 54L 55L 56L;
-      check_ymm "v14" v14 57L 58L 59L 60L;
-      check_ymm "v15" v15 61L 62L 63L 64L)
+    (fun () -> run_spin_and_check preempted)
 
-(* Test: Multiple preemptions with YMM registers *)
 let test_multiple_preemptions () =
   let count = ref 0 in
-  let sum = ref (int64x4_of_int64s 0L 0L 0L 0L) in
+  let stop = ref false in
   run_with_tick_handler ~interval:0.05 ~repeating:true
-    ~on_tick:(fun () -> incr count)
-    (fun () ->
-      let v0 = int64x4_of_int64s 1L 2L 3L 4L in
-      let v1 = int64x4_of_int64s 5L 6L 7L 8L in
-      let v2 = int64x4_of_int64s 9L 10L 11L 12L in
-      let v3 = int64x4_of_int64s 13L 14L 15L 16L in
-      let v4 = int64x4_of_int64s 17L 18L 19L 20L in
-      let v5 = int64x4_of_int64s 21L 22L 23L 24L in
-      let v6 = int64x4_of_int64s 25L 26L 27L 28L in
-      let v7 = int64x4_of_int64s 29L 30L 31L 32L in
-      let v8 = int64x4_of_int64s 33L 34L 35L 36L in
-      let v9 = int64x4_of_int64s 37L 38L 39L 40L in
-      let v10 = int64x4_of_int64s 41L 42L 43L 44L in
-      let v11 = int64x4_of_int64s 45L 46L 47L 48L in
-      let v12 = int64x4_of_int64s 49L 50L 51L 52L in
-      let v13 = int64x4_of_int64s 53L 54L 55L 56L in
-      let v14 = int64x4_of_int64s 57L 58L 59L 60L in
-      let v15 = int64x4_of_int64s 61L 62L 63L 64L in
-      let start_at = Sys.time () in
-      while !count < 5 do
-        if Sys.time () -. start_at > 10.
-        then failwith "Multiple preemptions timed out!";
-        sum
-          := lots_of_vectors v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14
-               v15
-      done;
-      check_ymm "sum" !sum 496L 512L 528L 544L)
+    ~on_tick:(fun () ->
+      incr count;
+      if !count >= 5 then stop := true)
+    (fun () -> run_spin_and_check stop)
 
 (* Test: GC stress during preemption *)
 let test_gc_stress () =
   let preempted = ref false in
-  let sum = ref (int64x4_of_int64s 0L 0L 0L 0L) in
   run_with_tick_handler
     ~on_tick:(fun () ->
       preempted := true;
@@ -181,32 +166,7 @@ let test_gc_stress () =
       let _ = Array.init 10000 (fun i -> i) in
       Gc.minor ();
       ())
-    (fun () ->
-      let v0 = int64x4_of_int64s 1L 2L 3L 4L in
-      let v1 = int64x4_of_int64s 5L 6L 7L 8L in
-      let v2 = int64x4_of_int64s 9L 10L 11L 12L in
-      let v3 = int64x4_of_int64s 13L 14L 15L 16L in
-      let v4 = int64x4_of_int64s 17L 18L 19L 20L in
-      let v5 = int64x4_of_int64s 21L 22L 23L 24L in
-      let v6 = int64x4_of_int64s 25L 26L 27L 28L in
-      let v7 = int64x4_of_int64s 29L 30L 31L 32L in
-      let v8 = int64x4_of_int64s 33L 34L 35L 36L in
-      let v9 = int64x4_of_int64s 37L 38L 39L 40L in
-      let v10 = int64x4_of_int64s 41L 42L 43L 44L in
-      let v11 = int64x4_of_int64s 45L 46L 47L 48L in
-      let v12 = int64x4_of_int64s 49L 50L 51L 52L in
-      let v13 = int64x4_of_int64s 53L 54L 55L 56L in
-      let v14 = int64x4_of_int64s 57L 58L 59L 60L in
-      let v15 = int64x4_of_int64s 61L 62L 63L 64L in
-      let start_at = Sys.time () in
-      while not !preempted do
-        if Sys.time () -. start_at > 5.
-        then failwith "Didn't get preempted after 5s!";
-        sum
-          := lots_of_vectors v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14
-               v15
-      done;
-      check_ymm "sum" !sum 496L 512L 528L 544L)
+    (fun () -> run_spin_and_check preempted)
 
 external runtime5 : unit -> bool = "%runtime5"
 
