@@ -170,8 +170,18 @@ let test_gc_stress () =
 
 external runtime5 : unit -> bool = "%runtime5"
 
+(* Dune has no poll-insertion condition available in [enabled_if] on this dune
+   lang version, so [make runtest] passes the configure-time value through
+   the environment and we gate the body on it here. The tight SIMD loop has
+   no C-call or allocation-site polls, so without compiler-inserted back-edge
+   polls preemption would never fire and the safety net would [failwith]. *)
+let poll_insertion_enabled () =
+  match Sys.getenv_opt "OXCAML_POLL_INSERTION" with
+  | Some "true" -> true
+  | _ -> false
+
 let () =
-  if runtime5 ()
+  if runtime5 () && poll_insertion_enabled ()
   then (
     test_ymm_preservation ();
     test_multiple_preemptions ();
