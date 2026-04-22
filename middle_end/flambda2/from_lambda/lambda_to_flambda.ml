@@ -1471,7 +1471,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     let is_a_param_unboxed =
       List.exists (fun (p : Lambda.lparam) -> p.attributes.unbox_param) params
     in
-    if attr.stub || ((not attr.unbox_return) && not is_a_param_unboxed)
+    if
+      attr.stub
+      || ((not (Option.is_some attr.unbox_return)) && not is_a_param_unboxed)
     then Normal_calling_convention
     else
       let unboxed_function_slot =
@@ -1481,7 +1483,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           ~is_always_immediate:false Flambda_kind.value
       in
       let unboxed_return =
-        if attr.unbox_return then unboxing_kind return else None
+        match unboxing_kind return, attr.unbox_return with
+        | Some kind, Some mode -> Some (kind, mode)
+        | _, _ -> None
       in
       let unboxed_param (param : Lambda.lparam) =
         if param.attributes.unbox_param
@@ -1500,13 +1504,13 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
              params unarized_per_param)
       in
       Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot, mode)
+        (unboxed_params, unboxed_return, unboxed_function_slot)
   in
   let body_cont =
     match calling_convention with
-    | Normal_calling_convention | Unboxed_calling_convention (_, None, _, _) ->
+    | Normal_calling_convention | Unboxed_calling_convention (_, None, _) ->
       Continuation.create ~sort:Return ()
-    | Unboxed_calling_convention (_, Some _, _, _) ->
+    | Unboxed_calling_convention (_, Some _, _) ->
       Continuation.create ~sort:Normal_or_exn ~name:"boxed_return" ()
   in
   let body_exn_cont = Continuation.create () in
