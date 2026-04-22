@@ -191,8 +191,8 @@ type alloc_mode_for_allocations =
   | Local of { region : region }
 
 type alloc_mode_for_applications =
-  | Heap
-  | Local of
+  | Not_alloc_stack
+  | Maybe_alloc_stack of
       { region : region;
         ghost_region : region
       }
