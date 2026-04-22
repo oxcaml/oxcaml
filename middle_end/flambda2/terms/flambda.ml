@@ -21,41 +21,6 @@ module Switch = Switch_expr
 
 let fprintf = Format.fprintf
 
-(* This signature ensures absolutely that the insides of an expression cannot be
-   accessed before any necessary delayed renaming has been applied. *)
-module With_delayed_renaming : sig
-  type 'descr t
-
-  val create : 'descr -> 'descr t
-
-  val apply_renaming : 'descr t -> Renaming.t -> 'descr t
-
-  val descr :
-    'descr t -> apply_renaming_descr:('descr -> Renaming.t -> 'descr) -> 'descr
-end = struct
-  type 'descr t =
-    { mutable descr : 'descr;
-      mutable delayed_renaming : Renaming.t
-    }
-
-  let create descr = { descr; delayed_renaming = Renaming.empty }
-
-  let apply_renaming t renaming =
-    let delayed_renaming =
-      Renaming.compose ~second:renaming ~first:t.delayed_renaming
-    in
-    { t with delayed_renaming }
-
-  let[@inline always] descr t ~apply_renaming_descr =
-    if Renaming.is_identity t.delayed_renaming
-    then t.descr
-    else
-      let descr = apply_renaming_descr t.descr t.delayed_renaming in
-      t.descr <- descr;
-      t.delayed_renaming <- Renaming.empty;
-      descr
-end
-
 type expr = expr_descr With_delayed_renaming.t
 
 and expr_descr =
