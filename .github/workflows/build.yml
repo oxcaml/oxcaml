@@ -328,11 +328,12 @@ jobs:
           if [[ "${{matrix.dissector_assembler}}" == "true" ]]; then
             dissector_config="--enable-assembler-suitable-for-dissector=$GITHUB_WORKSPACE/oxcaml-llvm/bin/llvm-mc"
           fi
-          if [[ "${{ runner.os }}" == "macOS" ]]; then
+          if [[ "${{ runner.os }}" == "macOS" \
+                && "${{ matrix.config }}" == *--disable-runtime5* ]]; then
             # Homebrew's autoconf (2.72+) probes for C23 and appends
             # -std=gnu23 to CC, which breaks the runtime4 aarch64-darwin
             # build. Pin CFLAGS to gnu11 so the later -std= wins at compile
-            # time.
+            # time. Scoped to runtime4 since it will be deleted soon.
             export CFLAGS="-std=gnu11"
           fi
           autoconf
