@@ -13,6 +13,9 @@ module Error : sig
 end
 
 val test :
-  Description.t -> Cfg_with_layout.t -> (Cfg_with_layout.t, Error.t) Result.t
+  Description.t ->
+  push_pop_slots:int InstructionId.Tbl.t ->
+  Cfg_with_layout.t ->
+  (Cfg_with_layout.t, Error.t) Result.t
 
 val run : Description.t option -> Cfg_with_infos.t -> Cfg_with_infos.t

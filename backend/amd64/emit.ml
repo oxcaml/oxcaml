@@ -235,6 +235,10 @@ let frame_required = ref false
 
 let contains_calls = ref false
 
+(* Track values pushed to the stack around calls for GC frame descriptors.
+   Stored in reverse push order (most recent push first). *)
+let pushed_stack_slots : Cmm.machtype_component list ref = ref []
+
 let frame_size () =
   Proc.frame_size ~stack_offset:!stack_offset ~num_stack_slots
     ~contains_calls:!contains_calls
@@ -611,6 +615,12 @@ let record_frame_label live dbg =
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
       | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512; _ } -> ())
     live;
+  List.iteri
+    (fun i (slot_type : Cmm.machtype_component) ->
+      match slot_type with
+      | Val -> live_offset := (i * Arch.size_addr) :: !live_offset
+      | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Addr | Valx2 -> ())
+    !pushed_stack_slots;
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of Linear labels. *)
   record_frame_descr ~label:lbl ~frame_size:(frame_size ())
@@ -2411,6 +2421,12 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
+  | Lop (Specific Ipush_to_stack) ->
+    push (arg i 0);
+    pushed_stack_slots := i.arg.(0).typ :: !pushed_stack_slots
+  | Lop (Specific Ipop_from_stack) ->
+    pop (res i 0);
+    pushed_stack_slots := List.tl !pushed_stack_slots
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
   | Lop (Specific (Icldemote addr)) ->
@@ -2626,6 +2642,7 @@ let fundecl fundecl =
   tailrec_entry_point := fundecl.fun_tailrec_entry_point_label;
   contains_calls := fundecl.fun_contains_calls;
   stack_offset := 0;
+  pushed_stack_slots := [];
   call_gc_sites := [];
   local_realloc_sites := [];
   clear_safety_checks ();

@@ -429,6 +429,8 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
           (Cfg_with_infos.cfg_with_layout cfg_with_infos)
       in
       cfg_with_infos ++ register_allocator fd_cmm
+      ++ cfg_with_infos_profile ~accumulate:true "push_pop_around_calls"
+           Push_pop_around_calls.run
       ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
            (Regalloc_validate.run cfg_description))
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
