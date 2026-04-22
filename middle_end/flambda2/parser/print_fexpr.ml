@@ -693,7 +693,9 @@ and code_binding ppf
     variable depth_var continuation_id ret_cont continuation_id exn_cont
     (pp_option ~space:Before (pp_like ": %a" arity))
     ret_arity
-    (match result_mode with Heap -> "" | Local -> " local")
+    (match result_mode with
+    | Not_alloc_stack -> ""
+    | Maybe_alloc_stack -> " local")
     (expr Outer) body
 
 let flambda_unit ppf ({ body } : flambda_unit) =

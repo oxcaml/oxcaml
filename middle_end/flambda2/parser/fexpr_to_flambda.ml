@@ -693,8 +693,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         in
         let result_mode =
           match result_mode with
-          | Heap -> Lambda.not_alloc_stack
-          | Local -> Lambda.maybe_alloc_stack
+          | Not_alloc_stack -> Lambda.not_alloc_stack
+          | Maybe_alloc_stack -> Lambda.maybe_alloc_stack
         in
         let code =
           (* CR mshinwell: [inlining_decision] should maybe be set properly *)
