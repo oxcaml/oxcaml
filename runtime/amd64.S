@@ -1348,6 +1348,9 @@ LBL(112):
         addq    $16, %rsp; CFI_ADJUST(-16)
         SWITCH_C_TO_OCAML
         subq    $1, %r10                /* r10 := Ptr_val(r10) */
+    /* Check if stack null, then already used */
+        testq   %r10, %r10
+        jz      LBL(113)
         movq    Caml_state(current_stack), %rsi
         SWITCH_OCAML_STACKS
     /* No parent stack. Raise Effect.Unhandled. */
@@ -1371,6 +1374,11 @@ LBL(112):
 #endif
         movq    %rax, C_ARG_1
         LEA_VAR(caml_raise_unhandled_effect, %rax)
+        jmp     LBL(caml_c_call)
+LBL(113):
+        ENTER_FUNCTION
+        TSAN_ENTER_FUNCTION(0)
+        LEA_VAR(caml_raise_continuation_already_resumed, %rax)
         jmp     LBL(caml_c_call)
 CFI_ENDPROC
 ENDFUNCTION(G(caml_perform))

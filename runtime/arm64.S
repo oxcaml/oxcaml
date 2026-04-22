@@ -1198,6 +1198,8 @@ L(do_perform):
         CFI_ADJUST(-16)
         SWITCH_C_TO_OCAML
         sub     x10, x10, 1 /* x10 := Ptr_val(x10) */
+    /* Check if stack null, then already used */
+        cbz     x10, 2f
         ldr     x9, Caml_state(current_stack)
         SWITCH_OCAML_STACKS x9, x10
     /*  No parent stack. Raise Effect.Unhandled. */
@@ -1216,6 +1218,8 @@ L(do_perform):
         TSAN_RESTORE_CALLER_REGS
 #endif
         ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_unhandled_effect)
+        b       G(caml_c_call)
+2:      ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
         b       G(caml_c_call)
         CFI_ENDPROC
 END_FUNCTION(caml_perform)
