@@ -1916,7 +1916,6 @@ let solve_constructor_annotation
   let expansion_scope = penv.equations_scope in
   (* Introduce fresh type names that expand to type variables.
      They should eventually be bound to ground types. *)
-  (* CR dkalinichenko: don't we want to keep the upstream [id_decls] name? *)
   let existentials =
     List.map
       (fun (name, jkind_annot_opt) ->
@@ -1960,8 +1959,7 @@ let solve_constructor_annotation
           Ttuple tyl -> List.map snd tyl
         | _ -> assert false
   in
-  (* CR dkalinichenko: why [ignore] here? *)
-  if existentials <> [] then ignore begin
+  if existentials <> [] then begin
     let ids_decls = List.map (fun (x,dm,_) -> (x.txt,dm)) existentials in
     let ids = List.map fst ids_decls in
     let rem =
@@ -3049,51 +3047,6 @@ and type_pat_aux
   let rp = crp
   and rvp x = crp (pure category x)
   and rcp x = crp (only_impure category x) in
-  let type_pat_array mutability spl pat_attributes =
-    (* CR dkalinichenko: we can inline this now. *)
-    (* Sharing the code between the two array cases means we're guaranteed to
-       keep them in sync, at the cost of a worse diff with upstream; it
-       shouldn't be too bad.  We can inline this when we upstream this code and
-       combine the two array pattern constructors. *)
-    (* [: :] syntax requires the iarray extension.
-       Check for it before proceeding with type-based disambiguation.  *)
-    (match mutability with
-    | Asttypes.Mutable -> ()
-    | Asttypes.Immutable ->
-      Language_extension.assert_enabled ~loc Immutable_arrays ());
-    let ty_elt, arg_sort, mutability =
-      solve_Ppat_array loc penv mutability expected_ty
-    in
-    let mutability =
-      match mutability with
-      | Mutable  -> Mutable {
-        mode = Value.Comonadic.legacy;
-        (* CR aspsmith: Revisit once we support atomic arrays *)
-        atomic = Nonatomic
-      }
-      | Immutable -> Immutable
-    in
-    let modalities = Typemode.mutable_modalities mutability in
-    check_project_mutability ~loc ~env:!!penv Array_elements mutability
-      alloc_mode.mode;
-    let is_contained_by : Mode.Hint.is_contained_by =
-      {containing = Array Modality; container = (loc, Pattern)}
-    in
-    let alloc_mode =
-      apply_is_contained_by is_contained_by ~modalities alloc_mode.mode
-    in
-    let alloc_mode = simple_pat_mode alloc_mode in
-    let pl =
-      List.map (fun p -> type_pat ~alloc_mode tps Value p ty_elt arg_sort) spl
-    in
-    rvp {
-      pat_desc = Tpat_array (mutability, arg_sort, pl);
-      pat_loc = loc; pat_extra=[];
-      pat_type = instance expected_ty;
-      pat_attributes;
-      pat_env = !!penv;
-      pat_unique_barrier = Unique_barrier.not_computed () }
-  in
   let type_tuple_pat spl closed =
     (* CR layouts v5: consider sharing code with [type_unboxed_tuple_pat] below
        when we allow non-values in boxed tuples. *)
@@ -3526,8 +3479,43 @@ and type_pat_aux
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_record_pat Unboxed_product lid_sp_list closed
   | Ppat_array (mut, spl) ->
-      (* CR dkalinichenko: why not inline this atp? *)
-      type_pat_array mut spl sp.ppat_attributes
+      (match mut with
+      | Asttypes.Mutable -> ()
+      | Asttypes.Immutable ->
+        Language_extension.assert_enabled ~loc Immutable_arrays ());
+      let ty_elt, arg_sort, mutability =
+        solve_Ppat_array loc penv mut expected_ty
+      in
+      let mutability =
+        match mutability with
+        | Mutable  -> Mutable {
+          mode = Value.Comonadic.legacy;
+          (* CR aspsmith: Revisit once we support atomic arrays *)
+          atomic = Nonatomic
+        }
+        | Immutable -> Immutable
+      in
+      let modalities = Typemode.mutable_modalities mutability in
+      check_project_mutability ~loc ~env:!!penv Array_elements mutability
+        alloc_mode.mode;
+      let is_contained_by : Mode.Hint.is_contained_by =
+        {containing = Array Modality; container = (loc, Pattern)}
+      in
+      let alloc_mode =
+        apply_is_contained_by is_contained_by ~modalities alloc_mode.mode
+      in
+      let alloc_mode = simple_pat_mode alloc_mode in
+      let pl =
+        List.map
+          (fun p -> type_pat ~alloc_mode tps Value p ty_elt arg_sort) spl
+      in
+      rvp {
+        pat_desc = Tpat_array (mutability, arg_sort, pl);
+        pat_loc = loc; pat_extra=[];
+        pat_type = instance expected_ty;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_or(sp1, sp2) ->
       (* Reset pattern forces for just [tps2] because later we append [tps1] and
          [tps2]'s pattern forces, and we don't want to duplicate [tps]'s pattern
@@ -4683,8 +4671,6 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
             | None ->
                 sargs, None
         in
-        (* CR dkalinichenko: what is happening here?
-           May be easier to explain in person/over video. *)
         match arrow_kind with
         | `Arrow (ty_arg, ty_ret, ty_arg0, ty_ret0) ->
             let sort_arg =
@@ -6642,7 +6628,6 @@ and type_expect_
         if TypeSet.mem ty seen then false else
           match get_desc ty with
             Tarrow (_l, ty_arg, ty_fun, _com) ->
-              (* CR dkalinichenko: [enforce_current_level]? *)
               (try Ctype.unify_var env (newvar2 outer_level
                 (Jkind.Builtin.any ~why:Dummy_jkind)) ty_arg
                with Unify _ -> assert false);
@@ -7914,7 +7899,6 @@ and type_expect_
             raise (Error (loc, env, Modalities_on_atomic_field lid.txt))
           end;
           submode ~loc ~env rmode argument_mode;
-          (* CR dkalinichenko: why? I don't think this is in either repo. *)
           let record =
             { record with exp_extra =
               (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
