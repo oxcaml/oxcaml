@@ -35,12 +35,14 @@ let () =
     done;
     Domain.Tick.release tick
   | child_pid -> (* in parent *)
+    (* SIGSTOP and SIGCONT the child many times, to try to catch it in the middle of a
+       tick sleep *)
     for _ = 0 to 10_000 do
       Unix.kill child_pid Sys.sigstop;
       Unix.kill child_pid Sys.sigcont;
     done;
-    (* If we release the tick in the parent, the child should still tick *)
     let _pid, status =  Unix.waitpid [ ] child_pid in
+    (* Ensure the child exited successfully *)
     begin match status with
     | WEXITED 0 -> ((* OK *))
     | WEXITED i -> Printf.printf "child exited with nonzero status: %d\n%!" i
