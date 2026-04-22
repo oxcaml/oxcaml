@@ -211,6 +211,10 @@ type alloc_mode_for_applications =
         ghost_region : region
       }
 
+type alloc_mode_for_return =
+  | Not_alloc_stack
+  | Maybe_alloc_stack
+
 type alloc_mode_for_assignments =
   | Heap
   | Local
@@ -388,7 +392,7 @@ and code =
     is_tupled : bool;
     stub : bool;
     loopify : loopify_attribute option;
-    result_mode : alloc_mode_for_assignments
+    result_mode : alloc_mode_for_return
   }
 
 and code_size = int
