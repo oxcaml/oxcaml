@@ -275,13 +275,13 @@ let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
 ;;
 [%%expect_asm X86_64{|
 unnecessary_moves:
-  movq  %rax, %rcx
-  movq  %rbx, %r8
+  movq  %rax, %r8
+  movq  %rbx, %rcx
   movq  %rdx, %rbx
-  leaq  -1(%rcx,%r8), %rax
-  cmpq  %r8, %rcx
+  leaq  -1(%r8,%rcx), %rax
+  cmpq  %rcx, %r8
   jge   .L106
-  movq  %rcx, %rax
+  movq  %r8, %rax
   ret
 .L106:
   cmpq  %rsi, %rdi
@@ -289,7 +289,7 @@ unnecessary_moves:
   subq  $8, %rsp
   movq  %rax, (%rsp)
   movq  (%rbx), %rdi
-  movq  %r8, %rax
+  movq  %rcx, %rax
   call  *%rdi
 .L117:
   movq  (%rsp), %rax
@@ -311,10 +311,10 @@ spill_one_or_two:
   subq  $24, %rsp
   movq  %rax, (%rsp)
   movq  %rbx, 8(%rsp)
-  movq  %rdi, %rbx
   movl  $1, %eax
-  movq  (%rbx), %rdi
-  call  *%rdi
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  call  *%rsi
 .L107:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
@@ -361,6 +361,7 @@ double_loop_no_definition_at_beginning:
 .L157:
   addq  72(%r14), %rbx
   addq  $8, %rbx
+  movq  %rbx, 48(%rsp)
   movq  $5111, -8(%rbx)
   movq  camlTOP15__f_33_37_code@GOTPCREL(%rip), %rcx
   movq  %rcx, (%rbx)
@@ -370,7 +371,6 @@ double_loop_no_definition_at_beginning:
   movq  %rdx, (%rsp)
   movq  %rcx, 16(%rbx)
   movq  %rax, 24(%rbx)
-  movq  %rbx, 48(%rsp)
   movq  %rdi, %rdx
   testb $1, %dl
   jne   .L135
@@ -560,9 +560,9 @@ let f ~(s: int64#) (t : int64#) =
   Int64_u.sub t (Int64_u.mul t s)
 [%%expect_asm X86_64{|
 f:
-  movq  %rax, %rdi
+  movq  %rbx, %rdi
+  imulq %rax, %rdi
   movq  %rbx, %rax
-  imulq %rdi, %rbx
-  subq  %rbx, %rax
+  subq  %rdi, %rax
   ret
 |}]

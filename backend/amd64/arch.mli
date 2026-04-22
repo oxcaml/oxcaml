@@ -130,6 +130,7 @@ val size_vec256 : int
 
 val size_vec512 : int
 
+
 (* Whether Ocaml provides shift operations where the shift amount is interpreted
    modulo bitwidth. *)
 val ocaml_shifts_are_wrapping : bool

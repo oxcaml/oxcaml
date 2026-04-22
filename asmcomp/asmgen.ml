@@ -507,12 +507,79 @@ let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
 
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
+  let module Ssa_selection = Ssa_of_cmm.Make (Cfg_selection) in
+  let module Ssa_lowering = Cfg_of_ssa.Make (Cfg_selection) in
   let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
   Reg.clear_relocatable_regs ();
   fd_cmm
   ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
   ++ (fun (fd_cmm : Cmm.fundecl) ->
-  Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+  (if !Oxcaml_flags.use_ssa
+   then (
+     let cfg_old =
+       let saved_instr_id = InstructionId.save Sub_cfg.instr_id in
+       let result =
+         Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+       in
+       InstructionId.restore Sub_cfg.instr_id saved_instr_id;
+       result
+     in
+     let ssa =
+       Label.with_saved_counter @@ fun () -> Ssa_selection.emit_fundecl fd_cmm
+     in
+     (try Ssa.validate ssa
+      with exn ->
+        let bt = Printexc.get_raw_backtrace () in
+        Format.fprintf ppf_dump
+          "*** SSA validation error for %s: %s@.*** CMM:@.%a@.*** SSA:@.%a@."
+          fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
+          fd_cmm Ssa.print ssa;
+        Printexc.raise_with_backtrace exn bt);
+     if !Oxcaml_flags.dump_cfg
+     then (
+       Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa.print ssa;
+       let loops = Induction_var.analyze ssa in
+       Format.fprintf ppf_dump "*** %a@." Induction_var.print loops;
+       let terminations =
+         List.map (fun (l, bivs) -> l, Termination.analyze l bivs) loops
+       in
+       Format.fprintf ppf_dump "*** %a@." Termination.print terminations;
+       Format.fprintf ppf_dump "*** %a@." Dead_induction_var.print
+         (Dead_induction_var.analyze ssa loops));
+     let deletions = Delete_empty_loops.run ssa in
+     if !Oxcaml_flags.dump_cfg
+     then (
+       Format.fprintf ppf_dump "*** %a@." Delete_empty_loops.print deletions;
+       if deletions <> []
+       then
+         Format.fprintf ppf_dump "*** SSA after loop deletion@.@.%a" Ssa.print
+           ssa);
+     let cfg_new =
+       Label.with_saved_counter @@ fun () ->
+       try Ssa_lowering.convert ~future_funcnames:funcnames ssa
+       with exn ->
+         let bt = Printexc.get_raw_backtrace () in
+         Format.fprintf ppf_dump
+           "*** SSA pipeline error for %s: %s@.*** CMM:@.%a@.*** SSA:@.%a@."
+           fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
+           fd_cmm Ssa.print ssa;
+         Printexc.raise_with_backtrace exn bt
+     in
+     (* [with_saved_counter] above restores the label counter to the value it
+        had before cfg_new was built, so cfg_old and cfg_new can share label
+        space for [Cfg_compare]. But cfg_new's labels remain in the CFG, so
+        downstream passes that allocate fresh labels (e.g. critical-edge
+        splitting in the register allocator) would collide. Advance the
+        counter past cfg_new's max label to avoid that. *)
+     Cfg.iter_blocks (Cfg_with_layout.cfg cfg_new) ~f:(fun label _ ->
+         if Label.to_int label > Label.to_int (Label.cur_label ())
+         then Label.set_label label);
+     (if deletions = []
+      then
+        Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name ~fd_cmm ~ssa
+          ~old_cfg:cfg_old ~new_cfg:cfg_new ppf_dump);
+     cfg_new)
+   else Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm)
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
