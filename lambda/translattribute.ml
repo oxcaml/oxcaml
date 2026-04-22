@@ -428,7 +428,7 @@ let add_cold_attribute expr loc attributes =
             (Warnings.Duplicated_attribute "cold");
       (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never]
          [@local never]` so we do the equivalent here. *)
-      begin match attr.inline with 
+      begin match attr.inline with
       | Always_inline
       | Never_inline
       | Available_inline
@@ -526,10 +526,34 @@ let add_unbox_return_attribute expr loc attributes =
       begin match attr with
       | None -> expr
       | Some _ ->
-          if funct.attr.unbox_return then
+          (* CR-soon : when setting the unbox_return attribute, we must
+          choose an allocation locality for the allocation that it might
+          introduce (which was not originally there).
+
+          For example, the following function must project out elements
+          from the tuple to construct an unboxed tuple:
+            let id (x : _ * _) = x
+            [@@unboxed]
+
+          Currently, we choose this based on the mode of the return
+          [funct.ret_mode], where [Not_alloc_stack] -> [Alloc_heap] and
+          [Maybe_alloc_stack] -> [Alloc_stack]
+
+          However, this is currently only sound because modes are fully
+          determined, and [Maybe_alloc_stack] is derived from a [local]
+          return mode. However, if we introduce mode variables (e.g. for
+          mode polymorphism), we might have situations where
+          [Maybe_alloc_stack] is derived from a [global -- local] return
+          mode variable, where it is no longer sound to choose
+          [Alloc_stack] (nor is it safe to choose [Alloc_heap]).
+
+          *)
+          let return_mode = funct.ret_mode in
+          let locality_mode = return_mode_to_locality_mode return_mode in
+          if Option.is_some funct.attr.unbox_return then
             Location.prerr_warning loc
               (Warnings.Duplicated_attribute "unboxable");
-          let attr = { funct.attr with unbox_return = true } in
+          let attr = { funct.attr with unbox_return = Some locality_mode } in
           lfunction_with_attr ~attr funct
       end
   | _ -> expr
