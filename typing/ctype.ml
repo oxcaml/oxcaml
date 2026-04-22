@@ -667,9 +667,6 @@ exception Non_closed of type_expr * variable_kind
 
    It is marked [@inline] so that calls to [add_one] are not indirect.
  *)
- (* CR dkalinichenko: is the difference between our and upstream
-    implementation intentional? I assume ours is more performant,
-    but want to check. It seems to be quite old. *)
 let[@inline] free_vars ~init ~add_one ?env mark tys =
   let rec fv ~kind acc ty =
     if not (try_mark_node mark ty) then acc
