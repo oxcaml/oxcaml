@@ -344,6 +344,12 @@ caml_rewrite_exception_stack(struct stack_info *old_stack,
                              struct stack_info *new_stack);
 #endif
 
+/* Consume a continuation, returning Val_ptr(stack)
+
+   Once a continuation object has been made visible to the GC, it *must* be
+   resumed exactly once by calling this function, and must not be resumed any
+   other way (eg by reading the stack out directly).
+ */
 value caml_continuation_use_noexc (value cont);
 value caml_continuation_use (value cont);
 
