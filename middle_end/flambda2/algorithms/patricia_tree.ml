@@ -665,10 +665,11 @@ end = struct
     branch_non_empty prefix_and_bit t0 t1
   [@@inline always]
 
-  let join prefix0 t0 prefix1 t1 =
-    match descr t0, descr t1 with
-    | _, Empty -> t0
-    | Empty, _ -> t1
+  let join_descr iv ~empty ~of_tree prefix0 t0 prefix1 t1 =
+    match (t0 : _ descr), (t1 : _ descr) with
+    | Empty, Empty -> empty iv
+    | Non_empty t0, Empty -> of_tree t0
+    | Empty, Non_empty t1 -> of_tree t1
     | Non_empty t0, Non_empty t1 ->
       of_tree (join_non_empty prefix0 t0 prefix1 t1)
   [@@inline always]
@@ -874,23 +875,29 @@ end = struct
   let no_phys_eq_shortcut _iv _t0 _t1 = None
 
   let phys_eq_shortcut_union _iv t0 t1 =
-    if t0 == t1 then Some (of_tree t0) else None
+    if t0 != t1 then None else Some (of_tree t0)
+
+  let phys_eq_shortcut_union_total _iv t0 t1 =
+    if t0 != t1 then None else Some t0
 
   let phys_eq_shortcut_diff iv t0 t1 =
-    if t0 == t1 then Some (empty iv) else None
+    if t0 != t1 then None else Some (empty iv)
 
   let no_phys_eq_check_branch ~orig_t:_ ~orig_t0:_ ~orig_t1:_ _t0 _t1 = None
 
   let phys_eq_check_branch ~orig_t ~orig_t0 ~orig_t1 t0 t1 =
-    if t0 == of_tree orig_t0 && t1 == of_tree orig_t1 then Some orig_t else None
+    if t0 != orig_t0 || t1 != orig_t1 then None else Some orig_t
 
   let no_phys_eq_check_leaf ~orig_t:_ ~orig_d:_ _d = None
 
   let phys_eq_check_leaf ~orig_t ~orig_d d =
-    if d == orig_d then Some orig_t else None
+    if d != orig_d then None else Some orig_t
 
   (* Perform a pattern-matching on two trees simultaneously, and reconstructs a
      new tree with similar shape (as in the [merge] function).
+
+     [empty] and [of_tree] are used to guide whether the reconstruction produces
+     a [(_, non_empty) tree] or a [_ t].
 
      [phys_eq_shortcut] is called before performing the actual pattern-matching
      and can be used to implement fast paths based on physical equality (e.g.
@@ -898,8 +905,9 @@ end = struct
 
      [phys_eq_check_branch_left], [phys_eq_check_branch_right],
      [phys_eq_check_leaf_left] and [phys_eq_check_leaf_right] are called when
-     reconstructing a new tree and can be used to enforce sharing. The [_left]
-     variants take precedence over the [_right] variants.
+     reconstructing a new tree (with non-empty children in the case of _branch
+     functions) and can be used to enforce sharing. The [_left] variants take
+     precedence over the [_right] variants.
 
      [only_left] (resp. [only_right]) is called on sub-trees that of [t0] (resp.
      [t1]) whose intersection with [t1] (resp. [t0]) is empty. Note that the
@@ -915,7 +923,7 @@ end = struct
      as they are expected to be inline anonymous functions, but the [combine]
      argument is not, as it is expected to be passed directly from the user in
      most cases. *)
-  let[@inline always] pattern_match_pair_merge
+  let[@inline always] pattern_match_pair_merge ~empty ~of_tree
       ?(phys_eq_shortcut = no_phys_eq_shortcut)
       ?(phys_eq_check_branch_left = no_phys_eq_check_branch)
       ?(phys_eq_check_branch_right = no_phys_eq_check_branch)
@@ -945,7 +953,7 @@ end = struct
               | Some t' -> of_tree t'
               | None -> of_tree (leaf iv i d))))
         ~join:(fun prefix0 prefix1 ->
-          join prefix0
+          join_descr iv ~empty ~of_tree prefix0
             ((only_left [@inlined hint]) t0)
             prefix1
             ((only_right [@inlined hint]) t1))
@@ -955,7 +963,7 @@ end = struct
              to a single path depending on context. *)
           let both_sides' t0 t1 =
             match t0, t1 with
-            | None, None -> empty iv
+            | None, None -> assert false
             | Some t0, None -> (only_left [@inlined hint]) t0
             | None, Some t1 -> (only_right [@inlined hint]) t1
             | Some t0, Some t1 -> (both_sides [@inlined hint]) t0 t1
@@ -963,30 +971,48 @@ end = struct
           in
           let t0' = both_sides' t00 t10 in
           let t1' = both_sides' t01 t11 in
-          let[@local] branch () = branch prefix_and_bit t0' t1' in
-          let[@local] branch1 () =
-            match t10, t11 with
-            | None, _ | _, None -> branch ()
-            | Some t10, Some t11 -> (
-              match
-                (phys_eq_check_branch_right [@inlined hint]) ~orig_t:t1
-                  ~orig_t0:t10 ~orig_t1:t11 t0' t1'
-              with
-              | Some t' -> of_tree t'
-              | None -> branch ())
-          in
-          let[@local] branch0 () =
-            match t00, t01 with
-            | None, _ | _, None -> branch1 ()
-            | Some t00, Some t01 -> (
-              match
-                (phys_eq_check_branch_left [@inlined hint]) ~orig_t:t0
-                  ~orig_t0:t00 ~orig_t1:t01 t0' t1'
-              with
-              | Some t' -> of_tree t'
-              | None -> branch1 ())
-          in
-          branch0 ())
+          match t0', t1' with
+          | Empty, Empty -> empty iv
+          | Empty, Non_empty t1' -> of_tree t1'
+          | Non_empty t0', Empty -> of_tree t0'
+          | Non_empty t0', Non_empty t1' ->
+            let[@local] branch () =
+              of_tree (branch_non_empty prefix_and_bit t0' t1')
+            in
+            let[@local] branch1 () =
+              match t10, t11 with
+              | None, _ | _, None -> branch ()
+              | Some t10, Some t11 -> (
+                match
+                  (phys_eq_check_branch_right [@inlined hint]) ~orig_t:t1
+                    ~orig_t0:t10 ~orig_t1:t11 t0' t1'
+                with
+                | Some t' -> of_tree t'
+                | None -> branch ())
+            in
+            let[@local] branch0 () =
+              match t00, t01 with
+              | None, _ | _, None -> branch1 ()
+              | Some t00, Some t01 -> (
+                match
+                  (phys_eq_check_branch_left [@inlined hint]) ~orig_t:t0
+                    ~orig_t0:t00 ~orig_t1:t01 t0' t1'
+                with
+                | Some t' -> of_tree t'
+                | None -> branch1 ())
+            in
+            branch0 ())
+
+  let pattern_match_pair_merge_total ~only_left ~only_right =
+    pattern_match_pair_merge
+      ~empty:(fun[@inline] _ -> assert false)
+      ~of_tree:(fun[@inline] x -> x)
+      ~only_left ~only_right
+  [@@inline always]
+
+  let pattern_match_pair_merge ~only_left ~only_right =
+    pattern_match_pair_merge ~empty ~of_tree ~only_left ~only_right
+  [@@inline always]
 
   let toplevel_union nonempty_union t0 t1 =
     match descr t0 with
@@ -997,12 +1023,16 @@ end = struct
       | Non_empty t1' -> nonempty_union t0' t1')
   [@@inline always]
 
+  let toplevel_union_total nonempty_union t0 t1 =
+    toplevel_union (fun[@inline] t0 t1 -> of_tree (nonempty_union t0 t1)) t0 t1
+  [@@inline always]
+
   let rec union_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
     pattern_match_pair_merge
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun t1 -> of_tree t1)
-      ~both_sides:(fun t0 t1 -> union_tree f t0 t1)
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun t1 -> Non_empty t1)
+      ~both_sides:(fun t0 t1 -> descr (union_tree f t0 t1))
       iv
       (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
       t0 t1
@@ -1019,14 +1049,19 @@ end = struct
     pattern_match_pair_merge ~phys_eq_check_branch_left:phys_eq_check_branch
       ~phys_eq_check_leaf_left:phys_eq_check_leaf
 
+  let pattern_match_pair_merge_total_sharing =
+    pattern_match_pair_merge_total
+      ~phys_eq_check_branch_left:phys_eq_check_branch
+      ~phys_eq_check_leaf_left:phys_eq_check_leaf
+
   let rec union_sharing_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
     pattern_match_pair_merge_sharing
       ~phys_eq_check_branch_right:phys_eq_check_branch
       ~phys_eq_check_leaf_right:phys_eq_check_leaf
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun t1 -> of_tree t1)
-      ~both_sides:(fun t0 t1 -> union_sharing_tree f t0 t1)
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun t1 -> Non_empty t1)
+      ~both_sides:(fun t0 t1 -> descr (union_sharing_tree f t0 t1))
       iv
       (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
       t0 t1
@@ -1039,9 +1074,9 @@ end = struct
     pattern_match_pair_merge_sharing ~phys_eq_shortcut:phys_eq_shortcut_union
       ~phys_eq_check_branch_right:phys_eq_check_branch
       ~phys_eq_check_leaf_right:phys_eq_check_leaf
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun t1 -> of_tree t1)
-      ~both_sides:(fun t0 t1 -> union_shared_tree f t0 t1)
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun t1 -> Non_empty t1)
+      ~both_sides:(fun t0 t1 -> descr (union_shared_tree f t0 t1))
       iv
       (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
       t0 t1
@@ -1051,66 +1086,73 @@ end = struct
 
   let rec union_total_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
-    pattern_match_pair_merge
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun t1 -> of_tree t1)
-      ~both_sides:(fun t0 t1 -> union_total_tree f t0 t1)
+    pattern_match_pair_merge_total
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun t1 -> Non_empty t1)
+      ~both_sides:(fun t0 t1 -> Non_empty (union_total_tree f t0 t1))
       iv
       (fun[@inline] k t t' -> Some (f k t t'))
       t0 t1
 
   let union_total f t0 t1 =
-    toplevel_union (fun[@inline] t0 t1 -> union_total_tree f t0 t1) t0 t1
+    toplevel_union_total (fun[@inline] t0 t1 -> union_total_tree f t0 t1) t0 t1
 
   let rec union_total_shared_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
-    pattern_match_pair_merge_sharing ~phys_eq_shortcut:phys_eq_shortcut_union
+    pattern_match_pair_merge_total_sharing
+      ~phys_eq_shortcut:phys_eq_shortcut_union_total
       ~phys_eq_check_branch_right:phys_eq_check_branch
       ~phys_eq_check_leaf_right:phys_eq_check_leaf
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun t1 -> of_tree t1)
-      ~both_sides:(fun t0 t1 -> union_total_shared_tree f t0 t1)
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun t1 -> Non_empty t1)
+      ~both_sides:(fun t0 t1 -> Non_empty (union_total_shared_tree f t0 t1))
       iv
       (fun[@inline] k t t' -> Some (f k t t'))
       t0 t1
 
   let union_total_shared f t0 t1 =
-    toplevel_union (fun[@inline] t0 t1 -> union_total_shared_tree f t0 t1) t0 t1
+    toplevel_union_total
+      (fun[@inline] t0 t1 -> union_total_shared_tree f t0 t1)
+      t0 t1
 
   let rec union_left_biased_tree t0 t1 =
     let iv = is_value_of_tree t0 in
-    pattern_match_pair_merge_sharing ~phys_eq_shortcut:phys_eq_shortcut_union
+    pattern_match_pair_merge_total_sharing
+      ~phys_eq_shortcut:phys_eq_shortcut_union_total
       ~phys_eq_check_branch_right:phys_eq_check_branch
       ~phys_eq_check_leaf_right:phys_eq_check_leaf
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun t1 -> of_tree t1)
-      ~both_sides:(fun t0 t1 -> union_left_biased_tree t0 t1)
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun t1 -> Non_empty t1)
+      ~both_sides:(fun t0 t1 -> Non_empty (union_left_biased_tree t0 t1))
       iv
       (fun[@inline] _k t _t' -> Some t)
       t0 t1
 
-  let union_left_biased t0 t1 = toplevel_union union_left_biased_tree t0 t1
+  let union_left_biased t0 t1 =
+    toplevel_union_total union_left_biased_tree t0 t1
 
   let rec union_right_biased_tree t0 t1 =
     let iv = is_value_of_tree t0 in
-    pattern_match_pair_merge_sharing ~phys_eq_shortcut:phys_eq_shortcut_union
+    pattern_match_pair_merge_total_sharing
+      ~phys_eq_shortcut:phys_eq_shortcut_union_total
       ~phys_eq_check_branch_right:phys_eq_check_branch
       ~phys_eq_check_leaf_right:phys_eq_check_leaf
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun t1 -> of_tree t1)
-      ~both_sides:(fun t0 t1 -> union_right_biased_tree t0 t1)
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun t1 -> Non_empty t1)
+      ~both_sides:(fun t0 t1 -> Non_empty (union_right_biased_tree t0 t1))
       iv
       (fun[@inline] _k _t t' -> Some t')
       t0 t1
 
-  let union_right_biased t0 t1 = toplevel_union union_right_biased_tree t0 t1
+  let union_right_biased t0 t1 =
+    toplevel_union_total union_right_biased_tree t0 t1
 
   let rec diff_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
     pattern_match_pair_merge
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun _ -> empty iv)
-      ~both_sides:(fun t0 t1 -> diff_tree f t0 t1)
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun _ -> Empty)
+      ~both_sides:(fun t0 t1 -> descr (diff_tree f t0 t1))
       iv
       (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
       t0 t1
@@ -1128,9 +1170,9 @@ end = struct
   let rec diff_sharing_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
     pattern_match_pair_merge_sharing
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun _ -> empty iv)
-      ~both_sides:(fun t0 t1 -> diff_sharing_tree f t0 t1)
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun _ -> Empty)
+      ~both_sides:(fun t0 t1 -> descr (diff_sharing_tree f t0 t1))
       iv
       (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
       t0 t1
@@ -1141,9 +1183,9 @@ end = struct
   let rec diff_shared_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
     pattern_match_pair_merge_sharing ~phys_eq_shortcut:phys_eq_shortcut_diff
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun _ -> empty iv)
-      ~both_sides:(fun t0 t1 -> diff_shared_tree f t0 t1)
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun _ -> Empty)
+      ~both_sides:(fun t0 t1 -> descr (diff_shared_tree f t0 t1))
       iv
       (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
       t0 t1
@@ -1624,9 +1666,9 @@ end = struct
 
   let rec merge_tree iv f t0 t1 =
     pattern_match_pair_merge
-      ~only_left:(fun t0 -> merge_left iv f t0)
-      ~only_right:(fun t1 -> merge_right iv f t1)
-      ~both_sides:(fun t0 t1 -> merge_tree iv f t0 t1)
+      ~only_left:(fun t0 -> descr (merge_left iv f t0))
+      ~only_right:(fun t1 -> descr (merge_right iv f t1))
+      ~both_sides:(fun t0 t1 -> descr (merge_tree iv f t0 t1))
       iv
       (fun[@inline always] i d0 d1 -> f i (Some d0) (Some d1))
       t0 t1
@@ -1725,9 +1767,9 @@ end = struct
   let rec update_many_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
     pattern_match_pair_merge
-      ~only_left:(fun t0 -> of_tree t0)
-      ~only_right:(fun t1 -> update_many_right iv f t1)
-      ~both_sides:(fun t0 t1 -> update_many_tree f t0 t1)
+      ~only_left:(fun t0 -> Non_empty t0)
+      ~only_right:(fun t1 -> descr (update_many_right iv f t1))
+      ~both_sides:(fun t0 t1 -> descr (update_many_tree f t0 t1))
       iv
       (fun[@inline always] k d0 d1 -> f k (Some d0) d1)
       t0 t1
