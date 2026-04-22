@@ -14,6 +14,23 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* Renaming the [result_types] field is by far the most expensive part of
+   [apply_renaming] on this record (it traverses a [Typing_env_extension]), yet
+   the field is frequently ignored (e.g. [approx_equal] skips it). We therefore
+   wrap it in [With_delayed_renaming] so that [apply_renaming] composes the
+   renaming into the wrapper in O(1) and the traversal only happens if and when
+   the result types are actually observed via [result_types]. *)
+module Result_types_with_delayed_renaming = With_delayed_renaming.Make (struct
+  type t = Result_types.t Or_unknown_or_bottom.t
+
+  let apply_renaming (t : t) renaming : t =
+    match t with
+    | Unknown | Bottom -> t
+    | Ok rt ->
+      let rt' = Result_types.apply_renaming rt renaming in
+      if rt == rt' then t else Ok rt'
+end)
+
 type t =
   { code_id : Code_id.t;
     newer_version_of : Code_id.t option;
@@ -24,7 +41,7 @@ type t =
        because it might be 0 if the closure itself has to be allocated locally,
        for instance as a result of a partial application. *)
     result_arity : [`Unarized] Flambda_arity.t;
-    result_types : Result_types.t Or_unknown_or_bottom.t;
+    result_types : Result_types_with_delayed_renaming.t;
     result_mode : Lambda.locality_mode;
     stub : bool;
     inline : Inline_attribute.t;
@@ -70,7 +87,8 @@ module Code_metadata_accessors (X : Metadata_view_type) = struct
 
   let result_arity t = (metadata t).result_arity
 
-  let result_types t = (metadata t).result_types
+  let result_types t =
+    Result_types_with_delayed_renaming.descr (metadata t).result_types
 
   let result_mode t = (metadata t).result_mode
 
@@ -206,7 +224,7 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
       param_modes;
       first_complex_local_param;
       result_arity;
-      result_types;
+      result_types = Result_types_with_delayed_renaming.create result_types;
       result_mode;
       stub;
       inline;
@@ -247,7 +265,10 @@ let with_param_modes param_modes t = { t with param_modes }
 
 let with_is_tupled is_tupled t = { t with is_tupled }
 
-let with_result_types result_types t = { t with result_types }
+let with_result_types result_types t =
+  { t with
+    result_types = Result_types_with_delayed_renaming.create result_types
+  }
 
 module Option = struct
   include Option
@@ -374,7 +395,8 @@ let [@ocamlformat "disable"] print ppf
     then Flambda_colours.elide
     else Flambda_colours.none)
     Flambda_colours.pop
-    (Or_unknown_or_bottom.print Result_types.print) result_types
+    (Or_unknown_or_bottom.print Result_types.print)
+    (Result_types_with_delayed_renaming.descr result_types)
     (match result_mode with Alloc_heap -> "Heap" | Alloc_local -> "Local")
     (match recursive with
     | Non_recursive -> Flambda_colours.elide
@@ -436,7 +458,7 @@ let free_names
   in
   Name_occurrences.union free_names
     (Name_occurrences.downgrade_occurrences_at_strictly_greater_name_mode
-       (match result_types with
+       (match Result_types_with_delayed_renaming.descr result_types with
        | Unknown | Bottom -> Name_occurrences.empty
        | Ok result_types -> Result_types.free_names result_types)
        Name_mode.in_types)
@@ -480,11 +502,7 @@ let apply_renaming
   in
   let code_id' = Renaming.apply_code_id renaming code_id in
   let result_types' =
-    match result_types with
-    | Unknown | Bottom -> result_types
-    | Ok result_types ->
-      Or_unknown_or_bottom.Ok
-        (Result_types.apply_renaming result_types renaming)
+    Result_types_with_delayed_renaming.apply_renaming result_types renaming
   in
   if
     code_id == code_id'
@@ -536,7 +554,7 @@ let ids_for_export
     Ids_for_export.add_code_id newer_version_of_ids code_id
   in
   Ids_for_export.union ids
-    (match result_types with
+    (match Result_types_with_delayed_renaming.descr result_types with
     | Unknown | Bottom -> Ids_for_export.empty
     | Ok result_types -> Result_types.ids_for_export result_types)
 
@@ -627,8 +645,11 @@ let approx_equal
   && Loopify_attribute.equal loopify1 loopify2
 
 let map_result_types ({ result_types; _ } as t) ~f =
+  let result_types =
+    Or_unknown_or_bottom.map
+      (Result_types_with_delayed_renaming.descr result_types)
+      ~f:(Result_types.map_result_types ~f)
+  in
   { t with
-    result_types =
-      Or_unknown_or_bottom.map result_types
-        ~f:(Result_types.map_result_types ~f)
+    result_types = Result_types_with_delayed_renaming.create result_types
   }
