@@ -468,24 +468,24 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
     Function_slot.create compilation_unit ~name:"partial_app_closure"
       ~is_always_immediate:false K.value
   in
-  (* The allocation mode of the closure is directly determined by the alloc_mode
-     of the application. We check here that it is consistent with
-     [first_complex_local_param]. *)
+  (* The allocation mode of the closure is directly determined by
+     [first_complex_local_param]. We check that it is consistent with the
+     return_mode of the application *)
   let new_closure_alloc_mode_and_first_complex_local_param : _ Or_bottom.t =
     match (first_complex_local_param : First_complex_local_param.t) with
     | Index index when num_non_unarized_args <= index ->
       (* At this point, we *have* to allocate the closure on the heap, even if
-         the alloc_mode of the application was local. Indeed, consider a
-         three-argument function, of type [string -> string -> string ->
-         string], coerced to [string -> local_ t] where [type t = string ->
+         the return_mode of the application was maybe_alloc_stack. Indeed,
+         consider a three-argument function, of type [string -> string -> string
+         -> string], coerced to [string -> local_ t] where [type t = string ->
          string -> string].
 
          If we apply this function twice to single arguments, the first
-         application will have a local alloc_mode. However, the second
-         application has a heap alloc_mode, and contains a reference to the
-         partial closure made by the first application. Due to this, the first
-         application must have a closure allocated on the heap as well, even
-         though it was with a local alloc_mode. *)
+         application will have a maybe_alloc_stack return_mode. However, the
+         second application has a not_alloc_stack return_mode, and contains a
+         reference to the partial closure made by the first application. Due to
+         this, the first application must have a closure allocated on the heap
+         as well, even though it was with a maybe_alloc_stack return_mode. *)
       let alloc_region =
         match Apply_expr.return_mode apply with
         | Not_alloc_stack { alloc_region }
@@ -493,14 +493,16 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           alloc_region
       in
       Ok
-        ( Alloc_mode.For_applications.not_alloc_stack ~alloc_region,
+        ( Alloc_mode.For_allocations.heap ~alloc_region,
           First_complex_local_param.Index (index - num_non_unarized_args) )
     | Index _ -> (
       match Apply_expr.return_mode apply with
       | Not_alloc_stack _ ->
         (* This can happen in dead GADT match cases. *) Bottom
-      | Maybe_alloc_stack _ as apply_alloc_mode ->
-        Ok (apply_alloc_mode, First_complex_local_param.Index 0))
+      | Maybe_alloc_stack { alloc_region; region; _ } ->
+        Ok
+          ( Alloc_mode.For_allocations.local ~alloc_region ~region,
+            First_complex_local_param.Index 0 ))
     | Never_partially_applied ->
       Misc.fatal_errorf
         "Partial application of %a, whose code metadata states that it is \
@@ -518,9 +520,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       | Heap_or_local -> ()
       | Heap -> ()
       | Local -> (
-        match (new_closure_alloc_mode : Alloc_mode.For_applications.t) with
-        | Maybe_alloc_stack _ -> ()
-        | Not_alloc_stack _ ->
+        match (new_closure_alloc_mode : Alloc_mode.For_allocations.t) with
+        | Local _ -> ()
+        | Heap _ ->
           Misc.fatal_errorf
             "New closure alloc mode cannot be [Not_alloc_stack] when existing \
              closure alloc mode is [Local]: direct partial application:@ %a"
@@ -757,13 +759,6 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                 Some (value_slot, value))
             applied_values
           |> Value_slot.Map.of_list
-        in
-        let new_closure_alloc_mode =
-          match (new_closure_alloc_mode : Alloc_mode.For_applications.t) with
-          | Not_alloc_stack { alloc_region } ->
-            Alloc_mode.For_allocations.heap ~alloc_region
-          | Maybe_alloc_stack { alloc_region; region; ghost_region = _ } ->
-            Alloc_mode.For_allocations.local ~alloc_region ~region
         in
         ( Set_of_closures.create ~value_slots function_decls,
           new_closure_alloc_mode,
