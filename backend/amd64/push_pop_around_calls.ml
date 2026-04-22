@@ -74,11 +74,16 @@ let collect_spills_backwards (cfg : Cfg.t) (block : Cfg.basic_block) =
   let exn_entry_live =
     match block.exn with
     | None -> Reg.Set.empty
-    | Some exn_label -> (
+    | Some exn_label ->
       let exn_block = Cfg.get_block_exn cfg exn_label in
-      match DLL.hd_cell exn_block.body with
-      | Some cell -> (DLL.value cell).live
-      | None -> exn_block.terminator.live)
+      let live_across, args =
+        match DLL.hd_cell exn_block.body with
+        | Some cell ->
+          let instr = DLL.value cell in
+          instr.live, instr.arg
+        | None -> exn_block.terminator.live, exn_block.terminator.arg
+      in
+      Array.fold_left (fun live reg -> Reg.Set.add reg live) live_across args
   in
   let body = block.body in
   let spills = ref [] in
