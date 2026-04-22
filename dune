@@ -67,6 +67,8 @@
 
 (copy_files# backend/cfg/*.ml{,i})
 
+(copy_files# backend/ssa/*.ml{,i})
+
 (copy_files# backend/debug/*.ml{,i})
 
 (copy_files# backend/debug/dwarf/dwarf_ocaml/*.ml{,i})
@@ -634,6 +636,7 @@
   ;; backend/cfg
   cfg
   cfg_available_regs
+  cfg_compare
   cfg_edge
   cfg_intf
   cfg_reducibility
@@ -689,6 +692,12 @@
   ;; file_formats/
   linear_format
   cfg_format
+  ;; backend/ssa/
+  ssa
+  ssa_print
+  ssa_validate
+  ssa_of_cmm
+  cfg_of_ssa
   ;; backend/debug/
   available_ranges_vars
   compute_ranges

@@ -28,4 +28,8 @@ let get_and_incr seq =
   seq.next <- succ seq.next;
   res
 
+let save seq = seq.next
+
+let restore seq saved = seq.next <- saved
+
 let to_int_unsafe t = t

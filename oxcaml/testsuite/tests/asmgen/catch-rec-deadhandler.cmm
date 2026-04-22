@@ -1,6 +1,7 @@
 (* TEST
  readonly_files = "main.c";
  arguments = "-DUNIT_INT -DFUN=catch_rec_deadhandler main.c";
+ flags = "-no-use-ssa";
  asmgen;
  run;
  check-program-output;

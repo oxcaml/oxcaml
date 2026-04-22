@@ -26,4 +26,8 @@ val get : sequence -> t
 
 val get_and_incr : sequence -> t
 
+val save : sequence -> t
+
+val restore : sequence -> t -> unit
+
 val to_int_unsafe : t -> int

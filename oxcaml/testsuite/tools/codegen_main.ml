@@ -65,6 +65,7 @@ let main() =
      "-dcmm", Arg.Set dump_cmm, "";
      "-dcse", Arg.Set dump_cse, "";
      "-dlinear", Arg.Set dump_linear, "";
+     "-no-use-ssa", Arg.Clear Oxcaml_flags.use_ssa, "";
      "-dtimings", Arg.Unit (fun () -> profile_columns := [ `Time ]), "";
      "-dcounters", Arg.Unit (fun () -> profile_columns := [ `Counters ]), "";
      ( "-dgranularity",

@@ -275,13 +275,13 @@ let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
 ;;
 [%%expect_asm X86_64{|
 unnecessary_moves:
-  movq  %rax, %rcx
-  movq  %rbx, %r8
+  movq  %rax, %r8
+  movq  %rbx, %rcx
   movq  %rdx, %rbx
-  leaq  -1(%rcx,%r8), %rax
-  cmpq  %r8, %rcx
+  leaq  -1(%r8,%rcx), %rax
+  cmpq  %rcx, %r8
   jge   .L106
-  movq  %rcx, %rax
+  movq  %r8, %rax
   ret
 .L106:
   cmpq  %rsi, %rdi
@@ -289,7 +289,7 @@ unnecessary_moves:
   subq  $8, %rsp
   movq  %rax, (%rsp)
   movq  (%rbx), %rdi
-  movq  %r8, %rax
+  movq  %rcx, %rax
   call  *%rdi
 .L117:
   movq  (%rsp), %rax
@@ -311,10 +311,10 @@ spill_one_or_two:
   subq  $24, %rsp
   movq  %rax, (%rsp)
   movq  %rbx, 8(%rsp)
-  movq  %rdi, %rbx
   movl  $1, %eax
-  movq  (%rbx), %rdi
-  call  *%rdi
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  call  *%rsi
 .L107:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
@@ -361,6 +361,7 @@ double_loop_no_definition_at_beginning:
 .L157:
   addq  72(%r14), %rbx
   addq  $8, %rbx
+  movq  %rbx, 48(%rsp)
   movq  $5111, -8(%rbx)
   movq  camlTOP15__f_33_37_code@GOTPCREL(%rip), %rcx
   movq  %rcx, (%rbx)
@@ -370,7 +371,6 @@ double_loop_no_definition_at_beginning:
   movq  %rdx, (%rsp)
   movq  %rcx, 16(%rbx)
   movq  %rax, 24(%rbx)
-  movq  %rbx, 48(%rsp)
   movq  %rdi, %rdx
   testb $1, %dl
   jne   .L135
@@ -560,9 +560,147 @@ let f ~(s: int64#) (t : int64#) =
   Int64_u.sub t (Int64_u.mul t s)
 [%%expect_asm X86_64{|
 f:
-  movq  %rax, %rdi
+  movq  %rbx, %rdi
+  imulq %rax, %rdi
   movq  %rbx, %rax
-  imulq %rdi, %rbx
-  subq  %rbx, %rax
+  subq  %rdi, %rax
+  ret
+|}]
+
+
+let[@inline never] register_pressure (x : int) =
+  let a = (x, x+1, x+2) in
+  let b = (x+3, x+4, x+5) in
+  let c = (x+6, x+7, x+8) in
+  let d = (x+9, x+10, x+11) in
+  let e = (x+12, x+13, x+14) in
+  let f = (x+15, x+16, x+17) in
+  let g = (x+18, x+19, x+20) in
+  let h = (x+21, x+22, x+23) in
+  let i = (x+24, x+25, x+26) in
+  let j = (x+27, x+28, x+29) in
+  let u = (a, b, c) in
+  let v = (a, d, e) in
+  (a, b, c, d, e, f, g, h, i, j, u, v)
+[%%expect_asm X86_64{|
+register_pressure:
+  subq  $24, %rsp
+  subq  $488, %r15
+  cmpq  (%r14), %r15
+  jb    .L145
+.L147:
+  leaq  8(%r15), %rbx
+  addq  $456, %rbx
+  movq  $3072, -8(%rbx)
+  movq  %rax, (%rbx)
+  leaq  2(%rax), %rdi
+  movq  %rdi, 8(%rbx)
+  leaq  4(%rax), %rdi
+  movq  %rdi, 16(%rbx)
+  leaq  -32(%rbx), %rdi
+  movq  $3072, -8(%rdi)
+  leaq  6(%rax), %rsi
+  movq  %rsi, (%rdi)
+  leaq  8(%rax), %rsi
+  movq  %rsi, 8(%rdi)
+  leaq  10(%rax), %rsi
+  movq  %rsi, 16(%rdi)
+  leaq  -32(%rdi), %rsi
+  movq  $3072, -8(%rsi)
+  leaq  12(%rax), %rdx
+  movq  %rdx, (%rsi)
+  leaq  14(%rax), %rdx
+  movq  %rdx, 8(%rsi)
+  leaq  16(%rax), %rdx
+  movq  %rdx, 16(%rsi)
+  leaq  -32(%rsi), %rdx
+  movq  $3072, -8(%rdx)
+  leaq  18(%rax), %rcx
+  movq  %rcx, (%rdx)
+  leaq  20(%rax), %rcx
+  movq  %rcx, 8(%rdx)
+  leaq  22(%rax), %rcx
+  movq  %rcx, 16(%rdx)
+  leaq  -32(%rdx), %rcx
+  movq  $3072, -8(%rcx)
+  leaq  24(%rax), %r8
+  movq  %r8, (%rcx)
+  leaq  26(%rax), %r8
+  movq  %r8, 8(%rcx)
+  leaq  28(%rax), %r8
+  movq  %r8, 16(%rcx)
+  leaq  -32(%rcx), %r8
+  movq  %r8, 8(%rsp)
+  movq  $3072, -8(%r8)
+  movq  8(%rsp), %r8
+  movq  %rbx, (%r8)
+  movq  8(%rsp), %r8
+  movq  %rdx, 8(%r8)
+  movq  8(%rsp), %r8
+  movq  %rcx, 16(%r8)
+  movq  8(%rsp), %r8
+  addq  $-32, %r8
+  movq  $3072, -8(%r8)
+  movq  %rbx, (%r8)
+  movq  %rdi, 8(%r8)
+  movq  %rsi, 16(%r8)
+  leaq  -32(%r8), %r9
+  movq  $3072, -8(%r9)
+  leaq  54(%rax), %r12
+  movq  %r12, (%r9)
+  leaq  56(%rax), %r12
+  movq  %r12, 8(%r9)
+  leaq  58(%rax), %r12
+  movq  %r12, 16(%r9)
+  leaq  -32(%r9), %r12
+  movq  $3072, -8(%r12)
+  leaq  48(%rax), %r13
+  movq  %r13, (%r12)
+  leaq  50(%rax), %r13
+  movq  %r13, 8(%r12)
+  leaq  52(%rax), %r13
+  movq  %r13, 16(%r12)
+  leaq  -32(%r12), %r13
+  movq  $3072, -8(%r13)
+  leaq  42(%rax), %r10
+  movq  %r10, (%r13)
+  leaq  44(%rax), %r10
+  movq  %r10, 8(%r13)
+  leaq  46(%rax), %r10
+  movq  %r10, 16(%r13)
+  leaq  -32(%r13), %r10
+  movq  $3072, -8(%r10)
+  leaq  36(%rax), %r11
+  movq  %r11, (%r10)
+  leaq  38(%rax), %r11
+  movq  %r11, 8(%r10)
+  leaq  40(%rax), %r11
+  movq  %r11, 16(%r10)
+  leaq  -32(%r10), %r11
+  movq  $3072, -8(%r11)
+  leaq  30(%rax), %rbp
+  movq  %rbp, (%rsp)
+  movq  %rbp, (%r11)
+  leaq  32(%rax), %rbp
+  movq  %rbp, (%rsp)
+  movq  %rbp, 8(%r11)
+  addq  $34, %rax
+  movq  %rax, 16(%r11)
+  leaq  -104(%r11), %rax
+  movq  $12288, -8(%rax)
+  movq  %rbx, (%rax)
+  movq  %rdi, 8(%rax)
+  movq  %rsi, 16(%rax)
+  movq  %rdx, 24(%rax)
+  movq  %rcx, 32(%rax)
+  movq  %r11, 40(%rax)
+  movq  %r10, 48(%rax)
+  movq  %r13, 56(%rax)
+  movq  %r12, 64(%rax)
+  movq  %r9, 72(%rax)
+  movq  %r8, 80(%rax)
+  movq  8(%rsp), %rbx
+  movq  %rbx, 88(%rax)
+  addq  $24, %rsp
   ret
 |}]
