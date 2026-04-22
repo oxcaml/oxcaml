@@ -200,9 +200,9 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
     (* CR mshinwell: do we need to remove unused function slot bindings from the
        result types too? *)
     all_code
+    |> EC.remove_unreachable ~reachable_names
     |> EC.remove_unused_value_slots_from_result_types_and_shortcut_aliases
          ~used_value_slots ~canonicalise
-    |> EC.remove_unreachable ~reachable_names
   in
   let final_typing_env = create_typing_env reachable_names in
   (* We need to re-export offsets for everything reachable from the cmx file;
