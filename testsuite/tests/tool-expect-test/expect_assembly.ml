@@ -55,12 +55,12 @@ f:
   subq  $8, %rsp
   movq  %rax, %rbx
   movq  camlTOP4__fn$5b$3a1$2c19$2d$2d45$5d_10@GOTPCREL(%rip), %rax
-  call  camlStdlib__List__map_15_113_code@PLT
+  call  camlStdlib__List__map_16_124_code@PLT
 .L113:
   movq  %rax, %rbx
   movq  camlTOP4__fn$5b$3a1$2c60$2d$2d86$5d_11@GOTPCREL(%rip), %rax
   addq  $8, %rsp
-  jmp   camlStdlib__List__map_15_113_code@PLT
+  jmp   camlStdlib__List__map_16_124_code@PLT
 
 f.(fun):
   movq  camlTOP4__fn$5b$3a1$2c60$2d$2d86$5d_11@GOTPCREL(%rip), %rbx
