@@ -74,6 +74,7 @@ type pattern_variable =
     pv_lpoly: Types.Lpoly.t;
     (** Not yet determined; gets determined during generalization in
         [type_let]. *)
+    pv_zero_alloc: Zero_alloc.check option;
   }
 
 val mk_expected:
@@ -349,6 +350,12 @@ type error =
   | Unexpected_hole
   | Let_poly_not_yet_implemented
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+  | Wrong_arg_zero_alloc of Zero_alloc.error
+  | Unsupported_arg_zero_alloc
+  | Must_provide_zero_alloc_arity
+  | Invalid_payload_arg_zero_alloc
+  | Incompatible_param_zero_alloc of Zero_alloc.error
+  | Zero_alloc_arity_mismatch of int * int
 
 and invalid_layout_poly_inst_context =
   | Binding_op

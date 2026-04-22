@@ -643,7 +643,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               end
           | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
-          | Tpoly (ty, _) ->
+          | Tpoly (ty, _, _) ->
               tree_of_val (depth - 1) obj ty
           | Trepr (ty, _) ->
               tree_of_val (depth - 1) obj ty

@@ -20,6 +20,11 @@ type const = Builtin_attributes.zero_alloc_attribute =
   | Check of check
   | Assume of assume
 
+type check_context =
+  | Signature
+  | Fun_param
+  | Default
+
 (* This type represents whether or not a function will be checked for
    zero-alloc-ness, and with what configuration (strict, opt, etc). It can be a
    variable which will be filled in when the module the function is in is
@@ -52,11 +57,24 @@ val undo_change : change -> unit
 
 (* These are the errors that may be raised by [sub_exn] below. *)
 type error
+val one_missing : error
+val error_is_arity_mismatch : error -> bool
 val print_error : Format_doc.formatter -> error -> unit
 
-(* [sub t1 t2] checks whether the zero_alloc check t1 is stronger than the
-   zero_alloc check t2. It returns [Ok ()] if so, and [Error e] if not.  If [t1]
-   is a variable, it may be set to make the relation hold. *)
-val sub : t -> t -> (unit, error) Result.t
+(* [sub ~context t1 t2] checks whether the zero_alloc check t1 is stronger than
+   the zero_alloc check t2. It returns [Ok ()] if so, and [Error e] if not.
+   The exact error being reported depends on the context. If [t1] is a variable,
+   it may be set to make the relation hold. *)
+val sub : context:check_context -> t -> t -> (unit, error) Result.t
+
+(* [check_payload_to_string ?apparent_arity c] returns the keyword portion of a
+   zero_alloc check attribute, e.g. [" strict opt arity 2"]. If
+   [~apparent_arity] equals the check's arity, the arity suffix is omitted. *)
+val check_payload_to_string : ?apparent_arity:int -> check -> string
+
+(* [assert_equal_checks ~context t1 t2] checks whether two [check] values are
+   identical. If they are not, an error is reported. *)
+val assert_equal_checks :
+  context:check_context -> check -> check -> (unit, error) Result.t
 
 val debug_printer : Format.formatter -> t -> unit

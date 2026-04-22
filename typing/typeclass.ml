@@ -197,7 +197,7 @@ let rec constructor_type constr cty =
       constr
   | Cty_arrow (l, ty, cty) ->
       let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
-      let ty = Ctype.newmono ty in
+      let ty = Ctype.newmono ~zero_alloc:None ty in
       Ctype.newty
         (Tarrow (arrow_desc, ty, constructor_type constr cty, commu_ok))
 
@@ -830,9 +830,9 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
                    let ty' =
                      Ctype.newvar (Jkind.Builtin.value ~why:Object_field)
                    in
-                   Ctype.unify val_env (Ctype.newmono ty') ty;
+                   Ctype.unify val_env (Ctype.newmono ~zero_alloc:None ty') ty;
                    Typecore.type_approx val_env sbody ty'
-               | Tpoly (ty1, tl) ->
+               | Tpoly (ty1, tl, _) ->
                    let ty1' = Ctype.instance_poly tl ty1 in
                    Typecore.type_approx val_env sbody ty1'
                | _ -> assert false
@@ -965,7 +965,7 @@ and class_field_second_pass cl_num sign met_env field =
            let ty = Btype.method_type label.txt sign in
            let self_type = sign.Types.csig_self in
            let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
-           let self_param_type = Btype.newgenty (Tpoly(self_type, [])) in
+           let self_param_type = Btype.newgenty (Tpoly(self_type, [], None)) in
            let meth_type =
              Typecore.mk_expected (Btype.newgenty
                 (Tarrow(arrow_desc, self_param_type, ty, commu_ok)))
@@ -983,7 +983,9 @@ and class_field_second_pass cl_num sign met_env field =
       Warnings.with_state warning_state
         (fun () ->
            let unit_type = Ctype.instance Predef.type_unit in
-           let self_param_type = Ctype.newmono sign.Types.csig_self in
+           let self_param_type =
+             Ctype.newmono ~zero_alloc:None sign.Types.csig_self
+           in
            let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
            let meth_type =
              Typecore.mk_expected (Ctype.newty
@@ -1489,7 +1491,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                 val_kind = Val_ivar (Immutable, cl_num);
                 val_lpoly = Lpoly.determined [];
                 val_attributes = [];
-                val_zero_alloc = Zero_alloc.default;
+                val_zero_alloc = vd.val_zero_alloc;
                 Types.val_loc = vd.val_loc;
                 val_uid = vd.val_uid;
                }
@@ -1589,7 +1591,7 @@ let rec approx_declaration cl =
           (* CR layouts: use of value here may be relaxed when we update
            classes to work with jkinds *)
       in
-      let arg = Ctype.newmono arg in
+      let arg = Ctype.newmono ~zero_alloc:None arg in
       let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
       Ctype.newty
         (Tarrow (arrow_desc, arg, approx_declaration cl, commu_ok))
@@ -1609,7 +1611,7 @@ let rec approx_description ct =
         (* CR layouts: use of value here may be relaxed when we
            relax jkinds in classes *)
       in
-      let arg = Ctype.newmono arg in
+      let arg = Ctype.newmono ~zero_alloc:None arg in
       let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
       Ctype.newty
         (Tarrow (arrow_desc, arg, approx_description ct, commu_ok))

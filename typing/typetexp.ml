@@ -105,6 +105,11 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+  | Must_provide_zero_alloc_arity
+  | Invalid_payload_arg_zero_alloc
+  | Zero_alloc_on_optional_param
+  | Zero_alloc_attr_non_function
+  | Zero_alloc_arity_mismatch of int * int
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -879,17 +884,43 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             | _ :: _ ->
               { mode_modes = acc_mode; mode_desc = [] }
           in
+          let zero_alloc =
+            match Types.get_desc arg_cty.ctyp_type with
+            | Tpoly (_, _, zero_alloc) -> zero_alloc
+            | _ ->
+              let default_arity = Ctype.arity arg_cty.ctyp_type in
+              let za =
+                Builtin_attributes.get_zero_alloc_attribute
+                  ~in_signature:false
+                  ~on_application:false
+                  ~on_function_argument:true
+                  ~default_arity
+                  arg_cty.ctyp_attributes
+              in
+              match za with
+              | Check {arity; _} when arity = 0 || default_arity = 0 ->
+                raise (Error (loc, env, Zero_alloc_attr_non_function))
+              | Check {arity; _} when arity <> default_arity ->
+                raise (Error (loc, env,
+                  Zero_alloc_arity_mismatch (arity, default_arity)))
+              | Check za -> Some za
+              | Assume _ ->
+                raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
+              | Ignore_assert_all | Default_zero_alloc -> None
+          in
           let ret_cty = loop acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
           let arg_ty =
-            if Btype.is_Tpoly arg_ty then arg_ty else newmono arg_ty
+            if Btype.is_Tpoly arg_ty then arg_ty else newmono ~zero_alloc arg_ty
           in
           let arg_ty =
             if not (Btype.is_optional l) then arg_ty
             else begin
+              if Option.is_some zero_alloc then
+                raise (Error (arg.ptyp_loc, env, Zero_alloc_on_optional_param));
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
-              newmono
+              newmono ~zero_alloc:None
                 (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
             end
           in
@@ -1152,8 +1183,33 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let ty = newty (Tvariant (make_row more)) in
       ctyp (Ttyp_variant (tfields, closed, present)) ty
   | Ptyp_poly(vars, st) ->
+      let on_function_argument =
+        match st.ptyp_desc with
+        | Ptyp_arrow _ -> true
+        | _ -> false
+      in
+      let zero_alloc =
+        Builtin_attributes.get_zero_alloc_attribute
+          ~in_signature:false
+          ~on_application:false
+          ~on_function_argument
+          ~default_arity:0
+          styp.ptyp_attributes
+      in
+      let zero_alloc =
+        begin
+          let open Builtin_attributes in
+          match zero_alloc with
+          | Assume _ ->
+            raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
+          | Default_zero_alloc | Ignore_assert_all -> None
+          (* arity=0 means no explicit arity; will be inferred in
+             transl_type_poly *)
+          | Check check -> Some check
+        end
+      in
       let desc, typ =
-        transl_type_poly env ~policy ~row_context mode styp.ptyp_loc
+        transl_type_poly env ~policy ~row_context ~zero_alloc mode styp.ptyp_loc
           vars st
       in
       ctyp desc typ
@@ -1162,8 +1218,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         Language_extension.Alpha;
       Env.check_no_open_quotations loc env Layout_polymorphism_qt;
       let desc, typ =
-        transl_type_repr env ~policy ~row_context mode styp.ptyp_loc
-          vars st
+        transl_type_repr env ~policy ~row_context ~zero_alloc:None
+          mode styp.ptyp_loc vars st
       in
       ctyp desc typ
   | Ptyp_newlayout _ ->
@@ -1272,7 +1328,7 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
   in
   Ttyp_var (Some name, jkind_annot), ty
 
-and transl_type_poly env ~policy ~row_context mode loc vars st =
+and transl_type_poly env ~policy ~row_context ~zero_alloc mode loc vars st =
   let typed_vars, new_univars, cty =
     with_local_level begin fun () ->
       let vars = List.map (fun (n, v) -> (n, v, Env.stage env)) vars in
@@ -1286,13 +1342,48 @@ and transl_type_poly env ~policy ~row_context mode loc vars st =
       ~post:(fun (_,_,cty) -> generalize_ctyp cty)
   in
   let ty = cty.ctyp_type in
+  let default_arity = Ctype.arity ty in
+  (* Validate and resolve a zero_alloc check against the inner type.
+     arity=0 in the check means "no explicit arity was given"; we infer it
+     from the inner type.  A non-zero arity must match exactly. *)
+  let resolve_check err_loc (check : Zero_alloc.check) =
+    let arity =
+      if check.arity = 0 then default_arity
+      else check.arity
+    in
+    if arity = 0 then
+      raise (Error (err_loc, env, Zero_alloc_attr_non_function))
+    else if arity <> default_arity then
+      raise (Error (err_loc, env,
+        Zero_alloc_arity_mismatch (arity, default_arity)))
+    else
+      Some { check with arity }
+  in
+  let zero_alloc =
+    match zero_alloc with
+    | Some check -> resolve_check loc check
+    | None ->
+      let za =
+        Builtin_attributes.get_zero_alloc_attribute
+          ~in_signature:false
+          ~on_application:false
+          ~on_function_argument:true
+          ~default_arity
+          st.ptyp_attributes
+      in
+      match za with
+      | Check check -> resolve_check st.ptyp_loc check
+      | Assume _ ->
+        raise (Error (st.ptyp_loc, env, Invalid_payload_arg_zero_alloc))
+      | Ignore_assert_all | Default_zero_alloc -> None
+  in
   let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
   let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
-  let ty' = Btype.newgenty (Tpoly(ty, ty_list)) in
+  let ty' = Btype.newgenty (Tpoly(ty, ty_list, zero_alloc)) in
   unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)) ty';
   Ttyp_poly (typed_vars, cty), ty'
 
-and transl_type_repr env ~policy ~row_context mode loc vars st =
+and transl_type_repr env ~policy ~row_context ~zero_alloc mode loc vars st =
   let sort_vars, new_univars, cty =
     with_local_level begin fun () ->
       let vars_with_stage = List.map (fun var -> var, Env.stage env) vars in
@@ -1307,7 +1398,7 @@ and transl_type_repr env ~policy ~row_context mode loc vars st =
   let ty = cty.ctyp_type in
   let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
   let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
-  let ty_poly = Btype.newgenty (Tpoly(ty, ty_list)) in
+  let ty_poly = Btype.newgenty (Tpoly(ty, ty_list, zero_alloc)) in
   let ty' = Btype.newgenty (Trepr(ty_poly, sort_vars)) in
   unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)) ty';
   Ttyp_repr (List.map (fun v -> v.txt) vars, cty), ty'
@@ -1570,7 +1661,7 @@ let transl_simple_type_univars env styp =
   end in
   make_fixed_univars typ.ctyp_type;
     { typ with ctyp_type =
-        instance (Btype.newgenty (Tpoly (typ.ctyp_type, univs))) }
+        instance (Btype.newgenty (Tpoly (typ.ctyp_type, univs, None))) }
 
 let transl_simple_type_delayed env mode styp =
   TyVarEnv.reset_locals ();
@@ -1919,6 +2010,29 @@ let report_error_doc env ppf =
       fprintf ppf
         "@[Layout polymorphism is not supported in term-level type \
          annotations@]"
+  | Must_provide_zero_alloc_arity ->
+    fprintf ppf
+      "Zero-alloc annotations on function arguments must specify arity."
+  | Invalid_payload_arg_zero_alloc ->
+    fprintf ppf
+      "%a is not permitted in %a attributes on function arguments."
+      Style.inline_code "assume"
+      Style.inline_code "zero_alloc"
+  | Zero_alloc_on_optional_param ->
+    fprintf ppf
+      "%a attributes are not supported on optional parameters."
+      Style.inline_code "zero_alloc"
+  | Zero_alloc_attr_non_function ->
+    fprintf ppf
+      "%a attributes on function arguments require the argument@ \
+       to be a function type."
+      Style.inline_code "zero_alloc"
+  | Zero_alloc_arity_mismatch (annotation_arity, type_arity) ->
+    fprintf ppf
+      "The arity in the %a attribute (%d) does not match the@ \
+       number of parameters in the argument type (%d)."
+      Style.inline_code "zero_alloc"
+      annotation_arity type_arity
 
 let () =
   Location.register_error_of_exn

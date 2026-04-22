@@ -22,7 +22,8 @@ let type_arrow ta tb =
     Types.Nolabel,Mode.Alloc.legacy,Mode.Alloc.legacy
   in
   Ctype.newty
-    (Tarrow (arrow_desc, Ctype.newmono ta, tb, Types.commu_var ()))
+    (Tarrow
+       (arrow_desc, Ctype.newmono ~zero_alloc:None ta, tb, Types.commu_var ()))
 
 let type_formatter () =
   let format = Path.Pident (Ident.create_persistent "Stdlib__Format") in

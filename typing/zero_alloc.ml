@@ -83,9 +83,26 @@ let get (t : t) =
     | Some { strict; opt; custom_error_msg; } ->
       Check { loc; arity; strict; opt; custom_error_msg }
 
+type check_context =
+  | Signature
+  | Fun_param
+  | Default
+
+type incompatible_check =
+  | Strict
+  | Opt
+
 type error =
   | Less_general of { missing_entirely : bool }
-  | Arity_mismatch of int * int
+  | Arity_mismatch of int * int * check_context
+  | Incompatible of incompatible_check
+  | One_missing
+
+let one_missing = One_missing
+
+let error_is_arity_mismatch = function
+  | Less_general _ | Incompatible _ | One_missing -> false
+  | Arity_mismatch _ -> true
 
 exception Error of error
 
@@ -96,14 +113,35 @@ let print_error ppf error =
     pr "The former provides a weaker \"zero_alloc\" guarantee than the latter.";
     if missing_entirely then
       pr "@ Hint: Add a \"zero_alloc\" attribute to the implementation."
-  | Arity_mismatch (n1, n2) ->
+  | Incompatible check_type ->
+    pr "There is a mismatch between the two \"zero_alloc\" assumptions:@ \
+        the \"%s\" payloads need to match exactly."
+      (match check_type with
+       | Strict -> "strict"
+       | Opt -> "opt")
+  | Arity_mismatch (n1, n2, Signature) ->
     pr "zero_alloc arity mismatch:@ \
-        When using \"zero_alloc\" in a signature, the syntactic arity of@ \
-        the implementation must match the function type in the interface.@ \
+        When using \"zero_alloc\" in a signature, the@ \
+        syntactic arity of the implementation must match the function type in@ \
+        the interface.@ \
         Here the former is %d and the latter is %d."
       n1 n2
+  | Arity_mismatch (n1, n2, Fun_param) ->
+    pr "When using \"zero_alloc\" on function parameters, the arities in the@ \
+        type of the function and the parameter term mus match exactly.@ \
+        Here the arity in the actual parameter term is %d and the arity in@ \
+        the type of the function is %d."
+      n1 n2
+  | Arity_mismatch (n1, n2, Default) ->
+    pr "Inconsistent \"zero_alloc\" arity properties: seen both %d and %d.@ \
+        This error should never be reported in this context.@ \
+        Contact the OxCaml development team and report a bug."
+      n1 n2
+  | One_missing ->
+    pr "The two types must agree on \"zero_alloc\": \
+        either both carry the annotation or neither does."
 
-let sub_const_const_exn za1 za2 =
+let sub_const_const_exn ~context za1 za2 =
   (* The core of the check here is that we translate both attributes into the
      abstract domain and use the existing inclusion check from there, ensuring
      what we do in the typechecker matches the backend.
@@ -160,7 +198,7 @@ let sub_const_const_exn za1 za2 =
   | Some arity1, Some arity2 ->
     (* Check *)
     if not (arity1 = arity2) then
-      raise (Error (Arity_mismatch (arity1, arity2)))
+      raise (Error (Arity_mismatch (arity1, arity2, context)))
   | Some _, None -> ()
     (* Forgetting zero_alloc info is fine *)
   | None, Some _ ->
@@ -168,14 +206,14 @@ let sub_const_const_exn za1 za2 =
     Misc.fatal_error "Zero_alloc: sub_const_exn"
   | None, None -> ()
 
-let sub_var_const_exn v c =
+let sub_var_const_exn ~context v c =
   (* This can only fail due to an arity mismatch. We have a linear order and can
      always constrain the var lower to make the sub succeed. *)
   match v, c with
   | _, (Default_zero_alloc | Ignore_assert_all | Assume _) -> assert false
   | { arity = arity1; _ }, Check { arity = arity2; _ }
     when arity1 <> arity2 ->
-    raise (Error (Arity_mismatch (arity1, arity2)))
+    raise (Error (Arity_mismatch (arity1, arity2, context)))
   | { desc = None; _ }, Check { strict; opt; custom_error_msg;  } ->
     !log_change (None, v);
     v.desc <- Some { strict; opt; custom_error_msg }
@@ -200,7 +238,7 @@ let sub_var_const_exn v c =
       v.desc <- Some { strict; opt; custom_error_msg; }
     end
 
-let sub_exn za1 za2 =
+let sub_exn ~context za1 za2 =
   match za1, za2 with
   | _, Var _ ->
     (* A fully inferred signature will never have a variable in it, so we almost
@@ -216,16 +254,39 @@ let sub_exn za1 za2 =
        event).
     *)
     if not (za1 == za2) then
-      Misc.fatal_error "zero_alloc: variable constraint"
+      Misc.fatal_error "zero_alloc sub: variable constraint"
   | _, Const (Assume _) ->
-    Misc.fatal_error "zero_alloc: invalid constraint"
+    Misc.fatal_error "zero_alloc sub: invalid constraint"
   | _, (Const (Default_zero_alloc | Ignore_assert_all)) -> ()
-  | Var v, Const c -> sub_var_const_exn v c
-  | Const c1, Const c2 -> sub_const_const_exn c1 c2
+  | Var v, Const c -> sub_var_const_exn ~context v c
+  | Const c1, Const c2 -> sub_const_const_exn ~context c1 c2
 
-let sub za1 za2 =
+let sub ~context za1 za2 =
   try
-    sub_exn za1 za2;
+    sub_exn ~context za1 za2;
+    Ok ()
+  with
+  | Error e -> Result.Error e
+
+let check_payload_to_string ?(apparent_arity = -1)
+    ({strict; opt; arity; _} : check) =
+  String.concat ""
+    [ if strict then " strict" else "";
+      if opt then " opt" else "";
+      if arity = apparent_arity then "" else Printf.sprintf " arity %d" arity;
+    ]
+
+let assert_equal_checks
+      ~context
+      {arity = arity1; opt = opt1; strict = strict1; _}
+      {arity = arity2; opt = opt2; strict = strict2; _} =
+  try
+    if arity1 <> arity2 then
+      raise (Error (Arity_mismatch (arity1, arity2, context)));
+    if strict1 <> strict2 then
+      raise (Error (Incompatible Strict));
+    if opt1 <> opt2 then
+      raise (Error (Incompatible Opt));
     Ok ()
   with
   | Error e -> Result.Error e
