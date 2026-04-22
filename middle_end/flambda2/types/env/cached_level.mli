@@ -28,6 +28,12 @@ val empty : t
 val names_to_types :
   t -> (Type_grammar.t * Binding_time.With_name_mode.t) Name.Map.t
 
+(** [find_opt t name] is equivalent to
+    [Name.Map.find_opt name (names_to_types t)] but avoids applying any pending
+    renaming to the types of names other than [name]. *)
+val find_opt :
+  t -> Name.t -> (Type_grammar.t * Binding_time.With_name_mode.t) option
+
 val aliases : t -> Aliases.t
 
 val add_or_replace_binding :

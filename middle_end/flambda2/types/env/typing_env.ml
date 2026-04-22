@@ -331,13 +331,11 @@ let binding_time_resolver resolver name =
       (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
   | None -> raise Binding_time_resolver_failure
   | Some t -> (
-    match
-      Name.Map.find name (Cached_level.names_to_types t.just_after_level)
-    with
-    | exception Not_found ->
+    match Cached_level.find_opt t.just_after_level name with
+    | None ->
       Misc.fatal_errorf "Binding time resolver cannot find name %a in:@ %a"
         Name.print name print_serializable t
-    | _, binding_time_and_mode -> binding_time_and_mode)
+    | Some (_, binding_time_and_mode) -> binding_time_and_mode)
 
 let resolver t = t.resolver
 
@@ -456,10 +454,8 @@ let find_with_binding_time_and_mode' t name kind =
               MTC.unknown kind, Binding_time.With_name_mode.imported_variables
             | None -> raise Missing_cmx_and_kind)
       | Some t -> (
-        match
-          Name.Map.find name (Cached_level.names_to_types t.just_after_level)
-        with
-        | exception Not_found ->
+        match Cached_level.find_opt t.just_after_level name with
+        | None ->
           Name.pattern_match name
             ~symbol:(fun symbol ->
               (* The symbol has no equation. Check that it is defined and return
@@ -476,7 +472,7 @@ let find_with_binding_time_and_mode' t name kind =
                 "Variable %a not bound in imported typing environment (maybe \
                  the wrong .cmx file is present?):@ %a"
                 Variable.print var print_serializable t)
-        | type_and_binding_time ->
+        | Some type_and_binding_time ->
           (* All variables in exported maps already have the right name mode
              (see [Cached_level.clean_for_export]) *)
           type_and_binding_time))
