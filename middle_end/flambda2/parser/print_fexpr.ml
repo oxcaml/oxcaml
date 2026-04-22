@@ -868,7 +868,9 @@ and code_binding ppf
     exn_cont
     (pp_option ~space:Before (pp_like ": %a" arity))
     ret_arity
-    (match result_mode with Heap -> "" | Local -> " local")
+    (match result_mode with
+    | Not_alloc_stack -> ""
+    | Maybe_alloc_stack -> " local")
     (expr Outer) body
 
 let flambda_unit ppf ({ body } : flambda_unit) =
