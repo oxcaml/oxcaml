@@ -659,6 +659,16 @@ end
 
 module Int = Stdlib.Int
 
+let repeated_label l =
+  let module Set = Stdlib.String.Set in
+  let rec go s = function
+    | [] -> None
+    | (None, _) :: l -> go s l
+    | (Some lbl, _) :: l ->
+      if Set.mem lbl s then Some lbl else go (Set.add lbl s) l
+  in
+  go Set.empty l
+
 (* File functions *)
 
 let find_in_path path name =

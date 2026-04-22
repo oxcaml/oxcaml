@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension labeled_tuples -dsource";
+ flags = "-dsource";
  expect;
 *)
 let x = ~x:1, ~y:2
@@ -10,15 +10,23 @@ val x : x:int * y:int = (~x:1, ~y:2)
 |}]
 
 (* Attribute should prevent punning *)
-let z = 5
-let y = ~z:z, ~z, ~z:(z [@attr])
+let z1 = 5
+let z2 = 5
+let z3 = 5
+let y = ~z1:z1, ~z2, ~z3:(z3 [@attr])
 [%%expect{|
 
-let z = 5;;
-val z : int = 5
+let z1 = 5;;
+val z1 : int = 5
 
-let y = (~z, ~z, ~z:((z)[@attr ]));;
-val y : z:int * z:int * z:int = (~z:5, ~z:5, ~z:5)
+let z2 = 5;;
+val z2 : int = 5
+
+let z3 = 5;;
+val z3 : int = 5
+
+let y = (~z1, ~z2, ~z3:((z3)[@attr ]));;
+val y : z1:int * z2:int * z3:int = (~z1:5, ~z2:5, ~z3:5)
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : x:int * s:string * y:int * string =

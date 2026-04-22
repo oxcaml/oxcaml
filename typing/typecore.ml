@@ -150,6 +150,8 @@ type error =
   | Partial_tuple_pattern_bad_type
   | Extra_tuple_label of string option * type_expr
   | Missing_tuple_label of string option * type_expr
+  | Repeated_tuple_exp_label of string
+  | Repeated_tuple_pat_label of string
   | Label_mismatch of
       record_form_packed * Longident.t * Errortrace.unification_error
   | Pattern_type_clash :
@@ -2950,14 +2952,13 @@ and type_pat_aux
   let type_tuple_pat spl closed =
     (* CR layouts v5: consider sharing code with [type_unboxed_tuple_pat] below
        when we allow non-values in boxed tuples. *)
+    Option.iter
+      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
+      (Misc.repeated_label spl);
     let args =
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
       | Ttuple labeled_tl when is_principal expected_ty ->
-        begin match closed with
-        | Open -> Language_extension.assert_enabled ~loc Labeled_tuples ()
-        | Closed -> ()
-        end;
         reorder_pat loc penv spl closed labeled_tl expected_ty
       (* If not, it's not allowed to be open (partial) *)
       | _ ->
@@ -2970,9 +2971,6 @@ and type_pat_aux
     in
     let pl =
       List.map (fun (lbl, p, t, alloc_mode) ->
-        Option.iter (fun _ ->
-            Language_extension.assert_enabled ~loc Labeled_tuples ())
-          lbl;
         lbl,
         type_pat tps Value ~alloc_mode p t
           Jkind.Sort.(of_const Const.for_tuple_element))
@@ -2989,14 +2987,13 @@ and type_pat_aux
   let type_unboxed_tuple_pat spl closed =
     Language_extension.assert_enabled ~loc Layouts
       Language_extension.Stable;
+    Option.iter
+      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
+      (Misc.repeated_label spl);
     let args =
       match get_desc (expand_head !!penv expected_ty) with
       (* If it's a principally-known tuple pattern, try to reorder *)
       | Tunboxed_tuple labeled_tl when is_principal expected_ty ->
-                begin match closed with
-        | Open -> Language_extension.assert_enabled ~loc Labeled_tuples ()
-        | Closed -> ()
-        end;
         reorder_pat loc penv spl closed labeled_tl expected_ty
       (* If not, it's not allowed to be open (partial) *)
       | _ ->
@@ -3010,9 +3007,6 @@ and type_pat_aux
     in
     let pl =
       List.map (fun (lbl, p, t, alloc_mode, sort) ->
-        Option.iter (fun _ ->
-            Language_extension.assert_enabled ~loc Labeled_tuples ())
-          lbl;
         lbl, type_pat tps Value ~alloc_mode p t sort, sort)
         spl_ann
     in
@@ -9536,6 +9530,9 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
      we allow non-values in boxed tuples. *)
   let arity = List.length sexpl in
   assert (arity >= 2);
+  Option.iter
+    (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
+    (Misc.repeated_label sexpl);
   let alloc_mode, value_mode =
     register_allocation_value_mode ~loc expected_mode.mode
   in
@@ -9587,9 +9584,6 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   let expl =
     Misc.Stdlib.List.map3
       (fun (label, body) ((_, ty), argument_mode) overwrite ->
-        Option.iter (fun _ ->
-             Language_extension.assert_enabled ~loc Labeled_tuples ())
-          label;
         let argument_mode = mode_default argument_mode in
         let argument_mode = expect_mode_cross env ty argument_mode in
           (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
@@ -9608,6 +9602,9 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
   let arity = List.length sexpl in
   assert (arity >= 2);
+  Option.iter
+    (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
+    (Misc.repeated_label sexpl);
   let argument_mode =
     expected_mode.mode
     |> apply_is_contained_by {containing = Tuple; container = (loc, Expression)}
@@ -9651,9 +9648,6 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   let expl =
     List.map2
       (fun (label, body) ((_, ty, sort), argument_mode) ->
-        Option.iter (fun _ ->
-             Language_extension.assert_enabled ~loc Labeled_tuples ())
-          label;
         let argument_mode = mode_default argument_mode in
         let argument_mode = expect_mode_cross env ty argument_mode in
           (label, type_expect env argument_mode body (mk_expected ty), sort))
@@ -12246,6 +12240,14 @@ let report_error ~loc env =
          which is not a %s type."
         (Style.as_inline_code Printtyp.type_expr) ty
         (record_form_to_string record_form)
+  | Repeated_tuple_exp_label l ->
+      Location.errorf ~loc
+        "@[This tuple expression has two labels named %a@]"
+        Style.inline_code l
+  | Repeated_tuple_pat_label l ->
+      Location.errorf ~loc
+        "@[This tuple pattern has two labels named %a@]"
+        Style.inline_code l
   | Expr_record_type_has_wrong_boxing (P record_form, ty) ->
       let expected, actual =
         match record_form with

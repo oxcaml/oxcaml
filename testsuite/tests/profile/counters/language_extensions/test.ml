@@ -1,13 +1,12 @@
 (* TEST
 
 subdirectories = "include_functor immutable_array_comprehensions comprehensions \
-                  immutable_arrays module_strengthening labeled_tuples nested";
+                  immutable_arrays module_strengthening nested";
 setup-ocamlc.byte-build-env;
 set OCAMLPARAM = "";
 ocamlc_byte_exit_status = "0";
 flags = "-dcounters -extension include_functor -extension comprehensions \
-        -extension immutable_arrays -extension immutable_arrays \
-        -extension module_strengthening -extension labeled_tuples";
+        -extension immutable_arrays -extension module_strengthening";
 
 
 
@@ -75,25 +74,6 @@ flags = "-dcounters -extension include_functor -extension comprehensions \
   ocamlc.byte;
   compiler_reference =
     "${test_source_directory}/immutable_arrays/mli_counters.ocamlc.reference";
-  check-ocamlc.byte-output;
-}
-
-(* Labeled tuples *)
-
-{
-  module = "labeled_tuples/ml_counters.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/labeled_tuples/ml_counters.ocamlc.reference";
-  check-ocamlc.byte-output;
-}
-{
-  module = "labeled_tuples/mli_counters.mli";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/labeled_tuples/mli_counters.ocamlc.reference";
   check-ocamlc.byte-output;
 }
 
