@@ -173,7 +173,7 @@ when it imports `backend.js`. If the outer script is cached aggressively by the
 embedding site or CDN, version the script URL in the page as well:
 
 ```html
-<script src="./oxcaml-embed.js?v=20260421-int-overflow-guard"></script>
+<script src="./oxcaml-embed.js?v=20260422-utop-check-gate"></script>
 ```
 
 When publishing a new bundle, keep the static assets in sync. Mixing a new

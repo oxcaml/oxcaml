@@ -1,5 +1,6 @@
 import {
   addBackendStatusListener,
+  checkString,
   interfaceString,
   ready,
   runString,
@@ -1440,10 +1441,25 @@ async function runEditor(editor, revision = editor.revision) {
     if (revision !== editor.revision) {
       return;
     }
-    const output =
-      editor.mode === "utop"
-        ? await utopString(editor.filename, source)
-        : await runString(editor.filename, source);
+    let output;
+    if (editor.mode === "utop") {
+      const checkOutput = await checkString(editor.filename, source);
+      if (revision !== editor.revision) {
+        return;
+      }
+      if (checkOutput.trim() !== "") {
+        updateEditorMarkers(editor, checkOutput);
+        const transcript = renderTranscript(editor, checkOutput, {
+          forceDiagnostics: true,
+          utopMode: true,
+        });
+        setStatus(editor, transcript.hasWarning ? "warning" : "error", "error");
+        return;
+      }
+      output = await utopString(editor.filename, source);
+    } else {
+      output = await runString(editor.filename, source);
+    }
     if (revision !== editor.revision) {
       return;
     }

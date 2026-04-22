@@ -55,12 +55,21 @@ let initialize_toplevel_for_environment environment =
       Topdirs.dir_directory
       Browser_switch_package_manifest.browser_package_include_dirs
 
+let capture_toplevel_output f =
+  let buffer, ppf = Browser_switch_common.make_formatter_buffer () in
+  (try ignore (f ppf) with
+   | Browser_switch_common.Missing_cmi _ as exn -> raise exn
+   | exn -> Location.report_exception ppf exn);
+  Browser_switch_common.flush_formatter ppf;
+  Buffer.contents buffer
+
 let utop_string ~browser ~filename ~source =
   let environment =
     if browser then Browser_switch_common.Browser
     else Browser_switch_common.Native
   in
   Browser_switch_common.with_missing_cmi_detection environment (fun () ->
+    capture_toplevel_output (fun ppf ->
       Browser_switch_common.prepare_compiler environment ~filename;
       initialize_toplevel_for_environment environment;
       Toploop.override_sys_argv [| filename |];
@@ -71,10 +80,8 @@ let utop_string ~browser ~filename ~source =
       List.for_all
         (fun phrase ->
           Warnings.reset_fatal ();
-          let phrase = Toploop.preprocess_phrase Format.std_formatter phrase in
+          let phrase = Toploop.preprocess_phrase ppf phrase in
           Env.reset_cache_toplevel ();
-          Toploop.execute_phrase true Format.std_formatter phrase)
+          Toploop.execute_phrase true ppf phrase)
         phrases
-      |> ignore;
-      Format.pp_print_flush Format.std_formatter ();
-      "")
+      |> ignore))
