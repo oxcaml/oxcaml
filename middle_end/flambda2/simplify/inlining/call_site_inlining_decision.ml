@@ -139,7 +139,20 @@ let argument_types_useful dacc ~apply ~code_or_metadata =
         Simple.pattern_match simple
           ~name:(fun name ~coercion:_ ->
             T.type_is_useful full_kind typing_env name)
-          ~const:(fun _ -> true))
+          ~const:(fun const ->
+            (* If the kind already restricts the possible values to a single
+               constant (e.g. unit type), even a constant can be not useful. *)
+            match Reg_width_const.is_tagged_immediate const with
+            | None -> true
+            | Some const ->
+              not
+                (Flambda_kind.With_subkind.equal full_kind
+                   (Flambda_kind.With_subkind.create Flambda_kind.value
+                      (Variant
+                         { consts = Target_ocaml_int.Set.singleton const;
+                           non_consts = Tag.Scannable.Map.empty
+                         })
+                      Non_nullable))))
       (Flambda_arity.unarize arity)
       (Apply.args apply)
 
