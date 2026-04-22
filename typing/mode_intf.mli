@@ -92,7 +92,10 @@ module type Common = sig
       [pinpoint] is already printed, which allows simplifying its own printing.
       The caller is responsible for printing [pinpoint] and placing the result
       of this function in a suitable linguistic context. *)
-  val print_error : Mode_hint.pinpoint -> error -> print_error
+  val print_error :
+    Mode_hint.pinpoint ->
+    error ->
+    print_error * left_hint_tighter:bool * right_hint_tighter:bool
 
   type equate_error = equate_step * error
 

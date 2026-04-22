@@ -2108,10 +2108,16 @@ module Report = struct
 
   and ('a, 'd) ahint = 'a * 'd hint constraint 'd = 'l * 'r
 
+  type ('a, 'd) ahint_with_attr =
+    { ahint : ('a, 'd) ahint;
+      is_hint_tighter : bool
+    }
+    constraint 'd = 'l * 'r
+
   (** Human-readible mode error report. *)
   type 'a t =
-    { left : ('a, left_only) ahint;
-      right : ('a, right_only) ahint
+    { left : ('a, left_only) ahint_with_attr;
+      right : ('a, right_only) ahint_with_attr
     }
 
   (** Convert Solver error to report. *)
@@ -2267,16 +2273,42 @@ module Report = struct
         (a, l * r) ahint =
      fun obj lorr c (a, hint) -> hint_axis obj lorr c a hint
 
+    let value_equal : type a. a C.obj -> a -> a -> bool =
+     fun obj a b -> Misc.Le_result.equal ~le:(C.le obj) a b
+
     let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
      fun obj axis { left = l, lhint; right = r, rhint } ->
-      let left = ahint_prod obj Left axis r (l, lhint) in
-      let right = ahint_prod obj Right axis l (r, rhint) in
+      let left_ahint = ahint_prod obj Left axis r (l, lhint) in
+      let right_ahint = ahint_prod obj Right axis l (r, rhint) in
+      let axis_obj = C.proj_obj axis obj in
+      let left =
+        { ahint = left_ahint;
+          is_hint_tighter =
+            not (value_equal axis_obj (fst left_ahint) (Axis.proj axis l))
+        }
+      in
+      let right =
+        { ahint = right_ahint;
+          is_hint_tighter =
+            not (value_equal axis_obj (fst right_ahint) (Axis.proj axis r))
+        }
+      in
       { left; right }
 
     let error_axis : type a. a C.obj -> a S.error -> a t =
      fun obj { left = l, lhint; right = r, rhint } ->
-      let left = ahint_axis obj Left r (l, lhint) in
-      let right = ahint_axis obj Right l (r, rhint) in
+      let left_ahint = ahint_axis obj Left r (l, lhint) in
+      let right_ahint = ahint_axis obj Right l (r, rhint) in
+      let left =
+        { ahint = left_ahint;
+          is_hint_tighter = not (value_equal obj (fst left_ahint) l)
+        }
+      in
+      let right =
+        { ahint = right_ahint;
+          is_hint_tighter = not (value_equal obj (fst right_ahint) r)
+        }
+      in
       { left; right }
   end
 
@@ -2741,16 +2773,25 @@ module Report = struct
     | Left ahint -> print_ahint `Left pp obj ppf ahint
     | Right ahint -> print_ahint `Right pp obj ppf ahint
 
-  let print : type a. pinpoint -> a C.obj -> a t -> print_error =
+  let print : type a.
+      pinpoint ->
+      a C.obj ->
+      a t ->
+      print_error * left_hint_tighter:bool * right_hint_tighter:bool =
    fun pp obj { left; right } ->
     let actual, expected =
       if C.is_opposite obj
-      then Right right, Left left
-      else Left left, Right right
+      then Right right.ahint, Left left.ahint
+      else Left left.ahint, Right right.ahint
+    in
+    let left_hint_tighter, right_hint_tighter =
+      if C.is_opposite obj
+      then right.is_hint_tighter, left.is_hint_tighter
+      else left.is_hint_tighter, right.is_hint_tighter
     in
     let left ppf = Option.get (print_ahint_sided pp obj ppf actual) in
     let right ppf = Option.get (print_ahint_sided pp obj ppf expected) in
-    { left; right }
+    { left; right }, ~left_hint_tighter, ~right_hint_tighter
 end
 
 let print_pinpoint = Report.print_pinpoint
@@ -2774,20 +2815,31 @@ module Error = struct
     | Axis : 'a C.obj * 'a t -> packed
 
   let print_product : type r a.
-      Hint.pinpoint -> r C.obj -> (r, a) Axis.t -> r t -> print_error =
+      Hint.pinpoint ->
+      r C.obj ->
+      (r, a) Axis.t ->
+      r t ->
+      print_error * left_hint_tighter:bool * right_hint_tighter:bool =
    fun pp obj ax err ->
     let err = S.populate_error obj err in
-    let err = Report.Of_solver.error_prod obj ax err in
+    let report = Report.Of_solver.error_prod obj ax err in
     let obj = C.proj_obj ax obj in
-    Report.print pp obj err
+    Report.print pp obj report
 
-  let print_axis : type a. Hint.pinpoint -> a C.obj -> a t -> print_error =
+  let print_axis : type a.
+      Hint.pinpoint ->
+      a C.obj ->
+      a t ->
+      print_error * left_hint_tighter:bool * right_hint_tighter:bool =
    fun pp obj err ->
     let err = S.populate_error obj err in
-    let err = Report.Of_solver.error_axis obj err in
-    Report.print pp obj err
+    let report = Report.Of_solver.error_axis obj err in
+    Report.print pp obj report
 
-  let print_packed : Hint.pinpoint -> packed -> print_error =
+  let print_packed :
+      Hint.pinpoint ->
+      packed ->
+      print_error * left_hint_tighter:bool * right_hint_tighter:bool =
    fun pp -> function
     | Product (obj, ax, err) -> print_product pp obj ax err
     | Axis (obj, err) -> print_axis pp obj err
@@ -2806,7 +2858,12 @@ module Error = struct
          | Some print_desc -> print_desc ~definite:true ~capitalize:true
        in
        fprintf ppf "%t%t is " open_box print_desc);
-      let ({ left; right } : print_error) = print_packed pp packed in
+      let ( ({ left; right } : print_error),
+            ~left_hint_tighter,
+            ~right_hint_tighter ) =
+        print_packed pp packed
+      in
+      if left_hint_tighter then fprintf ppf "weaker than ";
       (match left ppf with
       | Mode_with_hint ->
         let print_desc =
@@ -2818,6 +2875,7 @@ module Error = struct
         in
         fprintf ppf ".%tHowever, %t is expected to be " reopen_box print_desc
       | Mode -> fprintf ppf "%tbut is expected to be " reopen_box);
+      if right_hint_tighter then fprintf ppf "stronger than ";
       ignore (right ppf);
       fprintf ppf ".@]"
     in

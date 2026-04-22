@@ -406,17 +406,20 @@ let report_modality_sub_error first second ppf e =
 
 let report_mode_sub_error ?(pp : Mode.Hint.pinpoint = (Location.none, Unknown))
     got expected ppf e =
-  let {left; right} : _ Mode.simple_error =
+  let ({left; right} : _ Mode.simple_error),
+    ~left_hint_tighter, ~right_hint_tighter =
     Mode.Value.print_error pp e
   in
   let open Format_doc in
   let open_box = dprintf "@[<hov 2>" in
   let reopen_box = dprintf "@]@ %t" open_box in
   fprintf ppf "%t%s " open_box (String.capitalize_ascii got);
+  if left_hint_tighter then fprintf ppf "weaker than ";
   begin match left ppf with
   | Mode -> fprintf ppf "%tbut %s " reopen_box expected
   | Mode_with_hint -> fprintf ppf ".%tHowever, %s " reopen_box expected
   end;
+  if right_hint_tighter then fprintf ppf "stronger than ";
   ignore (right ppf);
   fprintf ppf ".@]"
 

@@ -12324,17 +12324,21 @@ let report_error ~loc env =
     in
     Location.error_of_printer ~loc ~sub (fun ppf e ->
       let open Format_doc in
-      let {left; right} : Mode_intf.print_error =
+      let ({left; right} : Mode_intf.print_error),
+      ~left_hint_tighter, ~right_hint_tighter
+        =
         Value.print_error (loc, Expression) e
       in
       let open_box = dprintf "@[<hov 2>" in
       let reopen_box = dprintf "@]@ %t" open_box in
       fprintf ppf "%tThis value is " open_box;
+      if left_hint_tighter then fprintf ppf "weaker than ";
     (match left ppf with
     | Mode_with_hint ->
       fprintf ppf
         ".%tHowever, the highlighted expression is expected to be " reopen_box
     | Mode -> fprintf ppf "%tbut is expected to be " reopen_box);
+    if right_hint_tighter then fprintf ppf "stronger than ";
     ignore (right ppf);
     fprintf ppf ".@]"
       ) e
