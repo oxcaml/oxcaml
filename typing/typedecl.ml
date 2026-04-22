@@ -4664,7 +4664,7 @@ let report_error ~loc = function
       Out_type.reset ();
       Reaching_path.add_to_preparation reaching_path;
       Location.errorf ~loc
-        "<v>The definition of %a is recursive without boxing%a"
+        "@[<v>The definition of %a is recursive without boxing%a@]"
         Style.inline_code s
         Reaching_path.pp_colon reaching_path
   | Definition_mismatch (ty, env, err) ->

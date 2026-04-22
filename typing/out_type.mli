@@ -99,6 +99,9 @@ val tree_of_typexp: type_or_scheme -> type_expr -> out_type
 
 val tree_of_type_scheme: type_expr -> out_type
 
+val tree_of_modalities:
+  Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list
+
 
 val prepared_type_scheme: type_expr printer
 val prepared_type_expr: type_expr printer
@@ -120,6 +123,8 @@ val type_expr_with_reserved_names: type_expr printer
 type 'a diff = Same of 'a | Diff of 'a * 'a
 val trees_of_type_expansion:
   type_or_scheme -> Errortrace.expanded_type -> out_type diff
+val trees_of_type_expansion':
+  var_jkinds:bool -> type_or_scheme -> Errortrace.expanded_type -> out_type diff
 val prepare_expansion: Errortrace.expanded_type -> Errortrace.expanded_type
 val pp_type_expansion: out_type diff printer
 val hide_variant_name: Types.type_expr -> Types.type_expr

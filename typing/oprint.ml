@@ -338,12 +338,6 @@ let print_out_modes ppf l =
   | _ -> pp_print_string ppf " @ ");
   pp_print_list ~pp_sep:pp_print_space print_out_mode ppf l
 
-(* Labeled tuples with the first element labeled sometimes require parens. *)
-let is_initially_labeled_tuple ty =
-  match ty with
-  | Otyp_tuple ((Some _, _) :: _) -> true
-  | _ -> false
-
 let print_out_modality = pp_print_string
 
 let print_out_modalities ppf l =
@@ -398,19 +392,8 @@ let rec print_out_type_0 ppf =
   | ty ->
       print_out_type_1 ppf ty
 
-(* We must parenthesize a labeled tuple with the first element labeled when:
-   - It is an argument to a function ([~arg])
-   - Or, there is at least one mode to print.
- *)
 and print_out_type_mode ~arg mode ppf ty =
-  let parens =
-    is_initially_labeled_tuple ty && arg
-  in
-  if parens then
-    pp_print_char ppf '(';
   print_out_type_2 ~arg ppf ty;
-  if parens then
-    pp_print_char ppf ')';
   print_out_modes ppf mode
 
 and print_out_type_1 ppf =

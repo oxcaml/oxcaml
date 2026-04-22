@@ -435,10 +435,12 @@ let prepare_expansion_head empty_tr = function
       Some (Errortrace.map_diff (may_prepare_expansion empty_tr) d)
   | _ -> None
 
-let head_error_printer mode txt_got txt_but = function
+let head_error_printer ~var_jkinds mode txt_got txt_but = function
   | None -> Format_doc.Doc.empty
   | Some d ->
-      let d = Errortrace.map_diff (trees_of_type_expansion mode) d in
+      let d =
+        Errortrace.map_diff (trees_of_type_expansion' ~var_jkinds mode) d
+      in
       doc_printf "%a@;<1 2>%a@ %a@;<1 2>%a"
         pp_doc txt_got pp_type_expansion d.Errortrace.got
         pp_doc txt_but pp_type_expansion d.Errortrace.expected
@@ -461,6 +463,13 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
          Errortrace.{ty_exp with expanded = hide_variant_name ty_exp.expanded})
       tr
   in
+  let jkind_error = match Misc.last tr with
+    | Some (Bad_jkind _ | Bad_jkind_sort _ | Unequal_var_jkinds _
+           | Unequal_tof_kind_jkinds _) ->
+        true
+    | _ ->
+        false
+  in
   match tr with
   | [] -> assert false
   | (elt :: tr) as full_trace ->
@@ -469,7 +478,9 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
       let head = prepare_expansion_head (tr=[] && last=None) elt in
       let tr = List.map (Errortrace.map_diff prepare_expansion) tr in
       let last = Option.map (Errortrace.map_diff prepare_expansion) last in
-      let head_error = head_error_printer mode txt1 txt2 head in
+      let head_error =
+        head_error_printer ~var_jkinds:jkind_error mode txt1 txt2 head
+      in
       let tr = trees_of_trace mode tr in
       let last =
         Option.map (Errortrace.map_diff (trees_of_type_expansion mode)) last in
@@ -486,7 +497,9 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
         pp_doc ty_expect_explanation
         (trace false (incompatibility_phrase trace_format)) tr
         (pp_print_option pp_doc) mis;
-      if env <> Env.empty
+      if env <> Env.empty && not jkind_error
+       (* the jkinds mechanism has its own way of reporting missing cmis
+          CR jkinds: streamline these *)
       then warn_on_missing_defs env ppf head;
        Internal_names.print_explanations env ppf;
        Ident_conflicts.err_print ppf

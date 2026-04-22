@@ -193,3 +193,4 @@ let row_field = raw_field
 let row_desc = raw_row_desc
 
 let () = Btype.print_raw := type_expr
+let () = Jkind.set_raw_type_expr type_expr
