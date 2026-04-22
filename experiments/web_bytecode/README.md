@@ -102,6 +102,17 @@ URL, the original tag contents, and the tag's duplicate index when a page has
 multiple identical examples. Each editor includes a reset button that restores
 the original tag contents and clears that stored edit.
 
+If saved code leaves a page unrecoverable, add `clear` to the URL. The editor
+clears saved OxCaml snippets for that page before mounting and then reloads the
+original tag contents:
+
+```text
+https://example.com/tutorial.html?clear
+```
+
+The clear parameter is ignored when computing storage keys, so removing the
+parameter afterward keeps using the same page-scoped storage.
+
 ### Files to deploy
 
 Host these files together in one static directory:
@@ -173,7 +184,7 @@ when it imports `backend.js`. If the outer script is cached aggressively by the
 embedding site or CDN, version the script URL in the page as well:
 
 ```html
-<script src="./oxcaml-embed.js?v=20260422-utop-check-gate"></script>
+<script src="./oxcaml-embed.js?v=20260422-storage-clear"></script>
 ```
 
 When publishing a new bundle, keep the static assets in sync. Mixing a new

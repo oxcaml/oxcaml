@@ -36,6 +36,7 @@ const maxCheckedNumericLiteralLength = 80;
 const maxBrowserDecimalIntLiteral = "2147483648";
 const buildBase = "../../_build/default/experiments/web_bytecode";
 const storagePrefix = "oxcaml-playground:v1";
+const clearStorageParam = "clear";
 
 const editorHostEl = document.getElementById("editor");
 const outputEl = document.getElementById("output");
@@ -82,6 +83,7 @@ function pageStorageScope() {
   try {
     const url = new URL(window.location.href);
     url.hash = "";
+    url.searchParams.delete(clearStorageParam);
     return url.href;
   } catch {
     return "";
@@ -124,6 +126,37 @@ function removeStoredSource(storageKey) {
     // Ignore storage failures.
   }
 }
+
+function shouldClearStoredSources() {
+  try {
+    return new URL(window.location.href).searchParams.has(clearStorageParam);
+  } catch {
+    return false;
+  }
+}
+
+function clearStoredSourcesForRequest() {
+  if (!shouldClearStoredSources()) {
+    return;
+  }
+  try {
+    const storage = window.localStorage;
+    const pagePrefix = `${storagePrefix}:${pageStorageScope()}:`;
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (!key) {
+        continue;
+      }
+      if (key.startsWith(pagePrefix)) {
+        storage.removeItem(key);
+      }
+    }
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+clearStoredSourcesForRequest();
 
 const oxcamlIdentifierNames = new Set(["local_", "stack_", "exclave_"]);
 const packageModuleNames = new Set(["Base", "Core", "Stdlib_stable"]);
