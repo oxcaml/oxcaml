@@ -260,7 +260,10 @@ let () =
     List.map (fun (name, _) -> name, enabled_if_main_amd64_not_macos) tests
   in
   List.iter (print_test ~extra_flag:"-internal-assembler") tests;
-  (* Tests that need Unix library (for preemption) *)
+  (* Tests that need Unix library (for preemption). The test itself checks at
+     runtime whether poll insertion is enabled (via the OXCAML_POLL_INSERTION
+     env var set by make runtest) — without polls in the tight SIMD loop, the
+     preemption signal would never be caught. *)
   let unix_tests = ["preemption256", enabled_if_main_amd64_not_macos] in
   List.iter print_test_with_unix unix_tests;
   List.iter (print_test_with_unix ~extra_flag:"-nodynlink") unix_tests;
