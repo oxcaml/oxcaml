@@ -223,7 +223,22 @@ G(name):
 #define Handler_parent(reg)     [reg, #24]
 #define Handler_parent_offset   24
 
-.macro WOSIZE_VAL dst, src
+/* Continuation values
+ *
+ * A continuation is a two or three word object:
+ *
+ * - The first field points to a fiber. That fiber will point to
+ *   its parent at Handler_parent(Stack_handler(f))
+ * - The second field points to the last fiber in the linked-list formed by
+ *   the parent pointer
+ * - The third field, if present, points to a [gc_regs] struct for a
+ *   continuation produced by a preemption
+ */
+#define Cont_fiber(reg)      [reg]
+#define Cont_last_fiber(reg) [reg, #8]
+#define Cont_gc_regs(reg)    [reg, #16]
+
+.macro WOSIZE_BLOCK_VAL dst, src
         ldr     \dst, [\src, #-8]
         lsr     \dst, \dst, #10
 .endm
@@ -562,13 +577,15 @@ L(caml_call_gc):
         bl      G(caml_garbage_collection)
         SWITCH_C_TO_OCAML
         TSAN_EXIT_FUNCTION
-    /* Check for preemption: Caml_state->preemption > 3 means preempt */
+    /* Caml_state->preemption > 3 means that we should preempt:
+       Caml_state->preemption points to a freshly allocated preemption
+       continuation. */
         ldr     TMP, Caml_state(preemption)
         cmp     TMP, #3
         b.hi    G(caml_preempt)
 L(resume_from_preempt):
-    /* When preempted continuations resume, they always jump back here, with a
-       frame for the continuation's address on the stack */
+    /* When preempted continuations resume, they always jump back here, with
+       a frame for the continuation on the stack */
         RESTORE_ALL_REGS
     /* Free stack space and return to caller */
         ldp     x29, x30, [sp], 16
@@ -585,8 +602,8 @@ END_FUNCTION(caml_call_gc)
 */
 FUNCTION(caml_preempt)
         CFI_STARTPROC
-    /* Restore the young_ptr that was saved at the beginning of
-       SAVE_ALL_REGS, in caml_call_gc */
+    /* Restore the young_ptr that was saved at the beginning of SAVE_ALL_REGS,
+       in caml_call_gc */
         ldr     ALLOC_PTR, Caml_state(young_ptr)
     /* We're about to store the current gc_regs in a continuation, so we
        need to make sure there's another one available for the preemption
@@ -596,16 +613,24 @@ FUNCTION(caml_preempt)
         bl      G(caml_get_preemption_effect) /* x0 := Effect.Preemption */
         SWITCH_C_TO_OCAML
         ldr     x1, Caml_state(preemption)    /* x1 := continuation */
+#ifdef DEBUG
+    /* Verify that the preemption continuation is freshly allocated */
+        sub     TMP, x1, #8
+        cmp     TMP, ALLOC_PTR
+        b.eq    1f
+        brk     #0
+1:
+#endif
     /* Reset Caml_state->preemption back to Val_unit, indicating no
        preemption is scheduled */
         mov     TMP, #1
         str     TMP, Caml_state(preemption)
         ldr     x2, Caml_state(current_stack) /* x2 := old stack */
         add     x3, x2, #1                    /* x3 (last_fiber) := Val_ptr(old stack) */
-        str     x3, [x1]                      /* Store fiber in continuation */
-        str     xzr, [x1, #8]                 /* set last fiber of continuation to NULL */
+        str     x3, Cont_fiber(x1)            /* Store fiber in continuation */
+        str     xzr, Cont_last_fiber(x1)      /* set last fiber of continuation to NULL */
         ldr     TMP, Caml_state(gc_regs)
-        str     TMP, [x1, #16]                /* save gc_regs in continuation */
+        str     TMP, Cont_gc_regs(x1)         /* save gc_regs in continuation */
     /* Clear gc_regs, as we'll be leaving the runtime after the effect is
        performed */
         str     xzr, Caml_state(gc_regs)
@@ -1182,20 +1207,13 @@ END_FUNCTION(caml_callback3_asm)
 .endm
 
 
-/*
- * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)). In the following,
- * the [last_fiber] refers to the last fiber in the linked-list formed by the
- * parent pointer.
- */
-
 FUNCTION(caml_perform)
         CFI_STARTPROC
     /*  x0: effect to perform
         x1: freshly allocated continuation */
         ldr     x2, Caml_state(current_stack) /* x2 := old stack */
-        add     x3, x2, 1 /* x3 := Val_ptr(old stack) */
-        str     x3, [x1] /* Initialize continuation */
+        add     x3, x2, 1                     /* x3 := Val_ptr(old stack) */
+        str     x3, Cont_fiber(x1)            /* Initialize continuation */
 L(do_perform):
     /*  x0: effect to perform
         x1: continuation
@@ -1241,16 +1259,17 @@ L(do_perform):
 1:
     /*  switch back to original performer before raising Effect.Unhandled
         (no-op unless this is a reperform) */
-        ldr     x10, [x1] /* load performer stack from continuation */
-        sub     x10, x10, 1 /* x10 := Ptr_val(x10) */
+        ldr     x10, Cont_fiber(x1)    /* load performer stack from continuation */
+        sub     x10, x10, 1            /* x10 := Ptr_val(x10) */
         ldr     x9, Caml_state(current_stack)
         SWITCH_OCAML_STACKS x9, x10
     /*  No parent stack. If this is a preemption effect (wosize of the
         continuation is 3, meaning we have a gc_regs present) then just
         continue execution. Otherwise, raise Effect.Unhandled. */
-        WOSIZE_VAL TMP, x1
+        WOSIZE_BLOCK_VAL TMP, x1
         cmp     TMP, #3
-        b.eq    L(preempt_unhandled_resume)
+        b.eq    L(preemption_unhandled)
+        CFI_REMEMBER_STATE
 #if defined(WITH_THREAD_SANITIZER)
         /* We must let the TSan runtime know that we switched back to the
            original performer stack. For that, we perform the necessary calls
@@ -1267,22 +1286,24 @@ L(do_perform):
 #endif
         ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_unhandled_effect)
         b       G(caml_c_call)
-L(preempt_unhandled_resume):
-    /* Preemption was unhandled. Redo the skipped allocation and restore
-       the saved registers to resume execution. This mirrors the handled
-       path (label 4 in caml_resume). */
-        ldr     x25, [x1, #16]                /* x25 = gc_regs from continuation */
-        str     x25, Caml_state(gc_regs)
-        str     ALLOC_PTR, Caml_state(young_ptr)
-    /* Push a frame so caml_redo_preempted_allocation sees the expected stack
-       layout, and resume_from_preempt can pop it. */
+        CFI_RESTORE_STATE
+L(preemption_unhandled):
+    /* When preemptions are unhandled, we resume them rather than raising. Load
+       gc_regs from the continuation into callee-saved x25 before the C call,
+       since x1 will not survive it. */
+        ldr     x25, Cont_gc_regs(x1)         /* x25 := gc_regs */
+        mov     x0, x1                        /* C_ARG_1 = continuation */
         stp     x29, x30, [sp, -16]!
         CFI_ADJUST(16)
         add     x29, sp, #0
-        SWITCH_OCAML_TO_C
-        bl      G(caml_redo_preempted_allocation)
-        SWITCH_C_TO_OCAML
-        b       L(resume_from_preempt)
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_continuation_use_noexc)
+        bl      G(caml_c_call)                /* x0 := stack (discarded) */
+        ldp     x29, x30, [sp], 16
+        CFI_ADJUST(-16)
+    /* Jump into caml_resume's preemption-resume path, which handles
+       redoing the interrupted allocation, restoring registers, and
+       returning to user code. */
+        b       L(resume_preemption)
         CFI_ENDPROC
 END_FUNCTION(caml_perform)
 
@@ -1309,24 +1330,25 @@ FUNCTION(caml_resume)
         stp     x29, x30, [sp, -16]!
         CFI_ADJUST(16)
         add     x29, sp, #0
-        ldr     x3, [x0, #8] /* x3 = last_fiber */
-        mov     x22, x2 /* move arg to callee-saved x22 */
-        mov     x23, x3 /* move last_fiber to callee-saved x23 */
-        mov     x24, x1 /* move fun to callee-saved x24 */
+        mov     x22, x2                       /* x22 := arg */
+        ldr     x23, Cont_last_fiber(x0)      /* x23 := last_fiber */
+        mov     x24, x1                       /* x24 := fun */
     /* Check if this is a preemption continuation (wosize == 3) */
-        WOSIZE_VAL TMP, x0
+        WOSIZE_BLOCK_VAL TMP, x0
         cmp     TMP, #3
         b.ne    2f
-        ldr     x25, [x0, #16] /* x25 = gc_regs from preemption continuation */
+    /* This is a preemption; load the gc regs to be restored later */
+        ldr     x25, Cont_gc_regs(x0)         /* x25 := gc_regs */
         b       3f
-2:      mov     x25, xzr       /* x25 = NULL, not a preemption continuation */
+    /* This is not a preemption, so set gc_regs = null */
+2:      mov     x25, xzr                      /* x25 := NULL */
 3:      ADDRGLOBAL(ADDITIONAL_ARG, caml_continuation_use_noexc)
         bl      G(caml_c_call) /* x0 := stack */
         sub     x0, x0, 1 /* x0 (new stack) = Ptr_val(x0) */
         mov     x2, x22 /* x2 := argument */
         mov     x1, x24 /* x1 := fun */
     /* Check if stack null, then already used */
-        cbz     x0, 1f
+        cbz     x0, L(continuation_already_resumed)
         ldr     x4, [x1]  /* code pointer */
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers x0, x1, x2, x3 and x4 */
@@ -1366,17 +1388,21 @@ FUNCTION(caml_resume)
         CFI_ADJUST(-16)
         SWITCH_OCAML_STACKS x9, x0
         FLUSH_DYNAMIC_CACHE
-    /* Check if we have a gc_regs (meaning this is a preemption continuation) */
-        cbnz    x25, 4f
+    /* Is this a preemption continuation? */
+        cbnz    x25, L(resume_preemption)
     /* Normal continuation: jump directly to the handler */
         mov     x0, x2
         br      x4
-4:  /* Preemption continuation: restore gc_regs and redo allocation */
+L(resume_preemption): /* x25 -> gc_regs */
+    /* This continuation represents a preemption, meaning we have to restore
+       its gc_regs before resuming */
         str     x25, Caml_state(gc_regs)
         str     ALLOC_PTR, Caml_state(young_ptr)
+    /* Before restoring registers, redo whatever allocation was interrupted by
+       preemption. This ensures ALLOC_PTR will point to a valid allocation in
+       the (possibly new) young heap. */
     /* Push a frame so caml_redo_preempted_allocation sees the expected stack
-       layout (x29/x30 contain the values from the SWITCH_OCAML_STACKS frame
-       that was just popped). resume_from_preempt will pop it. */
+       layout, and L(resume_from_preempt) can pop it. */
         stp     x29, x30, [sp, -16]!
         CFI_ADJUST(16)
         add     x29, sp, #0
@@ -1386,7 +1412,8 @@ FUNCTION(caml_resume)
     /* Jump into the second half of caml_call_gc, which will restore the
        registers and `ret` to resume */
         b       L(resume_from_preempt)
-1:      ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
+L(continuation_already_resumed):
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
         b       G(caml_c_call)
         CFI_ENDPROC
 END_FUNCTION(caml_resume)
