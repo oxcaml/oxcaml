@@ -34,6 +34,15 @@ val names_to_types :
 val find_opt :
   t -> Name.t -> (Type_grammar.t * Binding_time.With_name_mode.t) option
 
+(** [name_domain t] returns the set of names in the map returned by
+    [names_to_types t]. Unlike calling [Name.Map.keys (names_to_types t)] it
+    does not need to apply any pending renaming to the types themselves. *)
+val name_domain : t -> Name.Set.t
+
+(** [mem t name] is [true] iff [name] has an entry in [names_to_types t]. It
+    avoids applying any pending renaming to the types themselves. *)
+val mem : t -> Name.t -> bool
+
 val aliases : t -> Aliases.t
 
 val add_or_replace_binding :

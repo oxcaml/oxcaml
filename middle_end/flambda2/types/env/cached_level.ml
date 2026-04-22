@@ -32,13 +32,13 @@
    type. Bulk operations (e.g. [ids_for_export]) call [force_everything] to
    eagerly apply the renaming to every value.
 
-   Either pending renaming may carry an import map.  The only restriction is
-   that [Renaming.compose ~second:r ~first:s] requires [r] to be import-map
-   free (or [s] to be identity); [apply_renaming] and [force_structures]
-   therefore arrange to force just enough pending work to keep this
-   restriction satisfied when composing.  In the common cmx-import case the
-   incoming import-map renaming is applied to an otherwise-empty level so no
-   forcing happens and the renaming is simply stored.
+   Either pending renaming may carry an import map. The only restriction is that
+   [Renaming.compose ~second:r ~first:s] requires [r] to be import-map free (or
+   [s] to be identity); [apply_renaming] and [force_structures] therefore
+   arrange to force just enough pending work to keep this restriction satisfied
+   when composing. In the common cmx-import case the incoming import-map
+   renaming is applied to an otherwise-empty level so no forcing happens and the
+   renaming is simply stored.
 
    The mutation performed by the [force_*] functions preserves the logical value
    of [t], so it is safe to mutate even if other code holds the same [t]: any
@@ -85,13 +85,14 @@ let force_structures t =
     t.aliases <- Aliases.apply_renaming t.aliases r;
     t.symbol_projections <- rename_symbol_projections t.symbol_projections r;
     t.pending_renaming <- Renaming.empty;
-    (* Compose [r] into [pending_value_renaming].  [Renaming.compose] does not
+    (* Compose [r] into [pending_value_renaming]. [Renaming.compose] does not
        allow [second] (here [r]) to carry an import map when [first] is
        non-identity, so in that case we first eagerly apply the existing
        [pending_value_renaming] to all values and then set
        [pending_value_renaming] to [r] alone. *)
-    if Renaming.has_import_map r
-       && not (Renaming.is_identity t.pending_value_renaming)
+    if
+      Renaming.has_import_map r
+      && not (Renaming.is_identity t.pending_value_renaming)
     then (
       t.names_to_types
         <- apply_renaming_to_values t.names_to_types t.pending_value_renaming;
@@ -159,6 +160,14 @@ let find_opt t name =
     else
       let ty' = Type_grammar.apply_renaming ty t.pending_value_renaming in
       Some (ty', btm)
+
+let name_domain t =
+  force_structures t;
+  Name.Map.keys t.names_to_types
+
+let mem t name =
+  force_structures t;
+  Name.Map.mem name t.names_to_types
 
 let add_or_replace_binding t (name : Name.t) ty binding_time name_mode =
   force_everything t;
@@ -253,14 +262,15 @@ let apply_renaming t renaming =
   then t
   else (
     (* [Renaming.compose ~second:renaming ~first:pending_renaming] fails only
-       when [renaming] has an import map AND [pending_renaming] is
-       non-identity.  In that one case we force the existing
-       [pending_renaming] into [pending_value_renaming] so that the subsequent
-       [compose] has [first = Renaming.empty] and succeeds.  Crucially,
-       [force_structures] does not traverse any types in [names_to_types]:
-       only the keys, [aliases] and [symbol_projections] are touched. *)
-    if Renaming.has_import_map renaming
-       && not (Renaming.is_identity t.pending_renaming)
+       when [renaming] has an import map AND [pending_renaming] is non-identity.
+       In that one case we force the existing [pending_renaming] into
+       [pending_value_renaming] so that the subsequent [compose] has [first =
+       Renaming.empty] and succeeds. Crucially, [force_structures] does not
+       traverse any types in [names_to_types]: only the keys, [aliases] and
+       [symbol_projections] are touched. *)
+    if
+      Renaming.has_import_map renaming
+      && not (Renaming.is_identity t.pending_renaming)
     then force_structures t;
     { names_to_types = t.names_to_types;
       aliases = t.aliases;

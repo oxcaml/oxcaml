@@ -1143,13 +1143,12 @@ end = struct
       Code_age_relation.clean_for_export env.code_age_relation ~reachable_names
     in
     let just_after_level = One_level.just_after_level current_level in
-    let names_to_types = Cached_level.names_to_types just_after_level in
     let defined_symbols_without_equations =
       Symbol.Set.fold
         (fun symbol defined_symbols_without_equations ->
           if
             Name_occurrences.mem_symbol reachable_names symbol
-            && not (Name.Map.mem (Name.symbol symbol) names_to_types)
+            && not (Cached_level.mem just_after_level (Name.symbol symbol))
           then symbol :: defined_symbols_without_equations
           else defined_symbols_without_equations)
         env.defined_symbols []
@@ -1200,7 +1199,7 @@ end = struct
   let name_domain t =
     List.fold_left
       (fun name_domain symbol -> Name.Set.add (Name.symbol symbol) name_domain)
-      (Name.Map.keys (Cached_level.names_to_types t.just_after_level))
+      (Cached_level.name_domain t.just_after_level)
       t.defined_symbols_without_equations
 
   let ids_for_export
@@ -1343,8 +1342,9 @@ end = struct
       | Rec_info _ | Region _ -> assert false
     in
     let symbol_ty, _binding_time_and_mode =
-      Name.Map.find (Name.symbol symbol)
-        (Cached_level.names_to_types env.just_after_level)
+      match Cached_level.find_opt env.just_after_level (Name.symbol symbol) with
+      | Some entry -> entry
+      | None -> raise Not_found
     in
     type_to_approx symbol_ty
 end
