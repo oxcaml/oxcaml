@@ -165,7 +165,7 @@ let free_names t =
   | Code_present code -> Code.free_names code
   | Metadata_only code_metadata -> Code_metadata.free_names code_metadata
 
-let apply_renaming t renaming =
+let apply_renaming0 t renaming =
   match t with
   | Metadata_only code_metadata ->
     let code_metadata' = Code_metadata.apply_renaming code_metadata renaming in
@@ -191,6 +191,9 @@ let apply_renaming t renaming =
                 delayed_renaming = delayed_renaming'
               }
         }
+
+let apply_renaming t renaming =
+  if Renaming.is_identity renaming then t else apply_renaming0 t renaming
 
 let ids_for_export t =
   match view t with
