@@ -377,18 +377,19 @@ alloc_mode_for_allocations:
     { Local { alloc_region; region } }
 
 alloc_mode_for_applications:
-  | AMP; alloc_region = region { Heap { alloc_region } }
+  | AMP; alloc_region = region { Not_alloc_stack { alloc_region } }
   | AMP; alloc_region = region;
     AMP; region = region;
-    AMP; ghost_region = region
-    { Local { alloc_region; region; ghost_region } }
+    AMP;
+    ghost_region = region
+    { Maybe_alloc_stack { alloc_region; region; ghost_region } }
 
 alloc_mode_for_function_params:
-  | AMP; alloc_region = variable { Heap { alloc_region } }
+  | AMP; alloc_region = variable { Not_alloc_stack { alloc_region } }
   | AMP; alloc_region = variable;
     AMP; region = variable;
     AMP; ghost_region = variable
-    { Local { alloc_region; region; ghost_region } }
+    { Maybe_alloc_stack { alloc_region; region; ghost_region } }
 
 prim_param_val:
   | i = IDENT { make_located i ($startpos, $endpos) }
@@ -657,11 +658,13 @@ call_kind:
     { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC); AMP; alloc_region = region
     { (C_call { alloc = not noalloc },
-      (Heap { alloc_region } : region alloc_mode_for_applications)) }
+      (Not_alloc_stack { alloc_region }
+        : region alloc_mode_for_applications)) }
   | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN;
       AMP; alloc_region = region
     { (Method { kind; obj },
-        (Heap { alloc_region } : region alloc_mode_for_applications)) }
+        (Not_alloc_stack { alloc_region }
+          : region alloc_mode_for_applications)) }
 ;
 
 inline:

@@ -196,12 +196,12 @@ let alloc_mode_for_applications env (alloc : Alloc_mode.For_applications.t) :
   match alloc with
   | Not_alloc_stack { alloc_region } ->
     let alloc_region = Env.find_region_exn env alloc_region in
-    Heap { alloc_region }
+    Not_alloc_stack { alloc_region }
   | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     let alloc_region = Env.find_region_exn env alloc_region in
     let region = Env.find_region_exn env region in
     let ghost_region = Env.find_region_exn env ghost_region in
-    Local { alloc_region; region; ghost_region }
+    Maybe_alloc_stack { alloc_region; region; ghost_region }
 
 let prim env (p : Flambda_primitive.t) : Fexpr.prim =
   let p, args = Fexpr_prim.OfFlambda.prim env p in
@@ -474,7 +474,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
               match my_alloc_mode with
               | Not_alloc_stack { alloc_region } ->
                 let alloc_region, env = Env.bind_var env alloc_region in
-                Heap { alloc_region }, env
+                Not_alloc_stack { alloc_region }, env
               | Maybe_alloc_stack
                   { alloc_region = my_alloc_region;
                     region = my_region;
@@ -483,7 +483,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
                 let alloc_region, env = Env.bind_var env my_alloc_region in
                 let region, env = Env.bind_var env my_region in
                 let ghost_region, env = Env.bind_var env my_ghost_region in
-                Local { alloc_region; region; ghost_region }, env
+                Maybe_alloc_stack { alloc_region; region; ghost_region }, env
             in
             let depth_var, env = Env.bind_var env my_depth in
             let body = expr env body in

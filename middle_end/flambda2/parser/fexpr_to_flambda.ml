@@ -175,10 +175,10 @@ let alloc_mode_for_allocations env (alloc : Fexpr.alloc_mode_for_allocations) =
 let alloc_mode_for_applications env
     (alloc : Fexpr.region Fexpr.alloc_mode_for_applications) =
   match alloc with
-  | Heap { alloc_region } ->
+  | Not_alloc_stack { alloc_region } ->
     let alloc_region = find_region env alloc_region in
     Alloc_mode.For_applications.not_alloc_stack ~alloc_region
-  | Local { alloc_region; region; ghost_region } ->
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     let alloc_region = find_region env alloc_region in
     let region = find_region env region in
     let ghost_region = find_region env ghost_region in
@@ -721,12 +721,12 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           in
           let my_alloc_mode, env =
             match region_vars with
-            | Heap { alloc_region } ->
+            | Not_alloc_stack { alloc_region } ->
               let alloc_region, _duid, env =
                 fresh_var env alloc_region Flambda_kind.region
               in
               Alloc_mode.For_applications.not_alloc_stack ~alloc_region, env
-            | Local { alloc_region; region; ghost_region } ->
+            | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
               let alloc_region, _duid, env =
                 fresh_var env alloc_region Flambda_kind.region
               in

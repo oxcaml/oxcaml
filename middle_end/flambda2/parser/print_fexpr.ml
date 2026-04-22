@@ -383,8 +383,9 @@ let empty_array_kind ~space ppf (ak : empty_array_kind) =
 let alloc_mode_for_applications pp ppf (alloc : _ alloc_mode_for_applications)
     ~space =
   match alloc with
-  | Heap { alloc_region } -> pp_spaced ~space ppf "&%a" pp alloc_region
-  | Local { alloc_region; region; ghost_region } ->
+  | Not_alloc_stack { alloc_region } ->
+    pp_spaced ~space ppf "&%a" pp alloc_region
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     pp_spaced ~space ppf "&%a &%a &%a" pp alloc_region pp region pp ghost_region
 
 let boxed_variable ppf var ~kind =
