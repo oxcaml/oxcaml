@@ -23,13 +23,13 @@ let run_string ~browser ~filename ~source =
   Web_bytecode_common.capture_diagnostics (fun ppf ->
       run_toplevel_string ~browser ~filename ~source ~print_outcome:false ppf)
 
+let capture_toplevel_output f =
+  let buffer, ppf = Web_bytecode_common.make_formatter_buffer () in
+  (try ignore (f ppf)
+   with exn -> Location.report_exception ppf exn);
+  Web_bytecode_common.flush_formatter ppf;
+  Buffer.contents buffer
+
 let utop_string ~browser ~filename ~source =
-  run_toplevel_string
-    ~browser
-    ~filename
-    ~source
-    ~print_outcome:true
-    Format.std_formatter
-  |> ignore;
-  Format.pp_print_flush Format.std_formatter ();
-  ""
+  capture_toplevel_output (fun ppf ->
+      run_toplevel_string ~browser ~filename ~source ~print_outcome:true ppf)

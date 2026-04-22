@@ -1,5 +1,5 @@
 (function () {
-  const assetVersion = "20260421-int-overflow-guard";
+  const assetVersion = "20260422-utop-check-gate";
   const script = document.currentScript;
   const moduleUrl = script?.dataset.moduleSrc
     ? new URL(script.dataset.moduleSrc, script.src || document.baseURI).href
