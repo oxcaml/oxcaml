@@ -201,6 +201,41 @@ type r = {x : string @@ modalities}
 type r = {x : string @ modes -> string @ modes @@ modalities}
 ```
 
+Mutable record fields, including fields marked `[@atomic]`, differ from
+immutable fields in two ways. First, their default field modality is not the
+identity. For construction and reads, a plain mutable field behaves as if its
+field type were annotated with `@@ global many dynamic`. For example, `ref` is
+defined as a mutable record with one field:
+
+```ocaml
+type 'a ref = { mutable contents : 'a }
+```
+
+The implicit mutable-field modality means that `ref` behaves as if the
+`contents` field were annotated with `@@ global many dynamic`.
+
+As a modality, `global` implies `aliased`, `forkable`, and `unyielding`. For the
+locality, uniqueness, and linearity axes, the important part is therefore
+`@@ global many aliased`.
+
+This means that constructing a plain mutable field requires `global` and `many`
+contents. Reading such a field yields an `aliased` value, even if the record
+itself is `unique`.
+
+Explicit field modalities can override these defaults for construction and
+reads. For example:
+
+```ocaml
+type t = { mutable x : string option @@ local }
+```
+
+The `@@ local` annotation can allow local contents when constructing a
+non-escaping record, and reading `x` from a local record yields a local value.
+
+Second, assignment has a separate mutable-write rule. Even for a field annotated
+`@@ local`, a later assignment to the field must store a value that is `global`
+and `many`.
+
 ## Constructor fields
 Constructor fields can have modalities:
 ```ocaml
