@@ -778,13 +778,14 @@ module Function_decls = struct
       | Unboxed_number of Flambda_kind.Boxable_number.t
       | Unboxed_float_record of int
 
+    type unboxing_return_kind = unboxing_kind * Lambda.locality_mode
+
     type calling_convention =
       | Normal_calling_convention
       | Unboxed_calling_convention of
           unboxing_kind option list
-          * unboxing_kind option
+          * unboxing_return_kind option
           * Function_slot.t
-          * Lambda.locality_mode
 
     type t =
       { let_rec_ident : Ident.t;

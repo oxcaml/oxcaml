@@ -600,7 +600,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
       stub = false;
       tmc_candidate = false;
       may_fuse_arity = true;
-      unbox_return = false;
+      unbox_return = None;
     }
     ~loc
     ~mode:alloc_heap

@@ -2235,7 +2235,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     contains_no_escaping_local_allocs cost_metrics dbg is_tupled
     inlining_decision absolute_history relative_history main_code
     by_function_slot function_code_ids unboxed_function_slot unboxed_params
-    unboxed_return ~alloc_mode =
+    unboxed_return =
   (* The outside caller gave us the function slot and code ID meant for the
      boxed function, which will be a wrapper. So in this branch everything
      starting with 'main_' refers to the version with unboxed return/params. *)
@@ -2421,13 +2421,15 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         (Name_occurrences.remove_continuation free_names_of_body
            ~continuation:cont) )
   in
-  let alloc_mode =
-    Alloc_mode.For_allocations.from_lambda alloc_mode ~current_region:my_region
-  in
   let body, free_names_of_body =
     match unboxed_return with
     | None -> make_body return_continuation
-    | Some k -> make_return_wrapper (boxing_primitive k alloc_mode)
+    | Some (k, alloc_mode) ->
+      let alloc_mode =
+        Alloc_mode.For_allocations.from_lambda alloc_mode
+          ~current_region:my_region
+      in
+      make_return_wrapper (boxing_primitive k alloc_mode)
   in
   let my_alloc_mode =
     Alloc_mode.For_applications.from_lambda
@@ -2779,7 +2781,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         return_continuation,
         my_closure )
     | Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot, _) ->
+        (unboxed_params, unboxed_return, unboxed_function_slot) ->
+      let unboxed_return = Option.map fst unboxed_return in
       compute_body_of_unboxed_function acc my_region my_closure ~unarized_params
         params_arity ~unarized_param_modes function_slot compute_body return
         return_continuation unboxed_params unboxed_return unboxed_function_slot
@@ -2893,17 +2896,14 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     | Normal_calling_convention ->
       main_code, by_function_slot, function_code_ids, acc
     | Unboxed_calling_convention
-        ( unboxed_params,
-          unboxed_return,
-          unboxed_function_slot,
-          unboxed_alloc_mode ) ->
+        (unboxed_params, unboxed_return, unboxed_function_slot) ->
       make_unboxed_function_wrapper acc function_slot ~unarized_params
         params_arity ~unarized_param_modes return result_arity_main_code code_id
         main_code_id decl loc external_env recursive
         contains_no_escaping_local_allocs cost_metrics dbg is_tupled
         inlining_decision absolute_history relative_history main_code
         by_function_slot function_code_ids unboxed_function_slot unboxed_params
-        unboxed_return ~alloc_mode:unboxed_alloc_mode
+        unboxed_return
   in
   let approx =
     let code = Code_or_metadata.create code in
@@ -3390,7 +3390,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         poll = Default_poll;
         tmc_candidate = false;
         may_fuse_arity = true;
-        unbox_return = false
+        unbox_return = None
       }
   in
   let free_idents_of_body =

@@ -1265,7 +1265,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           stub = false;
           poll = Default_poll;
           tmc_candidate = false;
-          unbox_return = false;
+          unbox_return = None;
           may_fuse_arity = false;
         } in
       let funcid = Ident.create_local ("probe_handler_" ^ name) in

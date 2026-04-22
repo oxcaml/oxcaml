@@ -88,6 +88,11 @@ include (struct
     match a, b with
     | Alloc_local, _ | _, Alloc_local -> Alloc_local
     | Alloc_heap, Alloc_heap -> Alloc_heap
+
+  let return_mode_to_locality_mode a =
+    match a with
+    | Maybe_alloc_stack -> Alloc_local
+    | Not_alloc_stack -> Alloc_heap
 end : sig
 
   type locality_mode = private
@@ -113,6 +118,8 @@ end : sig
   val modify_maybe_stack : modify_mode
 
   val join_locality_mode : locality_mode -> locality_mode -> locality_mode
+
+  val return_mode_to_locality_mode : return_mode -> locality_mode
 end)
 
 let is_local_mode = function
@@ -936,6 +943,8 @@ type shared_code = (int * int) list
 
 type static_label = Static_label.t
 
+type unbox_return_attribute = locality_mode option
+
 type function_attribute = {
   inline : inline_attribute;
   specialise : specialise_attribute;
@@ -951,7 +960,7 @@ type function_attribute = {
   stub: bool;
   tmc_candidate: bool;
   may_fuse_arity: bool;
-  unbox_return: bool;
+  unbox_return: unbox_return_attribute;
 }
 
 type scoped_location = Debuginfo.Scoped_location.t
@@ -1482,7 +1491,7 @@ let default_function_attribute = {
      them multi-argument. So, we keep arity fusion turned on by default for now.
   *)
   may_fuse_arity = true;
-  unbox_return = false;
+  unbox_return = None;
 }
 
 let default_stub_attribute =
