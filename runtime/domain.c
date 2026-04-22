@@ -2154,6 +2154,14 @@ static bool tick_thread_wait(void)
   struct epoll_event events[2];
   int n = epoll_wait(tick_thread.epoll_fd, events, 2, -1);
   if (n <= 0) {
+    if (errno == EINTR) {
+      /* Despite what the man page for epoll_wait says, it *can* actually fail
+         with EINTR, even if the thread it's running on has signals masked, if
+         the process gets SIGSTOP and then SIGCONT. This is (likely) the only
+         case where we get EINTR, so we just unconditionally treat it as the
+         timer firing. */
+      return true;
+    }
     caml_plat_fatal_error("tick_thread_wait", errno);
   }
 
