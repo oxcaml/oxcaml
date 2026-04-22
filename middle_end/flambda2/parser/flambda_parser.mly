@@ -313,8 +313,9 @@ alloc_mode_for_allocations_opt:
   | AMP; region = region { Local { region } }
 
 alloc_mode_for_applications_opt:
-  | { Heap }
-  | AMP; region = region; AMP; ghost_region = region { Local { region; ghost_region } }
+  | { Not_alloc_stack }
+  | AMP; region = region; AMP;
+    ghost_region = region { Maybe_alloc_stack { region; ghost_region } }
 
 prim_param_val:
   | i = IDENT { make_located i ($startpos, $endpos) }
@@ -545,7 +546,8 @@ call_kind:
     RPAREN
     { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC)
-    { (C_call { alloc = not noalloc }, (Heap : alloc_mode_for_applications)) }
+    { (C_call { alloc = not noalloc },
+      (Not_alloc_stack : alloc_mode_for_applications)) }
 ;
 
 inline:

@@ -162,8 +162,8 @@ let alloc_mode_for_allocations env (alloc : Fexpr.alloc_mode_for_allocations) =
 let alloc_mode_for_applications env (alloc : Fexpr.alloc_mode_for_applications)
     =
   match alloc with
-  | Heap -> Alloc_mode.For_applications.not_alloc_stack
-  | Local { region = r; ghost_region = r' } ->
+  | Not_alloc_stack -> Alloc_mode.For_applications.not_alloc_stack
+  | Maybe_alloc_stack { region = r; ghost_region = r' } ->
     let r = find_region env r in
     let r' = find_region env r' in
     Alloc_mode.For_applications.maybe_alloc_stack ~region:r ~ghost_region:r'

@@ -181,11 +181,11 @@ let alloc_mode_for_allocations env (alloc : Alloc_mode.For_allocations.t) :
 let alloc_mode_for_applications env (alloc : Alloc_mode.For_applications.t) :
     Fexpr.alloc_mode_for_applications =
   match alloc with
-  | Not_alloc_stack -> Heap
+  | Not_alloc_stack -> Not_alloc_stack
   | Maybe_alloc_stack { region = r; ghost_region = r' } ->
     let r = Env.find_region_exn env r in
     let r' = Env.find_region_exn env r' in
-    Local { region = r; ghost_region = r' }
+    Maybe_alloc_stack { region = r; ghost_region = r' }
 
 let prim env (p : Flambda_primitive.t) : Fexpr.prim =
   let p, args = Fexpr_prim.OfFlambda.prim env p in
