@@ -109,8 +109,8 @@ let dump_sizes file_sizes =
 
 let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
     ~startup_obj ~ccobjs ~runtime_libs ~cached_genfns =
-  (* Check that -nodynlink was not used. The dissector requires GOTPCREL
-     relocations which are only emitted when dlcode=true. *)
+  (* Check that -nodynlink was not used. The dissector requires GOT relocations
+     which are only emitted when dlcode=true. *)
   if not !Clflags.dlcode then raise (Error Nodynlink_incompatible);
   (* Check that we're targeting Linux *)
   (match Target_system.system () with
@@ -118,8 +118,11 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   | Windows _ | MacOS_like | FreeBSD | NetBSD | OpenBSD | Generic_BSD | Solaris
   | Dragonfly | GNU | BeOS | Unknown ->
     Misc.fatal_error "The dissector pass is only supported on Linux targets");
-  (* Check that we're running on a 64-bit architecture. The dissector parses
-     ELF64 files and uses int64 arithmetic extensively. *)
+  (* Check that we're running on a supported 64-bit architecture. *)
+  (match Target_system.architecture () with
+  | X86_64 | AArch64 -> ()
+  | _ ->
+    Misc.fatal_error "The dissector is only supported on x86-64 and AArch64");
   if Sys.word_size <> 64
   then Misc.fatal_error "The dissector requires a 64-bit host architecture";
   (* Collect files to analyze for partitioning. C stubs and runtime libraries
