@@ -217,11 +217,11 @@ let print_out_phrase = Oprint.out_phrase
 
 let print_untyped_exception ppf obj =
   !print_out_value ppf (Printer.outval_of_untyped_exception obj)
-let outval_of_value env obj ty =
+let outval_of_value env obj subj_sort_vars ty =
   Printer.outval_of_value !max_printer_steps !max_printer_depth
-    (fun _ _ _ -> None) env obj ty
+    (fun _ _ _ -> None) env obj subj_sort_vars ty
 let print_value env obj ppf ty =
-  !print_out_value ppf (outval_of_value env obj ty)
+  !print_out_value ppf (outval_of_value env obj [] ty)
 
 type ('a, 'b) gen_printer = ('a, 'b) Genprintval.gen_printer =
   | Zero of 'b
@@ -359,10 +359,12 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   | None -> default_load ppf program
   | Some {Jit.load; _} -> load ~phrase_name:!phrase_name ppf program
 
-let outval_of_id env id val_type =
+let outval_of_id env id val_lpoly val_type =
   let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
   match mod_field (global_symbol glob) repr pos with
-  | Some obj_to_print -> outval_of_value env obj_to_print val_type
+  | Some obj_to_print ->
+    let subj_sort_vars = Types.Lpoly.get_exn val_lpoly in
+    outval_of_value env obj_to_print subj_sort_vars val_type
   | None -> Oval_stuff "<abstr>"
 
 (* Print the outcome of an evaluation *)
@@ -370,8 +372,8 @@ let outval_of_id env id val_type =
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-      | Sig_value(id, {val_kind = Val_reg _; val_type; _}, _) ->
-         Some (outval_of_id env id val_type)
+      | Sig_value(id, {val_kind = Val_reg _; val_type; val_lpoly}, _) ->
+         Some (outval_of_id env id val_lpoly val_type)
       | _ -> None
     )
 
@@ -387,7 +389,7 @@ let print_out_exception ppf exn outv =
 
 let print_exception_outcome ppf exn =
   if exn = Out_of_memory then Gc.full_major ();
-  let outv = outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn in
+  let outv = outval_of_value !toplevel_env (Obj.repr exn) [] Predef.type_exn in
   print_out_exception ppf exn outv
 
 (* The table of toplevel directives.
@@ -529,7 +531,9 @@ let execute_phrase print_outcome ppf phr =
                     if rewritten then
                       match sg' with
                       | [ Sig_value (id, vd, _) ] ->
-                          let outv = outval_of_id newenv id vd.val_type in
+                          let outv =
+                            outval_of_id newenv id vd.val_lpoly vd.val_type
+                          in
                           let ty = Printtyp.tree_of_type_scheme vd.val_type in
                           Ophr_eval (outv, ty)
                       | _ -> assert false
@@ -541,7 +545,7 @@ let execute_phrase print_outcome ppf phr =
               toplevel_sig := oldsig;
               if exn = Out_of_memory then Gc.full_major();
               let outv =
-                outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn
+                outval_of_value !toplevel_env (Obj.repr exn) [] Predef.type_exn
               in
               Ophr_exception (exn, outv)
         in

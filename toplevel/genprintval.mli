@@ -47,7 +47,8 @@ module type S =
   sig
     type t
     val install_printer :
-          Path.t -> Types.type_expr -> (formatter -> t -> unit) -> unit
+          Path.t -> Jkind_types.Sort.var list -> Types.type_expr ->
+          (formatter -> t -> unit) -> unit
     val install_generic_printer :
           Path.t -> Path.t ->
           (int -> (int -> t -> Outcometree.out_value,
@@ -66,7 +67,8 @@ module type S =
     val outval_of_value :
           int -> int ->
           (int -> t -> Types.type_expr -> Outcometree.out_value option) ->
-          Env.t -> t -> type_expr -> Outcometree.out_value
+          Env.t -> t -> Jkind_types.Sort.var list -> type_expr ->
+          Outcometree.out_value
   end
 
 module Make(O : OBJ)(_ : EVALPATH with type valu = O.t) :

@@ -119,7 +119,8 @@ type ('a, 'b) gen_printer =
   | Succ of ('a -> ('a, 'b) gen_printer)
 
 val install_printer :
-  Path.t -> Types.type_expr -> (formatter -> Obj.t -> unit) -> unit
+  Path.t -> Jkind_types.Sort.var list -> Types.type_expr ->
+  (formatter -> Obj.t -> unit) -> unit
 val install_generic_printer :
   Path.t -> Path.t ->
   (int -> (int -> Obj.t -> Outcometree.out_value,

@@ -93,22 +93,27 @@ let eval_value_path env path =
 (* Install, remove a printer (as in toplevel/topdirs) *)
 
 let match_printer_type desc make_printer_type =
+  let lvars = Types.Lpoly.get_exn desc.val_lpoly in
   Ctype.with_local_level ~post:Ctype.generalize begin fun () ->
     let ty_arg = Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument) in
+    let pat_sort_vars, val_type =
+      Jkind_types.Sort.instance_with ~level:(Ctype.get_current_level ())
+        lvars (fun () -> Ctype.instance desc.val_type)
+    in
     Ctype.unify (Lazy.force Env.initial)
       (make_printer_type ty_arg)
-      (Ctype.instance desc.val_type);
-    ty_arg
+      val_type;
+    (pat_sort_vars, ty_arg)
   end
 
 let find_printer_type lid =
   match Env.find_value_by_name lid Env.empty with
   | (path, desc) -> begin
       match match_printer_type desc Topprinters.printer_type_new with
-      | ty_arg -> (ty_arg, path, false)
+      | (pat_sort_vars, ty_arg) -> (ty_arg, pat_sort_vars, path, false)
       | exception Ctype.Unify _ -> begin
           match match_printer_type desc Topprinters.printer_type_old with
-          | ty_arg -> (ty_arg, path, true)
+          | (pat_sort_vars, ty_arg) -> (ty_arg, pat_sort_vars, path, true)
           | exception Ctype.Unify _ -> raise(Error(Wrong_type lid))
         end
     end
@@ -116,7 +121,7 @@ let find_printer_type lid =
       raise(Error(Unbound_identifier lid))
 
 let install_printer ppf lid =
-  let (ty_arg, path, is_old_style) = find_printer_type lid in
+  let (ty_arg, pat_sort_vars, path, is_old_style) = find_printer_type lid in
   let v =
     try
       eval_value_path Env.empty path
@@ -128,10 +133,10 @@ let install_printer ppf lid =
       (fun _formatter repr -> Obj.obj v (Obj.obj repr))
     else
       (fun formatter repr -> Obj.obj v formatter (Obj.obj repr)) in
-  Printval.install_printer path ty_arg ppf print_function
+  Printval.install_printer path pat_sort_vars ty_arg ppf print_function
 
 let remove_printer lid =
-  let (_ty_arg, path, _is_old_style) = find_printer_type lid in
+  let (_ty_arg, _pat_sort_vars, path, _is_old_style) = find_printer_type lid in
   try
     Printval.remove_printer path
   with Not_found ->

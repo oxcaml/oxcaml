@@ -52,7 +52,8 @@ module type S =
   sig
     type t
     val install_printer :
-          Path.t -> Types.type_expr -> (formatter -> t -> unit) -> unit
+          Path.t -> Jkind_types.Sort.var list -> Types.type_expr ->
+          (formatter -> t -> unit) -> unit
     val install_generic_printer :
            Path.t -> Path.t ->
            (int -> (int -> t -> Outcometree.out_value,
@@ -68,7 +69,8 @@ module type S =
     val outval_of_value :
           int -> int ->
           (int -> t -> Types.type_expr -> Outcometree.out_value option) ->
-          Env.t -> t -> type_expr -> Outcometree.out_value
+          Env.t -> t -> Jkind_types.Sort.var list -> type_expr ->
+          Outcometree.out_value
   end
 
 module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
@@ -146,7 +148,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     (* The user-defined printers. Also used for some builtin types. *)
 
     type printer =
-      | Simple of Types.type_expr * (O.t -> Outcometree.out_value)
+      | Simple of Jkind_types.Sort.var list * Types.type_expr *
+                  (O.t -> Outcometree.out_value)
       | Generic of Path.t * (int -> (int -> O.t -> Outcometree.out_value,
                                      O.t -> Outcometree.out_value) gen_printer)
 
@@ -154,31 +157,31 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
        printing support for unboxed values. *)
     let printers = ref ([
       ( Pident(Ident.create_local "print_int"),
-        Simple (Predef.type_int,
+        Simple ([], Predef.type_int,
                 (fun x -> Oval_int (O.obj x : int))) );
       ( Pident(Ident.create_local "print_float"),
-        Simple (Predef.type_float,
+        Simple ([], Predef.type_float,
                 (fun x -> Oval_float (O.obj x : float))) );
       ( Pident(Ident.create_local "print_float32"),
-        Simple (Predef.type_float32,
+        Simple ([], Predef.type_float32,
                 (fun x -> Oval_float32 (O.obj x : Obj.t))) );
       ( Pident(Ident.create_local "print_char"),
-        Simple (Predef.type_char,
+        Simple ([], Predef.type_char,
                 (fun x -> Oval_char (O.obj x : char))) );
       ( Pident(Ident.create_local "print_int8"),
-        Simple (Predef.type_int8,
+        Simple ([], Predef.type_int8,
                 (fun x -> Oval_int8 (O.obj x : int))) );
       ( Pident(Ident.create_local "print_int16"),
-        Simple (Predef.type_int16,
+        Simple ([], Predef.type_int16,
                 (fun x -> Oval_int16 (O.obj x : int))) );
       ( Pident(Ident.create_local "print_int32"),
-        Simple (Predef.type_int32,
+        Simple ([], Predef.type_int32,
                 (fun x -> Oval_int32 (O.obj x : int32))) );
       ( Pident(Ident.create_local "print_nativeint"),
-        Simple (Predef.type_nativeint,
+        Simple ([], Predef.type_nativeint,
                 (fun x -> Oval_nativeint (O.obj x : nativeint))) );
       ( Pident(Ident.create_local "print_int64"),
-        Simple (Predef.type_int64,
+        Simple ([], Predef.type_int64,
                 (fun x -> Oval_int64 (O.obj x : int64)) ))
     ] : (Path.t * printer) list)
 
@@ -198,10 +201,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         )
         ppf
 
-    let install_printer path ty fn =
+    let install_printer path pat_sort_vars ty fn =
       let print_val ppf obj = user_printer path fn ppf obj in
       let printer obj = Oval_printer (fun ppf -> print_val ppf obj) in
-      printers := (path, Simple (ty, printer)) :: !printers
+      printers := (path, Simple (pat_sort_vars, ty, printer)) :: !printers
 
     let install_generic_printer function_path constr_path fn =
       printers := (function_path, Generic (constr_path, fn))  :: !printers
@@ -290,7 +293,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Univar _ -> Print_as "<univar>"
       | Genvar _ -> Print_as "<genvar>"
 
-    let outval_of_value max_steps max_depth check_depth env obj ty =
+    let outval_of_value
+          max_steps max_depth check_depth env obj subj_sort_vars ty =
 
       let printer_steps = ref max_steps in
 
@@ -845,8 +849,11 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     and find_printer depth env ty =
       let rec find = function
       | [] -> raise Not_found
-      | (_name, Simple (sch, printer)) :: remainder ->
-          if Ctype.is_moregeneral env false sch ty
+      | (_name, Simple (pat_sort_vars, sch, printer)) :: remainder ->
+          if
+            (match Ctype.moregeneral env false pat_sort_vars subj_sort_vars
+                     sch ty
+             with _ -> true | exception Ctype.Moregen _ -> false)
           then printer
           else find remainder
       | (_name, Generic (path, fn)) :: remainder ->

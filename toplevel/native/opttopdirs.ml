@@ -143,21 +143,26 @@ let match_printer_type ppf desc typename =
         fprintf ppf "Cannot find type Topdirs.%s.@." typename;
         raise Exit
   in
+  let lvars = Types.Lpoly.get_exn desc.val_lpoly in
   Ctype.with_local_level ~post:Ctype.generalize (fun () ->
     let ty_arg = Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument) in
+    let pat_sort_vars, val_type =
+      Jkind_types.Sort.instance_with ~level:(Ctype.get_current_level ())
+        lvars (fun () -> Ctype.instance desc.val_type)
+    in
     Ctype.unify !toplevel_env
       (Ctype.newconstr printer_type [ty_arg])
-      (Ctype.instance desc.val_type);
-    ty_arg)
+      val_type;
+    (pat_sort_vars, ty_arg))
 
 let find_printer_type ppf lid =
   match Env.find_value_by_name lid !toplevel_env with
   | (path, desc) -> begin
     match match_printer_type ppf desc "printer_type_new" with
-    | ty_arg -> (ty_arg, path, false)
+    | (pat_sort_vars, ty_arg) -> (ty_arg, pat_sort_vars, path, false)
     | exception Ctype.Unify _ -> begin
         match match_printer_type ppf desc "printer_type_old" with
-        | ty_arg -> (ty_arg, path, true)
+        | (pat_sort_vars, ty_arg) -> (ty_arg, pat_sort_vars, path, true)
         | exception Ctype.Unify _ ->
             fprintf ppf "%a has a wrong type for a printing function.@."
               (Format_doc.compat Printtyp.longident) lid;
@@ -171,14 +176,16 @@ let find_printer_type ppf lid =
 
 let dir_install_printer ppf lid =
   try
-    let (ty_arg, path, is_old_style) = find_printer_type ppf lid in
+    let (ty_arg, pat_sort_vars, path, is_old_style) =
+      find_printer_type ppf lid
+    in
     let v = eval_value_path !toplevel_env path in
     let print_function =
       if is_old_style then
         (fun _formatter repr -> Obj.obj v (Obj.obj repr))
       else
         (fun formatter repr -> Obj.obj v formatter (Obj.obj repr)) in
-    install_printer path ty_arg print_function
+    install_printer path pat_sort_vars ty_arg print_function
   with Exit -> ()
 
 let dir_remove_printer ppf lid =
