@@ -1360,6 +1360,12 @@ let glb_array_type loc t1 t2 =
   | Pgcscannableproductarray _, _ | _, Pgcscannableproductarray _ ->
     Misc.fatal_error "unexpected Pgcscannableproductarray kind in glb"
 
+  (* Layout poly arrays. Same cheat as above for Pgenarray. *)
+  | Pgenarray, Ptemplatedarray var -> Ptemplatedarray var
+  | Ptemplatedarray var1, Ptemplatedarray var2 when Ident.equal var1 var2 -> t1
+  | Ptemplatedarray _, _ | _, Ptemplatedarray _ ->
+    Misc.fatal_error "unexpected templated array kind in glb"
+
   (* No GLB; only used in the [Obj.magic] case *)
   | Pfloatarray, (Paddrarray | Pgcignorableaddrarray | Pintarray)
   | (Paddrarray | Pgcignorableaddrarray | Pintarray), Pfloatarray -> t1
@@ -1379,8 +1385,6 @@ let glb_array_type loc t1 t2 =
   | Pintarray, Pgcignorableaddrarray -> Pintarray
   | Pintarray, Pintarray -> Pintarray
   | Pfloatarray, Pfloatarray -> Pfloatarray
-  | Ptemplatedarray _, _ | _, Ptemplatedarray _ ->
-    Misc.fatal_error "unexpected templated array kind in glb"
 
 let glb_array_ref_type loc t1 t2 =
   match t1, t2 with
@@ -1453,6 +1457,13 @@ let glb_array_ref_type loc t1 t2 =
   | Pgcscannableproductarray_ref _, _ | _, Pgcscannableproductarray _ ->
     Misc.fatal_error "unexpected Pgcscannableproductarray kind in glb"
 
+  (* Layout poly arrays. Same cheat as above for Pgenarray. *)
+  | Pgenarray_ref mode, Ptemplatedarray var -> Ptemplatedarray_ref (var, mode)
+  | Ptemplatedarray_ref (var1, _), Ptemplatedarray var2
+      when Ident.equal var1 var2 -> t1
+  | Ptemplatedarray_ref _, _ | _, Ptemplatedarray _ ->
+    Misc.fatal_error "unexpected templated array kind in glb"
+
   (* No GLB; only used in the [Obj.magic] case *)
   | Pfloatarray_ref _, (Paddrarray | Pgcignorableaddrarray | Pintarray)
   | (Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref), Pfloatarray ->
@@ -1485,8 +1496,6 @@ let glb_array_ref_type loc t1 t2 =
 
   (* Pfloatarray is a minimum *)
   | (Pfloatarray_ref _ as x), Pfloatarray -> x
-  | Ptemplatedarray_ref _, _ | _, Ptemplatedarray _ ->
-    Misc.fatal_error "unexpected templated array kind in glb"
 
 let glb_array_set_type loc t1 t2 =
   match t1, t2 with
@@ -1560,6 +1569,13 @@ let glb_array_set_type loc t1 t2 =
   | Pgcscannableproductarray_set _, _ | _, Pgcscannableproductarray _ ->
     Misc.fatal_error "unexpected Pgcscannableproductarray_set kind in glb"
 
+  (* Layout poly arrays. Same cheat as above for Pgenarray. *)
+  | Pgenarray_set mode, Ptemplatedarray var -> Ptemplatedarray_set (var, mode)
+  | Ptemplatedarray_set (var1, _), Ptemplatedarray var2
+      when Ident.equal var1 var2 -> t1
+  | Ptemplatedarray_set _, _ | _, Ptemplatedarray _ ->
+    Misc.fatal_error "unexpected templated array kind in glb"
+
   (* No GLB; only used in the [Obj.magic] case *)
   | Pfloatarray_set, (Paddrarray | Pgcignorableaddrarray | Pintarray)
   | (Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set),
@@ -1592,8 +1608,6 @@ let glb_array_set_type loc t1 t2 =
 
   (* Pfloatarray is a minimum *)
   | Pfloatarray_set, Pfloatarray -> Pfloatarray_set
-  | Ptemplatedarray_set _, _ | _, Ptemplatedarray _ ->
-    Misc.fatal_error "unexpected templated array kind in glb"
 
 let peek_or_poke_layout_from_type ~prim_name error_loc env ty
       : Lambda.peek_or_poke option =

@@ -1203,6 +1203,6 @@ module Layout = struct
   let get_const t = get_const Const.of_sort t
 
   let of_new_sort_var ~level sa =
-    let sort = Sort.(of_var (new_var ~level)) in
+    let sort = Sort.(of_var (new_var_unsafe ~level)) in
     Sort (sort, sa), sort
 end

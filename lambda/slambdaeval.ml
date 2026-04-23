@@ -317,9 +317,60 @@ and eval_layout env layout =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
     in
     if new_layouts == old_layouts then layout else Punboxed_product new_layouts
-  | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Pbottom ->
+  | Pvalue old_value_kind ->
+    let new_value_kind = eval_value_kind env old_value_kind in
+    if new_value_kind == old_value_kind then layout else Pvalue new_value_kind
+  | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _ | Punboxed_vector _
+  | Pbottom ->
     layout
+
+and eval_value_kind env ({ raw_kind = old_raw_kind; nullable } as value_kind) =
+  let new_raw_kind = eval_raw_value_kind env old_raw_kind in
+  if new_raw_kind == old_raw_kind
+  then value_kind
+  else { raw_kind = new_raw_kind; nullable }
+
+and eval_raw_value_kind env value_kind =
+  match value_kind with
+  | Pvariant { consts; non_consts = old_non_consts } ->
+    let new_non_consts =
+      Misc.Stdlib.List.map_sharing
+        (fun ((i, old_constructor_shape) as non_const) ->
+          let new_constructor_shape =
+            eval_constructor_shape env old_constructor_shape
+          in
+          if new_constructor_shape == old_constructor_shape
+          then non_const
+          else i, new_constructor_shape)
+        old_non_consts
+    in
+    if new_non_consts == old_non_consts
+    then value_kind
+    else Pvariant { consts; non_consts = new_non_consts }
+  | Parrayval old_array_kind ->
+    let new_array_kind = eval_array_kind env old_array_kind in
+    if new_array_kind == old_array_kind
+    then value_kind
+    else Parrayval new_array_kind
+  | Pgenval | Pintval | Pboxedfloatval _ | Pboxedintval _ | Pboxedvectorval _ ->
+    value_kind
+
+and eval_constructor_shape env constructor_shape =
+  match constructor_shape with
+  | Constructor_uniform old_value_kinds ->
+    let new_value_kinds =
+      Misc.Stdlib.List.map_sharing (eval_value_kind env) old_value_kinds
+    in
+    if new_value_kinds == old_value_kinds
+    then constructor_shape
+    else Constructor_uniform new_value_kinds
+  | Constructor_mixed old_mixed_block_shape ->
+    let new_mixed_block_shape =
+      eval_mixed_block_shape env old_mixed_block_shape
+    in
+    if new_mixed_block_shape == old_mixed_block_shape
+    then constructor_shape
+    else Constructor_mixed new_mixed_block_shape
 
 and eval_array_kind env kind : array_kind =
   match kind with

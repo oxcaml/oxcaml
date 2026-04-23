@@ -142,6 +142,7 @@ type 'a classification =
   | Addr  (* any value except a float or a lazy *)
   | Any
   | Product of 'a
+  | Splice_variable of Ident.t
 
 (* Classify a ty into a [classification]. Looks through synonyms, using
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
@@ -234,7 +235,9 @@ let classify ~classify_product env ty sort : _ classification =
   | Base Void -> Void
   | Product c -> Product (classify_product ty c)
   | Univar _ -> Misc.fatal_error "classify: Univar"
-  | Genvar _ -> Misc.fatal_error "classify: Genvar"
+  | Genvar var ->
+    Splice_variable
+      (Ident.create_sort_var (Jkind_types.Sort.Var.get_id var :> int))
 
 let rec scannable_product_array_kind elt_ty_for_error loc sorts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
@@ -295,8 +298,11 @@ let array_kind_of_elt ~elt_sort env loc ty =
     match elt_sort with
     | Some s -> s
     | None ->
-      Jkind.Sort.default_for_transl_and_get
-        (type_sort ~why:Array_element env loc ty)
+      let sort =
+        Ctype.with_level ~level:Ident.highest_scope
+          (fun () -> (type_sort ~why:Array_element env loc ty))
+      in
+      Jkind.Sort.default_for_transl_and_get sort
   in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
@@ -330,6 +336,7 @@ let array_kind_of_elt ~elt_sort env loc ty =
   | Product c -> c
   | Void ->
     raise (Error (loc, Unsupported_void_in_array))
+  | Splice_variable id -> Ptemplatedarray id
 
 let array_type_kind ~elt_sort ~elt_ty env loc ty =
   match scrape_poly env ty with
@@ -1191,6 +1198,8 @@ let lazy_val_requires_forward env loc ty =
      type has layout [value] which is different from these unboxed layouts. *)
   | Unboxed_float _ | Unboxed_int _ | Unboxed_vector _ | Void ->
     Misc.fatal_error "Unboxed value encountered inside lazy expression"
+  | Splice_variable _ ->
+    Misc.fatal_error "Splice variable encountered inside lazy expression"
   | Float -> Config.flat_float_array
   | Addr | Immediate | Immediate_or_null -> false
   | Product _ -> assert false (* because [classify_product] raises *)
