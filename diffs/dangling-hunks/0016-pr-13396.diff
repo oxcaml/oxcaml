@@ -1,0 +1,149 @@
+diff --git a/bytecomp/bytegen.ml b/bytecomp/bytegen.ml
+index 8d5a524166d5..32d681debd6c 100644
+--- a/bytecomp/bytegen.ml
++++ b/bytecomp/bytegen.ml
+@@ -164,7 +164,7 @@ let preserve_tailcall_for_prim = function
+   | Pbytes_set_64 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
+   | Pbigstring_load_64 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+   | Pbigstring_set_64 _ | Pctconst _ | Pbswap16 | Pbbswap _ | Pint_as_pointer
+-  | Patomic_load _
++  | Patomic_load
+   | Pdls_get ->
+       false
+ 
+@@ -488,7 +488,7 @@ let comp_primitive stack_info p sz args =
+   | Pint_as_pointer -> Kccall("caml_int_as_pointer", 1)
+   | Pbytes_to_string -> Kccall("caml_string_of_bytes", 1)
+   | Pbytes_of_string -> Kccall("caml_bytes_of_string", 1)
+-  | Patomic_load _ -> Kccall("caml_atomic_load", 1)
++  | Patomic_load -> Kccall("caml_atomic_load", 1)
+   | Pdls_get -> Kccall("caml_domain_dls_get", 1)
+   | Ppoll -> Kccall("caml_process_pending_actions_with_root", 1)
+   (* The cases below are handled in [comp_expr] before the [comp_primitive] call
+diff --git a/lambda/lambda.ml b/lambda/lambda.ml
+index cb3bdf94907a..95bb28b5b862 100644
+--- a/lambda/lambda.ml
++++ b/lambda/lambda.ml
+@@ -143,7 +143,7 @@ type primitive =
+   (* Integer to external pointer *)
+   | Pint_as_pointer
+   (* Atomic operations *)
+-  | Patomic_load of {immediate_or_pointer : immediate_or_pointer}
++  | Patomic_load
+   (* Inhibition of optimisation *)
+   | Popaque
+   (* Fetching domain-local state *)
+diff --git a/lambda/lambda.mli b/lambda/lambda.mli
+index bd17d2ab23a6..0c0809e96c0a 100644
+--- a/lambda/lambda.mli
++++ b/lambda/lambda.mli
+@@ -29,7 +29,9 @@ type compile_time_constant =
+ 
+ type immediate_or_pointer =
+   | Immediate
++  (* The value must be immediate. *)
+   | Pointer
++  (* The value may be a pointer or an immediate. *)
+ 
+ type initialization_or_assignment =
+   | Assignment
+@@ -153,7 +155,7 @@ type primitive =
+   (* Integer to external pointer *)
+   | Pint_as_pointer
+   (* Atomic operations *)
+-  | Patomic_load of {immediate_or_pointer : immediate_or_pointer}
++  | Patomic_load
+   (* Inhibition of optimisation *)
+   | Popaque
+   (* Fetching domain-local state *)
+diff --git a/lambda/printlambda.ml b/lambda/printlambda.ml
+index 886156e2091c..cf21acc55bb4 100644
+--- a/lambda/printlambda.ml
++++ b/lambda/printlambda.ml
+@@ -350,10 +350,7 @@ let primitive ppf = function
+   | Pbswap16 -> fprintf ppf "bswap16"
+   | Pbbswap(bi) -> print_boxed_integer "bswap" ppf bi
+   | Pint_as_pointer -> fprintf ppf "int_as_pointer"
+-  | Patomic_load {immediate_or_pointer} ->
+-      (match immediate_or_pointer with
+-        | Immediate -> fprintf ppf "atomic_load_imm"
+-        | Pointer -> fprintf ppf "atomic_load_ptr")
++  | Patomic_load -> fprintf ppf "atomic_load"
+   | Popaque -> fprintf ppf "opaque"
+   | Pdls_get -> fprintf ppf "dls_get"
+   | Ppoll -> fprintf ppf "poll"
+@@ -459,10 +456,7 @@ let name_of_primitive = function
+   | Pbswap16 -> "Pbswap16"
+   | Pbbswap _ -> "Pbbswap"
+   | Pint_as_pointer -> "Pint_as_pointer"
+-  | Patomic_load {immediate_or_pointer} ->
+-      (match immediate_or_pointer with
+-        | Immediate -> "atomic_load_imm"
+-        | Pointer -> "atomic_load_ptr")
++  | Patomic_load -> "Patomic_load"
+   | Popaque -> "Popaque"
+   | Prunstack -> "Prunstack"
+   | Presume -> "Presume"
+diff --git a/lambda/tmc.ml b/lambda/tmc.ml
+index 20a3bc1aa2c2..790960e5dac2 100644
+--- a/lambda/tmc.ml
++++ b/lambda/tmc.ml
+@@ -865,7 +865,7 @@ let rec choice ctx t =
+     | Prunstack | Pperform | Presume | Preperform | Pdls_get
+ 
+     (* we don't handle atomic primitives *)
+-    | Patomic_load _
++    | Patomic_load
+ 
+     (* we don't handle array indices as destinations yet *)
+     | (Pmakearray _ | Pduparray _)
+diff --git a/lambda/translprim.ml b/lambda/translprim.ml
+index 2996def4b0a8..30e130fe0884 100644
+--- a/lambda/translprim.ml
++++ b/lambda/translprim.ml
+@@ -372,8 +372,7 @@ let primitives_table =
+     "%greaterequal", Comparison(Greater_equal, Compare_generic);
+     "%greaterthan", Comparison(Greater_than, Compare_generic);
+     "%compare", Comparison(Compare, Compare_generic);
+-    "%atomic_load",
+-    Primitive ((Patomic_load {immediate_or_pointer=Pointer}), 1);
++    "%atomic_load", Primitive (Patomic_load, 1);
+     "%atomic_exchange", External prim_atomic_exchange;
+     "%atomic_cas", External prim_atomic_cas;
+     "%atomic_fetch_add", External prim_atomic_fetch_add;
+@@ -498,13 +497,6 @@ let specialize_primitive env ty ~has_constant_constructor prim =
+       if useful then Some (Primitive (Pmakeblock(tag, mut, Some shape), arity))
+       else None
+     end
+-  | Primitive (Patomic_load { immediate_or_pointer = Pointer },
+-               arity), _ ->begin
+-      let is_int = match is_function_type env ty with
+-        | None -> Pointer
+-        | Some (_p1, rhs) -> maybe_pointer_type env rhs in
+-      Some (Primitive (Patomic_load {immediate_or_pointer = is_int}, arity))
+-    end
+   | Comparison(comp, Compare_generic), p1 :: _ ->
+     if (has_constant_constructor
+         && simplify_constant_constructor comp) then begin
+@@ -834,7 +826,7 @@ let lambda_primitive_needs_event_after = function
+   | Pfloatcomp _ | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu
+   | Pbytessetu | Pmakearray ((Pintarray | Paddrarray | Pfloatarray), _)
+   | Parraylength _ | Parrayrefu _ | Parraysetu _ | Pisint | Pisout
+-  | Patomic_load _
++  | Patomic_load
+   | Pintofbint _ | Pctconst _ | Pbswap16 | Pint_as_pointer | Popaque | Pdls_get
+       -> false
+ 
+diff --git a/lambda/value_rec_compiler.ml b/lambda/value_rec_compiler.ml
+index 3950c3b6ba88..49d3d6805d29 100644
+--- a/lambda/value_rec_compiler.ml
++++ b/lambda/value_rec_compiler.ml
+@@ -304,7 +304,7 @@ let compute_static_size lam =
+     | Pbswap16
+     | Pbbswap _
+     | Pint_as_pointer
+-    | Patomic_load _
++    | Patomic_load
+     | Popaque
+     | Pdls_get ->
+         dynamic_size ()

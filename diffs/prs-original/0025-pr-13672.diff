@@ -1,0 +1,35 @@
+diff --git a/Changes b/Changes
+index d730c3b74bb0..c517f295a4e7 100644
+--- a/Changes
++++ b/Changes
+@@ -74,6 +74,10 @@ Working version
+   (Gabriel Scherer and Clément Allain, review by Vincent Laviron,
+    report by Vesa Karvonen)
+ 
++- #13672 Avoid register stall on conversion instructions on amd64.
++  (Pierre Chambart, review by Gabriel Scherer and Xavier Leroy,
++   report by Patrick Nicodemus)
++
+ ### Standard library:
+ 
+ - #13463, #13572: Avoid Queue.empty to be raised by Format when used
+diff --git a/asmcomp/amd64/emit.mlp b/asmcomp/amd64/emit.mlp
+index 9a3e9d287125..9900da5ee089 100644
+--- a/asmcomp/amd64/emit.mlp
++++ b/asmcomp/amd64/emit.mlp
+@@ -583,6 +583,7 @@ let emit_instr env fallthrough i =
+       | Thirtytwo_signed ->
+           I.movsxd (addressing addressing_mode DWORD i 0) dest
+       | Single ->
++          I.xorpd dest dest; (* avoid partial register stall *)
+           I.cvtss2sd (addressing addressing_mode REAL4 i 0) dest
+       | Double ->
+           I.movsd (addressing addressing_mode REAL8 i 0) dest
+@@ -703,6 +704,7 @@ let emit_instr env fallthrough i =
+   | Lop(Iaddf | Isubf | Imulf | Idivf as floatop) ->
+       instr_for_floatop floatop (arg i 1) (res i 0)
+   | Lop(Ifloatofint) ->
++      I.xorpd (res i 0) (res i 0); (* avoid partial register stall *)
+       I.cvtsi2sd  (arg i 0)  (res i 0)
+   | Lop(Iintoffloat) ->
+       I.cvttsd2si (arg i 0) (res i 0)

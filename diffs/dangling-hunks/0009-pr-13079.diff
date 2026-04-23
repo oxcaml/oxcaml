@@ -1,0 +1,48 @@
+diff --git a/Changes b/Changes
+index 04b8b877d03d..fd64b710c067 100644
+--- a/Changes
++++ b/Changes
+@@ -34,6 +34,9 @@ _______________
+   current status.
+   (Gabriel Scherer, review by Nick Roberts)
+ 
++- #13079: Save and restore frame pointer across Iextcall on ARM64
++  (Tim McGilchrist, review by KC Sivaramakrishnan and Miod Vallat)
++
+ ### Standard library:
+ 
+ - #12133: Expose support for printing substrings in Format
+diff --git a/runtime/arm64.S b/runtime/arm64.S
+index 638dd2fe07d8..e71f25ebba90 100644
+--- a/runtime/arm64.S
++++ b/runtime/arm64.S
+@@ -639,6 +639,8 @@ END_FUNCTION(caml_c_call_stack_args)
+ 
+ FUNCTION(caml_start_program)
+         CFI_STARTPROC
++        CFI_SIGNAL_FRAME
++
+ #if defined(WITH_THREAD_SANITIZER)
+         str     x0, [sp, -16]!
+         CFI_ADJUST(16)
+@@ -653,6 +655,7 @@ FUNCTION(caml_start_program)
+ #endif
+     /* domain state is passed as arg from C */
+         mov     TMP, C_ARG_1
++    /* Initial entry point is caml_program */
+         ADDRGLOBAL(TMP2, caml_program)
+ 
+ /* Code shared with caml_callback* */
+@@ -662,10 +665,10 @@ FUNCTION(caml_start_program)
+ 
+ L(jump_to_caml):
+     /* Set up stack frame and save callee-save registers */
+-        CFI_OFFSET(29, -160)
+-        CFI_OFFSET(30, -152)
+         stp     x29, x30, [sp, -160]!
+         CFI_ADJUST(160)
++        CFI_OFFSET(29, 0)
++        CFI_OFFSET(30, 8)
+         add     x29, sp, #0
+         stp     x19, x20, [sp, 16]
+         stp     x21, x22, [sp, 32]
