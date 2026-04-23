@@ -6623,23 +6623,24 @@ and type_expect_
       in
       let funct_expected_mode = mode_default funct_mode in
       let outer_level = get_current_level () in
+      let outer_level_var () =
+        newvar2 outer_level (Jkind.Builtin.any ~why:Dummy_jkind)
+      in
       let rec ret_tvar seen ty_fun =
         let ty = expand_head env ty_fun in
         if TypeSet.mem ty seen then false else
           match get_desc ty with
             Tarrow (_l, ty_arg, ty_fun, _com) ->
-              (try Ctype.unify_var env (newvar2 outer_level
-                (Jkind.Builtin.any ~why:Dummy_jkind)) ty_arg
+              (try Ctype.unify_var env (outer_level_var ()) ty_arg
                with Unify _ -> assert false);
               ret_tvar (TypeSet.add ty seen) ty_fun
           | Tvar _ ->
-              let v = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
+              let v = outer_level_var () in
               let rt = get_level ty > get_level v in
               unify_var env v ty;
               rt
           | _ ->
-            let v = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
-            unify_var env v ty;
+            unify_var env (outer_level_var ()) ty;
             false
       in
       (* one more level for warning on non-returning functions *)
