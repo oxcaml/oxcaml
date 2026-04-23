@@ -288,7 +288,6 @@ let recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms =
     let args : Simple.t list = List.rev args_rev in
     assert (List.compare_length_with args 1 >= 0);
     let module RWC = Reg_width_const in
-    let module AK = P.Array_kind in
     let module ALK = P.Array_load_kind in
     (* Symbols are always of kind [value]; they may be freely mixed with
        [Const]s of kind [value] (i.e. tagged immediates). For all other kinds
