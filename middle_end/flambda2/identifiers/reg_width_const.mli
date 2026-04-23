@@ -50,9 +50,6 @@ val is_naked_vec512 : t -> Vector_types.Vec512.Bit_pattern.t option
 
 (** Create a numeric constant of the given kind ([Region] and [Rec_info] are
     forbidden). *)
-
-(** Create a numeric constant of the given kind ([Region] and [Rec_info] are
-    forbidden). *)
 val of_int_of_kind : Target_system.Machine_width.t -> Flambda_kind.t -> int -> t
 
 val kind : t -> Flambda_kind.t
