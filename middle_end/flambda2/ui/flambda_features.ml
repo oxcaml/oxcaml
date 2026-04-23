@@ -269,6 +269,9 @@ module Inlining = struct
   let speculative_inlining_only_if_arguments_useful () =
     !Oxcaml_flags.Flambda2.Inlining
      .speculative_inlining_only_if_arguments_useful
+
+  let speculative_inlining_track_lifted_constants () =
+    !Oxcaml_flags.Flambda2.Inlining.speculative_inlining_track_lifted_constants
 end
 
 module Debug = struct

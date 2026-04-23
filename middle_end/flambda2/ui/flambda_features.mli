@@ -159,6 +159,8 @@ module Inlining : sig
   val threshold : round_or_default -> float
 
   val speculative_inlining_only_if_arguments_useful : unit -> bool
+
+  val speculative_inlining_track_lifted_constants : unit -> bool
 end
 
 module Debug : sig

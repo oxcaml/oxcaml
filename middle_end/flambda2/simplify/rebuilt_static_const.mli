@@ -26,6 +26,8 @@ type rebuilt_static_const = t
 
 val print : Format.formatter -> t -> unit
 
+val cost_metrics : t -> Cost_metrics.t
+
 val create_code :
   Are_rebuilding_terms.t ->
   params_and_body:Rebuilt_expr.Function_params_and_body.t ->
@@ -38,7 +40,11 @@ val create_code :
    values are not constructed unnecessarily. *)
 val create_code' : Code.t -> t
 
-val create_set_of_closures : Are_rebuilding_terms.t -> Set_of_closures.t -> t
+val create_set_of_closures :
+  Are_rebuilding_terms.t ->
+  find_code_metadata:(Code_id.t -> Code_metadata.t) ->
+  Set_of_closures.t ->
+  t
 
 val create_block :
   Are_rebuilding_terms.t ->
@@ -50,29 +56,51 @@ val create_block :
 
 val create_boxed_float32 :
   Are_rebuilding_terms.t ->
+  machine_width:Target_system.Machine_width.t ->
   Numeric_types.Float32_by_bit_pattern.t Or_variable.t ->
   t
 
 val create_boxed_float :
   Are_rebuilding_terms.t ->
+  machine_width:Target_system.Machine_width.t ->
   Numeric_types.Float_by_bit_pattern.t Or_variable.t ->
   t
 
-val create_boxed_int32 : Are_rebuilding_terms.t -> Int32.t Or_variable.t -> t
+val create_boxed_int32 :
+  Are_rebuilding_terms.t ->
+  machine_width:Target_system.Machine_width.t ->
+  Int32.t Or_variable.t ->
+  t
 
-val create_boxed_int64 : Are_rebuilding_terms.t -> Int64.t Or_variable.t -> t
+val create_boxed_int64 :
+  Are_rebuilding_terms.t ->
+  machine_width:Target_system.Machine_width.t ->
+  Int64.t Or_variable.t ->
+  t
 
 val create_boxed_nativeint :
-  Are_rebuilding_terms.t -> Targetint_32_64.t Or_variable.t -> t
+  Are_rebuilding_terms.t ->
+  machine_width:Target_system.Machine_width.t ->
+  Targetint_32_64.t Or_variable.t ->
+  t
 
 val create_boxed_vec128 :
-  Are_rebuilding_terms.t -> Vector_types.Vec128.Bit_pattern.t Or_variable.t -> t
+  Are_rebuilding_terms.t ->
+  machine_width:Target_system.Machine_width.t ->
+  Vector_types.Vec128.Bit_pattern.t Or_variable.t ->
+  t
 
 val create_boxed_vec256 :
-  Are_rebuilding_terms.t -> Vector_types.Vec256.Bit_pattern.t Or_variable.t -> t
+  Are_rebuilding_terms.t ->
+  machine_width:Target_system.Machine_width.t ->
+  Vector_types.Vec256.Bit_pattern.t Or_variable.t ->
+  t
 
 val create_boxed_vec512 :
-  Are_rebuilding_terms.t -> Vector_types.Vec512.Bit_pattern.t Or_variable.t -> t
+  Are_rebuilding_terms.t ->
+  machine_width:Target_system.Machine_width.t ->
+  Vector_types.Vec512.Bit_pattern.t Or_variable.t ->
+  t
 
 val create_immutable_float_block :
   Are_rebuilding_terms.t ->
@@ -131,7 +159,11 @@ val create_mutable_string : Are_rebuilding_terms.t -> initial_value:string -> t
 
 val create_immutable_string : Are_rebuilding_terms.t -> string -> t
 
-val map_set_of_closures : t -> f:(Set_of_closures.t -> Set_of_closures.t) -> t
+val map_set_of_closures :
+  t ->
+  find_code_metadata:(Code_id.t -> Code_metadata.t) ->
+  f:(Set_of_closures.t -> Set_of_closures.t) ->
+  t
 
 val free_names : t -> Name_occurrences.t
 

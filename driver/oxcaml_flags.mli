@@ -288,6 +288,7 @@ module Flambda2 : sig
     module Default : sig
       val default_arguments : inlining_arguments
       val speculative_inlining_only_if_arguments_useful : bool
+      val speculative_inlining_track_lifted_constants : bool
     end
 
     val oclassic_arguments : inlining_arguments
@@ -313,6 +314,8 @@ module Flambda2 : sig
     val threshold : Clflags.Float_arg_helper.parsed ref
 
     val speculative_inlining_only_if_arguments_useful : bool ref
+
+    val speculative_inlining_track_lifted_constants : bool ref
 
     val report_bin : bool ref
   end
