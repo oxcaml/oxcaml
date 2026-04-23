@@ -67,7 +67,7 @@ Line 1, characters 0-37:
 1 | type 'a t = A : 'a -> [< `X of 'a ] t;; (* fail *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
-         "A : 'a -> [< `X of 'a ] t"
+         "A : 'a -> [< `X of 'a ] t/2"
        the type variable "'a" cannot be deduced from the type parameters.
 |}];;
 
@@ -103,7 +103,7 @@ Line 3, characters 2-29:
 3 |   type _ t = T : 'a -> 'a s t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
-         "T : 'a -> 'a s t"
+         "T : 'a -> 'a s t/2"
        the type variable "'a" cannot be deduced from the type parameters.
 |}];;
 (* Otherwise we can write the following *)
