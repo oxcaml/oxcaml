@@ -2129,9 +2129,9 @@ module Report = struct
         a C.obj ->
         a ->
         a ->
-        a ->
+        other:a ->
         [`First | `Second] =
-     fun b a_obj x y c ->
+     fun b a_obj x y ~other ->
       (* CR-someday zqian: in the case where [x = y], we currently arbitrarily choose from
          [x] and [y], which are unordered anyway. In the future we might want to keep an
          order for better error messages. For example, order them by occurrence in the
@@ -2140,18 +2140,18 @@ module Report = struct
          nmatschke: Likewise for [x <> y] (middle modes of diamonds). *)
       match b with
       | Meet ->
-        if C.le a_obj c x
+        if C.le a_obj other x
         then begin
-          assert (not (C.le a_obj c y));
+          assert (not (C.le a_obj other y));
           `Second
         end
         else begin
           `First
         end
       | Join ->
-        if C.le a_obj x c
+        if C.le a_obj x other
         then begin
-          assert (not (C.le a_obj y c));
+          assert (not (C.le a_obj y other));
           `Second
         end
         else `First
@@ -2180,25 +2180,25 @@ module Report = struct
         a ->
         (l * r) morph ->
         (b, a, l * r) C.morph ->
-        a ->
+        other:a ->
         (b, l * r) S.ahint ->
         b C.For_hint.responsible_axis ->
         a * (l * r) hint =
-     fun obj side a morph_hint morph c ahint res ->
+     fun obj side a morph_hint morph ~other ahint res ->
       let src = C.src obj morph in
       match res with
       | NoneResponsible -> a, Irrelevant
       | SourceIsSingle ->
         let morph' = adjoint obj side morph in
-        let c = C.apply src morph' c in
-        let ahint = ahint_axis src side c ahint in
+        let other = C.apply src morph' other in
+        let ahint = ahint_axis src side ~other ahint in
         let ma = C.apply obj morph (fst ahint) in
         ma, Apply (morph_hint, src, ahint)
       | Axis ax ->
         let b, hint = ahint in
         let morph' = adjoint obj side morph in
-        let c = C.apply src morph' c in
-        let x, hint = hint_prod src side ax c b hint in
+        let other = C.apply src morph' other in
+        let x, hint = hint_prod src side ax ~other b hint in
         let b = C.Axis.set ax x b in
         let a = C.apply obj morph b in
         let src = C.proj_obj ax src in
@@ -2208,39 +2208,39 @@ module Report = struct
         t C.obj ->
         (l * r) side ->
         (t, a) Axis.t ->
-        t ->
+        other:t ->
         t ->
         (t, l * r) S.hint ->
         a * (l * r) hint =
-     fun obj side ax c a -> function
+     fun obj side ax ~other a -> function
       | Apply (morph_hint, morph, ahint) ->
         let t, hint =
-          hint_apply obj side a morph_hint morph c ahint
+          hint_apply obj side a morph_hint morph ~other ahint
             (C.For_hint.find_responsible_axis_prod morph ax)
         in
         Axis.proj ax t, hint
       | Const c' -> Axis.proj ax a, Const c'
       | Branch (b, (a1, hint1), (a2, hint2)) ->
-        let proj1 = Axis.proj ax a1 in
-        let proj2 = Axis.proj ax a2 in
-        let pobj = C.proj_obj ax obj in
-        let pc = Axis.proj ax c in
         let a, chosen_hint =
-          match choose_branch_axis b pobj proj1 proj2 pc with
+          let other = Axis.proj ax other in
+          let proj1 = Axis.proj ax a1 in
+          let proj2 = Axis.proj ax a2 in
+          let pobj = C.proj_obj ax obj in
+          match choose_branch_axis b pobj proj1 proj2 ~other with
           | `First -> a1, hint1
           | `Second -> a2, hint2
         in
-        hint_prod obj side ax c a chosen_hint
+        hint_prod obj side ax ~other a chosen_hint
 
     and ahint_prod : type t a l r.
         t C.obj ->
         (l * r) side ->
         (t, a) Axis.t ->
-        t ->
+        other:t ->
         (t, l * r) S.ahint ->
         (a, l * r) ahint =
-     fun obj side ax c (t, hint) ->
-      let a, hint = hint_prod obj side ax c t hint in
+     fun obj side ax ~other (t, hint) ->
+      let a, hint = hint_prod obj side ax ~other t hint in
       a, hint
 
     (** Given a solver hint on a single axis lattice, returns a human-readible
@@ -2248,38 +2248,38 @@ module Report = struct
     and hint_axis : type a l r.
         a C.obj ->
         (l * r) side ->
-        a ->
+        other:a ->
         a ->
         (a, l * r) S.hint ->
         a * (l * r) hint =
-     fun obj side c a -> function
+     fun obj side ~other a -> function
       | Apply (morph_hint, morph, ahint) ->
-        hint_apply obj side a morph_hint morph c ahint
+        hint_apply obj side a morph_hint morph ~other ahint
           (C.For_hint.find_responsible_axis_single morph)
       | Const c -> a, Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
         let a, chosen_hint =
-          match choose_branch_axis b obj a1 a2 c with
+          match choose_branch_axis b obj a1 a2 ~other with
           | `First -> a1, hint1
           | `Second -> a2, hint2
         in
-        hint_axis obj side c a chosen_hint
+        hint_axis obj side ~other a chosen_hint
 
     and ahint_axis : type a l r.
         a Lattices_mono.obj ->
         (l * r) side ->
-        a ->
+        other:a ->
         (a, l * r) S.ahint ->
         (a, l * r) ahint =
-     fun obj side c (a, hint) -> hint_axis obj side c a hint
+     fun obj side ~other (a, hint) -> hint_axis obj side ~other a hint
 
     let value_equal : type a. a C.obj -> a -> a -> bool =
      fun obj a b -> Misc.Le_result.equal ~le:(C.le obj) a b
 
     let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
      fun obj axis { left = l, lhint; right = r, rhint } ->
-      let left_ahint = ahint_prod obj Left axis r (l, lhint) in
-      let right_ahint = ahint_prod obj Right axis l (r, rhint) in
+      let left_ahint = ahint_prod obj Left axis ~other:r (l, lhint) in
+      let right_ahint = ahint_prod obj Right axis ~other:l (r, rhint) in
       let axis_obj = C.proj_obj axis obj in
       let left =
         { ahint = left_ahint;
@@ -2297,8 +2297,8 @@ module Report = struct
 
     let error_axis : type a. a C.obj -> a S.error -> a t =
      fun obj { left = l, lhint; right = r, rhint } ->
-      let left_ahint = ahint_axis obj Left r (l, lhint) in
-      let right_ahint = ahint_axis obj Right l (r, rhint) in
+      let left_ahint = ahint_axis obj Left ~other:r (l, lhint) in
+      let right_ahint = ahint_axis obj Right ~other:l (r, rhint) in
       let left =
         { ahint = left_ahint;
           is_hint_tighter = not (value_equal obj (fst left_ahint) l)
