@@ -289,15 +289,11 @@ let _ = <[ fun (Equal : ($(<[Inst0.t]> NonInst1.t),
                          $(<[Inst0.t']> NonInst1.t)) Type.eq)
                (x : Inst0.t) -> (x : Inst0.t') ]>
 [%%expect {|
-- : <[
-     ($(<[Inst0.t]> NonInst1.t), $(<[Inst0.t']> NonInst1.t)) Type.eq ->
-     Inst0.t -> Inst0.t']>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, _) Stdlib.Type.eq)
-    (x : Inst0.t) -> (x : Inst0.t')
-]>
+Line 3, characters 33-34:
+3 |                (x : Inst0.t) -> (x : Inst0.t') ]>
+                                     ^
+Error: This expression has type "Inst0.t"
+       but an expression was expected of type "Inst0.t'"
 |}]
 
 (** Flexibility (linking) happens before instantiability (equations). **)
