@@ -13,7 +13,7 @@ external weird_id : ('a : any mod separable). 'a array -> int = "%identity"
 let weird_id' arr = weird_id arr
 [%%expect{|
 external weird_id : ('a : any separable). 'a array -> int = "%identity"
-val weird_id' : ('a : value maybe_null). 'a array -> int = <fun>
+val weird_id' : ('a : any separable). 'a array -> int = <fun>
 |}]
 
 (* This is not sound whenever 'a is not a value, but this is the kind of
@@ -31,6 +31,5 @@ let product_edge_case x = product_edge_case x
 [%%expect{|
 external product_edge_case : ('a : any separable). #('a * 'a) array -> int
   = "%identity"
-val product_edge_case : ('a : value maybe_null). #('a * 'a) array -> int =
-  <fun>
+val product_edge_case : ('a : any separable). #('a * 'a) array -> int = <fun>
 |}]
