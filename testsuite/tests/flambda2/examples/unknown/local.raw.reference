@@ -126,7 +126,7 @@
        let a = %block_load.[`0`] (l) in
        let acc_1 = %block.[`0`].`local`[`my_region`] (a, acc) in
        (apply break_here (a) -> k6 * k2
-          where k6 (apply_result : imm tagged) =
+          where k6 (apply_result : [ 0 |1 ]) =
             ((let untagged = %untag_imm (apply_result) in
               switch untagged
                 | 0 -> k6

@@ -61,9 +61,9 @@ val length_ignorable : #(int * float#) iarray -> int = <fun>
 
 let length_bad (x : #(string * float#) iarray) = len x
 [%%expect{|
-Line 1, characters 49-54:
+Line 1, characters 53-54:
 1 | let length_bad (x : #(string * float#) iarray) = len x
-                                                     ^^^^^
+                                                         ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -92,9 +92,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x 42
 [%%expect{|
-Line 1, characters 46-54:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x 42
-                                                  ^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -123,9 +123,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x 42
 [%%expect{|
-Line 1, characters 46-54:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x 42
-                                                  ^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -154,9 +154,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42L
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42L
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -185,9 +185,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42L
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42L
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -216,9 +216,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42l
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42l
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -247,9 +247,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42l
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42l
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -279,9 +279,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42n
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42n
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -311,9 +311,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42n
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42n
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
