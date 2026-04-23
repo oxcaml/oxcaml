@@ -4616,6 +4616,12 @@ let variance_error ~loc ~v1 ~v2 =
   let open Typedecl_variance in
   function
   | Variance_variable_error { error; variable; context } ->
+      (* CR dkalinichenko: OxCaml changes the [Ident_names] map from
+         stateless to stateful. Normally, it would be reset by
+         [Printtyp.wrap_printing_env], but [Variance_variable_error]
+         lacks the [env]. Therefore, we clear [Ident_names] manually.
+         It'd be good to come up with a better solution. *)
+      Out_type.Ident_names.reset ();
       Out_type.prepare_for_printing [ variable ];
       let intro = variance_context context in
       Location.errorf ~loc "%a%t" pp_doc intro
