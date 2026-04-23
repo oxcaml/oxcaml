@@ -2156,19 +2156,19 @@ module Report = struct
         end
         else `First
 
-    type 'd sided =
-      | Left : left_only sided
-      | Right : right_only sided
+    type 'd side =
+      | Left : left_only side
+      | Right : right_only side
       constraint 'd = 'l * 'r
     [@@ocaml.warning "-62"]
 
     let adjoint : type a b l r.
         a C.obj ->
-        (l * r) sided ->
+        (l * r) side ->
         (b, a, l * r) C.morph ->
         (a, b, r * l) C.morph =
-     fun obj lorr morph ->
-      match lorr with
+     fun obj side morph ->
+      match side with
       | Left -> C.right_adjoint obj morph
       | Right -> C.left_adjoint obj morph
 
@@ -2176,7 +2176,7 @@ module Report = struct
         that we are interested in, returns a human-readible hint.*)
     let rec hint_apply : type a b l r.
         a C.obj ->
-        (l * r) sided ->
+        (l * r) side ->
         a ->
         (l * r) morph ->
         (b, a, l * r) C.morph ->
@@ -2184,21 +2184,21 @@ module Report = struct
         (b, l * r) S.ahint ->
         b C.For_hint.responsible_axis ->
         a * (l * r) hint =
-     fun obj lorr a morph_hint morph c ahint res ->
+     fun obj side a morph_hint morph c ahint res ->
       let src = C.src obj morph in
       match res with
       | NoneResponsible -> a, Irrelevant
       | SourceIsSingle ->
-        let morph' = adjoint obj lorr morph in
+        let morph' = adjoint obj side morph in
         let c = C.apply src morph' c in
-        let ahint = ahint_axis src lorr c ahint in
+        let ahint = ahint_axis src side c ahint in
         let ma = C.apply obj morph (fst ahint) in
         ma, Apply (morph_hint, src, ahint)
       | Axis ax ->
         let b, hint = ahint in
-        let morph' = adjoint obj lorr morph in
+        let morph' = adjoint obj side morph in
         let c = C.apply src morph' c in
-        let x, hint = hint_prod src lorr ax c b hint in
+        let x, hint = hint_prod src side ax c b hint in
         let b = C.Axis.set ax x b in
         let a = C.apply obj morph b in
         let src = C.proj_obj ax src in
@@ -2206,16 +2206,16 @@ module Report = struct
 
     and hint_prod : type t a l r.
         t C.obj ->
-        (l * r) sided ->
+        (l * r) side ->
         (t, a) Axis.t ->
         t ->
         t ->
         (t, l * r) S.hint ->
         a * (l * r) hint =
-     fun obj lorr ax c a -> function
+     fun obj side ax c a -> function
       | Apply (morph_hint, morph, ahint) ->
         let t, hint =
-          hint_apply obj lorr a morph_hint morph c ahint
+          hint_apply obj side a morph_hint morph c ahint
             (C.For_hint.find_responsible_axis_prod morph ax)
         in
         Axis.proj ax t, hint
@@ -2230,31 +2230,31 @@ module Report = struct
           | `First -> a1, hint1
           | `Second -> a2, hint2
         in
-        hint_prod obj lorr ax c a chosen_hint
+        hint_prod obj side ax c a chosen_hint
 
     and ahint_prod : type t a l r.
         t C.obj ->
-        (l * r) sided ->
+        (l * r) side ->
         (t, a) Axis.t ->
         t ->
         (t, l * r) S.ahint ->
         (a, l * r) ahint =
-     fun obj lorr ax c (t, hint) ->
-      let a, hint = hint_prod obj lorr ax c t hint in
+     fun obj side ax c (t, hint) ->
+      let a, hint = hint_prod obj side ax c t hint in
       a, hint
 
     (** Given a solver hint on a single axis lattice, returns a human-readible
         hint. *)
     and hint_axis : type a l r.
         a C.obj ->
-        (l * r) sided ->
+        (l * r) side ->
         a ->
         a ->
         (a, l * r) S.hint ->
         a * (l * r) hint =
-     fun obj lorr c a -> function
+     fun obj side c a -> function
       | Apply (morph_hint, morph, ahint) ->
-        hint_apply obj lorr a morph_hint morph c ahint
+        hint_apply obj side a morph_hint morph c ahint
           (C.For_hint.find_responsible_axis_single morph)
       | Const c -> a, Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
@@ -2263,15 +2263,15 @@ module Report = struct
           | `First -> a1, hint1
           | `Second -> a2, hint2
         in
-        hint_axis obj lorr c a chosen_hint
+        hint_axis obj side c a chosen_hint
 
     and ahint_axis : type a l r.
         a Lattices_mono.obj ->
-        (l * r) sided ->
+        (l * r) side ->
         a ->
         (a, l * r) S.ahint ->
         (a, l * r) ahint =
-     fun obj lorr c (a, hint) -> hint_axis obj lorr c a hint
+     fun obj side c (a, hint) -> hint_axis obj side c a hint
 
     let value_equal : type a. a C.obj -> a -> a -> bool =
      fun obj a b -> Misc.Le_result.equal ~le:(C.le obj) a b
