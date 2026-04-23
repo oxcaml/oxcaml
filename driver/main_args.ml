@@ -177,6 +177,14 @@ let mk_no_g f =
   "-no-g", Arg.Unit f,
   " Do not record debugging information (default)"
 
+let mk_gsframe f =
+  "-gsframe", Arg.Unit f,
+  " Emit SFrame stack trace information"
+
+let mk_no_gsframe f =
+  "-no-gsframe", Arg.Unit f,
+  " Do not emit SFrame stack trace information (default)"
+
 let mk_i f =
   "-i", Arg.Unit f, " Print inferred interface"
 
@@ -1206,6 +1214,8 @@ module type Compiler_options = sig
   val _for_pack : string -> unit
   val _g : unit -> unit
   val _no_g : unit -> unit
+  val _gsframe : unit -> unit
+  val _no_gsframe : unit -> unit
   val _stop_after : string -> unit
   val _i : unit -> unit
   val _impl : string -> unit
@@ -1473,6 +1483,8 @@ struct
     mk_for_pack_byt F._for_pack;
     mk_g_byt F._g;
     mk_no_g F._no_g;
+    mk_gsframe F._gsframe;
+    mk_no_gsframe F._no_gsframe;
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
     mk_I F._I;
@@ -1727,6 +1739,8 @@ struct
     mk_for_pack_opt F._for_pack;
     mk_g_opt F._g;
     mk_no_g F._no_g;
+    mk_gsframe F._gsframe;
+    mk_no_gsframe F._no_gsframe;
     mk_function_sections F._function_sections;
     mk_stop_after ~native:true F._stop_after;
     mk_save_ir_after ~native:true F._save_ir_after;
@@ -2060,6 +2074,8 @@ struct
     mk_for_pack_byt F._for_pack;
     mk_g_byt F._g;
     mk_no_g F._no_g;
+    mk_gsframe F._gsframe;
+    mk_no_gsframe F._no_gsframe;
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
     mk_I F._I;
@@ -2527,6 +2543,8 @@ module Default = struct
     let _for_pack s = for_package := (Some (String.capitalize_ascii s))
     let _g = set debug
     let _no_g = clear debug
+    let _gsframe = set gsframe
+    let _no_gsframe = clear gsframe
     let _i = set print_types
     let _impl = Compenv.impl
     let _instantiate = set instantiate

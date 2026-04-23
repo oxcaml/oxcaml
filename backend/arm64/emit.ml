@@ -1344,6 +1344,17 @@ let emit_condbranch arg tst lbl =
   | Ioddtest -> A.ins3 TBNZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
   | Ieventest -> A.ins3 TBZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
 
+let sframe_env : Sframe.t option ref = ref None
+
+let sframe_add_fre ~cfa_base ~cfa_offset ?ra_offset ?fp_offset () =
+  match !sframe_env with
+  | None -> ()
+  | Some env ->
+    let lbl = L.create Text in
+    D.define_label lbl;
+    Sframe.add_fre env
+      { fre_label = lbl; cfa_base; cfa_offset; ra_offset; fp_offset }
+
 (* Output the assembly code for an instruction *)
 
 let emit_instr env i =
@@ -1353,18 +1364,29 @@ let emit_instr env i =
   | Lprologue ->
     assert (Env.prologue_required env);
     let n = Env.frame_size env in
-    if n > 0 then emit_stack_adjustment (-n);
-    if Env.contains_calls env
+    if n > 0
     then (
-      D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
-      emit_str_sp_offset O.lr (n - 8))
+      emit_stack_adjustment (-n);
+      if Env.contains_calls env
+      then (
+        D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
+        emit_str_sp_offset O.lr (n - 8));
+      let ra_offset = if Env.contains_calls env then Some (-8) else None in
+      sframe_add_fre ~cfa_base:SP ~cfa_offset:n ?ra_offset ())
   | Lepilogue_open ->
     let n = Env.frame_size env in
     if Env.contains_calls env then emit_ldr_sp_offset O.lr (n - 8);
-    if n > 0 then emit_stack_adjustment n
+    if n > 0
+    then (
+      emit_stack_adjustment n;
+      sframe_add_fre ~cfa_base:SP ~cfa_offset:0 ())
   | Lepilogue_close ->
     let n = Env.frame_size env in
-    if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
+    if n > 0
+    then (
+      D.cfi_adjust_cfa_offset ~bytes:n;
+      let ra_offset = if Env.contains_calls env then Some (-8) else None in
+      sframe_add_fre ~cfa_base:SP ~cfa_offset:n ?ra_offset ())
   | Lop (Intop_atomic _) ->
     Misc.fatal_errorf
       "emit_instr: builtins are not yet translated to atomics: %a"
@@ -2083,6 +2105,13 @@ let fundecl fundecl =
   let fun_start_label = L.create_label_for_local_symbol Text fun_sym in
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
+  (* SFrame: begin recording for this function *)
+  (match !sframe_env with
+  | Some sfe ->
+    Sframe.new_function sfe ~fun_symbol:fun_sym ~fun_start_label
+      ~contains_calls:fundecl.fun_contains_calls;
+    sframe_add_fre ~cfa_base:SP ~cfa_offset:0 ()
+  | None -> ());
   let num_call_gc_sites = relax_branches env fundecl.fun_body in
   emit_all env fundecl.fun_body;
   List.iter emit_call_gc (Env.call_gc_sites env);
@@ -2097,6 +2126,13 @@ let fundecl fundecl =
     Emitaux.Dwarf_helpers.record_function_range ~function_symbol:fun_sym
       ~start_label:fun_start_label ~end_label:fun_end_label
       ~offset_past_end_label:None);
+  (* SFrame: end recording for this function *)
+  (match !sframe_env with
+  | Some sfe ->
+    let sframe_end_label = L.create Text in
+    D.define_label sframe_end_label;
+    Sframe.end_function sfe ~fun_end_label:sframe_end_label
+  | None -> ());
   D.cfi_endproc ();
   (* The type symbol and the size are system specific. They are not output on
      macOS. The asm directives take care of correctly handling this distinction.
@@ -2126,6 +2162,7 @@ let file_emitter ~file_num ~file_name =
 
 let begin_assembly _unix =
   reset_debug_info ();
+  if !Clflags.gsframe then sframe_env := Some (Sframe.create ());
   Probe_emission.reset ();
   A.set_emit_string ~emit_string:Emitaux.emit_string;
   Asm_targets.Asm_label.initialize ~new_label:(fun () ->
@@ -2225,6 +2262,7 @@ let end_assembly () =
     };
   D.type_symbol ~ty:Object frametable_sym;
   D.size frametable_sym;
+  (match !sframe_env with Some env -> Sframe.emit env | None -> ());
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
   Probe_emission.emit_probe_notes ~add_def_symbol:(fun _ -> ());
