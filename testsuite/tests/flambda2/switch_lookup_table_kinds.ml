@@ -46,7 +46,6 @@ let match_naked_immediate (t : t) : int# =
 match_naked_immediate:
   leaq  .LcamlTOP4__switch_block71(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
-  sarq  $1, %rax
   ret
 |}]
 
@@ -58,7 +57,7 @@ let match_naked_float (t : t) : float# =
   | D -> #7.0
 [%%expect_asm X86_64{|
 match_naked_float:
-  leaq  .LcamlTOP5__switch_block101(%rip), %rbx
+  leaq  .LcamlTOP5__switch_block99(%rip), %rbx
   vmovsd -4(%rbx,%rax,4), %xmm0
   ret
 |}]
@@ -71,7 +70,7 @@ let match_naked_float32 (t : t) : float32# =
   | D -> #7.0s
 [%%expect_asm X86_64{|
 match_naked_float32:
-  leaq  .LcamlTOP6__switch_block129(%rip), %rbx
+  leaq  .LcamlTOP6__switch_block127(%rip), %rbx
   vmovss -2(%rbx,%rax,2), %xmm0
   ret
 |}]
@@ -84,7 +83,7 @@ let match_naked_int32 (t : t) : int32# =
   | D -> #7l
 [%%expect_asm X86_64{|
 match_naked_int32:
-  leaq  .LcamlTOP7__switch_block157(%rip), %rbx
+  leaq  .LcamlTOP7__switch_block155(%rip), %rbx
   movslq -2(%rbx,%rax,2), %rax
   ret
 |}]
@@ -97,7 +96,7 @@ let match_naked_int64 (t : t) : int64# =
   | D -> #7L
 [%%expect_asm X86_64{|
 match_naked_int64:
-  leaq  .LcamlTOP8__switch_block185(%rip), %rbx
+  leaq  .LcamlTOP8__switch_block183(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -110,7 +109,7 @@ let match_naked_nativeint (t : t) : nativeint# =
   | D -> #7n
 [%%expect_asm X86_64{|
 match_naked_nativeint:
-  leaq  .LcamlTOP9__switch_block213(%rip), %rbx
+  leaq  .LcamlTOP9__switch_block211(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -124,7 +123,7 @@ let match_naked_int8 (t : t) : int8# =
 [%%expect_asm X86_64{|
 match_naked_int8:
   sarq  $1, %rax
-  leaq  .LcamlTOP10__switch_block241(%rip), %rbx
+  leaq  .LcamlTOP10__switch_block239(%rip), %rbx
   movsbq (%rbx,%rax), %rax
   ret
 |}]
@@ -137,7 +136,7 @@ let match_naked_int16 (t : t) : int16# =
   | D -> #7S
 [%%expect_asm X86_64{|
 match_naked_int16:
-  leaq  .LcamlTOP11__switch_block269(%rip), %rbx
+  leaq  .LcamlTOP11__switch_block267(%rip), %rbx
   movswq -1(%rbx,%rax), %rax
   ret
 |}]
@@ -150,7 +149,7 @@ let match_symbol (t : t) : string =
   | D -> "delta"
 [%%expect_asm X86_64{|
 match_symbol:
-  leaq  .LcamlTOP12__switch_block305(%rip), %rbx
+  leaq  .LcamlTOP12__switch_block303(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -169,7 +168,7 @@ let match_symbol_or_tagged_immediate (t : t) : foo =
   | D -> P
 [%%expect_asm X86_64{|
 match_symbol_or_tagged_immediate:
-  leaq  .LcamlTOP14__switch_block347(%rip), %rbx
+  leaq  .LcamlTOP14__switch_block345(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -185,7 +184,8 @@ let match_symbol_tagged_or_null (t : t) : foo or_null =
   | C -> This (R1 42)
   | D -> This P
 [%%expect_asm X86_64{|
-  leaq  .LcamlTOP14__switch_blockXXX(%rip), %rbx
+match_symbol_tagged_or_null:
+  leaq  .LcamlTOP15__switch_block379(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
