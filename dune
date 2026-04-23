@@ -649,6 +649,7 @@
   cfg_to_linear_desc
   cfg_cse
   cfg_cse_target_intf
+  cfg_ssa
   cfg_stack_checks
   cfg_polling
   cfg_simplify

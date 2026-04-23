@@ -414,7 +414,8 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
 
 let dump_terminator ?sep ppf terminator = dump_terminator' ?sep ppf terminator
 
-let print_basic' ?print_reg ppf (instruction : basic instruction) =
+let print_basic' ?print_reg ?assign_symbol ppf (instruction : basic instruction)
+    =
   let desc = Cfg_to_linear_desc.from_basic instruction.desc in
   let instruction =
     { Linear.desc;
@@ -428,7 +429,7 @@ let print_basic' ?print_reg ppf (instruction : basic instruction) =
       available_across = instruction.available_across
     }
   in
-  Printlinear.instr' ?print_reg ppf instruction
+  Printlinear.instr' ?print_reg ?assign_symbol ppf instruction
 
 let print_basic ppf i = print_basic' ppf i
 

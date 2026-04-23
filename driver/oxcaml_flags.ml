@@ -14,6 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 let dump_cfg = ref false                (* -dcfg *)
+let dump_cfg_ssa = ref false            (* -dcfg-ssa *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
 let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
