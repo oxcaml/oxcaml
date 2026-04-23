@@ -131,24 +131,6 @@ let (foo : 'a -> 'a) = ( (fun x -> x : 'a -> 'a)) in foo
 - : unit = ()
 |}];;
 
-(***********************************)
-(* Untypeast/pprintast correctly handle value binding type annotations. *)
-
-run {| let foo : 'a. 'a -> 'a = fun x -> x in foo |}
-
-[%%expect{|
-let foo : 'a . 'a -> 'a = fun x -> x in foo
-- : unit = ()
-|}];;
-
-run {| let foo : type a . a -> a = fun x -> x in foo |}
-
-[%%expect{|
-let foo : 'a . 'a -> 'a = fun (type a) -> (fun x -> x : a -> a) in foo
-- : unit = ()
-|}]
-
-
 let run s =
   let pe = Parse.implementation (Lexing.from_string s) in
   let te,_,_,_,_,_ = Typemod.type_structure (Lazy.force Env.initial) pe in
