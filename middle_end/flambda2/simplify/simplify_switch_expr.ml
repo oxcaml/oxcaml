@@ -305,7 +305,8 @@ let recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms =
     if not (List.for_all (fun arg -> K.equal (kind_of arg) first_kind) args)
     then None
     else
-      let single_kind array_kind array_load_kind element_kind =
+      let single_kind array_kind array_load_kind =
+        let element_kind = ALK.kind_of_loaded_value array_load_kind in
         Some
           ( dest,
             No_transformation,
@@ -320,75 +321,57 @@ let recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms =
           (fun simple acc ->
             match acc with
             | None -> None
-            | Some tis ->
+            | Some tagged_imms ->
               Simple.pattern_match' simple
                 ~var:(fun _ ~coercion:_ -> assert false)
                 ~symbol:(fun _ ~coercion:_ -> None)
                 ~const:(fun cst ->
-                  Option.map (fun ti -> ti :: tis) (RWC.is_tagged_immediate cst)))
+                  Option.map
+                    (fun tagged_imm -> tagged_imm :: tagged_imms)
+                    (RWC.is_tagged_immediate cst)))
           args (Some [])
       in
       match (first_kind : K.t) with
       | Value -> (
         (* All arms are of kind [value]: either all tagged immediates, or a mix
-           of tagged immediates and symbols (which may point at e.g. boxed
-           numbers). [Null] [Const]s are explicitly rejected to match the
-           previous behaviour. *)
-        let has_null =
-          List.exists
-            (fun simple ->
-              Simple.pattern_match' simple
-                ~var:(fun _ ~coercion:_ -> false)
-                ~symbol:(fun _ ~coercion:_ -> false)
-                ~const:(fun cst ->
-                  match RWC.descr cst with Null -> true | _ -> false))
-            args
-        in
-        if has_null
-        then None
-        else
-          match try_tagged_immediates () with
-          | Some tis -> Some (dest, No_transformation, Tagged_immediates tis)
-          | None ->
-            (* Note that we use a value array ([AK.Values]) rather than a flat
-               float array even when every symbol points at a boxed float. This
-               is safe because the array contains pointers to boxed numbers, not
-               raw doubles, so the usual flat-float-array convention does not
-               apply. *)
-            single_kind AK.Values ALK.Values KS.any_value)
-      | Naked_number Naked_immediate -> (
-        let tis =
-          List.filter_map
-            (fun simple ->
-              Simple.pattern_match' simple
-                ~var:(fun _ ~coercion:_ -> None)
-                ~symbol:(fun _ ~coercion:_ -> None)
-                ~const:RWC.is_naked_immediate)
-            args
-        in
-        match List.compare_lengths tis args with
-        | 0 -> Some (dest, Must_untag, Tagged_immediates tis)
-        | _ -> None)
-      | Naked_number Naked_float32 ->
-        single_kind AK.Naked_float32s ALK.Naked_float32s KS.naked_float32
-      | Naked_number Naked_float ->
-        single_kind AK.Naked_floats ALK.Naked_floats KS.naked_float
-      | Naked_number Naked_int8 ->
-        single_kind AK.Naked_int8s ALK.Naked_int8s KS.naked_int8
-      | Naked_number Naked_int16 ->
-        single_kind AK.Naked_int16s ALK.Naked_int16s KS.naked_int16
-      | Naked_number Naked_int32 ->
-        single_kind AK.Naked_int32s ALK.Naked_int32s KS.naked_int32
-      | Naked_number Naked_int64 ->
-        single_kind AK.Naked_int64s ALK.Naked_int64s KS.naked_int64
-      | Naked_number Naked_nativeint ->
-        single_kind AK.Naked_nativeints ALK.Naked_nativeints KS.naked_nativeint
-      | Naked_number Naked_vec128 ->
-        single_kind AK.Naked_vec128s ALK.Naked_vec128s KS.naked_vec128
-      | Naked_number Naked_vec256 ->
-        single_kind AK.Naked_vec256s ALK.Naked_vec256s KS.naked_vec256
-      | Naked_number Naked_vec512 ->
-        single_kind AK.Naked_vec512s ALK.Naked_vec512s KS.naked_vec512
+           of tagged immediates, symbols (which may point at e.g. boxed numbers)
+           or nulls. *)
+        match try_tagged_immediates () with
+        | Some tagged_imms ->
+          Some (dest, No_transformation, Tagged_immediates tagged_imms)
+        | None ->
+          (* It is possible that this array will contain only boxed floats even
+             with the float array optimization enabled. These would not normally
+             arise in the presence of such optimization, but if we don't tell
+             anyone it will be ok: we explicitly generate the load using array
+             load kind [Values] (which does not do any float array optimization
+             tests; all of those were expanded in [Lambda_to_flambda]). *)
+          single_kind Values Values)
+      | Naked_number nn -> (
+        match nn with
+        | Naked_immediate -> (
+          let naked_imms =
+            List.filter_map
+              (fun simple ->
+                Simple.pattern_match' simple
+                  ~var:(fun _ ~coercion:_ -> None)
+                  ~symbol:(fun _ ~coercion:_ -> None)
+                  ~const:RWC.is_naked_immediate)
+              args
+          in
+          match List.compare_lengths naked_imms args with
+          | 0 -> Some (dest, Must_untag, Tagged_immediates naked_imms)
+          | _ -> None)
+        | Naked_float32 -> single_kind Naked_float32s Naked_float32s
+        | Naked_float -> single_kind Naked_floats Naked_floats
+        | Naked_int8 -> single_kind Naked_int8s Naked_int8s
+        | Naked_int16 -> single_kind Naked_int16s Naked_int16s
+        | Naked_int32 -> single_kind Naked_int32s Naked_int32s
+        | Naked_int64 -> single_kind Naked_int64s Naked_int64s
+        | Naked_nativeint -> single_kind Naked_nativeints Naked_nativeints
+        | Naked_vec128 -> single_kind Naked_vec128s Naked_vec128s
+        | Naked_vec256 -> single_kind Naked_vec256s Naked_vec256s
+        | Naked_vec512 -> single_kind Naked_vec512s Naked_vec512s)
       | Region | Rec_info -> None)
 
 let recognize_switch_with_single_arg_to_same_destination machine_width ~arms =
@@ -431,6 +414,60 @@ let return ~added_code_size ~free_names expr uacc ~dacc_before_switch:_ =
 
 let run uacc ~dacc_before_switch k = k uacc ~dacc_before_switch
 
+let fields_to_simples dbg simples =
+  List.map (fun simple -> Simple.With_debuginfo.create simple dbg) simples
+
+let create_lookup_table_array_const dbg (array_kind : P.Array_kind.t) rebuilding
+    simples =
+  let module RWC = Reg_width_const in
+  let fields_to_or_variables prover simples =
+    ListLabels.map simples ~f:(fun simple ->
+        Simple.pattern_match simple
+          ~name:(fun _ ~coercion:_ ->
+            (* Only constants reach this point. *) assert false)
+          ~const:(fun cst ->
+            let cst =
+              match prover cst with
+              | Some v -> v
+              | None ->
+                Misc.fatal_errorf
+                  "Unexpected kind of constant (%a) in switch table at %a"
+                  RWC.print cst Debuginfo.print_compact dbg
+            in
+            Or_variable.Const cst))
+  in
+  let naked_number_array creator prover =
+    creator rebuilding (fields_to_or_variables prover simples)
+  in
+  match array_kind with
+  | Values ->
+    RSC.create_immutable_value_array rebuilding (fields_to_simples dbg simples)
+  | Naked_float32s ->
+    naked_number_array RSC.create_immutable_float32_array RWC.is_naked_float32
+  | Naked_floats ->
+    naked_number_array RSC.create_immutable_float_array RWC.is_naked_float
+  | Naked_int8s ->
+    naked_number_array RSC.create_immutable_int8_array RWC.is_naked_int8
+  | Naked_int16s ->
+    naked_number_array RSC.create_immutable_int16_array RWC.is_naked_int16
+  | Naked_int32s ->
+    naked_number_array RSC.create_immutable_int32_array RWC.is_naked_int32
+  | Naked_int64s ->
+    naked_number_array RSC.create_immutable_int64_array RWC.is_naked_int64
+  | Naked_nativeints ->
+    naked_number_array RSC.create_immutable_nativeint_array
+      RWC.is_naked_nativeint
+  | Naked_vec128s ->
+    naked_number_array RSC.create_immutable_vec128_array RWC.is_naked_vec128
+  | Naked_vec256s ->
+    naked_number_array RSC.create_immutable_vec256_array RWC.is_naked_vec256
+  | Naked_vec512s ->
+    naked_number_array RSC.create_immutable_vec512_array RWC.is_naked_vec512
+  | Immediates | Gc_ignorable_values | Naked_ints | Unboxed_product _ ->
+    Misc.fatal_errorf
+      "Unexpected array kind %a when rebuilding switch lookup table at %a"
+      P.Array_kind.print array_kind Debuginfo.print_compact dbg
+
 let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
     ~scrutinee ~dest ~(lookup_table_fields : lookup_table_fields)
     ~must_untag_lookup_table_result dbg =
@@ -442,23 +479,8 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
       (Linkage_name.of_string (Variable.unique_name var))
   in
   let uacc, array_kind, array_load_kind, loaded_kind =
-    let fields_to_simples simples =
-      List.map (fun simple -> Simple.With_debuginfo.create simple dbg) simples
-    in
-    let fields_to_or_variables extract =
-      List.map (fun simple ->
-          Simple.pattern_match simple
-            ~name:(fun _ ~coercion:_ ->
-              (* Only constants reach this point. *) assert false)
-            ~const:(fun cst -> Or_variable.Const (extract cst)))
-    in
     let alias_types_of kind simples =
       List.map (fun simple -> T.alias_type_of kind simple) simples
-    in
-    let must_get_value_kind prover cst =
-      match prover cst with
-      | Some v -> v
-      | None -> Misc.fatal_errorf "Unexpected constant kind in switch table"
     in
     let array_const, array_kind, array_load_kind, element_kind, fields =
       let module AK = P.Array_kind in
@@ -469,7 +491,8 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
            immediates, but we store them as tagged immediates in a value array
            and untag after loading. *)
         let simples = List.map Simple.const_int imms in
-        ( RSC.create_immutable_value_array rebuilding (fields_to_simples simples),
+        ( RSC.create_immutable_value_array rebuilding
+            (fields_to_simples dbg simples),
           AK.Values,
           ALK.Immediates,
           KS.tagged_immediate,
@@ -477,66 +500,8 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
       | Static_arguments_of_single_kind
           { array_kind; array_load_kind; element_kind; simples } ->
         let fields = alias_types_of (KS.kind element_kind) simples in
-        let module RWC = Reg_width_const in
         let array_const =
-          match array_kind with
-          | AK.Values ->
-            RSC.create_immutable_value_array rebuilding
-              (fields_to_simples simples)
-          | AK.Naked_float32s ->
-            RSC.create_immutable_float32_array rebuilding
-              (fields_to_or_variables
-                 (must_get_value_kind RWC.is_naked_float32)
-                 simples)
-          | AK.Naked_floats ->
-            RSC.create_immutable_float_array rebuilding
-              (fields_to_or_variables
-                 (must_get_value_kind RWC.is_naked_float)
-                 simples)
-          | AK.Naked_int8s ->
-            RSC.create_immutable_int8_array rebuilding
-              (fields_to_or_variables
-                 (must_get_value_kind RWC.is_naked_int8)
-                 simples)
-          | AK.Naked_int16s ->
-            RSC.create_immutable_int16_array rebuilding
-              (fields_to_or_variables
-                 (must_get_value_kind RWC.is_naked_int16)
-                 simples)
-          | AK.Naked_int32s ->
-            RSC.create_immutable_int32_array rebuilding
-              (fields_to_or_variables
-                 (must_get_value_kind RWC.is_naked_int32)
-                 simples)
-          | AK.Naked_int64s ->
-            RSC.create_immutable_int64_array rebuilding
-              (fields_to_or_variables
-                 (must_get_value_kind RWC.is_naked_int64)
-                 simples)
-          | AK.Naked_nativeints ->
-            RSC.create_immutable_nativeint_array rebuilding
-              (fields_to_or_variables
-                 (must_get_value_kind RWC.is_naked_nativeint)
-                 simples)
-          | AK.Naked_vec128s ->
-            RSC.create_immutable_vec128_array rebuilding
-              (fields_to_or_variables
-                 (must_get_value_kind RWC.is_naked_vec128)
-                 simples)
-          | AK.Naked_vec256s ->
-            RSC.create_immutable_vec256_array rebuilding
-              (fields_to_or_variables
-                 (must_get_value_kind RWC.is_naked_vec256)
-                 simples)
-          | AK.Naked_vec512s ->
-            RSC.create_immutable_vec512_array rebuilding
-              (fields_to_or_variables
-                 (must_get_value_kind RWC.is_naked_vec512)
-                 simples)
-          | AK.Immediates | AK.Gc_ignorable_values | AK.Naked_ints
-          | AK.Unboxed_product _ ->
-            Misc.fatal_errorf
-              "Unexpected array kind when rebuilding switch lookup table"
+          create_lookup_table_array_const dbg array_kind rebuilding simples
         in
         array_const, array_kind, array_load_kind, element_kind, fields
     in

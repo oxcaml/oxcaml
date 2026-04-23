@@ -173,3 +173,19 @@ match_symbol_or_tagged_immediate:
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
+
+(* As above, but additionally including a [Null] arm. The [Null] constant is
+   of kind [value], so it can sit in the same value-kind lookup table as the
+   symbol and tagged-immediate arms. *)
+
+let match_symbol_tagged_or_null (t : t) : foo or_null =
+  match t with
+  | A -> This (R2 "foo")
+  | B -> Null
+  | C -> This (R1 42)
+  | D -> This P
+[%%expect_asm X86_64{|
+  leaq  .LcamlTOP14__switch_blockXXX(%rip), %rbx
+  movq  -4(%rbx,%rax,4), %rax
+  ret
+|}]
