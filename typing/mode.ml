@@ -2114,8 +2114,8 @@ module Report = struct
 
   (** Human-readible mode error report. *)
   type 'a t =
-    { left : ('a * loosening, left_only) ahint;
-      right : ('a * loosening, right_only) ahint
+    { left : loosening * ('a, left_only) ahint;
+      right : loosening * ('a, right_only) ahint
     }
 
   (** Convert Solver error to report. *)
@@ -2256,7 +2256,7 @@ module Report = struct
         (t, a) Axis.t ->
         other:t ->
         (t, l * r) S.ahint ->
-        (a * loosening, l * r) ahint =
+        loosening * (a, l * r) ahint =
      fun obj side ax ~other ((t, _) as ahint) ->
       let axis_obj = C.proj_obj ax obj in
       let a, hint = hint_prod obj side ax ~other ahint in
@@ -2265,14 +2265,14 @@ module Report = struct
         then Not_loosened
         else Loosened
       in
-      (a, loosening), hint
+      loosening, (a, hint)
 
     let hint_axis_loosening : type a l r.
         a C.obj ->
         (l * r) side ->
         other:a ->
         (a, l * r) S.ahint ->
-        (a * loosening, l * r) ahint =
+        loosening * (a, l * r) ahint =
      fun obj side ~other ((original, _) as ahint) ->
       let a, hint = hint_axis obj side ~other ahint in
       let loosening =
@@ -2280,14 +2280,14 @@ module Report = struct
         then Not_loosened
         else Loosened
       in
-      (a, loosening), hint
+      loosening, (a, hint)
 
     let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
      fun obj axis { left = l, lhint; right = r, rhint } ->
       let left = hint_prod_loosening obj Left axis ~other:r (l, lhint) in
       let right =
         hint_prod_loosening obj Right axis
-          ~other:(Axis.set axis (fst (fst left)) r)
+          ~other:(Axis.set axis (fst (snd left)) r)
           (r, rhint)
       in
       { left; right }
@@ -2296,7 +2296,7 @@ module Report = struct
      fun obj { left = l, lhint; right = r, rhint } ->
       let left = hint_axis_loosening obj Left ~other:r (l, lhint) in
       let right =
-        hint_axis_loosening obj Right ~other:(fst (fst left)) (r, rhint)
+        hint_axis_loosening obj Right ~other:(fst (snd left)) (r, rhint)
       in
       { left; right }
   end
@@ -2766,8 +2766,8 @@ module Report = struct
     print_ahint side pp obj ppf ahint
 
   type 'a ahint_sided =
-    | Left of loosening * ('a, left_only) ahint
-    | Right of loosening * ('a, right_only) ahint
+    | Left of (loosening * ('a, left_only) ahint)
+    | Right of (loosening * ('a, right_only) ahint)
 
   let print_ahint_sided : type a.
       pinpoint ->
@@ -2784,12 +2784,10 @@ module Report = struct
 
   let print : type a. pinpoint -> a C.obj -> a t -> print_error =
    fun pp obj { left; right } ->
-    let (la, l_loosening), lh = left in
-    let (ra, r_loosening), rh = right in
     let actual, expected =
       if C.is_opposite obj
-      then Right (r_loosening, (ra, rh)), Left (l_loosening, (la, lh))
-      else Left (l_loosening, (la, lh)), Right (r_loosening, (ra, rh))
+      then Right right, Left left
+      else Left left, Right right
     in
     let left ppf = Option.get (print_ahint_sided pp obj ppf actual) in
     let right ppf = Option.get (print_ahint_sided pp obj ppf expected) in
