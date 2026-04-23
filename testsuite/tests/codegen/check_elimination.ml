@@ -116,8 +116,7 @@ search:
   cmpq  %rax, %rdi
   setl  %al
   movzbq %al, %rsi
-  testq %rsi, %rsi
-  je    .L123
+  jge   .L123
   movq  8(%rbx), %rax
   testq %rsi, %rsi
   jne   .L129

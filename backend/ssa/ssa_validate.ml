@@ -32,7 +32,9 @@ let validate (t : Ssa.t) =
       add_pred ~src:bl ~dst:ifnot
     | Switch (targets, _) ->
       Array.iter (fun dst -> add_pred ~src:bl ~dst) targets
-    | Return _ | Raise _ | Tailcall_func _ -> ()
+    | Return _ | Tailcall_func _ -> ()
+    | Raise (_, _, handler) ->
+      Option.iter (fun dst -> add_pred ~src:bl ~dst) handler
     | Tailcall_self { destination; _ } -> add_pred ~src:bl ~dst:destination
     | Call { continuation; exn_continuation; _ }
     | Prim { continuation; exn_continuation; _ } -> (
@@ -44,10 +46,10 @@ let validate (t : Ssa.t) =
       Option.iter (fun l -> add_pred ~src:bl ~dst:l) continuation
   in
   List.iter successor_blocks t.blocks;
-  (* The builder guarantees that blocks are listed in dominator order
+  (* The builder guarantees that reachable blocks are listed in dominator order
      (predecessors before successors, except loop back edges), so we can
      validate by iterating t.blocks directly, registering Op definitions as we
-     go. *)
+     go. Unreachable blocks are skipped entirely. *)
   let defined_ops = Ssa.InstructionId.Tbl.create 64 in
   let rec check_arg (bl : Ssa.block) (i : Ssa.instruction) =
     match i with
@@ -94,129 +96,114 @@ let validate (t : Ssa.t) =
   in
   let check_args bl args = Array.iter (check_arg bl) args in
   let visit_block (bl : Ssa.block) =
-    (* Check entry block is Function_start *)
-    (if Ssa.block_equal bl t.entry
-     then
-       match[@warning "-fragile-match"] bl.desc with
-       | Function_start -> ()
-       | _ -> error "entry block %a is not Function_start" pb bl);
-    (* Check block descriptor matches actual predecessors *)
-    (match bl.desc with
-    | Branch_target { predecessor } ->
-      if Array.length bl.params > 0
-      then error "block %a: Branch_target must not have parameters" pb bl;
-      let preds = Ssa.Block.Tbl.find actual_preds bl in
-      if not (List.exists (Ssa.block_equal predecessor) preds)
-      then
-        error
-          "block %a: Branch_target declares predecessor %a but it is not an \
-           actual predecessor"
-          pb bl pb predecessor
-    | Merge { predecessors } ->
-      let preds = Ssa.Block.Tbl.find actual_preds bl in
-      let pred_set =
-        List.fold_left
-          (fun s b -> Ssa.Block.Set.add b s)
-          Ssa.Block.Set.empty preds
-      in
-      let declared_set =
-        List.fold_left
-          (fun s b -> Ssa.Block.Set.add b s)
-          Ssa.Block.Set.empty predecessors
-      in
-      if not (Ssa.Block.Set.equal pred_set declared_set)
-      then
-        error
-          "block %a: Merge declares predecessors {%a} but actual predecessors \
-           are {%a}"
-          pb bl
-          (Format.pp_print_list
-             ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-             pb)
-          predecessors
-          (Format.pp_print_list
-             ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-             pb)
-          preds
-    | Loop { predecessors; backedges } ->
-      let preds = Ssa.Block.Tbl.find actual_preds bl in
-      let declared = predecessors @ backedges in
-      let pred_set =
-        List.fold_left
-          (fun s b -> Ssa.Block.Set.add b s)
-          Ssa.Block.Set.empty preds
-      in
-      let declared_set =
-        List.fold_left
-          (fun s b -> Ssa.Block.Set.add b s)
-          Ssa.Block.Set.empty declared
-      in
-      if not (Ssa.Block.Set.equal pred_set declared_set)
-      then
-        error
-          "block %a: Loop declares predecessors {%a} but actual predecessors \
-           are {%a}"
-          pb bl
-          (Format.pp_print_list
-             ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-             pb)
-          declared
-          (Format.pp_print_list
-             ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-             pb)
-          preds
-    | Function_start | Call_continuation _ | Trap_handler _ -> ());
-    (* Check body: validate args then register Op *)
-    Array.iter
-      (fun (i : Ssa.instruction) ->
-        match i with
-        | Op { id; args; _ } ->
-          check_args bl args;
-          if Ssa.InstructionId.Tbl.mem defined_ops id
-          then
-            error "block %a: duplicate Op id v%d" pb bl
-              (Ssa.InstructionId.hash id);
-          Ssa.InstructionId.Tbl.replace defined_ops id bl
-        | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ -> ()
-        | Block_param _ | Proj _ -> ())
-      bl.body;
-    (* Check terminator *)
-    match bl.terminator with
-    | Pending_construction ->
-      error "block %a: Pending_construction terminator in finished graph" pb bl
-    | Goto { goto; args } ->
-      check_args bl args;
-      if Array.length args <> Array.length (goto : Ssa.block).params
-      then
-        error "block %a: goto %a has %d args but target has %d params" pb bl pb
-          goto (Array.length args) (Array.length goto.params)
-    | Branch { cond; ifso; ifnot } ->
-      let check_branch_target (target : Ssa.block) =
-        match[@warning "-fragile-match"] target.desc with
-        | Branch_target _ -> ()
-        | _ ->
-          error "block %a: Branch target %a is not a Branch_target block" pb bl
-            pb target
-      in
-      check_arg bl cond;
-      check_branch_target ifso;
-      check_branch_target ifnot
-    | Switch (targets, args) ->
-      check_args bl args;
+    (* Invariant 1: recorded predecessors are exactly the reachable predecessors
+       derived from terminators. *)
+    let actual = Ssa.Block.Tbl.find actual_preds bl in
+    let reachable_actual =
+      List.filter (fun (p : Ssa.block) -> Ssa.reachable p.dominator_info) actual
+    in
+    let to_set =
+      List.fold_left (fun s b -> Ssa.Block.Set.add b s) Ssa.Block.Set.empty
+    in
+    if
+      not
+        (Ssa.Block.Set.equal (to_set reachable_actual) (to_set bl.predecessors))
+    then
+      error
+        "block %a: recorded predecessors {%a} differ from reachable actual \
+         predecessors {%a}"
+        pb bl
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+           pb)
+        bl.predecessors
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+           pb)
+        reachable_actual;
+    (* Invariant 2: a block is marked as reachable iff it has predecessors
+       (Function_start is reachable with no predecessors). *)
+    let recorded_reachable = Ssa.reachable bl.dominator_info in
+    let expected_reachable =
+      (match[@warning "-fragile-match"] bl.desc with
+        | Function_start -> true
+        | _ -> false)
+      || not (List.is_empty bl.predecessors)
+    in
+    if not (Bool.equal recorded_reachable expected_reachable)
+    then
+      error
+        "block %a: marked reachable=%b but expected reachable=%b based on \
+         predecessors"
+        pb bl recorded_reachable expected_reachable;
+    (* Unreachable blocks are not validated further: they don't produce emitted
+       code, and their contents may be stale or meaningless. *)
+    if recorded_reachable
+    then begin
+      (* Check entry block is Function_start *)
+      (if Ssa.block_equal bl t.entry
+       then
+         match[@warning "-fragile-match"] bl.desc with
+         | Function_start -> ()
+         | _ -> error "entry block %a is not Function_start" pb bl);
+      (match bl.desc with
+      | Branch_target ->
+        if Array.length bl.params > 0
+        then error "block %a: Branch_target must not have parameters" pb bl
+      | Merge | Function_start | Call_continuation | Trap_handler -> ());
+      (* Check body: validate args then register Op *)
       Array.iter
-        (fun (target : Ssa.block) ->
+        (fun (i : Ssa.instruction) ->
+          match i with
+          | Op { id; args; _ } ->
+            check_args bl args;
+            if Ssa.InstructionId.Tbl.mem defined_ops id
+            then
+              error "block %a: duplicate Op id v%d" pb bl
+                (Ssa.InstructionId.hash id);
+            Ssa.InstructionId.Tbl.replace defined_ops id bl
+          | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ -> ()
+          | Block_param _ | Proj _ -> ())
+        bl.body;
+      (* Check terminator *)
+      match bl.terminator with
+      | Pending_construction ->
+        error "block %a: Pending_construction terminator in finished graph" pb
+          bl
+      | Goto { goto; args } ->
+        check_args bl args;
+        if Array.length args <> Array.length (goto : Ssa.block).params
+        then
+          error "block %a: goto %a has %d args but target has %d params" pb bl
+            pb goto (Array.length args) (Array.length goto.params)
+      | Branch { cond; ifso; ifnot } ->
+        let check_branch_target (target : Ssa.block) =
           match[@warning "-fragile-match"] target.desc with
-          | Branch_target _ -> ()
+          | Branch_target -> ()
           | _ ->
-            error "block %a: Switch target %a is not a Branch_target block" pb
-              bl pb target)
-        targets
-    | Return args -> check_args bl args
-    | Raise (_, args, _) -> check_args bl args
-    | Tailcall_self { args; _ } -> check_args bl args
-    | Tailcall_func (_, args) -> check_args bl args
-    | Call { args; _ } -> check_args bl args
-    | Prim { args; _ } -> check_args bl args
-    | Invalid { args; _ } -> check_args bl args
+            error "block %a: Branch target %a is not a Branch_target block" pb
+              bl pb target
+        in
+        check_arg bl cond;
+        check_branch_target ifso;
+        check_branch_target ifnot
+      | Switch (targets, args) ->
+        check_args bl args;
+        Array.iter
+          (fun (target : Ssa.block) ->
+            match[@warning "-fragile-match"] target.desc with
+            | Branch_target -> ()
+            | _ ->
+              error "block %a: Switch target %a is not a Branch_target block" pb
+                bl pb target)
+          targets
+      | Return args -> check_args bl args
+      | Raise (_, args, _) -> check_args bl args
+      | Tailcall_self { args; _ } -> check_args bl args
+      | Tailcall_func (_, args) -> check_args bl args
+      | Call { args; _ } -> check_args bl args
+      | Prim { args; _ } -> check_args bl args
+      | Invalid { args; _ } -> check_args bl args
+    end
   in
   List.iter visit_block t.blocks

@@ -526,107 +526,50 @@ let verify_register_equivalence ~ppf_m ~old_cfg_t ~new_cfg_t ~new_to_old =
           Format.fprintf ppf_m "  %a -> %a@." Printreg.reg old_r Printreg.reg
             new_r))
 
-(* === Relabeling ===
-
-   After successful comparison, relabel the new CFG to use the old pipeline's
-   labels so that generated assembly has the same label numbers. *)
-
-let relabel_cfg ~new_to_old ~(new_cfg_t : Cfg.t) ~new_cfg =
-  let f lbl =
-    match Label.Tbl.find_opt new_to_old lbl with
-    | Some old_lbl -> old_lbl
-    | None ->
-      let fresh_label = Label.new_label () in
-      Label.Tbl.replace new_to_old lbl fresh_label;
-      fresh_label
-  in
-  let relabel_terminator_desc (desc : Cfg.terminator) : Cfg.terminator =
-    match desc with
-    | Never | Return | Raise _ | Tailcall_func _ | Call_no_return _ -> desc
-    | Always l -> Always (f l)
-    | Parity_test { ifso; ifnot } ->
-      Parity_test { ifso = f ifso; ifnot = f ifnot }
-    | Truth_test { ifso; ifnot } ->
-      Truth_test { ifso = f ifso; ifnot = f ifnot }
-    | Int_test { lt; eq; gt; is_signed; imm } ->
-      Int_test { lt = f lt; eq = f eq; gt = f gt; is_signed; imm }
-    | Float_test { width; lt; eq; gt; uo } ->
-      Float_test { width; lt = f lt; eq = f eq; gt = f gt; uo = f uo }
-    | Switch labels -> Switch (Array.map f labels)
-    | Tailcall_self { destination } ->
-      Tailcall_self { destination = f destination }
-    | Call { op; label_after } -> Call { op; label_after = f label_after }
-    | Prim { op; label_after } -> Prim { op; label_after = f label_after }
-    | Invalid ({ label_after = Some l; _ } as r) ->
-      Invalid { r with label_after = Some (f l) }
-    | Invalid { label_after = None; _ } -> desc
-  in
-  let all_blocks =
-    Label.Tbl.fold (fun _ b acc -> b :: acc) new_cfg_t.blocks []
-  in
-  Label.Tbl.reset new_cfg_t.blocks;
-  List.iter
-    (fun (block : Cfg.basic_block) ->
-      block.start <- f block.start;
-      block.predecessors <- Label.Set.map f block.predecessors;
-      block.exn <- Option.map f block.exn;
-      block.terminator
-        <- { block.terminator with
-             desc = relabel_terminator_desc block.terminator.desc
-           };
-      DLL.iter_cell block.body ~f:(fun cell ->
-          let (instr : Cfg.basic Cfg.instruction) = DLL.value cell in
-          match instr.desc with
-          | Cfg.Pushtrap { lbl_handler } ->
-            DLL.set_value cell
-              { instr with desc = Cfg.Pushtrap { lbl_handler = f lbl_handler } }
-          | Cfg.Poptrap { lbl_handler } ->
-            DLL.set_value cell
-              { instr with desc = Cfg.Poptrap { lbl_handler = f lbl_handler } }
-          | _ -> ());
-      Label.Tbl.add new_cfg_t.blocks block.start block)
-    all_blocks;
-  let layout = Cfg_with_layout.layout new_cfg in
-  DLL.iter_cell layout ~f:(fun cell -> DLL.set_value cell (f (DLL.value cell)))
-
 (* === Entry point === *)
 
 let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
-  let old_cfg_t = Cfg_with_layout.cfg old_cfg in
-  let new_cfg_t = Cfg_with_layout.cfg new_cfg in
   let mismatches = Buffer.create 256 in
   let ppf_m = Format.formatter_of_buffer mismatches in
-  (* Phase 1: structural matching *)
-  let new_to_old = collect_matching_blocks ~ppf_m ~old_cfg_t ~new_cfg_t in
-  (* Phase 2: register equivalence *)
-  verify_register_equivalence ~ppf_m ~old_cfg_t ~new_cfg_t ~new_to_old;
-  (* Check block counts *)
-  let old_count = Label.Tbl.length old_cfg_t.blocks in
-  let new_count = Label.Tbl.length new_cfg_t.blocks in
-  if old_count <> new_count
-  then
-    Format.fprintf ppf_m "Block count mismatch: old=%d new=%d@." old_count
-      new_count;
-  (* Check CFG metadata *)
-  if not (Bool.equal old_cfg_t.fun_contains_calls new_cfg_t.fun_contains_calls)
-  then
-    Format.fprintf ppf_m "fun_contains_calls mismatch: old=%b new=%b@."
-      old_cfg_t.fun_contains_calls new_cfg_t.fun_contains_calls;
-  if not (String.equal old_cfg_t.fun_name new_cfg_t.fun_name)
-  then
-    Format.fprintf ppf_m "fun_name mismatch: old=%s new=%s@." old_cfg_t.fun_name
-      new_cfg_t.fun_name;
-  if old_cfg_t.fun_codegen_options <> new_cfg_t.fun_codegen_options
-  then Format.fprintf ppf_m "fun_codegen_options mismatch@.";
-  if Debuginfo.compare old_cfg_t.fun_dbg new_cfg_t.fun_dbg <> 0
-  then
-    Format.fprintf ppf_m "fun_dbg mismatch: old=%a new=%a@."
-      Debuginfo.print_compact old_cfg_t.fun_dbg Debuginfo.print_compact
-      new_cfg_t.fun_dbg;
-  if old_cfg_t.fun_poll <> new_cfg_t.fun_poll
-  then Format.fprintf ppf_m "fun_poll mismatch@.";
-  if old_cfg_t.fun_ret_type <> new_cfg_t.fun_ret_type
-  then Format.fprintf ppf_m "fun_ret_type mismatch@.";
+  let new_to_old =
+    let old_cfg = Cfg_with_layout.cfg old_cfg in
+    let new_cfg = Cfg_with_layout.cfg new_cfg in
+    (* Phase 1: structural matching *)
+    let new_to_old =
+      collect_matching_blocks ~ppf_m ~old_cfg_t:old_cfg ~new_cfg_t:new_cfg
+    in
+    (* Phase 2: register equivalence *)
+    verify_register_equivalence ~ppf_m ~old_cfg_t:old_cfg ~new_cfg_t:new_cfg
+      ~new_to_old;
+    (* Check block counts *)
+    let old_count = Label.Tbl.length old_cfg.blocks in
+    let new_count = Label.Tbl.length new_cfg.blocks in
+    if old_count <> new_count
+    then
+      Format.fprintf ppf_m "Block count mismatch: old=%d new=%d@." old_count
+        new_count;
+    (* Check CFG metadata *)
+    if not (Bool.equal old_cfg.fun_contains_calls new_cfg.fun_contains_calls)
+    then
+      Format.fprintf ppf_m "fun_contains_calls mismatch: old=%b new=%b@."
+        old_cfg.fun_contains_calls new_cfg.fun_contains_calls;
+    if not (String.equal old_cfg.fun_name new_cfg.fun_name)
+    then
+      Format.fprintf ppf_m "fun_name mismatch: old=%s new=%s@." old_cfg.fun_name
+        new_cfg.fun_name;
+    if old_cfg.fun_codegen_options <> new_cfg.fun_codegen_options
+    then Format.fprintf ppf_m "fun_codegen_options mismatch@.";
+    if Debuginfo.compare old_cfg.fun_dbg new_cfg.fun_dbg <> 0
+    then
+      Format.fprintf ppf_m "fun_dbg mismatch: old=%a new=%a@."
+        Debuginfo.print_compact old_cfg.fun_dbg Debuginfo.print_compact
+        new_cfg.fun_dbg;
+    if old_cfg.fun_poll <> new_cfg.fun_poll
+    then Format.fprintf ppf_m "fun_poll mismatch@.";
+    if old_cfg.fun_ret_type <> new_cfg.fun_ret_type
+    then Format.fprintf ppf_m "fun_ret_type mismatch@.";
+    new_to_old
+  in
   (* Report *)
   Format.pp_print_flush ppf_m ();
   let msg = Buffer.contents mismatches in
@@ -644,5 +587,5 @@ let compare ~fun_name ~fd_cmm ~ssa ~old_cfg ~new_cfg ppf =
     Format.pp_print_flush ppf ();
     Format.print_flush ();
     Misc.fatal_errorf "CFG comparison MISMATCH for %s" fun_name);
-  (* Relabel new CFG to use old pipeline's labels *)
-  relabel_cfg ~new_to_old ~new_cfg_t ~new_cfg
+  (* Return (new_to_old mapping, unmatched_old_labels pool). *)
+  new_to_old
