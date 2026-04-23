@@ -380,6 +380,9 @@ let parse_command_line () =
         "Select linscan if the number of registers is above the threshold" );
       "-validate", Arg.Set validate, "Enable validation";
       "-insert-prologue", Arg.Set insert_prologue, "Enable prologue insertion";
+      ( "-copy-propagation",
+        Arg.Unit (fun () -> Oxcaml_flags.cfg_copy_propagation := true),
+        "Enable copy propagation" );
       "-csv-output", Arg.Set csv_output, "Enable CSV output";
       "-debug-output", Arg.Set debug_output, "Enable debug output";
       "-summary", Arg.Set print_summary, "Print summary" ]
