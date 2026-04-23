@@ -5,7 +5,7 @@
        return_local_0 (param : imm tagged)
          my_closure my_region my_ghost_region my_depth
          -> k1 * k2
-         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+         : [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ] local =
    let next_depth = rec_info (succ my_depth) in
    cont k1 ($camlLocal__const_block15)
  in
@@ -156,7 +156,7 @@
          (break_here : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure my_region my_ghost_region my_depth
          -> k1 * k2
-         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+         : [ 0 | 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ] local =
    let next_depth = rec_info (succ my_depth) in
    let rev_app = %project_value_slot.[`spans`].[`rev_app`] (my_closure) in
    let find_span =
@@ -182,12 +182,17 @@
             ((let Pfield = %block_load.[`1`] (`*match*`) in
               apply direct(spans_5 &my_region &my_ghost_region)
                 (my_closure ~ depth my_depth -> next_depth
-                 : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 : _ ->
+                   [ 0 | 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ]
+                   ]
+                 )
                   (break_here, Pfield)
                   -> k3 * k2)
                where k3
                        (apply_result :
-                          [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                          [ 0
+                          | 0 of [ 0 | 0 of val * val ] *
+                              [ 0 | 0 of val * val ] ]) =
                  ((let Pfield = %block_load.[`0`] (`*match*`) in
                    apply direct(rev_app_4 &my_region &my_ghost_region)
                      (rev_app
@@ -266,10 +271,13 @@
      ((let `region` = %begin_region () in
        let ghost_region = %begin_ghost_region () in
        apply direct(return_local_0 &`region` &ghost_region)
-         (return_local : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+         (return_local
+          : _ -> [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ])
            (0)
            -> k5 * error
-         where k5 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+         where k5
+                 (apply_result :
+                    [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ]) =
            apply direct(length_2) unroll(3)
              (length : _ -> imm tagged) (apply_result) -> k4 * error
          where k4 (apply_result : imm tagged) =
@@ -291,20 +299,32 @@
           ((let `region` = %begin_region () in
             let ghost_region = %begin_ghost_region () in
             apply direct(return_local_0 &`region` &ghost_region)
-              (return_local : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+              (return_local
+               : _ -> [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ]
+               )
                 (0)
                 -> k3 * error
-              where k3 (ns : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+              where k3
+                      (ns :
+                         [ 0
+                         | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ]) =
                 ((let `fn[local.ml:32,27--43]` =
                     closure `fn[local.ml:32,27--43]_3`
                       @`fn[local.ml:32,27--43]`
                   in
                   apply direct(map_local_1 &`region` &ghost_region)
                     (map_local
-                     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                     : _ ->
+                       [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ]
+                       ]
+                     )
                       (`fn[local.ml:32,27--43]`, ns)
                       -> k3 * error)
-                   where k3 (ms : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                   where k3
+                           (ms :
+                              [ 0
+                              | 0 of imm tagged *
+                                  [ 0 | 0 of imm tagged * val ] ]) =
                      (apply direct(length_2)
                         (length : _ -> imm tagged) (ms) -> k4 * error
                         where k4 (apply_result : imm tagged) =
@@ -334,12 +354,19 @@
                ((let `region` = %begin_region () in
                  let ghost_region = %begin_ghost_region () in
                  apply direct(spans_5 &`region` &ghost_region)
-                   (spans : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                   (spans
+                    : _ ->
+                      [ 0
+                      | 0 of [ 0 | 0 of imm tagged * val ] *
+                          [ 0 | 0 of val * val ] ]
+                    )
                      (is_even, $camlLocal__const_block176)
                      -> k3 * error
                    where k3
                            (even_spans :
-                              [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                              [ 0
+                              | 0 of [ 0 | 0 of imm tagged * val ] *
+                                  [ 0 | 0 of val * val ] ]) =
                      (apply direct(length_2)
                         (length : _ -> imm tagged) (even_spans) -> k4 * error
                         where k4 (apply_result : imm tagged) =

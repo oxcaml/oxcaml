@@ -58,12 +58,20 @@ let code loopify(never) size(50) newer_version_of(emit_instr_1)
 in
 let $camlEmitcode_repro__emit_instr_4 = closure emit_instr_1_1 @emit_instr in
 let code loopify(done) size(121) newer_version_of(emit_2)
-      emit_2_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      emit_2_1
+        (param :
+           [ 0
+           | 0 of [ 0 |1 | 0 of imm tagged |1 of imm tagged ] *
+               [ 0 | 0 of val * val ] ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
   cont self (param)
-    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 |1 | 0 of imm tagged |1 of imm tagged ] *
+                       [ 0 | 0 of val * val ] ]) =
       let `region` = %begin_region () in
       let ghost_region = %begin_ghost_region () in
       ((let prim = %is_int (param_1) in

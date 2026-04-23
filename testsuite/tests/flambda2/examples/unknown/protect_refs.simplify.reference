@@ -41,7 +41,8 @@ let $`camlProtect_refs__fn[protect_refs.ml:28,24--50]_8` =
 in
 let code loopify(never) size(11) newer_version_of(`fn[protect_refs.ml:29,2--43]_3`)
       `fn[protect_refs.ml:29,2--43]_3_1`
-        (refs : [ 0 | 0 of val * [ 0 | 0 of val * val ] ], f : val)
+        (refs : [ 0 | 0 of [ 0 of val * val ] * [ 0 | 0 of val * val ] ],
+         f : val)
         my_closure _region _ghost_region my_depth
         -> k * k1 =
   apply direct(iter_0_1) inlining_state(depth(10))

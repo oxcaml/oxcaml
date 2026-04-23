@@ -114,7 +114,7 @@ let code loopify(never) size(45) newer_version_of(inv_3) tupled
       inv_3_1 (param : [ 0 | 0 of val * val ], param_1, param_2)
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+        : [ 0 | 0 of [ 0 of val * val ] * [ 0 | 0 of val * val ] ] =
   let prim = %is_int (param) in
   switch prim
     | 0 -> k2
@@ -154,10 +154,13 @@ let code loopify(never) size(11) newer_version_of(div_4)
    let tuple_field_1 = %block_load.tag[`0`].`size`[`3`].[`1`] (i2) in
    let tuple_field_2 = %block_load.tag[`0`].`size`[`3`].[`2`] (i2) in
    apply direct(inv_3_1)
-     ($camlAlt_ergo__inv_8 : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+     ($camlAlt_ergo__inv_8
+      : _ -> [ 0 | 0 of [ 0 of val * val ] * [ 0 | 0 of val * val ] ])
        (tuple_field, tuple_field_1, tuple_field_2)
        -> k3 * k1
-     where k3 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+     where k3
+             (param :
+                [ 0 | 0 of [ 0 of val * val ] * [ 0 | 0 of val * val ] ]) =
        cont k2)
     where k2 =
       cont k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock106)

@@ -36,7 +36,7 @@ let code loopify(never) size(1) newer_version_of(return_local_0)
       return_local_0_1 (param : imm tagged)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
-        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+        : [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ] local =
   cont k ($camlLocal__const_block15)
 in
 let $camlLocal__return_local_8 = closure return_local_0_1 @return_local in
@@ -129,11 +129,14 @@ apply direct(length_2_1)
            in
            apply direct(map_local_1_1 &`region` &ghost_region)
              ($camlLocal__map_local_9
-              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+              : _ -> [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ])
                ($`camlLocal__fn[local.ml:32,27--43]_11`,
                 $camlLocal__const_block15)
                -> k1 * error)
-            where k1 (ms : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+            where k1
+                    (ms :
+                       [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ]
+                       ]) =
               (apply direct(length_2_1)
                  ($camlLocal__length_10 : _ -> imm tagged) (ms) -> k1 * error
                  where k1 (apply_result : imm tagged) =
@@ -230,7 +233,9 @@ apply direct(length_2_1)
                        l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                       my_closure my_region my_ghost_region my_depth
                       -> k * k1
-                      : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+                      : [ 0
+                        | 0 of [ 0 | 0 of val * val ] *
+                            [ 0 | 0 of val * val ] ] local =
                 let prim = %is_int (l) in
                 switch prim
                   | 0 -> k2
@@ -254,14 +259,17 @@ apply direct(length_2_1)
                                   &my_region &my_ghost_region)
                              ($camlLocal__spans_13 ~ depth my_depth -> succ my_depth
                               : _ ->
-                                [ 0 | 0 of val * [ 0 | 0 of val * val ] ]
+                                [ 0
+                                | 0 of [ 0 | 0 of val * val ] *
+                                    [ 0 | 0 of val * val ] ]
                               )
                                (break_here, Pfield)
                                -> k2 * k1)
                             where k2
                                     (apply_result :
                                        [ 0
-                                       | 0 of val * [ 0 | 0 of val * val ] ]) =
+                                       | 0 of [ 0 | 0 of val * val ] *
+                                           [ 0 | 0 of val * val ] ]) =
                               ((let Pfield = %block_load.[`0`] (`*match*`) in
                                 apply
                                        direct(rev_app_4_1
@@ -299,12 +307,18 @@ apply direct(length_2_1)
               let ghost_region_1 = %begin_ghost_region () in
               (apply direct(spans_5_1 &region_1 &ghost_region_1)
                  ($camlLocal__spans_13
-                  : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                  : _ ->
+                    [ 0
+                    | 0 of [ 0 | 0 of imm tagged * val ] *
+                        [ 0 | 0 of val * val ] ]
+                  )
                    ($camlLocal__is_even_15, $camlLocal__const_block176)
                    -> k1 * error
                  where k1
                          (even_spans :
-                            [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                            [ 0
+                            | 0 of [ 0 | 0 of imm tagged * val ] *
+                                [ 0 | 0 of val * val ] ]) =
                    (apply direct(length_2_1)
                       ($camlLocal__length_10 : _ -> imm tagged)
                         (even_spans)
