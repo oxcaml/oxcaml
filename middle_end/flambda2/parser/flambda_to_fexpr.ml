@@ -181,11 +181,11 @@ let alloc_mode_for_allocations env (alloc : Alloc_mode.For_allocations.t) :
 let alloc_mode_for_applications env (alloc : Alloc_mode.For_applications.t) :
     Fexpr.alloc_mode_for_applications =
   match alloc with
-  | Heap -> Heap
-  | Local { region = r; ghost_region = r' } ->
+  | Not_alloc_stack -> Not_alloc_stack
+  | Maybe_alloc_stack { region = r; ghost_region = r' } ->
     let r = Env.find_region_exn env r in
     let r' = Env.find_region_exn env r' in
-    Local { region = r; ghost_region = r' }
+    Maybe_alloc_stack { region = r; ghost_region = r' }
 
 let prim env (p : Flambda_primitive.t) : Fexpr.prim =
   let p, args = Fexpr_prim.OfFlambda.prim env p in
@@ -446,8 +446,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
             let closure_var, env = Env.bind_var env my_closure in
             let region_var, ghost_region_var, env =
               match my_alloc_mode with
-              | Heap -> nowhere "_region", nowhere "_ghost_region", env
-              | Local { region = my_region; ghost_region = my_ghost_region } ->
+              | Not_alloc_stack ->
+                nowhere "_region", nowhere "_ghost_region", env
+              | Maybe_alloc_stack
+                  { region = my_region; ghost_region = my_ghost_region } ->
                 let region_var, env = Env.bind_var env my_region in
                 let ghost_region_var, env = Env.bind_var env my_ghost_region in
                 region_var, ghost_region_var, env
@@ -468,10 +470,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       let code_size =
         Code.cost_metrics code |> Cost_metrics.size |> Code_size.to_int
       in
-      let result_mode : Fexpr.alloc_mode_for_assignments =
+      let result_mode : Fexpr.alloc_mode_for_return =
         match Code.result_mode code with
-        | Alloc_heap -> Heap
-        | Alloc_local -> Local
+        | Not_alloc_stack -> Not_alloc_stack
+        | Maybe_alloc_stack -> Maybe_alloc_stack
       in
       Code
         { id = code_id;
@@ -601,7 +603,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   in
   let args = List.map (simple env) (Apply_expr.args app) in
   let alloc_mode =
-    alloc_mode_for_applications env (Apply_expr.alloc_mode app)
+    alloc_mode_for_applications env (Apply_expr.return_mode app)
   in
   let call_kind : Fexpr.call_kind =
     match Apply_expr.call_kind app with

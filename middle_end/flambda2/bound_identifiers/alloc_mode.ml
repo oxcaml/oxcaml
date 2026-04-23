@@ -62,106 +62,115 @@ end
 
 module For_applications = struct
   type t =
-    | Heap
-    | Local of
+    | Not_alloc_stack
+    | Maybe_alloc_stack of
         { region : Variable.t;
           ghost_region : Variable.t
         }
 
   let print ppf t =
     match t with
-    | Heap -> Format.pp_print_string ppf "Heap"
-    | Local { region; ghost_region } ->
+    | Not_alloc_stack -> Format.pp_print_string ppf "Heap"
+    | Maybe_alloc_stack { region; ghost_region } ->
       Format.fprintf ppf "@[<hov 1>(Local (region@ %a)@ (ghost_region@ %a))@]"
         Variable.print region Variable.print ghost_region
 
   let compare t1 t2 =
     match t1, t2 with
-    | Heap, Heap -> 0
-    | ( Local { region = region1; ghost_region = ghost_region1 },
-        Local { region = region2; ghost_region = ghost_region2 } ) ->
+    | Not_alloc_stack, Not_alloc_stack -> 0
+    | ( Maybe_alloc_stack { region = region1; ghost_region = ghost_region1 },
+        Maybe_alloc_stack { region = region2; ghost_region = ghost_region2 } )
+      ->
       let c = Variable.compare region1 region2 in
       if c <> 0 then c else Variable.compare ghost_region1 ghost_region2
-    | Heap, Local _ -> -1
-    | Local _, Heap -> 1
+    | Not_alloc_stack, Maybe_alloc_stack _ -> -1
+    | Maybe_alloc_stack _, Not_alloc_stack -> 1
 
-  let heap = Heap
+  let not_alloc_stack = Not_alloc_stack
 
-  let local ~region ~ghost_region =
+  let maybe_alloc_stack ~region ~ghost_region =
     if Flambda_features.stack_allocation_enabled ()
-    then Local { region; ghost_region }
-    else Heap
+    then Maybe_alloc_stack { region; ghost_region }
+    else Not_alloc_stack
 
   let as_type t : For_types.t =
-    match t with Heap -> Heap | Local _ -> Heap_or_local
+    match t with
+    | Not_alloc_stack -> Heap
+    | Maybe_alloc_stack _ -> Heap_or_local
 
-  let from_lambda (mode : Lambda.locality_mode) ~current_region
+  let from_lambda (mode : Lambda.return_mode) ~current_region
       ~current_ghost_region =
     if not (Flambda_features.stack_allocation_enabled ())
-    then Heap
+    then Not_alloc_stack
     else
       match mode with
-      | Alloc_heap -> Heap
-      | Alloc_local -> (
+      | Not_alloc_stack -> Not_alloc_stack
+      | Maybe_alloc_stack -> (
         match current_region, current_ghost_region with
         | Some current_region, Some current_ghost_region ->
-          Local { region = current_region; ghost_region = current_ghost_region }
+          Maybe_alloc_stack
+            { region = current_region; ghost_region = current_ghost_region }
         | None, _ | _, None ->
           Misc.fatal_error "Local application without a region")
 
   let free_names t =
     match t with
-    | Heap -> Name_occurrences.empty
-    | Local { region; ghost_region } ->
+    | Not_alloc_stack -> Name_occurrences.empty
+    | Maybe_alloc_stack { region; ghost_region } ->
       Name_occurrences.add_variable
         (Name_occurrences.singleton_variable region Name_mode.normal)
         ghost_region Name_mode.normal
 
   let rename = function
-    | Heap -> Heap
-    | Local { region; ghost_region } ->
-      Local
+    | Not_alloc_stack -> Not_alloc_stack
+    | Maybe_alloc_stack { region; ghost_region } ->
+      Maybe_alloc_stack
         { region = Variable.rename region;
           ghost_region = Variable.rename ghost_region
         }
 
   let is_renamed_version_of t t' =
     match t, t' with
-    | Heap, Heap -> true
-    | Heap, Local _ | Local _, Heap -> false
-    | ( Local { region; ghost_region },
-        Local { region = region'; ghost_region = ghost_region' } ) ->
+    | Not_alloc_stack, Not_alloc_stack -> true
+    | Not_alloc_stack, Maybe_alloc_stack _
+    | Maybe_alloc_stack _, Not_alloc_stack ->
+      false
+    | ( Maybe_alloc_stack { region; ghost_region },
+        Maybe_alloc_stack { region = region'; ghost_region = ghost_region' } )
+      ->
       Variable.is_renamed_version_of region region'
       && Variable.is_renamed_version_of ghost_region ghost_region'
 
   let renaming t ~guaranteed_fresh =
     match t, guaranteed_fresh with
-    | Heap, Heap -> Renaming.empty
-    | ( Local { region; ghost_region },
-        Local { region = region'; ghost_region = ghost_region' } ) ->
+    | Not_alloc_stack, Not_alloc_stack -> Renaming.empty
+    | ( Maybe_alloc_stack { region; ghost_region },
+        Maybe_alloc_stack { region = region'; ghost_region = ghost_region' } )
+      ->
       let renaming =
         Renaming.add_fresh_variable Renaming.empty region
           ~guaranteed_fresh:region'
       in
       Renaming.add_fresh_variable renaming ghost_region
         ~guaranteed_fresh:ghost_region'
-    | Heap, Local _ | Local _, Heap ->
+    | Not_alloc_stack, Maybe_alloc_stack _
+    | Maybe_alloc_stack _, Not_alloc_stack ->
       Misc.fatal_error "Mismatched alloc_mode in renaming"
 
   let apply_renaming t renaming =
     match t with
-    | Heap -> Heap
-    | Local { region; ghost_region } ->
+    | Not_alloc_stack -> Not_alloc_stack
+    | Maybe_alloc_stack { region; ghost_region } ->
       let region' = Renaming.apply_variable renaming region in
       let ghost_region' = Renaming.apply_variable renaming ghost_region in
       if region == region' && ghost_region == ghost_region'
       then t
-      else Local { region = region'; ghost_region = ghost_region' }
+      else Maybe_alloc_stack { region = region'; ghost_region = ghost_region' }
 
   let ids_for_export t =
     match t with
-    | Heap -> Ids_for_export.empty
-    | Local { region; ghost_region } ->
+    | Not_alloc_stack -> Ids_for_export.empty
+    | Maybe_alloc_stack { region; ghost_region } ->
       Ids_for_export.add_variable
         (Ids_for_export.singleton_variable region)
         ghost_region

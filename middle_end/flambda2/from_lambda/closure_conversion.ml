@@ -505,7 +505,7 @@ module Inlining = struct
           "Trying to call [Closure_conversion.Inlining.inline] on a non-OCaml \
            function call."
     in
-    let region_inlined_into = Apply.alloc_mode apply in
+    let region_inlined_into = Apply.return_mode apply in
     let args = Apply.args apply in
     let apply_return_continuation = Apply.continuation apply in
     let apply_exn_continuation = Apply.exn_continuation apply in
@@ -739,10 +739,10 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         k acc (List.map (fun (v, _) -> Named.create_var v) let_bound_vars))
   in
   let alloc_mode_app =
-    match Lambda.locality_mode_of_primitive_description prim_desc with
+    match Lambda.return_mode_of_primitive_description prim_desc with
     | None ->
       (* This happens when stack allocation is disabled. *)
-      Alloc_mode.For_applications.heap
+      Alloc_mode.For_applications.not_alloc_stack
     | Some alloc_mode ->
       Alloc_mode.For_applications.from_lambda alloc_mode ~current_region
         ~current_ghost_region
@@ -1105,7 +1105,7 @@ let close_effect_primitive acc env ~dbg exn_continuation
         ~return_arity:
           (Flambda_arity.create_singletons
              [Flambda_kind.With_subkind.any_value])
-        ~call_kind ~alloc_mode:Alloc_mode.For_applications.heap dbg
+        ~call_kind ~alloc_mode:Alloc_mode.For_applications.not_alloc_stack dbg
         ~inlined:Never_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
@@ -2421,15 +2421,15 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         (Name_occurrences.remove_continuation free_names_of_body
            ~continuation:cont) )
   in
-  let alloc_mode =
-    Alloc_mode.For_allocations.from_lambda
-      (Function_decl.result_mode decl)
-      ~current_region:my_region
-  in
   let body, free_names_of_body =
     match unboxed_return with
     | None -> make_body return_continuation
-    | Some k -> make_return_wrapper (boxing_primitive k alloc_mode)
+    | Some (k, alloc_mode) ->
+      let alloc_mode =
+        Alloc_mode.For_allocations.from_lambda alloc_mode
+          ~current_region:my_region
+      in
+      make_return_wrapper (boxing_primitive k alloc_mode)
   in
   let my_alloc_mode =
     Alloc_mode.For_applications.from_lambda
@@ -2647,7 +2647,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let closure_env, my_region, my_ghost_region, my_alloc_mode =
     match my_region, my_ghost_region with
-    | None, None -> closure_env, None, None, Alloc_mode.For_applications.heap
+    | None, None ->
+      closure_env, None, None, Alloc_mode.For_applications.not_alloc_stack
     | Some _, None | None, Some _ ->
       Misc.fatal_errorf
         "In [close_one_function], only one of [my_region] and \
@@ -2664,7 +2665,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ( env,
         Some region,
         Some ghost_region,
-        Alloc_mode.For_applications.local ~region ~ghost_region )
+        Alloc_mode.For_applications.maybe_alloc_stack ~region ~ghost_region )
   in
   let closure_env = Env.with_depth closure_env my_depth in
   let closure_env, absolute_history, relative_history =
@@ -2781,6 +2782,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         my_closure )
     | Unboxed_calling_convention
         (unboxed_params, unboxed_return, unboxed_function_slot) ->
+      let unboxed_return = Option.map fst unboxed_return in
       compute_body_of_unboxed_function acc my_region my_closure ~unarized_params
         params_arity ~unarized_param_modes function_slot compute_body return
         return_continuation unboxed_params unboxed_return unboxed_function_slot
@@ -2812,11 +2814,11 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let result_mode = Function_decl.result_mode decl in
   (match my_region with
-  | Some _ -> assert (not (Lambda.is_heap_mode result_mode))
-  | None -> assert (Lambda.is_heap_mode result_mode));
+  | Some _ -> assert (Lambda.is_maybe_alloc_stack result_mode)
+  | None -> assert (Lambda.is_not_alloc_stack result_mode));
   (match my_ghost_region with
-  | Some _ -> assert (not (Lambda.is_heap_mode result_mode))
-  | None -> assert (Lambda.is_heap_mode result_mode));
+  | Some _ -> assert (Lambda.is_maybe_alloc_stack result_mode)
+  | None -> assert (Lambda.is_not_alloc_stack result_mode));
   let acc =
     List.fold_left
       (fun acc param -> Acc.remove_var_from_free_names (BP.var param) acc)
@@ -2857,8 +2859,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let contains_no_escaping_local_allocs =
     match Function_decl.result_mode decl with
-    | Alloc_heap -> false
-    | Alloc_local -> true
+    | Not_alloc_stack -> false
+    | Maybe_alloc_stack -> true
   in
   let main_code =
     Code.create main_code_id ~params_and_body
@@ -3342,9 +3344,9 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     provided @ List.map (fun (p : Function_decl.param) -> IR.Var p.name) params
   in
   let contains_no_escaping_local_allocs =
-    match (result_mode : Lambda.locality_mode) with
-    | Alloc_heap -> true
-    | Alloc_local -> false
+    match (result_mode : Lambda.return_mode) with
+    | Not_alloc_stack -> true
+    | Maybe_alloc_stack -> false
   in
   let my_region =
     if contains_no_escaping_local_allocs
@@ -3388,7 +3390,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         poll = Default_poll;
         tmc_candidate = false;
         may_fuse_arity = true;
-        unbox_return = false
+        unbox_return = None
       }
   in
   let free_idents_of_body =
@@ -3403,7 +3405,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     then Lambda.alloc_heap, first_complex_local_param - num_provided
     else Lambda.alloc_local, 0
   in
-  if not (Lambda.sub_locality_mode closure_alloc_mode apply.IR.mode)
+  if not (Lambda.locality_return_compat closure_alloc_mode apply.IR.mode)
   then
     (* This can happen in a dead GADT match case. *)
     ( acc,
@@ -3452,14 +3454,16 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
   let acc, remaining = find_simples acc env remaining in
   let apply_dbg = Debuginfo.from_location apply.loc in
   let needs_region =
-    match apply.mode, (result_mode : Lambda.locality_mode) with
-    | Alloc_heap, Alloc_local ->
+    match
+      (apply.mode : Lambda.return_mode), (result_mode : Lambda.return_mode)
+    with
+    | Not_alloc_stack, Maybe_alloc_stack ->
       let over_app_region = Variable.create "over_app_region" K.region in
       let over_app_ghost_region =
         Variable.create "over_app_ghost_region" K.region
       in
       Some (over_app_region, over_app_ghost_region, Continuation.create ())
-    | Alloc_heap, Alloc_heap | Alloc_local, _ -> None
+    | Not_alloc_stack, Not_alloc_stack | Maybe_alloc_stack, _ -> None
   in
   let apply_region, apply_ghost_region =
     match needs_region with
@@ -3600,7 +3604,7 @@ type call_args_split =
         provided_arity : [`Complex] Flambda_arity.t;
         remaining : IR.simple list;
         remaining_arity : [`Complex] Flambda_arity.t;
-        result_mode : Lambda.locality_mode
+        result_mode : Lambda.return_mode
       }
 
 let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =

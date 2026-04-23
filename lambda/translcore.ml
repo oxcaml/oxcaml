@@ -164,7 +164,7 @@ let function_attribute_disallowing_arity_fusion =
   the corresponding [curried_function_kind]. *)
 let curried_function_kind
     : (function_curry * Mode.Alloc.l) list
-      -> return_mode:locality_mode
+      -> return_mode:return_mode
       -> mode:locality_mode
       -> curried_function_kind
   =
@@ -176,7 +176,7 @@ let curried_function_kind
     | [ Final_arg, final_arg_mode ] ->
         let nlocal =
           if running_count = 0
-             && is_alloc_heap return_mode
+             && is_not_alloc_stack return_mode
              && is_alloc_heap mode
              && is_alloc_heap (transl_alloc_mode_l final_arg_mode)
           then 0
@@ -244,7 +244,7 @@ type fusable_function =
   { params : function_param list
   ; body : function_body
   ; return_sort : Jkind.Sort.Const.t
-  ; return_mode : locality_mode
+  ; return_mode : return_mode
   ; region : bool
   }
 
@@ -261,7 +261,7 @@ type fusable_function =
 let fuse_method_arity (parent : fusable_function) : fusable_function =
   match parent with
   | { params = [ self_param ];
-      return_mode = Alloc_heap;
+      return_mode = Not_alloc_stack;
       body =
         Tfunction_body { exp_desc = Texp_function method_; exp_extra; }
     }
@@ -288,7 +288,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
       let return_sort = Jkind.Sort.default_for_transl_and_get method_.ret_sort in
       { params = self_param :: method_.params;
         body = method_.body;
-        return_mode = transl_alloc_mode_l method_.ret_mode.mode_modes;
+        return_mode = transl_ret_mode method_.ret_mode.mode_modes;
         return_sort;
         region = true;
       }
@@ -462,7 +462,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         let inlined = Translattribute.get_inlined_attribute funct in
         let specialised = Translattribute.get_specialised_attribute funct in
         let position = transl_apply_position pos in
-        let mode = transl_locality_mode_l ap_mode in
+        let mode = transl_return_mode_l ap_mode in
         let result_layout = layout_exp sort e in
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised
@@ -477,7 +477,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let specialised = Translattribute.get_specialised_attribute funct in
       let result_layout = layout_exp sort e in
       let position = transl_apply_position position in
-      let mode = transl_locality_mode_l ap_mode in
+      let mode = transl_return_mode_l ap_mode in
       let assume_zero_alloc =
         zero_alloc_of_application ~num_args:(List.length oargs) zero_alloc funct
       in
@@ -968,7 +968,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_send(expr, met, pos) ->
       let lam =
         let pos = transl_apply_position pos in
-        let mode = Lambda.alloc_heap in
+        let mode = Lambda.not_alloc_stack in
         let loc = of_location ~scopes e.exp_loc in
         let layout = layout_exp sort e in
         match met with
@@ -1005,7 +1005,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         ap_args=[lambda_unit];
         ap_result_layout=layout_exp sort e;
         ap_region_close=pos;
-        ap_mode=alloc_heap;
+        ap_mode=not_alloc_stack;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
@@ -1037,7 +1037,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
              ap_args=[self];
              ap_result_layout=Lambda.layout_object;
              ap_region_close=Rc_normal;
-             ap_mode=alloc_heap;
+             ap_mode=not_alloc_stack;
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;
@@ -1129,7 +1129,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                             ~attr:function_attribute_disallowing_arity_fusion
                             ~loc:(of_location ~scopes e.exp_loc)
                             ~mode:alloc_heap
-                            ~ret_mode:alloc_heap
+                            ~ret_mode:not_alloc_stack
                             ~body:(maybe_region_layout
                                      Lambda.layout_lazy_contents
                                      (transl_exp ~scopes Jkind.Sort.Const.for_lazy_body e))
@@ -1265,7 +1265,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           stub = false;
           poll = Default_poll;
           tmc_candidate = false;
-          unbox_return = false;
+          unbox_return = None;
           may_fuse_arity = false;
         } in
       let funcid = Ident.create_local ("probe_handler_" ^ name) in
@@ -1286,7 +1286,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           ~loc:(of_location ~scopes exp.exp_loc)
           ~attr
           ~mode:alloc_heap
-          ~ret_mode:alloc_local
+          ~ret_mode:maybe_alloc_stack
           (* CR zqian: the handler function doesn't have a region. However, the
              [region] field is currently broken. *)
       in
@@ -1296,7 +1296,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           ap_args;
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
-          ap_mode = alloc_local;
+          ap_mode = maybe_alloc_stack;
           ap_loc;
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
@@ -1429,7 +1429,7 @@ and transl_apply ~scopes
       ?(specialised = Default_specialise)
       ?(assume_zero_alloc = Zero_alloc_utils.Assume_info.none)
       ?(position=Rc_normal)
-      ?(mode=alloc_heap)
+      ?(mode=not_alloc_stack)
       ~result_layout
       lam sargs loc
   =
@@ -1456,7 +1456,9 @@ and transl_apply ~scopes
       (Rc_normal | Rc_nontail) ->
         Lapply
           {ap with ap_args = ap.ap_args @ args; ap_loc = loc;
-                   ap_region_close = pos; ap_mode = mode; ap_result_layout = result_layout }
+                   ap_region_close = pos;
+                   ap_mode = mode;
+                   ap_result_layout = result_layout }
     | lexp, _ ->
       (* [assume_zero_alloc] is not used in the cases above but
          Misplaced_attribute won't be reported for it.
@@ -1529,7 +1531,7 @@ and transl_apply ~scopes
           let loc = map_scopes enter_partial_or_eta_wrapper loc in
           let mode = transl_alloc_mode_r mode_closure in
           let arg_mode = transl_alloc_mode_l mode_arg in
-          let ret_mode = transl_alloc_mode_l mode_ret in
+          let ret_mode = transl_ret_mode mode_ret in
           let sort_arg = Jkind.Sort.default_for_transl_and_get sort_arg in
           let sort_ret = Jkind.Sort.default_for_transl_and_get sort_ret in
           let result_layout = layout_of_sort (to_location loc) sort_ret in
@@ -1538,9 +1540,12 @@ and transl_apply ~scopes
               result_layout l
           in
           let nlocal =
-            match join_locality_mode mode (join_locality_mode arg_mode ret_mode) with
-            | Alloc_local -> 1
-            | Alloc_heap -> 0
+            match
+              (join_locality_mode mode arg_mode), ret_mode
+            with
+            | Alloc_local, _ -> 1
+            | _, Maybe_alloc_stack -> 1
+            | Alloc_heap, Not_alloc_stack -> 0
           in
           let layout_arg = layout_of_sort (to_location loc) sort_arg in
           let params = [{
@@ -1845,7 +1850,7 @@ and transl_curried_function ~scopes loc repr params body
       type acc =
         { body : lambda; (* The function body of those params *)
           return_layout : layout; (* The layout of [body] *)
-          return_mode : locality_mode; (* The mode of [body]. *)
+          return_mode : return_mode; (* The mode of [body]. *)
           region : bool; (* Whether the function has its own region *)
           nlocal : int;
           (* An upper bound on the [nlocal] field for the function. If [nlocal]
@@ -1888,7 +1893,9 @@ and transl_curried_function ~scopes loc repr params body
         (* we return Pgenval (for a function) after the rightmost chunk *)
         { body;
           return_layout = Lambda.layout_function;
-          return_mode = if enclosing_region then alloc_heap else alloc_local;
+          return_mode =
+            if enclosing_region then not_alloc_stack
+            else maybe_alloc_stack;
           nlocal = enclosing_nlocal;
           region = enclosing_region;
         }
@@ -1931,7 +1938,7 @@ and transl_function ~in_new_scope ~scopes e params body
       update_assume_zero_alloc ~scopes ~assume_zero_alloc
     else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
   in
-  let sreturn_mode = transl_alloc_mode_l sreturn_mode.mode_modes in
+  let sreturn_mode = transl_ret_mode sreturn_mode.mode_modes in
   let { params; body; return_sort; return_mode; region } =
     fuse_method_arity
       { params; body;
@@ -2595,7 +2602,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                ap_args=[Lvar left_id; Lvar right_id];
                ap_result_layout = result_layout;
                ap_region_close=Rc_normal;
-               ap_mode=alloc_heap;
+               ap_mode=not_alloc_stack;
                ap_tailcall = Default_tailcall;
                ap_inlined = Default_inlined;
                ap_specialised = Default_specialise;
@@ -2620,7 +2627,8 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
       (transl_exp ~scopes let_bop_exp_sort let_.bop_exp) ands
   in
   let func =
-    let return_mode = alloc_heap (* XXX fixme: use result of is_function_type *) in
+    (* XXX fixme: use result of is_function_type *)
+    let return_mode = not_alloc_stack in
     let (kind, params, return, _region, ret_mode), body =
       event_function ~scopes case.c_rhs
         (function repr ->
@@ -2652,7 +2660,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
       function2_return_layout env let_.bop_loc let_bop_op_return_sort
         let_.bop_op_type;
     ap_region_close=Rc_normal;
-    ap_mode=alloc_heap;
+    ap_mode=not_alloc_stack;
     ap_tailcall = Default_tailcall;
     ap_inlined = Default_inlined;
     ap_specialised = Default_specialise;

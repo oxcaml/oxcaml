@@ -245,7 +245,7 @@ let args t = t.args
 
 let call_kind t = t.call_kind
 
-let alloc_mode t = t.alloc_mode
+let return_mode t = t.alloc_mode
 
 let dbg t = t.dbg
 

@@ -1380,7 +1380,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ({ kind; params; return; body; attr; loc; mode; ret_mode } : L.lfunction) :
     Function_decl.t =
   let contains_no_escaping_local_allocs =
-    match ret_mode with Alloc_heap -> true | Alloc_local -> false
+    match ret_mode with Not_alloc_stack -> true | Maybe_alloc_stack -> false
   in
   let first_complex_local_param =
     List.length params
@@ -1471,7 +1471,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     let is_a_param_unboxed =
       List.exists (fun (p : Lambda.lparam) -> p.attributes.unbox_param) params
     in
-    if attr.stub || ((not attr.unbox_return) && not is_a_param_unboxed)
+    if
+      attr.stub
+      || ((not (Option.is_some attr.unbox_return)) && not is_a_param_unboxed)
     then Normal_calling_convention
     else
       let unboxed_function_slot =
@@ -1481,7 +1483,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           ~is_always_immediate:false Flambda_kind.value
       in
       let unboxed_return =
-        if attr.unbox_return then unboxing_kind return else None
+        match unboxing_kind return, attr.unbox_return with
+        | Some kind, Some mode -> Some (kind, mode)
+        | _, _ -> None
       in
       let unboxed_param (param : Lambda.lparam) =
         if param.attributes.unbox_param

@@ -328,7 +328,10 @@ let return_arity_identifier t =
 
 let print_generic_fns gfns =
   let pr_afuns _ fns =
-    let mode = function Cmx_format.Alloc_heap -> "" | Cmx_format.Alloc_local -> "L" in
+    let mode = function
+      | Cmx_format.Not_alloc_stack -> ""
+      | Cmx_format.Maybe_alloc_stack -> "L"
+    in
     List.iter (fun (arity,result,m) ->
         printf " %s%s%s"
           (unique_arity_identifier arity)

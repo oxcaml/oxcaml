@@ -307,8 +307,8 @@ let empty_array_kind ~space ppf (ak : empty_array_kind) =
 let alloc_mode_for_applications_opt ppf (alloc : alloc_mode_for_applications)
     ~space =
   match alloc with
-  | Heap -> ()
-  | Local { region = r; ghost_region = r' } ->
+  | Not_alloc_stack -> ()
+  | Maybe_alloc_stack { region = r; ghost_region = r' } ->
     pp_spaced ~space ppf "&%a &%a" region r region r'
 
 let boxed_variable ppf var ~kind =
@@ -693,7 +693,9 @@ and code_binding ppf
     variable depth_var continuation_id ret_cont continuation_id exn_cont
     (pp_option ~space:Before (pp_like ": %a" arity))
     ret_arity
-    (match result_mode with Heap -> "" | Local -> " local")
+    (match result_mode with
+    | Not_alloc_stack -> ""
+    | Maybe_alloc_stack -> " local")
     (expr Outer) body
 
 let flambda_unit ppf ({ body } : flambda_unit) =

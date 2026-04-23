@@ -253,7 +253,11 @@ let layout_annotation ppf lay_ =
   | _ -> fprintf ppf "[%a]" layout lay_
 
 let return_kind ppf (mode, kind) =
-  let smode = locality_mode_if_local mode in
+  let smode =
+    match mode with
+    | Not_alloc_stack -> ""
+    | Maybe_alloc_stack -> "stack"
+  in
   match kind with
   | Pvalue { raw_kind; nullable } -> begin
     let or_null_suffix =
@@ -262,7 +266,7 @@ let return_kind ppf (mode, kind) =
       | Nullable -> " or_null"
     in
     match raw_kind with
-    | Pgenval when is_heap_mode mode -> ()
+    | Pgenval when is_not_alloc_stack mode -> ()
     | Pgenval -> fprintf ppf ": %s@ " smode
     | Pintval -> fprintf ppf ": int@ "
     | Pboxedfloatval bf ->
@@ -288,6 +292,10 @@ let return_kind ppf (mode, kind) =
 let locality_kind = function
   | Alloc_heap -> ""
   | Alloc_local -> "[L]"
+
+let return_mode_kind = function
+  | Not_alloc_stack -> ""
+  | Maybe_alloc_stack -> "[L]"
 
 let print_bigarray name unsafe kind ppf layout =
   fprintf ppf "Bigarray.%s[%s,%s]"
@@ -1191,7 +1199,7 @@ let apply_kind name pos mode =
     | Rc_nontail -> name ^ "nontail"
     | Rc_close_at_apply -> name ^ "tail"
   in
-  name ^ locality_kind mode
+  name ^ return_mode_kind mode
 
 let debug_uid ppf duid =
   if !Clflags.dump_debug_uids then
@@ -1265,7 +1273,9 @@ let rec lam ppf = function
   | Lapply ap ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
-      let form = apply_kind "apply" ap.ap_region_close ap.ap_mode in
+      let form =
+        apply_kind "apply" ap.ap_region_close ap.ap_mode
+      in
       fprintf ppf "@[<2>(%s@ %a%a%a%a%a%a)@]" form
         lam ap.ap_func lams ap.ap_args
         apply_tailcall_attribute ap.ap_tailcall

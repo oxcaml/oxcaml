@@ -162,11 +162,11 @@ let alloc_mode_for_allocations env (alloc : Fexpr.alloc_mode_for_allocations) =
 let alloc_mode_for_applications env (alloc : Fexpr.alloc_mode_for_applications)
     =
   match alloc with
-  | Heap -> Alloc_mode.For_applications.heap
-  | Local { region = r; ghost_region = r' } ->
+  | Not_alloc_stack -> Alloc_mode.For_applications.not_alloc_stack
+  | Maybe_alloc_stack { region = r; ghost_region = r' } ->
     let r = find_region env r in
     let r' = find_region env r' in
-    Alloc_mode.For_applications.local ~region:r ~ghost_region:r'
+    Alloc_mode.For_applications.maybe_alloc_stack ~region:r ~ghost_region:r'
 
 let prim env ((p, args) : Fexpr.prim) : Flambda_primitive.t =
   let args = List.map (simple env) args in
@@ -659,7 +659,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               (Bound_parameters.create params)
               ~body ~my_closure
               ~my_alloc_mode:
-                (Alloc_mode.For_applications.local ~region:my_region
+                (Alloc_mode.For_applications.maybe_alloc_stack ~region:my_region
                    ~ghost_region:my_ghost_region)
               ~my_depth ~free_names_of_body:Unknown
           in
@@ -693,8 +693,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         in
         let result_mode =
           match result_mode with
-          | Heap -> Lambda.alloc_heap
-          | Local -> Lambda.alloc_local
+          | Not_alloc_stack -> Lambda.not_alloc_stack
+          | Maybe_alloc_stack -> Lambda.maybe_alloc_stack
         in
         let code =
           (* CR mshinwell: [inlining_decision] should maybe be set properly *)

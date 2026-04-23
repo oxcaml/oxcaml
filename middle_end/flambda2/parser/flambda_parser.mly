@@ -261,7 +261,9 @@ code:
         =
         header
       in
-      let result_mode : alloc_mode_for_assignments = if result_mode then Local else Heap in
+      let result_mode : alloc_mode_for_return =
+        if result_mode then Maybe_alloc_stack else Not_alloc_stack
+      in
       { id; newer_version_of; param_arity = None; ret_arity; recursive; inline;
         params_and_body = { params; closure_var; region_var; ghost_region_var; depth_var;
                             ret_cont; exn_cont; body };
@@ -313,8 +315,9 @@ alloc_mode_for_allocations_opt:
   | AMP; region = region { Local { region } }
 
 alloc_mode_for_applications_opt:
-  | { Heap }
-  | AMP; region = region; AMP; ghost_region = region { Local { region; ghost_region } }
+  | { Not_alloc_stack }
+  | AMP; region = region; AMP;
+    ghost_region = region { Maybe_alloc_stack { region; ghost_region } }
 
 prim_param_val:
   | i = IDENT { make_located i ($startpos, $endpos) }
@@ -545,7 +548,8 @@ call_kind:
     RPAREN
     { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC)
-    { (C_call { alloc = not noalloc }, (Heap : alloc_mode_for_applications)) }
+    { (C_call { alloc = not noalloc },
+      (Not_alloc_stack : alloc_mode_for_applications)) }
 ;
 
 inline:
