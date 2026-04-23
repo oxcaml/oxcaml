@@ -509,8 +509,8 @@ val mem
 val memq
   : ('a : value_or_null mod separable).
   local_ 'a -> set:local_ 'a iarray -> bool
-(** Same as {!mem}, but uses physical equality
-   instead of structural equality to compare list elements. *)
+(** Same as {!mem}, but uses physical equality instead of structural equality
+    to compare array elements. *)
 
 val find_opt
   : ('a : value_or_null mod separable).

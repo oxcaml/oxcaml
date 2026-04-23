@@ -4,9 +4,9 @@
  expect;
 *)
 
-module Iarray = Stdlib_stable.Iarray;;
+module Iarray = Stdlib_stable.IarrayLabels;;
 [%%expect{|
-module Iarray = Stdlib_stable.Iarray
+module Iarray = Stdlib_stable.IarrayLabels
 |}];;
 
 (******************************************************************************
@@ -90,9 +90,9 @@ pythagorean_triples 10;;
 
 let tails xs =
   let len = Iarray.length xs in
-  Iarray.init (len + 1) (fun i -> Iarray.sub xs ~pos:i ~len:(len - i))
+  Iarray.init (len + 1) ~f:(fun i -> Iarray.sub xs ~pos:i ~len:(len - i))
 in
-let sum = Iarray.fold_left ( + ) 0 in
+let sum = Iarray.fold_left ~f:( + ) ~init:0 in
 [:sum xs for xs in tails [:1; 20; 300; 4_000; 50_000; 600_000; 7_000_000:]:];;
 [%%expect{|
 - : int iarray =
@@ -298,14 +298,9 @@ Error: This expression has type "'a iarray"
        but an expression was expected of type "'b list"
 |}];;
 
-[:x for x in [||]:];;
+[:x for x in ([||] : _ array):];;
 [%%expect{|
-Line 1, characters 13-17:
-1 | [:x for x in [||]:];;
-                 ^^^^
-Error: This expression has type "'a array"
-       but an expression was expected of type "'b iarray"
-       because it is in a for-in iterator in an immutable array comprehension
+- : 'a iarray = [::]
 |}];;
 
 let empty = [||] in
