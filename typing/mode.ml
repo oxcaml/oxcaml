@@ -2221,8 +2221,8 @@ module Report = struct
           let other = Axis.proj ax other in
           let proj1 = Axis.proj ax a1 in
           let proj2 = Axis.proj ax a2 in
-          let pobj = C.proj_obj ax obj in
-          match choose_branch_axis b pobj proj1 proj2 ~other with
+          let obj = C.proj_obj ax obj in
+          match choose_branch_axis b obj proj1 proj2 ~other with
           | `First -> a1, hint1
           | `Second -> a2, hint2
         in
@@ -2773,10 +2773,9 @@ module Report = struct
       pinpoint ->
       a C.obj ->
       Fmt.formatter ->
-      loosening ->
-      a ahint_sided ->
+      loosening * a ahint_sided ->
       print_error_result option =
-   fun pp obj ppf loosening ahint_sided ->
+   fun pp obj ppf (loosening, ahint_sided) ->
     match ahint_sided with
     | Left ahint -> print_ahint_loosening `Left pp obj ppf loosening ahint
     | Right ahint -> print_ahint_loosening `Right pp obj ppf loosening ahint
@@ -2787,20 +2786,11 @@ module Report = struct
     let (ra, r_loosening), rh = right in
     let actual, expected =
       if C.is_opposite obj
-      then Right (ra, rh), Left (la, lh)
-      else Left (la, lh), Right (ra, rh)
+      then (r_loosening, Right (ra, rh)), (l_loosening, Left (la, lh))
+      else (l_loosening, Left (la, lh)), (r_loosening, Right (ra, rh))
     in
-    let actual_loosening, expected_loosening =
-      if C.is_opposite obj
-      then r_loosening, l_loosening
-      else l_loosening, r_loosening
-    in
-    let left ppf =
-      Option.get (print_ahint_sided pp obj ppf actual_loosening actual)
-    in
-    let right ppf =
-      Option.get (print_ahint_sided pp obj ppf expected_loosening expected)
-    in
+    let left ppf = Option.get (print_ahint_sided pp obj ppf actual) in
+    let right ppf = Option.get (print_ahint_sided pp obj ppf expected) in
     { left; right }
 end
 
@@ -2828,15 +2818,15 @@ module Error = struct
       Hint.pinpoint -> r C.obj -> (r, a) Axis.t -> r t -> print_error =
    fun pp obj ax err ->
     let err = S.populate_error obj err in
-    let report = Report.Of_solver.error_prod obj ax err in
+    let err = Report.Of_solver.error_prod obj ax err in
     let obj = C.proj_obj ax obj in
-    Report.print pp obj report
+    Report.print pp obj err
 
   let print_axis : type a. Hint.pinpoint -> a C.obj -> a t -> print_error =
    fun pp obj err ->
     let err = S.populate_error obj err in
-    let report = Report.Of_solver.error_axis obj err in
-    Report.print pp obj report
+    let err = Report.Of_solver.error_axis obj err in
+    Report.print pp obj err
 
   let print_packed : Hint.pinpoint -> packed -> print_error =
    fun pp -> function
