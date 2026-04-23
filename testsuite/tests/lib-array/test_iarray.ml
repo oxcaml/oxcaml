@@ -10,7 +10,7 @@ external ( .:() ) : 'a iarray -> int -> 'a = "%array_safe_get";;
 (** Create some immutable and mutable arrays *)
 
 let iarray  : int   iarray = [|1;2;3;4;5|];;
-let iarray_local () = exclave_ Iarray.init_local 5 (fun x -> x + 1);;
+let iarray_local () = exclave_ Iarray.init_local 5 ~f:(fun x -> x + 1);;
 let ifarray : float iarray = [:1.5;2.5;3.5;4.5;5.5:];;
 let ifarray_local () =
   exclave_ Iarray.init_local 5 ~f:(fun x -> Int.to_float x +. 1.5);;
@@ -32,12 +32,6 @@ let rec list_map_local_input (local_ f) (local_ list) =
 module Iarray = Stdlib_stable.IarrayLabels
 external ( .:() ) : 'a iarray -> int -> 'a = "%array_safe_get"
 val iarray : int iarray = [:1; 2; 3; 4; 5:]
-Line 8, characters 31-48:
-8 | let iarray_local () = exclave_ Iarray.init_local 5 (fun x -> x + 1);;
-                                   ^^^^^^^^^^^^^^^^^
-Warning 6 [labels-omitted]: label "f" was omitted in the application of this
-  function.
-
 val iarray_local : unit -> int iarray @ local = <fun>
 val ifarray : float iarray = [:1.5; 2.5; 3.5; 4.5; 5.5:]
 val ifarray_local : unit -> float iarray @ local = <fun>
@@ -108,14 +102,14 @@ Error: This pattern matches values of type "'a iarray"
 |}];;
 
 match iarray with
-| [||]          -> "empty"
-| [|1;2;3;4;5|] -> "1--5"
-| _             -> "who knows?"
+| ([||] : _ array) -> "empty"
+| [|1;2;3;4;5|]    -> "1--5"
+| _                -> "who knows?"
 ;;
 [%%expect{|
-Line 2, characters 2-6:
-2 | | [||]          -> "empty"
-      ^^^^
+Line 2, characters 2-18:
+2 | | ([||] : _ array) -> "empty"
+      ^^^^^^^^^^^^^^^^
 Error: This pattern matches values of type "'a array"
        but a pattern was expected which matches values of type "int iarray"
 |}];;

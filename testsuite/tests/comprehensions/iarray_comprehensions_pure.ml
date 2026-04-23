@@ -298,7 +298,7 @@ Error: This expression has type "'a iarray"
        but an expression was expected of type "'b list"
 |}];;
 
-[:x for x in [||]:];;
+[:x for x in ([||] : _ array):];;
 [%%expect{|
 - : 'a iarray = [::]
 |}];;
