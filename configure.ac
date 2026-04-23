@@ -2864,13 +2864,17 @@ AC_ARG_WITH([objcopy],
 
 ## Frame pointers
 
-AS_IF([test x"$enable_frame_pointers" = "xyes" -o x"$enable_address_sanitizer" = "xyes"],
-  [AS_CASE(["$host,$ocaml_cc_vendor"],
-    [x86_64-*-linux*,gcc-*|x86_64-*-linux*,clang-*],
-      [common_cflags="$common_cflags -g -fno-omit-frame-pointer"
-      frame_pointers=true
-      AC_DEFINE([WITH_FRAME_POINTERS])
-      AC_MSG_NOTICE([using frame pointers])],
+AS_IF([test x"$enable_frame_pointers" = "xyes"],
+  [AS_CASE([$target],
+    [x86_64-*-linux*|x86_64-*-darwin*|aarch64-*-linux*|aarch64-*-darwin*],
+     [AS_CASE([$ocaml_cc_vendor],
+        [clang-*|gcc-*],
+         [common_cflags="$common_cflags -g  -fno-omit-frame-pointer"
+         frame_pointers=true
+         AC_DEFINE([WITH_FRAME_POINTERS], [1])
+         AC_MSG_NOTICE([using frame pointers])],
+         [AC_MSG_ERROR([frame pointers not supported on this platform])]
+      )],
     [AC_MSG_ERROR([frame pointers not supported on this platform])]
   )],
   [AC_MSG_NOTICE([not using frame pointers])

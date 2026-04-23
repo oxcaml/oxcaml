@@ -18,6 +18,8 @@
  (modules simdgen amd64_simd_defs))
 
 (rule
+ (enabled_if
+  (= %{env:ARCH=amd64} "amd64"))
  (target amd64_simd_instrs.ml)
  (deps simdgen.exe amd64/amd64.csv)
  (mode promote)
