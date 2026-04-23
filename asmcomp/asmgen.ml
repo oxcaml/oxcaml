@@ -514,14 +514,10 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   ++ (fun (fd_cmm : Cmm.fundecl) ->
   (if !Oxcaml_flags.use_ssa
    then (
-     let cfg_old =
-       let saved_instr_id = InstructionId.save Sub_cfg.instr_id in
-       let result =
-         Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
-       in
-       InstructionId.restore Sub_cfg.instr_id saved_instr_id;
-       result
+     let cfg_without_ssa =
+       Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
      in
+     let label_counter_after_baseline = Label.cur_label () in
      let ssa = Ssa_of_cmm.convert fd_cmm in
      (try Ssa_validate.validate ssa
       with exn ->
@@ -533,7 +529,12 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
         Printexc.raise_with_backtrace exn bt);
      if !Oxcaml_flags.dump_cfg
      then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
-     let cfg_new =
+     let cfg_from_ssa_for_compare =
+       (* First conversion: used only for [Cfg_compare], so we emit a CFG that
+          stays faithful to plain [cfg_selectgen]. No optimizations here. Labels
+          allocated here must not leak into the real pipeline (the second
+          conversion will allocate its own or reuse the aligned hints), so we
+          run under a saved label counter. *)
        Label.with_saved_counter @@ fun () ->
        try
          Cfg_of_ssa.convert ~keep_unused_ops:true ~future_funcnames:funcnames
@@ -546,9 +547,57 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
            fd_cmm Ssa_print.print ssa;
          Printexc.raise_with_backtrace exn bt
      in
-     Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name ~fd_cmm ~ssa
-       ~old_cfg:cfg_old ~new_cfg:cfg_new ppf_dump;
-     cfg_new)
+     let new_to_old =
+       Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name ~fd_cmm ~ssa
+         ~old_cfg:cfg_without_ssa ~new_cfg:cfg_from_ssa_for_compare ppf_dump
+     in
+     (* Align SSA label hints with the old pipeline's labels, so the second
+        conversion produces identical label numbers. For blocks whose new label
+        isn't in the map, draw from the pool of old labels that weren't matched
+        — this avoids bumping the label counter with fresh allocations that
+        would shift labels allocated by later pipeline stages (e.g. edge
+        splitting in the register allocator). *)
+     List.iter
+       (fun (bl : Ssa.block) ->
+         match bl.label_hint with
+         | None -> ()
+         | Some l ->
+           let new_hint = Label.Tbl.find_opt new_to_old l in
+           Ssa.set_label_hint bl new_hint)
+       ssa.blocks;
+     (* Second conversion: produces the CFG that feeds the real pipeline. This
+        is where SSA-level optimizations run. *)
+     let ssa = Ssa_simplify.run ssa in
+     let cfg_final =
+       try
+         Label.with_saved_counter @@ fun () ->
+         Cfg_of_ssa.convert ~keep_unused_ops:true ~future_funcnames:funcnames
+           ssa
+       with exn ->
+         let bt = Printexc.get_raw_backtrace () in
+         Format.fprintf ppf_dump
+           "*** SSA pipeline error for %s: %s@.*** CMM:@.%a@.*** SSA:@.%a@."
+           fd_cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl
+           fd_cmm Ssa_print.print ssa;
+         Printexc.raise_with_backtrace exn bt
+     in
+     (* The SSA pipeline may allocate more labels than the baseline (e.g., for
+        blocks that [Cfg_simplify] later merges away). Reset the counter to the
+        max of the baseline counter and any label actually still present in
+        [cfg_final], so downstream passes don't pick up unnecessary "extra"
+        label numbers. *)
+     let max_used_label =
+       Label.Tbl.fold
+         (fun lbl _ acc -> if Label.compare lbl acc > 0 then lbl else acc)
+         (Cfg_with_layout.cfg cfg_final).blocks Label.none
+     in
+     let next_label =
+       if Label.compare label_counter_after_baseline max_used_label > 0
+       then label_counter_after_baseline
+       else Label.of_int_unsafe (Label.to_int max_used_label + 1)
+     in
+     Label.set_label next_label;
+     cfg_final)
    else Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm)
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)

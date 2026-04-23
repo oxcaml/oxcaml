@@ -129,20 +129,6 @@ let size_of_cmm_expr env (e : Cmm.expression) =
   in
   size e
 
-let unreachable_handler_body : Cmm.expression =
-  let dummy_constant : Cmm.expression = Cconst_int (1, Debuginfo.none) in
-  let segfault : Cmm.expression =
-    Cop
-      ( Cload
-          { memory_chunk = Word_int; mutability = Mutable; is_atomic = false },
-        [Cconst_int (0, Debuginfo.none)],
-        Debuginfo.none )
-  in
-  let dummy_raise : Cmm.expression =
-    Cop (Craise Raise_notrace, [dummy_constant], Debuginfo.none)
-  in
-  Csequence (segfault, dummy_raise)
-
 let emit_branch b (test : Operation.test) rarg ~true_block ~false_block :
     Ssa.terminator =
   let make_cond op args =
@@ -421,7 +407,7 @@ and emit_invalid env b message symbol =
   let* arg_instrs, b = emit_tuple env b [arg_expr] in
   if !SU.current_function_is_check_enabled
   then (
-    let cont_b = B.create_call_continuation b Cmm.typ_int in
+    let cont_b = B.new_block b ~params:Cmm.typ_int Call_continuation in
     let cont_block = B.current_block cont_b in
     B.finish_block b ~dbg:Debuginfo.none
       (Invalid { message; args = arg_instrs; continuation = Some cont_block });
@@ -449,7 +435,7 @@ and emit_expr_op_cont env b ~ty (new_op : Cfg.basic_or_terminator) arg_instrs
   in
   match new_op with
   | Terminator (Call { op = call_op; _ }) ->
-    let cont_b = B.create_call_continuation b ty in
+    let cont_b = B.new_block b ~params:ty Call_continuation in
     let cont_block = B.current_block cont_b in
     let exn_cont = current_exn_continuation env in
     B.finish_block b ~dbg
@@ -462,7 +448,7 @@ and emit_expr_op_cont env b ~ty (new_op : Cfg.basic_or_terminator) arg_instrs
     set_traps_for_raise env;
     Ok (B.block_params cont_b, cont_b)
   | Terminator (Prim { op = External ({ ty_res; _ } as ext_call); _ }) ->
-    let cont_b = B.create_call_continuation b ty_res in
+    let cont_b = B.new_block b ~params:ty_res Call_continuation in
     let cont_block = B.current_block cont_b in
     let exn_cont = current_exn_continuation env in
     B.finish_block b ~dbg
@@ -475,7 +461,7 @@ and emit_expr_op_cont env b ~ty (new_op : Cfg.basic_or_terminator) arg_instrs
     set_traps_for_raise env;
     Ok (B.block_params cont_b, cont_b)
   | Terminator (Prim { op = Probe _ as probe_op; _ }) ->
-    let cont_b = B.create_call_continuation b ty in
+    let cont_b = B.new_block b ~params:ty Call_continuation in
     let cont_block = B.current_block cont_b in
     B.finish_block b ~dbg
       (Prim
@@ -539,8 +525,8 @@ and emit_ifthenelse env b ~tail econd eif eelse : result =
   match emit env b earg ~tail:false with
   | Never_returns -> Never_returns
   | Ok (rarg, b) ->
-    let then_b = B.create_branch_target b in
-    let else_b = B.create_branch_target b in
+    let then_b = B.new_block b Branch_target in
+    let else_b = B.new_block b Branch_target in
     let then_block = B.current_block then_b in
     let else_block = B.current_block else_b in
     let term =
@@ -561,7 +547,7 @@ and emit_switch env b ~tail esel index ecases : result =
   | Never_returns -> Never_returns
   | Ok (rsel, b) ->
     let case_bs =
-      Array.map (fun (_case_expr, _dbg) -> B.create_branch_target b) ecases
+      Array.map (fun (_case_expr, _dbg) -> B.new_block b Branch_target) ecases
     in
     let targets = Array.map (fun idx -> B.current_block case_bs.(idx)) index in
     B.finish_block b ~dbg:Debuginfo.none (Switch (targets, rsel));
@@ -579,7 +565,7 @@ and emit_switch env b ~tail esel index ecases : result =
     else join_array case_results
 
 and emit_catch env b ~tail (flag : Cmm.ccatch_flag) handlers body : result =
-  let body_b = B.create_merge b [||] in
+  let body_b = B.new_block b Merge in
   let body_block = B.current_block body_b in
   assert (List.length handlers = 1);
   let Cmm.{ label = nfail; params; body = handler_body; _ } =
@@ -588,9 +574,8 @@ and emit_catch env b ~tail (flag : Cmm.ccatch_flag) handlers body : result =
   let types = List.map (fun (_id, ty) -> ty) params |> Array.concat in
   let handler_b =
     match flag with
-    | Cmm.Exn_handler -> B.create_trap_handler b types
-    | Cmm.Recursive -> B.create_loop body_b types
-    | Cmm.Normal -> B.create_merge b types
+    | Cmm.Exn_handler -> B.new_block b ~params:types Trap_handler
+    | Cmm.Recursive | Cmm.Normal -> B.new_block b ~params:types Merge
   in
   let traps_ref = ref SU.Unreachable in
   let env =
@@ -603,12 +588,14 @@ and emit_catch env b ~tail (flag : Cmm.ccatch_flag) handlers body : result =
   B.finish_block b ~dbg:Debuginfo.none (Goto { goto = body_block; args = [||] });
   let r_body = emit env body_b body ~tail in
   let translate_handler handler_body =
-    let trap_stack, handler_body =
+    (* Handlers are emitted unconditionally. If no [Cexit]/raise populated
+       [traps_ref], the handler is dead and its trap stack defaults to the
+       ambient one; later passes can drop the resulting unreachable block and
+       rewrite [Push_trap]/[Pop_trap] references to [None]. *)
+    let trap_stack =
       match !traps_ref with
-      | SU.Unreachable ->
-        assert (Cmm.is_exn_handler flag);
-        Operation.Uncaught, unreachable_handler_body
-      | SU.Reachable trap_stack -> trap_stack, handler_body
+      | SU.Reachable trap_stack -> trap_stack
+      | SU.Unreachable -> env.trap_stack
     in
     let handler_block = B.current_block handler_b in
     let handler_env = { env with trap_stack } in
@@ -642,12 +629,7 @@ and emit_catch env b ~tail (flag : Cmm.ccatch_flag) handlers body : result =
       params;
     emit handler_env handler_b handler_body ~tail
   in
-  let all_results =
-    match flag, !traps_ref with
-    | Normal, SU.Unreachable | Recursive, SU.Unreachable -> [| r_body |]
-    | Exn_handler, _ | Normal, _ | Recursive, _ ->
-      [| r_body; translate_handler handler_body |]
-  in
+  let all_results = [| r_body; translate_handler handler_body |] in
   if tail
   then (
     assert (
@@ -673,8 +655,8 @@ and emit_trap_actions env b traps =
       in
       B.emit_instruction b
         (match trap with
-        | Push _ -> Push_trap { handler = B.current_block h.handler_b }
-        | Pop _ -> Pop_trap { handler = B.current_block h.handler_b }))
+        | Push _ -> Push_trap { handler = Some (B.current_block h.handler_b) }
+        | Pop _ -> Pop_trap { handler = Some (B.current_block h.handler_b) }))
     traps
 
 and emit_expr_exit env b (lbl : Cmm.exit_label) args traps : result =
@@ -754,7 +736,7 @@ and join_branches (r1 : result) (r2 : result) : result =
   | Ok (r1_instrs, b1), Ok (r2_instrs, b2) ->
     assert (Array.length r1_instrs = Array.length r2_instrs);
     let join_types = Array.map typ_of_instruction r1_instrs in
-    let join_b = B.create_merge b1 join_types in
+    let join_b = B.new_block b1 ~params:join_types Merge in
     let join_block = B.current_block join_b in
     B.finish_block b1 ~dbg:Debuginfo.none
       (Goto { goto = join_block; args = r1_instrs });
@@ -779,7 +761,7 @@ and join_array (results : result array) : result =
   match !join_info with
   | None -> Never_returns
   | Some (join_types, any_b) ->
-    let join_b = B.create_merge any_b join_types in
+    let join_b = B.new_block any_b ~params:join_types Merge in
     let join_block = B.current_block join_b in
     Array.iter
       (fun r ->

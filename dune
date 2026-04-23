@@ -695,6 +695,8 @@
   ssa
   ssa_print
   ssa_validate
+  ssa_reducer
+  ssa_simplify
   ssa_of_cmm
   cfg_of_ssa
   ;; backend/debug/

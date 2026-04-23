@@ -32,4 +32,10 @@ let save seq = seq.next
 
 let restore seq saved = seq.next <- saved
 
+let with_saved_counter seq f =
+  let saved = save seq in
+  let result = f () in
+  restore seq saved;
+  result
+
 let to_int_unsafe t = t

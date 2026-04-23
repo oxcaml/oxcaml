@@ -9,7 +9,10 @@ type env =
     block_params_regs : Reg.t array Ssa.Block.Tbl.t;
     block_labels : Label.t Ssa.Block.Tbl.t;
     call_result_locs : Reg.t array Ssa.Block.Tbl.t;
-    call_stack_ofs : int Ssa.Block.Tbl.t
+    call_stack_ofs : int Ssa.Block.Tbl.t;
+    mutable invalid_handler_label : Label.t option
+        (** Lazily-allocated label for the shared "invalid handler" block
+            emitted for [Push_trap]/[Pop_trap] with [handler = None]. *)
   }
 
 let create_env () =
@@ -17,10 +20,24 @@ let create_env () =
     block_params_regs = Ssa.Block.Tbl.create 64;
     block_labels = Ssa.Block.Tbl.create 64;
     call_result_locs = Ssa.Block.Tbl.create 16;
-    call_stack_ofs = Ssa.Block.Tbl.create 16
+    call_stack_ofs = Ssa.Block.Tbl.create 16;
+    invalid_handler_label = None
   }
 
 let label_of env blk = Ssa.Block.Tbl.find env.block_labels blk
+
+let invalid_handler_label env =
+  match env.invalid_handler_label with
+  | Some l -> l
+  | None ->
+    let l = Label.new_label () in
+    env.invalid_handler_label <- Some l;
+    l
+
+let handler_label env (handler : Ssa.block option) =
+  match handler with
+  | Some h -> label_of env h
+  | None -> invalid_handler_label env
 
 let get_reg env (i : Ssa.instruction) : Reg.t =
   match i with
@@ -34,7 +51,8 @@ let get_reg env (i : Ssa.instruction) : Reg.t =
       regs.(index)
     with Not_found ->
       Misc.fatal_errorf "Cfg_of_ssa: no regs for Block_param %d.%d"
-        (Ssa.block_id block) index)
+        (block.id :> int)
+        index)
   | Proj { index; src = Op { id; _ } } ->
     (Ssa.InstructionId.Tbl.find env.op_regs id).(index)
   | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ | Proj _ ->
@@ -44,7 +62,7 @@ let get_block_params_regs env (block : Ssa.block) =
   try Ssa.Block.Tbl.find env.block_params_regs block
   with Not_found ->
     Misc.fatal_errorf "Cfg_of_ssa: no regs for block params of %d"
-      (Ssa.block_id block)
+      (block.id :> int)
 
 let make_cfg_instr desc arg res dbg =
   { Cfg.desc;
@@ -67,6 +85,51 @@ let emit_moves body ~src ~dst =
         DLL.add_end body
           (make_cfg_instr (Cfg.Op Move) [| s |] [| d |] Debuginfo.none))
     src dst
+
+(* Build the shared dummy handler referenced by [Push_trap]/[Pop_trap] with
+   [handler = None]. This mirrors [cfg_selectgen]'s [unreachable_handler] (load
+   from address 0 followed by a [Raise_notrace]) so it can be cfg_compared with
+   the baseline. *)
+let make_invalid_handler_block ~label : Cfg.basic_block =
+  let body = DLL.make_empty () in
+  (* Trap handler entry: copy [Proc.loc_exn_bucket] into a virtual reg, as would
+     be done for a regular exn handler's first parameter. *)
+  let exn_bucket_virt = Reg.createv Cmm.typ_val in
+  emit_moves body ~src:[| Proc.loc_exn_bucket |] ~dst:exn_bucket_virt;
+  (* Segfault: load from the constant address [0]. *)
+  let zero_reg = Reg.createv Cmm.typ_int in
+  DLL.add_end body
+    (make_cfg_instr (Cfg.Op (Const_int 0n)) [||] zero_reg Debuginfo.none);
+  let load_res = Reg.createv Cmm.typ_int in
+  DLL.add_end body
+    (make_cfg_instr
+       (Cfg.Op
+          (Load
+             { memory_chunk = Word_int;
+               addressing_mode = Arch.identity_addressing;
+               mutability = Mutable;
+               is_atomic = false
+             }))
+       zero_reg load_res Debuginfo.none);
+  (* Dummy raise of [1]. *)
+  let one_reg = Reg.createv Cmm.typ_int in
+  DLL.add_end body
+    (make_cfg_instr (Cfg.Op (Const_int 1n)) [||] one_reg Debuginfo.none);
+  emit_moves body ~src:one_reg ~dst:[| Proc.loc_exn_bucket |];
+  let terminator =
+    make_cfg_instr (Cfg.Raise Lambda.Raise_notrace) [| Proc.loc_exn_bucket |]
+      [||] Debuginfo.none
+  in
+  { Cfg.start = label;
+    body;
+    terminator;
+    predecessors = Label.Set.empty;
+    stack_offset = Cfg.invalid_stack_offset;
+    exn = None;
+    can_raise = true;
+    is_trap_handler = true;
+    cold = true
+  }
 
 (* A Branch condition that can be folded into the CFG test terminator, consuming
    the Op's args directly. *)
@@ -96,12 +159,21 @@ let fuse_comparison (cond : Ssa.instruction) ~true_label ~false_label :
     Some (Cfg.Parity_test { ifso = false_label; ifnot = true_label }, args)
   | _ -> None
 
+(* A sequence of actions that undo specific usage-count mutations made by the
+   pre-passes below. Applied at the end of [convert] to leave the SSA untouched
+   across calls. *)
+type undo_log = (unit -> unit) list ref
+
+let record_undo (log : undo_log) action = log := action :: !log
+
+let apply_undo (log : undo_log) = List.iter (fun f -> f ()) !log
+
 (* Decrement usage counts of comparisons that will be fused into branch
    terminators. Must run before block conversion so the body emission pass sees
    the post-fusion counts. After fusion, the branch terminator uses the
    comparison's args directly, so we pre-increment their use counts to keep them
    alive across the (potentially recursive) decrement. *)
-let decrement_fused_branch_conditions (ssa : Ssa.t) =
+let decrement_fused_branch_conditions (ssa : Ssa.t) (undo : undo_log) =
   List.iter
     (fun (block : Ssa.block) ->
       match[@warning "-fragile-match"] block.terminator with
@@ -109,7 +181,10 @@ let decrement_fused_branch_conditions (ssa : Ssa.t) =
         fuse_comparison cond ~true_label:Label.none ~false_label:Label.none
         |> Option.iter (fun (_, args) ->
             Array.iter Ssa.increment_use args;
-            Ssa.decrement_use cond)
+            Ssa.decrement_use cond;
+            record_undo undo (fun () ->
+                Ssa.increment_use cond;
+                Array.iter Ssa.decrement_use args))
       | _ -> ())
     ssa.blocks
 
@@ -117,13 +192,15 @@ let decrement_fused_branch_conditions (ssa : Ssa.t) =
    elimination for naturally-unused Ops, matching the non-SSA pipeline's
    behaviour (and keeping cfg_compare happy). Ops that were decremented by the
    fusion pre-pass are unaffected. *)
-let bump_unused_op_counts (ssa : Ssa.t) =
+let bump_unused_op_counts (ssa : Ssa.t) (undo : undo_log) =
   List.iter
     (fun (block : Ssa.block) ->
       Array.iter
         (fun (instr : Ssa.instruction) ->
           match instr with
-          | Op r when r.usage_count = 0 -> Ssa.increment_use instr
+          | Op r when r.usage_count = 0 ->
+            Ssa.increment_use instr;
+            record_undo undo (fun () -> Ssa.decrement_use instr)
           | Op _ | Block_param _ | Proj _ | Push_trap _ | Pop_trap _
           | Stack_check _ | Name_for_debugger _ ->
             ())
@@ -148,7 +225,7 @@ let emit_op body op dbg rs rd : Cfg.basic Cfg.instruction =
 let convert_block (env : env) (block : Ssa.block) : Cfg.basic_block =
   let body = DLL.make_empty () in
   (match block.desc with
-  | Call_continuation _ -> (
+  | Call_continuation -> (
     let virt_res = get_block_params_regs env block in
     match Ssa.Block.Tbl.find_opt env.call_result_locs block with
     | Some loc_res ->
@@ -164,12 +241,12 @@ let convert_block (env : env) (block : Ssa.block) : Cfg.basic_block =
           (make_cfg_instr (Cfg.Op (Stackoffset (-stack_ofs))) [||] [||]
              Debuginfo.none)
     | None -> ())
-  | Trap_handler _ ->
+  | Trap_handler ->
     let virt_res = get_block_params_regs env block in
     let exn_bucket = [| Proc.loc_exn_bucket |] in
     let first_param = [| virt_res.(0) |] in
     emit_moves body ~src:exn_bucket ~dst:first_param
-  | Merge _ | Loop _ | Branch_target _ | Function_start -> ());
+  | Merge | Branch_target | Function_start -> ());
   Array.iter
     (fun (i : Ssa.instruction) ->
       match i with
@@ -185,12 +262,12 @@ let convert_block (env : env) (block : Ssa.block) : Cfg.basic_block =
       | Push_trap { handler } ->
         DLL.add_end body
           (make_cfg_instr
-             (Cfg.Pushtrap { lbl_handler = label_of env handler })
+             (Cfg.Pushtrap { lbl_handler = handler_label env handler })
              [||] [||] Debuginfo.none)
       | Pop_trap { handler } ->
         DLL.add_end body
           (make_cfg_instr
-             (Cfg.Poptrap { lbl_handler = label_of env handler })
+             (Cfg.Poptrap { lbl_handler = handler_label env handler })
              [||] [||] Debuginfo.none)
       | Stack_check { max_frame_size_bytes } ->
         DLL.add_end body
@@ -409,7 +486,7 @@ let convert_block (env : env) (block : Ssa.block) : Cfg.basic_block =
         true )
   in
   let is_trap_handler =
-    match block.desc with Trap_handler _ -> true | _ -> false
+    match block.desc with Trap_handler -> true | _ -> false
   in
   let exn = None in
   { Cfg.start = label_of env block;
@@ -425,12 +502,26 @@ let convert_block (env : env) (block : Ssa.block) : Cfg.basic_block =
 
 let convert ~keep_unused_ops ~future_funcnames (ssa : Ssa.t) : Cfg_with_layout.t
     =
-  if keep_unused_ops then bump_unused_op_counts ssa;
-  decrement_fused_branch_conditions ssa;
+  (* Reset the instruction-id counter so this conversion starts from 0, matching
+     what [Cfg_selectgen.emit_fundecl] does. *)
+  Sub_cfg.reset_instr_id ();
+  (* Collect the inverse of every usage-count mutation we make, so we can leave
+     the SSA untouched across calls. *)
+  let undo = ref [] in
+  if keep_unused_ops then bump_unused_op_counts ssa undo;
+  decrement_fused_branch_conditions ssa undo;
   let env = create_env () in
   ssa.blocks
   |> List.iter (fun (block : Ssa.block) ->
-      Ssa.Block.Tbl.replace env.block_labels block (Cmm.new_label ());
+      let label =
+        match block.label_hint with
+        | Some l -> l
+        | None ->
+          let l = Label.new_label () in
+          Ssa.set_label_hint block (Some l);
+          l
+      in
+      Ssa.Block.Tbl.replace env.block_labels block label;
       Ssa.Block.Tbl.replace env.block_params_regs block
         (Reg.createv block.params));
   let fun_arg_regs = get_block_params_regs env ssa.entry in
@@ -555,6 +646,14 @@ let convert ~keep_unused_ops ~future_funcnames (ssa : Ssa.t) : Cfg_with_layout.t
                 let is_poll = InstructionId.equal instr.id poll_id in
                 if is_poll then found := true;
                 not is_poll)));
+  (* If any [Push_trap]/[Pop_trap] referenced [handler = None], emit the shared
+     invalid handler block now. *)
+  (match env.invalid_handler_label with
+  | None -> ()
+  | Some lbl ->
+    let blk = make_invalid_handler_block ~label:lbl in
+    Cfg.add_block_exn cfg blk;
+    DLL.add_end layout lbl);
   let cfg_with_layout = Cfg_with_layout.create cfg ~layout in
   let cfg_with_layout = Cfg_simplify.run cfg_with_layout in
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
@@ -564,4 +663,5 @@ let convert ~keep_unused_ops ~future_funcnames (ssa : Ssa.t) : Cfg_with_layout.t
       cfg.blocks false
   in
   let cfg = { cfg with fun_contains_calls } in
+  apply_undo undo;
   Cfg_with_layout.create cfg ~layout:(Cfg_with_layout.layout cfg_with_layout)

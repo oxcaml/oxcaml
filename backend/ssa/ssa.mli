@@ -1,22 +1,15 @@
 [@@@ocaml.warning "-30"]
 
-module InstructionId : sig
-  type t
+module InstructionId : Oxcaml_utils.Id_counter.S
 
-  val create : unit -> t
+module BlockId : Oxcaml_utils.Id_counter.S
 
-  val equal : t -> t -> bool
-
-  val compare : t -> t -> int
-
-  val hash : t -> int
-
-  module Set : Set.S with type elt = t
-
-  module Map : Map.S with type key = t
-
-  module Tbl : Hashtbl.S with type key = t
-end
+type block_desc =
+  | Merge
+  | Branch_target
+  | Function_start
+  | Call_continuation
+  | Trap_handler
 
 type op_data = private
   { id : InstructionId.t;
@@ -38,8 +31,10 @@ and instruction =
       { index : int;
         src : instruction
       }
-  | Push_trap of { handler : block }
-  | Pop_trap of { handler : block }
+  | Push_trap of { handler : block option }
+      (** [handler = None] means "no handler block exists"; CFG lowering
+          provides a shared dummy invalid block. *)
+  | Pop_trap of { handler : block option }
   | Stack_check of { max_frame_size_bytes : int }
   | Name_for_debugger of
       { ident : Ident.t;
@@ -85,32 +80,44 @@ and terminator =
         continuation : block option
       }
 
-and block_desc =
-  | Merge of { mutable predecessors : block list }
-  | Loop of
-      { mutable predecessors : block list;
-        mutable backedges : block list
-      }
-  | Branch_target of { predecessor : block }
-  | Function_start
-  | Call_continuation of { predecessor : block }
-  | Trap_handler of { mutable predecessors : block list }
+and dominator_info =
+  | Unreachable
+  | Reachable of dominator_of_reachable
 
-and block =
-  { id : int;
+and dominator_of_reachable = private
+  { dominator : block;  (** Immediate dominator, or self for the entry. *)
+    depth : int  (** Depth in the dominator tree, 0 for the entry. *)
+  }
+
+and block = private
+  { id : BlockId.t;
     desc : block_desc;
     params : Cmm.machtype;
+    mutable predecessors : block list;
     mutable body : instruction array;
     mutable terminator : terminator;
     mutable terminator_dbg : Debuginfo.t;
-    mutable reachable : bool;
-    mutable dominator : block;
-    mutable dominator_depth : int
+    mutable dominator_info : dominator_info;
+    mutable label_hint : Label.t option
+        (** Cached CFG label. Set by [Cfg_of_ssa.convert] so a second conversion
+            pass can reuse it, and updated after [Cfg_compare] to align labels
+            with the old pipeline. *)
   }
 
 val block_equal : block -> block -> bool
 
-val block_id : block -> int
+val set_label_hint : block -> Label.t option -> unit
+
+(** Smart constructor for [Op] instructions. Allocates a fresh [InstructionId.t]
+    and sets [usage_count] to 0. Does not emit into a builder. *)
+val make_op :
+  op:Operation.t ->
+  typ:Cmm.machtype ->
+  args:instruction array ->
+  dbg:Debuginfo.t ->
+  instruction
+
+val reachable : dominator_info -> bool
 
 module Block : sig
   type t = block
@@ -140,9 +147,13 @@ type t =
     fun_ret_type : Cmm.machtype
   }
 
+val predecessors : block -> block list
+
+val successors : block -> block list
+
 val dominates : block -> block -> bool
 
-val common_dominator : block -> block -> block
+val common_dominator : dominator_info -> dominator_info -> dominator_info
 
 module Builder : sig
   type t
@@ -163,15 +174,7 @@ module Builder : sig
 
   val current_block : t -> block
 
-  val create_merge : t -> Cmm.machtype -> t
-
-  val create_loop : t -> Cmm.machtype -> t
-
-  val create_trap_handler : t -> Cmm.machtype -> t
-
-  val create_branch_target : t -> t
-
-  val create_call_continuation : t -> Cmm.machtype -> t
+  val new_block : t -> ?params:Cmm.machtype -> block_desc -> t
 
   val block_params : t -> instruction array
 
