@@ -359,6 +359,7 @@ let insert_reloads :
   if debug then dedent ()
 
 let add_phi_moves_to_instr_list :
+    phi_moves:(Reg.t * Reg.t) list ref ->
     instr_id:InstructionId.sequence ->
     before:Cfg.basic_block ->
     phi:Cfg.basic_block ->
@@ -366,7 +367,7 @@ let add_phi_moves_to_instr_list :
     Reg.Set.t ->
     Cfg.basic_instruction_list ->
     unit =
- fun ~instr_id ~before ~phi substs to_unify instrs ->
+ fun ~phi_moves ~instr_id ~before ~phi substs to_unify instrs ->
   let before_subst = Substitution.for_label substs before.start in
   let phi_subst = Substitution.for_label substs phi.start in
   Reg.Set.iter
@@ -381,6 +382,7 @@ let add_phi_moves_to_instr_list :
             Printreg.reg to_
       | false ->
         if debug then log "phi %a -> %a" Printreg.reg from Printreg.reg to_;
+        phi_moves := (from, to_) :: !phi_moves;
         let phi_move =
           Move.make_instr Move.Plain
             ~id:(InstructionId.get_and_incr instr_id)
@@ -392,8 +394,13 @@ let add_phi_moves_to_instr_list :
 (* Insert phi moves: - to the predecessor block if the edge is an "always" one;
    - to a newly-inserted block otherwise. Returns `true` iff at least one block
    was inserted. *)
-let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
+let insert_phi_moves :
+    State.t ->
+    Cfg_with_infos.t ->
+    Substitution.map ->
+    bool * (Reg.t * Reg.t) list =
  fun state cfg_with_infos substs ->
+  let phi_moves = ref [] in
   let block_inserted = ref false in
   Label.Map.iter
     (fun label to_unify ->
@@ -417,13 +424,14 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
             assert false
           | Tailcall_self _ -> ()
           | Always _ ->
-            add_phi_moves_to_instr_list ~instr_id ~before:predecessor_block
-              ~phi:block substs to_unify predecessor_block.body
+            add_phi_moves_to_instr_list ~phi_moves ~instr_id
+              ~before:predecessor_block ~phi:block substs to_unify
+              predecessor_block.body
           | Switch _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
           | Call _ | Prim _ | Invalid _ ->
             let instrs = DLL.make_empty () in
-            add_phi_moves_to_instr_list ~instr_id ~before:predecessor_block
-              ~phi:block substs to_unify instrs;
+            add_phi_moves_to_instr_list ~phi_moves ~instr_id
+              ~before:predecessor_block ~phi:block substs to_unify instrs;
             (* CR-soon xclerc for xclerc: now that we preprocess critical nodes,
                no insertion should occur here. *)
             let inserted_blocks =
@@ -454,10 +462,11 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
               ()))
         block.predecessors)
     (State.phi_at_beginning state);
-  !block_inserted
+  !block_inserted, !phi_moves
 
 let split_at_destruction_points :
-    Cfg_with_infos.t -> (Regalloc_stack_slots.t * bool) option =
+    Cfg_with_infos.t ->
+    (Regalloc_stack_slots.t * bool * (Reg.t * Reg.t) list) option =
  fun cfg_with_infos ->
   if debug
   then (
@@ -498,7 +507,7 @@ let split_at_destruction_points :
     Profile.record ~accumulate:true "insert_reloads"
       (fun () -> insert_reloads state cfg_with_infos substs stack_subst)
       ();
-    let block_inserted =
+    let block_inserted, phi_moves =
       Profile.record ~accumulate:true "insert_phi_moves"
         (fun () -> insert_phi_moves state cfg_with_infos substs)
         ()
@@ -507,9 +516,10 @@ let split_at_destruction_points :
     then (
       Regalloc_irc_utils.log_cfg_with_infos cfg_with_infos;
       dedent ());
-    Some (State.stack_slots state, block_inserted)
+    Some (State.stack_slots state, block_inserted, phi_moves)
 
-let split_live_ranges : Cfg_with_infos.t -> Regalloc_stack_slots.t =
+let split_live_ranges :
+    Cfg_with_infos.t -> Regalloc_stack_slots.t * (Reg.t * Reg.t) list =
  fun cfg_with_infos ->
   (* CR-soon xclerc for xclerc: support closure, flambda, and
      flambda2/classic *)
@@ -525,8 +535,8 @@ let split_live_ranges : Cfg_with_infos.t -> Regalloc_stack_slots.t =
     ()
   | true, true -> assert false);
   match split_at_destruction_points cfg_with_infos with
-  | None -> Regalloc_stack_slots.make ()
-  | Some (stack_slots, block_inserted) ->
+  | None -> Regalloc_stack_slots.make (), []
+  | Some (stack_slots, block_inserted, phi_moves) ->
     Cfg_with_infos.invalidate_liveness cfg_with_infos;
     if block_inserted
     then Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
@@ -534,4 +544,4 @@ let split_live_ranges : Cfg_with_infos.t -> Regalloc_stack_slots.t =
       Profile.record ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
         cfg_with_infos
     in
-    stack_slots
+    stack_slots, phi_moves

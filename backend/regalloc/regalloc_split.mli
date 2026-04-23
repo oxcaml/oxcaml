@@ -13,4 +13,5 @@
     The algorithm is an adaptation of the one rewriting a CFG to put it in SSA
     form: we simply consider that new names are introduced at destruction
     points. *)
-val split_live_ranges : Cfg_with_infos.t -> Regalloc_stack_slots.t
+val split_live_ranges :
+  Cfg_with_infos.t -> Regalloc_stack_slots.t * (Reg.t * Reg.t) list
