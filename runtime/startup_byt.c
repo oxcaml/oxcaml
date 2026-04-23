@@ -298,7 +298,7 @@ static void do_print_help(void)
 
 /* Parse options on the command line */
 
-static int parse_command_line(char_os **argv)
+static int parse_command_line(char_os const * const * argv)
 {
   int i, j, len, parsed;
   /* cast to make caml_params mutable; this assumes we are only called
@@ -330,7 +330,7 @@ static int parse_command_line(char_os **argv)
         break;
       case 'I':
         if (argv[i + 1] != NULL) {
-          caml_ext_table_add(&caml_shared_libs_path, argv[i + 1]);
+          caml_ext_table_add(&caml_shared_libs_path, (void*) argv[i + 1]);
           i++;
         } else {
           error("option '-I' needs an argument.");
@@ -448,7 +448,7 @@ extern void caml_install_invalid_parameter_handler(void);
 
 /* Main entry point when loading code from a file */
 
-CAMLexport void caml_main(char_os **argv)
+CAMLexport void caml_main(char_os const * const * argv)
 {
   int fd, pos;
   struct exec_trailer trail;
@@ -484,7 +484,7 @@ CAMLexport void caml_main(char_os **argv)
   pos = 0;
 
   /* First, try argv[0] (when ocamlrun is called by a bytecode program) */
-  exe_name = argv[0];
+  exe_name = (char_os *) argv[0];
   fd = caml_attempt_open(&exe_name, &trail, 0);
 
   /* Little grasshopper wonders why we do that at all, since
@@ -507,7 +507,7 @@ CAMLexport void caml_main(char_os **argv)
     if (argv[pos] == 0) {
       error("no bytecode file specified");
     }
-    exe_name = argv[pos];
+    exe_name = (char_os *)argv[pos];
     fd = caml_attempt_open(&exe_name, &trail, 1);
     switch(fd) {
     case FILE_NOT_FOUND:
@@ -597,7 +597,7 @@ CAMLexport value caml_startup_code_exn(
            char *data, asize_t data_size,
            char *section_table, asize_t section_table_size,
            int pooling,
-           char_os **argv)
+           char_os const * const * argv)
 {
   char_os * exe_name;
   value res;
@@ -674,7 +674,7 @@ CAMLexport void caml_startup_code(
            char *data, asize_t data_size,
            char *section_table, asize_t section_table_size,
            int pooling,
-           char_os **argv)
+           char_os const * const * argv)
 {
   value res;
 
