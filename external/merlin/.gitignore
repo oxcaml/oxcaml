@@ -1,0 +1,20 @@
+_build
+_opam
+.merlin
+jbuild-workspace
+*.install
+*.tar.gz
+*.pyc
+*.cmly
+*.elc
+
+/ocamlmerlin
+/ocamlmerlin-server
+/ocamlmerlin-lsp
+/dot-merlin-reader
+
+# Ignore garbage files from editors
+*.un~
+*.swp
+*.swo
+.vscode/
