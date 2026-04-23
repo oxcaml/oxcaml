@@ -2108,16 +2108,10 @@ module Report = struct
 
   and ('a, 'd) ahint = 'a * 'd hint constraint 'd = 'l * 'r
 
-  type ('a, 'd) ahint_with_attr =
-    { ahint : ('a, 'd) ahint;
-      is_hint_tighter : bool
-    }
-    constraint 'd = 'l * 'r
-
   (** Human-readible mode error report. *)
   type 'a t =
-    { left : ('a, left_only) ahint_with_attr;
-      right : ('a, right_only) ahint_with_attr
+    { left : ('a * bool, left_only) ahint;
+      right : ('a * bool, right_only) ahint
     }
 
   (** Convert Solver error to report. *)
@@ -2181,7 +2175,7 @@ module Report = struct
         other:a ->
         (b, l * r) S.ahint ->
         b C.For_hint.responsible_axis ->
-        a * (l * r) hint =
+        (a, l * r) ahint =
      fun obj side a morph_hint morph ~other ahint res ->
       let src = C.src obj morph in
       match res with
@@ -2217,7 +2211,7 @@ module Report = struct
             (C.For_hint.find_responsible_axis_prod morph ax)
         in
         Axis.proj ax t, hint
-      | Const c' -> Axis.proj ax a, Const c'
+      | Const c -> Axis.proj ax a, Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
         let chosen_ahint =
           let other = Axis.proj ax other in
@@ -2252,43 +2246,49 @@ module Report = struct
         in
         hint_axis obj side ~other chosen_ahint
 
-    let value_equal : type a. a C.obj -> a -> a -> bool =
-     fun obj a b -> Misc.Le_result.equal ~le:(C.le obj) a b
+    let hint_prod_tighter : type t a l r.
+        t C.obj ->
+        (l * r) side ->
+        (t, a) Axis.t ->
+        other:t ->
+        (t, l * r) S.ahint ->
+        (a * bool, l * r) ahint =
+     fun obj side ax ~other ((t, _) as ahint) ->
+      let axis_obj = C.proj_obj ax obj in
+      let (a, hint) = hint_prod obj side ax ~other ahint in
+      let is_tighter =
+        not (Misc.Le_result.equal ~le:(C.le axis_obj) a (Axis.proj ax t))
+      in
+      (a, is_tighter), hint
+
+    let hint_axis_tighter : type a l r.
+        a C.obj ->
+        (l * r) side ->
+        other:a ->
+        (a, l * r) S.ahint ->
+        (a * bool, l * r) ahint =
+     fun obj side ~other ((original, _) as ahint) ->
+      let (a, hint) = hint_axis obj side ~other ahint in
+      let is_tighter =
+        not (Misc.Le_result.equal ~le:(C.le obj) a original)
+      in
+      (a, is_tighter), hint
 
     let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
      fun obj axis { left = l, lhint; right = r, rhint } ->
-      let left_ahint = hint_prod obj Left axis ~other:r (l, lhint) in
-      let right_ahint =
-        hint_prod obj Right axis ~other:(Axis.set axis (fst left_ahint) r) (r, rhint)
-      in
-      let axis_obj = C.proj_obj axis obj in
-      let left =
-        { ahint = left_ahint;
-          is_hint_tighter =
-            not (value_equal axis_obj (fst left_ahint) (Axis.proj axis l))
-        }
-      in
+      let left = hint_prod_tighter obj Left axis ~other:r (l, lhint) in
       let right =
-        { ahint = right_ahint;
-          is_hint_tighter =
-            not (value_equal axis_obj (fst right_ahint) (Axis.proj axis r))
-        }
+        hint_prod_tighter obj Right axis
+          ~other:(Axis.set axis (fst (fst left)) r)
+          (r, rhint)
       in
       { left; right }
 
     let error_axis : type a. a C.obj -> a S.error -> a t =
      fun obj { left = l, lhint; right = r, rhint } ->
-      let left_ahint = hint_axis obj Left ~other:r (l, lhint) in
-      let right_ahint = hint_axis obj Right ~other:(fst left_ahint) (r, rhint) in
-      let left =
-        { ahint = left_ahint;
-          is_hint_tighter = not (value_equal obj (fst left_ahint) l)
-        }
-      in
+      let left = hint_axis_tighter obj Left ~other:r (l, lhint) in
       let right =
-        { ahint = right_ahint;
-          is_hint_tighter = not (value_equal obj (fst right_ahint) r)
-        }
+        hint_axis_tighter obj Right ~other:(fst (fst left)) (r, rhint)
       in
       { left; right }
   end
@@ -2760,15 +2760,17 @@ module Report = struct
       a t ->
       print_error * left_hint_tighter:bool * right_hint_tighter:bool =
    fun pp obj { left; right } ->
+    let (la, l_tighter), lh = left in
+    let (ra, r_tighter), rh = right in
     let actual, expected =
       if C.is_opposite obj
-      then Right right.ahint, Left left.ahint
-      else Left left.ahint, Right right.ahint
+      then Right (ra, rh), Left (la, lh)
+      else Left (la, lh), Right (ra, rh)
     in
     let left_hint_tighter, right_hint_tighter =
       if C.is_opposite obj
-      then right.is_hint_tighter, left.is_hint_tighter
-      else left.is_hint_tighter, right.is_hint_tighter
+      then r_tighter, l_tighter
+      else l_tighter, r_tighter
     in
     let left ppf = Option.get (print_ahint_sided pp obj ppf actual) in
     let right ppf = Option.get (print_ahint_sided pp obj ppf expected) in
