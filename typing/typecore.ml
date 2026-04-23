@@ -12324,7 +12324,7 @@ let report_error ~loc env =
     in
     Location.error_of_printer ~loc ~sub (fun ppf e ->
       let open Format_doc in
-      let ({left; right} : Mode_intf.print_error) =
+      let {left; right} : Mode_intf.print_error =
         Value.print_error (loc, Expression) e
       in
       let open_box = dprintf "@[<hov 2>" in

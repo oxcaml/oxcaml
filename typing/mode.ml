@@ -2259,7 +2259,7 @@ module Report = struct
         (a * loosening, l * r) ahint =
      fun obj side ax ~other ((t, _) as ahint) ->
       let axis_obj = C.proj_obj ax obj in
-      let (a, hint) = hint_prod obj side ax ~other ahint in
+      let a, hint = hint_prod obj side ax ~other ahint in
       let loosening =
         if Misc.Le_result.equal ~le:(C.le axis_obj) a (Axis.proj ax t)
         then Not_loosened
@@ -2274,7 +2274,7 @@ module Report = struct
         (a, l * r) S.ahint ->
         (a * loosening, l * r) ahint =
      fun obj side ~other ((original, _) as ahint) ->
-      let (a, hint) = hint_axis obj side ~other ahint in
+      let a, hint = hint_axis obj side ~other ahint in
       let loosening =
         if Misc.Le_result.equal ~le:(C.le obj) a original
         then Not_loosened
@@ -2757,12 +2757,10 @@ module Report = struct
       print_error_result option =
    fun side pp obj ppf loosening ahint ->
     (match loosening with
-    | Loosened -> begin
-      match adjust_side obj side with
-      | `Actual ->
-        Fmt.fprintf ppf "weaker than "
-      | `Expected ->
-        Fmt.fprintf ppf "stronger than "
+    | Loosened ->
+      begin match adjust_side obj side with
+      | `Actual -> Fmt.fprintf ppf "weaker than "
+      | `Expected -> Fmt.fprintf ppf "stronger than "
       end
     | Not_loosened -> ());
     print_ahint side pp obj ppf ahint
@@ -2783,11 +2781,7 @@ module Report = struct
     | Left ahint -> print_ahint_loosening `Left pp obj ppf loosening ahint
     | Right ahint -> print_ahint_loosening `Right pp obj ppf loosening ahint
 
-  let print : type a.
-      pinpoint ->
-      a C.obj ->
-      a t ->
-      print_error =
+  let print : type a. pinpoint -> a C.obj -> a t -> print_error =
    fun pp obj { left; right } ->
     let (la, l_loosening), lh = left in
     let (ra, r_loosening), rh = right in
@@ -2831,31 +2825,20 @@ module Error = struct
     | Axis : 'a C.obj * 'a t -> packed
 
   let print_product : type r a.
-      Hint.pinpoint ->
-      r C.obj ->
-      (r, a) Axis.t ->
-      r t ->
-      print_error =
+      Hint.pinpoint -> r C.obj -> (r, a) Axis.t -> r t -> print_error =
    fun pp obj ax err ->
     let err = S.populate_error obj err in
     let report = Report.Of_solver.error_prod obj ax err in
     let obj = C.proj_obj ax obj in
     Report.print pp obj report
 
-  let print_axis : type a.
-      Hint.pinpoint ->
-      a C.obj ->
-      a t ->
-      print_error =
+  let print_axis : type a. Hint.pinpoint -> a C.obj -> a t -> print_error =
    fun pp obj err ->
     let err = S.populate_error obj err in
     let report = Report.Of_solver.error_axis obj err in
     Report.print pp obj report
 
-  let print_packed :
-      Hint.pinpoint ->
-      packed ->
-      print_error =
+  let print_packed : Hint.pinpoint -> packed -> print_error =
    fun pp -> function
     | Product (obj, ax, err) -> print_product pp obj ax err
     | Axis (obj, err) -> print_axis pp obj err
