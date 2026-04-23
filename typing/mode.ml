@@ -2283,21 +2283,19 @@ module Report = struct
       loosening, (a, hint)
 
     let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
-     fun obj axis { left = l, lhint; right = r, rhint } ->
-      let left = hint_prod_loosening obj Left axis ~other:r (l, lhint) in
+     fun obj axis { left; right } ->
+      let left = hint_prod_loosening obj Left axis ~other:(fst right) left in
       let right =
         hint_prod_loosening obj Right axis
-          ~other:(Axis.set axis (fst (snd left)) r)
-          (r, rhint)
+          ~other:(Axis.set axis (fst (snd left)) (fst right))
+          right
       in
       { left; right }
 
     let error_axis : type a. a C.obj -> a S.error -> a t =
-     fun obj { left = l, lhint; right = r, rhint } ->
-      let left = hint_axis_loosening obj Left ~other:r (l, lhint) in
-      let right =
-        hint_axis_loosening obj Right ~other:(fst (snd left)) (r, rhint)
-      in
+     fun obj { left; right } ->
+      let left = hint_axis_loosening obj Left ~other:(fst right) left in
+      let right = hint_axis_loosening obj Right ~other:(fst (snd left)) right in
       { left; right }
   end
 
