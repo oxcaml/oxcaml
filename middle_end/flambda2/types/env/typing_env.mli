@@ -107,9 +107,9 @@ val current_scope : t -> Scope.t
 val increment_scope : t -> t
 
 val add_variable_definition :
-  t -> Variable.t -> Flambda_kind.t -> Name_mode.t -> t
+  t -> Variable.t -> Flambda_kind.t -> Type_grammar.t -> Name_mode.t -> t
 
-val add_definition : t -> Bound_name.t -> Flambda_kind.t -> t
+val add_definition : t -> Bound_name.t -> Flambda_kind.t -> Type_grammar.t -> t
 
 val replace_equation : t -> Name.t -> Type_grammar.t -> t
 

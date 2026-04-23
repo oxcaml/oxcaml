@@ -1283,7 +1283,9 @@ struct
       Symbol.Set.fold
         (fun symbol base_env ->
           let bound_name = Bound_name.create_symbol symbol in
-          let base_env = TE.add_definition base_env bound_name K.value in
+          let base_env =
+            TE.add_definition base_env bound_name K.value (MTC.unknown K.value)
+          in
           base_env)
         (TE.defined_symbols env) base_env
     in
@@ -1294,7 +1296,7 @@ struct
             Bound_name.create_var
               (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
           in
-          TE.add_definition env bound_name kind)
+          TE.add_definition env bound_name kind (MTC.unknown K.value))
         live_vars env
     in
     let env =
@@ -1316,8 +1318,9 @@ struct
                 Bound_name.create_var
                   (Bound_var.create var' Flambda_debug_uid.none Name_mode.normal)
               in
+              let kind = TG.kind ty' in
               let base_env =
-                TE.add_definition base_env bound_name (TG.kind ty')
+                TE.add_definition base_env bound_name kind (MTC.unknown kind)
               in
               let new_types = Name.Map.add (Name.var var') ty' new_types in
               Var.Map.add var var' sbs, base_env, new_types, acc))
@@ -1343,7 +1346,8 @@ struct
                         (Bound_var.create var_after_rewrite
                            Flambda_debug_uid.none Name_mode.in_types)
                     in
-                    TE.add_definition base_env bound_name kind))
+                    TE.add_definition base_env bound_name kind
+                      (MTC.unknown kind)))
             aliases_of_name base_env)
         aliases_of_names base_env
     in
@@ -1396,7 +1400,9 @@ struct
             :: acc.names_to_process
           in
           let bound_name = Bound_name.create_symbol symbol in
-          let base_env = TE.add_definition base_env bound_name K.value in
+          let base_env =
+            TE.add_definition base_env bound_name K.value (MTC.unknown K.value)
+          in
           base_env, { aliases_of_names; names_to_process })
         (TE.defined_symbols env) (base_env, empty)
     in
@@ -1414,7 +1420,7 @@ struct
                       (Bound_var.create var_after_rewrite Flambda_debug_uid.none
                          Name_mode.in_types)
                   in
-                  TE.add_definition base_env bound_name kind))
+                  TE.add_definition base_env bound_name kind (MTC.unknown kind)))
             aliases_of_name base_env)
         aliases_of_names base_env
     in
