@@ -746,12 +746,16 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
         symbol, typ)
       closure_symbols
   in
+  let find_code_metadata code_id =
+    let env = DA.denv dacc in
+    DE.find_code_exn env code_id |> Code_or_metadata.code_metadata
+  in
   let set_of_closures_lifted_constant =
     LC.create_set_of_closures denv ~closure_symbols_with_types
       ~symbol_projections
       (Rebuilt_static_const.create_set_of_closures
          (DE.are_rebuilding_terms denv)
-         set_of_closures)
+         ~find_code_metadata set_of_closures)
   in
   let dacc =
     DA.add_to_lifted_constant_accumulator ~also_add_to_env:() dacc
@@ -1015,13 +1019,17 @@ let simplify_lifted_set_of_closures0 dacc context ~closure_symbols
     simplify_set_of_closures0 dacc context set_of_closures ~closure_bound_names
       ~closure_bound_names_inside ~value_slots ~value_slot_types
   in
+  let find_code_metadata code_id =
+    let env = DA.denv dacc in
+    Downwards_env.find_code_exn env code_id |> Code_or_metadata.code_metadata
+  in
   let set_of_closures_pattern =
     Bound_static.Pattern.set_of_closures closure_symbols
   in
   let set_of_closures_static_const =
     Rebuilt_static_const.create_set_of_closures
       (DA.are_rebuilding_terms dacc)
-      set_of_closures
+      ~find_code_metadata set_of_closures
   in
   let dacc =
     DA.map_denv dacc

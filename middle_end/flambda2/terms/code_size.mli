@@ -38,6 +38,15 @@ val equal : t -> t -> bool
 
 val print : Format.formatter -> t -> unit
 
+val box_number :
+  machine_width:Target_system.Machine_width.t ->
+  Flambda_kind.Boxable_number.t ->
+  t
+
+val block : int -> t
+
+val array : int -> t
+
 val prim :
   machine_width:Target_system.Machine_width.t -> Flambda_primitive.t -> t
 
