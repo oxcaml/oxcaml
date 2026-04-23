@@ -432,9 +432,11 @@ let without_generating_equations uenv f =
    While unlikely, this can indicate a soundness bug if we have access to
    a local constraint (GADT equation) from the wrong stage. *)
 let decr_stage env =
-  if Int.equal 0 (Env.stage env :> int) then
-    fatal_errorf "Ctype.decr_stage: Stage decreased below the meta stage";
-  Env.enter_splice ~loc:Location.none env
+  if Int.equal 0 (Env.stage env :> int) then begin
+    Location.prerr_warning Location.none Toplevel_splice_in_type_checking;
+    env
+  end else
+    Env.enter_splice ~loc:Location.none env
 
 let incr_stage env =
   Env.enter_quotation env
