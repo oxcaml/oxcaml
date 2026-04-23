@@ -166,6 +166,8 @@ val parameters : string list ref
 val as_parameter : bool ref
 val as_argument_for : string option ref
 val instantiate : bool ref
+val functorize_intf : bool ref
+val functorize_impl : bool ref
 val dump_source : bool ref
 val dump_parsetree : bool ref
 val dump_typedtree : bool ref

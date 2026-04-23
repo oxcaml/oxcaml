@@ -50,6 +50,10 @@ module type S = sig
 
   val instantiate : src:string -> args:string list -> string -> unit
 
+  val functorize_intf : srcs:string list -> string -> unit
+
+  val functorize_impl : srcs:string list -> string -> unit
+
   val package_files :
     ppf_dump:Format.formatter -> Env.t -> string list -> string -> unit
 end
@@ -149,6 +153,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           main_module_block_repr : Lambda.module_representation;
           arg_descr : Lambda.arg_descr option
         }
+    | Functorization of
+        { all_params : Global_module.t list;
+          modules : (Compilation_unit.t * Lambda.main_module_block_format) list
+        }
 
   let starting_point_of_compiler_pass start_from =
     match (start_from : Clflags.Compiler_pass.t), Backend.emit with
@@ -211,6 +219,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       in
       if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
       compile_from_tlambda info impl ~as_arg_for ~keep_symbol_tables
+    | Functorization { all_params; modules } ->
+      if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
+      let program =
+        Translmod.transl_functorize info.module_name ~all_params ~modules
+      in
+      compile_from_tlambda info program ~as_arg_for:None ~keep_symbol_tables
 
   let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables
       =
@@ -242,10 +256,46 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     let { Cmx_format.ui_unit; ui_arg_descr; ui_format; _ } = unit_info in
     { Instantiator.ui_unit; ui_arg_descr; ui_format }
 
+  let read_unit_info_of_cmx file : Functorizer.unit_info =
+    let unit_info, _crc = Compilenv.read_unit_info file in
+    { Functorizer.ui_unit = unit_info.ui_unit;
+      ui_format = unit_info.ui_format }
+
+  let find_unit_info_by_name_cmi name : Functorizer.unit_info =
+    let filename =
+      Load_path.find_normalized (String.uncapitalize_ascii name ^ ".cmi")
+    in
+    Functorizer.read_unit_info_of_cmi filename
+
+  let find_unit_info_by_name_cmx name : Functorizer.unit_info =
+    let filename =
+      Load_path.find_normalized
+        (String.uncapitalize_ascii name ^ ext_flambda_obj)
+    in
+    read_unit_info_of_cmx filename
+
+  let compile_lambda_program ~source_file ~output_prefix ~compilation_unit
+      ~all_params ~modules =
+    implementation_aux
+      ~start_from:(Functorization { all_params; modules })
+      ~source_file ~output_prefix ~keep_symbol_tables:false
+      ~compilation_unit:(Exactly compilation_unit)
+
   let instantiate ~src ~args targetcmx =
     Instantiator.instantiate ~src ~args targetcmx
       ~expected_extension:ext_flambda_obj ~read_unit_info
       ~compile:(instance ~keep_symbol_tables:false)
+
+  let functorize_intf ~srcs targetcmx =
+    Functorizer.functorize_intf ~srcs targetcmx
+      ~read_unit_info:Functorizer.read_unit_info_of_cmi
+      ~find_unit_info_by_name:find_unit_info_by_name_cmi
+
+  let functorize_impl ~srcs targetcmx =
+    Functorizer.functorize_impl ~srcs targetcmx
+      ~read_unit_info:read_unit_info_of_cmx
+      ~find_unit_info_by_name:find_unit_info_by_name_cmx
+      ~compile:compile_lambda_program
 end
 
 let native unix

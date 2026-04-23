@@ -53,7 +53,7 @@ let main argv ppf =
       List.length
         (List.filter (fun x -> !x)
            [make_archive;make_package;Compenv.stop_early;output_c_object;
-            instantiate])
+            instantiate;functorize_intf;functorize_impl])
         > 1
     then begin
       let module P = Clflags.Compiler_pass in
@@ -61,7 +61,7 @@ let main argv ppf =
       | None ->
           Compenv.fatal
             "Please specify at most one of -pack, -a, -c, -output-obj, \
-             -instantiate";
+             -instantiate, -functorize-intf, -functorize-impl";
       | Some ((P.Parsing | P.Typing | P.Lambda) as p) ->
         assert (P.is_compilation_pass p);
         Printf.ksprintf Compenv.fatal
@@ -105,6 +105,24 @@ let main argv ppf =
             src, args
       in
       Byteinstantiator.instantiate ~src ~args target;
+      Warnings.check_fatal ();
+    end
+    else if !functorize_intf then begin
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !output_name in
+      let srcs = Compenv.get_objfiles ~with_ocamlparam:false in
+      if srcs = [] then
+        Compenv.fatal "Must specify at least one .cmi file with -functorize-intf";
+      Bytefunctorizer.functorize_intf ~srcs target;
+      Warnings.check_fatal ();
+    end
+    else if !functorize_impl then begin
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !output_name in
+      let srcs = Compenv.get_objfiles ~with_ocamlparam:false in
+      if srcs = [] then
+        Compenv.fatal "Must specify at least one .cmo file with -functorize-impl";
+      Bytefunctorizer.functorize_impl ~srcs target;
       Warnings.check_fatal ();
     end
     else if not !Compenv.stop_early && !objfiles <> [] then begin

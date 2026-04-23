@@ -737,7 +737,8 @@ let process_action
       if Filename.check_suffix name ocaml_mod_ext
       || Filename.check_suffix name ocaml_lib_ext then
         objfiles := name :: !objfiles
-      else if Filename.check_suffix name ".cmi" && !make_package then
+      else if Filename.check_suffix name ".cmi"
+           && (!make_package || !Clflags.functorize_intf) then
         objfiles := name :: !objfiles
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin

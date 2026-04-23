@@ -61,6 +61,12 @@ val transl_instance:
         -> arg_block_idx:int option
         -> program
 
+val transl_functorize:
+      Compilation_unit.t
+        -> all_params:Global_module.t list
+        -> modules:(Compilation_unit.t * main_module_block_format) list
+        -> program
+
 val toplevel_name: Ident.t -> string
 
 val primitive_declarations: Primitive.description list ref
