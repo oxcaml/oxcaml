@@ -101,15 +101,16 @@ Error: This expression has type "a:'a * 'b * c:'c"
 
 (* Wrong label *)
 let foo b = if b then
-   ~a: "s", 10, ~a: "hi"
+   ~a1: "s", 10, ~a2: "hi"
 else
-   ~a: "5", 10, ~c: "hi"
+   ~a1: "5", 10, ~c: "hi"
 [%%expect{|
-Line 4, characters 3-24:
-4 |    ~a: "5", 10, ~c: "hi"
-       ^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "a:string * int * c:'a"
-       but an expression was expected of type "a:string * int * a:string"
+Line 4, characters 3-25:
+4 |    ~a1: "5", 10, ~c: "hi"
+       ^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "a1:string * int * c:'a"
+       but an expression was expected of type "a1:string * int * a2:string"
+       Labels "c" and "a2" do not match
 |}]
 
 (* Types in function argument/return *)

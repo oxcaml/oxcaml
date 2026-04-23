@@ -9,17 +9,16 @@ let x = (~x:1, ~y:2);;
 val x : x:int * y:int = (~x:1, ~y:2)
 |}]
 
-(* CR dallsopp: upstream rejected repeated labels *)
 (* Attribute should prevent punning *)
 let z = 5
-let y = ~z:z, ~z, ~z:(z [@attr])
+let y = ~z, ~z':z, ~z1:(z [@attr])
 [%%expect{|
 
 let z = 5;;
 val z : int = 5
 
-let y = (~z, ~z, ~z:((z)[@attr ]));;
-val y : z:int * z:int * z:int = (~z:5, ~z:5, ~z:5)
+let y = (~z, ~z':z, ~z1:((z)[@attr ]));;
+val y : z:int * z':int * z1:int = (~z:5, ~z':5, ~z1:5)
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : x:int * s:string * y:int * string =
