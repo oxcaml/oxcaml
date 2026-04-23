@@ -2089,6 +2089,10 @@ type nonrec 'a simple_error = 'a simple_error
 let print_longident =
   ref (fun _ _ -> assert false : Fmt.formatter -> Longident.t -> unit)
 
+type loosening = Mode_intf.loosening =
+  | Loosened
+  | Not_loosened
+
 module Report = struct
   open Hint
 
@@ -2110,8 +2114,8 @@ module Report = struct
 
   (** Human-readible mode error report. *)
   type 'a t =
-    { left : ('a * bool, left_only) ahint;
-      right : ('a * bool, right_only) ahint
+    { left : ('a * loosening, left_only) ahint;
+      right : ('a * loosening, right_only) ahint
     }
 
   (** Convert Solver error to report. *)
@@ -2252,27 +2256,31 @@ module Report = struct
         (t, a) Axis.t ->
         other:t ->
         (t, l * r) S.ahint ->
-        (a * bool, l * r) ahint =
+        (a * loosening, l * r) ahint =
      fun obj side ax ~other ((t, _) as ahint) ->
       let axis_obj = C.proj_obj ax obj in
       let (a, hint) = hint_prod obj side ax ~other ahint in
-      let is_tighter =
-        not (Misc.Le_result.equal ~le:(C.le axis_obj) a (Axis.proj ax t))
+      let loosening =
+        if Misc.Le_result.equal ~le:(C.le axis_obj) a (Axis.proj ax t)
+        then Loosened
+        else Not_loosened
       in
-      (a, is_tighter), hint
+      (a, loosening), hint
 
     let hint_axis_tighter : type a l r.
         a C.obj ->
         (l * r) side ->
         other:a ->
         (a, l * r) S.ahint ->
-        (a * bool, l * r) ahint =
+        (a * loosening, l * r) ahint =
      fun obj side ~other ((original, _) as ahint) ->
       let (a, hint) = hint_axis obj side ~other ahint in
-      let is_tighter =
-        not (Misc.Le_result.equal ~le:(C.le obj) a original)
+      let loosening =
+        if Misc.Le_result.equal ~le:(C.le obj) a original
+        then Loosened
+        else Not_loosened
       in
-      (a, is_tighter), hint
+      (a, loosening), hint
 
     let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
      fun obj axis { left = l, lhint; right = r, rhint } ->
@@ -2758,23 +2766,23 @@ module Report = struct
       pinpoint ->
       a C.obj ->
       a t ->
-      print_error * left_hint_tighter:bool * right_hint_tighter:bool =
+      print_error * left_loosening:loosening * right_loosening:loosening =
    fun pp obj { left; right } ->
-    let (la, l_tighter), lh = left in
-    let (ra, r_tighter), rh = right in
+    let (la, l_loosening), lh = left in
+    let (ra, r_loosening), rh = right in
     let actual, expected =
       if C.is_opposite obj
       then Right (ra, rh), Left (la, lh)
       else Left (la, lh), Right (ra, rh)
     in
-    let left_hint_tighter, right_hint_tighter =
+    let left_loosening, right_loosening =
       if C.is_opposite obj
-      then r_tighter, l_tighter
-      else l_tighter, r_tighter
+      then r_loosening, l_loosening
+      else l_loosening, r_loosening
     in
     let left ppf = Option.get (print_ahint_sided pp obj ppf actual) in
     let right ppf = Option.get (print_ahint_sided pp obj ppf expected) in
-    { left; right }, ~left_hint_tighter, ~right_hint_tighter
+    { left; right }, ~left_loosening, ~right_loosening
 end
 
 let print_pinpoint = Report.print_pinpoint
@@ -2802,7 +2810,7 @@ module Error = struct
       r C.obj ->
       (r, a) Axis.t ->
       r t ->
-      print_error * left_hint_tighter:bool * right_hint_tighter:bool =
+      print_error * left_loosening:loosening * right_loosening:loosening =
    fun pp obj ax err ->
     let err = S.populate_error obj err in
     let report = Report.Of_solver.error_prod obj ax err in
@@ -2813,7 +2821,7 @@ module Error = struct
       Hint.pinpoint ->
       a C.obj ->
       a t ->
-      print_error * left_hint_tighter:bool * right_hint_tighter:bool =
+      print_error * left_loosening:loosening * right_loosening:loosening =
    fun pp obj err ->
     let err = S.populate_error obj err in
     let report = Report.Of_solver.error_axis obj err in
@@ -2822,7 +2830,7 @@ module Error = struct
   let print_packed :
       Hint.pinpoint ->
       packed ->
-      print_error * left_hint_tighter:bool * right_hint_tighter:bool =
+      print_error * left_loosening:loosening * right_loosening:loosening =
    fun pp -> function
     | Product (obj, ax, err) -> print_product pp obj ax err
     | Axis (obj, err) -> print_axis pp obj err
@@ -2842,11 +2850,11 @@ module Error = struct
        in
        fprintf ppf "%t%t is " open_box print_desc);
       let ( ({ left; right } : print_error),
-            ~left_hint_tighter,
-            ~right_hint_tighter ) =
+            ~left_loosening,
+            ~right_loosening ) =
         print_packed pp packed
       in
-      if left_hint_tighter then fprintf ppf "weaker than ";
+      if left_loosening = Not_loosened then fprintf ppf "weaker than ";
       (match left ppf with
       | Mode_with_hint ->
         let print_desc =
@@ -2858,7 +2866,7 @@ module Error = struct
         in
         fprintf ppf ".%tHowever, %t is expected to be " reopen_box print_desc
       | Mode -> fprintf ppf "%tbut is expected to be " reopen_box);
-      if right_hint_tighter then fprintf ppf "stronger than ";
+      if right_loosening = Not_loosened then fprintf ppf "stronger than ";
       ignore (right ppf);
       fprintf ppf ".@]"
     in
