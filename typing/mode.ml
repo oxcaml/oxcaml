@@ -2766,19 +2766,21 @@ module Report = struct
     print_ahint side pp obj ppf ahint
 
   type 'a ahint_sided =
-    | Left of ('a, left_only) ahint
-    | Right of ('a, right_only) ahint
+    | Left of loosening * ('a, left_only) ahint
+    | Right of loosening * ('a, right_only) ahint
 
   let print_ahint_sided : type a.
       pinpoint ->
       a C.obj ->
       Fmt.formatter ->
-      loosening * a ahint_sided ->
+      a ahint_sided ->
       print_error_result option =
-   fun pp obj ppf (loosening, ahint_sided) ->
+   fun pp obj ppf ahint_sided ->
     match ahint_sided with
-    | Left ahint -> print_ahint_loosening `Left pp obj ppf loosening ahint
-    | Right ahint -> print_ahint_loosening `Right pp obj ppf loosening ahint
+    | Left (loosening, ahint) ->
+      print_ahint_loosening `Left pp obj ppf loosening ahint
+    | Right (loosening, ahint) ->
+      print_ahint_loosening `Right pp obj ppf loosening ahint
 
   let print : type a. pinpoint -> a C.obj -> a t -> print_error =
    fun pp obj { left; right } ->
@@ -2786,8 +2788,8 @@ module Report = struct
     let (ra, r_loosening), rh = right in
     let actual, expected =
       if C.is_opposite obj
-      then (r_loosening, Right (ra, rh)), (l_loosening, Left (la, lh))
-      else (l_loosening, Left (la, lh)), (r_loosening, Right (ra, rh))
+      then Right (r_loosening, (ra, rh)), Left (l_loosening, (la, lh))
+      else Left (l_loosening, (la, lh)), Right (r_loosening, (ra, rh))
     in
     let left ppf = Option.get (print_ahint_sided pp obj ppf actual) in
     let right ppf = Option.get (print_ahint_sided pp obj ppf expected) in
