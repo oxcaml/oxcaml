@@ -99,7 +99,7 @@ module type Common = sig
   val print_error :
     Mode_hint.pinpoint ->
     error ->
-    print_error * left_loosening:loosening * right_loosening:loosening
+    print_error
 
   type equate_error = equate_step * error
 
