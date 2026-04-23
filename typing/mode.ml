@@ -2132,12 +2132,12 @@ module Report = struct
         other:a ->
         [`First | `Second] =
      fun b a_obj x y ~other ->
-      (* CR-someday zqian: in the case where [x = y], we currently arbitrarily choose from
-         [x] and [y], which are unordered anyway. In the future we might want to keep an
-         order for better error messages. For example, order them by occurrence in the
-         source code such that the more recent hint is returned.
-
-         nmatschke: Likewise for [x <> y] (middle modes of diamonds). *)
+      (* CR-someday zqian: in the case where each of [x] and [y] can be
+         responsible independently, for not satisfying [~other], we currently
+         arbitrarily prioritize `Second. In the future we might want to
+         prioritize for better error messages. For example, prioritize the first
+         element in a [join]. This requires inspecting the [solver.ml] to ensure
+         the ordering in the [join] list is preserved. *)
       match b with
       | Meet ->
         if C.le a_obj other x
