@@ -198,11 +198,11 @@ type error = Tags of label * label
 exception Error of Location.t * error
 
 (* Layouts for types defined in camlinternalOO.ml *)
-let layout_label = layout_int
-let layout_label_array = layout_array Pintarray
+let layout_label = layout_any_value
+let layout_label_array = layout_any_value
 let layout_t = layout_any_value
-let layout_obj = layout_array Pgenarray
-let layout_table = layout_block
+let layout_obj = layout_any_value
+let layout_table = layout_any_value
 let layout_meth = layout_any_value
 let layout_tables = layout_any_value
 
