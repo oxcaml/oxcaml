@@ -64,18 +64,18 @@ for_loop_layout:
   subq  $24, %rsp
   movq  %rbx, (%rsp)
   sarq  $1, %rax
-  movq  %rax, 8(%rsp)
+  movq  %rax, 16(%rsp)
   xorl  %eax, %eax
 .L109:
-  movq  %rax, 16(%rsp)
+  movq  %rax, 8(%rsp)
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
 .L124:
-  movq  16(%rsp), %rax
+  movq  8(%rsp), %rax
   incq  %rax
   movq  (%rsp), %rbx
-  movq  8(%rsp), %rdi
+  movq  16(%rsp), %rdi
   cmpq  %rdi, %rax
   jle   .L109
   movl  $1, %eax

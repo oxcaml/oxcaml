@@ -1,21 +1,39 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
-let print_block_id ppf (b : Ssa.block) = Format.fprintf ppf "%d" b.id
+let print_block_id ppf (b : Ssa.block) = Format.fprintf ppf "B%d" (b.id :> int)
+
+let print_block_param ppf ((b : Ssa.block), index) =
+  Format.fprintf ppf "%a.%d" print_block_id b index
 
 let rec print_instruction ppf (i : Ssa.instruction) =
   match i with
   | Op { id; op; args; _ } ->
-    Format.fprintf ppf "v%d = %a(%a)"
-      (Ssa.InstructionId.hash id)
-      Operation.dump op print_args args
-  | Block_param { block; index; _ } ->
-    Format.fprintf ppf "%a.%d" print_block_id block index
+    let op_str = Format.asprintf "%a" Operation.dump op in
+    (* When the op has arguments, wrap its name in parens if it contains spaces,
+       so that [v2 = (intop + -2)(v3)] is unambiguous. When there are no
+       arguments, we omit both the op parens and the empty argument list. *)
+    if Array.length args = 0
+    then Format.fprintf ppf "v%d = %s" (id :> int) op_str
+    else
+      let formatted_op =
+        if String.contains op_str ' ' then "(" ^ op_str ^ ")" else op_str
+      in
+      Format.fprintf ppf "v%d = %s(%a)" (id :> int) formatted_op print_args args
+  | Block_param { block; index; _ } -> print_block_param ppf (block, index)
   | Proj { index; src } ->
     Format.fprintf ppf "proj(%d, %a)" index print_instr_ref src
   | Push_trap { handler } ->
-    Format.fprintf ppf "push_trap %a" print_block_id handler
+    Format.fprintf ppf "push_trap %a"
+      (Format.pp_print_option
+         ~none:(fun ppf () -> Format.pp_print_string ppf "<invalid>")
+         print_block_id)
+      handler
   | Pop_trap { handler } ->
-    Format.fprintf ppf "pop_trap %a" print_block_id handler
+    Format.fprintf ppf "pop_trap %a"
+      (Format.pp_print_option
+         ~none:(fun ppf () -> Format.pp_print_string ppf "<invalid>")
+         print_block_id)
+      handler
   | Stack_check { max_frame_size_bytes } ->
     Format.fprintf ppf "stack_check %d" max_frame_size_bytes
   | Name_for_debugger { ident; _ } ->
@@ -23,9 +41,8 @@ let rec print_instruction ppf (i : Ssa.instruction) =
 
 and print_instr_ref ppf (i : Ssa.instruction) =
   match i with
-  | Op { id; _ } -> Format.fprintf ppf "v%d" (Ssa.InstructionId.hash id)
-  | Block_param { block; index; _ } ->
-    Format.fprintf ppf "%a.%d" print_block_id block index
+  | Op { id; _ } -> Format.fprintf ppf "v%d" (id :> int)
+  | Block_param { block; index; _ } -> print_block_param ppf (block, index)
   | Proj { index; src } ->
     Format.fprintf ppf "proj(%d, %a)" index print_instr_ref src
   | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ ->
@@ -95,38 +112,42 @@ let print_terminator ppf (t : Ssa.terminator) =
     | Some l -> Format.fprintf ppf " -> %a" print_block_id l
     | None -> ())
 
-let print_preds ppf predecessors =
-  Format.fprintf ppf "preds=[%a]"
-    (Format.pp_print_list
-       ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-       print_block_id)
-    predecessors
+let print_typed_params ppf (blk : Ssa.block) =
+  Array.iteri
+    (fun i typ ->
+      if i > 0 then Format.fprintf ppf ", ";
+      Format.fprintf ppf "%a : %a" print_block_param (blk, i)
+        Printcmm.machtype_component typ)
+    blk.params
 
-let print_block_desc ppf (desc : Ssa.block_desc) =
-  match desc with
-  | Merge { predecessors } ->
-    Format.fprintf ppf "merge %a" print_preds predecessors
-  | Loop { predecessors; backedges } ->
-    Format.fprintf ppf "loop %a backedges=[%a]" print_preds predecessors
+let print_block_header ppf (blk : Ssa.block) =
+  let name =
+    match blk.desc with
+    | Function_start -> "FUNCTION_START"
+    | Branch_target -> "BRANCH_TARGET"
+    | Call_continuation -> "CALL_CONT"
+    | Merge -> "MERGE"
+    | Trap_handler -> "TRAP_HANDLER"
+  in
+  Format.fprintf ppf "%a: %s(%a)" print_block_id blk name print_typed_params blk;
+  (match blk.label_hint with
+  | None -> ()
+  | Some l -> Format.fprintf ppf " [label=%a]" Label.format l);
+  match Ssa.predecessors blk with
+  | [] -> ()
+  | preds ->
+    Format.fprintf ppf " <- %a"
       (Format.pp_print_list
          ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
          print_block_id)
-      backedges
-  | Branch_target { predecessor } ->
-    Format.fprintf ppf "branch_target pred=%a" print_block_id predecessor
-  | Function_start -> Format.fprintf ppf "function_start"
-  | Call_continuation { predecessor } ->
-    Format.fprintf ppf "call_cont pred=%a" print_block_id predecessor
-  | Trap_handler { predecessors } ->
-    Format.fprintf ppf "trap_handler %a" print_preds predecessors
+      preds
 
 let print_block ppf (blk : Ssa.block) =
-  Format.fprintf ppf "%a: %a(%a)@." print_block_id blk print_block_desc blk.desc
-    Printcmm.machtype blk.params;
+  Format.fprintf ppf "%a@." print_block_header blk;
   Array.iter
     (fun bi -> Format.fprintf ppf "  %a@." print_instruction bi)
     blk.body;
-  Format.fprintf ppf "  %a@." print_terminator blk.terminator
+  Format.fprintf ppf "  %a@.@." print_terminator blk.terminator
 
 let print ppf (t : Ssa.t) =
   Format.fprintf ppf "ssa %s(%a)@." t.fun_name Printcmm.machtype t.fun_args;
