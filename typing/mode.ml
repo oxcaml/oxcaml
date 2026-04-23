@@ -2258,7 +2258,9 @@ module Report = struct
     let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
      fun obj axis { left = l, lhint; right = r, rhint } ->
       let left_ahint = hint_prod obj Left axis ~other:r (l, lhint) in
-      let right_ahint = hint_prod obj Right axis ~other:l (r, rhint) in
+      let right_ahint =
+        hint_prod obj Right axis ~other:(Axis.set axis (fst left_ahint) r) (r, rhint)
+      in
       let axis_obj = C.proj_obj axis obj in
       let left =
         { ahint = left_ahint;
@@ -2277,7 +2279,7 @@ module Report = struct
     let error_axis : type a. a C.obj -> a S.error -> a t =
      fun obj { left = l, lhint; right = r, rhint } ->
       let left_ahint = hint_axis obj Left ~other:r (l, lhint) in
-      let right_ahint = hint_axis obj Right ~other:l (r, rhint) in
+      let right_ahint = hint_axis obj Right ~other:(fst left_ahint) (r, rhint) in
       let left =
         { ahint = left_ahint;
           is_hint_tighter = not (value_equal obj (fst left_ahint) l)
