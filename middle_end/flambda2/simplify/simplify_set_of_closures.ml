@@ -39,6 +39,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     |> DE.set_inlining_history_tracker
          (Inlining_history.Tracker.inside_function absolute_history)
   in
+  let denv =
+    if Code_metadata.stub code_metadata then DE.enter_stub denv else denv
+  in
   let my_closure_duid = Flambda_debug_uid.none in
   let denv =
     match function_slot_opt with
@@ -514,7 +517,12 @@ let simplify_function context ~outer_dacc function_slot code_id
   in
   let code_id, outer_dacc =
     match Code_or_metadata.view code_or_metadata with
-    | Code_present code when not (Code.stub code) ->
+    | Code_present code
+      when (not (Code.stub code))
+           || Flambda_features.simplify_stubs ()
+              && Inlining_state.stub_depth
+                   (DE.get_inlining_state (DA.denv outer_dacc))
+                 = 0 ->
       let rec run ~outer_dacc ~code count =
         let { code_id; code = new_code; outer_dacc; should_resimplify } =
           simplify_function0 context ~outer_dacc (Some function_slot) code_id
