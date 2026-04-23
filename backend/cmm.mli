@@ -416,6 +416,8 @@ type symbol =
 
 val equal_symbol : symbol -> symbol -> bool
 
+module Symbol_tbl : Hashtbl.S with type key = symbol
+
 type operation =
   | Capply of
       { result_type : machtype;

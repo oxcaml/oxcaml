@@ -232,6 +232,9 @@ let equal_sym_global left right =
   | Local, Local -> true
   | (Global | Local), _ -> false
 
+let arch_to_cmm_global (g : sym_global) : Cmm.is_global =
+  match g with Global -> Global | Local -> Local
+
 type addressing_mode =
     Ibased of string * sym_global * int (* symbol + displ *)
   | Iindexed of int                     (* reg + displ *)
