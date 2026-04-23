@@ -2145,9 +2145,7 @@ module Report = struct
           assert (not (C.le a_obj other y));
           `Second
         end
-        else begin
-          `First
-        end
+        else `First
       | Join ->
         if C.le a_obj x other
         then begin
