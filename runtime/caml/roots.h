@@ -46,7 +46,8 @@ CAMLextern void caml_do_local_roots(
   struct caml__roots_block* local_roots,
   struct stack_info *current_stack,
   value * v_gc_regs,
-  dynamic_thread_t dynamic_bindings);
+  dynamic_thread_t dynamic_bindings,
+  struct c_stack_link* c_stack);
 
 #endif /* CAML_INTERNALS */
 

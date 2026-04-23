@@ -75,13 +75,13 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback_inner(param=0 : ocaml_value)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback_inner(param=0 : ocaml_value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<unavailable>, arg=<unavailable>)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<PTR> : value, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_with_async_exns
 === Testing OCaml/C boundary - finalizer (C calls OCaml during GC) ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<unavailable>, arg=<unavailable>)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<PTR> : value, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_exn(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_final_do_calls_exn
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_do_pending_actions_exn
