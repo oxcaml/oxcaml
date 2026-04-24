@@ -654,6 +654,7 @@
   cfg_simplify
   cfg_prologue
   cfg_merge_blocks
+  cfg_share_instrs
   extra_debug
   label
   linear_utils

@@ -135,6 +135,13 @@ module Equivalent : sig
     Cfg.basic_block ->
     Cfg.basic_block ->
     bool
+
+  val instruction :
+    equal_desc:('a -> 'a -> bool) ->
+    equal_reg:(Reg.t -> Reg.t -> bool) ->
+    'a Cfg.instruction ->
+    'a Cfg.instruction ->
+    bool
 end = struct
   let instruction : type a.
       equal_desc:(a -> a -> bool) ->
@@ -171,7 +178,7 @@ end = struct
       && Misc.Stdlib.Array.equal equal_reg left_arg right_arg
       && Misc.Stdlib.Array.equal equal_reg left_res right_res
       && equal_desc left_desc right_desc
-      (* CR-someday xclerc for xclerc: consider definin equal in `Debuginfo` *)
+      (* CR-someday xclerc for xclerc: consider defining equal in `Debuginfo` *)
       && Debuginfo.compare left_dbg right_dbg = 0
 
   let basic_block :

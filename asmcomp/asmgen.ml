@@ -452,6 +452,12 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   | true ->
     Profile.record ~accumulate:true "cfg_merge_blocks"
       Cfg_merge_blocks.run_after_register_allocation cfg_with_layout)
+  ++ (fun cfg_with_layout ->
+  match !Oxcaml_flags.cfg_share_instrs with
+  | false -> cfg_with_layout
+  | true ->
+    Profile.record ~accumulate:true "cfg_share_instrs" Cfg_share_instrs.run
+      cfg_with_layout)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_simplify"
        Regalloc_utils.simplify_cfg
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
