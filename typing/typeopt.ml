@@ -1083,11 +1083,30 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
          non_nullable (Pvariant { consts = []; non_consts }))
     end
 
+let use_shallow_value_kinds : (unit -> bool) ref = ref (fun () -> false)
+
+let force_deep = ref false
+
+let with_deep_value_kinds f =
+  let saved = !force_deep in
+  force_deep := true;
+  Fun.protect ~finally:(fun () -> force_deep := saved) f
+
+(* In shallow mode, we start recursion at [depth = 2], which is the threshold
+   at which [cannot_proceed] returns [true]. The top-level match on primitive
+   types (int, float, int32, arrays, etc.) runs before any depth check, so we
+   still get precise kinds for those common cases. But any recursive descent
+   into variants/records/tuples immediately takes the [cannot_proceed] branch
+   (returning a cheap approximation from the type's jkind) rather than walking
+   each field recursively. *)
+let initial_depth () =
+  if (not !force_deep) && !use_shallow_value_kinds () then 2 else 0
+
 let value_kind env loc ty =
   try
     let (_num_nodes_visited, value_kind) =
-      value_kind env ~loc ~visited:Numbers.Int.Set.empty ~depth:0
-        ~num_nodes_visited:0 ty
+      value_kind env ~loc ~visited:Numbers.Int.Set.empty
+        ~depth:(initial_depth ()) ~num_nodes_visited:0 ty
     in
     value_kind
   with
@@ -1098,7 +1117,7 @@ let transl_mixed_block_element env loc ty mbe =
   try
     let (_num_nodes_visited, value_kind) =
       value_kind_mixed_block_field env ~loc ~visited:Numbers.Int.Set.empty
-        ~depth:0 ~num_nodes_visited:0 mbe (Some ty)
+        ~depth:(initial_depth ()) ~num_nodes_visited:0 mbe (Some ty)
     in
     value_kind
   with

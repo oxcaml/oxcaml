@@ -1635,7 +1635,15 @@ and transl_tupled_function
       && !Clflags.native_code
       && List.length pl <= (Lambda.max_arity ()) ->
       begin try
-        let arg_layout = layout_pat arg_sort arg_pat in
+        (* Force deep value-kind computation here: tupled-function flattening
+           requires the precise [Pvariant] structure of the tuple argument,
+           which [use_shallow_value_kinds] would otherwise collapse to
+           [Pgenval]. Tupled functions are uncommon enough that paying for a
+           deep computation at this one site is fine. *)
+        let arg_layout =
+          Typeopt.with_deep_value_kinds (fun () ->
+            layout_pat arg_sort arg_pat)
+        in
         let size = List.length pl in
         let pats_expr_list =
           List.map
