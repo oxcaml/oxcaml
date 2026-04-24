@@ -169,26 +169,11 @@ end = struct
   let poly_ g = M.f 42
 end
 [%%expect{|
-Line 6, characters 12-13:
+Line 6, characters 16-22:
 6 |   let poly_ g = M.f 42
-                ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
-
-Lines 5-7, characters 6-3:
-5 | ......struct
-6 |   let poly_ g = M.f 42
-7 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val g : '_weak2 -> unit end
-       is not included in
-         sig val g : layout_ l. ('b : l). 'b -> unit end
-       Values do not match:
-         val g : '_weak2 -> unit
-       is not included in
-         val g : layout_ l. ('b : l). 'b -> unit
-       The type "'_weak2 -> unit" is not compatible with the type "'a -> unit"
-       Type "'_weak2" is not compatible with type "'a"
+                    ^^^^^^
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function, constructor, tuple, record, or constant.
 |}]
 
 

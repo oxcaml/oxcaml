@@ -2496,6 +2496,10 @@ module Report = struct
         "is projected (at %a) from a float record (and thus allocated)"
         (Location.Doc.loc ~capitalize_first:false)
         loc
+    | Lpoly_captured_environment ->
+      Fmt.dprintf "is defined by a layout-polymorphic expression (at %a)"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
 
   let print_allocation_r : allocation -> Fmt.formatter -> unit =
    fun { txt; _ } ->
@@ -2510,6 +2514,9 @@ module Report = struct
          allocation)"
     | Float_projection ->
       Fmt.dprintf "is a float-record projection (and thus an allocation)"
+    | Lpoly_captured_environment ->
+      (* currently not testable *)
+      Fmt.dprintf "is a layout-polymorphic expression"
 
   let modality_if_relevant ~fixpoint pp =
     if
