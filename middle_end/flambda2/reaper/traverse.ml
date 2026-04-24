@@ -472,6 +472,17 @@ let traverse_apply denv acc apply : rev_expr =
       List.iter
         (Acc.add_cond_any_usage acc ~denv)
         [valuec; exnc; effc; dyn; bind; f; arg]
+    | Effect
+        (With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg }) ->
+      List.iter
+        (Acc.add_cond_any_usage acc ~denv)
+        [valuec; exnc; effc; handle_tick; f; arg]
+    | Effect
+        (With_stack_bind_preemptible
+           { valuec; exnc; effc; handle_tick; dyn; bind; f; arg }) ->
+      List.iter
+        (Acc.add_cond_any_usage acc ~denv)
+        [valuec; exnc; effc; handle_tick; dyn; bind; f; arg]
     | Effect (Resume { cont; f; arg }) ->
       List.iter (Acc.add_cond_any_usage acc ~denv) [cont; f; arg]
   in

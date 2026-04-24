@@ -2254,11 +2254,59 @@ static void tick_thread_wake(void) {}
 
 #endif
 
-void caml_process_tick(void)
+value caml_process_tick_exn(void)
 {
-  if (atomic_exchange(&Caml_state->requested_tick, false)) {
+  CAMLparam0();
+  CAMLlocal1(res);
+  if (atomic_exchange_explicit(&Caml_state->requested_tick, false,
+                               memory_order_acquire)) {
     caml_domain_tick_hook();
+
+    bool any_preemptible = false;
+    struct stack_info *stack = caml_state->current_stack;
+    struct stack_info *innermost_preemptible = NULL;
+    while (stack->handler->parent) {
+      if (stack->handler->handle_tick != Val_unit) {
+        any_preemptible = true;
+        stack->handler->preemptible_child = innermost_preemptible;
+        innermost_preemptible = stack;
+      }
+      stack = stack->handler->parent;
+    }
+    /* stack is now the root; fix up its preemptible_child */
+    stack->handler->preemptible_child = innermost_preemptible;
+
+    if (!any_preemptible) {
+      CAMLreturn(Val_unit);
+    }
+
+    while (stack) {
+      if (stack->handler->handle_tick != Val_unit) {
+        res = caml_callback_exn(stack->handler->handle_tick, Val_unit);
+        if (Is_exception_result(res)) {
+          CAMLreturn(res);
+        }
+
+        switch (Long_val(res)) {
+        case 0: /* Preempt */
+          domain_root_set(&Caml_state->preemption, Val_long(1));
+          CAMLreturn(Val_unit);
+        case 1: /* Continue */
+          break;
+        default:
+          /* Should be impossible unless the user defines their own tick handler
+             API with the wrong structure for the Outcome.t type
+          */
+          CAMLassert(false);
+          break;
+        }
+      }
+
+      stack = stack->handler->preemptible_child;
+    }
   }
+
+  CAMLreturn(Val_unit);
 }
 
 CAMLextern void caml_stop_tick_thread(void)

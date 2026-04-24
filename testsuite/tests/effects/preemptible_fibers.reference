@@ -1,0 +1,30 @@
+# Perform normal effect
+OK
+# Preempt on tick
+OK
+# Preempt after two ticks
+OK
+# Two preemptible fibers, inner handles tick
+OK
+# Two preemptible fibers, outer handles tick
+OK
+# Resume preempted within preemptible
+OK
+# Resume cont with non-preemptible within preemptible
+OK
+# Resume preempted in fiber, then tick
+OK
+# Resume preempted with inner preemptible, inner ticks
+OK
+# Multiple non-preemptible layers between preemptible
+OK
+# Inner preemptible finishes, outer still gets ticks
+OK
+# Inner preemptible finishes, sibling preemptible ticks
+OK
+# Three preemptible fibers, middle finishes, inner ticks
+OK
+# Stale preemptible_child after inner preemptible finishes
+OK
+# Multiple non-preemptible layers, outer preempts
+OK
