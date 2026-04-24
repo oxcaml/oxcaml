@@ -2201,7 +2201,10 @@ module_declaration_body(module_type_with_optional_modal_expr):
 ;
 %inline module_expr_alias:
   id = mkrhs(mod_longident) attrs = attributes
-    { Mty.alias ~loc:(make_loc $loc(id)) ~attrs id }
+    { if not (List.is_empty attrs) then
+        Language_extension.assert_enabled
+          ~loc:(make_loc $loc(attrs)) Let_mutable ();
+      Mty.alias ~loc:(make_loc $loc(id)) ~attrs id }
 ;
 (* A module substitution (in a signature). *)
 module_subst:
