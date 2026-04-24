@@ -263,6 +263,7 @@ type error =
   | Andop_type_clash of string * Errortrace.unification_error
   | Bindings_type_clash of Errortrace.unification_error
   | Unbound_existential of Ident.t list * type_expr
+  | Existential_jkind_mismatch of Ident.t * Jkind.Violation.t
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
   | Wrong_expected_record_boxing of
@@ -1840,7 +1841,7 @@ let solve_Ppat_unboxed_tuple ~refine ~alloc_mode loc env args expected_ty =
   ann
 
 let solve_constructor_annotation
-    tps (penv : Pattern_env.t) name_list sty ty_args ty_ex =
+    tps (penv : Pattern_env.t) name_list sty ty_args ty_ex cstr_existentials =
   let expansion_scope = penv.equations_scope in
   let existentials =
     List.map
@@ -1856,7 +1857,7 @@ let solve_constructor_annotation
         let (id, new_env) =
           Env.enter_type ~scope:expansion_scope name.txt decl !!penv in
         Pattern_env.set_env penv new_env;
-        {name with txt = id}, jkind_annot_opt)
+        {name with txt = id}, jkind_annot_opt, jkind)
       name_list
   in
   let cty, ty, force =
@@ -1879,24 +1880,58 @@ let solve_constructor_annotation
           Ttuple tyl -> (List.map snd tyl)
         | _ -> assert false
   in
+  (* Check that the kind from the declaration is a subkind of the kind from
+     the pattern annotation. *)
+  let check_existential id declared_jkind =
+    match
+      List.find_opt (fun (n, _, _) -> Ident.same n.txt id) existentials
+    with
+    | None -> ()
+    | Some (name, jkind_annot_opt, annotated_jkind) ->
+        let type_equal = Ctype.type_equal !!penv in
+        let context = Ctype.mk_jkind_context_always_principal !!penv in
+        (match
+           Jkind.sub_or_error ~type_equal ~context !!penv
+             declared_jkind annotated_jkind
+         with
+         | Ok () -> ()
+         | Error err ->
+             let loc = match jkind_annot_opt with
+               | Some ja -> ja.pjka_loc
+               | None -> name.loc
+             in
+             raise (Error (loc, !!penv,
+                           Existential_jkind_mismatch (name.txt, err))))
+  in
   if existentials <> [] then ignore begin
-    let ids = List.map (fun (x, _) -> x.txt) existentials in
+    let ids = List.map (fun (x, _, _) -> x.txt) existentials in
     let rem =
-      List.fold_left
-        (fun rem tv ->
+      List.fold_left2
+        (fun rem tv cstr_ex_tv ->
           match get_desc tv with
             Tconstr(Path.Pident id, [], _) when List.mem id rem ->
+              let declared_jkind =
+                match get_desc cstr_ex_tv with
+                | Tvar { jkind } -> jkind
+                | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
+                | _ -> Misc.fatal_error "Typecore.solve_constructor_annotation"
+              in
+              check_existential id declared_jkind;
               list_remove id rem
           | _ ->
               raise (Error (cty.ctyp_loc, !!penv,
                             Unbound_existential (ids, ty))))
-        ids ty_ex
+        ids ty_ex cstr_existentials
     in
     if rem <> [] then
       raise (Error (cty.ctyp_loc, !!penv,
                     Unbound_existential (ids, ty)))
   end;
-  ty_args, Some (existentials, cty)
+  let existentials_out =
+    List.map (fun (name, jkind_annot_opt, _) -> name, jkind_annot_opt)
+      existentials
+  in
+  ty_args, Some (existentials_out, cty)
 
 let solve_Ppat_construct ~refine tps penv loc constr no_existentials
         existential_styp expected_ty =
@@ -1943,7 +1978,7 @@ let solve_Ppat_construct ~refine tps penv loc constr no_existentials
                   ca.Types.ca_type) ty_args in
             let ty_args_ty, existential_ctyp =
               solve_constructor_annotation tps penv name_list sty ty_args_ty
-                ty_ex
+                ty_ex constr.cstr_existentials
             in
             let ty_args =
               List.map2 (fun arg ca_type -> {arg with Types.ca_type}) ty_args
@@ -12193,6 +12228,9 @@ let report_error ~loc env =
         "@[<2>%s:@ %a@]"
         "This type does not bind all existentials in the constructor"
         (Style.as_inline_code pp_type) (ids, ty)
+  | Existential_jkind_mismatch (id, err) ->
+      Location.error_of_printer ~loc
+        (Jkind.Violation.report_with_name ~name:(Ident.name id) env) err
   | Missing_type_constraint ->
       Location.errorf ~loc
         "@[%s@ %s@]"
