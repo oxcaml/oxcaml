@@ -40,5 +40,6 @@ let () =
     ~extra_args:Options.list
     ~extra_init:(fun () ->
       Clflags.native_code := true;
-      Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler)
+      Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
+      Opttoploop.use_existing_compilerlibs_state_for_artifacts ())
     (module Toplevel)
