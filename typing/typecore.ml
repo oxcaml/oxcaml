@@ -4903,24 +4903,24 @@ let rec maybe_computation exp =
 (* Returns true if, for every [Texp_ident x] occurring in the expression,
    the comonadic axes of the expression are weaker (higher) than [x].
    Conservative: may return false when the condition holds. *)
-let rec is_syntactic_value (exp : expression) =
+let rec captures_comonadic (exp : expression) =
   match exp.exp_desc with
   | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit | Texp_unboxed_bool _
   | Texp_function _ -> true
   | Texp_construct (_, _, args, _) ->
-    List.for_all is_syntactic_value args
+    List.for_all captures_comonadic args
   | Texp_variant (_, None) -> true
-  | Texp_variant (_, Some (e, _)) -> is_syntactic_value e
+  | Texp_variant (_, Some (e, _)) -> captures_comonadic e
   | Texp_tuple (args, _) ->
-    List.for_all (fun (_, e) -> is_syntactic_value e) args
+    List.for_all (fun (_, e) -> captures_comonadic e) args
   | Texp_unboxed_tuple args ->
-    List.for_all (fun (_, e, _) -> is_syntactic_value e) args
+    List.for_all (fun (_, e, _) -> captures_comonadic e) args
   | Texp_record { fields; extended_expression = None; _ } ->
     Array.for_all (fun (_, def) ->
       match def with
       | Kept _ -> assert false
-      | Overridden (_, e) -> is_syntactic_value e) fields
-  | Texp_apply_layout (e, _) | Texp_exclave e -> is_syntactic_value e
+      | Overridden (_, e) -> captures_comonadic e) fields
+  | Texp_apply_layout (e, _) | Texp_exclave e -> captures_comonadic e
   | _ -> false
 
 let annotate_recursive_bindings env valbinds =
@@ -5950,7 +5950,7 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
   in
   let env_alloc_mode, exp_mode =
     if is_lpoly then
-      (* Since we require [is_syntactic_value] for the RHS of [let poly_], we
+      (* Since we require [captures_comonadic] for the RHS of [let poly_], we
          can conservatively use the RHS's comonadic mode as the captured
          environment's mode. *)
       let env_alloc_mode, env_mode =
@@ -10559,7 +10559,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         (List.map2 (fun (attrs, _, _, _, _) (e, _) -> attrs, e) spatl exp_list);
       if is_lpoly then
         List.iter2 (fun { pvb_loc; _ } (exp, _) ->
-          if not (is_syntactic_value exp) then
+          if not (captures_comonadic exp) then
             raise (Error (pvb_loc, env, Let_poly_not_syntactic_value))
         ) spat_sexp_list exp_list;
       (mode_pat_typ_list, exp_list, new_env, mvs, sorts,
