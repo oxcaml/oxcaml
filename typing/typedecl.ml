@@ -1312,6 +1312,14 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
          alias). *)
       not (Builtin_attributes.attr_equals_builtin a "deprecated_mutable")
     in
+    let keep_decl_attribute a =
+      (* [@@represent_as_float_array] records don't have unboxed versions, but
+         we still produce one for the phase of typechecking where every record
+         has an unboxed version (see Note [Typechecking unboxed versions of
+         types]). For those unboxed versions, we don't keep the attribute, since
+         it's not valid on an unboxed record. *)
+      not (Builtin_attributes.attr_equals_builtin a "represent_as_float_array")
+    in
     let lbls_unboxed =
       List.map
         (fun (ld : Types.label_declaration) ->
@@ -1380,7 +1388,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_is_newtype = false;
         type_expansion_scope = Btype.lowest_level;
         type_loc = decl.type_loc;
-        type_attributes = decl.type_attributes;
+        type_attributes = List.filter keep_decl_attribute decl.type_attributes;
         type_unboxed_default = false;
         type_uid = Uid.unboxed_version decl.type_uid;
         type_unboxed_version = None;
@@ -2036,6 +2044,11 @@ let rec update_decl_jkind env dpath decl =
   let represent_as_float_array =
     Builtin_attributes.has_represent_as_float_array decl.type_attributes
   in
+  if represent_as_float_array then begin
+    match decl.type_kind with
+    | Type_record _ -> ()
+    | _ -> raise (Error (decl.type_loc, Bad_represent_as_float_array_attribute))
+  end;
   (* returns updated labels, updated rep, and updated jkind *)
   let update_record_kind loc lbls rep =
     match lbls, rep with

@@ -25,7 +25,34 @@ Error: "[@@represent_as_float_array]" can only be used on records whose fields a
 
 type t [@@represent_as_float_array]
 [%%expect{|
-type t
+Line 1, characters 0-35:
+1 | type t [@@represent_as_float_array]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
+|}]
+
+type t = A | B [@@represent_as_float_array]
+[%%expect{|
+Line 1, characters 0-43:
+1 | type t = A | B [@@represent_as_float_array]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
+|}]
+
+type t = .. [@@represent_as_float_array]
+[%%expect{|
+Line 1, characters 0-40:
+1 | type t = .. [@@represent_as_float_array]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
+|}]
+
+type t = #{ f : float# } [@@represent_as_float_array]
+[%%expect{|
+Line 1, characters 0-53:
+1 | type t = #{ f : float# } [@@represent_as_float_array]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
 |}]
 
 (* Can abstract a [@@represent_as_float_array] record *)
