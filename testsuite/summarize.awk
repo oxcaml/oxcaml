@@ -99,13 +99,18 @@ function record_unexp() {
     errored = 1;
 }
 
-# CR-someday dallsopp: this breaks our display of skipped tests (because we
-# still display the with part for skip results, as it's clearer). Resolve or
-# upstream this.
-#/^ ... testing '[^']*' with / {
-#    if (in_test) record_unexp();
-#    next;
-#}
+/^ ... testing '[^']*' with / {
+    if (in_test && !in_skipped_test) record_unexp();
+    match($0, /... testing '[^']*'/);
+    thiskey = sprintf ("%s/%s", curdir, substr($0, RSTART+13, RLENGTH-14));
+    if (!in_skipped_test && thiskey == key && key in RESULTS) {
+        # Failed test displaying full true - the => failed line comes first
+        # Skip all the remaining lines under this test key, therefore.
+        next;
+    } else {
+        in_skipped_test = 1;
+    }
+}
 
 /^ ... testing '[^']*'/ {
     if (in_test) record_unexp();
@@ -119,6 +124,7 @@ function record_unexp() {
     key = sprintf ("%s/%s", curdir, curfile);
     DIRS[key] = curdir;
     in_test = 1;
+    if (!match($0, /^ ... testing '[^']*' with /)) in_skipped_test = 0;
 }
 
 /=> passed/ {
@@ -133,9 +139,7 @@ function record_unexp() {
     record_skip();
 }
 
-/=> predicate.*is satisfied/ {
-    record_pass();
-}
+# A predicate being satisfied is NOT a pass! (because nothing was done)
 
 /=> n\/a/ {
     record_na();
