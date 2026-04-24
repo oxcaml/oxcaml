@@ -126,9 +126,9 @@ let repeat_comparisons r _f =
 [%%expect_asm X86_64{|
 repeat_comparisons:
   movq  (%rax), %rbx
+  xorl  %eax, %eax
   cmpq  $11, %rbx
   setg  %al
-  movzbq %al, %rax
   cmpq  $11, %rbx
   jle   .L113
   testq %rax, %rax
