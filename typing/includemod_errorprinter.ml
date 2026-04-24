@@ -982,7 +982,8 @@ and module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx = function
       dwith_context ctx printer :: before
   | Mode e ->
       let printer ppf =
-        Includecore.report_mode_sub_error "Got" "expected" ppf e
+        Includecore.report_mode_sub_error
+          ~pp:(Location.none, Unknown) "Got" "expected" ppf e
       in
       dwith_context ctx printer :: before
 
