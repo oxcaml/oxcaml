@@ -1564,16 +1564,16 @@ let transl_functorize compilation_unit ~all_params
       bindings
       result_block
   in
-  let all_idents = List.map snd param_globals_vars @ [unit_ident] in
+  let mk_param layout name =
+    { name;
+      debug_uid = debug_uid_none;
+      layout;
+      attributes = default_param_attribute;
+      mode = alloc_heap }
+  in
   let params =
-    List.map
-      (fun name ->
-        { name;
-          debug_uid = debug_uid_none;
-          layout = layout_module;
-          attributes = default_param_attribute;
-          mode = alloc_heap })
-      all_idents
+    List.map (mk_param layout_module) (List.map snd param_globals_vars)
+    @ [mk_param layout_unit unit_ident]
   in
   let func =
     lfunction

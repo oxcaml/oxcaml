@@ -6,15 +6,18 @@
    basic2.ml util2.ml \
    basic_share.mli basic_share.ml \
    util_share.mli util_share.ml \
+   derived.mli derived.ml \
    p_int.mli p_int.ml p_int__.ml \
    main_functorize.ml \
    main_functorize_double.ml \
+   main_functorize_derived.ml \
    main_functorize_share.ml \
    main_functorize_type_share.ml \
    bad_mix_bundles.ml \
    bad_mix_share.ml \
    test_functorize.reference \
    test_functorize_double.reference \
+   test_functorize_derived.reference \
    test_functorize_share.reference \
    test_functorize_type_share.reference \
    bad_mix_bundles.reference \
@@ -24,7 +27,7 @@
 
    set OCAMLPARAM = "";
 
-   script = "mkdir p basic util basic2 util2 basic_share util_share p_int bundle bundle2 bundle_share bundle_stopafter bundle_cmifile";
+   script = "mkdir p basic util basic2 util2 basic_share util_share derived p_int bundle bundle2 bundle_derived bundle_share bundle_stopafter bundle_cmifile";
    script;
 
    src = "p.mli p__.ml";
@@ -121,6 +124,16 @@
    module = "util2/util2.ml";
    ocamlc.byte;
 
+   (* Derived: parameterized by P, depends on Basic *)
+
+   src = "derived.mli derived.ml";
+   dst = "derived/";
+   copy;
+
+   flags = "$flg -parameter P -I p -I basic -I derived";
+   module = "derived/derived.mli derived/derived.ml";
+   ocamlc.byte;
+
    (* basic_share: abstract type t, with a counter *)
 
    flags = "$flg -parameter P -I p -I basic_share";
@@ -146,6 +159,46 @@
    program = "bundle/bundle.cmo";
    all_modules = "basic/basic.cmo util/util.cmo";
    ocamlc.byte;
+
+   (* Bundle basic and derived: derived depends on basic *)
+
+   flags = "$flg -functorize-intf -I p -I basic -I derived";
+   module = "";
+   program = "bundle_derived/bundle_derived.cmi";
+   all_modules = "basic/basic.cmi derived/derived.cmi";
+   ocamlc.byte;
+
+   flags = "$flg -functorize-impl -I p -I basic -I derived";
+   module = "";
+   program = "bundle_derived/bundle_derived.cmo";
+   all_modules = "basic/basic.cmo derived/derived.cmo";
+   ocamlc.byte;
+
+   flags = "$flg -I bundle_derived -I p -I p_int -I basic -I derived";
+   module = "main_functorize_derived.ml";
+   ocamlc.byte;
+
+   flags = "";
+   module = "";
+   program = "$test_build_directory/test_functorize_derived.bc";
+   all_modules = "\
+     basic/basic__.cmo \
+     basic/basic.cmo \
+     derived/derived.cmo \
+     p_int/p_int__.cmo \
+     p_int/p_int.cmo \
+     bundle_derived/bundle_derived.cmo \
+     main_functorize_derived.cmo \
+   ";
+   ocamlc.byte;
+
+   stdout = "test_functorize_derived.output";
+   stderr = "test_functorize_derived.output";
+   output = "test_functorize_derived.output";
+   run;
+
+   reference = "test_functorize_derived.reference";
+   check-program-output;
 
    (* Bundle the transparent modules into a second functor *)
 
