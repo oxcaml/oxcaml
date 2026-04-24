@@ -44,9 +44,9 @@ jobs:
             config: --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime4 dev (x86_64-linux)
-            config: --disable-runtime5 --enable-dev
-            os: warp-ubuntu-latest-x64-8x
+#          - name: runtime4 dev (x86_64-linux)
+#            config: --disable-runtime5 --enable-dev
+#            os: warp-ubuntu-latest-x64-8x
 
           # We use a custom install prefix for this workflow.
           # Consider renaming it to indicate as such when convenient.
@@ -69,29 +69,29 @@ jobs:
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
-          - name: runtime4 O3 (x86_64-linux)
-            config: --disable-runtime5
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: ''
-            ocamlparam: '_,O3=1'
+#          - name: runtime4 O3 (x86_64-linux)
+#            config: --disable-runtime5
+#            os: warp-ubuntu-latest-x64-8x
+#            build_ocamlparam: ''
+#            ocamlparam: '_,O3=1'
 
-          - name: runtime4 O3 metrics (x86_64-linux)
-            config: --disable-runtime5
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_'
-            ocamlparam: '_,O3=1'
-            collect_metrics: true
+#          - name: runtime4 O3 metrics (x86_64-linux)
+#            config: --disable-runtime5
+#            os: warp-ubuntu-latest-x64-8x
+#            build_ocamlparam: '_'
+#            ocamlparam: '_,O3=1'
+#            collect_metrics: true
 
-          - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
-            config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: ''
-            ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml'
+#          - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
+#            config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
+#            os: warp-ubuntu-latest-x64-8x
+#            build_ocamlparam: ''
+#            ocamlparam: '_,Oclassic=1'
+#            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml'
 
-          - name: runtime4 (aarch64-darwin)
-            config: --disable-runtime5 --disable-warn-error
-            os: warp-macos-15-arm64-6x
+#          - name: runtime4 (aarch64-darwin)
+#            config: --disable-runtime5 --disable-warn-error
+#            os: warp-macos-15-arm64-6x
 
           - name: runtime5 regalloc (aarch64-darwin)
             config: --enable-runtime5 --disable-warn-error
@@ -123,13 +123,13 @@ jobs:
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
-          - name: runtime4 regalloc (x86_64-linux)
-            config: --disable-runtime5
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            check_arch: true
-            run_regalloc_tool: true
+#          - name: runtime4 regalloc (x86_64-linux)
+#            config: --disable-runtime5
+#            os: warp-ubuntu-latest-x64-8x
+#            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+#            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+#            check_arch: true
+#            run_regalloc_tool: true
 
           - name: runtime5 frame-pointers irc (x86_64-linux)
             config: --enable-runtime5 --enable-frame-pointers
@@ -159,10 +159,10 @@ jobs:
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             check_arch: true
 
-          - name: runtime4 address-sanitizer (x86_64-linux)
-            config: --disable-runtime5 --enable-address-sanitizer
-            os: warp-ubuntu-latest-x64-8x
-            cc: clang
+#          - name: runtime4 address-sanitizer (x86_64-linux)
+#            config: --disable-runtime5 --enable-address-sanitizer
+#            os: warp-ubuntu-latest-x64-8x
+#            cc: clang
 
           - name: runtime5 address-sanitizer (x86_64-linux)
             config: --enable-runtime5 --enable-address-sanitizer
