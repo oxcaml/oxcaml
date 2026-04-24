@@ -81,6 +81,19 @@ val transl_mixed_block_element :
   Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
   -> unit Lambda.mixed_block_element
 
+(* If set to a function returning [true], [value_kind],
+   [transl_mixed_block_element] and [layout] (for value-sorted types) will
+   skip recursion into the fields of variants, records and tuples, taking a
+   cheap approximation ([Pgenval]) for field kinds. The outer structure of
+   the type is preserved (e.g., a tuple is still [Pvariant { consts = [];
+   non_consts = [0, Constructor_uniform [...]] }]), and precise kinds are
+   still returned for primitive types (int, float, int32, arrays, etc.), so
+   user-written [[@unboxable]] attributes and tupled-function flattening
+   continue to work. Intended for Flambda 2 classic mode, where the
+   field-by-field detailed kind information is rarely used by the
+   optimizer. *)
+val use_shallow_value_kinds : (unit -> bool) ref
+
 val classify_lazy_argument : Typedtree.expression ->
                              [ `Constant_or_function
                              | `Float_that_cannot_be_shortcut
