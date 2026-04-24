@@ -817,7 +817,7 @@ let instr_for_intop = function
   | Ilsl -> I.sal
   | Ilsr -> I.shr
   | Iasr -> I.sar
-  | Idiv | Imod | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ -> assert false
+  | Idiv | Imod | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
@@ -2320,7 +2320,7 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Specific (Ibswap { bitwidth = Sixtyfour })) -> I.bswap (res i 0)
   | Lop (Specific Isextend32) -> I.movsxd (arg32 i 0) (res i 0)
   | Lop (Specific Izextend32) -> I.mov (arg32 i 0) (res32 i 0)
-  | Lop (Intop (Iclz { arg_is_non_zero })) ->
+  | Lop (Intop Iclz) ->
     (* CR-someday gyorsh: can we do it at selection? mshinwell: We need to
        address this and the similar CRs below. My feeling is that we should try
        to do this earlier, based on previous experience with similar things, but
@@ -2328,12 +2328,6 @@ let emit_instr ~first ~last ~fallthrough i =
        situation is fine for now. *)
     if Arch.Extension.enabled LZCNT
     then I.simd lzcnt_r64_r64m64 [| arg i 0; res i 0 |]
-    else if arg_is_non_zero
-    then (
-      (* No need to handle that bsr is undefined on 0 input. *)
-      I.bsr (arg i 0) (res i 0);
-      (* We need (63 - result_of_bsr), which can be done with xor. *)
-      I.xor (int 63) (res i 0))
     else
       let lbl_z = L.create Text in
       let lbl_nz = L.create Text in
@@ -2344,14 +2338,10 @@ let emit_instr ~first ~last ~fallthrough i =
       D.define_label lbl_z;
       I.mov (int 64) (res i 0);
       D.define_label lbl_nz
-  | Lop (Intop (Ictz { arg_is_non_zero })) ->
+  | Lop (Intop Ictz) ->
     (* CR-someday gyorsh: can we do it at selection? *)
     if Arch.Extension.enabled BMI
     then I.simd tzcnt_r64_r64m64 [| arg i 0; res i 0 |]
-    else if arg_is_non_zero
-    then
-      (* No need to handle that bsf is undefined on 0 input. *)
-      I.bsf (arg i 0) (res i 0)
     else
       let lbl_nz = L.create Text in
       I.bsf (arg i 0) (res i 0);

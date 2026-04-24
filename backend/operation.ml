@@ -61,8 +61,8 @@ type integer_operation =
   | Ilsl
   | Ilsr
   | Iasr
-  | Iclz of { arg_is_non_zero : bool }
-  | Ictz of { arg_is_non_zero : bool }
+  | Iclz
+  | Ictz
   | Ipopcnt
   | Icomp of integer_comparison
 
@@ -84,8 +84,8 @@ let string_of_integer_operation = function
   | Ilsl -> " << "
   | Ilsr -> " >>u "
   | Iasr -> " >>s "
-  | Iclz { arg_is_non_zero } -> Printf.sprintf "clz %B " arg_is_non_zero
-  | Ictz { arg_is_non_zero } -> Printf.sprintf "ctz %B " arg_is_non_zero
+  | Iclz -> "clz "
+  | Ictz -> "ctz "
   | Ipopcnt -> "popcnt "
   | Icomp cmp -> string_of_integer_comparison cmp
 
@@ -95,7 +95,7 @@ let string_of_int128_operation = function
   | Imul64 { signed } -> " *" ^ if signed then " " else "u "
 
 let is_unary_integer_operation = function
-  | Iclz _ | Ictz _ | Ipopcnt -> true
+  | Iclz | Ictz | Ipopcnt -> true
   | Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
   | Iasr | Icomp _ ->
     false
@@ -114,62 +114,58 @@ let equal_integer_operation left right =
   | Ilsl, Ilsl -> true
   | Ilsr, Ilsr -> true
   | Iasr, Iasr -> true
-  | ( Iclz { arg_is_non_zero = left_arg_is_non_zero },
-      Iclz { arg_is_non_zero = right_arg_is_non_zero } ) ->
-    Bool.equal left_arg_is_non_zero right_arg_is_non_zero
-  | ( Ictz { arg_is_non_zero = left_arg_is_non_zero },
-      Ictz { arg_is_non_zero = right_arg_is_non_zero } ) ->
-    Bool.equal left_arg_is_non_zero right_arg_is_non_zero
+  | Iclz, Iclz -> true
+  | Ictz, Ictz -> true
   | Ipopcnt, Ipopcnt -> true
   | Icomp left, Icomp right -> equal_integer_comparison left right
   | ( Iadd,
       ( Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Isub,
       ( Iadd | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Imul,
       ( Iadd | Isub | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Imulh _,
       ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Idiv,
       ( Iadd | Isub | Imul | Imulh _ | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Imod,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Iand,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ior,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ixor,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ilsl,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ilsr,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Iasr,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
-  | ( Iclz _,
+      | Ilsr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
+  | ( Iclz,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Ictz _ | Ipopcnt | Icomp _ ) )
-  | ( Ictz _,
+      | Ilsr | Iasr | Ictz | Ipopcnt | Icomp _ ) )
+  | ( Ictz,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ipopcnt | Icomp _ ) )
+      | Ilsr | Iasr | Iclz | Ipopcnt | Icomp _ ) )
   | ( Ipopcnt,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ictz _ | Icomp _ ) )
+      | Ilsr | Iasr | Iclz | Ictz | Icomp _ ) )
   | ( Icomp _,
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ) ) ->
+      | Ilsr | Iasr | Iclz | Ictz | Ipopcnt ) ) ->
     false
 
 let equal_int128_operation left right =
@@ -401,8 +397,8 @@ let intop (op : integer_operation) =
   | Ilsr -> " >>u "
   | Iasr -> " >>s "
   | Ipopcnt -> " pop "
-  | Iclz _ -> " clz "
-  | Ictz _ -> " ctz "
+  | Iclz -> " clz "
+  | Ictz -> " ctz "
   | Icomp cmp -> intcomp cmp
 
 let int128op = function
