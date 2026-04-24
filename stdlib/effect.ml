@@ -100,9 +100,12 @@ module Deep = struct
 
   (* CR effect-syntax: Upstream the 3-parameter version of continuation and use
      it to maintain type safety here. *)
-  let[@inline] to_continuation (f : _ continuation -> 'a) (k : _ continuation_) =
+  let[@inline] to_continuation (f : _ continuation -> 'a) (k : _ continuation_)
+      =
     f (Obj.magic k)
-  let[@inline] of_continuation (f : _ continuation_ -> 'a) (k : _ continuation) =
+
+  let[@inline] of_continuation (f : _ continuation_ -> 'a) (k : _ continuation)
+      =
     f (Obj.magic k)
 
   let match_with comp arg handler =
