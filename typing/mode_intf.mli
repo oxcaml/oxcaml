@@ -75,6 +75,10 @@ type 'a simple_error =
     right : 'a
   }
 
+type loosening =
+  | Loosened
+  | Not_loosened
+
 type print_error_result =
   | Mode  (** A mode constant is printed *)
   | Mode_with_hint  (** A mode constant with hints is printed *)

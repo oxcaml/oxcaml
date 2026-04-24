@@ -2110,8 +2110,8 @@ module Report = struct
 
   (** Human-readible mode error report. *)
   type 'a t =
-    { left : ('a, left_only) ahint;
-      right : ('a, right_only) ahint
+    { left : loosening * ('a, left_only) ahint;
+      right : loosening * ('a, right_only) ahint
     }
 
   (** Convert Solver error to report. *)
@@ -2119,96 +2119,179 @@ module Report = struct
     (** Given a branch of two constant bounds on a single axis, choose the the
         one that's responsible for the branch. *)
     let choose_branch_axis : type a l r.
-        (l * r) Solver_intf.branch -> a C.obj -> a -> a -> [`First | `Second] =
-     fun b a_obj x y ->
-      (* CR-someday zqian: in the case where [x = y], we currently arbitrarily choose from
-         [x] and [y], which are unordered anyway. In the future we might want to keep an
-         order for better error messages. For example, order them by occurrence in the
-         source code such that the more recent hint is returned.
-
-         nmatschke: Likewise for [x <> y] (middle modes of diamonds). *)
-      if
-        begin match b with Join -> C.le a_obj y x | Meet -> C.le a_obj x y
+        (l * r) Solver_intf.branch ->
+        a C.obj ->
+        a ->
+        a ->
+        other:a ->
+        [`First | `Second] =
+     fun b a_obj x y ~other ->
+      (* CR-someday zqian: in the case where each of [x] and [y] can be
+         responsible independently, for not satisfying [~other], we currently
+         arbitrarily prioritize `Second. In the future we might want to
+         prioritize for better error messages. For example, prioritize the first
+         element in a [join]. This requires inspecting the [solver.ml] to ensure
+         the ordering in the [join] list is preserved. *)
+      match b with
+      | Meet ->
+        if C.le a_obj other x
+        then begin
+          assert (not (C.le a_obj other y));
+          `Second
         end
-      then `First
-      else `Second
+        else `First
+      | Join ->
+        if C.le a_obj x other
+        then begin
+          assert (not (C.le a_obj y other));
+          `Second
+        end
+        else `First
+
+    type 'd side =
+      | Left : left_only side
+      | Right : right_only side
+      constraint 'd = 'l * 'r
+    [@@ocaml.warning "-62"]
+
+    let adjoint : type a b l r.
+        a C.obj ->
+        (l * r) side ->
+        (b, a, l * r) C.morph ->
+        (a, b, r * l) C.morph =
+     fun obj side morph ->
+      match side with
+      | Left -> C.right_adjoint obj morph
+      | Right -> C.left_adjoint obj morph
 
     (** Given a solver hint on a product lattice, and an axis in that product
         that we are interested in, returns a human-readible hint.*)
     let rec hint_apply : type a b l r.
         a C.obj ->
+        (l * r) side ->
+        a ->
         (l * r) morph ->
         (b, a, l * r) C.morph ->
+        other:a ->
         (b, l * r) S.ahint ->
         b C.For_hint.responsible_axis ->
-        (l * r) hint =
-     fun obj morph_hint morph ahint res ->
-      let obj = C.src obj morph in
+        (a, l * r) ahint =
+     fun obj side a morph_hint morph ~other ahint res ->
+      let src = C.src obj morph in
       match res with
-      | NoneResponsible -> Irrelevant
+      | NoneResponsible -> a, Irrelevant
       | SourceIsSingle ->
-        let ahint = ahint_axis obj ahint in
-        Apply (morph_hint, obj, ahint)
+        let morph' = adjoint obj side morph in
+        let other = C.apply src morph' other in
+        let ahint = hint_axis src side ~other ahint in
+        let ma = C.apply obj morph (fst ahint) in
+        ma, Apply (morph_hint, src, ahint)
       | Axis ax ->
-        let ahint = ahint_prod obj ax ahint in
-        let obj = C.proj_obj ax obj in
-        Apply (morph_hint, obj, ahint)
+        let b, hint = ahint in
+        let morph' = adjoint obj side morph in
+        let other = C.apply src morph' other in
+        let x, hint = hint_prod src side ax ~other (b, hint) in
+        let b = C.Axis.set ax x b in
+        let a = C.apply obj morph b in
+        let src = C.proj_obj ax src in
+        a, Apply (morph_hint, src, (x, hint))
 
     and hint_prod : type t a l r.
-        t C.obj -> (t, a) Axis.t -> (t, l * r) S.hint -> (l * r) hint =
-     fun obj ax -> function
+        t C.obj ->
+        (l * r) side ->
+        (t, a) Axis.t ->
+        other:t ->
+        (t, l * r) S.ahint ->
+        (a, l * r) ahint =
+     fun obj side ax ~other (a, hint) ->
+      match hint with
       | Apply (morph_hint, morph, ahint) ->
-        hint_apply obj morph_hint morph ahint
-          (C.For_hint.find_responsible_axis_prod morph ax)
-      | Const c -> Const c
+        let t, hint =
+          hint_apply obj side a morph_hint morph ~other ahint
+            (C.For_hint.find_responsible_axis_prod morph ax)
+        in
+        Axis.proj ax t, hint
+      | Const c -> Axis.proj ax a, Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
-        let chosen_hint =
+        let chosen_ahint =
+          let other = Axis.proj ax other in
           let proj1 = Axis.proj ax a1 in
           let proj2 = Axis.proj ax a2 in
           let obj = C.proj_obj ax obj in
-          match choose_branch_axis b obj proj1 proj2 with
-          | `First -> hint1
-          | `Second -> hint2
+          match choose_branch_axis b obj proj1 proj2 ~other with
+          | `First -> a1, hint1
+          | `Second -> a2, hint2
         in
-        hint_prod obj ax chosen_hint
-
-    and ahint_prod : type t a l r.
-        t C.obj -> (t, a) Axis.t -> (t, l * r) S.ahint -> (a, l * r) ahint =
-     fun obj ax (t, hint) ->
-      let a = Axis.proj ax t in
-      let hint = hint_prod obj ax hint in
-      a, hint
+        hint_prod obj side ax ~other chosen_ahint
 
     (** Given a solver hint on a single axis lattice, returns a human-readible
         hint. *)
-    and hint_axis : type a l r. a C.obj -> (a, l * r) S.hint -> (l * r) hint =
-     fun obj -> function
+    and hint_axis : type a l r.
+        a C.obj ->
+        (l * r) side ->
+        other:a ->
+        (a, l * r) S.ahint ->
+        (a, l * r) ahint =
+     fun obj side ~other (a, hint) ->
+      match hint with
       | Apply (morph_hint, morph, ahint) ->
-        hint_apply obj morph_hint morph ahint
+        hint_apply obj side a morph_hint morph ~other ahint
           (C.For_hint.find_responsible_axis_single morph)
-      | Const c -> Const c
+      | Const c -> a, Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
-        let chosen_hint =
-          match choose_branch_axis b obj a1 a2 with
-          | `First -> hint1
-          | `Second -> hint2
+        let chosen_ahint =
+          match choose_branch_axis b obj a1 a2 ~other with
+          | `First -> a1, hint1
+          | `Second -> a2, hint2
         in
-        hint_axis obj chosen_hint
+        hint_axis obj side ~other chosen_ahint
 
-    and ahint_axis : type a l r.
-        a Lattices_mono.obj -> (a, l * r) S.ahint -> (a, l * r) ahint =
-     fun obj (a, hint) -> a, hint_axis obj hint
+    let hint_prod_loosening : type t a l r.
+        t C.obj ->
+        (l * r) side ->
+        (t, a) Axis.t ->
+        other:t ->
+        (t, l * r) S.ahint ->
+        loosening * (a, l * r) ahint =
+     fun obj side ax ~other ((t, _) as ahint) ->
+      let axis_obj = C.proj_obj ax obj in
+      let a, hint = hint_prod obj side ax ~other ahint in
+      let loosening =
+        if Misc.Le_result.equal ~le:(C.le axis_obj) a (Axis.proj ax t)
+        then Not_loosened
+        else Loosened
+      in
+      loosening, (a, hint)
+
+    let hint_axis_loosening : type a l r.
+        a C.obj ->
+        (l * r) side ->
+        other:a ->
+        (a, l * r) S.ahint ->
+        loosening * (a, l * r) ahint =
+     fun obj side ~other ((original, _) as ahint) ->
+      let a, hint = hint_axis obj side ~other ahint in
+      let loosening =
+        if Misc.Le_result.equal ~le:(C.le obj) a original
+        then Not_loosened
+        else Loosened
+      in
+      loosening, (a, hint)
 
     let error_prod : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
      fun obj axis { left; right } ->
-      let left = ahint_prod obj axis left in
-      let right = ahint_prod obj axis right in
+      let left = hint_prod_loosening obj Left axis ~other:(fst right) left in
+      let right =
+        hint_prod_loosening obj Right axis
+          ~other:(Axis.set axis (fst (snd left)) (fst right))
+          right
+      in
       { left; right }
 
     let error_axis : type a. a C.obj -> a S.error -> a t =
      fun obj { left; right } ->
-      let left = ahint_axis obj left in
-      let right = ahint_axis obj right in
+      let left = hint_axis_loosening obj Left ~other:(fst right) left in
+      let right = hint_axis_loosening obj Right ~other:(fst (snd left)) right in
       { left; right }
   end
 
@@ -2658,9 +2741,27 @@ module Report = struct
       Some Mode_with_hint
   [@@ocaml.warning "-4"]
 
+  let print_ahint_loosening : type a l r.
+      [`Left | `Right] ->
+      pinpoint ->
+      a C.obj ->
+      Fmt.formatter ->
+      loosening ->
+      (a, l * r) ahint ->
+      print_error_result option =
+   fun side pp obj ppf loosening ahint ->
+    (match loosening with
+    | Loosened ->
+      begin match adjust_side obj side with
+      | `Actual -> Fmt.fprintf ppf "weaker than "
+      | `Expected -> Fmt.fprintf ppf "stronger than "
+      end
+    | Not_loosened -> ());
+    print_ahint side pp obj ppf ahint
+
   type 'a ahint_sided =
-    | Left of ('a, left_only) ahint
-    | Right of ('a, right_only) ahint
+    | Left of (loosening * ('a, left_only) ahint)
+    | Right of (loosening * ('a, right_only) ahint)
 
   let print_ahint_sided : type a.
       pinpoint ->
@@ -2670,8 +2771,10 @@ module Report = struct
       print_error_result option =
    fun pp obj ppf ahint_sided ->
     match ahint_sided with
-    | Left ahint -> print_ahint `Left pp obj ppf ahint
-    | Right ahint -> print_ahint `Right pp obj ppf ahint
+    | Left (loosening, ahint) ->
+      print_ahint_loosening `Left pp obj ppf loosening ahint
+    | Right (loosening, ahint) ->
+      print_ahint_loosening `Right pp obj ppf loosening ahint
 
   let print : type a. pinpoint -> a C.obj -> a t -> print_error =
    fun pp obj { left; right } ->

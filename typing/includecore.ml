@@ -404,10 +404,8 @@ let report_modality_sub_error first second ppf e =
     first
     (print_modality "not") left
 
-let report_mode_sub_error got expected ppf e =
-  let {left; right} : _ Mode.simple_error =
-    Mode.Value.print_error (Location.none, Unknown) e
-  in
+let report_mode_sub_error ~pp got expected ppf e =
+  let ({ left; right } : _ Mode.simple_error) = Mode.Value.print_error pp e in
   let open Format_doc in
   let open_box = dprintf "@[<hov 2>" in
   let reopen_box = dprintf "@]@ %t" open_box in
@@ -457,7 +455,7 @@ let report_primitive_mismatch first second ppf err =
   | Layout_poly_attr ->
       pr "The two primitives have different [@@layout_poly] attributes"
 
-let report_value_mismatch first second env ppf err =
+let report_value_mismatch ~pp first second env ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in
   pr "@ ";
   match (err : value_mismatch) with
@@ -475,7 +473,7 @@ let report_value_mismatch first second env ppf err =
   | Mode e ->
       let got = first ^ " is" in
       let expected = second ^ " is" in
-      report_mode_sub_error got expected ppf e
+      report_mode_sub_error ~pp got expected ppf e
   | Layout_poly_coercion (Extra_lhs { extra }) ->
       pr "%s has %d more layout parameter%s that %s not used,@ \
           which is not supported yet."
