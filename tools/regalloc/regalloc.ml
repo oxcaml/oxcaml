@@ -41,6 +41,7 @@ type config =
   { strategy : strategy;
     validation : bool;
     prologue_insertion : bool;
+    copy_propagation : bool;
     linscan_threshold : int;
     debug_output : bool;
     csv_output : bool;
@@ -74,7 +75,8 @@ let dummy_in_stats =
   }
 
 type out_stats =
-  { spills : int;
+  { moves : int;
+    spills : int;
     reloads : int;
     spill_cost : int;
     reload_cost : int
@@ -92,6 +94,7 @@ let row_header =
       "in_num_instrs";
       "in_num_destruction_points";
       "in_num_high_pressure_points";
+      "out_moves";
       "out_spills";
       "out_reloads";
       "out_spill_cost";
@@ -105,12 +108,12 @@ let print_row ~allocator ~function_name ~duration ~rounds
         num_instrs;
         num_destruction_points;
         num_high_pressure_points
-      } ~out_stats:{ spills; reloads; spill_cost; reload_cost } =
-  Printf.printf "%s;%s;%g;%d;%s;%d;%d;%d;%d;%d;%d;%d;%d;%d\n%!" allocator
+      } ~out_stats:{ moves; spills; reloads; spill_cost; reload_cost } =
+  Printf.printf "%s;%s;%g;%d;%s;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d\n%!" allocator
     function_name duration rounds
     (if is_entry_function then "True" else "False")
     num_regs num_blocks num_instrs num_destruction_points
-    num_high_pressure_points spills reloads spill_cost reload_cost
+    num_high_pressure_points moves spills reloads spill_cost reload_cost
 
 let collect_in_stats (cfg_with_infos : Cfg_with_infos.t)
     (relocatable_regs : Reg.t list) =
@@ -201,7 +204,8 @@ let safe_pow10 n =
 let collect_out_stats (cfg_with_infos : Cfg_with_infos.t) =
   let loop_depths = (Cfg_with_infos.loop_infos cfg_with_infos).loop_depths in
   Cfg_with_infos.fold_blocks cfg_with_infos
-    ~init:{ spills = 0; reloads = 0; spill_cost = 0; reload_cost = 0 }
+    ~init:
+      { moves = 0; spills = 0; reloads = 0; spill_cost = 0; reload_cost = 0 }
     ~f:(fun (label : Label.t) (block : Cfg.basic_block) (acc : out_stats) ->
       let cost =
         match Label.Map.find_opt label loop_depths with
@@ -215,6 +219,7 @@ let collect_out_stats (cfg_with_infos : Cfg_with_infos.t) =
       DLL.fold_left block.body ~init:acc
         ~f:(fun (acc : out_stats) (instr : Cfg.basic Cfg.instruction) ->
           match[@ocaml.warning "-4"] instr.desc with
+          | Op Move -> { acc with moves = succ acc.moves }
           | Op Spill ->
             { acc with
               spills = succ acc.spills;
@@ -259,6 +264,11 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
   Cmm.reset ();
   Cmm.set_label cmm_label;
   Reg.For_testing.set_state ~stamp:reg_stamp ~relocatable_regs;
+  let cfg_with_infos =
+    match config.copy_propagation with
+    | false -> cfg_with_infos
+    | true -> Cfg_copy_propagation.run cfg_with_infos
+  in
   let cfg_description =
     match config.validation with
     | false -> None
@@ -361,6 +371,7 @@ let parse_command_line () =
   in
   let validate = ref false in
   let insert_prologue = ref false in
+  let copy_propagation = ref false in
   let linscan_threshold = ref !Oxcaml_flags.regalloc_linscan_threshold in
   let csv_output = ref false in
   let debug_output = ref false in
@@ -380,9 +391,7 @@ let parse_command_line () =
         "Select linscan if the number of registers is above the threshold" );
       "-validate", Arg.Set validate, "Enable validation";
       "-insert-prologue", Arg.Set insert_prologue, "Enable prologue insertion";
-      ( "-copy-propagation",
-        Arg.Unit (fun () -> Oxcaml_flags.cfg_copy_propagation := true),
-        "Enable copy propagation" );
+      "-copy-propagation", Arg.Set copy_propagation, "Enable copy propagation";
       "-csv-output", Arg.Set csv_output, "Enable CSV output";
       "-debug-output", Arg.Set debug_output, "Enable debug output";
       "-summary", Arg.Set print_summary, "Print summary" ]
@@ -395,6 +404,7 @@ let parse_command_line () =
     { strategy;
       validation = !validate;
       prologue_insertion = !insert_prologue;
+      copy_propagation = !copy_propagation;
       linscan_threshold = !linscan_threshold;
       csv_output = !csv_output;
       debug_output = !debug_output;
