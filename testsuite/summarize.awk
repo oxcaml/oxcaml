@@ -99,10 +99,13 @@ function record_unexp() {
     errored = 1;
 }
 
-/^ ... testing '[^']*' with / {
-    if (in_test) record_unexp();
-    next;
-}
+# CR-someday dallsopp: this breaks our display of skipped tests (because we
+# still display the with part for skip results, as it's clearer). Resolve or
+# upstream this.
+#/^ ... testing '[^']*' with / {
+#    if (in_test) record_unexp();
+#    next;
+#}
 
 /^ ... testing '[^']*'/ {
     if (in_test) record_unexp();

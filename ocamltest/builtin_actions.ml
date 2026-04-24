@@ -114,11 +114,17 @@ let hasstr = make
     "str library available"
     "str library not available")
 
+(* Upstream's multicore predicate is merged with our older multidomain predicate
+   meaning that tests marked multicore will only run if it both possible and
+   permitted to spawn domains. *)
+let multicore_possible_and_allowed =
+  Domain.recommended_domain_count () >= 2 && Config.multidomain
+
 let multicore = make
   ~name:"multicore"
   ~description:"Pass if running on multicore"
   ~does_something:false
-  (Actions_helpers.predicate (Domain.recommended_domain_count () >= 2)
+  (Actions_helpers.predicate multicore_possible_and_allowed
     "running on multicore"
     "not running on multicore")
 
