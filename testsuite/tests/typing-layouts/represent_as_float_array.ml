@@ -28,6 +28,17 @@ type t [@@represent_as_float_array]
 type t
 |}]
 
+(* Can abstract a [@@represent_as_float_array] record *)
+
+module M : sig
+  type r
+end = struct
+  type r = { f : float# } [@@represent_as_float_array]
+end
+[%%expect{|
+module M : sig type r end
+|}]
+
 (* Representation checks *)
 
 module M : sig
