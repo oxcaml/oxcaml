@@ -864,14 +864,11 @@ type 'a mutable_record = { mutable m : 'a }
 let mutable_field_aliased r =
   let y = OptionA "foo" in
   r.m <- y;
-  (r @ unique), y
+  (r : @ unique), y
 [%%expect{|
 type 'a mutable_record = { mutable m : 'a; }
-Line 6, characters 3-4:
-6 |   (r @ unique), y
-       ^
-Error: This expression has type "options mutable_record"
-       but an expression was expected of type "'a list"
+val mutable_field_aliased :
+  options mutable_record @ unique -> options mutable_record * options = <fun>
 |}]
 
 let mutable_field_aliased r =
