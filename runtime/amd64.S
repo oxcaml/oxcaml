@@ -1397,9 +1397,21 @@ LBL(do_perform):
 LBL(112):
     /* Switch back to original performer before raising Effect.Unhandled
        (no-op unless this is a reperform) */
-        movq    Cont_fiber(%rbx), %r10  /* load performer stack from
-                                           continuation */
+        movq    %rbx, C_ARG_1
+        SWITCH_OCAML_TO_C
+    /* Save %rax (effect, needed later by caml_raise_unhandled_effect)
+       across the C call. Reserve 16 bytes to keep %rsp 16-byte aligned. */
+        subq    $16, %rsp; CFI_ADJUST(16)
+        movq    %rax, 0(%rsp)
+        C_call  (GCALL(caml_continuation_use_noexc)) /* %rax := stack */
+        movq    %rax, %r10
+        movq    0(%rsp), %rax
+        addq    $16, %rsp; CFI_ADJUST(-16)
+        SWITCH_C_TO_OCAML
         subq    $1, %r10                /* r10 := Ptr_val(r10) */
+    /* Check if stack null, then already used */
+        testq   %r10, %r10
+        jz      LBL(113)
         movq    Caml_state(current_stack), %rsi
         SWITCH_OCAML_STACKS
     /* No parent stack. If this is a preemption effect (wosize of the
@@ -1442,6 +1454,11 @@ LBL(preemption_unhandled):
        code */
         movq   Cont_gc_regs(%rbx), %rdx
         jmp    LBL(resume_preemption)
+LBL(113):
+        ENTER_FUNCTION
+        TSAN_ENTER_FUNCTION(0)
+        LEA_VAR(caml_raise_continuation_already_resumed, %rax)
+        jmp     LBL(caml_c_call)
 CFI_ENDPROC
 ENDFUNCTION(G(caml_perform))
 

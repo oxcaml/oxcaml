@@ -1259,8 +1259,20 @@ L(do_perform):
 1:
     /*  switch back to original performer before raising Effect.Unhandled
         (no-op unless this is a reperform) */
-        ldr     x10, Cont_fiber(x1)    /* load performer stack from continuation */
-        sub     x10, x10, 1            /* x10 := Ptr_val(x10) */
+        SWITCH_OCAML_TO_C
+    /* Save x0 (effect, needed later by caml_raise_unhandled_effect) and x30
+       across the C call */
+        stp     x0, x30, [sp, -16]!
+        CFI_ADJUST(16)
+        mov     x0, x1 /* pass continuation to caml_continuation_use_noexc */
+        bl      G(caml_continuation_use_noexc) /* x0 := stack */
+        mov     x10, x0
+        ldp     x0, x30, [sp], 16
+        CFI_ADJUST(-16)
+        SWITCH_C_TO_OCAML
+        sub     x10, x10, 1 /* x10 := Ptr_val(x10) */
+    /* Check if stack null, then already used */
+        cbz     x10, 2f
         ldr     x9, Caml_state(current_stack)
         SWITCH_OCAML_STACKS x9, x10
     /*  No parent stack. If this is a preemption effect (wosize of the
@@ -1304,6 +1316,8 @@ L(preemption_unhandled):
        redoing the interrupted allocation, restoring registers, and
        returning to user code. */
         b       L(resume_preemption)
+2:      ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
+        b       G(caml_c_call)
         CFI_ENDPROC
 END_FUNCTION(caml_perform)
 
