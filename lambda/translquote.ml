@@ -2838,8 +2838,9 @@ let type_for_annotation ~env ~loc typ =
         | Tquote ty -> Ttyp_quote (go ty)
         | Tsplice _ ->
           fatal_errorf
-            "Translquote [at %a]:@ Explicitly quantified type variables@ \
-             cannot be spliced@ within quoted higher-rank function types"
+            "Translquote [at %a]:@ Type variables cannot be spliced@ in type \
+             annotations inserted in quotations@ for higher-rank or package \
+             types."
             Location.print_loc_in_lowercase loc
         | Tquote_eval _ ->
           let lident = Untypeast.lident_of_path Predef.path_eval in
