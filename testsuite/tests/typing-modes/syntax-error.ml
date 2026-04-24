@@ -55,7 +55,7 @@ let foo () =
   ~(bar @ ), ~(biz @ )
 ;;
 
-type r = local_ string @  -> unique_ string @ ;;
+type r = local_ string @  -> string @ ;;
 
 type r = local_ string * y:string @  -> local_ string * w:string @;;
 

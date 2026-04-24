@@ -1,8 +1,8 @@
 modes: local [File "_none_", line 1, characters 7-13]
 ------------------------------
-modes: unique [File "_none_", line 1, characters 4-11]
-modes: local [File "_none_", line 1, characters 15-21]
-modes: unique [File "_none_", line 1, characters 4-11]
+modes: unique [File "_none_", line 1, characters 9-15]
+modes: local [File "_none_", line 1, characters 18-24]
+modes: unique [File "_none_", line 1, characters 9-15]
 ------------------------------
 modes: local [File "_none_", line 1, characters 4-10]
 modes: local [File "_none_", line 1, characters 4-10]
