@@ -49,7 +49,7 @@ let test3 () =
 
 (* Since the tail was marked unique, it can not be lifted out *)
 let constant_list_unique x =
-  let unique_ y = 2 :: [] in x :: y
+  let (y @ unique) = 2 :: [] in x :: y
 
 let test4 () =
   List.hd (constant_list_unique 1) == List.hd (constant_list_unique 2),
@@ -57,8 +57,8 @@ let test4 () =
 
 (* Since the tail was marked unique, it can not be lifted out *)
 let constant_list_unique2 x =
-  let unique_ z = [] in
-  let unique_ y = 2 :: z in x :: y
+  let (z @ unique) = [] in
+  let (y @ unique) = 2 :: z in x :: y
 
 let test5 () =
   List.hd (constant_list_unique2 1) == List.hd (constant_list_unique2 2),

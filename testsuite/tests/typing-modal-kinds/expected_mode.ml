@@ -225,38 +225,38 @@ Error: This value is "local" to the parent region
 |}]
 
 type t_value
-let value_duplicate : once_ _ -> t_value = fun x -> x
+let value_duplicate : _ @ once -> t_value = fun x -> x
 
 [%%expect{|
 type t_value
-Line 2, characters 52-53:
-2 | let value_duplicate : once_ _ -> t_value = fun x -> x
-                                                        ^
+Line 2, characters 53-54:
+2 | let value_duplicate : _ @ once -> t_value = fun x -> x
+                                                         ^
 Error: This value is "once" but is expected to be "many".
 |}]
 
-let int_duplicate : once_ _ -> int = fun x -> x
+let int_duplicate : _ @ once -> int = fun x -> x
 
 [%%expect{|
 val int_duplicate : int @ once -> int = <fun>
 |}]
 
-let value_list_duplicate : once_ _ -> t_value list = fun x -> x
+let value_list_duplicate : _ @ once -> t_value list = fun x -> x
 
 [%%expect{|
-Line 1, characters 62-63:
-1 | let value_list_duplicate : once_ _ -> t_value list = fun x -> x
-                                                                  ^
+Line 1, characters 63-64:
+1 | let value_list_duplicate : _ @ once -> t_value list = fun x -> x
+                                                                   ^
 Error: This value is "once" but is expected to be "many".
 |}]
 
-let int_list_duplicate : once_ _ -> int list = fun x -> x
+let int_list_duplicate : _ @ once -> int list = fun x -> x
 
 [%%expect{|
 val int_list_duplicate : int list @ once -> int list = <fun>
 |}]
 
-let hidden_string_duplicate : once_ _ -> Hidden_string.t =
+let hidden_string_duplicate : _ @ once -> Hidden_string.t =
   fun x -> x
 
 [%%expect{|
@@ -266,33 +266,33 @@ Line 2, characters 11-12:
 Error: This value is "once" but is expected to be "many".
 |}]
 
-let hidden_int_duplicate : once_ _ -> Hidden_int.t =
+let hidden_int_duplicate : _ @ once -> Hidden_int.t =
   fun x -> x
 
 [%%expect{|
 val hidden_int_duplicate : Hidden_int.t @ once -> Hidden_int.t = <fun>
 |}]
 
-let float_duplicate : once_ _ -> float = fun x -> x
+let float_duplicate : _ @ once -> float = fun x -> x
 
 [%%expect{|
 val float_duplicate : float @ once -> float = <fun>
 |}]
 
-let float_u_duplicate : once_ _ -> float# = fun x -> x
+let float_u_duplicate : _ @ once -> float# = fun x -> x
 
 [%%expect{|
 val float_u_duplicate : float# @ once -> float# = <fun>
 |}]
 
-let hidden_float_u_duplicate : once_ _ -> Hidden_float_u.t = fun x -> x
+let hidden_float_u_duplicate : _ @ once -> Hidden_float_u.t = fun x -> x
 
 [%%expect{|
 val hidden_float_u_duplicate : Hidden_float_u.t @ once -> Hidden_float_u.t =
   <fun>
 |}]
 
-let float_u_record_duplicate : once_ _ -> float_u_record =
+let float_u_record_duplicate : _ @ once -> float_u_record =
   fun x -> x
 
 [%%expect{|
@@ -301,7 +301,7 @@ val float_u_record_duplicate : float_u_record @ once -> float_u_record =
 |}]
 
 let float_u_record_list_duplicate :
-  once_ _ -> float_u_record list =
+  _ @ once -> float_u_record list =
   fun x -> x
 
 [%%expect{|
@@ -309,16 +309,16 @@ val float_u_record_list_duplicate :
   float_u_record list @ once -> float_u_record list = <fun>
 |}]
 
-let function_duplicate : once_ _ -> (int -> int) = fun x -> x
+let function_duplicate : _ @ once -> (int -> int) = fun x -> x
 
 [%%expect{|
-Line 1, characters 60-61:
-1 | let function_duplicate : once_ _ -> (int -> int) = fun x -> x
-                                                                ^
+Line 1, characters 61-62:
+1 | let function_duplicate : _ @ once -> (int -> int) = fun x -> x
+                                                                 ^
 Error: This value is "once" but is expected to be "many".
 |}]
 
-let function_list_duplicate : once_ _ -> (int -> int) list =
+let function_list_duplicate : _ @ once -> (int -> int) list =
   fun x -> x
 
 [%%expect{|
@@ -328,46 +328,46 @@ Line 2, characters 11-12:
 Error: This value is "once" but is expected to be "many".
 |}]
 
-let string_unshare : _ -> unique_ string = fun x -> x
+let string_unshare : _ -> string @ unique = fun x -> x
 
 [%%expect{|
-Line 1, characters 52-53:
-1 | let string_unshare : _ -> unique_ string = fun x -> x
-                                                        ^
+Line 1, characters 53-54:
+1 | let string_unshare : _ -> string @ unique = fun x -> x
+                                                         ^
 Error: This value is "aliased" but is expected to be "unique".
 |}]
 
-let int_unshare : _ -> unique_ int = fun x -> x
+let int_unshare : _ -> int @ unique = fun x -> x
 
 [%%expect{|
 val int_unshare : int -> int @ unique = <fun>
 |}]
 
-let string_list_unshare : _ -> unique_ string list = fun x -> x
+let string_list_unshare : _ -> string list @ unique = fun x -> x
 
 [%%expect{|
-Line 1, characters 62-63:
-1 | let string_list_unshare : _ -> unique_ string list = fun x -> x
-                                                                  ^
+Line 1, characters 63-64:
+1 | let string_list_unshare : _ -> string list @ unique = fun x -> x
+                                                                   ^
 Error: This value is "aliased" but is expected to be "unique".
 |}]
 
-let int_list_unshare : _ -> unique_ int list = fun x -> x
+let int_list_unshare : _ -> int list @ unique = fun x -> x
 
 [%%expect{|
-Line 1, characters 56-57:
-1 | let int_list_unshare : _ -> unique_ int list = fun x -> x
-                                                            ^
+Line 1, characters 57-58:
+1 | let int_list_unshare : _ -> int list @ unique = fun x -> x
+                                                             ^
 Error: This value is "aliased" but is expected to be "unique".
 |}]
 
-let function_unshare : _ -> unique_ (int -> int) = fun x -> x
+let function_unshare : _ -> (int -> int) @ unique = fun x -> x
 
 [%%expect{|
 val function_unshare : (int -> int) -> (int -> int) @ unique = <fun>
 |}]
 
-let hidden_string_unshare : _ -> unique_ Hidden_string.t =
+let hidden_string_unshare : _ -> Hidden_string.t @ unique =
   fun x -> x
 
 [%%expect{|
@@ -377,36 +377,36 @@ Line 2, characters 11-12:
 Error: This value is "aliased" but is expected to be "unique".
 |}]
 
-let hidden_int_unshare : _ -> unique_ Hidden_int.t =
+let hidden_int_unshare : _ -> Hidden_int.t @ unique =
   fun x -> x
 
 [%%expect{|
 val hidden_int_unshare : Hidden_int.t -> Hidden_int.t @ unique = <fun>
 |}]
 
-let float_unshare : _ -> unique_ float = fun x -> x
+let float_unshare : _ -> float @ unique = fun x -> x
 
 [%%expect{|
-Line 1, characters 50-51:
-1 | let float_unshare : _ -> unique_ float = fun x -> x
-                                                      ^
+Line 1, characters 51-52:
+1 | let float_unshare : _ -> float @ unique = fun x -> x
+                                                       ^
 Error: This value is "aliased" but is expected to be "unique".
 |}]
 
-let float_u_unshare : _ -> unique_ float# = fun x -> x
+let float_u_unshare : _ -> float# @ unique = fun x -> x
 
 [%%expect{|
 val float_u_unshare : float# -> float# @ unique = <fun>
 |}]
 
-let hidden_float_u_unshare : _ -> unique_ Hidden_float_u.t = fun x -> x
+let hidden_float_u_unshare : _ -> Hidden_float_u.t @ unique = fun x -> x
 
 [%%expect{|
 val hidden_float_u_unshare : Hidden_float_u.t -> Hidden_float_u.t @ unique =
   <fun>
 |}]
 
-let float_u_record_unshare : _ -> unique_ float_u_record =
+let float_u_record_unshare : _ -> float_u_record @ unique =
   fun x -> x
 
 [%%expect{|
@@ -417,7 +417,7 @@ Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let float_u_record_list_unshare :
-  _ -> unique_ float_u_record list =
+  _ -> float_u_record list @ unique =
   fun x -> x
 
 [%%expect{|
@@ -427,16 +427,16 @@ Line 3, characters 11-12:
 Error: This value is "aliased" but is expected to be "unique".
 |}]
 
-let hidden_function_unshare : _ -> unique_ (int, int) Hidden_function.t = fun x -> x
+let hidden_function_unshare : _ -> (int, int) Hidden_function.t @ unique = fun x -> x
 
 [%%expect{|
-Line 1, characters 83-84:
-1 | let hidden_function_unshare : _ -> unique_ (int, int) Hidden_function.t = fun x -> x
-                                                                                       ^
+Line 1, characters 84-85:
+1 | let hidden_function_unshare : _ -> (int, int) Hidden_function.t @ unique = fun x -> x
+                                                                                        ^
 Error: This value is "aliased" but is expected to be "unique".
 |}]
 
-let function_list_unshare : _ -> unique_ (int -> int) list =
+let function_list_unshare : _ -> (int -> int) list @ unique =
   fun x -> x
 
 [%%expect{|

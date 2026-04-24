@@ -40,7 +40,7 @@ let test mapper s =
 
 let () =
   test mapper "let f (local_ x) = x";
-  test mapper "let unique_ f (local_ x) = x";
+  test mapper "let (f @ unique) (local_ x) = x";
   test mapper "let local_ f x: int -> int = x";
   test mapper "module M : sig val x : string -> string @ foo @@ bar hello end = struct end";
   ()
