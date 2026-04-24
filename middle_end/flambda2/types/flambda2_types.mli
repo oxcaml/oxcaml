@@ -123,7 +123,7 @@ module Typing_env : sig
       used_value_slots:Value_slot.Set.t ->
       t * (Simple.t -> Simple.t)
 
-    val find_or_missing : t -> Name.t -> flambda_type option
+    val find : t -> Name.t -> flambda_type
   end
 
   module Serializable : sig
@@ -202,8 +202,6 @@ module Typing_env : sig
   val mem_simple : ?min_name_mode:Name_mode.t -> t -> Simple.t -> bool
 
   val find : t -> Name.t -> Flambda_kind.t option -> flambda_type
-
-  val find_or_missing : t -> Name.t -> flambda_type option
 
   val find_params : t -> Bound_parameters.t -> flambda_type list
 

@@ -1150,9 +1150,7 @@ let prove_alloc_mode_of_boxed_number env t =
   gen_value_to_proof prove_alloc_mode_of_boxed_number_value env t
 
 let never_holds_locally_allocated_values env var : _ proof_of_property =
-  match TE.find_or_missing env (Name.var var) with
-  | None -> Unknown
-  | Some ty -> (
+  let ty = TE.find env (Name.var var) None in
     match expand_head env ty with
     | Value (Ok { non_null = Unknown | Bottom; _ }) | Value (Unknown | Bottom)
       ->
@@ -1188,7 +1186,7 @@ let never_holds_locally_allocated_values env var : _ proof_of_property =
     | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
     | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _
     | Region _ ->
-      Proved ())
+      Proved ()
 
 let prove_physical_equality env t1 t2 =
   let incompatible_naked_numbers t1 t2 =

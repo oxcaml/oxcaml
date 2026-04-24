@@ -201,11 +201,10 @@ let added_useful_alias_in_loop typing_env (acc : T.Acc.t)
                     point *)
                  false)
                ~symbol:(fun sym ~coercion:_ ->
-                 match
-                   Typing_env.find_or_missing typing_env (Name.symbol sym)
-                 with
-                 | None -> false
-                 | Some ty -> not (Flambda2_types.is_unknown typing_env ty)))
+                 let ty =
+                   Typing_env.find typing_env (Name.symbol sym) (Some Flambda_kind.value)
+                 in
+                 not (Flambda2_types.is_unknown typing_env ty)))
            continuation_param_aliases.lets_to_introduce)
     (Continuation.Map.to_seq acc.map)
     (Continuation.Map.to_seq result.aliases_result.continuation_parameters)

@@ -408,8 +408,6 @@ let check_optional_kind_matches name ty kind_opt =
         "Kind %a of type@ %a@ for %a@ doesn't match expected kind %a" K.print
         ty_kind TG.print ty Name.print name K.print kind
 
-exception Missing_cmx_and_kind
-
 (* CR-someday mshinwell: [kind] could also take a [subkind] *)
 let find_with_binding_time_and_mode' t name kind =
   (* Note that [Pre_serializable] (below) assumes this function only looks up
@@ -445,12 +443,10 @@ let find_with_binding_time_and_mode' t name kind =
             (* .cmx file missing *)
             check_optional_kind_matches name (fst initial_symbol_type) kind;
             initial_symbol_type)
-          ~var:(fun _ ->
-            match kind with
-            | Some kind ->
-              (* See comment below about binding times. *)
-              MTC.unknown kind, Binding_time.With_name_mode.imported_variables
-            | None -> raise Missing_cmx_and_kind)
+          ~var:(fun var ->
+            let ty = MTC.unknown (Variable.kind var) in
+            check_optional_kind_matches name ty kind;
+            ty, Binding_time.With_name_mode.imported_variables)
       | Some t -> (
         match
           Name.Map.find name (Cached_level.names_to_types t.just_after_level)
@@ -481,25 +477,15 @@ let find_with_binding_time_and_mode' t name kind =
     check_optional_kind_matches name ty kind;
     if t.is_bottom then MTC.bottom_like ty, binding_time_and_mode else found
 
-(* This version doesn't check min_binding_time. This ensures that no allocation
-   occurs when we're not interested in the name mode. *)
-let find_with_binding_time_and_mode_unscoped t name kind =
-  try find_with_binding_time_and_mode' t name kind
-  with Missing_cmx_and_kind ->
-    Misc.fatal_errorf
-      "Don't know kind of variable %a from another unit whose .cmx file is \
-       unavailable"
-      Name.print name
-
 let find t name kind =
   let ty, _binding_time_and_mode =
-    find_with_binding_time_and_mode_unscoped t name kind
+    find_with_binding_time_and_mode' t name kind
   in
   ty
 
 let find_with_binding_time_and_mode t name kind =
   let ((ty, binding_time_and_mode) as found) =
-    find_with_binding_time_and_mode_unscoped t name kind
+    find_with_binding_time_and_mode' t name kind
   in
   let scoped_mode =
     Binding_time.With_name_mode.scoped_name_mode binding_time_and_mode
@@ -515,11 +501,6 @@ let find_with_binding_time_and_mode t name kind =
       Binding_time.With_name_mode.create
         (Binding_time.With_name_mode.binding_time binding_time_and_mode)
         scoped_mode )
-
-let find_or_missing t name =
-  match find_with_binding_time_and_mode' t name None with
-  | ty, _ -> Some ty
-  | exception Missing_cmx_and_kind -> None
 
 let find_params t params =
   List.map
@@ -1076,7 +1057,7 @@ module Pre_serializable : sig
     used_value_slots:Value_slot.Set.t ->
     t * (Simple.t -> Simple.t)
 
-  val find_or_missing : t -> Name.t -> Type_grammar.t option
+  val find : t -> Name.t -> Type_grammar.t
 end = struct
   type t = typing_env
 
@@ -1087,7 +1068,7 @@ end = struct
     in
     { t with current_level }, One_level.canonicalise current_level
 
-  let find_or_missing = find_or_missing
+  let find env name = find env name None
 end
 
 module Serializable : sig

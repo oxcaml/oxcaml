@@ -26,7 +26,7 @@ module Pre_serializable : sig
     used_value_slots:Value_slot.Set.t ->
     t * (Simple.t -> Simple.t)
 
-  val find_or_missing : t -> Name.t -> Type_grammar.t option
+  val find : t -> Name.t -> Type_grammar.t
 end
 
 module Serializable : sig
@@ -136,8 +136,6 @@ val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
     be omitted. Such omission will cause an error if the name satisfies
     [variable_is_from_missing_cmx_file]. *)
 val find : t -> Name.t -> Flambda_kind.t option -> Type_grammar.t
-
-val find_or_missing : t -> Name.t -> Type_grammar.t option
 
 val find_params : t -> Bound_parameters.t -> Type_grammar.t list
 
