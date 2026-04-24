@@ -69,7 +69,7 @@ let block :
         Cfg.dump_basic instr.desc Cfg_colours.pop instr_suffix (instr, liveness));
   Format.fprintf fmt "%a%t%a%t%a\n\n" instr_prefix block.terminator
     Cfg_colours.terminator
-    (Cfg.dump_terminator ~sep:"\n         ")
+    (Cfg.dump_terminator ~sep:", ")
     block.terminator.desc Cfg_colours.pop instr_suffix
     (block.terminator, liveness)
 
