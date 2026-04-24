@@ -130,6 +130,8 @@ module Array_load_kind : sig
   val print : Format.formatter -> t -> unit
 
   val compare : t -> t -> int
+
+  val kind_of_loaded_value : t -> Flambda_kind.With_subkind.t
 end
 
 module Array_set_kind : sig

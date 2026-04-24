@@ -222,14 +222,29 @@ let find_cse_simple ?(required = true) dacc required_names prim =
       filter_and_choose_alias required_names
         (find_all_aliases (DA.typing_env dacc) simple))
 
-type must_untag_lookup_table_result =
-  | Must_untag
-  | Leave_as_tagged_immediate
+type lookup_table_fields =
+  | Tagged_immediates of TI.t list
+      (** All arms are tagged immediates. The lookup table uses a value array
+          specialised to [Immediates]. This case is split out from
+          [Static_arguments_of_single_kind] so that the affine-arithmetic
+          optimisation can be applied. *)
+  | Static_arguments_of_single_kind of
+      { array_kind : P.Array_kind.t;
+        array_load_kind : P.Array_load_kind.t;
+        element_kind : K.With_subkind.t;
+        simples : Simple.t list
+      }
+      (** All arms are symbols or constants of the same [Flambda_kind.t]. For
+          the value kind (with [array_kind = Values]), this variant allows a mix
+          of symbols (including ones pointing at boxed numbers), tagged
+          immediates and nulls; for all other kinds symbols are forbidden, so
+          every arm is a constant of the kind described by [element_kind]. *)
 
 (* Recognise sufficiently-large Switch expressions where all of the arms provide
    a single argument to a unique destination. These expressions can be compiled
    using lookup tables, which dramatically reduces code size. *)
-let recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms =
+let recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
+    ~arms =
   let check_arm discr dest dest_and_args_rev_and_expected_discr =
     let dest' = AC.continuation dest in
     match dest_and_args_rev_and_expected_discr with
@@ -246,52 +261,107 @@ let recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms =
       | Some _ | None -> (
         match AC.to_one_arg_without_trap_action dest with
         | None ->
-          (* The destination continuations must have single constant arguments.
-             Trap actions are forbidden. *)
+          (* The destination continuations must have single constant or symbol
+             arguments. Trap actions are forbidden. *)
           None
         | Some arg ->
-          Simple.pattern_match arg
-            ~name:(fun _ ~coercion:_ ->
-              (* Aliases should have been followed by now. *) None)
-            ~const:(fun const ->
-              let expected_discr =
-                TI.add (TI.one machine_width) expected_discr
-              in
-              Some (Some dest', const :: args_rev, expected_discr))))
+          if Simple.is_var arg
+          then (* CR mshinwell: we could allow variables, if at toplevel *)
+            (* Aliases should have been followed by now. *)
+            None
+          else
+            let expected_discr = TI.add (TI.one machine_width) expected_discr in
+            Some (Some dest', arg :: args_rev, expected_discr)))
   in
   match TI.Map.fold check_arm arms (Some (None, [], TI.zero machine_width)) with
   | None | Some (None, _, _) | Some (_, [], _) -> None
   | Some (Some dest, args_rev, _) -> (
-    let args = List.rev args_rev in
+    let args : Simple.t list = List.rev args_rev in
     assert (List.compare_length_with args 1 >= 0);
-    (* For the moment just do this for things that can be put in scannable
-       blocks (which might then need untagging depending on how they appeared in
-       the original [Switch]). *)
-    let[@inline] check_args prover must_untag_lookup_table_result =
-      let args' = List.filter_map prover args in
-      if List.compare_lengths args args' = 0
-      then Some (dest, must_untag_lookup_table_result, args')
-      else None
+    let module RWC = Reg_width_const in
+    let module ALK = P.Array_load_kind in
+    (* Symbols are always of kind [value]; they may be freely mixed with
+       [Const]s of kind [value] (i.e. tagged immediates). For all other kinds
+       symbols are not permitted and every arm must be a constant of the same
+       [Flambda_kind.t]. *)
+    let kind_of simple =
+      Simple.pattern_match' simple
+        ~var:(fun _ ~coercion:_ ->
+          (* Variables have already been ruled out above. *)
+          Misc.fatal_errorf "Variable (%a) was not expected here: %a"
+            Simple.print simple Debuginfo.print_compact dbg)
+        ~symbol:(fun _ ~coercion:_ -> K.value)
+        ~const:RWC.kind
     in
-    (* All arguments must be of an appropriate kind and the same kind. *)
-    match Reg_width_const.descr (List.hd args) with
-    | Naked_immediate _ ->
-      check_args Reg_width_const.is_naked_immediate Must_untag
-    | Tagged_immediate _ ->
-      (* Note that even though the [Reg_width_const] is specifying a tagged
-         immediate, the value which we store inside values of that type is still
-         a normal untagged [TI.t]. *)
-      check_args Reg_width_const.is_tagged_immediate Leave_as_tagged_immediate
-    | Naked_float _ | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
-    | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
-    | Naked_vec256 _ | Naked_vec512 _ | Null ->
-      None)
+    let first_kind = kind_of (List.hd args) in
+    if not (List.for_all (fun arg -> K.equal (kind_of arg) first_kind) args)
+    then None
+    else
+      let single_kind array_kind array_load_kind =
+        let element_kind = ALK.kind_of_loaded_value array_load_kind in
+        Some
+          ( dest,
+            Static_arguments_of_single_kind
+              { array_kind; array_load_kind; element_kind; simples = args } )
+      in
+      let try_tagged_immediates () =
+        (* If no arm is a symbol and all [Const]s are tagged immediates, return
+           a [Tagged_immediates] variant so that the affine optimization can
+           apply below. Returns [None] otherwise. *)
+        List.fold_right
+          (fun simple acc ->
+            match acc with
+            | None -> None
+            | Some tagged_imms ->
+              Simple.pattern_match' simple
+                ~var:(fun _ ~coercion:_ ->
+                  Misc.fatal_errorf "Variable (%a) was not expected here: %a"
+                    Simple.print simple Debuginfo.print_compact dbg)
+                ~symbol:(fun _ ~coercion:_ -> None)
+                ~const:(fun cst ->
+                  Option.map
+                    (fun tagged_imm -> tagged_imm :: tagged_imms)
+                    (RWC.is_tagged_immediate cst)))
+          args (Some [])
+      in
+      match (first_kind : K.t) with
+      | Value -> (
+        (* All arms are of kind [value]: either all tagged immediates, or a mix
+           of tagged immediates, symbols (which may point at e.g. boxed numbers)
+           or nulls. *)
+        match try_tagged_immediates () with
+        | Some tagged_imms -> Some (dest, Tagged_immediates tagged_imms)
+        | None ->
+          (* It is possible that this array will contain only boxed floats even
+             with the float array optimization enabled. These would not normally
+             arise in the presence of such optimization, but if we don't tell
+             anyone it will be ok: we explicitly generate the load using array
+             load kind [Values] (which does not do any float array optimization
+             tests; all of those were expanded in [Lambda_to_flambda]). *)
+          single_kind Values Values)
+      | Naked_number nn -> (
+        match nn with
+        | Naked_immediate -> single_kind Naked_ints Naked_ints
+        | Naked_float32 -> single_kind Naked_float32s Naked_float32s
+        | Naked_float -> single_kind Naked_floats Naked_floats
+        | Naked_int8 -> single_kind Naked_int8s Naked_int8s
+        | Naked_int16 -> single_kind Naked_int16s Naked_int16s
+        | Naked_int32 -> single_kind Naked_int32s Naked_int32s
+        | Naked_int64 -> single_kind Naked_int64s Naked_int64s
+        | Naked_nativeint -> single_kind Naked_nativeints Naked_nativeints
+        | Naked_vec128 -> single_kind Naked_vec128s Naked_vec128s
+        | Naked_vec256 -> single_kind Naked_vec256s Naked_vec256s
+        | Naked_vec512 -> single_kind Naked_vec512s Naked_vec512s)
+      | Region | Rec_info -> None)
 
-let recognize_switch_with_single_arg_to_same_destination machine_width ~arms =
+let recognize_switch_with_single_arg_to_same_destination dbg machine_width ~arms
+    =
   (* Switch must be large enough. *)
   if TI.Map.cardinal arms < 3
   then None
-  else recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms
+  else
+    recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
+      ~arms
 
 (* Tiny DSL to preserve sanity while rebuilding expressions. *)
 
@@ -327,8 +397,64 @@ let return ~added_code_size ~free_names expr uacc ~dacc_before_switch:_ =
 
 let run uacc ~dacc_before_switch k = k uacc ~dacc_before_switch
 
+let fields_to_simples dbg simples =
+  List.map (fun simple -> Simple.With_debuginfo.create simple dbg) simples
+
+let create_lookup_table_array_const dbg (array_kind : P.Array_kind.t) rebuilding
+    simples =
+  let module RWC = Reg_width_const in
+  let fields_to_or_variables prover simples =
+    ListLabels.map simples ~f:(fun simple ->
+        Simple.pattern_match simple
+          ~name:(fun _ ~coercion:_ ->
+            (* Only constants reach this point. *) assert false)
+          ~const:(fun cst ->
+            let cst =
+              match prover cst with
+              | Some v -> v
+              | None ->
+                Misc.fatal_errorf
+                  "Unexpected kind of constant (%a) in switch table at %a"
+                  RWC.print cst Debuginfo.print_compact dbg
+            in
+            Or_variable.Const cst))
+  in
+  let naked_number_array creator prover =
+    creator rebuilding (fields_to_or_variables prover simples)
+  in
+  match array_kind with
+  | Values ->
+    RSC.create_immutable_value_array rebuilding (fields_to_simples dbg simples)
+  | Naked_float32s ->
+    naked_number_array RSC.create_immutable_float32_array RWC.is_naked_float32
+  | Naked_floats ->
+    naked_number_array RSC.create_immutable_float_array RWC.is_naked_float
+  | Naked_ints ->
+    naked_number_array RSC.create_immutable_int_array RWC.is_naked_immediate
+  | Naked_int8s ->
+    naked_number_array RSC.create_immutable_int8_array RWC.is_naked_int8
+  | Naked_int16s ->
+    naked_number_array RSC.create_immutable_int16_array RWC.is_naked_int16
+  | Naked_int32s ->
+    naked_number_array RSC.create_immutable_int32_array RWC.is_naked_int32
+  | Naked_int64s ->
+    naked_number_array RSC.create_immutable_int64_array RWC.is_naked_int64
+  | Naked_nativeints ->
+    naked_number_array RSC.create_immutable_nativeint_array
+      RWC.is_naked_nativeint
+  | Naked_vec128s ->
+    naked_number_array RSC.create_immutable_vec128_array RWC.is_naked_vec128
+  | Naked_vec256s ->
+    naked_number_array RSC.create_immutable_vec256_array RWC.is_naked_vec256
+  | Naked_vec512s ->
+    naked_number_array RSC.create_immutable_vec512_array RWC.is_naked_vec512
+  | Immediates | Gc_ignorable_values | Unboxed_product _ ->
+    Misc.fatal_errorf
+      "Unexpected array kind %a when rebuilding switch lookup table at %a"
+      P.Array_kind.print array_kind Debuginfo.print_compact dbg
+
 let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
-    ~scrutinee ~dest ~consts ~must_untag_lookup_table_result dbg =
+    ~scrutinee ~dest ~(lookup_table_fields : lookup_table_fields) dbg =
   let rebuilding = UA.are_rebuilding_terms uacc in
   let block_sym =
     let var = Variable.create "switch_block" K.value in
@@ -336,29 +462,44 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
       (Compilation_unit.get_current_exn ())
       (Linkage_name.of_string (Variable.unique_name var))
   in
-  let uacc =
-    let fields =
-      List.map
-        (fun const -> Simple.With_debuginfo.create (Simple.const_int const) dbg)
-        consts
+  let uacc, array_kind, array_load_kind, loaded_kind =
+    let alias_types_of kind simples =
+      List.map (fun simple -> T.alias_type_of kind simple) simples
+    in
+    let array_const, array_kind, array_load_kind, element_kind, fields =
+      let module AK = P.Array_kind in
+      let module ALK = P.Array_load_kind in
+      match lookup_table_fields with
+      | Tagged_immediates imms ->
+        let simples = List.map Simple.const_int imms in
+        ( RSC.create_immutable_value_array rebuilding
+            (fields_to_simples dbg simples),
+          AK.Values,
+          ALK.Immediates,
+          KS.tagged_immediate,
+          alias_types_of K.value simples )
+      | Static_arguments_of_single_kind
+          { array_kind; array_load_kind; element_kind; simples } ->
+        let fields = alias_types_of (KS.kind element_kind) simples in
+        let array_const =
+          create_lookup_table_array_const dbg array_kind rebuilding simples
+        in
+        array_const, array_kind, array_load_kind, element_kind, fields
     in
     let block_type =
-      T.immutable_array ~element_kind:(Ok KS.tagged_immediate)
-        ~fields:
-          (List.map
-             (fun const ->
-               T.alias_type_of K.value
-                 (Simple.const (Reg_width_const.const_int const)))
-             consts)
+      T.immutable_array ~element_kind:(Ok element_kind) ~fields
         Alloc_mode.For_types.heap
         ~machine_width:(DE.machine_width (DA.denv dacc_before_switch))
     in
-    UA.add_lifted_constant uacc
-      (LC.create_definition
-         (LC.Definition.block_like
-            (DA.denv dacc_before_switch)
-            block_sym block_type ~symbol_projections:Variable.Map.empty
-            (RSC.create_immutable_value_array rebuilding fields)))
+    let uacc =
+      UA.add_lifted_constant uacc
+        (LC.create_definition
+           (LC.Definition.block_like
+              (DA.denv dacc_before_switch)
+              block_sym block_type ~symbol_projections:Variable.Map.empty
+              array_const))
+    in
+    uacc, array_kind, array_load_kind, KS.kind element_kind
   in
   (* CR mshinwell: consider sharing the constants *)
   let block = Simple.symbol block_sym in
@@ -369,20 +510,15 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
          dbg
      in
      let load_from_block_prim : P.t =
-       Binary (Array_load (Values, Values, Immutable), block, tagged_scrutinee)
+       Binary
+         ( Array_load (array_kind, array_load_kind, Immutable),
+           block,
+           tagged_scrutinee )
      in
      let load_from_block = Named.create_prim load_from_block_prim dbg in
-     let arg_var = Variable.create "arg" K.value in
+     let arg_var = Variable.create "arg" loaded_kind in
      let arg_var_duid = Flambda_debug_uid.none in
      let arg = Simple.var arg_var in
-     let final_arg_var, final_arg_var_duid, final_arg =
-       match must_untag_lookup_table_result with
-       | Must_untag ->
-         let final_arg_var = Variable.create "final_arg" K.naked_immediate in
-         let final_arg_var_duid = Flambda_debug_uid.none in
-         final_arg_var, final_arg_var_duid, Simple.var final_arg_var
-       | Leave_as_tagged_immediate -> arg_var, arg_var_duid, arg
-     in
      (* Note that, unlike for the untagging of normal Switch scrutinees, there's
         no problem with CSE and Data_flow here. The reason is that in this case
         the generated primitive always names a fresh variable, so it will never
@@ -391,42 +527,26 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
         continuations in [Name_occurrences] and then try to inline out [dest].
         This might happen anyway in the backend though so this probably isn't
         that important for now. *)
-     let apply_cont = Apply_cont.create dest ~args:[final_arg] ~dbg in
+     let apply_cont = Apply_cont.create dest ~args:[arg] ~dbg in
      let free_names_of_body = Apply_cont.free_names apply_cont in
-     let untag_arg_prim : P.t = Unary (Untag_immediate, arg) in
      let expr =
-       let body =
-         let body = RE.create_apply_cont apply_cont in
-         match must_untag_lookup_table_result with
-         | Leave_as_tagged_immediate -> body
-         | Must_untag ->
-           let bound =
-             BPt.singleton
-               (BV.create final_arg_var final_arg_var_duid NM.normal)
-           in
-           let untag_arg = Named.create_prim untag_arg_prim dbg in
-           RE.create_let rebuilding bound untag_arg ~body ~free_names_of_body
-       in
+       let body = RE.create_apply_cont apply_cont in
        let bound = BPt.singleton (BV.create arg_var arg_var_duid NM.normal) in
        RE.create_let rebuilding bound load_from_block ~body ~free_names_of_body
      in
      let extra_free_names =
        NO.union
          (Named.free_names load_from_block)
-         (NO.remove_var free_names_of_body ~var:final_arg_var)
+         (NO.remove_var free_names_of_body ~var:arg_var)
      in
      let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
      let added_code_size =
        Code_size.( + )
          (Code_size.prim ~machine_width load_from_block_prim)
-         (Code_size.( + )
-            (Code_size.apply_cont apply_cont)
-            (match must_untag_lookup_table_result with
-            | Must_untag -> Code_size.prim ~machine_width untag_arg_prim
-            | Leave_as_tagged_immediate -> Code_size.zero))
+         (Code_size.apply_cont apply_cont)
      in
      (* CR mshinwell: it seems we need to fix [Cost_metrics] so we can note that
-        we have *added* operations here (load, maybe untagging). *)
+        we have *added* operations here (load). *)
      return ~added_code_size ~free_names:extra_free_names expr)
 
 let recognize_affine_switch_to_same_destination machine_width consts =
@@ -443,8 +563,12 @@ let recognize_affine_switch_to_same_destination machine_width consts =
     in
     check const0 slope (TI.of_int machine_width 2) other_consts
 
+type affine_immediate_kind =
+  | Tagged
+  | Naked
+
 let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
-    ~scrutinee ~dest ~offset ~slope ~must_untag_lookup_table_result dbg =
+    ~scrutinee ~dest ~offset ~slope ~immediate_kind dbg =
   (* We are creating the following fragment: *)
   (* let scaled = x * slope in
    * let final = scaled + offset in
@@ -456,22 +580,22 @@ let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
         (Int_arith (standard_int, Mul), scrutinee, Simple.const (const slope))
     in
     let$ scaled_arg = bound_prim "scaled_arg" kind mul_prim dbg in
-    let prim : P.t =
+    let add_prim : P.t =
       Binary
         (Int_arith (standard_int, Add), scaled_arg, Simple.const (const offset))
     in
-    let$ final_arg = bound_prim "final_arg" kind prim dbg in
+    let$ final_arg = bound_prim "final_arg" kind add_prim dbg in
     let apply_cont = Apply_cont.create dest ~args:[final_arg] ~dbg in
     let free_names = Apply_cont.free_names apply_cont in
     let added_code_size = Code_size.apply_cont apply_cont in
     return ~added_code_size ~free_names (RE.create_apply_cont apply_cont)
   in
   run ~dacc_before_switch uacc
-    (match must_untag_lookup_table_result with
-    | Must_untag ->
+    (match (immediate_kind : affine_immediate_kind) with
+    | Naked ->
       rebuild_affine_expr scrutinee K.naked_immediate
         K.Standard_int.Naked_immediate Reg_width_const.naked_immediate
-    | Leave_as_tagged_immediate ->
+    | Tagged ->
       let$ tagged_scrutinee =
         bound_prim "tagged_scrutinee" K.value
           (P.Unary (Tag_immediate, scrutinee))
@@ -523,7 +647,8 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
       |> Continuation.Set.of_list |> Continuation.Set.get_singleton
   in
   let switch_is_single_arg_to_same_destination =
-    recognize_switch_with_single_arg_to_same_destination machine_width ~arms
+    recognize_switch_with_single_arg_to_same_destination condition_dbg
+      machine_width ~arms
   in
   let body, uacc =
     if TI.Map.cardinal arms < 1
@@ -555,19 +680,46 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
       let[@inline] normal_case uacc =
         match switch_is_single_arg_to_same_destination with
         | None -> normal_case0 uacc
-        | Some (dest, must_untag_lookup_table_result, consts) -> (
-          assert (List.length consts = TI.Map.cardinal arms);
-          match
-            recognize_affine_switch_to_same_destination machine_width consts
-          with
+        | Some (dest, lookup_table_fields) -> (
+          let try_affine immediate_kind consts =
+            assert (List.length consts = TI.Map.cardinal arms);
+            Option.map
+              (fun (offset, slope) -> immediate_kind, offset, slope)
+              (recognize_affine_switch_to_same_destination machine_width consts)
+          in
+          let affine =
+            match lookup_table_fields with
+            | Tagged_immediates consts -> try_affine Tagged consts
+            | Static_arguments_of_single_kind
+                { array_kind; array_load_kind = _; element_kind = _; simples }
+              -> (
+              match (array_kind : P.Array_kind.t) with
+              | Naked_ints ->
+                let consts =
+                  List.filter_map
+                    (fun simple ->
+                      Simple.pattern_match' simple
+                        ~var:(fun _ ~coercion:_ -> None)
+                        ~symbol:(fun _ ~coercion:_ -> None)
+                        ~const:Reg_width_const.is_naked_immediate)
+                    simples
+                in
+                if List.compare_lengths consts simples = 0
+                then try_affine Naked consts
+                else None
+              | Immediates | Gc_ignorable_values | Values | Naked_floats
+              | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s
+              | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+              | Naked_vec512s | Unboxed_product _ ->
+                None)
+          in
+          match affine with
           | None ->
             rebuild_switch_with_single_arg_to_same_destination uacc
-              ~dacc_before_switch ~scrutinee ~dest ~consts
-              ~must_untag_lookup_table_result dbg
-          | Some (offset, slope) ->
+              ~dacc_before_switch ~scrutinee ~dest ~lookup_table_fields dbg
+          | Some (immediate_kind, offset, slope) ->
             rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
-              ~scrutinee ~dest ~offset ~slope ~must_untag_lookup_table_result
-              dbg)
+              ~scrutinee ~dest ~offset ~slope ~immediate_kind dbg)
       in
       match switch_merged with
       | Some (dest, args) ->
