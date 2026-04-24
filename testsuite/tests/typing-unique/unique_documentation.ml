@@ -11,7 +11,7 @@
 type t = Con of { field : int list }
 
 let free : t @ unique -> unit = fun t -> ()
-let free_field (unique_ i) = ()
+let free_field (i @ unique) = ()
 let store : t @ aliased -> unit = fun t -> ()
 let store_field i = ()
 let flip_coin () = true
@@ -193,7 +193,7 @@ Error: The value "set" is "once"
 |}]
 
 let set_all_zero arr =
-  let size (unique_ arr) = 10, arr in
+  let size (arr @ unique) = 10, arr in
   let rec loop idx arr =
     if idx == 0 then arr
     else loop (idx - 1) (Unique_array.set arr idx 0)
@@ -210,7 +210,7 @@ val set_all_zero : 'a @ unique -> 'a = <fun>
 type t = { field1 : t; field2 : t }
 
 let free : t @ unique -> unit = fun t -> ()
-let free_field (unique_ i) = ()
+let free_field (i @ unique) = ()
 let store : t @ aliased -> unit = fun t -> ()
 let store_field i = ()
 let flip_coin () = true

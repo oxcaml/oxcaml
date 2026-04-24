@@ -2,7 +2,7 @@
   expect;
 *)
 
-let unique_use (local_ unique_ _x) = ()
+let unique_use (_x @ local unique) = ()
 [%%expect{|
 val unique_use : 'a @ local unique -> unit = <fun>
 |}]
@@ -17,12 +17,12 @@ let local_aliased_use (local_ a) = ()
 val local_aliased_use : 'a @ local -> unit = <fun>
 |}]
 
-let unique_aliased_use (local_ unique_ x) (local_ y) = ()
+let unique_aliased_use (x @ local unique) (local_ y) = ()
 [%%expect{|
 val unique_aliased_use : 'a @ local unique -> 'b @ local -> unit = <fun>
 |}]
 
-let aliased_unique_use (local_ x) (local_ unique_ y) = ()
+let aliased_unique_use (local_ x) (y @ local unique) = ()
 [%%expect{|
 val aliased_unique_use : 'a @ local -> 'b @ local unique -> unit = <fun>
 |}]
@@ -48,7 +48,7 @@ Error: This value is "local" because it is borrowed.
 |}]
 
 let foo () =
-  let unique_ y = "hello" in
+  let (y @ unique) = "hello" in
   let x = borrow_ y in
   unique_use y
 [%%expect{|
@@ -70,7 +70,7 @@ Lines 3-4, characters 2-14:
 
 (* CR-someday zqian: support non-shallow borrowing *)
 let foo () =
-  let unique_ y = "hello" in
+  let (y @ unique) = "hello" in
   let y0, y1 = borrow_ y, borrow_ y in
   ()
 [%%expect{|
@@ -107,7 +107,7 @@ val foo : unit -> unit = <fun>
 
 (* borrowed values are aliased and cannot be used as unique *)
 let foo () =
-  let unique_ y = "hello" in
+  let (y @ unique) = "hello" in
   unique_use (borrow_ y);
   ()
 [%%expect{|
@@ -379,7 +379,7 @@ Error: This value is "aliased" because it is borrowed,
 
 (* borrowed values are local and cannot escape *)
 let foo () =
-  let unique_ y = "hello" in
+  let (y @ unique) = "hello" in
   match borrow_ y with
   | x -> ignore (global_aliased_use x)
 [%%expect{|
@@ -475,7 +475,7 @@ Line 4, characters 28-29:
 
 (* You can't use x uniquely after aliased usage *)
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   global_aliased_use x;
   unique_use x;
   ()
@@ -492,7 +492,7 @@ Line 3, characters 21-22:
 
 (* unless if you borrow it *)
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   local_aliased_use (borrow_ x);
   unique_use x;
   ()
@@ -502,7 +502,7 @@ val foo : unit -> unit = <fun>
 
 (* borrow after unique usage is bad *)
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   unique_use x;
   local_aliased_use (borrow_ x);
   ()
@@ -520,7 +520,7 @@ Line 3, characters 13-14:
 
 (* multiple borrowing is fine *)
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   aliased_aliased_use (borrow_ x) (borrow_ x);
   unique_use x;
   ()
@@ -530,7 +530,7 @@ val foo : unit -> unit = <fun>
 
 (* but you need to borrow both of course *)
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   aliased_aliased_use (borrow_ x) x;
   unique_use x;
   ()
@@ -552,7 +552,7 @@ Line 3, characters 34-35:
 |}]
 
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   local_aliased_use (borrow_ (global_aliased_use x));
   unique_use x;
   ()
@@ -569,7 +569,7 @@ Line 3, characters 49-50:
 
 (* borrowed values are aliased *)
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   unique_use (borrow_ x);
   ()
 [%%expect{|
@@ -582,7 +582,7 @@ Error: This value is "aliased" because it is borrowed,
 
 (* borrowed values are local and cannot escape *)
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   global_aliased_use (borrow_ x);
   ()
 [%%expect{|
@@ -596,7 +596,7 @@ Error: This value is "local" because it is borrowed.
 (* CR-soon zqian: The following should pass, once we distinguish stack region
 and ghost region, and allow functions to have "stack" as return mode. *)
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   local_returning (borrow_ x);
   ()
 [%%expect{|
@@ -609,7 +609,7 @@ Error: This value is "local"
 |}]
 
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   aliased_unique_use (borrow_ x) x;
   ()
 [%%expect{|
@@ -716,7 +716,7 @@ Error: The value is "once" but expected to be "many" because it is to be borrowe
 
 let aliased_local_and_legacy_use (a @ aliased local) () = ();;
 let foo () =
-  let unique_ x = "hello" in
+  let (x @ unique) = "hello" in
   let f = aliased_local_and_legacy_use (borrow_ x) in
   unique_use x;
   f ();

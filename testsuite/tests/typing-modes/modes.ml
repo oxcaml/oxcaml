@@ -261,7 +261,7 @@ Error: Found a aliased value where a unique value was expected
 *)
 
 (* arrow types *)
-type r = local_ string @ unique once -> unique_ string @ local once
+type r = local_ string @ unique once -> string @ local unique once
 [%%expect{|
 type r = string @ local unique once -> string @ local unique once
 |}]
@@ -296,12 +296,12 @@ Error: The locality axis has already been specified.
 |}]
 
 (* Mixing legacy and new modes *)
-type r = local_ unique_ once_ string -> string
+type r = local_ string @ unique once -> string
 [%%expect{|
 type r = string @ local unique once -> string
 |}]
 
-type r = local_ unique_ once_ string @ portable contended -> string
+type r = local_ string @ unique once portable contended -> string
 [%%expect{|
 type r = string @ local unique once portable contended -> string
 |}]
