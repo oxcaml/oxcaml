@@ -239,14 +239,13 @@ let generate_cmi ~(compilation_unit : CU.t) ~(all_params : GM.t list)
     ~output_prefix =
   let outer_sig = compute_bundle_sig ~all_params ~modules in
   let target =
-    Unit_info.make_with_known_compilation_unit ~source_file Impl
-      output_prefix compilation_unit
+    Unit_info.make_with_known_compilation_unit ~source_file Impl output_prefix
+      compilation_unit
   in
   ignore
     (Env.save_signature ~alerts:Misc.Stdlib.String.Map.empty outer_sig
        (CU.name compilation_unit)
-       (Cmi_format.Normal
-          { cmi_impl = compilation_unit; cmi_arg_for = None })
+       (Cmi_format.Normal { cmi_impl = compilation_unit; cmi_arg_for = None })
        (Unit_info.cmi target))
 
 let functorize_intf ~srcs target ~read_unit_info ~find_unit_info_by_name =
@@ -260,7 +259,8 @@ let functorize_intf ~srcs target ~read_unit_info ~find_unit_info_by_name =
   in
   let modules = List.map (fun ui -> (ui.ui_unit, ui.ui_format)) all_modules in
   let source_file = List.hd srcs in
-  generate_cmi ~compilation_unit ~all_params ~modules ~source_file ~output_prefix
+  generate_cmi ~compilation_unit ~all_params ~modules ~source_file
+    ~output_prefix
 
 let functorize_impl ~srcs target ~read_unit_info ~find_unit_info_by_name
     ~compile =

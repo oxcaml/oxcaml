@@ -29,7 +29,7 @@ module CU := Compilation_unit
 type unit_info = { ui_unit : CU.t; ui_format : Lambda.main_module_block_format }
 
 val read_unit_info_of_cmi : Misc.filepath -> unit_info
-(** Read a [unit_info] from a .cmi file.  Used for the [-functorize-intf] path.
+(** Read a [unit_info] from a .cmi file. Used for the [-functorize-intf] path.
     The [mb_runtime_params] ordering in the returned [ui_format] is derived from
     the interface and need not match the canonical runtime ordering; it is only
     used for dependency discovery and CMI type generation. *)
@@ -40,10 +40,10 @@ val functorize_intf :
   read_unit_info:(Misc.filepath -> unit_info) ->
   find_unit_info_by_name:(string -> unit_info) ->
   unit
-(** [functorize_intf ~srcs target ~read_unit_info ~find_unit_info_by_name]
-    reads the given .cmi files, collects all parameterised transitive
-    dependencies, and writes a bundle-functor .cmi to [target].
-    [read_unit_info] and [find_unit_info_by_name] both read from .cmi files. *)
+(** [functorize_intf ~srcs target ~read_unit_info ~find_unit_info_by_name] reads
+    the given .cmi files, collects all parameterised transitive dependencies,
+    and writes a bundle-functor .cmi to [target]. [read_unit_info] and
+    [find_unit_info_by_name] both read from .cmi files. *)
 
 val functorize_impl :
   srcs:Misc.filepath list ->
@@ -59,8 +59,8 @@ val functorize_impl :
     unit) ->
   unit
 (** [functorize_impl ~srcs target ~read_unit_info ~find_unit_info_by_name
-    ~compile] reads the given .cmx/.cmo files, collects all parameterised
+     ~compile] reads the given .cmx/.cmo files, collects all parameterised
     transitive dependencies, and compiles a bundle-functor .cmx/.cmo to
-    [target].  [read_unit_info] reads from .cmx/.cmo files so that
+    [target]. [read_unit_info] reads from .cmx/.cmo files so that
     [mb_runtime_params] comes directly from the compiled objects with the
     correct canonical ordering. *)

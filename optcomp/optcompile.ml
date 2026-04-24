@@ -258,8 +258,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   let read_unit_info_of_cmx file : Functorizer.unit_info =
     let unit_info, _crc = Compilenv.read_unit_info file in
-    { Functorizer.ui_unit = unit_info.ui_unit;
-      ui_format = unit_info.ui_format }
+    { Functorizer.ui_unit = unit_info.ui_unit; ui_format = unit_info.ui_format }
 
   let find_unit_info_by_name_cmi name : Functorizer.unit_info =
     let filename =

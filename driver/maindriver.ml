@@ -112,7 +112,8 @@ let main argv ppf =
       let target = Compenv.extract_output !output_name in
       let srcs = Compenv.get_objfiles ~with_ocamlparam:false in
       if srcs = [] then
-        Compenv.fatal "Must specify at least one .cmi file with -functorize-intf";
+        Compenv.fatal
+          "Must specify at least one .cmi file with -functorize-intf";
       Bytefunctorizer.functorize_intf ~srcs target;
       Warnings.check_fatal ();
     end
@@ -121,7 +122,8 @@ let main argv ppf =
       let target = Compenv.extract_output !output_name in
       let srcs = Compenv.get_objfiles ~with_ocamlparam:false in
       if srcs = [] then
-        Compenv.fatal "Must specify at least one .cmo file with -functorize-impl";
+        Compenv.fatal
+          "Must specify at least one .cmo file with -functorize-impl";
       Bytefunctorizer.functorize_impl ~srcs target;
       Warnings.check_fatal ();
     end

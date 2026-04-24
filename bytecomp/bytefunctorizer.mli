@@ -25,4 +25,5 @@
  **********************************************************************************)
 
 val functorize_intf : srcs:string list -> string -> unit
+
 val functorize_impl : srcs:string list -> string -> unit
