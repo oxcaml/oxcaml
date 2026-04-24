@@ -2211,13 +2211,35 @@ let emit_instr ~first ~last ~fallthrough i =
     D.define_label lbl_after_poll
   | Lop Pause -> I.pause ()
   | Lop (Intop (Icomp cmp)) ->
-    I.cmp (arg i 1) (arg i 0);
-    I.set (cond cmp) al;
-    I.movzx al (res i 0)
+    if
+      Reg.is_reg i.res.(0)
+      && not
+           (Reg.equal_location i.res.(0).loc i.arg.(0).loc
+           || Reg.equal_location i.res.(0).loc i.arg.(1).loc)
+    then begin
+      I.xor (res32 i 0) (res32 i 0);
+      I.cmp (arg i 1) (arg i 0);
+      I.set (cond cmp) (res8 i 0)
+    end
+    else begin
+      I.cmp (arg i 1) (arg i 0);
+      I.set (cond cmp) al;
+      I.movzx al (res i 0)
+    end
   | Lop (Intop_imm (Icomp cmp, n)) ->
-    I.cmp (int n) (arg i 0);
-    I.set (cond cmp) al;
-    I.movzx al (res i 0)
+    if
+      Reg.is_reg i.res.(0)
+      && not (Reg.equal_location i.res.(0).loc i.arg.(0).loc)
+    then begin
+      I.xor (res32 i 0) (res32 i 0);
+      I.cmp (int n) (arg i 0);
+      I.set (cond cmp) (res8 i 0)
+    end
+    else begin
+      I.cmp (int n) (arg i 0);
+      I.set (cond cmp) al;
+      I.movzx al (res i 0)
+    end
   | Lop (Intop_imm (Iand, n))
     when n >= 0 && n <= 0xFFFF_FFFF && Reg.is_reg i.res.(0) ->
     I.and_ (int n) (res32 i 0)

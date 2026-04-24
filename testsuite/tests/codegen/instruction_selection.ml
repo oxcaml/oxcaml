@@ -103,9 +103,9 @@ let combine_comparisons r f =
 [%%expect_asm X86_64{|
 combine_comparisons:
   movq  (%rax), %rbx
+  xorl  %eax, %eax
   cmpq  $41, %rbx
   setl  %al
-  movzbq %al, %rax
   cmpq  $11, %rbx
   jle   .L114
   testq %rax, %rax
@@ -126,9 +126,9 @@ let repeat_comparisons r _f =
 [%%expect_asm X86_64{|
 repeat_comparisons:
   movq  (%rax), %rbx
+  xorl  %eax, %eax
   cmpq  $11, %rbx
   setg  %al
-  movzbq %al, %rax
   cmpq  $11, %rbx
   jle   .L113
   testq %rax, %rax
@@ -149,9 +149,9 @@ let branch_and_return o =
 [%%expect_asm X86_64{|
 branch_and_return:
   movq  %rax, %rbx
+  xorl  %eax, %eax
   cmpq  $1, %rbx
   setne %al
-  movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
   cmpq  $3, %rax
   jne   .L107

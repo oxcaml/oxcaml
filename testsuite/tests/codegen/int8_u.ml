@@ -226,13 +226,12 @@ let compare x y = Int8_u.compare x y
 [%%expect_asm X86_64{|
 compare:
   movq  %rax, %rdi
+  movq  $-1, %rsi
+  xorl  %eax, %eax
   cmpq  %rbx, %rdi
-  setl  %al
-  movzbq %al, %rsi
   setg  %al
-  movzbq %al, %rax
-  subq  %rsi, %rax
-  leaq  1(%rax,%rax), %rax
+  cmovge %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
   ret
 |}]
 
@@ -280,13 +279,12 @@ let unsigned_compare x y = Int8_u.unsigned_compare x y
 [%%expect_asm X86_64{|
 unsigned_compare:
   movq  %rax, %rdi
+  movq  $-1, %rsi
+  xorl  %eax, %eax
   cmpq  %rbx, %rdi
-  setb  %al
-  movzbq %al, %rsi
   seta  %al
-  movzbq %al, %rax
-  subq  %rsi, %rax
-  leaq  1(%rax,%rax), %rax
+  cmovae %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
   ret
 |}]
 

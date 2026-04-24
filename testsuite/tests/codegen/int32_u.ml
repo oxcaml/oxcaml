@@ -50,18 +50,17 @@ bswap:
   ret
 |}]
 
-(* CR ttebbi: Subtraction should be done on byte registers. *)
+(* CR ttebbi: `movq  $-1, %rsi` has a large encoding. *)
 let compare x y = Int32_u.compare x y
 [%%expect_asm X86_64{|
 compare:
   movq  %rax, %rdi
+  movq  $-1, %rsi
+  xorl  %eax, %eax
   cmpq  %rbx, %rdi
-  setl  %al
-  movzbq %al, %rsi
   setg  %al
-  movzbq %al, %rax
-  subq  %rsi, %rax
-  leaq  1(%rax,%rax), %rax
+  cmovge %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
   ret
 |}]
 
