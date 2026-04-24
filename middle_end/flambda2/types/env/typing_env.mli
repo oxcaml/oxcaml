@@ -41,7 +41,7 @@ module Serializable : sig
 
   val predefined_exceptions : Symbol.Set.t -> t
 
-  val free_function_slots_and_value_slots : t -> Name_occurrences.t
+  val fold_free_names : t -> init:'a -> f:(Name_occurrences.t -> 'a -> 'a) -> 'a
 
   val print : Format.formatter -> t -> unit
 

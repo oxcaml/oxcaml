@@ -176,23 +176,18 @@ let remove_unused_value_slots_and_shortcut_aliases
   in
   { names_to_types; aliases; symbol_projections }
 
-let free_function_slots_and_value_slots
-    { names_to_types; aliases = _; symbol_projections } =
-  let from_projections =
+let[@inline] fold_free_names { names_to_types; aliases = _; symbol_projections }
+    ~init ~f =
+  let acc_from_projections =
     Variable.Map.fold
-      (fun _var proj free_names ->
-        Name_occurrences.union free_names
-          (Name_occurrences.restrict_to_value_slots_and_function_slots
-             (Symbol_projection.free_names proj)))
-      symbol_projections Name_occurrences.empty
+      (fun _var proj acc ->
+        (f [@inlined hint]) (Symbol_projection.free_names proj) acc)
+      symbol_projections init
   in
   Name.Map.fold
-    (fun _name (ty, _binding_time) free_names ->
-      let free_names_of_ty = Type_grammar.free_names ty in
-      Name_occurrences.union free_names
-        (Name_occurrences.restrict_to_value_slots_and_function_slots
-           free_names_of_ty))
-    names_to_types from_projections
+    (fun _name (ty, _binding_time) acc ->
+      (f [@inlined hint]) (Type_grammar.free_names ty) acc)
+    names_to_types acc_from_projections
 
 let ids_for_export t =
   if not (Aliases.is_empty t.aliases)

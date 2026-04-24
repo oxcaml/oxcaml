@@ -56,4 +56,4 @@ val remove_unused_value_slots_and_shortcut_aliases :
 
 val canonicalise : t -> Simple.t -> Simple.t
 
-val free_function_slots_and_value_slots : t -> Name_occurrences.t
+val fold_free_names : t -> init:'a -> f:(Name_occurrences.t -> 'a -> 'a) -> 'a

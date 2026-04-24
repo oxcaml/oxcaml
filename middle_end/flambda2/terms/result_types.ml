@@ -151,5 +151,7 @@ let ids_for_export = A.ids_for_export
 let map_result_types t ~f =
   A.pattern_match t
     ~f:(fun { Bound.params; results; other_vars = _ } env_extension ->
-      let env_extension = TEEV.map_types ~f env_extension in
-      create ~params ~results env_extension)
+      let env_extension' = TEEV.map_types ~f env_extension in
+      if env_extension == env_extension'
+      then t
+      else create ~params ~results env_extension')

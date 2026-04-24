@@ -130,9 +130,15 @@ val function_slots_in_normal_projections : t -> Function_slot.Set.t
 
 val all_function_slots_at_normal_mode : t -> Function_slot.Set.t
 
+val fold_all_function_slots_at_normal_mode :
+  t -> init:'a -> f:('a -> Function_slot.t -> 'a) -> 'a
+
 val value_slots_in_normal_projections : t -> Value_slot.Set.t
 
 val all_value_slots_at_normal_mode : t -> Value_slot.Set.t
+
+val fold_all_value_slots_at_normal_mode :
+  t -> init:'a -> f:('a -> Value_slot.t -> 'a) -> 'a
 
 val symbols : t -> Symbol.Set.t
 
