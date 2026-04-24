@@ -2610,7 +2610,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         let mutability = convert_field_read_semantics sem in
         let field_elt = flattened_reordered_shape.(new_index) in
         let block_access =
-          H.block_access_kind_of_mixed_field_element ~kind_shape field_elt
+          H.block_access_kind_of_mixed_field_element ~kind_shape ~tag:Unknown
+            ~size:Unknown field_elt
         in
         let prim : H.expr_primitive =
           Unary
@@ -2687,7 +2688,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           check_non_negative_imm imm "Psetmixedfield";
           let field_elt = flattened_reordered_shape.(new_index) in
           let block_access =
-            H.block_access_kind_of_mixed_field_element ~kind_shape field_elt
+            H.block_access_kind_of_mixed_field_element ~kind_shape ~tag:Unknown
+              ~size:Unknown field_elt
           in
           let init_or_assign =
             convert_init_or_assign initialization_or_assignment
