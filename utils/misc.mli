@@ -105,6 +105,9 @@ val split_last: 'a list -> 'a list * 'a
 val last : 'a list -> 'a option
         (** Return the last element of a list if it's nonempty *)
 
+val repeated_label : (string option * 'a) list -> string option
+       (** Detects a repeated label - for use with labeled tuples. *)
+
 (** {1 Hash table operations} *)
 
 val create_hashtable: int -> ('a * 'b) list -> ('a, 'b) Hashtbl.t

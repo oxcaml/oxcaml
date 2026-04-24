@@ -90,7 +90,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml'
+            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/array_element_kind_meet.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml'
 
           - name: runtime4 (aarch64-darwin)
             config: --disable-runtime5 --disable-warn-error
@@ -229,7 +229,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'flambda2-expert-cont-lifting-budget=1000,flambda2-expert-cont-spec-budget=100,_'
             ocamlparam: 'flambda2-expert-cont-lifting-budget=1000,flambda2-expert-cont-spec-budget=100,_'
-            disable_testcases: 'testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
+            disable_testcases: 'testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/array_element_kind_meet.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
 
     env:
       J: "8"
@@ -328,6 +328,14 @@ jobs:
           if [[ "${{matrix.dissector_assembler}}" == "true" ]]; then
             dissector_config="--enable-assembler-suitable-for-dissector=$GITHUB_WORKSPACE/oxcaml-llvm/bin/llvm-mc"
           fi
+          if [[ "${{ runner.os }}" == "macOS" \
+                && "${{ matrix.config }}" == *--disable-runtime5* ]]; then
+            # Homebrew's autoconf (2.72+) probes for C23 and appends
+            # -std=gnu23 to CC, which breaks the runtime4 aarch64-darwin
+            # build. Pin CFLAGS to gnu11 so the later -std= wins at compile
+            # time. Scoped to runtime4 since it will be deleted soon.
+            export CFLAGS="-std=gnu11"
+          fi
           autoconf
           ./configure \
             --prefix=$GITHUB_WORKSPACE/$install_path \
@@ -383,7 +391,7 @@ jobs:
 
       - name: Promote failed tests and capture diffs
         # Compute the diff for an arbitrary job, we expect all to have the same diff
-        if: failure() && matrix.name == 'runtime5'
+        if: failure() && matrix.name == 'runtime5 (x86_64-linux)'
         continue-on-error: true
         run: |
           export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH

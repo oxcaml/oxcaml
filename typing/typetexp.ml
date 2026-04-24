@@ -89,6 +89,7 @@ type error =
   | Method_mismatch of string * type_expr * type_expr
   | Opened_object of Path.t option
   | Not_an_object of type_expr
+  | Repeated_tuple_label of string
   | Unsupported_extension : _ Language_extension.t -> error
   | Polymorphic_optional_param
   | Non_value of
@@ -1410,12 +1411,11 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
 
 and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
   assert (List.length stl >= 2);
+  Option.iter (fun l -> raise (Error (loc, env, Repeated_tuple_label l)))
+    (Misc.repeated_label stl);
   let ctys =
     List.map
       (fun (label, t) ->
-         Option.iter (fun _ ->
-             Language_extension.assert_enabled ~loc Labeled_tuples ())
-           label;
          label, transl_type env ~policy ~row_context Alloc.Const.legacy t)
       stl
   in
@@ -1866,6 +1866,9 @@ let report_error_doc env ppf =
                    To enable it, pass the '-extension %s' flag@]" ext ext
   | Polymorphic_optional_param ->
       fprintf ppf "@[Optional parameters cannot be polymorphic@]"
+  | Repeated_tuple_label l ->
+      fprintf ppf "@[This tuple type has two labels named %a@]"
+        Style.inline_code l
   | Non_value {vloc; typ; err} ->
     let s =
       match vloc with

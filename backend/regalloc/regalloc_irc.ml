@@ -539,7 +539,6 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t option =
       ~initial:(Reg.Set.elements all_temporaries)
       ~stack_slots ~affinity ()
   in
-  Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
   match main ~round:1 state cfg_with_infos with
   | exception Function_is_too_complex -> None
   | () ->

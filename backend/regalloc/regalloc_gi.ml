@@ -274,7 +274,6 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   let initial_temporaries = Reg.Set.cardinal all_temporaries in
   if debug then log "#temporaries=%d" initial_temporaries;
   let state = State.make ~stack_slots ~initial_temporaries ~affinity in
-  Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
   let flat =
     match Lazy.force Spilling_heuristics.value with
     | Flat_uses -> true

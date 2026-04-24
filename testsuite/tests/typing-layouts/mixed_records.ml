@@ -10,21 +10,36 @@
  }
 *)
 
-(* Mixed float-float# blocks are always OK. *)
+(* Mixed float-float# blocks require [@@flatten_floats]. *)
 type t =
   { a : float;
     b : float#;
   }
 
 [%%expect{|
+Lines 1-4, characters 0-3:
+1 | type t =
+2 |   { a : float;
+3 |     b : float#;
+4 |   }
+Error: This record type mixes boxed and unboxed float fields,
+       which causes the flat float record optimization.
+       You must annotate it with "[@@flatten_floats]".
+|}];;
+
+type t =
+  { a : float;
+    b : float#;
+  } [@@flatten_floats]
+
+[%%expect{|
 type t = { a : float; b : float#; }
 |}];;
 
-(* Mixed float-float# blocks are always OK. *)
 type t =
   { a : float#;
     b : float;
-  }
+  } [@@flatten_floats]
 
 [%%expect{|
 type t = { a : float#; b : float; }
@@ -82,7 +97,7 @@ type t =
   { f1 : float#;
     f2 : float#;
     f3 : float;
-  }
+  } [@@flatten_floats]
 
 [%%expect{|
 type t = { f1 : float#; f2 : float#; f3 : float; }
@@ -227,14 +242,14 @@ module _ : sig
   val t : t
 end = struct
   type u = float
-  type t = { u : float; f : float# }
+  type t = { u : float; f : float# } [@@flatten_floats]
   let t = { u = 3.0; f = #4.0 }
 end
 [%%expect {|
 Lines 5-9, characters 6-3:
 5 | ......struct
 6 |   type u = float
-7 |   type t = { u : float; f : float# }
+7 |   type t = { u : float; f : float# } [@@flatten_floats]
 8 |   let t = { u = 3.0; f = #4.0 }
 9 | end
 Error: Signature mismatch:
@@ -302,4 +317,45 @@ Lines 2-37, characters 0-3:
 36 |     unboxed:float#;
 37 |   }
 Error: Mixed records may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+|}];;
+
+(* [@@flatten_floats] on all-float record is an error *)
+type t = { a : float; b : float } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-52:
+1 | type t = { a : float; b : float } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
+|}];;
+
+(* [@@flatten_floats] on all-float# record is an error *)
+type t = { a : float#; b : float# } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-54:
+1 | type t = { a : float#; b : float# } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
+|}];;
+
+(* [@@flatten_floats] on non-float record is an error *)
+type t = { a : int; b : string } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-51:
+1 | type t = { a : int; b : string } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
+|}];;
+
+(* [@@flatten_floats] on mixed record with non-float value fields is an error:
+   the float is in the value prefix, not flat. *)
+type t = { a : float; b : float#; c : int } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-62:
+1 | type t = { a : float; b : float#; c : int } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on record types
+       that mix boxed "float" and unboxed "float#" fields.
 |}];;

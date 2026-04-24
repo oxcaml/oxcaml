@@ -464,21 +464,23 @@ let[@inline always] join_unknown join_contents (env : Join_env.t)
 (* Note: Bottom is a valid element kind for empty arrays, so this function never
    leads to a general Bottom result *)
 let meet_array_element_kinds (element_kind1 : _ Or_unknown_or_bottom.t)
-    (element_kind2 : _ Or_unknown_or_bottom.t) : _ Or_unknown_or_bottom.t =
+    (element_kind2 : _ Or_unknown_or_bottom.t) :
+    _ Or_unknown_or_bottom.t meet_return_value =
   match element_kind1, element_kind2 with
-  | Unknown, Unknown -> Unknown
-  | Bottom, _ | _, Bottom -> Bottom
-  | Unknown, Ok kind | Ok kind, Unknown -> Ok kind
-  | Ok element_kind1, Ok element_kind2 ->
-    if
-      Flambda_kind.With_subkind.compatible element_kind1
-        ~when_used_at:element_kind2
-    then Ok element_kind1
-    else if
-      Flambda_kind.With_subkind.compatible element_kind2
-        ~when_used_at:element_kind1
-    then Ok element_kind2
-    else Bottom
+  | Unknown, Unknown | Bottom, Bottom -> Both_inputs
+  | Bottom, _ | Ok _, Unknown -> Left_input
+  | _, Bottom | Unknown, Ok _ -> Right_input
+  | Ok element_kind1, Ok element_kind2 -> (
+    match
+      ( Flambda_kind.With_subkind.compatible element_kind1
+          ~when_used_at:element_kind2,
+        Flambda_kind.With_subkind.compatible element_kind2
+          ~when_used_at:element_kind1 )
+    with
+    | true, true -> Both_inputs
+    | true, false -> Left_input
+    | false, true -> Right_input
+    | false, false -> New_result Bottom)
 
 let join_array_element_kinds (element_kind1 : _ Or_unknown_or_bottom.t)
     (element_kind2 : _ Or_unknown_or_bottom.t) : _ Or_unknown_or_bottom.t =
@@ -871,16 +873,20 @@ and meet_head_of_kind_value_non_null env
 and meet_array_type env (element_kind1, length1, contents1, alloc_mode1)
     (element_kind2, length2, contents2, alloc_mode2) =
   let element_kind = meet_array_element_kinds element_kind1 element_kind2 in
+  let meet_element_kind =
+    extract_value element_kind element_kind1 element_kind2
+  in
   combine_results env
-    ~rebuild:(fun (length, (contents, (alloc_mode, ()))) ->
+    ~rebuild:(fun (length, (contents, (alloc_mode, (element_kind, ())))) ->
       TG.Head_of_kind_value_non_null.create_array_with_contents ~element_kind
         ~length contents alloc_mode)
     ~meet_ops:
       [ meet;
-        meet_array_contents ~meet_element_kind:element_kind;
-        meet_alloc_mode ]
-    ~left_inputs:[length1; contents1; alloc_mode1]
-    ~right_inputs:[length2; contents2; alloc_mode2]
+        meet_array_contents ~meet_element_kind;
+        meet_alloc_mode;
+        (fun env _element_kind1 _element_kind2 -> Ok (element_kind, env)) ]
+    ~left_inputs:[length1; contents1; alloc_mode1; element_kind1]
+    ~right_inputs:[length2; contents2; alloc_mode2; element_kind2]
 
 and meet_array_contents env (array_contents1 : TG.array_contents Or_unknown.t)
     (array_contents2 : TG.array_contents Or_unknown.t)
