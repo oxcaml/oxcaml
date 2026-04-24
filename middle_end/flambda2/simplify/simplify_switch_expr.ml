@@ -243,7 +243,8 @@ type lookup_table_fields =
 (* Recognise sufficiently-large Switch expressions where all of the arms provide
    a single argument to a unique destination. These expressions can be compiled
    using lookup tables, which dramatically reduces code size. *)
-let recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms =
+let recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
+    ~arms =
   let check_arm discr dest dest_and_args_rev_and_expected_discr =
     let dest' = AC.continuation dest in
     match dest_and_args_rev_and_expected_discr with
@@ -264,20 +265,13 @@ let recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms =
              arguments. Trap actions are forbidden. *)
           None
         | Some arg ->
-          Simple.pattern_match'
-            arg (* CR mshinwell: we could allow variables, if at toplevel *)
-            ~var:(fun _ ~coercion:_ ->
-              (* Aliases should have been followed by now. *) None)
-            ~symbol:(fun _sym ~coercion:_ ->
-              let expected_discr =
-                TI.add (TI.one machine_width) expected_discr
-              in
-              Some (Some dest', arg :: args_rev, expected_discr))
-            ~const:(fun _const ->
-              let expected_discr =
-                TI.add (TI.one machine_width) expected_discr
-              in
-              Some (Some dest', arg :: args_rev, expected_discr))))
+          if Simple.is_var arg
+          then (* CR mshinwell: we could allow variables, if at toplevel *)
+            (* Aliases should have been followed by now. *)
+            None
+          else
+            let expected_discr = TI.add (TI.one machine_width) expected_discr in
+            Some (Some dest', arg :: args_rev, expected_discr)))
   in
   match TI.Map.fold check_arm arms (Some (None, [], TI.zero machine_width)) with
   | None | Some (None, _, _) | Some (_, [], _) -> None
@@ -293,7 +287,9 @@ let recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms =
     let kind_of simple =
       Simple.pattern_match' simple
         ~var:(fun _ ~coercion:_ ->
-          (* Variables have already been ruled out above. *) assert false)
+          (* Variables have already been ruled out above. *)
+          Misc.fatal_errorf "Variable (%a) was not expected here: %a"
+            Simple.print simple Debuginfo.print_compact dbg)
         ~symbol:(fun _ ~coercion:_ -> K.value)
         ~const:RWC.kind
     in
@@ -318,7 +314,9 @@ let recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms =
             | None -> None
             | Some tagged_imms ->
               Simple.pattern_match' simple
-                ~var:(fun _ ~coercion:_ -> assert false)
+                ~var:(fun _ ~coercion:_ ->
+                  Misc.fatal_errorf "Variable (%a) was not expected here: %a"
+                    Simple.print simple Debuginfo.print_compact dbg)
                 ~symbol:(fun _ ~coercion:_ -> None)
                 ~const:(fun cst ->
                   Option.map
@@ -356,11 +354,14 @@ let recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms =
         | Naked_vec512 -> single_kind Naked_vec512s Naked_vec512s)
       | Region | Rec_info -> None)
 
-let recognize_switch_with_single_arg_to_same_destination machine_width ~arms =
+let recognize_switch_with_single_arg_to_same_destination dbg machine_width ~arms
+    =
   (* Switch must be large enough. *)
   if TI.Map.cardinal arms < 3
   then None
-  else recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms
+  else
+    recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
+      ~arms
 
 (* Tiny DSL to preserve sanity while rebuilding expressions. *)
 
@@ -646,7 +647,8 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
       |> Continuation.Set.of_list |> Continuation.Set.get_singleton
   in
   let switch_is_single_arg_to_same_destination =
-    recognize_switch_with_single_arg_to_same_destination machine_width ~arms
+    recognize_switch_with_single_arg_to_same_destination condition_dbg
+      machine_width ~arms
   in
   let body, uacc =
     if TI.Map.cardinal arms < 1
