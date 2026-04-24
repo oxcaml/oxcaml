@@ -2089,10 +2089,6 @@ type nonrec 'a simple_error = 'a simple_error
 let print_longident =
   ref (fun _ _ -> assert false : Fmt.formatter -> Longident.t -> unit)
 
-type loosening = Mode_intf.loosening =
-  | Loosened
-  | Not_loosened
-
 module Report = struct
   open Hint
 
