@@ -261,8 +261,7 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
                 let ty =
                   TE.find
                     (DE.typing_env denv_inside_functions)
-                    (Name.var var)
-                    None
+                    (Name.var var) None
                 in
                 match T.kind ty with
                 | Rec_info -> Variable.Set.add var free_depth_variables
@@ -294,9 +293,7 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
           (T.this_rec_info Rec_info_expr.do_not_inline))
       free_depth_variables denv_inside_functions
   in
-  let value_slot_types_inside_functions_all_sets =
-    value_slot_types_all_sets
-  in
+  let value_slot_types_inside_functions_all_sets = value_slot_types_all_sets in
   let old_to_new_code_ids_all_sets =
     compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures
   in

@@ -1151,42 +1151,41 @@ let prove_alloc_mode_of_boxed_number env t =
 
 let never_holds_locally_allocated_values env var : _ proof_of_property =
   let ty = TE.find env (Name.var var) None in
-    match expand_head env ty with
-    | Value (Ok { non_null = Unknown | Bottom; _ }) | Value (Unknown | Bottom)
-      ->
-      Unknown
-    | Value (Ok { non_null = Ok value_head; _ }) -> (
-      match value_head with
-      | Variant { blocks; _ } -> (
-        match blocks with
-        | Unknown -> Unknown
-        | Known blocks -> (
-          if TG.Row_like_for_blocks.is_bottom blocks
-          then Proved ()
-          else
-            match blocks.alloc_mode with
-            | Heap -> Proved ()
-            | Local | Heap_or_local -> Unknown))
-      | Boxed_float32 (_, alloc_mode)
-      | Boxed_float (_, alloc_mode)
-      | Boxed_int32 (_, alloc_mode)
-      | Boxed_int64 (_, alloc_mode)
-      | Boxed_nativeint (_, alloc_mode)
-      | Boxed_vec128 (_, alloc_mode)
-      | Boxed_vec256 (_, alloc_mode)
-      | Boxed_vec512 (_, alloc_mode)
-      | Mutable_block { alloc_mode }
-      | Closures { alloc_mode; _ }
-      | Array { alloc_mode; _ } -> (
-        match alloc_mode with
-        | Heap -> Proved ()
-        | Local | Heap_or_local -> Unknown)
-      | String _ -> Proved ())
-    | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
-    | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-    | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _
-    | Region _ ->
-      Proved ()
+  match expand_head env ty with
+  | Value (Ok { non_null = Unknown | Bottom; _ }) | Value (Unknown | Bottom) ->
+    Unknown
+  | Value (Ok { non_null = Ok value_head; _ }) -> (
+    match value_head with
+    | Variant { blocks; _ } -> (
+      match blocks with
+      | Unknown -> Unknown
+      | Known blocks -> (
+        if TG.Row_like_for_blocks.is_bottom blocks
+        then Proved ()
+        else
+          match blocks.alloc_mode with
+          | Heap -> Proved ()
+          | Local | Heap_or_local -> Unknown))
+    | Boxed_float32 (_, alloc_mode)
+    | Boxed_float (_, alloc_mode)
+    | Boxed_int32 (_, alloc_mode)
+    | Boxed_int64 (_, alloc_mode)
+    | Boxed_nativeint (_, alloc_mode)
+    | Boxed_vec128 (_, alloc_mode)
+    | Boxed_vec256 (_, alloc_mode)
+    | Boxed_vec512 (_, alloc_mode)
+    | Mutable_block { alloc_mode }
+    | Closures { alloc_mode; _ }
+    | Array { alloc_mode; _ } -> (
+      match alloc_mode with
+      | Heap -> Proved ()
+      | Local | Heap_or_local -> Unknown)
+    | String _ -> Proved ())
+  | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
+  | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _ | Region _
+    ->
+    Proved ()
 
 let prove_physical_equality env t1 t2 =
   let incompatible_naked_numbers t1 t2 =

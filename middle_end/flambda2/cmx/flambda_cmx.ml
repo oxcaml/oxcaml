@@ -246,8 +246,7 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
       TE.Serializable.create typing_env ~reachable_names
     in
     let free_names_of_name name =
-      Some (T.free_names
-        (TE.Pre_serializable.find typing_env name))
+      Some (T.free_names (TE.Pre_serializable.find typing_env name))
     in
     prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
       ~used_value_slots ~canonicalise ~exported_offsets all_code

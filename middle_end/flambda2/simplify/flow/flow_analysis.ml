@@ -202,7 +202,8 @@ let added_useful_alias_in_loop typing_env (acc : T.Acc.t)
                  false)
                ~symbol:(fun sym ~coercion:_ ->
                  let ty =
-                   Typing_env.find typing_env (Name.symbol sym) (Some Flambda_kind.value)
+                   Typing_env.find typing_env (Name.symbol sym)
+                     (Some Flambda_kind.value)
                  in
                  not (Flambda2_types.is_unknown typing_env ty)))
            continuation_param_aliases.lets_to_introduce)
