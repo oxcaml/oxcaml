@@ -190,7 +190,7 @@ let foo (b @ dynamic) @ static =
     match[@warning "-8"] b with
     | [| |] -> "hello"
 [%%expect{|
-val foo : ('a : value maybe_null). 'a array -> string = <fun>
+val foo : ('a : value_maybe_null). 'a array -> string = <fun>
 |}]
 
 (* Testing exceptions *)

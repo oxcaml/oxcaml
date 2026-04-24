@@ -325,14 +325,14 @@ Error: The layout of type "t2" is value non_float
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]
-type t3 : immediate non_float with [ `A of string] t1 = C of string  (* should be accepted *)
+type t3 : value non_float mod everything with [ `A of string] t1 = C of string  (* should be accepted *)
 (* CR layouts v2.8: This should be accepted, but still fails in principal mode.
    ikinds regression vs non-ikinds.
    Internal ticket 6481. *)
 [%%expect{|
-Line 1, characters 0-67:
-1 | type t3 : immediate non_float with [ `A of string] t1 = C of string  (* should be accepted *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-78:
+1 | type t3 : value non_float mod everything with [ `A of string] t1 = C of string  (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t3" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t3" must be a subkind of immutable_data
@@ -354,14 +354,14 @@ Error: The layout of type "t2" is value non_float
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]
-type t3 : immediate non_float with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
+type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
 (* CR layouts v2.8: This should be accepted, but still fails in principal mode.
    ikinds regression vs non-ikinds.
    Internal ticket 6481. *)
 [%%expect{|
-Line 1, characters 0-85:
-1 | type t3 : immediate non_float with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-96:
+1 | type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t3" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t3" must be a subkind of immutable_data
@@ -393,7 +393,7 @@ Error: The layout of type "t2" is value non_float
 module M2 : S with type t = [ `A of string ] = struct
   type t = [ `A of string ]
 end
-type t3 : immediate non_float with M2.t = C of string (* should be accepted *)
+type t3 : value non_float mod everything with M2.t = C of string (* should be accepted *)
 [%%expect{|
 module M2 : sig type t = [ `A of string ] end
 type t3 = C of string
@@ -499,7 +499,7 @@ end
 module M2 : S2 with type t = [ `A of string | `B of int ] = struct
   type t = [ `A of string | `B of int ]
 end
-type t3 : immediate non_float with M2.t = C of string (* should be accepted *)
+type t3 : value non_float mod everything with M2.t = C of string (* should be accepted *)
 [%%expect{|
 module type S2 = sig type t = private [< `A of string | `B of int ] end
 module M2 : sig type t = [ `A of string | `B of int ] end

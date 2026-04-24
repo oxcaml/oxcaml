@@ -922,7 +922,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : ('a : value maybe_null). 'a iarray -> 'a iarray = <fun>
+val f : ('a : value_maybe_null). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)

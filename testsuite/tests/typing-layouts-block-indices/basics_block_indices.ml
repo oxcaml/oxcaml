@@ -1002,7 +1002,7 @@ type ('a, 'b : any) an_idx = ('a, 'b) idx_imm
 type ('a : any separable) an_array = 'a iarray
 external ok : ('a : any separable). int -> ('a an_array, 'a) an_idx
   = "%unsafe_array_idx" [@@layout_poly]
-val use_ok : ('a : value maybe_null). unit -> ('a an_array, 'a) an_idx =
+val use_ok : ('a : value_maybe_null). unit -> ('a an_array, 'a) an_idx =
   <fun>
 |}]
 
