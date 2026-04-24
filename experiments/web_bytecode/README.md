@@ -19,6 +19,8 @@ The current working path is JS-first:
   the `js_of_ocaml` binary installed in the official release switch
 - `app.js` and `index.html` are a static host that load the translated bundle,
   a staged compressed browser filesystem, and the small runtime shim layer
+- `backend.js` proxies compiler calls to `backend_worker.js`, keeping automatic
+  runs off the editor's main thread
 
 No local API server is required for the working browser path.
 
@@ -102,6 +104,32 @@ URL, the original tag contents, and the tag's duplicate index when a page has
 multiple identical examples. Each editor includes a reset button that restores
 the original tag contents and clears that stored edit.
 
+### Rendered HTML Output
+
+Program output is escaped by default. To intentionally render HTML or SVG in the
+browser output panel, print a block delimited by these marker lines:
+
+```ocaml
+let print_html html =
+  print_endline "%%OXCAML_HTML_BEGIN%%";
+  print_endline html;
+  print_endline "%%OXCAML_HTML_END%%"
+```
+
+The playground renders the delimited HTML inside a sandboxed iframe. Normal
+stdout before and after the block remains plain escaped transcript text. The
+iframe deliberately omits `allow-scripts`, so the feature is suitable for
+structured HTML and SVG visualizations, not for running arbitrary page scripts.
+
+The sample picker also includes **Output Rendering / Rendered value
+representation graph**. That sample defines `Repr_html.inspect`, a pure OCaml
+helper that walks an `Obj` graph, assigns `@n` node ids, and renders a
+structured HTML view through the marker protocol above. Repeated edges point to
+the same node when the runtime exposes stable object identity. Use this as an
+interactive browser visualization helper for ordinary values; use a native
+compiler run when teaching exact native memory layout, cyclic graphs, or mixed
+blocks with unboxed fields.
+
 If saved code leaves a page unrecoverable, add `clear` to the URL. The editor
 clears saved OxCaml snippets for that page before mounting and then reloads the
 original tag contents:
@@ -120,6 +148,8 @@ Host these files together in one static directory:
 - `oxcaml-embed.js`
 - `oxcaml-embed-module.js`
 - `backend.js`
+- `backend_direct.js`
+- `backend_worker.js`
 - `runtime_shims.js`
 - `build/web_bytecode_js.bc.js`
 - `build/browser_fs_manifest.json`

@@ -17,6 +17,40 @@ let append_output text =
   | None -> ()
   | Some buffer -> Buffer.add_string buffer (string_of_js_string text)
 
+let ends_with ~suffix text =
+  let text_length = String.length text in
+  let suffix_length = String.length suffix in
+  text_length >= suffix_length
+  && String.sub text (text_length - suffix_length) suffix_length = suffix
+
+let normalize_captured_filenames ~filename text =
+  let basename = Filename.basename filename in
+  let marker = "_" ^ basename in
+  let buffer = Buffer.create (String.length text) in
+  let rec loop start =
+    match String.index_from_opt text start '"' with
+    | None ->
+        Buffer.add_substring buffer text start (String.length text - start)
+    | Some quote_start -> (
+        Buffer.add_substring buffer text start (quote_start - start);
+        match String.index_from_opt text (quote_start + 1) '"' with
+        | None ->
+            Buffer.add_substring buffer text quote_start
+              (String.length text - quote_start)
+        | Some quote_end ->
+            let quoted =
+              String.sub text (quote_start + 1) (quote_end - quote_start - 1)
+            in
+            Buffer.add_char buffer '"';
+            if ends_with ~suffix:marker quoted
+            then Buffer.add_string buffer filename
+            else Buffer.add_string buffer quoted;
+            Buffer.add_char buffer '"';
+            loop (quote_end + 1))
+  in
+  loop 0;
+  Buffer.contents buffer
+
 let () =
   Printexc.record_backtrace true;
   set_channel_output stdout (wrap_callback append_output);
@@ -50,33 +84,49 @@ let missing_cmi_result filename =
 
 let check_string filename source =
   try
-    ok_result
-      (Browser_switch_check.check_string
-         ~browser:true
-         ~filename:(string_of_js_string filename)
-         ~source:(string_of_js_string source))
+    let filename = string_of_js_string filename in
+    let output, diagnostics =
+      with_output_capture (fun () ->
+          Browser_switch_check.check_string
+            ~browser:true
+            ~filename
+            ~source:(string_of_js_string source))
+    in
+    let output = normalize_captured_filenames ~filename output in
+    if String.equal diagnostics ""
+    then ok_result output
+    else ok_result (output ^ diagnostics)
   with
   | Browser_switch_common.Missing_cmi filename -> missing_cmi_result filename
 
 let interface_string filename source =
   try
-    ok_result
-      (Browser_switch_interface.interface_string
-         ~browser:true
-         ~filename:(string_of_js_string filename)
-         ~source:(string_of_js_string source))
+    let filename = string_of_js_string filename in
+    let output, diagnostics =
+      with_output_capture (fun () ->
+          Browser_switch_interface.interface_string
+            ~browser:true
+            ~filename
+            ~source:(string_of_js_string source))
+    in
+    let output = normalize_captured_filenames ~filename output in
+    if String.equal diagnostics ""
+    then ok_result output
+    else ok_result (output ^ diagnostics)
   with
   | Browser_switch_common.Missing_cmi filename -> missing_cmi_result filename
 
 let run_string filename source =
   try
+    let filename = string_of_js_string filename in
     let output, diagnostics =
       with_output_capture (fun () ->
           Browser_switch_run.run_string
             ~browser:true
-            ~filename:(string_of_js_string filename)
+            ~filename
             ~source:(string_of_js_string source))
     in
+    let output = normalize_captured_filenames ~filename output in
     if String.equal diagnostics ""
     then ok_result output
     else ok_result (output ^ diagnostics)
@@ -85,13 +135,15 @@ let run_string filename source =
 
 let utop_string filename source =
   try
+    let filename = string_of_js_string filename in
     let output, diagnostics =
       with_output_capture (fun () ->
           Browser_switch_run.utop_string
             ~browser:true
-            ~filename:(string_of_js_string filename)
+            ~filename
             ~source:(string_of_js_string source))
     in
+    let output = normalize_captured_filenames ~filename output in
     if String.equal diagnostics ""
     then ok_result output
     else ok_result (output ^ diagnostics)

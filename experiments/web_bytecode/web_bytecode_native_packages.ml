@@ -1,4 +1,4 @@
-let package_roots = [ "stdlib_stable"; "base"; "core"; "parallel" ]
+let package_roots = [ "stdlib_stable"; "base"; "core"; "parallel"; "threads" ]
 
 let uniq xs =
   let rec loop seen = function

@@ -1,5 +1,5 @@
 (function () {
-  const assetVersion = "20260422-storage-clear";
+  const assetVersion = "20260424-multicore-shim";
   const script = document.currentScript;
   const moduleUrl = script?.dataset.moduleSrc
     ? new URL(script.dataset.moduleSrc, script.src || document.baseURI).href

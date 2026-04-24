@@ -5,7 +5,7 @@ import {
   ready,
   runString,
   utopString,
-} from "./backend.js?v=20260421-input-guard";
+} from "./backend.js?v=20260424-multicore-shim";
 import {
   EditorState,
   RangeSetBuilder,
@@ -33,13 +33,16 @@ import {
   indentWithTab,
 } from "https://esm.sh/@codemirror/commands@6.8.1?deps=@codemirror/state@6.5.2,@codemirror/view@6.38.6,@codemirror/language@6.11.3";
 
-const autoRunDelayMs = 360;
+const autoRunDelayMs = 90;
 const maxCheckedSourceLength = 100000;
 const maxCheckedNumericLiteralLength = 80;
 const maxBrowserDecimalIntLiteral = "2147483648";
+const htmlOutputBeginMarker = "%%OXCAML_HTML_BEGIN%%";
+const htmlOutputEndMarker = "%%OXCAML_HTML_END%%";
 const storagePrefix = "oxcaml-editor:v1";
 const clearStorageParam = "clear";
 const mountedEditors = new Set();
+let editorRunQueue = Promise.resolve();
 const setDiagnosticsEffect = StateEffect.define();
 const setSyntaxDecorationsEffect = StateEffect.define();
 
@@ -551,6 +554,7 @@ function buildSyntaxDecorations(source) {
     }
   }
   ranges.push(...collectSupplementalSyntaxRanges(source));
+  ranges.sort((left, right) => left.from - right.from || left.to - right.to);
   const builder = new RangeSetBuilder();
   for (const { from, to, className } of ranges) {
     builder.add(from, to, Decoration.mark({ class: className }));
@@ -649,6 +653,50 @@ function streamLineHtml(line, cls, clickableClass, attrs, { utopMode = false } =
     attrs,
     `<span class="utop-stdout">${escapeHtml(line || " ")}</span>`,
   );
+}
+
+function htmlOutputFrameHtml(htmlSource) {
+  return (
+    '<div class="html-output">' +
+    `<iframe class="html-output__frame" sandbox srcdoc="${escapeHtml(htmlSource)}"></iframe>` +
+    "</div>"
+  );
+}
+
+function parsedTranscriptParts(text) {
+  const lines = text.replace(/\n$/, "").split("\n");
+  const parts = [];
+  let textLines = [];
+  let htmlLines = null;
+
+  const flushText = () => {
+    if (textLines.length > 0) {
+      parts.push({ kind: "text", lines: textLines });
+      textLines = [];
+    }
+  };
+
+  for (const line of lines) {
+    if (htmlLines !== null) {
+      if (line === htmlOutputEndMarker) {
+        parts.push({ kind: "html", html: htmlLines.join("\n") });
+        htmlLines = null;
+      } else {
+        htmlLines.push(line);
+      }
+    } else if (line === htmlOutputBeginMarker) {
+      flushText();
+      htmlLines = [];
+    } else {
+      textLines.push(line);
+    }
+  }
+
+  if (htmlLines !== null) {
+    textLines.push(htmlOutputBeginMarker, ...htmlLines);
+  }
+  flushText();
+  return parts;
 }
 
 function sourceText(editor) {
@@ -975,39 +1023,51 @@ function buildTranscript(editor, text, { emptyPlaceholder = null, forceDiagnosti
     };
   }
 
-  const lines = normalized.replace(/\n$/, "").split("\n");
+  const parts = parsedTranscriptParts(normalized);
   const markerByLine = buildDiagnosticLineMarkerMap(editor.markers);
   let hasWarning = false;
   let hasError = false;
   let hasException = false;
   let hasCompilerError = false;
   let inDiagnosticBlock = forceDiagnostics;
-  const body = lines
-    .map((line, lineIndex) => {
-      const info = classifyTranscriptLine(line, inDiagnosticBlock, forceDiagnostics);
-      inDiagnosticBlock = info.nextDiagnosticBlock;
-      hasWarning ||= info.hasWarning;
-      hasError ||= info.hasError;
-      hasException ||= info.hasException;
-      hasCompilerError ||= info.hasCompilerError;
-      const markerIndex = markerByLine.get(lineIndex);
-      const attrs =
-        markerIndex === undefined
-          ? ""
-          : ` data-marker-index="${markerIndex}" tabindex="0" role="button"`;
-      const clickableClass = markerIndex === undefined ? "" : " clickable";
-      let lineHtml = escapeHtml(line || " ");
-      if (info.cls === "code") {
-        const match = /^(\d+\s+\|\s?)(.*)$/.exec(line);
-        if (match) {
-          lineHtml =
-            `<span class="diagnostic-code-prefix">${escapeHtml(match[1])}</span>` +
-            highlightedSyntaxHtml(match[2]);
-        }
-      } else if (info.cls === "stream") {
-        return streamLineHtml(line, info.cls, clickableClass, attrs, { utopMode });
+  let globalLineIndex = 0;
+  const body = parts
+    .map((part) => {
+      if (part.kind === "html") {
+        globalLineIndex += part.html === "" ? 2 : part.html.split("\n").length + 2;
+        return htmlOutputFrameHtml(part.html);
       }
-      return transcriptLineHtml(info.cls, clickableClass, attrs, lineHtml);
+      const preBody = part.lines
+        .map((line) => {
+          const lineIndex = globalLineIndex;
+          globalLineIndex += 1;
+          const info = classifyTranscriptLine(line, inDiagnosticBlock, forceDiagnostics);
+          inDiagnosticBlock = info.nextDiagnosticBlock;
+          hasWarning ||= info.hasWarning;
+          hasError ||= info.hasError;
+          hasException ||= info.hasException;
+          hasCompilerError ||= info.hasCompilerError;
+          const markerIndex = markerByLine.get(lineIndex);
+          const attrs =
+            markerIndex === undefined
+              ? ""
+              : ` data-marker-index="${markerIndex}" tabindex="0" role="button"`;
+          const clickableClass = markerIndex === undefined ? "" : " clickable";
+          let lineHtml = escapeHtml(line || " ");
+          if (info.cls === "code") {
+            const match = /^(\d+\s+\|\s?)(.*)$/.exec(line);
+            if (match) {
+              lineHtml =
+                `<span class="diagnostic-code-prefix">${escapeHtml(match[1])}</span>` +
+                highlightedSyntaxHtml(match[2]);
+            }
+          } else if (info.cls === "stream") {
+            return streamLineHtml(line, info.cls, clickableClass, attrs, { utopMode });
+          }
+          return transcriptLineHtml(info.cls, clickableClass, attrs, lineHtml);
+        })
+        .join("");
+      return preBody === "" ? "" : `<pre class="transcript">${preBody}</pre>`;
     })
     .join("");
 
@@ -1017,7 +1077,7 @@ function buildTranscript(editor, text, { emptyPlaceholder = null, forceDiagnosti
     hasException,
     hasCompilerError,
     tone: hasError ? "error" : hasWarning ? "warning" : "output",
-    html: `<pre class="transcript">${body}</pre>`,
+    html: body,
   };
 }
 
@@ -1034,9 +1094,15 @@ function buildInterfaceHtml(text) {
 
 function modeForElement(element, options = {}) {
   if (options.mode !== undefined) {
-    return options.mode === "utop" ? "utop" : "run";
+    return options.mode === "utop" || options.mode === "check" ? options.mode : "run";
   }
-  return element.hasAttribute("utop") ? "utop" : "run";
+  if (element.hasAttribute("utop")) {
+    return "utop";
+  }
+  if (element.hasAttribute("check")) {
+    return "check";
+  }
+  return "run";
 }
 
 function injectStyles() {
@@ -1047,18 +1113,47 @@ function injectStyles() {
   style.id = "oxcaml-embed-styles";
   style.textContent = `
     .oxcaml-embed {
+      color-scheme: light dark;
       --oxcaml-bg: #fffdf9;
       --oxcaml-ink: #1c2530;
       --oxcaml-muted: #687586;
       --oxcaml-border: rgba(21, 32, 46, 0.16);
-      --oxcaml-editor: #12161d;
-      --oxcaml-editor-ink: #edf4ff;
+      --oxcaml-editor: #fbfcfd;
+      --oxcaml-editor-ink: #1d2733;
+      --oxcaml-editor-gutter: #eef2f6;
+      --oxcaml-editor-gutter-ink: #687586;
+      --oxcaml-editor-gutter-border: rgba(21, 32, 46, 0.1);
+      --oxcaml-editor-active: rgba(21, 32, 46, 0.055);
+      --oxcaml-editor-selection: rgba(15, 123, 95, 0.18);
+      --oxcaml-editor-cursor: #0f7b5f;
       --oxcaml-output-bg: #f1f5f7;
       --oxcaml-output-border: rgba(21, 32, 46, 0.12);
       --oxcaml-accent: #bf4f2d;
       --oxcaml-ok: #0f7b5f;
       --oxcaml-warn: #b36b00;
       --oxcaml-error: #b23b2c;
+      --oxcaml-tooltip-bg: #fffdf9;
+      --oxcaml-tooltip-ink: #1d2733;
+      --oxcaml-stream: #243142;
+      --oxcaml-code: #2e4053;
+      --oxcaml-detail: #526274;
+      --oxcaml-prefix: #718095;
+      --oxcaml-interface-bg: rgba(224, 245, 238, 0.62);
+      --oxcaml-interface-ink: #173829;
+      --syntax-keyword: #98521a;
+      --syntax-module: #0d638c;
+      --syntax-string: #276a3f;
+      --syntax-comment: #6d7988;
+      --syntax-number: #846000;
+      --syntax-operator: #4f5c6b;
+      --syntax-function: #0d638c;
+      --syntax-parameter: #805514;
+      --syntax-type: #0d638c;
+      --syntax-constructor: #8a5a00;
+      --syntax-annotation: #8c5f16;
+      --syntax-package: #007260;
+      --syntax-package-open: #475fa5;
+      --syntax-label: #8b3aa8;
       border: 1px solid var(--oxcaml-border);
       border-radius: 8px;
       background: var(--oxcaml-bg);
@@ -1066,6 +1161,51 @@ function injectStyles() {
       font-family: Avenir Next, Segoe UI, system-ui, sans-serif;
       margin: 1rem 0;
       overflow: hidden;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .oxcaml-embed {
+        --oxcaml-bg: #17202a;
+        --oxcaml-ink: #eef4fb;
+        --oxcaml-muted: #9aa7b8;
+        --oxcaml-border: rgba(215, 226, 240, 0.16);
+        --oxcaml-editor: #10151d;
+        --oxcaml-editor-ink: #ebf3ff;
+        --oxcaml-editor-gutter: #0c1118;
+        --oxcaml-editor-gutter-ink: #78879c;
+        --oxcaml-editor-gutter-border: rgba(255, 255, 255, 0.08);
+        --oxcaml-editor-active: rgba(255, 255, 255, 0.06);
+        --oxcaml-editor-selection: rgba(110, 169, 255, 0.34);
+        --oxcaml-editor-cursor: #ffd28f;
+        --oxcaml-output-bg: #141c25;
+        --oxcaml-output-border: rgba(215, 226, 240, 0.14);
+        --oxcaml-accent: #ff9f7a;
+        --oxcaml-ok: #7fd6c2;
+        --oxcaml-warn: #f0bd64;
+        --oxcaml-error: #ff7f68;
+        --oxcaml-tooltip-bg: #202b37;
+        --oxcaml-tooltip-ink: #eef4fb;
+        --oxcaml-stream: #dce6f2;
+        --oxcaml-code: #d6e1ef;
+        --oxcaml-detail: #a9b7c8;
+        --oxcaml-prefix: #8e9caf;
+        --oxcaml-interface-bg: rgba(35, 70, 62, 0.46);
+        --oxcaml-interface-ink: #d8f5ea;
+        --syntax-keyword: #ffb57e;
+        --syntax-module: #8ed2ff;
+        --syntax-string: #b6f09c;
+        --syntax-comment: #78879c;
+        --syntax-number: #f7cd74;
+        --syntax-operator: #f0f5ff;
+        --syntax-function: #9fd8ff;
+        --syntax-parameter: #ffd7a1;
+        --syntax-type: #88c6ff;
+        --syntax-constructor: #f2c572;
+        --syntax-annotation: #ffd28f;
+        --syntax-package: #7fd6c2;
+        --syntax-package-open: #a8bcff;
+        --syntax-label: #f4b5ff;
+      }
     }
 
     .oxcaml-embed__status {
@@ -1151,9 +1291,9 @@ function injectStyles() {
     }
 
     .oxcaml-embed__editor-host .cm-gutters {
-      background: #0e131a;
-      border-right: 1px solid rgba(255, 255, 255, 0.08);
-      color: #6e7a8d;
+      background: var(--oxcaml-editor-gutter);
+      border-right: 1px solid var(--oxcaml-editor-gutter-border);
+      color: var(--oxcaml-editor-gutter-ink);
     }
 
     .oxcaml-embed__editor-host .cm-gutterElement {
@@ -1162,7 +1302,7 @@ function injectStyles() {
     }
 
     .oxcaml-embed__editor-host .cm-content {
-      caret-color: #ffffff;
+      caret-color: var(--oxcaml-editor-cursor);
       padding: 0.85rem 5.9rem 0.85rem 0.95rem;
     }
 
@@ -1172,33 +1312,33 @@ function injectStyles() {
 
     .oxcaml-embed__editor-host .cm-activeLine,
     .oxcaml-embed__editor-host .cm-activeLineGutter {
-      background: rgba(255, 255, 255, 0.06);
+      background: var(--oxcaml-editor-active);
     }
 
     .oxcaml-embed__editor-host .cm-selectionBackground {
-      background: rgba(110, 169, 255, 0.34) !important;
+      background: var(--oxcaml-editor-selection) !important;
     }
 
     .oxcaml-embed__editor-host .cm-cursor,
     .oxcaml-embed__editor-host .cm-dropCursor {
-      border-left-color: #ffffff;
+      border-left-color: var(--oxcaml-editor-cursor);
     }
 
-    .tok-keyword { color: #ffb57e; }
-    .tok-module { color: #8ed2ff; }
-    .tok-string { color: #b6f09c; }
-    .tok-comment { color: #6a768c; }
-    .tok-number { color: #f7cd74; }
-    .tok-operator { color: #f0f5ff; }
-    .tok-function { color: #9fd8ff; }
-    .tok-parameter { color: #ffd7a1; }
-    .tok-type { color: #88c6ff; }
-    .tok-constructor { color: #f2c572; }
-    .tok-oxcaml { color: #ff9f7a; font-weight: 700; }
-    .tok-annotation { color: #ffd28f; font-style: italic; }
-    .tok-package { color: #7fd6c2; font-weight: 700; }
-    .tok-package-open { color: #a8bcff; }
-    .tok-label { color: #f4b5ff; }
+    .tok-keyword { color: var(--syntax-keyword); }
+    .tok-module { color: var(--syntax-module); }
+    .tok-string { color: var(--syntax-string); }
+    .tok-comment { color: var(--syntax-comment); }
+    .tok-number { color: var(--syntax-number); }
+    .tok-operator { color: var(--syntax-operator); }
+    .tok-function { color: var(--syntax-function); }
+    .tok-parameter { color: var(--syntax-parameter); }
+    .tok-type { color: var(--syntax-type); }
+    .tok-constructor { color: var(--syntax-constructor); }
+    .tok-oxcaml { color: var(--oxcaml-accent); font-weight: 700; }
+    .tok-annotation { color: var(--syntax-annotation); font-style: italic; }
+    .tok-package { color: var(--syntax-package); font-weight: 700; }
+    .tok-package-open { color: var(--syntax-package-open); }
+    .tok-label { color: var(--syntax-label); }
 
     .cm-diagnostic-error {
       border-bottom: 2px solid rgba(255, 92, 92, 0.95);
@@ -1217,8 +1357,8 @@ function injectStyles() {
       max-width: min(520px, calc(100vw - 48px));
       border: 1px solid rgba(21, 32, 46, 0.18);
       border-radius: 8px;
-      background: #fffdf9;
-      color: #1d2733;
+      background: var(--oxcaml-tooltip-bg);
+      color: var(--oxcaml-tooltip-ink);
       box-shadow: 0 14px 32px rgba(16, 24, 35, 0.18);
       font: 0.82rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       padding: 0.65rem 0.75rem;
@@ -1271,11 +1411,27 @@ function injectStyles() {
     }
 
     .transcript-line.stream {
-      color: #243142;
+      color: var(--oxcaml-stream);
     }
 
     .transcript-line.placeholder {
       color: var(--oxcaml-muted);
+    }
+
+    .html-output {
+      margin: 0.75rem 0;
+      border: 1px solid var(--oxcaml-output-border);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .html-output__frame {
+      display: block;
+      width: 100%;
+      height: 320px;
+      border: 0;
+      background: #fff;
     }
 
     .transcript-line.file {
@@ -1295,7 +1451,7 @@ function injectStyles() {
     }
 
     .transcript-line.hint {
-      color: #725c9e;
+      color: var(--syntax-label);
     }
 
     .transcript-line.caret {
@@ -1304,31 +1460,31 @@ function injectStyles() {
     }
 
     .transcript-line.code {
-      color: #2e4053;
+      color: var(--oxcaml-code);
     }
 
     .diagnostic-code-prefix {
-      color: #718095;
+      color: var(--oxcaml-prefix);
     }
 
     .transcript-line.detail,
     .transcript-line.trace {
-      color: #526274;
+      color: var(--oxcaml-detail);
     }
 
     .utop-outcome__keyword {
-      color: #98521a;
+      color: var(--syntax-keyword);
       font-weight: 750;
     }
 
     .utop-outcome__name {
-      color: #0b638a;
+      color: var(--syntax-module);
       font-weight: 700;
     }
 
     .utop-outcome__punctuation,
     .utop-outcome__equals {
-      color: #718095;
+      color: var(--oxcaml-prefix);
     }
 
     .utop-outcome__type {
@@ -1336,11 +1492,11 @@ function injectStyles() {
     }
 
     .utop-outcome__value {
-      color: #263341;
+      color: var(--oxcaml-code);
     }
 
     .utop-stdout {
-      color: #334155;
+      color: var(--oxcaml-detail);
     }
 
     .interface-output {
@@ -1348,7 +1504,7 @@ function injectStyles() {
       border: 1px solid rgba(15, 123, 95, 0.18);
       border-left: 4px solid var(--oxcaml-ok);
       border-radius: 7px;
-      background: rgba(224, 245, 238, 0.62);
+      background: var(--oxcaml-interface-bg);
       padding: 0.68rem 0.8rem 0.75rem;
     }
 
@@ -1362,26 +1518,26 @@ function injectStyles() {
 
     .interface-output__body {
       margin: 0;
-      color: #173829;
+      color: var(--oxcaml-interface-ink);
       font: 0.84rem/1.48 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       white-space: pre-wrap;
     }
 
-    .oxcaml-embed__output .tok-keyword { color: #98521a; font-weight: 650; }
-    .oxcaml-embed__output .tok-module { color: #0d638c; }
-    .oxcaml-embed__output .tok-string { color: #276a3f; }
-    .oxcaml-embed__output .tok-comment { color: #6d7988; }
-    .oxcaml-embed__output .tok-number { color: #846000; }
-    .oxcaml-embed__output .tok-operator { color: #4f5c6b; }
-    .oxcaml-embed__output .tok-function { color: #0d638c; }
-    .oxcaml-embed__output .tok-parameter { color: #805514; }
-    .oxcaml-embed__output .tok-type { color: #0d638c; }
-    .oxcaml-embed__output .tok-constructor { color: #8a5a00; }
-    .oxcaml-embed__output .tok-oxcaml { color: #b8462b; font-weight: 700; }
-    .oxcaml-embed__output .tok-annotation { color: #8c5f16; font-style: italic; }
-    .oxcaml-embed__output .tok-package { color: #007260; font-weight: 700; }
-    .oxcaml-embed__output .tok-package-open { color: #475fa5; }
-    .oxcaml-embed__output .tok-label { color: #8b3aa8; }
+    .oxcaml-embed__output .tok-keyword { color: var(--syntax-keyword); font-weight: 650; }
+    .oxcaml-embed__output .tok-module { color: var(--syntax-module); }
+    .oxcaml-embed__output .tok-string { color: var(--syntax-string); }
+    .oxcaml-embed__output .tok-comment { color: var(--syntax-comment); }
+    .oxcaml-embed__output .tok-number { color: var(--syntax-number); }
+    .oxcaml-embed__output .tok-operator { color: var(--syntax-operator); }
+    .oxcaml-embed__output .tok-function { color: var(--syntax-function); }
+    .oxcaml-embed__output .tok-parameter { color: var(--syntax-parameter); }
+    .oxcaml-embed__output .tok-type { color: var(--syntax-type); }
+    .oxcaml-embed__output .tok-constructor { color: var(--syntax-constructor); }
+    .oxcaml-embed__output .tok-oxcaml { color: var(--oxcaml-accent); font-weight: 700; }
+    .oxcaml-embed__output .tok-annotation { color: var(--syntax-annotation); font-style: italic; }
+    .oxcaml-embed__output .tok-package { color: var(--syntax-package); font-weight: 700; }
+    .oxcaml-embed__output .tok-package-open { color: var(--syntax-package-open); }
+    .oxcaml-embed__output .tok-label { color: var(--syntax-label); }
   `;
   document.head.appendChild(style);
 }
@@ -1433,6 +1589,7 @@ function clearPendingWork(editor) {
     window.clearTimeout(editor.pendingTimer);
     editor.pendingTimer = null;
   }
+  editor.queuedRevision = null;
 }
 
 function resetEditor(editor) {
@@ -1453,11 +1610,26 @@ function scheduleRun(editor) {
   setStatus(editor, "running", "running");
   editor.pendingTimer = window.setTimeout(() => {
     editor.pendingTimer = null;
-    void runEditor(editor, revision);
+    void requestEditorRun(editor, revision);
   }, autoRunDelayMs);
 }
 
+async function requestEditorRun(editor, revision) {
+  if (editor.running) {
+    editor.queuedRevision = revision;
+    return;
+  }
+  const run = () => runEditor(editor, revision);
+  const queuedRun = editorRunQueue.then(run, run);
+  editorRunQueue = queuedRun.catch(() => {});
+  await queuedRun;
+}
+
 async function runEditor(editor, revision = editor.revision) {
+  if (revision !== editor.revision) {
+    return;
+  }
+  editor.running = true;
   try {
     setStatus(editor, "running", "running");
     const source = sourceText(editor);
@@ -1490,6 +1662,8 @@ async function runEditor(editor, revision = editor.revision) {
         return;
       }
       output = await utopString(editor.filename, source);
+    } else if (editor.mode === "check") {
+      output = await checkString(editor.filename, source);
     } else {
       output = await runString(editor.filename, source);
     }
@@ -1503,6 +1677,7 @@ async function runEditor(editor, revision = editor.revision) {
     });
     const showInterface =
       editor.mode !== "utop" &&
+      editor.mode !== "check" &&
       !transcriptPreview.hasException && !transcriptPreview.hasCompilerError;
     const interfaceOutput = showInterface
       ? await interfaceString(editor.filename, source)
@@ -1533,6 +1708,15 @@ async function runEditor(editor, revision = editor.revision) {
       forceDiagnostics: true,
     });
     setStatus(editor, "error", "offline");
+  } finally {
+    editor.running = false;
+    if (editor.queuedRevision !== null) {
+      const nextRevision = editor.queuedRevision;
+      editor.queuedRevision = null;
+      window.setTimeout(() => {
+        void requestEditorRun(editor, nextRevision);
+      }, 0);
+    }
   }
 }
 
@@ -1636,6 +1820,8 @@ export function mount(element, options = {}) {
     mode,
     originalSource,
     pendingTimer: null,
+    queuedRevision: null,
+    running: false,
     revision: 0,
     storageKey,
     suppressEditorChanges: false,

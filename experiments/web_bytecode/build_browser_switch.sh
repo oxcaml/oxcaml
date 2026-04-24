@@ -54,7 +54,7 @@ require_dir "$release_opam_root" "OPAM root"
 require_dir "$release_opam_root/$release_opam_switch" "OPAM switch"
 
 missing_packages=()
-for package_name in findlib js_of_ocaml js_of_ocaml-toplevel stdlib_stable base core parallel; do
+for package_name in findlib js_of_ocaml js_of_ocaml-toplevel stdlib_stable base core parallel threads; do
   require_package "$package_name"
 done
 
@@ -111,6 +111,9 @@ copy_cmis_from_dir "$install_lib_root"
 compilerlibs_dir="$(run_tool ocamlfind query compiler-libs 2>/dev/null || true)"
 if [ -n "$compilerlibs_dir" ] && [ -d "$compilerlibs_dir" ]; then
   copy_cmis_from_dir "$compilerlibs_dir"
+fi
+if [ -d "$js_of_ocaml_compiler_dir/runtime" ]; then
+  copy_cmis_from_dir "$js_of_ocaml_compiler_dir/runtime"
 fi
 
 run_tool ocamlfind ocamlc -g -package findlib -linkpkg \
