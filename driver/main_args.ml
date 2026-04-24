@@ -1255,8 +1255,6 @@ module type Compiler_options = sig
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit
   val _linkall : unit -> unit
-  val _requires_metaprogramming : unit -> unit
-  val _uses_metaprogramming : unit -> unit
   val _noautolink : unit -> unit
   val _o : string -> unit
   val _opaque :  unit -> unit
@@ -1366,6 +1364,9 @@ module type Optcommon_options = sig
   val _no_insn_sched : unit -> unit
   val _linscan : unit -> unit
   val _no_float_const_prop : unit -> unit
+
+  val _requires_metaprogramming : unit -> unit
+  val _uses_metaprogramming : unit -> unit
 
   val _clambda_checks : unit -> unit
   val _dflambda : unit -> unit
@@ -1530,8 +1531,6 @@ struct
     mk_keywords F._keywords;
     mk_labels F._labels;
     mk_linkall F._linkall;
-    mk_requires_metaprogramming F._requires_metaprogramming;
-    mk_uses_metaprogramming F._uses_metaprogramming;
     mk_llvm_backend F._llvm_backend;
     mk_make_runtime F._make_runtime;
     mk_make_runtime_2 F._make_runtime;
@@ -1991,6 +1990,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_inline_branch_factor F._inline_branch_factor;
     mk_keywords F._keywords;
     mk_labels F._labels;
+    mk_requires_metaprogramming F._requires_metaprogramming;
+    mk_uses_metaprogramming F._uses_metaprogramming;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
     mk_linscan F._linscan;
@@ -2147,8 +2148,6 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
-    mk_requires_metaprogramming F._requires_metaprogramming;
-    mk_uses_metaprogramming F._uses_metaprogramming;
     mk_modern F._labels;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
@@ -2567,6 +2566,8 @@ module Default = struct
     let _unbox_closures = set unbox_closures
     let _unbox_closures_factor f = unbox_closures_factor := f
     let _verbose = set verbose
+    let _requires_metaprogramming = set requires_metaprogramming
+    let _uses_metaprogramming = set uses_metaprogramming
   end
 
   module Compiler = struct
@@ -2615,8 +2616,6 @@ module Default = struct
     let _keep_docs = set keep_docs
     let _keep_locs = set keep_locs
     let _linkall = set link_everything
-    let _requires_metaprogramming = set requires_metaprogramming
-    let _uses_metaprogramming = set uses_metaprogramming
     let _llvm_backend = set llvm_backend
     let _match_context_rows n = match_context_rows := n
     let _no_keep_docs = clear keep_docs
