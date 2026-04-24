@@ -12553,7 +12553,7 @@ let report_error ~loc env =
         Style.inline_code "let poly_"
   | Let_poly_not_syntactic_value ->
       Location.errorf ~loc
-        "This expression is not allowed in a %a definition; \
+        "This expression is not allowed in a %a definition;@ \
          it must be a function, constructor, tuple, record, or constant."
         Style.inline_code "let poly_"
   | Layout_poly_inst_not_yet_supported ctx ->

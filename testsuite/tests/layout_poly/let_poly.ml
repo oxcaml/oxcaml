@@ -50,7 +50,8 @@ end
 Lines 5-6, characters 4-5:
 5 | ....let f x = x in
 6 |     f
-Error: This expression is not allowed in a "let poly_" definition; it must be a function, constructor, tuple, record, or constant.
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function, constructor, tuple, record, or constant.
 |}]
 
 module _ : sig
@@ -235,7 +236,8 @@ end
 Line 4, characters 19-49:
 4 |   let poly_ pair = let y = 42 in fun x -> #(x, y)
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression is not allowed in a "let poly_" definition; it must be a function, constructor, tuple, record, or constant.
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function, constructor, tuple, record, or constant.
 |}]
 
 (* constructor: passing when all args are syntactic values *)
@@ -252,7 +254,8 @@ let poly_ f = Some (let x = ref 0 in x)
 Line 1, characters 19-39:
 1 | let poly_ f = Some (let x = ref 0 in x)
                        ^^^^^^^^^^^^^^^^^^^^
-Error: This expression is not allowed in a "let poly_" definition; it must be a function, constructor, tuple, record, or constant.
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function, constructor, tuple, record, or constant.
 |}]
 
 (* variant: passing - no payload *)
@@ -281,7 +284,8 @@ let poly_ f = `A (let x = ref 0 in x)
 Line 1, characters 17-37:
 1 | let poly_ f = `A (let x = ref 0 in x)
                      ^^^^^^^^^^^^^^^^^^^^
-Error: This expression is not allowed in a "let poly_" definition; it must be a function, constructor, tuple, record, or constant.
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function, constructor, tuple, record, or constant.
 |}]
 
 (* tuple: passing when all components are syntactic values *)
@@ -298,7 +302,8 @@ let poly_ f = (let x = ref 0 in x, fun x -> x)
 Line 1, characters 14-46:
 1 | let poly_ f = (let x = ref 0 in x, fun x -> x)
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression is not allowed in a "let poly_" definition; it must be a function, constructor, tuple, record, or constant.
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function, constructor, tuple, record, or constant.
 |}]
 
 (* unboxed tuple: passing when all components are syntactic values *)
@@ -315,7 +320,8 @@ let poly_ f = #((let x = ref 0 in x), fun x -> x)
 Line 1, characters 16-36:
 1 | let poly_ f = #((let x = ref 0 in x), fun x -> x)
                     ^^^^^^^^^^^^^^^^^^^^
-Error: This expression is not allowed in a "let poly_" definition; it must be a function, constructor, tuple, record, or constant.
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function, constructor, tuple, record, or constant.
 |}]
 
 (* record: passing when all fields are syntactic values *)
@@ -338,7 +344,8 @@ let poly_ f = { a = (let x = ref 0 in !x); b = fun x -> x }
 Line 1, characters 20-41:
 1 | let poly_ f = { a = (let x = ref 0 in !x); b = fun x -> x }
                         ^^^^^^^^^^^^^^^^^^^^^
-Error: This expression is not allowed in a "let poly_" definition; it must be a function, constructor, tuple, record, or constant.
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function, constructor, tuple, record, or constant.
 |}]
 
 (* unboxed product record: passing when all fields are syntactic values *)
@@ -361,7 +368,8 @@ let poly_ f = #{ a = (let x = ref 0 in !x); b = 0 }
 Line 1, characters 21-42:
 1 | let poly_ f = #{ a = (let x = ref 0 in !x); b = 0 }
                          ^^^^^^^^^^^^^^^^^^^^^
-Error: This expression is not allowed in a "let poly_" definition; it must be a function, constructor, tuple, record, or constant.
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function, constructor, tuple, record, or constant.
 |}]
 
 (* RHS might constrain a layout and makes it not polymorphic *)
