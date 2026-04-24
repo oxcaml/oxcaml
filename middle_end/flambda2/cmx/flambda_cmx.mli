@@ -22,8 +22,6 @@ type loader
 val create_loader :
   get_module_info:(Compilation_unit.t -> Flambda_cmx_format.t option) -> loader
 
-val get_imported_names : loader -> unit -> Name.Set.t
-
 val get_imported_code : loader -> unit -> Exported_code.t
 
 val load_cmx_file_contents :
