@@ -337,7 +337,7 @@ let foo (r @ shared) =
     | [| x; y |] -> ()
     | _ -> ()
 [%%expect{|
-val foo : ('a : value maybe_null). 'a array @ shared -> unit = <fun>
+val foo : ('a : value_maybe_null). 'a array @ shared -> unit = <fun>
 |}]
 
 (* Closing over write gives nonportable *)

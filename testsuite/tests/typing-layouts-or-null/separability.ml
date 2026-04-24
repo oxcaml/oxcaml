@@ -517,7 +517,7 @@ Line 1, characters 13-18:
 1 | type fails = t_b64 or_null accepts_maybesep
                  ^^^^^
 Error: This type "t_b64" should be an instance of type
-         "('a : value maybe_separable)"
+         "('a : value_maybe_separable)"
        The layout of t_b64 is bits64
          because of the definition of t_b64 at line 1, characters 0-19.
        But the layout of t_b64 must be a value layout
@@ -528,7 +528,7 @@ type t_maybesep_val : value_or_null mod non_null
 type succeeds = t_maybesep_val or_null
 
 [%%expect{|
-type t_maybesep_val : value maybe_separable
+type t_maybesep_val : value_maybe_separable
 type succeeds = t_maybesep_val or_null
 |}]
 
@@ -691,7 +691,7 @@ type unbx = { unbx : t_maybesep_val; } [@@unboxed]
 type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
 
 [%%expect{|
-type ('a : value maybe_separable) unbx' = Unbx of 'a [@@unboxed]
+type ('a : value_maybe_separable) unbx' = Unbx of 'a [@@unboxed]
 |}]
 
 (* Separability and unboxed records. *)
@@ -959,7 +959,7 @@ module type S0 = sig
 end
 
 [%%expect{|
-module type S0 = sig type t : value maybe_null end
+module type S0 = sig type t : value_maybe_null end
 |}]
 
 module M5 : S0 = struct
@@ -995,7 +995,7 @@ Error: Signature mismatch:
        Type declarations do not match:
          type t = float or_null
        is not included in
-         type t : value maybe_null
+         type t : value_maybe_null
        The layout of the first is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of the first must be a sublayout of value maybe_null

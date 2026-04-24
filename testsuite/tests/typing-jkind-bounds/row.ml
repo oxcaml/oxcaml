@@ -310,37 +310,37 @@ type trec_rec_succeeds =
 (* Future tests for when we start adding row variables to with-bounds. *)
 
 type 'a t1 = [< `A of string | `B of int ] as 'a
-type 'a t2 : immediate non_float with 'a t1 = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
+type 'a t2 : value non_float mod everything with 'a t1 = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
 [%%expect{|
 type 'a t1 = 'a constraint 'a = [< `A of string | `B of int ]
-Line 2, characters 0-57:
-2 | type 'a t2 : immediate non_float with 'a t1 = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 0-68:
+2 | type 'a t2 : value non_float mod everything with 'a t1 = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
            immediate non_float with [< `A of string | `B of int ] t1
          because of the annotation on the declaration of the type t2.
 |}]
-type t3 : immediate non_float with [ `A of string] t1 = C of string  (* should be accepted *)
+type t3 : value non_float mod everything with [ `A of string] t1 = C of string  (* should be accepted *)
 [%%expect{|
 type t3 = C of string
 |}]
 
 type 'a t1 = [> `A of string | `B of int ] as 'a
-type 'a t2 : immediate non_float with 'a t1 = C of string  (* should be rejected *)
+type 'a t2 : value non_float mod everything with 'a t1 = C of string  (* should be rejected *)
 [%%expect{|
 type 'a t1 = 'a constraint 'a = [> `A of string | `B of int ]
-Line 2, characters 0-57:
-2 | type 'a t2 : immediate non_float with 'a t1 = C of string  (* should be rejected *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 0-68:
+2 | type 'a t2 : value non_float mod everything with 'a t1 = C of string  (* should be rejected *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
            immediate non_float with [> `A of string | `B of int ] t1
          because of the annotation on the declaration of the type t2.
 |}]
-type t3 : immediate non_float with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
+type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
 [%%expect{|
 type t3 = C of string
 |}]
@@ -351,13 +351,13 @@ end
 module M1 : S = struct
   type t = [ `A of string ]
 end
-type t2 : immediate non_float with M1.t = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
+type t2 : value non_float mod everything with M1.t = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
 [%%expect{|
 module type S = sig type t = private [< `A of string | `B of int ] end
 module M1 : S
-Line 7, characters 0-53:
-7 | type t2 : immediate non_float with M1.t = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 7, characters 0-64:
+7 | type t2 : value non_float mod everything with M1.t = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
@@ -368,7 +368,7 @@ Error: The kind of type "t2" is immutable_data
 module M2 : S with type t = [ `A of string ] = struct
   type t = [ `A of string ]
 end
-type t3 : immediate non_float with M2.t = C of string (* should be accepted *)
+type t3 : value non_float mod everything with M2.t = C of string (* should be accepted *)
 [%%expect{|
 module M2 : sig type t = [ `A of string ] end
 type t3 = C of string
@@ -379,13 +379,13 @@ type (_, _) eq = Refl : ('a, 'a) eq
 (* I'm not sure whether module substitution over a non-static private row type preserves the Tvariant structure; so I made this harder case, too *)
 let sneaky (x : (M1.t, [ `A of string ]) eq) = match x with
   | Refl -> let open struct
-    type t4 : immediate non_float with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
+    type t4 : value non_float mod everything with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
   end in ()
 [%%expect{|
 type (_, _) eq = Refl : ('a, 'a) eq
-Line 6, characters 4-57:
-6 |     type t4 : immediate non_float with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 6, characters 4-68:
+6 |     type t4 : value non_float mod everything with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t4" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t4" must be a subkind of
@@ -399,13 +399,13 @@ end
 module M1 : S = struct
   type t = [ `A of string | `B of int | `C of (int -> int) ref ]
 end
-type t2 : immediate non_float with M1.t = C of string  (* should be rejected *)
+type t2 : value non_float mod everything with M1.t = C of string  (* should be rejected *)
 [%%expect{|
 module type S = sig type t = private [> `A of string | `B of int ] end
 module M1 : S
-Line 7, characters 0-53:
-7 | type t2 : immediate non_float with M1.t = C of string  (* should be rejected *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 7, characters 0-64:
+7 | type t2 : value non_float mod everything with M1.t = C of string  (* should be rejected *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
@@ -470,7 +470,7 @@ end
 module M2 : S2 with type t = [ `A of string | `B of int ] = struct
   type t = [ `A of string | `B of int ]
 end
-type t3 : immediate non_float with M2.t = C of string (* should be accepted *)
+type t3 : value non_float mod everything with M2.t = C of string (* should be accepted *)
 [%%expect{|
 module type S2 = sig type t = private [< `A of string | `B of int ] end
 module M2 : sig type t = [ `A of string | `B of int ] end
@@ -479,12 +479,12 @@ type t3 = C of string
 
 let sneaky (x : (M1.t, [ `A of string | `B of int ]) eq) = match x with
   | Refl -> let open struct
-    type t4 : immediate non_float with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
+    type t4 : value non_float mod everything with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
   end in ()
 [%%expect{|
-Line 3, characters 4-57:
-3 |     type t4 : immediate non_float with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 3, characters 4-68:
+3 |     type t4 : value non_float mod everything with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t4" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t4" must be a subkind of

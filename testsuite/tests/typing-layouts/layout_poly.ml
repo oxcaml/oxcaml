@@ -659,7 +659,7 @@ let id' x = id x
 [%%expect{|
 external id : ('a : any separable). 'a t -> int = "%array_length"
   [@@layout_poly]
-val id' : ('a : value maybe_null). 'a t -> int = <fun>
+val id' : ('a : value_maybe_null). 'a t -> int = <fun>
 |}]
 
 external id : ('a : any mod separable). 'a t -> int = "%identity"
@@ -667,7 +667,7 @@ let id' x = id x
 
 [%%expect{|
 external id : ('a : any separable). 'a t -> int = "%identity"
-val id' : ('a : value maybe_null). 'a t -> int = <fun>
+val id' : ('a : value_maybe_null). 'a t -> int = <fun>
 |}]
 
 
@@ -776,7 +776,7 @@ Error:
        The kind of 'a -> 'b is value non_float mod aliased immutable
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of
-           value maybe_null mod portable contended
+           value_maybe_null mod portable contended
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).

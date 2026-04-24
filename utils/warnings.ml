@@ -1291,7 +1291,8 @@ let message = function
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
   | Redundant_kind_modifier abbrev ->
-      "This kind modifier is already implied by the kind \"" ^ abbrev ^ "\"."
+      "This kind modifier, or a stronger one, is\n\
+       already implied by the kind \"" ^ abbrev ^ "\"."
   | Ignored_kind_modifier (abbrev, modifiers) ->
       Printf.sprintf
       "The kind modifier(s) \"%s\" have no effect on the kind \"%s\"."
