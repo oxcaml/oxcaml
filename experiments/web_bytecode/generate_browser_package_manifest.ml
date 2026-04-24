@@ -1,4 +1,4 @@
-let package_roots = [ "stdlib_stable"; "base"; "core"; "parallel" ]
+let package_roots = [ "stdlib_stable"; "base"; "core"; "parallel"; "threads" ]
 
 let linked_packages =
   [ "compiler-libs"

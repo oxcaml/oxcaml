@@ -8,11 +8,17 @@
     <title>OxCaml Playground</title>
     <style>
       :root {
-        color-scheme: light;
+        color-scheme: light dark;
         --page: #f2eee7;
         --paper: #fffdf9;
-        --editor: #12161d;
-        --editor-ink: #ebf3ff;
+        --editor: #fbfcfd;
+        --editor-ink: #1d2733;
+        --editor-gutter: #eef2f6;
+        --editor-gutter-ink: #687586;
+        --editor-gutter-border: rgba(19, 31, 47, 0.1);
+        --editor-active: rgba(24, 33, 44, 0.055);
+        --editor-selection: rgba(15, 123, 95, 0.18);
+        --editor-cursor: #0f7b5f;
         --panel-ink: #18212c;
         --muted: #6d7988;
         --border: rgba(19, 31, 47, 0.12);
@@ -21,6 +27,89 @@
         --ok: #0f7b5f;
         --warn: #b14b2b;
         --shadow: 0 24px 60px rgba(26, 31, 42, 0.12);
+        --syntax-keyword: #98521a;
+        --syntax-module: #0d638c;
+        --syntax-string: #276a3f;
+        --syntax-comment: #6d7988;
+        --syntax-number: #846000;
+        --syntax-operator: #4f5c6b;
+        --syntax-function: #0d638c;
+        --syntax-parameter: #805514;
+        --syntax-type: #0d638c;
+        --syntax-constructor: #8a5a00;
+        --syntax-property: #7a4d9b;
+        --syntax-tag: #b8462b;
+        --syntax-annotation: #8c5f16;
+        --syntax-package: #007260;
+        --syntax-package-open: #475fa5;
+        --syntax-label: #8b3aa8;
+        --output-panel-bg: rgba(255, 255, 255, 0.84);
+        --output-bg: #fffdf9;
+        --output-stream: #18212c;
+        --output-code: #233040;
+        --output-detail: #4f5c6b;
+        --output-prefix: #7a8695;
+        --output-empty-a: rgba(250, 247, 241, 0.8);
+        --output-empty-b: rgba(245, 240, 232, 0.8);
+        --output-empty-stripe: rgba(24, 33, 44, 0.018);
+        --output-warning-bg: linear-gradient(180deg, rgba(215, 153, 71, 0.08), rgba(255, 255, 255, 0.9));
+        --output-error-bg: linear-gradient(180deg, rgba(193, 78, 42, 0.06), rgba(255, 255, 255, 0.9));
+        --output-success-bg: linear-gradient(180deg, rgba(15, 123, 95, 0.05), rgba(255, 255, 255, 0.9));
+        --interface-bg: rgba(224, 245, 238, 0.55);
+        --interface-ink: #173829;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --page: #111820;
+          --paper: #17202a;
+          --editor: #10151d;
+          --editor-ink: #ebf3ff;
+          --editor-gutter: #0c1118;
+          --editor-gutter-ink: #78879c;
+          --editor-gutter-border: rgba(255, 255, 255, 0.08);
+          --editor-active: rgba(255, 255, 255, 0.06);
+          --editor-selection: rgba(110, 169, 255, 0.34);
+          --editor-cursor: #ffd28f;
+          --panel-ink: #eef4fb;
+          --muted: #9aa7b8;
+          --border: rgba(215, 226, 240, 0.16);
+          --accent: #ff9f7a;
+          --accent-strong: #ffb57e;
+          --ok: #7fd6c2;
+          --warn: #f0bd64;
+          --shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+          --syntax-keyword: #ffb57e;
+          --syntax-module: #8ed2ff;
+          --syntax-string: #b6f09c;
+          --syntax-comment: #78879c;
+          --syntax-number: #f7cd74;
+          --syntax-operator: #f0f5ff;
+          --syntax-function: #9fd8ff;
+          --syntax-parameter: #ffd7a1;
+          --syntax-type: #88c6ff;
+          --syntax-constructor: #f2c572;
+          --syntax-property: #d7c1ff;
+          --syntax-tag: #ff9f7a;
+          --syntax-annotation: #ffd28f;
+          --syntax-package: #7fd6c2;
+          --syntax-package-open: #a8bcff;
+          --syntax-label: #f4b5ff;
+          --output-panel-bg: rgba(23, 32, 42, 0.9);
+          --output-bg: #141c25;
+          --output-stream: #dce6f2;
+          --output-code: #d6e1ef;
+          --output-detail: #a9b7c8;
+          --output-prefix: #8e9caf;
+          --output-empty-a: rgba(21, 29, 38, 0.88);
+          --output-empty-b: rgba(18, 25, 34, 0.88);
+          --output-empty-stripe: rgba(235, 243, 255, 0.035);
+          --output-warning-bg: linear-gradient(180deg, rgba(240, 189, 100, 0.12), rgba(23, 32, 42, 0.92));
+          --output-error-bg: linear-gradient(180deg, rgba(255, 127, 104, 0.12), rgba(23, 32, 42, 0.92));
+          --output-success-bg: linear-gradient(180deg, rgba(127, 214, 194, 0.1), rgba(23, 32, 42, 0.92));
+          --interface-bg: rgba(35, 70, 62, 0.46);
+          --interface-ink: #d8f5ea;
+        }
       }
 
       * {
@@ -30,10 +119,7 @@
       body {
         margin: 0;
         min-height: 100vh;
-        background:
-          radial-gradient(circle at top left, #fff8ed 0%, transparent 38%),
-          radial-gradient(circle at top right, #efe7da 0%, transparent 30%),
-          linear-gradient(180deg, #faf7f1 0%, var(--page) 100%);
+        background: var(--page);
         color: var(--panel-ink);
         font-family: "Avenir Next", "Segoe UI", sans-serif;
       }
@@ -178,7 +264,7 @@
       .surface {
         border: 1px solid var(--border);
         border-radius: 24px;
-        background: rgba(255, 255, 255, 0.84);
+        background: var(--output-panel-bg);
         box-shadow: var(--shadow);
         overflow: hidden;
         backdrop-filter: blur(10px);
@@ -190,7 +276,7 @@
         justify-content: space-between;
         min-height: 56px;
         padding: 10px 18px;
-        background: rgba(255, 255, 255, 0.84);
+        background: var(--output-panel-bg);
         border-bottom: 1px solid rgba(19, 31, 47, 0.08);
       }
 
@@ -220,9 +306,7 @@
       .editor-frame {
         position: relative;
         min-height: 68vh;
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
-          var(--editor);
+        background: var(--editor);
       }
 
       .editor-host {
@@ -241,9 +325,9 @@
       }
 
       .editor-frame .cm-gutters {
-        background: rgba(5, 8, 12, 0.22);
-        border-right: 1px solid rgba(255, 255, 255, 0.06);
-        color: #6a768c;
+        background: var(--editor-gutter);
+        border-right: 1px solid var(--editor-gutter-border);
+        color: var(--editor-gutter-ink);
       }
 
       .editor-frame .cm-gutterElement {
@@ -253,7 +337,7 @@
       .editor-frame .cm-content {
         padding: 22px 104px 28px 18px;
         min-height: 100%;
-        caret-color: #ffd28f;
+        caret-color: var(--editor-cursor);
       }
 
       .editor-frame .cm-line {
@@ -262,35 +346,35 @@
 
       .editor-frame .cm-activeLine,
       .editor-frame .cm-activeLineGutter {
-        background: rgba(255, 255, 255, 0.04);
+        background: var(--editor-active);
       }
 
       .editor-frame .cm-selectionBackground {
-        background: rgba(255, 210, 143, 0.22) !important;
+        background: var(--editor-selection) !important;
       }
 
       .editor-frame .cm-cursor,
       .editor-frame .cm-dropCursor {
-        border-left-color: #ffd28f;
+        border-left-color: var(--editor-cursor);
       }
 
-      .tok-keyword { color: #ffb57e; }
-      .tok-module { color: #8ed2ff; }
-      .tok-string { color: #b6f09c; }
-      .tok-comment { color: #6a768c; }
-      .tok-number { color: #f7cd74; }
-      .tok-operator { color: #f0f5ff; }
-      .tok-function { color: #9fd8ff; }
-      .tok-parameter { color: #ffd7a1; }
-      .tok-type { color: #88c6ff; }
-      .tok-constructor { color: #f2c572; }
-      .tok-property { color: #d7c1ff; }
-      .tok-tag { color: #ff9f7a; }
-      .tok-oxcaml { color: #ff9f7a; font-weight: 700; }
-      .tok-annotation { color: #ffd28f; font-style: italic; }
-      .tok-package { color: #7fd6c2; font-weight: 700; }
-      .tok-package-open { color: #a8bcff; }
-      .tok-label { color: #f4b5ff; }
+      .tok-keyword { color: var(--syntax-keyword); }
+      .tok-module { color: var(--syntax-module); }
+      .tok-string { color: var(--syntax-string); }
+      .tok-comment { color: var(--syntax-comment); }
+      .tok-number { color: var(--syntax-number); }
+      .tok-operator { color: var(--syntax-operator); }
+      .tok-function { color: var(--syntax-function); }
+      .tok-parameter { color: var(--syntax-parameter); }
+      .tok-type { color: var(--syntax-type); }
+      .tok-constructor { color: var(--syntax-constructor); }
+      .tok-property { color: var(--syntax-property); }
+      .tok-tag { color: var(--syntax-tag); }
+      .tok-oxcaml { color: var(--syntax-tag); font-weight: 700; }
+      .tok-annotation { color: var(--syntax-annotation); font-style: italic; }
+      .tok-package { color: var(--syntax-package); font-weight: 700; }
+      .tok-package-open { color: var(--syntax-package-open); }
+      .tok-label { color: var(--syntax-label); }
 
       .diag-error {
         text-decoration-line: underline;
@@ -352,15 +436,15 @@
       }
 
       .output-panel[data-state="warning"] {
-        background: linear-gradient(180deg, rgba(215, 153, 71, 0.08), rgba(255, 255, 255, 0.9));
+        background: var(--output-warning-bg);
       }
 
       .output-panel[data-state="error"] {
-        background: linear-gradient(180deg, rgba(193, 78, 42, 0.06), rgba(255, 255, 255, 0.9));
+        background: var(--output-error-bg);
       }
 
       .output-panel[data-state="output"] {
-        background: linear-gradient(180deg, rgba(15, 123, 95, 0.05), rgba(255, 255, 255, 0.9));
+        background: var(--output-success-bg);
       }
 
       .output-body {
@@ -381,11 +465,11 @@
         min-height: 180px;
         border-radius: 18px;
         background:
-          linear-gradient(180deg, rgba(250, 247, 241, 0.8), rgba(245, 240, 232, 0.8)),
+          linear-gradient(180deg, var(--output-empty-a), var(--output-empty-b)),
           repeating-linear-gradient(
             -45deg,
-            rgba(24, 33, 44, 0.018) 0,
-            rgba(24, 33, 44, 0.018) 12px,
+            var(--output-empty-stripe) 0,
+            var(--output-empty-stripe) 12px,
             transparent 12px,
             transparent 24px
           );
@@ -412,11 +496,11 @@
       }
 
       .transcript-line.stream {
-        color: #18212c;
+        color: var(--output-stream);
       }
 
       .transcript-line.placeholder {
-        color: #6d7988;
+        color: var(--muted);
       }
 
       .transcript-line.file {
@@ -443,16 +527,16 @@
       }
 
       .transcript-line.code {
-        color: #233040;
+        color: var(--output-code);
       }
 
       .diagnostic-code-prefix {
-        color: #7a8695;
+        color: var(--output-prefix);
       }
 
       .transcript-line.detail,
       .transcript-line.trace {
-        color: #4f5c6b;
+        color: var(--output-detail);
       }
 
       .utop-outcome__keyword {
@@ -475,11 +559,27 @@
       }
 
       .utop-outcome__value {
-        color: #263341;
+        color: var(--output-code);
       }
 
       .utop-stdout {
-        color: #334155;
+        color: var(--output-detail);
+      }
+
+      .html-output {
+        margin: 14px 0;
+        border: 1px solid rgba(71, 91, 112, 0.2);
+        border-radius: 8px;
+        background: #ffffff;
+        overflow: hidden;
+      }
+
+      .html-output__frame {
+        display: block;
+        width: 100%;
+        height: 320px;
+        border: 0;
+        background: #ffffff;
       }
 
       .interface-output {
@@ -487,7 +587,7 @@
         border: 1px solid rgba(15, 123, 95, 0.2);
         border-left: 4px solid #0f7b5f;
         border-radius: 8px;
-        background: rgba(224, 245, 238, 0.55);
+        background: var(--interface-bg);
         padding: 12px 14px 13px;
       }
 
@@ -501,25 +601,25 @@
 
       .interface-output__body {
         margin: 0;
-        color: #173829;
+        color: var(--interface-ink);
         white-space: pre-wrap;
       }
 
-      .output-body .tok-keyword { color: #98521a; font-weight: 650; }
-      .output-body .tok-module { color: #0d638c; }
-      .output-body .tok-string { color: #276a3f; }
-      .output-body .tok-comment { color: #6d7988; }
-      .output-body .tok-number { color: #846000; }
-      .output-body .tok-operator { color: #4f5c6b; }
-      .output-body .tok-function { color: #0d638c; }
-      .output-body .tok-parameter { color: #805514; }
-      .output-body .tok-type { color: #0d638c; }
-      .output-body .tok-constructor { color: #8a5a00; }
-      .output-body .tok-oxcaml { color: #b8462b; font-weight: 700; }
-      .output-body .tok-annotation { color: #8c5f16; font-style: italic; }
-      .output-body .tok-package { color: #007260; font-weight: 700; }
-      .output-body .tok-package-open { color: #475fa5; }
-      .output-body .tok-label { color: #8b3aa8; }
+      .output-body .tok-keyword { color: var(--syntax-keyword); font-weight: 650; }
+      .output-body .tok-module { color: var(--syntax-module); }
+      .output-body .tok-string { color: var(--syntax-string); }
+      .output-body .tok-comment { color: var(--syntax-comment); }
+      .output-body .tok-number { color: var(--syntax-number); }
+      .output-body .tok-operator { color: var(--syntax-operator); }
+      .output-body .tok-function { color: var(--syntax-function); }
+      .output-body .tok-parameter { color: var(--syntax-parameter); }
+      .output-body .tok-type { color: var(--syntax-type); }
+      .output-body .tok-constructor { color: var(--syntax-constructor); }
+      .output-body .tok-oxcaml { color: var(--syntax-tag); font-weight: 700; }
+      .output-body .tok-annotation { color: var(--syntax-annotation); font-style: italic; }
+      .output-body .tok-package { color: var(--syntax-package); font-weight: 700; }
+      .output-body .tok-package-open { color: var(--syntax-package-open); }
+      .output-body .tok-label { color: var(--syntax-label); }
 
       @media (max-width: 1180px) {
         main {
