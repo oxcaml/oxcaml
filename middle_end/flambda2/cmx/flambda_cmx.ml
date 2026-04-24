@@ -190,10 +190,8 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   let all_code =
     (* CR mshinwell: do we need to remove unused function slot bindings from the
        result types too? *)
-    all_code
-    |> EC.remove_unused_value_slots_from_result_types_and_shortcut_aliases
-         ~used_value_slots ~canonicalise
-    |> EC.remove_unreachable ~reachable_names
+    EC.prepare_for_export all_code ~reachable_names ~used_value_slots
+      ~canonicalise
   in
   let final_typing_env = create_typing_env reachable_names in
   (* We need to re-export offsets for everything reachable from the cmx file;
@@ -204,26 +202,17 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
      function_slots/vars reachable from the code of the current compilation
      unit, but since we also re-export code metadata (including return types)
      from other compilation units, we need to take those into account. *)
-  (* CR gbury: it might be more efficient to not compute the free names for all
-     exported code, but fold over the exported code to avoid allocating some
-     free_names *)
-  let free_names_of_all_code = EC.free_names all_code in
-  let slots_used_in_typing_env =
-    TE.Serializable.free_function_slots_and_value_slots final_typing_env
+  let slot_free_names =
+    Name_occurrences.union
+      (EC.free_function_slots_and_value_slots all_code)
+      (TE.Serializable.free_function_slots_and_value_slots final_typing_env)
   in
   let exported_offsets =
     exported_offsets
     |> Exported_offsets.reexport_function_slots
-         (Name_occurrences.all_function_slots_at_normal_mode
-            free_names_of_all_code)
+         (Name_occurrences.all_function_slots_at_normal_mode slot_free_names)
     |> Exported_offsets.reexport_value_slots
-         (Name_occurrences.all_value_slots_at_normal_mode free_names_of_all_code)
-    |> Exported_offsets.reexport_function_slots
-         (Name_occurrences.all_function_slots_at_normal_mode
-            slots_used_in_typing_env)
-    |> Exported_offsets.reexport_value_slots
-         (Name_occurrences.all_value_slots_at_normal_mode
-            slots_used_in_typing_env)
+         (Name_occurrences.all_value_slots_at_normal_mode slot_free_names)
   in
   let cmx =
     Flambda_cmx_format.create ~final_typing_env ~all_code ~exported_offsets
