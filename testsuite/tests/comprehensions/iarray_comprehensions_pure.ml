@@ -300,7 +300,11 @@ Error: This expression has type "'a iarray"
 
 [:x for x in ([||] : _ array):];;
 [%%expect{|
-- : 'a iarray = [::]
+Line 1, characters 13-29:
+1 | [:x for x in ([||] : _ array):];;
+                 ^^^^^^^^^^^^^^^^
+Error: This expression has type "'a array"
+       but an expression was expected of type "'b iarray"
 |}];;
 
 let empty = [||] in

@@ -329,8 +329,8 @@ Line 2, characters 22-26:
 2 |   let (k' @ global) = k () in
                           ^^^^
 Error: This value is "local" but is expected to be "global".
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 
 (* However, for [f : (A -> (B -> C) @ mode1) @ mode2], we presume that [f]
@@ -886,9 +886,9 @@ Line 3, characters 25-26:
                              ^
 Error: Signature mismatch:
        Modules do not match:
-         functor (Arg : T @ read_write) -> ...
+         (Arg : T @ read_write) -> ...
        is not included in
-         functor T @ immutable -> ...
+         T @ immutable -> ...
        Module types do not match:
          T @ read_write
        does not include
