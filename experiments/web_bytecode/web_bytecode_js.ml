@@ -31,18 +31,28 @@ let with_output_capture f =
   Buffer.contents buffer, result
 
 let check_string filename source =
-  Web_bytecode_check.check_string
-    ~browser:true
-    ~filename:(Js.to_string filename)
-    ~source:(Js.to_string source)
-  |> Js.string
+  let output, diagnostics =
+    with_output_capture (fun () ->
+        Web_bytecode_check.check_string
+          ~browser:true
+          ~filename:(Js.to_string filename)
+          ~source:(Js.to_string source))
+  in
+  if String.equal diagnostics ""
+  then Js.string output
+  else Js.string (output ^ diagnostics)
 
 let interface_string filename source =
-  Web_bytecode_interface.interface_string
-    ~browser:true
-    ~filename:(Js.to_string filename)
-    ~source:(Js.to_string source)
-  |> Js.string
+  let output, diagnostics =
+    with_output_capture (fun () ->
+        Web_bytecode_interface.interface_string
+          ~browser:true
+          ~filename:(Js.to_string filename)
+          ~source:(Js.to_string source))
+  in
+  if String.equal diagnostics ""
+  then Js.string output
+  else Js.string (output ^ diagnostics)
 
 let run_string filename source =
   let output, result =
