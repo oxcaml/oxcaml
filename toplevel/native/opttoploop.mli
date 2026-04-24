@@ -59,9 +59,11 @@ val print_exception_outcome : formatter -> exn -> unit
 val execute_phrase : bool -> formatter -> Parsetree.toplevel_phrase
   -> bool * Compilation_unit.t option
         (* Execute the given toplevel phrase. Return [true] if the
-           phrase executed with no errors and [false] otherwise.
-           First bool says whether the values and types of the results
-           should be printed. Uncaught exceptions are always printed. *)
+           phrase executed with no errors and [false] otherwise, and
+           the adhoc compilation unit generated if the phrase contains
+           actual code. First bool says whether the values and types
+           of the results should be printed. Uncaught exceptions are
+           always printed. *)
 val preprocess_phrase :
       formatter -> Parsetree.toplevel_phrase ->  Parsetree.toplevel_phrase
         (* Preprocess the given toplevel phrase using regular and ppx
