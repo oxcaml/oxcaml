@@ -4903,25 +4903,34 @@ let rec maybe_computation exp =
 (* Returns true if, for every [Texp_ident x] occurring in the expression,
    the comonadic axes of the expression are weaker (higher) than [x].
    Conservative: may return false when the condition holds. *)
-let rec captures_comonadic (exp : expression) =
+let rec check_captures_comonadic env (exp : expression) =
+  let check e = check_captures_comonadic env e in
+  let fail () =
+    raise (Error (exp.exp_loc, env, Let_poly_not_syntactic_value))
+  in
   match exp.exp_desc with
   | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit | Texp_unboxed_bool _
-  | Texp_function _ -> true
+  | Texp_function _ -> ()
   | Texp_construct (_, _, args, _) ->
-    List.for_all captures_comonadic args
-  | Texp_variant (_, None) -> true
-  | Texp_variant (_, Some (e, _)) -> captures_comonadic e
+    List.iter check args
+  | Texp_variant (_, None) -> ()
+  | Texp_variant (_, Some (e, _)) -> check e
   | Texp_tuple (args, _) ->
-    List.for_all (fun (_, e) -> captures_comonadic e) args
+    List.iter (fun (_, e) -> check e) args
   | Texp_unboxed_tuple args ->
-    List.for_all (fun (_, e, _) -> captures_comonadic e) args
+    List.iter (fun (_, e, _) -> check e) args
   | Texp_record { fields; extended_expression = None; _ } ->
-    Array.for_all (fun (_, def) ->
+    Array.iter (fun (_, def) ->
       match def with
       | Kept _ -> assert false
-      | Overridden (_, e) -> captures_comonadic e) fields
-  | Texp_apply_layout (e, _) | Texp_exclave e -> captures_comonadic e
-  | _ -> false
+      | Overridden (_, e) -> check e) fields
+  | Texp_record_unboxed_product { fields; extended_expression = None; _ } ->
+    Array.iter (fun (_, def) ->
+      match def with
+      | Kept _ -> assert false
+      | Overridden (_, e) -> check e) fields
+  | Texp_apply_layout (e, _) | Texp_exclave e -> check e
+  | _ -> fail ()
 
 let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
@@ -10558,10 +10567,9 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         mode_pat_typ_list
         (List.map2 (fun (attrs, _, _, _, _) (e, _) -> attrs, e) spatl exp_list);
       if is_lpoly then
-        List.iter2 (fun { pvb_loc; _ } (exp, _) ->
-          if not (captures_comonadic exp) then
-            raise (Error (pvb_loc, env, Let_poly_not_syntactic_value))
-        ) spat_sexp_list exp_list;
+        List.iter (fun (exp, _) ->
+          check_captures_comonadic env exp
+        ) exp_list;
       (mode_pat_typ_list, exp_list, new_env, mvs, sorts,
        List.map (fun pv -> { pv with pv_type = instance pv.pv_type}) pvs)
     end
@@ -12545,7 +12553,8 @@ let report_error ~loc env =
         Style.inline_code "let poly_"
   | Let_poly_not_syntactic_value ->
       Location.errorf ~loc
-        "The right-hand side of a %a binding must be a syntactic value."
+        "This expression is not allowed in a %a definition; \
+         it must be a function, constructor, tuple, record, or constant."
         Style.inline_code "let poly_"
   | Layout_poly_inst_not_yet_supported ctx ->
       let ctx_str = match ctx with

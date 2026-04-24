@@ -169,10 +169,10 @@ end = struct
   let poly_ g = M.f 42
 end
 [%%expect{|
-Line 6, characters 2-22:
+Line 6, characters 16-22:
 6 |   let poly_ g = M.f 42
-      ^^^^^^^^^^^^^^^^^^^^
-Error: The right-hand side of a "let poly_" binding must be a syntactic value.
+                    ^^^^^^
+Error: This expression is not allowed in a "let poly_" definition; it must be a function, constructor, tuple, record, or constant.
 |}]
 
 
