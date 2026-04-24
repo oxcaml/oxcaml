@@ -102,10 +102,12 @@ function record_unexp() {
 # CR-someday dallsopp: this breaks our display of skipped tests (because we
 # still display the with part for skip results, as it's clearer). Resolve or
 # upstream this.
-#/^ ... testing '[^']*' with / {
-#    if (in_test) record_unexp();
-#    next;
-#}
+/^ ... testing '[^']*' with / {
+    if (in_test) record_unexp();
+    match($0, /... testing '[^']*'/);
+    curfile = substr($0, RSTART+13, RLENGTH-14);
+    if (sprintf ("%s/%s", curdir, curfile) == key && key in RESULTS) next;
+}
 
 /^ ... testing '[^']*'/ {
     if (in_test) record_unexp();
