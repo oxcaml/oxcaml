@@ -83,11 +83,11 @@ module Deep = struct
   type ('a,'b) continuation_ =
     | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation_ [@@unboxed]
 
-  let continue (Cont k) v = resume k (fun x-> x) v
+  let[@inline] continue (Cont k) v = resume k (fun x-> x) v
 
-  let discontinue (Cont k) e = resume k (fun e -> raise e) e
+  let[@inline] discontinue (Cont k) e = resume k (fun e -> raise e) e
 
-  let discontinue_with_backtrace (Cont k) e bt =
+  let[@inline] discontinue_with_backtrace (Cont k) e bt =
     resume k (fun e -> Printexc.raise_with_backtrace e bt) e
 
   type ('a,'b) handler =
@@ -100,9 +100,9 @@ module Deep = struct
 
   (* CR effect-syntax: Upstream the 3-parameter version of continuation and use
      it to maintain type safety here. *)
-  let to_continuation (f : _ continuation -> 'a) (k : _ continuation_) =
+  let[@inline] to_continuation (f : _ continuation -> 'a) (k : _ continuation_) =
     f (Obj.magic k)
-  let of_continuation (f : _ continuation_ -> 'a) (k : _ continuation) =
+  let[@inline] of_continuation (f : _ continuation_ -> 'a) (k : _ continuation) =
     f (Obj.magic k)
 
   let match_with comp arg handler =
@@ -124,9 +124,9 @@ module Deep = struct
     in
     with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
 
-  let continue k = of_continuation continue k
-  let discontinue k = of_continuation discontinue k
-  let discontinue_with_backtrace k =
+  let[@inline] continue k = of_continuation continue k
+  let[@inline] discontinue k = of_continuation discontinue k
+  let[@inline] discontinue_with_backtrace k =
     of_continuation discontinue_with_backtrace k
 
   external get_callstack :
