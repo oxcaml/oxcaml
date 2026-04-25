@@ -2105,6 +2105,8 @@ signature_item:
         { Psig_attribute $1 }
      | jkind_decl
         { Psig_jkind $1 }
+     | jkind_subst_decl
+        { Psig_jkindsubst $1 }
     )
     { $1 }
   | wrap_mksig_ext(
@@ -4139,6 +4141,10 @@ jkind_constraint:
   | EQUAL jkind=jkind_annotation { Some jkind }
 ;
 
+%inline jkind_subst_manifest:
+  | COLONEQUAL jkind=jkind_annotation { jkind }
+;
+
 jkind_decl:
   KIND
   attrs1=attributes
@@ -4148,6 +4154,20 @@ jkind_decl:
     {
       let pjkind_attributes = attrs1 @ attrs2 in
       let pjkind_loc = make_loc $sloc in
+      { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
+    }
+;
+
+jkind_subst_decl:
+  KIND
+  attrs1=attributes
+  pjkind_name=mkrhs(LIDENT)
+  jkind=jkind_subst_manifest
+  attrs2=post_item_attributes
+    {
+      let pjkind_attributes = attrs1 @ attrs2 in
+      let pjkind_loc = make_loc $sloc in
+      let pjkind_manifest = Some jkind in
       { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
     }
 ;

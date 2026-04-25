@@ -1537,6 +1537,11 @@ and signature_item ctxt f x : unit =
          avoid printing a [nonrec] flag, which would be rejected by the parser.
       *)
       type_def_list ctxt f (Recursive, false, l)
+  | Psig_jkindsubst jd ->
+      pp f "@[<2>kind_@ %a@ :=@ %a@]%a"
+        string_loc jd.pjkind_name
+        (jkind_declaration ctxt) jd
+        (item_attributes ctxt) jd.pjkind_attributes
   | Psig_value vd ->
       let intro = if vd.pval_prim = [] then "val" else "external" in
       if vd.pval_prim <> [] then assert (not vd.pval_poly);
