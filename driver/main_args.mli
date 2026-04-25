@@ -120,6 +120,8 @@ module type Compiler_options = sig
   val _i : unit -> unit
   val _impl : string -> unit
   val _instantiate : unit -> unit
+  val _functorize_intf : unit -> unit
+  val _functorize_impl : unit -> unit
   val _intf : string -> unit
   val _intf_suffix : string -> unit
   val _keep_docs : unit -> unit

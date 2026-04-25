@@ -103,6 +103,7 @@ let main unix argv ppf ~flambda2 =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
+                      functorize_intf; functorize_impl;
                       Compenv.stop_early; output_c_object]) > 1
     then
     begin
@@ -110,7 +111,8 @@ let main unix argv ppf ~flambda2 =
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate";
+                         -output-obj, -instantiate, -functorize-intf, \
+                         -functorize-impl";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -152,6 +154,28 @@ let main unix argv ppf ~flambda2 =
           src, args
       in
       Compiler.instantiate ~src ~args target;
+      Warnings.check_fatal ();
+    end
+    else if !functorize_intf then begin
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !output_name in
+      let srcs = Compenv.get_objfiles ~with_ocamlparam:false in
+      if srcs = [] then
+        Compenv.fatal
+          "Must specify at least one .cmi file with -functorize-intf";
+      Compiler.functorize_intf ~srcs target;
+      Warnings.check_fatal ();
+    end
+    else if !functorize_impl then begin
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !output_name in
+      let srcs = Compenv.get_objfiles ~with_ocamlparam:false in
+      if srcs = [] then
+        Compenv.fatal
+          (Printf.sprintf
+             "Must specify at least one %s file with -functorize-impl"
+             Compiler.ext_flambda_obj);
+      Compiler.functorize_impl ~srcs target;
       Warnings.check_fatal ();
     end
     else if !shared then begin
