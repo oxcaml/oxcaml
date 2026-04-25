@@ -1288,9 +1288,9 @@ val block_shape_of_value_kinds : value_kind list option -> block_shape
    Errors if there's a splice variable *)
 val is_uniform_block_shape : block_shape -> bool
 
-(* Returns [None] if contains all values,
-   returns the [mixed_block_shape] if it has at least one non-value.
-   Errors if there's a splice variable *)
+(* Returns [None] if contains all values (including products of values
+   and void), returns the [mixed_block_shape] if it has at least one
+   non-value. Errors if there's a splice variable *)
 val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
 
 val transl_mixed_product_shape_for_read :
@@ -1300,9 +1300,6 @@ val transl_mixed_product_shape_for_read :
 
 val transl_module_representation :
   Types.module_representation -> module_representation
-
-val block_of_module_representation :
-  loc:Warnings.loc -> module_representation -> primitive
 
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 

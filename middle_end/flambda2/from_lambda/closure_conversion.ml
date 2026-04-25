@@ -284,7 +284,14 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
           | Float_boxed _ -> unbox_float_constant arg)
         args
     in
-    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+    let block_shape : K.Scannable_block_shape.t =
+      match K.Scannable_block_shape.from_mixed_block_shape shape with
+      | Value_only ->
+        (* See Note [Constant all-value mixed records] in translcore.ml *)
+        Misc.fatal_error
+          "Const_mixed_block: from_mixed_block_shape returned Value_only"
+      | Mixed_record _ as block_shape -> block_shape
+    in
     let acc, fields =
       List.fold_left_map
         (fun acc c ->
@@ -293,9 +300,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
         acc args
     in
     let const : SC.t =
-      SC.block
-        (Tag.Scannable.create_exn tag)
-        Immutable (Mixed_record kind_shape) fields
+      SC.block (Tag.Scannable.create_exn tag) Immutable block_shape fields
     in
     register_const acc dbg const "const_mixed_block"
   | Const_null -> acc, reg_width RWC.const_null, "null"
@@ -3866,45 +3871,45 @@ let bind_static_consts_and_code acc body =
    determining [field_count]. *)
 let final_module_block_representation acc
     ~(module_repr : Lambda.module_representation) =
-  match module_repr with
-  | Module_value_only { field_count } ->
-    let block_access _pos : P.Block_access_kind.t =
-      Values
-        { tag = Known Tag.Scannable.zero;
-          size =
-            Known (Target_ocaml_int.of_int (Acc.machine_width acc) field_count);
-          field_kind = Any_value
-        }
-    in
-    ( K.Scannable_block_shape.Value_only,
-      field_count,
-      block_access,
-      fun _ -> K.value )
-  | Module_mixed (shape, _) ->
-    let shape =
-      K.Mixed_block_lambda_shape.of_mixed_block_elements shape
-        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-    in
-    let flattened_reordered_shape =
-      K.Mixed_block_lambda_shape.flattened_reordered_shape shape
-    in
-    let field_count = Array.length flattened_reordered_shape in
-    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
-    let field_kinds = K.Mixed_block_shape.field_kinds kind_shape in
-    let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
-    let block_access pos : P.Block_access_kind.t =
-      let field_kind =
-        Lambda_to_flambda_primitives_helpers.mixed_block_access_field_kind
+  let (block_shape : K.Scannable_block_shape.t), block_access, field_count =
+    match module_repr with
+    | Module_value_only { field_count } ->
+      let block_access _pos : P.Block_access_kind.t =
+        Values
+          { tag = Known Tag.Scannable.zero;
+            size =
+              Known
+                (Target_ocaml_int.of_int (Acc.machine_width acc) field_count);
+            field_kind = Any_value
+          }
+      in
+      Value_only, block_access, field_count
+    | Module_mixed (shape, _) ->
+      let shape =
+        K.Mixed_block_lambda_shape.of_mixed_block_elements shape
+          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+      in
+      let flattened_reordered_shape =
+        K.Mixed_block_lambda_shape.flattened_reordered_shape shape
+      in
+      let block_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
+      let field_count = Array.length flattened_reordered_shape in
+      let block_access pos : P.Block_access_kind.t =
+        Lambda_to_flambda_primitives_helpers
+        .block_access_kind_of_mixed_field_element
+          ~tag:(Known Tag.Scannable.zero) ~size:Unknown ~kind_shape:block_shape
           flattened_reordered_shape.(pos)
       in
-      Mixed
-        { tag = Known Tag.Scannable.zero;
-          size = Unknown;
-          field_kind;
-          shape = kind_shape
-        }
-    in
-    block_shape, field_count, block_access, fun pos -> field_kinds.(pos)
+      block_shape, block_access, field_count
+  in
+  let kind_of_field =
+    match block_shape with
+    | Value_only -> fun _ -> K.value
+    | Mixed_record shape ->
+      let field_kinds = K.Mixed_block_shape.field_kinds shape in
+      fun pos -> field_kinds.(pos)
+  in
+  block_shape, field_count, block_access, kind_of_field
 
 let wrap_final_module_block acc env ~program ~prog_return_cont
     ~(module_repr : Lambda.module_representation) ~return_cont ~module_symbol =

@@ -107,8 +107,6 @@ module Mixed_block_lambda_shape = Mixed_block_shape
 module Mixed_block_shape : sig
   type t
 
-  val from_mixed_block_shape : _ Mixed_block_lambda_shape.t -> t
-
   val field_kinds : t -> kind array
 
   val value_prefix_size : t -> int
@@ -141,6 +139,8 @@ module Scannable_block_shape : sig
   val print : Format.formatter -> t -> unit
 
   val element_kind : t -> int -> kind
+
+  val from_mixed_block_shape : _ Mixed_block_lambda_shape.t -> t
 end
 
 module Block_shape : sig

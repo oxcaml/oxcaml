@@ -503,6 +503,8 @@ let convert_block_access_field_kind_from_value_kind
   | Pboxedvectorval _ ->
     Any_value
 
+(* This function shouldn't be used directly since lambda mixed blocks with an
+   empty flat suffix are translated to value-only blocks in flambda. *)
 let mixed_block_access_field_kind
     (elt : 'a Mixed_block_shape.Singleton_mixed_block_element.t) :
     P.Mixed_block_access_field_kind.t =
@@ -515,3 +517,19 @@ let mixed_block_access_field_kind
       (K.Flat_suffix_element.from_singleton_mixed_block_element
          mixed_block_element)
   | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float
+
+let block_access_kind_of_mixed_field_element
+    ~(kind_shape : K.Scannable_block_shape.t) ~tag ~size
+    (elt : 'a Mixed_block_shape.Singleton_mixed_block_element.t) :
+    P.Block_access_kind.t =
+  match kind_shape with
+  | Value_only -> (
+    match mixed_block_access_field_kind elt with
+    | Value_prefix field_kind -> Values { tag; size; field_kind }
+    | Flat_suffix _ ->
+      Misc.fatal_error
+        "block_access_kind_of_mixed_field_element: flat element in uniform \
+         shape")
+  | Mixed_record kind_shape ->
+    let field_kind = mixed_block_access_field_kind elt in
+    Mixed { tag; field_kind; shape = kind_shape; size }

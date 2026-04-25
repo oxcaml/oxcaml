@@ -122,26 +122,27 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
   match shape with
   | All_value -> List.init num_fields (fun _field -> K.With_subkind.any_value)
   | Shape shape ->
-    let shape_length = Array.length shape in
-    if num_fields <> shape_length
+    (* This function is only called for uniform block shapes. We flatten
+       products of values into individual value fields. *)
+    let rec collect_value_fields acc (elem : unit L.mixed_block_element) =
+      match elem with
+      | L.Value vk ->
+        K.With_subkind.from_lambda_value_kind ~machine_width vk :: acc
+      | Product elts -> Array.fold_left collect_value_fields acc elts
+      | Float_boxed ()
+      | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+      | Vec512 | Word | Untagged_immediate | Splice_variable _ ->
+        Misc.fatal_error "convert_block_shape: non-uniform shape"
+    in
+    let fields = Array.fold_left collect_value_fields [] shape |> List.rev in
+    let fields_length = List.length fields in
+    if num_fields <> fields_length
     then
       Misc.fatal_errorf
         "Flambda_arity.of_block_shape: num_fields is %d yet the shape has %d \
          fields"
-        num_fields shape_length;
-    (* This function is only called for uniform block shapes *)
-    Array.to_list
-      (Array.map
-         (fun (elem : unit L.mixed_block_element) ->
-           match elem with
-           | L.Value vk ->
-             K.With_subkind.from_lambda_value_kind ~machine_width vk
-           | Float_boxed ()
-           | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-           | Vec256 | Vec512 | Word | Untagged_immediate | Product _
-           | Splice_variable _ ->
-             Misc.fatal_error "convert_block_shape: non-uniform shape")
-         shape)
+        num_fields fields_length;
+    fields
 
 let check_float_array_optimisation_enabled name =
   if not (Flambda_features.flat_float_array ())
@@ -1840,7 +1841,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             | Float_boxed _ -> unbox_float arg)
           args
       in
-      let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+      let kind_shape =
+        match K.Scannable_block_shape.from_mixed_block_shape shape with
+        | Mixed_record kind_shape -> kind_shape
+        | Value_only ->
+          Misc.fatal_error
+            "Pmakeblock: mixed_block_of_block_shape returned Some but \
+             from_mixed_block_shape returned Value_only"
+      in
       [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
   | Pmake_unboxed_product layouts, _ ->
@@ -2092,6 +2100,19 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_float | Record_ufloat ->
         Naked_floats
           { length = Target_ocaml_int.of_int machine_width num_fields }
+      | Record_inlined
+          (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
+        when Mixed_product_bytes.types_shape_is_all_value shape ->
+        Values
+          { tag = Tag.Scannable.create_exn runtime_tag;
+            length = Target_ocaml_int.of_int machine_width num_fields
+          }
+      | Record_mixed shape
+        when Mixed_product_bytes.types_shape_is_all_value shape ->
+        Values
+          { tag = Tag.Scannable.zero;
+            length = Target_ocaml_int.of_int machine_width num_fields
+          }
       | Record_inlined (_, Constructor_mixed _, _) | Record_mixed _ -> Mixed
       | Record_inlined
           ( Ordinary { runtime_tag; _ },
@@ -2578,7 +2599,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape
     in
-    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+    let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
     let new_indexes =
       Mixed_block_shape.lookup_path_producing_new_indexes shape field_path
     in
@@ -2587,25 +2608,22 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         let imm = Target_ocaml_int.of_int machine_width new_index in
         check_non_negative_imm imm "Pmixedfield";
         let mutability = convert_field_read_semantics sem in
-        let block_access : P.Block_access_kind.t =
-          let field_kind =
-            H.mixed_block_access_field_kind
-              flattened_reordered_shape.(new_index)
-          in
-          Mixed
-            { tag = Unknown; field_kind; shape = kind_shape; size = Unknown }
+        let field_elt = flattened_reordered_shape.(new_index) in
+        let block_access =
+          H.block_access_kind_of_mixed_field_element ~kind_shape ~tag:Unknown
+            ~size:Unknown field_elt
         in
-        let block_access : H.expr_primitive =
+        let prim : H.expr_primitive =
           Unary
             ( Block_load { kind = block_access; mut = mutability; field = imm },
               arg )
         in
-        match flattened_reordered_shape.(new_index) with
+        match field_elt with
         | Float_boxed (mode : Lambda.locality_mode) ->
-          box_float mode block_access ~current_region
+          box_float mode prim ~current_region
         | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
         | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
-          block_access)
+          prim)
       new_indexes
   | ( Psetfield (index, immediate_or_pointer, initialization_or_assignment),
       [[block]; [value]] ) ->
@@ -2653,7 +2671,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape
     in
-    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+    let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
     let new_indexes =
       Mixed_block_shape.lookup_path_producing_new_indexes shape field_path
     in
@@ -2668,21 +2686,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         (fun new_index value : H.expr_primitive ->
           let imm = Target_ocaml_int.of_int machine_width new_index in
           check_non_negative_imm imm "Psetmixedfield";
-          let block_access : P.Block_access_kind.t =
-            Mixed
-              { field_kind =
-                  H.mixed_block_access_field_kind
-                    flattened_reordered_shape.(new_index);
-                shape = kind_shape;
-                tag = Unknown;
-                size = Unknown
-              }
+          let field_elt = flattened_reordered_shape.(new_index) in
+          let block_access =
+            H.block_access_kind_of_mixed_field_element ~kind_shape ~tag:Unknown
+              ~size:Unknown field_elt
           in
           let init_or_assign =
             convert_init_or_assign initialization_or_assignment
           in
           let value : H.simple_or_prim =
-            match flattened_reordered_shape.(new_index) with
+            match field_elt with
             | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
             | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
               value

@@ -165,6 +165,7 @@
   static_label
   slambdaident
   lambda
+  mixed_product_bytes
   runtimedef
   runtimetags
   structured_mangling
@@ -389,6 +390,8 @@
 
 (copy_files ../../lambda/slambdaident.ml)
 
+(copy_files ../../lambda/mixed_product_bytes.ml)
+
 (copy_files ../../lambda/lambda.ml)
 
 (copy_files ../../lambda/runtimedef.ml)
@@ -583,6 +586,8 @@
 
 (copy_files ../../lambda/slambdaident.mli)
 
+(copy_files ../../lambda/mixed_product_bytes.mli)
+
 (copy_files ../../lambda/lambda.mli)
 
 (copy_files ../../lambda/runtimedef.mli)
@@ -754,15 +759,16 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Printtyp.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Includecore.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedtree.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Static_label.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Slambdaident.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Mixed_product_bytes.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl_properties.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl_separability.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl_variance.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typetexp.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Mtype.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Static_label.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Slambdaident.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Dll.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Instruct.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Meta.cmo
@@ -875,15 +881,16 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Printtyp.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Includecore.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedtree.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Static_label.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Slambdaident.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Mixed_product_bytes.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl_properties.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl_separability.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl_variance.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typetexp.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Mtype.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Static_label.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Slambdaident.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Dll.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Instruct.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Meta.cmx

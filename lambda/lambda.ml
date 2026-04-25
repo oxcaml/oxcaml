@@ -694,22 +694,25 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
   | None -> All_value
   | Some vks -> Shape (Array.of_list (List.map (fun vk -> Value vk) vks))
 
+(* CR rtjoa: This function is redundant with [Mixed_product_bytes], but it's
+   duplicated for now. We should fix the module dependency structure *)
+let rec is_value_or_void_element : _ mixed_block_element -> bool = function
+  | Value _ -> true
+  | Product elts -> Array.for_all is_value_or_void_element elts
+  | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
+  | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+    false
+(* CR layout poly: This function probably shouldn't exist at all and we should
+   merge mixed_block_shape and block_shape. *)
 let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
     =
   match shape with
   | All_value -> None
   | Shape shape ->
-    let is_uniform =
-      Array.for_all
-        (function
-          | Value _ -> true
-          (* CR layout poly: This function probably shouldn't exist at all
-             and we should merge mixed_block_shape and block_shape. *)
-          | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
-          | _ -> false)
-        shape
-    in
-    if is_uniform then None else Some shape
+    if Array.for_all is_value_or_void_element shape
+    then None
+    else Some shape
 
 let is_uniform_block_shape (shape : block_shape) : bool =
   Option.is_none (mixed_block_of_block_shape shape)
@@ -1896,28 +1899,6 @@ let transl_prim mod_name name =
   | path, _ -> transl_value_path Loc_unknown env path
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
-
-let block_of_module_representation ~loc = function
-  | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
-  | Module_mixed (shape, _) ->
-    let rec count_values shape =
-      Array.fold_left
-        (fun acc elt ->
-          match elt with
-          | Value _ -> acc + 1
-          | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-          | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate -> acc
-          | Product product_shape -> acc + count_values product_shape
-          (* CR layout poly: We need to support this for relatively simple
-             layout poly usecases, however it should be easy to move this assert
-             to after slambdaeval (or maybe during?). *)
-          | Splice_variable _ ->
-            error ~loc (Slambda_unsupported "mixed modules"))
-        0 shape
-    in
-    Typedecl.assert_mixed_product_support loc Module
-      ~value_prefix_len:(count_values shape);
-    Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 
