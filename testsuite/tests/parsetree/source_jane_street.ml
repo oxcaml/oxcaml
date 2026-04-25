@@ -1650,6 +1650,28 @@ type ('a, _[@foo] : any)  t
 type ('a, _ : any) t
 |}]
 
+(**********************************************)
+(* attributes on module aliases in signatures *)
+module Foo = struct end
+module type S = sig
+  module Foo = Foo [@foo] @@ nonportable
+end
+[%%expect{|
+module Foo : sig end @@ stateless
+module type S = sig module Foo = Foo end
+|}]
+
+(* make sure loc is set correctly *)
+module type S = sig
+  module Bar = Bar [@foo] @@ nonportable
+end
+[%%expect{|
+Line 2, characters 15-18:
+2 |   module Bar = Bar [@foo] @@ nonportable
+                   ^^^
+Error: Unbound module "Bar"
+|}]
+
 (*********************)
 (* quotations syntax *)
 
