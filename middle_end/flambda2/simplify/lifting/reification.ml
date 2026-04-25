@@ -34,6 +34,7 @@ let create_static_const dacc dbg (to_lift : T.to_lift) : RSC.t =
         Simple.With_debuginfo.create field dbg)
   in
   let art = DA.are_rebuilding_terms dacc in
+  let machine_width = DE.machine_width (DA.denv dacc) in
   match to_lift with
   | Immutable_block { tag; is_unique; shape; fields } ->
     let fields = convert_fields fields in
@@ -41,14 +42,14 @@ let create_static_const dacc dbg (to_lift : T.to_lift) : RSC.t =
       if is_unique then Immutable_unique else Immutable
     in
     RSC.create_block art tag mut shape ~fields
-  | Boxed_float32 f -> RSC.create_boxed_float32 art (Const f)
-  | Boxed_float f -> RSC.create_boxed_float art (Const f)
-  | Boxed_int32 i -> RSC.create_boxed_int32 art (Const i)
-  | Boxed_int64 i -> RSC.create_boxed_int64 art (Const i)
-  | Boxed_nativeint i -> RSC.create_boxed_nativeint art (Const i)
-  | Boxed_vec128 v -> RSC.create_boxed_vec128 art (Const v)
-  | Boxed_vec256 v -> RSC.create_boxed_vec256 art (Const v)
-  | Boxed_vec512 v -> RSC.create_boxed_vec512 art (Const v)
+  | Boxed_float32 f -> RSC.create_boxed_float32 art ~machine_width (Const f)
+  | Boxed_float f -> RSC.create_boxed_float art ~machine_width (Const f)
+  | Boxed_int32 i -> RSC.create_boxed_int32 art ~machine_width (Const i)
+  | Boxed_int64 i -> RSC.create_boxed_int64 art ~machine_width (Const i)
+  | Boxed_nativeint i -> RSC.create_boxed_nativeint art ~machine_width (Const i)
+  | Boxed_vec128 v -> RSC.create_boxed_vec128 art ~machine_width (Const v)
+  | Boxed_vec256 v -> RSC.create_boxed_vec256 art ~machine_width (Const v)
+  | Boxed_vec512 v -> RSC.create_boxed_vec512 art ~machine_width (Const v)
   | Immutable_float32_array { fields } ->
     let fields = List.map (fun f -> Or_variable.Const f) fields in
     RSC.create_immutable_float32_array art fields

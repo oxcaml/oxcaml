@@ -500,15 +500,18 @@ let quaternary_prim_size prim =
   | Atomic_compare_exchange_field { atomic_kind = _; args_kind = Any_value } ->
     does_not_need_caml_c_call_extcall_size
 
+let block num_fields = alloc_size + num_fields
+
+let array num_fields = alloc_size + num_fields
+
 let variadic_prim_size prim args =
   match (prim : Flambda_primitive.variadic_primitive) with
   | Begin_region { ghost } -> if ghost then 0 else 1
   | Begin_try_region { ghost } -> if ghost then 0 else 1
-  | Make_block (_, _mut, _alloc_mode)
+  | Make_block (_, _mut, _alloc_mode) -> block (List.length args)
   (* CR mshinwell: I think Make_array for a generic array ("Anything") is more
      expensive than the other cases *)
-  | Make_array (_, _mut, _alloc_mode) ->
-    alloc_size + List.length args
+  | Make_array (_, _mut, _alloc_mode) -> array (List.length args)
 
 let prim ~machine_width (prim : Flambda_primitive.t) =
   match prim with

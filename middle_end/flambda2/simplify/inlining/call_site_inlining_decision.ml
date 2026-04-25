@@ -123,7 +123,19 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
         in
         rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
   in
-  UA.cost_metrics uacc
+  let lifted_constants = UA.lifted_constants uacc in
+  let cost_metrics_of_lifted_constants =
+    Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
+      ~f:(fun cost_metrics lifted_constant ->
+        List.fold_left
+          (fun cost_metrics definition ->
+            Cost_metrics.( + ) cost_metrics
+              (Rebuilt_static_const.cost_metrics
+                 (Lifted_constant.Definition.defining_expr definition)))
+          cost_metrics
+          (Lifted_constant.definitions lifted_constant))
+  in
+  Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
 
 let argument_types_useful dacc apply =
   if
