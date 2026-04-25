@@ -25,11 +25,11 @@ let print_view ppf t = Code_id.Map.print Code_or_metadata.print_view ppf t
 
 let empty = Code_id.Map.empty
 
-let free_names t =
+let[@inline] fold_free_names t ~init ~f =
   Code_id.Map.fold
-    (fun _code_id code acc ->
-      Name_occurrences.union acc (Code_or_metadata.free_names code))
-    t Name_occurrences.empty
+    (fun code_id code_or_metadata ->
+      (f [@inlined hint]) code_id (Code_or_metadata.free_names code_or_metadata))
+    t init
 
 let add_code ~keep_code code_map t =
   Code_id.Map.mapi
@@ -78,19 +78,19 @@ let find t code_id =
     None
   | code_or_metadata -> Some code_or_metadata
 
-let remove_unreachable ~reachable_names t =
-  Code_id.Map.filter
-    (fun code_id _code_or_metadata ->
-      Name_occurrences.mem_code_id reachable_names code_id)
-    t
-
-let remove_unused_value_slots_from_result_types_and_shortcut_aliases
-    ~used_value_slots ~canonicalise t =
-  Code_id.Map.map
-    (fun code_or_metadata ->
-      Code_or_metadata.map_result_types code_or_metadata ~f:(fun result_ty ->
-          Flambda2_types.remove_unused_value_slots_and_shortcut_aliases
-            result_ty ~used_value_slots ~canonicalise))
+let prepare_for_export t ~reachable_names ~used_value_slots ~canonicalise =
+  Code_id.Map.filter_map
+    (fun code_id code_or_metadata ->
+      if not (Name_occurrences.mem_code_id reachable_names code_id)
+      then None
+      else
+        let code_or_metadata =
+          Code_or_metadata.map_result_types code_or_metadata
+            ~f:(fun result_ty ->
+              Flambda2_types.remove_unused_value_slots_and_shortcut_aliases
+                result_ty ~used_value_slots ~canonicalise)
+        in
+        Some code_or_metadata)
     t
 
 let ids_for_export t =

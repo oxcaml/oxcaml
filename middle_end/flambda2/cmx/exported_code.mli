@@ -27,7 +27,8 @@ val print_view : Format.formatter -> t -> unit
 
 val empty : t
 
-val free_names : t -> Name_occurrences.t
+val fold_free_names :
+  t -> init:'a -> f:(Code_id.t -> Name_occurrences.t -> 'a -> 'a) -> 'a
 
 val add_code : keep_code:(Code_id.t -> bool) -> Code.t Code_id.Map.t -> t -> t
 
@@ -44,12 +45,11 @@ val find_exn : t -> Code_id.t -> Code_or_metadata.t
     be special handling if a code ID is unbound (see comment in the .ml file) *)
 val find : t -> Code_id.t -> Code_or_metadata.t option
 
-val remove_unreachable : reachable_names:Name_occurrences.t -> t -> t
-
-val remove_unused_value_slots_from_result_types_and_shortcut_aliases :
+val prepare_for_export :
+  t ->
+  reachable_names:Name_occurrences.t ->
   used_value_slots:Value_slot.Set.t ->
   canonicalise:(Simple.t -> Simple.t) ->
-  t ->
   t
 
 val iter_code : t -> f:(Code.t -> unit) -> unit

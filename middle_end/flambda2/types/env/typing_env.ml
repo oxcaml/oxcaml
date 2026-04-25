@@ -1083,7 +1083,7 @@ module Serializable : sig
 
   val predefined_exceptions : Symbol.Set.t -> t
 
-  val free_function_slots_and_value_slots : t -> Name_occurrences.t
+  val fold_free_names : t -> init:'a -> f:(Name_occurrences.t -> 'a -> 'a) -> 'a
 
   val print : Format.formatter -> t -> unit
 
@@ -1157,8 +1157,8 @@ end = struct
     in
     { defined_symbols_without_equations; code_age_relation; just_after_level }
 
-  let free_function_slots_and_value_slots t =
-    Cached_level.free_function_slots_and_value_slots t.just_after_level
+  let fold_free_names t ~init ~f =
+    Cached_level.fold_free_names t.just_after_level ~init ~f
 
   let print = print_serializable
 

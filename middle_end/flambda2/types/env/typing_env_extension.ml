@@ -145,7 +145,9 @@ module With_extra_variables = struct
   let existential_vars { existential_vars; _ } =
     Variable.Map.keys existential_vars
 
-  let map_types { existential_vars; equations } ~f =
-    let equations = Name.Map.map f equations in
-    { existential_vars; equations }
+  let map_types ({ existential_vars; equations } as t) ~f =
+    let equations' = Name.Map.map_sharing f equations in
+    if equations == equations'
+    then t
+    else { existential_vars; equations = equations' }
 end
