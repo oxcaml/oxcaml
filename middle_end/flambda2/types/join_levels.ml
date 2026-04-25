@@ -51,7 +51,7 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
   let ts = List.rev_map (fun (t, use_id, _) -> use_id, t) ts_and_use_ids in
   let env, analysis =
     Join_env.cut_and_n_way_join_with_analysis
-      ~meet_type:Meet_and_n_way_join.meet_type
+      ~meet_expanded_head:Meet_and_n_way_join.meet_expanded_head
       ~n_way_join_type:Meet_and_n_way_join.n_way_join definition_typing_env
       ~cut_after ts
   in
@@ -90,8 +90,9 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
      in
      let distinct_names =
        Equal_types_for_debug.names_with_non_equal_types_level_ignoring_name_mode
-         ~config ~meet_type:(Meet.meet_type ()) typing_env old_joined_level
-         new_joined_level
+         ~config
+         ~meet_expanded_head:(Meet.meet_expanded_head ())
+         typing_env old_joined_level new_joined_level
      in
      let distinct_names =
        Name.Set.filter
@@ -121,5 +122,5 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
        Format.eprintf "@]@\n%s@." (String.make 60 '=')));
     ( Meet_env.use_meet_env definition_typing_env ~f:(fun target_env ->
           Meet_env.add_env_extension_from_level target_env new_joined_level
-            ~meet_type:(Meet.meet_type ())),
+            ~meet_expanded_head:(Meet.meet_expanded_head ())),
       analysis )
