@@ -1716,7 +1716,7 @@ Line 1, characters 31-37:
 1 | let _ = Array.init 3 (fun _ -> #(1,2))
                                    ^^^^^^
 Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value maybe_null)"
+       but an expression was expected of type "('c : value_maybe_null)"
        The layout of #('a * 'b) is
            '_representable_layout_13 & '_representable_layout_14
          because it is an unboxed tuple.
@@ -1802,7 +1802,7 @@ Line 2, characters 31-50:
 2 | let _ = Array.init 3 (fun _ -> #{ i1 = 1; i2 = 2 })
                                    ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "array_init_record"
-       but an expression was expected of type "('a : value maybe_null)"
+       but an expression was expected of type "('a : value_maybe_null)"
        The layout of array_init_record is
            value non_pointer & value non_pointer
          because of the definition of array_init_record at line 1, characters 0-48.
@@ -2181,7 +2181,7 @@ let g (x : 'a) = f () x
 
 [%%expect{|
 val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
-val g : ('a : value maybe_null & value). 'a -> 'a = <fun>
+val g : ('a : value_maybe_null & value). 'a -> 'a = <fun>
 |}]
 
 (* test subjkinding *)

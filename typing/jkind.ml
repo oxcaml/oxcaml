@@ -1916,34 +1916,28 @@ module Const = struct
                 (Layout.Const.set_root_scannable_axes layout (f sa modifier loc))
           }))
 
-  let set_nullability ~abbrev env (nul : Nullability.t Location.loc option) t =
+  let meet_nullability ?abbrev env (nul : Nullability.t Location.loc option) t =
     apply_kind_modifier env t nul (fun sa nullability loc ->
-        if nullability = sa.nullability
-        then
+        let meet = Nullability.meet sa.nullability nullability in
+        (match abbrev with
+        | Some abbrev when Nullability.equal meet sa.nullability ->
           Location.prerr_warning loc
             (Warnings.Redundant_kind_modifier
-               (Format.asprintf "%a" Pprintast.longident abbrev));
-        { sa with nullability })
+               (Format.asprintf "%a" Pprintast.longident abbrev))
+        | _ -> ());
+        { sa with nullability = meet })
 
-  let set_separability ~abbrev env (sep : Separability.t Location.loc option) t
+  let meet_separability ?abbrev env (sep : Separability.t Location.loc option) t
       =
     apply_kind_modifier env t sep (fun sa separability loc ->
-        if separability = sa.separability
-        then
+        let meet = Separability.meet sa.separability separability in
+        (match abbrev with
+        | Some abbrev when Separability.equal meet sa.separability ->
           Location.prerr_warning loc
             (Warnings.Redundant_kind_modifier
-               (Format.asprintf "%a" Pprintast.longident abbrev));
-        { sa with separability })
-
-  let meet_nullability env (nul : Nullability.t Location.loc option) t =
-    apply_kind_modifier env t nul (fun sa nullability _loc ->
-        { sa with nullability = Nullability.meet sa.nullability nullability })
-
-  let meet_separability env (sep : Separability.t Location.loc option) t =
-    apply_kind_modifier env t sep (fun sa separability _loc ->
-        { sa with
-          separability = Separability.meet sa.separability separability
-        })
+               (Format.asprintf "%a" Pprintast.longident abbrev))
+        | _ -> ());
+        { sa with separability = meet })
 
   let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
       =
@@ -1971,50 +1965,30 @@ module Const = struct
       with_bounds
     }
 
+  type scannable_axis_annot =
+    | Null_annot of Nullability.t Location.loc
+    | Sep_annot of Separability.t Location.loc
+
   let transl_scannable_axes sa_annots =
-    let set_or_warn ~loc ~to_ ~to_string cur_axis =
-      match cur_axis with
-      | Some overridden_by ->
-        Location.prerr_warning loc
-          (Warnings.Overridden_kind_modifier
-             (to_string (Location.get_txt overridden_by)));
-        cur_axis
-      | None -> Some (Location.mkloc to_ loc)
-    in
-    (* This will compute and report errors from right-to-left, which enables
-       better error messages while traversing the list only once. It comes at
-       the cost of warnings being reported in a slightly weirder order. *)
-    List.fold_right
-      (fun ({ txt; loc } : string Location.loc) (nullability, separability) ->
+    List.map
+      (fun ({ txt; loc } : string Location.loc) ->
         match txt with
         | "non_pointer" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Non_pointer ~to_string separability) )
+          Sep_annot (Location.mkloc Separability.Non_pointer loc)
         | "non_pointer64" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Non_pointer64 ~to_string separability) )
-        | "non_float" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Non_float ~to_string separability) )
-        | "separable" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Separable ~to_string separability) )
+          Sep_annot (Location.mkloc Separability.Non_pointer64 loc)
+        | "non_float" -> Sep_annot (Location.mkloc Separability.Non_float loc)
+        | "separable" -> Sep_annot (Location.mkloc Separability.Separable loc)
         | "maybe_separable" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Maybe_separable ~to_string separability) )
-        | "non_null" ->
-          ( Nullability.(set_or_warn ~loc ~to_:Non_null ~to_string nullability),
-            separability )
-        | "maybe_null" ->
-          ( Nullability.(set_or_warn ~loc ~to_:Maybe_null ~to_string nullability),
-            separability )
+          Sep_annot (Location.mkloc Separability.Maybe_separable loc)
+        | "non_null" -> Null_annot (Location.mkloc Nullability.Non_null loc)
+        | "maybe_null" -> Null_annot (Location.mkloc Nullability.Maybe_null loc)
         | _ -> raise ~loc (Unknown_kind_modifier txt))
-      sa_annots (None, None)
+      sa_annots
+
+  let apply_scannable_axis_annot ?abbrev env t = function
+    | Null_annot n -> meet_nullability ?abbrev env (Some n) t
+    | Sep_annot s -> meet_separability ?abbrev env (Some s) t
 
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
@@ -2028,7 +2002,7 @@ module Const = struct
     | Pjk_abbreviation (name, sa_annot) ->
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
       let jkind_without_sa = of_path p in
-      let nullability, separability = transl_scannable_axes sa_annot in
+      let scannable_annots = transl_scannable_axes sa_annot in
       if
         sa_annot <> []
         &&
@@ -2040,9 +2014,9 @@ module Const = struct
           (Warnings.Ignored_kind_modifier
              ( Format.asprintf "%a" Pprintast.longident name.txt,
                List.map Location.get_txt sa_annot ));
-      jkind_without_sa
-      |> set_nullability ~abbrev:name.txt env nullability
-      |> set_separability ~abbrev:name.txt env separability
+      List.fold_left
+        (apply_scannable_axis_annot ~abbrev:name.txt env)
+        jkind_without_sa scannable_annots
       |> allow_left |> allow_right
     | Pjk_mod (base, modifiers) ->
       let base =

@@ -55,7 +55,8 @@ type. The axis has two possible values, with `non_null < maybe_null`. A type may
 be `non_null` only if none of its values are `NULL`.
 
 The kind of values with `NULL` added as a possibility is written
-`value_or_null`, which is equivalent to `value maybe_null maybe_separable`.
+`value_or_null`. It is an abbreviation for the value layout with
+`Maybe_null` nullability and `Maybe_separable` separability.
 
 Types that don't have `NULL` as a possible value are
 compatible with `or_null`, a non-allocating option type that is built into
@@ -80,10 +81,16 @@ and non-float elements. However, all types in vanilla OCaml are `separable`.
 
 ### Using scannable axes
 
-Scannable axes written after a value layout overwrite the previous value of the axis. They can also be written after non-value layouts, but have no effect, e.g. `float64 = float64 non_null = float64 maybe_null`. Scannable axes can also be written on `any`, in which case they take effect *only in the case* that it is lowered to a value layout. For example, `float64` and `value` are both sublayouts of `any non_null`, but not `value maybe_null`.
+<!-- CR rtjoa: a human needs to fix this up. also update list of abbrevitions elsewhere -->
+Scannable axes written after a layout only *lower* the axis (take the meet), consistent with how `mod` lowers other modal bounds. For example, `value non_pointer` is equivalent to `value` with its separability lowered to `Non_pointer`, but `value maybe_separable` is equivalent to `value` (the axis cannot be raised). Scannable axes written after non-value layouts have no effect, e.g. `float64 = float64 non_null`. Scannable axes can also be written on `any`, in which case they take effect *only in the case* that it is lowered to a value layout.
 
-We also support the `mod` syntax for scannable axes, which only lowers the scannable axis (takes the meet). For example, `value mod non_pointer` is equivalent to `value non_pointer`, but `value mod maybe_separable` is equivalent to `value`.
-(This support is meant to be transitional; we expect to remove this eventually. New code should write the scannable axes before the `mod`.)
+Because scannable modifiers cannot raise an axis, we provide dedicated abbreviations for value layouts whose scannable axes sit above `value`'s defaults:
+
+- `value_maybe_null` — `Maybe_null` nullability, `Separable` separability.
+- `value_maybe_separable` — `Non_null` nullability, `Maybe_separable` separability.
+- `value_or_null` — `Maybe_null` nullability, `Maybe_separable` separability.
+
+The `mod` syntax may also be written with scannable axes; it has the same meet effect as bare juxtaposition.
 
 ### Relationship between `immediate` and value layouts
 

@@ -98,7 +98,7 @@ Line 1, characters 14-25:
 1 | type nested = int or_null or_null
                   ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
-         "('a : value maybe_separable)"
+         "('a : value_maybe_separable)"
        The layout of int or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of int or_null must be a sublayout of

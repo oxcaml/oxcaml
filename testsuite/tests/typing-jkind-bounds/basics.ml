@@ -1700,7 +1700,7 @@ type extensible = ..
 
 (* Since the kind is [best], it should normalize away *)
 module M : sig
-  type t : immediate non_float with extensible
+  type t : value non_float mod everything with extensible
 end = struct
   type t : value mod non_float
 end
