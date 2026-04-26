@@ -442,9 +442,9 @@ let dump ppf op =
   | Stackoffset n -> Format.fprintf ppf "stackoffset %d" n
   | Load _ -> Format.fprintf ppf "load"
   | Store _ -> Format.fprintf ppf "store"
-  | Intop op -> Format.fprintf ppf "intop %s" (intop op)
-  | Int128op op -> Format.fprintf ppf "int128op %s" (int128op op)
-  | Intop_imm (op, n) -> Format.fprintf ppf "intop %s %d" (intop op) n
+  | Intop op -> Format.fprintf ppf "intop%s" (intop op)
+  | Int128op op -> Format.fprintf ppf "int128op%s" (int128op op)
+  | Intop_imm (op, n) -> Format.fprintf ppf "intop%s%d" (intop op) n
   | Intop_atomic { op; size = _; addr = _ } ->
     Format.fprintf ppf "intop atomic %s" (Printcmm.atomic_op op)
   | Floatop (Float64, op) -> Format.fprintf ppf "floatop %a" floatop op

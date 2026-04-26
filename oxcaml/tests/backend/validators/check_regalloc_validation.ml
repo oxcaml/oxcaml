@@ -531,7 +531,7 @@ let () =
     ~exp_std:"fatal exception raised when validating description"
     ~exp_err:
       ">> Fatal error: Register allocation added a terminator no. 26 but \
-       that's not allowed for this type of terminator: Return"
+       that's not allowed for this type of terminator: return"
 
 let () =
   check "Regalloc reordered instructions between blocks"
@@ -619,7 +619,7 @@ let () =
     ~exp_std:"fatal exception raised when validating description"
     ~exp_err:
       ">> Fatal error: The desc of terminator with id 3 changed, before: \
-       Return, after: Raise."
+       return, after: raise."
 
 let () =
   check "Deleted instruction"
