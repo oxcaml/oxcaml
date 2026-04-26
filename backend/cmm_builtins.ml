@@ -21,7 +21,15 @@ open Arch
 
 type error = Bad_immediate of string
 
+type error_with_dbg =
+  | Invalid_extcall_parameter of
+      { name : string;
+        layout : string
+      }
+
 exception Error of error
+
+exception Error_with_dbg of error_with_dbg * Debuginfo.t
 
 let bad_immediate fmt =
   Format.kasprintf (fun msg -> raise (Error (Bad_immediate msg))) fmt
@@ -1328,12 +1336,38 @@ let extcall ~dbg ~returns ~alloc ~is_c_builtin ~effects ~coeffects ~ty_args name
     | Some op ->
       { extcall = op; builtin_sign_extends = builtin_sign_extends name }
     | None -> { extcall = default; builtin_sign_extends = false }
-  else { extcall = default; builtin_sign_extends = false }
+  else begin
+    List.iter
+      (fun ty_arg ->
+        match (ty_arg : Cmm.exttype) with
+        | XInt8 ->
+          raise
+            (Error_with_dbg
+               (Invalid_extcall_parameter { name; layout = "bits8" }, dbg))
+        | XInt16 ->
+          raise
+            (Error_with_dbg
+               (Invalid_extcall_parameter { name; layout = "bits16" }, dbg))
+        | XInt | XInt32 | XInt64 | XFloat | XFloat32 | XVec128 | XVec256
+        | XVec512 ->
+          ())
+      ty_args;
+    { extcall = default; builtin_sign_extends = false }
+  end
 
 let report_error ppf = function
   | Bad_immediate msg -> Format_doc.pp_print_string ppf msg
 
+let report_error_with_dbg ppf = function
+  | Invalid_extcall_parameter { name; layout } ->
+    Format_doc.fprintf ppf
+      "Layout %S can't be used for external C calls. Here it is used in %S"
+      layout name
+
 let () =
   Location.register_error_of_exn (function
     | Error err -> Some (Location.error_of_printer_file report_error err)
+    | Error_with_dbg (err, dbg) ->
+      let loc = Debuginfo.to_location dbg in
+      Some (Location.error_of_printer ~loc report_error_with_dbg err)
     | _ -> None)
