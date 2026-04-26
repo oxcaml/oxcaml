@@ -410,13 +410,24 @@ static int perf_events_setup(struct perf_counters* counters,
    seqlock checks detect kernel re-scheduling between samples; on a
    mismatch we refresh rdpmc_info and retry.
 
+   If perf_events_setup_rdpmc reports rdpmc currently unavailable
+   (e.g. the counter has been descheduled because the hardware slots
+   are oversubscribed), we write zeros for this event rather than
+   spinning: last_seq isn't advanced on failure, so retrying would
+   loop forever. We'll automatically recover on a later sample once
+   the kernel reschedules the counter.
+
    Warning: counters must be a fully set-up struct from perf_events_setup,
    and [samples] must have space for at least counters->ncounters words. */
 static void perf_events_sample(struct perf_counters* counters,
                                uint64_t* samples)
 {
-  if (*counters->leader_seq_lock != counters->last_seq)
-    perf_events_setup_rdpmc(counters);
+  if (*counters->leader_seq_lock != counters->last_seq) {
+    if (perf_events_setup_rdpmc(counters) != 0) {
+      memset(samples, 0, counters->ncounters * sizeof(uint64_t));
+      return;
+    }
+  }
 retry:
   int n = counters->ncounters;
   for (int i = 0; i < n; i++) {
@@ -428,7 +439,10 @@ retry:
   }
   seqlock_barrier();
   if (*counters->leader_seq_lock != counters->last_seq) {
-    perf_events_setup_rdpmc(counters);
+    if (perf_events_setup_rdpmc(counters) != 0) {
+      memset(samples, 0, counters->ncounters * sizeof(uint64_t));
+      return;
+    }
     goto retry;
   }
 }
