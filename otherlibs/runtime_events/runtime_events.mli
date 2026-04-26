@@ -191,8 +191,7 @@ val runtime_counter_name : runtime_counter -> string
 
 type perf_sample = #{ config: int64#; value: int64# }
 (** An unboxed record containing a performance counter configuration ID
-    and its corresponding counter value. Used to efficiently pass
-    performance counter data to callbacks without boxing overhead. *)
+    and its corresponding counter value. *)
 
 type cursor
 (** Type of the cursor used when consuming. *)
