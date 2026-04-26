@@ -1577,20 +1577,23 @@ type existential_treatment =
 let instance_constructor existential_treatment cstr =
   For_copy.with_scope (fun copy_scope ->
     let name_counter = ref 0 in
+    let declared_jkind_of existential =
+      match get_desc existential with
+      | Tvar { jkind } -> jkind
+      | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
+          (* Existential row variable *)
+      | _ -> Misc.fatal_error "Ctype.instance_constructor"
+    in
     let copy_existential =
       match existential_treatment with
-      | Keep_existentials_flexible -> copy copy_scope
+      | Keep_existentials_flexible ->
+          fun existential ->
+            (copy copy_scope existential, declared_jkind_of existential)
       | Make_existentials_abstract penv ->
           fun existential ->
             (* CR layouts v1.5: Add test case that hits this once we have syntax
                for it *)
-            let jkind =
-              match get_desc existential with
-              | Tvar { jkind } -> jkind
-              | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
-                  (* Existential row variable *)
-              | _ -> assert false
-            in
+            let jkind = declared_jkind_of existential in
             let decl = new_local_type (Existential cstr.cstr_name) jkind in
             let name = existential_name name_counter existential in
             let env = penv.env in
@@ -1603,7 +1606,7 @@ let instance_constructor existential_treatment cstr =
             let tv = copy copy_scope existential in
             assert (is_Tvar tv);
             link_type tv to_unify;
-            tv
+            (tv, jkind)
     in
     let ty_ex = List.map copy_existential cstr.cstr_existentials in
     let ty_res = copy copy_scope cstr.cstr_res in
