@@ -1886,7 +1886,7 @@ let solve_constructor_annotation
     match
       List.find_opt (fun (n, _, _) -> Ident.same n.txt id) existentials
     with
-    | None -> ()
+    | None -> assert false
     | Some (name, jkind_annot_opt, annotated_jkind) ->
         let type_equal = Ctype.type_equal !!penv in
         let context = Ctype.mk_jkind_context_always_principal !!penv in
@@ -1903,7 +1903,10 @@ let solve_constructor_annotation
              raise (Error (loc, !!penv,
                            Existential_jkind_mismatch (name.txt, err))))
   in
-  if existentials <> [] then ignore begin
+  (* We don't have to perform checks when [existentials] is empty, because when
+     [name_list] (which has the same length) is empty, [solve_Ppat_construct]
+     uses treatment [Make_existentials_abstract] *)
+  if existentials <> [] then begin
     let ids = List.map (fun (x, _, _) -> x.txt) existentials in
     let rem =
       List.fold_left2
@@ -1927,11 +1930,11 @@ let solve_constructor_annotation
       raise (Error (cty.ctyp_loc, !!penv,
                     Unbound_existential (ids, ty)))
   end;
-  let existentials_out =
+  let existentials =
     List.map (fun (name, jkind_annot_opt, _) -> name, jkind_annot_opt)
       existentials
   in
-  ty_args, Some (existentials_out, cty)
+  ty_args, Some (existentials, cty)
 
 let solve_Ppat_construct ~refine tps penv loc constr no_existentials
         existential_styp expected_ty =
