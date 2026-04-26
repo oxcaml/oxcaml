@@ -634,6 +634,7 @@
   ;; backend/cfg
   cfg
   cfg_available_regs
+  cfg_copy_propagation
   cfg_edge
   cfg_intf
   cfg_reducibility
