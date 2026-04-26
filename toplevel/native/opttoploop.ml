@@ -552,8 +552,8 @@ let execute_phrase print_outcome ppf phr =
             !print_out_phrase ppf out_phr
         end;
         begin match out_phr with
-        | Ophr_eval (_, _) | Ophr_signature _ -> true
-        | Ophr_exception _ -> false
+        | Ophr_eval (_, _) | Ophr_signature _ -> true, Some compilation_unit
+        | Ophr_exception _ -> false, Some compilation_unit
         end
       with x ->
         toplevel_env := oldenv; toplevel_sig := oldsig; raise x
@@ -566,30 +566,33 @@ let execute_phrase print_outcome ppf phr =
       begin match d with
       | None ->
           fprintf ppf "Unknown directive `%s'.@." dir_name;
-          false
+          false, None
       | Some d ->
           match d, pdir_arg with
-          | Directive_none f, None -> f (); true
-          | Directive_string f, Some {pdira_desc = Pdir_string s; _} -> f s; true
+          | Directive_none f, None -> f (); true, None
+          | Directive_string f, Some {pdira_desc = Pdir_string s; _} ->
+              f s; true, None
           | Directive_int f, Some {pdira_desc = Pdir_int (n,None); _} ->
              begin match Int_literal_converter.int n with
-             | n -> f n; true
+             | n -> f n; true, None
              | exception _ ->
                fprintf ppf "Integer literal exceeds the range of \
                             representable integers for directive `%s'.@."
                        dir_name;
-               false
+               false, None
              end
           | Directive_int _, Some {pdira_desc = Pdir_int (_, Some _); _} ->
               fprintf ppf "Wrong integer literal for directive `%s'.@."
                 dir_name;
-              false
-          | Directive_ident f, Some {pdira_desc = Pdir_ident lid; _} -> f lid; true
-          | Directive_bool f, Some {pdira_desc = Pdir_bool b; _} -> f b; true
+              false, None
+          | Directive_ident f, Some {pdira_desc = Pdir_ident lid; _} ->
+              f lid; true, None
+          | Directive_bool f, Some {pdira_desc = Pdir_bool b; _} ->
+              f b; true, None
           | _ ->
               fprintf ppf "Wrong type of argument for directive `%s'.@."
                 dir_name;
-              false
+              false, None
       end
 
 (* Read and execute commands from a file, or from stdin if [name] is "". *)
@@ -621,7 +624,8 @@ let use_channel ppf ~wrap_in_module ic name filename =
         List.iter
           (fun ph ->
             let ph = preprocess_phrase ppf ph in
-            if not (execute_phrase !use_print_results ppf ph) then raise Exit)
+            let success, _unit = execute_phrase !use_print_results ppf ph in
+            if not success then raise Exit)
           (if wrap_in_module then
              parse_mod_use_file name lb
            else
