@@ -126,6 +126,8 @@ module Scannable_axes : sig
   val equal : t -> t -> bool
 
   val less_or_equal : t -> t -> Misc.Le_result.t
+
+  val meet : t -> t -> t
 end
 
 module Layout : sig
@@ -159,6 +161,20 @@ module Layout : sig
     val max : t
 
     val get_sort : t -> Sort.Const.t option
+
+    val is_scannable_or_any : t -> bool
+
+    (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
+        [Base Float64], [Product], [Univar], [Genvar]). *)
+    val get_root_scannable_axes : t -> Scannable_axes.t option
+
+    (** Updates the scannable axes at the root of [t] (changes nothing when
+        [get_root_scannable_axes] would return [None]). *)
+    val set_root_scannable_axes : t -> Scannable_axes.t -> t
+
+    (** Meets [sa] into [t]'s root scannable axes (if [t] has meaningful ones;
+        otherwise returns [t] unchanged). *)
+    val meet_root_scannable_axes : t -> Scannable_axes.t -> t
   end
 
   val of_const : Const.t -> Sort.t t
