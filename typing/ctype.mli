@@ -213,8 +213,11 @@ type existential_treatment =
 
 val instance_constructor: existential_treatment ->
         constructor_description ->
-        Types.constructor_argument list * type_expr * type_expr list
-        (* Same, for a constructor. Also returns existentials. *)
+        Types.constructor_argument list * type_expr
+          * (type_expr * Types.jkind_lr) list
+        (* Same, for a constructor. The third component pairs each existential
+           with its declared jkind (read from the original, not the copy, so it
+           is unaffected by later unification). *)
 val instance_parameterized_type:
         ?keep_names:bool ->
         type_expr list -> type_expr -> type_expr list * type_expr

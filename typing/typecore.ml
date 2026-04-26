@@ -1841,7 +1841,7 @@ let solve_Ppat_unboxed_tuple ~refine ~alloc_mode loc env args expected_ty =
   ann
 
 let solve_constructor_annotation
-    tps (penv : Pattern_env.t) name_list sty ty_args ty_ex cstr_existentials =
+    tps (penv : Pattern_env.t) name_list sty ty_args ty_ex =
   let expansion_scope = penv.equations_scope in
   let existentials =
     List.map
@@ -1909,22 +1909,16 @@ let solve_constructor_annotation
   if existentials <> [] then begin
     let ids = List.map (fun (x, _, _) -> x.txt) existentials in
     let rem =
-      List.fold_left2
-        (fun rem tv cstr_ex_tv ->
+      List.fold_left
+        (fun rem (tv, declared_jkind) ->
           match get_desc tv with
             Tconstr(Path.Pident id, [], _) when List.mem id rem ->
-              let declared_jkind =
-                match get_desc cstr_ex_tv with
-                | Tvar { jkind } -> jkind
-                | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
-                | _ -> Misc.fatal_error "Typecore.solve_constructor_annotation"
-              in
               check_existential id declared_jkind;
               list_remove id rem
           | _ ->
               raise (Error (cty.ctyp_loc, !!penv,
                             Unbound_existential (ids, ty))))
-        ids ty_ex cstr_existentials
+        ids ty_ex
     in
     if rem <> [] then
       raise (Error (cty.ctyp_loc, !!penv,
@@ -1981,7 +1975,7 @@ let solve_Ppat_construct ~refine tps penv loc constr no_existentials
                   ca.Types.ca_type) ty_args in
             let ty_args_ty, existential_ctyp =
               solve_constructor_annotation tps penv name_list sty ty_args_ty
-                ty_ex constr.cstr_existentials
+                ty_ex
             in
             let ty_args =
               List.map2 (fun arg ca_type -> {arg with Types.ca_type}) ty_args
