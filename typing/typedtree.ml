@@ -148,6 +148,7 @@ type label_ambiguity =
 type _ type_inspection =
   | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
   | Polymorphic_parameter : 'a poly_param -> 'a type_inspection
+  | Module_pack : type_expr -> [< `pat | `exp ] type_inspection
 
 and _ poly_param =
   | Param : type_expr -> [`pat] poly_param

@@ -231,6 +231,18 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 - : <[int * int -> int]> expr = <[fun (x, y) -> x + y]>
 |}];;
 
+<[ fun (Some x) -> x ]>;;
+[%%expect {|
+Line 1, characters 7-15:
+1 | <[ fun (Some x) -> x ]>;;
+           ^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+None
+
+- : <[$('a) option -> $('a)]> expr = <[fun (Some (x)) -> x]>
+|}];;
+
 <[ function | _ -> 12 ]>;;
 [%%expect {|
 - : <[$('a) -> int]> expr = <[function | _ -> 12]>
@@ -795,7 +807,10 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 <[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
 [%%expect {|
 - : <[(module Hashtbl.S) -> int -> unit]> expr =
-<[fun (module M : Stdlib.Hashtbl.S) x -> M.clear (M.create x)]>
+<[
+  fun (((module M) : (module Stdlib.Hashtbl.S)) : (module Stdlib.Hashtbl.S))
+    x -> M.clear (M.create x)
+]>
 |}];;
 
 <[ fun (module _ : S) x -> 42 ]>;;
