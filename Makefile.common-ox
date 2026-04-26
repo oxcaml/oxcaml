@@ -108,6 +108,7 @@ compiler: runtime-stdlib
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           $(dune) build $(ws_main) \
           --only-package=ocaml @install \
+          tools/ocamlcmt.exe \
           tools/regalloc/regalloc.exe \
           oxcaml/testsuite/tools/expect.exe \
           oxcaml/testsuite/tools/expectnat.exe \

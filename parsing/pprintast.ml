@@ -218,13 +218,16 @@ type ctxt = {
   semi : bool;
   ifthenelse : bool;
   functionrhs : bool;
+  arrow : bool;
 }
 
-let reset_ctxt = { pipe=false; semi=false; ifthenelse=false; functionrhs=false }
+let reset_ctxt =
+  { pipe=false; semi=false; ifthenelse=false; functionrhs=false; arrow=false; }
 let under_pipe ctxt = { ctxt with pipe=true }
 let under_semi ctxt = { ctxt with semi=true }
 let under_ifthenelse ctxt = { ctxt with ifthenelse=true }
 let under_functionrhs ctxt = { ctxt with functionrhs = true }
+let before_arrow ctxt = { ctxt with arrow = true }
 (*
 let reset_semi ctxt = { ctxt with semi=false }
 let reset_ifthenelse ctxt = { ctxt with ifthenelse=false }
@@ -463,6 +466,8 @@ and core_type ctxt f x =
       (attributes ctxt) x.ptyp_attributes
   end
   else match x.ptyp_desc with
+    | Ptyp_arrow _ when ctxt.arrow ->
+        paren true (core_type reset_ctxt) f x
     | Ptyp_arrow (l, ct1, ct2, m1, m2) ->
         pp f "@[<2>%a@;->@;%a@]" (* FIXME remove parens later *)
           (type_with_label ctxt) (l,ct1,m1) (return_type ctxt) (ct2,m2)
@@ -2317,7 +2322,8 @@ and function_params_then_body ctxt f params constraint_ body ~delimiter =
   in
   pp f "%t%a%s@;%a"
     pp_params
-    (function_constraint ctxt) constraint_
+    (function_constraint (if delimiter = "->" then before_arrow ctxt else ctxt))
+    constraint_
     delimiter
     (function_body (under_functionrhs ctxt)) body
 
