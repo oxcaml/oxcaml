@@ -174,7 +174,7 @@ module Typing_env : sig
 
   val increment_scope : t -> t
 
-  val add_definition : t -> Bound_name.t -> Flambda_kind.t -> t
+  val add_definition : t -> Bound_name.t -> Flambda_kind.t -> flambda_type -> t
 
   val add_definitions_of_params : t -> params:Bound_parameters.t -> t
 
