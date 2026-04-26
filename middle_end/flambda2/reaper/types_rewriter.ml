@@ -171,7 +171,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
 let rewrite_kind_with_subkind uses var kind =
   let db = uses.UA.db in
   let var = Code_id_or_name.name var in
-  if PTA.any_source db var
+  if PTA.any_usage db var
   then kind
   else if not (PTA.has_use db var)
   then erase kind
