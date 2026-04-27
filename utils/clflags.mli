@@ -308,6 +308,23 @@ module Opt_flag_handler : sig
   val set : t -> unit
 end
 
+(** Snapshot/restore of the global state mutated by the optimization-level
+    setters ([set_oclassic]/[set_o2]/[set_o3]/[set_o4]) and by
+    [Opt_flag_handler.set]. Use [protect_optimization_state] to confine such
+    mutations to a single call (e.g. when JIT-compiling a quoted body). *)
+module Optimization_state : sig
+  type t
+
+  val snapshot : unit -> t
+
+  val restore : t -> unit
+end
+
+(** [protect_optimization_state f] snapshots the optimization-related state
+    before calling [f ()] and restores it on return (whether normal or
+    exceptional). *)
+val protect_optimization_state : (unit -> 'a) -> 'a
+
 val set_oclassic : unit -> unit
 val set_o2 : unit -> unit
 val set_o3 : unit -> unit
