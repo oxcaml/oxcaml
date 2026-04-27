@@ -92,7 +92,9 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
   | Legacy -> "record"
   | Unboxed_product -> "unboxed record"
 
-let lbl_res_type_path lbl =
+let gen_lbl_res_type_path lbl =
   match get_desc lbl.lbl_res with
   | Tconstr (p, _, _) -> p
   | _ -> assert false
+
+let lbl_res_type_path lbl = gen_lbl_res_type_path lbl

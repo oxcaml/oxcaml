@@ -93,3 +93,4 @@ val record_form_to_string : _ record_form -> string
 
 (* Type constructor of the label record type. *)
 val lbl_res_type_path : label_description -> Path.t
+val gen_lbl_res_type_path : _ gen_label_description -> Path.t
