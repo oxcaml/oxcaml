@@ -1,0 +1,8 @@
+int8: in -1, out -1
+int8: in -128, out -128
+int8: in 127, out 127
+int8: in 0, out 0
+int16: in -1, out -1
+int16: in -32768, out -32768
+int16: in 32767, out 32767
+int16: in 0, out 0
