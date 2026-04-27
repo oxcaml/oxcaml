@@ -101,6 +101,8 @@ let pat mapper p =
 
 let typ mapper ty =
   match ty.ptyp_desc with
+  | Ptyp_extension ({txt="alias_with_too_many_nones";loc},_) ->
+      alias_with_too_many_nones loc
   | Ptyp_extension ({txt="empty_poly_binder";loc},_) ->
       empty_poly_binder loc
   | _ -> super.M.typ mapper ty
