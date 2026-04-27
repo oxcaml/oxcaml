@@ -5235,7 +5235,7 @@ let report_lookup_error_doc loc env = function
         "The type %a has no unboxed version."
         quoted_longident lid
   | Error_from_persistent_env err ->
-      Location.error_of_printer_file Persistent_env.report_error_doc err
+      Location.error_of_printer ~loc Persistent_env.report_error_doc err
   | Mutable_value_used_in_closure ctx ->
       Location.errorf ~loc
         "Mutable variable cannot be used inside %t."
