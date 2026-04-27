@@ -91,7 +91,7 @@ Error: This application of the functor "F" is ill-typed.
          (X : x) (Y : y) -> ...
        1. Module X matches the expected module type x
        2. Modules do not match:
-            W : sig type w = W.w end
+            W : w
           is not included in
             y
           The type "y" is required but not provided
@@ -586,7 +586,7 @@ module F : functor (X : a) -> sig type t end
 Line 6, characters 13-17:
 6 |     type t = F(X).t
                  ^^^^
-Error: Modules do not match: a is not included in a/2
+Error: Modules do not match: (a/1 with P.X) is not included in a/2
 Line 3, characters 2-15:
   Definition of module type "a/1"
 Line 1, characters 0-13:
@@ -961,18 +961,7 @@ Error: Signature mismatch:
          sig
            module B :
              sig
-               module C :
-                 sig
-                   module D :
-                     sig
-                       module E :
-                         sig
-                           module F :
-                             (X : sig type x end) (Y : sig type y' end)
-                             (W : sig type w end) -> sig end
-                         end
-                     end
-                 end
+               module C : sig module D : sig module E : sig ... end end end
              end
          end
        is not included in
@@ -1268,12 +1257,15 @@ end
 
 module U = F(PF)(PF)(PF)
 [%%expect {|
-module F : (X : sig type witness module type t module M : t end) -> X.t
+module F :
+  functor (X : sig type witness module type t module M : t end) ->
+    (X.t with X.M)
 module PF :
   sig
     type witness
     module type t =
-      (X : sig type witness module type t module M : t end) -> X.t
+      functor (X : sig type witness module type t module M : t end) ->
+        (X.t with X.M)
     module M = F
   end
 module U :
@@ -1297,7 +1289,9 @@ Error: This application of the functor "F" is ill-typed.
        4. Module PF matches the expected module type
        5. Module PF matches the expected module type
        6. Modules do not match:
-            F : (X : sig type witness module type t module M : t end) -> X.t
+            F :
+            functor (X : sig type witness module type t module M : t end) ->
+              (X.t with X.M)
           is not included in
             $T6 = sig type witness module type t module M : t end
           This module should not be a functor, a structure was expected.
@@ -1495,6 +1489,8 @@ Error: Signature mismatch:
        2. Module types $S2 and $T2 match
        3. Module types X/3.T and X/2.T match
        4. Module types X/3.T and X/2.T match
+Line 1, characters 0-34:
+  Definition of module "X/1"
 |}]
 
 
@@ -1531,8 +1527,8 @@ Error: Signature mismatch:
          sig
            module F :
              sig type wrong end ->
-               (X : sig module type T end) (Res : X.T) (Res : X.T)
-               (Res : X.T) -> X.T
+               functor (X : sig module type T end) (Res : X.T) (Res : X.T)
+                 (Res : X.T) -> (X.T with Res)
          end
        is not included in
          sig
@@ -1568,6 +1564,8 @@ Error: Signature mismatch:
        3. Module types X/2.T and X/2.T match
        4. Module types X/2.T and X/2.T match
        5. An extra argument is provided of module type X/2.T
+Line 1, characters 0-34:
+  Definition of module "X/1"
 |}]
 
 
@@ -1616,10 +1614,8 @@ Error: This application of the functor "F" is ill-typed.
           Constructors have different names, "Y" and "Z".
        4. The following extra argument is provided
               Z : sig type t = Z.t = Z of int end
-File "_none_", line 1:
-  Definition of module "Y"
-Line 6, characters 0-39:
-  Definition of module "Y/2"
+Line 5, characters 0-32:
+  Definition of module "X/1"
 |}]
 
 (** Final state in the presence of extensions
@@ -1658,7 +1654,7 @@ module type Ext = sig module type T module X : T end
 module AExt : sig module type T = A module X = A end
 module FiveArgsExt :
   sig module type T = ty -> ty -> ty -> ty -> ty -> sig end module X : T end
-module Bar : (W : A) (X : Ext) (Y : B) (Z : Ext) -> Z.T
+module Bar : functor (W : A) (X : Ext) (Y : B) (Z : Ext) -> (Z.T with Z.X)
 type fine = Bar(A)(FiveArgsExt)(B)(AExt).a
 |}]
 
@@ -1875,12 +1871,12 @@ Error: This application of the functor "F" is ill-typed.
           is not included in
             type 'a t
           They have different arities.
-          Lines 9-12, characters 0-3:
-            Definition of module "A/1"
        2. Modules do not match:
             $S2 : sig val f : 'a -> 'a end
           is not included in
             $T2 = sig type 'a t val f : 'a A/2.t -> 'a t end
+Lines 9-12, characters 0-3:
+  Definition of module "A/1"
 |}]
 
 
@@ -1971,6 +1967,8 @@ Error: This application of the functor "With_expansion" is ill-typed.
               $T2 = sig module type t = A/2.t end
        3. Module () matches the expected module type
        4. Module () matches the expected module type
+Lines 9-12, characters 0-3:
+  Definition of module "A/1"
 |}]
 
 
@@ -2023,8 +2021,6 @@ Error: This application of the functor "H" is ill-typed.
             $T1 = sig type 'a t type 'a s end
           Type declarations do not match: type t is not included in type 'a t
           They have different arities.
-          Line 5, characters 0-32:
-            Definition of module "X/1"
        2. Modules do not match:
             $S2 : sig val f : 'a -> 'a end
           is not included in
@@ -2036,6 +2032,8 @@ Error: This application of the functor "H" is ill-typed.
           The type "'a X.s -> 'a X.s" is not compatible with the type
             "'a X.s -> 'a"
           Type "'a X.s" is not compatible with type "'a"
+Line 5, characters 0-32:
+  Definition of module "X/1"
 |}]
 
 
@@ -2120,14 +2118,16 @@ Error: The functor application "Set.Make(Set)(A)" is ill-typed.
               module type OrderedType = Set.OrderedType
               module type S = Set.S
               module Make = Set.Make
+              module MakePortable = Set.MakePortable
             end
           is not included in
             Set.OrderedType
           The type "t" is required but not provided
-          File "set.mli", line 52, characters 4-10: Expected declaration
+          File "set.mli", line 57, characters 4-10: Expected declaration
           The value "compare" is required but not provided
-          File "set.mli", line 55, characters 4-31: Expected declaration
-       2. The following extra argument is provided A : sig type a = A.a end
+          File "set.mli", line 60, characters 4-31: Expected declaration
+       2. The following extra argument is provided
+              A : sig module type S = A.S module M = A.M end
 |}]
 
 
@@ -2209,11 +2209,14 @@ Line 1, characters 49-72:
                                                      ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
-         sig module F : a end
+         sig module F : (a with X) end
        is not included in
          sig module F : empty -> empty end
        In module "F":
-       Modules do not match: a is not included in empty -> empty
+       Modules do not match:
+         ((a with X) with F)
+       is not included in
+         empty -> empty
 |}]
 
 (** Incorrect hint: the compatibility check consider that [X.T] can not be equal
@@ -2276,6 +2279,10 @@ Error: Signature mismatch:
          $T1 = sig val f : t/2 val g : Inner/2.t val h : float end
        Values do not match: val h : float is not included in val h : int
        The type "float" is not compatible with the type "int"
+Line 8, characters 2-8:
+  Definition of type "t/1"
+Line 9, characters 2-33:
+  Definition of module "Inner/1"
 |}]
 
 module M: sig
