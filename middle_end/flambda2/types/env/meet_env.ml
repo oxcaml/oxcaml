@@ -151,7 +151,7 @@ let add_concrete_equation_on_canonical ~raise_on_bottom t simple ty
       | Bottom _ -> if raise_on_bottom then raise Bottom_equation else t)
     ~name:(fun name ~coercion ->
       adding_equation_for_name t name ~f:(fun t ->
-          let kind = TG.kind (ET.to_type ty) in
+          let kind = ET.kind ty in
           (* Note: this will check that the [existing_ty] has the expected
              kind. *)
           let existing_ty_of_name = TE.find (typing_env t) name (Some kind) in
