@@ -38,6 +38,7 @@ let rec print_instruction ppf (i : Ssa.instruction) =
     Format.fprintf ppf "stack_check %d" max_frame_size_bytes
   | Name_for_debugger { ident; _ } ->
     Format.fprintf ppf "name_for_debugger %a" Ident.print ident
+  | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
 
 and print_instr_ref ppf (i : Ssa.instruction) =
   match i with
@@ -45,6 +46,7 @@ and print_instr_ref ppf (i : Ssa.instruction) =
   | Block_param { block; index; _ } -> print_block_param ppf (block, index)
   | Proj { index; src } ->
     Format.fprintf ppf "proj(%d, %a)" index print_instr_ref src
+  | Tuple elems -> Format.fprintf ppf "tuple(%a)" print_args elems
   | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ ->
     print_instruction ppf i
 

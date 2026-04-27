@@ -24,7 +24,11 @@ let create_env () =
     invalid_handler_label = None
   }
 
-let label_of env blk = Ssa.Block.Tbl.find env.block_labels blk
+let label_of env (blk : Ssa.block) =
+  try Ssa.Block.Tbl.find env.block_labels blk
+  with Not_found ->
+    Misc.fatal_errorf "Cfg_of_ssa.label_of: block %d not in block_labels"
+      (blk.id :> int)
 
 let invalid_handler_label env =
   match env.invalid_handler_label with
@@ -42,7 +46,11 @@ let handler_label env (handler : Ssa.block option) =
 let get_reg env (i : Ssa.instruction) : Reg.t =
   match i with
   | Op { id; _ } ->
-    let regs = Ssa.InstructionId.Tbl.find env.op_regs id in
+    let regs =
+      try Ssa.InstructionId.Tbl.find env.op_regs id
+      with Not_found ->
+        Misc.fatal_errorf "Cfg_of_ssa.get_reg: no regs for Op v%d" (id :> int)
+    in
     assert (Array.length regs = 1);
     regs.(0)
   | Block_param { block; index; _ } -> (
@@ -54,8 +62,15 @@ let get_reg env (i : Ssa.instruction) : Reg.t =
         (block.id :> int)
         index)
   | Proj { index; src = Op { id; _ } } ->
-    (Ssa.InstructionId.Tbl.find env.op_regs id).(index)
-  | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ | Proj _ ->
+    let regs =
+      try Ssa.InstructionId.Tbl.find env.op_regs id
+      with Not_found ->
+        Misc.fatal_errorf "Cfg_of_ssa.get_reg: no regs for Op v%d (Proj)"
+          (id :> int)
+    in
+    regs.(index)
+  | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
+  | Proj _ ->
     Misc.fatal_error "Cfg_of_ssa.get_reg: unexpected instruction"
 
 let get_block_params_regs env (block : Ssa.block) =
@@ -201,7 +216,7 @@ let bump_unused_op_counts (ssa : Ssa.t) (undo : undo_log) =
           | Op r when r.usage_count = 0 ->
             Ssa.increment_use instr;
             record_undo undo (fun () -> Ssa.decrement_use instr)
-          | Op _ | Block_param _ | Proj _ | Push_trap _ | Pop_trap _
+          | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
           | Stack_check _ | Name_for_debugger _ ->
             ())
         block.body)
@@ -258,7 +273,10 @@ let convert_block (env : env) (block : Ssa.block) : Cfg.basic_block =
           let arg = Array.map (get_reg env) args in
           let (_ : Cfg.basic Cfg.instruction) = emit_op body op dbg arg regs in
           ()
-      | Block_param _ | Proj _ -> ()
+      | Block_param _ | Proj _ | Tuple _ ->
+        Misc.fatal_error
+          "Cfg_of_ssa: virtual instruction (Block_param/Proj/Tuple) must not \
+           appear in a block body"
       | Push_trap { handler } ->
         DLL.add_end body
           (make_cfg_instr

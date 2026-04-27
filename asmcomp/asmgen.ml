@@ -569,6 +569,10 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
      (* Second conversion: produces the CFG that feeds the real pipeline. This
         is where SSA-level optimizations run. *)
      let ssa = Ssa_simplify.run ssa in
+     if !Oxcaml_flags.dump_cfg
+     then
+       Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
+         ssa;
      let cfg_final =
        try
          Label.with_saved_counter @@ fun () ->

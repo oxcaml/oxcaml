@@ -50,9 +50,11 @@ let bind_let env b v r1 =
   let provenance = VP.provenance v in
   if Option.is_some provenance
   then
-    B.emit_instruction b
-      (Name_for_debugger
-         { ident = VP.var v; provenance; which_parameter = None; regs = r1 });
+    ignore
+      (B.emit_instruction b
+         (Name_for_debugger
+            { ident = VP.var v; provenance; which_parameter = None; regs = r1 })
+        : Ssa.instruction);
   env
 
 let insert_op_debug b op dbg args typ : Ssa.instruction array =
@@ -101,7 +103,7 @@ let typ_of_instruction (r : Ssa.instruction) : Cmm.machtype_component =
     match src with
     | Op { typ; _ } -> typ.(index)
     | _ -> Misc.fatal_error "typ_of_instruction: Proj of non-Op")
-  | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ ->
+  | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _ | Tuple _ ->
     Misc.fatal_error "typ_of_instruction: not a value instruction"
 
 let size_of_cmm_expr env (e : Cmm.expression) =
@@ -567,31 +569,42 @@ and emit_switch env b ~tail esel index ecases : result =
 and emit_catch env b ~tail (flag : Cmm.ccatch_flag) handlers body : result =
   let body_b = B.new_block b Merge in
   let body_block = B.current_block body_b in
-  assert (List.length handlers = 1);
-  let Cmm.{ label = nfail; params; body = handler_body; _ } =
-    List.hd handlers
+  (* Create one block per handler up front so they can refer to one another
+     (mutually recursive [Recursive] handlers). All handlers are emitted
+     unconditionally, regardless of whether the body or peer handlers
+     reach them — later passes drop unreachable blocks. *)
+  let handler_infos =
+    List.map
+      (fun Cmm.{ label = nfail; params; body = h_body; _ } ->
+        let types =
+          List.map (fun (_id, ty) -> ty) params |> Array.concat
+        in
+        let handler_b =
+          match flag with
+          | Cmm.Exn_handler -> B.new_block b ~params:types Trap_handler
+          | Cmm.Recursive | Cmm.Normal -> B.new_block b ~params:types Merge
+        in
+        let traps_ref = ref SU.Unreachable in
+        nfail, params, h_body, handler_b, traps_ref)
+      handlers
   in
-  let types = List.map (fun (_id, ty) -> ty) params |> Array.concat in
-  let handler_b =
-    match flag with
-    | Cmm.Exn_handler -> B.new_block b ~params:types Trap_handler
-    | Cmm.Recursive | Cmm.Normal -> B.new_block b ~params:types Merge
-  in
-  let traps_ref = ref SU.Unreachable in
   let env =
-    { env with
-      static_exceptions =
-        Static_label.Map.add nfail { handler_b; traps_ref }
-          env.static_exceptions
-    }
+    List.fold_left
+      (fun env (nfail, _, _, handler_b, traps_ref) ->
+        { env with
+          static_exceptions =
+            Static_label.Map.add nfail { handler_b; traps_ref }
+              env.static_exceptions
+        })
+      env handler_infos
   in
   B.finish_block b ~dbg:Debuginfo.none (Goto { goto = body_block; args = [||] });
   let r_body = emit env body_b body ~tail in
-  let translate_handler handler_body =
-    (* Handlers are emitted unconditionally. If no [Cexit]/raise populated
-       [traps_ref], the handler is dead and its trap stack defaults to the
-       ambient one; later passes can drop the resulting unreachable block and
-       rewrite [Push_trap]/[Pop_trap] references to [None]. *)
+  let translate_handler params handler_b traps_ref handler_body =
+    (* If no [Cexit]/raise populated [traps_ref], the handler is dead and its
+       trap stack defaults to the ambient one; later passes drop the
+       resulting unreachable block and rewrite [Push_trap]/[Pop_trap]
+       references to [None]. *)
     let trap_stack =
       match !traps_ref with
       | SU.Reachable trap_stack -> trap_stack
@@ -623,13 +636,26 @@ and emit_catch env b ~tail (flag : Cmm.ccatch_flag) handlers body : result =
         if Option.is_some provenance
         then
           let regs = V.Map.find (VP.var id) handler_env.vars in
-          B.emit_instruction handler_b
-            (Name_for_debugger
-               { ident = VP.var id; provenance; which_parameter = None; regs }))
+          ignore
+            (B.emit_instruction handler_b
+               (Name_for_debugger
+                  { ident = VP.var id;
+                    provenance;
+                    which_parameter = None;
+                    regs
+                  })
+              : Ssa.instruction))
       params;
     emit handler_env handler_b handler_body ~tail
   in
-  let all_results = [| r_body; translate_handler handler_body |] in
+  let all_results =
+    Array.of_list
+      (r_body
+      :: List.map
+           (fun (_nfail, params, h_body, handler_b, traps_ref) ->
+             translate_handler params handler_b traps_ref h_body)
+           handler_infos)
+  in
   if tail
   then (
     assert (
@@ -653,10 +679,12 @@ and emit_trap_actions env b traps =
         | Push handler_id -> find_handler env handler_id
         | Pop handler_id -> find_handler env handler_id
       in
-      B.emit_instruction b
-        (match trap with
-        | Push _ -> Push_trap { handler = Some (B.current_block h.handler_b) }
-        | Pop _ -> Pop_trap { handler = Some (B.current_block h.handler_b) }))
+      ignore
+        (B.emit_instruction b
+           (match trap with
+           | Push _ -> Push_trap { handler = Some (B.current_block h.handler_b) }
+           | Pop _ -> Pop_trap { handler = Some (B.current_block h.handler_b) })
+          : Ssa.instruction))
     traps
 
 and emit_expr_exit env b (lbl : Cmm.exit_label) args traps : result =
@@ -756,7 +784,16 @@ and join_array (results : result array) : result =
         let types = Array.map typ_of_instruction instrs in
         match !join_info with
         | None -> join_info := Some (types, any_b)
-        | Some (prev, _) -> assert (Cmm.equal_machtype prev types)))
+        | Some (prev, any_b) ->
+          (* Different paths may produce values of compatible but distinct
+             machtype components (e.g. a [try val E with _ 456] mixes [val]
+             and [int]). Pick the least upper bound so the joined block's
+             param types accommodate every incoming arm. *)
+          assert (Array.length prev = Array.length types);
+          let lub =
+            Array.map2 Cmm.lub_component prev types
+          in
+          join_info := Some (lub, any_b)))
     results;
   match !join_info with
   | None -> Never_returns

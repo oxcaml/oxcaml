@@ -68,14 +68,14 @@ arr_sum:
   movq  -4(%rbx,%rcx,4), %rcx
 =======
   cmpq  %rbx, %rcx
-  jae   .L133
+  jae   .L140
   movq  -4(%rdi,%rcx,4), %rcx
   leaq  -1(%rax,%rcx), %rax
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L114
   ret
-.L133:
+.L140:
   movq  camlTOP2__block101@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

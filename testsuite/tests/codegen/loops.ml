@@ -297,7 +297,7 @@ loop_invariant_code:
   cmpq  $1, %rax
   je    .L118
   jmp   .L113
-.L109:
+.L128:
   cmpq  $1, %rax
   je    .L118
 .L113:
@@ -305,14 +305,14 @@ loop_invariant_code:
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
-.L130:
+.L132:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
   movq  16(%rsp), %rdi
 .L118:
   incq  %rdi
   cmpq  $9, %rdi
-  jle   .L109
+  jle   .L128
   movl  $1, %eax
   addq  $24, %rsp
   ret

@@ -198,10 +198,10 @@ bytes_safe_get_int32:
   xorq  $-1, %rsi
   andq  %rdi, %rsi
   cmpq  %rsi, %rbx
-  jae   .L123
+  jae   .L126
   movslq (%rax,%rbx), %rax
   ret
-.L123:
+.L126:
   movq  camlTOP18__block602@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
